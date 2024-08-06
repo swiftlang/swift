@@ -690,7 +690,7 @@ bb3(%7 : $Builtin.RawPointer):
   return %10 : $Int64
 }
 
-// Test storage for SIL global variable declations.
+// Test storage for SIL global variable declarations.
 
 sil_global hidden @testGlobal : $Builtin.Int64
 

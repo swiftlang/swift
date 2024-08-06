@@ -182,10 +182,13 @@ TypeRefinementContext::createForWhileStmtBody(ASTContext &Ctx, WhileStmt *S,
 /// range.
 static bool rangeContainsTokenLocWithGeneratedSource(
     SourceManager &sourceMgr, SourceRange parentRange, SourceLoc childLoc) {
-  auto parentBuffer = sourceMgr.findBufferContainingLoc(parentRange.Start);
+  if (sourceMgr.rangeContainsTokenLoc(parentRange, childLoc))
+    return true;
+
   auto childBuffer = sourceMgr.findBufferContainingLoc(childLoc);
-  while (parentBuffer != childBuffer) {
-    auto info = sourceMgr.getGeneratedSourceInfo(childBuffer);
+  while (!sourceMgr.rangeContainsTokenLoc(
+      sourceMgr.getRangeForBuffer(childBuffer), parentRange.Start)) {
+    auto *info = sourceMgr.getGeneratedSourceInfo(childBuffer);
     if (!info)
       return false;
 

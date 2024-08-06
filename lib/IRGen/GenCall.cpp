@@ -650,7 +650,7 @@ void SignatureExpansion::expandResult(
   const TypeInfo *directResultTypeInfo;
   std::tie(ResultIRType, directResultTypeInfo) = expandDirectResult();
 
-  if (!fnConv.hasIndirectSILErrorResults()) {
+  if (!fnConv.hasIndirectSILResults() && !fnConv.hasIndirectSILErrorResults()) {
     llvm::Type *directErrorType;
     const TypeInfo *directErrorTypeInfo;
     std::tie(directErrorType, directErrorTypeInfo) = expandDirectErrorType();
@@ -760,9 +760,6 @@ void SignatureExpansion::expandCoroutineResult(bool forContinuation) {
 
     // Yield-once coroutines may optionaly return a value from the continuation.
     case SILCoroutineKind::YieldOnce: {
-      auto fnConv = getSILFuncConventions();
-
-      assert(fnConv.getNumIndirectSILResults() == 0);
       // Ensure that no parameters were added before to correctly record their ABI
       // details.
       assert(ParamIRTypes.empty());
@@ -1930,6 +1927,17 @@ void SignatureExpansion::expandParameters(
   case SILCoroutineKind::YieldOnce:
   case SILCoroutineKind::YieldMany:
     addCoroutineContextParameter();
+
+    // Add indirect results as parameters. Similar to
+    // expandIndirectResults, but it doesn't add sret attribute,
+    // because the function has direct results (a continuation pointer
+    // and yield results).
+    auto fnConv = getSILFuncConventions();
+    for (auto indirectResultType : fnConv.getIndirectSILResultTypes(
+           IGM.getMaximalTypeExpansionContext())) {
+      auto storageTy = IGM.getStorageType(indirectResultType);
+      addPointerParameter(storageTy);
+    }
     break;
   }
 
@@ -2032,7 +2040,8 @@ void SignatureExpansion::expandParameters(
       auto &errorTI = IGM.getTypeInfo(errorType);
       auto &nativeError = errorTI.nativeReturnValueSchema(IGM);
 
-      if (getSILFuncConventions().hasIndirectSILErrorResults() ||
+      if (getSILFuncConventions().hasIndirectSILResults() ||
+          getSILFuncConventions().hasIndirectSILErrorResults() ||
           native.requiresIndirect() ||
           nativeError.shouldReturnTypedErrorIndirectly()) {
         ParamIRTypes.push_back(IGM.getStorageType(errorType)->getPointerTo());
@@ -2113,10 +2122,40 @@ void SignatureExpansion::expandAsyncReturnType() {
     }
   };
 
-  auto resultType = getSILFuncConventions().getSILResultType(
-      IGM.getMaximalTypeExpansionContext());
+  auto fnConv = getSILFuncConventions();
+
+  auto resultType =
+      fnConv.getSILResultType(IGM.getMaximalTypeExpansionContext());
   auto &ti = IGM.getTypeInfo(resultType);
   auto &native = ti.nativeReturnValueSchema(IGM);
+
+  if (!fnConv.hasIndirectSILResults() && !fnConv.hasIndirectSILErrorResults() &&
+      !native.requiresIndirect() && fnConv.funcTy->hasErrorResult() &&
+      fnConv.isTypedError()) {
+    auto errorType = getSILFuncConventions().getSILErrorType(
+        IGM.getMaximalTypeExpansionContext());
+    auto &errorTi = IGM.getTypeInfo(errorType);
+    auto &nativeError = errorTi.nativeReturnValueSchema(IGM);
+    if (!nativeError.shouldReturnTypedErrorIndirectly()) {
+      auto combined = combineResultAndTypedErrorType(IGM, native, nativeError);
+
+      if (combined.combinedTy->isVoidTy()) {
+        addErrorResult();
+        return;
+      }
+
+      if (auto *structTy = dyn_cast<llvm::StructType>(combined.combinedTy)) {
+        for (auto *elem : structTy->elements()) {
+          ParamIRTypes.push_back(elem);
+        }
+      } else {
+        ParamIRTypes.push_back(combined.combinedTy);
+      }
+    }
+    addErrorResult();
+    return;
+  }
+
   if (native.requiresIndirect() || native.empty()) {
     addErrorResult();
     return;
@@ -2134,11 +2173,23 @@ void SignatureExpansion::expandAsyncReturnType() {
 void SignatureExpansion::addIndirectThrowingResult() {
   if (getSILFuncConventions().funcTy->hasErrorResult() &&
       getSILFuncConventions().isTypedError()) {
-    auto resultType = getSILFuncConventions().getSILErrorType(
-      IGM.getMaximalTypeExpansionContext());
-    const TypeInfo &resultTI = IGM.getTypeInfo(resultType);
-    auto storageTy = resultTI.getStorageType();
-    ParamIRTypes.push_back(storageTy->getPointerTo());
+    auto resultType = getSILFuncConventions().getSILResultType(
+        IGM.getMaximalTypeExpansionContext());
+    auto &ti = IGM.getTypeInfo(resultType);
+    auto &native = ti.nativeReturnValueSchema(IGM);
+
+    auto errorType = getSILFuncConventions().getSILErrorType(
+        IGM.getMaximalTypeExpansionContext());
+    const TypeInfo &errorTI = IGM.getTypeInfo(errorType);
+    auto &nativeError = errorTI.nativeReturnValueSchema(IGM);
+
+    if (getSILFuncConventions().hasIndirectSILResults() ||
+        getSILFuncConventions().hasIndirectSILErrorResults() ||
+        native.requiresIndirect() ||
+        nativeError.shouldReturnTypedErrorIndirectly()) {
+      auto errorStorageTy = errorTI.getStorageType();
+      ParamIRTypes.push_back(errorStorageTy->getPointerTo());
+    }
   }
 
 }
@@ -2264,6 +2315,36 @@ void SignatureExpansion::expandAsyncAwaitType() {
       IGM.getMaximalTypeExpansionContext());
   auto &ti = IGM.getTypeInfo(resultType);
   auto &native = ti.nativeReturnValueSchema(IGM);
+
+  if (!getSILFuncConventions().hasIndirectSILResults() &&
+      !getSILFuncConventions().hasIndirectSILErrorResults() &&
+      getSILFuncConventions().funcTy->hasErrorResult() &&
+      !native.requiresIndirect() && getSILFuncConventions().isTypedError()) {
+    auto errorType = getSILFuncConventions().getSILErrorType(
+        IGM.getMaximalTypeExpansionContext());
+    auto &errorTi = IGM.getTypeInfo(errorType);
+    auto &nativeError = errorTi.nativeReturnValueSchema(IGM);
+    if (!nativeError.shouldReturnTypedErrorIndirectly()) {
+      auto combined = combineResultAndTypedErrorType(IGM, native, nativeError);
+
+      if (combined.combinedTy->isVoidTy()) {
+        addErrorResult();
+        return;
+      }
+
+      if (auto *structTy = dyn_cast<llvm::StructType>(combined.combinedTy)) {
+        for (auto *elem : structTy->elements()) {
+          components.push_back(elem);
+        }
+      } else {
+        components.push_back(combined.combinedTy);
+      }
+      addErrorResult();
+      ResultIRType = llvm::StructType::get(IGM.getLLVMContext(), components);
+      return;
+    }
+  }
+
   if (native.requiresIndirect() || native.empty()) {
     addErrorResult();
     ResultIRType = llvm::StructType::get(IGM.getLLVMContext(), components);
@@ -2277,7 +2358,6 @@ void SignatureExpansion::expandAsyncAwaitType() {
       });
 
   addErrorResult();
-
   ResultIRType = llvm::StructType::get(IGM.getLLVMContext(), components);
 }
 
@@ -2595,7 +2675,8 @@ public:
           auto &errorSchema =
               IGF.IGM.getTypeInfo(silErrorTy).nativeReturnValueSchema(IGF.IGM);
 
-          if (nativeSchema.requiresIndirect() ||
+          if (fnConv.hasIndirectSILResults() ||
+              nativeSchema.requiresIndirect() ||
               errorSchema.shouldReturnTypedErrorIndirectly()) {
             // Return the error indirectly.
             auto buf = IGF.getCalleeTypedErrorResultSlot(silErrorTy);
@@ -2745,17 +2826,7 @@ public:
                                    Explosion &out) override {
     SILFunctionConventions fnConv(getCallee().getOrigFunctionType(),
                                   IGF.getSILModule());
-    bool mayReturnErrorDirectly = false;
-    if (!convertDirectToIndirectReturn &&
-        !fnConv.hasIndirectSILErrorResults() &&
-        fnConv.funcTy->hasErrorResult() && fnConv.isTypedError()) {
-      auto errorType =
-          fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext());
-      auto &errorSchema =
-          IGF.IGM.getTypeInfo(errorType).nativeReturnValueSchema(IGF.IGM);
-
-      mayReturnErrorDirectly = !errorSchema.shouldReturnTypedErrorIndirectly();
-    }
+    bool mayReturnErrorDirectly = mayReturnTypedErrorDirectly();
 
     // Bail out immediately on a void result.
     llvm::Value *result = call;
@@ -2812,72 +2883,8 @@ public:
 
     // Handle direct return of typed errors
     if (mayReturnErrorDirectly && !nativeSchema.requiresIndirect()) {
-      auto errorType =
-          fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext());
-      auto &errorSchema =
-          IGF.IGM.getTypeInfo(errorType).nativeReturnValueSchema(IGF.IGM);
-
-      auto combined =
-          combineResultAndTypedErrorType(IGF.IGM, nativeSchema, errorSchema);
-
-      if (combined.combinedTy->isVoidTy()) {
-        typedErrorExplosion = Explosion();
-        return;
-      }
-
-      Explosion nativeExplosion;
-      extractScalarResults(IGF, result->getType(), result, nativeExplosion);
-      auto values = nativeExplosion.claimAll();
-
-      auto convertIfNecessary = [&](llvm::Type *nativeTy,
-                                    llvm::Value *elt) -> llvm::Value * {
-        auto *eltTy = elt->getType();
-        if (nativeTy->isIntOrPtrTy() && eltTy->isIntOrPtrTy() &&
-            nativeTy->getPrimitiveSizeInBits() !=
-                eltTy->getPrimitiveSizeInBits()) {
-          return IGF.Builder.CreateTruncOrBitCast(elt, nativeTy);
-        }
-        return elt;
-      };
-
-      Explosion errorExplosion;
-      if (!errorSchema.empty()) {
-        if (auto *structTy = dyn_cast<llvm::StructType>(
-                errorSchema.getExpandedType(IGF.IGM))) {
-          for (unsigned i = 0, e = structTy->getNumElements(); i < e; ++i) {
-            llvm::Value *elt = values[combined.errorValueMapping[i]];
-            auto *nativeTy = structTy->getElementType(i);
-            elt = convertIfNecessary(nativeTy, elt);
-            errorExplosion.add(elt);
-          }
-        } else {
-          errorExplosion.add(convertIfNecessary(
-              combined.combinedTy, values[combined.errorValueMapping[0]]));
-        }
-
-        typedErrorExplosion =
-            errorSchema.mapFromNative(IGF.IGM, IGF, errorExplosion, errorType);
-      } else {
-        typedErrorExplosion = std::move(errorExplosion);
-      }
-
-      // If the regular result type is void, there is nothing to explode
-      if (!resultType.isVoid()) {
-        Explosion resultExplosion;
-        if (auto *structTy = dyn_cast<llvm::StructType>(
-                nativeSchema.getExpandedType(IGF.IGM))) {
-          for (unsigned i = 0, e = structTy->getNumElements(); i < e; ++i) {
-            auto *nativeTy = structTy->getElementType(i);
-            resultExplosion.add(convertIfNecessary(nativeTy, values[i]));
-          }
-        } else {
-          resultExplosion.add(
-              convertIfNecessary(combined.combinedTy, values[0]));
-        }
-        out = nativeSchema.mapFromNative(IGF.IGM, IGF, resultExplosion,
-                                         resultType);
-      }
-      return;
+      return emitToUnmappedExplosionWithDirectTypedError(resultType, result,
+                                                         out);
     }
 
     if (result->getType()->isVoidTy())
@@ -3022,9 +3029,22 @@ public:
           setIndirectTypedErrorResultSlotArgsIndex(--LastArgWritten);
           Args[LastArgWritten] = nullptr;
       } else {
-        auto buf = IGF.getCalleeTypedErrorResultSlot(
-          fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
-        Args[--LastArgWritten] = buf.getAddress();
+        auto silResultTy =
+            fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext());
+        auto silErrorTy =
+            fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext());
+
+        auto &nativeSchema =
+            IGF.IGM.getTypeInfo(silResultTy).nativeReturnValueSchema(IGF.IGM);
+        auto &errorSchema =
+            IGF.IGM.getTypeInfo(silErrorTy).nativeReturnValueSchema(IGF.IGM);
+
+        if (nativeSchema.requiresIndirect() ||
+            errorSchema.shouldReturnTypedErrorIndirectly()) {
+          // Return the error indirectly.
+          auto buf = IGF.getCalleeTypedErrorResultSlot(silErrorTy);
+          Args[--LastArgWritten] = buf.getAddress();
+        }
       }
     }
 
@@ -3206,7 +3226,34 @@ public:
       errorType =
           substConv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
 
-    if (resultTys.size() == 1) {
+    SILFunctionConventions fnConv(getCallee().getOrigFunctionType(),
+                                  IGF.getSILModule());
+
+    // Get the natural IR type in the body of the function that makes
+    // the call. This may be different than the IR type returned by the
+    // call itself due to ABI type coercion.
+    auto resultType =
+        fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext());
+    auto &nativeSchema =
+        IGF.IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGF.IGM);
+
+    bool mayReturnErrorDirectly = mayReturnTypedErrorDirectly();
+    if (mayReturnErrorDirectly && !nativeSchema.requiresIndirect()) {
+      llvm::Value *resultAgg;
+      if (resultTys.size() == 1) {
+        resultAgg = Builder.CreateExtractValue(result, numAsyncContextParams);
+      } else {
+        auto resultTy = llvm::StructType::get(IGM.getLLVMContext(), resultTys);
+        resultAgg = llvm::UndefValue::get(resultTy);
+        for (unsigned i = 0, e = resultTys.size(); i != e; ++i) {
+          llvm::Value *elt =
+              Builder.CreateExtractValue(result, numAsyncContextParams + i);
+          resultAgg = Builder.CreateInsertValue(resultAgg, elt, i);
+        }
+      }
+      return emitToUnmappedExplosionWithDirectTypedError(resultType, resultAgg,
+                                                         out);
+    } else if (resultTys.size() == 1) {
       result = Builder.CreateExtractValue(result, numAsyncContextParams);
       if (hasError) {
         Address errorAddr = IGF.getCalleeErrorResultSlot(errorType,
@@ -3237,17 +3284,6 @@ public:
       }
       result = resultAgg;
     }
-
-    SILFunctionConventions fnConv(getCallee().getOrigFunctionType(),
-                                  IGF.getSILModule());
-
-    // Get the natural IR type in the body of the function that makes
-    // the call. This may be different than the IR type returned by the
-    // call itself due to ABI type coercion.
-    auto resultType =
-        fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext());
-    auto &nativeSchema =
-        IGF.IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGF.IGM);
 
     // For ABI reasons the result type of the call might not actually match the
     // expected result type.
@@ -3387,7 +3423,7 @@ void CallEmission::emitToUnmappedMemory(Address result) {
 #ifndef NDEBUG
   LastArgWritten = 0; // appease an assert
 #endif
-  
+
   auto call = emitCallSite();
 
   // Async calls need to store the error result that is passed as a parameter.
@@ -4434,6 +4470,90 @@ void CallEmission::externalizeArguments(IRGenFunction &IGF, const Callee &callee
   }
 }
 
+bool CallEmission::mayReturnTypedErrorDirectly() const {
+  SILFunctionConventions fnConv(getCallee().getOrigFunctionType(),
+                                IGF.getSILModule());
+  bool mayReturnErrorDirectly = false;
+  if (!convertDirectToIndirectReturn && !fnConv.hasIndirectSILResults() &&
+      !fnConv.hasIndirectSILErrorResults() && fnConv.funcTy->hasErrorResult() &&
+      fnConv.isTypedError()) {
+    auto errorType =
+        fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext());
+    auto &errorSchema =
+        IGF.IGM.getTypeInfo(errorType).nativeReturnValueSchema(IGF.IGM);
+
+    mayReturnErrorDirectly = !errorSchema.shouldReturnTypedErrorIndirectly();
+  }
+
+  return mayReturnErrorDirectly;
+}
+
+void CallEmission::emitToUnmappedExplosionWithDirectTypedError(
+    SILType resultType, llvm::Value *result, Explosion &out) {
+  SILFunctionConventions fnConv(getCallee().getOrigFunctionType(),
+                                IGF.getSILModule());
+  auto &nativeSchema =
+      IGF.IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGF.IGM);
+  auto errorType =
+      fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext());
+  auto &errorSchema =
+      IGF.IGM.getTypeInfo(errorType).nativeReturnValueSchema(IGF.IGM);
+
+  auto combined =
+      combineResultAndTypedErrorType(IGF.IGM, nativeSchema, errorSchema);
+
+  if (combined.combinedTy->isVoidTy()) {
+    typedErrorExplosion = Explosion();
+    return;
+  }
+
+  Explosion nativeExplosion;
+  extractScalarResults(IGF, result->getType(), result, nativeExplosion);
+  auto values = nativeExplosion.claimAll();
+
+  Explosion errorExplosion;
+  if (!errorSchema.empty()) {
+    if (auto *structTy =
+            dyn_cast<llvm::StructType>(errorSchema.getExpandedType(IGF.IGM))) {
+      for (unsigned i = 0, e = structTy->getNumElements(); i < e; ++i) {
+        llvm::Value *elt = values[combined.errorValueMapping[i]];
+        auto *nativeTy = structTy->getElementType(i);
+        elt = convertForDirectError(IGF, elt, nativeTy, /*forExtraction*/ true);
+        errorExplosion.add(elt);
+      }
+    } else {
+      auto *converted =
+          convertForDirectError(IGF, values[combined.errorValueMapping[0]],
+                                combined.combinedTy, /*forExtraction*/ true);
+      errorExplosion.add(converted);
+    }
+
+    typedErrorExplosion =
+        errorSchema.mapFromNative(IGF.IGM, IGF, errorExplosion, errorType);
+  } else {
+    typedErrorExplosion = std::move(errorExplosion);
+  }
+
+  // If the regular result type is void, there is nothing to explode
+  if (!resultType.isVoid()) {
+    Explosion resultExplosion;
+    if (auto *structTy =
+            dyn_cast<llvm::StructType>(nativeSchema.getExpandedType(IGF.IGM))) {
+      for (unsigned i = 0, e = structTy->getNumElements(); i < e; ++i) {
+        auto *nativeTy = structTy->getElementType(i);
+        auto *converted = convertForDirectError(IGF, values[i], nativeTy,
+                                                /*forExtraction*/ true);
+        resultExplosion.add(converted);
+      }
+    } else {
+      auto *converted = convertForDirectError(
+          IGF, values[0], combined.combinedTy, /*forExtraction*/ true);
+      resultExplosion.add(converted);
+    }
+    out = nativeSchema.mapFromNative(IGF.IGM, IGF, resultExplosion, resultType);
+  }
+}
+
 void CallEmission::setKeyPathAccessorArguments(Explosion &in, bool isOutlined,
                                                Explosion &out) {
   auto origCalleeType = CurCallee.getOrigFunctionType();
@@ -5294,6 +5414,30 @@ llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
   return loaded;
 }
 
+llvm::Value *irgen::convertForDirectError(IRGenFunction &IGF,
+                                          llvm::Value *value, llvm::Type *toTy,
+                                          bool forExtraction) {
+  auto &Builder = IGF.Builder;
+  auto *fromTy = value->getType();
+  if (toTy->isIntOrPtrTy() && fromTy->isIntOrPtrTy() && toTy != fromTy) {
+
+    if (toTy->isPointerTy()) {
+      if (fromTy->isPointerTy())
+        return Builder.CreateBitCast(value, toTy);
+      return Builder.CreateIntToPtr(value, toTy);
+    } else if (fromTy->isPointerTy()) {
+      return Builder.CreatePtrToInt(value, toTy);
+    }
+
+    if (forExtraction) {
+      return Builder.CreateTruncOrBitCast(value, toTy);
+    } else {
+      return Builder.CreateZExtOrBitCast(value, toTy);
+    }
+  }
+  return value;
+}
+
 void IRGenFunction::emitScalarReturn(llvm::Type *resultType,
                                      Explosion &result) {
   if (result.empty()) {
@@ -5735,32 +5879,18 @@ void IRGenFunction::emitScalarReturn(SILType returnResultType,
         return;
       }
 
-      auto convertIfNecessary = [&](llvm::Type *nativeTy,
-                                    llvm::Value *elt) -> llvm::Value * {
-        auto *eltTy = elt->getType();
-        if (nativeTy->isIntOrPtrTy() && eltTy->isIntOrPtrTy() &&
-            nativeTy->getPrimitiveSizeInBits() !=
-                eltTy->getPrimitiveSizeInBits()) {
-          assert(nativeTy->getPrimitiveSizeInBits() >
-                 eltTy->getPrimitiveSizeInBits());
-          if (eltTy->isPointerTy()) {
-            return Builder.CreatePtrToInt(elt, nativeTy);
-          }
-          return Builder.CreateZExt(elt, nativeTy);
-        }
-        return elt;
-      };
-
       if (auto *structTy = dyn_cast<llvm::StructType>(combinedTy)) {
         nativeAgg = llvm::UndefValue::get(combinedTy);
         for (unsigned i = 0, e = native.size(); i != e; ++i) {
           llvm::Value *elt = native.claimNext();
           auto *nativeTy = structTy->getElementType(i);
-          elt = convertIfNecessary(nativeTy, elt);
+          elt = convertForDirectError(*this, elt, nativeTy,
+                                      /*forExtraction*/ false);
           nativeAgg = Builder.CreateInsertValue(nativeAgg, elt, i);
         }
       } else {
-        nativeAgg = convertIfNecessary(combinedTy, native.claimNext());
+        nativeAgg = convertForDirectError(*this, native.claimNext(), combinedTy,
+                                          /*forExtraction*/ false);
       }
     }
 
@@ -6070,6 +6200,51 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
   SILFunctionConventions conv(fnType, IGF.getSILModule());
   auto &nativeSchema =
       IGM.getTypeInfo(funcResultTypeInContext).nativeReturnValueSchema(IGM);
+
+  if (fnType->hasErrorResult() && !conv.hasIndirectSILResults() &&
+      !conv.hasIndirectSILErrorResults() && !nativeSchema.requiresIndirect() &&
+      conv.isTypedError()) {
+    auto errorType = conv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
+    auto &errorTI = IGM.getTypeInfo(errorType);
+    auto &nativeError = errorTI.nativeReturnValueSchema(IGM);
+    if (!nativeError.shouldReturnTypedErrorIndirectly()) {
+      assert(!error.empty() && "Direct error return must have error value");
+      auto *combinedTy =
+          combineResultAndTypedErrorType(IGM, nativeSchema, nativeError)
+              .combinedTy;
+
+      if (combinedTy->isVoidTy()) {
+        assert(result.empty() && "Unexpected result values");
+      } else {
+        if (auto *structTy = dyn_cast<llvm::StructType>(combinedTy)) {
+          llvm::Value *nativeAgg = llvm::UndefValue::get(structTy);
+          for (unsigned i = 0, e = result.size(); i != e; ++i) {
+            llvm::Value *elt = result.claimNext();
+            auto *nativeTy = structTy->getElementType(i);
+            elt = convertForDirectError(IGF, elt, nativeTy,
+                                        /*forExtraction*/ false);
+            nativeAgg = IGF.Builder.CreateInsertValue(nativeAgg, elt, i);
+          }
+          Explosion out;
+          IGF.emitAllExtractValues(nativeAgg, structTy, out);
+          while (!out.empty()) {
+            nativeResultsStorage.push_back(out.claimNext());
+          }
+        } else {
+          auto *converted = convertForDirectError(
+              IGF, result.claimNext(), combinedTy, /*forExtraction*/ false);
+          nativeResultsStorage.push_back(converted);
+        }
+      }
+
+      nativeResultsStorage.push_back(error.claimNext());
+      nativeResults = nativeResultsStorage;
+
+      emitAsyncReturn(IGF, asyncLayout, fnType, nativeResults);
+      return;
+    }
+  }
+
   if (result.empty() && !nativeSchema.empty()) {
     if (!nativeSchema.requiresIndirect())
       // When we throw, we set the return values to undef.
@@ -6160,13 +6335,12 @@ void irgen::emitYieldOnceCoroutineResult(IRGenFunction &IGF, Explosion &result,
       // Capture results via result token
       resultToken =
         Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end_results, coroResults);
-
-        Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end,
-                              {handle,
-                               /*is unwind*/ Builder.getFalse(),
-                               resultToken});
-        Builder.CreateUnreachable();
     }
+    Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end,
+                                {handle,
+                                 /*is unwind*/ Builder.getFalse(),
+                                 resultToken});
+    Builder.CreateUnreachable();
   } else {
     if (coroResults.empty()) {
       // No results, we do not need to change anything around existing coro.end

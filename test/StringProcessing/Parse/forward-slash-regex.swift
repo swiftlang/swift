@@ -52,7 +52,6 @@ do {
   _=/0/
   // expected-error@-1 {{'_' can only appear in a pattern or on the left side of an assignment}}
   // expected-error@-2 {{cannot find operator '=/' in scope}}
-  // expected-error@-3 {{'/' is not a postfix unary operator}}
 }
 
 // No closing '/' so a prefix operator.

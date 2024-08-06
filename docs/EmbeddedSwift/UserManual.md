@@ -4,7 +4,7 @@
 
 **‼️ Use the latest downloadable 'Trunk Development' snapshot from swift.org to use Embedded Swift. Public releases of Swift do not yet support Embedded Swift.**
 
-For an introduction and motivation into Embedded Swift, please see "[A Vision for Embedded Swift](https://github.com/apple/swift-evolution/blob/main/visions/embedded-swift.md)", a Swift Evolution document highlighting the main goals and approaches.
+For an introduction and motivation into Embedded Swift, please see "[A Vision for Embedded Swift](https://github.com/swiftlang/swift-evolution/blob/main/visions/embedded-swift.md)", a Swift Evolution document highlighting the main goals and approaches.
 
 The following document explains how to use Embedded Swift's support in the Swift compiler and toolchain.
 
@@ -22,8 +22,8 @@ A typical setup and build + run cycle for an embedded development board involves
 - (1) Getting an SDK with the C compilers, headers and libraries for the target
 - (2) Building the C source code, and Swift source code into object files.
 - (3) Linking all the libraries, C object files, and Swift object files.
-- (4) Post-processing the linked firmware into a flashable format (UF2, BIN, or bespoke formats)
-- (5) Uploading the flashable binary to the board over a USB cable using some vendor-provided JTAG/SWD tool or by copying it to a fake USB Mass Storage volume presented by the board.
+- (4) Post-processing the linked firmware into a flashable format (UF2, BIN, HEX, or bespoke formats)
+- (5) Uploading the flashable binary to the board over a USB cable using some vendor-provided JTAG/SWD tool, by copying it to a fake USB Mass Storage volume presented by the board or a custom platform bootloader.
 - (6) Restarting the board, observing physical effects of the firmware (LEDs light up) or UART output over USB, or presence on network, etc.
 
 Most of these steps are out of scope for this document, instead refer to the vendor provided documentation. This document only focuses on (2) from the list above, and it's important that you first get familiar with the details of firmware development for your board without Swift in the mix. Even if you want to build a completely pure Swift firmware, you are still going to need the vendor provided tooling for linking, post-processing, uploading, etc.
@@ -252,11 +252,11 @@ For (2), external dependencies are also triggered by specific code needing them,
   - dependency: `void *__stack_chk_guard;`
   - dependency: `void __stack_chk_fail(void);`
   - stack protectors can be disabled with `-disable-stack-protector` swiftc flag
-- **atomics instrinsics**
+- **atomics intrinsics**
   - on CPU architectures that don't have direct load-acquire/store-release support in the ISA, LLVM calls helper functions for atomic operations
   - needed by refcounting in the Embedded Swift runtime (so any class usage will trigger this dependency)
   - also needed when using atomics from the Synchronization module
-- **multiplication/division/modulo instrinsics**
+- **multiplication/division/modulo intrinsics**
   - on CPU architectures that don't have direct support for the math operations in the ISA
   - dependency (on Mach-O): `__divti3`
   - dependency (on Mach-O): `__modti3`

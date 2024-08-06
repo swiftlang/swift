@@ -258,11 +258,6 @@ struct FunctionPassContext : MutatingContext {
     SimplifyContext(_bridged: _bridged, notifyInstructionChanged: notifyInstructionChanged, preserveDebugInfo: preserveDebugInfo)
   }
 
-  var aliasAnalysis: AliasAnalysis {
-    let bridgedAA = _bridged.getAliasAnalysis()
-    return AliasAnalysis(bridged: bridgedAA)
-  }
-
   var deadEndBlocks: DeadEndBlocksAnalysis {
     let bridgeDEA = _bridged.getDeadEndBlocksAnalysis()
     return DeadEndBlocksAnalysis(bridged: bridgeDEA)
@@ -492,19 +487,23 @@ extension Builder {
   }
 
   /// Creates a builder which inserts _after_ `insPnt`, using a custom `location`.
+  ///
+  /// TODO: this is usually incorrect for terminator instructions. Instead use
+  /// `Builder.insert(after:location:_:insertFunc)` from OptUtils.swift. Rename this to afterNonTerminator.
   init(after insPnt: Instruction, location: Location, _ context: some MutatingContext) {
     context.verifyIsTransforming(function: insPnt.parentFunction)
-    if let nextInst = insPnt.next {
-      self.init(insertAt: .before(nextInst), location: location,
-                context.notifyInstructionChanged, context._bridged.asNotificationHandler())
-    } else {
-      self.init(insertAt: .atEndOf(insPnt.parentBlock), location: location,
-                context.notifyInstructionChanged, context._bridged.asNotificationHandler())
+    guard let nextInst = insPnt.next else {
+      fatalError("cannot insert an instruction after a block terminator.")
     }
+    self.init(insertAt: .before(nextInst), location: location,
+              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
   }
 
   /// Creates a builder which inserts _after_ `insPnt`, using `insPnt`'s next
   /// non-meta instruction's location.
+  ///
+  /// TODO: this is incorrect for terminator instructions. Instead use `Builder.insert(after:location:_:insertFunc)`
+  /// from OptUtils.swift. Rename this to afterNonTerminator.
   init(after insPnt: Instruction, _ context: some MutatingContext) {
     self.init(after: insPnt, location: insPnt.locationOfNextNonMetaInstruction, context)
   }

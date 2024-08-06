@@ -214,6 +214,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
       "wasm64    wasm64-unknown-none-wasm    wasm64-unknown-none-wasm"
     )
   endif()
+
+  if("AVR" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "avr  avr-none-none-elf    avr-none-none-elf"
+    )
+  endif()  
 endif()
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
@@ -263,6 +269,16 @@ if(SWIFT_BUILD_STDLIB)
   if(SWIFT_BUILD_CLANG_OVERLAYS)
     add_subdirectory(ClangOverlays)
   endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+    add_subdirectory(Concurrency)
+  endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
+    add_subdirectory(RegexParser)
+    add_subdirectory(StringProcessing)
+    add_subdirectory(RegexBuilder)
+  endif()
 endif()
 
 if(SWIFT_BUILD_STDLIB AND NOT SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES)
@@ -273,18 +289,8 @@ if(SWIFT_BUILD_STDLIB AND NOT SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES)
     add_subdirectory(Differentiation)
   endif()
 
-  if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
-    add_subdirectory(Concurrency)
-  endif()
-
   if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
     add_subdirectory(Distributed)
-  endif()
-
-  if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
-    add_subdirectory(RegexParser)
-    add_subdirectory(StringProcessing)
-    add_subdirectory(RegexBuilder)
   endif()
 
   if(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)

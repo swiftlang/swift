@@ -44,7 +44,7 @@ let nonStrictGlobal = NonStrictClass() // no warning
 
 let strictGlobal = StrictStruct() // expected-warning{{let 'strictGlobal' is not concurrency-safe because non-'Sendable' type 'StrictStruct' may have shared mutable state}}
 // expected-note@-1{{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
-// expected-note@-2{{annotate 'strictGlobal' with '@MainActor' if property should only be accessed from the main actor}}
+// expected-note@-2{{add '@MainActor' to make let 'strictGlobal' part of global actor 'MainActor'}}
 
 extension NonStrictClass {
   @Sendable func f() { }
@@ -62,7 +62,7 @@ struct HasStatics {
   // expected-warning@-1{{'nonisolated' can not be applied to variable with non-'Sendable' type 'StrictStruct'}}
   // expected-warning@-2{{static property 'ss' is not concurrency-safe because non-'Sendable' type 'StrictStruct' may have shared mutable state}}
   // expected-note@-3{{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
-  // expected-note@-4{{annotate 'ss' with '@MainActor' if property should only be accessed from the main actor}}
+  // expected-note@-4{{add '@MainActor' to make static property 'ss' part of global actor 'MainActor'}}
 }
 
 extension NonStrictClass2: @retroactive MySendableProto { }

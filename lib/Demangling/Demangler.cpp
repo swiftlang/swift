@@ -224,6 +224,8 @@ llvm::StringRef swift::Demangle::dropSwiftManglingPrefix(StringRef mangledName){
 }
 
 static bool isAliasNode(Demangle::NodePointer Node) {
+  if (!Node)
+    return false;
   switch (Node->getKind()) {
   case Demangle::Node::Kind::Type:
     return isAliasNode(Node->getChild(0));
@@ -241,6 +243,8 @@ bool swift::Demangle::isAlias(llvm::StringRef mangledName) {
 }
 
 static bool isClassNode(Demangle::NodePointer Node) {
+  if (!Node)
+    return false;
   switch (Node->getKind()) {
   case Demangle::Node::Kind::Type:
     return isClassNode(Node->getChild(0));
@@ -259,6 +263,8 @@ bool swift::Demangle::isClass(llvm::StringRef mangledName) {
 }
 
 static bool isEnumNode(Demangle::NodePointer Node) {
+  if (!Node)
+    return false;
   switch (Node->getKind()) {
   case Demangle::Node::Kind::Type:
     return isEnumNode(Node->getChild(0));
@@ -277,6 +283,8 @@ bool swift::Demangle::isEnum(llvm::StringRef mangledName) {
 }
 
 static bool isProtocolNode(Demangle::NodePointer Node) {
+  if (!Node)
+    return false;
   switch (Node->getKind()) {
   case Demangle::Node::Kind::Type:
     return isProtocolNode(Node->getChild(0));
@@ -296,6 +304,8 @@ bool swift::Demangle::isProtocol(llvm::StringRef mangledName) {
 }
 
 static bool isStructNode(Demangle::NodePointer Node) {
+  if (!Node)
+    return false;
   switch (Node->getKind()) {
   case Demangle::Node::Kind::Type:
     return isStructNode(Node->getChild(0));
@@ -471,9 +481,9 @@ Node* Node::findByKind(Node::Kind kind, int maxDepth) {
 // NodeFactory member functions //
 //////////////////////////////////
 
-void NodeFactory::freeSlabs(Slab *slab) {
+void NodeFactory::freeSlabs(AllocatedSlab *slab) {
   while (slab) {
-    Slab *prev = slab->Previous;
+    AllocatedSlab *prev = slab->Previous;
     free(slab);
     slab = prev;
   }
@@ -533,7 +543,7 @@ void NodeFactory::popCheckpoint(NodeFactory::Checkpoint checkpoint) {
     // checkpoint's slab is less than 1/16th of the current slab's space. We
     // won't repeatedly allocate and deallocate the current slab. The size
     // doubles each time so we'll quickly pass the threshold.
-    Slab *savedSlab = nullptr;
+    AllocatedSlab *savedSlab = nullptr;
     if (CurrentSlab) {
       size_t checkpointSlabFreeSpace = checkpoint.End - checkpoint.CurPtr;
       size_t currentSlabSize = End - (char *)(CurrentSlab + 1);
@@ -774,12 +784,16 @@ NodePointer Demangler::demangleType(StringRef MangledName,
         std::function<SymbolicReferenceResolver_t> Resolver) {
   DemangleInitRAII state(*this, MangledName, std::move(Resolver));
 
-  parseAndPushNodes();
+  if (!parseAndPushNodes())
+    return nullptr;
 
-  if (NodePointer Result = popNode())
-    return Result;
+  NodePointer Result = popNode();
 
-  return createNode(Node::Kind::Suffix, Text);
+  // The result is only valid if it was the only node on the stack.
+  if (popNode())
+    return nullptr;
+
+  return Result;
 }
 
 bool Demangler::parseAndPushNodes() {
@@ -948,7 +962,7 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind) {
 }
 
 NodePointer Demangler::demangleTypeAnnotation() {
-  switch (char c2 = nextChar()) {
+  switch (nextChar()) {
   case 'a':
     return createNode(Node::Kind::AsyncAnnotation);
   case 'A':
@@ -976,10 +990,11 @@ NodePointer Demangler::demangleTypeAnnotation() {
   case 'u':
     return createType(
         createWithChild(Node::Kind::Sending, popTypeAndGetChild()));
-  case 'l':
-    return demangleLifetimeDependenceKind(/*isSelfDependence*/ false);
-  case 'L':
-    return demangleLifetimeDependenceKind(/*isSelfDependence*/ true);
+  case 'l': {
+    auto *node = demangleLifetimeDependence();
+    addChild(node, popTypeAndGetChild());
+    return createType(node);
+  }
   default:
     return nullptr;
   }
@@ -1004,7 +1019,7 @@ recur:
     case 'F': return demanglePlainFunction();
     case 'G': return demangleBoundGenericType();
     case 'H':
-      switch (char c2 = nextChar()) {
+      switch (nextChar()) {
       case 'A': return demangleDependentProtocolConformanceAssociated();
       case 'C': return demangleConcreteProtocolConformance();
       case 'D': return demangleDependentProtocolConformanceRoot();
@@ -1185,7 +1200,7 @@ NodePointer Demangler::createSwiftType(Node::Kind typeKind, const char *name) {
 }
 
 NodePointer Demangler::demangleStandardSubstitution() {
-  switch (char c = nextChar()) {
+  switch (nextChar()) {
     case 'o':
       return createNode(Node::Kind::Module, MANGLING_MODULE_OBJC);
     case 'C':
@@ -1580,7 +1595,6 @@ NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
     ClangType = demangleClangType();
   }
   addChild(FuncType, ClangType);
-  addChild(FuncType, popNode(Node::Kind::SelfLifetimeDependence));
   addChild(FuncType, popNode(Node::Kind::GlobalActorFunctionType));
   addChild(FuncType, popNode(Node::Kind::IsolatedAnyFunctionType));
   addChild(FuncType, popNode(Node::Kind::SendingResultFunctionType));
@@ -1623,9 +1637,6 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
     return nullptr;
 
   unsigned FirstChildIdx = 0;
-  if (FuncType->getChild(FirstChildIdx)->getKind() ==
-      Node::Kind::SelfLifetimeDependence)
-    ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::GlobalActorFunctionType)
     ++FirstChildIdx;
@@ -1648,9 +1659,6 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::AsyncAnnotation)
-    ++FirstChildIdx;
-  if (FuncType->getChild(FirstChildIdx)->getKind() ==
-      Node::Kind::ParamLifetimeDependence)
     ++FirstChildIdx;
   auto ParameterType = FuncType->getChild(FirstChildIdx);
 
@@ -3104,7 +3112,7 @@ NodePointer Demangler::demangleDifferentiabilityWitness() {
     result = addChild(result, node);
   result->reverseChildren();
   MangledDifferentiabilityKind kind;
-  switch (auto c = nextChar()) {
+  switch (nextChar()) {
   case 'f': kind = MangledDifferentiabilityKind::Forward; break;
   case 'r': kind = MangledDifferentiabilityKind::Reverse; break;
   case 'd': kind = MangledDifferentiabilityKind::Normal; break;
@@ -3136,7 +3144,7 @@ NodePointer Demangler::demangleIndexSubset() {
 
 NodePointer Demangler::demangleDifferentiableFunctionType() {
   MangledDifferentiabilityKind kind;
-  switch (auto c = nextChar()) {
+  switch (nextChar()) {
   case 'f': kind = MangledDifferentiabilityKind::Forward; break;
   case 'r': kind = MangledDifferentiabilityKind::Reverse; break;
   case 'd': kind = MangledDifferentiabilityKind::Normal; break;
@@ -3147,26 +3155,29 @@ NodePointer Demangler::demangleDifferentiableFunctionType() {
       Node::Kind::DifferentiableFunctionType, (Node::IndexType)kind);
 }
 
-NodePointer Demangler::demangleLifetimeDependenceKind(bool isSelfDependence) {
-  MangledLifetimeDependenceKind kind;
-  switch (auto c = nextChar()) {
+static std::optional<MangledLifetimeDependenceKind>
+getMangledLifetimeDependenceKind(char nextChar) {
+  switch (nextChar) {
   case 's':
-    kind = MangledLifetimeDependenceKind::Scope;
-    break;
+    return MangledLifetimeDependenceKind::Scope;
   case 'i':
-    kind = MangledLifetimeDependenceKind::Inherit;
-    break;
-  default:
+    return MangledLifetimeDependenceKind::Inherit;
+  }
+  return std::nullopt;
+}
+
+NodePointer Demangler::demangleLifetimeDependence() {
+  auto kind = getMangledLifetimeDependenceKind(nextChar());
+  if (!kind.has_value()) {
     return nullptr;
   }
-  if (isSelfDependence) {
-    return createNode(Node::Kind::SelfLifetimeDependence,
-                      (Node::IndexType)kind);
-  }
-  auto node = createWithChildren(Node::Kind::ParamLifetimeDependence,
-                                 createNode(Node::Kind::Index, unsigned(kind)),
-                                 popTypeAndGetChild());
-  return createType(node);
+  auto result = createNode(Node::Kind::LifetimeDependence);
+  result =
+      addChild(result, createNode(Node::Kind::Index, (Node::IndexType)*kind));
+  result = addChild(result, demangleIndexSubset());
+  if (!nextIf('_'))
+    return nullptr;
+  return result;
 }
 
 std::string Demangler::demangleBridgedMethodParams() {
@@ -3649,7 +3660,7 @@ NodePointer Demangler::demangleWitness() {
     case 'z': {
       auto declList = createNode(Node::Kind::GlobalVariableOnceDeclList);
       std::vector<NodePointer> vars;
-      while (auto sig = popNode(Node::Kind::FirstElementMarker)) {
+      while (popNode(Node::Kind::FirstElementMarker)) {
         auto identifier = popNode(isDeclName);
         if (!identifier)
           return nullptr;
@@ -3700,7 +3711,7 @@ NodePointer Demangler::demangleSpecialType() {
     case 'j':
       return demangleSymbolicExtendedExistentialType();
     case 'z':
-      switch (auto cchar = nextChar()) {
+      switch (nextChar()) {
       case 'B':
         return popFunctionType(Node::Kind::ObjCBlock, true);
       case 'C':

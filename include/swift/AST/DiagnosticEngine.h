@@ -140,6 +140,7 @@ namespace swift {
     VersionTuple,
     LayoutConstraint,
     ActorIsolation,
+    IsolationSource,
     Diagnostic,
     ClangDecl
   };
@@ -175,6 +176,7 @@ namespace swift {
       llvm::VersionTuple VersionVal;
       LayoutConstraint LayoutConstraintVal;
       ActorIsolation ActorIsolationVal;
+      IsolationSource IsolationSourceVal;
       DiagnosticInfo *DiagnosticVal;
       const clang::NamedDecl *ClangDecl;
     };
@@ -281,6 +283,11 @@ namespace swift {
     DiagnosticArgument(ActorIsolation AI)
       : Kind(DiagnosticArgumentKind::ActorIsolation),
         ActorIsolationVal(AI) {
+    }
+
+    DiagnosticArgument(IsolationSource IS)
+      : Kind(DiagnosticArgumentKind::IsolationSource),
+        IsolationSourceVal(IS){
     }
 
     DiagnosticArgument(DiagnosticInfo *D)
@@ -400,6 +407,11 @@ namespace swift {
     ActorIsolation getAsActorIsolation() const {
       assert(Kind == DiagnosticArgumentKind::ActorIsolation);
       return ActorIsolationVal;
+    }
+
+    IsolationSource getAsIsolationSource() const {
+      assert(Kind == DiagnosticArgumentKind::IsolationSource);
+      return IsolationSourceVal;
     }
 
     DiagnosticInfo *getAsDiagnostic() const {
@@ -1686,10 +1698,6 @@ namespace swift {
     /// The unescaped message to display to the user.
     const StringRef Message;
   };
-
-/// Retrieve the macro name for a generated source info that represents
-/// a macro expansion.
-DeclName getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info);
 
 } // end namespace swift
 

@@ -381,7 +381,7 @@ namespace swift::test {
 // - function
 // - the computed pruned liveness
 // - the liveness boundary
-static FunctionTest LinearLivenessTest("linear-liveness", [](auto &function,
+static FunctionTest LinearLivenessTest("linear_liveness", [](auto &function,
                                                              auto &arguments,
                                                              auto &test) {
   SILValue value = arguments.takeValue();

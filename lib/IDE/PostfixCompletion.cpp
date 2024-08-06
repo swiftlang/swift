@@ -292,8 +292,7 @@ getOperatorCompletionTypes(DeclContext *DC, Type LHSType, OperatorDecl *Op) {
   UnresolvedDeclRefExpr UDRE(DeclNameRef(Op->getName()),
                              getDeclRefKindOfOperator(Op), DeclNameLoc(Loc));
   DiagnosticTransaction IgnoreDiags(DC->getASTContext().Diags);
-  Expr *OpExpr =
-      resolveDeclRefExpr(&UDRE, DC, /*replaceInvalidRefsWithErrors=*/true);
+  Expr *OpExpr = resolveDeclRefExpr(&UDRE, DC);
   IgnoreDiags.abort();
   if (isa<ErrorExpr>(OpExpr)) {
     // If we couldn't resolve the operator (e.g. because there is only an
@@ -318,7 +317,7 @@ getOperatorCompletionTypes(DeclContext *DC, Type LHSType, OperatorDecl *Op) {
     llvm_unreachable("unexpected operator kind");
   }
 
-  CS.preCheckExpression(OpCallExpr, DC, /*replaceInvalidRefsWithErrors=*/true);
+  CS.preCheckExpression(OpCallExpr, DC);
   OpCallExpr = CS.generateConstraints(OpCallExpr, DC);
 
   CS.assignFixedType(CS.getType(&LHS)->getAs<TypeVariableType>(), LHSType);

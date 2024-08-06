@@ -101,6 +101,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationArches[] =
   "s390x",
   "wasm32",
   "riscv64",
+  "avr"
 };
 
 static const SupportedConditionalValue SupportedConditionalCompilationEndianness[] = {
@@ -109,6 +110,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationEndianness
 };
 
 static const SupportedConditionalValue SupportedConditionalCompilationPointerBitWidths[] = {
+  "_16",
   "_32",
   "_64"
 };
@@ -541,6 +543,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::ArchType::riscv64:
     addPlatformConditionValue(PlatformConditionKind::Arch, "riscv64");
     break;
+  case llvm::Triple::ArchType::avr:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "avr");
+    break;
   default:
     UnsupportedArch = true;
 
@@ -564,7 +569,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   }
 
   // Set the "_pointerBitWidth" platform condition.
-  if (Target.isArch32Bit()) {
+  if (Target.isArch16Bit()) {
+    addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_16");
+  } else if (Target.isArch32Bit()) {
     addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_32");
   } else if (Target.isArch64Bit()) {
     addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_64");
@@ -722,22 +729,22 @@ namespace {
         "-working-directory=",
         "-working-directory"};
 
-constexpr std::array<std::string_view, 15> knownClangDependencyIgnorablePrefiexes =
-     {"-I",
-      "-F",
-      "-fmodule-map-file=",
-      "-iquote",
-      "-idirafter",
-      "-iframeworkwithsysroot",
-      "-iframework",
-      "-iprefix",
-      "-iwithprefixbefore",
-      "-iwithprefix",
-      "-isystemafter",
-      "-isystem",
-      "-isysroot",
-      "-working-directory=",
-      "-working-directory"};
+  constexpr std::array<std::string_view, 15>
+      knownClangDependencyIgnorablePrefiexes = {"-I",
+                                                "-F",
+                                                "-fmodule-map-file=",
+                                                "-iquote",
+                                                "-idirafter",
+                                                "-iframeworkwithsysroot",
+                                                "-iframework",
+                                                "-iprefix",
+                                                "-iwithprefixbefore",
+                                                "-iwithprefix",
+                                                "-isystemafter",
+                                                "-isystem",
+                                                "-isysroot",
+                                                "-working-directory=",
+                                                "-working-directory"};
 }
 
 std::vector<std::string> ClangImporterOptions::getRemappedExtraArgs(

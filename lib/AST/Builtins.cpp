@@ -1383,10 +1383,10 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
       Context, SmallBitVector(diffFnType->getNumParams(), true));
   // Generator for the resultant function type, i.e. the AD derivative function.
   BuiltinFunctionBuilder::LambdaGenerator resultGen{
-      [=, &Context](BuiltinFunctionBuilder &builder) -> Type {
+      [=](BuiltinFunctionBuilder &builder) -> Type {
         auto derivativeFnTy = diffFnType->getAutoDiffDerivativeFunctionType(
             paramIndices, kind,
-            LookUpConformanceInModule(Context.TheBuiltinModule));
+            LookUpConformanceInModule());
         return derivativeFnTy->getResult();
       }};
   builder.addParameter(firstArgGen);
@@ -1686,7 +1686,7 @@ static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
   bool hasSendingResult =
       ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation);
 
-  // operation async function pointer: () async throws -> transferring T
+  // operation async function pointer: () async throws -> sending T
   auto extInfo = ASTExtInfoBuilder()
                      .withAsync()
                      .withThrows()
@@ -1764,6 +1764,21 @@ static ValueDecl *getTargetOSVersionAtLeast(ASTContext &Context,
                                             Identifier Id) {
   auto int32Type = BuiltinIntegerType::get(32, Context);
   return getBuiltinFunction(Id, {int32Type, int32Type, int32Type}, int32Type);
+}
+
+static ValueDecl *getTargetVariantOSVersionAtLeast(ASTContext &Context,
+                                                   Identifier Id) {
+  auto int32Type = BuiltinIntegerType::get(32, Context);
+  return getBuiltinFunction(Id, {int32Type, int32Type, int32Type}, int32Type);
+}
+
+static ValueDecl *
+getTargetOSVersionOrVariantOSVersionAtLeast(ASTContext &Context,
+                                            Identifier Id) {
+  auto int32Type = BuiltinIntegerType::get(32, Context);
+  return getBuiltinFunction(Id, {int32Type, int32Type, int32Type,
+                                 int32Type, int32Type, int32Type},
+                            int32Type);
 }
 
 static ValueDecl *getBuildOrdinaryTaskExecutorRef(ASTContext &ctx,
@@ -3161,6 +3176,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::TargetOSVersionAtLeast:
     return getTargetOSVersionAtLeast(Context, Id);
+
+  case BuiltinValueKind::TargetVariantOSVersionAtLeast:
+    return getTargetVariantOSVersionAtLeast(Context, Id);
+
+  case BuiltinValueKind::TargetOSVersionOrVariantOSVersionAtLeast:
+    return getTargetOSVersionOrVariantOSVersionAtLeast(Context, Id);
 
   case BuiltinValueKind::ConvertTaskToJob:
     return getConvertTaskToJob(Context, Id);

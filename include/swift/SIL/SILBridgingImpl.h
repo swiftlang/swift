@@ -82,23 +82,59 @@ BridgedParameterInfo BridgedParameterInfoArray::at(SwiftInt parameterIndex) cons
 //                       BridgedLifetimeDependenceInfo
 //===----------------------------------------------------------------------===//
 
+SwiftInt BridgedLifetimeDependenceInfoArray::count() const {
+  return unbridged().size();
+}
+
+BridgedLifetimeDependenceInfo
+BridgedLifetimeDependenceInfoArray::at(SwiftInt index) const {
+  return BridgedLifetimeDependenceInfo(unbridged()[index]);
+}
+
 bool BridgedLifetimeDependenceInfo::empty() const {
-  return info == nullptr || info->empty();
+  return !immortal && inheritLifetimeParamIndices == nullptr &&
+         scopeLifetimeParamIndices == nullptr;
 }
 
 bool BridgedLifetimeDependenceInfo::checkInherit(SwiftInt index) const {
-  assert(info);
-  return info->checkInherit(index);
+  return inheritLifetimeParamIndices &&
+         inheritLifetimeParamIndices->contains(index);
 }
 
 bool BridgedLifetimeDependenceInfo::checkScope(SwiftInt index) const {
-  assert(info);
-  return info->checkScope(index);
+  return scopeLifetimeParamIndices &&
+         scopeLifetimeParamIndices->contains(index);
+}
+
+SwiftInt BridgedLifetimeDependenceInfo::getTargetIndex() const {
+  return targetIndex;
 }
 
 BridgedOwnedString BridgedLifetimeDependenceInfo::getDebugDescription() const {
-  assert(info);
-  return BridgedOwnedString(info->getString());
+  std::string lifetimeDependenceString;
+  auto getOnIndices = [](swift::IndexSubset *bitvector) {
+    std::string result;
+    bool isFirstSetBit = true;
+    for (unsigned i = 0; i < bitvector->getCapacity(); i++) {
+      if (bitvector->contains(i)) {
+        if (!isFirstSetBit) {
+          result += ", ";
+        }
+        result += std::to_string(i);
+        isFirstSetBit = false;
+      }
+    }
+    return result;
+  };
+  if (inheritLifetimeParamIndices && !inheritLifetimeParamIndices->isEmpty()) {
+    lifetimeDependenceString =
+        "_inherit(" + getOnIndices(inheritLifetimeParamIndices) + ") ";
+  }
+  if (scopeLifetimeParamIndices && !scopeLifetimeParamIndices->isEmpty()) {
+    lifetimeDependenceString +=
+        "_scope(" + getOnIndices(scopeLifetimeParamIndices) + ") ";
+  }
+  return lifetimeDependenceString;
 }
 
 //===----------------------------------------------------------------------===//
@@ -162,9 +198,10 @@ BridgedYieldInfoArray BridgedASTType::SILFunctionType_getYields() const {
   return unbridged()->castTo<swift::SILFunctionType>()->getYields();
 }
 
-BridgedLifetimeDependenceInfo BridgedASTType::SILFunctionType_getLifetimeDependenceInfo() const {
+BridgedLifetimeDependenceInfoArray
+BridgedASTType::SILFunctionType_getLifetimeDependencies() const {
   auto fnTy = unbridged()->castTo<swift::SILFunctionType>();
-  return {fnTy->getLifetimeDependenceInfoOrNull()};
+  return fnTy->getLifetimeDependencies();
 }
 
 //===----------------------------------------------------------------------===//
@@ -259,6 +296,10 @@ bool BridgedType::isMetatype() const {
   return unbridged().isMetatype();
 }
 
+bool BridgedType::isClassExistential() const {
+  return unbridged().isClassExistentialType();
+}
+
 bool BridgedType::isNoEscapeFunction() const {
   return unbridged().isNoEscapeFunction();
 }
@@ -273,6 +314,10 @@ bool BridgedType::isThickFunction() const {
 
 bool BridgedType::isAsyncFunction() const {
   return unbridged().isAsyncFunction();
+}
+
+bool BridgedType::isVoid() const {
+  return unbridged().isVoid();
 }
 
 bool BridgedType::isEmpty(BridgedFunction f) const {
@@ -319,8 +364,8 @@ bool BridgedType::isExactSuperclassOf(BridgedType t) const {
   return unbridged().isExactSuperclassOf(t.unbridged());
 }
 
-BridgedType BridgedType::getInstanceTypeOfMetatype(BridgedFunction f) const {
-  return unbridged().getInstanceTypeOfMetatype(f.getFunction());
+BridgedType BridgedType::getLoweredInstanceTypeOfMetatype(BridgedFunction f) const {
+  return unbridged().getLoweredInstanceTypeOfMetatype(f.getFunction());
 }
 
 bool BridgedType::isDynamicSelfMetatype() const {
@@ -1038,12 +1083,20 @@ bool BridgedInstruction::BeginBorrow_isLexical() const {
   return getAs<swift::BeginBorrowInst>()->isLexical();
 }
 
+bool BridgedInstruction::BeginBorrow_hasPointerEscape() const {
+  return getAs<swift::BeginBorrowInst>()->hasPointerEscape();
+}
+
 bool BridgedInstruction::BeginBorrow_isFromVarDecl() const {
   return getAs<swift::BeginBorrowInst>()->isFromVarDecl();
 }
 
 bool BridgedInstruction::MoveValue_isLexical() const {
   return getAs<swift::MoveValueInst>()->isLexical();
+}
+
+bool BridgedInstruction::MoveValue_hasPointerEscape() const {
+  return getAs<swift::MoveValueInst>()->hasPointerEscape();
 }
 
 bool BridgedInstruction::MoveValue_isFromVarDecl() const {
@@ -1056,6 +1109,10 @@ SwiftInt BridgedInstruction::ProjectBoxInst_fieldIndex() const {
 
 bool BridgedInstruction::EndCOWMutationInst_doKeepUnique() const {
   return getAs<swift::EndCOWMutationInst>()->doKeepUnique();
+}
+
+bool BridgedInstruction::DestroyValueInst_isDeadEnd() const {
+  return getAs<swift::DestroyValueInst>()->isDeadEnd();
 }
 
 SwiftInt BridgedInstruction::EnumInst_caseIndex() const {
@@ -1092,6 +1149,10 @@ bool BridgedInstruction::RefElementAddrInst_isImmutable() const {
 
 void BridgedInstruction::RefElementAddrInst_setImmutable(bool isImmutable) const {
   getAs<swift::RefElementAddrInst>()->setImmutable(isImmutable);
+}
+
+bool BridgedInstruction::RefTailAddrInst_isImmutable() const {
+  return getAs<swift::RefTailAddrInst>()->isImmutable();
 }
 
 SwiftInt BridgedInstruction::PartialApplyInst_numArguments() const {
@@ -1201,6 +1262,10 @@ SwiftInt BridgedInstruction::BeginAccessInst_getAccessKind() const {
 
 bool BridgedInstruction::BeginAccessInst_isStatic() const {
   return getAs<swift::BeginAccessInst>()->getEnforcement() == swift::SILAccessEnforcement::Static;
+}
+
+bool BridgedInstruction::BeginAccessInst_isUnsafe() const {
+  return getAs<swift::BeginAccessInst>()->getEnforcement() == swift::SILAccessEnforcement::Unsafe;
 }
 
 bool BridgedInstruction::CopyAddrInst_isTakeOfSrc() const {
@@ -1362,11 +1427,11 @@ BridgedNullableVarDecl BridgedInstruction::AllocBox_getDecl() const {
 }
 
 BridgedNullableVarDecl BridgedInstruction::GlobalAddr_getDecl() const {
-  return {getAs<swift::DebugValueInst>()->getDecl()};
+  return {getAs<swift::GlobalAddrInst>()->getReferencedGlobal()->getDecl()};
 }
 
 BridgedNullableVarDecl BridgedInstruction::RefElementAddr_getDecl() const {
-  return {getAs<swift::DebugValueInst>()->getDecl()};
+  return {getAs<swift::RefElementAddrInst>()->getField()};
 }
 
 OptionalBridgedSILDebugVariable

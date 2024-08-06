@@ -554,6 +554,9 @@ public:
   /// Return the effective triple used by clang.
   llvm::Triple getEffectiveClangTriple();
 
+  /// Return the effective variant triple used by clang.
+  llvm::Triple getEffectiveClangVariantTriple();
+
   const llvm::StringRef getClangDataLayoutString();
 };
 
@@ -658,6 +661,7 @@ public:
   llvm::Module &Module;
   const llvm::DataLayout DataLayout;
   const llvm::Triple Triple;
+  const llvm::Triple VariantTriple;
   std::unique_ptr<llvm::TargetMachine> TargetMachine;
   ModuleDecl *getSwiftModule() const;
   AvailabilityContext getAvailabilityContext() const;
@@ -1564,6 +1568,8 @@ public:
 
   void emitSourceFile(SourceFile &SF);
   void emitSynthesizedFileUnit(SynthesizedFileUnit &SFU);
+
+  void addLinkLibraries();
   void addLinkLibrary(const LinkLibrary &linkLib);
 
   /// Attempt to finalize the module.

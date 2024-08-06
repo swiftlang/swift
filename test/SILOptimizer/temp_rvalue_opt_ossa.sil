@@ -39,7 +39,7 @@ public enum FakeOptional<T> {
   case some(T)
 }
 
-@_moveOnly struct MOS {}
+struct MOS: ~Copyable {}
 
 sil [ossa] @getKlass : $@convention(thin) () -> @owned Klass
 sil [ossa] @getNonTrivialStruct : $@convention(thin) () -> @owned NonTrivialStruct
@@ -1741,17 +1741,15 @@ sil [ossa] @take_from_original_copy_addr__final_use_apply__move_only : $() -> ()
   return %tuple : $()
 }
 
-// This does not get optimized correctly because of the conservative treatment of load_borrow/end_borrow in MemBehavior
 // CHECK-LABEL: sil [ossa] @test_temprvoborrowboundary1 :
-// CHECK: copy_addr
-// TODO-CHECK-NOT:   alloc_stack
-// TODO-CHECK-NOT:   copy_addr
-// TODO-CHECK: [[ADDR:%.*]] = unchecked_take_enum_data_addr %0 : $*FakeOptional<NonTrivialStruct>, #FakeOptional.some!enumelt
-// TODO-CHECK: [[ELE:%.*]] = struct_element_addr [[ADDR]] : $*NonTrivialStruct, #NonTrivialStruct.val
-// TODO-CHECK: [[LD:%.*]] = load_borrow [[ELE]] : $*Klass
-// TODO-CHECK: end_borrow [[LD]] : $Klass
-// TODO-CHECK: destroy_addr [[ADDR]]
-// CHECK: } // end sil function 'test_temprvoborrowboundary1'
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     copy_addr
+// CHECK:         [[ADDR:%.*]] = unchecked_take_enum_data_addr %0 : $*FakeOptional<NonTrivialStruct>, #FakeOptional.some!enumelt
+// CHECK:         [[ELE:%.*]] = struct_element_addr [[ADDR]] : $*NonTrivialStruct, #NonTrivialStruct.val
+// CHECK:         [[LD:%.*]] = load_borrow [[ELE]] : $*Klass
+// CHECK:         end_borrow [[LD]] : $Klass
+// CHECK:         destroy_addr [[ADDR]]
+// CHECK:       } // end sil function 'test_temprvoborrowboundary1'
 sil [ossa] @test_temprvoborrowboundary1 : $@convention(thin) (@in FakeOptional<NonTrivialStruct>) -> () {
 bb0(%0 : $*FakeOptional<NonTrivialStruct>):
   %1 = alloc_stack $NonTrivialStruct

@@ -1638,11 +1638,13 @@ private:
 /// ```
 class InaccessibleMemberFailure final : public FailureDiagnostic {
   ValueDecl *Member;
+  bool IsMissingImport;
 
 public:
   InaccessibleMemberFailure(const Solution &solution, ValueDecl *member,
-                            ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator), Member(member) {}
+                            ConstraintLocator *locator, bool isMissingImport)
+      : FailureDiagnostic(solution, locator), Member(member),
+        IsMissingImport(isMissingImport) {}
 
   bool diagnoseAsError() override;
 };
@@ -2621,6 +2623,20 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose a placeholder type in an invalid place, e.g:
+///
+/// \code
+/// y as? _
+/// \endcode
+class InvalidPlaceholderFailure final : public FailureDiagnostic {
+public:
+  InvalidPlaceholderFailure(const Solution &solution,
+                            ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose situations where there is no context to determine the type of a
 /// placeholder, e.g.,
 ///
@@ -3111,12 +3127,25 @@ public:
 /// \endcode
 class ConcreteTypeSpecialization final : public FailureDiagnostic {
   Type ConcreteType;
+  ValueDecl *Decl;
 
 public:
   ConcreteTypeSpecialization(const Solution &solution, Type concreteTy,
-                             ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator),
-        ConcreteType(resolveType(concreteTy)) {}
+                             ValueDecl *decl, ConstraintLocator *locator,
+                             FixBehavior fixBehavior)
+      : FailureDiagnostic(solution, locator, fixBehavior),
+        ConcreteType(resolveType(concreteTy)), Decl(decl) {}
+
+  bool diagnoseAsError() override;
+};
+
+class GenericFunctionSpecialization final : public FailureDiagnostic {
+  ValueDecl *Decl;
+
+public:
+  GenericFunctionSpecialization(const Solution &solution, ValueDecl *decl,
+                                ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), Decl(decl) {}
 
   bool diagnoseAsError() override;
 };

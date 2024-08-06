@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/SILOptions.h"
+#include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Frontend/Frontend.h"
 
 #include "ArgsToFrontendOptionsConverter.h"
@@ -459,6 +460,7 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     Args.hasArg(OPT_debug_emit_invalid_swiftinterface_syntax);
   Opts.PrintMissingImports =
     !Args.hasArg(OPT_disable_print_missing_imports_in_module_interface);
+  Opts.DisablePackageNameForNonPackageInterface |= Args.hasArg(OPT_disable_print_package_name_for_non_package_interface);
 
   if (const Arg *A = Args.getLastArg(OPT_library_level)) {
     StringRef contents = A->getValue();
@@ -474,6 +476,10 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
 /// Checks if an arg is generally allowed to be included
 /// in a module interface
 static bool ShouldIncludeModuleInterfaceArg(const Arg *A) {
+  if (!A->getOption().hasFlag(options::ModuleInterfaceOption) &&
+      !A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorable))
+    return false;
+
   if (!A->getOption().matches(options::OPT_enable_experimental_feature))
     return true;
 
@@ -484,6 +490,16 @@ static bool ShouldIncludeModuleInterfaceArg(const Arg *A) {
   return true;
 }
 
+static bool IsPackageInterfaceFlag(const Arg *A, ArgList &Args) {
+  return A->getOption().matches(options::OPT_package_name) &&
+         Args.hasArg(
+             options::OPT_disable_print_package_name_for_non_package_interface);
+}
+
+static bool IsPrivateInterfaceFlag(const Arg *A, ArgList &Args) {
+  return A->getOption().matches(options::OPT_project_name);
+}
+
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
 /// in a mode that is going to emit a .swiftinterface file.
 static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
@@ -491,39 +507,52 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
                                     ArgList &Args, DiagnosticEngine &Diags) {
   if (!FOpts.InputsAndOutputs.hasModuleInterfaceOutputPath())
     return;
-  ArgStringList RenderedArgs;
-  ArgStringList RenderedArgsIgnorable;
-  ArgStringList RenderedArgsIgnorablePrivate;
+
+  struct RenderedInterfaceArgs {
+    ArgStringList Standard = {};
+    ArgStringList Ignorable = {};
+  };
+
+  RenderedInterfaceArgs PublicArgs{};
+  RenderedInterfaceArgs PrivateArgs{};
+  RenderedInterfaceArgs PackageArgs{};
+
+  auto interfaceArgListForArg = [&](Arg *A) -> ArgStringList & {
+    bool ignorable =
+        A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorable);
+    if (IsPackageInterfaceFlag(A, Args))
+      return ignorable ? PackageArgs.Ignorable : PackageArgs.Standard;
+
+    if (IsPrivateInterfaceFlag(A, Args))
+      return ignorable ? PrivateArgs.Ignorable : PrivateArgs.Standard;
+
+    return ignorable ? PublicArgs.Ignorable : PublicArgs.Standard;
+  };
+
   for (auto A : Args) {
     if (!ShouldIncludeModuleInterfaceArg(A))
       continue;
 
-    if (A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorablePrivate)) {
-      A->render(Args, RenderedArgsIgnorablePrivate);
-    } else if (A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorable)) {
-      A->render(Args, RenderedArgsIgnorable);
-    } else if (A->getOption().hasFlag(options::ModuleInterfaceOption)) {
-      A->render(Args, RenderedArgs);
-    }
+    ArgStringList &ArgList = interfaceArgListForArg(A);
+    A->render(Args, ArgList);
   }
-  {
-    llvm::raw_string_ostream OS(Opts.Flags);
-    interleave(RenderedArgs,
-               [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
-               [&] { OS << " "; });
-  }
-  {
-    llvm::raw_string_ostream OS(Opts.IgnorablePrivateFlags);
-    interleave(RenderedArgsIgnorablePrivate,
-               [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
-               [&] { OS << " "; });
-  }
-  {
-    llvm::raw_string_ostream OS(Opts.IgnorableFlags);
-    interleave(RenderedArgsIgnorable,
-               [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
-               [&] { OS << " "; });
-  }
+
+  auto updateInterfaceOpts = [](ModuleInterfaceOptions::InterfaceFlags &Flags,
+                                RenderedInterfaceArgs &RenderedArgs) {
+    auto printFlags = [](std::string &str, ArgStringList argList) {
+      llvm::raw_string_ostream OS(str);
+      interleave(
+          argList,
+          [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
+          [&] { OS << " "; });
+    };
+    printFlags(Flags.Flags, RenderedArgs.Standard);
+    printFlags(Flags.IgnorableFlags, RenderedArgs.Ignorable);
+  };
+
+  updateInterfaceOpts(Opts.PublicFlags, PublicArgs);
+  updateInterfaceOpts(Opts.PrivateFlags, PrivateArgs);
+  updateInterfaceOpts(Opts.PackageFlags, PackageArgs);
 }
 
 enum class CxxCompatMode {
@@ -756,10 +785,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // Either the env var and the flag has to be set to enable package interface load
   Opts.EnablePackageInterfaceLoad = Args.hasArg(OPT_experimental_package_interface_load) ||
                                     ::getenv("SWIFT_ENABLE_PACKAGE_INTERFACE_LOAD");
-
-  Opts.EnableBypassResilienceInPackage =
-      Args.hasArg(OPT_experimental_package_bypass_resilience) ||
-      Opts.hasFeature(Feature::ClientBypassResilientAccessInPackage);
 
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
@@ -1139,6 +1164,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.WarnImplicitOverrides =
     Args.hasArg(OPT_warn_implicit_overrides);
 
+  Opts.WarnSoftDeprecated = Args.hasArg(OPT_warn_soft_deprecated);
+
   Opts.EnableNSKeyedArchiverDiagnostics =
       Args.hasFlag(OPT_enable_nskeyedarchiver_diagnostics,
                    OPT_disable_nskeyedarchiver_diagnostics,
@@ -1210,13 +1237,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.AllowNonResilientAccess =
       Args.hasArg(OPT_experimental_allow_non_resilient_access) ||
+      Args.hasArg(OPT_allow_non_resilient_access) ||
       Opts.hasFeature(Feature::AllowNonResilientAccessInPackage);
   if (Opts.AllowNonResilientAccess) {
     // Override the option to skip non-exportable decls.
     if (Opts.SkipNonExportableDecls) {
       Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
                      "-experimental-skip-non-exportable-decls",
-                     "-experimental-allow-non-resilient-access");
+                     "-allow-non-resilient-access");
       Opts.SkipNonExportableDecls = false;
     }
     // If built from interface, non-resilient access should not be allowed.
@@ -1225,7 +1253,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
             FrontendOpts.RequestedAction)) {
       Diags.diagnose(
           SourceLoc(), diag::warn_ignore_option_overriden_by,
-          "-experimental-allow-non-resilient-access",
+          "-allow-non-resilient-access",
           "-compile-module-from-interface or -typecheck-module-from-interface");
       Opts.AllowNonResilientAccess = false;
     }
@@ -1444,6 +1472,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableSubstSILFunctionTypes =
       Args.hasArg(OPT_disable_subst_sil_function_types);
 
+  Opts.AnalyzeRequestEvaluator = Args.hasArg(
+      OPT_analyze_request_evaluator);
+
   Opts.DumpRequirementMachine = Args.hasArg(
       OPT_dump_requirement_machine);
   Opts.AnalyzeRequirementMachine = Args.hasArg(
@@ -1544,7 +1575,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       HadError = true;
     }
 
-    if (!FrontendOpts.InputsAndOutputs.isWholeModule()) {
+    if (!FrontendOpts.InputsAndOutputs.isWholeModule() && FrontendOptions::doesActionGenerateSIL(FrontendOpts.RequestedAction)) {
       Diags.diagnose(SourceLoc(), diag::wmo_with_embedded);
       HadError = true;
     }
@@ -1574,10 +1605,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DisableDynamicActorIsolation |=
       Args.hasArg(OPT_disable_dynamic_actor_isolation);
-
-  // @DebugDescription uses @_section and @_used attributes.
-  if (Opts.hasFeature(Feature::DebugDescriptionMacro))
-    Opts.enableFeature(Feature::SymbolLinkageMarkers);
 
 #if SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION
   /// Enable round trip parsing via the new swift parser unless it is disabled
@@ -1639,7 +1666,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
     if (LangOpts.AllowNonResilientAccess)
       Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
                      "-experimental-skip-non-inlinable-function-bodies-without-types",
-                     "-experimental-allow-non-resilient-access");
+                     "-allow-non-resilient-access");
     else
       Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinableWithoutTypes;
   }
@@ -1650,7 +1677,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
     if (LangOpts.AllowNonResilientAccess)
       Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
                      "-experimental-skip-non-inlinable-function-bodies",
-                     "-experimental-allow-non-resilient-access");
+                     "-allow-non-resilient-access");
     else
       Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinable;
   }
@@ -1659,7 +1686,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
     if (LangOpts.AllowNonResilientAccess)
       Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
                      "-tbd-is-installapi",
-                     "-experimental-allow-non-resilient-access");
+                     "-allow-non-resilient-access");
     else
       Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinable;
   }
@@ -1668,7 +1695,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
     if (LangOpts.AllowNonResilientAccess)
       Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
                      "-experimental-skip-all-function-bodies",
-                     "-experimental-allow-non-resilient-access");
+                     "-allow-non-resilient-access");
     else
       Opts.SkipFunctionBodies = FunctionBodySkipping::All;
   }
@@ -1742,7 +1769,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
       Opts.EnableLazyTypecheck) {
     Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
                    "-experimental-lazy-typecheck",
-                   "-experimental-allow-non-resilient-access");
+                   "-allow-non-resilient-access");
     Opts.EnableLazyTypecheck = false;
   }
 
@@ -1978,6 +2005,7 @@ static bool validateSwiftModuleFileArgumentAndAdd(const std::string &swiftModule
 
 static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
                                 DiagnosticEngine &Diags,
+                                const CASOptions &CASOpts,
                                 StringRef workingDirectory) {
   using namespace options;
   namespace path = llvm::sys::path;
@@ -2081,6 +2109,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_visualc_tools_version))
     Opts.setVCToolsVersion(A->getValue());
 
+  if (const Arg *A = Args.getLastArg(OPT_sysroot))
+    Opts.setSysRoot(A->getValue());
+
   if (const Arg *A = Args.getLastArg(OPT_resource_dir))
     Opts.RuntimeResourcePath = A->getValue();
 
@@ -2118,8 +2149,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     Opts.ScannerPrefixMapper.push_back(Opt.str());
   }
 
-  Opts.NoScannerModuleValidation |=
-      Args.hasArg(OPT_no_scanner_module_validation);
+  // rdar://132340493 disable scanner-side validation for non-caching builds
+  Opts.ScannerModuleValidation |= Args.hasFlag(OPT_scanner_module_validation,
+                                               OPT_no_scanner_module_validation,
+                                               CASOpts.EnableCaching);
 
   std::optional<std::string> forceModuleLoadingMode;
   if (auto *A = Args.getLastArg(OPT_module_load_mode))
@@ -2197,8 +2230,12 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_color_diagnostics,
                    OPT_no_color_diagnostics,
                    /*Default=*/llvm::sys::Process::StandardErrHasColors());
-  // If no style options are specified, default to Swift style.
-  Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::Swift;
+  // If no style options are specified, default to Swift style, unless it is
+  // under swift caching, which llvm style is preferred because LLVM style
+  // replays a lot faster.
+  Opts.PrintedFormattingStyle = Args.hasArg(OPT_cache_compile_job)
+                                    ? DiagnosticOptions::FormattingStyle::LLVM
+                                    : DiagnosticOptions::FormattingStyle::Swift;
   if (const Arg *arg = Args.getLastArg(OPT_diagnostic_style)) {
     StringRef contents = arg->getValue();
     if (contents == "llvm") {
@@ -2211,9 +2248,6 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       return true;
     }
   }
-  // Swift style is not fully supported in cached mode yet.
-  if (Args.hasArg(OPT_cache_compile_job))
-    Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::LLVM;
 
   for (const Arg *arg: Args.filtered(OPT_emit_macro_expansion_files)) {
     StringRef contents = arg->getValue();
@@ -2568,18 +2602,19 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);
   if (Args.hasArg(OPT_CrossModuleOptimization)) {
     Opts.CMOMode = CrossModuleOptimizationMode::Aggressive;
-  } else if (Args.hasArg(OPT_EnbaleDefaultCMO)) {
-    Opts.CMOMode = CrossModuleOptimizationMode::Default;  
-  } else if (Args.hasArg(OPT_EnbaleCMOEverything)) {
+  } else if (Args.hasArg(OPT_EnableDefaultCMO)) {
+    Opts.CMOMode = CrossModuleOptimizationMode::Default;
+  } else if (Args.hasArg(OPT_EnableCMOEverything)) {
     Opts.CMOMode = CrossModuleOptimizationMode::Everything;
   }
 
   if (Args.hasArg(OPT_ExperimentalPackageCMO) ||
+      Args.hasArg(OPT_PackageCMO) ||
       LangOpts.hasFeature(Feature::PackageCMO)) {
     if (!LangOpts.AllowNonResilientAccess) {
       Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
-                     "-experimental-package-cmo",
-                     "-experimental-allow-non-resilient-access");
+                     "-package-cmo",
+                     "-allow-non-resilient-access");
     } else {
       Opts.EnableSerializePackage = true;
       Opts.CMOMode = CrossModuleOptimizationMode::Default;
@@ -3524,7 +3559,7 @@ bool CompilerInvocation::parseArgs(
   ParseSymbolGraphArgs(SymbolGraphOpts, ParsedArgs, Diags, LangOpts);
 
   if (ParseSearchPathArgs(SearchPathOpts, ParsedArgs, Diags,
-                          workingDirectory)) {
+                          CASOpts, workingDirectory)) {
     return true;
   }
 

@@ -102,7 +102,10 @@ func test_closure_capture(a : A) async {
   print(ns3)
 
   // this should consume ns0
-  await a.run_closure(captures0) // expected-tns-warning {{sending value of non-Sendable type '() -> ()' with later accesses from nonisolated context to actor-isolated context risks causing data races}}
+  await a.run_closure(captures0)
+  // expected-tns-warning @-1 {{sending 'captures0' risks causing data races}}
+  // expected-tns-note @-2 {{sending 'captures0' to actor-isolated instance method 'run_closure' risks causing data races between actor-isolated and local nonisolated uses}}
+
   // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into actor-isolated context may introduce data races}}
   // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
@@ -112,7 +115,9 @@ func test_closure_capture(a : A) async {
   print(ns3)
 
   // this should consume ns1 and ns2
-  await a.run_closure(captures12) // expected-tns-warning {{sending value of non-Sendable type '() -> ()' with later accesses from nonisolated context to actor-isolated context risks causing data races}}
+  await a.run_closure(captures12)
+  // expected-tns-warning @-1 {{sending 'captures12' risks causing data races}}
+  // expected-tns-note @-2 {{sending 'captures12' to actor-isolated instance method 'run_closure' risks causing data races between actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into actor-isolated context may introduce data races}}
   // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
@@ -123,7 +128,9 @@ func test_closure_capture(a : A) async {
   print(ns3)
 
   // this should consume ns3
-  await a.run_closure(captures3indirect) // expected-tns-warning {{sending value of non-Sendable type '() -> ()' with later accesses from nonisolated context to actor-isolated context risks causing data races}}
+  await a.run_closure(captures3indirect)
+  // expected-tns-warning @-1 {{sending 'captures3indirect' risks causing data races}}
+  // expected-tns-note @-2 {{sending 'captures3indirect' to actor-isolated instance method 'run_closure' risks causing data races between actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into actor-isolated context may introduce data races}}
   // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
@@ -660,8 +667,8 @@ func test_tuple_formation(a : A, i : Int) async {
     foo_noniso(ns012);
     foo_noniso(ns13);
   case 4:
-    await a.foo(ns012) // expected-tns-warning {{sending value of non-Sendable type '(NonSendable, NonSendable, NonSendable)' with later accesses from nonisolated context to actor-isolated context risks causing data races}}
-    // TODO: Interestingly with complete, we emit this error 3 times?!
+    await a.foo(ns012) // expected-tns-warning {{sending value of non-Sendable type '(NonSendable, NonSendable, NonSendable)' risks causing data races}}
+    // expected-tns-note @-1 {{sending value of non-Sendable type '(NonSendable, NonSendable, NonSendable)' to actor-isolated instance method 'foo' risks causing data races between actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 3{{passing argument of non-sendable type '(NonSendable, NonSendable, NonSendable)' into actor-isolated context may introduce data races}}
 
     if bool {
@@ -680,7 +687,8 @@ func test_tuple_formation(a : A, i : Int) async {
       foo_noniso(ns13); // expected-tns-note {{access can happen concurrently}}
     }
   default:
-    await a.foo(ns13) // expected-tns-warning {{sending value of non-Sendable type '(NonSendable, NonSendable)' with later accesses from nonisolated context to actor-isolated context risks causing data races}}
+      await a.foo(ns13) // expected-tns-warning {{sending value of non-Sendable type '(NonSendable, NonSendable)' risks causing data races}}
+      // expected-tns-note @-1 {{sending value of non-Sendable type '(NonSendable, NonSendable)' to actor-isolated instance method 'foo' risks causing data races between actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-1 2{{passing argument of non-sendable type '(NonSendable, NonSendable)' into actor-isolated context may introduce data races}}
 
     if bool {
@@ -816,9 +824,10 @@ func one_consume_many_require_varag(a : A) async {
   let ns3 = NonSendable();
   let ns4 = NonSendable();
 
-  //TODO: find a way to make the type used in the diagnostic more specific than the signature type
+  // TODO: find a way to make the type used in the diagnostic more specific than the signature type
   await a.foo_vararg(ns0, ns1, ns2);
-  // expected-tns-warning @-1 {{sending value of non-Sendable type 'Any...' with later accesses from nonisolated context to actor-isolated context risks causing data races}}
+  // expected-tns-warning @-1 {{sending value of non-Sendable type 'Any...' risks causing data races}}
+  // expected-tns-note @-2 {{sending value of non-Sendable type 'Any...' to actor-isolated instance method 'foo_vararg' risks causing data races between actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
 
   if bool {
@@ -836,7 +845,8 @@ func one_consume_one_require_vararg(a : A) async {
   let ns2 = NonSendable();
 
   await a.foo_vararg(ns0, ns1, ns2);
-  // expected-tns-warning @-1 {{sending value of non-Sendable type 'Any...' with later accesses from nonisolated context to actor-isolated context risks causing data races}}
+  // expected-tns-warning @-1 {{sending value of non-Sendable type 'Any...' risks causing data races}}
+  // expected-tns-note @-2 {{sending value of non-Sendable type 'Any...' to actor-isolated instance method 'foo_vararg' risks causing data races between actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
 
   foo_noniso_vararg(ns0, ns1, ns2); // expected-tns-note 1{{access can happen concurrently}}
@@ -851,13 +861,16 @@ func many_consume_one_require_vararg(a : A) async {
   let ns5 = NonSendable();
 
   await a.foo_vararg(ns0, ns3, ns3)
-  // expected-tns-warning @-1 {{sending value of non-Sendable type 'Any...' with later accesses from nonisolated context to actor-isolated context risks causing data races}}
+  // expected-tns-warning @-1 {{sending value of non-Sendable type 'Any...' risks causing data races}}
+  // expected-tns-note @-2 {{sending value of non-Sendable type 'Any...' to actor-isolated instance method 'foo_vararg' risks causing data races between actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
   await a.foo_vararg(ns4, ns1, ns4)
-  // expected-tns-warning @-1 {{sending value of non-Sendable type 'Any...' with later accesses from nonisolated context to actor-isolated context risks causing data races}}
+  // expected-tns-warning @-1 {{sending value of non-Sendable type 'Any...' risks causing data races}}
+  // expected-tns-note @-2 {{sending value of non-Sendable type 'Any...' to actor-isolated instance method 'foo_vararg' risks causing data races between actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
   await a.foo_vararg(ns5, ns5, ns2)
-  // expected-tns-warning @-1 {{sending value of non-Sendable type 'Any...' with later accesses from nonisolated context to actor-isolated context risks causing data races}}
+  // expected-tns-warning @-1 {{sending value of non-Sendable type 'Any...' risks causing data races}}
+  // expected-tns-note @-2 {{sending value of non-Sendable type 'Any...' to actor-isolated instance method 'foo_vararg' risks causing data races between actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
 
   foo_noniso_vararg(ns0, ns1, ns2); // expected-tns-note 3{{access can happen concurrently}}
@@ -874,13 +887,16 @@ func many_consume_many_require_vararg(a : A) async {
   let ns7 = NonSendable();
 
   await a.foo_vararg(ns0, ns3, ns3)
-  // expected-tns-warning @-1 {{sending value of non-Sendable type 'Any...' with later accesses from nonisolated context to actor-isolated context risks causing data races}}
+  // expected-tns-warning @-1 {{sending value of non-Sendable type 'Any...' risks causing data races}}
+  // expected-tns-note @-2 {{sending value of non-Sendable type 'Any...' to actor-isolated instance method 'foo_vararg' risks causing data races between actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
   await a.foo_vararg(ns4, ns1, ns4)
-  // expected-tns-warning @-1 {{sending value of non-Sendable type 'Any...' with later accesses from nonisolated context to actor-isolated context risks causing data races}}
+  // expected-tns-warning @-1 {{sending value of non-Sendable type 'Any...' risks causing data races}}
+  // expected-tns-note @-2 {{sending value of non-Sendable type 'Any...' to actor-isolated instance method 'foo_vararg' risks causing data races between actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
   await a.foo_vararg(ns5, ns5, ns2)
-  // expected-tns-warning @-1 {{sending value of non-Sendable type 'Any...' with later accesses from nonisolated context to actor-isolated context risks causing data races}}
+  // expected-tns-warning @-1 {{sending value of non-Sendable type 'Any...' risks causing data races}}
+  // expected-tns-note @-2 {{sending value of non-Sendable type 'Any...' to actor-isolated instance method 'foo_vararg' risks causing data races between actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
 
   if bool {
@@ -918,7 +934,8 @@ func enum_test(a : A) async {
     case .E2:
       switch (e3) {
       case let .E3(ns3):
-        await a.foo(ns3.x); // expected-tns-warning {{sending value of non-Sendable type 'Any' with later accesses from nonisolated context to actor-isolated context risks causing data races}}
+        await a.foo(ns3.x) // expected-tns-warning {{sending value of non-Sendable type 'Any' risks causing data races}}
+        // expected-tns-note @-1 {{sending value of non-Sendable type 'Any' to actor-isolated instance method 'foo' risks causing data races between actor-isolated and local nonisolated uses}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'Any' into actor-isolated context may introduce data races}}
       default: ()
       }

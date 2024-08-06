@@ -226,6 +226,25 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
       // involving them.
     }
 
+    /// Any nominal type that has an inverse requirement in its generic
+    /// signature uses NoncopyableGenerics. Since inverses are mangled into
+    /// symbols, a Swift 6.0+ runtime is generally needed to demangle them.
+    ///
+    /// We make an exception for types in the stdlib, like Optional, since the
+    /// runtime should still be able to demangle them, based on the availability
+    /// of the type.
+    if (auto nominalTy = dyn_cast<NominalOrBoundGenericNominalType>(t)) {
+      auto *nom = nominalTy->getDecl();
+      if (auto sig = nom->getGenericSignature()) {
+        SmallVector<InverseRequirement, 2> inverses;
+        SmallVector<Requirement, 2> reqs;
+        sig->getRequirementsWithInverses(reqs, inverses);
+        if (!inverses.empty() && !nom->getModuleContext()->isStdlibModule()) {
+          return addRequirement(Swift_6_0);
+        }
+      }
+    }
+
     return false;
   });
 
@@ -418,21 +437,31 @@ getTypeRefImpl(IRGenModule &IGM,
 
     bool isAlwaysNoncopyable = false;
     if (contextualTy->isNoncopyable()) {
+      isAlwaysNoncopyable = true;
+
       // If the contextual type has any archetypes in it, it's plausible that
-      // we could end up with a copyable type in some instances. Look for those.
+      // we could end up with a copyable type in some instances. Look for those
+      // so we can permit unsafe reflection of the field, by assuming it could
+      // be Copyable.
       if (contextualTy->hasArchetype()) {
         // If this is a nominal type, check whether it can ever be copyable.
         if (auto nominal = contextualTy->getAnyNominal()) {
-          if (!nominal->canBeCopyable())
-            isAlwaysNoncopyable = true;
+          // If it's a nominal that can ever be Copyable _and_ it's defined in
+          // the stdlib, assume that we could end up with a Copyable type.
+          if (nominal->canBeCopyable()
+              && nominal->getModuleContext()->isStdlibModule())
+            isAlwaysNoncopyable = false;
         } else {
-          // Assume that we could end up with a copyable type somehow.
+          // Assume that we could end up with a Copyable type somehow.
+          // This allows you to reflect a 'T: ~Copyable' stored in a type.
+          isAlwaysNoncopyable = false;
         }
-      } else {
-        isAlwaysNoncopyable = true;
       }
     }
 
+    // The getTypeRefByFunction strategy will emit a forward-compatible runtime
+    // check to see if the runtime can safely reflect such fields. Otherwise,
+    // the field will be artificially hidden to reflectors.
     if (isAlwaysNoncopyable) {
       IGM.IRGen.noteUseOfTypeMetadata(type);
       return getTypeRefByFunction(IGM, sig, type);

@@ -37,7 +37,7 @@ sil @getC : $@convention(thin) () -> @owned C
 // LinearLiveness
 // =============================================================================
 
-// CHECK-LABEL: testLinearRefElementEscape: linear-liveness with: %borrow
+// CHECK-LABEL: testLinearRefElementEscape: linear_liveness with: %borrow
 // CHECK-LABEL: Linear liveness:
 // CHECK: lifetime-ending user:
 // CHECK-SAME: end_borrow
@@ -56,7 +56,7 @@ sil @getC : $@convention(thin) () -> @owned C
 sil [ossa] @testLinearRefElementEscape : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   %borrow = begin_borrow %0 : $C
-  specify_test "linear-liveness %borrow"
+  specify_test "linear_liveness %borrow"
   specify_test "linear_liveness_swift %borrow"
   cond_br undef, bb1, bb2
 
@@ -78,7 +78,7 @@ bb3(%phi : @guaranteed $D):
   return %99 : $()
 }
 
-// CHECK-LABEL: testLinearBitwiseEscape: linear-liveness with: %borrow
+// CHECK-LABEL: testLinearBitwiseEscape: linear_liveness with: %borrow
 // CHECK: Linear liveness:
 // CHECK: lifetime-ending user:
 // CHECK-SAME: end_borrow
@@ -97,7 +97,7 @@ bb3(%phi : @guaranteed $D):
 sil [ossa] @testLinearBitwiseEscape : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   %borrow = begin_borrow %0 : $C
-  specify_test "linear-liveness %borrow"
+  specify_test "linear_liveness %borrow"
   specify_test "linear_liveness_swift %borrow"
   cond_br undef, bb1, bb2
 
@@ -115,7 +115,7 @@ bb3(%phi : @unowned $D):
   return %99 : $()
 }
 
-// CHECK-LABEL: testLinearInnerReborrow: linear-liveness with: @argument[0]
+// CHECK-LABEL: testLinearInnerReborrow: linear_liveness with: @argument[0]
 // CHECK: Linear liveness:
 // CHECK: lifetime-ending user:
 // CHECK-SAME: destroy_value %0
@@ -133,7 +133,7 @@ bb3(%phi : @unowned $D):
 // CHECK-NEXT: testLinearInnerReborrow
 sil [ossa] @testLinearInnerReborrow : $@convention(thin) (@owned C) -> () {
 bb0(%0 : @owned $C):
-  specify_test "linear-liveness @argument[0]"
+  specify_test "linear_liveness @argument[0]"
   specify_test "linear_liveness_swift @argument[0]"
   cond_br undef, bb1, bb2
 
@@ -152,7 +152,7 @@ bb3(%phi : @guaranteed $C):
   return %99 : $()
 }
 
-// CHECK-LABEL: testLinearAdjacentReborrow: linear-liveness with: %borrow
+// CHECK-LABEL: testLinearAdjacentReborrow: linear_liveness with: %borrow
 // CHECK: lifetime-ending user:
 // CHECK-SAME: br bb3
 // CHECK-NEXT: lifetime-ending user: br bb3
@@ -172,7 +172,7 @@ bb3(%phi : @guaranteed $C):
 // CHECK-NEXT: testLinearAdjacentReborrow
 sil [ossa] @testLinearAdjacentReborrow : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  specify_test "linear-liveness %borrow"
+  specify_test "linear_liveness %borrow"
   specify_test "linear_liveness_swift %borrow"
   %borrow = begin_borrow %0 : $C
   cond_br undef, bb1, bb2
@@ -192,7 +192,7 @@ bb3(%outer : @guaranteed $C, %inner : @guaranteed $C):
   return %99 : $()
 }
 
-// CHECK-LABEL: begin running test {{.*}} on testLoopConditional_incomplete_linear: linear-liveness
+// CHECK-LABEL: begin running test {{.*}} on testLoopConditional_incomplete_linear: linear_liveness
 // CHECK-LABEL: sil [ossa] @testLoopConditional_incomplete_linear : {{.*}} {
 // CHECK:       [[ENTRY:bb[0-9]+]]([[C:%[^,]+]] :
 // CHECK:         cond_br undef, [[HEADER:bb[0-9]+]], [[EXIT:bb[0-9]+]]
@@ -211,7 +211,7 @@ bb3(%outer : @guaranteed $C, %inner : @guaranteed $C):
 // CHECK:       lifetime-ending user:   destroy_value [[C]]
 // CHECK:       last user:   destroy_value [[C]]
 // CHECK:       boundary edge: [[HEADER]]
-// CHECK-LABEL: end running test {{.*}} on testLoopConditional_incomplete_linear: linear-liveness
+// CHECK-LABEL: end running test {{.*}} on testLoopConditional_incomplete_linear: linear_liveness
 // CHECK-LABEL: begin running test {{.*}} on testLoopConditional_incomplete_linear: linear_liveness_swift
 // CHECK:       Linear liveness: [[C]]
 // CHECK:       Live blocks:
@@ -225,7 +225,7 @@ bb3(%outer : @guaranteed $C, %inner : @guaranteed $C):
 // CHECK-LABEL: end running test {{.*}} on testLoopConditional_incomplete_linear: linear_liveness_swift
 sil [ossa] @testLoopConditional_incomplete_linear : $@convention(thin) (@owned C) -> () {
 entry(%c : @owned $C):
-  specify_test "linear-liveness %c"
+  specify_test "linear_liveness %c"
   specify_test "linear_liveness_swift %c"
   cond_br undef, header, exit
 
@@ -243,7 +243,7 @@ exit:
   return %retval : $()
 }
 
-// CHECK-LABEL: begin running test {{.*}} on testLoopConditional_complete_linear: linear-liveness
+// CHECK-LABEL: begin running test {{.*}} on testLoopConditional_complete_linear: linear_liveness
 // CHECK-LABEL: sil [ossa] @testLoopConditional_complete_linear : {{.*}} {
 // CHECK:       [[ENTRY:bb[0-9]+]]([[C:%[^,]+]] :
 // CHECK:         cond_br undef, [[HEADER:bb[0-9]+]], [[EXIT:bb[0-9]+]]
@@ -265,7 +265,7 @@ exit:
 // CHECK:       lifetime-ending user:   destroy_value [[C]]
 // CHECK:       regular user:   extend_lifetime [[C]]
 // CHECK:       last user:   destroy_value [[C]]
-// CHECK-LABEL: end running test {{.*}} on testLoopConditional_complete_linear: linear-liveness
+// CHECK-LABEL: end running test {{.*}} on testLoopConditional_complete_linear: linear_liveness
 // CHECK-LABEL: begin running test {{.*}} on testLoopConditional_complete_linear: linear_liveness_swift
 // CHECK:       Linear liveness: [[C]]
 // CHECK:       Live blocks:
@@ -276,7 +276,7 @@ exit:
 // CHECK-LABEL: end running test {{.*}} on testLoopConditional_complete_linear: linear_liveness_swift
 sil [ossa] @testLoopConditional_complete_linear : $@convention(thin) (@owned C) -> () {
 entry(%c : @owned $C):
-  specify_test "linear-liveness %c"
+  specify_test "linear_liveness %c"
   specify_test "linear_liveness_swift %c"
   cond_br undef, header, exit
 
@@ -299,7 +299,7 @@ exit:
 // visitInnerAdjacentPhis
 // =============================================================================
 
-// CHECK-LABEL: pay_the_phi: visit-inner-adjacent-phis with: %owned
+// CHECK-LABEL: pay_the_phi: visit_inner_adjacent_phis with: %owned
 // CHECK: sil [ossa] @pay_the_phi : {{.*}} {
 // CHECK:   [[C:%[^,]+]] = apply
 // CHECK:   [[BORROW1:%[^,]+]] = begin_borrow %1
@@ -310,7 +310,7 @@ exit:
 //
 // CHECK:[[GUARANTEED1]] = argument of [[EXIT]]
 // CHECK:[[GUARANTEED2]] = argument of [[EXIT]]
-// CHECK-LABEL: pay_the_phi: visit-inner-adjacent-phis with: %owned
+// CHECK-LABEL: pay_the_phi: visit_inner_adjacent_phis with: %owned
 sil [ossa] @pay_the_phi : $@convention(thin) () -> () {
 entry:
   %getC = function_ref @getC : $@convention(thin) () -> @owned C
@@ -321,7 +321,7 @@ entry:
   br exit(%c : $C, %borrow1 : $C, %borrow2 : $C, %borrow3 : $C)
 
 exit(%owned : @owned $C, %guaranteed_1 : @guaranteed $C, %guaranteed_2 : @guaranteed $C, %guaranteed_3 : @guaranteed $C):
-  specify_test "visit-inner-adjacent-phis %owned"
+  specify_test "visit_inner_adjacent_phis %owned"
   end_borrow %guaranteed_3 : $C
   end_borrow %guaranteed_2 : $C
   end_borrow %guaranteed_1 : $C
@@ -330,11 +330,11 @@ exit(%owned : @owned $C, %guaranteed_1 : @guaranteed $C, %guaranteed_2 : @guaran
   return %retval : $()
 }
 
-// CHECK-LABEL: pay_the_phi_forward: visit-inner-adjacent-phis with: %reborrow
+// CHECK-LABEL: pay_the_phi_forward: visit_inner_adjacent_phis with: %reborrow
 // CHECK: bb1(%{{.*}} : @reborrow @guaranteed $C, [[INNER:%.*]] : @guaranteed $D):    // Preds: bb0
 // CHECK: } // end sil function 'pay_the_phi_forward'
 // CHECK: [[INNER]] = argument of bb1 : $D
-// CHECK: pay_the_phi_forward: visit-inner-adjacent-phis with: %reborrow
+// CHECK: pay_the_phi_forward: visit_inner_adjacent_phis with: %reborrow
 sil [ossa] @pay_the_phi_forward : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   %borrow0 = begin_borrow %0 : $C
@@ -342,7 +342,7 @@ bb0(%0 : @guaranteed $C):
   br exit(%borrow0 : $C, %d0 : $D)
 
 exit(%reborrow : @guaranteed $C, %phi : @guaranteed $D):
-  specify_test "visit-inner-adjacent-phis %reborrow"
+  specify_test "visit_inner_adjacent_phis %reborrow"
   %f = ref_element_addr %phi : $D, #D.object
   %o = load [copy] %f : $*C
   destroy_value %o : $C

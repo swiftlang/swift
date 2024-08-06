@@ -250,6 +250,16 @@ SILValue swift::stripValueProjections(SILValue V) {
   }
 }
 
+SILValue swift::lookThroughAddressAndValueProjections(SILValue V) {
+  while (true) {
+    V = stripSinglePredecessorArgs(V);
+    if (!Projection::isObjectProjection(V) &&
+        !Projection::isAddressProjection(V))
+      return V;
+    V = cast<SingleValueInstruction>(V)->getOperand(0);
+  }
+}
+
 SILValue swift::stripIndexingInsts(SILValue V) {
   while (true) {
     if (!isa<IndexingInst>(V))
@@ -718,8 +728,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::AllocVectorInst:
   case SILInstructionKind::ProjectBoxInst:
-    if (!cast<SingleValueInstruction>(inst)->getType().
-          isLoadable(*inst->getFunction())) {
+    if (cast<SingleValueInstruction>(inst)->getType().hasArchetype()) {
       impactType = cast<SingleValueInstruction>(inst)->getType();
       return RuntimeEffect::MetaData;
     }
@@ -1018,7 +1027,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     case BuiltinValueKind::AtomicLoad:
     case BuiltinValueKind::AtomicStore:
     case BuiltinValueKind::AtomicRMW:
-      return RuntimeEffect::Locking;
+      return RuntimeEffect::NoEffect;
     case BuiltinValueKind::DestroyArray:
       return RuntimeEffect::Releasing;
     case BuiltinValueKind::CopyArray:

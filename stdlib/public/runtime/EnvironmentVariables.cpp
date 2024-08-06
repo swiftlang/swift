@@ -161,8 +161,9 @@ void printHelp(const char *extra) {
 } // end anonymous namespace
 
 // Define backing variables.
-#define VARIABLE(name, type, defaultValue, help) \
-  type swift::runtime::environment::name ## _variable = defaultValue;
+#define VARIABLE(name, type, defaultValue, help)                               \
+  type swift::runtime::environment::name##_variable = defaultValue;            \
+  bool swift::runtime::environment::name##_isSet_variable = false;
 #include "EnvironmentVariables.def"
 
 // Initialization code.
@@ -194,6 +195,11 @@ void swift::runtime::environment::initialize(void *context) {
   // us to detect some spelling mistakes by warning on unknown SWIFT_ variables.
 
   bool SWIFT_DEBUG_HELP_variable = false;
+
+  // Placeholder variable, we never use the result but the macros want to write
+  // to it.
+  bool SWIFT_DEBUG_HELP_isSet_variable = false;
+  (void)SWIFT_DEBUG_HELP_isSet_variable; // Silence warnings about unused vars.
   for (char **var = ENVIRON; *var; var++) {
     // Immediately skip anything without a SWIFT_ prefix.
     if (strncmp(*var, "SWIFT_", 6) != 0)
@@ -204,12 +210,13 @@ void swift::runtime::environment::initialize(void *context) {
     // parsed by functions named parse_<type> above. An unknown type will
     // produce an error that parse_<unknown-type> doesn't exist. Add new parsers
     // above.
-#define VARIABLE(name, type, defaultValue, help)                       \
-    if (strncmp(*var, #name "=", strlen(#name "=")) == 0) {            \
-      name ## _variable =                                              \
-        parse_ ## type(#name, *var + strlen(#name "="), defaultValue); \
-      foundVariable = true;                                            \
-    }
+#define VARIABLE(name, type, defaultValue, help)                               \
+  if (strncmp(*var, #name "=", strlen(#name "=")) == 0) {                      \
+    name##_variable =                                                          \
+        parse_##type(#name, *var + strlen(#name "="), defaultValue);           \
+    name##_isSet_variable = true;                                              \
+    foundVariable = true;                                                      \
+  }
     // SWIFT_DEBUG_HELP is not in the variables list. Parse it like the other
     // variables.
     VARIABLE(SWIFT_DEBUG_HELP, bool, false, )
@@ -238,8 +245,13 @@ void swift::runtime::environment::initialize(void *context) {
 void swift::runtime::environment::initialize(void *context) {
   // Emit a getenv call for each variable. This is less efficient but works
   // everywhere.
-#define VARIABLE(name, type, defaultValue, help) \
-  name ## _variable = parse_ ## type(#name, getenv(#name), defaultValue);
+#define VARIABLE(name, type, defaultValue, help)                               \
+  do {                                                                         \
+    const char *name##_string = getenv(#name);                                 \
+    if (name##_string)                                                         \
+      name##_isSet_variable = true;                                            \
+    name##_variable = parse_##type(#name, name##_string, defaultValue);        \
+  } while (0);
 #include "EnvironmentVariables.def"
 
   // Print help if requested.

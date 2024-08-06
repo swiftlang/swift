@@ -236,7 +236,10 @@ class IUOTestSubclassOkay : IUOTestBaseClass {
   override func oneC(_ x: AnyObject) {}
 }
 
-class GenericBase<T> {}
+class GenericBase<T> { // expected-note{{generic type 'GenericBase' declared here}}
+  var values: Int { 0 } // expected-note{{attempt to override property here}}
+}
+
 class ConcreteDerived: GenericBase<Int> {}
 
 class OverriddenWithConcreteDerived<T> {
@@ -413,4 +416,18 @@ open class OpenDerivedFinal : OpenBase {
 
 open class OpenDerivedStatic : OpenBase {
   override public static func classMethod() {}
+}
+
+// When override matching an invalid decl, avoid emitting
+// another error saying it doesn't override anything.
+class OverrideTypoBaseClass {
+  func foo(_ x: Int) {}
+}
+class OverrideTypoSubclass: OverrideTypoBaseClass {
+  override func foo(_ x: Itn) {} // expected-error {{cannot find type 'Itn' in scope}}
+}
+
+// https://github.com/swiftlang/swift/issues/74651
+class InvalidSubclass: GenericBase { // expected-error {{reference to generic type 'GenericBase' requires arguments in <...>}}
+  var values: Float { 0 } // expected-error {{property 'values' with type 'Float' cannot override a property with type 'Int'}}
 }

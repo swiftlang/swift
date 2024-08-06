@@ -490,7 +490,6 @@ namespace {
     RecursiveProperties
     getNormalDifferentiableSILFunctionTypeRecursiveProperties(
         CanSILFunctionType type, AbstractionPattern origType) {
-      auto &M = TC.M;
       auto origTy = type->getWithoutDifferentiability();
       // Pass the original type of abstraction pattern to
       // `SILFunctionType:getAutoDiffDerivativeFunctionType` to get the
@@ -501,13 +500,13 @@ namespace {
           type->getDifferentiabilityParameterIndices(),
           type->getDifferentiabilityResultIndices(),
           AutoDiffDerivativeFunctionKind::JVP, TC,
-          LookUpConformanceInModule(&M), CanGenericSignature(),
+          LookUpConformanceInModule(), CanGenericSignature(),
           false, origTypeOfAbstraction);
       auto vjpTy = origTy->getAutoDiffDerivativeFunctionType(
           type->getDifferentiabilityParameterIndices(),
           type->getDifferentiabilityResultIndices(),
           AutoDiffDerivativeFunctionKind::VJP, TC,
-          LookUpConformanceInModule(&M), CanGenericSignature(),
+          LookUpConformanceInModule(), CanGenericSignature(),
           false, origTypeOfAbstraction);
       RecursiveProperties props;
       props.addSubobject(classifyType(origType, origTy, TC, Expansion));
@@ -519,11 +518,10 @@ namespace {
     RecursiveProperties
     getLinearDifferentiableSILFunctionTypeRecursiveProperties(
         CanSILFunctionType type, AbstractionPattern origType) {
-      auto &M = TC.M;
       auto origTy = type->getWithoutDifferentiability();
       auto transposeTy = origTy->getAutoDiffTransposeFunctionType(
           type->getDifferentiabilityParameterIndices(), TC,
-          LookUpConformanceInModule(&M), origType.getGenericSignatureOrNull());
+          LookUpConformanceInModule(), origType.getGenericSignatureOrNull());
       RecursiveProperties props;
       props.addSubobject(classifyType(origType, origTy, TC, Expansion));
       props.addSubobject(classifyType(origType, transposeTy, TC, Expansion));
@@ -1063,6 +1061,15 @@ namespace {
 
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
+      if (B.getFunction().hasOwnership()
+          && B.getModule().getStage() == SILStage::Raw
+          && value->isFromVarDecl()) {
+        // Do not use destroy_value for trivial values. The lifetime introducer
+        // may be implicitly copied and used outside of its original scope,
+        // which violates the invariants of destroy_value.
+        B.createExtendLifetime(loc, value);
+        return;
+      }
       // Trivial
     }
   };
@@ -1560,7 +1567,7 @@ namespace {
                 AutoDiffDerivativeFunctionKind::VJP}) {
         auto derivativeFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
             paramIndices, resultIndices, kind, TC,
-            LookUpConformanceInModule(&TC.M));
+            LookUpConformanceInModule());
         auto silTy = SILType::getPrimitiveObjectType(derivativeFnTy);
         NormalDifferentiableFunctionTypeComponent extractee(kind);
         // Assert that we have the right extractee. A terrible bug in the past
@@ -1726,7 +1733,7 @@ namespace {
         TC.getTypeLowering(origFnTy, getExpansionContext())
       });
       auto transposeFnTy = origFnTy->getAutoDiffTransposeFunctionType(
-          paramIndices, TC, LookUpConformanceInModule(&TC.M));
+          paramIndices, TC, LookUpConformanceInModule());
       auto transposeSILFnTy = SILType::getPrimitiveObjectType(transposeFnTy);
       children.push_back(Child{
         LinearDifferentiableFunctionTypeComponent::Transpose,
@@ -2435,7 +2442,7 @@ namespace {
         return handleAddressOnly(structType, properties);
       }
 
-      auto subMap = structType->getContextSubstitutionMap(&TC.M, D);
+      auto subMap = structType->getContextSubstitutionMap();
 
       // Classify the type according to its stored properties.
       for (auto field : D->getStoredProperties()) {
@@ -2532,7 +2539,7 @@ namespace {
                                                  Expansion);
       }
 
-      auto subMap = enumType->getContextSubstitutionMap(&TC.M, D);
+      auto subMap = enumType->getContextSubstitutionMap();
 
       // Accumulate the properties of all direct payloads.
       for (auto elt : D->getAllElements()) {
@@ -2938,7 +2945,7 @@ bool TypeConverter::visitAggregateLeaves(
                            field, index);
       } else if (auto *decl = ty.getStructOrBoundGenericStruct()) {
         for (auto *structField : decl->getStoredProperties()) {
-          auto subMap = ty->getContextSubstitutionMap(&M, decl);
+          auto subMap = ty->getContextSubstitutionMap();
           auto substFieldTy =
               structField->getInterfaceType().subst(subMap)->getCanonicalType();
           auto sig =
@@ -2952,7 +2959,7 @@ bool TypeConverter::visitAggregateLeaves(
                              std::nullopt);
         }
       } else if (auto *decl = ty.getEnumOrBoundGenericEnum()) {
-        auto subMap = ty->getContextSubstitutionMap(&M, decl);
+        auto subMap = ty->getContextSubstitutionMap();
         for (auto *element : decl->getAllElements()) {
           if (!element->hasAssociatedValues())
             continue;
@@ -3912,7 +3919,7 @@ getAnyFunctionRefInterfaceType(TypeConverter &TC,
           .withSendable(funcType->isSendable())
           .withAsync(funcType->isAsync())
           .withIsolation(funcType->getIsolation())
-          .withLifetimeDependenceInfo(funcType->getLifetimeDependenceInfo())
+          .withLifetimeDependencies(funcType->getLifetimeDependencies())
           .withSendingResult(funcType->hasSendingResult())
           .build();
 
@@ -3993,7 +4000,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
         makeConstantInterfaceType(c.asAutoDiffOriginalFunction());
     auto *derivativeFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
         derivativeId->getParameterIndices(), derivativeId->getKind(),
-        LookUpConformanceInModule(&M),
+        LookUpConformanceInModule(),
         derivativeId->getDerivativeGenericSignature());
     return cast<AnyFunctionType>(derivativeFnTy->getCanonicalType());
   }
@@ -5028,7 +5035,7 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
 
   return cast<SILBoxType>(
     Type(boxType).subst(mapIntoContext,
-                        LookUpConformanceInModule(&M),
+                        LookUpConformanceInModule(),
                         SubstFlags::PreservePackExpansionLevel |
                         SubstFlags::AllowLoweredTypes)->getCanonicalType());
 }
@@ -5065,8 +5072,7 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
                                /*captures generics*/ false);
 
   // Instantiate the layout with enum's substitution list.
-  auto subMap = boundEnum->getContextSubstitutionMap(
-      &M, enumDecl, enumDecl->getGenericEnvironment());
+  auto subMap = boundEnum->getContextSubstitutionMap();
 
   auto boxTy = SILBoxType::get(C, layout, subMap);
   return boxTy;

@@ -18,7 +18,6 @@ from . import cmark
 from . import foundation
 from . import libcxx
 from . import libdispatch
-from . import libicu
 from . import llbuild
 from . import llvm
 from . import product
@@ -74,7 +73,6 @@ class IndexStoreDB(product.Product):
         return [cmark.CMark,
                 llvm.LLVM,
                 libcxx.LibCXX,
-                libicu.LibICU,
                 swift.Swift,
                 libdispatch.LibDispatch,
                 foundation.Foundation,
@@ -85,7 +83,7 @@ class IndexStoreDB(product.Product):
 
 
 def run_build_script_helper(action, host_target, product, args,
-                            sanitize_all=False, clean=True):
+                            sanitize_all=False, clean=False):
     script_path = os.path.join(
         product.source_dir, 'Utilities', 'build-script-helper.py')
 
@@ -115,8 +113,8 @@ def run_build_script_helper(action, host_target, product, args,
     elif args.enable_tsan:
         helper_cmd.extend(['--sanitize', 'thread'])
 
-    if not clean:
-        helper_cmd.append('--no-clean')
+    if clean:
+        helper_cmd.append('--clean')
 
     # Pass Cross compile host info unless we're testing.
     # It doesn't make sense to run tests of the cross compile host.

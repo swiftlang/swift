@@ -25,6 +25,7 @@ extension Foo {
 
 // CHECK-NOT:   Foo bar(swift::Int version)
 
+// CHECK: class SWIFT_SYMBOL("s:5Enums3FooO") Foo final {
 // CHECK:    switch (_getEnumTag()) {
 // CHECK-NEXT:      case 0: return cases::bar;
 // CHECK-NEXT:      default: abort();

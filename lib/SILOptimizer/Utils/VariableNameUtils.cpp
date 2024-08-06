@@ -627,7 +627,8 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
         isa<MoveOnlyWrapperToCopyableAddrInst>(searchValue) ||
         isa<MoveOnlyWrapperToCopyableValueInst>(searchValue) ||
         isa<CopyableToMoveOnlyWrapperValueInst>(searchValue) ||
-        isa<EndInitLetRefInst>(searchValue)) {
+        isa<EndInitLetRefInst>(searchValue) ||
+        isa<ConvertEscapeToNoEscapeInst>(searchValue)) {
       searchValue = cast<SingleValueInstruction>(searchValue)->getOperand(0);
       continue;
     }
@@ -638,7 +639,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
   }
 }
 
-static StringRef getNameFromDecl(Decl *d) {
+StringRef VariableNameInferrer::getNameFromDecl(Decl *d) {
   if (d) {
     if (auto accessor = dyn_cast<AccessorDecl>(d)) {
       return accessor->getStorage()->getBaseName().userFacingName();
@@ -800,7 +801,7 @@ namespace swift::test {
 // - The inferred name
 // - The inferred value.
 static FunctionTest VariableNameInferrerTests(
-    "variable-name-inference", [](auto &function, auto &arguments, auto &test) {
+    "variable_name_inference", [](auto &function, auto &arguments, auto &test) {
       auto value = arguments.takeValue();
       SmallString<64> finalString;
       VariableNameInferrer::Options options;

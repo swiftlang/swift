@@ -2664,7 +2664,8 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
   // post-dominating consuming use sets. This can happen if we have an enum that
   // is known dynamically none along a path. This is dynamically correct, but
   // can not be represented in OSSA so we insert these destroys along said path.
-  OSSALifetimeCompletion completion(TheMemory->getFunction(), domInfo);
+  OSSALifetimeCompletion completion(TheMemory->getFunction(), domInfo,
+                                    deadEndBlocks);
 
   while (!valuesNeedingLifetimeCompletion.empty()) {
     auto optV = valuesNeedingLifetimeCompletion.pop_back_val();

@@ -1021,6 +1021,8 @@ void LoopTreeOptimization::analyzeCurrentLoop(
         std::any_of(sideEffects.begin(), sideEffects.end(),
                     [&](SILInstruction *W) { return W->mayRelease(); });
     for (auto *FL : FixLifetimes) {
+      if (!FL->getOperand()->getType().isAddress())
+        continue;
       if (!sideEffectsMayRelease || !mayWriteTo(AA, sideEffects, FL)) {
         SinkDown.push_back(FL);
       }

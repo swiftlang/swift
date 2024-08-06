@@ -8,6 +8,7 @@
 sil_stage canonical
 
 import Builtin
+import Swift
 
 typealias AnyObject = Builtin.AnyObject
 
@@ -79,8 +80,8 @@ struct STXXITXXII {
   var i: I
 }
 
-@_moveOnly struct MoS {}
-@_moveOnly struct MoE {}
+struct MoS: ~Copyable {}
+struct MoE: ~Copyable {}
 
 sil @unknown : $@convention(thin) () -> ()
 sil @use_S : $@convention(thin) (@in_guaranteed S) -> ()
@@ -590,7 +591,7 @@ entry(%in_addr : $*X):
   return %retval : $X
 }
 
-// If a begin_apply uses the address, the end_appy and abort_apply should be
+// If a begin_apply uses the address, the end_apply and abort_apply should be
 // regarded as uses too.  Don't hoist over them.
 //
 // CHECK-LABEL: sil [ossa] @nohoist_over_end_apply_use : {{.*}} {

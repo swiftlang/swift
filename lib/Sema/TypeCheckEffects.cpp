@@ -1396,7 +1396,7 @@ public:
             isRethrowLikeTypedThrows(fnRef.getFunction())) {
           // If we are in a rethrowing context and the function we're referring
           // to is a rethrow-like function using typed throws or we are
-          // calling the next() or next(_:) of an async iterator,
+          // calling the next() or next(isolation:) of an async iterator,
           // then look at all of the closure arguments.
           LLVM_FALLTHROUGH;
         } else {
@@ -3721,8 +3721,15 @@ private:
            // callee is isolated to an actor.
            auto callee = call->getCalledValue(/*skipFunctionConversions=*/true);
            if (callee) {
-             Ctx.Diags.diagnose(diag.expr.getStartLoc(), diag::actor_isolated_sync_func,
+             auto calleeIsolation = getInferredActorIsolation(callee);
+             Ctx.Diags.diagnose(diag.expr.getStartLoc(),
+                                diag::actor_isolated_sync_func,
                                 callee);
+             if (calleeIsolation.source.isInferred()) {
+               callee->diagnose(diag::actor_isolation_source,
+                                calleeIsolation.isolation,
+                                calleeIsolation.source);
+             }
            } else {
              Ctx.Diags.diagnose(
                  diag.expr.getStartLoc(), diag::actor_isolated_sync_func_value,

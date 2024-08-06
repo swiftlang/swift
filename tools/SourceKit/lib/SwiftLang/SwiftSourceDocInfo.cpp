@@ -2099,7 +2099,7 @@ void SwiftLangSupport::getCursorInfo(
         } else {
           std::string Diagnostic; // Unused.
           ResolvedValueRefCursorInfoPtr Info = new ResolvedValueRefCursorInfo(
-              /*SourcFile=*/nullptr, SourceLoc(),
+              /*SourceFile=*/nullptr, SourceLoc(),
               const_cast<ValueDecl *>(Entity.Dcl),
               /*CtorTyRef=*/nullptr,
               /*ExtTyRef=*/nullptr, Entity.IsRef,
@@ -2537,6 +2537,8 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
     std::function<void(const RequestResult<RelatedIdentsResult> &)> Receiver;
     SwiftInvocationRef Invok;
 
+    bool requiresDeepStack() override { return true; }
+
 #if SWIFT_BUILD_SWIFT_SYNTAX
     // FIXME: Don't silently eat errors here.
     RelatedIdentsResult getRelatedIdents(SourceFile *SrcFile,
@@ -2585,7 +2587,7 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
 #ifndef NDEBUG
       for (auto loc : Locs.getLocations()) {
         assert(loc.OldName == OldName &&
-               "Found related identfiers with different names?");
+               "Found related identifiers with different names?");
       }
 #endif
 

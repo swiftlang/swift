@@ -441,6 +441,8 @@ public:
 
   /// The entry point to this function transformation.
   void run() override;
+
+  void verifyOwnership();
 };
 
 } // end anonymous namespace
@@ -450,6 +452,7 @@ void CopyPropagation::run() {
   auto *f = getFunction();
   auto *postOrderAnalysis = getAnalysis<PostOrderAnalysis>();
   auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
+  auto *deadEndBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
   auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
   auto *calleeAnalysis = getAnalysis<BasicCalleeAnalysis>();
   DominanceInfo *domTree = dominanceAnalysis->get(f);
@@ -495,7 +498,8 @@ void CopyPropagation::run() {
   // don't need to explicitly check for changes.
   CanonicalizeOSSALifetime canonicalizer(
       pruneDebug, MaximizeLifetime_t(!getFunction()->shouldOptimize()),
-      getFunction(), accessBlockAnalysis, domTree, calleeAnalysis, deleter);
+      getFunction(), accessBlockAnalysis, deadEndBlocksAnalysis, domTree,
+      calleeAnalysis, deleter);
   // NOTE: We assume that the function is in reverse post order so visiting the
   //       blocks and pushing begin_borrows as we see them and then popping them
   //       off the end will result in shrinking inner borrow scopes first.
@@ -503,8 +507,9 @@ void CopyPropagation::run() {
     bool firstRun = true;
     // Run the sequence of utilities:
     // - ShrinkBorrowScope
-    // - CanonicalizeOSSALifetime
+    // - CanonicalizeOSSALifetime(borrowee)
     // - LexicalDestroyFolding
+    // - CanonicalizeOSSALifetime(folded)
     // at least once and then until each stops making changes.
     while (true) {
       SmallVector<CopyValueInst *, 4> modifiedCopyValueInsts;
@@ -529,8 +534,7 @@ void CopyPropagation::run() {
       auto folded = foldDestroysOfCopiedLexicalBorrow(bbi, *domTree, deleter);
       if (!folded)
         break;
-      auto hoisted =
-          hoistDestroysOfOwnedLexicalValue(folded, *f, deleter, calleeAnalysis);
+      auto hoisted = canonicalizer.canonicalizeValueLifetime(folded);
       // Keep running even if the new move's destroys can't be hoisted.
       (void)hoisted;
       eliminateRedundantMove(folded, deleter, defWorklist);
@@ -542,7 +546,7 @@ void CopyPropagation::run() {
   }
   for (auto *argument : f->getArguments()) {
     if (argument->getOwnershipKind() == OwnershipKind::Owned) {
-      hoistDestroysOfOwnedLexicalValue(argument, *f, deleter, calleeAnalysis);
+      canonicalizer.canonicalizeValueLifetime(argument);
     }
   }
   deleter.cleanupDeadInstructions();
@@ -635,12 +639,17 @@ void CopyPropagation::run() {
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     accessBlockAnalysis->unlockInvalidation();
     if (f->getModule().getOptions().VerifySILOwnership) {
-      auto *deBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
-      f->verifyOwnership(f->getModule().getOptions().OSSAVerifyComplete
-                             ? nullptr
-                             : deBlocksAnalysis->get(f));
+      verifyOwnership();
     }
   }
+}
+
+void CopyPropagation::verifyOwnership() {
+  auto *f = getFunction();
+  auto *deBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
+  f->verifyOwnership(f->getModule().getOptions().OSSAVerifyComplete
+                         ? nullptr
+                         : deBlocksAnalysis->get(f));
 }
 
 // MandatoryCopyPropagation is not currently enabled in the -Onone pipeline

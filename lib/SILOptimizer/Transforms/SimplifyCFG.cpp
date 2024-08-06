@@ -232,6 +232,7 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
                    (*ThreadedSuccessorBlock->args_begin())->getType() &&
                "Argument types must match");
         Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {UED});
+        Cloner.registerBlockWithNewPhiArg(ThreadedSuccessorBlock);
       } else {
         assert(SEI->getDefaultBB() == ThreadedSuccessorBlock);
         auto *OldBlockArg = ThreadedSuccessorBlock->getArgument(0);
@@ -1078,7 +1079,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGTryJumpThreading(
-    "simplify-cfg-try-jump-threading",
+    "simplify_cfg_try_jump_threading",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -1828,7 +1829,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSimplifySwitchEnumUnreachableBlocks(
-    "simplify-cfg-simplify-switch-enum-unreachable-blocks",
+    "simplify_cfg_simplify_switch_enum_unreachable_blocks",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -2138,7 +2139,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSwitchEnumOnObjcClassOptional(
-    "simplify-cfg-simplify-switch-enum-on-objc-class-optional",
+    "simplify_cfg_simplify_switch_enum_on_objc_class_optional",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -2214,7 +2215,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSimplifySwitchEnumBlock(
-    "simplify-cfg-simplify-switch-enum-block",
+    "simplify_cfg_simplify_switch_enum_block",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -2664,7 +2665,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSimplifyTermWithIdenticalDestBlocks(
-    "simplify-cfg-simplify-term-with-identical-dest-blocks",
+    "simplify_cfg_simplify_term_with_identical_dest_blocks",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -2910,7 +2911,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGCanonicalizeSwitchEnum(
-    "simplify-cfg-canonicalize-switch-enum",
+    "simplify_cfg_canonicalize_switch_enum",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -3679,7 +3680,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSimplifyBlockArgs(
-    "simplify-cfg-simplify-block-args",
+    "simplify_cfg_simplify_block_args",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -3792,7 +3793,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSimplifyArgument(
-    "simplify-cfg-simplify-argument",
+    "simplify_cfg_simplify_argument",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());

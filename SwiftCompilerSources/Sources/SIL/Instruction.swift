@@ -48,7 +48,8 @@ public class Instruction : CustomStringConvertible, Hashable {
     return OperandArray(base: operands.base, count: operands.count)
   }
 
-  // All operands defined by the operation. Returns the prefix of `operands` that does not include trailing type dependent operands.
+  // All operands defined by the operation.
+  // Returns the prefix of `operands` that does not include trailing type dependent operands.
   final public var definedOperands: OperandArray {
     let operands = bridged.getOperands()
     let typeOperands = bridged.getTypeDependentOperands()
@@ -237,7 +238,7 @@ public class MultipleValueInstruction : Instruction {
   }
 }
 
-/// Instructions, which have a single operand.
+/// Instructions, which have a single operand (not including type-dependent operands).
 public protocol UnaryInstruction : Instruction {
   var operand: Operand { get }
 }
@@ -311,14 +312,13 @@ public protocol SourceDestAddrInstruction : Instruction {
 }
 
 extension SourceDestAddrInstruction {
-  public var sourceOperand: Operand { return operands[0] }
-  public var destinationOperand: Operand { return operands[1] }
+  public var sourceOperand: Operand { operands[0] }
+  public var destinationOperand: Operand { operands[1] }
+  public var source: Value { sourceOperand.value }
+  public var destination: Value { destinationOperand.value }
 }
 
 final public class CopyAddrInst : Instruction, SourceDestAddrInstruction {
-  public var source: Value { return sourceOperand.value }
-  public var destination: Value { return destinationOperand.value }
-  
   public var isTakeOfSrc: Bool {
     bridged.CopyAddrInst_isTakeOfSrc()
   }
@@ -506,6 +506,11 @@ final public class UnmanagedAutoreleaseValueInst : RefCountingInst {}
 
 final public class DestroyValueInst : Instruction, UnaryInstruction {
   public var destroyedValue: Value { operand.value }
+
+  /// True if this `destroy_value` is inside a dead-end block is only needed to formally
+  /// end the lifetime of its operand.
+  /// Such `destroy_value` instructions are lowered to no-ops.
+  public var isDeadEnd: Bool { bridged.DestroyValueInst_isDeadEnd() }
 }
 
 final public class DestroyAddrInst : Instruction, UnaryInstruction {
@@ -681,7 +686,7 @@ final public
 class InitExistentialAddrInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
-class DeinitExistentialAddrInst : Instruction {}
+class DeinitExistentialAddrInst : Instruction, UnaryInstruction {}
 
 final public
 class DeinitExistentialValueInst : Instruction {}
@@ -873,6 +878,8 @@ final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction
 
 final public class RefTailAddrInst : SingleValueInstruction, UnaryInstruction {
   public var instance: Value { operand.value }
+
+  public var isImmutable: Bool { bridged.RefTailAddrInst_isImmutable() }
 }
 
 final public class KeyPathInst : SingleValueInstruction {
@@ -1015,7 +1022,7 @@ final public class MoveValueInst : SingleValueInstruction, UnaryInstruction {
   public var fromValue: Value { operand.value }
 
   public var isLexical: Bool { bridged.MoveValue_isLexical() }
-
+  public var hasPointerEscape: Bool { bridged.MoveValue_hasPointerEscape() }
   public var isFromVarDecl: Bool { bridged.MoveValue_isFromVarDecl() }
 }
 
@@ -1219,7 +1226,9 @@ extension Instruction {
 /// Instructions beginning a borrow-scope which must be ended by `end_borrow`.
 public protocol BorrowIntroducingInstruction : SingleValueInstruction, ScopedInstruction {}
 
-final public class EndBorrowInst : Instruction, UnaryInstruction {}
+final public class EndBorrowInst : Instruction, UnaryInstruction {
+  public var borrow: Value { operand.value }
+}
 
 extension BorrowIntroducingInstruction {
   public var endOperands: LazyFilterSequence<UseList> {
@@ -1231,7 +1240,7 @@ final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, B
   public var borrowedValue: Value { operand.value }
 
   public var isLexical: Bool { bridged.BeginBorrow_isLexical() }
-
+  public var hasPointerEscape: Bool { bridged.BeginBorrow_hasPointerEscape() }
   public var isFromVarDecl: Bool { bridged.BeginBorrow_isFromVarDecl() }
 
   public var endOperands: LazyFilterSequence<UseList> {
@@ -1264,6 +1273,7 @@ final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
   }
 
   public var isStatic: Bool { bridged.BeginAccessInst_isStatic() }
+  public var isUnsafe: Bool { bridged.BeginAccessInst_isUnsafe() }
 
   public var address: Value { operand.value }
 
@@ -1304,8 +1314,15 @@ final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
   }
 }
 
-final public class EndApplyInst : Instruction, UnaryInstruction {}
-final public class AbortApplyInst : Instruction, UnaryInstruction {}
+final public class EndApplyInst : Instruction, UnaryInstruction {
+  public var token: MultipleValueInstructionResult { operand.value as! MultipleValueInstructionResult }
+  public var beginApply: BeginApplyInst { token.parentInstruction as! BeginApplyInst }
+}
+
+final public class AbortApplyInst : Instruction, UnaryInstruction {
+  public var token: MultipleValueInstructionResult { operand.value as! MultipleValueInstructionResult }
+  public var beginApply: BeginApplyInst { token.parentInstruction as! BeginApplyInst }
+}
 
 extension BeginApplyInst : ScopedInstruction {
   public var endOperands: LazyFilterSequence<UseList> {

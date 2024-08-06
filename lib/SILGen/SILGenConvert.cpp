@@ -530,10 +530,9 @@ SILGenFunction::emitPointerToPointer(SILLocation loc,
     origValue = emitManagedBufferWithCleanup(origBuf);
   }
   // Invoke the conversion intrinsic to convert to the destination type.
-  auto *M = SGM.M.getSwiftModule();
   auto *proto = getPointerProtocol();
-  auto firstSubMap = inputType->getContextSubstitutionMap(M, proto);
-  auto secondSubMap = outputType->getContextSubstitutionMap(M, proto);
+  auto firstSubMap = inputType->getContextSubstitutionMap(proto);
+  auto secondSubMap = outputType->getContextSubstitutionMap(proto);
 
   auto genericSig = converter->getGenericSignature();
   auto subMap =

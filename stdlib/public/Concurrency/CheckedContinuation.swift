@@ -79,7 +79,7 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
     // Log if the continuation was never consumed before the instance was
     // destructed.
     if _continuationPtr.pointee != nil {
-      logFailedCheck("SWIFT TASK CONTINUATION MISUSE: \(function) leaked its continuation!\n")
+      logFailedCheck("SWIFT TASK CONTINUATION MISUSE: \(function) leaked its continuation without resuming it. This may cause tasks waiting on it to remain suspended forever.\n")
     }
   }
 }
@@ -267,7 +267,7 @@ extension CheckedContinuation {
 /// indefinitely which will result in the task "hanging" as well as being leaked with
 /// no possibility to destroy it.
 ///
-/// The checked continuation offers detection of mis-use, and dropping the last reference
+/// The checked continuation offers detection of misuse, and dropping the last reference
 /// to it, without having resumed it will trigger a warning. Resuming a continuation twice
 /// is also diagnosed and will cause a crash.
 ///
@@ -299,12 +299,17 @@ public func withCheckedContinuation<T>(
   }
 }
 
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+//
+// This function also doubles as an ABI-compatibility shim predating the
+// introduction of #isolation.
 @available(SwiftStdlib 5.1, *)
-@usableFromInline
 @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
 @_unavailableInEmbedded
 @_silgen_name("$ss23withCheckedContinuation8function_xSS_yScCyxs5NeverOGXEtYalF")
-internal func __abi_withCheckedContinuation<T>(
+public func _unsafeInheritExecutor_withCheckedContinuation<T>(
   function: String = #function,
   _ body: (CheckedContinuation<T, Never>) -> Void
 ) async -> T {
@@ -328,7 +333,7 @@ internal func __abi_withCheckedContinuation<T>(
 /// indefinitely which will result in the task "hanging" as well as being leaked with
 /// no possibility to destroy it.
 ///
-/// The checked continuation offers detection of mis-use, and dropping the last reference
+/// The checked continuation offers detection of misuse, and dropping the last reference
 /// to it, without having resumed it will trigger a warning. Resuming a continuation twice
 /// is also diagnosed and will cause a crash.
 ///
@@ -360,12 +365,17 @@ public func withCheckedThrowingContinuation<T>(
   }
 }
 
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+//
+// This function also doubles as an ABI-compatibility shim predating the
+// introduction of #isolation.
 @available(SwiftStdlib 5.1, *)
-@usableFromInline
 @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
 @_unavailableInEmbedded
 @_silgen_name("$ss31withCheckedThrowingContinuation8function_xSS_yScCyxs5Error_pGXEtYaKlF")
-internal func __abi_withCheckedThrowingContinuation<T>(
+public func _unsafeInheritExecutor_withCheckedThrowingContinuation<T>(
   function: String = #function,
   _ body: (CheckedContinuation<T, Error>) -> Void
 ) async throws -> T {

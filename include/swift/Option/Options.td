@@ -56,12 +56,6 @@ def ModuleInterfaceOption : OptionFlag;
 // The option can be safely ignored by the older compiler.
 def ModuleInterfaceOptionIgnorable : OptionFlag;
 
-// The option should be written into a .private.swiftinterface or
-// .package.swiftinterface module interface file, and read/parsed from
-// there when reconstituting a .swiftmodule from it.
-// The option can be safely ignored by the older compiler.
-def ModuleInterfaceOptionIgnorablePrivate : OptionFlag;
-
 // The option causes the output of a supplementary output, or is the path option
 // for a supplementary output. E.g., `-emit-module` and `-emit-module-path`.
 def SupplementaryOutput : OptionFlag;
@@ -260,6 +254,13 @@ def visualc_tools_version : Separate<["-"], "visualc-tools-version">,
   Flags<[FrontendOption,
          SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"VisualC++ ToolSet Version">, MetaVarName<"<version>">;
+
+// Android Options
+
+def sysroot : Separate<["-"], "sysroot">,
+  Flags<[ArgumentIsPath, FrontendOption, SwiftSymbolGraphExtractOption,
+         SwiftAPIDigesterOption]>,
+  HelpText<"Native Platform sysroot">, MetaVarName<"<sysroot>">;
 
 // Standard Options
 def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
@@ -525,11 +526,15 @@ def unavailable_decl_optimization_EQ : Joined<["-"], "unavailable-decl-optimizat
 
 def experimental_package_bypass_resilience : Flag<["-"], "experimental-package-bypass-resilience">,
   Flags<[FrontendOption]>,
-  HelpText<"Enable optimization to bypass resilience within a package">;
+  HelpText<"Deprecated; has no effect">;
 
 def experimental_allow_non_resilient_access : Flag<["-"], "experimental-allow-non-resilient-access">,
   Flags<[FrontendOption]>,
-  HelpText<"Allow non-resilient access by generating all contents besides exportable decls">;
+  HelpText<"Deprecated; use -allow-non-resilient-access instead">;
+
+def allow_non_resilient_access : Flag<["-"], "allow-non-resilient-access">,
+  Flags<[FrontendOption]>,
+  HelpText<"Ensures all contents are generated besides exportable decls in the binary module, so non-resilient access can be allowed">;
 
 def library_level : Separate<["-"], "library-level">,
   MetaVarName<"<level>">,
@@ -720,6 +725,11 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
   Flags<[HelpHidden]>,
   HelpText<"Disable automatic generation of bridging PCH files">;
 
+def disable_print_package_name_for_non_package_interface :
+  Flag<["-"], "disable-print-package-name-for-non-package-interface">,
+  Flags<[FrontendOption, NoDriverOption, ModuleInterfaceOption, HelpHidden]>,
+  HelpText<"Disable adding package name to public or private interface">;
+
 def lto : Joined<["-"], "lto=">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Specify the LTO type to either 'llvm-thin' or 'llvm-full'">;
@@ -838,6 +848,11 @@ def warn_implicit_overrides :
   Flag<["-"], "warn-implicit-overrides">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Warn about implicit overrides of protocol members">;
+
+def warn_soft_deprecated :
+  Flag<["-"], "warn-soft-deprecated">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>,
+  HelpText<"Warn when soft-deprecated declarations are referenced">;
 
 def typo_correction_limit : Separate<["-"], "typo-correction-limit">,
   Flags<[FrontendOption, HelpHidden]>,
@@ -977,6 +992,14 @@ def Xlinker : Separate<["-"], "Xlinker">,
   Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Specifies an option which should be passed to the linker">;
 
+def build_id : JoinedOrSeparate<["-"], "build-id">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Specify the build ID argument passed to the linker">,
+  MetaVarName<"<build-id>">;
+def build_id_EQ : Joined<["-"], "build-id=">,
+  Flags<[NewDriverOnlyOption]>,
+  Alias<build_id>;
+
 // Optimization levels
 
 def O_Group : OptionGroup<"<optimization level options>">;
@@ -999,13 +1022,17 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
 
 def ExperimentalPackageCMO : Flag<["-"], "experimental-package-cmo">,
   Flags<[FrontendOption]>,
-  HelpText<"Enable optimization to perform default CMO within a package boundary">;
+  HelpText<"Deprecated; use -package-cmo instead">;
 
-def EnbaleDefaultCMO : Flag<["-"], "enable-default-cmo">,
+def PackageCMO : Flag<["-"], "package-cmo">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable optimization to perform defalut CMO within a package boundary">;
+
+def EnableDefaultCMO : Flag<["-"], "enable-default-cmo">,
   Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Perform conservative cross-module optimization">;
 
-def EnbaleCMOEverything : Flag<["-"], "enable-cmo-everything">,
+def EnableCMOEverything : Flag<["-"], "enable-cmo-everything">,
   Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Perform cross-module optimization on everything (all APIs). "
            "This is the same level of serialization as Embedded Swift.">;
@@ -1357,7 +1384,7 @@ def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption, ModuleInt
   HelpText<"Generate code for a particular CPU variant">;
 
 def target_variant : Separate<["-"], "target-variant">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Generate 'zippered' code for macCatalyst that can run on the specified"
            " variant target triple in addition to the main -target triple">;
 
@@ -1371,7 +1398,11 @@ def disable_clang_target : Flag<["-"], "disable-clang-target">,
 
 def explain_module_dependency : Separate<["-"], "explain-module-dependency">,
   Flags<[NewDriverOnlyOption]>,
-  HelpText<"Emit remark/notes describing why compilation may depend on a module with a given name.">;
+  HelpText<"Emit remark describing why compilation may depend on a module with a given name.">;
+
+def explain_module_dependency_detailed : Separate<["-"], "explain-module-dependency-detailed">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Emit remarks describing every possible dependency path that explains why compilation may depend on a module with a given name.">;
 
 def explicit_auto_linking : Flag<["-"], "explicit-auto-linking">,
   Flags<[NewDriverOnlyOption]>,

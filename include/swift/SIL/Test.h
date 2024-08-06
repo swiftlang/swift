@@ -108,6 +108,7 @@ class SILFunctionTransform;
 class SILPassManager;
 class DominanceAnalysis;
 class DominanceInfo;
+class DeadEndBlocks;
 
 namespace test {
 
@@ -147,7 +148,7 @@ public:
   /// To create a new test, just write
   ///
   ///     namespace swift::test {
-  ///     static FunctionTest myTest("my-test", [](
+  ///     static FunctionTest myTest("my_new_test", [](
   ///       SILFunction &function, Arguments &arguments, FunctionTest &test){
   ///         // test code
   ///       });
@@ -161,6 +162,9 @@ public:
 
   /// Computes and returns the function's dominance tree.
   DominanceInfo *getDominanceInfo();
+
+  /// The function's dead-end blocks.
+  DeadEndBlocks *getDeadEndBlocks();
 
   /// Returns the active pass manager.
   SILPassManager *getPassManager();
@@ -254,6 +258,7 @@ private:
   /// are visible: TestRunner::FunctionTestDependenciesImpl.
   struct Dependencies {
     virtual DominanceInfo *getDominanceInfo() = 0;
+    virtual DeadEndBlocks *getDeadEndBlocks() = 0;
     virtual SILPassManager *getPassManager() = 0;
     virtual SwiftPassInvocation *getSwiftPassInvocation() = 0;
     virtual ~Dependencies(){};

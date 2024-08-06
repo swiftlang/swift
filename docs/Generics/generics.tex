@@ -195,6 +195,7 @@
 \newcommand{\DefRef}[1]{\hyperref[#1]{Definition~\ref*{#1}}}
 \newcommand{\PropRef}[1]{\hyperref[#1]{Proposition~\ref*{#1}}}
 \newcommand{\ThmRef}[1]{\hyperref[#1]{Theorem~\ref*{#1}}}
+\newcommand{\CorollaryRef}[1]{\hyperref[#1]{Corollary~\ref*{#1}}}
 \newcommand{\LemmaRef}[1]{\hyperref[#1]{Lemma~\ref*{#1}}}
 \newcommand{\AlgRef}[1]{\hyperref[#1]{Algorithm~\ref*{#1}}}
 \newcommand{\ExRef}[1]{\hyperref[#1]{Example~\ref*{#1}}}
@@ -232,37 +233,46 @@
 \newcommand{\SameReq}[2]{[\texttt{#1 == #2}]}
 \newcommand{\ConfReq}[2]{[\texttt{#1:~#2}]}
 
-\newcommand{\GP}{G_\texttt{P}}
+\newcommand{\TP}{\ConfReq{T}{P}}
+\newcommand{\TC}{\ConfReq{T}{C}}
+\newcommand{\TAnyObject}{\ConfReq{T}{AnyObject}}
+\newcommand{\TU}{\SameReq{T}{U}}
+\newcommand{\TX}{\SameReq{T}{X}}
+
+\newcommand{\AssocSameReq}[3]{\SameReq{#1}{#2}_{\texttt{#3}}}
+\newcommand{\AssocConfReq}[3]{\ConfReq{#1}{#2}_{\texttt{#3}}}
+
+\newcommand{\GP}{G_\tP}
 
 \newcommand{\GenericStepDef}{\ttgp{d}{i}\tag{\textsc{Generic}}}
 
-\newcommand{\ConfStepDef}{\ConfReq{T}{P}\tag{\textsc{Conf}}}
-\newcommand{\SameStepDef}{\SameReq{T}{U}\tag{\textsc{Same}}}
+\newcommand{\ConfStepDef}{\TP\tag{\textsc{Conf}}}
+\newcommand{\SameStepDef}{\TU\tag{\textsc{Same}}}
 \newcommand{\ConcreteStepDef}{\SameReq{T}{X}\tag{\textsc{Concrete}}}
 \newcommand{\SuperStepDef}{\ConfReq{T}{C}\tag{\textsc{Super}}}
 \newcommand{\LayoutStepDef}{\ConfReq{T}{AnyObject}\tag{\textsc{Layout}}}
 
-\newcommand{\AssocNameStepDef}{\texttt{T.A}\tag{\textsc{AssocName} $\ConfReq{T}{P}$}}
-\newcommand{\AssocDeclStepDef}{\texttt{T.[P]A}\tag{\textsc{AssocDecl} $\ConfReq{T}{P}$}}
-\newcommand{\AssocBindStepDef}{\SameReq{T.[P]A}{T.A}\tag{\textsc{AssocBind} $\ConfReq{T}{P}$}}
+\newcommand{\AssocNameStepDef}{\texttt{T.A}\tag{\textsc{AssocName} $\TP$}}
+\newcommand{\AssocDeclStepDef}{\texttt{T.[P]A}\tag{\textsc{AssocDecl} $\TP$}}
+\newcommand{\AssocBindStepDef}{\SameReq{T.[P]A}{T.A}\tag{\textsc{AssocBind} $\TP$}}
 
-\newcommand{\AssocConfStepDef}{\ConfReq{T.U}{Q}\tag{\textsc{AssocConf} $\ConfReq{Self.U}{Q}_\texttt{P}$ $\ConfReq{T}{P}$}}
-\newcommand{\AssocSameStepDef}{\SameReq{T.U}{T.V}\tag{\textsc{AssocSame} $\SameReq{Self.U}{Self.V}_\texttt{P}$ $\ConfReq{T}{P}$}}
-\newcommand{\AssocConcreteStepDef}{\SameReq{T.U}{$\Xprime$}\tag{\textsc{AssocConcrete} $\SameReq{Self.U}{X}_\texttt{P}$ $\ConfReq{T}{P}$}}
-\newcommand{\AssocSuperStepDef}{\ConfReq{T.U}{$\Cprime$}\tag{\textsc{AssocSuper} $\ConfReq{Self.U}{C}_\texttt{P}$ $\ConfReq{T}{P}$}}
-\newcommand{\AssocLayoutStepDef}{\ConfReq{T.U}{AnyObject}\tag{\textsc{AssocLayout} $\ConfReq{Self.U}{AnyObject}_\texttt{P}$ $\ConfReq{T}{P}$}}
+\newcommand{\AssocConfStepDef}{\ConfReq{T.U}{Q}\tag{\textsc{AssocConf} $\AssocConfReq{Self.U}{Q}{P}$ $\TP$}}
+\newcommand{\AssocSameStepDef}{\SameReq{T.U}{T.V}\tag{\textsc{AssocSame} $\AssocSameReq{Self.U}{Self.V}{P}$ $\TP$}}
+\newcommand{\AssocConcreteStepDef}{\SameReq{T.U}{$\Xprime$}\tag{\textsc{AssocConcrete} $\AssocSameReq{Self.U}{X}{P}$ $\TP$}}
+\newcommand{\AssocSuperStepDef}{\ConfReq{T.U}{$\Cprime$}\tag{\textsc{AssocSuper} $\AssocConfReq{Self.U}{C}{P}$ $\TP$}}
+\newcommand{\AssocLayoutStepDef}{\ConfReq{T.U}{AnyObject}\tag{\textsc{AssocLayout} $\AssocConfReq{Self.U}{AnyObject}{P}$ $\TP$}}
 
 \newcommand{\ReflexStepDef}{\SameReq{T}{T}\tag{\textsc{Reflex} $\texttt{T}$}}
-\newcommand{\SymStepDef}{\SameReq{U}{T}\tag{\textsc{Sym} $\SameReq{T}{U}$}}
-\newcommand{\TransStepDef}{\SameReq{T}{V}\tag{\textsc{Trans} $\SameReq{T}{U}$ $\SameReq{U}{V}$}}
+\newcommand{\SymStepDef}{\SameReq{U}{T}\tag{\textsc{Sym} $\TU$}}
+\newcommand{\TransStepDef}{\SameReq{T}{V}\tag{\textsc{Trans} $\TU$ $\SameReq{U}{V}$}}
 
-\newcommand{\SameConfStepDef}{\ConfReq{T}{P}\tag{\textsc{SameConf} $\ConfReq{U}{P}$ $\SameReq{T}{U}$}}
-\newcommand{\SameConcreteStepDef}{\SameReq{T}{X}\tag{\textsc{SameConcrete} $\SameReq{U}{X}$ $\SameReq{T}{U}$}}
-\newcommand{\SameSuperStepDef}{\ConfReq{T}{C}\tag{\textsc{SameSuper} $\ConfReq{U}{C}$ $\SameReq{T}{U}$}}
-\newcommand{\SameLayoutStepDef}{\ConfReq{T}{AnyObject}\tag{\textsc{SameLayout} $\ConfReq{U}{AnyObject}$ $\SameReq{T}{U}$}}
+\newcommand{\SameConfStepDef}{\TP\tag{\textsc{SameConf} $\ConfReq{U}{P}$ $\TU$}}
+\newcommand{\SameConcreteStepDef}{\SameReq{T}{X}\tag{\textsc{SameConcrete} $\SameReq{U}{X}$ $\TU$}}
+\newcommand{\SameSuperStepDef}{\ConfReq{T}{C}\tag{\textsc{SameSuper} $\ConfReq{U}{C}$ $\TU$}}
+\newcommand{\SameLayoutStepDef}{\ConfReq{T}{AnyObject}\tag{\textsc{SameLayout} $\ConfReq{U}{AnyObject}$ $\TU$}}
 
-\newcommand{\SameNameStepDef}{\SameReq{T.A}{U.A}\tag{\textsc{SameName} $\ConfReq{U}{P}$ $\SameReq{T}{U}$}}
-\newcommand{\SameDeclStepDef}{\SameReq{T.[P]A}{U.[P]A}\tag{\textsc{SameDecl} $\ConfReq{U}{P}$ $\SameReq{T}{U}$}}
+\newcommand{\SameNameStepDef}{\SameReq{T.A}{U.A}\tag{\textsc{SameName} $\ConfReq{U}{P}$ $\TU$}}
+\newcommand{\SameDeclStepDef}{\SameReq{T.[P]A}{U.[P]A}\tag{\textsc{SameDecl} $\ConfReq{U}{P}$ $\TU$}}
 
 \newcommand{\AnyStep}[2]{{#2}.\ #1\tag{$\ldots$}}
 
@@ -318,17 +328,60 @@
 \newcommand{\AssocTypeObj}[1]{\textsc{AssocType}_{\texttt{#1}}}
 \newcommand{\AssocConfObj}[1]{\textsc{AssocConf}_{\texttt{#1}}}
 
-\newcommand{\ttgp}[2]{\texttt{$\uptau$\_#1\_#2}}
+\newcommand{\ttgp}[2]{\texttt{$\uptau$\char`_#1\char`_#2}}
 \newcommand{\rT}{\ttgp{0}{0}}
 \newcommand{\rU}{\ttgp{0}{1}}
 \newcommand{\rV}{\ttgp{0}{2}}
 
+\newcommand{\tT}{\texttt{T}}
+\newcommand{\tU}{\texttt{U}}
+\newcommand{\tV}{\texttt{V}}
+\newcommand{\tP}{\texttt{P}}
+\newcommand{\tQ}{\texttt{Q}}
+
+\newcommand{\tSelf}{\texttt{Self}}
+
 % Monoids etc
-\newcommand{\Pres}[2]{\langle #1;\,#2\rangle}
+\newcommand{\Pres}[2]{\langle #1\,|\,#2\rangle}
+\newcommand{\AR}{\Pres{A}{R}}
 \newcommand{\PhiInv}{\varphi^{-1}}
-\newcommand{\AR}{\langle A;\,R\rangle}
 \newcommand{\BaseCase}{\smallskip\par\emph{Base case.}\ }
 \newcommand{\InductiveStep}{\smallskip\par\emph{Inductive step.}\ }
+\newcommand{\NN}{\mathbb{N}}
+
+\newcommand{\WL}{\triangleleft}
+\newcommand{\WR}{\triangleright}
+
+\newcommand{\Term}{\mathsf{term}}
+\newcommand{\Rule}{\mathsf{rule}}
+
+\newcommand{\TermP}[1]{\mathsf{term}_{\texttt{#1}}}
+\newcommand{\RuleP}[1]{\mathsf{rule}_{\texttt{#1}}}
+
+\newcommand{\Type}{\mathsf{type}}
+
+\newcommand{\nA}{\texttt{A}}
+\newcommand{\nB}{\texttt{B}}
+\newcommand{\nC}{\texttt{C}}
+\newcommand{\nElement}{\texttt{Element}}
+\newcommand{\nIterator}{\texttt{Iterator}}
+
+\newcommand{\pP}{\protosym{P}}
+\newcommand{\pQ}{\protosym{Q}}
+\newcommand{\pR}{\protosym{R}}
+
+\newcommand{\aPA}{\assocsym{P}{A}}
+\newcommand{\aPB}{\assocsym{P}{B}}
+\newcommand{\aPC}{\assocsym{P}{C}}
+\newcommand{\aPD}{\assocsym{P}{D}}
+
+\newcommand{\aNA}{\assocsym{N}{A}}
+
+\newcommand{\pSequence}{\protosym{Sequence}}
+\newcommand{\pIterator}{\protosym{IteratorProtocol}}
+
+\newcommand{\ConfRule}[2]{#1 \cdot #2 \sim #1}
+\newcommand{\SameRule}[2]{#1 \sim #2}
 
 \newcommand{\Tight}{\hspace{-0.08em}}
 
@@ -369,9 +422,9 @@
 \newcommand{\proto}[1]{\texttt{#1}}
 \newcommand{\protosym}[1]{[\texttt{#1}]}
 \newcommand{\assocsym}[2]{[\texttt{#1}|\texttt{#2}]}
-\newcommand{\layoutsym}[1]{[\mathrm{layout}\colon\texttt{#1}]}
-\newcommand{\supersym}[1]{[\mathrm{superclass}\colon #1]}
-\newcommand{\concretesym}[1]{[\mathrm{concrete}\colon #1]}
+\newcommand{\layoutsym}[1]{[\mathsf{layout}\colon\texttt{#1}]}
+\newcommand{\supersym}[1]{[\mathsf{superclass}\colon #1]}
+\newcommand{\concretesym}[1]{[\mathsf{concrete}\colon #1]}
 
 \DeclareMathOperator{\Src}{src}
 \DeclareMathOperator{\Dst}{dst}
@@ -469,6 +522,8 @@
 \newcommand{\IndexQueryDef}[1]{\IndexDefinition{#1()@$\texttt{#1}()$}}
 \newcommand{\IndexQuerySource}[1]{\IndexSource{#1()@$\texttt{#1}()$}}
 \newcommand{\IndexQuery}[1]{\Index{#1()@$\texttt{#1}()$}}
+
+\newcommand{\IndexSelf}{\Index{protocol Self type@protocol \texttt{Self} type}}
 
 % Normally a seealso index entry elides the page number, but sometimes we want index entries that look like this:
 %

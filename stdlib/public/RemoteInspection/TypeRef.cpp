@@ -214,7 +214,7 @@ public:
         printHeader("variadic");
 
       if (flags.isSending())
-        printHeader("transferring");
+        printHeader("sending");
 
       printRec(param.getType());
 
@@ -895,7 +895,7 @@ public:
       node->addChild(MemberId, Dem);
     } else {
       // Otherwise, build up a DependentAssociatedTR node with
-      // the member Identifer and protocol
+      // the member Identifier and protocol
       auto AssocTy = Dem.createNode(Node::Kind::DependentAssociatedTypeRef);
       AssocTy->addChild(MemberId, Dem);
       auto Proto = Dem.demangleType(MangledProtocol);
@@ -1087,7 +1087,7 @@ unsigned NominalTypeTrait::getDepth() const {
   if (auto P = Parent) {
     switch (P->getKind()) {
     case TypeRefKind::Nominal:
-      return 1 + cast<NominalTypeRef>(P)->getDepth();
+      return cast<NominalTypeRef>(P)->getDepth();
     case TypeRefKind::BoundGeneric:
       return 1 + cast<BoundGenericTypeRef>(P)->getDepth();
     default:

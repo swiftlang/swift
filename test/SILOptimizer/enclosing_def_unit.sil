@@ -28,20 +28,20 @@ class D : C {}
 
 // These introducers have no enclosing def.
 
-// CHECK-LABEL: enclosing_def_empty: find-enclosing-defs with: %0
+// CHECK-LABEL: enclosing_def_empty: find_enclosing_defs with: %0
 // CHECK: } // end sil function 'enclosing_def_empty'
 // CHECK: Enclosing Defs:
-// CHECK-NEXT: enclosing_def_empty: find-enclosing-defs with: %0
+// CHECK-NEXT: enclosing_def_empty: find_enclosing_defs with: %0
 
 // CHECK-LABEL: enclosing_def_empty: enclosing_values with: %0
 // CHECK: } // end sil function 'enclosing_def_empty'
 // CHECK: Enclosing values for:  %0 = argument of bb0 : $C
 // CHECK-NEXT: enclosing_def_empty: enclosing_values with: %0
 
-// CHECK-LABEL: enclosing_def_empty: find-enclosing-defs with: %borrow1
+// CHECK-LABEL: enclosing_def_empty: find_enclosing_defs with: %borrow1
 // CHECK: } // end sil function 'enclosing_def_empty'
 // CHECK: Enclosing Defs:
-// CHECK-NEXT: enclosing_def_empty: find-enclosing-defs with: %borrow1
+// CHECK-NEXT: enclosing_def_empty: find_enclosing_defs with: %borrow1
 
 // CHECK-LABEL: enclosing_def_empty: enclosing_values with: %borrow1
 // CHECK: } // end sil function 'enclosing_def_empty'
@@ -49,10 +49,10 @@ class D : C {}
 // CHECK-NEXT: enclosing_def_empty: enclosing_values with: %borrow1
 sil [ossa] @enclosing_def_empty : $@convention(thin) (@guaranteed C, @in C) -> () {
 entry(%0 : @guaranteed $C, %1 : $*C):
-  specify_test "find-enclosing-defs %0"
+  specify_test "find_enclosing_defs %0"
   specify_test "enclosing_values %0"
   %borrow1 = load_borrow %1 : $*C
-  specify_test "find-enclosing-defs %borrow1"
+  specify_test "find_enclosing_defs %borrow1"
   specify_test "enclosing_values %borrow1"
   end_borrow %borrow1 : $C
   destroy_addr %1 : $*C
@@ -63,10 +63,10 @@ entry(%0 : @guaranteed $C, %1 : $*C):
 // There is no introducer if the guaranteed value is produced from a
 // trivial value.
 
-// CHECK-LABEL: enclosing_def_trivial: find-enclosing-defs with: %phi
+// CHECK-LABEL: enclosing_def_trivial: find_enclosing_defs with: %phi
 // CHECK: } // end sil function 'enclosing_def_trivial'
 // CHECK: Enclosing Defs:
-// CHECK-NEXT: enclosing_def_trivial: find-enclosing-defs with: %phi
+// CHECK-NEXT: enclosing_def_trivial: find_enclosing_defs with: %phi
 
 // CHECK-LABEL: enclosing_def_trivial: enclosing_values with: %phi
 // CHECK: } // end sil function 'enclosing_def_trivial'
@@ -78,7 +78,7 @@ entry:
   br none(%trivial : $FakeOptional<C>)
 
 none(%phi : @guaranteed $FakeOptional<C>):
-  specify_test "find-enclosing-defs %phi"
+  specify_test "find_enclosing_defs %phi"
   specify_test "enclosing_values %phi"
   %retval = tuple ()
   return %retval : $()
@@ -87,10 +87,10 @@ none(%phi : @guaranteed $FakeOptional<C>):
 // There is an introducer but no enclosing def if the guaranteed value
 // is produced from a an unreachable loop.
 
-// CHECK-LABEL: enclosing_def_unreachable: find-enclosing-defs with: %phiCycle
+// CHECK-LABEL: enclosing_def_unreachable: find_enclosing_defs with: %phiCycle
 // CHECK: } // end sil function 'enclosing_def_unreachable'
 // CHECK: Enclosing Defs:
-// CHECK-NEXT: enclosing_def_unreachable: find-enclosing-defs with: %phiCycle
+// CHECK-NEXT: enclosing_def_unreachable: find_enclosing_defs with: %phiCycle
 
 // CHECK-LABEL: enclosing_def_unreachable: enclosing_values with: %phiCycle
 // CHECK: } // end sil function 'enclosing_def_unreachable'
@@ -101,7 +101,7 @@ entry:
   br exit
 
 unreachable_loop(%phiCycle : @guaranteed $C):
-  specify_test "find-enclosing-defs %phiCycle"
+  specify_test "find_enclosing_defs %phiCycle"
   specify_test "enclosing_values %phiCycle"
   br unreachable_loop(%phiCycle : $C)
 
@@ -113,11 +113,11 @@ exit:
 // All data flow paths through phis and aggregates originate from the
 // same borrow scope. This is the same as finding the introducer.
 
-// CHECK-LABEL: enclosing_def_single_introducer: find-enclosing-defs with: %aggregate2
+// CHECK-LABEL: enclosing_def_single_introducer: find_enclosing_defs with: %aggregate2
 // CHECK: sil [ossa] @enclosing_def_single_introducer
 // CHECK: Enclosing Defs:
 // CHECK:   begin_borrow %0 : $C
-// CHECK-NEXT: enclosing_def_single_introducer: find-enclosing-defs with: %aggregate2
+// CHECK-NEXT: enclosing_def_single_introducer: find_enclosing_defs with: %aggregate2
 
 // CHECK-LABEL: enclosing_def_single_introducer: enclosing_values with: %aggregate2
 // CHECK: sil [ossa] @enclosing_def_single_introducer
@@ -140,7 +140,7 @@ bb1(%payload : @guaranteed $D):
   %first = struct_extract %aggregate : $PairC, #PairC.first
   %second = struct_extract %aggregate : $PairC, #PairC.second
   %aggregate2 = struct $PairC(%first : $C, %second : $C)
-  specify_test "find-enclosing-defs %aggregate2"
+  specify_test "find_enclosing_defs %aggregate2"
   specify_test "enclosing_values %aggregate2"
   br exit
 
@@ -155,11 +155,11 @@ exit:
 
 // All reborrows original from the same dominating borrow scope.
 
-// CHECK: enclosing_def_single_outer: find-enclosing-defs with: %reborrow3
+// CHECK: enclosing_def_single_outer: find_enclosing_defs with: %reborrow3
 // CHECK: } // end sil function 'enclosing_def_single_outer'
 // CHECK: Enclosing Defs:
 // CHECK-NEXT: %0 = argument of bb0 : $C
-// CHECK-NEXT: enclosing_def_single_outer: find-enclosing-defs with: %reborrow3
+// CHECK-NEXT: enclosing_def_single_outer: find_enclosing_defs with: %reborrow3
 
 // CHECK: enclosing_def_single_outer: enclosing_values with: %reborrow3
 // CHECK: } // end sil function 'enclosing_def_single_outer'
@@ -176,7 +176,7 @@ bb2(%reborrow2 : @guaranteed $C):
   br bb3(%reborrow2 : $C)
 
 bb3(%reborrow3 : @guaranteed $C):
-  specify_test "find-enclosing-defs %reborrow3"
+  specify_test "find_enclosing_defs %reborrow3"
   specify_test "enclosing_values %reborrow3"
   end_borrow %reborrow3 : $C
   %retval = tuple ()
@@ -185,13 +185,13 @@ bb3(%reborrow3 : @guaranteed $C):
 
 // Find the outer enclosingreborrow.
 
-// CHECK-LABEL: enclosing_def_reborrow: find-enclosing-defs with: %reborrow_inner3
+// CHECK-LABEL: enclosing_def_reborrow: find_enclosing_defs with: %reborrow_inner3
 // CHECK: sil [ossa] @enclosing_def_reborrow : $@convention(thin) (@guaranteed C) -> () {
 // CHECK: bb1([[REBORROW:%.*]] : @reborrow @guaranteed $C, %{{.*}} : @reborrow @guaranteed $C):
 // CHECK: } // end sil function 'enclosing_def_reborrow'
 // CHECK: Enclosing Defs:
 // CHECK-NEXT: [[REBORROW]] = argument of bb1 : $C
-// CHECK-NEXT: enclosing_def_reborrow: find-enclosing-defs with: %reborrow_inner3
+// CHECK-NEXT: enclosing_def_reborrow: find_enclosing_defs with: %reborrow_inner3
 
 // CHECK-LABEL: enclosing_def_reborrow: enclosing_values with: %reborrow_inner3
 // CHECK: sil [ossa] @enclosing_def_reborrow : $@convention(thin) (@guaranteed C) -> () {
@@ -210,7 +210,7 @@ bb2(%reborrow_outer : @guaranteed $C, %reborrow_inner : @guaranteed $C):
   br bb3(%reborrow_inner : $C)
 
 bb3(%reborrow_inner3 : @guaranteed $C):
-  specify_test "find-enclosing-defs %reborrow_inner3"
+  specify_test "find_enclosing_defs %reborrow_inner3"
   specify_test "enclosing_values %reborrow_inner3"
   end_borrow %reborrow_inner3 : $C
   end_borrow %reborrow_outer : $C
@@ -220,13 +220,13 @@ bb3(%reborrow_inner3 : @guaranteed $C):
 
 // The enclosing def of a forwarding phi cycle is the reborrow phi cycle.
 
-// CHECK-LABEL: enclosing_def_cycle: find-enclosing-defs with: %forward
+// CHECK-LABEL: enclosing_def_cycle: find_enclosing_defs with: %forward
 // CHECK: sil [ossa] @enclosing_def_cycle : $@convention(thin) (@guaranteed C) -> () {
 // CHECK: bb1([[REBORROW:%.*]] : @reborrow @guaranteed $C,
 // CHECK: } // end sil function 'enclosing_def_cycle'
 // CHECK: Enclosing Defs:
 // CHECK-NEXT: [[REBORROW]] = argument of bb1 : $C
-// CHECK-NEXT: enclosing_def_cycle: find-enclosing-defs with: %forward
+// CHECK-NEXT: enclosing_def_cycle: find_enclosing_defs with: %forward
 
 // CHECK-LABEL: enclosing_def_cycle: enclosing_values with: %forward
 // CHECK: sil [ossa] @enclosing_def_cycle : $@convention(thin) (@guaranteed C) -> () {
@@ -243,7 +243,7 @@ entry(%0 : @guaranteed $C):
   br bb2(%borrow : $C, %first1 : $C)
 
 bb2(%reborrow_outer : @guaranteed $C, %forward : @guaranteed $C):
-  specify_test "find-enclosing-defs %forward"
+  specify_test "find_enclosing_defs %forward"
   specify_test "enclosing_values %forward"
   %aggregate2 = struct $PairC(%reborrow_outer : $C, %forward : $C)
   %first2 = struct_extract %aggregate2 : $PairC, #PairC.first

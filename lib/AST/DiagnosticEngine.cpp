@@ -1012,8 +1012,16 @@ static void formatDiagnosticArgument(StringRef Modifier,
         << FormatOpts.ClosingQuotationMark;
     break;
   case DiagnosticArgumentKind::ActorIsolation: {
-    assert(Modifier.empty() && "Improper modifier for ActorIsolation argument");
+    assert((Modifier.empty() || Modifier == "noun") &&
+           "Improper modifier for ActorIsolation argument");
     auto isolation = Arg.getAsActorIsolation();
+    isolation.printForDiagnostics(Out, FormatOpts.OpeningQuotationMark,
+                                  /*asNoun*/ Modifier == "noun");
+    break;
+  }
+  case DiagnosticArgumentKind::IsolationSource: {
+    assert(Modifier.empty() && "Improper modifier for IsolationSource argument");
+    auto isolation = Arg.getAsIsolationSource();
     isolation.printForDiagnostics(Out, FormatOpts.OpeningQuotationMark);
     break;
   }
@@ -1463,6 +1471,37 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
       diagnostic.isChildNote());
 }
 
+static DeclName
+getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info) {
+  ASTNode expansionNode = ASTNode::getFromOpaqueValue(info.astNode);
+  switch (info.kind) {
+#define MACRO_ROLE(Name, Description)                                          \
+  case GeneratedSourceInfo::Name##MacroExpansion:
+#include "swift/Basic/MacroRoles.def"
+    {
+      if (auto customAttr = info.attachedMacroCustomAttr) {
+        // FIXME: How will we handle deserialized custom attributes like this?
+        auto declRefType = cast<DeclRefTypeRepr>(customAttr->getTypeRepr());
+        return declRefType->getNameRef().getFullName();
+      }
+
+      if (auto expansionExpr = dyn_cast_or_null<MacroExpansionExpr>(
+              expansionNode.dyn_cast<Expr *>())) {
+        return expansionExpr->getMacroName().getFullName();
+      }
+
+      auto expansionDecl =
+          cast<MacroExpansionDecl>(expansionNode.get<Decl *>());
+      return expansionDecl->getMacroName().getFullName();
+    }
+
+  case GeneratedSourceInfo::PrettyPrinted:
+  case GeneratedSourceInfo::ReplacedFunctionBody:
+  case GeneratedSourceInfo::DefaultArgument:
+    return DeclName();
+  }
+}
+
 std::vector<Diagnostic>
 DiagnosticEngine::getGeneratedSourceBufferNotes(SourceLoc loc) {
   // The set of child notes we're building up.
@@ -1674,35 +1713,3 @@ EncodedDiagnosticMessage::EncodedDiagnosticMessage(StringRef S)
     : Message(Lexer::getEncodedStringSegment(S, Buf, /*IsFirstSegment=*/true,
                                              /*IsLastSegment=*/true,
                                              /*IndentToStrip=*/~0U)) {}
-
-DeclName
-swift::getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info) {
-  ASTNode expansionNode = ASTNode::getFromOpaqueValue(info.astNode);
-  switch (info.kind) {
-#define MACRO_ROLE(Name, Description)  \
-    case GeneratedSourceInfo::Name##MacroExpansion:
-#include "swift/Basic/MacroRoles.def"
-  {
-    DeclName macroName;
-    if (auto customAttr = info.attachedMacroCustomAttr) {
-      // FIXME: How will we handle deserialized custom attributes like this?
-      auto declRefType = cast<DeclRefTypeRepr>(customAttr->getTypeRepr());
-      return declRefType->getNameRef().getFullName();
-    }
-
-    if (auto expansionExpr = dyn_cast_or_null<MacroExpansionExpr>(
-            expansionNode.dyn_cast<Expr *>())) {
-      return expansionExpr->getMacroName().getFullName();
-    }
-
-    auto expansionDecl =
-        cast<MacroExpansionDecl>(expansionNode.get<Decl *>());
-      return expansionDecl->getMacroName().getFullName();
-  }
-
-  case GeneratedSourceInfo::PrettyPrinted:
-  case GeneratedSourceInfo::ReplacedFunctionBody:
-  case GeneratedSourceInfo::DefaultArgument:
-      return DeclName();
-  }
-}

@@ -25,7 +25,6 @@ sil_global @globalArray : $Storage
 
 // CHECK: bb2({{.*}}):
 // CHECK-NOT: load
-// CHECK-NOT: fix_lifetime
 // CHECK: cond_br
 
 sil @memset : $@convention(thin) (@inout Builtin.NativeObject, Int) -> () {
@@ -59,7 +58,7 @@ bb2(%54 : $Builtin.Word):
 // CHECK: bb0
 // CHECK: load %0
 // CHECK: cond_fail
-// CHECK: [[INVARIANTADDR:%.*]] = pointer_to_address
+// CHECK: [[INVARIANTADDR:%.*]] = index_addr
 // CHECK: load [[INVARIANTADDR]]
 // CHECK: br bb2
 
@@ -90,14 +89,13 @@ bb2(%48 : $Builtin.Word):
   %57 = builtin "sadd_with_overflow_Word"(%48 : $Builtin.Word, %55 : $Builtin.Word, %5 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %58 = tuple_extract %57 : $(Builtin.Word, Builtin.Int1), 0
   %60 = integer_literal $Builtin.Word, 100
-  %61 = ref_to_raw_pointer %6 : $Builtin.NativeObject to $Builtin.RawPointer
-  %62 = index_raw_pointer %61 : $Builtin.RawPointer, %52 : $Builtin.Word
-  %63 = pointer_to_address %62 : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+  %61 = unchecked_ref_cast %6 : $Builtin.NativeObject to $C
+  %62 = ref_tail_addr %61 : $C, $Builtin.NativeObject
+  %63 = index_addr %62 : $*Builtin.NativeObject, %52 : $Builtin.Word
   %64 = load %63 : $*Builtin.NativeObject
-  %96 = ref_to_raw_pointer %64 : $Builtin.NativeObject to $Builtin.RawPointer
-  %97 = index_raw_pointer %96 : $Builtin.RawPointer, %58 : $Builtin.Word
-  %98 = pointer_to_address %97 : $Builtin.RawPointer to [strict] $*Int
-  %99 = index_addr %98 : $*Int, %48 : $Builtin.Word
+  %96 = unchecked_ref_cast %64 : $Builtin.NativeObject to $Storage
+  %97 = ref_tail_addr %96 : $Storage, $Int
+  %99 = index_addr %97 : $*Int, %48 : $Builtin.Word
   store %1 to %99 : $*Int
   %101 = builtin "cmp_eq_Word"(%58 : $Builtin.Word, %60 : $Builtin.Word) : $Builtin.Int1
   cond_br %101, bb1, bb2(%58 : $Builtin.Word)
@@ -226,7 +224,7 @@ public protocol P : class {
 }
 
 // Check that LICM does not hoist a metatype instruction before
-// the open_existential instruction which creates the archtype,
+// the open_existential instruction which creates the archetype,
 // because this would break the dominance relation between them.
 // CHECK-LABEL: sil @dont_hoist_metatype
 // CHECK-NOT: metatype
@@ -1096,7 +1094,7 @@ bb3:
 }
 
 // Test multiple stores to disjoint access paths with a single load
-// that spans both of them. The load should be split and hosited and
+// that spans both of them. The load should be split and hoisted and
 // and the stores be sunk.
 // testCommonSplitLoad
 // CHECK-LABEL: sil shared @testCommonSplitLoad : $@convention(method) (Int64, Builtin.RawPointer) -> (Int64, Int64, Int64) {

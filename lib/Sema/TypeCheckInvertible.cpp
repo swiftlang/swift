@@ -144,6 +144,16 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
       conformanceLoc = normalConf->getLoc();
       assert(conformanceLoc);
 
+      // Conformance must be defined in the same source file as the nominal.
+      auto conformanceDC = concrete->getDeclContext();
+      if (auto *sourceFile = conformanceDC->getOutermostParentSourceFile()) {
+        if (sourceFile != nominalDecl->getOutermostParentSourceFile()) {
+          ctx.Diags.diagnose(conformanceLoc,
+                             diag::invertible_conformance_other_source_file,
+                             getInvertibleProtocolKindName(ip), nominalDecl);
+        }
+      }
+
       auto condReqs = normalConf->getConditionalRequirements();
       hasUnconditionalConformance = condReqs.empty();
       auto *thisProto = normalConf->getProtocol();

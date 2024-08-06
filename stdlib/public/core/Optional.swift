@@ -230,16 +230,12 @@ extension Optional where Wrapped: ~Copyable {
   public borrowing func _borrowingMap<U: ~Copyable, E: Error>(
     _ transform: (borrowing Wrapped) throws(E) -> U
   ) throws(E) -> U? {
-    #if compiler(>=6.0) && $NoncopyableGenerics
     switch self {
     case .some(let y):
       return .some(try transform(y))
     case .none:
       return .none
     }
-    #else
-    fatalError("unsupported compiler")
-    #endif
   }
 }
 
@@ -308,16 +304,12 @@ extension Optional where Wrapped: ~Copyable {
   public func _borrowingFlatMap<U: ~Copyable, E: Error>(
     _ transform: (borrowing Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
-    #if compiler(>=6.0) && $NoncopyableGenerics
     switch self {
     case .some(let y):
       return try transform(y)
     case .none:
       return .none
     }
-    #else
-    fatalError("Unsupported compiler")
-    #endif
   }
 }
 

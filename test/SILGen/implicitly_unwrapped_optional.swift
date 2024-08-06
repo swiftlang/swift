@@ -73,7 +73,7 @@ func f_46343() {
   // Verify that there are no additional reabstractions introduced.
   // CHECK: [[CLOSURE:%.+]] = function_ref @$s29implicitly_unwrapped_optional7f_46343yyFyypSgcfU_ : $@convention(thin) (@in_guaranteed Optional<Any>) -> ()
   // CHECK: [[F:%.+]] = thin_to_thick_function [[CLOSURE]] : $@convention(thin) (@in_guaranteed Optional<Any>) -> () to $@callee_guaranteed (@in_guaranteed Optional<Any>) -> ()
-  // CHECK: [[MOVED_F:%.*]] = move_value [var_decl] [[F]]
+  // CHECK: [[MOVED_F:%.*]] = move_value [lexical] [var_decl] [[F]]
   // CHECK: [[BORROWED_F:%.*]] = begin_borrow [[MOVED_F]]
   // CHECK: [[COPIED_F:%.*]] = copy_value [[BORROWED_F]]
   // CHECK: [[BORROWED_F:%.*]] = begin_borrow [[COPIED_F]]

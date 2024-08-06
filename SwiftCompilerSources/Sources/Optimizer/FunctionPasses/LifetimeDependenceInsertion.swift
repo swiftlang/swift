@@ -24,7 +24,7 @@ private let verbose = false
 
 private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
   if verbose {
-    print((prefix ? "### " : "") + message())
+    debugLog(prefix: prefix, message())
   }
 }
 
@@ -40,7 +40,10 @@ let lifetimeDependenceInsertionPass = FunctionPass(
 
   for instruction in function.instructions {
     if let dependentApply = LifetimeDependentApply(instruction) {
-      insertDependencies(for: dependentApply, context)
+      for operand in dependentApply.applySite.parameterOperands {
+        insertParameterDependencies(apply: dependentApply, target: operand, context)
+      }
+      insertResultDependencies(for: dependentApply, context)
     }
   }
 }
@@ -53,7 +56,7 @@ private struct LifetimeDependentApply {
     guard let apply = instruction as? FullApplySite else {
       return nil
     }
-    if !apply.hasResultDependence {
+    if !apply.hasLifetimeDependence {
       return nil
     }
     self.applySite = apply
@@ -85,22 +88,117 @@ private struct LifetimeDependentApply {
 }
 
 extension LifetimeDependentApply {
-  /// A lifetime argument copies, borrows, or mutatably borrows the
-  /// lifetime of the argument value.
-  struct LifetimeArgument {
+  enum TargetKind {
+    case result
+    case inParameter
+    case inoutParameter
+    case yield
+    case yieldAddress
+  }
+  
+  /// A lifetime argument that either inherits or creates a new scope for the lifetime of the argument value.
+  struct LifetimeSource {
     let convention: LifetimeDependenceConvention
     let value: Value
   }
 
-  func getLifetimeArguments() -> SingleInlineArray<LifetimeArgument> {
-    var args = SingleInlineArray<LifetimeArgument>()
+  /// List of lifetime dependencies for a single target.
+  struct LifetimeSources {
+    let targetKind: TargetKind
+    var sources = SingleInlineArray<LifetimeSource>()
+  }
+
+  func getResultDependenceSources() -> LifetimeSources? {
+    guard applySite.hasResultDependence else { return nil }
+    var sources: LifetimeSources
+    switch applySite {
+    case let beginApply as BeginApplyInst:
+      if beginApply.yieldedValues.contains(where: { $0.type.isAddress }) {
+        sources = LifetimeSources(targetKind: .yieldAddress)
+      } else {
+        sources = LifetimeSources(targetKind: .yield)
+      }
+    default:
+      sources = LifetimeSources(targetKind: .result)
+    }
     for operand in applySite.parameterOperands {
       guard let dep = applySite.resultDependence(on: operand) else {
         continue
       }
-      args.push(LifetimeArgument(convention: dep, value: operand.value))
+      sources.sources.push(LifetimeSource(convention: dep, value: operand.value))
     }
-    return args
+    return sources
+  }
+
+  func getParameterDependenceSources(target: Operand) -> LifetimeSources? {
+    guard let deps = applySite.parameterDependencies(target: target) else {
+      return nil
+    }
+    var sources: LifetimeSources
+    let convention = applySite.convention(of: target)!
+    switch convention {
+    case .indirectInout, .indirectInoutAliasable, .packInout:
+      sources = LifetimeSources(targetKind: .inoutParameter)
+    case .indirectIn, .indirectInGuaranteed, .indirectInCXX, .directOwned, .directUnowned, .directGuaranteed,
+         .packOwned, .packGuaranteed:
+      sources = LifetimeSources(targetKind: .inParameter)
+    case .indirectOut, .packOut:
+      debugLog("\(applySite)")
+      fatalError("Lifetime dependencies cannot target \(convention) parameter")
+    }
+    for (dep, operand) in zip(deps, applySite.parameterOperands) {
+      guard let dep = dep else {
+        continue
+      }
+      sources.sources.push(LifetimeSource(convention: dep, value: operand.value))
+    }
+    return sources
+  }
+
+  // Scoped dependencies require a mark_dependence for every variable that introduces this scope.
+  //
+  // Inherited dependencies do not require a mark_dependence if the target is a result or yielded value. The inherited
+  // lifetime is nonescapable, so either
+  //
+  // (a) the result or yield is never returned from this function
+  //
+  // (b) the inherited lifetime has a dependence root within this function (it comes from a dependent function argument
+  // or scoped dependence). In this case, when that depedence root is diagnosed, the analysis will find transtive uses
+  // of this apply's result.
+  //
+  // (c) the dependent value is passed to another call with a dependent inout argument, or it is stored to a yielded
+  // address of a coroutine that has a dependent inout argument. In this case, a mark_dependence will already be created
+  // for that inout argument.
+  //
+  // Parameter dependencies and yielded addresses always require a mark_dependence.
+  static func findDependenceBases(sources: LifetimeSources, _ context: FunctionPassContext) -> [Value] {
+    var bases: [Value] = []
+    for source in sources.sources {
+      switch source.convention {
+      case .inherit:
+        switch sources.targetKind {
+        case .result, .yield:
+          continue
+        case .inParameter, .inoutParameter, .yieldAddress:
+          _ = LifetimeDependence.visitDependenceRoots(enclosing: source.value, context) { scope in
+            log("Inherited lifetime from \(source.value)")
+            log("  scope: \(scope)")
+            bases.append(scope.parentValue)
+            return .continueWalk
+          }
+        }
+      case .scope:
+        // Create a new dependence on the apply's access to the argument.
+        for varIntoducer in gatherVariableIntroducers(for: source.value, context) {
+          if let scope = LifetimeDependence.Scope(base: varIntoducer, context) {
+            log("Scoped lifetime from \(source.value)")
+            log("  scope: \(scope)")
+            bases.append(scope.parentValue)
+          }
+        }
+      }
+    }
+    return bases
   }
 }
 
@@ -108,61 +206,49 @@ extension LifetimeDependentApply {
 /// arguments, then insert a mark_dependence [unresolved] from the
 /// result on each argument so that the result is recognized as a
 /// dependent value within each scope.
-private func insertDependencies(for apply: LifetimeDependentApply,
-  _ context: FunctionPassContext ) {
-  let bases = findDependenceBases(of: apply, context)
+private func insertResultDependencies(for apply: LifetimeDependentApply, _ context: FunctionPassContext ) {
+  guard let sources = apply.getResultDependenceSources() else {
+    return
+  }
+  log("Creating dependencies for \(apply.applySite)")
+
+  let bases = LifetimeDependentApply.findDependenceBases(sources: sources, context)
+
   for dependentValue in apply.applySite.resultOrYields {
     let builder = Builder(before: dependentValue.nextInstruction, context)
-    insertMarkDependencies(value: dependentValue, initializer: nil,
-                           bases: bases, builder: builder, context)
+    insertMarkDependencies(value: dependentValue, initializer: nil, bases: bases, builder: builder, context)
   }
-  let builder = Builder(after: apply.applySite, context)
   for resultOper in apply.applySite.indirectResultOperands {
     let accessBase = resultOper.value.accessBase
-    guard let (initialAddress, initializingStore) =
-            accessBase.findSingleInitializer(context) else {
+    guard let (initialAddress, initializingStore) = accessBase.findSingleInitializer(context) else {
       continue
     }
-    // TODO: This is currently too strict for a diagnostic pass. We
-    // should handle/cleanup projections and casts that occur before
-    // the initializingStore. Or check in the SIL verifier that all
-    // stores without an access scope follow this form. Then convert
-    // this bail-out to an assert.
-    guard initialAddress.usesOccurOnOrAfter(instruction: initializingStore,
-                                            context) else {
+    // TODO: This might bail-out on SIL that should be diagnosed. We should handle/cleanup projections and casts that
+    // occur before the initializingStore. Or check in the SIL verifier that all stores without an access scope follow
+    // this form. Then convert this bail-out to an assert.
+    guard initialAddress.usesOccurOnOrAfter(instruction: initializingStore, context) else {
       continue
     }
-    assert(initializingStore == resultOper.instruction,
-           "an indirect result is a store")
-    insertMarkDependencies(value: initialAddress,
-                           initializer: initializingStore, bases: bases,
-                           builder: builder, context)
+    assert(initializingStore == resultOper.instruction, "an indirect result is a store")
+    Builder.insert(after: apply.applySite, context) { builder in
+      insertMarkDependencies(value: initialAddress, initializer: initializingStore, bases: bases, builder: builder,
+                             context)
+    }
   }
 }
 
-private func findDependenceBases(of apply: LifetimeDependentApply,
-                                 _ context: FunctionPassContext)
-  -> [Value] {
-  log("Creating dependencies for \(apply.applySite)")
-  var bases: [Value] = []
-  for lifetimeArg in apply.getLifetimeArguments() {
-    switch lifetimeArg.convention {
-    case .inherit:
-      continue
-    case .scope:
-      // Create a new dependence on the apply's access to the argument.
-      for varIntoducer in gatherVariableIntroducers(for: lifetimeArg.value,
-                                                    context) {
-        if let scope =
-             LifetimeDependence.Scope(base: varIntoducer, context) {
-          log("Scoped lifetime from \(lifetimeArg.value)")
-          log("  scope: \(scope)")
-          bases.append(scope.parentValue)
-        }
-      }
-    }
+private func insertParameterDependencies(apply: LifetimeDependentApply, target: Operand,
+                                         _ context: FunctionPassContext ) {
+  guard let sources = apply.getParameterDependenceSources(target: target) else {
+    return
   }
-  return bases
+  log("Creating dependencies for \(apply.applySite)")
+
+  let bases = LifetimeDependentApply.findDependenceBases(sources: sources, context)
+
+  Builder.insert(after: apply.applySite, context) {
+    insertMarkDependencies(value: target.value, initializer: nil, bases: bases, builder: $0, context)    
+  }
 }
 
 private func insertMarkDependencies(value: Value, initializer: Instruction?,

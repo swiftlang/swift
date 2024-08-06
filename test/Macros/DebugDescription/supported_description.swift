@@ -31,7 +31,7 @@ struct MyStruct2: CustomDebugStringConvertible {
 struct MyStruct3: CustomDebugStringConvertible {
   var description: String { "thirty" }
   var debugDescription: String { "eleven" }
-  var _debugDescription: String { "two" }
+  var lldbDescription: String { "two" }
 }
 // CHECK: static let _lldb_summary = (
 // CHECK:     /* version */ 1 as UInt8,

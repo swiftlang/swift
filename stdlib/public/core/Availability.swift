@@ -44,9 +44,60 @@ public func _stdlib_isOSVersionAtLeast(
 #endif
 }
 
-#if os(macOS) && SWIFT_RUNTIME_OS_VERSIONING
+// Performs an availability check in macCatalyst code to support back
+// deployment. This entry point takes in a variant OS version
+// (i.e, an iOS version).
+//
+// This is not inlinable because we
+// don't want to inline the messy implementation details of the
+// compiler-rt support into apps and expose those as ABI surface.
+//
 // This is a magic entry point known to the compiler. It is called in
 // generated code for API availability checking.
+
+#if (os(macOS) || os(iOS) && targetEnvironment(macCatalyst)) && SWIFT_RUNTIME_OS_VERSIONING
+@_semantics("availability.osversion")
+@_effects(readnone)
+@available(macOS 10.15, iOS 13.0, *)
+public func _stdlib_isVariantOSVersionAtLeast(
+  _ major: Builtin.Word,
+  _ minor: Builtin.Word,
+  _ patch: Builtin.Word
+  ) -> Builtin.Int1 {
+  if Int(major) == 9999 {
+    return true._value
+  }
+  let queryVersion = (Int(major), Int(minor), Int(patch))
+  let major32 = Int32(truncatingIfNeeded:Int(queryVersion.0))
+  let minor32 = Int32(truncatingIfNeeded:Int(queryVersion.1))
+  let patch32 = Int32(truncatingIfNeeded:Int(queryVersion.2))
+
+  // Defer to a builtin that calls clang's version checking builtin from
+  // compiler-rt.
+  let result32 = Int32(Builtin.targetVariantOSVersionAtLeast(major32._value,
+                                                             minor32._value,
+                                                             patch32._value))
+  return (result32 != (0 as Int32))._value
+}
+#endif
+
+// Performs an availability check in zippered code to support back
+// deployment. This entry point takes in both a primary OS version
+// (i.e., a macOS version) and a variant OS version  (i.e, an iOS version).
+//
+// In a normal macOS process it will return 1 if the running OS version is
+// greater than or equal to major.minor.patchVersion and 0 otherwise. For an
+// macCatalyst process it will return 1 if the running macCatalyst version is greater
+// than or equal to the passed-in variant version.
+//
+// Unlike _stdlib_isOSVersionAtLeast, this is not inlinable because we
+// don't want to inline the messy implementation details of the
+// compiler-rt support into apps and expose those as ABI surface.
+//
+// This is a magic entry point known to the compiler. It is called in
+// generated code for API availability checking.
+
+#if (os(macOS) || os(iOS) && targetEnvironment(macCatalyst)) && SWIFT_RUNTIME_OS_VERSIONING
 @_semantics("availability.osversion")
 @_effects(readnone)
 @_unavailableInEmbedded
@@ -58,7 +109,28 @@ public func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(
   _ variantMinor: Builtin.Word,
   _ variantPatch: Builtin.Word
   ) -> Builtin.Int1 {
-  return _stdlib_isOSVersionAtLeast(major, minor, patch)
+  if Int(major) == 9999 {
+    return true._value
+  }
+  let queryVersion = (Int(major), Int(minor), Int(patch))
+  let queryVariantVersion =
+    (Int(variantMajor), Int(variantMinor), Int(variantPatch))
+
+  let major32 = UInt32(truncatingIfNeeded:Int(queryVersion.0))
+  let minor32 = UInt32(truncatingIfNeeded:Int(queryVersion.1))
+  let patch32 = UInt32(truncatingIfNeeded:Int(queryVersion.2))
+
+  let variantMajor32 = UInt32(truncatingIfNeeded:Int(queryVariantVersion.0))
+  let variantMinor32 = UInt32(truncatingIfNeeded:Int(queryVariantVersion.1))
+  let variantPatch32 = UInt32(truncatingIfNeeded:Int(queryVariantVersion.2))
+
+  // Defer to a builtin that calls clang's version checking builtin from
+  // compiler-rt.
+  let result32 = Int32(Builtin.targetOSVersionOrVariantOSVersionAtLeast(
+          major32._value, minor32._value, patch32._value,
+          variantMajor32._value, variantMinor32._value, variantPatch32._value))
+
+  return (result32 != (0 as UInt32))._value
 }
 #endif
 

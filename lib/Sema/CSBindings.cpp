@@ -2529,6 +2529,11 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
       return std::make_pair(fix, /*impact=*/(unsigned)10);
     }
 
+    // If the placeholder is in an invalid position, we'll have already
+    // recorded a fix, and can skip recording another.
+    if (cs.hasFixFor(dstLocator, FixKind::IgnoreInvalidPlaceholder))
+      return std::nullopt;
+
     ConstraintFix *fix = SpecifyTypeForPlaceholder::create(cs, srcLocator);
     return std::make_pair(fix, defaultImpact);
   }

@@ -75,9 +75,9 @@ distributed actor D {
 
 func test_outside(distributed: D) async throws {
   _ = distributed.normal
-  // expected-error@-1{{distributed actor-isolated property 'normal' can not be accessed from a non-isolated context}}
+  // expected-error@-1{{distributed actor-isolated property 'normal' can not be accessed from a nonisolated context}}
 
   _ = distributed.computed
-  // expected-error@-1{{distributed actor-isolated property 'computed' can not be accessed from a non-isolated context}}
+  // expected-error@-1{{distributed actor-isolated property 'computed' can not be accessed from a nonisolated context}}
 }
 

@@ -451,6 +451,8 @@ extension UInt128: BinaryInteger {
     UInt(Builtin.trunc_Int128_Int64(_value))
 #elseif _pointerBitWidth(_32)
     UInt(Builtin.trunc_Int128_Int32(_value))
+#elseif _pointerBitWidth(_16)
+    UInt(Builtin.trunc_Int128_Int16(_value))
 #else
 #error("Unsupported platform")
 #endif
@@ -548,5 +550,32 @@ extension UInt128: FixedWidthInteger, UnsignedInteger {
   @_transparent
   public var byteSwapped: Self {
     return Self(_low: _high.byteSwapped, _high: _low.byteSwapped)
+  }
+}
+
+// MARK: - Integer comparison type inference
+@available(SwiftStdlib 6.0, *)
+extension UInt128 {
+  // IMPORTANT: The following four apparently unnecessary overloads of
+  // comparison operations are necessary for literal comparands to be
+  // inferred as the desired type.
+  @_transparent @_alwaysEmitIntoClient
+  public static func != (lhs: Self, rhs: Self) -> Bool {
+    return !(lhs == rhs)
+  }
+
+  @_transparent @_alwaysEmitIntoClient
+  public static func <= (lhs: Self, rhs: Self) -> Bool {
+    return !(rhs < lhs)
+  }
+
+  @_transparent @_alwaysEmitIntoClient
+  public static func >= (lhs: Self, rhs: Self) -> Bool {
+    return !(lhs < rhs)
+  }
+
+  @_transparent @_alwaysEmitIntoClient
+  public static func > (lhs: Self, rhs: Self) -> Bool {
+    return rhs < lhs
   }
 }

@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend %S/swift-class-virtual-method-dispatch.swift -typecheck -module-name Class -clang-header-expose-decls=all-public -emit-clang-header-path %t/class.h -enable-library-evolution
 // RUN: %FileCheck %s < %t/class.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/class.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/class.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 // note: implemented in swift-class-virtual-method-dispatch.swift
 

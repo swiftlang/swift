@@ -205,7 +205,9 @@ protected:
     SHARED_FIELD(AddressToPointerInst, bool needsStackProtection);
     SHARED_FIELD(IndexAddrInst, bool needsStackProtection);
     SHARED_FIELD(HopToExecutorInst, bool mandatory);
-    SHARED_FIELD(DestroyValueInst, bool poisonRefs);
+    SHARED_FIELD(DestroyValueInst, uint8_t
+        poisonRefs : 1,
+        deadEnd : 1);
     SHARED_FIELD(EndCOWMutationInst, bool keepUnique);
     SHARED_FIELD(ConvertFunctionInst, bool withoutActuallyEscaping);
     SHARED_FIELD(BeginCOWMutationInst, bool native);
@@ -245,6 +247,9 @@ protected:
                  pointerEscape : 1,
                  fromVarDecl : 1,
                  fixed : 1);
+
+    SHARED_FIELD(DeallocBoxInst, uint8_t
+                 deadEnd : 1);
 
     SHARED_FIELD(CopyAddrInst, uint8_t
       isTakeOfSrc : 1,

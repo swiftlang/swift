@@ -1327,7 +1327,8 @@ static bool tryReplayCompilerResults(CompilerInstance &Instance) {
       Instance.getObjectStore(), Instance.getActionCache(),
       *Instance.getCompilerBaseKey(), Instance.getDiags(),
       Instance.getInvocation().getFrontendOptions().InputsAndOutputs, *CDP,
-      Instance.getInvocation().getCASOptions().EnableCachingRemarks);
+      Instance.getInvocation().getCASOptions().EnableCachingRemarks,
+      Instance.getInvocation().getIRGenOptions().UseCASBackend);
 
   // If we didn't replay successfully, re-start capture.
   if (!replayed)
@@ -1584,6 +1585,18 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
       createTargetMachine(opts, Instance.getASTContext());
 
   TargetMachine->Options.MCOptions.CAS = Instance.getSharedCASInstance();
+
+  if (Instance.getInvocation().getCASOptions().EnableCaching &&
+      opts.UseCASBackend)
+    TargetMachine->Options.MCOptions.ResultCallBack =
+        [&](const llvm::cas::CASID &ID) -> llvm::Error {
+      if (auto Err = Instance.getCASOutputBackend().storeMCCASObjectID(
+              OutputFilename, ID))
+        return Err;
+
+      return llvm::Error::success();
+    };
+
   // Free up some compiler resources now that we have an IRModule.
   freeASTContextIfPossible(Instance);
 
@@ -1940,6 +1953,13 @@ int swift::performFrontend(ArrayRef<const char *> Args,
                            &configurationFileBuffers, workingDirectory,
                            MainExecutablePath)) {
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
+  }
+
+  // Scripts that use the Foundation framework need it loaded early for bridging
+  // to work correctly on Darwin platforms. On other platforms this is a no-op.
+  if (Invocation.getFrontendOptions().RequestedAction ==
+      FrontendOptions::ActionType::Immediate) {
+    loadFoundationIfNeeded(Instance->getDiags());
   }
 
   // Don't ask clients to report bugs when running a script in immediate mode.

@@ -69,9 +69,13 @@ public:
   /// The custom attribute for an attached macro.
   CustomAttr *attachedMacroCustomAttr = nullptr;
 
+  /// MacroDecl name if the generated source is coming from macro expansion,
+  /// otherwise empty string.
+  std::string macroName = "";
+
   /// The name of the source file on disk that was created to hold the
   /// contents of this file for external clients.
-  StringRef onDiskBufferCopyFileName = StringRef();
+  mutable StringRef onDiskBufferCopyFileName = StringRef();
 
   /// Contains the ancestors of this source buffer, starting with the root source
   /// buffer and ending at this source buffer.
@@ -94,6 +98,7 @@ public:
 private:
   llvm::SourceMgr LLVMSourceMgr;
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem;
+  bool OpenSourcesAsVolatile = false;
   unsigned IDEInspectionTargetBufferID = 0U;
   unsigned IDEInspectionTargetOffset;
 
@@ -166,6 +171,12 @@ public:
     return FileSystem;
   }
 
+  // Setting this prevents SourceManager from memory mapping sources (via opening files
+  // with isVolatile=true);
+  void setOpenSourcesAsVolatile() {
+    OpenSourcesAsVolatile = true;
+  }
+
   void setIDEInspectionTarget(unsigned BufferID, unsigned Offset) {
     assert(BufferID != 0U && "Buffer should be valid");
 
@@ -209,8 +220,7 @@ public:
   bool hasGeneratedSourceInfo(unsigned bufferID);
 
   /// Retrieve the generated source information for the given buffer.
-  std::optional<GeneratedSourceInfo>
-  getGeneratedSourceInfo(unsigned bufferID) const;
+  const GeneratedSourceInfo *getGeneratedSourceInfo(unsigned bufferID) const;
 
   /// Retrieve the list of ancestors of the given source buffer, starting with
   /// the root buffer and proceding to the given buffer ID at the end.

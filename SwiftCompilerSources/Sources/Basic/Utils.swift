@@ -58,6 +58,14 @@ public func precondition(_ condition: Bool, _ message: @autoclosure () -> String
 //                            Debugging Utilities
 //===----------------------------------------------------------------------===//
 
+public func debugLog(prefix: Bool = true, _ message: @autoclosure () -> String) {
+  let formatted = (prefix ? "### " : "") + message()
+  formatted._withBridgedStringRef { ref in
+    Bridged_dbgs().write(ref)
+  }
+  Bridged_dbgs().newLine()
+}
+
 /// Let's lldb's `po` command not print any "internal" properties of the conforming type.
 ///
 /// This is useful if the `description` already contains all the information of a type instance.
@@ -66,31 +74,6 @@ public protocol NoReflectionChildren : CustomReflectable { }
 public extension NoReflectionChildren {
   var customMirror: Mirror { Mirror(self, children: []) }
 }
-
-#if !os(Windows)
-// TODO: https://github.com/apple/swift/issues/73252
-
-public var standardError = CFileStream(fp: stderr)
-
-#if os(Android) || canImport(Musl)
-  public typealias FILEPointer = OpaquePointer
-#else
-  public typealias FILEPointer = UnsafeMutablePointer<FILE>
-#endif
-
-public struct CFileStream: TextOutputStream {
-  var fp: FILEPointer
-
-  public func write(_ string: String) {
-    fputs(string, fp)
-  }
-
-  public func flush() {
-    fflush(fp)
-  }
-}
-
-#endif
 
 //===----------------------------------------------------------------------===//
 //                              StringRef

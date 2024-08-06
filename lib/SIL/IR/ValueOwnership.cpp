@@ -85,7 +85,6 @@ CONSTANT_OWNERSHIP_INST(Owned, CopyBlock)
 CONSTANT_OWNERSHIP_INST(Owned, CopyBlockWithoutEscaping)
 CONSTANT_OWNERSHIP_INST(Owned, CopyValue)
 CONSTANT_OWNERSHIP_INST(Owned, ExplicitCopyValue)
-CONSTANT_OWNERSHIP_INST(Owned, MoveValue)
 CONSTANT_OWNERSHIP_INST(Owned, EndCOWMutation)
 CONSTANT_OWNERSHIP_INST(Owned, EndInitLetRef)
 CONSTANT_OWNERSHIP_INST(Owned, BeginDeallocRef)
@@ -212,7 +211,9 @@ CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, OpenExistentialBoxValue)
 // value).
 CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MarkUninitialized)
 
-// unchecked_bitwise_cast is a bitwise copy. It produces a trivial or unowned
+// In raw SIL, a MoveValue delimits the scope of trivial variables.
+CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MoveValue)
+
 // result.
 //
 // If the operand is nontrivial and the result is trivial, then it is the
@@ -602,6 +603,8 @@ CONSTANT_OWNERSHIP_BUILTIN(None, TSanInoutAccess)
 CONSTANT_OWNERSHIP_BUILTIN(None, PoundAssert)
 CONSTANT_OWNERSHIP_BUILTIN(None, TypePtrAuthDiscriminator)
 CONSTANT_OWNERSHIP_BUILTIN(None, TargetOSVersionAtLeast)
+CONSTANT_OWNERSHIP_BUILTIN(None, TargetVariantOSVersionAtLeast)
+CONSTANT_OWNERSHIP_BUILTIN(None, TargetOSVersionOrVariantOSVersionAtLeast)
 CONSTANT_OWNERSHIP_BUILTIN(None, GlobalStringTablePointer)
 CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(None, CancelAsyncTask)
@@ -723,7 +726,7 @@ namespace swift::test {
 // - SILValue: value
 // Dumps:
 // - message
-static FunctionTest GetOwnershipKind("get-ownership-kind", [](auto &function,
+static FunctionTest GetOwnershipKind("get_ownership_kind", [](auto &function,
                                                               auto &arguments,
                                                               auto &test) {
   SILValue value = arguments.takeValue();

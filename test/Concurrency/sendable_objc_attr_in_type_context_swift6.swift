@@ -102,13 +102,13 @@ func test_sendable_attr_in_type_context(test: Test) {
 
   _ = TestWithSendableID<SendableValue>() // Ok
 
-  // TOOD(diagnostics): Duplicate diagnostics
+  // TODO(diagnostics): Duplicate diagnostics
   TestWithSendableID().add(MyValue())
   // expected-error@-1 3 {{type 'MyValue' does not conform to the 'Sendable' protocol}}
 
   TestWithSendableSuperclass().add(SendableMyValue()) // Ok
 
-  // TOOD(diagnostics): Duplicate diagnostics
+  // TODO(diagnostics): Duplicate diagnostics
   TestWithSendableSuperclass().add(MyValue())
   // expected-error@-1 3 {{type 'MyValue' does not conform to the 'Sendable' protocol}}
 }

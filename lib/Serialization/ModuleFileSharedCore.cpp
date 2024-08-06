@@ -703,7 +703,7 @@ void ModuleFileSharedCore::outputDiagnosticInfo(llvm::raw_ostream &os) const {
      << " against SDK " << SDKVersion
      << ", " << (resilient? "resilient": "non-resilient");
   if (Bits.AllowNonResilientAccess)
-    os << ", built with -experimental-allow-non-resilient-access";
+    os << ", built with -allow-non-resilient-access";
   if (Bits.IsAllowModuleWithCompilerErrorsEnabled)
     os << ", built with -experimental-allow-module-with-compiler-errors";
   if (ModuleInputBuffer)
@@ -1785,10 +1785,23 @@ bool ModuleFileSharedCore::hasSourceInfo() const {
   return !!DeclUSRsTable;
 }
 
+std::string ModuleFileSharedCore::resolveModuleDefiningFilePath(const StringRef SDKPath) const {
+  if (!ModuleInterfacePath.empty()) {
+    std::string interfacePath = ModuleInterfacePath.str();
+    if (llvm::sys::path::is_relative(interfacePath)) {
+      SmallString<128> absoluteInterfacePath(SDKPath);
+      llvm::sys::path::append(absoluteInterfacePath, interfacePath);
+      return absoluteInterfacePath.str().str();
+    } else
+      return interfacePath;
+  } else
+    return ModuleInputBuffer->getBufferIdentifier().str();
+}
+
 ModuleLoadingBehavior
 ModuleFileSharedCore::getTransitiveLoadingBehavior(
                                           const Dependency &dependency,
-                                          bool debuggerMode,
+                                          bool importNonPublicDependencies,
                                           bool isPartialModule,
                                           StringRef packageName,
                                           bool forTestable) const {
@@ -1804,7 +1817,7 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
   if (dependency.isImplementationOnly()) {
     // Implementation-only dependencies are not usually loaded from
     // transitive imports.
-    if (debuggerMode || forTestable) {
+    if (importNonPublicDependencies || forTestable) {
       // In the debugger, try to load the module if possible.
       // Same in the case of a testable import, try to load the dependency
       // but don't fail if it's missing as this could be source breaking.
@@ -1822,7 +1835,7 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
     // on testable imports.
     if (forTestable || !moduleIsResilient) {
       return ModuleLoadingBehavior::Required;
-    } else if (debuggerMode) {
+    } else if (importNonPublicDependencies) {
       return ModuleLoadingBehavior::Optional;
     } else {
       return ModuleLoadingBehavior::Ignored;
@@ -1836,7 +1849,7 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
         forTestable ||
         !moduleIsResilient) {
       return ModuleLoadingBehavior::Required;
-    } else if (debuggerMode) {
+    } else if (importNonPublicDependencies) {
       return ModuleLoadingBehavior::Optional;
     } else {
       return ModuleLoadingBehavior::Ignored;

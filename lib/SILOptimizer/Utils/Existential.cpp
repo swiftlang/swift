@@ -390,7 +390,7 @@ ConcreteExistentialInfo::ConcreteExistentialInfo(SILValue existential,
 
   // We have the open_existential; we still need the conformance.
   auto ConformanceRef =
-      M->getSwiftModule()->checkConformance(ConcreteTypeCandidate, Protocol);
+      ModuleDecl::checkConformance(ConcreteTypeCandidate, Protocol);
   if (ConformanceRef.isInvalid())
     return;
 

@@ -190,6 +190,50 @@ struct ConcreteIntMoveAsLike: ~Copyable {
   let cell: CellThatMovesAsLike<Int32>
 }
 
+// CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}25SmallVectorOf2MovesAsLikeVWV" = {{.*}} %swift.vwtable
+// initializeWithTake
+// CHECK-SAME:  , ptr @"$s10raw_layout25SmallVectorOf2MovesAsLikeVwtk
+// assignWithTake
+// CHECK-SAME:  , ptr @"$s10raw_layout25SmallVectorOf2MovesAsLikeVwta
+// size
+// CHECK-SAME:  , {{i64|i32}} 0
+// stride
+// CHECK-SAME:  , {{i64|i32}} 0
+// flags: alignment 0, incomplete
+// CHECK-SAME:  , <i32 0x400000>
+@_rawLayout(likeArrayOf: T, count: 2, movesAsLike)
+struct SmallVectorOf2MovesAsLike<T: ~Copyable>: ~Copyable {}
+
+// CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}30ConcreteSmallVectorMovesAsLikeVWV" = {{.*}} %swift.vwtable
+// initializeWithTake
+// CHECK-SAME:  , ptr @"$s10raw_layout30ConcreteSmallVectorMovesAsLikeVwtk
+// assignWithTake
+// CHECK-SAME:  , ptr @"$s10raw_layout30ConcreteSmallVectorMovesAsLikeVwta
+// size
+// CHECK-SAME:  , {{i64|i32}} 2
+// stride
+// CHECK-SAME:  , {{i64|i32}} 2
+// flags: not copyable, not bitwise takable, not pod, not inline
+// CHECK-SAME:  , <i32 0x930000>
+struct ConcreteSmallVectorMovesAsLike: ~Copyable {
+  let vector: SmallVectorOf2MovesAsLike<NonBitwiseTakableCXXType>
+}
+
+// CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}33ConcreteSmallVectorIntMovesAsLikeVWV" = {{.*}} %swift.vwtable
+// initializeWithTake
+// CHECK-SAME:  , ptr @__swift_memcpy8_4
+// assignWithTake
+// CHECK-SAME:  , ptr @__swift_memcpy8_4
+// size
+// CHECK-SAME:  , {{i64|i32}} 8
+// stride
+// CHECK-SAME:  , {{i64|i32}} 8
+// flags: alignment 3, not copyable
+// CHECK-SAME:  , <i32 0x800003>
+struct ConcreteSmallVectorIntMovesAsLike: ~Copyable {
+  let vector: SmallVectorOf2MovesAsLike<Int32>
+}
+
 sil @use_lock : $@convention(thin) (@in_guaranteed Lock) -> () {
 entry(%L: $*Lock):
     return undef : $()
@@ -217,7 +261,9 @@ entry(%0 : $*Cell<T>):
     return %2 : $UnsafeMutablePointer<T>
 }
 
-// Dependent layout metadata initialization:
+//===----------------------------------------------------------------------===//
+// Dependent layout metadata initialization
+//===----------------------------------------------------------------------===//
 
 // Cell<T>
 
@@ -241,32 +287,106 @@ entry(%0 : $*Cell<T>):
 // CHECK-LABEL: define {{.*}} swiftcc %swift.metadata_response @"$s{{[A-Za-z0-9_]*}}14SmallVectorBufVMr"(ptr %"SmallVectorBuf<T>", ptr {{.*}}, ptr {{.*}})
 // CHECK: call void @swift_initRawStructMetadata(ptr %"SmallVectorBuf<T>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} 8)
 
+//===----------------------------------------------------------------------===//
 // Ensure that 'movesAsLike' is correctly calling the underlying type's move constructor
+//===----------------------------------------------------------------------===//
 
+//===----------------------------------------------------------------------===//
 // CellThatMovesAsLike<T> initializeWithTake
+//===----------------------------------------------------------------------===//
 
 // CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout19CellThatMovesAsLikeVwtk"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %"CellThatMovesAsLike<T>")
 // CHECK: [[T_ADDR:%.*]] = getelementptr inbounds ptr, ptr %"CellThatMovesAsLike<T>", {{i64|i32}} 2
 // CHECK-NEXT: [[T:%.*]] = load ptr, ptr [[T_ADDR]]
 // CHECK: {{%.*}} = call ptr %InitializeWithTake(ptr {{.*}} %dest, ptr {{.*}} %src, ptr [[T]])
 
+//===----------------------------------------------------------------------===//
 // CellThatMovesAsLike<T> assignWithTake
+//===----------------------------------------------------------------------===//
 
 // CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout19CellThatMovesAsLikeVwta"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %"CellThatMovesAsLike<T>")
 // CHECK: [[T_ADDR:%.*]] = getelementptr inbounds ptr, ptr %"CellThatMovesAsLike<T>", {{i64|i32}} 2
 // CHECK-NEXT: [[T:%.*]] = load ptr, ptr [[T_ADDR]]
 // CHECK: {{%.*}} = call ptr %AssignWithTake(ptr {{.*}} %dest, ptr {{.*}} %src, ptr [[T]])
 
+//===----------------------------------------------------------------------===//
 // ConcreteMoveAsLike initializeWithTake
+//===----------------------------------------------------------------------===//
 
 // CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout18ConcreteMoveAsLikeVwtk"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %ConcreteMoveAsLike)
 // CHECK: [[DEST_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %dest, i32 0, i32 0
 // CHECK: [[SRC_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %src, i32 0, i32 0
 // CHECK: {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[DEST_CELL]], ptr [[SRC_CELL]])
 
+//===----------------------------------------------------------------------===//
 // ConcreteMoveAsLike assignWithTake
+//===----------------------------------------------------------------------===//
 
 // CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout18ConcreteMoveAsLikeVwta"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %ConcreteMoveAsLike)
 // CHECK: [[DEST_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %dest, i32 0, i32 0
 // CHECK: [[SRC_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %src, i32 0, i32 0
 // CHECK: {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[DEST_CELL]], ptr [[SRC_CELL]])
+
+//===----------------------------------------------------------------------===//
+// SmallVectorOf2MovesAsLike<T> initializeWithTake
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout25SmallVectorOf2MovesAsLikeVwtk"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %"SmallVectorOf2MovesAsLike<T>")
+// CHECK: [[T_ADDR:%.*]] = getelementptr inbounds ptr, ptr %"SmallVectorOf2MovesAsLike<T>", {{i64|i32}} 2
+// CHECK-NEXT: [[T:%.*]] = load ptr, ptr [[T_ADDR]]
+// CHECK: [[STRIDE_GEP:%.*]] = getelementptr inbounds %swift.vwtable, ptr {{%.*}}, i32 0, i32 9
+// CHECK-NEXT: [[STRIDE:%.*]] = load {{i64|i32}}, ptr [[STRIDE_GEP]]
+// CHECK: [[OFFSET_0:%.*]] = mul {{i64|i32}} 0, [[STRIDE]]
+// CHECK-NEXT: [[SRC_ELT_0:%.*]] = getelementptr inbounds i8, ptr %src, {{i64|i32}} [[OFFSET_0]]
+// CHECK-NEXT: [[DEST_ELT_0:%.*]] = getelementptr inbounds i8, ptr %dest, {{i64|i32}} [[OFFSET_0]]
+// CHECK: {{%.*}} = call ptr %InitializeWithTake(ptr {{.*}} [[DEST_ELT_0]], ptr {{.*}} [[SRC_ELT_0]], ptr [[T]])
+// CHECK: [[OFFSET_1:%.*]] = mul {{i64|i32}} 1, [[STRIDE]]
+// CHECK-NEXT: [[SRC_ELT_1:%.*]] = getelementptr inbounds i8, ptr %src, {{i64|i32}} [[OFFSET_1]]
+// CHECK-NEXT: [[DEST_ELT_1:%.*]] = getelementptr inbounds i8, ptr %dest, {{i64|i32}} [[OFFSET_1]]
+// CHECK: {{%.*}} = call ptr %InitializeWithTake(ptr {{.*}} [[DEST_ELT_1]], ptr {{.*}} [[SRC_ELT_1]], ptr [[T]])
+
+//===----------------------------------------------------------------------===//
+// SmallVectorOf2MovesAsLike<T> assignWithTake
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout25SmallVectorOf2MovesAsLikeVwta"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %"SmallVectorOf2MovesAsLike<T>")
+// CHECK: [[T_ADDR:%.*]] = getelementptr inbounds ptr, ptr %"SmallVectorOf2MovesAsLike<T>", {{i64|i32}} 2
+// CHECK-NEXT: [[T:%.*]] = load ptr, ptr [[T_ADDR]]
+// CHECK: [[STRIDE_GEP:%.*]] = getelementptr inbounds %swift.vwtable, ptr {{%.*}}, i32 0, i32 9
+// CHECK-NEXT: [[STRIDE:%.*]] = load {{i64|i32}}, ptr [[STRIDE_GEP]]
+// CHECK: [[OFFSET_0:%.*]] = mul {{i64|i32}} 0, [[STRIDE]]
+// CHECK-NEXT: [[SRC_ELT_0:%.*]] = getelementptr inbounds i8, ptr %src, {{i64|i32}} [[OFFSET_0]]
+// CHECK-NEXT: [[DEST_ELT_0:%.*]] = getelementptr inbounds i8, ptr %dest, {{i64|i32}} [[OFFSET_0]]
+// CHECK: {{%.*}} = call ptr %AssignWithTake(ptr {{.*}} [[DEST_ELT_0]], ptr {{.*}} [[SRC_ELT_0]], ptr [[T]])
+// CHECK: [[OFFSET_1:%.*]] = mul {{i64|i32}} 1, [[STRIDE]]
+// CHECK-NEXT: [[SRC_ELT_1:%.*]] = getelementptr inbounds i8, ptr %src, {{i64|i32}} [[OFFSET_1]]
+// CHECK-NEXT: [[DEST_ELT_1:%.*]] = getelementptr inbounds i8, ptr %dest, {{i64|i32}} [[OFFSET_1]]
+// CHECK: {{%.*}} = call ptr %AssignWithTake(ptr {{.*}} [[DEST_ELT_1]], ptr {{.*}} [[SRC_ELT_1]], ptr [[T]])
+
+//===----------------------------------------------------------------------===//
+// ConcreteSmallVectorMovesAsLike initializeWithTake
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout30ConcreteSmallVectorMovesAsLikeVwtk"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %ConcreteSmallVectorMovesAsLike)
+// CHECK: [[DEST_VECTOR:%.*]] = getelementptr inbounds %T10raw_layout30ConcreteSmallVectorMovesAsLikeV, ptr %dest, i32 0, i32 0
+// CHECK: [[SRC_VECTOR:%.*]] = getelementptr inbounds %T10raw_layout30ConcreteSmallVectorMovesAsLikeV, ptr %src, i32 0, i32 0
+// CHECK: [[SRC_0:%.*]] = getelementptr inbounds %TSo24NonBitwiseTakableCXXTypeV, ptr [[SRC_VECTOR]], {{i64|i32}} 0
+// CHECK-NEXT: [[DEST_0:%.*]] = getelementptr inbounds %TSo24NonBitwiseTakableCXXTypeV, ptr [[DEST_VECTOR]], {{i64|i32}} 0
+// CHECK-NEXT: {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[DEST_0]], ptr [[SRC_0]])
+// CHECK: [[SRC_1:%.*]] = getelementptr inbounds %TSo24NonBitwiseTakableCXXTypeV, ptr [[SRC_VECTOR]], {{i64|i32}} 1
+// CHECK-NEXT: [[DEST_1:%.*]] = getelementptr inbounds %TSo24NonBitwiseTakableCXXTypeV, ptr [[DEST_VECTOR]], {{i64|i32}} 1
+// CHECK-NEXT: {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[DEST_1]], ptr [[SRC_1]])
+
+//===----------------------------------------------------------------------===//
+// ConcreteSmallVectorMovesAsLike assignWithTake
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout30ConcreteSmallVectorMovesAsLikeVwta"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %ConcreteSmallVectorMovesAsLike)
+// CHECK: [[DEST_VECTOR:%.*]] = getelementptr inbounds %T10raw_layout30ConcreteSmallVectorMovesAsLikeV, ptr %dest, i32 0, i32 0
+// CHECK: [[SRC_VECTOR:%.*]] = getelementptr inbounds %T10raw_layout30ConcreteSmallVectorMovesAsLikeV, ptr %src, i32 0, i32 0
+// CHECK: [[SRC_0:%.*]] = getelementptr inbounds %TSo24NonBitwiseTakableCXXTypeV, ptr [[SRC_VECTOR]], {{i64|i32}} 0
+// CHECK-NEXT: [[DEST_0:%.*]] = getelementptr inbounds %TSo24NonBitwiseTakableCXXTypeV, ptr [[DEST_VECTOR]], {{i64|i32}} 0
+// CHECK: {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[DEST_0]], ptr [[SRC_0]])
+// CHECK: [[SRC_1:%.*]] = getelementptr inbounds %TSo24NonBitwiseTakableCXXTypeV, ptr [[SRC_VECTOR]], {{i64|i32}} 1
+// CHECK-NEXT: [[DEST_1:%.*]] = getelementptr inbounds %TSo24NonBitwiseTakableCXXTypeV, ptr [[DEST_VECTOR]], {{i64|i32}} 1
+// CHECK: {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[DEST_1]], ptr [[SRC_1]])

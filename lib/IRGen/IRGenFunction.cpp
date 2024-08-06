@@ -309,6 +309,39 @@ IRGenFunction::emitTargetOSVersionAtLeastCall(llvm::Value *major,
   return Builder.CreateCall(fn, {platformID, major, minor, patch});
 }
 
+llvm::Value *
+IRGenFunction::emitTargetVariantOSVersionAtLeastCall(llvm::Value *major,
+                                                     llvm::Value *minor,
+                                                     llvm::Value *patch) {
+  auto *fn = cast<llvm::Function>(IGM.getPlatformVersionAtLeastFn());
+
+  llvm::Value *iOSPlatformID =
+    llvm::ConstantInt::get(IGM.Int32Ty, llvm::MachO::PLATFORM_IOS);
+  return Builder.CreateCall(fn->getFunctionType(), fn, {iOSPlatformID, major, minor, patch});
+}
+
+llvm::Value *
+IRGenFunction::emitTargetOSVersionOrVariantOSVersionAtLeastCall(
+    llvm::Value *major, llvm::Value *minor, llvm::Value *patch,
+    llvm::Value *variantMajor, llvm::Value *variantMinor,
+    llvm::Value *variantPatch) {
+  auto *fn = cast<llvm::Function>(
+      IGM.getTargetOSVersionOrVariantOSVersionAtLeastFn());
+
+  llvm::Value *macOSPlatformID =
+      llvm::ConstantInt::get(IGM.Int32Ty, llvm::MachO::PLATFORM_MACOS);
+
+  llvm::Value *iOSPlatformID =
+    llvm::ConstantInt::get(IGM.Int32Ty, llvm::MachO::PLATFORM_IOS);
+
+  return Builder.CreateCall(fn->getFunctionType(),
+                            fn, {macOSPlatformID, major, minor, patch,
+                                 iOSPlatformID, variantMajor, variantMinor,
+                                 variantPatch});
+}
+
+
+
 /// Initialize a relative indirectable pointer to the given value.
 /// This always leaves the value in the direct state; if it's not a
 /// far reference, it's the caller's responsibility to ensure that the

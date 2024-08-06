@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h
 // RUN: %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-abi < %t/functions.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/functions.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 // CHECK:      SWIFT_INLINE_THUNK float passThrougCFloat(float x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT: return _impl::$s9Functions16passThrougCFloatyS2fF(x);

@@ -92,19 +92,6 @@ static bool isTargetTooNew(const llvm::Triple &moduleTarget,
   return ctxTarget.isOSVersionLT(moduleTarget);
 }
 
-std::string ModuleFile::resolveModuleDefiningFilename(const ASTContext &ctx) {
-  if (!Core->ModuleInterfacePath.empty()) {
-    std::string interfacePath = Core->ModuleInterfacePath.str();
-    if (llvm::sys::path::is_relative(interfacePath)) {
-      SmallString<128> absoluteInterfacePath(ctx.SearchPathOpts.getSDKPath());
-      llvm::sys::path::append(absoluteInterfacePath, interfacePath);
-      return absoluteInterfacePath.str().str();
-    } else
-      return interfacePath;
-  } else
-    return getModuleLoadedFilename().str();
-}
-
 namespace swift {
 namespace serialization {
 bool areCompatible(const llvm::Triple &moduleTarget,
@@ -272,7 +259,8 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
 
   ASTContext &ctx = getContext();
   // Resolve potentially-SDK-relative module-defining .swiftinterface path
-  ResolvedModuleDefiningFilename = resolveModuleDefiningFilename(ctx);
+  ResolvedModuleDefiningFilename =
+       Core->resolveModuleDefiningFilePath(ctx.SearchPathOpts.getSDKPath());
 
   llvm::Triple moduleTarget(llvm::Triple::normalize(Core->TargetTriple));
   if (!areCompatible(moduleTarget, ctx.LangOpts.Target)) {
@@ -321,11 +309,9 @@ ModuleFile::getTransitiveLoadingBehavior(const Dependency &dependency,
   // as a partial module.
   auto isPartialModule = mod->isMainModule();
 
-  return Core->getTransitiveLoadingBehavior(dependency.Core,
-                                            ctx.LangOpts.DebuggerSupport,
-                                            isPartialModule,
-                                            ctx.LangOpts.PackageName,
-                                            forTestable);
+  return Core->getTransitiveLoadingBehavior(
+      dependency.Core, ctx.LangOpts.ImportNonPublicDependencies,
+      isPartialModule, ctx.LangOpts.PackageName, forTestable);
 }
 
 bool ModuleFile::mayHaveDiagnosticsPointingAtBuffer() const {

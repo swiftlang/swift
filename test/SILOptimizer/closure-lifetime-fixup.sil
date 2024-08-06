@@ -14,6 +14,8 @@ sil @noescapeBlock3 : $@convention(c) (Optional<@convention(block) @noescape (Op
 sil @$sSS10FoundationE19_bridgeToObjectiveCSo8FakeNSStringCyF : $@convention(method) (@guaranteed String) -> @owned FakeNSString
 sil @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
 sil @$sSSSgIegg_So8FakeNSStringCSgIyBy_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@guaranteed Optional<String>) -> (), Optional<FakeNSString>) -> ()
+sil @nothrower : $@convention(thin) () -> Int 
+sil @rethrower : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error any Error)) -> (Int, @error any Error) 
 
 // Just make sure that we perform the optimization and do not trigger the ownership verifier.
 //
@@ -267,22 +269,16 @@ bb3:
 
 // CHECK-LABEL: sil [ossa] @test_alloc_stack_arg_with_frontier_outside_try_apply_successors : $@convention(thin) <Self> (@in_guaranteed Self) -> @error any Error {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
-// CHECK:         [[STACK:%[^,]+]] = alloc_stack $Self
 // CHECK:         try_apply undef() {{.*}}, normal [[SUCCESS_1:bb[0-9]+]], error [[FAILURE_1:bb[0-9]+]]
 // CHECK:       [[SUCCESS_1]]
-// CHECK:         copy_addr [[INSTANCE]] to [init] [[STACK]] : $*Self, {{.*}} scope [[STACK_SCOPE:[0-9]+]]
-// CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] undef<Self>([[STACK]])
-// CHECK:         [[DEPENDENCY:%[^,]+]] = mark_dependence [nonescaping] [[CLOSURE]] {{.*}} on [[STACK]]
+// CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] undef<Self>([[INSTANCE]])
+// CHECK:         [[DEPENDENCY:%[^,]+]] = mark_dependence [nonescaping] [[CLOSURE]] {{.*}} on [[INSTANCE]]
 // CHECK:         try_apply undef([[DEPENDENCY]]) {{.*}}, normal [[SUCCESS_2:bb[0-9]+]], error [[FAILURE_2:bb[0-9]+]]
 // CHECK:       [[SUCCESS_2]]
 // CHECK:         destroy_value [[DEPENDENCY]]
-// CHECK:         destroy_addr [[STACK]]
-// CHECK:         dealloc_stack [[STACK]] : $*Self, {{.*}} scope [[STACK_SCOPE]]
 // CHECK:       [[FAILURE_1]]
-// CHECK:         dealloc_stack [[STACK]] : $*Self, {{.*}} scope [[STACK_SCOPE]]
 // CHECK:         throw
 // CHECK:       [[FAILURE_2]]
-// CHECK-NOT:     dealloc_stack
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'test_alloc_stack_arg_with_frontier_outside_try_apply_successors'
 sil [ossa] @test_alloc_stack_arg_with_frontier_outside_try_apply_successors : $@convention(thin) <Self> (@in_guaranteed Self) -> (@error any Error) {
@@ -383,3 +379,34 @@ bb2(%19 : @owned $any Error):
   dealloc_stack %5 : $*Int
   throw %19 : $any Error
 }
+
+// The destroy that's created in the dead-end should be flagged [dead_end].
+// CHECK-LABEL: sil [ossa] @testRethrowingNonthrowing : {{.*}} {
+// CHECK:         [[NOTHROWER:%[^,]+]] = function_ref @nothrower
+// CHECK:         [[THICK_NOTHROWER:%[^,]+]] = thin_to_thick_function [[NOTHROWER]]
+// CHECK:         [[THROWING_NOTHROWER:%[^,]+]] = convert_function [[THICK_NOTHROWER]]
+// CHECK:         [[NOTHROWER_COPY:%[^,]+]] = copy_value [[THROWING_NOTHROWER]]
+// CHECK:       {{bb[0-9]+}}
+// CHECK:         destroy_value [[NOTHROWER_COPY]]
+// CHECK:       {{bb[0-9]+}}
+// CHECK:         destroy_value [dead_end] [[NOTHROWER_COPY]]
+// CHECK-LABEL: } // end sil function 'testRethrowingNonthrowing'
+sil [ossa] @testRethrowingNonthrowing : $@convention(thin) () -> () {
+bb0:
+  %nothrower = function_ref @nothrower : $@convention(thin) () -> Int 
+  %thick_nothrower = thin_to_thick_function %nothrower : $@convention(thin) () -> Int to $@callee_guaranteed () -> Int 
+  %throwing_nothrower = convert_function %thick_nothrower : $@callee_guaranteed () -> Int to $@callee_guaranteed () -> (Int, @error any Error) 
+  %nonescaping_nothrower = convert_escape_to_noescape [not_guaranteed] %throwing_nothrower : $@callee_guaranteed () -> (Int, @error any Error) to $@noescape @callee_guaranteed () -> (Int, @error any Error) 
+  %rethrower = function_ref @rethrower : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error any Error)) -> (Int, @error any Error) 
+  try_apply %rethrower(%nonescaping_nothrower) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error any Error)) -> (Int, @error any Error), normal bb1, error bb2 
+
+bb1(%val : $Int):                                   
+  destroy_value %nonescaping_nothrower : $@noescape @callee_guaranteed () -> (Int, @error any Error) 
+  %8 = tuple ()                                   
+  return %8 : $()                                 
+
+bb2(%error : @owned $any Error):                     
+  destroy_value [dead_end] %error : $any Error       
+  destroy_value [dead_end] %nonescaping_nothrower : $@noescape @callee_guaranteed () -> (Int, @error any Error) 
+  unreachable                                     
+} 

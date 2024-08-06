@@ -245,7 +245,7 @@ extension AtomicUpdateOrdering {
   /// An acquiring update synchronizes with a releasing operation
   /// whose value its reads. It ensures that the releasing and
   /// acquiring threads agree that all subsequent variable accesses on
-  /// the acquring thread happen after the atomic operation itself.
+  /// the acquiring thread happen after the atomic operation itself.
   ///
   /// This value corresponds to `std::memory_order_acquire` in C++.
   @available(SwiftStdlib 6.0, *)

@@ -1591,7 +1591,19 @@ public:
   // Patterns
   //===--------------------------------------------------------------------===//
 
-  SILValue emitOSVersionRangeCheck(SILLocation loc, const VersionRange &range);
+  SILValue emitOSVersionRangeCheck(SILLocation loc, const VersionRange &range,
+                                   bool forTargetVariant = false);
+  SILValue
+  emitOSVersionOrVariantVersionRangeCheck(SILLocation loc,
+                                          const VersionRange &targetRange,
+                                          const VersionRange &variantRange);
+  /// Emits either a single OS version range check or an OS version & variant
+  /// version range check automatically, depending on the active target triple
+  /// and requested versions.
+  SILValue emitZipperedOSVersionRangeCheck(SILLocation loc,
+                                           const VersionRange &targetRange,
+                                           const VersionRange &variantRange);
+
   void emitStmtCondition(StmtCondition Cond, JumpDest FalseDest, SILLocation loc,
                          ProfileCounter NumTrueTaken = ProfileCounter(),
                          ProfileCounter NumFalseTaken = ProfileCounter());

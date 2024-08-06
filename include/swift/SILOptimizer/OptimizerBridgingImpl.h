@@ -34,9 +34,8 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 //                                BridgedAliasAnalysis
 //===----------------------------------------------------------------------===//
 
-BridgedMemoryBehavior BridgedAliasAnalysis::getMemBehavior(BridgedInstruction inst, BridgedValue addr) const {
-  return (BridgedMemoryBehavior)aa->computeMemoryBehavior(inst.unbridged(),
-                                                          addr.getSILValue());
+bool BridgedAliasAnalysis::unused(BridgedValue address1, BridgedValue address2) const {
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -415,9 +414,7 @@ void BridgedPassContext::loadFunction(BridgedFunction function, bool loadCallees
 
 BridgedSubstitutionMap BridgedPassContext::getContextSubstitutionMap(BridgedType type) const {
   swift::SILType ty = type.unbridged();
-  auto *ntd = ty.getASTType()->getAnyNominal();
-  auto *mod = invocation->getPassManager()->getModule()->getSwiftModule();
-  return ty.getASTType()->getContextSubstitutionMap(mod, ntd);
+  return ty.getASTType()->getContextSubstitutionMap();
 }
 
 BridgedType BridgedPassContext::getBuiltinIntegerType(SwiftInt bitWidth) const {

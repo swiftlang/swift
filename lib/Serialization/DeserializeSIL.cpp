@@ -1455,14 +1455,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ONETYPE_ONEOPERAND_INST(ExistentialMetatype)
     ONETYPE_ONEOPERAND_INST(ProjectExistentialBox)
 #undef ONETYPE_ONEOPERAND_INST
-  case SILInstructionKind::DeallocBoxInst:
+  case SILInstructionKind::DeallocBoxInst: {
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");
+    IsDeadEnd_t isDeadEnd = IsDeadEnd_t(Attr & 0x1);
     ResultInst = Builder.createDeallocBox(
-        Loc, getLocalValue(Builder.maybeGetFunction(), ValID,
-                           getSILType(MF->getType(TyID2),
-                                      (SILValueCategory)TyCategory2, Fn)));
+        Loc,
+        getLocalValue(
+            Builder.maybeGetFunction(), ValID,
+            getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn)),
+        isDeadEnd);
     break;
+  }
   case SILInstructionKind::OpenExistentialAddrInst:
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");
@@ -2322,13 +2326,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   }
   case SILInstructionKind::DestroyValueInst: {
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
-    unsigned poisonRefs = Attr;
+    PoisonRefs_t poisonRefs = PoisonRefs_t(Attr & 0x1);
+    IsDeadEnd_t isDeadEnd = IsDeadEnd_t((Attr >> 1) & 0x1);
     ResultInst = Builder.createDestroyValue(
         Loc,
         getLocalValue(
             Builder.maybeGetFunction(), ValID,
             getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn)),
-        poisonRefs != 0);
+        poisonRefs, isDeadEnd);
     break;
   }
 
@@ -3651,11 +3656,23 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
     return nullptr;
   }
 
+  VarDecl *globalDecl = nullptr;
+  if (dID) {
+    llvm::Expected<Decl *> d = MF->getDeclChecked(dID);
+    if (d) {
+      globalDecl = cast<VarDecl>(d.get());
+    } else {
+      // This can happen with cross-module-optimizations, if the linkage of a
+      // private global variable is changed to public.
+      consumeError(d.takeError());
+    }
+  }
+
   auto Ty = MF->getType(TyID);
   SILGlobalVariable *v = SILGlobalVariable::create(
       SILMod, linkage.value(), SerializedKind_t(serializedKind),
       Name.str(), getSILType(Ty, SILValueCategory::Object, nullptr),
-      std::nullopt, dID ? cast<VarDecl>(MF->getDecl(dID)) : nullptr);
+      std::nullopt, globalDecl);
   v->setLet(IsLet);
   globalVarOrOffset.set(v, true /*isFullyDeserialized*/);
   v->setDeclaration(IsDeclaration);

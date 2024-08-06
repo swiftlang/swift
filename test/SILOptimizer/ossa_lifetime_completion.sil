@@ -32,13 +32,13 @@ typealias AnyObject = Builtin.AnyObject
 
 protocol P : AnyObject {}
 
-// CHECK-LABEL: begin running test 1 of 1 on eagerConsumneOwnedArg: ossa_lifetime_completion with: @argument
+// CHECK-LABEL: begin running test 1 of 1 on eagerConsumeOwnedArg: ossa_lifetime_completion with: @argument
 // CHECK-LABEL: OSSA lifetime completion on liveness boundary: %0 = argument of bb0 : $C
-// CHECK: sil [ossa] @eagerConsumneOwnedArg : $@convention(thin) (@owned C) -> () {
+// CHECK: sil [ossa] @eagerConsumeOwnedArg : $@convention(thin) (@owned C) -> () {
 // CHECK: bb0(%0 : @_eagerMove @owned $C):
 // CHECK-NEXT:   destroy_value %0 : $C
-// CHECK-LABEL: end running test 1 of 1 on eagerConsumneOwnedArg: ossa_lifetime_completion with: @argument
-sil [ossa] @eagerConsumneOwnedArg : $@convention(thin) (@owned C) -> () {
+// CHECK-LABEL: end running test 1 of 1 on eagerConsumeOwnedArg: ossa_lifetime_completion with: @argument
+sil [ossa] @eagerConsumeOwnedArg : $@convention(thin) (@owned C) -> () {
 entry(%0 : @_eagerMove @owned $C):
   specify_test "ossa_lifetime_completion @argument liveness"
   br exit
@@ -54,7 +54,7 @@ exit:
 // CHECK: bb0(%0 : @owned $C):
 // CHECK:   cond_br undef, bb1, bb2
 // CHECK: bb2:
-// CHECK-NEXT:   destroy_value %0 : $C
+// CHECK-NEXT:   destroy_value [dead_end] %0 : $C
 // CHECK-NEXT:   unreachable
 // CHECK: } // end sil function 'lexicalOwnedArg'
 // CHECK-LABEL: end running test 1 of 1 on lexicalOwnedArg: ossa_lifetime_completion with: @argument
@@ -246,7 +246,7 @@ bb0(%0 : @guaranteed $C):
 // CHECK:       [[TO_DIE_1]]:
 // CHECK:         br [[TO_DIE_11:bb[0-9]+]]
 // CHECK:       [[TO_DIE_11]]:
-// CHECK:         destroy_value [[VALUE]]
+// CHECK:         destroy_value [dead_end] [[VALUE]]
 // CHECK:         br [[DIE:bb[0-9]+]]
 // CHECK:       [[TO_DIE_2]]:
 // CHECK:         br [[DIE]]
@@ -303,7 +303,7 @@ exit:
 // CHECK:       [[BACKEDGE]]:
 // CHECK:         br [[HEADER]]
 // CHECK:       [[TO_DIE_1]]:
-// CHECK:         destroy_value [[LEXICAL]]
+// CHECK:         destroy_value [dead_end] [[LEXICAL]]
 // CHECK:         br [[DIE:bb[0-9]+]]
 // CHECK:       [[TO_DIE_2]]:
 // CHECK:         br [[DIE]]
@@ -362,7 +362,7 @@ exit:
 // CHECK:       [[TO_BODY]]:
 // CHECK:         br [[BODY:bb[0-9]+]]
 // CHECK:       [[PREHEADER]]:
-// CHECK:         destroy_value [[VALUE]]
+// CHECK:         destroy_value [dead_end] [[VALUE]]
 // CHECK:         br [[HEADER:bb[0-9]+]]
 // CHECK:       [[HEADER]]:
 // CHECK:         br [[BODY]]
@@ -450,7 +450,7 @@ indirect enum IndirectEnumNontrivialPayload {
 // CHECK:         cond_br undef, {{bb[0-9]+}}, [[RIGHT:bb[0-9]+]]
 // CHECK:       [[RIGHT]]:
 // CHECK:         end_borrow [[C]]
-// CHECK:         dealloc_box [[BOX]]
+// CHECK:         dealloc_box [dead_end] [[BOX]]
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'project_box_owned'
 sil [ossa] @project_box_owned : $@convention(thin) (@owned IndirectEnumNontrivialPayload) -> () {
@@ -507,7 +507,7 @@ bb0:
 // CHECK-LABEL: begin running test {{.*}} on alloc_box: ossa_lifetime_completion
 // CHECK-LABEL: sil [ossa] @alloc_box : {{.*}} {
 // CHECK:         [[BOX:%[^,]+]] = alloc_box
-// CHECK:         dealloc_box [[BOX]]
+// CHECK:         dealloc_box [dead_end] [[BOX]]
 // CHECK-LABEL: } // end sil function 'alloc_box'
 // CHECK-LABEL: end running test {{.*}} on alloc_box: ossa_lifetime_completion
 sil [ossa] @alloc_box : $@convention(thin) (@owned C) -> () {

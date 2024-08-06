@@ -15,6 +15,8 @@
 
 #include "OutputLanguageMode.h"
 
+#include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 // for OptionalTypeKind
 #include "swift/ClangImporter/ClangImporter.h"
@@ -115,6 +117,9 @@ public:
 
   void print(const Decl *D);
   void print(Type ty);
+
+  /// Prints the name of the type including generic arguments.
+  void printTypeName(raw_ostream &os, Type ty, const ModuleDecl *moduleContext);
 
   void printAvailability(raw_ostream &os, const Decl *D);
 

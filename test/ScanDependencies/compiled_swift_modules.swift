@@ -10,7 +10,7 @@ import Foo
 
 // HAS_BINARY: "swiftPrebuiltExternal": "Foo"
 
-// HAS_NO_COMPILED-NOT: "{{.*}}Foo.swiftmodule{{.*}}.swiftmodule"
+// HAS_NO_COMPILED-NOT: "compiledModulePath":{{.*}}"{{.*}}Foo.swiftmodule{{.*}}.swiftmodule"
 
 // Step 1: build swift interface and swift module side by side
 // RUN: %target-swift-frontend -emit-module %t/Foo.swift -emit-module-path %t/Foo.swiftmodule/%target-swiftmodule-name -module-name Foo -emit-module-interface-path %t/Foo.swiftmodule/%target-swiftinterface-name
@@ -20,7 +20,7 @@ import Foo
 // RUN: %validate-json %t/deps.json | %FileCheck %s -check-prefix=HAS_COMPILED
 
 /// Check scanner picked binary dependency if not requesting raw scan output.
-// RUN: %target-swift-frontend -scan-dependencies %s -o %t/deps.json -I %t -emit-dependencies -emit-dependencies-path %t/deps.d
+// RUN: %target-swift-frontend -scan-dependencies %s -scanner-module-validation -o %t/deps.json -I %t -emit-dependencies -emit-dependencies-path %t/deps.d
 // RUN: %validate-json %t/deps.json | %FileCheck %s -check-prefix=HAS_BINARY
 
 // Step 3: remove the adjacent module.
@@ -38,7 +38,7 @@ import Foo
 // RUN: %validate-json %t/deps.json | %FileCheck %s -check-prefix=HAS_COMPILED
 
 /// Check scanner picked binary dependency if not requesting raw scan output.
-// RUN: %target-swift-frontend -scan-dependencies %s -o %t/deps.json -I %t -emit-dependencies -emit-dependencies-path %t/deps.d -sdk %t -prebuilt-module-cache-path %t/ResourceDir/%target-sdk-name/prebuilt-modules
+// RUN: %target-swift-frontend -scan-dependencies %s -scanner-module-validation -o %t/deps.json -I %t -emit-dependencies -emit-dependencies-path %t/deps.d -sdk %t -prebuilt-module-cache-path %t/ResourceDir/%target-sdk-name/prebuilt-modules
 // RUN: %validate-json %t/deps.json | %FileCheck %s -check-prefix=HAS_BINARY
 
 // Step 6: update the interface file from where the prebuilt module cache was built.

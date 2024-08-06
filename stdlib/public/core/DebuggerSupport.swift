@@ -44,12 +44,12 @@ import SwiftShims
 ///     }
 ///
 /// The `DebugDescription` macro supports both `debugDescription`, `description`,
-/// as well as a third option: a property named `_debugDescription`. The first
+/// as well as a third option: a property named `lldbDescription`. The first
 /// two are implemented when conforming to the `CustomDebugStringConvertible`
-/// and `CustomStringConvertible` protocols. The additional `_debugDescription`
+/// and `CustomStringConvertible` protocols. The additional `lldbDescription`
 /// property is useful when both `debugDescription` and `description` are
 /// implemented, but don't meet the requirements of the `DebugDescription`
-/// macro. If `_debugDescription` is implemented, `DebugDescription` choose it
+/// macro. If `lldbDescription` is implemented, `DebugDescription` choose it
 /// over `debugDescription` and `description`. Likewise, `debugDescription` is
 /// preferred over `description`.
 ///
@@ -64,6 +64,7 @@ import SwiftShims
 ///   and other arbitrary computation are not supported. Of note, conditional
 ///   logic and computed properties are not supported.
 /// * Overloaded string interpolation cannot be used.
+@attached(member)
 @attached(memberAttribute)
 public macro DebugDescription() =
   #externalMacro(module: "SwiftMacros", type: "DebugDescriptionMacro")

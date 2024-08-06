@@ -507,6 +507,7 @@ SwiftDependencyScanningService::SwiftDependencyScanningService() {
       /* CAS (llvm::cas::ObjectStore) */ nullptr,
       /* Cache (llvm::cas::ActionCache) */ nullptr,
       /* SharedFS */ nullptr);
+  SharedFilesystemCache.emplace();
 }
 
 bool
@@ -735,6 +736,7 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
 
 SwiftDependencyScanningService::ContextSpecificGlobalCacheState *
 SwiftDependencyScanningService::getCacheForScanningContextHash(StringRef scanningContextHash) const {
+  llvm::sys::SmartScopedLock<true> Lock(ScanningServiceGlobalLock);
   auto contextSpecificCache = ContextSpecificCacheMap.find(scanningContextHash);
   assert(contextSpecificCache != ContextSpecificCacheMap.end() &&
          "Global Module Dependencies Cache not configured with context-specific "
@@ -755,7 +757,6 @@ SwiftDependencyScanningService::getDependenciesMap(
 ModuleNameToDependencyMap &
 SwiftDependencyScanningService::getDependenciesMap(
     ModuleDependencyKind kind, StringRef scanContextHash) {
-  llvm::sys::SmartScopedLock<true> Lock(ScanningServiceGlobalLock);
   auto contextSpecificCache = getCacheForScanningContextHash(scanContextHash);
   auto it = contextSpecificCache->ModuleDependenciesMap.find(kind);
   assert(it != contextSpecificCache->ModuleDependenciesMap.end() &&

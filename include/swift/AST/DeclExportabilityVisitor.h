@@ -50,6 +50,20 @@ public:
   bool visitDecl(const Decl *D) = delete;
   bool visitValueDecl(const ValueDecl *valueDecl) = delete;
 
+  bool visitAbstractFunctionDecl(const AbstractFunctionDecl *afd) {
+    // If this function is nested within another function that is exportable to
+    // clients then it is also exportable.
+    auto dc = afd->getDeclContext();
+    do {
+      if (auto parent = dyn_cast<AbstractFunctionDecl>(dc)) {
+        if (DeclExportabilityVisitor().visit(parent))
+          return true;
+      }
+    } while ((dc = dc->getParent()));
+
+    return false;
+  }
+
   bool visitExtensionDecl(const ExtensionDecl *ext) {
     // Extensions must extend exportable types to be exportable.
     auto nominalType = ext->getExtendedNominal();
@@ -135,7 +149,6 @@ public:
   DEFAULT_TO_ACCESS_LEVEL(TypeAlias);
   DEFAULT_TO_ACCESS_LEVEL(AssociatedType);
   DEFAULT_TO_ACCESS_LEVEL(AbstractStorage);
-  DEFAULT_TO_ACCESS_LEVEL(AbstractFunction);
   DEFAULT_TO_ACCESS_LEVEL(Macro);
   DEFAULT_TO_ACCESS_LEVEL(EnumElement);
 

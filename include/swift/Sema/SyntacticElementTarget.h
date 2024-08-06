@@ -591,6 +591,19 @@ public:
     expression.expression = expr;
   }
 
+  Pattern *getPattern() const {
+    if (auto *pattern = getAsUninitializedVar())
+      return pattern;
+
+    if (isForInitialization())
+      return getInitializationPattern();
+
+    if (kind == Kind::forEachPreamble)
+      return forEachStmt.pattern;
+
+    return nullptr;
+  }
+
   void setPattern(Pattern *pattern) {
     if (kind == Kind::uninitializedVar) {
       assert(uninitializedVar.declaration.is<Pattern *>());

@@ -4034,6 +4034,15 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return makeParserSuccess();
       }
       
+      bool movesAsLike = false;
+
+      // @_rawLayout(likeArrayOf: T, count: N, movesAsLike)
+      if (consumeIf(tok::comma) && Tok.isAny(tok::identifier) &&
+          !parseSpecificIdentifier("movesAsLike",
+            diag::attr_rawlayout_expected_label, "movesAsLike")) {
+        movesAsLike = true;
+      }
+
       SourceLoc rParenLoc;
       if (!consumeIf(tok::r_paren, rParenLoc)) {
         diagnose(Tok.getLoc(), diag::attr_expected_rparen,
@@ -4041,7 +4050,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return makeParserSuccess();
       }
       
-      attr = new (Context) RawLayoutAttr(likeType.get(), count,
+      attr = new (Context) RawLayoutAttr(likeType.get(), count, movesAsLike,
                                          AtLoc, SourceRange(Loc, rParenLoc));
     } else {
       diagnose(Loc, diag::attr_rawlayout_expected_label,
@@ -4478,7 +4487,8 @@ bool Parser::canParseTypeAttribute() {
   TypeOrCustomAttr result; // ignored
   PatternBindingInitializer *initContext = nullptr;
   return !parseTypeAttribute(result, /*atLoc=*/SourceLoc(),
-                             /*atEndLoc=*/SourceLoc(), initContext,
+                             /*atEndLoc=*/SourceLoc(),
+                             ParseTypeReason::Unspecified, initContext,
                              /*justChecking*/ true)
               .isError();
 }
@@ -4679,6 +4689,7 @@ bool Parser::parseUUIDString(UUID &uuid, Diag<> diagnostic, bool justChecking) {
 ///   no need to actually record the attribute
 ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
                                         SourceLoc AtLoc, SourceLoc AtEndLoc,
+                                        ParseTypeReason reason,
                                         PatternBindingInitializer *&initContext,
                                         bool justChecking) {
   if (AtEndLoc != Tok.getLoc()) {
@@ -4694,7 +4705,14 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     if (Tok.is(tok::code_complete)) {
       if (!justChecking) {
         if (CodeCompletionCallbacks) {
-          CodeCompletionCallbacks->completeTypeAttrBeginning();
+          switch (reason) {
+          case ParseTypeReason::InheritanceClause:
+            CodeCompletionCallbacks->completeTypeAttrInheritanceBeginning();
+            break;
+          default:
+            CodeCompletionCallbacks->completeTypeAttrBeginning();
+            break;
+          }
         }
       }
       consumeToken(tok::code_complete);
@@ -4845,11 +4863,12 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
       kind = IsolatedTypeAttr::IsolationKind::Dynamic;
 
     // Add new kinds of isolation here; be sure to update the text for
-    // attr_isolated_expected_kind.
+    // attr_isolated_expected_kind, and change the associated fix-it below.
 
     } else {
       if (!justChecking) {
-        diagnose(Tok, diag::attr_isolated_expected_kind);
+        diagnose(Tok, diag::attr_isolated_expected_kind)
+          .fixItReplace(Tok.getLoc(), "any");
       }
       invalid = true;
       consumeIf(tok::identifier);
@@ -5447,40 +5466,6 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       continue;
     }
 
-    // Perform an extra check for transferring. Since it is a specifier, we use
-    // the actual parsing logic below.
-    if (Tok.isContextualKeyword("transferring")) {
-      // Now that we have sending, warn users to convert 'transferring' to
-      // 'sendable'.
-      P.diagnose(Tok, diag::transferring_is_now_sendable);
-
-      // Do not allow for transferring to be parsed after a specifier has been
-      // parsed.
-      //
-      // Example: We want to force users to write transferring consuming, not
-      // consuming transferring.
-      if (SpecifierLoc.isValid()) {
-        P.diagnose(Tok, diag::transferring_after_parameter_specifier,
-                   getNameForParamSpecifier(Specifier))
-            .fixItRemove(Tok.getLoc());
-      }
-
-      // Only allow for transferring to be written once.
-      if (TransferringLoc.isValid()) {
-        P.diagnose(Tok, diag::transferring_repeated).fixItRemove(Tok.getLoc());
-      }
-
-      // If we have already seen 'sending', emit an error to the user and give a
-      // fixit that removes the transferring.
-      if (SendingLoc.isValid()) {
-        P.diagnose(Tok, diag::sending_and_transferring_used_together)
-            .fixItRemove(Tok.getLoc());
-      }
-
-      TransferringLoc = P.consumeToken();
-      continue;
-    }
-
     // Perform an extra check for 'sending'. Since it is a specifier, we use
     // the actual parsing logic below.
     if (Tok.isContextualKeyword("sending")) {
@@ -5492,13 +5477,6 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       // Only allow for 'sending' to be written once.
       if (SendingLoc.isValid()) {
         P.diagnose(Tok, diag::sending_repeated).fixItRemove(Tok.getLoc());
-      }
-
-      // If 'transferring' was written before 'sending', suggest the user remove
-      // 'transferring' since 'sendable' is the final form.
-      if (TransferringLoc.isValid()) {
-        P.diagnose(Tok, diag::sending_and_transferring_used_together)
-            .fixItRemove(TransferringLoc);
       }
 
       // If we already saw a specifier, check if we have borrowing. In such a
@@ -5547,13 +5525,6 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
         P.diagnose(Tok, diag::sending_before_parameter_specifier,
                    getNameForParamSpecifier(Specifier));
       }
-
-      // We cannot use transferring with borrowing.
-      if (TransferringLoc.isValid() &&
-          Specifier == ParamDecl::Specifier::Borrowing) {
-        P.diagnose(TransferringLoc, diag::sending_cannot_be_used_with_borrowing,
-                   "transferring");
-      }
     }
     Tok.setKind(tok::contextual_keyword);
     SpecifierLoc = P.consumeToken();
@@ -5567,7 +5538,8 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
     TypeOrCustomAttr result;
     SourceLoc AtEndLoc = Tok.getRange().getEnd();
     SourceLoc AtLoc = P.consumeToken();
-    status |= P.parseTypeAttribute(result, AtLoc, AtEndLoc, initContext);
+    status |=
+        P.parseTypeAttribute(result, AtLoc, AtEndLoc, ParseReason, initContext);
     if (status.isError())
       return status;
     if (result)
@@ -5643,11 +5615,13 @@ static void diagnoseOperatorFixityAttributes(Parser &P,
 
 static unsigned skipUntilMatchingRBrace(Parser &P,
                                         bool &HasPoundDirective,
+                                        bool &HasPoundSourceLocation,
                                         bool &HasOperatorDeclarations,
                                         bool &HasNestedClassDeclarations,
                                         bool &HasNestedTypeDeclarations,
                                         bool &HasPotentialRegexLiteral) {
   HasPoundDirective = false;
+  HasPoundSourceLocation = false;
   HasOperatorDeclarations = false;
   HasNestedClassDeclarations = false;
   HasNestedTypeDeclarations = false;
@@ -5669,8 +5643,11 @@ static unsigned skipUntilMatchingRBrace(Parser &P,
 
     HasNestedClassDeclarations |= P.Tok.is(tok::kw_class);
 
-    HasPoundDirective |= P.Tok.isAny(tok::pound_sourceLocation, tok::pound_line,
-      tok::pound_if, tok::pound_else, tok::pound_endif, tok::pound_elseif);
+    HasPoundSourceLocation |= P.Tok.isAny(tok::pound_sourceLocation,
+                                          tok::pound_line);
+    HasPoundDirective |= HasPoundSourceLocation;
+    HasPoundDirective |= P.Tok.isAny(tok::pound_if, tok::pound_else,
+                                     tok::pound_endif, tok::pound_elseif);
 
     HasNestedTypeDeclarations |= P.Tok.isAny(tok::kw_class, tok::kw_struct,
                                              tok::kw_enum, tok::kw_typealias,
@@ -6851,7 +6828,8 @@ ParserStatus Parser::parseInheritance(
       continue;
     }
 
-    auto ParsedTypeResult = parseType();
+    auto ParsedTypeResult =
+        parseType(diag::expected_type, ParseTypeReason::InheritanceClause);
     Status |= ParsedTypeResult;
 
     // Record the type if its a single type.
@@ -7105,25 +7083,27 @@ bool Parser::canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
   // If explicitly disabled, respect the flag.
   if (!isDelayedParsingEnabled())
     return false;
-  // Recovering parser status later for #sourceLocation is not-trivial and
-  // it may not worth it.
-  if (InPoundLineEnvironment)
-    return false;
 
   // Skip until the matching right curly bracket; if we find a pound directive,
   // we can't lazily parse.
   CancellableBacktrackingScope BackTrack(*this);
   bool HasPoundDirective;
+  bool HasPoundSourceLocation;
   bool HasNestedTypeDeclarations;
   bool HasPotentialRegexLiteral;
   skipUntilMatchingRBrace(*this,
                           HasPoundDirective,
+                          HasPoundSourceLocation,
                           HasOperatorDeclarations,
                           HasNestedClassDeclarations,
                           HasNestedTypeDeclarations,
                           HasPotentialRegexLiteral);
-  if (!HasPoundDirective && !HasPotentialRegexLiteral)
+  if (!HasPoundDirective && !HasPotentialRegexLiteral) {
+    // If we didn't see any pound directive, we must not have seen
+    // #sourceLocation either.
+    ASSERT(!HasPoundSourceLocation);
     BackTrack.cancelBacktrack();
+  }
   return !BackTrack.willBacktrack();
 }
 
@@ -7719,17 +7699,20 @@ bool Parser::canDelayFunctionBodyParsing(bool &HasNestedTypeDeclarations) {
     return false;
 
   // Skip until the matching right curly bracket; If it has a potential regex
-  // literal, we can't skip. We don't care others, so just ignore them;
+  // literal, we can't skip. If there's a `#sourceLocation`, we also can't skip
+  // since we rely on setting and restoring state in the parser. Other cases we
+  // can handle.
   CancellableBacktrackingScope BackTrack(*this);
   consumeToken(tok::l_brace);
   bool HasPoundDirectives;
+  bool HasPoundSourceLocation;
   bool HasOperatorDeclarations;
   bool HasNestedClassDeclarations;
   bool HasPotentialRegexLiteral;
-  skipUntilMatchingRBrace(*this, HasPoundDirectives, HasOperatorDeclarations,
-                          HasNestedClassDeclarations, HasNestedTypeDeclarations,
-                          HasPotentialRegexLiteral);
-  if (HasPotentialRegexLiteral)
+  skipUntilMatchingRBrace(*this, HasPoundDirectives, HasPoundSourceLocation,
+                          HasOperatorDeclarations, HasNestedClassDeclarations,
+                          HasNestedTypeDeclarations, HasPotentialRegexLiteral);
+  if (HasPoundSourceLocation || HasPotentialRegexLiteral)
     return false;
 
   BackTrack.cancelBacktrack();
@@ -9975,7 +9958,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
 
   if (auto *lifetimeTyR =
-          dyn_cast_or_null<LifetimeDependentReturnTypeRepr>(FuncRetTy)) {
+          dyn_cast_or_null<LifetimeDependentTypeRepr>(FuncRetTy)) {
     auto *base = lifetimeTyR->getBase();
 
     auto isOptionalSimpleUnqualifiedIdentifier = [](TypeRepr *typeRepr,

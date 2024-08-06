@@ -166,9 +166,6 @@ internal final class _IteratorBox<Base: IteratorProtocol>
   internal var _base: Base
 }
 
-@available(*, unavailable)
-extension _IteratorBox: Sendable {}
-
 //===--- Sequence ---------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
@@ -402,9 +399,6 @@ internal class _AnyCollectionBox<Element>: _AnySequenceBox<Element> {
   ) -> _AnyCollectionBox<Element> { _abstract() }
 }
 
-@available(*, unavailable)
-extension _AnyCollectionBox: Sendable {}
-
 @_fixed_layout
 @usableFromInline
 internal class _AnyBidirectionalCollectionBox<Element>
@@ -468,9 +462,6 @@ internal class _AnyBidirectionalCollectionBox<Element>
   internal func _formIndex(before i: _AnyIndexBox) { _abstract() }
 }
 
-@available(*, unavailable)
-extension _AnyBidirectionalCollectionBox: Sendable {}
-
 @_fixed_layout
 @usableFromInline
 internal class _AnyRandomAccessCollectionBox<Element>
@@ -528,9 +519,6 @@ internal class _AnyRandomAccessCollectionBox<Element>
   ) -> _AnyRandomAccessCollectionBox<Element> { _abstract() }
 }
 
-@available(*, unavailable)
-extension _AnyRandomAccessCollectionBox: Sendable {}
-
 @_fixed_layout
 @usableFromInline
 internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
@@ -550,11 +538,7 @@ internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
-#if $TypedThrows
     try _base.map(transform)
-#else
-    try _base.__rethrows_map(transform)
-#endif
   }
   @inlinable
   internal override func _filter(
@@ -627,9 +611,6 @@ internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
   internal var _base: S
 }
 
-@available(*, unavailable)
-extension _SequenceBox: Sendable {}
-
 @_fixed_layout
 @usableFromInline
 internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
@@ -650,11 +631,7 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
-#if $TypedThrows
     try _base.map(transform)
-#else
-    try _base.__rethrows_map(transform)
-#endif
   }
   @inlinable
   internal override func _filter(
@@ -828,9 +805,6 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
   internal var _base: S
 }
 
-@available(*, unavailable)
-extension _CollectionBox: Sendable {}
-
 @_fixed_layout
 @usableFromInline
 internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
@@ -852,11 +826,7 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
-#if $TypedThrows
     try _base.map(transform)
-#else
-    try _base.__rethrows_map(transform)
-#endif
   }
   @inlinable
   internal override func _filter(
@@ -1048,9 +1018,6 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
   internal var _base: S
 }
 
-@available(*, unavailable)
-extension _BidirectionalCollectionBox: Sendable {}
-
 @_fixed_layout
 @usableFromInline
 internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
@@ -1072,11 +1039,7 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
-#if $TypedThrows
     try _base.map(transform)
-#else
-    try _base.__rethrows_map(transform)
-#endif
   }
   @inlinable
   internal override func _filter(
@@ -1267,9 +1230,6 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
   internal var _base: S
 }
 
-@available(*, unavailable)
-extension _RandomAccessCollectionBox: Sendable {}
-
 @usableFromInline
 @frozen
 internal struct _ClosureBasedSequence<Iterator: IteratorProtocol> {
@@ -1286,10 +1246,7 @@ internal struct _ClosureBasedSequence<Iterator: IteratorProtocol> {
 extension _ClosureBasedSequence: Sendable {}
 
 extension _ClosureBasedSequence: Sequence {
-
-#if $NoncopyableGenerics
   public typealias Element = Iterator.Element
-#endif
 
   @inlinable
   internal func makeIterator() -> Iterator {
@@ -1380,6 +1337,7 @@ extension AnySequence {
   // ABI-only entrypoint for the rethrows version of map, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   @_silgen_name("$ss11AnySequenceV3mapySayqd__Gqd__xKXEKlF")
   func __rethrows_map<T>(
@@ -1483,6 +1441,7 @@ extension AnyCollection {
   // ABI-only entrypoint for the rethrows version of map, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   @_silgen_name("$ss13AnyCollectionV3mapySayqd__Gqd__xKXEKlF")
   func __rethrows_map<T>(
@@ -1592,6 +1551,7 @@ extension AnyBidirectionalCollection {
   // ABI-only entrypoint for the rethrows version of map, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   @_silgen_name("$ss26AnyBidirectionalCollectionV3mapySayqd__Gqd__xKXEKlF")
   func __rethrows_map<T>(
@@ -1703,6 +1663,7 @@ extension AnyRandomAccessCollection {
   // ABI-only entrypoint for the rethrows version of map, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   @_silgen_name("$ss25AnyRandomAccessCollectionV3mapySayqd__Gqd__xKXEKlF")
   func __rethrows_map<T>(

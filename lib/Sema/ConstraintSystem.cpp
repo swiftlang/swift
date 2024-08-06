@@ -293,6 +293,13 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclNameRef name,
   result = TypeChecker::lookupMember(DC, base, name, loc,
                                      defaultMemberLookupOptions);
 
+  // If we are in an @_unsafeInheritExecutor context, swap out
+  // declarations for their _unsafeInheritExecutor_ counterparts if they
+  // exist.
+  if (enclosingUnsafeInheritsExecutor(DC)) {
+    introduceUnsafeInheritExecutorReplacements(DC, base, loc, *result);
+  }
+
   // If we aren't performing dynamic lookup, we're done.
   if (!*result || !base->isAnyObject())
     return *result;
@@ -1030,12 +1037,11 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
   auto extension = dyn_cast<ExtensionDecl>(decl->getDeclContext());
   if (extension && extension->isConstrainedExtension()) {
     auto contextSubMap = parentTy->getContextSubstitutionMap(
-        extension->getParentModule(), extension->getSelfNominalTypeDecl());
+        extension->getSelfNominalTypeDecl());
     if (!subMap) {
       // The substitution map wasn't set above, meaning we should grab the map
       // for the extension itself.
-      subMap = parentTy->getContextSubstitutionMap(extension->getParentModule(),
-                                                   extension);
+      subMap = parentTy->getContextSubstitutionMap(extension);
     }
 
     if (auto signature = decl->getGenericSignature()) {
@@ -1071,17 +1077,17 @@ Type ConstraintSystem::replaceInferableTypesWithTypeVars(
         return openUnboundGenericType(unbound->getDecl(), unbound->getParent(),
                                       locator, /*isTypeResolution=*/false);
       } else if (auto *placeholderTy = type->getAs<PlaceholderType>()) {
-        if (auto *placeholderRepr = placeholderTy->getOriginator()
-                                        .dyn_cast<PlaceholderTypeRepr *>()) {
-
-          return createTypeVariable(
-              getConstraintLocator(
-                  locator, LocatorPathElt::PlaceholderType(placeholderRepr)),
-              TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
-                  TVO_CanBindToHole);
-        }
-
-        if (auto *var = placeholderTy->getOriginator().dyn_cast<VarDecl *>()) {
+        if (auto *typeRepr =
+                placeholderTy->getOriginator().dyn_cast<TypeRepr *>()) {
+          if (isa<PlaceholderTypeRepr>(typeRepr)) {
+            return createTypeVariable(
+                getConstraintLocator(locator,
+                                     LocatorPathElt::PlaceholderType(typeRepr)),
+                TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
+                    TVO_CanBindToHole);
+          }
+        } else if (auto *var =
+                       placeholderTy->getOriginator().dyn_cast<VarDecl *>()) {
           if (var->getName().hasDollarPrefix()) {
             auto *repr =
                 new (type->getASTContext()) PlaceholderTypeRepr(var->getLoc());
@@ -1372,8 +1378,7 @@ getPropertyWrapperInformationFromOverload(
       VarDecl *memberDecl;
       std::tie(memberDecl, type) = *declInformation;
       if (Type baseType = resolvedOverload.choice.getBaseType()) {
-        type =
-            baseType->getTypeOfMember(DC->getParentModule(), memberDecl, type);
+        type = baseType->getTypeOfMember(memberDecl, type);
       }
       return std::make_pair(decl, type);
     }
@@ -2725,8 +2730,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
     assert(!isa<ModuleDecl>(typeDecl) && "Nested module?");
 
-    auto memberTy = TypeChecker::substMemberTypeWithBase(DC->getParentModule(),
-                                                         typeDecl, baseObjTy);
+    auto memberTy = TypeChecker::substMemberTypeWithBase(typeDecl, baseObjTy);
 
     // If the member type is a constraint, e.g. because the
     // reference is to a typealias with an underlying protocol
@@ -7775,8 +7779,7 @@ ConstraintSystem::lookupConformance(Type type, ProtocolDecl *protocol) {
     return cachedConformance->second;
 
   auto conformance =
-      DC->getParentModule()->lookupConformance(type, protocol,
-                                               /*allowMissing=*/true);
+      ModuleDecl::lookupConformance(type, protocol, /*allowMissing=*/true);
   Conformances[cacheKey] = conformance;
   return conformance;
 }

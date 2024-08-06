@@ -41,34 +41,34 @@ Conformance substitution with a \index{root abstract conformance}root abstract c
 \[
 \ConfReq{T}{Q} \otimes \SubstMapC{\ldots}{\ldots,\,\SubstConf{T}{G<Int>}{Q},\,\ldots} := \ConfReq{G<Int>}{Q}
 \]
-If $\texttt{T}\in\TypeObj{G_1}$, $\ConfReq{T}{P}\in\ConfPObj{P}{G_1}$, $\Sigma_1\in\SubMapObj{G_1}{G_2}$, $\Sigma_2\in\SubMapObj{G_2}{G_3}$, $\Sigma_3\in\SubMapObj{G_3}{G_4}$, then 
+If $\texttt{T}\in\TypeObj{G_1}$, $\TP\in\ConfPObj{P}{G_1}$, $\Sigma_1\in\SubMapObj{G_1}{G_2}$, $\Sigma_2\in\SubMapObj{G_2}{G_3}$, $\Sigma_3\in\SubMapObj{G_3}{G_4}$, then 
 \begin{gather*}
 (\texttt{T}\otimes \Sigma_1) \otimes \Sigma_2=\texttt{T}\otimes (\Sigma_1\otimes \Sigma_2)\\
-(\ConfReq{T}{P}\otimes \Sigma_1) \otimes \Sigma_2=\ConfReq{T}{P}\otimes (\Sigma_1\otimes \Sigma_2)\\
+(\TP\otimes \Sigma_1) \otimes \Sigma_2=\TP\otimes (\Sigma_1\otimes \Sigma_2)\\
 (\Sigma_1\otimes \Sigma_2) \otimes \Sigma_3=\Sigma_1\otimes(\Sigma_2\otimes \Sigma_3)
 \end{gather*}
 
-\paragraph{Conformances.} Type witness and associated conformance projection is compatible with conformance substitution. Suppose $\ConfReq{T}{P}\in\ConfPObj{P}{G}$, $\AssocType{[P]A}\in\AssocTypeObj{P}$, $\AssocConf{Self.U}{Q}\in\AssocConfObj{P}$, and $\Sigma\in\SubMapObj{G}{H}$, then
+\paragraph{Conformances.} Type witness and associated conformance projection is compatible with conformance substitution. Suppose $\TP\in\ConfPObj{P}{G}$, $\AssocType{[P]A}\in\AssocTypeObj{P}$, $\AssocConf{Self.U}{Q}\in\AssocConfObj{P}$, and $\Sigma\in\SubMapObj{G}{H}$, then
 \begin{gather*}
-\bigl(\AssocType{[P]A}\otimes \ConfReq{T}{P}\bigr)\otimes \Sigma=\AssocType{[P]A}\otimes (\ConfReq{T}{P}\otimes \Sigma)\\
-\bigl(\AssocConf{Self.U}{Q}\otimes \ConfReq{T}{P}\bigr)\otimes \Sigma=\AssocConf{Self.U}{Q}\otimes \bigl(\ConfReq{T}{P}\otimes \Sigma\bigr)
+\bigl(\AssocType{[P]A}\otimes \TP\bigr)\otimes \Sigma=\AssocType{[P]A}\otimes (\TP\otimes \Sigma)\\
+\bigl(\AssocConf{Self.U}{Q}\otimes \TP\bigr)\otimes \Sigma=\AssocConf{Self.U}{Q}\otimes \bigl(\TP\otimes \Sigma\bigr)
 \end{gather*}
 If $d$ is a \index{nominal type declaration}nominal type declaration conforming to \texttt{P}, and $G$ is the generic signature of the conformance context, then there exists a \index{normal conformance}normal conformance $\ConfReq{$\texttt{T}_d$}{P}\in\ConfPObj{P}{G}$, and
 \[\protosym{P}\otimes\texttt{T}_d=\ConfReq{$\texttt{T}_d$}{P}\]
-If $H$ is some other generic signature, $\Sigma\in\SubMapObj{G}{H}$, and $\texttt{T}=\texttt{T}_d\otimes \Sigma$, then there exists a \index{specialized conformance}specialized conformance $\ConfReq{T}{P}\in\ConfPObj{P}{H}$, and
-\[\protosym{P}\otimes\texttt{T}=\ConfReq{$\texttt{T}_d$}{P}\otimes \Sigma = \ConfReq{T}{P}\]
-If \texttt{T} is a \index{type parameter}type parameter of $G$ and the conformance requirement $\ConfReq{T}{P}$ can be derived from $G$, then there exists an \index{abstract conformance}abstract conformance $\ConfReq{T}{P}\in\ConfPObj{G}{P}$, and
-\[\protosym{P}\otimes\texttt{T} = \ConfReq{T}{P}\]
+If $H$ is some other generic signature, $\Sigma\in\SubMapObj{G}{H}$, and $\texttt{T}=\texttt{T}_d\otimes \Sigma$, then there exists a \index{specialized conformance}specialized conformance $\TP\in\ConfPObj{P}{H}$, and
+\[\protosym{P}\otimes\texttt{T}=\ConfReq{$\texttt{T}_d$}{P}\otimes \Sigma = \TP\]
+If \texttt{T} is a \index{type parameter}type parameter of $G$ and the conformance requirement $\TP$ can be derived from $G$, then there exists an \index{abstract conformance}abstract conformance $\TP\in\ConfPObj{G}{P}$, and
+\[\protosym{P}\otimes\texttt{T} = \TP\]
 Global conformance lookup is compatible with type substitution:
 \[(\protosym{P}\otimes\texttt{T})\otimes \Sigma = \texttt{P}\otimes(\texttt{T}\otimes \Sigma)\]
 
 \paragraph{Abstract conformances.} The type witnesses of an abstract conformance are \index{dependent member type}dependent member types, and the associated conformances are other abstract conformances:
 \begin{gather*}
-\AssocType{[P]A} \otimes \ConfReq{T}{P} = \texttt{T.[P]A}\\
-\AssocConf{Self.U}{Q} \otimes \ConfReq{T}{P} = \ConfReq{T.U}{Q}
+\AssocType{[P]A} \otimes \TP = \texttt{T.[P]A}\\
+\AssocConf{Self.U}{Q} \otimes \TP = \ConfReq{T.U}{Q}
 \end{gather*}
 Applying a substitution map to an abstract conformance is called \index{local conformance lookup}local conformance lookup (\SecRef{abstract conformances}). The first identity above defines substitution of dependent member types in terms of local conformance lookup:
-\[\texttt{T.[P]A} \otimes \Sigma = \AssocType{[P]A} \otimes (\ConfReq{T}{P} \otimes \Sigma)\]
+\[\texttt{T.[P]A} \otimes \Sigma = \AssocType{[P]A} \otimes (\TP \otimes \Sigma)\]
 Every abstract conformance has a unique factorization as a \index{reduced conformance path}reduced conformance path. A conformance path is a sequence of zero or more associated conformance projections applied to an root abstract conformance:
 \[
 \AssocConf{Self.[$\texttt{P}_{n+1}$]$\texttt{A}_n$}{$\texttt{P}_n$}

@@ -73,26 +73,33 @@ public struct FunctionConvention : CustomStringConvertible {
       hasLoweredAddresses: hasLoweredAddresses)
   }
 
-  /// If the function result depends on any parameters, return a
-  /// Collection of LifetimeDependenceConvention indexed on the
-  /// function parameter.
-  public var resultDependencies: ResultDependencies? {
-    let deps = bridgedFunctionType.SILFunctionType_getLifetimeDependenceInfo()
-    if deps.empty() {
-      return nil
-    }
-    return ResultDependencies(bridged: deps,
-                                         parameterCount: parameters.count,
-                                         hasSelfParameter: hasSelfParameter)
+  /// If the function result depends on any parameters, return a Collection of LifetimeDependenceConventions for the
+  /// dependence source parameters.
+  public var resultDependencies: LifetimeDependencies? {
+    lifetimeDependencies(for: parameters.count)
+  }
+
+  /// If the parameter indexed by 'targetParameterIndex' is the target of any dependencies on other parameters, return a
+  /// Collection of LifetimeDependenceConventions for the dependence source parameters.
+  public func parameterDependencies(for targetParameterIndex: Int) -> LifetimeDependencies? {
+    lifetimeDependencies(for: targetParameterIndex)
+  }
+
+  public func hasLifetimeDependencies() -> Bool {
+    return bridgedFunctionType.SILFunctionType_getLifetimeDependencies().count() != 0
   }
 
   public var description: String {
     var str = String(taking: bridgedFunctionType.getDebugDescription())
-    parameters.forEach { str += "\nparameter: " + $0.description }
+    for paramIdx in 0..<parameters.count {
+      str += "\nparameter: " + parameters[paramIdx].description
+      if let deps = parameterDependencies(for: paramIdx) {
+        str += "\n lifetime: \(deps)"
+      }
+    }
     results.forEach { str += "\n   result: " + $0.description }
-    str += (hasLoweredAddresses ? "\n[lowered_address]" : "\n[sil_opaque]")
     if let deps = resultDependencies {
-      str += "\nresult dependences \(deps)"
+      str += "\n lifetime: \(deps)"
     }
     return str
   }
@@ -243,8 +250,22 @@ public enum LifetimeDependenceConvention : CustomStringConvertible {
 }
 
 extension FunctionConvention {
+  // 'targetIndex' is either the parameter index or parameters.count for the function result.
+  private func lifetimeDependencies(for targetIndex: Int) -> LifetimeDependencies? {
+    let bridgedDependenceInfoArray = bridgedFunctionType.SILFunctionType_getLifetimeDependencies()
+    for infoIndex in 0..<bridgedDependenceInfoArray.count() {
+      let bridgedDependenceInfo = bridgedDependenceInfoArray.at(infoIndex)
+      if bridgedDependenceInfo.targetIndex == targetIndex {
+        return LifetimeDependencies(bridged: bridgedDependenceInfo,
+                                    parameterCount: parameters.count,
+                                    hasSelfParameter: hasSelfParameter)
+      }
+    }
+    return nil
+  }
+
   /// Collection of LifetimeDependenceConvention? that parallels parameters.
-  public struct ResultDependencies : Collection, CustomStringConvertible {
+  public struct LifetimeDependencies : Collection, CustomStringConvertible {
     let bridged: BridgedLifetimeDependenceInfo
     let paramCount: Int
     let hasSelfParam: Bool

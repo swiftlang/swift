@@ -58,8 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR =
-    878; // immortal bit in LifetimeDependence
+const uint16_t SWIFTMODULE_VERSION_MINOR = 881; // Changes to LifetimeDependence
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1252,7 +1251,7 @@ namespace decls_block {
     TypeIDField,                     // thrown error
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
-    BCFixed<1>                       // has transferring result
+    BCFixed<1>                       // has sending result
     // trailed by parameters
     // Optionally lifetime dependence info
   );
@@ -1269,7 +1268,7 @@ namespace decls_block {
                      BCFixed<1>,              // isolated
                      BCFixed<1>,              // noDerivative?
                      BCFixed<1>,              // compileTimeConst
-                     BCFixed<1>               // transferring
+                     BCFixed<1>               // sending
                      >;
 
   TYPE_LAYOUT(MetatypeTypeLayout,
@@ -1351,7 +1350,7 @@ namespace decls_block {
     TypeIDField,                     // thrown error
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
-    BCFixed<1>,                      // has transferring result
+    BCFixed<1>,                      // has sending result
     GenericSignatureIDField          // generic signature
 
     // trailed by parameters
@@ -1671,7 +1670,7 @@ namespace decls_block {
     DeclIDField,  // opaque result type decl
     BCFixed<1>,   // isUserAccessible?
     BCFixed<1>,   // is distributed thunk
-    BCFixed<1>,   // has transferring result
+    BCFixed<1>,   // has sending result
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:
@@ -2214,6 +2213,7 @@ namespace decls_block {
 
   using LifetimeDependenceLayout =
       BCRecordLayout<LIFETIME_DEPENDENCE,
+                     BCVBR<4>,           // targetIndex
                      BCFixed<1>,         // isImmortal
                      BCFixed<1>,         // hasInheritLifetimeParamIndices
                      BCFixed<1>,         // hasScopeLifetimeParamIndices
