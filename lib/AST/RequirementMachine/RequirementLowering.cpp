@@ -355,6 +355,15 @@ static void desugarConformanceRequirement(
 
   // Fast path.
   if (constraintType->is<ProtocolType>()) {
+    // Diagnose attempts to introduce a value generic like 'let N: P' where 'P'
+    // is some protocol in either the defining context or in an extension where
+    // clause.
+    if (req.getFirstType()->isValueParameter()) {
+      errors.push_back(
+        RequirementError::forInvalidValueGenericConformance(req, loc));
+      return;
+    }
+
     if (req.getFirstType()->isTypeParameter()) {
       result.push_back(req);
       return;
@@ -521,43 +530,7 @@ static void realizeTypeRequirement(DeclContext *dc,
     }
   }
 
-  if (subjectType->isValueParameter()) {
-    // This is a correct value generic definition where 'let N: Int'.
-    //
-    // Note: This definition is only valid in non-extension contexts. If we are
-    // in an extension context then the user has written something like:
-    // 'extension T where N: Int' which is weird and not supported.
-    if (constraintType->isLegalValueGenericType() && !isa<ExtensionDecl>(dc)) {
-      return;
-    }
-
-    // Diagnose attempts to introduce a value generic like 'let N: P' where 'P'
-    // is some protocol in either the defining context or in an extension where
-    // clause.
-    if (constraintType->isConstraintType()) {
-      errors.push_back(
-        RequirementError::forInvalidValueGenericConformance(subjectType,
-                                                            constraintType,
-                                                            loc));
-    // OK, this is not a constraint type. If we're in an extension complain
-    // about constraining to non-protocol type.
-    //
-    // FIXME: Maybe a better diagnostic here saying you can't constrain a value
-    // generic parameter to a different value type in an extension?
-    } else if (isa<ExtensionDecl>(dc)) {
-      errors.push_back(
-        RequirementError::forInvalidTypeRequirement(subjectType,
-                                                    constraintType,
-                                                    loc));
-    // Otherwise, we're trying to define a value generic parameter with an
-    // unsupported type right now e.g. 'let N: UInt8'.
-    } else {
-      errors.push_back(
-        RequirementError::forInvalidValueGenericType(subjectType,
-                                                     constraintType,
-                                                     loc));
-    }
-  } else if (constraintType->isConstraintType()) {
+  if (constraintType->isConstraintType()) {
     result.push_back({Requirement(RequirementKind::Conformance,
                                   subjectType, constraintType),
                       loc});
@@ -565,6 +538,22 @@ static void realizeTypeRequirement(DeclContext *dc,
     result.push_back({Requirement(RequirementKind::Superclass,
                                   subjectType, constraintType),
                       loc});
+  } else if (subjectType->isValueParameter() && !isa<ExtensionDecl>(dc)) {
+    // This is a correct value generic definition where 'let N: Int'.
+    //
+    // Note: This definition is only valid in non-extension contexts. If we are
+    // in an extension context then the user has written something like:
+    // 'extension T where N: Int' which is weird and not supported.
+    if (constraintType->isLegalValueGenericType()) {
+      return;
+    }
+
+    // Otherwise, we're trying to define a value generic parameter with an
+    // unsupported type right now e.g. 'let N: UInt8'.
+    errors.push_back(
+        RequirementError::forInvalidValueGenericType(subjectType,
+                                                     constraintType,
+                                                     loc));
   } else {
     errors.push_back(
         RequirementError::forInvalidTypeRequirement(subjectType,

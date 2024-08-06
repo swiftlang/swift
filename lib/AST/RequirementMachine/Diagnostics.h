@@ -166,11 +166,9 @@ public:
     return {Kind::InvalidValueGenericType, requirement, loc};
   }
 
-  static RequirementError forInvalidValueGenericConformance(Type subjectType,
-                                                            Type constraint,
+  static RequirementError forInvalidValueGenericConformance(Requirement req,
                                                             SourceLoc loc) {
-    Requirement requirement(RequirementKind::Conformance, subjectType, constraint);
-    return {Kind::InvalidValueGenericConformance, requirement, loc};
+    return {Kind::InvalidValueGenericConformance, req, loc};
   }
 
   static RequirementError forInvalidValueGenericSameType(Type subjectType,
