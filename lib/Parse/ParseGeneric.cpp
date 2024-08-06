@@ -140,12 +140,6 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
       SpecifierLoc = LetLoc;
     }
 
-    // If we're a value type parameter with no inherited entry, then diagnose
-    // because we must have a type that we're assigning to the value.
-    if (ParamKind == GenericTypeParamKind::Value && Inherited.empty()) {
-      diagnose(LetLoc, diag::expected_value_generic_type);
-    }
-
     auto *Param = GenericTypeParamDecl::createParsed(
         CurDeclContext, Name, NameLoc, SpecifierLoc,
         /*index*/ GenericParams.size(), ParamKind);

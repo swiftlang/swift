@@ -1886,9 +1886,6 @@ ERROR(expected_rangle_primary_associated_type_list,PointsToFirstBadToken,
 ERROR(expected_primary_associated_type_name,PointsToFirstBadToken,
       "expected an identifier to name primary associated type", ())
 
-ERROR(expected_value_generic_type,none,
-      "expected type for value generic type", ())
-
 //------------------------------------------------------------------------------
 // MARK: Conditional compilation parsing diagnostics
 //------------------------------------------------------------------------------

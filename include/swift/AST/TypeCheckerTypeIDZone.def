@@ -596,3 +596,6 @@ SWIFT_REQUEST(TypeChecker, ParamCaptureInfoRequest,
 SWIFT_REQUEST(TypeChecker, IsUnsafeRequest,
               bool(Decl *),
               SeparatelyCached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, GenericTypeParamDeclGetValueTypeRequest,
+              Type(GenericTypeParamDecl *), Cached, NoLocationInfo)

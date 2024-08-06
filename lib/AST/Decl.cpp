@@ -5730,11 +5730,9 @@ GenericTypeParamDecl *GenericTypeParamDecl::createImplicit(
 }
 
 Type GenericTypeParamDecl::getValueType() const {
-  if (!isValue())
-    return Type();
-
-  // GenericTypeParamDecls should only have 1 inherited entry, so get that.
-  return getInherited().getResolvedType(0, TypeResolutionStage::Structural);
+  return evaluateOrDefault(getASTContext().evaluator,
+    GenericTypeParamDeclGetValueTypeRequest{const_cast<GenericTypeParamDecl *>(this)},
+    Type());
 }
 
 SourceRange GenericTypeParamDecl::getSourceRange() const {
