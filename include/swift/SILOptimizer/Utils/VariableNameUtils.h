@@ -192,6 +192,8 @@ public:
 
   StringRef getName() const { return resultingString; }
 
+  SWIFT_DEBUG_DUMP { llvm::dbgs() << getName() << '\n'; }
+
   /// Given a specific SILValue, construct a VariableNameInferrer and use it to
   /// attempt to infer an identifier for the value.
   static std::optional<Identifier> inferName(SILValue value);

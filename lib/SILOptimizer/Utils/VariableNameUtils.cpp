@@ -426,8 +426,13 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
         return SILValue();
       }
 
-      variableNamePath.push_back(allocInst);
+      variableNamePath.push_back(DebugVarCarryingInst(allocInst).getName());
       return allocInst;
+    }
+
+    if (auto *abi = dyn_cast<AllocBoxInst>(searchValue)) {
+      variableNamePath.push_back(DebugVarCarryingInst(abi).getName());
+      return abi;
     }
 
     // If we have a store_borrow, always look at the dest. We are going to see
@@ -438,7 +443,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     }
 
     if (auto *globalAddrInst = dyn_cast<GlobalAddrInst>(searchValue)) {
-      variableNamePath.push_back(globalAddrInst);
+      variableNamePath.push_back(VarDeclCarryingInst(globalAddrInst).getName());
       return globalAddrInst;
     }
 
@@ -448,7 +453,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     }
 
     if (auto *rei = dyn_cast<RefElementAddrInst>(searchValue)) {
-      variableNamePath.push_back(rei);
+      variableNamePath.push_back(VarDeclCarryingInst(rei).getName());
       searchValue = rei->getOperand();
       continue;
     }
@@ -662,15 +667,6 @@ void VariableNameInferrer::popSingleVariableName() {
 
   if (std::holds_alternative<SILInstruction *>(next)) {
     auto *inst = std::get<SILInstruction *>(next);
-    if (auto i = DebugVarCarryingInst(inst)) {
-      resultingString += i.getName();
-      return;
-    }
-
-    if (auto i = VarDeclCarryingInst(inst)) {
-      resultingString += i.getName();
-      return;
-    }
 
     if (auto f = dyn_cast<FunctionRefBaseInst>(inst)) {
       if (auto dc = f->getInitiallyReferencedFunction()->getDeclContext()) {
