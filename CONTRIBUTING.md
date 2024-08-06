@@ -218,7 +218,7 @@ This means that a bug in Swift could cause bugs in thousands, even millions of d
 Because of this, the Swift project maintains a high bar for quality.
 The minimum quality standards that any change must satisfy before being committed to the main development branch include:
 
-1. Code must compile without errors or warnings on at least one platform.
+1. Code must compile without errors on all supported platforms and should be free of warnings on at least one platform.
 2. Bug fixes and new features must include a test case to pinpoint any future regressions, or include a justification for why a test case would be impractical.
 3. Code must pass the appropriate test suites—for example, the `swift/test` and `swift/validation-test` test suites in the Swift compiler.
 
