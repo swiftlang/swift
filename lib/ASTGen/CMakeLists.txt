@@ -21,6 +21,7 @@ endif()
 add_pure_swift_host_library(swiftASTGen STATIC
   Sources/ASTGen/ASTGen.swift
   Sources/ASTGen/Bridge.swift
+  Sources/ASTGen/CompilerBuildConfiguration.swift
   Sources/ASTGen/DeclAttrs.swift
   Sources/ASTGen/Decls.swift
   Sources/ASTGen/Diagnostics.swift
@@ -44,6 +45,7 @@ add_pure_swift_host_library(swiftASTGen STATIC
     swiftAST
   SWIFT_DEPENDENCIES
     _CompilerSwiftSyntax
+    _CompilerSwiftIfConfig
     _CompilerSwiftOperators
     _CompilerSwiftSyntaxBuilder
     _CompilerSwiftParser
