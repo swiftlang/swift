@@ -1,7 +1,7 @@
 # Contributing to Swift
 
 Contributions to Swift are welcomed and encouraged!
-For contributions to the broader Swift Language project, please see the
+For contributions to the broader Swift project, please see the
 [Contributing to Swift guide](https://swift.org/contributing/).
 
 To give clarity of what is expected of our members, Swift has adopted the code of conduct defined by the [Contributor Covenant](http://contributor-covenant.org/).
