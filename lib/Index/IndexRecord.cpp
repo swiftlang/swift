@@ -35,6 +35,7 @@
 #include "clang/Index/IndexingAction.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Serialization/ASTReader.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/Path.h"
 
 using namespace swift;
@@ -636,8 +637,11 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
         }
 
         auto F = fileMgr.getFileRef(modulePath);
-        if (!F)
+        if (!F) {
+          // Ignore error and continue.
+          llvm::consumeError(F.takeError());
           break;
+        }
 
         // Use module real name for unit writer in case module aliasing
         // is used. For example, if a file being indexed has `import Foo`
