@@ -962,7 +962,7 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind) {
 }
 
 NodePointer Demangler::demangleTypeAnnotation() {
-  switch (char c2 = nextChar()) {
+  switch (nextChar()) {
   case 'a':
     return createNode(Node::Kind::AsyncAnnotation);
   case 'A':
@@ -1019,7 +1019,7 @@ recur:
     case 'F': return demanglePlainFunction();
     case 'G': return demangleBoundGenericType();
     case 'H':
-      switch (char c2 = nextChar()) {
+      switch (nextChar()) {
       case 'A': return demangleDependentProtocolConformanceAssociated();
       case 'C': return demangleConcreteProtocolConformance();
       case 'D': return demangleDependentProtocolConformanceRoot();
@@ -1200,7 +1200,7 @@ NodePointer Demangler::createSwiftType(Node::Kind typeKind, const char *name) {
 }
 
 NodePointer Demangler::demangleStandardSubstitution() {
-  switch (char c = nextChar()) {
+  switch (nextChar()) {
     case 'o':
       return createNode(Node::Kind::Module, MANGLING_MODULE_OBJC);
     case 'C':
@@ -3112,7 +3112,7 @@ NodePointer Demangler::demangleDifferentiabilityWitness() {
     result = addChild(result, node);
   result->reverseChildren();
   MangledDifferentiabilityKind kind;
-  switch (auto c = nextChar()) {
+  switch (nextChar()) {
   case 'f': kind = MangledDifferentiabilityKind::Forward; break;
   case 'r': kind = MangledDifferentiabilityKind::Reverse; break;
   case 'd': kind = MangledDifferentiabilityKind::Normal; break;
@@ -3144,7 +3144,7 @@ NodePointer Demangler::demangleIndexSubset() {
 
 NodePointer Demangler::demangleDifferentiableFunctionType() {
   MangledDifferentiabilityKind kind;
-  switch (auto c = nextChar()) {
+  switch (nextChar()) {
   case 'f': kind = MangledDifferentiabilityKind::Forward; break;
   case 'r': kind = MangledDifferentiabilityKind::Reverse; break;
   case 'd': kind = MangledDifferentiabilityKind::Normal; break;
@@ -3157,7 +3157,7 @@ NodePointer Demangler::demangleDifferentiableFunctionType() {
 
 static std::optional<MangledLifetimeDependenceKind>
 getMangledLifetimeDependenceKind(char nextChar) {
-  switch (auto c = nextChar) {
+  switch (nextChar) {
   case 's':
     return MangledLifetimeDependenceKind::Scope;
   case 'i':
@@ -3660,7 +3660,7 @@ NodePointer Demangler::demangleWitness() {
     case 'z': {
       auto declList = createNode(Node::Kind::GlobalVariableOnceDeclList);
       std::vector<NodePointer> vars;
-      while (auto sig = popNode(Node::Kind::FirstElementMarker)) {
+      while (popNode(Node::Kind::FirstElementMarker)) {
         auto identifier = popNode(isDeclName);
         if (!identifier)
           return nullptr;
@@ -3711,7 +3711,7 @@ NodePointer Demangler::demangleSpecialType() {
     case 'j':
       return demangleSymbolicExtendedExistentialType();
     case 'z':
-      switch (auto cchar = nextChar()) {
+      switch (nextChar()) {
       case 'B':
         return popFunctionType(Node::Kind::ObjCBlock, true);
       case 'C':
