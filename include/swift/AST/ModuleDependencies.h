@@ -398,14 +398,15 @@ public:
       ArrayRef<ScannerImportStatementInfo> optionalModuleImports,
       ArrayRef<LinkLibrary> linkLibraries, StringRef headerImport,
       StringRef definingModuleInterface, bool isFramework, bool isStatic,
-      StringRef moduleCacheKey)
+      StringRef moduleCacheKey, StringRef userModuleVersion)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftBinary,
                                         moduleImports, optionalModuleImports,
                                         linkLibraries, moduleCacheKey),
         compiledModulePath(compiledModulePath), moduleDocPath(moduleDocPath),
         sourceInfoPath(sourceInfoPath), headerImport(headerImport),
         definingModuleInterfacePath(definingModuleInterface),
-        isFramework(isFramework), isStatic(isStatic) {}
+        isFramework(isFramework), isStatic(isStatic),
+        userModuleVersion(userModuleVersion) {}
 
   ModuleDependencyInfoStorageBase *clone() const override {
     return new SwiftBinaryModuleDependencyStorage(*this);
@@ -438,6 +439,9 @@ public:
 
   /// A flag that indicates this dependency is associated with a static archive
   const bool isStatic;
+
+  /// The user module version of this binary module.
+  const std::string userModuleVersion;
 
   /// Return the path to the defining .swiftinterface of this module
   /// of one was determined. Otherwise, return the .swiftmodule path
@@ -604,12 +608,13 @@ public:
       ArrayRef<ScannerImportStatementInfo> optionalModuleImports,
       ArrayRef<LinkLibrary> linkLibraries, StringRef headerImport,
       StringRef definingModuleInterface, bool isFramework,
-      bool isStatic, StringRef moduleCacheKey) {
+      bool isStatic, StringRef moduleCacheKey, StringRef userModuleVer) {
     return ModuleDependencyInfo(
         std::make_unique<SwiftBinaryModuleDependencyStorage>(
             compiledModulePath, moduleDocPath, sourceInfoPath, moduleImports,
             optionalModuleImports, linkLibraries, headerImport,
-            definingModuleInterface,isFramework, isStatic, moduleCacheKey));
+            definingModuleInterface,isFramework, isStatic, moduleCacheKey,
+            userModuleVer));
   }
 
   /// Describe the main Swift module.

@@ -166,6 +166,9 @@ typedef struct {
 
   /// ModuleCacheKey
   swiftscan_string_ref_t module_cache_key;
+
+  /// User module version
+  swiftscan_string_ref_t user_module_version;
 } swiftscan_swift_binary_details_t;
 
 /// Swift placeholder modules carry additional details that specify their
