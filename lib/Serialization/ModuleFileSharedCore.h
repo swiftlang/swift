@@ -623,6 +623,10 @@ public:
     return Bits.IsStaticLibrary;
   }
 
+  llvm::VersionTuple getUserModuleVersion() const {
+    return UserModuleVersion;
+  }
+
   /// If the module-defining `.swiftinterface` file is an SDK-relative path,
   /// resolve it to be absolute to the specified SDK.
   std::string resolveModuleDefiningFilePath(const StringRef SDKPath) const;
