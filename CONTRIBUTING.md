@@ -186,7 +186,7 @@ Smaller changes (or changes where the developer owns the component) can be revie
 - Code reviews are conducted on GitHub (through comments on pull requests or commits) and are reflected on the relevant project’s commit mailing list.
 - The developer responsible for a code change is also responsible for making all necessary review-related changes.
 
-Code review can be an iterative process, which continues until the change is ready to be committed.
+Code review can be an iterative process, which continues until the change is ready to be merged.
 After a change is sent out for review it needs an explicit approval before it’s submitted.
 Do not assume silent approval or request active objections to the patch by setting a deadline.
 
