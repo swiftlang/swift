@@ -481,9 +481,9 @@ Node* Node::findByKind(Node::Kind kind, int maxDepth) {
 // NodeFactory member functions //
 //////////////////////////////////
 
-void NodeFactory::freeSlabs(Slab *slab) {
+void NodeFactory::freeSlabs(AllocatedSlab *slab) {
   while (slab) {
-    Slab *prev = slab->Previous;
+    AllocatedSlab *prev = slab->Previous;
     free(slab);
     slab = prev;
   }
@@ -543,7 +543,7 @@ void NodeFactory::popCheckpoint(NodeFactory::Checkpoint checkpoint) {
     // checkpoint's slab is less than 1/16th of the current slab's space. We
     // won't repeatedly allocate and deallocate the current slab. The size
     // doubles each time so we'll quickly pass the threshold.
-    Slab *savedSlab = nullptr;
+    AllocatedSlab *savedSlab = nullptr;
     if (CurrentSlab) {
       size_t checkpointSlabFreeSpace = checkpoint.End - checkpoint.CurPtr;
       size_t currentSlabSize = End - (char *)(CurrentSlab + 1);
