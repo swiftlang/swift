@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Ownership.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Strings.h"
