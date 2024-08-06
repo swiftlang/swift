@@ -1535,6 +1535,17 @@ void recordRequiredImportAccessLevelForDecl(
 /// Report imports that are marked public but are not used in API.
 void diagnoseUnnecessaryPublicImports(SourceFile &SF);
 
+/// Emit or delay a diagnostic that suggests adding a missing import that is
+/// necessary to bring \p decl into scope in the containing source file. If
+/// delayed, the diagnostic will instead be emitted after type checking the
+/// entire file and will include an appropriate fix-it. Returns true if a
+/// diagnostic was emitted (and not delayed).
+bool maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
+                                         const DeclContext *dc, SourceLoc loc);
+
+/// Emit delayed diagnostics regarding imports that should be added to the
+/// source file.
+void diagnoseMissingImports(SourceFile &sf);
 } // end namespace swift
 
 #endif

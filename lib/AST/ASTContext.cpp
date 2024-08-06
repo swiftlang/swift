@@ -2598,7 +2598,10 @@ bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
     // The module version could not be parsed from the preferred source for
     // this query. Diagnose and treat the query as if it succeeded.
     auto mID = ModuleName[0];
-    Diags.diagnose(mID.Loc, diag::cannot_find_project_version,
+    auto diagLoc = mID.Loc;
+    if (mID.Loc.isInvalid())
+      diagLoc = loc;
+    Diags.diagnose(diagLoc, diag::cannot_find_project_version,
                    getModuleVersionKindString(bestVersionInfo), mID.Item.str());
     return true;
   }

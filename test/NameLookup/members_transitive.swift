@@ -7,7 +7,7 @@
 // RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 5 -package-name TestPackage -enable-experimental-feature MemberImportVisibility -verify-additional-prefix member-visibility-
 
 import members_C
-// expected-member-visibility-note 11{{add import of module 'members_B'}}{{1-1=import members_B\n}}
+// expected-member-visibility-note 11{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
 
 
 func testExtensionMembers(x: X, y: Y<Z>) {

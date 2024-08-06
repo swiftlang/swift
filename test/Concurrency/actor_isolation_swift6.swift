@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -swift-version 6 -emit-sil -o /dev/null -verify -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s
+// RUN: %target-swift-frontend -disable-availability-checking -swift-version 6 -emit-sil -o /dev/null -verify %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -65,7 +65,7 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
 
   // these do need await, regardless of reference or value type
   _ = await (formance as any MainCounter).counter
-  // expected-error@-1 {{non-sendable type 'any MainCounter' passed in implicitly asynchronous call to main actor-isolated property 'counter' cannot cross actor boundary}}
+  // expected-error@-1 {{non-sendable type 'any MainCounter' cannot be sent into main actor-isolated context in call to property 'counter'}}
   _ = await ext[1]
   _ = await formance.ticker
   _ = await ext.polygon

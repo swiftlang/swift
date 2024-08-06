@@ -725,8 +725,13 @@ void LifetimeChecker::noteUninitializedMembers(const DIMemoryUse &Use) {
     std::string Name;
     auto *Decl = TheMemory.getPathStringToElement(i, Name);
     SILLocation Loc = Use.Inst->getLoc();
+    auto propertyInitIsolation = ActorIsolation::forUnspecified();
 
     if (Decl) {
+      if (auto *var = dyn_cast<VarDecl>(Decl)) {
+        propertyInitIsolation = var->getInitializerIsolation();
+      }
+
       // If we found a non-implicit declaration, use its source location.
       if (!Decl->isImplicit())
         Loc = SILLocation(Decl);
@@ -741,8 +746,17 @@ void LifetimeChecker::noteUninitializedMembers(const DIMemoryUse &Use) {
       }
     }
 
-    diagnose(Module, Loc, diag::stored_property_not_initialized,
-             StringRef(Name));
+    if (propertyInitIsolation.isGlobalActor()) {
+      auto *init =
+          dyn_cast<ConstructorDecl>(F.getDeclContext()->getAsDecl());
+      diagnose(Module, Loc, diag::isolated_property_initializer,
+               StringRef(Name), propertyInitIsolation,
+               getActorIsolation(init));
+    } else {
+      diagnose(Module, Loc, diag::stored_property_not_initialized,
+               StringRef(Name));
+    }
+
     emittedNote = true;
   }
 

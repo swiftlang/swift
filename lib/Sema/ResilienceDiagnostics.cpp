@@ -45,7 +45,7 @@ static bool addMissingImport(SourceLoc loc, const Decl *D,
   // API.
   auto missingImport = ImportedModule(ImportPath::Access(),
                                       const_cast<ModuleDecl *>(M));
-  SF->addMissingImportedModule(missingImport);
+  SF->addImplicitImportForModuleInterface(missingImport);
   ctx.Diags.diagnose(loc, diag::missing_import_inserted, M->getName());
   return true;
 }

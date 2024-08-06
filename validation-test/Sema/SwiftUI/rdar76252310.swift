@@ -42,7 +42,7 @@ func fromConcurrencyAware() async {
   let view = CoffeeTrackerView() // synthesized 'init' is 'nonisolated'
 
   // expected-note@+3 {{property access is 'async'}}
-  // expected-warning@+2 {{non-sendable type 'some View' in implicitly asynchronous access to main actor-isolated property 'body' cannot cross actor boundary}}
+  // expected-warning@+2 {{non-sendable type 'some View' of property 'body' cannot exit main actor-isolated context}}
   // expected-warning@+1 {{expression is 'async' but is not marked with 'await'}}
   _ = view.body
 

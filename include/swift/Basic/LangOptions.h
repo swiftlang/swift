@@ -264,6 +264,10 @@ namespace swift {
     /// Enable features useful for running in the debugger.
     bool DebuggerSupport = false;
 
+    /// Used only by the debugger. When set, the module loader will try to
+    /// import non-public transitive dependencies.
+    bool ImportNonPublicDependencies = false;
+
     /// Enable the MemoryBufferSerializedModuleImporter.
     /// Only used by lldb-moduleimport-test.
     bool EnableMemoryBufferImporter = false;
@@ -730,18 +734,23 @@ namespace swift {
       switch (maxWidth) {
       case 128:
         AtomicBitWidths.emplace_back("_128");
+        AtomicBitWidthValues.push_back(128);
         LLVM_FALLTHROUGH;
       case 64:
         AtomicBitWidths.emplace_back("_64");
+        AtomicBitWidthValues.push_back(64);
         LLVM_FALLTHROUGH;
       case 32:
         AtomicBitWidths.emplace_back("_32");
+        AtomicBitWidthValues.push_back(32);
         LLVM_FALLTHROUGH;
       case 16:
         AtomicBitWidths.emplace_back("_16");
+        AtomicBitWidthValues.push_back(16);
         LLVM_FALLTHROUGH;
       case 8:
         AtomicBitWidths.emplace_back("_8");
+        AtomicBitWidthValues.push_back(8);
         break;
       default:
         return;
@@ -751,6 +760,11 @@ namespace swift {
     /// Removes all atomic bit widths.
     void clearAtomicBitWidths() {
       AtomicBitWidths.clear();
+      AtomicBitWidthValues.clear();
+    }
+
+    llvm::ArrayRef<unsigned> getAtomicBitWidthValues() const {
+      return AtomicBitWidthValues;
     }
 
     /// Returns true if the given platform condition argument represents
@@ -791,6 +805,7 @@ namespace swift {
 
   private:
     llvm::SmallVector<std::string, 2> AtomicBitWidths;
+    llvm::SmallVector<unsigned, 2> AtomicBitWidthValues;
     llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 10>
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;

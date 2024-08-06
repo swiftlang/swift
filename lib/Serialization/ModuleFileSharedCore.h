@@ -642,8 +642,8 @@ public:
 
   /// How should \p dependency be loaded for a transitive import via \c this?
   ///
-  /// If \p debuggerMode, more transitive dependencies should try to be loaded
-  /// as they can be useful in debugging.
+  /// If \p importNonPublicDependencies, more transitive dependencies
+  /// should try to be loaded as they can be useful in debugging.
   ///
   /// If \p isPartialModule, transitive dependencies should be loaded as we're
   /// in merge-module mode.
@@ -655,12 +655,9 @@ public:
   /// import. Reports non-public dependencies as required for a testable
   /// client so it can access internal details, which in turn can reference
   /// those non-public dependencies.
-  ModuleLoadingBehavior
-  getTransitiveLoadingBehavior(const Dependency &dependency,
-                               bool debuggerMode,
-                               bool isPartialModule,
-                               StringRef packageName,
-                               bool forTestable) const;
+  ModuleLoadingBehavior getTransitiveLoadingBehavior(
+      const Dependency &dependency, bool importNonPublicDependencies,
+      bool isPartialModule, StringRef packageName, bool forTestable) const;
 };
 
 template <typename T, typename RawData>

@@ -1318,25 +1318,6 @@ void AssociatedConformanceRequest::cacheResult(
 }
 
 //----------------------------------------------------------------------------//
-// PreCheckResultBuilderRequest computation.
-//----------------------------------------------------------------------------//
-
-void swift::simple_display(llvm::raw_ostream &out,
-                           ResultBuilderBodyPreCheck value) {
-  switch (value) {
-  case ResultBuilderBodyPreCheck::Okay:
-    out << "okay";
-    break;
-  case ResultBuilderBodyPreCheck::HasReturnStmt:
-    out << "has return statement";
-    break;
-  case ResultBuilderBodyPreCheck::Error:
-    out << "error";
-    break;
-  }
-}
-
-//----------------------------------------------------------------------------//
 // HasCircularInheritedProtocolsRequest computation.
 //----------------------------------------------------------------------------//
 

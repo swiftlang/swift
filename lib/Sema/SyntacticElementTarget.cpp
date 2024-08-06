@@ -337,8 +337,8 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
   SyntacticElementTarget result = *this;
   switch (kind) {
   case Kind::expression: {
-    if (isForInitialization()) {
-      if (auto *newPattern = getInitializationPattern()->walk(walker)) {
+    if (auto *pattern = getPattern()) {
+      if (auto *newPattern = pattern->walk(walker)) {
         result.setPattern(newPattern);
       } else {
         return std::nullopt;
