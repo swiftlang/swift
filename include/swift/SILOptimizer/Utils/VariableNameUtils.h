@@ -109,7 +109,7 @@ private:
   ///
   /// Has to be a small vector since we push/pop the last segment start. This
   /// lets us speculate when processing phis.
-  VariableNamePathArray<PointerUnion<SILInstruction *, SILValue>, 4>
+  VariableNamePathArray<std::variant<SILInstruction *, SILValue, StringRef>, 4>
       variableNamePath;
 
   /// The root value of our string.
