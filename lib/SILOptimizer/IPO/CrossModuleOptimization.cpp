@@ -625,7 +625,15 @@ bool CrossModuleOptimization::canUseFromInline(DeclContext *declCtxt) {
   /// conservative here.
   if (conservative && M.getOptions().emitTBD && couldBeLinkedStatically(declCtxt, M))
     return false;
-    
+
+  if (auto *decl = declCtxt->getAsDecl()) {
+    // rdar://132411524 Don't serialize pure ObjectiveC types
+    // in PackageCMO to avoid potential over-releasing.
+    if (decl->hasClangNode() &&
+        isPackageCMOEnabled(M.getSwiftModule()))
+      return false;
+  }
+
   return true;
 }
 
