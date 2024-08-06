@@ -38,8 +38,7 @@ Before opening a new issue, take a moment to [browse our existing issues](https:
 ## Good First Issues
 
 Good first issues are bugs, ideas, and tasks that are intended to be accessible for contributors that are new to working on the Swift project, and even new to the patterns and concepts behind subprojects such as the Swift compiler.
-Good first issues are decorated with a corresponding label and are most easily found by visiting `github.com/apple/<repository>/contribute`.
-An example for the main Swift repository is [github.com/apple/swiftlang/contribute](https://github.com/swiftlang/swift/contribute).
+Good first issues are decorated with a corresponding label and are most easily found by visiting https://github.com/swiftlang/swift/contribute.
 They are expected to be low-priority and of modest scope, and not require excessive refactoring, research, or debugging — rather, they should encourage newcomers to dip their toes in some part of Swift, learn more about it, and make a real contribution.
 
 Anyone with [commit access](https://www.swift.org/contributing/#commit-access) and insight into a particular area is welcome and encouraged to pin down or think up good first issues.
