@@ -2959,62 +2959,12 @@ IfConfigClauseRangeInfo::getWholeRange(const SourceManager &SM) const {
 
 void SourceFile::recordIfConfigClauseRangeInfo(
     const IfConfigClauseRangeInfo &range) {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  // Don't record ranges; they'll be extracted from swift-syntax when needed.
+#else
   IfConfigClauseRanges.Ranges.push_back(range);
   IfConfigClauseRanges.IsSorted = false;
-}
-
-ArrayRef<IfConfigClauseRangeInfo> SourceFile::getIfConfigClauseRanges() const {
-  if (!IfConfigClauseRanges.IsSorted) {
-    auto &SM = getASTContext().SourceMgr;
-    // Sort the ranges if we need to.
-    llvm::sort(
-        IfConfigClauseRanges.Ranges, [&](const IfConfigClauseRangeInfo &lhs,
-                                         const IfConfigClauseRangeInfo &rhs) {
-          return SM.isBeforeInBuffer(lhs.getStartLoc(), rhs.getStartLoc());
-        });
-
-    // Be defensive and eliminate duplicates in case we've parsed twice.
-    auto newEnd = llvm::unique(
-        IfConfigClauseRanges.Ranges, [&](const IfConfigClauseRangeInfo &lhs,
-                                         const IfConfigClauseRangeInfo &rhs) {
-          if (lhs.getStartLoc() != rhs.getStartLoc())
-            return false;
-          assert(lhs.getBodyRange(SM) == rhs.getBodyRange(SM) &&
-                 "range changed on a re-parse?");
-          return true;
-        });
-    IfConfigClauseRanges.Ranges.erase(newEnd,
-                                      IfConfigClauseRanges.Ranges.end());
-    IfConfigClauseRanges.IsSorted = true;
-  }
-
-  return IfConfigClauseRanges.Ranges;
-}
-
-ArrayRef<IfConfigClauseRangeInfo>
-SourceFile::getIfConfigClausesWithin(SourceRange outer) const {
-  auto &SM = getASTContext().SourceMgr;
-  assert(SM.getRangeForBuffer(BufferID).contains(outer.Start) &&
-         "Range not within this file?");
-
-  // First let's find the first #if that is after the outer start loc.
-  auto ranges = getIfConfigClauseRanges();
-  auto lower = llvm::lower_bound(
-      ranges, outer.Start,
-      [&](const IfConfigClauseRangeInfo &range, SourceLoc loc) {
-        return SM.isBeforeInBuffer(range.getStartLoc(), loc);
-      });
-  if (lower == ranges.end() ||
-      SM.isBeforeInBuffer(outer.End, lower->getStartLoc())) {
-    return {};
-  }
-  // Next let's find the first #if that's after the outer end loc.
-  auto upper = llvm::upper_bound(
-      ranges, outer.End,
-      [&](SourceLoc loc, const IfConfigClauseRangeInfo &range) {
-        return SM.isBeforeInBuffer(loc, range.getStartLoc());
-      });
-  return llvm::ArrayRef(lower, upper - lower);
+#endif
 }
 
 void ModuleDecl::setPackageName(Identifier name) {

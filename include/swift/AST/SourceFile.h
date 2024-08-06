@@ -15,6 +15,7 @@
 
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/FileUnit.h"
+#include "swift/AST/IfConfigClauseRangeInfo.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/Basic/Debug.h"
@@ -47,44 +48,6 @@ enum class RestrictedImportKind {
 
 /// Import that limits the access level of imported entities.
 using ImportAccessLevel = std::optional<AttributedImport<ImportedModule>>;
-
-/// Stores range information for a \c #if block in a SourceFile.
-class IfConfigClauseRangeInfo final {
-public:
-  enum ClauseKind {
-    // Active '#if', '#elseif', or '#else' clause.
-    ActiveClause,
-    // Inactive '#if', '#elseif', or '#else' clause.
-    InactiveClause,
-    // '#endif' directive.
-    EndDirective,
-  };
-
-private:
-  /// Source location of '#if', '#elseif', etc.
-  SourceLoc DirectiveLoc;
-  /// Character source location of body starts.
-  SourceLoc BodyLoc;
-  /// Location of the end of the body.
-  SourceLoc EndLoc;
-
-  ClauseKind Kind;
-
-public:
-  IfConfigClauseRangeInfo(SourceLoc DirectiveLoc, SourceLoc BodyLoc,
-                          SourceLoc EndLoc, ClauseKind Kind)
-      : DirectiveLoc(DirectiveLoc), BodyLoc(BodyLoc), EndLoc(EndLoc),
-        Kind(Kind) {
-    assert(DirectiveLoc.isValid() && BodyLoc.isValid() && EndLoc.isValid());
-  }
-
-  SourceLoc getStartLoc() const { return DirectiveLoc; }
-  CharSourceRange getDirectiveRange(const SourceManager &SM) const;
-  CharSourceRange getWholeRange(const SourceManager &SM) const;
-  CharSourceRange getBodyRange(const SourceManager &SM) const;
-
-  ClauseKind getKind() const { return Kind; }
-};
 
 /// A file containing Swift source code.
 ///
