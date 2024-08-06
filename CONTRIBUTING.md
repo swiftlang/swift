@@ -310,7 +310,7 @@ Commits to an upstream LLVM repository are automatically merged into the appropr
 
 ### Swift and LLVM Developer Policies
 
-Contributions to Swift’s LLVM or Clang clones are governed by the [LLVM Developer Policy](http://llvm.org/docs/DeveloperPolicy.html) and should follow the appropriate [licensing](http://llvm.org/docs/DeveloperPolicy.html#copyright-license-and-patents) and [coding standards](http://llvm.org/docs/CodingStandards.html).
+Contributions to [llvm-project clone](https://github.com/swiftlang/llvm-project) are governed by the [LLVM Developer Policy](http://llvm.org/docs/DeveloperPolicy.html) and should follow the appropriate [licensing](http://llvm.org/docs/DeveloperPolicy.html#copyright-license-and-patents) and [coding standards](http://llvm.org/docs/CodingStandards.html).
 Issues with LLVM code are tracked using the [LLVM bug database](https://github.com/llvm/llvm-project/issues).
 For LLDB, changes to files with llvm.org comment headers must go to the [upstream LLDB at llvm.org](https://github.com/llvm/llvm-project/tree/main/lldb) and abide by the [LLVM Developer Policy](http://llvm.org/docs/DeveloperPolicy.html) and [LLDB coding conventions](https://llvm.org/docs/CodingStandards.html).
 Contributions to the Swift-specific parts of LLDB (that is, those with a Swift.org comment header) use the [Swift license](https://www.swift.org/community/#license) but still follow the LLDB coding conventions.
