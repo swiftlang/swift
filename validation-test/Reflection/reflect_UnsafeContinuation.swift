@@ -7,7 +7,7 @@
 // REQUIRES: reflection_test_support
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
-// UNSUPPORTED: ASAN
+// UNSUPPORTED: asan
 // UNSUPPORTED: back_deployment_runtime
 
 import SwiftReflectionTest
