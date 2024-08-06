@@ -629,7 +629,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
         TypeChecker::lookupUnqualified(DC, LookupName, Loc, relookupOptions);
     if (nonImportedResults) {
       const ValueDecl *first = nonImportedResults.front().getValueDecl();
-      diagnoseMissingImportForMember(first, DC, Loc);
+      maybeDiagnoseMissingImportForMember(first, DC, Loc);
 
       // Don't try to recover here; we'll get more access-related diagnostics
       // downstream if the type of the inaccessible decl is also inaccessible.
@@ -1040,8 +1040,6 @@ namespace {
     ASTContext &Ctx;
     DeclContext *DC;
 
-    Expr *ParentExpr;
-
     /// A stack of expressions being walked, used to determine where to
     /// insert RebindSelfInConstructorExpr nodes.
     llvm::SmallVector<Expr *, 8> ExprStack;
@@ -1055,9 +1053,6 @@ namespace {
 
     /// Keep track of acceptable DiscardAssignmentExpr's.
     llvm::SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
-
-    /// The current number of nested \c SingleValueStmtExprs that we're within.
-    unsigned SingleValueStmtExprDepth = 0;
 
     /// Simplify expressions which are type sugar productions that got parsed
     /// as expressions due to the parser not knowing which identifiers are
@@ -1106,8 +1101,7 @@ namespace {
     void markAcceptableDiscardExprs(Expr *E);
 
   public:
-    PreCheckExpression(DeclContext *dc, Expr *parent)
-        : Ctx(dc->getASTContext()), DC(dc), ParentExpr(parent) {}
+    PreCheckExpression(DeclContext *dc) : Ctx(dc->getASTContext()), DC(dc) {}
 
     ASTContext &getASTContext() const { return Ctx; }
 
@@ -1216,13 +1210,6 @@ namespace {
       if (auto closure = dyn_cast<ClosureExpr>(expr))
         return finish(walkToClosureExprPre(closure), expr);
 
-      if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
-        // Record the scope of a single value stmt expr, as we want to skip
-        // pre-checking of any patterns, similar to closures.
-        SingleValueStmtExprDepth += 1;
-        return finish(true, expr);
-      }
-
       if (auto *unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr))
         return finish(true, TypeChecker::resolveDeclRefExpr(unresolved, DC));
 
@@ -1237,25 +1224,26 @@ namespace {
         if (expr->isImplicit())
           return finish(true, expr);
 
-        auto parents = ParentExpr->getParentMap();
+        ArrayRef<Expr *> parents = ExprStack;
+        auto takeNextParent = [&]() -> Expr * {
+          if (parents.empty())
+            return nullptr;
 
-        auto result = parents.find(expr);
-        if (result != parents.end()) {
-          auto *parent = result->getSecond();
-
-          if (isa<SequenceExpr>(parent))
-            return finish(true, expr);
-
+          auto parent = parents.back();
+          parents = parents.drop_back();
+          return parent;
+        };
+        if (auto *parent = takeNextParent()) {
           SourceLoc lastInnerParenLoc;
           // Unwrap to the outermost paren in the sequence.
           // e.g. `foo(((&bar))`
           while (auto *PE = dyn_cast<ParenExpr>(parent)) {
-            auto nextParent = parents.find(parent);
-            if (nextParent == parents.end())
+            auto nextParent = takeNextParent();
+            if (!nextParent)
               break;
 
             lastInnerParenLoc = PE->getLParenLoc();
-            parent = nextParent->second;
+            parent = nextParent;
           }
 
           if (isa<ApplyExpr>(parent) || isa<UnresolvedMemberExpr>(parent)) {
@@ -1322,10 +1310,6 @@ namespace {
         assert(DC == ce && "DeclContext imbalance");
         DC = ce->getParent();
       }
-
-      // Restore the depth for the single value stmt counter.
-      if (isa<SingleValueStmtExpr>(expr))
-        SingleValueStmtExprDepth -= 1;
 
       if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
         // Mark the direct callee as being a callee.
@@ -1475,11 +1459,17 @@ namespace {
     }
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
-      // Constraint generation is responsible for pattern verification and
-      // type-checking in the body of the closure and single value stmt expr,
-      // so there is no need to walk into patterns.
-      return Action::SkipNodeIf(
-          isa<ClosureExpr>(DC) || SingleValueStmtExprDepth > 0, pattern);
+      // In general we can't walk into patterns due to the fact that we don't
+      // currently resolve patterns until constraint generation, and therefore
+      // shouldn't walk into any expressions that may turn into patterns.
+      // One exception to this is if the parent is an expression. In that case,
+      // we are type-checking an expression in an ExprPattern, meaning that
+      // the pattern will already be resolved, and that we ought to e.g
+      // diagnose any stray '_' expressions nested within it. This then also
+      // means we should walk into any child pattern if we walked into the
+      // parent pattern.
+      return Action::VisitNodeIf(Parent.getAsExpr() || Parent.getAsPattern(),
+                                 pattern);
     }
   };
 } // end anonymous namespace
@@ -2437,37 +2427,17 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 
 bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target) {
   auto *DC = target.getDeclContext();
+  auto &ctx = DC->getASTContext();
 
-  bool hadErrors = false;
+  FrontendStatsTracer StatsTracer(ctx.Stats, "precheck-target");
+  PreCheckExpression preCheck(DC);
 
-  if (auto *expr = target.getAsExpr()) {
-    hadErrors |= preCheckExpression(expr, DC);
-    // Even if the pre-check fails, expression still has to be re-set.
-    target.setExpr(expr);
-  }
+  auto newTarget = target.walk(preCheck);
+  if (!newTarget)
+    return true;
 
-  if (target.isForEachPreamble()) {
-    auto *stmt = target.getAsForEachStmt();
-
-    auto *sequenceExpr = stmt->getParsedSequence();
-    auto *whereExpr = stmt->getWhere();
-
-    hadErrors |= preCheckExpression(sequenceExpr, DC);
-
-    if (whereExpr) {
-      hadErrors |= preCheckExpression(whereExpr, DC);
-    }
-
-    // Update sequence and where expressions to pre-checked versions.
-    if (!hadErrors) {
-      stmt->setParsedSequence(sequenceExpr);
-
-      if (whereExpr)
-        stmt->setWhere(whereExpr);
-    }
-  }
-
-  return hadErrors;
+  target = *newTarget;
+  return false;
 }
 
 /// Pre-check the expression, validating any types that occur in the
@@ -2476,7 +2446,7 @@ bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc) {
   auto &ctx = dc->getASTContext();
   FrontendStatsTracer StatsTracer(ctx.Stats, "precheck-expr", expr);
 
-  PreCheckExpression preCheck(dc, expr);
+  PreCheckExpression preCheck(dc);
 
   // Perform the pre-check.
   if (auto result = expr->walk(preCheck)) {

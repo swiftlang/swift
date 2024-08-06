@@ -322,6 +322,7 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   if (!Ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation))
     diagnoseUnnecessaryPreconcurrencyImports(*SF);
   diagnoseUnnecessaryPublicImports(*SF);
+  diagnoseMissingImports(*SF);
 
   // Check to see if there are any inconsistent imports.
   // Whole-module @_implementationOnly imports.

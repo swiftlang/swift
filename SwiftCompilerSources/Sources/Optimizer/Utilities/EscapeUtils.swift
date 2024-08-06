@@ -571,7 +571,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
           switch uacUse.instruction {
           case is IsUniqueInst:
             break
-          case is LoadInst, is LoadBorrowInst:
+          case is LoadInst, is LoadBorrowInst, is ApplyInst, is TryApplyInst:
             if followLoads(at: path) {
               return .abortWalk
             }

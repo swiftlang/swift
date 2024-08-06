@@ -506,6 +506,11 @@ final public class UnmanagedAutoreleaseValueInst : RefCountingInst {}
 
 final public class DestroyValueInst : Instruction, UnaryInstruction {
   public var destroyedValue: Value { operand.value }
+
+  /// True if this `destroy_value` is inside a dead-end block is only needed to formally
+  /// end the lifetime of its operand.
+  /// Such `destroy_value` instructions are lowered to no-ops.
+  public var isDeadEnd: Bool { bridged.DestroyValueInst_isDeadEnd() }
 }
 
 final public class DestroyAddrInst : Instruction, UnaryInstruction {

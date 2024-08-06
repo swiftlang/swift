@@ -882,6 +882,81 @@ bb0:
   return %8 : $()
 }
 
+sil [global_init] @addressor_of_globalC : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %0 = global_addr @globalC : $*C
+  %1 = address_to_pointer %0 : $*C to $Builtin.RawPointer
+  return %1 : $Builtin.RawPointer
+}
+
+sil [global_init] @addressor_of_globalCVar : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %0 = global_addr @globalCVar : $*C
+  %1 = address_to_pointer %0 : $*C to $Builtin.RawPointer
+  return %1 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: @testGlobalViaAddressorLet
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     %5 = apply %4() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*C
+// CHECK-NEXT:   r=1,w=0
+sil @testGlobalViaAddressorLet : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @addressor_of_globalC : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*C
+  %3 = load %2 : $*C
+  %4 = function_ref @nouser_func : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  %6 = function_ref @read_C : $@convention(thin) (@in_guaranteed C) -> ()
+  %7 = apply %6(%2) : $@convention(thin) (@in_guaranteed C) -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: @testGlobalViaAddressorVar
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     %5 = apply %4() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*C
+// CHECK-NEXT:   r=1,w=1
+sil @testGlobalViaAddressorVar : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @addressor_of_globalCVar : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*C
+  %3 = load %2 : $*C
+  %4 = function_ref @nouser_func : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: @testGlobalAliasing
+// CHECK:      PAIR #6.
+// CHECK-NEXT:     store %0 to %3 : $*C
+// CHECK-NEXT:     %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*C
+// CHECK-NEXT:   r=0,w=1
+// CHECK:      PAIR #7.
+// CHECK-NEXT:     store %0 to %3 : $*C
+// CHECK-NEXT:     %6 = pointer_to_address %5 : $Builtin.RawPointer to [strict] $*C
+// CHECK-NEXT:   r=0,w=0
+sil @testGlobalAliasing : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : $C):
+  %1 = function_ref @addressor_of_globalCVar : $@convention(thin) () -> Builtin.RawPointer
+  %2 = apply %1() : $@convention(thin) () -> Builtin.RawPointer
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*C
+  %4 = function_ref @addressor_of_globalC : $@convention(thin) () -> Builtin.RawPointer
+  %5 = apply %4() : $@convention(thin) () -> Builtin.RawPointer
+  %6 = pointer_to_address %5 : $Builtin.RawPointer to [strict] $*C
+  %7 = global_addr @globalCVar : $*C
+  store %0 to %3 : $*C
+  fix_lifetime %3 : $*C
+  fix_lifetime %6 : $*C
+  %9 = tuple ()
+  return %9 : $()
+}
+
 // ===-----------------------------------------------------------------------===
 // Test the effect of a [deinit] access on a global 'let'
 //
@@ -1007,6 +1082,36 @@ bb0 (%0 : $*C):
   destroy_addr %0 : $*C
   %2 = tuple()
   return %2 : $()
+}
+
+// CHECK-LABEL: @test_destroy_value_with_effects
+// CHECK:       PAIR #1.
+// CHECK-NEXT:     destroy_value %0 : $X
+// CHECK-NEXT:     %2 = ref_element_addr %1 : $X, #X.x
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @test_destroy_value_with_effects : $@convention(thin) (@owned X) -> () {
+bb0 (%0 : @owned $X):
+  %1 = begin_borrow %0 : $X
+  %2 = ref_element_addr %1 : $X, #X.x
+  fix_lifetime %2 : $*X
+  end_borrow %1 : $X
+  destroy_value %0 : $X
+  unreachable
+}
+
+// CHECK-LABEL: @test_deadend_destroy_value
+// CHECK:       PAIR #1.
+// CHECK-NEXT:      destroy_value [dead_end] %0 : $X
+// CHECK-NEXT:      %2 = ref_element_addr %1 : $X, #X.x
+// CHECK-NEXT:    r=0,w=0
+sil [ossa] @test_deadend_destroy_value : $@convention(thin) (@owned X) -> () {
+bb0 (%0 : @owned $X):
+  %1 = begin_borrow %0 : $X
+  %2 = ref_element_addr %1 : $X, #X.x
+  fix_lifetime %2 : $*X
+  end_borrow %1 : $X
+  destroy_value [dead_end] %0 : $X
+  unreachable
 }
 
 // CHECK-LABEL: @test_copy_value

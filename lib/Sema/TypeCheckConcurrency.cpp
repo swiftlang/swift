@@ -1121,6 +1121,72 @@ bool swift::diagnoseNonSendableTypes(
   return anyMissing;
 }
 
+static
+Diag<Type, const ValueDecl *, ActorIsolation>
+getSendableParamDiag(SendableCheckReason refKind) {
+  switch (refKind) {
+  case SendableCheckReason::CrossActor:
+  case SendableCheckReason::SynchronousAsAsync:
+    return diag::non_sendable_arg_into_actor;
+
+  case SendableCheckReason::ExitingActor:
+    return diag::non_sendable_arg_exits_actor;
+
+  case SendableCheckReason::Conformance:
+    return diag::non_sendable_param_in_witness;
+
+  case SendableCheckReason::Override:
+    return diag::non_sendable_param_in_override;
+
+  case SendableCheckReason::ObjC:
+    return diag::non_sendable_param_in_objc;
+  }
+}
+
+static
+Diag<Type, const ValueDecl *, ActorIsolation>
+getSendableResultDiag(SendableCheckReason refKind) {
+  switch (refKind) {
+  case SendableCheckReason::CrossActor:
+  case SendableCheckReason::SynchronousAsAsync:
+    return diag::non_sendable_result_into_actor;
+
+  case SendableCheckReason::ExitingActor:
+    return diag::non_sendable_result_exits_actor;
+
+  case SendableCheckReason::Conformance:
+    return diag::non_sendable_result_in_witness;
+
+  case SendableCheckReason::Override:
+    return diag::non_sendable_result_in_override;
+
+  case SendableCheckReason::ObjC:
+    return diag::non_sendable_result_in_objc;
+  }
+}
+
+static
+Diag<Type, const ValueDecl *, ActorIsolation>
+getSendablePropertyDiag(SendableCheckReason refKind) {
+  switch (refKind) {
+  case SendableCheckReason::CrossActor:
+  case SendableCheckReason::SynchronousAsAsync:
+    return diag::non_sendable_property_exits_actor;
+
+  case SendableCheckReason::ExitingActor:
+    return diag::non_sendable_property_into_actor;
+
+  case SendableCheckReason::Conformance:
+    return diag::non_sendable_property_in_witness;
+
+  case SendableCheckReason::Override:
+    return diag::non_sendable_property_in_override;
+
+  case SendableCheckReason::ObjC:
+    return diag::non_sendable_property_in_objc;
+  }
+}
+
 bool swift::diagnoseNonSendableTypesInReference(
     Expr *base, ConcreteDeclRef declRef, const DeclContext *fromDC,
     SourceLoc refLoc, SendableCheckReason refKind,
@@ -1155,8 +1221,8 @@ bool swift::diagnoseNonSendableTypesInReference(
             base->getType(),
             fromDC, derivedConformanceType,
             base->getStartLoc(),
-            diag::non_sendable_param_type,
-            (unsigned)refKind, declRef.getDecl(),
+            getSendableParamDiag(refKind),
+            declRef.getDecl(),
             getActorIsolation()))
       return true;
   }
@@ -1171,8 +1237,8 @@ bool swift::diagnoseNonSendableTypesInReference(
         if (diagnoseNonSendableTypes(
                 paramType, fromDC, derivedConformanceType,
                 refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
-                diag::non_sendable_param_type,
-            (unsigned)refKind, function, getActorIsolation()))
+                getSendableParamDiag(refKind),
+                function, getActorIsolation()))
           return true;
       }
     }
@@ -1185,8 +1251,8 @@ bool swift::diagnoseNonSendableTypesInReference(
         if (diagnoseNonSendableTypes(
             resultType, fromDC, derivedConformanceType,
             refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
-                diag::non_sendable_result_type,
-            (unsigned)refKind, func, getActorIsolation()))
+            getSendableResultDiag(refKind),
+            func, getActorIsolation()))
           return true;
       }
     }
@@ -1201,11 +1267,8 @@ bool swift::diagnoseNonSendableTypesInReference(
     if (diagnoseNonSendableTypes(
             propertyType, fromDC,
             derivedConformanceType, refLoc,
-            diag::non_sendable_property_type,
-            var,
-            var->isLocalCapture(),
-            (unsigned)refKind,
-            getActorIsolation()))
+            getSendablePropertyDiag(refKind),
+            var, getActorIsolation()))
       return true;
   }
 
@@ -1217,8 +1280,8 @@ bool swift::diagnoseNonSendableTypesInReference(
         if (diagnoseNonSendableTypes(
                 paramType, fromDC, derivedConformanceType,
                 refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
-                diag::non_sendable_param_type,
-                (unsigned)refKind, subscript, getActorIsolation()))
+                getSendableParamDiag(refKind),
+                subscript, getActorIsolation()))
           return true;
       }
     }
@@ -1229,8 +1292,8 @@ bool swift::diagnoseNonSendableTypesInReference(
       if (diagnoseNonSendableTypes(
               resultType, fromDC, derivedConformanceType,
               refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
-              diag::non_sendable_result_type,
-          (unsigned)refKind, subscript, getActorIsolation()))
+              getSendableResultDiag(refKind),
+              subscript, getActorIsolation()))
         return true;
     }
 
@@ -3849,14 +3912,21 @@ namespace {
                  fnType->getResult().getPointer();
         };
 
-        if (!willDoubleError() &&
-            diagnoseNonSendableTypes(fnType->getResult(), getDeclContext(),
-                                     /*inDerivedConformance*/ Type(),
-                                     apply->getLoc(),
-                                     diag::non_sendable_call_result_type,
-                                     apply->isImplicitlyAsync().has_value(),
-                                     *unsatisfiedIsolation)) {
-          return true;
+        if (!willDoubleError()) {
+          if (calleeDecl) {
+            return diagnoseNonSendableTypes(fnType->getResult(), getDeclContext(),
+                /*inDerivedConformance*/ Type(),
+                apply->getLoc(),
+                diag::non_sendable_result_into_actor,
+                calleeDecl,
+                *unsatisfiedIsolation);
+          }
+
+          return diagnoseNonSendableTypes(fnType->getResult(), getDeclContext(),
+              /*inDerivedConformance*/ Type(),
+              apply->getLoc(),
+              diag::non_sendable_call_result_type,
+              *unsatisfiedIsolation);
         }
       }
 

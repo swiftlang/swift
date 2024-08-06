@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/reflect_UnsafeContinuation
-// RUN: %target-codesign %t/reflect_UnsafeContinuation
+// RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/reflect_CheckedContinuation
+// RUN: %target-codesign %t/reflect_CheckedContinuation
 
-// RUN: %target-run %target-swift-reflection-test %t/reflect_UnsafeContinuation | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-run %target-swift-reflection-test %t/reflect_CheckedContinuation | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: reflection_test_support
 // REQUIRES: executable_test
@@ -22,31 +22,31 @@ struct MyError: Error {
 
 @available(SwiftStdlib 5.1, *)
 class MyClass {
-    let cont: UnsafeContinuation<MyValue, any Error>
+    let cont: CheckedContinuation<MyValue, any Error>
 
-    init(cont: UnsafeContinuation<MyValue, any Error>) {
+    init(cont: CheckedContinuation<MyValue, any Error>) {
         self.cont = cont
     }
 }
 
 if #available(SwiftStdlib 5.1, *) {
-  _ = try await withUnsafeThrowingContinuation { unsafeContinuation in
-    let myClass = MyClass(cont: unsafeContinuation)
+  _ = try await withCheckedThrowingContinuation { checkedContinuation in
+    let myClass = MyClass(cont: checkedContinuation)
     reflect(object: myClass)
-    unsafeContinuation.resume(returning: MyValue(u: 1))
+    checkedContinuation.resume(returning: MyValue(u: 1))
   }
 }
 
 // CHECK: Reflecting an object.
 // CHECK-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
 // CHECK-NEXT: Type reference:
-// CHECK-NEXT: (class reflect_UnsafeContinuation.MyClass)
+// CHECK-NEXT: (class reflect_CheckedContinuation.MyClass)
 
 // CHECK-64: Type info:
 // CHECK-64-NEXT: (class_instance size=24 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:   (field name=cont offset=16
 // CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64-NEXT:       (field name=context offset=0
+// CHECK-64-NEXT:       (field name=canary offset=0
 // CHECK-64-NEXT:         (reference kind=strong refcounting=native)))))
 
 // TODO: 32-bit layout
