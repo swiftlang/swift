@@ -3028,10 +3028,11 @@ metadata:
 /// Initialize the value witness table for a @_rawLayout struct.
 SWIFT_RUNTIME_EXPORT
 void swift::swift_initRawStructMetadata(StructMetadata *structType,
-                                        StructLayoutFlags layoutFlags,
+                                        StructLayoutFlags structLayoutFlags,
                                         const TypeLayout *likeTypeLayout,
-                                        ssize_t count) {
-  auto vwtable = getMutableVWTableForInit(structType, layoutFlags);
+                                        ssize_t count,
+                                        RawLayoutFlags rawLayoutFlags) {
+  auto vwtable = getMutableVWTableForInit(structType, structLayoutFlags);
 
   // The existing vwt function entries are all fine to preserve, the only thing
   // we need to initialize is the actual type layout.
@@ -3040,9 +3041,8 @@ void swift::swift_initRawStructMetadata(StructMetadata *structType,
   auto alignMask = likeTypeLayout->flags.getAlignmentMask();
   auto extraInhabitantCount = likeTypeLayout->extraInhabitantCount;
 
-  // If our count is not -1, we're dealing an array like layout.
-  if (count != -1) {
-    stride *= (size_t)count;
+  if (isRawLayoutArray(rawLayoutFlags)) {
+    stride *= std::min(count, (ssize_t)0);
     size = stride;
   }
 
@@ -3052,6 +3052,12 @@ void swift::swift_initRawStructMetadata(StructMetadata *structType,
                     .withAlignmentMask(alignMask)
                     .withCopyable(false);
   vwtable->extraInhabitantCount = extraInhabitantCount;
+
+  if (shouldRawLayoutMoveAsLike(rawLayoutFlags)) {
+    vwtable->flags = vwtable->flags
+                .withBitwiseTakable(likeTypeLayout->flags.isBitwiseTakable())
+                .withInlineStorage(likeTypeLayout->flags.isInlineStorage());
+  }
 }
 
 /***************************************************************************/

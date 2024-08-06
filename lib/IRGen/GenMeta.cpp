@@ -3315,19 +3315,29 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
   }
 
   auto &IGM = IGF.IGM;
+  auto rawLayout = T.getRawLayout();
   auto likeTypeLayout = emitTypeLayoutRef(IGF, likeType, collector);
-  StructLayoutFlags flags = StructLayoutFlags::Swift5Algorithm;
+  auto structLayoutflags = StructLayoutFlags::Swift5Algorithm;
+  RawLayoutFlags rawLayoutFlags;
 
-  // If we don't have a count, then we're the 'like:' variant and we need to
-  // pass '-1' to the runtime call.
+  if (rawLayout->shouldMoveAsLikeType())
+    rawLayoutFlags |= RawLayoutFlags::MovesAsLike;
+
+  // If we don't have a count, then we're the 'like:' variant so just pass some
+  // 0 to the runtime call.
   if (!count) {
-    count = llvm::ConstantInt::get(IGF.IGM.SizeTy, -1);
+    count = IGM.getSize(Size(0));
+  } else {
+    rawLayoutFlags |= RawLayoutFlags::IsArray;
   }
 
   // Call swift_initRawStructMetadata().
   IGF.Builder.CreateCall(IGM.getInitRawStructMetadataFunctionPointer(),
-                         {metadata, IGM.getSize(Size(uintptr_t(flags))),
-                          likeTypeLayout, count});
+                         {metadata,
+                          IGM.getSize(Size(uintptr_t(structLayoutflags))),
+                          likeTypeLayout,
+                          count,
+                          IGM.getSize(Size(uintptr_t(rawLayoutFlags)))});
 }
 
 static void emitInitializeValueMetadata(IRGenFunction &IGF,

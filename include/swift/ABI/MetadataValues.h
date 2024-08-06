@@ -1525,6 +1525,29 @@ static inline bool isValueWitnessTableMutable(EnumLayoutFlags flags) {
   return uintptr_t(flags) & uintptr_t(EnumLayoutFlags::IsVWTMutable);
 }
 
+/// Flags for raw layout.
+enum class RawLayoutFlags : uintptr_t {
+  /// Whether or not we're initializing an array like raw layout type.
+  IsArray = 0x1,
+
+  /// Whether or not this raw layout type was declared 'movesAsLike'.
+  MovesAsLike = 0x2,
+};
+static inline RawLayoutFlags operator|(RawLayoutFlags lhs,
+                                       RawLayoutFlags rhs) {
+  return RawLayoutFlags(uintptr_t(lhs) | uintptr_t(rhs));
+}
+static inline RawLayoutFlags &operator|=(RawLayoutFlags &lhs,
+                                         RawLayoutFlags rhs) {
+  return (lhs = (lhs | rhs));
+}
+static inline bool isRawLayoutArray(RawLayoutFlags flags) {
+  return uintptr_t(flags) & uintptr_t(RawLayoutFlags::IsArray);
+}
+static inline bool shouldRawLayoutMoveAsLike(RawLayoutFlags flags) {
+  return uintptr_t(flags) & uintptr_t(RawLayoutFlags::MovesAsLike);
+}
+
 namespace SpecialPointerAuthDiscriminators {
   // All of these values are the stable string hash of the corresponding
   // variable name:
