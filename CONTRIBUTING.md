@@ -16,21 +16,7 @@ We put together handy [Getting Started](https://www.swift.org/getting-started/) 
 Reporting bugs is a great way for anyone to help improve Swift.
 The open source Swift project uses GitHub Issues for tracking bugs.
 
-> [!NOTE]
-> If a bug can be reproduced only within an Xcode project or a playground, or if the bug is associated with an Apple NDA, please file a report to Apple’s [bug reporter](https://bugreport.apple.com/) instead.
-When opening an issue, please include the following:
-
-- **A concise description of the problem**.
-If the issue is a crash, include a stack trace.
-Otherwise, describe the behavior you were expecting to see, along with the behavior you actually observed.
-
-- **A reproducible test case**.
-Double-check that your test case reproduces the issue.
-A relatively small sample (roughly within 50 lines of code) is best pasted directly into the description; a larger one may be uploaded as an attachment.
-Consider reducing the sample to the smallest amount of code possible; a smaller test case is easier to reason about and more appealing to сontributors.
-
-- **A description of the environment that reproduces the problem**.
-Include information about the Swift compiler’s version, the deployment target (if explicitly set) and your platform.
+If a bug can be reproduced only within an Xcode project or a playground, or if the bug is associated with an Apple NDA, please file a report to Apple’s [bug reporter](https://bugreport.apple.com/) instead.
 
 Because Swift is under very active development, we receive a lot of bug reports.
 Before opening a new issue, take a moment to [browse our existing issues](https://github.com/swiftlang/swift/issues) to reduce the chance of reporting a duplicate.
@@ -232,12 +218,6 @@ This responsibility means that you may need to update your change in order to:
 - Fix any performance or correctness regressions that result in customer code that uses Swift.
 - Address any bugs that appear in the bug tracker as a result from your change.
 
-We prefer that these issues be handled before submission, but we understand that it isn’t possible to test all of this for every submission.
-Our continuous integration (CI) infrastructure normally finds these problems.
-We recommend watching the CI infrastructure throughout the next day to look for regressions.
-The CI infrastructure will directly email you if a group of commits that included yours caused a failure.
-You are expected to check those messages to see whether they are your fault and, if so, fix the breakage.
-
 Commits that clearly violate these quality standards may be reverted, in particular when the change blocks other developers from making progress.
 The developer is welcome to recommit the change after the problem has been fixed.
 
@@ -274,10 +254,6 @@ To get approval, create a pull request. When the pull request is approved, you m
 - You may commit an obvious change without first getting approval.
 The community expects you to use good judgment.
 Examples are reverting obviously broken patches, correcting code comments, and other minor changes.
-
-- You are allowed to commit changes without approval to the portions of Swift to which you have contributed or for which you have been assigned responsibility.
-Such commits must not break the build.
-This is a “trust but verify” policy, and commits of this nature are reviewed after being committed.
 
 Multiple violations of these policies or a single egregious violation may cause commit access to be revoked.
 Even with commit access, your changes are still subject to [code review](#code-review).
