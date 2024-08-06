@@ -105,6 +105,9 @@ private:
     bool empty() const { return !insertionPointIndex; }
   };
 
+  /// ASTContext for forming identifiers when we need to.
+  ASTContext &astContext;
+
   /// The stacklist that we use to print out variable names.
   ///
   /// Has to be a small vector since we push/pop the last segment start. This
@@ -128,12 +131,13 @@ private:
 
 public:
   VariableNameInferrer(SILFunction *fn, SmallString<64> &resultingString)
-      : variableNamePath(), resultingString(resultingString) {}
+      : astContext(fn->getASTContext()), variableNamePath(),
+        resultingString(resultingString) {}
 
   VariableNameInferrer(SILFunction *fn, Options options,
                        SmallString<64> &resultingString)
-      : variableNamePath(), resultingString(resultingString), options(options) {
-  }
+      : astContext(fn->getASTContext()), variableNamePath(),
+        resultingString(resultingString), options(options) {}
 
   /// Attempts to infer a name from just uses of \p searchValue.
   ///
@@ -238,10 +242,7 @@ private:
       llvm::raw_svector_ostream stream(indexString);
       stream << index;
     }
-    return rootValue->getFunction()
-        ->getASTContext()
-        .getIdentifier(indexString)
-        .str();
+    return astContext.getIdentifier(indexString).str();
   }
 };
 
