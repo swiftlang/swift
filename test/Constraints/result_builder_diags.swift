@@ -79,7 +79,7 @@ struct TupleBuilderWithoutIf { // expected-note 3{{struct 'TupleBuilderWithoutIf
   static func buildDo<T>(_ value: T) -> T { return value }
 }
 
-func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) { // expected-note {{'tuplify(_:body:)' declared here}}
+func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) { // expected-note 2{{'tuplify(_:body:)' declared here}}
   print(body(cond))
 }
 
@@ -455,7 +455,7 @@ func testNonExhaustiveSwitch(e: E) {
 // rdar://problem/59856491
 struct TestConstraintGenerationErrors {
   @TupleBuilder var buildTupleFnBody: String {
-    let a = nil // There is no diagnostic here because next line fails to pre-check, so body is invalid
+    let a = nil // expected-error {{'nil' requires a contextual type}}
     String(nothing) // expected-error {{cannot find 'nothing' in scope}}
   }
 
@@ -722,7 +722,7 @@ struct TuplifiedStructWithInvalidClosure {
 
   @TupleBuilder var errorsDiagnosedByParser: some Any {
     if let _ = condition {
-      tuplify { _ in
+      tuplify { _ in // expected-error {{missing argument for parameter #1 in call}}
         self. // expected-error {{expected member name following '.'}}
       }
       42
