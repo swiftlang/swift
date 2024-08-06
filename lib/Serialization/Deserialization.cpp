@@ -1598,6 +1598,16 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
         auto *paramDecl = GenericTypeParamDecl::createDeserialized(
             getAssociatedModule(), name, paramTy->getDepth(),
             paramTy->getIndex(), paramTy->getParamKind());
+
+        // If we're dealing with a value generic, the parameter type already
+        // serializes the value type. Inform the request evaluator that we don't
+        // need to recompute this value for the param decl.
+        if (paramTy->isValue()) {
+          paramDecl->getASTContext().evaluator.cacheOutput(
+              GenericTypeParamDeclGetValueTypeRequest{paramDecl},
+              paramTy->getValueType());
+        }
+
         paramTy = paramDecl->getDeclaredInterfaceType()
                    ->castTo<GenericTypeParamType>();
       }
@@ -3466,26 +3476,36 @@ public:
                                   StringRef blobData) {
     IdentifierID nameID;
     bool isImplicit;
-    unsigned rawParamKind;
-    unsigned depth;
-    unsigned index;
+    TypeID interfaceTypeID;
 
     decls_block::GenericTypeParamDeclLayout::readRecord(
-        scratch, nameID, isImplicit, rawParamKind, depth, index);
+        scratch, nameID, isImplicit, interfaceTypeID);
 
-    auto paramKind = getActualParamKind(rawParamKind);
-    if (!paramKind)
-      return MF.diagnoseFatal();
+    auto interfaceTy = MF.getTypeChecked(interfaceTypeID);
+    if (!interfaceTy)
+      return interfaceTy.takeError();
+
+    auto paramTy = interfaceTy.get()->castTo<GenericTypeParamType>();
 
     // Always create GenericTypeParamDecls in the associated file; the real
     // context will reparent them.
     auto *DC = MF.getFile();
     auto *genericParam = GenericTypeParamDecl::createDeserialized(
-        DC, MF.getIdentifier(nameID), depth, index, *paramKind);
+        DC, MF.getIdentifier(nameID), paramTy->getDepth(), paramTy->getIndex(),
+        paramTy->getParamKind());
     declOrOffset = genericParam;
 
     if (isImplicit)
       genericParam->setImplicit();
+
+    // If we're dealing with a value generic, the parameter type already
+    // serializes the value type. Inform the request evaluator that we don't
+    // need to recompute this value for the param decl.
+    if (paramTy->isValue()) {
+      ctx.evaluator.cacheOutput(
+        GenericTypeParamDeclGetValueTypeRequest{genericParam},
+        paramTy->getValueType());
+    }
 
     return genericParam;
   }

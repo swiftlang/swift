@@ -4942,12 +4942,13 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     result = applyNonEscapingIfNecessary(result, options);
 
   // Referencing a value generic by name, e.g. 'let N' and referencing 'N', is
-  // only valid as a generic argument, in generic requirements, and when being
-  // used as an expression.
+  // only valid as a generic argument, in generic requirements, when being
+  // used as an expression, and in SIL mode.
   if (result->isValueParameter() &&
       !(options.isGenericArgument() ||
         options.isGenericRequirement() ||
-        options.isAnyExpr())) {
+        options.isAnyExpr() ||
+        options.contains(TypeResolutionFlags::SILMode))) {
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       diagnose(repr->getNameLoc(), diag::value_generic_unexpected, result);
     }

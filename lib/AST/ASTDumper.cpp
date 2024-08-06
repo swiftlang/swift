@@ -1176,6 +1176,19 @@ namespace {
       printCommon(decl, "generic_type_param", label);
       printField(decl->getDepth(), "depth");
       printField(decl->getIndex(), "index");
+
+      switch (decl->getParamKind()) {
+      case GenericTypeParamKind::Type:
+        printField((StringRef)"type", "param_kind");
+        break;
+      case GenericTypeParamKind::Pack:
+        printField((StringRef)"pack", "param_kind");
+        break;
+      case GenericTypeParamKind::Value:
+        printField((StringRef)"value", "param_kind");
+        break;
+      }
+
       printFoot();
     }
 
@@ -4282,10 +4295,18 @@ namespace {
       printField(T->getIndex(), "index");
       if (!T->isCanonical())
         printFieldQuoted(T->getName(), "name");
-      printFlag(T->isParameterPack(), "pack");
 
-      if (T->isValue())
-        printRec(T->getValueType(), "value");
+      switch (T->getParamKind()) {
+      case GenericTypeParamKind::Type:
+        printField((StringRef)"type", "param_kind");
+        break;
+      case GenericTypeParamKind::Pack:
+        printField((StringRef)"pack", "param_kind");
+        break;
+      case GenericTypeParamKind::Value:
+        printField((StringRef)"value", "param_kind");
+        printRec(T->getValueType(), "value_type");
+      }
 
       printFoot();
     }

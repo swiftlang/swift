@@ -2,6 +2,8 @@
 
 protocol P {}
 
+func invalid<let N>() {} // expected-error {{value generic 'N' must have an explicit value type declared}}
+
 struct A<let N: Int> {
   var int: Int {
     N // OK

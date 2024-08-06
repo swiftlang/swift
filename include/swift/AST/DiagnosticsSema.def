@@ -8023,7 +8023,7 @@ ERROR(integer_type_not_accepted,none,
 ERROR(value_generic_unexpected,none,
       "using value generic %0 here is not allowed", (Type))
 ERROR(missing_value_generic_type,none,
-      "value generic 'let %0' must have an explicit value type declared", (Identifier))
+      "value generic %0 must have an explicit value type declared", (Identifier))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -1855,10 +1855,24 @@ void PrintAST::printSingleDepthOfGenericSignature(
                                           GP);
             Printer.printName(GP->getName(),
                               PrintNameContext::GenericParameter);
+
+            if (param->isValue()) {
+              Printer << " : ";
+              printType(param->getValueType());
+            }
+
             Printer.printStructurePost(PrintStructureKind::GenericParameter,
                                        GP);
           } else {
+            if (param->isValue())
+              Printer << "let ";
+
             printType(param);
+
+            if (param->isValue()) {
+              Printer << " : ";
+              printType(param->getValueType());
+            }
           }
         },
         [&] { Printer << ", "; });
@@ -7173,7 +7187,6 @@ public:
   void visitGenericTypeParamType(GenericTypeParamType *T) {
     auto printPrefix = [&]{
       if (T->isParameterPack()) printEach();
-      if (T->isValue()) printLet();
     };
 
     if (T->isCanonical()) {

@@ -1491,9 +1491,7 @@ namespace decls_block {
   using GenericTypeParamDeclLayout = BCRecordLayout<GENERIC_TYPE_PARAM_DECL,
     IdentifierIDField,     // name
     BCFixed<1>,            // implicit flag
-    GenericParamKindField, // param kind
-    BCVBR<4>,              // depth
-    BCVBR<4>               // index
+    TypeIDField            // interface type
   >;
 
   using AssociatedTypeDeclLayout = BCRecordLayout<

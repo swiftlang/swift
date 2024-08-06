@@ -7762,6 +7762,20 @@ element value operand is the projected element type of the pack element
 and must be structurally well-typed for the given index and pack type;
 see the structural type matching rules for pack indices.
 
+Value Generics
+~~~~~~~~~~~~~~~~~
+
+type_value
+```````````
+
+::
+
+  sil-instruction ::= 'type_value' sil-type 'for' sil-identifier
+
+Produce the dynamic value of the given value generic, which must be a formal
+value generic type. The value of the instruction has the type of whatever the
+underlying value generic's type is. For right now that is limited to ``Int``.
+
 Unchecked Conversions
 ~~~~~~~~~~~~~~~~~~~~~
 

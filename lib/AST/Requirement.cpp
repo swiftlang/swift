@@ -154,7 +154,7 @@ CheckRequirementResult Requirement::checkRequirement(
     return CheckRequirementResult::Success;
   }
 
-  case RequirementKind::Superclass: {
+  case RequirementKind::Superclass:
     if (auto packType = firstType->getAs<PackType>()) {
       return expandPackRequirement(packType);
     }
@@ -163,22 +163,19 @@ CheckRequirementResult Requirement::checkRequirement(
       return CheckRequirementResult::Success;
 
     return CheckRequirementResult::RequirementFailure;
-  }
 
-  case RequirementKind::SameType: {
+  case RequirementKind::SameType:
     if (firstType->isEqual(getSecondType()))
       return CheckRequirementResult::Success;
 
     return CheckRequirementResult::RequirementFailure;
-  }
 
-  case RequirementKind::SameShape: {
+  case RequirementKind::SameShape:
     if (firstType->getReducedShape() ==
         getSecondType()->getReducedShape())
       return CheckRequirementResult::Success;
 
     return CheckRequirementResult::RequirementFailure;
-  }
   }
 
   llvm_unreachable("Bad requirement kind");
@@ -253,13 +250,11 @@ int Requirement::compare(const Requirement &other) const {
     abort();
   }
 
-  auto decl1 = getProtocolDecl();
-  auto decl2 = other.getProtocolDecl();
+  int compareProtos =
+    TypeDecl::compare(getProtocolDecl(), other.getProtocolDecl());
+  assert(compareProtos != 0 && "Duplicate conformance requirements");
 
-  int compareDecls = TypeDecl::compare(decl1, decl2);
-  assert(compareDecls != 0 && "Duplicate decl requirements");
-
-  return compareDecls;
+  return compareProtos;
 }
 
 static std::optional<CheckRequirementsResult>

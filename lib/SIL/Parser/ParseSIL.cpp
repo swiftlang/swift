@@ -3097,7 +3097,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     CanType paramType;
     if (parseSILType(Ty) ||
         parseVerbatim("for") ||
-        P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
         parseASTType(paramType))
       return true;
 
