@@ -306,7 +306,7 @@ Swift follows a policy of making a change in the most upstream repository that i
 Contributions to Swift that involve Apple’s version of LLVM Project should go directly into the upstream LLVM repository unless they are specific to Swift.
 For example, an improvement to LLDB’s data formatters for a Swift type belongs in the Apple LLVM Project repository, whereas a bug fix to an LLVM optimizer—even if it’s only been observed when operating on Swift-generated LLVM IR—belongs in upstream LLVM.
 
-Commits to an upstream LLVM repository are automatically merged into the appropriate upstream branches in the corresponding Swift repository (`next`) in the [llvm-project](https://github.com/apple/llvm-project).
+Commits to an upstream LLVM repository are automatically merged into the appropriate upstream branches in the corresponding Swift repository (`next`) in the [llvm-project](https://github.com/swiftlang/llvm-project).
 
 ### Swift and LLVM Developer Policies
 
