@@ -11835,10 +11835,19 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
         if (contextualParam->isIsolated() && !flags.isIsolated() && paramDecl)
           isolatedParams.insert(paramDecl);
 
+        // Carry-over the ownership specifier from the contextual parameter.
+        auto paramOwnership =
+            contextualParam->getParameterFlags().getOwnershipSpecifier();
+
+        // `sending` is already carried over; skip this related ownership kind.
+        if (paramOwnership == ParamSpecifier::ImplicitlyCopyableConsuming)
+          paramOwnership = flags.getOwnershipSpecifier();
+
         param = param.withFlags(flags.withInOut(contextualParam->isInOut())
                                     .withVariadic(contextualParam->isVariadic())
                                     .withIsolated(contextualParam->isIsolated())
-                                    .withSending(contextualParam->isSending()));
+                                    .withSending(contextualParam->isSending())
+                                    .withOwnershipSpecifier(paramOwnership));
       }
     }
 
