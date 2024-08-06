@@ -362,7 +362,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     if (auto *use = getAnyDebugUse(searchValue)) {
       if (auto debugVar = DebugVarCarryingInst(use->getUser())) {
         assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
-        variableNamePath.push_back(use->getUser());
+        variableNamePath.push_back(debugVar.getName());
 
         // We return the value, not the debug_info.
         return searchValue;
@@ -385,7 +385,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
             if (auto debugVar = DebugVarCarryingInst(debugUse->getUser())) {
               assert(debugVar.getKind() ==
                      DebugVarCarryingInst::Kind::DebugValue);
-              variableNamePath.push_back(debugUse->getUser());
+              variableNamePath.push_back(debugVar.getName());
 
               // We return the value, not the debug_info.
               return searchValue;
@@ -399,7 +399,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
       if (auto *debugUse = getAnyDebugUse(bbi)) {
         if (auto debugVar = DebugVarCarryingInst(debugUse->getUser())) {
           assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
-          variableNamePath.push_back(debugUse->getUser());
+          variableNamePath.push_back(debugVar.getName());
 
           // We return the value, not the debug_info.
           return searchValue;
