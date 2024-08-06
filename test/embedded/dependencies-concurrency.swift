@@ -17,6 +17,7 @@
 // DEP: __ZNSt3__19to_stringEj
 // DEP: __ZNSt3__19to_stringEy
 // DEP: __ZdlPv
+// DEP: __ZdlPvm
 // DEP: __Znwm
 // DEP: ___assert_rtn
 // DEP: ___error
