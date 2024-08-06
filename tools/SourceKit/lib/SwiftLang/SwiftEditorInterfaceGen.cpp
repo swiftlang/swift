@@ -56,6 +56,8 @@ public:
     const Decl *Dcl = nullptr;
     /// The range in the interface source.
     TextRange Range;
+    /// The USR, if the declaration has one
+    StringRef USR;
 
     TextDecl(const Decl *D, TextRange Range)
       : Dcl(D), Range(Range) {}
@@ -155,8 +157,10 @@ public:
           OS << TargetUSR;
         }
         StringRef USR = OS.str();
-        Info.USRMap[USR] = Entry;
         DeclUSRs.emplace_back(VD, USR);
+        auto iterator = Info.USRMap.insert_or_assign(USR, Entry).first;
+        // Set the USR in the declarations to the key in the USRMap, because the lifetime of that matches/exceeds the lifetime of Decls
+        Info.Decls.back().USR = iterator->getKey();
       }
     }
   }
@@ -262,6 +266,19 @@ static void reportSemanticAnnotations(const SourceTextInfo &IFaceInfo,
     unsigned Offset = Ref.Range.Offset;
     unsigned Length = Ref.Range.Length;
     Consumer.handleSemanticAnnotation(Offset, Length, Kind, IsSystem);
+  }
+}
+
+/// Create the declarations array (sourcekitd::DeclarationsArrayBuilder) from the SourceTextInfo about declarations
+static void reportDeclarations(const SourceTextInfo &IFaceInfo,
+                                      EditorConsumer &Consumer) {
+  for (auto &Dcl : IFaceInfo.Decls) {
+    if(!Dcl.Dcl)
+      continue;
+    UIdent Kind = SwiftLangSupport::getUIDForDecl(Dcl.Dcl);
+    if (Kind.isInvalid())
+      continue;
+    Consumer.handleDeclaration(Dcl.Range.Offset, Dcl.Range.Length, Kind, Dcl.USR);
   }
 }
 
@@ -593,6 +610,8 @@ void SwiftInterfaceGenContext::reportEditorInfo(EditorConsumer &Consumer) const 
   reportSyntacticAnnotations(Impl.TextCI, Consumer);
   reportDocumentStructure(Impl.TextCI, Consumer);
   reportSemanticAnnotations(Impl.Info, Consumer);
+
+  reportDeclarations(Impl.Info, Consumer);
   Consumer.finished();
 }
 
