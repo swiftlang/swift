@@ -135,7 +135,7 @@ struct ValueSet : IntrusiveSet {
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct InstructionSet : IntrusiveSet {
+struct SpecificInstructionSet<InstType: Instruction> : IntrusiveSet {
 
   private let context: BridgedPassContext
   private let bridged: BridgedNodeSet
@@ -145,25 +145,25 @@ struct InstructionSet : IntrusiveSet {
     self.bridged = self.context.allocNodeSet()
   }
 
-  func contains(_ inst: Instruction) -> Bool {
+  func contains(_ inst: InstType) -> Bool {
     bridged.containsInstruction(inst.bridged)
   }
 
   /// Returns true if `inst` was not contained in the set before inserting.
   @discardableResult
-  mutating func insert(_ inst: Instruction) -> Bool {
+  mutating func insert(_ inst: InstType) -> Bool {
     bridged.insertInstruction(inst.bridged)
   }
 
-  mutating func erase(_ inst: Instruction) {
+  mutating func erase(_ inst: InstType) {
     bridged.eraseInstruction(inst.bridged)
   }
 
   var description: String {
     let function = bridged.getFunction().function
     var d = "{\n"
-    for inst in function.instructions {
-      if contains(inst) {
+    for i in function.instructions {
+      if let inst = i as? InstType, contains(inst) {
         d += inst.description + "\n"
       }
     }
@@ -176,6 +176,8 @@ struct InstructionSet : IntrusiveSet {
     context.freeNodeSet(bridged)
   }
 }
+
+typealias InstructionSet = SpecificInstructionSet<Instruction>
 
 /// A set of operands.
 ///
