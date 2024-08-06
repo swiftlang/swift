@@ -2378,7 +2378,7 @@ static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro,
   if (macro->isUsedForHeaderGuard() && macro->getNumTokens() == 1) {
     auto tok = macro->tokens()[0];
     if (tok.is(clang::tok::numeric_constant) && tok.getLength() == 1 &&
-        PP.getSpellingOfSingleCharacterNumericConstant(tok) == '1')
+        PP.getSpellingOfSingleCharacterNumericConstant(tok) == 1)
       return true;
   }
 
