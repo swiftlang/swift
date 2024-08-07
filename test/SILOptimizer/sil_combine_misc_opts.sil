@@ -12,6 +12,10 @@ import Builtin
 
 class Klass {}
 
+struct S {
+  var a: Klass
+}
+
 sil @nativeobject_guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 
 ///////////
@@ -96,3 +100,22 @@ bb0(%0 : $*Builtin.NativeObject):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @test_updating_borrowed_from :
+// CHECK:         borrowed {{.*}} from {{.*}} %0 : $S
+// CHECK-LABEL: } // end sil function 'test_updating_borrowed_from'
+sil [ossa] @test_updating_borrowed_from : $@convention(thin) (@guaranteed S) -> () {
+bb0(%0 : @guaranteed $S):
+  %1 = destructure_struct %0 : $S
+  %2 = copy_value %1 : $Klass
+  %3 = begin_borrow %2 : $Klass
+  br bb1(%3 : $Klass)
+
+bb1(%5 : @reborrow @guaranteed $Klass):
+  %6 = borrowed %5 : $Klass from (%2 : $Klass)
+  end_borrow %6 : $Klass
+  destroy_value %2 : $Klass
+  %9 = tuple ()
+  return %9 : $()
+}
+

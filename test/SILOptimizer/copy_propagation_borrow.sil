@@ -1207,3 +1207,22 @@ bb0(%0 : @guaranteed $C):
   %7 = tuple ()
   return %7 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @test_updating_borrowed_from :
+// CHECK:         borrowed {{.*}} from {{.*}} %0 : $HasObject
+// CHECK-LABEL: } // end sil function 'test_updating_borrowed_from'
+sil [ossa] @test_updating_borrowed_from : $@convention(thin) (@guaranteed HasObject) -> () {
+bb0(%0 : @guaranteed $HasObject):
+  %1 = destructure_struct %0 : $HasObject
+  %2 = copy_value %1 : $C
+  %3 = begin_borrow %2 : $C
+  br bb1(%3 : $C)
+
+bb1(%5 : @reborrow @guaranteed $C):
+  %6 = borrowed %5 : $C from (%2 : $C)
+  end_borrow %6 : $C
+  destroy_value %2 : $C
+  %9 = tuple ()
+  return %9 : $()
+}
+
