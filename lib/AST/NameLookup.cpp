@@ -1092,6 +1092,10 @@ enum class DirectlyReferencedTypeLookupFlags {
   /// Include results that are members of protocols to which the contextual
   /// type conforms.
   AllowProtocolMembers = 1 << 2,
+
+  /// Include members that would normally be excluded because they come from
+  /// modules that have not been imported directly.
+  IgnoreMissingImports = 1 << 3,
 };
 
 using DirectlyReferencedTypeLookupOptions =
@@ -2917,6 +2921,10 @@ static DirectlyReferencedTypeDecls directReferencesForUnqualifiedTypeLookup(
           DirectlyReferencedTypeLookupFlags::AllowUsableFromInline))
     options |= UnqualifiedLookupFlags::IncludeUsableFromInline;
 
+  if (typeLookupOptions.contains(
+          DirectlyReferencedTypeLookupFlags::IgnoreMissingImports))
+    options |= UnqualifiedLookupFlags::IgnoreMissingImports;
+
   // Manually exclude macro expansions here since the source location
   // is overridden below.
   if (namelookup::isInMacroArgument(dc->getParentSourceFile(), loc))
@@ -2968,14 +2976,10 @@ static DirectlyReferencedTypeDecls directReferencesForUnqualifiedTypeLookup(
 }
 
 /// Perform qualified name lookup for types.
-static llvm::TinyPtrVector<TypeDecl *>
-directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
-                                       ASTContext &ctx,
-                                       ArrayRef<TypeDecl *> baseTypes,
-                                       DeclNameRef name,
-                                       DeclContext *dc,
-                                       SourceLoc loc,
-                                       bool allowUsableFromInline=false) {
+static llvm::TinyPtrVector<TypeDecl *> directReferencesForQualifiedTypeLookup(
+    Evaluator &evaluator, ASTContext &ctx, ArrayRef<TypeDecl *> baseTypes,
+    DeclNameRef name, DeclContext *dc, SourceLoc loc,
+    DirectlyReferencedTypeLookupOptions typeLookupOptions) {
   llvm::TinyPtrVector<TypeDecl *> result;
   auto addResults = [&result](ArrayRef<ValueDecl *> found){
     for (auto decl : found){
@@ -2990,8 +2994,13 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
     SmallVector<ValueDecl *, 4> members;
     auto options = NL_RemoveNonVisible | NL_OnlyTypes;
 
-    if (allowUsableFromInline)
+    if (typeLookupOptions.contains(
+            DirectlyReferencedTypeLookupFlags::AllowUsableFromInline))
       options |= NL_IncludeUsableFromInline;
+
+    if (typeLookupOptions.contains(
+            DirectlyReferencedTypeLookupFlags::IgnoreMissingImports))
+      options |= NL_IgnoreMissingImports;
 
     // Look through the type declarations we were given, resolving them down
     // to nominal type declarations, module declarations, and
@@ -3031,8 +3040,7 @@ static DirectlyReferencedTypeDecls directReferencesForDeclRefTypeRepr(
     // For a qualified identifier, perform qualified name lookup.
     result.first = directReferencesForQualifiedTypeLookup(
         evaluator, ctx, result.first, repr->getNameRef(), dc, repr->getLoc(),
-        options.contains(
-            DirectlyReferencedTypeLookupFlags::AllowUsableFromInline));
+        options);
 
     return result;
   }
@@ -3418,6 +3426,16 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   }
   DirectlyReferencedTypeDecls referenced = directReferencesForTypeRepr(
       evaluator, ctx, typeRepr, ext->getParent(), options);
+
+  // If there were no results, expand the lookup to include members that are
+  // inaccessible due to missing imports. The missing imports will be diagnosed
+  // elsewhere.
+  if (referenced.first.empty() &&
+      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+    options |= DirectlyReferencedTypeLookupFlags::IgnoreMissingImports;
+    referenced = directReferencesForTypeRepr(evaluator, ctx, typeRepr,
+                                             ext->getParent(), options);
+  }
 
   // Resolve those type declarations to nominal type declarations.
   SmallVector<ModuleDecl *, 2> modulesFound;
