@@ -84,6 +84,11 @@ func _convertDarwinBooleanToBool(_ x: DarwinBoolean) -> Bool {
 
 #endif
 
+// wasi-libc defines `errno` in a way ClangImporter can understand, so we don't
+// need to define shims for it. On the contrary, if we define the shim, we will
+// get an ambiguity error when importing WASILibc module and SwiftWASILibc Clang
+// module (or a Clang module that re-exports SwiftWASILibc).
+#if !os(WASI)
 //===----------------------------------------------------------------------===//
 // sys/errno.h
 //===----------------------------------------------------------------------===//
@@ -96,6 +101,7 @@ public var errno : Int32 {
     return _swift_stdlib_setErrno(val)
   }
 }
+#endif
 
 
 //===----------------------------------------------------------------------===//
