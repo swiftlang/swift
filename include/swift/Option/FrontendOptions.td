@@ -540,6 +540,11 @@ def enable_spec_devirt : Flag<["-"], "enable-spec-devirt">,
 def enable_async_demotion : Flag<["-"], "enable-experimental-async-demotion">,
   HelpText<"Enables an optimization pass to demote async functions.">;
 
+def enable_throws_prediction : Flag<["-"], "enable-throws-prediction">,
+  HelpText<"Enables optimization assumption that functions rarely throw errors.">;
+def disable_throws_prediction : Flag<["-"], "disable-throws-prediction">,
+  HelpText<"Disables optimization assumption that functions rarely throw errors.">;
+
 def disable_access_control : Flag<["-"], "disable-access-control">,
   HelpText<"Don't respect access control restrictions">;
 def enable_access_control : Flag<["-"], "enable-access-control">,
