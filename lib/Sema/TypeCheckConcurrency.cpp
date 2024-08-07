@@ -5366,70 +5366,6 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
       };
   }
 
-  // Diagnose global state that is not either immutable plus Sendable or
-  // isolated to a global actor.
-  auto checkGlobalIsolation = [var = dyn_cast<VarDecl>(value), &ctx](
-                                  ActorIsolation isolation) {
-    // Diagnose only declarations in the same module.
-    //
-    // TODO: This should be factored out from ActorIsolationRequest into
-    // either ActorIsolationChecker or DeclChecker.
-    if (var && var->getLoc(/*SerializedOK*/false) &&
-        var->getASTContext().LangOpts.hasFeature(Feature::GlobalConcurrency) &&
-        !isolation.isGlobalActor() &&
-        (isolation != ActorIsolation::NonisolatedUnsafe)) {
-      auto *classDecl = var->getDeclContext()->getSelfClassDecl();
-      const bool isActorType = classDecl && classDecl->isAnyActor();
-      if (var->isGlobalStorage() && !isActorType) {
-        auto *diagVar = var;
-        if (auto *originalVar = var->getOriginalWrappedProperty()) {
-          diagVar = originalVar;
-        }
-
-        bool diagnosed = false;
-        if (var->isLet()) {
-          auto type = var->getInterfaceType();
-          diagnosed = diagnoseIfAnyNonSendableTypes(
-              type, SendableCheckContext(var->getDeclContext()),
-              /*inDerivedConformance=*/Type(), /*typeLoc=*/SourceLoc(),
-              /*diagnoseLoc=*/var->getLoc(),
-              diag::shared_immutable_state_decl, diagVar);
-        } else {
-          diagVar->diagnose(diag::shared_mutable_state_decl, diagVar)
-              .warnUntilSwiftVersion(6);
-          diagnosed = true;
-        }
-
-        // If we diagnosed this global, tack on notes to suggest potential
-        // courses of action.
-        if (diagnosed) {
-          if (!var->isLet()) {
-            auto diag = diagVar->diagnose(diag::shared_state_make_immutable,
-                                          diagVar);
-            SourceLoc fixItLoc = getFixItLocForVarToLet(diagVar);
-            if (fixItLoc.isValid()) {
-              diag.fixItReplace(fixItLoc, "let");
-            }
-          }
-
-          auto mainActor = ctx.getMainActorType();
-          if (mainActor) {
-            diagVar->diagnose(diag::add_globalactor_to_decl,
-                              mainActor->getWithoutParens().getString(),
-                              diagVar, mainActor)
-                .fixItInsert(diagVar->getAttributeInsertionLoc(false),
-                             diag::insert_globalactor_attr, mainActor);
-          }
-          diagVar->diagnose(diag::shared_state_nonisolated_unsafe,
-                            diagVar)
-              .fixItInsert(diagVar->getAttributeInsertionLoc(true),
-                           "nonisolated(unsafe) ");
-        }
-      }
-    }
-    return isolation;
-  };
-
   auto isolationFromAttr = getIsolationFromAttributes(value);
   if (isolationFromAttr && isolationFromAttr->preconcurrency() &&
       !value->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
@@ -5466,10 +5402,8 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
         checkClassGlobalActorIsolation(classDecl, *isolationFromAttr);
     }
 
-    return {
-      checkGlobalIsolation(*isolationFromAttr),
-      IsolationSource(/*source*/nullptr, IsolationSource::Explicit)
-    };
+    return {*isolationFromAttr,
+            IsolationSource(/*source*/ nullptr, IsolationSource::Explicit)};
   }
 
   // Determine the default isolation for this declaration, which may still be
@@ -5505,83 +5439,77 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
   // Function used when returning an inferred isolation.
   auto inferredIsolation = [&](ActorIsolation inferred,
                                bool onlyGlobal = false) {
-    // Invoke the body within checkGlobalIsolation to check the result.
-    return checkGlobalIsolation([&] {
-      // check if the inferred isolation is valid in the context of
-      // its overridden isolation.
-      if (overriddenValue) {
-        // if the inferred isolation is not valid, then carry-over the
-        // overridden declaration's isolation as this decl's inferred isolation.
-        switch (validOverrideIsolation(value, inferred, overriddenValue,
-                                       *overriddenIso)) {
-        case OverrideIsolationResult::Allowed:
-        case OverrideIsolationResult::Sendable:
-          break;
+    // check if the inferred isolation is valid in the context of its overridden
+    // isolation.
+    if (overriddenValue) {
+      // if the inferred isolation is not valid, then carry-over the overridden
+      // declaration's isolation as this decl's inferred isolation.
+      switch (validOverrideIsolation(value, inferred, overriddenValue,
+                                     *overriddenIso)) {
+      case OverrideIsolationResult::Allowed:
+      case OverrideIsolationResult::Sendable:
+        break;
 
-        case OverrideIsolationResult::Disallowed:
-          if (overriddenValue->hasClangNode() &&
-              overriddenIso->isUnspecified()) {
-            inferred = overriddenIso->withPreconcurrency(true);
-          } else {
-            inferred = *overriddenIso;
-          }
-          break;
+      case OverrideIsolationResult::Disallowed:
+        if (overriddenValue->hasClangNode() && overriddenIso->isUnspecified()) {
+          inferred = overriddenIso->withPreconcurrency(true);
+        } else {
+          inferred = *overriddenIso;
         }
+        break;
       }
+    }
 
-      // Add an implicit attribute to capture the actor isolation that was
-      // inferred, so that (e.g.) it will be printed and serialized.
-      switch (inferred) {
-      case ActorIsolation::Nonisolated:
-      case ActorIsolation::NonisolatedUnsafe:
-        // Stored properties cannot be non-isolated, so don't infer it.
-        if (auto var = dyn_cast<VarDecl>(value)) {
-          if (!var->isStatic() && var->hasStorage())
-            return ActorIsolation::forUnspecified().withPreconcurrency(
-                inferred.preconcurrency());
-        }
-
-        if (onlyGlobal) {
+    // Add an implicit attribute to capture the actor isolation that was
+    // inferred, so that (e.g.) it will be printed and serialized.
+    switch (inferred) {
+    case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
+      // Stored properties cannot be non-isolated, so don't infer it.
+      if (auto var = dyn_cast<VarDecl>(value)) {
+        if (!var->isStatic() && var->hasStorage())
           return ActorIsolation::forUnspecified().withPreconcurrency(
               inferred.preconcurrency());
-        }
-
-        value->getAttrs().add(new (ctx) NonisolatedAttr(
-            inferred == ActorIsolation::NonisolatedUnsafe, /*implicit=*/true));
-        break;
-
-      case ActorIsolation::Erased:
-        llvm_unreachable("cannot infer erased isolation");
-
-      case ActorIsolation::GlobalActor: {
-        auto typeExpr =
-            TypeExpr::createImplicit(inferred.getGlobalActor(), ctx);
-        auto attr =
-            CustomAttr::create(ctx, SourceLoc(), typeExpr, /*implicit=*/true);
-        value->getAttrs().add(attr);
-
-        if (inferred.preconcurrency() &&
-            !value->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
-          auto preconcurrency =
-              new (ctx) PreconcurrencyAttr(/*isImplicit*/true);
-          value->getAttrs().add(preconcurrency);
-        }
-
-        break;
       }
 
-      case ActorIsolation::ActorInstance:
-      case ActorIsolation::Unspecified:
-        if (onlyGlobal)
-          return ActorIsolation::forUnspecified().withPreconcurrency(
-              inferred.preconcurrency());
-
-        // Nothing to do.
-        break;
+      if (onlyGlobal) {
+        return ActorIsolation::forUnspecified().withPreconcurrency(
+            inferred.preconcurrency());
       }
 
-      return inferred;
-    }());
+      value->getAttrs().add(new (ctx) NonisolatedAttr(
+          inferred == ActorIsolation::NonisolatedUnsafe, /*implicit=*/true));
+      break;
+
+    case ActorIsolation::Erased:
+      llvm_unreachable("cannot infer erased isolation");
+
+    case ActorIsolation::GlobalActor: {
+      auto typeExpr = TypeExpr::createImplicit(inferred.getGlobalActor(), ctx);
+      auto attr =
+          CustomAttr::create(ctx, SourceLoc(), typeExpr, /*implicit=*/true);
+      value->getAttrs().add(attr);
+
+      if (inferred.preconcurrency() &&
+          !value->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
+        auto preconcurrency = new (ctx) PreconcurrencyAttr(/*isImplicit*/ true);
+        value->getAttrs().add(preconcurrency);
+      }
+
+      break;
+    }
+
+    case ActorIsolation::ActorInstance:
+    case ActorIsolation::Unspecified:
+      if (onlyGlobal)
+        return ActorIsolation::forUnspecified().withPreconcurrency(
+            inferred.preconcurrency());
+
+      // Nothing to do.
+      break;
+    }
+
+    return inferred;
   };
 
   // If this is a local function, inherit the actor isolation from its
@@ -5783,10 +5711,7 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
   }
 
   // Default isolation for this member.
-  return {
-    checkGlobalIsolation(defaultIsolation),
-    defaultIsolationSource
-  };
+  return {defaultIsolation, defaultIsolationSource};
 }
 
 bool HasIsolatedSelfRequest::evaluate(
@@ -5982,6 +5907,63 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
       value, overriddenIsolation)
     .limitBehaviorUntilSwiftVersion(behavior, 6);
   overridden->diagnose(diag::overridden_here);
+}
+
+void swift::checkGlobalIsolation(VarDecl *var) {
+  const auto isolation = getActorIsolation(var);
+  if (var->getLoc() &&
+      var->getASTContext().LangOpts.hasFeature(Feature::GlobalConcurrency) &&
+      !isolation.isGlobalActor() &&
+      (isolation != ActorIsolation::NonisolatedUnsafe)) {
+    auto *classDecl = var->getDeclContext()->getSelfClassDecl();
+    const bool isActorType = classDecl && classDecl->isAnyActor();
+    if (var->isGlobalStorage() && !isActorType) {
+      auto *diagVar = var;
+      if (auto *originalVar = var->getOriginalWrappedProperty()) {
+        diagVar = originalVar;
+      }
+
+      bool diagnosed = false;
+      if (var->isLet()) {
+        auto type = var->getInterfaceType();
+        diagnosed = diagnoseIfAnyNonSendableTypes(
+            type, SendableCheckContext(var->getDeclContext()),
+            /*inDerivedConformance=*/Type(), /*typeLoc=*/SourceLoc(),
+            /*diagnoseLoc=*/var->getLoc(), diag::shared_immutable_state_decl,
+            diagVar);
+      } else {
+        diagVar->diagnose(diag::shared_mutable_state_decl, diagVar)
+            .warnUntilSwiftVersion(6);
+        diagnosed = true;
+      }
+
+      // If we diagnosed this global, tack on notes to suggest potential courses
+      // of action.
+      if (diagnosed) {
+        if (!var->isLet()) {
+          auto diag =
+              diagVar->diagnose(diag::shared_state_make_immutable, diagVar);
+          SourceLoc fixItLoc = getFixItLocForVarToLet(diagVar);
+          if (fixItLoc.isValid()) {
+            diag.fixItReplace(fixItLoc, "let");
+          }
+        }
+
+        auto mainActor = var->getASTContext().getMainActorType();
+        if (mainActor) {
+          diagVar
+              ->diagnose(diag::add_globalactor_to_decl,
+                         mainActor->getWithoutParens().getString(), diagVar,
+                         mainActor)
+              .fixItInsert(diagVar->getAttributeInsertionLoc(false),
+                           diag::insert_globalactor_attr, mainActor);
+        }
+        diagVar->diagnose(diag::shared_state_nonisolated_unsafe, diagVar)
+            .fixItInsert(diagVar->getAttributeInsertionLoc(true),
+                         "nonisolated(unsafe) ");
+      }
+    }
+  }
 }
 
 bool swift::contextRequiresStrictConcurrencyChecking(
