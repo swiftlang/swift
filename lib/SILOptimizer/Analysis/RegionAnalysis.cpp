@@ -48,8 +48,6 @@ using namespace swift::PartitionPrimitives;
 using namespace swift::PatternMatch;
 using namespace swift::regionanalysisimpl;
 
-#ifndef NDEBUG
-
 bool swift::regionanalysisimpl::AbortOnUnknownPatternMatchError = false;
 
 static llvm::cl::opt<bool, true> AbortOnUnknownPatternMatchErrorCmdLine(
@@ -59,8 +57,6 @@ static llvm::cl::opt<bool, true> AbortOnUnknownPatternMatchErrorCmdLine(
     llvm::cl::Hidden,
     llvm::cl::location(
         swift::regionanalysisimpl::AbortOnUnknownPatternMatchError));
-
-#endif
 
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities
@@ -778,8 +774,9 @@ void PartialApplyReachabilityDataflow::add(Operand *op) {
   assert(!propagatedReachability &&
          "Cannot add more operands once reachability is computed");
   SILValue underlyingValue = getRootValue(op->get());
-  LLVM_DEBUG(llvm::dbgs() << "PartialApplyReachability::add.\nValue: "
-                          << underlyingValue << "User: " << *op->getUser());
+  REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                           << "PartialApplyReachability::add.\nValue: "
+                           << underlyingValue << "User: " << *op->getUser());
 
   unsigned bit = getBitForValue(underlyingValue);
   auto &state = blockData[op->getParentBlock()];
@@ -899,8 +896,8 @@ void PartialApplyReachabilityDataflow::propagateReachability() {
     }
   }
 
-  LLVM_DEBUG(llvm::dbgs() << "Propagating Captures Result!\n";
-             print(llvm::dbgs()));
+  REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Propagating Captures Result!\n";
+                           print(llvm::dbgs()));
 }
 
 void PartialApplyReachabilityDataflow::print(llvm::raw_ostream &os) const {
@@ -1177,9 +1174,11 @@ struct PartitionOpBuilder {
 
     Element srcID = lookupValueID(srcOperand->get());
     if (lookupValueID(destValue) == srcID) {
-      LLVM_DEBUG(llvm::dbgs() << "    Skipping assign since tgt and src have "
-                                 "the same representative.\n");
-      LLVM_DEBUG(llvm::dbgs() << "    Rep ID: %%" << srcID.num << ".\n");
+      REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                               << "    Skipping assign since tgt and src have "
+                                  "the same representative.\n");
+      REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                               << "    Rep ID: %%" << srcID.num << ".\n");
       return;
     }
 
@@ -1434,9 +1433,10 @@ class PartitionOpTranslator {
   RegionAnalysisValueMap &valueMap;
 
   void gatherFlowInsensitiveInformationBeforeDataflow() {
-    LLVM_DEBUG(llvm::dbgs() << ">>> Performing pre-dataflow scan to gather "
-                               "flow insensitive information "
-                            << function->getName() << ":\n");
+    REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                             << ">>> Performing pre-dataflow scan to gather "
+                                "flow insensitive information "
+                             << function->getName() << ":\n");
 
     for (auto &block : *function) {
       for (auto &inst : block) {
@@ -1462,7 +1462,7 @@ class PartitionOpTranslator {
                 isNonSendableType(val->getType())) {
               auto trackVal = getTrackableValue(val, true);
               (void)trackVal;
-              LLVM_DEBUG(trackVal.print(llvm::dbgs()));
+              REGIONBASEDISOLATION_LOG(trackVal.print(llvm::dbgs()));
               continue;
             }
             if (auto *pbi = dyn_cast<ProjectBoxInst>(val)) {
@@ -1490,10 +1490,10 @@ public:
     builder.translator = this;
     gatherFlowInsensitiveInformationBeforeDataflow();
 
-    LLVM_DEBUG(llvm::dbgs() << "Initializing Function Args:\n");
+    REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Initializing Function Args:\n");
     auto functionArguments = function->getArguments();
     if (functionArguments.empty()) {
-      LLVM_DEBUG(llvm::dbgs() << "    None.\n");
+      REGIONBASEDISOLATION_LOG(llvm::dbgs() << "    None.\n");
       functionArgPartition = Partition::singleRegion(SILLocation::invalid(), {},
                                                      historyFactory.get());
       return;
@@ -1510,19 +1510,20 @@ public:
         // NOTE: We do not support today the ability to have multiple parameters
         // transfer together as part of the same region.
         if (isTransferrableFunctionArgument(cast<SILFunctionArgument>(arg))) {
-          LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID()
-                                  << " (transferring): " << *arg);
+          REGIONBASEDISOLATION_LOG(llvm::dbgs() << "    %%" << state->getID()
+                                                << " (transferring): " << *arg);
           nonSendableSeparateIndices.push_back(state->getID());
           continue;
         }
 
         // Otherwise, it is one of our merged parameters. Add it to the never
         // transfer list and to the region join list.
-        LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID() << ": ";
-                   state->print(llvm::dbgs()); llvm::dbgs() << *arg);
+        REGIONBASEDISOLATION_LOG(
+            llvm::dbgs() << "    %%" << state->getID() << ": ";
+            state->print(llvm::dbgs()); llvm::dbgs() << *arg);
         nonSendableJoinedIndices.push_back(state->getID());
       } else {
-        LLVM_DEBUG(llvm::dbgs() << "    Sendable: " << *arg);
+        REGIONBASEDISOLATION_LOG(llvm::dbgs() << "    Sendable: " << *arg);
       }
     }
 
@@ -1665,7 +1666,7 @@ public:
         // of our arguments (consider isolated to different actors) or with the
         // isolationInfo we specified. Emit an unknown patten error.
         if (!mergedInfo) {
-          LLVM_DEBUG(
+          REGIONBASEDISOLATION_LOG(
               llvm::dbgs() << "Merge Failure!\n"
                            << "Original Info: ";
               if (originalMergedInfo)
@@ -1829,7 +1830,8 @@ public:
   }
 
   void translateSILPartialApplyAsyncLetBegin(PartialApplyInst *pai) {
-    LLVM_DEBUG(llvm::dbgs() << "Translating Async Let Begin Partial Apply!\n");
+    REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                             << "Translating Async Let Begin Partial Apply!\n");
     // Grab our partial apply and transfer all of its non-sendable
     // parameters. We do not merge the parameters since each individual capture
     // of the async let at the program level is viewed as still being in
@@ -1858,7 +1860,8 @@ public:
   void translateIsolatedPartialApply(PartialApplyInst *pai,
                                      SILIsolationInfo actorIsolation) {
     ApplySite applySite(pai);
-    LLVM_DEBUG(llvm::dbgs() << "Translating Isolated Partial Apply!\n");
+    REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                             << "Translating Isolated Partial Apply!\n");
 
     // For each argument operand.
     for (auto &op : applySite.getArgumentOperands()) {
@@ -2346,15 +2349,16 @@ public:
   /// that define the block's dataflow.
   void translateSILBasicBlock(SILBasicBlock *basicBlock,
                               std::vector<PartitionOp> &foundPartitionOps) {
-    LLVM_DEBUG(llvm::dbgs() << SEP_STR << "Compiling basic block for function "
-                            << basicBlock->getFunction()->getName() << ": ";
-               basicBlock->dumpID(); llvm::dbgs() << SEP_STR;
-               basicBlock->print(llvm::dbgs());
-               llvm::dbgs() << SEP_STR << "Results:\n";);
+    REGIONBASEDISOLATION_LOG(
+        llvm::dbgs() << SEP_STR << "Compiling basic block for function "
+                     << basicBlock->getFunction()->getName() << ": ";
+        basicBlock->dumpID(); llvm::dbgs() << SEP_STR;
+        basicBlock->print(llvm::dbgs());
+        llvm::dbgs() << SEP_STR << "Results:\n";);
     // Translate each SIL instruction to the PartitionOps that it represents if
     // any.
     for (auto &instruction : *basicBlock) {
-      LLVM_DEBUG(llvm::dbgs() << "Visiting: " << instruction);
+      REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Visiting: " << instruction);
       translateSILInstruction(&instruction);
       copy(builder.currentInstPartitionOps,
            std::back_inserter(foundPartitionOps));
@@ -2383,7 +2387,7 @@ public:
   /// Top level switch that translates SIL instructions.
   void translateSILInstruction(SILInstruction *inst) {
     builder.reset(inst);
-    SWIFT_DEFER { LLVM_DEBUG(builder.print(llvm::dbgs())); };
+    SWIFT_DEFER { REGIONBASEDISOLATION_LOG(builder.print(llvm::dbgs())); };
 
     auto computeOpKind = [&]() -> TranslationSemantics {
       switch (inst->getKind()) {
@@ -2395,7 +2399,7 @@ public:
     };
 
     auto kind = computeOpKind();
-    LLVM_DEBUG(llvm::dbgs() << "    Semantics: " << kind << '\n');
+    REGIONBASEDISOLATION_LOG(llvm::dbgs() << "    Semantics: " << kind << '\n');
     switch (kind) {
     case TranslationSemantics::Ignored:
       return;
@@ -3170,7 +3174,8 @@ PartitionOpTranslator::visitRefElementAddrInst(RefElementAddrInst *reai) {
     // And the field is a let... then ignore it. We know that we cannot race on
     // any writes to the field.
     if (reai->getField()->isLet()) {
-      LLVM_DEBUG(llvm::dbgs() << "    Found a let! Not tracking!\n");
+      REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                               << "    Found a let! Not tracking!\n");
       return TranslationSemantics::Ignored;
     }
 
@@ -3189,7 +3194,7 @@ PartitionOpTranslator::visitRefTailAddrInst(RefTailAddrInst *reai) {
     // And our ref_tail_addr is immutable... we can ignore the access since we
     // cannot race against a write to any of these fields.
     if (reai->isImmutable()) {
-      LLVM_DEBUG(
+      REGIONBASEDISOLATION_LOG(
           llvm::dbgs()
           << "    Found an immutable Sendable ref_tail_addr! Not tracking!\n");
       return TranslationSemantics::Ignored;
@@ -3326,14 +3331,14 @@ bool BlockPartitionState::recomputeExitFromEntry(
     // will be surpressed.  will be suppressed
     eval.apply(partitionOp);
   }
-  LLVM_DEBUG(llvm::dbgs() << "    Working Partition: ";
-             workingPartition.print(llvm::dbgs()));
+  REGIONBASEDISOLATION_LOG(llvm::dbgs() << "    Working Partition: ";
+                           workingPartition.print(llvm::dbgs()));
   bool exitUpdated = !Partition::equals(exitPartition, workingPartition);
   exitPartition = workingPartition;
-  LLVM_DEBUG(llvm::dbgs() << "    Exit Partition: ";
-             exitPartition.print(llvm::dbgs()));
-  LLVM_DEBUG(llvm::dbgs() << "    Updated Partition: "
-                          << (exitUpdated ? "yes\n" : "no\n"));
+  REGIONBASEDISOLATION_LOG(llvm::dbgs() << "    Exit Partition: ";
+                           exitPartition.print(llvm::dbgs()));
+  REGIONBASEDISOLATION_LOG(llvm::dbgs() << "    Updated Partition: "
+                                        << (exitUpdated ? "yes\n" : "no\n"));
   return exitUpdated;
 }
 
@@ -3389,7 +3394,8 @@ static bool canComputeRegionsForFunction(SILFunction *fn) {
   }
 
   if (!fn->hasOwnership()) {
-    LLVM_DEBUG(llvm::dbgs() << "Only runs on Ownership SSA, skipping!\n");
+    REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                             << "Only runs on Ownership SSA, skipping!\n");
     return false;
   }
 
@@ -3453,9 +3459,10 @@ void RegionAnalysisFunctionInfo::runDataflow() {
   assert(!solved && "solve should only be called once");
   solved = true;
 
-  LLVM_DEBUG(llvm::dbgs() << SEP_STR << "Performing Dataflow!\n" << SEP_STR);
-  LLVM_DEBUG(llvm::dbgs() << "Values!\n";
-             translator->getValueMap().print(llvm::dbgs()));
+  REGIONBASEDISOLATION_LOG(llvm::dbgs() << SEP_STR << "Performing Dataflow!\n"
+                                        << SEP_STR);
+  REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Values!\n";
+                           translator->getValueMap().print(llvm::dbgs()));
 
   bool anyNeedUpdate = true;
   while (anyNeedUpdate) {
@@ -3465,9 +3472,11 @@ void RegionAnalysisFunctionInfo::runDataflow() {
       auto &blockState = (*blockStates)[block];
       blockState.isLive = true;
 
-      LLVM_DEBUG(llvm::dbgs() << "Block: bb" << block->getDebugID() << "\n");
+      REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                               << "Block: bb" << block->getDebugID() << "\n");
       if (!blockState.needsUpdate) {
-        LLVM_DEBUG(llvm::dbgs() << "    Doesn't need update! Skipping!\n");
+        REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                                 << "    Doesn't need update! Skipping!\n");
         continue;
       }
 
@@ -3477,7 +3486,7 @@ void RegionAnalysisFunctionInfo::runDataflow() {
       // Compute the new entry partition to this block.
       Partition newEntryPartition = blockState.entryPartition;
 
-      LLVM_DEBUG(llvm::dbgs() << "    Visiting Preds!\n");
+      REGIONBASEDISOLATION_LOG(llvm::dbgs() << "    Visiting Preds!\n");
 
       // This loop computes the union of the exit partitions of all
       // predecessors of this block
@@ -3486,9 +3495,9 @@ void RegionAnalysisFunctionInfo::runDataflow() {
 
         // Predecessors that have not been reached yet will have an empty pred
         // state... so just merge them all. Also our initial value of
-        LLVM_DEBUG(llvm::dbgs()
-                       << "    Pred. bb" << predBlock->getDebugID() << ": ";
-                   predState.exitPartition.print(llvm::dbgs()));
+        REGIONBASEDISOLATION_LOG(
+            llvm::dbgs() << "    Pred. bb" << predBlock->getDebugID() << ": ";
+            predState.exitPartition.print(llvm::dbgs()));
         newEntryPartition =
             Partition::join(newEntryPartition, predState.exitPartition);
       }
