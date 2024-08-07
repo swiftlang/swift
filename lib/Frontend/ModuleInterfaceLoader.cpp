@@ -2135,15 +2135,18 @@ InterfaceSubContextDelegateImpl::runInSubContext(StringRef moduleName,
                                                  StringRef outputPath,
                                                  SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*, ArrayRef<StringRef>,
-                            ArrayRef<StringRef>, StringRef)> action) {
+                          ArrayRef<StringRef>, StringRef, StringRef)> action) {
   return runInSubCompilerInstance(moduleName, interfacePath, sdkPath, outputPath,
                                   diagLoc, /*silenceErrors=*/false,
                                   [&](SubCompilerInstanceInfo &info){
+    std::string UserModuleVer = info.Instance->getInvocation().getFrontendOptions()
+      .UserModuleVersion.getAsString();
     return action(info.Instance->getASTContext(),
                   info.Instance->getMainModule(),
                   info.BuildArguments,
                   info.ExtraPCMArgs,
-                  info.Hash);
+                  info.Hash,
+                  UserModuleVer);
   });
 }
 

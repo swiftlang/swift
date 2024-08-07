@@ -255,14 +255,15 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
           extraPCMArgsArrayID, contextHashID, isFramework, isStatic, bridgingHeaderFileID,
           sourceFilesArrayID, bridgingSourceFilesArrayID,
           bridgingModuleDependenciesArrayID, overlayDependencyIDArrayID,
-          CASFileSystemRootID, bridgingHeaderIncludeTreeID, moduleCacheKeyID;
+          CASFileSystemRootID, bridgingHeaderIncludeTreeID, moduleCacheKeyID,
+          userModuleVersionID;
       SwiftInterfaceModuleDetailsLayout::readRecord(
           Scratch, outputPathFileID, interfaceFileID,
           compiledModuleCandidatesArrayID, buildCommandLineArrayID,
           extraPCMArgsArrayID, contextHashID, isFramework, isStatic, bridgingHeaderFileID,
           sourceFilesArrayID, bridgingSourceFilesArrayID,
           bridgingModuleDependenciesArrayID, overlayDependencyIDArrayID,
-          CASFileSystemRootID, bridgingHeaderIncludeTreeID, moduleCacheKeyID);
+          CASFileSystemRootID, bridgingHeaderIncludeTreeID, moduleCacheKeyID, userModuleVersionID);
 
       auto outputModulePath = getIdentifier(outputPathFileID);
       if (!outputModulePath)
@@ -302,15 +303,19 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       if (!rootFileSystemID)
         llvm::report_fatal_error("Bad CASFileSystem RootID");
       auto moduleCacheKey = getIdentifier(moduleCacheKeyID);
-      if (!moduleCacheKeyID)
+      if (!moduleCacheKey)
         llvm::report_fatal_error("Bad moduleCacheKey");
+      auto userModuleVersion = getIdentifier(userModuleVersionID);
+      if (!userModuleVersion)
+        llvm::report_fatal_error("Bad userModuleVersion");
 
       // TODO: LinkLibraries, MacroDependencies
       // Form the dependencies storage object
       auto moduleDep = ModuleDependencyInfo::forSwiftInterfaceModule(
           outputModulePath.value(), optionalSwiftInterfaceFile.value(),
           compiledCandidatesRefs, buildCommandRefs, {}, extraPCMRefs,
-          *contextHash, isFramework, isStatic, *rootFileSystemID, *moduleCacheKey);
+          *contextHash, isFramework, isStatic, *rootFileSystemID, *moduleCacheKey,
+          *userModuleVersion);
 
       // Add imports of this module
       for (const auto &moduleName : currentModuleImports)
@@ -626,7 +631,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       if (!clangIncludeTreeRoot)
         llvm::report_fatal_error("Bad clang include tree ID");
       auto moduleCacheKey = getIdentifier(moduleCacheKeyID);
-      if (!moduleCacheKeyID)
+      if (!moduleCacheKey)
         llvm::report_fatal_error("Bad moduleCacheKey");
 
       // TODO: LinkLibraries
@@ -1007,7 +1012,8 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(
         getIdentifier(swiftTextDeps->textualModuleDetails.CASFileSystemRootID),
         getIdentifier(swiftTextDeps->textualModuleDetails
                           .CASBridgingHeaderIncludeTreeRootID),
-        getIdentifier(swiftTextDeps->moduleCacheKey));
+        getIdentifier(swiftTextDeps->moduleCacheKey),
+        getIdentifier(swiftTextDeps->userModuleVersion));
     break;
   }
   case swift::ModuleDependencyKind::SwiftSource: {
