@@ -4,9 +4,6 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/enums.h -Wno-unused-private-field -Wno-unused-function -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
-// rdar://124466216
-// UNSUPPORTED: OS=watchos
-
 public class C {
     public var x: Int
     public init(x: Int) { self.x = x }
@@ -56,7 +53,7 @@ public enum G<T> {
 // CHECK-NEXT: }
 
 // CHECK: SWIFT_INLINE_THUNK bool E::matchesIntValue(swift::Int value) const {
-// CHECK-NEXT: return _impl::$s5Enums1EO15matchesIntValueySbSiF(value, _impl::swift_interop_passDirect_Enums_uint64_t_0_8_uint8_t_8_9(_getOpaquePointer()));
+// CHECK-NEXT: return _impl::$s5Enums1EO15matchesIntValueySbSiF(value, _impl::swift_interop_passDirect_Enums_{{.*}}(_getOpaquePointer()));
 
 // CHECK: SWIFT_INLINE_THUNK swift::Array<C> F::getB() const {
 // CHECK-NEXT:    if (!isB()) abort();
