@@ -32,15 +32,27 @@ class IsolatedSub: NXSender {
   }
 }
 
+class NotSendable {}
+
+@MainActor
+class NSObjectInitOverride: NSObject {
+  var ns: NotSendable
+
+  override init() {
+    self.ns = NotSendable()
+    super.init()
+  }
+}
+
+
 @objc
 @MainActor
 class Test : NSObject {
-  static var shared: Test? // expected-note {{mutation of this static property is only permitted within the actor}}
+  static var shared: Test?
 
   override init() {
     super.init()
 
     Self.shared = self
-    // expected-warning@-1 {{main actor-isolated static property 'shared' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
   }
 }
