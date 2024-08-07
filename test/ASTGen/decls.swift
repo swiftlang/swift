@@ -284,3 +284,9 @@ struct TestStruct {
 // FIXME: Compute 'static' location
 //  static func instance(arg: Int) -> TestStruct { return TestStruct() }
 }
+
+struct ValueStruct<let N: Int> {}
+
+func genericTest1<T>(_: T) {}
+func genericTest2<each T>(_: repeat each T) {}
+func genericTest4<let T: Int>(_: ValueStruct<T>) {}

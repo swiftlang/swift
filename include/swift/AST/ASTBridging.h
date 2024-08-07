@@ -1887,6 +1887,15 @@ enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : size_t {
   BridgedBuiltinIsolationMacro,
 };
 
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedGenericTypeParamKind : size_t {
+  /// A regular generic type parameter: 'T'
+  BridgedGenericTypeParamKindType = 0,
+  /// A generic parameter pack: 'each T'
+  BridgedGenericTypeParamKindPack,
+  /// A generic value parameter: 'let T'
+  BridgedGenericTypeParamKindValue,
+};
+
 SWIFT_NAME("BridgedGenericParamList.createParsed(_:leftAngleLoc:parameters:"
            "genericWhereClause:rightAngleLoc:)")
 BridgedGenericParamList BridgedGenericParamList_createParsed(
@@ -1897,12 +1906,12 @@ BridgedGenericParamList BridgedGenericParamList_createParsed(
 
 SWIFT_NAME(
     "BridgedGenericTypeParamDecl.createParsed(_:declContext:specifierLoc:"
-    "name:nameLoc:inheritedType:index:)")
+    "name:nameLoc:inheritedType:index:paramKind:)")
 BridgedGenericTypeParamDecl BridgedGenericTypeParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, BridgedNullableTypeRepr opaqueInheritedType,
-    size_t index);
+    size_t index, BridgedGenericTypeParamKind paramKind);
 
 SWIFT_NAME(
     "BridgedTrailingWhereClause.createParsed(_:whereKeywordLoc:requirements:)")
