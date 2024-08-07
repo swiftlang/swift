@@ -1472,19 +1472,6 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
     return ErrorType::get(ctx);
   }
 
-  // Try ignoring missing imports.
-  relookupOptions |= NameLookupFlags::IgnoreMissingImports;
-  auto nonImportedMembers = TypeChecker::lookupMemberType(
-      dc, parentType, repr->getNameRef(), repr->getLoc(), relookupOptions);
-  if (nonImportedMembers) {
-    const TypeDecl *first = nonImportedMembers.front().Member;
-    auto nameLoc = repr->getNameLoc();
-    maybeDiagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc());
-    // Don't try to recover here; we'll get more access-related diagnostics
-    // downstream if we do.
-    return ErrorType::get(ctx);
-  }
-
   // FIXME: Typo correction!
 
   // Lookup into a type.
@@ -1902,9 +1889,24 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
   if (options.contains(TypeResolutionFlags::AllowUsableFromInline))
     lookupOptions |= NameLookupFlags::IncludeUsableFromInline;
   LookupTypeResult memberTypes;
-  if (parentTy->mayHaveMembers())
+  if (parentTy->mayHaveMembers()) {
     memberTypes = TypeChecker::lookupMemberType(
         DC, parentTy, repr->getNameRef(), repr->getLoc(), lookupOptions);
+
+    // If no members were found, try ignoring missing imports.
+    if (!memberTypes &&
+        ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+      lookupOptions |= NameLookupFlags::IgnoreMissingImports;
+      memberTypes = TypeChecker::lookupMemberType(
+          DC, parentTy, repr->getNameRef(), repr->getLoc(), lookupOptions);
+
+      if (memberTypes.size() == 1) {
+        if (maybeDiagnoseMissingImportForMember(memberTypes.back().Member, DC,
+                                                repr->getLoc()))
+          return ErrorType::get(ctx);
+      }
+    }
+  }
 
   // Name lookup was ambiguous. Complain.
   // FIXME: Could try to apply generic arguments first, and see whether

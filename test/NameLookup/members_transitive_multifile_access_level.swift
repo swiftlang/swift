@@ -10,7 +10,9 @@
 // RUN: %target-swift-frontend -emit-module -o %t %t/Exports.swift -I %t
 // RUN: %target-swift-frontend -typecheck -verify -swift-version 5 \
 // RUN:   -primary-file %t/function_bodies.swift \
-// RUN:   -primary-file %t/function_signatures.swift \
+// RUN:   -primary-file %t/function_signatures_unqualified.swift \
+// RUN:   -primary-file %t/function_signatures_qualified.swift \
+// RUN:   -primary-file %t/extensions.swift \
 // RUN:   %t/imports.swift \
 // RUN:   -I %t -package-name Package \
 // RUN:   -enable-experimental-feature MemberImportVisibility
@@ -45,7 +47,7 @@ func internalFunc(_ x: Int) {
   _ = x.memberInMixedUses // expected-error {{property 'memberInMixedUses' is not available due to missing import of defining module 'MixedUses'}}
 }
 
-//--- function_signatures.swift
+//--- function_signatures_unqualified.swift
 
 import Swift // Just here to anchor the fix-its
 // expected-note    2 {{add import of module 'InternalUsesOnly'}}{{1-1=internal import InternalUsesOnly\n}}
@@ -64,6 +66,57 @@ extension Int {
   internal func usesTypealiasInMixedUses_Internal(x: TypealiasInMixedUses) {} // expected-error {{type alias 'TypealiasInMixedUses' is not available due to missing import of defining module 'MixedUses'}}
 }
 
+//--- function_signatures_qualified.swift
+
+import Swift // Just here to anchor the fix-its
+// expected-note    2 {{add import of module 'InternalUsesOnly'}}{{1-1=internal import InternalUsesOnly\n}}
+// expected-note@-1   {{add import of module 'PackageUsesOnly'}}{{1-1=package import PackageUsesOnly\n}}
+// expected-note@-2   {{add import of module 'PublicUsesOnly'}}{{1-1=public import PublicUsesOnly\n}}
+// expected-note@-3 2 {{add import of module 'MixedUses'}}{{1-1=public import MixedUses\n}}
+
+private func usesTypealiasInInternalUsesOnly_Private(x: Int.TypealiasInInternalUsesOnly) {} // expected-error {{type alias 'TypealiasInInternalUsesOnly' is not available due to missing import of defining module 'InternalUsesOnly'}}
+internal func usesTypealiasInInternalUsesOnly(x: Int.TypealiasInInternalUsesOnly) {} // expected-error {{type alias 'TypealiasInInternalUsesOnly' is not available due to missing import of defining module 'InternalUsesOnly'}}
+package func usesTypealiasInPackageUsesOnly(x: Int.TypealiasInPackageUsesOnly) {} // expected-error {{type alias 'TypealiasInPackageUsesOnly' is not available due to missing import of defining module 'PackageUsesOnly'}}
+public func usesTypealiasInPublicUsesOnly(x: Int.TypealiasInPublicUsesOnly) {} // expected-error {{type alias 'TypealiasInPublicUsesOnly' is not available due to missing import of defining module 'PublicUsesOnly'}}
+// expected-warning@-1 {{cannot use type alias 'TypealiasInPublicUsesOnly' here; 'PublicUsesOnly' was not imported by this file}}
+public func usesTypealiasInMixedUses(x: Int.TypealiasInMixedUses) {} // expected-error {{type alias 'TypealiasInMixedUses' is not available due to missing import of defining module 'MixedUses'}}
+// expected-warning@-1 {{cannot use type alias 'TypealiasInMixedUses' here; 'MixedUses' was not imported by this file}}
+internal func usesTypealiasInMixedUses_Internal(x: Int.TypealiasInMixedUses) {} // expected-error {{type alias 'TypealiasInMixedUses' is not available due to missing import of defining module 'MixedUses'}}
+
+//--- extensions.swift
+
+import Swift // Just here to anchor the fix-its
+// expected-note    2 {{add import of module 'InternalUsesOnly'}}{{1-1=internal import InternalUsesOnly\n}}
+// expected-note@-1   {{add import of module 'PackageUsesOnly'}}{{1-1=package import PackageUsesOnly\n}}
+// expected-note@-2   {{add import of module 'PublicUsesOnly'}}{{1-1=public import PublicUsesOnly\n}}
+// expected-note@-3 2 {{add import of module 'MixedUses'}}{{1-1=public import MixedUses\n}}
+
+extension Int.NestedInInternalUsesOnly { // expected-error {{struct 'NestedInInternalUsesOnly' is not available due to missing import of defining module 'InternalUsesOnly'}}
+  private func privateMethod() {}
+}
+
+extension Int.NestedInInternalUsesOnly { // expected-error {{struct 'NestedInInternalUsesOnly' is not available due to missing import of defining module 'InternalUsesOnly'}}
+  internal func internalMethod() {}
+}
+
+extension Int.NestedInPackageUsesOnly { // expected-error {{struct 'NestedInPackageUsesOnly' is not available due to missing import of defining module 'PackageUsesOnly'}}
+  package func packageMethod() {}
+}
+
+extension Int.NestedInPublicUsesOnly { // expected-error {{struct 'NestedInPublicUsesOnly' is not available due to missing import of defining module 'PublicUsesOnly'}}
+  // expected-warning@-1 {{cannot use struct 'NestedInPublicUsesOnly' in an extension with public or '@usableFromInline' members; 'PublicUsesOnly' was not imported by this file}}
+  public func publicMethod() {}
+}
+
+extension Int.NestedInMixedUses { // expected-error {{struct 'NestedInMixedUses' is not available due to missing import of defining module 'MixedUses'}}
+  // expected-warning@-1 {{cannot use struct 'NestedInMixedUses' in an extension with public or '@usableFromInline' members; 'MixedUses' was not imported by this file}}
+  public func publicMethod() {}
+}
+
+extension Int.NestedInMixedUses { // expected-error {{struct 'NestedInMixedUses' is not available due to missing import of defining module 'MixedUses'}}
+  internal func internalMethod() {}
+}
+
 //--- imports.swift
 
 internal import InternalUsesOnly
@@ -78,6 +131,7 @@ internal import Exports
 
 extension Int {
   public typealias TypealiasInInternalUsesOnly = Self
+  public struct NestedInInternalUsesOnly {}
   public var memberInInternalUsesOnly: Int { return self }
 }
 
@@ -85,6 +139,7 @@ extension Int {
 
 extension Int {
   public typealias TypealiasInInternalUsesOnlyDefaultedImport = Self
+  public struct NestedInInternalUsesOnlyDefaultedImport {}
   public var memberInInternalUsesOnlyDefaultedImport: Int { return self }
 }
 
@@ -92,6 +147,7 @@ extension Int {
 
 extension Int {
   public typealias TypealiasInPackageUsesOnly = Self
+  public struct NestedInPackageUsesOnly {}
   public var memberInPackageUsesOnly: Int { return self }
 }
 
@@ -99,6 +155,7 @@ extension Int {
 
 extension Int {
   public typealias TypealiasInPublicUsesOnly = Self
+  public struct NestedInPublicUsesOnly {}
   public var memberInPublicUsesOnly: Int { return self }
 }
 
@@ -106,6 +163,7 @@ extension Int {
 
 extension Int {
   public typealias TypealiasInPublicUsesOnlyDefaultedImport = Self
+  public struct NestedInPublicUsesOnlyDefaultedImport {}
   public var memberInPublicUsesOnlyDefaultedImport: Int { return self }
 }
 
@@ -113,6 +171,7 @@ extension Int {
 
 extension Int {
   public typealias TypealiasInMixedUses = Self
+  public struct NestedInMixedUses {}
   public var memberInMixedUses: Int { return self }
 }
 
@@ -120,6 +179,7 @@ extension Int {
 
 extension Int {
   public typealias TypealiasInInternalUsesOnlyTransitivelyImported = Self
+  public struct NestedInInternalUsesOnlyTransitivelyImported {}
   public var memberInInternalUsesOnlyTransitivelyImported: Int { return self }
 }
 
