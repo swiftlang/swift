@@ -5309,6 +5309,16 @@ ConcreteDeclRef swift::getDeclRefInContext(ValueDecl *value) {
   return ConcreteDeclRef(value);
 }
 
+static bool isNSObjectInit(ValueDecl *overridden) {
+  auto *classDecl = dyn_cast_or_null<ClassDecl>(
+      overridden->getDeclContext()->getSelfNominalTypeDecl());
+  if (!classDecl || !classDecl->isNSObject()) {
+    return false;
+  }
+
+  return isa<ConstructorDecl>(overridden);
+}
+
 /// Generally speaking, the isolation of the decl that overrides
 /// must match the overridden decl. But there are a number of exceptions,
 /// e.g., the decl that overrides can be nonisolated.
@@ -5341,9 +5351,21 @@ static OverrideIsolationResult validOverrideIsolation(
     }
 
     // If the overridden declaration is from Objective-C with no actor
-    // annotation, allow it.
-    if (ctx.LangOpts.StrictConcurrencyLevel != StrictConcurrency::Complete &&
-        overridden->hasClangNode() && !overriddenIsolation) {
+    // annotation, don't allow overriding isolation in complete concurrency
+    // checking. Calls from outside the actor, via the nonisolated superclass
+    // method that is dynamically dispatched, will crash at runtime due to
+    // the dynamic isolation check in the @objc thunk.
+    //
+    // There's a narrow carve out for `NSObject.init()` because overriding
+    // this init of `@MainActor`-isolated type is difficult-to-impossible,
+    // especially if you need to call an initializer from an intermediate
+    // superclass that is also `@MainActor`-isolated. This won't admit a
+    // runtime data-race safety hole, because dynamic isolation checks will
+    // be inserted in the @objc thunks under `DynamicActorIsolation`, and
+    // direct calls will enforce `@MainActor` as usual.
+    if (isNSObjectInit(overridden) ||
+        (ctx.LangOpts.StrictConcurrencyLevel != StrictConcurrency::Complete &&
+         overridden->hasClangNode() && !overriddenIsolation)) {
       return OverrideIsolationResult::Allowed;
     }
 
