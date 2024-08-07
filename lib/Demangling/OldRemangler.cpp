@@ -3051,5 +3051,7 @@ ManglingError Remangler::mangleHasSymbolQuery(Node *node, unsigned depth) {
 ManglingError
 Remangler::mangleDependentGenericInverseConformanceRequirement(Node *node,
                                                                unsigned depth) {
-  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+  DEMANGLER_ASSERT(node->getNumChildren() == 2, node);
+  RETURN_IF_ERROR(mangleConstrainedType(node->getChild(0), depth + 1));
+  return mangle(node->getChild(1), depth + 1);
 }
