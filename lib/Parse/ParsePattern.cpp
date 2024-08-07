@@ -212,7 +212,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
   // Parse the parameter list.
   bool isClosure = paramContext == ParameterContextKind::Closure;
   return parseList(tok::r_paren, leftParenLoc, rightParenLoc,
-                      /*AllowSepAfterLast=*/false,
+                      /*AllowSepAfterLast=*/true,
                       diag::expected_rparen_parameter,
                       [&]() -> ParserStatus {
     ParsedParameter param;
@@ -1270,24 +1270,23 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
 
   // Parse all the elements.
   SmallVector<TuplePatternElt, 8> elts;
-  ParserStatus ListStatus =
-    parseList(tok::r_paren, LPLoc, RPLoc,
-              /*AllowSepAfterLast=*/false,
-              diag::expected_rparen_tuple_pattern_list,
-              [&] () -> ParserStatus {
-    // Parse the pattern tuple element.
-    ParserStatus EltStatus;
-    std::optional<TuplePatternElt> elt;
-    std::tie(EltStatus, elt) = parsePatternTupleElement();
-    if (EltStatus.hasCodeCompletion())
-      return makeParserCodeCompletionStatus();
-    if (!elt)
-      return makeParserError();
+  ParserStatus ListStatus = parseList(
+      tok::r_paren, LPLoc, RPLoc,
+      /*AllowSepAfterLast=*/true, diag::expected_rparen_tuple_pattern_list,
+      [&]() -> ParserStatus {
+        // Parse the pattern tuple element.
+        ParserStatus EltStatus;
+        std::optional<TuplePatternElt> elt;
+        std::tie(EltStatus, elt) = parsePatternTupleElement();
+        if (EltStatus.hasCodeCompletion())
+          return makeParserCodeCompletionStatus();
+        if (!elt)
+          return makeParserError();
 
-    // Add this element to the list.
-    elts.push_back(*elt);
-    return makeParserSuccess();
-  });
+        // Add this element to the list.
+        elts.push_back(*elt);
+        return makeParserSuccess();
+      });
 
   return makeParserResult(
            ListStatus,

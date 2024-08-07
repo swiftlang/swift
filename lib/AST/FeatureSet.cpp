@@ -224,6 +224,7 @@ UNINTERESTING_FEATURE(Sensitive)
 UNINTERESTING_FEATURE(DebugDescriptionMacro)
 UNINTERESTING_FEATURE(ReinitializeConsumeInMultiBlockDefer)
 UNINTERESTING_FEATURE(SE427NoInferenceOnExtension)
+UNINTERESTING_FEATURE(TrailingComma)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
