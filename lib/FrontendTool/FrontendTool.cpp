@@ -1955,13 +1955,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 
-  // Scripts that use the Foundation framework need it loaded early for bridging
-  // to work correctly on Darwin platforms. On other platforms this is a no-op.
-  if (Invocation.getFrontendOptions().RequestedAction ==
-      FrontendOptions::ActionType::Immediate) {
-    loadFoundationIfNeeded(Instance->getDiags());
-  }
-
   // Don't ask clients to report bugs when running a script in immediate mode.
   // When a script asserts the compiler reports the error with the same
   // stacktrace as a compiler crash. From here we can't tell which is which,

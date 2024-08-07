@@ -115,8 +115,6 @@ ERROR(error_immediate_mode_missing_library,none,
       (unsigned, StringRef))
 ERROR(error_immediate_mode_primary_file,none,
       "immediate mode is incompatible with -primary-file", ())
-WARNING(warning_immediate_mode_cannot_load_foundation,none,
-        "immediate mode failed to load Foundation: %0", (StringRef))
 ERROR(error_missing_frontend_action,none,
       "no frontend action was selected", ())
 ERROR(error_invalid_source_location_str,none,
