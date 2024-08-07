@@ -493,6 +493,24 @@ static void determineBestChoicesInContext(
           }
 
           if (score > 0) {
+            if (decl->isOperator() &&
+                decl->getBaseIdentifier().isArithmeticOperator() &&
+                overloadType->getNumParams() == 2) {
+              // Nudge the score slightly to prefer concrete homogeneous
+              // operators.
+              //
+              // This is an opportunistic optimization based on the operator
+              // use patterns where homogeneous operators are the most
+              // heavily used ones.
+              auto resultTy = overloadType->getResult();
+              if (!resultTy->hasTypeParameter() &&
+                  llvm::all_of(overloadType->getParams(),
+                               [&resultTy](const auto &param) {
+                                 return param.getPlainType()->isEqual(resultTy);
+                               }))
+                score += 0.001;
+            }
+
             favoredChoices.push_back({choice, score});
             bestScore = std::max(bestScore, score);
           }
