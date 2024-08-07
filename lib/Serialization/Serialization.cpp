@@ -5896,7 +5896,12 @@ public:
   }
 
   void visitIntegerType(const IntegerType *integer) {
-    llvm_unreachable("implement me");
+    using namespace decls_block;
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[IntegerTypeLayout::Code];
+    IntegerTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                  integer->isNegative(),
+                                  integer->getDigitsText());
   }
 };
 
@@ -6083,6 +6088,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<PackElementTypeLayout>();
   registerDeclTypeAbbr<PackTypeLayout>();
   registerDeclTypeAbbr<SILPackTypeLayout>();
+  registerDeclTypeAbbr<IntegerTypeLayout>();
 
   registerDeclTypeAbbr<ErrorFlagLayout>();
   registerDeclTypeAbbr<ErrorTypeLayout>();

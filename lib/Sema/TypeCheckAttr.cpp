@@ -3856,8 +3856,10 @@ ResolveRawLayoutTypeRequest::evaluate(Evaluator &evaluator, StructDecl *sd,
     return fixedTy->getType();
   }
 
+  TypeResolutionOptions options(TypeResolverContext::RawLayoutAttr);
+
   // Resolve the type in the struct's context.
-  return TypeResolution::resolveContextualType(typeRepr, sd, std::nullopt,
+  return TypeResolution::resolveContextualType(typeRepr, sd, options,
                                                // Unbound generics and
                                                // placeholders are not allowed
                                                // within this attribute.

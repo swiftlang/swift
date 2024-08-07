@@ -7945,6 +7945,17 @@ Expected<Type> DESERIALIZE_TYPE(ERROR_TYPE)(ModuleFile &MF,
     return ErrorType::get(ctx);
   return ErrorType::get(origTy);
 }
+
+Expected<Type> DESERIALIZE_TYPE(INTEGER_TYPE)(ModuleFile &MF,
+                                              SmallVectorImpl<uint64_t> &scratch,
+                                              StringRef blobData) {
+  auto &ctx = MF.getContext();
+  bool isNegative;
+  
+  decls_block::IntegerTypeLayout::readRecord(scratch, isNegative);
+
+  return IntegerType::get(blobData, isNegative, ctx);
+}
 } // namespace decls_block
 } // namespace serialization
 }

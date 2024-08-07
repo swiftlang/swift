@@ -210,6 +210,9 @@ enum class TypeResolverContext : uint8_t {
 
   /// Whether this is the argument of an inverted constraint (~).
   Inverted,
+
+  /// Whether this is inside a @_rawLayout attribute.
+  RawLayoutAttr,
 };
 
 /// Options that determine how type resolution should work.
@@ -308,6 +311,7 @@ public:
     case Context::Inverted:
     case Context::ValueGenericArgument:
     case Context::PatternBindingDecl:
+    case Context::RawLayoutAttr:
       return false;
     }
     llvm_unreachable("unhandled kind");
@@ -353,6 +357,7 @@ public:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
     case Context::ValueGenericArgument:
+    case Context::RawLayoutAttr:
       return true;
     }
   }
@@ -396,6 +401,7 @@ public:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
     case Context::ValueGenericArgument:
+    case Context::RawLayoutAttr:
       return false;
     }
   }
@@ -440,6 +446,7 @@ public:
     case Context::Inverted:
     case Context::GenericParameterInherited:
     case Context::AssociatedTypeInherited:
+    case Context::RawLayoutAttr:
       return false;
     }
   }
@@ -485,6 +492,7 @@ public:
     case Context::CustomAttr:
     case Context::Inverted:
     case Context::ValueGenericArgument:
+    case Context::RawLayoutAttr:
       return false;
     }
   }

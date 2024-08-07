@@ -1475,6 +1475,12 @@ namespace decls_block {
     BCArray<TypeIDField>// component types
   );
 
+  TYPE_LAYOUT(IntegerTypeLayout,
+    INTEGER_TYPE,
+    BCFixed<1>,   // is negative?
+    BCBlob        // integer value text
+  );
+
   using TypeAliasLayout = BCRecordLayout<
     TYPE_ALIAS_DECL,
     IdentifierIDField, // name
