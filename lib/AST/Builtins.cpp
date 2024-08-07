@@ -210,6 +210,19 @@ _generics(ParamS... params) {
   return {{params...}};
 }
 
+///// A conditional synthesizer which generates a generic parameter list.
+///// If the 'condition' is false, no generic parameters are created.
+//template <class... ParamS>
+//struct ConditionalGenericParamListSynthesizer {
+//  bool condition;
+//  VariadicSynthesizerStorage<ParamS...> Params;
+//};
+//template <class... ParamS>
+//constexpr ConditionalGenericParamListSynthesizer<ParamS...>
+//_ifGenerics(bool condition, ParamS... params) {
+//  return {condition, {params...}};
+//}
+
 struct CountGenericParameters {
   unsigned &Count;
 
@@ -276,6 +289,21 @@ static GenericParamList *synthesizeGenericParamList(SynthesisContext &SC,
   return paramList;
 }
 
+//template <class... ParamsS>
+//static GenericParamList *synthesizeGenericParamList(
+//    SynthesisContext &SC,
+//    const ConditionalGenericParamListSynthesizer<ParamsS...> &params) {
+//  if (params.condition) {
+//    unsigned count = 0;
+//    params.Params.visit(CountGenericParameters{count});
+//    auto paramList = getGenericParams(SC.Context, count);
+//    SC.GenericParams = paramList;
+//    return paramList;
+//  } else {
+//    return GenericParamList::create(SC.Context, SourceLoc(), {}, SourceLoc());
+//  }
+//}
+
 namespace {
 struct CollectGenericParams {
   SynthesisContext &SC;
@@ -324,6 +352,24 @@ synthesizeGenericSignature(SynthesisContext &SC,
                                std::move(collector.AddedRequirements),
                                /*allowInverses=*/false);
 }
+
+//template <class... ParamsS>
+//static GenericSignature
+//synthesizeGenericSignature(SynthesisContext &SC,
+//                     const ConditionalGenericParamListSynthesizer<ParamsS...> &list) {
+//  CollectGenericParams collector(SC);
+//  if (list.condition) {
+//    list.Params.visit(collector);
+//
+//    return buildGenericSignature(SC.Context,
+//                                 GenericSignature(),
+//                                 std::move(collector.GenericParamTypes),
+//                                 std::move(collector.AddedRequirements),
+//                                 /*allowInverses=*/false);
+//  } else {
+//    return GenericSignature();
+//  }
+//}
 
 /// Build a builtin function declaration.
 ///
@@ -1531,7 +1577,35 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
   return TupleType::get(resultTupleElements, ctx);
 }
 
+//static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id, bool isDiscarding) {
+//  auto taskExecutorIsAvailable =
+//      ctx.getProtocol(swift::KnownProtocolKind::TaskExecutor) != nullptr;
+//
+//  return getBuiltinFunction(
+//      ctx, id, _thin, _ifGenerics(/*if=*/isDiscarding,
+//                                  _unrestricted, _conformsToDefaults(0)),
+//      _parameters(
+//          _label("flags", _swiftInt),
+//          _label("initialSerialExecutor",
+//                 _defaulted(_optional(_executor), _nil)),
+//          _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
+//          _label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
+//          _label("initialTaskExecutorConsuming",
+//                 _defaulted(_consuming(_optional(_bincompatType(
+//                                /*if=*/taskExecutorIsAvailable,
+//                                _existential(_taskExecutor),
+//                                /*else=*/_executor))),
+//                            _nil)),
+//          _label("taskName", _defaulted(_optional(_unsafeRawBufferPointer), _nil)),
+//          _label("operation",
+//                 _sending(_function(_async(_throws(_thick)), _typeparam(0),
+//                                    _parameters())))),
+//      _tuple(_nativeObject, _rawPointer));
+//}
+
 static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
+  // return getCreateTask(ctx, id, /*isDiscarding=*/false);
+
   auto taskExecutorIsAvailable =
       ctx.getProtocol(swift::KnownProtocolKind::TaskExecutor) != nullptr;
 
@@ -1549,6 +1623,7 @@ static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
                                 _existential(_taskExecutor),
                                 /*else*/ _executor))),
                             _nil)),
+          _label("taskName", _defaulted(_optional(_unsafeRawBufferPointer), _nil)),
           _label("operation",
                  _sending(_function(_async(_throws(_thick)), _typeparam(0),
                                     _parameters())))),
@@ -1573,6 +1648,7 @@ static ValueDecl *getCreateDiscardingTask(ASTContext &ctx, Identifier id) {
                                 _existential(_taskExecutor),
                                 /*else*/ _executor))),
                             _nil)),
+          _label("taskName", _defaulted(_optional(_unsafeRawBufferPointer), _nil)),
           _label("operation", _sending(_function(_async(_throws(_thick)), _void,
                                                  _parameters())))),
       _tuple(_nativeObject, _rawPointer));
