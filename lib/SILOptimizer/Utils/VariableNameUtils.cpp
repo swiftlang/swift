@@ -342,6 +342,12 @@ static BeginBorrowInst *hasOnlyBorrowingNonDestroyUse(SILValue searchValue) {
   return result;
 }
 
+namespace {
+
+constexpr StringLiteral UnknownDeclString = "<unknown decl>";
+
+} // namespace
+
 SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     SILValue searchValue, ValueSet &visitedValues) {
   assert(searchValue);
@@ -552,15 +558,19 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
 
     auto getNamePathComponentFromCallee = [&](FullApplySite call) -> SILValue {
       // Use the name of the property being accessed if we can get to it.
-      if (isa<FunctionRefBaseInst>(call.getCallee()) ||
-          isa<MethodInst>(call.getCallee())) {
-        if (call.getSubstCalleeType()->hasSelfParam()) {
-          variableNamePath.push_back(
-              call.getCallee()->getDefiningInstruction());
-          return call.getSelfArgument();
+      if (call.getSubstCalleeType()->hasSelfParam()) {
+        if (auto *f = dyn_cast<FunctionRefBaseInst>(call.getCallee())) {
+          if (auto dc = f->getInitiallyReferencedFunction()->getDeclContext()) {
+            variableNamePath.push_back(getNameFromDecl(dc->getAsDecl()));
+            return call.getSelfArgument();
+          }
         }
 
-        return SILValue();
+        if (auto *mi = dyn_cast<MethodInst>(call.getCallee())) {
+          variableNamePath.push_back(
+              getNameFromDecl(mi->getMember().getDecl()));
+          return call.getSelfArgument();
+        }
       }
 
       return SILValue();
@@ -655,7 +665,7 @@ StringRef VariableNameInferrer::getNameFromDecl(Decl *d) {
     }
   }
 
-  return "<unknown decl>";
+  return UnknownDeclString;
 }
 
 void VariableNameInferrer::popSingleVariableName() {
@@ -666,29 +676,7 @@ void VariableNameInferrer::popSingleVariableName() {
     return;
   }
 
-  if (std::holds_alternative<SILInstruction *>(next)) {
-    auto *inst = std::get<SILInstruction *>(next);
-
-    if (auto f = dyn_cast<FunctionRefBaseInst>(inst)) {
-      if (auto dc = f->getInitiallyReferencedFunction()->getDeclContext()) {
-        resultingString += getNameFromDecl(dc->getAsDecl());
-        return;
-      }
-
-      resultingString += "<unknown decl>";
-      return;
-    }
-
-    if (auto m = dyn_cast<MethodInst>(inst)) {
-      resultingString += getNameFromDecl(m->getMember().getDecl());
-      return;
-    }
-
-    resultingString += "<unknown decl>";
-    return;
-  }
-
-  resultingString += "<unknown decl>";
+  resultingString += UnknownDeclString;
 }
 
 void VariableNameInferrer::drainVariableNamePath() {
