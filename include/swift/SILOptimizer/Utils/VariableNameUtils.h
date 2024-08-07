@@ -112,8 +112,7 @@ private:
   ///
   /// Has to be a small vector since we push/pop the last segment start. This
   /// lets us speculate when processing phis.
-  VariableNamePathArray<std::variant<SILInstruction *, SILValue, StringRef>, 4>
-      variableNamePath;
+  VariableNamePathArray<StringRef, 4> variableNamePath;
 
   /// The root value of our string.
   ///
@@ -216,7 +215,6 @@ public:
 
 private:
   void drainVariableNamePath();
-  void popSingleVariableName();
 
   /// Finds the SILValue that either provides the direct debug information or
   /// that has a debug_value user that provides the name of the value.

@@ -281,8 +281,11 @@ SILValue VariableNameInferrer::getRootValueForTemporaryAllocation(
 
 SILValue
 VariableNameInferrer::findDebugInfoProvidingValue(SILValue searchValue) {
+  // NOTE: This should only return a non-empty SILValue if we actually have a
+  // full path (including base name) in the variable name path.
   if (!searchValue)
     return SILValue();
+
   LLVM_DEBUG(llvm::dbgs() << "Searching for debug info providing value for: "
                           << searchValue);
   ValueSet valueSet(searchValue->getFunction());
@@ -668,24 +671,13 @@ StringRef VariableNameInferrer::getNameFromDecl(Decl *d) {
   return UnknownDeclString;
 }
 
-void VariableNameInferrer::popSingleVariableName() {
-  auto next = variableNamePath.pop_back_val();
-
-  if (std::holds_alternative<StringRef>(next)) {
-    resultingString += std::get<StringRef>(next);
-    return;
-  }
-
-  resultingString += UnknownDeclString;
-}
-
 void VariableNameInferrer::drainVariableNamePath() {
   if (variableNamePath.empty())
     return;
 
   // Walk backwards, constructing our string.
   while (true) {
-    popSingleVariableName();
+    resultingString += variableNamePath.pop_back_val();
 
     if (variableNamePath.empty())
       return;
