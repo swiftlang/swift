@@ -2973,6 +2973,14 @@ public:
   /// \c \@usableFromInline, \c \@inlinalbe, and \c \@_alwaysEmitIntoClient
   bool isUsableFromInline() const;
 
+  /// Treat as public and allow skipping access checks if the following conditions
+  /// are met:
+  /// - This decl has a package access level,
+  /// - Has a @usableFromInline (or other inlinable) attribute,
+  /// - And is defined in a module built from a public or private
+  ///   interface that does not contain package-name.
+  bool isPackageEffectivelyPublic() const;
+
   /// Returns \c true if this declaration is *not* intended to be used directly
   /// by application developers despite the visibility.
   bool shouldHideFromEditor() const;

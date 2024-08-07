@@ -5,6 +5,7 @@
 // RUN: %target-swift-frontend -emit-module %t/Bar.swift -I %t \
 // RUN:   -module-name Bar -package-name foopkg -package-name barpkg \
 // RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -disable-print-package-name-for-non-package-interface \
 // RUN:   -emit-module-interface-path %t/Bar.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/Bar.private.swiftinterface \
 // RUN:   -emit-package-module-interface-path %t/Bar.package.swiftinterface
@@ -31,7 +32,8 @@
 // RUN:   -package-name barpkg \
 // RUN:   -Rmodule-loading 2> %t/load-pkg-off.output
 // RUN: %FileCheck -check-prefix=CHECK-LOAD-PKG-OFF %s < %t/load-pkg-off.output
-// CHECK-LOAD-PKG-OFF: error: module 'Bar' is in package 'barpkg' but was built from a non-package interface; modules of the same package can only be loaded if built from source or package interface:{{.*}}Bar.private.swiftinterface
+// CHECK-LOAD-PKG-OFF: remark: loaded module 'Bar'; source: '{{.*}}Bar.private.swiftinterface', loaded: '{{.*}}Bar-{{.*}}.swiftmodule'
+// CHECK-LOAD-PKG-OFF: error: cannot find 'PkgKlass' in scope; did you mean 'PubKlass'?
 
 /// Client loads a private interface since the package-name is different from the loaded module's.
 // RUN: not %target-swift-frontend -typecheck %t/Client.swift -I %t \
@@ -45,13 +47,15 @@
 // RUN: rm -rf %t/*.swiftmodule
 // RUN: rm -rf %t/Bar.package.swiftinterface
 
-/// Client loads a private interface since package interface doesn't exist. It should error since the loaded module is not built from a package interface.
+/// Client loads a private interface since package interface doesn't exist. It should error since the
+/// loaded module is not built from a package interface.
 // RUN: not %target-swift-frontend -typecheck %t/Client.swift -I %t \
 // RUN:   -package-name barpkg \
 // RUN:   -experimental-package-interface-load \
 // RUN:   -Rmodule-loading 2> %t/load-priv.output
 // RUN: %FileCheck -check-prefix=CHECK-LOAD-PRIV %s < %t/load-priv.output
-// CHECK-LOAD-PRIV: no such module 'Bar'
+// CHECK-LOAD-PRIV: remark: loaded module 'Bar'; source: '{{.*}}Bar.private.swiftinterface', loaded: '{{.*}}Bar-{{.*}}.swiftmodule'
+// CHECK-LOAD-PRIV: error: cannot find 'PkgKlass' in scope; did you mean 'PubKlass'?
 
 // RUN: rm -rf %t/*.swiftmodule
 // RUN: rm -rf %t/Bar.private.swiftinterface
@@ -64,7 +68,8 @@
 // RUN:   -Rmodule-loading 2> %t/load-pub.output
 
 // RUN: %FileCheck -check-prefix=CHECK-LOAD-PUB %s < %t/load-pub.output
-// CHECK-LOAD-PUB: no such module 'Bar'
+// CHECK-LOAD-PUB: remark: loaded module 'Bar'; source: '{{.*}}Bar.swiftinterface', loaded: '{{.*}}Bar-{{.*}}.swiftmodule'
+// CHECK-LOAD-PUB: error: cannot find 'PkgKlass' in scope; did you mean 'PubKlass'?
 
 //--- Bar.swift
 public class PubKlass {

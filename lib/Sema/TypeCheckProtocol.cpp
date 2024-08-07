@@ -4277,6 +4277,9 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           requiredAccessScope.requiredAccessForDiagnostics();
         auto proto = conformance->getProtocol();
         auto protoAccessScope = proto->getFormalAccessScope(DC);
+        if (proto->isPackageEffectivelyPublic())
+          return;
+
         bool protoForcesAccess =
           requiredAccessScope.hasEqualDeclContextWith(protoAccessScope);
         auto diagKind = protoForcesAccess

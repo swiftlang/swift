@@ -4212,6 +4212,21 @@ bool ValueDecl::isUsableFromInline() const {
   return false;
 }
 
+bool ValueDecl::isPackageEffectivelyPublic() const {
+  // If a package decl has a @usableFromInline (or other inlinable)
+  // attribute, and is defined in a module built from interface, it
+  // can be referenced by another module that imports it even though
+  // the defining interface module does not have package-name (such
+  // as public or private interface); in such case, the decl is treated
+  // as public and access checks in sema are skipped.
+  // We might need to add another check here to ensure the interface
+  // was part of the same package before the package-name was removed.
+  return getFormalAccess() == AccessLevel::Package &&
+         isUsableFromInline() &&
+         getModuleContext()->getPackageName().empty() &&
+         getModuleContext()->isBuiltFromInterface();
+}
+
 bool ValueDecl::shouldHideFromEditor() const {
   // Hide private stdlib declarations.
   if (isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic*/ false) ||
@@ -4303,6 +4318,9 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
   // access level of the current declaration to be as open as possible.
   if (useDC && VD->getASTContext().isAccessControlDisabled())
     return getMaximallyOpenAccessFor(VD);
+
+  if (VD->isPackageEffectivelyPublic())
+    return AccessLevel::Public;
 
   if (treatUsableFromInlineAsPublic &&
       access < AccessLevel::Public &&
@@ -4486,6 +4504,8 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   case AccessLevel::Package: {
     auto pkg = resultDC->getPackageContext(/*lookupIfNotCurrent*/ true);
     if (!pkg) {
+      if (VD->isPackageEffectivelyPublic())
+        return AccessScope::getPublic();
       // Instead of reporting and failing early, return the scope of resultDC to
       // allow continuation (should still non-zero exit later if in script mode)
       return AccessScope(resultDC);
@@ -4619,6 +4639,9 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return false;
 
   if (VD->getASTContext().isAccessControlDisabled())
+    return true;
+
+  if (VD->isPackageEffectivelyPublic())
     return true;
 
   auto access = getAccessLevel();
