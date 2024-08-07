@@ -214,7 +214,8 @@ struct InterfaceSubContextDelegate {
                                           SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
                                        ArrayRef<StringRef>,
-                                       ArrayRef<StringRef>, StringRef)> action) = 0;
+                                       ArrayRef<StringRef>, StringRef,
+                                       StringRef)> action) = 0;
   virtual std::error_code runInSubCompilerInstance(StringRef moduleName,
                                                    StringRef interfacePath,
                                                    StringRef sdkPath,

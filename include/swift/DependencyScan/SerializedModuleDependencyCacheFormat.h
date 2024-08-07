@@ -150,7 +150,8 @@ using SwiftInterfaceModuleDetailsLayout =
                    DependencyIDArrayIDField,            // swiftOverlayDependencies
                    IdentifierIDField,                   // CASFileSystemRootID
                    IdentifierIDField,                   // bridgingHeaderIncludeTree
-                   IdentifierIDField                    // moduleCacheKey
+                   IdentifierIDField,                   // moduleCacheKey
+                   IdentifierIDField                    // UserModuleVersion
                    >;
 
 using SwiftSourceModuleDetailsLayout =

@@ -456,6 +456,9 @@ void writeJSON(llvm::raw_ostream &out,
                              swiftTextualDeps->module_cache_key, 5,
                              /*trailingComma=*/true);
       }
+      writeJSONSingleField(out, "userModuleVersion",
+                           swiftTextualDeps->user_module_version, 5,
+                           /*trailingComma=*/true);
       writeMacroDependencies(out, swiftTextualDeps->macro_dependencies, 5,
                              /*trailingComma=*/true);
       writeJSONSingleField(out, "isFramework", swiftTextualDeps->is_framework,

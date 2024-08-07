@@ -294,12 +294,16 @@ public:
   /// Details common to Swift textual (interface or source) modules
   CommonSwiftTextualModuleDependencyDetails textualModuleDetails;
 
+  /// The user module version of this textual module interface.
+  const std::string userModuleVersion;
+
   SwiftInterfaceModuleDependenciesStorage(
       StringRef moduleOutputPath, StringRef swiftInterfaceFile,
       ArrayRef<StringRef> compiledModuleCandidates,
       ArrayRef<StringRef> buildCommandLine, ArrayRef<LinkLibrary> linkLibraries,
       ArrayRef<StringRef> extraPCMArgs, StringRef contextHash, bool isFramework,
-      bool isStatic, StringRef RootID, StringRef moduleCacheKey)
+      bool isStatic, StringRef RootID, StringRef moduleCacheKey,
+      StringRef userModuleVersion)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftInterface,
                                         linkLibraries, moduleCacheKey),
         moduleOutputPath(moduleOutputPath),
@@ -307,7 +311,8 @@ public:
         compiledModuleCandidates(compiledModuleCandidates.begin(),
                                  compiledModuleCandidates.end()),
         contextHash(contextHash), isFramework(isFramework), isStatic(isStatic),
-        textualModuleDetails(extraPCMArgs, buildCommandLine, RootID) {}
+        textualModuleDetails(extraPCMArgs, buildCommandLine, RootID),
+        userModuleVersion(userModuleVersion) {}
 
   ModuleDependencyInfoStorageBase *clone() const override {
     return new SwiftInterfaceModuleDependenciesStorage(*this);
@@ -592,12 +597,14 @@ public:
       ArrayRef<StringRef> compiledCandidates, ArrayRef<StringRef> buildCommands,
       ArrayRef<LinkLibrary> linkLibraries, ArrayRef<StringRef> extraPCMArgs,
       StringRef contextHash, bool isFramework, bool isStatic,
-      StringRef CASFileSystemRootID, StringRef moduleCacheKey) {
+      StringRef CASFileSystemRootID, StringRef moduleCacheKey,
+      StringRef userModuleVersion) {
     return ModuleDependencyInfo(
         std::make_unique<SwiftInterfaceModuleDependenciesStorage>(
             moduleOutputPath, swiftInterfaceFile, compiledCandidates,
             buildCommands, linkLibraries, extraPCMArgs, contextHash,
-            isFramework, isStatic, CASFileSystemRootID, moduleCacheKey));
+            isFramework, isStatic, CASFileSystemRootID, moduleCacheKey,
+            userModuleVersion));
   }
 
   /// Describe the module dependencies for a serialized or parsed Swift module.
