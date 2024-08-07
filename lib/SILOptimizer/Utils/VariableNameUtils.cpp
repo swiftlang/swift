@@ -507,23 +507,24 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
 
     if (auto *dti = dyn_cast_or_null<DestructureTupleInst>(
             searchValue->getDefiningInstruction())) {
-      // Append searchValue, so we can find the specific tuple index.
-      variableNamePath.push_back(searchValue);
+      variableNamePath.push_back(
+          getStringRefForIndex(*dti->getIndexOfResult(searchValue)));
       searchValue = dti->getOperand();
       continue;
     }
 
     if (auto *dsi = dyn_cast_or_null<DestructureStructInst>(
             searchValue->getDefiningInstruction())) {
-      // Append searchValue, so we can find the specific struct field.
-      variableNamePath.push_back(searchValue);
+      unsigned index = *dsi->getIndexOfResult(searchValue);
+      variableNamePath.push_back(
+          getNameFromDecl(dsi->getStructDecl()->getStoredProperties()[index]));
       searchValue = dsi->getOperand();
       continue;
     }
 
     if (auto *fArg = dyn_cast<SILFunctionArgument>(searchValue)) {
-      if (fArg->getDecl()) {
-        variableNamePath.push_back({fArg});
+      if (auto *decl = fArg->getDecl()) {
+        variableNamePath.push_back(decl->getBaseName().userFacingName());
         return fArg;
       }
     }
@@ -685,29 +686,6 @@ void VariableNameInferrer::popSingleVariableName() {
 
     resultingString += "<unknown decl>";
     return;
-  }
-
-  if (std::holds_alternative<SILValue>(next)) {
-    auto value = std::get<SILValue>(next);
-    if (auto *fArg = dyn_cast<SILFunctionArgument>(value)) {
-      resultingString += fArg->getDecl()->getBaseName().userFacingName();
-      return;
-    }
-
-    if (auto *dti = dyn_cast_or_null<DestructureTupleInst>(
-            value->getDefiningInstruction())) {
-      llvm::raw_svector_ostream stream(resultingString);
-      stream << *dti->getIndexOfResult(value);
-      return;
-    }
-
-    if (auto *dsi = dyn_cast_or_null<DestructureStructInst>(
-            value->getDefiningInstruction())) {
-      unsigned index = *dsi->getIndexOfResult(value);
-      resultingString +=
-          getNameFromDecl(dsi->getStructDecl()->getStoredProperties()[index]);
-      return;
-    }
   }
 
   resultingString += "<unknown decl>";
