@@ -919,3 +919,21 @@ bb0:
   %9999 = tuple ()
   return %9999 : $()
 }
+
+// CHECK-LABEL: begin running test 1 of 1 on infer_through_convert_function: variable_name_inference with: @trace[0]
+// CHECK: Input Value: // function_ref sideEffect
+// CHECK-NEXT: %0 = function_ref @sideEffect
+// CHECK: Name: 'closure'
+// CHECK: Root:   // function_ref sideEffect
+// CHECK-NEXT: %0 = function_ref @sideEffect
+// CHECK: end running test 1 of 1 on infer_through_convert_function: variable_name_inference with: @trace[0]
+sil [ossa] @infer_through_convert_function : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable_name_inference @trace[0]"
+  %0 = function_ref @sideEffect : $@convention(thin) () -> ()
+  debug_value %0 : $@convention(thin) () -> (), let, name "closure"
+  %1 = convert_function %0 : $@convention(thin) () -> () to $@convention(thin) () -> ()
+  debug_value [trace] %0 : $@convention(thin) () -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
