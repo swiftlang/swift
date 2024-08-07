@@ -783,8 +783,11 @@ PartialApplyInst *PartialApplyInst::create(
 TryApplyInstBase::TryApplyInstBase(SILInstructionKind kind,
                                    SILDebugLocation loc,
                                    SILBasicBlock *normalBB,
-                                   SILBasicBlock *errorBB)
-    : TermInst(kind, loc), DestBBs{{{this, normalBB}, {this, errorBB}}} {}
+                                   SILBasicBlock *errorBB,
+                                   ProfileCounter normalCount,
+                                   ProfileCounter errorCount)
+    : TermInst(kind, loc), DestBBs{{{this, normalBB, normalCount},
+                                    {this, errorBB, errorCount}}} {}
 
 TryApplyInst::TryApplyInst(
     SILDebugLocation loc, SILValue callee, SILType substCalleeTy,
@@ -792,10 +795,12 @@ TryApplyInst::TryApplyInst(
     ArrayRef<SILValue> typeDependentOperands, SILBasicBlock *normalBB,
     SILBasicBlock *errorBB, ApplyOptions options,
     const GenericSpecializationInformation *specializationInfo,
-    std::optional<ApplyIsolationCrossing> isolationCrossing)
+    std::optional<ApplyIsolationCrossing> isolationCrossing,
+    ProfileCounter normalCount,
+    ProfileCounter errorCount)
     : InstructionBase(isolationCrossing, loc, callee, substCalleeTy, subs, args,
                       typeDependentOperands, specializationInfo, normalBB,
-                      errorBB) {
+                      errorBB, normalCount, errorCount) {
   setApplyOptions(options);
 }
 
@@ -805,10 +810,23 @@ TryApplyInst::create(SILDebugLocation loc, SILValue callee,
                      SILBasicBlock *normalBB, SILBasicBlock *errorBB,
                      ApplyOptions options, SILFunction &parentFunction,
                      const GenericSpecializationInformation *specializationInfo,
-                     std::optional<ApplyIsolationCrossing> isolationCrossing) {
+                     std::optional<ApplyIsolationCrossing> isolationCrossing,
+                     ProfileCounter normalCount,
+                     ProfileCounter errorCount) {
   SILType substCalleeTy = callee->getType().substGenericArgs(
       parentFunction.getModule(), subs,
       parentFunction.getTypeExpansionContext());
+
+  if (parentFunction.getModule().getOptions().EnableThrowsPrediction &&
+      !normalCount && !errorCount) {
+    // Predict that the error branch is not taken.
+    //
+    // We cannot use the Expect builtin within SIL because try_apply abstracts
+    // over the raw conditional test to see if an error was returned.
+    // So, we synthesize profiling branch weights instead.
+    normalCount = 1999;
+    errorCount = 0;
+  }
 
   SmallVector<SILValue, 32> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, parentFunction,
@@ -817,7 +835,8 @@ TryApplyInst::create(SILDebugLocation loc, SILValue callee,
       parentFunction, getNumAllOperands(args, typeDependentOperands));
   return ::new (buffer) TryApplyInst(
       loc, callee, substCalleeTy, subs, args, typeDependentOperands, normalBB,
-      errorBB, options, specializationInfo, isolationCrossing);
+      errorBB, options, specializationInfo, isolationCrossing,
+      normalCount, errorCount);
 }
 
 SILType DifferentiableFunctionInst::getDifferentiableFunctionType(

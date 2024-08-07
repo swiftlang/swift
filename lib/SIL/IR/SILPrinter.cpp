@@ -1573,6 +1573,10 @@ public:
     visitApplyInstBase(AI);
     *this << ", normal " << Ctx.getID(AI->getNormalBB());
     *this << ", error " << Ctx.getID(AI->getErrorBB());
+    if (AI->getNormalBBCount())
+      *this << " !normal_count(" << AI->getNormalBBCount().getValue() << ")";
+    if (AI->getErrorBBCount())
+      *this << " !error_count(" << AI->getErrorBBCount().getValue() << ")";
   }
 
   void visitPartialApplyInst(PartialApplyInst *CI) {
