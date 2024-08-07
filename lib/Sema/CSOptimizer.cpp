@@ -662,16 +662,9 @@ ConstraintSystem::selectDisjunction() {
         unsigned firstFavored = favorings[first].size();
         unsigned secondFavored = favorings[second].size();
 
-        // Everything else equal, choose the disjunction with the greatest
-        // number of resolved argument types. The number of resolved argument
-        // types is always zero for disjunctions that don't represent applied
-        // overloads.
         if (firstFavored == secondFavored) {
           if (firstActive != secondActive)
             return firstActive < secondActive;
-
-          return first->countResolvedArgumentTypes(*this) >
-                 second->countResolvedArgumentTypes(*this);
         }
 
         firstFavored = firstFavored ? firstFavored : firstActive;
