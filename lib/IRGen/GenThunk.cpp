@@ -357,6 +357,12 @@ void IRGenThunk::emit() {
     llvm::Value *nil = llvm::ConstantPointerNull::get(
         cast<llvm::PointerType>(errorValue->getType()));
     auto *hasError = IGF.Builder.CreateICmpNE(errorValue, nil);
+
+    // Predict no error is thrown.
+    hasError =
+        IGF.IGM.getSILModule().getOptions().EnableThrowsPrediction ?
+        IGF.Builder.CreateExpectCond(IGF.IGM, hasError, false) : hasError;
+
     IGF.Builder.CreateCondBr(hasError, errorBB, successBB);
 
     IGF.Builder.emitBlock(errorBB);

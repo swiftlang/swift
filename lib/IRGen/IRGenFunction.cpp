@@ -446,6 +446,14 @@ Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
   return Address(slotPtr, objectTy, objectAlignment);
 }
 
+llvm::CallInst *IRBuilder::CreateExpectCond(IRGenModule &IGM,
+                                            llvm::Value *value,
+                                            bool expectedValue,
+                                            const Twine &name) {
+  unsigned flag = expectedValue ? 1 : 0;
+  return CreateExpect(value, llvm::ConstantInt::get(IGM.Int1Ty, flag), name);
+}
+
 llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
                                                   StringRef failureMsg) {
   if (IGM.DebugInfo && IGM.getOptions().isDebugInfoCodeView()) {
@@ -777,6 +785,12 @@ void IRGenFunction::emitAwaitAsyncContinuation(
     auto nullError = llvm::Constant::getNullValue(errorRes->getType());
     auto hasError = Builder.CreateICmpNE(errorRes, nullError);
     optionalErrorResult->addIncoming(errorRes, Builder.GetInsertBlock());
+
+    // Predict no error.
+    hasError =
+        getSILModule().getOptions().EnableThrowsPrediction ?
+        Builder.CreateExpectCond(IGM, hasError, false) : hasError;
+
     Builder.CreateCondBr(hasError, optionalErrorBB, normalContBB);
     Builder.emitBlock(normalContBB);
   }
