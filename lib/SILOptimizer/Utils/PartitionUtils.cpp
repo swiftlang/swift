@@ -31,7 +31,16 @@ using namespace swift::PartitionPrimitives;
 //                               MARK: Logging
 //===----------------------------------------------------------------------===//
 
-#ifndef NDEBUG
+bool swift::PartitionPrimitives::REGIONBASEDISOLATION_ENABLE_LOGGING;
+
+static llvm::cl::opt<bool, true> // The parser
+    RegionBasedIsolationLog(
+        "sil-regionbasedisolation-log",
+        llvm::cl::desc("Enable logging for SIL region based isolation "
+                       "diagnostics"),
+        llvm::cl::Hidden,
+        llvm::cl::location(
+            swift::PartitionPrimitives::REGIONBASEDISOLATION_ENABLE_LOGGING));
 
 bool swift::PartitionPrimitives::REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING;
 
@@ -43,8 +52,6 @@ static llvm::cl::opt<bool, true> // The parser
         llvm::cl::Hidden,
         llvm::cl::location(swift::PartitionPrimitives::
                                REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING));
-
-#endif
 
 //===----------------------------------------------------------------------===//
 //                             MARK: PartitionOp

@@ -28,6 +28,8 @@
             "remote": { "id": "apple/swift-log" } },
         "swift-numerics": {
             "remote": { "id": "apple/swift-numerics" } },        
+        "swift-toolchain-sqlite": {
+            "remote": { "id": "swiftlang/swift-toolchain-sqlite" } },
         "swift-tools-support-core": {
             "remote": { "id": "swiftlang/swift-tools-support-core" } },
         "swiftpm": {
@@ -121,6 +123,7 @@
                 "swift": "main",
                 "cmark": "gfm",
                 "llbuild": "main",
+                "swift-toolchain-sqlite": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
                 "swift-argument-parser": "1.4.0",
@@ -271,6 +274,7 @@
                 "swift": "rebranch",
                 "cmark": "gfm",
                 "llbuild": "main",
+                "swift-toolchain-sqlite": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
                 "swift-argument-parser": "1.4.0",
@@ -654,6 +658,7 @@
                 "swift": "next",
                 "cmark": "gfm",
                 "llbuild": "main",
+                "swift-toolchain-sqlite": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
                 "swift-argument-parser": "1.4.0",
