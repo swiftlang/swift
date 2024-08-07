@@ -3,6 +3,9 @@
 protocol P {}
 
 func invalid<let N>() {} // expected-error {{value generic 'N' must have an explicit value type declared}}
+                         // expected-error@-1 {{generic parameter 'N' is not used in function signature}}
+func invalid<let N>(_: A<N>) {} // expected-error {{value generic 'N' must have an explicit value type declared}}
+                                // expected-error@-1 {{cannot pass type 'N' as a value for generic value 'N'}}
 
 struct A<let N: Int> {
   var int: Int {
@@ -21,11 +24,11 @@ struct A<let N: Int> {
     N.self // OK
   }
 
-  var n: N { // expected-error {{using value generic 'let N' here is not allowed}}
+  var n: N { // expected-error {{using value generic 'N' here is not allowed}}
     fatalError()
   }
 
-  var nType: N.Type { // expected-error {{using value generic 'let N' here is not allowed}}
+  var nType: N.Type { // expected-error {{using value generic 'N' here is not allowed}}
     fatalError()
   }
 
@@ -34,47 +37,47 @@ struct A<let N: Int> {
   }
 }
 
-extension A where N: P {} // expected-error {{value generic type 'let N' cannot conform to protocol 'P'}}
+extension A where N: P {} // expected-error {{value generic type 'N' cannot conform to protocol 'P'}}
 
-extension A where N == Int {} // expected-error {{cannot constrain value parameter 'let N' to be type 'Int'}}
+extension A where N == Int {} // expected-error {{cannot constrain value parameter 'N' to be type 'Int'}}
 
 func b(with a: A<123>) {} // OK
 func c<let M: Int>(with a: A<M>) {} // OK
-func d<T>(with a: A<T>) {} // expected-error {{cannot pass type 'T' as a value for generic value 'let N'}}
-func e(with a: A<Int>) {} // expected-error {{cannot pass type 'Int' as a value for generic value 'let N'}}
+func d<T>(with a: A<T>) {} // expected-error {{cannot pass type 'T' as a value for generic value 'N'}}
+func e(with a: A<Int>) {} // expected-error {{cannot pass type 'Int' as a value for generic value 'N'}}
 
 struct Generic<T: ~Copyable & ~Escapable> {}
 struct GenericWithIntParam<T: ~Copyable & ~Escapable, let N: Int> {}
 
 func f(_: Generic<123>) {} // expected-error {{integer unexpectedly used in a type position}}
-func g<let N: Int>(_: Generic<N>) {} // expected-error {{cannot use value type 'let N' for generic argument 'T'}}
+func g<let N: Int>(_: Generic<N>) {} // expected-error {{cannot use value type 'N' for generic argument 'T'}}
 func h(_: (Int, 123)) {} // expected-error {{integer unexpectedly used in a type position}}
 func i(_: () -> 123) {} // expected-error {{integer unexpectedly used in a type position}}
 func j(_: (A<123>) -> ()) {} // OK
 func k(_: some 123) {} // expected-error {{integer unexpectedly used in a type position}}
-func l(_: GenericWithIntParam<123, Int>) {} // expected-error {{cannot pass type 'Int' as a value for generic value 'let N'}}
+func l(_: GenericWithIntParam<123, Int>) {} // expected-error {{cannot pass type 'Int' as a value for generic value 'N'}}
 func m(_: GenericWithIntParam<Int, 123>) {} // OK
 
 typealias One = 1 // expected-error {{integer unexpectedly used in a type position}}
 
-struct B<let N: UInt8> {} // expected-error {{'UInt8' is not a supported value type for 'let N'}}
+struct B<let N: UInt8> {} // expected-error {{'UInt8' is not a supported value type for 'N'}}
 
 struct C<let N: Int, let M: Int> {}
 
-extension C where N == 123 { // expected-note {{where 'let N' = '0'}}
-                             // expected-note@-1 {{where 'let N' = '0'}}
-                             // expected-note@-2 {{where 'let N' = 'let T'}}
+extension C where N == 123 { // expected-note {{where 'N' = '0'}}
+                             // expected-note@-1 {{where 'N' = '0'}}
+                             // expected-note@-2 {{where 'N' = 'T'}}
   func nIs123() {}
 }
 
-extension C where M == 321 { // expected-note {{where 'let M' = '0'}}
-                             // expected-note@-1 {{where 'let M' = '0'}}
-                             // expected-note@-2 {{where 'let M' = 'let T'}}
+extension C where M == 321 { // expected-note {{where 'M' = '0'}}
+                             // expected-note@-1 {{where 'M' = '0'}}
+                             // expected-note@-2 {{where 'M' = 'T'}}
   func mIs123() {}
 }
 
-extension C where N == M { // expected-note {{where 'let N' = '123', 'let M' = '0'}}
-                           // expected-note@-1 {{where 'let N' = '0', 'let M' = '321'}}
+extension C where N == M { // expected-note {{where 'N' = '123', 'M' = '0'}}
+                           // expected-note@-1 {{where 'N' = '0', 'M' = '321'}}
   func nAndMAreBothEqual() {}
 }
 
@@ -97,8 +100,8 @@ func testC3(with c: C<0, 321>) {
 }
 
 func testC4<let T: Int>(with c: C<T, T>) {
-  c.nIs123() // expected-error {{referencing instance method 'nIs123()' on 'C' requires the types 'let T' and '123' be equivalent}}
-  c.mIs123() // expected-error {{referencing instance method 'mIs123()' on 'C' requires the types 'let T' and '321' be equivalent}}
+  c.nIs123() // expected-error {{referencing instance method 'nIs123()' on 'C' requires the types 'T' and '123' be equivalent}}
+  c.mIs123() // expected-error {{referencing instance method 'mIs123()' on 'C' requires the types 'T' and '321' be equivalent}}
   c.nAndMAreBothEqual() // OK
 }
 

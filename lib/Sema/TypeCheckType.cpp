@@ -755,6 +755,13 @@ namespace {
       if (!paramType->isValue())
         return true;
 
+      // Both of these generic type parameters are values, but they may not have
+      // underlying value types associated with them. This can occur when a
+      // parameter doesn't declare a value type and we're going to diagnose it
+      // later.
+      if (!paramType->getValueType() || !secondType->getValueType())
+        return false;
+
       // Otherwise, these are both value parameters and check that both their
       // value types are the same.
       return paramType->getValueType()->isEqual(secondType->getValueType());

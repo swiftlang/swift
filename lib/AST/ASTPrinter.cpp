@@ -5324,9 +5324,7 @@ void PrintAST::visitMacroExpansionExpr(MacroExpansionExpr *expr) {
 }
 
 void PrintAST::visitTypeValueExpr(TypeValueExpr *expr) {
-  // Explicitly don't use 'printType' with 'getParamType' because that will
-  // print the preceeding 'let N' which is illegal in source.
-  expr->getParamTypeRepr()->print(Printer, Options);
+  expr->getType()->print(Printer, Options);
 }
 
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {

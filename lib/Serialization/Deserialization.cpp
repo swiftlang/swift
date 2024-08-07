@@ -1595,21 +1595,11 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
       auto paramTy = getType(rawParamIDs[i+1])->castTo<GenericTypeParamType>();
 
       if (!name.empty()) {
-        auto *paramDecl = GenericTypeParamDecl::createDeserialized(
-            getAssociatedModule(), name, paramTy->getDepth(),
-            paramTy->getIndex(), paramTy->getParamKind());
-
-        // If we're dealing with a value generic, the parameter type already
-        // serializes the value type. Inform the request evaluator that we don't
-        // need to recompute this value for the param decl.
-        if (paramTy->isValue()) {
-          paramDecl->getASTContext().evaluator.cacheOutput(
-              GenericTypeParamDeclGetValueTypeRequest{paramDecl},
-              paramTy->getValueType());
-        }
-
-        paramTy = paramDecl->getDeclaredInterfaceType()
-                   ->castTo<GenericTypeParamType>();
+        paramTy = GenericTypeParamType::get(name, paramTy->getParamKind(),
+                                            paramTy->getDepth(),
+                                            paramTy->getIndex(),
+                                            paramTy->getValueType(),
+                                            getContext());
       }
 
       paramTypes.push_back(paramTy);
