@@ -187,6 +187,11 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
     primTypesArray = primTypesArray.drop_back(2);
 
   // We do not have metadata for primitive types in Embedded Swift.
+  // As a result, the following features are not supported with primitive types in this mode:
+  // - Dynamic casts
+  // - Static self
+  // - Generic requirement parameters
+  // - Metadata source parameter
   bool embedded = astContext.LangOpts.hasFeature(Feature::Embedded);
 
   for (Type type : primTypesArray) {
