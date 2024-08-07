@@ -3,6 +3,32 @@
 > [!NOTE]
 > This is in reverse chronological order, so newer entries are added to the top.
 
+## Swift (next)
+
+* [SE-0442][]:
+  TaskGroups can now be created without explicitly specifying their child task's result types:
+
+Previously the child task type would have to be specified explicitly when creating the task group:
+
+  ```swift
+  await withTaskGroup(of: Int.self) { group in 
+    group.addTask { 12 }
+
+    return await group.next()
+  } 
+  ```
+
+Now the type is inferred based on the first use of the task group within the task group's body:
+
+  ```swift
+  await withTaskGroup { group in 
+    group.addTask { 12 }
+
+    return await group.next()
+  } 
+  ```
+
+
 ## Swift 6.0
 
 * Swift 6 comes with a new language mode that prevents the risk of data races
@@ -10586,6 +10612,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0424]: https://github.com/apple/swift-evolution/blob/main/proposals/0424-custom-isolation-checking-for-serialexecutor.md
 [SE-0428]: https://github.com/apple/swift-evolution/blob/main/proposals/0428-resolve-distributed-actor-protocols.md
 [SE-0431]: https://github.com/apple/swift-evolution/blob/main/proposals/0431-isolated-any-functions.md
+[SE-0442]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0442-allow-taskgroup-childtaskresult-type-to-be-inferred.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
