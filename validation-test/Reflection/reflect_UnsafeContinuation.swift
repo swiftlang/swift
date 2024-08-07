@@ -2,7 +2,7 @@
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/reflect_UnsafeContinuation
 // RUN: %target-codesign %t/reflect_UnsafeContinuation
 
-// RUN: %target-run %target-swift-reflection-test %t/reflect_UnsafeContinuation | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-run %target-swift-reflection-test %t/reflect_UnsafeContinuation | %FileCheck %s --check-prefix=CHECK-%target-ptrsize %add_num_extra_inhabitants
 
 // REQUIRES: reflection_test_support
 // REQUIRES: executable_test
@@ -45,7 +45,7 @@ if #available(SwiftStdlib 5.1, *) {
 // CHECK-64: Type info:
 // CHECK-64-NEXT: (class_instance size=24 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:   (field name=cont offset=16
-// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64-NEXT:       (field name=context offset=0
 // CHECK-64-NEXT:         (reference kind=strong refcounting=native)))))
 
