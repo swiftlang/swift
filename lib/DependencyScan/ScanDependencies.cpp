@@ -701,7 +701,8 @@ generateFullDependencyGraph(const CompilerInstance &instance,
                              .CASBridgingHeaderIncludeTreeRootID.c_str()),
             create_clone(swiftTextualDeps->moduleCacheKey.c_str()),
             createMacroDependencySet(
-                swiftTextualDeps->textualModuleDetails.macroDependencies)};
+                swiftTextualDeps->textualModuleDetails.macroDependencies),
+            create_clone(swiftTextualDeps->userModuleVersion.c_str())};
       } else if (swiftSourceDeps) {
         swiftscan_string_ref_t moduleInterfacePath = create_null();
         swiftscan_string_ref_t bridgingHeaderPath =
