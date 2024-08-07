@@ -1381,20 +1381,6 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
       return ErrorType::get(ctx);
     }
 
-    // Try ignoring missing imports.
-    relookupOptions |= NameLookupFlags::IgnoreMissingImports;
-    auto nonImportedResults = TypeChecker::lookupUnqualifiedType(
-        dc, repr->getNameRef(), repr->getLoc(), relookupOptions);
-    if (!nonImportedResults.empty()) {
-      auto first = cast<TypeDecl>(nonImportedResults.front().getValueDecl());
-      auto nameLoc = repr->getNameLoc();
-      maybeDiagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc());
-
-      // Don't try to recover here; we'll get more access-related diagnostics
-      // downstream if we do.
-      return ErrorType::get(ctx);
-    }
-
     // Fallback.
     auto L = repr->getNameLoc();
     SourceRange R = repr->getNameLoc().getSourceRange();
@@ -1481,19 +1467,6 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
       lookupResult.Member->diagnose(diag::kind_declared_here,
                                     DescriptiveDeclKind::Type);
 
-    // Don't try to recover here; we'll get more access-related diagnostics
-    // downstream if we do.
-    return ErrorType::get(ctx);
-  }
-
-  // Try ignoring missing imports.
-  relookupOptions |= NameLookupFlags::IgnoreMissingImports;
-  auto nonImportedMembers = TypeChecker::lookupMemberType(
-      dc, parentType, repr->getNameRef(), repr->getLoc(), relookupOptions);
-  if (nonImportedMembers) {
-    const TypeDecl *first = nonImportedMembers.front().Member;
-    auto nameLoc = repr->getNameLoc();
-    maybeDiagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc());
     // Don't try to recover here; we'll get more access-related diagnostics
     // downstream if we do.
     return ErrorType::get(ctx);
@@ -1656,6 +1629,16 @@ resolveUnqualifiedIdentTypeRepr(const TypeResolution &resolution,
   auto globals =
       TypeChecker::lookupUnqualifiedType(DC, id, repr->getLoc(), lookupOptions);
 
+  // If the look up did not yield any results, try again but allow members from
+  // modules that are not directly imported to be accessible.
+  bool didIgnoreMissingImports = false;
+  if (!globals && ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+    lookupOptions |= NameLookupFlags::IgnoreMissingImports;
+    globals = TypeChecker::lookupUnqualifiedType(DC, id, repr->getLoc(),
+                                                 lookupOptions);
+    didIgnoreMissingImports = true;
+  }
+
   // If we're doing structural resolution and one of the results is an
   // associated type, ignore any other results found from the same
   // DeclContext; they are going to be protocol typealiases, possibly
@@ -1730,6 +1713,11 @@ resolveUnqualifiedIdentTypeRepr(const TypeResolution &resolution,
 
   // If we found a type declaration with the given name, return it now.
   if (current) {
+    if (didIgnoreMissingImports &&
+        maybeDiagnoseMissingImportForMember(currentDecl, DC, repr->getLoc())) {
+      repr->setInvalid();
+      return ErrorType::get(ctx);
+    }
     repr->setValue(currentDecl, currentDC);
     return current;
   }
@@ -1901,9 +1889,24 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
   if (options.contains(TypeResolutionFlags::AllowUsableFromInline))
     lookupOptions |= NameLookupFlags::IncludeUsableFromInline;
   LookupTypeResult memberTypes;
-  if (parentTy->mayHaveMembers())
+  if (parentTy->mayHaveMembers()) {
     memberTypes = TypeChecker::lookupMemberType(
         DC, parentTy, repr->getNameRef(), repr->getLoc(), lookupOptions);
+
+    // If no members were found, try ignoring missing imports.
+    if (!memberTypes &&
+        ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+      lookupOptions |= NameLookupFlags::IgnoreMissingImports;
+      memberTypes = TypeChecker::lookupMemberType(
+          DC, parentTy, repr->getNameRef(), repr->getLoc(), lookupOptions);
+
+      if (memberTypes.size() == 1) {
+        if (maybeDiagnoseMissingImportForMember(memberTypes.back().Member, DC,
+                                                repr->getLoc()))
+          return ErrorType::get(ctx);
+      }
+    }
+  }
 
   // Name lookup was ambiguous. Complain.
   // FIXME: Could try to apply generic arguments first, and see whether
