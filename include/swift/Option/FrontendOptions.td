@@ -1310,6 +1310,13 @@ def disable_fragile_resilient_protocol_witnesses :
   Flag<["-"], "disable-fragile-relative-protocol-tables">,
   HelpText<"Disable relative protocol witness tables">;
 
+def enable_split_cold_code :
+  Flag<["-"], "enable-split-cold-code">,
+  HelpText<"Enable splitting of cold code when optimizing">;
+def disable_split_cold_code :
+  Flag<["-"], "disable-split-cold-code">,
+  HelpText<"Disable splitting of cold code when optimizing">;
+
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,
   HelpText<"Enable the new llvm pass manager">;
