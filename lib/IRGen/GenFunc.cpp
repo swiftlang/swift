@@ -1593,10 +1593,14 @@ public:
 
     /// Get the continuation function pointer
     ///
-    PointerAuthInfo newAuthInfo =
-        fnPtr.getAuthInfo().getCorrespondingCodeAuthInfo();
+    auto sig = Signature::forCoroutineContinuation(subIGF.IGM, origType);
+    auto schemaAndEntity =
+      getCoroutineResumeFunctionPointerAuth(subIGF.IGM, origType);
+    auto pointerAuth = PointerAuthInfo::emit(subIGF, schemaAndEntity.first,
+                                             calleeHandle,
+                                             schemaAndEntity.second);
     FunctionPointer contFn = FunctionPointer::createSigned(
-        FunctionPointer::Kind::Function, yieldedValues.claimNext(), newAuthInfo,
+        FunctionPointer::Kind::Function, yieldedValues.claimNext(), pointerAuth,
         Signature::forCoroutineContinuation(subIGF.IGM, origType));
 
     /// Forward the remaining yields of the wrapped coroutine
