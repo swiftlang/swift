@@ -620,6 +620,7 @@ class SILCombine : public SILFunctionTransform {
     bool Changed = Combiner.runOnFunction(*getFunction());
 
     if (Changed) {
+      updateBorrowedFrom(getPassManager(), getFunction());
       // Invalidate everything.
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
     }
