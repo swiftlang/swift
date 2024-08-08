@@ -395,7 +395,8 @@ function Get-TargetProjectBinaryCache($Arch, [TargetComponent]$Project) {
 
 enum HostComponent {
   Compilers = 5
-  System = 10
+  FoundationMacros = 10
+  System
   ToolsSupportCore
   LLBuild
   Yams
@@ -426,6 +427,7 @@ function Get-HostProjectCMakeModules([HostComponent]$Project) {
 enum BuildComponent {
   BuildTools
   Compilers
+  FoundationMacros
 }
 
 function Get-BuildProjectBinaryCache([BuildComponent]$Project) {
@@ -1664,7 +1666,6 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
     }
   } else {
     $DispatchBinaryCache = Get-TargetProjectBinaryCache $Arch Dispatch
-    $SwiftSyntaxDir = Get-HostProjectCMakeModules Compilers
     $FoundationBinaryCache = Get-TargetProjectBinaryCache $Arch Foundation
     $ShortArch = $Arch.LLVMName
 
@@ -1672,12 +1673,6 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
       $TestingDefines = @{ ENABLE_TESTING = "NO" }
       $Targets = @("default")
       $InstallPath = "$($Arch.SDKInstallRoot)\usr"
-
-      if ($Platform -eq "Android") {
-        $HostDefines = @{ CMAKE_HOST_Swift_FLAGS = "-sdk `"$($HostArch.SDKInstallRoot)`"" }
-      } else {
-        $HostDefines = @{}
-      }
 
       Build-CMakeProject `
         -Src $SourceCache\swift-corelibs-foundation `
@@ -1704,13 +1699,61 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
           };
           ZLIB_INCLUDE_DIR = "$LibraryRoot\zlib-1.3.1\usr\include";
           dispatch_DIR = "$DispatchBinaryCache\cmake\modules";
-          SwiftSyntax_DIR = "$SwiftSyntaxDir";
+          SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
           _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
           _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
-          _SwiftCollections_SourceDIR = "$SourceCache\swift-collections"
-        } + $HostDefines + $TestingDefines)
+          _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
+          SwiftFoundation_MACRO = "$(Get-BuildProjectBinaryCache FoundationMacros)\bin"
+        } + $TestingDefines)
     }
   }
+}
+
+function Build-FoundationMacros() {
+  [CmdletBinding(PositionalBinding = $false)]
+  param
+  (
+    [Parameter(Position = 0, Mandatory = $true)]
+    [Platform]$Platform,
+    [Parameter(Position = 1, Mandatory = $true)]
+    [hashtable]$Arch,
+    [switch] $Build = $false
+  )
+
+  $FoundationMacrosBinaryCache = if ($Build) {
+    Get-BuildProjectBinaryCache FoundationMacros
+  } else {
+    Get-HostProjectBinaryCache FoundationMacros
+  }
+
+  $SwiftSDK = $null
+  if ($Build) {
+    $SwiftSDK = $HostArch.SDKInstallRoot
+  }
+
+  $Targets = if ($Build) {
+    @("default")
+  } else {
+    @("default", "install")
+  }
+
+  $InstallDir = $null
+  if (-not $Build) {
+    $InstallDir = "$($Arch.ToolchainInstallRoot)\usr"
+  }
+
+  Build-CMakeProject `
+    -Src $SourceCache\swift-foundation\Sources\FoundationMacros `
+    -Bin $FoundationMacrosBinaryCache `
+    -InstallTo:$InstallDir `
+    -Arch $Arch `
+    -Platform $Platform `
+    -UseBuiltCompilers Swift `
+    -SwiftSDK:$SwiftSDK `
+    -BuildTargets $Targets `
+    -Defines @{
+      SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
+    }
 }
 
 function Build-XCTest([Platform]$Platform, $Arch, [switch]$Test = $false) {
@@ -2341,6 +2384,7 @@ if (-not $SkipBuild) {
     # Build platform: SDK, Redist and XCTest
     Invoke-BuildStep Build-Runtime Windows $Arch
     Invoke-BuildStep Build-Dispatch Windows $Arch
+    Invoke-BuildStep Build-FoundationMacros -Build Windows $BuildArch
     Invoke-BuildStep Build-Foundation Windows $Arch
     Invoke-BuildStep Build-XCTest Windows $Arch
   }
@@ -2357,6 +2401,11 @@ if (-not $SkipBuild) {
      Invoke-BuildStep Build-Foundation Android $Arch
      Invoke-BuildStep Build-XCTest Android $Arch
    }
+}
+
+if (-not $SkipBuild) {
+  # Build Macros for distribution
+  Invoke-BuildStep Build-FoundationMacros Windows $HostArch
 }
 
 if (-not $ToBatch) {
