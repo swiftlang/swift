@@ -183,7 +183,7 @@ extension String: RangeReplaceableCollection {
   /// string.
   ///
   /// - Parameters:
-  ///   - bounds: The range of text to replace. The bounds of the range must be
+  ///   - subrange: The range of text to replace. The bounds of the range must be
   ///     valid indices of the string.
   ///   - newElements: The new characters to add to the string.
   ///
