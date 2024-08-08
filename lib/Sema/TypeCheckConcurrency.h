@@ -89,6 +89,10 @@ enum class SendableCheckReason {
 /// overridden declaration.
 void checkOverrideActorIsolation(ValueDecl *value);
 
+/// Diagnose global state that is not either immutable plus Sendable or isolated
+/// to a global actor.
+void checkGlobalIsolation(VarDecl *var);
+
 /// Determine whether the given context requires strict concurrency checking,
 /// e.g., because it uses concurrency features directly or because it's in
 /// code where strict checking has been enabled.
