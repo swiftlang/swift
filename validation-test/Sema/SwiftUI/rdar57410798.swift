@@ -6,6 +6,7 @@ import SwiftUI
 
 enum ColorScheme: CaseIterable, Hashable, Equatable, Identifiable {
 // expected-error@-1 {{type 'ColorScheme' does not conform to protocol 'Identifiable'}}
+// expected-note@-2 {{add stubs for conformance}}
   case `default`
   case pink
 

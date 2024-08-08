@@ -122,7 +122,7 @@ enum Recovery6 {
   case Tusk, // expected-error {{expected identifier after comma in enum 'case' declaration}}
 } 
 
-enum RawTypeEmpty : Int {} // expected-error {{an enum with no cases cannot declare a raw type}}
+enum RawTypeEmpty : Int {} // expected-error {{an enum with no cases cannot declare a raw type}} expected-note {{add stubs for conformance}}
 // expected-error@-1{{'RawTypeEmpty' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}}
 
 enum Raw : Int {
@@ -138,7 +138,7 @@ enum RawTypeNotFirst : RawTypeNotFirstProtocol, Int { // expected-error {{raw ty
   case E
 }
 
-enum ExpressibleByRawTypeNotLiteral : Array<Int> { // expected-error {{raw type 'Array<Int>' is not expressible by a string, integer, or floating-point literal}}
+enum ExpressibleByRawTypeNotLiteral : Array<Int> { // expected-error {{raw type 'Array<Int>' is not expressible by a string, integer, or floating-point literal}} expected-note {{add stubs for conformance}}
   // expected-error@-1{{'ExpressibleByRawTypeNotLiteral' declares raw type 'Array<Int>', but does not conform to RawRepresentable and conformance could not be synthesized}}
   case Ladd, Elliott, Sixteenth, Harrison
 }
@@ -162,7 +162,7 @@ enum RawTypeCircularityB : RawTypeCircularityA, ExpressibleByIntegerLiteral { //
 struct ExpressibleByFloatLiteralOnly : ExpressibleByFloatLiteral {
     init(floatLiteral: Double) {}
 }
-enum ExpressibleByRawTypeNotIntegerLiteral : ExpressibleByFloatLiteralOnly { // expected-error {{'ExpressibleByRawTypeNotIntegerLiteral' declares raw type 'ExpressibleByFloatLiteralOnly', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-error {{RawRepresentable conformance cannot be synthesized because raw type 'ExpressibleByFloatLiteralOnly' is not Equatable}}
+enum ExpressibleByRawTypeNotIntegerLiteral : ExpressibleByFloatLiteralOnly { // expected-error {{'ExpressibleByRawTypeNotIntegerLiteral' declares raw type 'ExpressibleByFloatLiteralOnly', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-error {{RawRepresentable conformance cannot be synthesized because raw type 'ExpressibleByFloatLiteralOnly' is not Equatable}} expected-note {{add stubs for conformance}}
   case Everett // expected-error {{enum cases require explicit raw values when the raw type is not expressible by integer or string literal}}
   case Flanders
 }
@@ -176,13 +176,13 @@ enum RawTypeWithNegativeValues : Int {
   case AutoIncAcrossZero = -1, Zero, One
 }
 
-enum RawTypeWithUnicodeScalarValues : UnicodeScalar { // expected-error {{'RawTypeWithUnicodeScalarValues' declares raw type 'UnicodeScalar' (aka 'Unicode.Scalar'), but does not conform to RawRepresentable and conformance could not be synthesized}}
+enum RawTypeWithUnicodeScalarValues : UnicodeScalar { // expected-error {{'RawTypeWithUnicodeScalarValues' declares raw type 'UnicodeScalar' (aka 'Unicode.Scalar'), but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{add stubs for conformance}}
   case Kearney = "K"
   case Lovejoy // expected-error {{enum cases require explicit raw values when the raw type is not expressible by integer or string literal}}
   case Marshall = "M"
 }
 
-enum RawTypeWithCharacterValues : Character { // expected-error {{'RawTypeWithCharacterValues' declares raw type 'Character', but does not conform to RawRepresentable and conformance could not be synthesized}}
+enum RawTypeWithCharacterValues : Character { // expected-error {{'RawTypeWithCharacterValues' declares raw type 'Character', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{add stubs for conformance}}
   case First = "い"
   case Second // expected-error {{enum cases require explicit raw values when the raw type is not expressible by integer or string literal}}
   case Third = "は"
@@ -195,7 +195,7 @@ enum RawTypeWithCharacterValues_Correct : Character {
   case Fourth = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}" // ok
 }
 
-enum RawTypeWithCharacterValues_Error1 : Character { // expected-error {{'RawTypeWithCharacterValues_Error1' declares raw type 'Character', but does not conform to RawRepresentable and conformance could not be synthesized}}
+enum RawTypeWithCharacterValues_Error1 : Character { // expected-error {{'RawTypeWithCharacterValues_Error1' declares raw type 'Character', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{add stubs for conformance}}
   case First = "abc" // expected-error {{cannot convert value of type 'String' to raw type 'Character'}}
 }
 
@@ -240,12 +240,12 @@ enum NonliteralRawValue : Int {
   case Yeon = 100 + 20 + 3 // expected-error {{raw value for enum case must be a literal}}
 }
 
-enum RawTypeWithPayload : Int { // expected-error {{'RawTypeWithPayload' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{declared raw type 'Int' here}} expected-note {{declared raw type 'Int' here}}
+enum RawTypeWithPayload : Int { // expected-error {{'RawTypeWithPayload' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{declared raw type 'Int' here}} expected-note {{declared raw type 'Int' here}} expected-note {{add stubs for conformance}}
   case Powell(Int) // expected-error {{enum with raw type cannot have cases with arguments}}
   case Terwilliger(Int) = 17 // expected-error {{enum with raw type cannot have cases with arguments}}
 }
 
-enum RawTypeMismatch : Int { // expected-error {{'RawTypeMismatch' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}}
+enum RawTypeMismatch : Int { // expected-error {{'RawTypeMismatch' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{add stubs for conformance}}
   case Barbur = "foo" // expected-error {{}}
 }
 
@@ -265,12 +265,12 @@ enum DuplicateMembers3 {
   case Foo(Int) // expected-error {{invalid redeclaration of 'Foo'}}
 }
 
-enum DuplicateMembers4 : Int { // expected-error {{'DuplicateMembers4' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}}
+enum DuplicateMembers4 : Int { // expected-error {{'DuplicateMembers4' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{add stubs for conformance}}
   case Foo = 1 // expected-note {{'Foo' previously declared here}}
   case Foo = 2 // expected-error {{invalid redeclaration of 'Foo'}}
 }
 
-enum DuplicateMembers5 : Int { // expected-error {{'DuplicateMembers5' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}}
+enum DuplicateMembers5 : Int { // expected-error {{'DuplicateMembers5' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{add stubs for conformance}}
   case Foo = 1 // expected-note {{'Foo' previously declared here}}
   case Foo = 1 + 1 // expected-error {{invalid redeclaration of 'Foo'}} expected-error {{raw value for enum case must be a literal}}
 }
@@ -281,19 +281,19 @@ enum DuplicateMembers6 {
   case Foo // expected-error {{invalid redeclaration of 'Foo'}}
 }
 
-enum DuplicateMembers7 : String { // expected-error {{'DuplicateMembers7' declares raw type 'String', but does not conform to RawRepresentable and conformance could not be synthesized}}
+enum DuplicateMembers7 : String { // expected-error {{'DuplicateMembers7' declares raw type 'String', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{add stubs for conformance}}
   case Foo // expected-note {{'Foo' previously declared here}}
   case Foo = "Bar" // expected-error {{invalid redeclaration of 'Foo'}}
 }
 
-enum DuplicateMembers8 : String { // expected-error {{'DuplicateMembers8' declares raw type 'String', but does not conform to RawRepresentable and conformance could not be synthesized}}
+enum DuplicateMembers8 : String { // expected-error {{'DuplicateMembers8' declares raw type 'String', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{add stubs for conformance}}
   case Foo // expected-note {{'Foo' previously declared here}}
   // expected-note@-1 {{raw value previously used here}}
   case Foo // expected-error {{invalid redeclaration of 'Foo'}}
   // expected-error@-1 {{raw value for enum case is not unique}}
 }
 
-enum DuplicateMembers9 : String { // expected-error {{'DuplicateMembers9' declares raw type 'String', but does not conform to RawRepresentable and conformance could not be synthesized}}
+enum DuplicateMembers9 : String { // expected-error {{'DuplicateMembers9' declares raw type 'String', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{add stubs for conformance}}
   case Foo = "Foo" // expected-note {{'Foo' previously declared here}}
   // expected-note@-1 {{raw value previously used here}}
   case Foo = "Foo"// expected-error {{invalid redeclaration of 'Foo'}}
@@ -352,7 +352,7 @@ enum ManyLiteralA : ManyLiteralable {
   case B = 0 // expected-error {{raw value for enum case is not unique}}
 }
 
-enum ManyLiteralB : ManyLiteralable { // expected-error {{'ManyLiteralB' declares raw type 'ManyLiteralable', but does not conform to RawRepresentable and conformance could not be synthesized}}
+enum ManyLiteralB : ManyLiteralable { // expected-error {{'ManyLiteralB' declares raw type 'ManyLiteralable', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{add stubs for conformance}}
   case A = "abc"
   case B // expected-error {{enum case must declare a raw value when the preceding raw value is not an integer}}
 }
@@ -362,7 +362,7 @@ enum ManyLiteralC : ManyLiteralable {
   case B = "0"
 }
 
-enum foo : String { // expected-error {{'foo' declares raw type 'String', but does not conform to RawRepresentable and conformance could not be synthesized}}
+enum foo : String { // expected-error {{'foo' declares raw type 'String', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{add stubs for conformance}}
   case bar = nil // expected-error {{cannot convert 'nil' to raw type 'String'}}
 }
 
@@ -517,6 +517,7 @@ enum E_53662_PatternMatching {
 
 enum CasesWithMissingElement: Int {
   // expected-error@-1 {{'CasesWithMissingElement' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}}
+  // expected-note@-2 {{add stubs for conformance}}
 
   case a = "hello", // expected-error{{expected identifier after comma in enum 'case' declaration}}
   // expected-error@-1 {{cannot convert value of type 'String' to raw type 'Int'}}

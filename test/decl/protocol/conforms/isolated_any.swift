@@ -12,5 +12,6 @@ protocol AnnotatedEnqueuer {
   func enqueue(operation: @escaping @isolated(any) @Sendable () async -> Result)
 }
 
-// expected-error @+1 {{type 'A<T>' does not conform to protocol 'AnnotatedEnqueuer'}}
+// expected-error@+2 {{type 'A<T>' does not conform to protocol 'AnnotatedEnqueuer'}}
+// expected-note@+1 {{add stubs for conformance}}
 extension A : AnnotatedEnqueuer {}

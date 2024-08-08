@@ -5,7 +5,7 @@ protocol P {
   associatedtype B
 
   func f<T: P>(_: T) where T.A == Self.A, T.A == Self.B // expected-error{{instance method requirement 'f' cannot add constraint 'Self.A == Self.B' on 'Self'}}
-  // expected-note@-1 {{protocol requires function 'f' with type '<T> (T) -> ()'; add a stub for conformance}}
+  // expected-note@-1 {{protocol requires function 'f' with type '<T> (T) -> ()'}}
 }
 
 extension P {
@@ -13,7 +13,9 @@ extension P {
   // expected-note@-1 {{candidate would match if 'X' was the same type as 'X.B' (aka 'Int')}}
 }
 
-struct X : P { // expected-error {{type 'X' does not conform to protocol 'P'}}
+struct X : P { 
+  // expected-error@-1 {{type 'X' does not conform to protocol 'P'}}
+  // expected-note@-2 {{add stubs for conformance}}
   typealias A = X
   typealias B = Int
 }
@@ -65,11 +67,12 @@ protocol P6 {
 
   func foo() where T == U
   // expected-error@-1 {{instance method requirement 'foo()' cannot add constraint 'Self.T == Self.U' on 'Self'}}
-  // expected-note@-2 {{protocol requires function 'foo()' with type '() -> ()'; add a stub for conformance}}
+  // expected-note@-2 {{protocol requires function 'foo()' with type '() -> ()'}}
 }
 
 struct S2 : P6 {
   // expected-error@-1 {{type 'S2' does not conform to protocol 'P6'}}
+  // expected-note@-2 {{add stubs for conformance}}
   typealias T = Int
   typealias U = String
 

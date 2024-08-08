@@ -2116,7 +2116,7 @@ ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
     ConformanceDecl->diagnose(diag::type_does_not_conform,
                               Nominal->getDeclaredType(), getProtocolType());
     requirement->diagnose(diag::no_witnesses, diag::RequirementKind::Func,
-                          requirement, getProtocolType(), /*AddFixIt=*/false);
+                          requirement, getProtocolType());
 
     return nullptr;
   }
@@ -2146,8 +2146,9 @@ ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
   if (!canSynthesize(*this, requirement, delayedNotes)) {
     ConformanceDecl->diagnose(diag::type_does_not_conform,
                               Nominal->getDeclaredType(), getProtocolType());
-    requirement->diagnose(diag::no_witnesses, diag::RequirementKind::Constructor,
-                          requirement, getProtocolType(), /*AddFixIt=*/false);
+    requirement->diagnose(diag::no_witnesses,
+                          diag::RequirementKind::Constructor, requirement,
+                          getProtocolType());
 
     return nullptr;
   }

@@ -638,8 +638,8 @@ ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
   ConformanceDecl->diagnose(diag::type_does_not_conform,
                             Nominal->getDeclaredType(), getProtocolType());
   requirement->diagnose(diag::no_witnesses,
-                        getProtocolRequirementKind(requirement),
-                        requirement, getProtocolType(), /*AddFixIt=*/false);
+                        getProtocolRequirementKind(requirement), requirement,
+                        getProtocolType());
 
   // If derivation is possible, cancel the diagnostic and perform derivation.
   if (canDeriveDifferentiable(Nominal, getConformanceContext(), requirement)) {

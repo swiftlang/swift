@@ -298,11 +298,12 @@ class C : any Empty {} // expected-error {{inheritance from non-protocol, non-cl
 
 enum E : any Empty { // expected-error {{raw type 'any Empty' is not expressible by a string, integer, or floating-point literal}}
 // expected-error@-1 {{'E' declares raw type 'any Empty', but does not conform to RawRepresentable and conformance could not be synthesized}}
-// expected-error@-2 {{RawRepresentable conformance cannot be synthesized because raw type 'any Empty' is not Equatable}}
+// expected-note@-2 {{add stubs for conformance}}
+// expected-error@-3 {{RawRepresentable conformance cannot be synthesized because raw type 'any Empty' is not Equatable}}
   case hack
 }
 
-enum EE : Equatable, any Empty { // expected-error {{raw type 'any Empty' is not expressible by a string, integer, or floating-point literal}}
+enum EE : Equatable, any Empty { // expected-error {{raw type 'any Empty' is not expressible by a string, integer, or floating-point literal}} expected-note {{add stubs for conformance}}
 // expected-error@-1 {{'EE' declares raw type 'any Empty', but does not conform to RawRepresentable and conformance could not be synthesized}}
 // expected-error@-2 {{RawRepresentable conformance cannot be synthesized because raw type 'any Empty' is not Equatable}}
 // expected-error@-3 {{raw type 'any Empty' must appear first in the enum inheritance clause}}
