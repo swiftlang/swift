@@ -170,7 +170,7 @@ The Swift project relies heavily on code review to improve software quality:
 
 - All significant changes, by all developers, must be reviewed before they are committed to the repository.
 Smaller changes (or changes where the developer owns the component) can be reviewed after being committed.
-- Code reviews are conducted on GitHub (through comments on pull requests or commits) and are reflected on the relevant project’s commit mailing list.
+- Code reviews are conducted on GitHub.
 - The developer responsible for a code change is also responsible for making all necessary review-related changes.
 
 Code review can be an iterative process, which continues until the change is ready to be merged.
