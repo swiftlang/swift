@@ -1,4 +1,4 @@
-# swift_build_support/products/swift_testing.py -----------------*- python -*-
+# swift_build_support/products/swift_testing_macros.py ----------*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
@@ -19,7 +19,7 @@ from . import product
 from . import swift
 
 
-class SwiftTesting(product.Product):
+class SwiftTestingMacros(product.Product):
     @classmethod
     def is_build_script_impl_product(cls):
         return False
@@ -30,7 +30,7 @@ class SwiftTesting(product.Product):
 
     @classmethod
     def product_source_name(cls):
-        return "swift-testing"
+        return "swift-testing/Sources/TestingMacros"
 
     @classmethod
     def get_dependencies(cls):
@@ -40,7 +40,6 @@ class SwiftTesting(product.Product):
         return True
 
     def should_test(self, host_target):
-        # TODO: Implement.
         return False
 
     def should_install(self, host_target):
@@ -51,7 +50,7 @@ class SwiftTesting(product.Product):
         build_dir = os.path.join(
             build_root, '%s-%s' % (self.product_name(), host_target))
 
-        return SwiftTestingCMakeShim(
+        return SwiftTestingMacrosCMakeShim(
             args=self.args,
             toolchain=self.toolchain,
             source_dir=self.source_dir,
@@ -69,9 +68,6 @@ class SwiftTesting(product.Product):
             for target in self.args.cross_compile_hosts:
                 self._build_with_cmake(target)
 
-        # FIXME: build testing library for 'stdlib_deployment_targets'?
-        pass
-
     def _install_with_cmake(self, host_target):
         self._cmake_product(host_target).install(host_target)
 
@@ -85,14 +81,12 @@ class SwiftTesting(product.Product):
                 self._install_with_cmake(target)
 
 
-class SwiftTestingCMakeShim(cmake_product.CMakeProduct):
+class SwiftTestingMacrosCMakeShim(cmake_product.CMakeProduct):
     def build(self, host_target):
         override_deployment_version = None
         if host_target.startswith('macosx'):
             if Version(self.args.darwin_deployment_version_osx) < Version('10.15'):
                 override_deployment_version = '10.15'
-
-        self.cmake_options.define('BUILD_SHARED_LIBS', 'YES')
 
         # Use empty CMake install prefix, since the `DESTDIR` env var is set by
         # `install_with_cmake` later which already has the same prefix.
@@ -100,8 +94,11 @@ class SwiftTestingCMakeShim(cmake_product.CMakeProduct):
 
         self.cmake_options.define('CMAKE_BUILD_TYPE', self.args.build_variant)
 
-        # FIXME: If we build macros for the builder, specify the path.
-        self.cmake_options.define('SwiftTesting_MACRO', 'NO')
+        build_root = os.path.dirname(self.build_dir)
+        swift_build_dir = os.path.join(
+            '..', build_root, '%s-%s' % ('swift', host_target))
+        swift_cmake_dir = os.path.join(swift_build_dir, 'cmake', 'modules')
+        self.cmake_options.define('SwiftSyntax_DIR:PATH', swift_cmake_dir)
 
         self.generate_toolchain_file_for_darwin_or_linux(
             host_target, override_macos_deployment_version=override_deployment_version)
