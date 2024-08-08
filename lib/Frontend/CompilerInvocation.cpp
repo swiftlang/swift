@@ -232,8 +232,35 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   if (LangOpts.hasFeature(Feature::Embedded))
     LibSubDir = "embedded";
 
-  llvm::sys::path::append(LibPath, LibSubDir);
   SearchPathOpts.RuntimeLibraryPaths.clear();
+
+#if defined(_WIN32)
+  // Resource path looks like this:
+  //
+  //   C:\...\Swift\Toolchains\6.0.0+Asserts\usr\lib\swift
+  //
+  // The runtimes are in
+  //
+  //   C:\...\Swift\Runtimes\6.0.0\usr\bin
+  //
+  llvm::SmallString<128> RuntimePath(LibPath);
+
+  llvm::sys::path::remove_filename(RuntimePath);
+  llvm::sys::path::remove_filename(RuntimePath);
+  llvm::sys::path::remove_filename(RuntimePath);
+
+  llvm::SmallString<128> VersionWithAttrs(llvm::sys::path::filename(RuntimePath));
+  size_t MaybePlus = VersionWithAttrs.find_first_of('+');
+  StringRef Version = VersionWithAttrs.substr(0, MaybePlus);
+
+  llvm::sys::path::remove_filename(RuntimePath);
+  llvm::sys::path::remove_filename(RuntimePath);
+  llvm::sys::path::append(RuntimePath, "Runtimes", Version, "usr", "bin");
+
+  SearchPathOpts.RuntimeLibraryPaths.push_back(std::string(RuntimePath.str()));
+#endif
+
+  llvm::sys::path::append(LibPath, LibSubDir);
   SearchPathOpts.RuntimeLibraryPaths.push_back(std::string(LibPath.str()));
   if (Triple.isOSDarwin())
     SearchPathOpts.RuntimeLibraryPaths.push_back(DARWIN_OS_LIBRARY_PATH);
