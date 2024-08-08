@@ -76,7 +76,7 @@ Next, define the first increment and get consensus on the development goal of th
 - Make each change in the set either stand alone (for example, to fix a bug) or part of a planned series of changes that work toward the development goal.
 Explaining these relationships to the community can be helpful.
 
-If you are interested in making a large change and feel unsure about its overall effect, please make sure to first discuss the change and reach a consensus through the developer forums.
+If you are interested in making a large change and feel unsure about its overall effect, please make sure to first discuss the change and reach a consensus through the https://forums.swift.org.
 Then ask about the best way to go about making the change.
 
 ### Commit Messages
