@@ -36,14 +36,9 @@ If you are interested in:
 
 - Contributing fixes and features to the compiler: See our
   [How to Submit Your First Pull Request guide](/docs/HowToGuides/FirstPullRequest.md).
-- Building the compiler as a one-off: See our [Getting Started guide][].
-- Building a toolchain as a one-off: Follow the [Getting Started guide][]
-  up until the "Building the project" section. After that, follow the
-  instructions in the [Swift Toolchains](/README.md#swift-toolchains).
+- Building the compiler as a one-off: See our [Getting Started guide](/docs/HowToGuides/GettingStarted.md).
 
 We also host answers to [Frequently Asked Questions](/docs/HowToGuides/FAQ.md) that may be of interest.
-
-[Getting Started guide]: /docs/HowToGuides/GettingStarted.md
 
 ### Proposing changes - Swift Evolution
 
