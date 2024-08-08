@@ -62,6 +62,7 @@
 #include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/SetVector.h"
 
 using namespace swift;
@@ -634,6 +635,7 @@ void CopyPropagation::run() {
 
   // Invalidate analyses.
   if (changed || deleter.hadCallbackInvocation()) {
+    updateBorrowedFrom(getPassManager(), getFunction());
     // Preserves NonLocalAccessBlockAnalysis.
     accessBlockAnalysis->lockInvalidation();
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
