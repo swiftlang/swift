@@ -41,7 +41,7 @@ If you are interested in:
   up until the "Building the project" section. After that, follow the
   instructions in the [Swift Toolchains](/README.md#swift-toolchains).
 
-We also host answers to [Frequently Aasked Questions](/docs/HowToGuides/FAQ.md) that may be of interest.
+We also host answers to [Frequently Asked Questions](/docs/HowToGuides/FAQ.md) that may be of interest.
 
 [Getting Started guide]: /docs/HowToGuides/GettingStarted.md
 
