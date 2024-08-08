@@ -16,7 +16,8 @@ We put together handy [Getting Started](https://www.swift.org/getting-started/) 
 Reporting bugs is a great way for anyone to help improve Swift.
 The open source Swift project uses GitHub Issues for tracking bugs.
 
-If a bug can be reproduced only within an Xcode project or a playground, or if the bug is associated with an Apple NDA, please file a report to Apple’s [bug reporter](https://bugreport.apple.com/) instead.
+> [!NOTE]
+> If a bug can be reproduced only within an Xcode project or a playground, or if the bug is associated with an Apple NDA, please file a report to Apple’s [bug reporter](https://bugreport.apple.com/) instead.
 
 Because Swift is under very active development, we receive a lot of bug reports.
 Before opening a new issue, take a moment to [browse our existing issues](https://github.com/swiftlang/swift/issues) to reduce the chance of reporting a duplicate.
