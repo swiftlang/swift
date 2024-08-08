@@ -184,6 +184,7 @@ struct ContainsEnum {
     switch n { // expected-error {{switch must be exhaustive}}
     // expected-note@-1 {{missing case: '.Mere(_)'}}
     // expected-note@-2 {{missing case: '.Twain(_, _)'}}
+    // expected-note@-3 {{add missing cases}}
     case ContainsEnum.Possible<Int>.Naught,
          ContainsEnum.Possible.Naught, // expected-warning {{case is already handled by previous patterns; consider removing it}}
          Possible<Int>.Naught, // expected-warning {{case is already handled by previous patterns; consider removing it}}
@@ -198,6 +199,7 @@ func nonmemberAccessesMemberType(_ n: ContainsEnum.Possible<Int>) {
   switch n { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{missing case: '.Mere(_)'}}
   // expected-note@-2 {{missing case: '.Twain(_, _)'}}
+  // expected-note@-3 {{add missing cases}}
   case ContainsEnum.Possible<Int>.Naught,
        .Naught: // expected-warning {{case is already handled by previous patterns; consider removing it}}
     ()

@@ -550,6 +550,7 @@ _ = (switch Bool.random() {
   // expected-error@-2 {{switch must be exhaustive}}
   // expected-note@-3 {{add missing case: 'true'}}
   // expected-note@-4 {{add missing case: 'false'}}
+  // expected-note@-5 {{add missing cases}}
   #if FOO
 case true:
   0
@@ -564,6 +565,7 @@ _ = (switch Bool.random() {
   // expected-error@-2 {{switch must be exhaustive}}
   // expected-note@-3 {{add missing case: 'true'}}
   // expected-note@-4 {{add missing case: 'false'}}
+  // expected-note@-5 {{add missing cases}}
   #if FOO
 case true:
   0
