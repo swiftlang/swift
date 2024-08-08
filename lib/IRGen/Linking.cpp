@@ -376,10 +376,8 @@ std::string LinkEntity::mangleAsString() const {
   }
 
   case Kind::CoroutineContinuationPrototype:
-    // Emit unnamed functions for coroutine continuation
-    // prototypes. These are supposed to be replaced by the LLVM
-    // coroutine lowering pass.
-    return std::string();
+    return mangler.mangleCoroutineContinuationPrototype(
+                                            cast<SILFunctionType>(getType()));
 
     // An Objective-C class reference reference. The symbol is private, so
     // the mangling is unimportant; it should just be readable in LLVM IR.

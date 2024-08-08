@@ -1456,8 +1456,11 @@ public:
         Self(nullptr), FirstData(nullptr), SecondData(nullptr) {}
 
   void begin() override {
+    auto unsubstType = substType->getUnsubstitutedType(IGM.getSILModule());
     auto prototype = subIGF.IGM.getOpaquePtr(
-        subIGF.IGM.getAddrOfContinuationPrototype(origType));
+      subIGF.IGM.getAddrOfContinuationPrototype(
+        cast<SILFunctionType>(
+          unsubstType->mapTypeOutOfContext()->getCanonicalType())));
 
     // Use malloc and free as our allocator.
     auto allocFn = subIGF.IGM.getOpaquePtr(subIGF.IGM.getMallocFn());
