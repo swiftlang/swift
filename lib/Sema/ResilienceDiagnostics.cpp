@@ -236,6 +236,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
 
   auto reason = where.getExportabilityReason();
   auto DC = where.getDeclContext();
+  auto SF = DC->getParentSourceFile();
   ASTContext &ctx = DC->getASTContext();
   auto originKind = getDisallowedOriginKind(D, where, downgradeToWarning);
 
@@ -275,16 +276,18 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
   if (originKind == DisallowedOriginKind::None)
     return false;
 
-  auto diagName = D->getName();
+  // Some diagnostics emitted with the `MemberImportVisibility` feature enabled
+  // subsume these diagnostics.
+  if (originKind == DisallowedOriginKind::MissingImport &&
+      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility) && SF &&
+      SF->hasDelayedMissingImportForMemberDiagnostic(D))
+    return false;
+
   if (auto accessor = dyn_cast<AccessorDecl>(D)) {
     // Only diagnose accessors if their disallowed origin kind differs from
     // that of their storage.
     if (getDisallowedOriginKind(accessor->getStorage(), where) == originKind)
       return false;
-
-    // For accessors, diagnose with the name of the storage instead of the
-    // implicit '_'.
-    diagName = accessor->getStorage()->getName();
   }
 
   auto fragileKind = where.getFragileFunctionKind();

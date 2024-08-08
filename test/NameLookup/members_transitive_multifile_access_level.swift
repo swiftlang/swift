@@ -60,9 +60,7 @@ extension Int {
   internal func usesTypealiasInInternalUsesOnly(x: TypealiasInInternalUsesOnly) {} // expected-error {{type alias 'TypealiasInInternalUsesOnly' is not available due to missing import of defining module 'InternalUsesOnly'}}
   package func usesTypealiasInPackageUsesOnly(x: TypealiasInPackageUsesOnly) {} // expected-error {{type alias 'TypealiasInPackageUsesOnly' is not available due to missing import of defining module 'PackageUsesOnly'}}
   public func usesTypealiasInPublicUsesOnly(x: TypealiasInPublicUsesOnly) {} // expected-error {{type alias 'TypealiasInPublicUsesOnly' is not available due to missing import of defining module 'PublicUsesOnly'}}
-  // expected-warning@-1 {{cannot use type alias 'TypealiasInPublicUsesOnly' here; 'PublicUsesOnly' was not imported by this file}}
   public func usesTypealiasInMixedUses(x: TypealiasInMixedUses) {} // expected-error {{type alias 'TypealiasInMixedUses' is not available due to missing import of defining module 'MixedUses'}}
-  // expected-warning@-1 {{cannot use type alias 'TypealiasInMixedUses' here; 'MixedUses' was not imported by this file}}
   internal func usesTypealiasInMixedUses_Internal(x: TypealiasInMixedUses) {} // expected-error {{type alias 'TypealiasInMixedUses' is not available due to missing import of defining module 'MixedUses'}}
 }
 
@@ -78,9 +76,7 @@ private func usesTypealiasInInternalUsesOnly_Private(x: Int.TypealiasInInternalU
 internal func usesTypealiasInInternalUsesOnly(x: Int.TypealiasInInternalUsesOnly) {} // expected-error {{type alias 'TypealiasInInternalUsesOnly' is not available due to missing import of defining module 'InternalUsesOnly'}}
 package func usesTypealiasInPackageUsesOnly(x: Int.TypealiasInPackageUsesOnly) {} // expected-error {{type alias 'TypealiasInPackageUsesOnly' is not available due to missing import of defining module 'PackageUsesOnly'}}
 public func usesTypealiasInPublicUsesOnly(x: Int.TypealiasInPublicUsesOnly) {} // expected-error {{type alias 'TypealiasInPublicUsesOnly' is not available due to missing import of defining module 'PublicUsesOnly'}}
-// expected-warning@-1 {{cannot use type alias 'TypealiasInPublicUsesOnly' here; 'PublicUsesOnly' was not imported by this file}}
 public func usesTypealiasInMixedUses(x: Int.TypealiasInMixedUses) {} // expected-error {{type alias 'TypealiasInMixedUses' is not available due to missing import of defining module 'MixedUses'}}
-// expected-warning@-1 {{cannot use type alias 'TypealiasInMixedUses' here; 'MixedUses' was not imported by this file}}
 internal func usesTypealiasInMixedUses_Internal(x: Int.TypealiasInMixedUses) {} // expected-error {{type alias 'TypealiasInMixedUses' is not available due to missing import of defining module 'MixedUses'}}
 
 //--- extensions.swift
@@ -104,12 +100,10 @@ extension Int.NestedInPackageUsesOnly { // expected-error {{struct 'NestedInPack
 }
 
 extension Int.NestedInPublicUsesOnly { // expected-error {{struct 'NestedInPublicUsesOnly' is not available due to missing import of defining module 'PublicUsesOnly'}}
-  // expected-warning@-1 {{cannot use struct 'NestedInPublicUsesOnly' in an extension with public or '@usableFromInline' members; 'PublicUsesOnly' was not imported by this file}}
   public func publicMethod() {}
 }
 
 extension Int.NestedInMixedUses { // expected-error {{struct 'NestedInMixedUses' is not available due to missing import of defining module 'MixedUses'}}
-  // expected-warning@-1 {{cannot use struct 'NestedInMixedUses' in an extension with public or '@usableFromInline' members; 'MixedUses' was not imported by this file}}
   public func publicMethod() {}
 }
 
