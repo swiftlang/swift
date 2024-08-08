@@ -391,3 +391,17 @@ DocComment *swift::getSingleDocComment(swift::markup::MarkupContext &MC,
     return nullptr;
   return DocComment::create(D, MC, RC);
 }
+
+const Decl *Decl::getDocCommentProvidingDecl() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           DocCommentProvidingDeclRequest{this}, nullptr);
+}
+
+StringRef Decl::getSemanticBriefComment() const {
+  if (!canHaveComment())
+    return StringRef();
+
+  auto &eval = getASTContext().evaluator;
+  return evaluateOrDefault(eval, SemanticBriefCommentRequest{this},
+                           StringRef());
+}

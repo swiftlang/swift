@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Comment.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -80,9 +81,11 @@ private:
     }
 
     for (auto *member : members) {
-      if (isa<AbstractFunctionDecl>(member) ||
-          isa<AbstractStorageDecl>(member)) {
-        if (VD->isStatic() != member->isStatic()) {
+      if (VD == member || member->isInvalid()) {
+        continue;
+      }
+      if (!isa<TypeDecl>(member)) {
+        if (!swift::TypeChecker::witnessStructureMatches(member, VD)) {
           continue;
         }
         Type memberComparisonTy = member->getInterfaceType();
@@ -151,7 +154,8 @@ public:
 };
 } // end anonymous namespace
 
-const Decl *Decl::getDocCommentProvidingDecl() const {
+const Decl *DocCommentProvidingDeclRequest::evaluate(Evaluator &evaluator,
+                                                     const Decl *D) const {
   // Search for the first decl we see with a non-empty raw comment.
   auto finder = CommentProviderFinder<RawComment>(
       [](const Decl *D) -> std::optional<RawComment> {
@@ -161,17 +165,8 @@ const Decl *Decl::getDocCommentProvidingDecl() const {
         return comment;
       });
 
-  auto result = finder.findCommentProvider(this);
+  auto result = finder.findCommentProvider(D);
   return result ? result->second : nullptr;
-}
-
-StringRef swift::Decl::getSemanticBriefComment() const {
-  if (!canHaveComment())
-    return StringRef();
-
-  auto &eval = getASTContext().evaluator;
-  return evaluateOrDefault(eval, SemanticBriefCommentRequest{this},
-                           StringRef());
 }
 
 /// Retrieve the brief comment for a given decl \p D, without attempting to

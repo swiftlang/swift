@@ -499,15 +499,12 @@ checkEffects(AbstractStorageDecl *witness, AbstractStorageDecl *req) {
   return std::nullopt; // OK
 }
 
-RequirementMatch swift::matchWitness(
-    DeclContext *dc, ValueDecl *req, ValueDecl *witness,
-    llvm::function_ref<
-        std::tuple<std::optional<RequirementMatch>, Type, Type>(void)>
-        setup,
-    llvm::function_ref<std::optional<RequirementMatch>(Type, Type)> matchTypes,
-    llvm::function_ref<RequirementMatch(bool, ArrayRef<OptionalAdjustment>)>
-        finalize) {
-
+/// Implementation of `matchWitnessStructure` that also sets a few out paramters
+/// to be used by `matchWitness`.
+static std::optional<RequirementMatch>
+matchWitnessStructureImpl(ValueDecl *req, ValueDecl *witness,
+                          bool &decomposeFunctionType, bool &ignoreReturnType,
+                          Type &reqThrownError, Type &witnessThrownError) {
   assert(!req->isInvalid() && "Cannot have an invalid requirement here");
 
   /// Make sure the witness is of the same kind as the requirement.
@@ -530,7 +527,7 @@ RequirementMatch swift::matchWitness(
   if (witness->isRecursiveValidation()) {
     return RequirementMatch(witness, MatchKind::Circularity);
   }
-  
+
   // If the witness is invalid, record that and stop now.
   if (witness->isInvalid()) {
     return RequirementMatch(witness, MatchKind::WitnessInvalid);
@@ -541,10 +538,6 @@ RequirementMatch swift::matchWitness(
   const auto &witnessAttrs = witness->getAttrs();
 
   // Perform basic matching of the requirement and witness.
-  bool decomposeFunctionType = false;
-  bool ignoreReturnType = false;
-  Type reqThrownError;
-  Type witnessThrownError;
   if (isa<FuncDecl>(req) && isa<FuncDecl>(witness)) {
     auto funcReq = cast<FuncDecl>(req);
     auto funcWitness = cast<FuncDecl>(witness);
@@ -617,7 +610,7 @@ RequirementMatch swift::matchWitness(
     decomposeFunctionType = true;
   } else if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness)) {
     auto *reqASD = cast<AbstractStorageDecl>(req);
-    
+
     // Check that the static-ness matches.
     if (reqASD->isStatic() != witnessASD->isStatic())
       return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
@@ -701,8 +694,42 @@ RequirementMatch swift::matchWitness(
   // If the requirement is @objc, the witness must not be marked with @nonobjc.
   // @objc-ness will be inferred (separately) and the selector will be checked
   // later.
-  if (req->isObjC() && witness->getAttrs().hasAttribute<NonObjCAttr>())
+  if (req->isObjC() && witness->getAttrs().hasAttribute<NonObjCAttr>()) {
     return RequirementMatch(witness, MatchKind::NonObjC);
+  }
+  return std::nullopt;
+}
+
+bool swift::TypeChecker::witnessStructureMatches(ValueDecl *req,
+                                                 const ValueDecl *witness) {
+  bool decomposeFunctionType = false;
+  bool ignoreReturnType = false;
+  Type reqThrownError;
+  Type witnessThrownError;
+  return matchWitnessStructureImpl(req, const_cast<ValueDecl *>(witness),
+                                   decomposeFunctionType, ignoreReturnType,
+                                   reqThrownError,
+                                   witnessThrownError) == std::nullopt;
+}
+
+RequirementMatch swift::matchWitness(
+    DeclContext *dc, ValueDecl *req, ValueDecl *witness,
+    llvm::function_ref<
+        std::tuple<std::optional<RequirementMatch>, Type, Type>(void)>
+        setup,
+    llvm::function_ref<std::optional<RequirementMatch>(Type, Type)> matchTypes,
+    llvm::function_ref<RequirementMatch(bool, ArrayRef<OptionalAdjustment>)>
+        finalize) {
+  bool decomposeFunctionType = false;
+  bool ignoreReturnType = false;
+  Type reqThrownError;
+  Type witnessThrownError;
+
+  if (auto StructuralMismatch = matchWitnessStructureImpl(
+          req, witness, decomposeFunctionType, ignoreReturnType, reqThrownError,
+          witnessThrownError)) {
+    return *StructuralMismatch;
+  }
 
   // Set up the match, determining the requirement and witness types
   // in the process.
