@@ -14,7 +14,7 @@ public func publicVisibility(_ x: Int) -> Int
 
 // CHECK-DAG: sil @private_visible : $@convention(c) (Int) -> Int
 @_extern(c, "private_visible")
-private func privateVisiblity(_ x: Int) -> Int
+private func privateVisibility(_ x: Int) -> Int
 
 // CHECK-DAG: sil hidden_external @withoutCName : $@convention(c) () -> Int
 @_extern(c)
@@ -35,7 +35,7 @@ func main() {
   _ = publicVisibility(42)
   // CHECK-DAG: [[F4:%.+]] = function_ref @private_visible : $@convention(c) (Int) -> Int
   // CHECK-DAG: apply [[F4]]({{.*}}) : $@convention(c) (Int) -> Int
-  _ = privateVisiblity(24)
+  _ = privateVisibility(24)
   // CHECK-DAG: [[F5:%.+]] = function_ref @withoutCName : $@convention(c) () -> Int
   // CHECK-DAG: apply [[F5]]() : $@convention(c) () -> Int
   _ = withoutCName()
