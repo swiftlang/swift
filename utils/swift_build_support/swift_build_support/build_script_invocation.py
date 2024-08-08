@@ -666,6 +666,8 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.build_swiftpm)
         builder.add_product(products.SwiftSyntax,
                             is_enabled=self.args.build_swiftsyntax)
+        builder.add_product(products.SwiftTestingMacros,
+                            is_enabled=self.args.build_swift_testing_macros)
         builder.add_product(products.SwiftTesting,
                             is_enabled=self.args.build_swift_testing)
         builder.add_product(products.SwiftFormat,

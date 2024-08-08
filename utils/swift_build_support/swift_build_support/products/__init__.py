@@ -31,6 +31,7 @@ from .sourcekitlsp import SourceKitLSP
 from .staticswiftlinux import StaticSwiftLinuxConfig
 from .swift import Swift
 from .swift_testing import SwiftTesting
+from .swift_testing_macros import SwiftTestingMacros
 from .swiftdocc import SwiftDocC
 from .swiftdoccrender import SwiftDocCRender
 from .swiftdriver import SwiftDriver
@@ -67,6 +68,7 @@ __all__ = [
     'SwiftPM',
     'SwiftDriver',
     'SwiftTesting',
+    'SwiftTestingMacros',
     'EarlySwiftDriver',
     'XCTest',
     'SwiftSyntax',
