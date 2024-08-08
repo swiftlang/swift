@@ -72,21 +72,6 @@ static Decl *lookupDirectSingleWithoutExtensions(NominalTypeDecl *decl,
   return dyn_cast<Decl>(results.front());
 }
 
-/// Similar to ModuleDecl::conformsToProtocol, but doesn't introduce a
-/// dependency on Sema.
-static bool isConcreteAndValid(ProtocolConformanceRef conformanceRef) {
-  if (conformanceRef.isInvalid())
-    return false;
-  if (!conformanceRef.isConcrete())
-    return false;
-  auto conformance = conformanceRef.getConcrete();
-  auto subMap = conformance->getSubstitutionMap();
-  return llvm::all_of(subMap.getConformances(),
-                      [&](ProtocolConformanceRef each) -> bool {
-                        return isConcreteAndValid(each);
-                      });
-}
-
 static FuncDecl *getInsertFunc(NominalTypeDecl *decl,
                                TypeAliasDecl *valueType) {
   ASTContext &ctx = decl->getASTContext();
@@ -226,9 +211,7 @@ static FuncDecl *getMinusOperator(NominalTypeDecl *decl) {
     if (lhsNominal != rhsNominal || lhsNominal != decl)
       return false;
     auto returnTy = minus->getResultInterfaceType();
-    auto conformanceRef =
-        lookupConformance(returnTy, binaryIntegerProto);
-    if (!isConcreteAndValid(conformanceRef))
+    if (!checkConformance(returnTy, binaryIntegerProto))
       return false;
     return true;
   };
@@ -722,8 +705,8 @@ void swift::conformToCxxSequenceIfNeeded(
 
   // Check if RawIterator conforms to UnsafeCxxInputIterator.
   auto rawIteratorConformanceRef =
-      lookupConformance(rawIteratorTy, cxxIteratorProto);
-  if (!isConcreteAndValid(rawIteratorConformanceRef))
+      checkConformance(rawIteratorTy, cxxIteratorProto);
+  if (!rawIteratorConformanceRef)
     return;
   auto rawIteratorConformance = rawIteratorConformanceRef.getConcrete();
   auto pointeeDecl =
@@ -768,9 +751,7 @@ void swift::conformToCxxSequenceIfNeeded(
       return false;
 
     // Check if RawIterator conforms to UnsafeCxxRandomAccessIterator.
-    auto rawIteratorRAConformanceRef =
-        lookupConformance(rawIteratorTy, cxxRAIteratorProto);
-    if (!isConcreteAndValid(rawIteratorRAConformanceRef))
+    if (!checkConformance(rawIteratorTy, cxxRAIteratorProto))
       return false;
 
     // CxxRandomAccessCollection always uses Int as an Index.
@@ -890,9 +871,7 @@ void swift::conformToCxxSetIfNeeded(ClangImporter::Implementation &impl,
 
   auto rawMutableIteratorTy = rawMutableIteratorType->getUnderlyingType();
   // Check if RawMutableIterator conforms to UnsafeCxxInputIterator.
-  auto rawIteratorConformanceRef =
-      lookupConformance(rawMutableIteratorTy, cxxIteratorProto);
-  if (!isConcreteAndValid(rawIteratorConformanceRef))
+  if (!checkConformance(rawMutableIteratorTy, cxxIteratorProto))
     return;
 
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawMutableIterator"),
@@ -973,15 +952,11 @@ void swift::conformToCxxDictionaryIfNeeded(
   auto rawMutableIteratorTy = mutableIterType->getUnderlyingType();
 
   // Check if RawIterator conforms to UnsafeCxxInputIterator.
-  auto rawIteratorConformanceRef =
-      lookupConformance(rawIteratorTy, cxxInputIteratorProto);
-  if (!isConcreteAndValid(rawIteratorConformanceRef))
+  if (!checkConformance(rawIteratorTy, cxxInputIteratorProto))
     return;
 
   // Check if RawMutableIterator conforms to UnsafeCxxMutableInputIterator.
-  auto rawMutableIteratorConformanceRef = lookupConformance(
-      rawMutableIteratorTy, cxxMutableInputIteratorProto);
-  if (!isConcreteAndValid(rawMutableIteratorConformanceRef))
+  if (!checkConformance(rawMutableIteratorTy, cxxMutableInputIteratorProto))
     return;
 
   // Make the original subscript that returns a non-optional value unavailable.
@@ -1039,9 +1014,7 @@ void swift::conformToCxxVectorIfNeeded(ClangImporter::Implementation &impl,
   auto rawIteratorTy = iterType->getUnderlyingType();
 
   // Check if RawIterator conforms to UnsafeCxxRandomAccessIterator.
-  auto rawIteratorConformanceRef =
-      lookupConformance(rawIteratorTy, cxxRandomAccessIteratorProto);
-  if (!isConcreteAndValid(rawIteratorConformanceRef))
+  if (!checkConformance(rawIteratorTy, cxxRandomAccessIteratorProto))
     return;
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element,
