@@ -387,6 +387,12 @@ func testPointersAreNotSendable() {
     testSendable(rawMutableBuffer) // expected-warning {{conformance of 'UnsafeMutableRawBufferPointer' to 'Sendable' is unavailable}}
     testSendable(rawMutableBuffer.makeIterator()) // expected-warning {{conformance of 'UnsafeRawBufferPointer.Iterator' to 'Sendable' is unavailable}}
   }
+
+  func testManagedBuffers(buffer1: ManagedBuffer<Int, Int>, buffer2: ManagedBufferPointer<Int, Int>) {
+    testSendable(buffer1) // expected-warning {{conformance of 'ManagedBuffer<Header, Element>' to 'Sendable' is unavailable}}
+
+    testSendable(buffer2) // expected-warning {{conformance of 'ManagedBufferPointer<Header, Element>' to 'Sendable' is unavailable}}
+  }
 }
 
 @available(*, unavailable)
