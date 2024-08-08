@@ -1400,6 +1400,10 @@ def experimental_spi_only_imports :
   Flag<["-"], "experimental-spi-only-imports">,
   HelpText<"Enable use of @_spiOnly imports">;
 
+def diagnose_escaping_implementation_only_properties :
+  Flag<["-"], "diagnose-escaping-implementation-only-properties">,
+  HelpText<"Diagnose use of implementationOnly imported types in public structs or classes">;
+
 def enable_ossa_complete_lifetimes :
   Flag<["-"], "enable-ossa-complete-lifetimes">,
   HelpText<"Require linear OSSA lifetimes after SILGen">;

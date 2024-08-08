@@ -924,6 +924,10 @@ namespace swift {
     /// Allow request evalutation to perform type checking lazily, instead of
     /// eagerly typechecking source files after parsing.
     bool EnableLazyTypecheck = false;
+
+    /// Diagnose when a type imported via _implementationOnly import or as an SPI
+    /// is used to define a property on a public struct or class.
+    bool DiagnoseEscapingImplementationOnlyProperties = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.

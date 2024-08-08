@@ -2431,23 +2431,25 @@ bool VarDecl::isInitExposedToClients() const {
   if (getAttrs().hasAttribute<LazyAttr>())
     return false;
 
-  return hasInitialValue() && isLayoutExposedToClients();
+  auto &context = getASTContext();
+  return hasInitialValue() && isLayoutExposedToClients(context.TypeCheckerOpts.DiagnoseEscapingImplementationOnlyProperties);
 }
 
-bool VarDecl::isLayoutExposedToClients() const {
+bool VarDecl::isLayoutExposedToClients(bool inFrozenContext) const {
   auto parent = dyn_cast<NominalTypeDecl>(getDeclContext());
   if (!parent) return false;
   if (isStatic()) return false;
-
 
   auto nominalAccess =
     parent->getFormalAccessScope(/*useDC=*/nullptr,
                                  /*treatUsableFromInlineAsPublic=*/true);
   if (!nominalAccess.isPublic()) return false;
 
-  if (!parent->getAttrs().hasAttribute<FrozenAttr>() &&
-      !parent->getAttrs().hasAttribute<FixedLayoutAttr>())
-    return false;
+  auto parentIsClass = dyn_cast<ClassDecl>(parent);
+  if (parentIsClass || !inFrozenContext)
+    if (!parent->getAttrs().hasAttribute<FrozenAttr>() &&
+        !parent->getAttrs().hasAttribute<FixedLayoutAttr>())
+      return false;
 
   if (!hasStorage() &&
       !getAttrs().hasAttribute<LazyAttr>() &&
