@@ -554,7 +554,7 @@ extension BasicBlock {
 
 extension SimplifyContext {
 
-  /// Replaces a pair of redudant instructions, like
+  /// Replaces a pair of redundant instructions, like
   /// ```
   ///   %first = enum $E, #E.CaseA!enumelt, %replacement
   ///   %second = unchecked_enum_data %first : $E, #E.CaseA!enumelt

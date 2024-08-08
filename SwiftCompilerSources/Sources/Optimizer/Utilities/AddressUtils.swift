@@ -194,7 +194,7 @@ extension AddressUseVisitor {
       if operand.instruction.isIncidentalUse {
         return leafAddressUse(of: operand)
       }
-      // Unkown instruction.
+      // Unknown instruction.
       return unknownAddressUse(of: operand)
     }
   }
@@ -289,7 +289,7 @@ extension AddressInitializationWalker {
   }
 }
 
-// Implement AddresUseVisitor
+// Implement AddressUseVisitor
 extension AddressInitializationWalker {
   /// An address projection produces a single address result and does not
   /// escape its address operand in any other way.
@@ -359,7 +359,7 @@ extension AddressInitializationWalker {
   }
 }
 
-/// A live range representing the ownership of addressible memory.
+/// A live range representing the ownership of addressable memory.
 ///
 /// This live range represents the minimal guaranteed lifetime of the object being addressed. Uses of derived addresses
 /// may be extended up to the ends of this scope without violating ownership.

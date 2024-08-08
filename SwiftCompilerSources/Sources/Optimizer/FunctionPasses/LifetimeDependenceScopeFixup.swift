@@ -112,7 +112,7 @@ private func extendAccessScopes(dependence: LifetimeDependence,
 /// caller scope, which is handled separately). A nested 'read' access can never interfere with another access in the
 /// same outer 'read', because it is impossible to nest a 'modify' access within a 'read'. For 'modify' accesses,
 /// however, the inner scope must be extended for correctness. A 'modify' access can interfere with other 'modify'
-/// accesss in the same scope. We rely on exclusivity diagnostics to report these interferences. For example:
+/// access in the same scope. We rely on exclusivity diagnostics to report these interferences. For example:
 ///
 ///     sil @foo : $(@inout C) -> () {
 ///       bb0(%0 : $*C):
@@ -133,12 +133,12 @@ private func extendAccessScopes(dependence: LifetimeDependence,
 /// violation, and that subsequent optimizations do not shrink the inner access `%a1`.
 private func extendAccessScope(beginAccess: BeginAccessInst, range: inout InstructionRange,
                                _ context: FunctionPassContext) -> FunctionArgument? {
-  var endAcceses = [Instruction]()
+  var endAccesses = [Instruction]()
   // Collect the original end_access instructions and extend the range to to cover them. The resulting access scope must
   // cover the original scope because it may protect other memory operations.
   var requiresExtension = false
   for end in beginAccess.endInstructions {
-    endAcceses.append(end)
+    endAccesses.append(end)
     if range.contains(end) {
       // If any end_access is inside the new range, then all end_accesses must be rewritten.
       requiresExtension = true
@@ -171,7 +171,7 @@ private func extendAccessScope(beginAccess: BeginAccessInst, range: inout Instru
     range.insert(endAccess)
   }
   // Delete original end_access instructions
-  for endAccess in endAcceses {
+  for endAccess in endAccesses {
     context.erase(instruction: endAccess)
   }
   // TODO: Add SIL support for lifetime dependence and write unit test for nested access scopes
