@@ -126,7 +126,7 @@ func testVegetarian(chef: Chef<Vegetarian>) {
   let _ = chefMeta.init(.#^CONDITIONAL_OVERLOAD_INIT_ARG^#)
 
   chef.eat(.#^CONDITIONAL_INAPPLICABLE_ARG^#)
-// Note: 'eat' is from an inapplicable constrained extension. We complete as if the user intends to addess that later
+// Note: 'eat' is from an inapplicable constrained extension. We complete as if the user intends to address that later
 //       (e.g. by adding the missing 'Meat' conformance to 'Vegetarian' - clearly not the intention here - but replace 'Meat' with 'Equatable').
 // CONDITIONAL_INAPPLICABLE_ARG: Begin completions, 2 items
 // CONDITIONAL_INAPPLICABLE_ARG-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: chicken[#Meat#]; name=chicken
