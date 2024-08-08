@@ -30,6 +30,7 @@ from .skstresstester import SKStressTester
 from .sourcekitlsp import SourceKitLSP
 from .staticswiftlinux import StaticSwiftLinuxConfig
 from .swift import Swift
+from .swiftcompatibilitylibs import SwiftCompatibilityLibs
 from .swiftdocc import SwiftDocC
 from .swiftdoccrender import SwiftDocCRender
 from .swiftdriver import SwiftDriver
@@ -64,6 +65,7 @@ __all__ = [
     'PlaygroundSupport',
     'StaticSwiftLinuxConfig',
     'Swift',
+    'SwiftCompatibilityLibs',
     'SwiftFormat',
     'SwiftInspect',
     'SwiftPM',
