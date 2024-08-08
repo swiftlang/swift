@@ -67,7 +67,7 @@ extension BorrowedFromInst : VerifyableInstruction {
     var existingEVs = ValueSet(insertContentsOf: enclosingValues, context)
     defer { existingEVs.deinitialize() }
 
-    for computedEV in enclosingValues {
+    for computedEV in computedEVs {
       require(existingEVs.contains(computedEV),
                    "\(computedEV)\n  missing in enclosing values of \(self)")
     }
