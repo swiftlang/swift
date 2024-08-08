@@ -3,8 +3,8 @@
 class C<T> {}
 
 protocol P {
-  associatedtype A: C<B> // expected-note 2{{protocol requires nested type 'A'; add nested type 'A' for conformance}}
-  associatedtype B // expected-note 2{{protocol requires nested type 'B'; add nested type 'B' for conformance}}
+  associatedtype A: C<B> // expected-note 2{{protocol requires nested type 'A'}}
+  associatedtype B // expected-note 2{{protocol requires nested type 'B'}}
 
   func f() -> A
   func g() -> B
@@ -66,12 +66,12 @@ struct S42: P {
   func g() -> Int { fatalError() }
 }
 
-struct SBad1: P { // expected-error {{type 'SBad1' does not conform to protocol 'P'}}
+struct SBad1: P { // expected-error {{type 'SBad1' does not conform to protocol 'P'}} expected-note {{add stubs for conformance}}
   func f() -> D { fatalError() }
   func g() -> String { fatalError() }
 }
 
-struct SBad2: P { // expected-error {{type 'SBad2' does not conform to protocol 'P'}}
+struct SBad2: P { // expected-error {{type 'SBad2' does not conform to protocol 'P'}} expected-note {{add stubs for conformance}}
   func f() -> C<Int> { fatalError() }
   func g() -> String { fatalError() }
 }

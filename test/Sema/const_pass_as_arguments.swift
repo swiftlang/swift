@@ -42,10 +42,10 @@ func main_member(_ u: Utils, _ i: Int, _ d: Double, _ s: String) {
 }
 
 protocol ConstFan {
-	static _const var v: String { get }  // expected-note {{protocol requires property 'v' with type 'String'; add a stub for conformance}}
+	static _const var v: String { get }  // expected-note {{protocol requires property 'v' with type 'String'}}
 }
 
-class ConstFanClass1: ConstFan { // expected-error {{type 'ConstFanClass1' does not conform to protocol 'ConstFan'}}
+class ConstFanClass1: ConstFan { // expected-error {{type 'ConstFanClass1' does not conform to protocol 'ConstFan'}} expected-note {{add stubs for conformance}}
 	static let v: String = "" // expected-note {{candidate operates as non-const, not const as required}}
 }
 

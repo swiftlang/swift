@@ -85,7 +85,10 @@ struct MatchSuccess : ProtocolWithSendingReqs, ProtocolWithMixedReqs {
   func nonSendingParamAndSendingResult(_ x: NonSendableKlass) -> sending NonSendableKlass { fatalError() }
 }
 
-struct FailToMatch : ProtocolWithSendingReqs, ProtocolWithMixedReqs { // expected-error 2{{}}
+struct FailToMatch : ProtocolWithSendingReqs, ProtocolWithMixedReqs {
+  // expected-error@-1 {{type 'FailToMatch' does not conform to protocol 'ProtocolWithSendingReqs'}} 
+  // expected-error@-2 {{type 'FailToMatch' does not conform to protocol 'ProtocolWithMixedReqs'}} 
+  // expected-note@-3 {{add stubs for conformance}}
   func sendingResult() -> NonSendableKlass { fatalError() }
   // expected-note @-1 {{candidate has non-matching type '() -> NonSendableKlass'}}
   func nonSendingParam(_ x: sending NonSendableKlass) -> () { fatalError() }
@@ -94,17 +97,17 @@ struct FailToMatch : ProtocolWithSendingReqs, ProtocolWithMixedReqs { // expecte
   // expected-note @-1 {{candidate has non-matching type '(sending NonSendableKlass) -> NonSendableKlass'}}
 }
 
-struct FailToMatch2 : ProtocolWithMixedReqs { // expected-error {{}}
+struct FailToMatch2 : ProtocolWithMixedReqs { // expected-error {{type 'FailToMatch2' does not conform to protocol 'ProtocolWithMixedReqs'}} expected-note {{add stubs for conformance}}
   func nonSendingParamAndSendingResult(_ x: sending NonSendableKlass) -> NonSendableKlass { fatalError() }
   // expected-note @-1 {{candidate has non-matching type '(sending NonSendableKlass) -> NonSendableKlass'}}
 }
 
-struct FailToMatch3 : ProtocolWithMixedReqs { // expected-error {{}}
+struct FailToMatch3 : ProtocolWithMixedReqs { // expected-error {{type 'FailToMatch3' does not conform to protocol 'ProtocolWithMixedReqs'}} expected-note {{add stubs for conformance}} 
   func nonSendingParamAndSendingResult(_ x: NonSendableKlass) -> NonSendableKlass { fatalError() }
   // expected-note @-1 {{candidate has non-matching type '(NonSendableKlass) -> NonSendableKlass'}}
 }
 
-struct FailToMatch4 : ProtocolWithMixedReqs { // expected-error {{}}
+struct FailToMatch4 : ProtocolWithMixedReqs { // expected-error {{type 'FailToMatch4' does not conform to protocol 'ProtocolWithMixedReqs'}} expected-note {{add stubs for conformance}}
   func nonSendingParamAndSendingResult(_ x: sending NonSendableKlass) -> sending NonSendableKlass { fatalError() }
   // expected-note @-1 {{candidate has non-matching type '(sending NonSendableKlass) -> sending NonSendableKlass'}}
 }

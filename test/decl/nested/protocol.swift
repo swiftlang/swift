@@ -275,9 +275,9 @@ extension OtherGenericClass {
 // A nested protocol does not satisfy an associated type requirement.
 
 protocol HasAssoc {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'}}
 }
-struct ConformsToHasAssoc: HasAssoc { // expected-error {{type 'ConformsToHasAssoc' does not conform to protocol 'HasAssoc'}}
+struct ConformsToHasAssoc: HasAssoc { // expected-error {{type 'ConformsToHasAssoc' does not conform to protocol 'HasAssoc'}} expected-note {{add stubs for conformance}} 
   protocol A {}
 }
 

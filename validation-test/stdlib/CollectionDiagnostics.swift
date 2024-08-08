@@ -70,9 +70,10 @@ struct AnotherGoodIndexable1 : Indexable {
   subscript(pos: Int) -> Int { return 0 }
 }
 
-// expected-warning@+3 {{'Indexable' is deprecated: renamed to 'Collection'}}
-// expected-error@+2 {{type 'BadIndexable2' does not conform to protocol 'Collection'}}
-// expected-note@+1 {{use 'Collection' instead}}
+// expected-warning@+4 {{'Indexable' is deprecated: renamed to 'Collection'}}
+// expected-error@+3 {{type 'BadIndexable2' does not conform to protocol 'Collection'}}
+// expected-note@+2 {{use 'Collection' instead}}
+// expected-note@+1 {{add stubs for conformance}}
 struct BadIndexable2 : Indexable {
   var startIndex: Int { return 0 }
   var endIndex: Int { return 0 }

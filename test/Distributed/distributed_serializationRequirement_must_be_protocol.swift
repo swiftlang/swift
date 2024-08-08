@@ -20,6 +20,7 @@ final class System: DistributedActorSystem {
   // expected-error@-4{{class 'System' is missing witness for protocol requirement 'remoteCall'}}
   // expected-note@-5{{add stubs for conformance}}
   // expected-error@-6{{class 'System' is missing witness for protocol requirement 'remoteCallVoid'}}
+  // expected-note@-7{{add stubs for conformance}}
   typealias ActorID = String
   typealias InvocationEncoder = ClassInvocationEncoder
   typealias InvocationDecoder = ClassInvocationDecoder
@@ -82,10 +83,11 @@ final class System: DistributedActorSystem {
 }
 
 struct ClassInvocationEncoder: DistributedTargetInvocationEncoder { // expected-error {{type 'ClassInvocationEncoder' does not conform to protocol 'DistributedTargetInvocationEncoder'}}
-  // expected-error@-1{{struct 'ClassInvocationEncoder' is missing witness for protocol requirement 'recordArgument'}}
-  // expected-note@-2{{add stubs for conformance}}
-  // expected-error@-3{{struct 'ClassInvocationEncoder' is missing witness for protocol requirement 'recordReturnType'}}
-  // expected-note@-4{{add stubs for conformance}}
+  // expected-note@-1{{add stubs for conformance}}
+  // expected-error@-2{{struct 'ClassInvocationEncoder' is missing witness for protocol requirement 'recordArgument'}}
+  // expected-note@-3{{add stubs for conformance}}
+  // expected-error@-4{{struct 'ClassInvocationEncoder' is missing witness for protocol requirement 'recordReturnType'}}
+  // expected-note@-5{{add stubs for conformance}}
   typealias SerializationRequirement = SomeClazz
 
   public mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
@@ -99,8 +101,9 @@ struct ClassInvocationEncoder: DistributedTargetInvocationEncoder { // expected-
 }
 
 final class ClassInvocationDecoder: DistributedTargetInvocationDecoder { // expected-error {{type 'ClassInvocationDecoder' does not conform to protocol 'DistributedTargetInvocationDecoder'}}
-  // expected-error@-1{{class 'ClassInvocationDecoder' is missing witness for protocol requirement 'decodeNextArgument'}}
-  // expected-note@-2{{add stubs for conformance}}
+  // expected-note@-1{{add stubs for conformance}}
+  // expected-error@-2{{class 'ClassInvocationDecoder' is missing witness for protocol requirement 'decodeNextArgument'}}
+  // expected-note@-3{{add stubs for conformance}}
   typealias SerializationRequirement = SomeClazz
 
   public func decodeGenericSubstitutions() throws -> [Any.Type] {
