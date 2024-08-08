@@ -2173,21 +2173,11 @@ static void diagnoseConformanceImpliedByConditionalConformance(
                  << indent;
   }
 
-  if (!ctxt.LangOpts.DiagnosticsEditorMode) {
-    // The fixits below are too complicated for the command line: the suggested
-    // code ends up not being displayed, and the text by itself doesn't help. So
-    // instead we skip all that and just have some text.
-    Diags.diagnose(loc,
-                   diag::note_explicitly_state_conditional_conformance_noneditor,
-                   prefix.str());
-    return;
-  }
-
   // First, we do the fixit for "matching" requirements (i.e. X: P where T: P).
   bool matchingIsValid = true;
-  llvm::SmallString<128> matchingFixit = prefix;
+  llvm::SmallString<128> matchingWhereClause;
   {
-    llvm::raw_svector_ostream matchingStream(matchingFixit);
+    llvm::raw_svector_ostream matchingStream(matchingWhereClause);
     matchingStream << "where ";
     bool first = true;
     for (const auto &req : implyingConf->getConditionalRequirements()) {
@@ -2207,35 +2197,30 @@ static void diagnoseConformanceImpliedByConditionalConformance(
   }
 
   if (matchingIsValid) {
-    matchingFixit += suffix;
     Diags
         .diagnose(loc,
-                  diag::note_explicitly_state_conditional_conformance_relaxed)
-        .fixItInsert(loc, matchingFixit);
+                  diag::note_explicitly_state_conditional_conformance_relaxed, matchingWhereClause)
+        .fixItInsert(loc, (prefix + matchingWhereClause + suffix).str());
   }
 
   // Next, do the fixit for using the same requirements, but be resilient to a
   // missing `where` clause: this is one of a few fixits that get emitted here,
   // and so is a very low priority diagnostic, and so shouldn't crash.
   if (auto TWC = ext->getTrailingWhereClause()) {
-    llvm::SmallString<128> sameFixit = prefix;
+    llvm::SmallString<128> sameWhereClause;
     auto CSR =
         Lexer::getCharSourceRangeFromSourceRange(SM, TWC->getSourceRange());
-    sameFixit += SM.extractText(CSR);
-    sameFixit += suffix;
+    sameWhereClause += SM.extractText(CSR);
     Diags
-        .diagnose(loc, diag::note_explicitly_state_conditional_conformance_same)
-        .fixItInsert(loc, sameFixit);
+        .diagnose(loc, diag::note_explicitly_state_conditional_conformance_same, sameWhereClause)
+        .fixItInsert(loc, (prefix + sameWhereClause + suffix).str());
   }
 
   // And finally, just the generic new-requirements one:
-  llvm::SmallString<128> differentFixit = prefix;
-  differentFixit += "where <#requirements#>";
-  differentFixit += suffix;
   Diags
       .diagnose(loc,
                 diag::note_explicitly_state_conditional_conformance_different)
-      .fixItInsert(loc, differentFixit);
+      .fixItInsert(loc, (prefix + "where <#requirements#>" + suffix).str());
 }
 
 /// Determine whether there are additional semantic checks for conformance

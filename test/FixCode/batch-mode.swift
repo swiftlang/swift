@@ -1,4 +1,4 @@
-// RUN: not %swift -typecheck -target %target-triple -primary-file %s  -emit-fixits-path %t.main.remap -primary-file %S/Inputs/batch-mode-helper.swift -emit-fixits-path %t.helper.remap -diagnostics-editor-mode
+// RUN: not %swift -typecheck -target %target-triple -primary-file %s  -emit-fixits-path %t.main.remap -primary-file %S/Inputs/batch-mode-helper.swift -emit-fixits-path %t.helper.remap
 // RUN: %FileCheck -check-prefix=CHECK-MAIN %s < %t.main.remap
 // RUN: %FileCheck -check-prefix=NEGATIVE-MAIN %s < %t.main.remap
 // RUN: %FileCheck -check-prefix=CHECK-HELPER %s < %t.helper.remap

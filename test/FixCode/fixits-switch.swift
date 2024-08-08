@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -I %S/Inputs -diagnostics-editor-mode -verify
+// RUN: %target-swift-frontend -emit-sil %s -I %S/Inputs -verify
 
 enum E1 : Int {
   case e1
