@@ -2535,7 +2535,7 @@ public:
     (void) VD->getPropertyWrapperAuxiliaryVariables();
     (void) VD->getPropertyWrapperInitializerInfo();
     (void) VD->getImplInfo();
-    (void) getActorIsolation(VD);
+    checkGlobalIsolation(VD);
 
     // Visit auxiliary decls first
     VD->visitAuxiliaryDecls([&](VarDecl *var) {
