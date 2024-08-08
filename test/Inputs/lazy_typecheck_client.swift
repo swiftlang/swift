@@ -27,7 +27,7 @@ func testGlobalFunctions() {
   }
 }
 
-func testGobalVars() {
+func testGlobalVars() {
   let _: Int = publicGlobalVar
   let _: Int = publicGlobalVarTypealias
   let _: String = publicGlobalVarInferredType

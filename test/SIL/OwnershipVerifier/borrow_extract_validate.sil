@@ -55,8 +55,8 @@ bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
   return %ret : $()
 }
 
-// CHECK-NOT: Function: 'borrowed_extract_dominate_discrepency_simple_correct'
-sil [ossa] @borrowed_extract_dominate_discrepency_simple_correct : $@convention(thin) (@guaranteed WrapperStruct) -> () {
+// CHECK-NOT: Function: 'borrowed_extract_dominate_discrepancy_simple_correct'
+sil [ossa] @borrowed_extract_dominate_discrepancy_simple_correct : $@convention(thin) (@guaranteed WrapperStruct) -> () {
 bb0(%0 : @guaranteed $WrapperStruct):
   %elem = struct_extract %0 : $WrapperStruct, #WrapperStruct.cls
   br bb1(%elem : $Klass)
@@ -77,14 +77,14 @@ bb1(%newelem : @guaranteed $Klass):
   return %res : $()
 }
 
-// CHECK-LABEL: Error#: 0. Begin Error in Function: 'borrowed_extract_dominate_discrepency_incorrect1'
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'borrowed_extract_dominate_discrepancy_incorrect1'
 // CHECK: Found outside of lifetime use?!
 // CHECK: Value: %7 = argument of bb1 : $WrapperStruct
 // CHECK: Consuming User:   end_borrow %7 : $WrapperStruct
 // CHECK: Non Consuming User:   %10 = apply %9(%6) : $@convention(thin) (@guaranteed Klass) -> ()
 // CHECK: Block: bb1
-// CHECK-LABEL: Error#: 0. End Error in Function: 'borrowed_extract_dominate_discrepency_incorrect1'
-sil [ossa] @borrowed_extract_dominate_discrepency_incorrect1 : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+// CHECK-LABEL: Error#: 0. End Error in Function: 'borrowed_extract_dominate_discrepancy_incorrect1'
+sil [ossa] @borrowed_extract_dominate_discrepancy_incorrect1 : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
 bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
   %copy0 = copy_value %0 : $WrapperStruct
   %borrow0 = begin_borrow %copy0 : $WrapperStruct
@@ -100,15 +100,15 @@ bb1(%elem : @guaranteed $Klass, %newborrow : @guaranteed $WrapperStruct):
   return %ret : $()
 }
 
-// CHECK-LABEL: Error#: 0. Begin Error in Function: 'borrowed_extract_dominate_discrepency_incorrect2'
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'borrowed_extract_dominate_discrepancy_incorrect2'
 // CHECK: Found outside of lifetime use?!
 // CHECK: Value:   %2 = copy_value %0 : $WrapperStruct           
 // CHECK: Consuming User:   destroy_value %2 : $WrapperStruct               
 // CHECK: Non Consuming User:   end_borrow %7 : $WrapperStruct                  
 // CHECK: Block: bb1
-// CHECK-LABEL: Error#: 0. End Error in Function: 'borrowed_extract_dominate_discrepency_incorrect2'
-// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'borrowed_extract_dominate_discrepency_incorrect2'
-sil [ossa] @borrowed_extract_dominate_discrepency_incorrect2 : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+// CHECK-LABEL: Error#: 0. End Error in Function: 'borrowed_extract_dominate_discrepancy_incorrect2'
+// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'borrowed_extract_dominate_discrepancy_incorrect2'
+sil [ossa] @borrowed_extract_dominate_discrepancy_incorrect2 : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
 bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
   %copy0 = copy_value %0 : $WrapperStruct
   %borrow0 = begin_borrow %copy0 : $WrapperStruct

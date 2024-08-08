@@ -14,6 +14,6 @@ void takeACompleteInterface(ForwardDeclaredInterface *param) {
   [param doSomethingForwardDeclaredInterfacesCan];
 }
 void takeACompleteProtocol(NSObject<ForwardDeclaredProtocol> *param) {
-  NSLog(@"takeACompleteProcotol");
+  NSLog(@"takeACompleteProtocol");
   [param doSomethingForwardDeclaredProtocolsCan];
 }

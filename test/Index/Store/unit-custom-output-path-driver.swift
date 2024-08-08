@@ -139,7 +139,7 @@
 //    Check the unit output is based on "index-unit-output-path":
 //    RUN: c-index-test core -print-unit %/t/idx_batch_with | %FileCheck -check-prefixes=INDEX_WITH %s
 //
-//    Check the unit output is not baed on the "output" values:
+//    Check the unit output is not based on the "output" values:
 //    RUN: c-index-test core -print-unit %/t/idx_batch_with | %FileCheck -check-prefixes=INDEX_WITH_NEGATIVE %s
 //
 // C) Do the above again but with a fresh index store and using file lists.

@@ -955,7 +955,7 @@ package enum PackageGenericEnumT<T: InternalProto> { // expected-error {{generic
   case A
 }
 
-/// Test setters with less accss level
+/// Test setters with less access level
 public protocol PublicMutationOperations {
   var size: Int { get set }
   subscript (_: Int) -> Int { get set }
@@ -1482,19 +1482,19 @@ public class DerivedFromInternalConcreteGenericCompositionPkg : InternalConcrete
 }
 
 package typealias PackageConcreteGenericComposition = PublicGenericClass<Int> & PublicProto // expected-note {{declared here}}
-public class DerivedFromPacakgeConcreteGenericComposition : PackageConcreteGenericComposition { // expected-error {{class cannot be declared public because its superclass is package}}
+public class DerivedFromPackageConcreteGenericComposition : PackageConcreteGenericComposition { // expected-error {{class cannot be declared public because its superclass is package}}
   public func publicReq() {}
 }
 
 package typealias PackageConcreteGenericCompositionStr = PackageGenericClass<String> & PackageProto // expected-note {{declared here}}
-public class DerivedFromPacakgeConcreteGenericComposition2 : PackageConcreteGenericCompositionStr { // expected-error {{class cannot be declared public because its superclass is package}}
+public class DerivedFromPackageConcreteGenericComposition2 : PackageConcreteGenericCompositionStr { // expected-error {{class cannot be declared public because its superclass is package}}
   public func packageReq() {}
 }
 
-package class DerivedFromPacakgeConcreteGenericComposition3 : PackageConcreteGenericCompositionStr { // no-warning
+package class DerivedFromPackageConcreteGenericComposition3 : PackageConcreteGenericCompositionStr { // no-warning
   public func packageReq() {}
 }
-internal class DerivedFromPacakgeConcreteGenericComposition4 : PackageConcreteGenericCompositionStr { // no-warning
+internal class DerivedFromPackageConcreteGenericComposition4 : PackageConcreteGenericCompositionStr { // no-warning
   public func packageReq() {}
 }
 

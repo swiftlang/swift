@@ -4,7 +4,7 @@
 
 // REQUIRES: concurrency, OS=macosx
 
-// CHECK: public struct SequenceAdapte
+// CHECK: public struct SequenceAdapter
 @available(SwiftStdlib 5.1, *)
 public struct SequenceAdapter<Base: AsyncSequence>: AsyncSequence {
   // CHECK-LABEL: public struct AsyncIterator
@@ -28,7 +28,7 @@ public struct SequenceAdapter<Base: AsyncSequence>: AsyncSequence {
   // CHECK-SAME: public typealias __AsyncSequence_Failure = Base.Failure
 }
 
-// CHECK: public struct OtherSequenceAdapte
+// CHECK: public struct OtherSequenceAdapter
 @available(SwiftStdlib 5.1, *)
 public struct OtherSequenceAdapter<Base: AsyncSequence>: AsyncSequence {
   // CHECK: public typealias Element = Base.Element

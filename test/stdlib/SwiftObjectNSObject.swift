@@ -245,7 +245,7 @@ if #available(OSX 10.12, iOS 10.0, *) {
   TestNonEquatableEquals(F1(i: 1), E(i: 1))
   TestEquatableEquals(H(i:1), E(i:1))
 
-  // Equatable but not Hashable: alway have the same Obj-C hashValue
+  // Equatable but not Hashable: always have the same Obj-C hashValue
   TestEquatableHash(E(i: 1))
   TestEquatableHash(E1(i: 3))
   TestEquatableHash(E2(i: 8))

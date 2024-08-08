@@ -36,4 +36,4 @@ _ = /*MyClass:unknown*/Mismatch()
 _ = /*MyClass:unknown*/MyClass()
 #endif
 
-// All occcurrences of MyClass are outside of comments and string literals, so there's nothing to rename. swift-refactor indicates this by outputing empty results.
+// All occcurrences of MyClass are outside of comments and string literals, so there's nothing to rename. swift-refactor indicates this by outputting empty results.

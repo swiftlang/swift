@@ -65,7 +65,7 @@
 // RUN: %target-swift-frontend  -cache-compile-job -module-name Test -O -cas-path %t/cas @%t/MyApp.cmd %t/test.swift \
 // RUN:   -emit-module -o %t/Test.swiftmodule
 
-/// Importing binary module with bridging header built from CAS from a regluar build.
+/// Importing binary module with bridging header built from CAS from a regular build.
 /// This should succeed even it is also importing a bridging header that shares same header dependencies (with proper header guard).
 // RUN: %target-swift-frontend -typecheck -module-name User -swift-version 5 \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \

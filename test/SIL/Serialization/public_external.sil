@@ -40,7 +40,7 @@ sil hidden @he : $@convention(thin) () -> () {
   return %0 : $()
 }
 
-sil hidden [transparent] @tranparent_he : $@convention(thin) () -> () {
+sil hidden [transparent] @transparent_he : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }

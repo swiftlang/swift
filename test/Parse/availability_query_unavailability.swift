@@ -65,7 +65,7 @@ if #unavailable(iOS 8.0) {
 if #unavailable(iOSApplicationExtension, unavailable) { // expected-error 2{{expected version number}}
 }
 
-// Should this be a valid spelling since `#unvailable(*)` cannot be written?
+// Should this be a valid spelling since `#unavailable(*)` cannot be written?
 if #unavailable() { // expected-error {{expected platform name}}
 }
 
