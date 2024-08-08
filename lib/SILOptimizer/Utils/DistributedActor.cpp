@@ -48,12 +48,7 @@ void emitDistributedActorSystemWitnessCall(
         OpenedExistentialAccess::Immutable);
   }
 
-  if (systemASTType->isTypeParameter() || systemASTType->is<ArchetypeType>()) {
-    systemConfRef = ProtocolConformanceRef(DAS);
-  } else {
-    systemConfRef = lookupConformance(systemASTType, DAS);
-  }
-
+  systemConfRef = lookupConformance(systemASTType, DAS);
   assert(!systemConfRef.isInvalid() &&
          "Missing conformance to `DistributedActorSystem`");
 
