@@ -8,7 +8,7 @@ public protocol View {
 
 public protocol ViewGraphNodeChildren {
     associatedtype ParentView: View where ParentView.NodeChildren == Self
-    // expected-note@-1 {{protocol requires nested type 'ParentView'; add nested type 'ParentView' for conformance}}
+    // expected-note@-1 {{protocol requires nested type 'ParentView'}}
 }
 
 public protocol ChildlessView: View where NodeChildren == EmptyViewGraphNodeChildren<Self> {}
@@ -17,3 +17,4 @@ public protocol ChildlessView: View where NodeChildren == EmptyViewGraphNodeChil
 public struct EmptyViewGraphNodeChildren<ParentView: ChildlessView>: ViewGraphNodeChildren {}
 // expected-note@-1 3{{through reference here}}
 // expected-error@-2 {{type 'EmptyViewGraphNodeChildren<ParentView>' does not conform to protocol 'ViewGraphNodeChildren'}}
+// expected-note@-3 {{add stubs for conformance}}

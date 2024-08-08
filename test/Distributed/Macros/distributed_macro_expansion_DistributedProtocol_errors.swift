@@ -26,16 +26,16 @@ distributed actor Caplin {
   typealias ActorSystem = FakeActorSystem
 }
 
-@Resolvable // expected-note 3{{in expansion of macro 'Resolvable' on protocol 'Fail' here}}
+@Resolvable // expected-note 4{{in expansion of macro 'Resolvable' on protocol 'Fail' here}}
 protocol Fail: DistributedActor {
   distributed func method() -> String
 }
 
-@Resolvable // expected-note{{in expansion of macro 'Resolvable' on protocol 'SomeRoot' here}}
+@Resolvable // expected-note2{{in expansion of macro 'Resolvable' on protocol 'SomeRoot' here}}
 public protocol SomeRoot: DistributedActor, Sendable
   where ActorSystem: DistributedActorSystem<any Codable> {
 
-  associatedtype AssociatedSomething: Sendable // expected-note{{protocol requires nested type 'AssociatedSomething'; add nested type 'AssociatedSomething' for conformance}}
+  associatedtype AssociatedSomething: Sendable // expected-note{{protocol requires nested type 'AssociatedSomething'}}
   static var staticValue: String { get }
   var value: String { get }
 }

@@ -57,7 +57,7 @@ protocol P6 where A == Never { // expected-error {{no type for 'Self.A' can sati
   // expected-note@+1 {{protocol requires nested type 'A}}
   associatedtype A: P6
 }
-struct S6: P6 {} // expected-error {{type 'S6' does not conform to protocol 'P6'}}
+struct S6: P6 {} // expected-error {{type 'S6' does not conform to protocol 'P6'}} expected-note {{add stubs for conformance}}
 
 protocol P7a where A == Never {
   associatedtype A
@@ -67,7 +67,7 @@ protocol P7b: P7a where A == Bool {}
 struct S7: P7b {}
 
 protocol P8a where A == Never {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'}}
 }
 protocol P8b where A == Bool {
   associatedtype A
@@ -79,6 +79,7 @@ do {
   struct Conformer: P8a, P8b {}
   // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P8a'}}
   // expected-error@-2 {{type 'Conformer' does not conform to protocol 'P8b'}}
+  // expected-note@-3 {{add stubs for conformance}}
 }
 
 protocol P9a where A == Never {
@@ -190,12 +191,12 @@ do {
 }
 
 protocol P17a where A == Never {
-  associatedtype A = B // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
-  associatedtype B // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
+  associatedtype A = B // expected-note {{protocol requires nested type 'A'}}
+  associatedtype B // expected-note {{protocol requires nested type 'B'}}
 }
 protocol P17b {
-  associatedtype A = B // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
-  associatedtype B // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
+  associatedtype A = B // expected-note {{protocol requires nested type 'A'}}
+  associatedtype B // expected-note {{protocol requires nested type 'B'}}
 }
 protocol P17c where A == Never {
   associatedtype A
@@ -209,12 +210,12 @@ do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer1 to P17a: {
   // CHECK-NEXT: B => (unresolved){{$}}
   // CHECK-NEXT: }
-  struct Conformer1: P17a {} // expected-error {{type 'Conformer1' does not conform to protocol 'P17a'}}
+  struct Conformer1: P17a {} // expected-error {{type 'Conformer1' does not conform to protocol 'P17a'}} expected-note {{add stubs for conformance}}
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer2<A> to P17b: {
   // CHECK-NEXT: A => A (preferred), [[EQUIV_CLASS:0x[0-9a-f]+]]
   // CHECK-NEXT: B => (unresolved)
   // CHECK-NEXT: }
-  struct Conformer2<A>: P17b {} // expected-error {{type 'Conformer2<A>' does not conform to protocol 'P17b'}}
+  struct Conformer2<A>: P17b {} // expected-error {{type 'Conformer2<A>' does not conform to protocol 'P17b'}} expected-note {{add stubs for conformance}}
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer3 to P17c: {
   // CHECK-NEXT: B => Self.A (preferred), [[EQUIV_CLASS:0x[0-9a-f]+]]
   // CHECK-NEXT: }
@@ -300,8 +301,8 @@ do {
 }
 
 protocol P23 {
-  associatedtype A: P23 = B.A // expected-note 2 {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
-  associatedtype B: P23 = A.B // expected-note 2 {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
+  associatedtype A: P23 = B.A // expected-note 2 {{protocol requires nested type 'A'}}
+  associatedtype B: P23 = A.B // expected-note 2 {{protocol requires nested type 'B'}}
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P23: {
@@ -317,20 +318,20 @@ do {
 }
 
 protocol P24 where A == B.A {
-  associatedtype A: P24 // expected-note 2 {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
-  associatedtype B: P24 = A.B // expected-note 2 {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
+  associatedtype A: P24 // expected-note 2 {{protocol requires nested type 'A'}}
+  associatedtype B: P24 = A.B // expected-note 2 {{protocol requires nested type 'B'}}
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P24: {
   // CHECK-NEXT: A => Self.B.A (preferred),
   // CHECK-NEXT: B => Self.A.B (preferred),
   // CHECK-NEXT: }
-  struct Conformer: P24 {} // expected-error {{type 'Conformer' does not conform to protocol 'P24'}}
+  struct Conformer: P24 {} // expected-error {{type 'Conformer' does not conform to protocol 'P24'}} expected-note {{add stubs for conformance}}
   // CHECK-LABEL: Abstract type witness system for conformance of ConformerGeneric<T> to P24: {
   // CHECK-NEXT: A => Self.B.A (preferred),
   // CHECK-NEXT: B => Self.A.B (preferred),
   // CHECK-NEXT: }
-  struct ConformerGeneric<T>: P24 {} // expected-error {{type 'ConformerGeneric<T>' does not conform to protocol 'P24'}}
+  struct ConformerGeneric<T>: P24 {} // expected-error {{type 'ConformerGeneric<T>' does not conform to protocol 'P24'}} expected-note {{add stubs for conformance}}
 }
 
 protocol P25a_1 where A == Int, B == C.Element {
@@ -407,7 +408,7 @@ do {
 }
 
 protocol P28a where A == Int {
-  associatedtype A // expected-note 2 {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype A // expected-note 2 {{protocol requires nested type 'A'}}
 }
 protocol P28b where A == Bool {
   associatedtype A
@@ -428,6 +429,7 @@ do {
   struct Conformer1: Q28a {}
   // expected-error@-1 {{type 'Conformer1' does not conform to protocol 'P28a'}}
   // expected-error@-2 {{type 'Conformer1' does not conform to protocol 'P28b'}}
+  // expected-note@-3 {{add stubs for conformance}}
 
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer2 to P28a: {
   // CHECK-NEXT: A => (ambiguous),
@@ -436,6 +438,7 @@ do {
   // expected-error@-1 {{type 'Conformer2' does not conform to protocol 'P28a'}}
   // expected-error@-2 {{type 'Conformer2' does not conform to protocol 'P28b'}}
   // expected-error@-3 {{type 'Conformer2' does not conform to protocol 'P28c'}}
+  // expected-note@-4 {{add stubs for conformance}}
 }
 
 protocol P29a where A == Int {
@@ -446,8 +449,8 @@ protocol P29b where B == Never {
   associatedtype B
 }
 protocol P29c where A == B {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
-  associatedtype B // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'}}
+  associatedtype B // expected-note {{protocol requires nested type 'B'}}
 }
 protocol Q29a: P29a, P29b, P29c {}
 // expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Int'}}
@@ -469,6 +472,7 @@ do {
   // expected-error@-1 {{type 'Conformer2' does not conform to protocol 'P29a'}}
   // expected-error@-2 {{type 'Conformer2' does not conform to protocol 'P29b'}}
   // expected-error@-3 {{type 'Conformer2' does not conform to protocol 'P29c'}}
+  // expected-note@-4 {{add stubs for conformance}}
 }
 
 protocol P30a where A == Int {
@@ -478,8 +482,8 @@ protocol P30b where A == Never {
   associatedtype A
 }
 protocol P30c where A == B {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
-  associatedtype B // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'}}
+  associatedtype B // expected-note {{protocol requires nested type 'B'}}
 }
 protocol Q30: P30c, P30a, P30b {}
 // expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Int'}}
@@ -492,6 +496,7 @@ do {
   // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P30a'}}
   // expected-error@-2 {{type 'Conformer' does not conform to protocol 'P30b'}}
   // expected-error@-3 {{type 'Conformer' does not conform to protocol 'P30c'}}
+  // expected-note@-4 {{add stubs for conformance}}
 }
 
 protocol P31a where B == Int {
@@ -501,8 +506,8 @@ protocol P31b where B == Never {
   associatedtype B
 }
 protocol P31c where B == A {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
-  associatedtype B // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'}}
+  associatedtype B // expected-note {{protocol requires nested type 'B'}}
 }
 protocol Q31: P31c, P31a, P31b {}
 // expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Int'}}
@@ -514,6 +519,7 @@ do {
   // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P31a'}}
   // expected-error@-2 {{type 'Conformer' does not conform to protocol 'P31b'}}
   // expected-error@-3 {{type 'Conformer' does not conform to protocol 'P31c'}}
+  // expected-note@-4 {{add stubs for conformance}}
 }
 
 protocol P32a where A == Int {
@@ -529,8 +535,8 @@ protocol P32d where B == Never {
   associatedtype B
 }
 protocol P32e where A == B {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
-  associatedtype B // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'}}
+  associatedtype B // expected-note {{protocol requires nested type 'B'}}
 }
 protocol Q32: P32e, P32a, P32b, P32c, P32d {}
 // expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == ()'}}
@@ -550,6 +556,7 @@ do {
   // expected-error@-3 {{type 'Conformer' does not conform to protocol 'P32c'}}
   // expected-error@-4 {{type 'Conformer' does not conform to protocol 'P32d'}}
   // expected-error@-5 {{type 'Conformer' does not conform to protocol 'P32e'}}
+ // expected-note@-6 {{add stubs for conformance}}
 }
 
 protocol P33a where A == Int {
@@ -572,7 +579,7 @@ protocol P34b {
 protocol Q34a: P34a, P34b {}
 protocol Q34b: P34b, P34a {}
 protocol Q34c: P34a, P34b {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'}}
 }
 do {
   // FIXME: should really be ambiguous (source-breaking)?
@@ -590,7 +597,7 @@ do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer3 to Q34c: {
   // CHECK-NEXT: A => (unresolved){{$}}
   // CHECK-NEXT: }
-  struct Conformer3: Q34c {} // expected-error {{type 'Conformer3' does not conform to protocol 'Q34c'}}
+  struct Conformer3: Q34c {} // expected-error {{type 'Conformer3' does not conform to protocol 'Q34c'}} expected-note {{add stubs for conformance}}
 }
 
 protocol P35 {
@@ -711,15 +718,15 @@ do {
 }
 
 protocol P41 {
-  associatedtype A where A == B.A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
-  associatedtype B: P41 = Self // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
+  associatedtype A where A == B.A // expected-note {{protocol requires nested type 'A'}}
+  associatedtype B: P41 = Self // expected-note {{protocol requires nested type 'B'}}
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P41: {
   // CHECK-NEXT: A => Self.B.A (preferred),
   // CHECK-NEXT: B => Self (preferred),
   // CHECK-NEXT: }
-  struct Conformer: P41 {} // expected-error{{type 'Conformer' does not conform to protocol 'P41'}}
+  struct Conformer: P41 {} // expected-error{{type 'Conformer' does not conform to protocol 'P41'}} expected-note {{add stubs for conformance}}
 }
 
 protocol P42a {
@@ -835,8 +842,8 @@ do {
   }
 }
 
-protocol P48a { associatedtype A = Int } // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
-protocol P48b { associatedtype B } // expected-note {{protocol requires nested type 'B'; add nested type 'B' for conformance}}
+protocol P48a { associatedtype A = Int } // expected-note {{protocol requires nested type 'A'}}
+protocol P48b { associatedtype B } // expected-note {{protocol requires nested type 'B'}}
 protocol P48c: P48a, P48b where A == B {}
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P48a: {
@@ -853,4 +860,5 @@ do {
   struct Conformer: P48c {}
   // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P48a'}}
   // expected-error@-2 {{type 'Conformer' does not conform to protocol 'P48b'}}
+  // expected-note@-3 {{add stubs for conformance}}
 }

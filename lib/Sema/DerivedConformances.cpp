@@ -599,20 +599,18 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
                               getProtocolType());
     Nominal->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
 
-    // In editor mode, try to insert a stub.
-    if (Context.LangOpts.DiagnosticsEditorMode) {
-      auto Extension = cast<ExtensionDecl>(getConformanceContext());
-      auto FixitLocation = Extension->getBraces().Start;
-      llvm::SmallString<128> Text;
-      {
-        llvm::raw_svector_ostream SS(Text);
-        swift::printRequirementStub(synthesizing, Nominal,
-                                    Nominal->getDeclaredType(),
-                                    Extension->getStartLoc(), SS);
-        if (!Text.empty()) {
-          ConformanceDecl->diagnose(diag::missing_witnesses_general)
-            .fixItInsertAfter(FixitLocation, Text.str());
-        }
+    // Try to insert a stub.
+    auto Extension = cast<ExtensionDecl>(getConformanceContext());
+    auto FixitLocation = Extension->getBraces().Start;
+    llvm::SmallString<128> Text;
+    {
+      llvm::raw_svector_ostream SS(Text);
+      swift::printRequirementStub(synthesizing, Nominal,
+                                  Nominal->getDeclaredType(),
+                                  Extension->getStartLoc(), SS);
+      if (!Text.empty()) {
+        ConformanceDecl->diagnose(diag::missing_witnesses_general)
+          .fixItInsertAfter(FixitLocation, Text.str());
       }
     }
     return true;

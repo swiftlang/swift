@@ -3825,16 +3825,10 @@ static void diagnoseProtocolStubFixit(
                                NoStubRequirements);
   auto &Diags = Ctx.Diags;
 
-  // If we are in editor mode, squash all notes into a single fixit.
-  if (Ctx.LangOpts.DiagnosticsEditorMode) {
-    if (!FixIt.empty()) {
-      Diags.diagnose(ComplainLoc, diag::missing_witnesses_general).
-        fixItInsertAfter(FixitLocation, FixIt);
-    }
-    return;
+  if (!FixIt.empty()) {
+    Diags.diagnose(ComplainLoc, diag::missing_witnesses_general).
+      fixItInsertAfter(FixitLocation, FixIt);
   }
-  auto &SM = Ctx.SourceMgr;
-  auto FixitBufferId = SM.findBufferContainingLoc(FixitLocation);
   for (const auto &Missing : MissingWitnesses) {
     auto VD = Missing.requirement;
 
@@ -3842,11 +3836,6 @@ static void diagnoseProtocolStubFixit(
     // protocol. They're not implementable.
     if (isNSObjectProtocol(VD->getDeclContext()->getSelfProtocolDecl()))
       continue;
-
-    // Whether this VD has a stub printed.
-    bool AddFixit = !NoStubRequirements.count(VD);
-    bool SameFile = VD->getLoc().isValid() ?
-      SM.findBufferContainingLoc(VD->getLoc()) == FixitBufferId : false;
 
     // Issue diagnostics for witness types.
     if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(VD)) {
@@ -3859,50 +3848,15 @@ static void diagnoseProtocolStubFixit(
         diag.emplace(Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
                                     MissingTypeWitness));
       }
-      if (SameFile) {
-        // If the protocol member decl is in the same file of the stub,
-        // we can directly associate the fixit with the note issued to the
-        // requirement.
-        diag->fixItInsertAfter(FixitLocation, FixIt);
-      } else {
-        diag.value().flush();
-
-        // Otherwise, we have to issue another note to carry the fixit,
-        // because editor may assume the fixit is in the same file with the note.
-        if (Ctx.LangOpts.DiagnosticsEditorMode) {
-          Diags.diagnose(ComplainLoc, diag::missing_witnesses_general)
-            .fixItInsertAfter(FixitLocation, FixIt);
-        }
-      }
+      diag.value().flush();
       continue;
     }
 
     // Issue diagnostics for witness values.
     Type RequirementType =
       getRequirementTypeForDisplay(Conf, VD);
-    if (AddFixit) {
-      if (SameFile) {
-        // If the protocol member decl is in the same file of the stub,
-        // we can directly associate the fixit with the note issued to the
-        // requirement.
-        Diags
-            .diagnose(VD, diag::no_witnesses, getProtocolRequirementKind(VD),
-                      VD, RequirementType, true)
-            .fixItInsertAfter(FixitLocation, FixIt);
-      } else {
-        // Otherwise, we have to issue another note to carry the fixit,
-        // because editor may assume the fixit is in the same file with the note.
-        Diags.diagnose(VD, diag::no_witnesses, getProtocolRequirementKind(VD),
-                       VD, RequirementType, false);
-        if (Ctx.LangOpts.DiagnosticsEditorMode) {
-          Diags.diagnose(ComplainLoc, diag::missing_witnesses_general)
-            .fixItInsertAfter(FixitLocation, FixIt);
-        }
-      }
-    } else {
-      Diags.diagnose(VD, diag::no_witnesses, getProtocolRequirementKind(VD),
-                     VD, RequirementType, true);
-    }
+    Diags.diagnose(VD, diag::no_witnesses, getProtocolRequirementKind(VD), VD,
+                   RequirementType);
   }
 }
 

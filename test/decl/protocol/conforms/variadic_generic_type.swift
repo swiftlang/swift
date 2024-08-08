@@ -3,11 +3,12 @@
 // Generic parameter packs cannot witness associated type requirements
 protocol HasAssoc {
   associatedtype A
-  // expected-note@-1 {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  // expected-note@-1 {{protocol requires nested type 'A'}}
 }
 
 struct HasPack<each A>: HasAssoc {}
 // expected-error@-1 {{type 'HasPack<repeat each A>' does not conform to protocol 'HasAssoc'}}
+// expected-note@-2 {{add stubs for conformance}}
 
 protocol P {}
 

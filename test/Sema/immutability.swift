@@ -283,7 +283,7 @@ struct TestStruct2 : MutatingTestProto {
   __consuming func consuming_nonmutating_func() {}
 }
 
-struct TestStruct3 : MutatingTestProto {   // expected-error {{type 'TestStruct3' does not conform to protocol 'MutatingTestProto'}}
+struct TestStruct3 : MutatingTestProto {   // expected-error {{type 'TestStruct3' does not conform to protocol 'MutatingTestProto'}} expected-note {{add stubs for conformance}}
   func mutatingfunc() {}
 
   // This is not ok, "nonmutatingfunc" doesn't allow mutating functions.
@@ -312,7 +312,7 @@ struct TestStruct5 : MutatingTestProto {
 protocol NonMutatingSubscriptable {
   subscript(i: Int) -> Int {get nonmutating set} // expected-note {{protocol requires subscript with type '(Int) -> Int'}}
 }
-struct MutatingSubscriptor : NonMutatingSubscriptable {  // expected-error {{type 'MutatingSubscriptor' does not conform to protocol 'NonMutatingSubscriptable'}}
+struct MutatingSubscriptor : NonMutatingSubscriptable {  // expected-error {{type 'MutatingSubscriptor' does not conform to protocol 'NonMutatingSubscriptable'}} expected-note {{add stubs for conformance}}
   subscript(i: Int) -> Int {
     get { return 42 }
     mutating set {}   // expected-note {{candidate is marked 'mutating' but protocol does not allow it}}
@@ -322,7 +322,7 @@ struct MutatingSubscriptor : NonMutatingSubscriptable {  // expected-error {{typ
 protocol NonMutatingGet {
   var a: Int { get } // expected-note {{protocol requires property 'a' with type 'Int'}}
 }
-struct MutatingGet : NonMutatingGet { // expected-error {{type 'MutatingGet' does not conform to protocol 'NonMutatingGet'}}
+struct MutatingGet : NonMutatingGet { // expected-error {{type 'MutatingGet' does not conform to protocol 'NonMutatingGet'}} expected-note {{add stubs for conformance}}
   var a: Int { mutating get { return 0 } } // expected-note {{candidate is marked 'mutating' but protocol does not allow it}}
 }
 
@@ -353,7 +353,7 @@ protocol OpaqueRefinement : class, OpaqueBase {
   var x: Int { get set } // expected-note {{protocol requires property 'x' with type 'Int'}}
 }
 
-class SetterMutatingConflict : OpaqueRefinement {} // expected-error {{type 'SetterMutatingConflict' does not conform to protocol 'OpaqueRefinement'}}
+class SetterMutatingConflict : OpaqueRefinement {} // expected-error {{type 'SetterMutatingConflict' does not conform to protocol 'OpaqueRefinement'}} expected-note {{add stubs for conformance}}
 
 struct DuplicateMutating {
   mutating mutating func f() {} // expected-error {{duplicate modifier}} expected-note {{modifier already specified here}}

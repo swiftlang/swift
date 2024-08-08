@@ -17,7 +17,7 @@ extension ConformsToProtocol : HasReturn42 {}
 extension HasVirtualMethod : HasReturn42 {}
 #endif
 
-extension DoesNotConformToProtocol : HasReturn42 {} // expected-error {{'DoesNotConformToProtocol' does not conform to protocol}}
+extension DoesNotConformToProtocol : HasReturn42 {} // expected-error {{'DoesNotConformToProtocol' does not conform to protocol}} expected-note {{add stubs for conformance}}
 
 
 protocol HasReturnNullable {
