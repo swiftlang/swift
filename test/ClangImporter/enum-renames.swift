@@ -1,3 +1,5 @@
+// REQUIRES: rdar127262612
+
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify
 
 import enums_using_attributes
