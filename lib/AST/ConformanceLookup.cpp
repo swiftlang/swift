@@ -519,6 +519,10 @@ LookupConformanceInModuleRequest::evaluate(
     return result;
   }
 
+  // Type parameters have trivial conformances.
+  if (type->isTypeParameter())
+    return ProtocolConformanceRef(protocol);
+
   // Type variables have trivial conformances.
   if (type->isTypeVariableOrMember())
     return ProtocolConformanceRef(protocol);
