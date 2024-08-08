@@ -6686,11 +6686,11 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
                      }))
       continue;
 
-    params[cast<GenericTypeParamType>(GP->getCanonicalType())] = type;
+    params[GP] = type;
   }
 
   auto getPreferredType = [&](const GenericTypeParamType *GP) -> Type {
-    auto type = params.find(cast<GenericTypeParamType>(GP->getCanonicalType()));
+    auto type = params.find(GP);
     return (type == params.end()) ? Type() : type->second;
   };
 

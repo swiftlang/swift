@@ -5157,6 +5157,7 @@ TypeResolver::resolveIntegerTypeRepr(IntegerTypeRepr *repr,
                                      TypeResolutionOptions options) {
   if (!options.is(TypeResolverContext::ValueGenericArgument) &&
       !options.is(TypeResolverContext::SameTypeRequirement) &&
+      !options.is(TypeResolverContext::RawLayoutAttr) &&
       !options.contains(TypeResolutionFlags::SILMode)) {
     diagnoseInvalid(repr, repr->getLoc(),
                     diag::integer_type_not_accepted);

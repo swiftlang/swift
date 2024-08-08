@@ -62,7 +62,7 @@ class Theodosia: Aaron {
 
     // FIXME: We could optimistically parse this as an expression instead
     // expected-error@+2 {{initializers may only be declared within a type}}
-    // expected-error@+1 {{expected parameter type following ':'}}
+    // expected-error@+1 {{integer unexpectedly used in a type position}}
     init(z: 0)
   }
 
@@ -98,7 +98,7 @@ struct AaronStruct {
 
     // FIXME: We could optimistically parse this as an expression instead
     // expected-error@+2 {{initializers may only be declared within a type}}
-    // expected-error@+1 {{expected parameter type following ':'}}
+    // expected-error@+1 {{integer unexpectedly used in a type position}}
     init(y: 1)
   }
 

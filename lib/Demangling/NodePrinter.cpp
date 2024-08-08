@@ -1092,7 +1092,7 @@ private:
     auto isGenericParamValue = [&](unsigned depth, unsigned index) {
       for (unsigned i = numGenericParams; i < firstRequirement; ++i) {
         auto child = Node->getChild(i);
-        if (child->getKind() != Node::Kind::DependentGenericParamPackMarker)
+        if (child->getKind() != Node::Kind::DependentGenericParamValueMarker)
           continue;
         child = child->getChild(0);
 

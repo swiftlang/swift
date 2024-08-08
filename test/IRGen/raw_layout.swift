@@ -369,21 +369,31 @@ entry(%0 : $*Cell<T>):
 // CHECK: [[T_VWT_ADDR:%.*]] = getelementptr inbounds ptr, ptr [[T]], {{i64|i32}} -1
 // CHECK-NEXT: {{%.*}} = load ptr, ptr [[T_VWT_ADDR]]
 // CHECK: [[T_LAYOUT:%.*]] = getelementptr inbounds ptr, ptr {{%.*}}, i32 8
-// CHECK-NEXT: call void @swift_initRawStructMetadata(ptr %"Cell<T>", {{i64|i32}} 0, ptr [[T_LAYOUT]], {{i64|i32}} -1)
+// CHECK-NEXT: call void @swift_initRawStructMetadata(ptr %"Cell<T>", {{i64|i32}} 0, ptr [[T_LAYOUT]], {{i64|i32}} 0, {{i64|i32}} 0)
 
 // PaddedCell<T>
 
 // CHECK-LABEL: define {{.*}} swiftcc %swift.metadata_response @"$s{{[A-Za-z0-9_]*}}10PaddedCellVMr"(ptr %"PaddedCell<T>", ptr {{.*}}, ptr {{.*}})
-// CHECK: call void @swift_initRawStructMetadata(ptr %"PaddedCell<T>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} 1)
+// CHECK: call void @swift_initRawStructMetadata(ptr %"PaddedCell<T>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} 1, {{i64|i32}} 1)
 
 // SmallVectorBuf<T>
 
 // CHECK-LABEL: define {{.*}} swiftcc %swift.metadata_response @"$s{{[A-Za-z0-9_]*}}14SmallVectorBufVMr"(ptr %"SmallVectorBuf<T>", ptr {{.*}}, ptr {{.*}})
-// CHECK: call void @swift_initRawStructMetadata(ptr %"SmallVectorBuf<T>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} 8)
+// CHECK: call void @swift_initRawStructMetadata(ptr %"SmallVectorBuf<T>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} 8, {{i64|i32}} 1)
+
+// Vector<T, N>
+
+// CHECK-LABEL: define {{.*}} swiftcc %swift.metadata_response @"$s{{[A-Za-z0-9_]*}}6VectorVMr"(ptr %"Vector<T, N>", ptr {{.*}}, ptr {{.*}})
+// CHECK:         [[N_GEP:%.*]] = getelementptr inbounds {{i64|i32}}, ptr %"Vector<T, N>", {{i64|i32}} 3
+// CHECK-NEXT:    [[N:%.*]] = load {{i64|i32}}, ptr [[N_GEP]]
+// CHECK:         call void @swift_initRawStructMetadata(ptr %"Vector<T, N>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} [[N]], {{i64|i32}} 1)
 
 //===----------------------------------------------------------------------===//
-// Ensure that 'movesAsLike' is correctly calling the underlying type's move constructor
+// CellThatMovesAsLike<T> Dependent layout metadata initialization
 //===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: define {{.*}} swiftcc %swift.metadata_response @"$s{{[A-Za-z0-9_]*}}19CellThatMovesAsLikeVMr"(ptr %"CellThatMovesAsLike<T>", ptr {{.*}}, ptr {{.*}})
+// CHECK: call void @swift_initRawStructMetadata(ptr %"CellThatMovesAsLike<T>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} 0, {{i64|i32}} 2)
 
 //===----------------------------------------------------------------------===//
 // CellThatMovesAsLike<T> destroy
@@ -613,12 +623,21 @@ entry(%0 : $*Cell<T>):
 // CHECK:         ret ptr %dest
 
 //===----------------------------------------------------------------------===//
-// Vector destroy
+// VectorMovesAsLike Dependent layout metadata initialization
 //===----------------------------------------------------------------------===//
 
-// CHECK-LABEL: define {{.*}} void @"$s10raw_layout17VectorMovesAsLikeVwxx"(ptr {{.*}} %object, ptr %"VectorMovesAsLike<T, let N>")
+// CHECK-LABEL: define {{.*}} swiftcc %swift.metadata_response @"$s{{[A-Za-z0-9_]*}}17VectorMovesAsLikeVMr"(ptr %"VectorMovesAsLike<T, N>", ptr {{.*}}, ptr {{.*}})
+// CHECK:         [[N_GEP:%.*]] = getelementptr inbounds {{i64|i32}}, ptr %"VectorMovesAsLike<T, N>", {{i64|i32}} 3
+// CHECK-NEXT:    [[N:%.*]] = load {{i64|i32}}, ptr [[N_GEP]]
+// CHECK:         call void @swift_initRawStructMetadata(ptr %"VectorMovesAsLike<T, N>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} [[N]], {{i64|i32}} 3)
+
+//===----------------------------------------------------------------------===//
+// VectorMovesAsLike destroy
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: define {{.*}} void @"$s10raw_layout17VectorMovesAsLikeVwxx"(ptr {{.*}} %object, ptr %"VectorMovesAsLike<T, N>")
 // CHECK:         [[I_ALLOCA:%.*]] = alloca {{i64|i32}}
-// CHECK:         [[N_GEP:%.*]] = getelementptr inbounds {{i64|i32}}, ptr %"VectorMovesAsLike<T, let N>", {{i64|i32}} 3
+// CHECK:         [[N_GEP:%.*]] = getelementptr inbounds {{i64|i32}}, ptr %"VectorMovesAsLike<T, N>", {{i64|i32}} 3
 // CHECK-NEXT:    [[N:%.*]] = load {{i64|i32}}, ptr [[N_GEP]]
 // CHECK:         store {{i64|i32}} 0, ptr [[I_ALLOCA]]
 // CHECK:         br label %[[COND_BR:.*]]
@@ -631,7 +650,7 @@ entry(%0 : $*Cell<T>):
 // CHECK:       [[LOOP_BR]]:
 // CHECK:         [[NEW_I:%.*]] = add {{i64|i32}} [[I]], 1
 // CHECK:         store {{i64|i32}} [[NEW_I]], ptr [[I_ALLOCA]]
-// CHECK:         [[T_ADDR:%.*]] = getelementptr inbounds ptr, ptr %"VectorMovesAsLike<T, let N>", {{i64|i32}} 2
+// CHECK:         [[T_ADDR:%.*]] = getelementptr inbounds ptr, ptr %"VectorMovesAsLike<T, N>", {{i64|i32}} 2
 // CHECK-NEXT:    [[T:%.*]] = load ptr, ptr [[T_ADDR]]
 // CHECK:         [[STRIDE_GEP:%.*]] = getelementptr inbounds %swift.vwtable, ptr {{%.*}}, i32 0, i32 9
 // CHECK-NEXT:    [[STRIDE:%.*]] = load {{i64|i32}}, ptr [[STRIDE_GEP]]
@@ -645,12 +664,12 @@ entry(%0 : $*Cell<T>):
 // CHECK:         ret void
 
 //===----------------------------------------------------------------------===//
-// Vector initializeWithTake
+// VectorMovesAsLike initializeWithTake
 //===----------------------------------------------------------------------===//
 
-// CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout17VectorMovesAsLikeVwtk"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %"VectorMovesAsLike<T, let N>")
+// CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout17VectorMovesAsLikeVwtk"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %"VectorMovesAsLike<T, N>")
 // CHECK:         [[I_ALLOCA:%.*]] = alloca {{i64|i32}}
-// CHECK:         [[N_GEP:%.*]] = getelementptr inbounds {{i64|i32}}, ptr %"VectorMovesAsLike<T, let N>", {{i64|i32}} 3
+// CHECK:         [[N_GEP:%.*]] = getelementptr inbounds {{i64|i32}}, ptr %"VectorMovesAsLike<T, N>", {{i64|i32}} 3
 // CHECK-NEXT:    [[N:%.*]] = load {{i64|i32}}, ptr [[N_GEP]]
 // CHECK:         store {{i64|i32}} 0, ptr [[I_ALLOCA]]
 // CHECK:         br label %[[COND_BR:.*]]
@@ -663,7 +682,7 @@ entry(%0 : $*Cell<T>):
 // CHECK:       [[LOOP_BR]]:
 // CHECK:         [[NEW_I:%.*]] = add {{i64|i32}} [[I]], 1
 // CHECK:         store {{i64|i32}} [[NEW_I]], ptr [[I_ALLOCA]]
-// CHECK:         [[T_ADDR:%.*]] = getelementptr inbounds ptr, ptr %"VectorMovesAsLike<T, let N>", {{i64|i32}} 2
+// CHECK:         [[T_ADDR:%.*]] = getelementptr inbounds ptr, ptr %"VectorMovesAsLike<T, N>", {{i64|i32}} 2
 // CHECK-NEXT:    [[T:%.*]] = load ptr, ptr [[T_ADDR]]
 // CHECK:         [[STRIDE_GEP:%.*]] = getelementptr inbounds %swift.vwtable, ptr {{%.*}}, i32 0, i32 9
 // CHECK-NEXT:    [[STRIDE:%.*]] = load {{i64|i32}}, ptr [[STRIDE_GEP]]
@@ -678,12 +697,12 @@ entry(%0 : $*Cell<T>):
 // CHECK:         ret ptr %dest
 
 //===----------------------------------------------------------------------===//
-// Vector assignWithTake
+// VectorMovesAsLike assignWithTake
 //===----------------------------------------------------------------------===//
 
-// CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout17VectorMovesAsLikeVwta"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %"VectorMovesAsLike<T, let N>")
+// CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout17VectorMovesAsLikeVwta"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %"VectorMovesAsLike<T, N>")
 // CHECK:         [[I_ALLOCA:%.*]] = alloca {{i64|i32}}
-// CHECK:         [[N_GEP:%.*]] = getelementptr inbounds {{i64|i32}}, ptr %"VectorMovesAsLike<T, let N>", {{i64|i32}} 3
+// CHECK:         [[N_GEP:%.*]] = getelementptr inbounds {{i64|i32}}, ptr %"VectorMovesAsLike<T, N>", {{i64|i32}} 3
 // CHECK-NEXT:    [[N:%.*]] = load {{i64|i32}}, ptr [[N_GEP]]
 // CHECK:         store {{i64|i32}} 0, ptr [[I_ALLOCA]]
 // CHECK:         br label %[[COND_BR:.*]]
@@ -696,7 +715,7 @@ entry(%0 : $*Cell<T>):
 // CHECK:       [[LOOP_BR]]:
 // CHECK:         [[NEW_I:%.*]] = add {{i64|i32}} [[I]], 1
 // CHECK:         store {{i64|i32}} [[NEW_I]], ptr [[I_ALLOCA]]
-// CHECK:         [[T_ADDR:%.*]] = getelementptr inbounds ptr, ptr %"VectorMovesAsLike<T, let N>", {{i64|i32}} 2
+// CHECK:         [[T_ADDR:%.*]] = getelementptr inbounds ptr, ptr %"VectorMovesAsLike<T, N>", {{i64|i32}} 2
 // CHECK-NEXT:    [[T:%.*]] = load ptr, ptr [[T_ADDR]]
 // CHECK:         [[STRIDE_GEP:%.*]] = getelementptr inbounds %swift.vwtable, ptr {{%.*}}, i32 0, i32 9
 // CHECK-NEXT:    [[STRIDE:%.*]] = load {{i64|i32}}, ptr [[STRIDE_GEP]]

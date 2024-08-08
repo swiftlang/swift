@@ -3318,7 +3318,7 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
   auto rawLayout = T.getRawLayout();
   auto likeTypeLayout = emitTypeLayoutRef(IGF, likeType, collector);
   auto structLayoutflags = StructLayoutFlags::Swift5Algorithm;
-  RawLayoutFlags rawLayoutFlags;
+  auto rawLayoutFlags = (RawLayoutFlags) 0;
 
   if (rawLayout->shouldMoveAsLikeType())
     rawLayoutFlags |= RawLayoutFlags::MovesAsLike;
