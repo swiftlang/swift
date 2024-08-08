@@ -38,6 +38,7 @@
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Platform.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -1028,6 +1029,28 @@ static bool isSynthesizedNonUnique(const RootProtocolConformance *conformance) {
   return false;
 }
 
+/// Determine whether a protocol can ever have a dependent conformance.
+static bool protocolCanHaveDependentConformance(ProtocolDecl *proto) {
+  // Objective-C protocols have never been able to have a dependent conformance.
+  if (proto->isObjC())
+    return false;
+
+  // Prior to Swift 6.0, only Objective-C protocols were never able to have
+  // a dependent conformance. This is overly pessimistic when the protocol
+  // is a marker protocol (since they don't have requirements), but we must
+  // retain backward compatibility with binaries built for earlier deployment
+  // targets that concluded that these protocols might involve dependent
+  // conformances.
+  ASTContext &ctx = proto->getASTContext();
+  if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget(
+          ctx.LangOpts.Target)) {
+    if (runtimeCompatVersion < llvm::VersionTuple(6, 0))
+      return true;
+  }
+
+  return Lowering::TypeConverter::protocolRequiresWitnessTable(proto);
+}
+
 static bool isDependentConformance(
               IRGenModule &IGM,
               const RootProtocolConformance *rootConformance,
@@ -1060,7 +1083,7 @@ static bool isDependentConformance(
       continue;
 
     auto assocProtocol = req.getProtocolDecl();
-    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(assocProtocol))
+    if (!protocolCanHaveDependentConformance(assocProtocol))
       continue;
 
     auto assocConformance =
