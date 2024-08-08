@@ -15,6 +15,7 @@
 #include "SILParserState.h"
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1769,7 +1770,7 @@ static bool getConformancesForSubstitution(Parser &P,
   subReplacement = subReplacement->getReferenceStorageReferent();
 
   for (auto protoDecl : protocols) {
-    auto conformance = ModuleDecl::lookupConformance(subReplacement, protoDecl);
+    auto conformance = lookupConformance(subReplacement, protoDecl);
     if (conformance.isInvalid()) {
       P.diagnose(loc, diag::sil_substitution_mismatch, subReplacement,
                  protoDecl->getDeclaredInterfaceType());
@@ -1822,7 +1823,7 @@ SubstitutionMap getApplySubstitutionsFromParsed(
       [&](CanType dependentType, Type replacementType,
           ProtocolDecl *proto) -> ProtocolConformanceRef {
         replacementType = replacementType->getReferenceStorageReferent();
-        if (auto conformance = ModuleDecl::lookupConformance(replacementType, proto))
+        if (auto conformance = lookupConformance(replacementType, proto))
           return conformance;
 
         SP.P.diagnose(loc, diag::sil_substitution_mismatch, replacementType,
@@ -2300,7 +2301,7 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
            contextFormalTy = patternSig.getGenericEnvironment()
               ->mapTypeIntoContext(formalTy);
          }
-         auto lookup = ModuleDecl::lookupConformance(contextFormalTy, proto);
+         auto lookup = lookupConformance(contextFormalTy, proto);
          if (lookup.isInvalid()) {
            P.diagnose(formalTyLoc,
                       diag::sil_keypath_index_not_hashable,
@@ -5447,7 +5448,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         P.diagnose(TyLoc, diag::sil_witness_method_not_protocol);
         return true;
       }
-      auto conformance = ModuleDecl::lookupConformance(LookupTy, proto);
+      auto conformance = lookupConformance(LookupTy, proto);
       if (conformance.isInvalid()) {
         P.diagnose(TyLoc, diag::sil_witness_method_type_does_not_conform);
         return true;
@@ -6089,8 +6090,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
       // Collect conformances for the type.
       ArrayRef<ProtocolConformanceRef> conformances =
-          collectExistentialConformances(P, Ty, TyLoc,
-                                         Val->getType().getASTType());
+          ::collectExistentialConformances(P, Ty, TyLoc,
+                                           Val->getType().getASTType());
 
       ResultVal = B.createInitExistentialAddr(InstLoc, Val, Ty, LoweredTy,
                                               conformances);
@@ -6110,8 +6111,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         return true;
 
       ArrayRef<ProtocolConformanceRef> conformances =
-          collectExistentialConformances(P, FormalConcreteTy, TyLoc,
-                                         ExistentialTy.getASTType());
+          ::collectExistentialConformances(P, FormalConcreteTy, TyLoc,
+                                           ExistentialTy.getASTType());
 
       ResultVal = B.createInitExistentialValue(
           InstLoc, ExistentialTy, FormalConcreteTy, Val, conformances);
@@ -6131,8 +6132,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
       // Collect conformances for the type.
       ArrayRef<ProtocolConformanceRef> conformances =
-          collectExistentialConformances(P, ConcreteFormalTy, TyLoc,
-                                         ExistentialTy.getASTType());
+          ::collectExistentialConformances(P, ConcreteFormalTy, TyLoc,
+                                           ExistentialTy.getASTType());
 
       ResultVal = B.createAllocExistentialBox(InstLoc, ExistentialTy,
                                               ConcreteFormalTy, conformances);
@@ -6158,8 +6159,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         return true;
 
       ArrayRef<ProtocolConformanceRef> conformances =
-          collectExistentialConformances(P, FormalConcreteTy, TyLoc,
-                                         ExistentialTy.getASTType());
+          ::collectExistentialConformances(P, FormalConcreteTy, TyLoc,
+                                           ExistentialTy.getASTType());
 
       // FIXME: Conformances in InitExistentialRefInst is currently not included
       // in SIL.rst.
@@ -6186,8 +6187,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       }
 
       ArrayRef<ProtocolConformanceRef> conformances =
-          collectExistentialConformances(P, formalConcreteType, TyLoc,
-                                         baseExType);
+          ::collectExistentialConformances(P, formalConcreteType, TyLoc,
+                                           baseExType);
 
       ResultVal = B.createInitExistentialMetatype(InstLoc, Val, ExistentialTy,
                                                   conformances);
@@ -7837,12 +7838,13 @@ parseRootProtocolConformance(Parser &P, SILParser &SP, Type ConformingTy,
       SP.parseSILIdentifier(ModuleName, Loc, diag::expected_sil_value_name))
     return ProtocolConformanceRef();
 
-  // Calling lookupConformance on a BoundGenericType will return a specialized
-  // conformance. We use UnboundGenericType to find the normal conformance.
+  // Calling lookupConformance on a specialized type will return a specialized
+  // conformance. We pass getDeclaredInterfaceType() to find the normal
+  // conformance.
   Type lookupTy = ConformingTy;
   if (auto bound = lookupTy->getAs<BoundGenericType>())
-    lookupTy = bound->getDecl()->getDeclaredType();
-  auto lookup = ModuleDecl::lookupConformance(lookupTy, proto);
+    lookupTy = bound->getDecl()->getDeclaredInterfaceType();
+  auto lookup = lookupConformance(lookupTy, proto);
   if (lookup.isInvalid()) {
     P.diagnose(KeywordLoc, diag::sil_witness_protocol_conformance_not_found);
     return ProtocolConformanceRef();

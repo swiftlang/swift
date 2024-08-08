@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTSynthesis.h"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -6300,12 +6301,6 @@ public:
         }
         return packElementType;
       };
-      auto substConformances = [&](CanType dependentType,
-                                   Type conformingType,
-                                   ProtocolDecl *protocol) -> ProtocolConformanceRef {
-        // FIXME: This violates the spirit of this verifier check.
-        return ModuleDecl::lookupConformance(conformingType, protocol);
-      };
 
       // If the pack components and expected element types are SIL types,
       // we need to perform SIL substitution.
@@ -6316,7 +6311,8 @@ public:
           SILType::getPrimitiveObjectType(indexedElementType);
         auto substTargetElementSILType =
           targetElementSILType.subst(F.getModule(),
-                                     substTypes, substConformances,
+                                     substTypes,
+                                     LookUpConformanceInModule(),
                                      CanGenericSignature(),
                                      SubstFlags::PreservePackExpansionLevel);
         requireSameType(indexedElementSILType, substTargetElementSILType,
@@ -6324,7 +6320,7 @@ public:
                         "match expected element type");
       } else {
         auto substTargetElementType =
-          targetElementType.subst(substTypes, substConformances)
+          targetElementType.subst(substTypes, LookUpConformanceInModule())
                            ->getCanonicalType();
         requireSameType(indexedElementType, substTargetElementType,
                         "lanewise-substituted pack element type didn't "

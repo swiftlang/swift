@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/Basic/Assertions.h"
@@ -131,7 +132,7 @@ static bool isExtensionWithSelfBound(const ExtensionDecl *ED,
   if (selfType->is<ExistentialType>())
     return false;
 
-  return ED->getExtendedNominal() == PD || ModuleDecl::checkConformance(selfType, PD);
+  return ED->getExtendedNominal() == PD || checkConformance(selfType, PD);
 }
 
 static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,

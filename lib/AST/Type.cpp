@@ -20,6 +20,7 @@
 #include "ForeignRepresentationInfo.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -2307,8 +2308,7 @@ public:
           newConformances.push_back(ProtocolConformanceRef(proto));
         } else {
           auto newConformance
-            = ModuleDecl::lookupConformance(
-                  newSubstTy, proto, /*allowMissing=*/true);
+            = lookupConformance(newSubstTy, proto, /*allowMissing=*/true);
           if (!newConformance)
             return CanType();
           newConformances.push_back(newConformance);

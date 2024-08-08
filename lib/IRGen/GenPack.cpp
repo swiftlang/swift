@@ -16,6 +16,7 @@
 
 #include "GenPack.h"
 #include "GenProto.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
@@ -572,8 +573,7 @@ static llvm::Value *emitPackExpansionElementWitnessTable(
   auto instantiatedPatternTy =
       context.environment->mapContextualPackTypeIntoElementContext(patternTy);
   auto instantiatedConformance =
-      ModuleDecl::lookupConformance(
-          instantiatedPatternTy, conformance.getRequirement());
+      lookupConformance(instantiatedPatternTy, conformance.getRequirement());
 
   // Emit the element witness table.
   auto *wtable = emitWitnessTableRef(IGF, instantiatedPatternTy,

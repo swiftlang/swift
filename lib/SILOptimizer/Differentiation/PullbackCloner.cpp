@@ -26,6 +26,7 @@
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
 #include "swift/SILOptimizer/Differentiation/VJPCloner.h"
 
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -2713,7 +2714,7 @@ AllocStackInst *PullbackCloner::Implementation::createOptionalAdjoint(
   auto *diffProto =
       builder.getASTContext().getProtocol(KnownProtocolKind::Differentiable);
   auto diffConf =
-      ModuleDecl::lookupConformance(wrappedType.getASTType(), diffProto);
+      lookupConformance(wrappedType.getASTType(), diffProto);
   assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
   auto subMap = SubstitutionMap::get(
       initFn->getLoweredFunctionType()->getSubstGenericSignature(),
@@ -3621,10 +3622,10 @@ AllocStackInst *PullbackCloner::Implementation::getArrayAdjointElementBuffer(
   // %index_int = struct $Int (%index_literal)
   auto *eltIndexInt = builder.createStruct(loc, intType, {eltIndexLiteral});
   auto *diffProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto diffConf = ModuleDecl::lookupConformance(eltTanType, diffProto);
+  auto diffConf = lookupConformance(eltTanType, diffProto);
   assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
   auto *addArithProto = ctx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-  auto addArithConf = ModuleDecl::lookupConformance(eltTanType, addArithProto);
+  auto addArithConf = lookupConformance(eltTanType, addArithProto);
   assert(!addArithConf.isInvalid() &&
          "Missing conformance to `AdditiveArithmetic`");
   auto subMap = SubstitutionMap::get(subscriptFnGenSig, {eltTanType},

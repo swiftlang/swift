@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ClangDerivedConformances.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -226,7 +227,7 @@ static FuncDecl *getMinusOperator(NominalTypeDecl *decl) {
       return false;
     auto returnTy = minus->getResultInterfaceType();
     auto conformanceRef =
-        ModuleDecl::lookupConformance(returnTy, binaryIntegerProto);
+        lookupConformance(returnTy, binaryIntegerProto);
     if (!isConcreteAndValid(conformanceRef))
       return false;
     return true;
@@ -721,7 +722,7 @@ void swift::conformToCxxSequenceIfNeeded(
 
   // Check if RawIterator conforms to UnsafeCxxInputIterator.
   auto rawIteratorConformanceRef =
-      ModuleDecl::lookupConformance(rawIteratorTy, cxxIteratorProto);
+      lookupConformance(rawIteratorTy, cxxIteratorProto);
   if (!isConcreteAndValid(rawIteratorConformanceRef))
     return;
   auto rawIteratorConformance = rawIteratorConformanceRef.getConcrete();
@@ -768,7 +769,7 @@ void swift::conformToCxxSequenceIfNeeded(
 
     // Check if RawIterator conforms to UnsafeCxxRandomAccessIterator.
     auto rawIteratorRAConformanceRef =
-        ModuleDecl::lookupConformance(rawIteratorTy, cxxRAIteratorProto);
+        lookupConformance(rawIteratorTy, cxxRAIteratorProto);
     if (!isConcreteAndValid(rawIteratorRAConformanceRef))
       return false;
 
@@ -890,7 +891,7 @@ void swift::conformToCxxSetIfNeeded(ClangImporter::Implementation &impl,
   auto rawMutableIteratorTy = rawMutableIteratorType->getUnderlyingType();
   // Check if RawMutableIterator conforms to UnsafeCxxInputIterator.
   auto rawIteratorConformanceRef =
-      ModuleDecl::lookupConformance(rawMutableIteratorTy, cxxIteratorProto);
+      lookupConformance(rawMutableIteratorTy, cxxIteratorProto);
   if (!isConcreteAndValid(rawIteratorConformanceRef))
     return;
 
@@ -973,12 +974,12 @@ void swift::conformToCxxDictionaryIfNeeded(
 
   // Check if RawIterator conforms to UnsafeCxxInputIterator.
   auto rawIteratorConformanceRef =
-      ModuleDecl::lookupConformance(rawIteratorTy, cxxInputIteratorProto);
+      lookupConformance(rawIteratorTy, cxxInputIteratorProto);
   if (!isConcreteAndValid(rawIteratorConformanceRef))
     return;
 
   // Check if RawMutableIterator conforms to UnsafeCxxMutableInputIterator.
-  auto rawMutableIteratorConformanceRef = ModuleDecl::lookupConformance(
+  auto rawMutableIteratorConformanceRef = lookupConformance(
       rawMutableIteratorTy, cxxMutableInputIteratorProto);
   if (!isConcreteAndValid(rawMutableIteratorConformanceRef))
     return;
@@ -1039,7 +1040,7 @@ void swift::conformToCxxVectorIfNeeded(ClangImporter::Implementation &impl,
 
   // Check if RawIterator conforms to UnsafeCxxRandomAccessIterator.
   auto rawIteratorConformanceRef =
-      ModuleDecl::lookupConformance(rawIteratorTy, cxxRandomAccessIteratorProto);
+      lookupConformance(rawIteratorTy, cxxRandomAccessIteratorProto);
   if (!isConcreteAndValid(rawIteratorConformanceRef))
     return;
 

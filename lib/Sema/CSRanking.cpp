@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -297,7 +298,7 @@ computeSelfTypeRelationship(DeclContext *dc, ValueDecl *decl1,
 
   // If the model type does not conform to the protocol, the bases are
   // unrelated.
-  auto conformance = ModuleDecl::lookupConformance(modelTy, proto);
+  auto conformance = lookupConformance(modelTy, proto);
   if (conformance.isInvalid())
     return {SelfTypeRelationship::Unrelated, conformance};
 

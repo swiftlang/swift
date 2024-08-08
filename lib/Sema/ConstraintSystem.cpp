@@ -22,6 +22,7 @@
 #include "TypeCheckMacros.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -7779,7 +7780,7 @@ ConstraintSystem::lookupConformance(Type type, ProtocolDecl *protocol) {
     return cachedConformance->second;
 
   auto conformance =
-      ModuleDecl::lookupConformance(type, protocol, /*allowMissing=*/true);
+      swift::lookupConformance(type, protocol, /*allowMissing=*/true);
   Conformances[cacheKey] = conformance;
   return conformance;
 }
