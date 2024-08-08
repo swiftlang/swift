@@ -740,7 +740,8 @@ generateFullDependencyGraph(const CompilerInstance &instance,
                              .CASBridgingHeaderIncludeTreeRootID.c_str()),
             /*CacheKey*/ create_clone(""),
             createMacroDependencySet(
-                swiftSourceDeps->textualModuleDetails.macroDependencies)};
+                swiftSourceDeps->textualModuleDetails.macroDependencies),
+            /*userModuleVersion*/ create_clone("")};
       } else if (swiftPlaceholderDeps) {
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER;
         details->swift_placeholder_details = {
