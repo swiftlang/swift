@@ -120,7 +120,7 @@ If someone sends you a change privately, encourage them to submit it to the appr
 Code Templates
 
 The license and copyright protections for Swift.org code are called out at the top of every source code file.
-On the rare occasion you contribute a change that includes a new source file, ensure that the header is filled out appropriately.
+If you contribute a change that includes a new source file, ensure that the header is filled out appropriately.
 
 For Swift source files the code header should look this:
 
