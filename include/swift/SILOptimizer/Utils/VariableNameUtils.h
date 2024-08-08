@@ -122,12 +122,14 @@ private:
     bool empty() const { return !insertionPointIndex; }
   };
 
+  /// ASTContext for forming identifiers when we need to.
+  ASTContext &astContext;
+
   /// The stacklist that we use to print out variable names.
   ///
   /// Has to be a small vector since we push/pop the last segment start. This
   /// lets us speculate when processing phis.
-  VariableNamePathArray<PointerUnion<SILInstruction *, SILValue>, 4>
-      variableNamePath;
+  VariableNamePathArray<StringRef, 4> variableNamePath;
 
   /// The root value of our string.
   ///
@@ -145,12 +147,13 @@ private:
 
 public:
   VariableNameInferrer(SILFunction *fn, SmallString<64> &resultingString)
-      : variableNamePath(), resultingString(resultingString) {}
+      : astContext(fn->getASTContext()), variableNamePath(),
+        resultingString(resultingString) {}
 
   VariableNameInferrer(SILFunction *fn, Options options,
                        SmallString<64> &resultingString)
-      : variableNamePath(), resultingString(resultingString), options(options) {
-  }
+      : astContext(fn->getASTContext()), variableNamePath(),
+        resultingString(resultingString), options(options) {}
 
   /// Attempts to infer a name from just uses of \p searchValue.
   ///
@@ -209,6 +212,8 @@ public:
 
   StringRef getName() const { return resultingString; }
 
+  SWIFT_DEBUG_DUMP { llvm::dbgs() << getName() << '\n'; }
+
   /// Given a specific SILValue, construct a VariableNameInferrer and use it to
   /// attempt to infer an identifier for the value.
   static std::optional<Identifier> inferName(SILValue value);
@@ -227,7 +232,6 @@ public:
 
 private:
   void drainVariableNamePath();
-  void popSingleVariableName();
 
   /// Finds the SILValue that either provides the direct debug information or
   /// that has a debug_value user that provides the name of the value.
@@ -246,6 +250,15 @@ private:
   /// DebugVariable provided name, attempt to find a root value from its
   /// initialization.
   SILValue getRootValueForTemporaryAllocation(AllocationInst *allocInst);
+
+  StringRef getStringRefForIndex(unsigned index) const {
+    llvm::SmallString<64> indexString;
+    {
+      llvm::raw_svector_ostream stream(indexString);
+      stream << index;
+    }
+    return astContext.getIdentifier(indexString).str();
+  }
 };
 
 } // namespace swift
