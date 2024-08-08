@@ -1048,7 +1048,8 @@ static bool protocolCanHaveDependentConformance(ProtocolDecl *proto) {
   ASTContext &ctx = proto->getASTContext();
   if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget(
           ctx.LangOpts.Target)) {
-    if (runtimeCompatVersion < llvm::VersionTuple(6, 0))
+    if (runtimeCompatVersion < llvm::VersionTuple(6, 0) &&
+        proto->isSpecificProtocol(KnownProtocolKind::Sendable))
       return true;
   }
 
