@@ -108,6 +108,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(DestroyValueInst.self,     { run(DestroyValueInst.self, $0) })
   registerForSILCombine(DestructureStructInst.self, { run(DestructureStructInst.self, $0) })
   registerForSILCombine(DestructureTupleInst.self, { run(DestructureTupleInst.self, $0) })
+  registerForSILCombine(TypeValueInst.self, { run(TypeValueInst.self, $0) })
 
   // Test passes
   registerPass(aliasInfoDumper, { aliasInfoDumper.run($0) })

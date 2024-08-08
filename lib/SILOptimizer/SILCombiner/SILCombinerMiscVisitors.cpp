@@ -2237,18 +2237,3 @@ SILCombiner::visitCopyAddrInst(CopyAddrInst *CAI) {
       CAI->getLoc(), Src->getOperand(), Dst->getOperand(),
       CAI->isTakeOfSrc(), CAI->isInitializationOfDest());
 }
-
-SILInstruction *SILCombiner::visitTypeValueInst(TypeValueInst *TVI) {
-  auto integer = TVI->getParamType()->getAs<IntegerType>();
-
-  if (!integer) {
-    return nullptr;
-  }
-
-  auto fieldType = TVI->getType().getFieldType((intptr_t)0, TVI->getFunction());
-  assert(fieldType.isBuiltinInteger());
-
-  auto intLiteral = Builder.createIntegerLiteral(TVI->getLoc(), fieldType,
-                                            integer->getValue().getZExtValue());
-  return Builder.createStruct(TVI->getLoc(), TVI->getType(), {intLiteral});
-}

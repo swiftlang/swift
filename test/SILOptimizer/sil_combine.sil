@@ -4331,3 +4331,31 @@ bb0(%0 : $*Optional<String>, %1 : $*Kp1):
   return %r : $()
 }
 
+// CHECK-LABEL: sil @test_type_value_generic : $@convention(thin) <let N : Int> () -> Int {
+// CHECK:         [[TYPE_VALUE:%.*]] = type_value $Int for N
+// CHECK-NEXT:    return [[TYPE_VALUE]] : $Int
+// CHECK-LABEL: } // end sil function 'test_type_value_generic'
+sil @test_type_value_generic : $@convention(thin) <let N : Int> () -> Int {
+  %val = type_value $Int for N
+  return %val : $Int
+}
+
+// CHECK-LABEL: sil @test_type_value_concrete : $@convention(thin) () -> Int {
+// CHECK:         [[INT_LITERAL:%.*]] = integer_literal $Builtin.Int{{64|32}}, 123
+// CHECK-NEXT:    [[STRUCT:%.*]] = struct $Int ([[INT_LITERAL]] : $Builtin.Int{{64|32}})
+// CHECK-NEXT:    return [[STRUCT]] : $Int
+// CHECK-LABEL: } // end sil function 'test_type_value_concrete'
+sil @test_type_value_concrete : $@convention(thin) () -> Int {
+  %val = type_value $Int for 123
+  return %val : $Int
+}
+
+// CHECK-LABEL: sil @test_type_value_concrete_negative : $@convention(thin) () -> Int {
+// CHECK:         [[INT_LITERAL:%.*]] = integer_literal $Builtin.Int{{64|32}}, -128
+// CHECK-NEXT:    [[STRUCT:%.*]] = struct $Int ([[INT_LITERAL]] : $Builtin.Int{{64|32}})
+// CHECK-NEXT:    return [[STRUCT]] : $Int
+// CHECK-LABEL: } // end sil function 'test_type_value_concrete_negative'
+sil @test_type_value_concrete_negative : $@convention(thin) () -> Int {
+  %val = type_value $Int for -128
+  return %val : $Int
+}

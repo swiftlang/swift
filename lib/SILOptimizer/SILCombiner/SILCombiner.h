@@ -303,7 +303,6 @@ public:
   SILInstruction *visitPackElementGetInst(PackElementGetInst *PEGI);
   SILInstruction *visitTuplePackElementAddrInst(TuplePackElementAddrInst *TPEAI);
   SILInstruction *visitCopyAddrInst(CopyAddrInst *CAI);
-  SILInstruction *visitTypeValueInst(TypeValueInst *TVI);
 
   SILInstruction *legacyVisitGlobalValueInst(GlobalValueInst *globalValue);
 

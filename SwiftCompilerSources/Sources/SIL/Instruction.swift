@@ -718,7 +718,15 @@ class ExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class ObjCProtocolInst : SingleValueInstruction {}
 
-final public class TypeValueInst: SingleValueInstruction, UnaryInstruction {}
+final public class TypeValueInst: SingleValueInstruction, UnaryInstruction {
+  public var paramType: BridgedASTType {
+    bridged.TypeValueInst_getParamType()
+  }
+
+  public var value: Int {
+    bridged.TypeValueInst_getValue()
+  }
+}
 
 public class GlobalAccessInstruction : SingleValueInstruction {
   final public var global: GlobalVariable {
