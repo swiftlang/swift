@@ -374,6 +374,9 @@ public struct ManagedBufferPointer<
   }
 }
 
+@available(*, unavailable)
+extension ManagedBufferPointer: Sendable where Element: ~Copyable {}
+
 extension ManagedBufferPointer where Element: ~Copyable {
   /// The stored `Header` instance.
   @_preInverseGenerics
