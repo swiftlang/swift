@@ -200,7 +200,7 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
 
     if (!isCForwardDefinition) {
       os << "template<>\n";
-      os << "static inline const constexpr bool isUsableInGenericContext<"
+      os << "inline const constexpr bool isUsableInGenericContext<"
          << typeInfo.name << "> = true;\n\n";
     }
 
