@@ -71,7 +71,7 @@ Next, define the first increment and get consensus on the development goal of th
 - Make each change in the set either stand alone (for example, to fix a bug) or part of a planned series of changes that work toward the development goal.
 Explaining these relationships to the community can be helpful.
 
-If you are interested in making a large change and feel unsure about its overall effect, please make sure to first discuss the change and reach a consensus through the https://forums.swift.org.
+If you are interested in making a large change and feel unsure about its overall effect, please make sure to first discuss the change and reach a consensus through the [Swift Forums](https://forums.swift.org).
 Then ask about the best way to go about making the change.
 
 ### Commit Messages
@@ -95,8 +95,7 @@ Unless required to understand the change, additional code examples or other deta
 - For text formatting and spelling, follow the same rules as documentation and in-code comments—for example, the use of capitalization and periods.
 - If the commit is a bug fix on top of another recently committed change, or a revert or reapply of a patch, include the Git revision number of the prior related commit, for example “Revert abcdef because it caused bug#”.
 
-For minor violations of these guidelines, the community normally favors reminding the contributor of this policy over reverting.
-Minor corrections and omissions can be handled by sending a reply to the commits mailing list.
+
 
 ### Attribution of Changes
 
@@ -106,9 +105,7 @@ When doing so, it is important to retain correct attribution of the contribution
 We do not want the source code to be littered with random attributions like “this code written by J. Random Hacker”, which is noisy and distracting.
 Do not add contributor names to the source code or documentation.
 
-In addition, don’t commit changes authored by others unless they have submitted the change to the project or you have been authorized to submit on their behalf—for example, you work together and your company authorized you to contribute the changes.
-The author should first either submit the change through a pull request to the relevant project, email the development list, or add a bug tracker item.
-If someone sends you a change privately, encourage them to submit it to the appropriate list first.
+In addition, don’t commit changes authored by others unless they have submitted the change to the project or you have been authorized to submit on their behalf — for example, you work together and your company authorized you to contribute the changes.
 
 ### Code Templates
 
