@@ -31,6 +31,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Effects.h"
@@ -2466,8 +2467,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
 
   // Check that T conforms to all inherited protocols.
   for (auto InheritedProto : Proto->getInheritedProtocols()) {
-    auto InheritedConformance =
-      ModuleDecl::lookupConformance(T, InheritedProto);
+    auto InheritedConformance = lookupConformance(T, InheritedProto);
     if (InheritedConformance.isInvalid() ||
         !InheritedConformance.isConcrete()) {
       diagnoseConformanceFailure(T, InheritedProto, DC, ComplainLoc);
@@ -4135,8 +4135,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         // Otherwise, go satisfy the derivable requirement, which can introduce
         // a member that could in turn satisfy *this* requirement.
         auto derivableProto = cast<ProtocolDecl>(derivable->getDeclContext());
-        auto conformance =
-            ModuleDecl::lookupConformance(Adoptee, derivableProto);
+        auto conformance = lookupConformance(Adoptee, derivableProto);
         if (conformance.isConcrete()) {
           (void) conformance.getConcrete()->getWitnessDecl(derivable);
         }
@@ -5360,8 +5359,8 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto,
     // would result in a missing conformance if type is `& Sendable`
     // protocol composition. It's handled for type as a whole below.
     if (auto superclass = layout.getSuperclass()) {
-      auto result = ModuleDecl::lookupConformance(superclass, Proto,
-                                                  /*allowMissing=*/false);
+      auto result =lookupConformance(superclass, Proto,
+                                     /*allowMissing=*/false);
       if (result) {
         return result;
       }
@@ -5384,14 +5383,14 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto,
   }
 
   // For non-existential types, this is equivalent to checking conformance.
-  return ModuleDecl::lookupConformance(T, Proto, allowMissing);
+  return lookupConformance(T, Proto, allowMissing);
 }
 
 bool TypeChecker::conformsToKnownProtocol(
     Type type, KnownProtocolKind protocol,
     bool allowMissing) {
   if (auto *proto = type->getASTContext().getProtocol(protocol))
-    return (bool) ModuleDecl::checkConformance(type, proto, allowMissing);
+    return (bool) checkConformance(type, proto, allowMissing);
   return false;
 }
 
@@ -5429,9 +5428,8 @@ TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto) {
   // as an intermediate collection cast can dynamically change if the conditions
   // are met or not.
   if (type->isKnownStdlibCollectionType())
-    return !ModuleDecl::lookupConformance(type, Proto, /*allowMissing=*/true)
-                .isInvalid();
-  return !ModuleDecl::checkConformance(type, Proto).isInvalid();
+    return !lookupConformance(type, Proto, /*allowMissing=*/true).isInvalid();
+  return !checkConformance(type, Proto).isInvalid();
 }
 
 /// Determine the score when trying to match two identifiers together.
@@ -6748,8 +6746,8 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     Type defaultAssocTypeInContext =
       proto->mapTypeIntoContext(defaultAssocType);
     auto requirementProto = req.getProtocolDecl();
-    auto conformance = ModuleDecl::checkConformance(defaultAssocTypeInContext,
-                                                    requirementProto);
+    auto conformance = checkConformance(defaultAssocTypeInContext,
+                                        requirementProto);
     if (conformance.isInvalid()) {
       // Diagnose the lack of a conformance. This is potentially an ABI
       // incompatibility.

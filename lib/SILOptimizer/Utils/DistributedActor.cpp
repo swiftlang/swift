@@ -12,6 +12,7 @@
 
 #include "swift/SILOptimizer/Utils/DistributedActor.h"
 
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILBuilder.h"
@@ -47,12 +48,7 @@ void emitDistributedActorSystemWitnessCall(
         OpenedExistentialAccess::Immutable);
   }
 
-  if (systemASTType->isTypeParameter() || systemASTType->is<ArchetypeType>()) {
-    systemConfRef = ProtocolConformanceRef(DAS);
-  } else {
-    systemConfRef = ModuleDecl::lookupConformance(systemASTType, DAS);
-  }
-
+  systemConfRef = lookupConformance(systemASTType, DAS);
   assert(!systemConfRef.isInvalid() &&
          "Missing conformance to `DistributedActorSystem`");
 
@@ -80,7 +76,7 @@ void emitDistributedActorSystemWitnessCall(
       assert(actorProto);
 
       ProtocolConformanceRef conformance;
-      auto distributedActorConfRef = ModuleDecl::lookupConformance(
+      auto distributedActorConfRef = lookupConformance(
           actorType.getASTType(), actorProto);
       assert(!distributedActorConfRef.isInvalid() &&
              "Missing conformance to `DistributedActor`");

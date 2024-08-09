@@ -17,6 +17,7 @@
 #include "GenStruct.h"
 
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
@@ -1709,7 +1710,7 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
         IGM.getSwiftModule()->getASTContext().getProtocol(
             KnownProtocolKind::BitwiseCopyable);
     if (bitwiseCopyableProtocol &&
-        ModuleDecl::checkConformance(type, bitwiseCopyableProtocol)) {
+        checkConformance(type, bitwiseCopyableProtocol)) {
       return BitwiseCopyableTypeInfo::create(IGM.OpaqueTy, structAccessible);
     }
     return &getResilientStructTypeInfo(copyable, structAccessible);

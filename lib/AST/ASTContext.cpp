@@ -21,6 +21,7 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -1613,8 +1614,7 @@ ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
 
   auto type = decl->getDeclaredInterfaceType();
   auto builtinProtocol = getProtocol(builtinProtocolKind);
-  auto builtinConformance = ModuleDecl::lookupConformance(
-      type, builtinProtocol);
+  auto builtinConformance = lookupConformance(type, builtinProtocol);
   if (builtinConformance.isInvalid()) {
     assert(false && "Missing required conformance");
     witness = ConcreteDeclRef();
@@ -5834,7 +5834,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
     if (nominal != dc->getASTContext().getOptionalDecl()) {
       if (auto objcBridgeable
             = getProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
-        auto conformance = ModuleDecl::lookupConformance(
+        auto conformance = lookupConformance(
             nominal->getDeclaredInterfaceType(), objcBridgeable);
         if (conformance) {
           result =
@@ -5986,7 +5986,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
     if (!proto)
       return ProtocolConformanceRef::forInvalid();
 
-    return ModuleDecl::lookupConformance(type, proto);
+    return lookupConformance(type, proto);
   };
 
   // Do we conform to _ObjectiveCBridgeable?

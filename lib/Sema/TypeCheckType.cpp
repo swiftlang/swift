@@ -26,6 +26,7 @@
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -1228,7 +1229,7 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
   // If we weren't given a conformance, go look it up.
   ProtocolConformance *conformance = nullptr;
   if (protocol) {
-    auto conformanceRef = ModuleDecl::lookupConformance(parentTy, protocol);
+    auto conformanceRef = lookupConformance(parentTy, protocol);
     if (conformanceRef.isConcrete())
       conformance = conformanceRef.getConcrete();
   }
@@ -4023,8 +4024,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
       thrownTy = Type();
     } else if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
                !thrownTy->hasTypeParameter() &&
-               !ModuleDecl::checkConformance(
-                  thrownTy, ctx.getErrorDecl())) {
+               !checkConformance(thrownTy, ctx.getErrorDecl())) {
       diagnoseInvalid(
           thrownTypeRepr, thrownTypeRepr->getLoc(), diag::thrown_type_not_error,
           thrownTy);
@@ -4405,7 +4405,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       selfType = next;
     }
 
-    witnessMethodConformance = ModuleDecl::checkConformance(
+    witnessMethodConformance = checkConformance(
         selfType, protocolType->getDecl());
     assert(witnessMethodConformance &&
            "found witness_method without matching conformance");

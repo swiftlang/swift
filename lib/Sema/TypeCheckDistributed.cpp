@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "swift/Strings.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -444,8 +445,7 @@ static bool checkDistributedTargetResultType(
           C, serializationRequirement);
 
   for (auto serializationReq: serializationRequirements) {
-    auto conformance =
-        ModuleDecl::checkConformance(resultType, serializationReq);
+    auto conformance = checkConformance(resultType, serializationReq);
     if (conformance.isInvalid()) {
       if (diagnose) {
         llvm::StringRef conformanceToSuggest = isCodableRequirement ?
@@ -562,7 +562,7 @@ bool CheckDistributedFunctionRequest::evaluate(
 
       auto srl = serializationReqType->getExistentialLayout();
       for (auto req: srl.getProtocols()) {
-        if (ModuleDecl::checkConformance(paramTy, req).isInvalid()) {
+        if (checkConformance(paramTy, req).isInvalid()) {
           auto diag = func->diagnose(
               diag::distributed_actor_func_param_not_codable,
               param->getArgumentName().str(), param->getInterfaceType(),

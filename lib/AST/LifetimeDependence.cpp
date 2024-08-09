@@ -12,6 +12,7 @@
 
 #include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Module.h"
@@ -203,7 +204,7 @@ static bool isBitwiseCopyable(Type type, ASTContext &ctx) {
   if (!bitwiseCopyableProtocol) {
     return false;
   }
-  return (bool)(ModuleDecl::checkConformance(type, bitwiseCopyableProtocol));
+  return (bool)checkConformance(type, bitwiseCopyableProtocol);
 }
 
 std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::fromTypeRepr(

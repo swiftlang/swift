@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericParamList.h"
@@ -112,7 +113,11 @@ CheckRequirementResult Requirement::checkRequirement(
     }
 
     auto *proto = getProtocolDecl();
-    auto conformance = ModuleDecl::lookupConformance(
+
+    if (firstType->isTypeParameter())
+      return CheckRequirementResult::RequirementFailure;
+
+    auto conformance = lookupConformance(
         firstType, proto, allowMissing);
     if (!conformance)
       return CheckRequirementResult::RequirementFailure;

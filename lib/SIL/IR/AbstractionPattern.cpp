@@ -17,6 +17,7 @@
 
 #define DEBUG_TYPE "libsil"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -292,8 +293,8 @@ bool AbstractionPattern::conformsToKnownProtocol(
     
   auto definitelyConforms = [&](CanType t) -> bool {
     auto result =
-      ModuleDecl::checkConformanceWithoutContext(t, suppressible,
-                                                 /*allowMissing=*/false);
+      checkConformanceWithoutContext(t, suppressible,
+                                     /*allowMissing=*/false);
     return result.has_value() && !result.value().isInvalid();
   };
     
@@ -2840,17 +2841,7 @@ const {
     [&](SubstitutableType *dependentType) -> Type {
       auto index = cast<GenericTypeParamType>(dependentType)->getIndex();
       return visitor.substReplacementTypes[index];
-    }, [&](CanType dependentType,
-           Type conformingReplacementType,
-           ProtocolDecl *conformedProtocol) -> ProtocolConformanceRef {
-      // TODO: Should have collected the conformances used in the original
-      // type.
-      if (conformingReplacementType->isTypeParameter())
-        return ProtocolConformanceRef(conformedProtocol);
-    
-      return TC.M.lookupConformance(conformingReplacementType, conformedProtocol,
-                                    /*allowMissing*/ true);
-    });
+    }, LookUpConformanceInModule());
 
   auto yieldType = visitor.substYieldType;
   if (yieldType)

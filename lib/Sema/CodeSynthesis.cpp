@@ -24,6 +24,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Availability.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1381,8 +1382,7 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
       return false;
 
     auto targetType = target->getDeclaredInterfaceType();
-    auto ref = ModuleDecl::lookupConformance(
-        targetType, protocol);
+    auto ref = lookupConformance(targetType, protocol);
     if (ref.isInvalid()) {
       return false;
     }

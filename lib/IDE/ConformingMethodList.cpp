@@ -13,6 +13,7 @@
 #include "swift/IDE/ConformingMethodList.h"
 #include "ExprContextAnalysis.h"
 #include "swift/AST/ASTDemangler.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/USRGeneration.h"
@@ -191,7 +192,7 @@ void ConformingMethodListCallbacks::getMatchingMethods(
 
       // The return type conforms to any of the requested protocols.
       for (auto Proto : ExpectedTypes) {
-        if (ModuleDecl::checkConformance(resultTy, Proto))
+        if (checkConformance(resultTy, Proto))
           return true;
       }
 

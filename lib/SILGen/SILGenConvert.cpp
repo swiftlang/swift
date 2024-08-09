@@ -19,6 +19,7 @@
 #include "Scope.h"
 #include "SwitchEnumBuilder.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -869,8 +870,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
 
         // The original conformances are no good because they have the wrong
         // (pseudogeneric) subject type.
-        auto *M = SGM.M.getSwiftModule();
-        conformances = M->collectExistentialConformances(
+        conformances = collectExistentialConformances(
             concreteFormalType, anyObjectTy);
         F = eraseToAnyObject;
       }

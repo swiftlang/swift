@@ -22,6 +22,7 @@
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
@@ -682,10 +683,8 @@ public:
   void addConditionalRequirements() {
     SILWitnessTable::enumerateWitnessTableConditionalConformances(
         Conformance, [&](unsigned, CanType type, ProtocolDecl *protocol) {
-          auto conformance = (type->isTypeParameter()
-                              ? ProtocolConformanceRef(protocol)
-                              : ModuleDecl::lookupConformance(type, protocol,
-                                                              /*allowMissing=*/true));
+          auto conformance = lookupConformance(type, protocol,
+                                               /*allowMissing=*/true);
           assert(conformance &&
                  "unable to find conformance that should be known");
 
