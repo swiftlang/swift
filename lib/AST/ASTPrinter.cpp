@@ -743,7 +743,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
   void printSwiftDocumentationComment(const Decl *D) {
     if (Options.CascadeDocComment)
-      D = getDocCommentProvidingDecl(D);
+      D = D->getDocCommentProvidingDecl();
     if (!D)
       return;
     auto RC = D->getRawComment();

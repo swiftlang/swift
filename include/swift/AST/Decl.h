@@ -1202,6 +1202,9 @@ public:
 
   std::optional<unsigned> getSourceOrder() const;
 
+  /// Get the declaration that actually provides a doc comment for another.
+  const Decl *getDocCommentProvidingDecl() const;
+
   /// \returns The brief comment attached to this declaration, or the brief
   /// comment attached to the comment providing decl.
   StringRef getSemanticBriefComment() const;
