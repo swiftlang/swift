@@ -9,6 +9,10 @@
 // REQUIRES: CPU=arm64 || CPU=x86_64
 // REQUIRES: swift_in_compiler
 
+// The required relocation format for a single return LLVM instruction are not necessarily
+// supported on object file formats other than Mach-O.
+// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchOS || OS=xros
+
 // This is an end-to-end test to ensure that the optimizer generates
 // optimal code for static String variables.
 
