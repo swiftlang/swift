@@ -2352,7 +2352,7 @@ public:
     REGIONBASEDISOLATION_LOG(
         llvm::dbgs() << SEP_STR << "Compiling basic block for function "
                      << basicBlock->getFunction()->getName() << ": ";
-        basicBlock->dumpID(); llvm::dbgs() << SEP_STR;
+        basicBlock->printID(llvm::dbgs()); llvm::dbgs() << SEP_STR;
         basicBlock->print(llvm::dbgs());
         llvm::dbgs() << SEP_STR << "Results:\n";);
     // Translate each SIL instruction to the PartitionOps that it represents if
@@ -3345,12 +3345,7 @@ bool BlockPartitionState::recomputeExitFromEntry(
 void BlockPartitionState::print(llvm::raw_ostream &os) const {
   os << SEP_STR << "BlockPartitionState[needsUpdate=" << needsUpdate
      << "]\nid: ";
-#ifndef NDEBUG
-  auto printID = [&](SILBasicBlock *block) { block->printID(os); };
-#else
-  auto printID = [&](SILBasicBlock *) { os << "NOASSERTS. "; };
-#endif
-  printID(basicBlock);
+  basicBlock->printID(os);
   os << "entry partition: ";
   entryPartition.print(os);
   os << "exit partition: ";
@@ -3363,12 +3358,12 @@ void BlockPartitionState::print(llvm::raw_ostream &os) const {
   os << "└──────────╼\nSuccs:\n";
   for (auto succ : basicBlock->getSuccessorBlocks()) {
     os << "→";
-    printID(succ);
+    succ->printID(os);
   }
   os << "Preds:\n";
   for (auto pred : basicBlock->getPredecessorBlocks()) {
     os << "←";
-    printID(pred);
+    pred->printID(os);
   }
   os << SEP_STR;
 }
