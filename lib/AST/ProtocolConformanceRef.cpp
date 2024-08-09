@@ -111,8 +111,7 @@ ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
   // If the type is an existential, it must be self-conforming.
   if (substType->isExistentialType()) {
     auto optConformance =
-        proto->getModuleContext()->lookupExistentialConformance(substType,
-                                                                proto);
+        ModuleDecl::lookupConformance(substType, proto, /*allowMissing=*/true);
     if (optConformance)
       return optConformance;
 
