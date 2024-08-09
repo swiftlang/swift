@@ -1651,17 +1651,18 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         -Arch $HostArch
     }
 
-    $OutDir = Join-Path -Path $HostArch.BinaryCache -ChildPath foundation-tests
+    # swift-corelibs-foundation tests are disabled since the package does not build for Windows yet
+    # $OutDir = Join-Path -Path $HostArch.BinaryCache -ChildPath foundation-tests
 
-    Isolate-EnvVars {
-      $env:SWIFTCI_USE_LOCAL_DEPS=1
-      $env:DISPATCH_INCLUDE_PATH="$($Arch.SDKInstallRoot)/usr/lib/swift"
-      Build-SPMProject `
-        -Test `
-        -Src $SourceCache\swift-corelibs-foundation `
-        -Bin $OutDir `
-        -Arch $HostArch
-    }
+    # Isolate-EnvVars {
+    #   $env:SWIFTCI_USE_LOCAL_DEPS=1
+    #   $env:DISPATCH_INCLUDE_PATH="$($Arch.SDKInstallRoot)/usr/lib/swift"
+    #   Build-SPMProject `
+    #     -Test `
+    #     -Src $SourceCache\swift-corelibs-foundation `
+    #     -Bin $OutDir `
+    #     -Arch $HostArch
+    # }
   } else {
     $DispatchBinaryCache = Get-TargetProjectBinaryCache $Arch Dispatch
     $SwiftSyntaxDir = Get-HostProjectCMakeModules Compilers
