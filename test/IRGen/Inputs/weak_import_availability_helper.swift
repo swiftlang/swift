@@ -26,7 +26,7 @@ extension ConditionallyAvailableStruct {
 }
 
 @available(macOS, unavailable)
-public struct UnvailableStruct {
+public struct UnavailableStruct {
   public func unavailableMethod() {}
 }
 

@@ -236,3 +236,6 @@ unwind:
   // CHECK:         call i1 @llvm.coro.end(ptr [[BEGIN]], i1 false, token none)
   // CHECK-NEXT:    unreachable
 }
+
+// CHECK-LABEL:     declare{{( dllimport)?}}{{( protected)?}} swiftcc void @"$s14yield_once_big10BigWrapperVyxGAA0D0VyxGAA9SomeClassCRbzlIetAnYn_TC"
+// CHECK-SAME:      (ptr noalias dereferenceable([[BUFFER_SIZE]]), i1)
