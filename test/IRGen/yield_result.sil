@@ -47,6 +47,8 @@ unwind:
   // CHECK-NEXT:    unreachable
 }
 
+// CHECK-LABEL:     declare{{( dllimport)?}}{{( protected)?}} swiftcc i64 @"$sBi64_IetAd_TC{{(.ptrauth)?}}"
+// CHECK-SAME:      (ptr noalias dereferenceable([[BUFFER_SIZE]]), i1)
 
 // CHECK-LABEL: test_coro_ret
 sil @test_coro_ret : $() -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) {
