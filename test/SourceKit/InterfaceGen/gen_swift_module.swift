@@ -44,39 +44,55 @@ func f(s : inout [Int]) {
 // CHECK-DECLARATIONS-ARRAY: {{^}}]{{$}}
 
 // public class MyClass
-// CHECK-DECLARATIONS-ARRAY: key.kind:{{.*}}class
-// CHECK-DECLARATIONS-ARRAY-NEXT: key.usr
-// CHECK-DECLARATIONS-ARRAY-SAME: swift_mod
-// CHECK-DECLARATIONS-ARRAY-SAME: MyClass
+// CHECK-DECLARATIONS-ARRAY: key.kind:
+// CHECK-DECLARATIONS-ARRAY-SAME: decl
+// CHECK-DECLARATIONS-ARRAY-SAME: class
+// CHECK-DECLARATIONS-ARRAY-NEXT: key.usr:
+// could check for parts of the usr, but as the .response files always check for exact matches, do the same here
+// CHECK-DECLARATIONS-ARRAY-SAME: s:9swift_mod7MyClassC
+// check that offsets are there, but not zero, as that might mean offsets are broken (none of the declaration offsets in this file should be zero)
+// CHECK-DECLARATIONS-ARRAY-NOT: key.offset:{{.*}}{{^[0-9]}}0{{^[0-9]}}
+// CHECK-DECLARATIONS-ARRAY: key.offset
 
 // public func pub_method
-// CHECK-DECLARATIONS-ARRAY: key.kind:{{.*}}method.instance
-// CHECK-DECLARATIONS-ARRAY-NEXT: key.usr
-// CHECK-DECLARATIONS-ARRAY-SAME: swift_mod
-// CHECK-DECLARATIONS-ARRAY-SAME: MyClass
-// CHECK-DECLARATIONS-ARRAY-SAME: pub_method
+// CHECK-DECLARATIONS-ARRAY: key.kind:
+// CHECK-DECLARATIONS-ARRAY-SAME: decl
+// CHECK-DECLARATIONS-ARRAY-SAME: method.instance
+// CHECK-DECLARATIONS-ARRAY-NEXT: key.usr:
+// CHECK-DECLARATIONS-ARRAY-SAME: s:9swift_mod7MyClassC10pub_methodyyF
+// CHECK-DECLARATIONS-ARRAY-NOT: key.offset:{{.*}}{{^[0-9]}}0{{^[0-9]}}
+// CHECK-DECLARATIONS-ARRAY: key.offset
 
 // CHECK-DECLARATIONS-ARRAY-NOT: int_method
 // CHECK-DECLARATIONS-ARRAY-NOT: fp_method
 // CHECK-DECLARATIONS-ARRAY-NOT: priv_method
 
 // public protocol MyProto
-// CHECK-DECLARATIONS-ARRAY: key.kind:{{.*}}protocol
+// CHECK-DECLARATIONS-ARRAY: key.kind:
+// CHECK-DECLARATIONS-ARRAY-SAME: decl
+// CHECK-DECLARATIONS-ARRAY-SAME: protocol
 // CHECK-DECLARATIONS-ARRAY-NEXT: key.usr
-// CHECK-DECLARATIONS-ARRAY-SAME: swift_mod
-// CHECK-DECLARATIONS-ARRAY-SAME: MyProto
+// CHECK-DECLARATIONS-ARRAY-SAME: s:9swift_mod7MyProtoP
+// CHECK-DECLARATIONS-ARRAY-NOT: key.offset:{{.*}}{{^[0-9]}}0{{^[0-9]}}
+// CHECK-DECLARATIONS-ARRAY: key.offset
 
 // associatedtype Assoc
-// CHECK-DECLARATIONS-ARRAY: key.kind:{{.*}}associatedtype
+// CHECK-DECLARATIONS-ARRAY: key.kind:
+// CHECK-DECLARATIONS-ARRAY-SAME: decl
+// CHECK-DECLARATIONS-ARRAY-SAME: associatedtype
 // CHECK-DECLARATIONS-ARRAY-NEXT: key.usr
-// CHECK-DECLARATIONS-ARRAY-SAME: swift_mod
-// CHECK-DECLARATIONS-ARRAY-SAME: Assoc
+// CHECK-DECLARATIONS-ARRAY-SAME: s:9swift_mod7MyProtoP5AssocQa
+// CHECK-DECLARATIONS-ARRAY-NOT: key.offset:{{.*}}{{^[0-9]}}0{{^[0-9]}}
+// CHECK-DECLARATIONS-ARRAY: key.offset
 
 // public func pub_function
-// CHECK-DECLARATIONS-ARRAY: key.kind:{{.*}}function.free
+// CHECK-DECLARATIONS-ARRAY: key.kind:
+// CHECK-DECLARATIONS-ARRAY-SAME: decl
+// CHECK-DECLARATIONS-ARRAY-SAME: function.free
 // CHECK-DECLARATIONS-ARRAY-NEXT: key.usr
-// CHECK-DECLARATIONS-ARRAY-SAME: swift_mod
-// CHECK-DECLARATIONS-ARRAY-SAME: pub_function
+// CHECK-DECLARATIONS-ARRAY-SAME: s:9swift_mod12pub_functionSiyF
+// CHECK-DECLARATIONS-ARRAY-NOT: key.offset:{{.*}}{{^[0-9]}}0{{^[0-9]}}
+// CHECK-DECLARATIONS-ARRAY: key.offset
 
 // CHECK-DECLARATIONS-ARRAY-NOT: int_function
 // CHECK-DECLARATIONS-ARRAY-NOT: fp_function
