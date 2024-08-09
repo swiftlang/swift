@@ -10993,7 +10993,8 @@ private:
 
 protected:
   TryApplyInstBase(SILInstructionKind valueKind, SILDebugLocation Loc,
-                   SILBasicBlock *normalBB, SILBasicBlock *errorBB);
+                   SILBasicBlock *normalBB, SILBasicBlock *errorBB,
+                   ProfileCounter normalCount, ProfileCounter errorCount);
 
 public:
   SuccessorListTy getSuccessors() {
@@ -11013,6 +11014,11 @@ public:
   const SILBasicBlock *getNormalBB() const { return DestBBs[NormalIdx]; }
   SILBasicBlock *getErrorBB() { return DestBBs[ErrorIdx]; }
   const SILBasicBlock *getErrorBB() const { return DestBBs[ErrorIdx]; }
+
+  /// The number of times the Normal branch was executed
+  ProfileCounter getNormalBBCount() const { return DestBBs[NormalIdx].getCount(); }
+  /// The number of times the Error branch was executed
+  ProfileCounter getErrorBBCount() const { return DestBBs[ErrorIdx].getCount(); }
 };
 
 /// TryApplyInst - Represents the full application of a function that
@@ -11030,7 +11036,9 @@ class TryApplyInst final
                SILBasicBlock *normalBB, SILBasicBlock *errorBB,
                ApplyOptions options,
                const GenericSpecializationInformation *specializationInfo,
-               std::optional<ApplyIsolationCrossing> isolationCrossing);
+               std::optional<ApplyIsolationCrossing> isolationCrossing,
+               ProfileCounter normalCount,
+               ProfileCounter errorCount);
 
   static TryApplyInst *
   create(SILDebugLocation debugLoc, SILValue callee,
@@ -11038,7 +11046,9 @@ class TryApplyInst final
          SILBasicBlock *normalBB, SILBasicBlock *errorBB, ApplyOptions options,
          SILFunction &parentFunction,
          const GenericSpecializationInformation *specializationInfo,
-         std::optional<ApplyIsolationCrossing> isolationCrossing);
+         std::optional<ApplyIsolationCrossing> isolationCrossing,
+         ProfileCounter normalCount,
+         ProfileCounter errorCount);
 };
 
 /// DifferentiableFunctionInst - creates a `@differentiable` function-typed

@@ -555,10 +555,13 @@ public:
       ArrayRef<SILValue> args, SILBasicBlock *normalBB, SILBasicBlock *errorBB,
       ApplyOptions options = ApplyOptions(),
       const GenericSpecializationInformation *specializationInfo = nullptr,
-      std::optional<ApplyIsolationCrossing> isolationCrossing = std::nullopt) {
+      std::optional<ApplyIsolationCrossing> isolationCrossing = std::nullopt,
+      ProfileCounter normalCount = ProfileCounter(),
+      ProfileCounter errorCount = ProfileCounter()) {
     return insertTerminator(TryApplyInst::create(
         getSILDebugLocation(loc), callee, subs, args, normalBB, errorBB,
-        options, *F, specializationInfo, isolationCrossing));
+        options, *F, specializationInfo, isolationCrossing,
+        normalCount, errorCount));
   }
 
   PartialApplyInst *createPartialApply(

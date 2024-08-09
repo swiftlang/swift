@@ -540,6 +540,11 @@ def enable_spec_devirt : Flag<["-"], "enable-spec-devirt">,
 def enable_async_demotion : Flag<["-"], "enable-experimental-async-demotion">,
   HelpText<"Enables an optimization pass to demote async functions.">;
 
+def enable_throws_prediction : Flag<["-"], "enable-throws-prediction">,
+  HelpText<"Enables optimization assumption that functions rarely throw errors.">;
+def disable_throws_prediction : Flag<["-"], "disable-throws-prediction">,
+  HelpText<"Disables optimization assumption that functions rarely throw errors.">;
+
 def disable_access_control : Flag<["-"], "disable-access-control">,
   HelpText<"Don't respect access control restrictions">;
 def enable_access_control : Flag<["-"], "enable-access-control">,
@@ -1304,6 +1309,13 @@ def enable_fragile_resilient_protocol_witnesses :
 def disable_fragile_resilient_protocol_witnesses :
   Flag<["-"], "disable-fragile-relative-protocol-tables">,
   HelpText<"Disable relative protocol witness tables">;
+
+def enable_split_cold_code :
+  Flag<["-"], "enable-split-cold-code">,
+  HelpText<"Enable splitting of cold code when optimizing">;
+def disable_split_cold_code :
+  Flag<["-"], "disable-split-cold-code">,
+  HelpText<"Disable splitting of cold code when optimizing">;
 
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,
