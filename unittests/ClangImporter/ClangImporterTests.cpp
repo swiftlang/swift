@@ -185,6 +185,8 @@ TEST(ClangImporterTest, libStdCxxInjectionTest) {
   swift::LangOptions langOpts;
   langOpts.EnableCXXInterop = true;
   langOpts.Target = llvm::Triple("x86_64", "unknown", "linux", "gnu");
+  langOpts.CXXStdlib = CXXStdlibKind::Libstdcxx;
+  langOpts.PlatformDefaultCXXStdlib = CXXStdlibKind::Libstdcxx;
   swift::SILOptions silOpts;
   swift::TypeCheckerOptions typecheckOpts;
   INITIALIZE_LLVM();

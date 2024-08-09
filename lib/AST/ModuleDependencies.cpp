@@ -541,11 +541,11 @@ void
 swift::dependencies::registerCxxInteropLibraries(
     const llvm::Triple &Target,
     StringRef mainModuleName,
-    bool hasStaticCxx, bool hasStaticCxxStdlib,
+    bool hasStaticCxx, bool hasStaticCxxStdlib, CXXStdlibKind cxxStdlibKind,
     std::function<void(const LinkLibrary&)> RegistrationCallback) {
-  if (Target.isOSDarwin())
+  if (cxxStdlibKind == CXXStdlibKind::Libcxx)
     RegistrationCallback(LinkLibrary("c++", LibraryKind::Library));
-  else if (Target.isOSLinux())
+  else if (cxxStdlibKind == CXXStdlibKind::Libstdcxx)
     RegistrationCallback(LinkLibrary("stdc++", LibraryKind::Library));
 
   // Do not try to link Cxx with itself.

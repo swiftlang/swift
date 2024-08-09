@@ -19,6 +19,7 @@
 #define SWIFT_BASIC_LANGOPTIONS_H
 
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/FixedBitSet.h"
 #include "swift/Basic/FunctionBodySkipping.h"
@@ -324,6 +325,16 @@ namespace swift {
 
     void setCxxInteropFromArgs(llvm::opt::ArgList &Args,
                                swift::DiagnosticEngine &Diags);
+
+    /// The C++ standard library used for the current build. This can differ
+    /// from the default C++ stdlib on a particular platform when `-Xcc
+    /// -stdlib=xyz` was passed to the compiler.
+    CXXStdlibKind CXXStdlib = CXXStdlibKind::Unknown;
+    CXXStdlibKind PlatformDefaultCXXStdlib = CXXStdlibKind::Unknown;
+
+    bool isUsingPlatformDefaultCXXStdlib() const {
+      return CXXStdlib == PlatformDefaultCXXStdlib;
+    }
 
     bool CForeignReferenceTypes = false;
 

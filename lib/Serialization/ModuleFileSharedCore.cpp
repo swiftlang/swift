@@ -198,6 +198,11 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::HAS_CXX_INTEROPERABILITY_ENABLED:
       extendedInfo.setHasCxxInteroperability(true);
       break;
+    case options_block::CXX_STDLIB_KIND:
+      unsigned rawKind;
+      options_block::CXXStdlibKindLayout::readRecord(scratch, rawKind);
+      extendedInfo.setCXXStdlibKind(static_cast<CXXStdlibKind>(rawKind));
+      break;
     case options_block::ALLOW_NON_RESILIENT_ACCESS:
       extendedInfo.setAllowNonResilientAccess(true);
       break;
@@ -1461,6 +1466,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           extInfo.isAllowModuleWithCompilerErrorsEnabled();
       Bits.IsConcurrencyChecked = extInfo.isConcurrencyChecked();
       Bits.HasCxxInteroperability = extInfo.hasCxxInteroperability();
+      Bits.CXXStdlibKind = static_cast<uint8_t>(extInfo.getCXXStdlibKind());
       Bits.AllowNonResilientAccess = extInfo.allowNonResilientAccess();
       Bits.SerializePackageEnabled = extInfo.serializePackageEnabled();
       MiscVersion = info.miscVersion;
