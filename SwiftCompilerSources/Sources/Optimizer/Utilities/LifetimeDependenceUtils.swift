@@ -113,7 +113,7 @@ struct LifetimeDependence : CustomStringConvertible {
     case yield(Value)
     /// An owned value whose OSSA lifetime encloses nonescapable values
     case owned(Value)
-    /// Singly-initialized addressible storage (likely for an
+    /// Singly-initialized addressable storage (likely for an
     /// immutable address-only value). The lifetime extends until the
     /// memory is destroyed. e.g. A value produced by an @in
     /// FunctionArgument or @out apply. @inout has caller scope
@@ -559,7 +559,7 @@ extension LifetimeDependence {
 /// This uses LifetimeDependenceUseDefWalker to find the introducers
 /// of a dependence chain, which represent the value's "inherited"
 /// dependencies. This stops at an address, unless the address refers
-/// to a singly-initialized temprorary, in which case it continues to
+/// to a singly-initialized temporary, in which case it continues to
 /// walk up the stored value.
 ///
 /// This overrides LifetimeDependenceUseDefWalker to stop at a value
@@ -773,7 +773,7 @@ extension LifetimeDependenceUseDefWalker {
 /// follows interior pointers using AddressUseVisitor. Handles stores to and loads from local variables using
 /// LocalVariableReachabilityCache.
 ///
-/// Ignores trivial values (~Escapable types are never trivial. Escapable types may only be lifetime-depenent values if
+/// Ignores trivial values (~Escapable types are never trivial. Escapable types may only be lifetime-dependent values if
 /// they are non-trivial).
 ///
 /// Skips uses within nested borrow scopes.

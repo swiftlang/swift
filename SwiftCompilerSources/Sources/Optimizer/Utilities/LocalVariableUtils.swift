@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 ///
-/// SIL operates on three kinds of addressible memory:
+/// SIL operates on three kinds of addressable memory:
 ///
 /// 1. Temporary RValues. These are recognied by AddressInitializationWalker. These largely disappear with opaque SIL
 /// values.
@@ -35,13 +35,13 @@ private func log(_ message: @autoclosure () -> String) {
 
 // Local variables are accessed in one of these ways.
 //
-// Note: @in is only immutable up to when it is destroyed, so still requies a local live range.
+// Note: @in is only immutable up to when it is destroyed, so still requires a local live range.
 struct LocalVariableAccess: CustomStringConvertible {
   enum Kind {
     case incomingArgument // @in, @inout, @inout_aliasable
     case outgoingArgument // @inout, @inout_aliasable
     case inoutYield       // indirect yield from this accessor
-    case beginAccess // Reading or reassinging a 'var'
+    case beginAccess // Reading or reassigning a 'var'
     case load        // Reading a 'let'. Returning 'var' from an initializer.
     case store       // 'var' initialization and destruction
     case apply       // indirect arguments
@@ -214,7 +214,7 @@ class LocalVariableAccessInfo: CustomStringConvertible {
   }
 }
 
-/// Model the formal accesses of an addressible variable introduced by an alloc_box, alloc_stack, or indirect
+/// Model the formal accesses of an addressable variable introduced by an alloc_box, alloc_stack, or indirect
 /// FunctionArgument.
 ///
 /// This instantiates a unique LocalVariableAccessInfo instances for each access instruction, caching it an an access

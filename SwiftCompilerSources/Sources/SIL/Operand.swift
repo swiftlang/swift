@@ -87,7 +87,7 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
   
   /// Returns a sub-array defined by `bounds`.
   ///
-  /// Note: this does not return a Slice. The first index of the returnd array is always 0.
+  /// Note: this does not return a Slice. The first index of the returned array is always 0.
   public subscript(bounds: Range<Int>) -> OperandArray {
     assert(bounds.lowerBound >= startIndex && bounds.upperBound <= endIndex)
     return OperandArray(

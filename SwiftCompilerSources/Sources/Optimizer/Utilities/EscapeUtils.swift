@@ -156,7 +156,7 @@ protocol EscapeVisitor {
   /// If true, the traversals follow values with trivial types.
   var followTrivialTypes: Bool { get }
 
-  /// If true, the traveral follows loaded values.
+  /// If true, the traversal follows loaded values.
   var followLoads: Bool { get }
 }
 
