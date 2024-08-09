@@ -3789,11 +3789,14 @@ class GenericTypeParamDecl final
   /// \param depth The generic signature depth.
   /// \param index The index of the parameter in the generic signature.
   /// \param paramKind The kind of generic type parameter this is.
+  /// \param isOpaqueType Whether the generic parameter is written as an opaque
+  ///                     parameter e.g 'some Collection'.
   /// \param opaqueTypeRepr The TypeRepr of an opaque generic parameter.
   ///
   GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc,
                        SourceLoc specifierLoc, unsigned depth, unsigned index,
-                       GenericTypeParamKind paramKind, TypeRepr *opaqueTypeRepr);
+                       GenericTypeParamKind paramKind, bool isOpaqueType,
+                       TypeRepr *opaqueTypeRepr);
 
   /// Construct a new generic type parameter.
   ///
@@ -3808,12 +3811,15 @@ class GenericTypeParamDecl final
   /// \param depth The generic signature depth.
   /// \param index The index of the parameter in the generic signature.
   /// \param paramKind The kind of generic type parameter this is.
+  /// \param isOpaqueType Whether the generic parameter is written as an opaque
+  ///                     parameter e.g 'some Collection'.
   /// \param opaqueTypeRepr The TypeRepr of an opaque generic parameter.
   ///
   static GenericTypeParamDecl *create(DeclContext *dc, Identifier name,
                                       SourceLoc nameLoc, SourceLoc specifierLoc,
                                       unsigned depth, unsigned index,
                                       GenericTypeParamKind paramKind,
+                                      bool isOpaqueType,
                                       TypeRepr *opaqueTypeRepr);
 
 public:
@@ -3825,7 +3831,7 @@ public:
                        SourceLoc specifierLoc, unsigned depth, unsigned index,
                        GenericTypeParamKind paramKind)
       : GenericTypeParamDecl(dc, name, nameLoc, specifierLoc, depth, index,
-                             paramKind, nullptr) {
+                             paramKind, false, nullptr) {
   }
 
   /// Construct a deserialized generic type parameter.
@@ -3838,10 +3844,13 @@ public:
   /// \param depth The generic signature depth.
   /// \param index The index of the parameter in the generic signature.
   /// \param paramKind The kind of generic type parameter this is.
+  /// \param isOpaqueType Whether the generic parameter is written as an opaque
+  ///                     parameter e.g 'some Collection'.
   ///
   static GenericTypeParamDecl *
   createDeserialized(DeclContext *dc, Identifier name, unsigned depth,
-                     unsigned index, GenericTypeParamKind paramKind);
+                     unsigned index, GenericTypeParamKind paramKind,
+                     bool isOpaqueType);
 
   /// Construct a new parsed generic type parameter.
   ///

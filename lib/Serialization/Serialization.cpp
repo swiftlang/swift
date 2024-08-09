@@ -4198,6 +4198,7 @@ public:
         S.Out, S.ScratchRecord, abbrCode,
         S.addDeclBaseNameRef(genericParam->getName()),
         genericParam->isImplicit(),
+        genericParam->isOpaqueType(),
         S.addTypeRef(genericParam->getDeclaredInterfaceType()->getCanonicalType()));
   }
 

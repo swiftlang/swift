@@ -3466,10 +3466,11 @@ public:
                                   StringRef blobData) {
     IdentifierID nameID;
     bool isImplicit;
+    bool isOpaqueType;
     TypeID interfaceTypeID;
 
     decls_block::GenericTypeParamDeclLayout::readRecord(
-        scratch, nameID, isImplicit, interfaceTypeID);
+        scratch, nameID, isImplicit, isOpaqueType, interfaceTypeID);
 
     auto interfaceTy = MF.getTypeChecked(interfaceTypeID);
     if (!interfaceTy)
@@ -3482,7 +3483,7 @@ public:
     auto *DC = MF.getFile();
     auto *genericParam = GenericTypeParamDecl::createDeserialized(
         DC, MF.getIdentifier(nameID), paramTy->getDepth(), paramTy->getIndex(),
-        paramTy->getParamKind());
+        paramTy->getParamKind(), isOpaqueType);
     declOrOffset = genericParam;
 
     if (isImplicit)
