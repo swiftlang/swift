@@ -1659,6 +1659,10 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
     Type resultTy, bool isDefinition,
     std::optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo) {
   assert(accessor->isGetter());
+  // operator[] with multiple parameters only supported C++23 and up.
+  bool multiParam = accessor->getParameters()->size() > 1;
+  if (multiParam)
+    os << "#if __cplusplus >= 202302L\n";
   FunctionSignatureModifiers modifiers;
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
@@ -1671,6 +1675,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
   declAndTypePrinter.printAvailability(os, accessor->getStorage());
   if (!isDefinition) {
     os << ";\n";
+    if (multiParam)
+      os << "#endif // #if __cplusplus >= 202302L\n";
     return;
   }
   os << " {\n";
@@ -1680,6 +1686,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
       accessor->getModuleContext(), resultTy, accessor->getParameters(),
       /*hasThrows=*/false, nullptr, /*isStatic=*/false, dispatchInfo);
   os << "  }\n";
+  if (multiParam)
+    os << "#endif // #if __cplusplus >= 202302L\n";
 }
 
 bool DeclAndTypeClangFunctionPrinter::hasKnownOptionalNullableCxxMapping(
