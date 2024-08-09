@@ -112,6 +112,10 @@ CheckRequirementResult Requirement::checkRequirement(
     }
 
     auto *proto = getProtocolDecl();
+
+    if (firstType->isTypeParameter())
+      return CheckRequirementResult::RequirementFailure;
+
     auto conformance = ModuleDecl::lookupConformance(
         firstType, proto, allowMissing);
     if (!conformance)
