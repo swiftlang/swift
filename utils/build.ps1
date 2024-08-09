@@ -1453,6 +1453,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         dispatch_DIR = "$DispatchBinaryCache\cmake\modules";
         SwiftSyntax_DIR = "$SwiftSyntaxDir";
         _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
+        SwiftFoundation_BUILD_MACROS = "NO";
         _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
         _SwiftCollections_SourceDIR = "$SourceCache\swift-collections"
       } + $TestingDefines)
