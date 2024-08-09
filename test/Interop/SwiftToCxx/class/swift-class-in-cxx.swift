@@ -38,7 +38,7 @@ public final class ClassWithIntField {
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<>
-// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Class::ClassWithIntField> = true;
+// CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<Class::ClassWithIntField> = true;
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 
