@@ -68,6 +68,7 @@ public:
     std::string Text;
     std::vector<TextReference> References;
     std::vector<TextDecl> Decls;
+    /// Do not clear the map or erase elements, without keeping the Decls vector in sync
     llvm::StringMap<TextDecl> USRMap;
   };
 
@@ -160,6 +161,9 @@ public:
         DeclUSRs.emplace_back(VD, USR);
         auto iterator = Info.USRMap.insert_or_assign(USR, Entry).first;
         // Set the USR in the declarations to the key in the USRMap, because the lifetime of that matches/exceeds the lifetime of Decls
+        // String keys in the StringMap are heap allocated and only get destroyed on explicit erase() or clear() calls, or on destructor calls
+        // (the ProgrammersManual description itself also states that StringMap "only ever copies a string if a value is inserted").
+        // Thus this never results in a dangling reference, as the USRMap is never cleared and no elements are erased in its lifetime.
         Info.Decls.back().USR = iterator->getKey();
       }
     }
