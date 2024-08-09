@@ -800,7 +800,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   try_apply [[UNWRAP_FN]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error any Error), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
   //
   // Now we emit the call to the initializer. Notice how we return self back to
-  // its memory locatio nbefore any other work is done.
+  // its memory location before any other work is done.
   // CHECK: [[NORMAL_BB]](
   // CHECK:   [[INIT_FN:%.*]] = function_ref @$s21failable_initializers14ThrowBaseClassC6noFailACSi_tcfc : $@convention(method)
   // CHECK:   [[BASE_SELF_INIT:%.*]] = apply [[INIT_FN]]({{%.*}}, [[BASE_SELF]])
