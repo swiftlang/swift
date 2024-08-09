@@ -10,8 +10,8 @@ import ReferenceCountedObjCProperty
 // CHECK: %[[V4:.*]] = load ptr, ptr @"\01L_selector(lc)", align {{4|8}}
 // CHECK: %[[V5:.*]] = call ptr @objc_msgSend(ptr %{{.*}}, ptr %[[V4]])
 // CHECK: call void @_Z8LCRetainPN2NS10LocalCountE(ptr %[[V5]])
-// CHECK: store ptr %[[V5]], ptr %[[LC]], align 8
-// CHECK: %[[TODESTROY:.*]] = load ptr, ptr %[[LC]], align 8
+// CHECK: store ptr %[[V5]], ptr %[[LC]], align {{4|8}}
+// CHECK: %[[TODESTROY:.*]] = load ptr, ptr %[[LC]], align {{4|8}}
 // CHECK: call void @_Z9LCReleasePN2NS10LocalCountE(ptr %[[TODESTROY]]
 
 public func testGetter() {
