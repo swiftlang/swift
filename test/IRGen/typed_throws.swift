@@ -122,7 +122,7 @@ struct MyError: Error {
 
 // CHECK: define hidden swiftcc { float, i64, float } @"$s12typed_throws8mayThrow1x1ySf_s5Int32VSftSb_yXltAA7MyErrorVYKF"
 // CHECK:   [[CONVERTED:%.*]] = ptrtoint ptr {{%.*}} to i64
-// CEHCK:   insertvalue { float, i64, float } undef, i64 [[CONVERTED]], 1
+// CHECK:   insertvalue { float, i64, float } undef, i64 [[CONVERTED]], 1
 // CHECK: }
 @inline(never)
 func mayThrow(x: Bool, y: AnyObject) throws(MyError) -> (Float, Int32, Float) {
