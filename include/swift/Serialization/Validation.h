@@ -14,6 +14,7 @@
 #define SWIFT_SERIALIZATION_VALIDATION_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
 #include "swift/Serialization/SerializationOptions.h"
@@ -128,6 +129,7 @@ class ExtendedValidationInfo {
   StringRef ModuleABIName;
   StringRef ModulePackageName;
   StringRef ExportAsName;
+  CXXStdlibKind CXXStdlib;
   struct {
     unsigned ArePrivateImportsEnabled : 1;
     unsigned IsSIB : 1;
@@ -241,6 +243,9 @@ public:
   void setHasCxxInteroperability(bool val) {
     Bits.HasCxxInteroperability = val;
   }
+
+  CXXStdlibKind getCXXStdlibKind() const { return CXXStdlib; }
+  void setCXXStdlibKind(CXXStdlibKind kind) { CXXStdlib = kind; }
 };
 
 struct SearchPath {

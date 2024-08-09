@@ -20,6 +20,7 @@
 #include "TypeCheckInvertible.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
@@ -479,7 +480,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
             !ty->hasUnboundGenericType() &&
             !ty->hasArchetype()) {
           auto bitCopy = Ctx.getProtocol(KnownProtocolKind::BitwiseCopyable);
-          if (DC->getParentModule()->checkConformance(ty, bitCopy)) {
+          if (checkConformance(ty, bitCopy)) {
             Ctx.Diags.diagnose(consumeExpr->getLoc(),
                                diag::consume_of_bitwisecopyable_noop, ty)
                    .fixItRemoveChars(consumeExpr->getStartLoc(),
@@ -3471,7 +3472,7 @@ public:
                   .getRequirements(),
               [&exprType](auto requirement) {
                 if (requirement.getKind() == RequirementKind::Conformance) {
-                  auto conformance = ModuleDecl::checkConformance(
+                  auto conformance = checkConformance(
                       exprType->getRValueType(),
                       requirement.getProtocolDecl(),
                       /*allowMissing=*/false);

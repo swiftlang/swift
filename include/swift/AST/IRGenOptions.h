@@ -475,6 +475,9 @@ public:
 
   unsigned UseFragileResilientProtocolWitnesses : 1;
 
+  // Whether to run the HotColdSplitting pass when optimizing.
+  unsigned EnableHotColdSplit : 1;
+
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
 
@@ -564,6 +567,7 @@ public:
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false),
+        EnableHotColdSplit(false),
         CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),

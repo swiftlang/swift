@@ -13,6 +13,7 @@
 #include "TypeChecker.h"
 #include "TypeCheckConcurrency.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
@@ -188,8 +189,7 @@ DerivedConformance::storedPropertiesNotConformingToProtocol(
     if (!type)
       nonconformingProperties.push_back(propertyDecl);
 
-    if (!ModuleDecl::checkConformance(DC->mapTypeIntoContext(type),
-                                      protocol)) {
+    if (!checkConformance(DC->mapTypeIntoContext(type), protocol)) {
       nonconformingProperties.push_back(propertyDecl);
     }
   }
@@ -294,7 +294,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
 
-    auto conformance = ModuleDecl::lookupConformance(
+    auto conformance = lookupConformance(
         nominal->getDeclaredInterfaceType(), proto);
     if (conformance) {
       auto DC = conformance.getConcrete()->getDeclContext();
@@ -834,8 +834,7 @@ DerivedConformance::associatedValuesNotConformingToProtocol(
 
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
-      if (ModuleDecl::checkConformance(DC->mapTypeIntoContext(type),
-                                       protocol).isInvalid()) {
+      if (checkConformance(DC->mapTypeIntoContext(type), protocol).isInvalid()) {
         nonconformingAssociatedValues.push_back(param);
       }
     }

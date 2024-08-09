@@ -298,9 +298,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
           return Type(type).subst(SubMap);
         return type;
       },
-      [&](CanType depType, Type substType, ProtocolDecl *proto) {
-        return ModuleDecl::lookupConformance(substType, proto);
-      },
+      LookUpConformanceInModule(),
       SubstFlags::DesugarMemberTypes);
   };
 

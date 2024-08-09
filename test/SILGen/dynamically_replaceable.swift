@@ -401,8 +401,8 @@ public func testWithLocalFun() {
     localLocalFun()
   }
   localFun()
-  let unamedClosure = { print("foo") }
-  unamedClosure()
+  let unnamedClosure = { print("foo") }
+  unnamedClosure()
 }
 
 @propertyWrapper

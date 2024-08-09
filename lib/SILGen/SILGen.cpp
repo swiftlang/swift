@@ -18,6 +18,7 @@
 #include "SILGenFunctionBuilder.h"
 #include "SILGenTopLevel.h"
 #include "Scope.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Evaluator.h"
@@ -318,7 +319,7 @@ SILGenModule::getConformanceToObjectiveCBridgeable(SILLocation loc, Type type) {
   if (!proto) return nullptr;
 
   // Find the conformance to _ObjectiveCBridgeable.
-  auto result = ModuleDecl::lookupConformance(type, proto);
+  auto result = lookupConformance(type, proto);
   if (result.isInvalid())
     return nullptr;
 
@@ -363,7 +364,7 @@ SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
     return ProtocolConformanceRef::forInvalid();
 
   // Find the conformance to _BridgedStoredNSError.
-  return ModuleDecl::lookupConformance(type, proto);
+  return lookupConformance(type, proto);
 }
 
 static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C, StringRef name) {
@@ -515,8 +516,7 @@ ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
     return nullptr;
   }
 
-  auto conformance =
-    ModuleDecl::lookupConformance(nsErrorTy, cast<ProtocolDecl>(error));
+  auto conformance = lookupConformance(nsErrorTy, cast<ProtocolDecl>(error));
 
   if (conformance.isConcrete())
     NSErrorConformanceToError = conformance.getConcrete();

@@ -18,6 +18,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Availability.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
@@ -777,7 +778,7 @@ addDistributedActorCodableConformance(
 
   // === Does the actor explicitly conform to the protocol already?
   auto explicitConformance =
-      ModuleDecl::lookupConformance(actor->getInterfaceType(), proto);
+      lookupConformance(actor->getInterfaceType(), proto);
   if (!explicitConformance.isInvalid()) {
     // ok, it was conformed explicitly -- let's not synthesize;
     return nullptr;
@@ -988,7 +989,7 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
     auto DistributedActorProto = C.getDistributedActorDecl();
     for (auto system : DistributedActorProto->lookupDirect(C.Id_actorSystem)) {
       if (auto var = dyn_cast<VarDecl>(system)) {
-        auto conformance = ModuleDecl::checkConformance(
+        auto conformance = checkConformance(
             proto->mapTypeIntoContext(var->getInterfaceType()),
             DAS);
 
