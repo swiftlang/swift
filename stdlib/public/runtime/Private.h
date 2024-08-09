@@ -316,7 +316,7 @@ public:
 
     explicit MetadataPackOrValue(const void *ptr) : Ptr(ptr) {}
 
-    explicit MetadataPackOrValue(ssize_t value)
+    explicit MetadataPackOrValue(intptr_t value)
         : Ptr(reinterpret_cast<const void *>(value)) {}
 
     explicit MetadataPackOrValue(MetadataResponse response) : Ptr(response.Value) {}
@@ -362,8 +362,8 @@ public:
       fatalError(0, "Expected a metadata pack but got metadata\n");
     }
 
-    size_t getValue() const {
-      return reinterpret_cast<size_t>(Ptr);
+    intptr_t getValue() const {
+      return reinterpret_cast<intptr_t>(Ptr);
     }
   };
 

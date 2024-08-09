@@ -267,17 +267,15 @@ _buildDemanglingForMetadataPack(MetadataPackPointer pack, size_t count,
 }
 
 static Demangle::NodePointer
-_buildDemanglingForValue(size_t value, GenericValueDescriptor valueDescriptor,
+_buildDemanglingForValue(intptr_t value, GenericValueDescriptor valueDescriptor,
                          Demangle::Demangler &Dem) {
   switch (valueDescriptor.Type) {
   case GenericValueType::Int: {
-    auto signedValue = (ssize_t)value;
-
-    if (signedValue < 0) {
-      return Dem.createNode(Node::Kind::NegativeInteger, signedValue);
+    if (value < 0) {
+      return Dem.createNode(Node::Kind::NegativeInteger, value);
     }
 
-    return Dem.createNode(Node::Kind::Integer, signedValue);
+    return Dem.createNode(Node::Kind::Integer, value);
   }
   }
 }
