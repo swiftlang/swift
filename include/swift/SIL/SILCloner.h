@@ -235,6 +235,9 @@ public:
         llvm::errs() << "\nsubstitution map:\n";
         Subs.dump(llvm::errs());
         llvm::errs() << "\n";
+        llvm::errs() << "\ncomposed substitution map:\n";
+        substSubs.dump(llvm::errs());
+        llvm::errs() << "\n";
         abort();
       }
     }
