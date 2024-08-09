@@ -24,6 +24,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -1834,7 +1835,7 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl,
   if (!hasKeywordArguments) {
     auto arrayLitProto =
       ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
-    return (bool) ModuleDecl::checkConformance(argType, arrayLitProto);
+    return (bool) checkConformance(argType, arrayLitProto);
   }
   // If keyword arguments, check that argument type conforms to
   // `ExpressibleByDictionaryLiteral` and that the `Key` associated type
@@ -1843,11 +1844,11 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl,
     ctx.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
   auto dictLitProto =
     ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
-  auto dictConf = ModuleDecl::checkConformance(argType, dictLitProto);
+  auto dictConf = checkConformance(argType, dictLitProto);
   if (dictConf.isInvalid())
     return false;
   auto keyType = dictConf.getTypeWitnessByName(argType, ctx.Id_Key);
-  return (bool) ModuleDecl::checkConformance(keyType, stringLitProtocol);
+  return (bool) checkConformance(keyType, stringLitProtocol);
 }
 
 /// Returns true if the given nominal type has a valid implementation of a
@@ -2772,8 +2773,8 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   }
 
   if (!ApplicationDelegateProto ||
-      !ModuleDecl::checkConformance(CD->getDeclaredInterfaceType(),
-                                    ApplicationDelegateProto)) {
+      !checkConformance(CD->getDeclaredInterfaceType(),
+                        ApplicationDelegateProto)) {
     diagnose(attr->getLocation(),
              diag::attr_ApplicationMain_not_ApplicationDelegate,
              applicationMainKind);
@@ -3885,7 +3886,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
   }
 
   // The type eraser must conform to the annotated protocol
-  if (!ModuleDecl::checkConformance(typeEraser, protocol)) {
+  if (!checkConformance(typeEraser, protocol)) {
     diags.diagnose(attr->getLoc(), diag::type_eraser_does_not_conform,
                    typeEraser, protocolType);
     diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
@@ -5132,7 +5133,7 @@ static bool conformsToDifferentiable(Type type,
   auto &ctx = type->getASTContext();
   auto *differentiableProto =
       ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto conf = ModuleDecl::checkConformance(type, differentiableProto);
+  auto conf = checkConformance(type, differentiableProto);
   if (conf.isInvalid())
     return false;
   if (!tangentVectorEqualsSelf)

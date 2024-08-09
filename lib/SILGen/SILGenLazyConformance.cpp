@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -140,14 +141,12 @@ void SILGenModule::useConformancesFromObjectiveCType(CanType type) {
       return;
 
     if (objectiveCBridgeable) {
-      if (auto subConformance =
-              ModuleDecl::lookupConformance(t, objectiveCBridgeable))
+      if (auto subConformance = lookupConformance(t, objectiveCBridgeable))
         useConformance(subConformance);
     }
 
     if (bridgedStoredNSError) {
-      if (auto subConformance =
-              ModuleDecl::lookupConformance(t, bridgedStoredNSError))
+      if (auto subConformance = lookupConformance(t, bridgedStoredNSError))
         useConformance(subConformance);
     }
   });

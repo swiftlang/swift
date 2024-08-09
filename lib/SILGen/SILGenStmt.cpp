@@ -21,6 +21,7 @@
 #include "SILGen.h"
 #include "Scope.h"
 #include "SwitchEnumBuilder.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/ProfileCounter.h"
@@ -1633,7 +1634,7 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
     assert(destErrorType == SILType::getExceptionType(getASTContext()));
 
     ProtocolConformanceRef conformances[1] = {
-      ModuleDecl::checkConformance(
+      checkConformance(
         exn->getType().getASTType(), getASTContext().getErrorDecl())
     };
 

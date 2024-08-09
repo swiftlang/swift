@@ -22,6 +22,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
@@ -2418,7 +2419,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
       return nullptr;
   }
 
-  return ModuleDecl::lookupConformance(castTy, protocol)
+  return lookupConformance(castTy, protocol)
              ? CoerceExpr::forLiteralInit(getASTContext(), literal,
                                           call->getSourceRange(),
                                           typeExpr->getTypeRepr())

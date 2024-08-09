@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/Existential.h"
-#include "swift/AST/Module.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
@@ -389,8 +389,7 @@ ConcreteExistentialInfo::ConcreteExistentialInfo(SILValue existential,
   SILModule *M = existential->getModule();
 
   // We have the open_existential; we still need the conformance.
-  auto ConformanceRef =
-      ModuleDecl::checkConformance(ConcreteTypeCandidate, Protocol);
+  auto ConformanceRef = checkConformance(ConcreteTypeCandidate, Protocol);
   if (ConformanceRef.isInvalid())
     return;
 

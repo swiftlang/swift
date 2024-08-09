@@ -19,6 +19,7 @@
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckEffects.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1589,10 +1590,9 @@ shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
       existentialObjectType = existentialMetaTy->getInstanceType();
     else
       existentialObjectType = argTy;
-    auto module = cs.DC->getParentModule();
     bool containsNonSelfConformance = false;
     for (auto proto : genericSig->getRequiredProtocols(genericParam)) {
-      auto conformance = module->lookupExistentialConformance(
+      auto conformance = lookupExistentialConformance(
           existentialObjectType, proto);
       if (conformance.isInvalid()) {
         containsNonSelfConformance = true;
@@ -10290,8 +10290,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
     if (shouldCheckSendabilityOfBase()) {
       auto sendableProtocol = Context.getProtocol(KnownProtocolKind::Sendable);
-      auto baseConformance = ModuleDecl::lookupConformance(
-          instanceTy, sendableProtocol);
+      auto baseConformance = lookupConformance(instanceTy, sendableProtocol);
 
       if (llvm::any_of(
               baseConformance.getConditionalRequirements(),

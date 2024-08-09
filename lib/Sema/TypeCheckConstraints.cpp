@@ -21,6 +21,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Initializer.h"
@@ -1990,8 +1991,8 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
       auto archetype = toType->castTo<ArchetypeType>();
       conformsToAllProtocols = llvm::all_of(archetype->getConformsTo(),
         [&](ProtocolDecl *proto) {
-          return ModuleDecl::checkConformance(fromType, proto,
-                                              /*allowMissing=*/false);
+          return checkConformance(fromType, proto,
+                                  /*allowMissing=*/false);
         });
     }
 
@@ -2242,7 +2243,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
     auto nsErrorTy = Context.getNSErrorType();
 
     if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::Error)) {
-      if (ModuleDecl::checkConformance(toType, errorTypeProto)) {
+      if (checkConformance(toType, errorTypeProto)) {
         if (nsErrorTy) {
           if (isSubtypeOf(fromType, nsErrorTy, dc)
               // Don't mask "always true" warnings if NSError is cast to
@@ -2252,7 +2253,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
         }
       }
 
-      if (ModuleDecl::checkConformance(fromType, errorTypeProto)) {
+      if (checkConformance(fromType, errorTypeProto)) {
         // Cast of an error-conforming type to NSError or NSObject.
         if ((nsObject && toType->isEqual(nsObject)) ||
              (nsErrorTy && toType->isEqual(nsErrorTy)))

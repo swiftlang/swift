@@ -16,6 +16,7 @@
 
 #include "ConformanceLookupTable.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericParamList.h"
@@ -871,7 +872,7 @@ DeclContext *ConformanceLookupTable::getConformingContext(
         Type superclassTy = classTy->getSuperclassForDecl(superclassDecl);
         if (superclassTy->is<ErrorType>())
           return nullptr;
-        auto inheritedConformance = ModuleDecl::lookupConformance(
+        auto inheritedConformance = swift::lookupConformance(
             superclassTy, protocol, /*allowMissing=*/false);
         if (inheritedConformance)
           return superclassDecl;
@@ -947,7 +948,7 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
       return nullptr;
 
     // Look up the inherited conformance.
-    auto inheritedConformance = ModuleDecl::lookupConformance(
+    auto inheritedConformance = swift::lookupConformance(
         superclassTy, protocol, /*allowMissing=*/true);
 
     // Form the inherited conformance.

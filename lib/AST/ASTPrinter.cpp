@@ -23,6 +23,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Comment.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
@@ -1799,7 +1800,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
         return type;
       },
       [&](CanType depType, Type substType, ProtocolDecl *proto) {
-        return ModuleDecl::lookupConformance(substType, proto);
+        return lookupConformance(substType, proto);
       });
   };
 
