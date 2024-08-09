@@ -198,7 +198,7 @@ extension Value {
     ProjectedValue(value: self, path: path)
   }
 
-  /// Returns a projected value, defined by this value and path containig a single field of `kind` and `index`.
+  /// Returns a projected value, defined by this value and path containing a single field of `kind` and `index`.
   public func at(_ kind: SmallProjectionPath.FieldKind, index: Int = 0) -> ProjectedValue {
     ProjectedValue(value: self, path: SmallProjectionPath(kind, index: index))
   }

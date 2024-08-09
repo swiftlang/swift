@@ -335,7 +335,7 @@ public struct AccessPath : CustomStringConvertible {
   /// Returns true if this access addresses the same memory location as `other` or if `other`
   /// is a sub-field of this access.
 
-  /// Note that this access _contains_ `other` if `other` has a _larger_ projection path than this acccess.
+  /// Note that this access _contains_ `other` if `other` has a _larger_ projection path than this access.
   /// For example:
   ///   `%value.s0` contains `%value.s0.s1`
   public func isEqualOrContains(_ other: AccessPath) -> Bool {
