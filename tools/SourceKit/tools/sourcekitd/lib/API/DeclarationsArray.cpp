@@ -148,7 +148,8 @@ struct CompactVariantFuncs<DeclarationsArray> {
 
   template <typename FnTy>
   static auto getElement(sourcekitd_variant_t dict, sourcekitd_uid_t key,
-                const FnTy &Fn) -> decltype(Fn(nullptr, nullptr, 0, 0, nullptr)) {
+                const FnTy &Fn) -> decltype(Fn(nullptr, nullptr, 0, 0,
+                                               nullptr)) {
     void *Buf = (void*)dict.data[1];
     size_t Index = dict.data[2];
 

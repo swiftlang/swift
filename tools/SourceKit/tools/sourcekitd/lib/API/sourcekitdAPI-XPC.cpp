@@ -11,13 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "sourcekitd/CodeCompletionResultsArray.h"
-#include "sourcekitd/DeclarationsArray.h"
 #include "sourcekitd/DictionaryKeys.h"
 #include "sourcekitd/DocStructureArray.h"
 #include "sourcekitd/DocSupportAnnotationArray.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
 #include "sourcekitd/ExpressionTypeArray.h"
 #include "sourcekitd/VariableTypeArray.h"
+#include "sourcekitd/DeclarationsArray.h"
 #include "sourcekitd/RawData.h"
 #include "sourcekitd/RequestResponsePrinterBase.h"
 #include "SourceKit/Support/UIdent.h"

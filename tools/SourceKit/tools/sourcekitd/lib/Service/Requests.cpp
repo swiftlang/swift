@@ -280,10 +280,12 @@ editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
                           StringRef swiftVersion,
                           bool EnableDeclarations);
 
-static void editorOpenSwiftSourceInterface(
-    StringRef Name, StringRef SourceName, ArrayRef<const char *> Args,
-    SourceKitCancellationToken CancellationToken, ResponseReceiver Rec,
-    bool EnableDeclarations);
+static void
+editorOpenSwiftSourceInterface(StringRef Name, StringRef SourceName,
+                               ArrayRef<const char *> Args,
+                               SourceKitCancellationToken CancellationToken,
+                               ResponseReceiver Rec,
+                               bool EnableDeclarations);
 
 static void
 editorOpenSwiftTypeInterface(StringRef TypeUsr, ArrayRef<const char *> Args,
@@ -941,7 +943,8 @@ handleRequestEditorOpenInterface(const RequestDict &Req,
     Req.getInt64(KeySynthesizedExtension, SynthesizedExtension,
                  /*isOptional=*/true);
     std::optional<StringRef> InterestedUSR = Req.getString(KeyInterestedUSR);
-    bool EnableDeclarations = Req.getOptionalInt64(KeyEnableDeclarations).value_or(false);
+    bool EnableDeclarations =
+        Req.getOptionalInt64(KeyEnableDeclarations).value_or(false);
     return Rec(editorOpenInterface(*Name, *ModuleName, GroupName, Args,
                                    SynthesizedExtension, InterestedUSR,
                                    EnableDeclarations));
@@ -976,11 +979,11 @@ static void handleRequestEditorOpenHeaderInterface(
       if (swiftVerVal.has_value())
         swiftVer = std::to_string(*swiftVerVal);
     }
-    bool EnableDeclarations = Req.getOptionalInt64(KeyEnableDeclarations).value_or(false);
-    return Rec(editorOpenHeaderInterface(*Name, *HeaderName, Args,
-                                         UsingSwiftArgs.value_or(false),
-                                         SynthesizedExtension, swiftVer,
-                                         EnableDeclarations));
+    bool EnableDeclarations =
+        Req.getOptionalInt64(KeyEnableDeclarations).value_or(false);
+    return Rec(editorOpenHeaderInterface(
+        *Name, *HeaderName, Args, UsingSwiftArgs.value_or(false),
+        SynthesizedExtension, swiftVer, EnableDeclarations));
   }
 }
 
@@ -998,10 +1001,10 @@ static void handleRequestEditorOpenSwiftSourceInterface(
     if (!FileName.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.sourcefile'"));
     // Reporting the declarations array is off by default
-    bool EnableDeclarations = Req.getOptionalInt64(KeyEnableDeclarations).value_or(false);
-    return editorOpenSwiftSourceInterface(*Name, *FileName, Args,
-                                          CancellationToken, Rec,
-                                          EnableDeclarations);
+    bool EnableDeclarations =
+        Req.getOptionalInt64(KeyEnableDeclarations).value_or(false);
+    return editorOpenSwiftSourceInterface(
+        *Name, *FileName, Args, CancellationToken, Rec, EnableDeclarations);
   }
 }
 
@@ -3550,7 +3553,8 @@ public:
   void handleSemanticAnnotation(unsigned Offset, unsigned Length, UIdent Kind,
                                 bool isSystem) override;
 
-  void handleDeclaration(unsigned Offset, unsigned Length, UIdent Kind, StringRef USR) override;
+  void handleDeclaration(unsigned Offset, unsigned Length, UIdent Kind,
+                         StringRef USR) override;
 
   bool documentStructureEnabled() override { return Opts.EnableStructure; }
 
@@ -3743,10 +3747,9 @@ sourcekitd_response_t SKEditorConsumer::createResponse() {
   if (Opts.EnableStructure) {
     Dict.setCustomBuffer(KeySubStructure, DocStructure.createBuffer());
   }
-  if(Opts.EnableDeclarations){
+  if (Opts.EnableDeclarations) {
     Dict.setCustomBuffer(KeyDeclarations, Declarations.createBuffer());
   }
-
 
   return RespBuilder.createResponse();
 }
@@ -3776,7 +3779,8 @@ void SKEditorConsumer::handleSemanticAnnotation(unsigned Offset,
   SemanticAnnotations.add(Kind, Offset, Length, isSystem);
 }
 
-void SKEditorConsumer::handleDeclaration(unsigned Offset, unsigned Length, UIdent Kind, StringRef USR) {
+void SKEditorConsumer::handleDeclaration(unsigned Offset, unsigned Length,
+                                         UIdent Kind, StringRef USR) {
   assert(Kind.isValid());
   Declarations.add(Kind, Offset, Length, USR);
 }

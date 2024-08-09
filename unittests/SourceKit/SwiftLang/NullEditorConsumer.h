@@ -29,7 +29,8 @@ class NullEditorConsumer : public EditorConsumer {
   void handleSemanticAnnotation(unsigned Offset, unsigned Length, UIdent Kind,
                                 bool isSystem) override {}
 
-  void handleDeclaration(unsigned Offset, unsigned Length, UIdent Kind, StringRef USR) override {}
+  void handleDeclaration(unsigned Offset, unsigned Length, UIdent Kind,
+                         StringRef USR) override {}
 
   bool documentStructureEnabled() override { return false; }
 

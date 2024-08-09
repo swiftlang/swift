@@ -2456,11 +2456,12 @@ static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII) {
   sourcekitd_variant_t structure =
       sourcekitd_variant_dictionary_get_value(Info, KeySubStructure);
   printRawVariant(structure);
-  sourcekitd_variant_t declarations = 
+  sourcekitd_variant_t declarations =
       sourcekitd_variant_dictionary_get_value(Info, KeyDeclarations);
-  // only output declarations if there are any (because this might have been disabled in the request itself)
-  if(sourcekitd_variant_get_type(declarations) != SOURCEKITD_VARIANT_TYPE_NULL)
-      printRawVariant(declarations);
+  // only output declarations if there are any (because this might have been
+  // disabled in the request itself)
+  if (sourcekitd_variant_get_type(declarations) != SOURCEKITD_VARIANT_TYPE_NULL)
+    printRawVariant(declarations);
 }
 
 static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,
