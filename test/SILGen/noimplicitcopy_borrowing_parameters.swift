@@ -212,7 +212,7 @@ func testLoadableBorrowingEnum(_ x: borrowing LoadableEnum) {
 // CHECK:   copy_addr [[UNWRAP]] to [init] [[STACK]]
 // CHECK:   destroy_addr [[STACK]]
 // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[CHECK]]
-// TODO: We probably want the unwrap to be on the struct_element_addr, not the other wya around.
+// TODO: We probably want the unwrap to be on the struct_element_addr, not the other way around.
 // CHECK:   [[GEP:%.*]] = struct_element_addr [[UNWRAP]]
 // CHECK:   [[STACK:%.*]] = alloc_stack
 // CHECK:   copy_addr [[GEP]] to [init] [[STACK]]
