@@ -126,7 +126,7 @@
 //
 //
 // TODO: These utilities should be integrated with OSSA SIL verification and
-// guaranteed to be compelete (produce known results for all legal SIL
+// guaranteed to be complete (produce known results for all legal SIL
 // patterns).
 // ===----------------------------------------------------------------------===//
 
@@ -211,7 +211,7 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
   /// the last in the function (e.g. a store rather than a destroy or return).
   /// The client needs to use LifetimeDependenceDefUseWalker to do better.
   ///
-  /// TODO: to hande reborrow-extended uses, migrate ExtendedLiveness
+  /// TODO: to handle reborrow-extended uses, migrate ExtendedLiveness
   /// to SwiftCompilerSources.
   ///
   /// TODO: Handle .partialApply and .markDependence forwarded uses
@@ -278,7 +278,7 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
 ///
 /// If the value is a begin_apply result, then it may be the token or
 /// one of the yielded values. In any case, the scope ending operands
-/// are on the end_apply or abort_apply intructions that use the
+/// are on the end_apply or abort_apply instructions that use the
 /// token.
 ///
 /// Note: equivalent to C++ BorrowedValue, but also handles begin_apply.
