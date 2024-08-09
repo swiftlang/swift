@@ -53,5 +53,5 @@ TEST(ASTDumper, ArchetypeType) {
 
   EXPECT_EQ(str,
             " name=\"\\xCF\\x84_0_0\"\n"
-            "  (interface_type=generic_type_param_type depth=0 index=0))\n");
+            "  (interface_type=generic_type_param_type depth=0 index=0 param_kind=type))\n");
 }
