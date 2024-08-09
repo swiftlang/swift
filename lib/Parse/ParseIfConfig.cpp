@@ -767,13 +767,6 @@ static Expr *findAnyLikelySimulatorEnvironmentTest(Expr *Condition) {
 
 } // end anonymous namespace
 
-extern "C" intptr_t swift_ASTGen_evaluatePoundIfCondition(
-                        BridgedASTContext astContext,
-                        void *_Nonnull diagEngine,
-                        BridgedStringRef sourceFileBuffer,
-                        BridgedStringRef conditionText,
-                        bool);
-
 /// Call into the Swift implementation of #if condition evaluation.
 ///
 /// \returns std::nullopt if the Swift implementation is not available, or
@@ -786,21 +779,10 @@ static std::optional<std::pair<bool, bool>> evaluateWithSwiftIfConfig(
     bool shouldEvaluate
 ) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
-  // FIXME: When we migrate to SwiftParser, use the parsed syntax tree.
-  auto &sourceMgr = parser.Context.SourceMgr;
-  StringRef sourceFileText =
-      sourceMgr.getEntireTextForBuffer(*parser.SF.getBufferID());
-  StringRef conditionText =
-      sourceMgr.extractText(Lexer::getCharSourceRangeFromSourceRange(
-          sourceMgr, conditionRange));
-  intptr_t evalResult = swift_ASTGen_evaluatePoundIfCondition(
-      parser.Context, &parser.Context.Diags, sourceFileText, conditionText,
-      shouldEvaluate
-  );
-
-  bool isActive = (evalResult & 0x01) != 0;
-  bool allowSyntaxErrors = (evalResult & 0x02) != 0;
-  return std::pair(isActive, allowSyntaxErrors);
+  return evaluateOrDefault(
+      parser.Context.evaluator,
+      EvaluateIfConditionRequest{&parser.SF, conditionRange, shouldEvaluate},
+      std::pair(false, false));
 #else
   return std::nullopt;
 #endif
