@@ -62,10 +62,6 @@ static llvm::cl::opt<bool> SILViewSILGenCFG(
     "sil-view-silgen-cfg", llvm::cl::init(false),
     llvm::cl::desc("Enable the sil cfg viewer pass before diagnostics"));
 
-static llvm::cl::opt<bool>
-    EnableDeinitDevirtualizer("enable-deinit-devirtualizer", llvm::cl::init(false),
-                          llvm::cl::desc("Enable the DestroyHoisting pass."));
-
 //===----------------------------------------------------------------------===//
 //                          Diagnostic Pass Pipeline
 //===----------------------------------------------------------------------===//
@@ -190,14 +186,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   if (P.getOptions().EnableLifetimeDependenceDiagnostics) {
     P.addLifetimeDependenceDiagnostics();
   }
-
-  // Devirtualize deinits early if requested.
-  //
-  // FIXME: why is DeinitDevirtualizer in the middle of the mandatory pipeline,
-  // and what passes/compilation modes depend on it? This pass is never executed
-  // or tested without '-Xllvm enable-deinit-devirtualizer'.
-  if (EnableDeinitDevirtualizer)
-    P.addDeinitDevirtualizer();
 
   // As a temporary measure, we also eliminate move only for non-trivial types
   // until we can audit the later part of the pipeline. Eventually, this should
@@ -517,6 +505,8 @@ void addFunctionPasses(SILPassPipelinePlan &P,
     P.addDevirtualizer();
   }
   P.addARCSequenceOpts();
+
+  P.addDeinitDevirtualizer();
 
   // We earlier eliminated ownership if we are not compiling the stdlib. Now
   // handle the stdlib functions, re-simplifying, eliminating ARC as we do.
