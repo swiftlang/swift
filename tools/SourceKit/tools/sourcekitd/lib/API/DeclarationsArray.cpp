@@ -22,39 +22,23 @@ using namespace SourceKit;
 using namespace sourcekitd;
 
 struct DeclarationsArrayBuilder::Implementation {
-  CompactArrayBuilder<UIdent,
-                      unsigned,
-                      unsigned,
-                      StringRef> Builder;
+  CompactArrayBuilder<UIdent, unsigned, unsigned, StringRef> Builder;
 };
 
 DeclarationsArrayBuilder::DeclarationsArrayBuilder()
-  : Impl(*new Implementation()) {
+    : Impl(*new Implementation()) {}
 
+DeclarationsArrayBuilder::~DeclarationsArrayBuilder() { delete &Impl; }
+
+void DeclarationsArrayBuilder::add(UIdent Kind, unsigned Offset,
+                                   unsigned Length, StringRef USR) {
+
+  Impl.Builder.addEntry(Kind, Offset, Length, USR);
 }
 
-DeclarationsArrayBuilder::~DeclarationsArrayBuilder() {
-  delete &Impl;
-}
+bool DeclarationsArrayBuilder::empty() const { return Impl.Builder.empty(); }
 
-void DeclarationsArrayBuilder::add(
-    UIdent Kind,
-    unsigned Offset,
-    unsigned Length,
-    StringRef USR) {
-
-  Impl.Builder.addEntry(Kind,
-                        Offset,
-                        Length,
-                        USR);
-}
-
-bool DeclarationsArrayBuilder::empty() const {
-  return Impl.Builder.empty();
-}
-
-std::unique_ptr<llvm::MemoryBuffer>
-DeclarationsArrayBuilder::createBuffer() {
+std::unique_ptr<llvm::MemoryBuffer> DeclarationsArrayBuilder::createBuffer() {
   return Impl.Builder.createBuffer(CustomBufferKind::DeclarationsArray);
 }
 
@@ -62,36 +46,28 @@ namespace {
 
 class DeclarationsArray {
 public:
-  typedef CompactArrayReader<sourcekitd_uid_t,
-                             unsigned,
-                             unsigned,
-                             const char*> CompactArrayReaderTy;
+  typedef CompactArrayReader<sourcekitd_uid_t, unsigned, unsigned, const char *>
+      CompactArrayReaderTy;
 
-  static void readElements(void *Buf, size_t Index,
-                           sourcekitd_uid_t &Kind,
-                           unsigned &Offset,
-                           unsigned &Length,
-                           const char* &USR) {
+  static void readElements(void *Buf, size_t Index, sourcekitd_uid_t &Kind,
+                           unsigned &Offset, unsigned &Length,
+                           const char *&USR) {
     CompactArrayReaderTy Reader(Buf);
-    Reader.readEntries(Index,
-                   Kind,
-                   Offset,
-                   Length,
-                   USR);
+    Reader.readEntries(Index, Kind, Offset, Length, USR);
   }
 
-  static bool apply(sourcekitd_uid_t Kind,
-                    unsigned Offset,
-                    unsigned Length,
-                    const char* USR,
-                    llvm::function_ref<bool(sourcekitd_uid_t,
-                                            sourcekitd_variant_t)> applier) {
+  static bool
+  apply(sourcekitd_uid_t Kind, unsigned Offset, unsigned Length,
+        const char *USR,
+        llvm::function_ref<bool(sourcekitd_uid_t, sourcekitd_variant_t)>
+            applier) {
 
-#define APPLY(K, Ty, Field)                              \
-  do {                                                   \
-    sourcekitd_uid_t key = SKDUIDFromUIdent(K);          \
-    sourcekitd_variant_t var = make##Ty##Variant(Field); \
-    if (!applier(key, var)) return false;                \
+#define APPLY(K, Ty, Field)                                                    \
+  do {                                                                         \
+    sourcekitd_uid_t key = SKDUIDFromUIdent(K);                                \
+    sourcekitd_variant_t var = make##Ty##Variant(Field);                       \
+    if (!applier(key, var))                                                    \
+      return false;                                                            \
   } while (0)
 
     APPLY(KeyKind, UID, Kind);
@@ -103,11 +79,8 @@ public:
     return true;
   }
 
-  static int64_t getInt(sourcekitd_uid_t Key,
-                        sourcekitd_uid_t Kind,
-                        unsigned Offset,
-                        unsigned Length,
-                        const char* USR) {
+  static int64_t getInt(sourcekitd_uid_t Key, sourcekitd_uid_t Kind,
+                        unsigned Offset, unsigned Length, const char *USR) {
     if (Key == SKDUIDFromUIdent(KeyOffset))
       return Offset;
     if (Key == SKDUIDFromUIdent(KeyLength))
@@ -115,21 +88,17 @@ public:
     return 0;
   }
 
-  static sourcekitd_uid_t getUID(sourcekitd_uid_t Key,
-                                 sourcekitd_uid_t Kind,
-                                 unsigned Offset,
-                                 unsigned Length,
-                                 const char* USR) {
+  static sourcekitd_uid_t getUID(sourcekitd_uid_t Key, sourcekitd_uid_t Kind,
+                                 unsigned Offset, unsigned Length,
+                                 const char *USR) {
     if (Key == SKDUIDFromUIdent(KeyKind))
       return Kind;
     return nullptr;
   }
 
-  static const char* getString(sourcekitd_uid_t Key,
-                                 sourcekitd_uid_t Kind,
-                                 unsigned Offset,
-                                 unsigned Length,
-                                 const char* USR) {
+  static const char *getString(sourcekitd_uid_t Key, sourcekitd_uid_t Kind,
+                               unsigned Offset, unsigned Length,
+                               const char *USR) {
     if (Key == SKDUIDFromUIdent(KeyUSR))
       return USR;
     return nullptr;
@@ -148,34 +117,32 @@ struct CompactVariantFuncs<DeclarationsArray> {
 
   template <typename FnTy>
   static auto getElement(sourcekitd_variant_t dict, sourcekitd_uid_t key,
-                const FnTy &Fn) -> decltype(Fn(nullptr, nullptr, 0, 0,
-                                               nullptr)) {
-    void *Buf = (void*)dict.data[1];
+                         const FnTy &Fn) -> decltype(Fn(nullptr, nullptr, 0, 0,
+                                                        nullptr)) {
+    void *Buf = (void *)dict.data[1];
     size_t Index = dict.data[2];
 
     sourcekitd_uid_t Kind;
     unsigned Offset;
     unsigned Length;
-    const char* USR;
-    DeclarationsArray::readElements(Buf, Index,
-                                        Kind, Offset, Length, USR);
+    const char *USR;
+    DeclarationsArray::readElements(Buf, Index, Kind, Offset, Length, USR);
 
     return Fn(key, Kind, Offset, Length, USR);
   }
-  
-  static bool
-  dictionary_apply(sourcekitd_variant_t dict,
-                   llvm::function_ref<bool(sourcekitd_uid_t,
-                                           sourcekitd_variant_t)> applier) {
-    void *Buf = (void*)dict.data[1];
+
+  static bool dictionary_apply(
+      sourcekitd_variant_t dict,
+      llvm::function_ref<bool(sourcekitd_uid_t, sourcekitd_variant_t)>
+          applier) {
+    void *Buf = (void *)dict.data[1];
     size_t Index = dict.data[2];
 
     sourcekitd_uid_t Kind;
     unsigned Offset;
     unsigned Length;
-    const char* USR;
-    DeclarationsArray::readElements(Buf, Index,
-                                        Kind, Offset, Length, USR);
+    const char *USR;
+    DeclarationsArray::readElements(Buf, Index, Kind, Offset, Length, USR);
     return DeclarationsArray::apply(Kind, Offset, Length, USR, applier);
   }
 
@@ -191,8 +158,8 @@ struct CompactVariantFuncs<DeclarationsArray> {
     return getElement(dict, key, DeclarationsArray::getUID);
   }
 
-  static const char* dictionary_get_string(sourcekitd_variant_t dict,
-                                                sourcekitd_uid_t key) {
+  static const char *dictionary_get_string(sourcekitd_variant_t dict,
+                                           sourcekitd_uid_t key) {
 
     return getElement(dict, key, DeclarationsArray::getString);
   }
@@ -201,32 +168,31 @@ struct CompactVariantFuncs<DeclarationsArray> {
 };
 
 VariantFunctions CompactVariantFuncs<DeclarationsArray>::Funcs = {
-  get_type,
-  nullptr/*Annot_array_apply*/,
-  nullptr/*Annot_array_get_bool*/,
-  nullptr/*Annot_array_get_count*/,
-  nullptr/*Annot_array_get_int64*/,
-  nullptr/*Annot_array_get_string*/,
-  nullptr/*Annot_array_get_uid*/,
-  nullptr/*Annot_array_get_value*/,
-  nullptr/*Annot_bool_get_value*/,
-  dictionary_apply,
-  nullptr/*Annot_dictionary_get_bool*/,
-  dictionary_get_int64,
-  dictionary_get_string,
-  nullptr/*Annot_dictionary_get_value*/,
-  dictionary_get_uid,
-  nullptr/*Annot_string_get_length*/,
-  nullptr/*Annot_string_get_ptr*/,
-  nullptr/*Annot_int64_get_value*/,
-  nullptr/*Annot_uid_get_value*/,
-  nullptr/*Annot_data_get_size*/,
-  nullptr/*Annot_data_get_ptr*/,
+    get_type,
+    nullptr /*Annot_array_apply*/,
+    nullptr /*Annot_array_get_bool*/,
+    nullptr /*Annot_array_get_count*/,
+    nullptr /*Annot_array_get_int64*/,
+    nullptr /*Annot_array_get_string*/,
+    nullptr /*Annot_array_get_uid*/,
+    nullptr /*Annot_array_get_value*/,
+    nullptr /*Annot_bool_get_value*/,
+    dictionary_apply,
+    nullptr /*Annot_dictionary_get_bool*/,
+    dictionary_get_int64,
+    dictionary_get_string,
+    nullptr /*Annot_dictionary_get_value*/,
+    dictionary_get_uid,
+    nullptr /*Annot_string_get_length*/,
+    nullptr /*Annot_string_get_ptr*/,
+    nullptr /*Annot_int64_get_value*/,
+    nullptr /*Annot_uid_get_value*/,
+    nullptr /*Annot_data_get_size*/,
+    nullptr /*Annot_data_get_ptr*/,
 };
 
 } // namespace sourcekitd
 
-VariantFunctions *
-sourcekitd::getVariantFunctionsForDeclarationsArray() {
+VariantFunctions *sourcekitd::getVariantFunctionsForDeclarationsArray() {
   return &CompactArrayFuncs<DeclarationsArray>::Funcs;
 }

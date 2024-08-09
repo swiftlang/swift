@@ -28,9 +28,7 @@ public:
   DeclarationsArrayBuilder();
   ~DeclarationsArrayBuilder();
 
-  void add(SourceKit::UIdent Kind,
-           unsigned Offset,
-           unsigned Length,
+  void add(SourceKit::UIdent Kind, unsigned Offset, unsigned Length,
            llvm::StringRef USR);
 
   bool empty() const;

@@ -10,14 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "sourcekitd/DeclarationsArray.h"
-#include "sourcekitd/Service.h"
 #include "sourcekitd/CodeCompletionResultsArray.h"
+#include "sourcekitd/DeclarationsArray.h"
 #include "sourcekitd/DictionaryKeys.h"
 #include "sourcekitd/DocStructureArray.h"
 #include "sourcekitd/DocSupportAnnotationArray.h"
-#include "sourcekitd/TokenAnnotationsArray.h"
 #include "sourcekitd/ExpressionTypeArray.h"
+#include "sourcekitd/Service.h"
+#include "sourcekitd/TokenAnnotationsArray.h"
 #include "sourcekitd/VariableTypeArray.h"
 
 #include "SourceKit/Core/Context.h"
@@ -265,27 +265,22 @@ static sourcekitd_response_t editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
                                         ArrayRef<const char *> Args,
                                         std::optional<VFSOptions> vfsOptions);
 
-static sourcekitd_response_t
-editorOpenInterface(StringRef Name, StringRef ModuleName,
-                    std::optional<StringRef> Group, ArrayRef<const char *> Args,
-                    bool SynthesizedExtensions,
-                    std::optional<StringRef> InterestedUSR,
-                    bool EnableDeclarations);
+static sourcekitd_response_t editorOpenInterface(
+    StringRef Name, StringRef ModuleName, std::optional<StringRef> Group,
+    ArrayRef<const char *> Args, bool SynthesizedExtensions,
+    std::optional<StringRef> InterestedUSR, bool EnableDeclarations);
 
 static sourcekitd_response_t
 editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
-                          ArrayRef<const char *> Args,
-                          bool UsingSwiftArgs,
-                          bool SynthesizedExtensions,
-                          StringRef swiftVersion,
+                          ArrayRef<const char *> Args, bool UsingSwiftArgs,
+                          bool SynthesizedExtensions, StringRef swiftVersion,
                           bool EnableDeclarations);
 
 static void
 editorOpenSwiftSourceInterface(StringRef Name, StringRef SourceName,
                                ArrayRef<const char *> Args,
                                SourceKitCancellationToken CancellationToken,
-                               ResponseReceiver Rec,
-                               bool EnableDeclarations);
+                               ResponseReceiver Rec, bool EnableDeclarations);
 
 static void
 editorOpenSwiftTypeInterface(StringRef TypeUsr, ArrayRef<const char *> Args,
@@ -3610,12 +3605,10 @@ static sourcekitd_response_t editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
   return EditC.createResponse();
 }
 
-static sourcekitd_response_t
-editorOpenInterface(StringRef Name, StringRef ModuleName,
-                    std::optional<StringRef> Group, ArrayRef<const char *> Args,
-                    bool SynthesizedExtensions,
-                    std::optional<StringRef> InterestedUSR,
-                    bool EnableDeclarations) {
+static sourcekitd_response_t editorOpenInterface(
+    StringRef Name, StringRef ModuleName, std::optional<StringRef> Group,
+    ArrayRef<const char *> Args, bool SynthesizedExtensions,
+    std::optional<StringRef> InterestedUSR, bool EnableDeclarations) {
   SKEditorConsumerOptions Opts;
   Opts.EnableSyntaxMap = true;
   Opts.EnableStructure = true;
@@ -3629,10 +3622,11 @@ editorOpenInterface(StringRef Name, StringRef ModuleName,
 
 /// Getting the interface from a swift source file differs from getting interfaces
 /// from headers or modules for its performing asynchronously.
-static void editorOpenSwiftSourceInterface(
-    StringRef Name, StringRef HeaderName, ArrayRef<const char *> Args,
-    SourceKitCancellationToken CancellationToken, ResponseReceiver Rec,
-    bool EnableDeclarations) {
+static void
+editorOpenSwiftSourceInterface(StringRef Name, StringRef HeaderName,
+                               ArrayRef<const char *> Args,
+                               SourceKitCancellationToken CancellationToken,
+                               ResponseReceiver Rec, bool EnableDeclarations) {
   SKEditorConsumerOptions Opts;
   Opts.EnableSyntaxMap = true;
   Opts.EnableStructure = true;
@@ -3674,10 +3668,8 @@ static sourcekitd_response_t editorConvertMarkupToXML(StringRef Source) {
 
 static sourcekitd_response_t
 editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
-                          ArrayRef<const char *> Args,
-                          bool UsingSwiftArgs,
-                          bool SynthesizedExtensions,
-                          StringRef swiftVersion,
+                          ArrayRef<const char *> Args, bool UsingSwiftArgs,
+                          bool SynthesizedExtensions, StringRef swiftVersion,
                           bool EnableDeclarations) {
   SKEditorConsumerOptions Opts;
   Opts.EnableSyntaxMap = true;
