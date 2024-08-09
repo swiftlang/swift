@@ -1648,6 +1648,7 @@ void IRGenModule::addLinkLibraries() {
                                               getSwiftModule()->getName().str(),
                                               hasStaticCxx,
                                               hasStaticCxxStdlib,
+                                              Context.LangOpts.CXXStdlib,
                                               registerLinkLibrary);
   }
 

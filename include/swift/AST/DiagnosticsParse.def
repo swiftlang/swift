@@ -253,11 +253,6 @@ ERROR(enum_case_dot_prefix,none,
 ERROR(static_var_decl_global_scope,none,
       "%select{%error|static properties|class properties}0 may only be declared on a type",
       (StaticSpellingKind))
-ERROR(unexpected_curly_braces_in_decl, none,
-      "unexpected '{' in declaration", ())
-ERROR(missing_accessor_return_decl,none,
-      "missing return in %select{accessor|subscript}0 expected to return %1",
-      (bool, TypeRepr*))
 ERROR(expected_getset_in_protocol,none,
       "expected get or set in a protocol property", ())
 ERROR(unexpected_getset_implementation_in_protocol,none,

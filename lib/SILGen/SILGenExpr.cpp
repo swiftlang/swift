@@ -29,6 +29,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DistributedDecl.h"
@@ -6145,12 +6146,12 @@ static void diagnoseImplicitRawConversion(Type sourceTy, Type pointerTy,
   auto &ctx = SGF.getASTContext();
   if (auto *bitwiseCopyableDecl = ctx.getProtocol(
         KnownProtocolKind::BitwiseCopyable)) {
-    if (ModuleDecl::checkConformance(eltTy, bitwiseCopyableDecl))
+    if (checkConformance(eltTy, bitwiseCopyableDecl))
       return;
   }
   if (auto *fixedWidthIntegerDecl = ctx.getProtocol(
           KnownProtocolKind::FixedWidthInteger)) {
-    if (ModuleDecl::checkConformance(eltTy, fixedWidthIntegerDecl))
+    if (checkConformance(eltTy, fixedWidthIntegerDecl))
       return;
   }
 

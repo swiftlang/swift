@@ -21,6 +21,7 @@
 #include "TypeCheckType.h"
 #include "swift/Strings.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ImportCache.h"
@@ -858,7 +859,7 @@ bool swift::hasExplicitSendableConformance(NominalTypeDecl *nominal,
 
   // Look for a conformance. If it's present and not (directly) missing,
   // we're done.
-  auto conformance = ModuleDecl::lookupConformance(
+  auto conformance = lookupConformance(
       nominal->getDeclaredInterfaceType(), proto, /*allowMissing=*/true);
   return conformance &&
       !(isa<BuiltinProtocolConformance>(conformance.getConcrete()) &&
@@ -1099,7 +1100,7 @@ bool swift::diagnoseNonSendableTypes(
     return false;
 
   // FIXME: More detail for unavailable conformances.
-  auto conformance = ModuleDecl::lookupConformance(type, proto, /*allowMissing=*/true);
+  auto conformance = lookupConformance(type, proto, /*allowMissing=*/true);
   if (conformance.isInvalid() || conformance.hasUnavailableConformance()) {
     return diagnoseSingleNonSendableType(
         type, fromContext, inDerivedConformance, loc, diagnose);
@@ -1357,7 +1358,7 @@ inferSendableFromInstanceStorage(NominalTypeDecl *nominal,
       if (!sendableProto)
         return true;
 
-      auto conformance = ModuleDecl::checkConformance(type, sendableProto);
+      auto conformance = checkConformance(type, sendableProto);
       if (conformance.isInvalid())
         return true;
 
@@ -1534,7 +1535,7 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
       break; // we're done looking for the requirements
   }
 
-  auto conformance = ModuleDecl::lookupConformance(nominalTy, proto);
+  auto conformance = lookupConformance(nominalTy, proto);
   auto concreteConformance = conformance.getConcrete();
   assert(unownedEnqueueRequirement && "could not find the enqueue(UnownedJob) requirement, which should be always there");
 
@@ -6613,7 +6614,7 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
   // form an inherited conformance.
   if (classDecl) {
     if (Type superclass = classDecl->getSuperclass()) {
-      auto inheritedConformance = ModuleDecl::checkConformance(
+      auto inheritedConformance = checkConformance(
           classDecl->mapTypeIntoContext(superclass),
           proto, /*allowMissing=*/false);
       if (inheritedConformance) {

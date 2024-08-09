@@ -24,6 +24,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1216,9 +1217,8 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     CanType anyObjectMetaTy = CanExistentialMetatypeType::get(anyObjectTy,
                                                   MetatypeRepresentation::ObjC);
 
-    auto conformances =
-        SGM.SwiftModule->collectExistentialConformances(mainClassMetaty,
-                                                        anyObjectMetaTy);
+    auto conformances = collectExistentialConformances(mainClassMetaty,
+                                                       anyObjectMetaTy);
 
     auto paramConvention = ParameterConvention::Direct_Unowned;
     auto params = {SILParameterInfo(anyObjectMetaTy, paramConvention)};

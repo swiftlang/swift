@@ -21,6 +21,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -2151,11 +2152,11 @@ namespace {
 
         auto type = contextualType->lookThroughAllOptionalTypes();
 
-        if (ModuleDecl::lookupConformance(type, arrayProto))
+        if (lookupConformance(type, arrayProto))
           return false;
 
         if (auto *proto = ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral))
-          if (ModuleDecl::lookupConformance(type, proto))
+          if (lookupConformance(type, proto))
             return true;
 
         return false;

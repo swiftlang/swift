@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
@@ -74,7 +75,7 @@ getObjCToSwiftBridgingFunction(SILOptFunctionBuilder &funcBuilder,
 static SubstitutionMap lookupBridgeToObjCProtocolSubs(CanType target) {
   auto bridgedProto =
       target->getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
-  auto conf = ModuleDecl::lookupConformance(target, bridgedProto);
+  auto conf = lookupConformance(target, bridgedProto);
   return SubstitutionMap::getProtocolSubstitutions(conf.getRequirement(),
                                                    target, conf);
 }
@@ -485,8 +486,7 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
       ctx.getProtocol(
         KnownProtocolKind::ObjectiveCBridgeable);
 
-  auto conf = ModuleDecl::lookupConformance(
-    sourceFormalType, bridgedProto);
+  auto conf = lookupConformance(sourceFormalType, bridgedProto);
   assert(conf && "_ObjectiveCBridgeable conformance should exist");
   (void)conf;
 
@@ -1460,14 +1460,14 @@ static bool optimizeStaticallyKnownProtocolConformance(
     // SourceType is a non-existential type with a non-conditional
     // conformance to a protocol represented by the TargetType.
     //
-    // ModuleDecl::checkConformance() checks any conditional conformances. If
+    // swift::checkConformance() checks any conditional conformances. If
     // they depend on information not known until runtime, the conformance
     // will not be returned. For instance, if `X: P` where `T == Int` in `func
     // foo<T>(_: T) { ... X<T>() as? P ... }`, the cast will succeed for
     // `foo(0)` but not for `foo("string")`. There are many cases where
     // everything is completely static (`X<Int>() as? P`), in which case a
     // valid conformance will be returned.
-    auto Conformance = ModuleDecl::checkConformance(SourceType, Proto);
+    auto Conformance = checkConformance(SourceType, Proto);
     if (Conformance.isInvalid())
       return false;
 

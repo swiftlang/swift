@@ -25,6 +25,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "SubstitutionMapStorage.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericParamList.h"
@@ -326,7 +327,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   if (proto->getInvertibleProtocolKind()) {
     auto substType = type.subst(*this);
     if (!substType->isTypeParameter())
-      return ModuleDecl::lookupConformance(substType, proto);
+      return swift::lookupConformance(substType, proto);
     return ProtocolConformanceRef(proto);
   }
 
@@ -360,7 +361,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
            substType->castTo<ArchetypeType>()->getSuperclass()) &&
           !substType->isTypeParameter() &&
           !substType->isExistentialType()) {
-        return ModuleDecl::lookupConformance(substType, proto);
+        return swift::lookupConformance(substType, proto);
       }
 
       return ProtocolConformanceRef(proto);
@@ -565,7 +566,7 @@ LookUpConformanceInOverrideSubs::operator()(CanType type,
   if (substType->isTypeParameter())
     return ProtocolConformanceRef(proto);
 
-  return ModuleDecl::lookupConformance(substType, proto);
+  return lookupConformance(substType, proto);
 }
 
 SubstitutionMap
@@ -663,7 +664,7 @@ SubstitutionMap::combineSubstitutionMaps(SubstitutionMap firstSubMap,
       if (substType->isTypeParameter())
         return ProtocolConformanceRef(proto);
 
-      return ModuleDecl::lookupConformance(substType, proto);
+      return swift::lookupConformance(substType, proto);
     });
 }
 

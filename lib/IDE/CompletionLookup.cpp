@@ -13,6 +13,7 @@
 #include "swift/IDE/CompletionLookup.h"
 #include "CodeCompletionResultBuilder.h"
 #include "ExprContextAnalysis.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
@@ -778,7 +779,7 @@ Type CompletionLookup::getAssociatedTypeType(const AssociatedTypeDecl *ATD) {
   if (BaseTy) {
     BaseTy = BaseTy->getInOutObjectType()->getMetatypeInstanceType();
     if (auto NTD = BaseTy->getAnyNominal()) {
-      auto Conformance = ModuleDecl::lookupConformance(BaseTy, ATD->getProtocol());
+      auto Conformance = lookupConformance(BaseTy, ATD->getProtocol());
       if (Conformance.isConcrete()) {
         return Conformance.getConcrete()->getTypeWitness(
             const_cast<AssociatedTypeDecl *>(ATD));
@@ -2631,7 +2632,7 @@ void CompletionLookup::addTypeRelationFromProtocol(
 
     // Check for conformance to the literal protocol.
     if (T->getAnyNominal()) {
-      if (ModuleDecl::lookupConformance(T, PD)) {
+      if (lookupConformance(T, PD)) {
         literalType = T;
         break;
       }

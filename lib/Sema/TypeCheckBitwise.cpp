@@ -19,6 +19,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Ownership.h"
@@ -142,7 +143,7 @@ bool BitwiseCopyableStorageVisitor::visitMemberDecl(ValueDecl *decl, Type ty) {
 }
 
 bool BitwiseCopyableStorageVisitor::visitMemberType(Type ty, SourceLoc loc) {
-  auto conformance = ModuleDecl::checkConformance(ty, protocol);
+  auto conformance = checkConformance(ty, protocol);
   if (conformance.isInvalid() || conformance.hasUnavailableConformance()) {
     return visitNonconformingMemberType(ty, loc);
   }

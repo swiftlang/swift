@@ -25,6 +25,7 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     set_property(TARGET SwiftInProcPluginServer
       APPEND PROPERTY INSTALL_RPATH
         "$ORIGIN")
+    _set_pure_swift_link_flags(SwiftInProcPluginServer "../../")
   endif()
 
   # FXIME: Importing package-cmo enabled '.swiftmodule' causes compiler crash :(

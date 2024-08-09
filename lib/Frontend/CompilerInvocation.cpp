@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "clang/Driver/Driver.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Frontend/Frontend.h"
@@ -360,6 +361,43 @@ setBridgingHeaderFromFrontendOptions(ClangImporterOptions &ImporterOpts,
 
   ImporterOpts.BridgingHeader =
       FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput();
+}
+
+void CompilerInvocation::computeCXXStdlibOptions() {
+  auto [clangDriver, clangDiagEngine] =
+      ClangImporter::createClangDriver(LangOpts, ClangImporterOpts);
+  auto clangDriverArgs = ClangImporter::createClangArgs(
+      ClangImporterOpts, SearchPathOpts, clangDriver);
+  auto &clangToolchain =
+      clangDriver.getToolChain(clangDriverArgs, LangOpts.Target);
+  auto cxxStdlibKind = clangToolchain.GetCXXStdlibType(clangDriverArgs);
+  auto cxxDefaultStdlibKind = clangToolchain.GetDefaultCXXStdlibType();
+
+  auto toCXXStdlibKind =
+      [](clang::driver::ToolChain::CXXStdlibType clangCXXStdlibType)
+      -> CXXStdlibKind {
+    switch (clangCXXStdlibType) {
+    case clang::driver::ToolChain::CST_Libcxx:
+      return CXXStdlibKind::Libcxx;
+    case clang::driver::ToolChain::CST_Libstdcxx:
+      return CXXStdlibKind::Libstdcxx;
+    }
+  };
+
+  // The MSVC driver in Clang is not aware of the C++ stdlib, and currently
+  // always assumes libstdc++, which is incorrect: the Microsoft stdlib is
+  // normally used.
+  if (LangOpts.Target.isOSWindows()) {
+    // In the future, we should support libc++ on Windows. That would require
+    // the MSVC driver to support it first
+    // (see https://reviews.llvm.org/D101479).
+    LangOpts.CXXStdlib = CXXStdlibKind::Msvcprt;
+    LangOpts.PlatformDefaultCXXStdlib = CXXStdlibKind::Msvcprt;
+  }
+  if (LangOpts.Target.isOSLinux() || LangOpts.Target.isOSDarwin()) {
+    LangOpts.CXXStdlib = toCXXStdlibKind(cxxStdlibKind);
+    LangOpts.PlatformDefaultCXXStdlib = toCXXStdlibKind(cxxDefaultStdlibKind);
+  }
 }
 
 void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
@@ -2623,6 +2661,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       OPT_enable_sil_opaque_values, OPT_disable_sil_opaque_values, false);
   Opts.EnableSpeculativeDevirtualization |= Args.hasArg(OPT_enable_spec_devirt);
   Opts.EnableAsyncDemotion |= Args.hasArg(OPT_enable_async_demotion);
+  Opts.EnableThrowsPrediction = Args.hasFlag(
+      OPT_enable_throws_prediction, OPT_disable_throws_prediction,
+      Opts.EnableThrowsPrediction);
   Opts.EnableActorDataRaceChecks |= Args.hasFlag(
       OPT_enable_actor_data_race_checks,
       OPT_disable_actor_data_race_checks, /*default=*/false);
@@ -3385,6 +3426,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_fragile_resilient_protocol_witnesses,
                  OPT_disable_fragile_resilient_protocol_witnesses,
                  Opts.UseFragileResilientProtocolWitnesses);
+  Opts.EnableHotColdSplit =
+      Args.hasFlag(OPT_enable_split_cold_code,
+                   OPT_disable_split_cold_code,
+                   Opts.EnableHotColdSplit);
   Opts.EnableLargeLoadableTypesReg2Mem =
       Args.hasFlag(OPT_enable_large_loadable_types_reg2mem,
                    OPT_disable_large_loadable_types_reg2mem,
@@ -3622,6 +3667,7 @@ bool CompilerInvocation::parseArgs(
   // Now that we've parsed everything, setup some inter-option-dependent state.
   setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);
   setBridgingHeaderFromFrontendOptions(ClangImporterOpts, FrontendOpts);
+  computeCXXStdlibOptions();
   if (LangOpts.hasFeature(Feature::Embedded)) {
     IRGenOpts.InternalizeAtLink = true;
     IRGenOpts.DisableLegacyTypeInfo = true;

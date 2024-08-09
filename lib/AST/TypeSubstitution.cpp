@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -188,12 +189,9 @@ static Type getMemberForBaseType(InFlightSubstitution &IFS,
 ProtocolConformanceRef LookUpConformanceInModule::
 operator()(CanType dependentType, Type conformingReplacementType,
            ProtocolDecl *conformedProtocol) const {
-  if (conformingReplacementType->isTypeParameter())
-    return ProtocolConformanceRef(conformedProtocol);
-
-  return ModuleDecl::lookupConformance(conformingReplacementType,
-                                       conformedProtocol,
-                                       /*allowMissing=*/true);
+  return lookupConformance(conformingReplacementType,
+                           conformedProtocol,
+                           /*allowMissing=*/true);
 }
 
 ProtocolConformanceRef LookUpConformanceInSubstitutionMap::
@@ -202,7 +200,7 @@ operator()(CanType dependentType, Type conformingReplacementType,
   // Lookup conformances for archetypes that conform concretely
   // via a superclass.
   if (auto archetypeType = conformingReplacementType->getAs<ArchetypeType>()) {
-    return ModuleDecl::lookupConformance(
+    return lookupConformance(
         conformingReplacementType, conformedProtocol,
         /*allowMissing=*/true);
   }
@@ -216,7 +214,7 @@ operator()(CanType dependentType, Type conformingReplacementType,
   if (auto genericSig = Subs.getGenericSignature()) {
     if (genericSig->isValidTypeParameter(dependentType) &&
         genericSig->isConcreteType(dependentType)) {
-      return ModuleDecl::lookupConformance(
+      return lookupConformance(
           conformingReplacementType, conformedProtocol,
           /*allowMissing=*/true);
     }
@@ -255,7 +253,7 @@ operator()(CanType dependentType, Type conformingReplacementType,
   // concretely.
   if (auto *archetypeType = conformingReplacementType->getAs<ArchetypeType>()) {
     if (auto superclassType = archetypeType->getSuperclass()) {
-      return ModuleDecl::lookupConformance(archetypeType, conformedProtocol);
+      return lookupConformance(archetypeType, conformedProtocol);
     }
   }
   return ProtocolConformanceRef(conformedProtocol);
@@ -1298,7 +1296,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
     // SIL type lowering may have already substituted away the opaque type, in
     // which case we'll end up "substituting" the same type.
     if (maybeOpaqueType->isEqual(replacementType)) {
-      return ModuleDecl::lookupConformance(replacementType, protocol);
+      return lookupConformance(replacementType, protocol);
     }
     
     llvm_unreachable("origType should have been an opaque type or type parameter");

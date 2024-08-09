@@ -955,8 +955,10 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
     if (loadedModuleFile->isConcurrencyChecked())
       M.setIsConcurrencyChecked();
-    if (loadedModuleFile->hasCxxInteroperability())
+    if (loadedModuleFile->hasCxxInteroperability()) {
       M.setHasCxxInteroperability();
+      M.setCXXStdlibKind(loadedModuleFile->getCXXStdlibKind());
+    }
     if (!loadedModuleFile->getModulePackageName().empty()) {
       M.setPackageName(Ctx.getIdentifier(loadedModuleFile->getModulePackageName()));
     }
@@ -1055,6 +1057,18 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     Ctx.Diags.diagnose(loc, diag::need_cxx_interop_to_import_module,
                        M.getName());
     Ctx.Diags.diagnose(loc, diag::enable_cxx_interop_docs);
+  }
+  // Modules built with libc++ cannot be imported into modules that are built
+  // with libstdc++, and vice versa. Make an exception for Cxx.swiftmodule since
+  // it doesn't refer to any C++ stdlib symbols, and for CxxStdlib.swiftmodule
+  // since we skipped loading the overlay for the module.
+  if (M.hasCxxInteroperability() && Ctx.LangOpts.EnableCXXInterop &&
+      M.getCXXStdlibKind() != Ctx.LangOpts.CXXStdlib &&
+      M.getName() != Ctx.Id_Cxx && M.getName() != Ctx.Id_CxxStdlib) {
+    auto loc = diagLoc.value_or(SourceLoc());
+    Ctx.Diags.diagnose(loc, diag::cxx_stdlib_kind_mismatch, M.getName(),
+                       to_string(M.getCXXStdlibKind()),
+                       to_string(Ctx.LangOpts.CXXStdlib));
   }
 
   return fileUnit;

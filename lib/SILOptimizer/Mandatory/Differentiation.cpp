@@ -21,6 +21,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
@@ -266,7 +267,7 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
       assert(protocol && "Expected protocol in generic signature requirement");
       // If the first type does not conform to the second type in the current
       // module, then record the unsatisfied requirement.
-      if (!ModuleDecl::lookupConformance(firstType, protocol))
+      if (!lookupConformance(firstType, protocol))
         unsatisfiedRequirements.push_back(req);
       continue;
     }

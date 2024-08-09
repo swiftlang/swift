@@ -11,6 +11,10 @@
 // so these tests will need to be adapted for that.
 // XFAIL: OS=linux-android && CPU=aarch64
 
+
+// CHECK: [[S1:^@".*"]] = {{.*}} c"a{{.*}}+{{.*}}={{.*}}\00"
+// CHECK: [[S2:^@".*"]] = {{.*}} c"abcd{{.*}}fgh{{.*}}klmno{{.*}}qr\00"
+
 // NOTE: 25185.byteSwapped = 0x62 'a', 0x61 'b'
 // CHECK-LABEL: test_ascii_scalar_scalar2
 // CHECK:  ret { i64, ptr } { i64 25185, ptr inttoptr (i64 -{{[0-9]+}} to ptr) }
@@ -42,7 +46,8 @@ public func test_strng_strng2() -> String {
 
 // NOTE: 1152921504606847019 = 43 (code-unit length) | `isTailAllocated` perf flag
 // CHECK-LABEL: test_scalar_strng
-// CHECK:  ret { i64, ptr } { i64 1152921504606847019, ptr inttoptr {{.*}}i64 -{{[0-9]+}}{{.*}} to ptr) }
+// CHECK-DAG: 1152921504606847019
+// CHECK-DAG: [[S1]]
 public func test_scalar_strng() -> String {
   return "a" + "👨🏿‍💼+🧙🏿‍♂️=🕴🏿"
 }
@@ -56,7 +61,8 @@ public func test_strng_concat_smol() -> String {
 
 // NOTE: 1152921504606846999 = 23 (code-unit length) | `isTailAllocated` perf flag
 // CHECK-LABEL: test_strng_concat_large
-// CHECK:  ret { i64, ptr } { i64 1152921504606846999, ptr inttoptr {{.*}}i64 -{{[0-9]+}}{{.*}} to ptr) }
+// CHECK-DAG: 1152921504606846999
+// CHECK-DAG: [[S2]]
 public func test_strng_concat_large() -> String {
   return "a" + "bc" + "dèf" + "ghī" + "jklmn" + "o" + "𝛒qr"
 }

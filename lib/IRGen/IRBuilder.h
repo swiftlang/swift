@@ -410,6 +410,11 @@ public:
                                name);
   }
 
+  // Creates an @llvm.expect.i1 call, where the value should be an i1 type.
+  llvm::CallInst *CreateExpectCond(IRGenModule &IGM,
+                                   llvm::Value *value,
+                                   bool expectedValue, const Twine &name = "");
+
   /// Call the trap intrinsic. If optimizations are enabled, an inline asm
   /// gadget is emitted before the trap. The gadget inhibits transforms which
   /// merge trap calls together, which makes debugging crashes easier.
