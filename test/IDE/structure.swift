@@ -31,12 +31,12 @@ class MyCls : OtherClass {
 // CHECK: }</class>
 }
 
-// CHECK: <struct>struct <name>MyStruc</name> {
+// CHECK: <struct>struct <name>MyStruct</name> {
 // CHECK:   <property>var <name>myVar</name>: <type>Int</type></property>
 // CHECK:   <svar>static var <name>sbar</name> : <type>Int</type> = 0</svar>
 // CHECK:   <sfunc>static func <name>cfoo()</name></sfunc>
 // CHECK: }</struct>
-struct MyStruc {
+struct MyStruct {
   var myVar: Int
   static var sbar : Int = 0
   static func cfoo()
@@ -61,11 +61,11 @@ protocol MyProt {
   init<T>(a: T) where T: MyProt
 }
 
-// CHECK: <extension>extension <name>MyStruc</name> {
+// CHECK: <extension>extension <name>MyStruct</name> {
 // CHECK:   <ifunc>func <name>foo()</name> {
 // CHECK:   }</ifunc>
 // CHECK: }</extension>
-extension MyStruc {
+extension MyStruct {
   func foo() {
   }
 }
@@ -299,8 +299,8 @@ enum FooEnum {
 // CHECK: <enum>enum <name>FooEnum</name> {
   case blah(x: () -> () = {
   // CHECK: <enum-case>case <enum-elem><name>blah(<param><name>x</name>: <type>() -> ()</type> = <closure><brace>{
-    @Tuples func foo(x: MyStruc) {}
-    // CHECK: @Tuples <ffunc>func <name>foo(<param><name>x</name>: <type>MyStruc</type></param>)</name> {}</ffunc>
+    @Tuples func foo(x: MyStruct) {}
+    // CHECK: @Tuples <ffunc>func <name>foo(<param><name>x</name>: <type>MyStruct</type></param>)</name> {}</ffunc>
   })
   // CHECK: }</brace></closure></param>)</name></enum-elem></enum-case>
 }

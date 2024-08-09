@@ -1,6 +1,6 @@
 // RUN: %batch-code-completion
 
-// EMTPY: Token
+// EMPTY: Token
 // EMPTY-NOT: Begin completions
 
 //===--- Helper types that are used in this test
@@ -385,11 +385,11 @@ func testClosureInPatternBindingInit() {
     case dragging(translation: Int, predictedLocation: Int)
   }
 
-  func pnChanged(_ action: () -> Void) {}
+  func onChanged(_ action: () -> Void) {}
 
   func foo() {
     var gestureViewState: DragState = .dragging(translation: 0, predictedLocation: 0)
-    let longPressDrag = pnChanged {
+    let longPressDrag = onChanged {
       _ = 1
       gestureViewState = .dragging(translation: 0, #^CLOSURE_IN_PATTERN_BINDING^#predictedLocation: 0)
     }
