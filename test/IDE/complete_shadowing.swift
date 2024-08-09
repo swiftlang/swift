@@ -151,7 +151,7 @@ var globalTest: Int = 1
 func test_Global_Local() {
   var globalTest: String = ""
   #^Global_Local^#
-// FIXME: currently global varialbles are suggested despite they are shadowed.
+// FIXME: currently global variables are suggested despite they are shadowed.
 // Ideally they should be suggested with the qualification (i.e. 'ModuleName.globalTest')
 // Global_Local-DAG: Decl[LocalVar]/Local:               globalTest[#String#]; name=globalTest
 // Global_Local-DAG: Decl[GlobalVar]/CurrModule:         globalTest[#Int#]; name=globalTest
@@ -257,7 +257,7 @@ struct test_InheritedMemberProtoExt_Member: ProtoWithIntTestValueExt {
   }
 }
 
-protocol ClassWitnIntTestValue {
+protocol ClassWithIntTestValue {
   var testValue: Int { 1 }
 }
 struct test_InheritedMemberSuper_Member: ClassWithIntTestValue {
