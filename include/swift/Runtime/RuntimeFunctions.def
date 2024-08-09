@@ -2825,7 +2825,7 @@ FUNCTION(GenericInstantiateLayoutString,
 // void swift_initRawStructMetadata(Metadata *structType,
 //                                  StructLayoutFlags structLayoutFlags,
 //                                  const TypeLayout *likeType,
-//                                  ssize_t count,
+//                                  intptr_t count,
 //                                  RawLayoutFlags rawLayoutFlags);
 FUNCTION(InitRawStructMetadata,
          swift_initRawStructMetadata,

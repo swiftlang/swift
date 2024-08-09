@@ -3030,7 +3030,7 @@ SWIFT_RUNTIME_EXPORT
 void swift::swift_initRawStructMetadata(StructMetadata *structType,
                                         StructLayoutFlags structLayoutFlags,
                                         const TypeLayout *likeTypeLayout,
-                                        ssize_t count,
+                                        intptr_t count,
                                         RawLayoutFlags rawLayoutFlags) {
   auto vwtable = getMutableVWTableForInit(structType, structLayoutFlags);
 
@@ -3042,7 +3042,8 @@ void swift::swift_initRawStructMetadata(StructMetadata *structType,
   auto extraInhabitantCount = likeTypeLayout->extraInhabitantCount;
 
   if (isRawLayoutArray(rawLayoutFlags)) {
-    stride *= std::min(count, (ssize_t)0);
+    // Our count value may be negative, so use 0 if that's the case.
+    stride *= std::max(count, (intptr_t)0);
     size = stride;
   }
 
@@ -3050,13 +3051,27 @@ void swift::swift_initRawStructMetadata(StructMetadata *structType,
   vwtable->stride = stride;
   vwtable->flags = ValueWitnessFlags()
                     .withAlignmentMask(alignMask)
-                    .withCopyable(false);
+                    .withCopyable(false)
+                    .withBitwiseTakable(true); // All raw layouts are assumed
+                                               // to be bitwise takable unless
+                                               // movesAsLike is present.
   vwtable->extraInhabitantCount = extraInhabitantCount;
 
   if (shouldRawLayoutMoveAsLike(rawLayoutFlags)) {
     vwtable->flags = vwtable->flags
-                .withBitwiseTakable(likeTypeLayout->flags.isBitwiseTakable())
+                .withBitwiseTakable(likeTypeLayout->flags.isBitwiseTakable());
+  }
+
+  // If the calculated size of this raw layout type is available to be put in
+  // value buffers, then set the inline storage bit if our like type is also
+  // able to be put into inline storage.
+  if (size <= NumWords_ValueBuffer) {
+    vwtable->flags = vwtable->flags
                 .withInlineStorage(likeTypeLayout->flags.isInlineStorage());
+  } else {
+    // Otherwise, we're too big to fit in inline storage regardless of the like
+    // type's ability to be put in inline storage.
+    vwtable->flags = vwtable->flags.withInlineStorage(false);
   }
 }
 

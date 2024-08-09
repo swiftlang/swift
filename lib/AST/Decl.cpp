@@ -5682,7 +5682,7 @@ GenericTypeParamDecl *GenericTypeParamDecl::create(
 
   auto numTypeReprs = 0;
 
-  if (opaqueTypeRepr)
+  if (isOpaqueType)
     numTypeReprs = 1;
 
   auto numSourceLocs = 0;

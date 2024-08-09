@@ -1059,7 +1059,7 @@ SWIFT_RUNTIME_EXPORT
 void swift_initRawStructMetadata(StructMetadata *self,
                                  StructLayoutFlags structLayoutFlags,
                                  const TypeLayout *likeType,
-                                 ssize_t count,
+                                 intptr_t count,
                                  RawLayoutFlags rawLayoutFlags);
 
 /// Check if the given generic arguments are valid inputs for the generic type

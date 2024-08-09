@@ -428,7 +428,7 @@ entry(%0 : $*Cell<T>):
 
 // CHECK-LABEL: define {{.*}} void @"$s10raw_layout18ConcreteMoveAsLikeVwxx"(ptr {{.*}} %object, ptr %ConcreteMoveAsLike)
 // CHECK:         [[OBJ_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %object, i32 0, i32 0
-// CHECK:         {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[OBJ_CELL]])
+// CHECK:         {{invoke void|invoke ptr|call void}} @{{.*}}(ptr [[OBJ_CELL]])
 
 //===----------------------------------------------------------------------===//
 // ConcreteMoveAsLike initializeWithTake
@@ -555,7 +555,7 @@ entry(%0 : $*Cell<T>):
 // CHECK:         [[NEW_I:%.*]] = add {{i64|i32}} [[I]], 1
 // CHECK:         store {{i64|i32}} [[NEW_I]], ptr [[I_ALLOCA]]
 // CHECK:         [[OBJECT:%.*]] = getelementptr inbounds %TSo24NonBitwiseTakableCXXTypeV, ptr [[OBJ_VECTOR]], {{i64|i32}} [[I]]
-// CHECK-NEXT:    {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[OBJECT]])
+// CHECK-NEXT:    {{invoke void|invoke ptr|call void}} @{{.*}}(ptr [[OBJECT]])
 
 // This may or may not be in the loop_br
 // CHECK:         [[EQ_CMP:%.*]] = icmp eq {{i64|i32}} [[NEW_I]], 2
@@ -747,7 +747,7 @@ entry(%0 : $*Cell<T>):
 // CHECK:         [[NEW_I:%.*]] = add {{i64|i32}} [[I]], 1
 // CHECK:         store {{i64|i32}} [[NEW_I]], ptr [[I_ALLOCA]]
 // CHECK:         [[OBJECT:%.*]] = getelementptr inbounds %TSo24NonBitwiseTakableCXXTypeV, ptr [[OBJ_VECTOR]], {{i64|i32}} [[I]]
-// CHECK-NEXT:    {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[OBJECT]])
+// CHECK-NEXT:    {{invoke void|invoke ptr|call void}} @{{.*}}(ptr [[OBJECT]])
 
 // This may or may not be in the loop_br
 // CHECK:         [[EQ_CMP:%.*]] = icmp eq {{i64|i32}} [[NEW_I]], 4
