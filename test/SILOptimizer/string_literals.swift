@@ -3,6 +3,10 @@
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: swift_in_compiler
 
+// The required relocation format for a single return LLVM instruction are not necessarily
+// supported on object file formats other than Mach-O.
+// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchOS || OS=xros
+
 // FIXME(rdar://problem/45856408): The 7-bit discriminator complicates codegen
 // on 32-bit platforms.
 // UNSUPPORTED: PTRSIZE=32
