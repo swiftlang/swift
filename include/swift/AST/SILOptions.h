@@ -118,6 +118,10 @@ public:
   /// Controls whether to run async demotion pass.
   bool EnableAsyncDemotion = false;
 
+  /// Controls whether to always assume that functions rarely throw an Error
+  /// within the optimizer. This influences static branch prediction.
+  bool EnableThrowsPrediction = false;
+
   /// Should we run any SIL performance optimizations
   ///
   /// Useful when you want to enable -O LLVM opts but not -O SIL opts.

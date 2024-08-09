@@ -3885,9 +3885,18 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     // FIXME: Remove this when the following radar is fixed: rdar://116636601
     Builder.CreatePtrToInt(errorValue, IGM.IntPtrTy);
 
+    // Emit profile metadata if available.
+    llvm::MDNode *Weights = nullptr;
+    auto NormalBBCount = tryApplyInst->getNormalBBCount();
+    auto ErrorBBCount = tryApplyInst->getErrorBBCount();
+    if (NormalBBCount || ErrorBBCount)
+      Weights = IGM.createProfileWeights(ErrorBBCount ? ErrorBBCount.getValue() : 0,
+                                         NormalBBCount ? NormalBBCount.getValue() : 0);
+
     Builder.CreateCondBr(hasError,
                          typedErrorLoadBB ? typedErrorLoadBB : errorDest.bb,
-                         normalDest.bb);
+                         normalDest.bb,
+                         Weights);
 
     // Set up the PHI nodes on the normal edge.
     unsigned firstIndex = 0;
@@ -4634,6 +4643,12 @@ void IRGenSILFunction::visitYieldInst(swift::YieldInst *i) {
   // Branch to the appropriate destination.
   auto unwindBB = getLoweredBB(i->getUnwindBB()).bb;
   auto resumeBB = getLoweredBB(i->getResumeBB()).bb;
+
+  // Predict no unwind happens.
+  isUnwind =
+      IGM.getSILModule().getOptions().EnableThrowsPrediction ?
+      Builder.CreateExpectCond(IGM, isUnwind, false) : isUnwind;
+
   Builder.CreateCondBr(isUnwind, unwindBB, resumeBB);
 }
 
