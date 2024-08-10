@@ -995,6 +995,9 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
     return false;
   }
 
+  for (auto *I : UsersToRemove)
+    salvageDebugInfo(I);
+
   if (ASI->getFunction()->hasOwnership()) {
     for (auto *user : UsersToRemove) {
       auto *store = dyn_cast<StoreInst>(user);
@@ -1019,8 +1022,6 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
     }
   }
 
-  for (auto *I : UsersToRemove)
-    salvageDebugInfo(I);
   // Remove the AllocRef and all of its users.
   removeInstructions(
     ArrayRef<SILInstruction*>(UsersToRemove.begin(), UsersToRemove.end()));
