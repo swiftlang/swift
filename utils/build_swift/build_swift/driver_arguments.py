@@ -809,6 +809,16 @@ def create_argument_parser():
     option(['--wasmkit'], toggle_true('build_wasmkit'),
            help='build WasmKit')
 
+    option('--swift-testing', toggle_true('build_swift_testing'),
+           help='build Swift Testing')
+    option('--install-swift-testing', toggle_true('install_swift_testing'),
+           help='install Swift Testing')
+    option('--swift-testing-macros', toggle_true('build_swift_testing_macros'),
+           help='build Swift Testing macro plugin')
+    option('--install-swift-testing-macros',
+           toggle_true('install_swift_testing_macros'),
+           help='install Swift Testing macro plugin')
+
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
 
