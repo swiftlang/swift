@@ -805,9 +805,10 @@ private:
   void run() override {
     SILModule *module = getModule();
 
-    // Skip all performance/embedded diagnostics if not in WMO mode. Building in
-    // non-WMO mode currently results in false positives.
-    if (!module->isWholeModule()) return;
+    // Skip all performance/embedded diagnostics if asked. This is used from
+    // SourceKit to avoid reporting false positives when WMO is turned off for
+    // indexing purposes.
+    if (!module->getOptions().EnablePerformanceDiagnostics) return;
 
     PerformanceDiagnostics diagnoser(*module, getAnalysis<BasicCalleeAnalysis>());
 
