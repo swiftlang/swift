@@ -2423,7 +2423,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_BUILD_TYPE:STRING=${FOUNDATION_BUILD_TYPE}
                     -DCMAKE_C_COMPILER:PATH=${CLANG_BIN}/clang
                     -DCMAKE_CXX_COMPILER:PATH=${CLANG_BIN}/clang++
-                    -DCMAKE_SWIFT_COMPILER:PATH=${SWIFTC_BIN}
                     -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
                     -DCMAKE_Swift_FLAGS:STRING="$(common_swift_flags)"
                     -DCMAKE_INSTALL_PREFIX:PATH=$(get_host_install_prefix ${host})
