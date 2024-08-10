@@ -5697,7 +5697,6 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
 
     // Emit a tailored diagnostic for the incorrect optional
     // syntax 'any P?' with a fix-it to add parenthesis.
-    auto wrapped = constraintType->getOptionalObjectType();
     if (wrapped && (wrapped->is<ExistentialType>() ||
                     wrapped->is<ExistentialMetatypeType>())) {
       std::string fix;
