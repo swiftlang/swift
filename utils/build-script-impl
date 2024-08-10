@@ -2532,7 +2532,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=$(build_directory ${host} libdispatch)
                   -Ddispatch_DIR=$(build_directory ${host} libdispatch)/cmake/modules
 
-                  -DSwiftFoundation_MACROS=$(build_directory ${LOCAL_HOST} foundation_macros)/lib
+                  -DSwiftFoundation_MACRO=$(build_directory ${LOCAL_HOST} foundation_macros)/lib
 
                   -D_SwiftFoundation_SourceDIR=${FOUNDATION_SWIFTFOUNDATION_SOURCE_DIR}
                   -D_SwiftFoundationICU_SourceDIR=${FOUNDATION_SWIFTFOUNDATIONICU_SOURCE_DIR}
