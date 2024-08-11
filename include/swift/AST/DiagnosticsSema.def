@@ -6313,7 +6313,7 @@ ERROR(no_opaque_return_type_of,none,
       "unable to resolve type for _opaqueReturnTypeOf attribute", ())
 
 ERROR(objc_observing_accessor, none,
-      "%0 is not allowed to be marked '@objc'", (DescriptiveDeclKind))
+      "observers (%0) is not allowed to be marked '@objc'", (DescriptiveDeclKind))
 ERROR(objc_init_accessor, none,
       "init accessors cannot be marked @objc", ())
 ERROR(objc_addressor, none,
