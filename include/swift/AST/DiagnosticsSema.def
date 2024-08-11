@@ -3952,8 +3952,8 @@ ERROR(attr_incompatible_with_objc,none,
       (DeclAttribute, DescriptiveDeclKind))
 
 ERROR(final_not_on_accessors,none,
-      "only %select{var|let|subscript}0 itself can be marked as 'final'"
-      ,(unsigned))
+      "only the %select{property|subscript}0 itself can be marked as 'final'"
+      ,(bool))
 
 ERROR(override_rethrows_with_non_rethrows,none,
       "override of 'rethrows' %select{method|initializer}0 should also "
