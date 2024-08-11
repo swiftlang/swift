@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
+// RUN: %target-sil-opt %s -enable-experimental-feature ValueGenerics | %target-sil-opt -enable-experimental-feature ValueGenerics | %FileCheck %s
 
 import Builtin
 import Swift

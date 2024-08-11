@@ -761,7 +761,7 @@ namespace {
       // parameter doesn't declare a value type and we're going to diagnose it
       // later.
       if (!paramType->getValueType() || !secondType->getValueType())
-        return false;
+        return true;
 
       // Otherwise, these are both value parameters and check that both their
       // value types are the same.

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -sil-combine -enable-experimental-feature ValueGenerics | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 

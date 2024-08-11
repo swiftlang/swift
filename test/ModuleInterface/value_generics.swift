@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name ValueGeneric
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name ValueGeneric -enable-experimental-feature ValueGenerics
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name ValueGeneric
 // RUN: %FileCheck %s < %t.swiftinterface
 
