@@ -1035,11 +1035,11 @@ Type ASTBuilder::createParenType(Type base) {
   return ParenType::get(Ctx, base);
 }
 
-Type ASTBuilder::createIntegerType(size_t value) {
+Type ASTBuilder::createIntegerType(intptr_t value) {
   return IntegerType::get(std::to_string(value), /*isNegative*/ false, Ctx);
 }
 
-Type ASTBuilder::createNegativeIntegerType(size_t value) {
+Type ASTBuilder::createNegativeIntegerType(intptr_t value) {
   return IntegerType::get(std::to_string(value), /*isNegative*/ true, Ctx);
 }
 

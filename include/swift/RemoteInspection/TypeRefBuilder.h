@@ -917,12 +917,12 @@ public:
     return nullptr;
   }
 
-  const TypeRef *createIntegerType(size_t value) {
+  const TypeRef *createIntegerType(intptr_t value) {
     // FIXME: implement
     return nullptr;
   }
 
-  const TypeRef *createNegativeIntegerType(size_t value) {
+  const TypeRef *createNegativeIntegerType(intptr_t value) {
     // FIXME: implement
     return nullptr;
   }

@@ -3432,7 +3432,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << Node->getIndex();
     return nullptr;
   case Node::Kind::NegativeInteger: {
-    auto signedValue = (ssize_t)Node->getIndex();
+    intptr_t signedValue = Node->getIndex();
 
     Printer << signedValue;
     return nullptr;

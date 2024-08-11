@@ -1517,11 +1517,11 @@ protected:
     }
 
     case NodeKind::Integer: {
-      return Builder.createIntegerType((size_t)Node->getIndex());
+      return Builder.createIntegerType((intptr_t)Node->getIndex());
     }
 
     case NodeKind::NegativeInteger: {
-      return Builder.createNegativeIntegerType((size_t)Node->getIndex());
+      return Builder.createNegativeIntegerType((intptr_t)Node->getIndex());
     }
 
     // TODO: Handle OpaqueReturnType, when we're in the middle of reconstructing

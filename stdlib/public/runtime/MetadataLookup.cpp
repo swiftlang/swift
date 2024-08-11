@@ -2442,11 +2442,11 @@ public:
     return BuiltType();
   }
 
-  TypeLookupErrorOr<BuiltType> createIntegerType(size_t value) {
+  TypeLookupErrorOr<BuiltType> createIntegerType(intptr_t value) {
     return BuiltType(value);
   }
 
-  TypeLookupErrorOr<BuiltType> createNegativeIntegerType(size_t value) {
+  TypeLookupErrorOr<BuiltType> createNegativeIntegerType(intptr_t value) {
     return BuiltType(-value);
   }
 };
