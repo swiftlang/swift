@@ -5769,7 +5769,7 @@ ERROR(incorrect_optional_any,none,
       "using '!' is not allowed here; perhaps '?' was intended",
       ())
 ERROR(incorrect_iuo_any,none,
-      "implicitly unwrapped 'any' type must be written (%0)!",
+      "implicitly unwrapped optional 'any' type must be written (%0)!",
       (StringRef))
 ERROR(existential_requires_any,none,
       "use of %select{protocol |}2%0 as a type must be written %1",
