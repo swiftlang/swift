@@ -42,8 +42,6 @@ using namespace SourceKit;
 using namespace swift;
 using namespace swift::sys;
 
-void SwiftASTConsumer::failed(StringRef Error) { }
-
 //===----------------------------------------------------------------------===//
 // SwiftInvocation
 //===----------------------------------------------------------------------===//
