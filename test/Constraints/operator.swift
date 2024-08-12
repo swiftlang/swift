@@ -329,3 +329,10 @@ enum I60954 {
   }
   init?<S>(_ string: S) where S: StringProtocol {} // expected-note{{where 'S' = 'I60954'}}
 }
+
+// https://github.com/swiftlang/swift/issues/72533
+func f_72533() {
+  let foo: Int = 1
+  Int(foo)..<Int16.max
+  // expected-error@-1{{conflicting arguments to generic parameter 'Self'}}
+}

@@ -4881,8 +4881,24 @@ std::string swift::describeGenericType(ValueDecl *GP, bool includeName) {
 static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
                                                 const SolutionDiff &diff,
                                                 ArrayRef<Solution> solutions) {
-  if (!diff.overloads.empty())
-    return false;
+  // Attempt to diagnose conflicting generic arguments only when
+  // the overload choices in the solutions cannot be the cause the
+  // conflicts, by checking that all differing overloads resolve
+  // to the same opened type in all solutions.
+  for (auto &overload : diff.overloads) {
+    auto firstChoiceType = overload.choices[0].getBaseType();
+    if (!firstChoiceType)
+      return false;
+    CanType referenceType = firstChoiceType->getCanonicalType();
+
+    for (auto &choice : overload.choices) {
+      Type choiceType = choice.getBaseType();
+      if (!choiceType || choiceType->hasTypeVariable())
+        return false;
+      if (choiceType->getCanonicalType() != referenceType)
+        return false;
+    }
+  }
 
   bool noFixes = llvm::all_of(solutions, [](const Solution &solution) -> bool {
      const auto score = solution.getFixedScore();
