@@ -1874,44 +1874,10 @@ function Install-Platform([Platform]$Platform, $Arch) {
 }
 
 function Build-SQLite($Arch) {
-  $SrcPath = "$SourceCache\sqlite-3.43.2"
-
-  # Download the sources
-  if (-not (Test-Path $SrcPath)) {
-    $ZipPath = "$env:TEMP\sqlite-amalgamation-3430200.zip"
-    if (-not $ToBatch) { Remove-item $ZipPath -ErrorAction Ignore | Out-Null }
-    Invoke-Program curl.exe -- -sL https://sqlite.org/2023/sqlite-amalgamation-3430200.zip -o $ZipPath
-
-    if (-not $ToBatch) { New-Item -Type Directory -Path $SrcPath -ErrorAction Ignore | Out-Null }
-    Invoke-Program "$UnixToolsBinDir\unzip.exe" -- -j -o $ZipPath -d $SrcPath
-    if (-not $ToBatch) { Remove-item $ZipPath | Out-Null }
-
-    if (-not $ToBatch) {
-      # Inject a CMakeLists.txt so we can build sqlite
-@"
-cmake_minimum_required(VERSION 3.12.3)
-project(SQLite LANGUAGES C)
-
-set(CMAKE_POSITION_INDEPENDENT_CODE YES)
-add_library(SQLite3 sqlite3.c)
-
-if(CMAKE_SYSTEM_NAME STREQUAL Windows AND BUILD_SHARED_LIBS)
-  target_compile_definitions(SQLite3 PRIVATE "SQLITE_API=__declspec(dllexport)")
-endif()
-
-install(TARGETS SQLite3
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin)
-install(FILES sqlite3.h sqlite3ext.h DESTINATION include)
-"@ | Out-File -Encoding UTF8 $SrcPath\CMakeLists.txt
-    }
-  }
-
   Build-CMakeProject `
-    -Src $SrcPath `
-    -Bin "$($Arch.BinaryCache)\sqlite-3.43.2" `
-    -InstallTo $LibraryRoot\sqlite-3.43.2\usr `
+    -Src $SourceCache\swift-toolchain-sqlite `
+    -Bin "$($Arch.BinaryCache)\sqlite-3.46.0" `
+    -InstallTo $LibraryRoot\sqlite-3.46.0\usr `
     -Arch $Arch `
     -UseMSVCCompilers C `
     -BuildTargets default `
@@ -1993,8 +1959,8 @@ function Build-LLBuild($Arch, [switch]$Test = $false) {
       -Defines ($TestingDefines + @{
         BUILD_SHARED_LIBS = "YES";
         LLBUILD_SUPPORT_BINDINGS = "Swift";
-        SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.43.2\usr\include";
-        SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.43.2\usr\lib\SQLite3.lib";
+        SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.46.0\usr\include";
+        SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.46.0\usr\lib\SQLite3.lib";
       })
   }
 }
@@ -2047,8 +2013,8 @@ function Build-Driver($Arch) {
       LLBuild_DIR = (Get-HostProjectCMakeModules LLBuild);
       Yams_DIR = (Get-HostProjectCMakeModules Yams);
       ArgumentParser_DIR = (Get-HostProjectCMakeModules ArgumentParser);
-      SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.43.2\usr\include";
-      SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.43.2\usr\lib\SQLite3.lib";
+      SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.46.0\usr\include";
+      SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.46.0\usr\lib\SQLite3.lib";
       SWIFT_DRIVER_BUILD_TOOLS = "YES";
       LLVM_DIR = "$(Get-HostProjectBinaryCache Compilers)\lib\cmake\llvm";
       Clang_DIR = "$(Get-HostProjectBinaryCache Compilers)\lib\cmake\clang";
@@ -2143,8 +2109,8 @@ function Build-PackageManager($Arch) {
       SwiftASN1_DIR = (Get-HostProjectCMakeModules ASN1);
       SwiftCertificates_DIR = (Get-HostProjectCMakeModules Certificates);
       SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
-      SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.43.2\usr\include";
-      SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.43.2\usr\lib\SQLite3.lib";
+      SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.46.0\usr\include";
+      SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.46.0\usr\lib\SQLite3.lib";
     }
 }
 
@@ -2303,7 +2269,7 @@ function Test-PackageManager() {
       -Src $SrcDir `
       -Bin $OutDir `
       -Arch $HostArch `
-      -Xcc "-I$LibraryRoot\sqlite-3.43.2\usr\include" -Xlinker "-L$LibraryRoot\sqlite-3.43.2\usr\lib"
+      -Xcc "-I$LibraryRoot\sqlite-3.46.0\usr\include" -Xlinker "-L$LibraryRoot\sqlite-3.46.0\usr\lib"
   }
 }
 
