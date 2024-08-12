@@ -1073,7 +1073,7 @@ Type ConstraintSystem::replaceInferableTypesWithTypeVars(
   if (!type->hasUnboundGenericType() && !type->hasPlaceholder())
     return type;
 
-  type = type.transform([&](Type type) -> Type {
+  type = type.transformRec([&](Type type) -> std::optional<Type> {
       if (auto unbound = type->getAs<UnboundGenericType>()) {
         return openUnboundGenericType(unbound->getDecl(), unbound->getParent(),
                                       locator, /*isTypeResolution=*/false);
@@ -1081,27 +1081,27 @@ Type ConstraintSystem::replaceInferableTypesWithTypeVars(
         if (auto *typeRepr =
                 placeholderTy->getOriginator().dyn_cast<TypeRepr *>()) {
           if (isa<PlaceholderTypeRepr>(typeRepr)) {
-            return createTypeVariable(
+            return Type(createTypeVariable(
                 getConstraintLocator(locator,
                                      LocatorPathElt::PlaceholderType(typeRepr)),
                 TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
-                    TVO_CanBindToHole);
+                    TVO_CanBindToHole));
           }
         } else if (auto *var =
                        placeholderTy->getOriginator().dyn_cast<VarDecl *>()) {
           if (var->getName().hasDollarPrefix()) {
             auto *repr =
                 new (type->getASTContext()) PlaceholderTypeRepr(var->getLoc());
-            return createTypeVariable(
+            return Type(createTypeVariable(
                 getConstraintLocator(locator,
                                      LocatorPathElt::PlaceholderType(repr)),
                 TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
-                    TVO_CanBindToHole);
+                    TVO_CanBindToHole));
           }
         }
       }
 
-      return type;
+      return std::nullopt;
     });
 
   if (!type)
@@ -1117,7 +1117,7 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements,
   if (!type->hasTypeParameter())
     return type;
 
-  return type.transform([&](Type type) -> Type {
+  return type.transformRec([&](Type type) -> std::optional<Type> {
       assert(!type->is<GenericFunctionType>());
 
       // Preserve single element tuples if their element is
@@ -1151,7 +1151,7 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements,
         return known->second;
       }
 
-      return type;
+      return std::nullopt;
     });
 }
 
@@ -1239,13 +1239,13 @@ Type ConstraintSystem::openOpaqueType(Type type, ContextualTypePurpose context,
     return true;
   };
 
-  return type.transform([&](Type type) -> Type {
+  return type.transformRec([&](Type type) -> std::optional<Type> {
     auto *opaqueType = type->getAs<OpaqueTypeArchetypeType>();
 
     if (opaqueType && shouldOpen(opaqueType))
       return openOpaqueType(opaqueType, locator);
 
-    return type;
+    return std::nullopt;
   });
 }
 
@@ -4203,8 +4203,8 @@ struct TypeSimplifier {
                  llvm::function_ref<Type(TypeVariableType *)> getFixedTypeFn)
     : CS(CS), GetFixedTypeFn(getFixedTypeFn) {}
 
-  Type operator()(Type type) {
-    if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer())) {
+  std::optional<Type> operator()(TypeBase *type) {
+    if (auto tvt = dyn_cast<TypeVariableType>(type)) {
       auto fixedTy = GetFixedTypeFn(tvt);
 
       // TODO: the following logic should be applied when rewriting
@@ -4216,7 +4216,7 @@ struct TypeSimplifier {
       if (auto fixedPack = fixedTy->getAs<PackType>()) {
         auto &activeExpansion = ActivePackExpansions.back();
         if (activeExpansion.index >= fixedPack->getNumElements()) {
-          return tvt;
+          return std::nullopt;
         }
 
         auto fixedElt = fixedPack->getElementType(activeExpansion.index);
@@ -4226,18 +4226,18 @@ struct TypeSimplifier {
         } else if (!activeExpansion.isPackExpansion && !fixedExpansion) {
           return fixedElt;
         } else {
-          return tvt;
+          return std::nullopt;
         }
       }
 
       return fixedTy;
     }
 
-    if (auto tuple = dyn_cast<TupleType>(type.getPointer())) {
+    if (auto tuple = dyn_cast<TupleType>(type)) {
       if (tuple->getNumElements() == 1) {
         auto element = tuple->getElement(0);
         auto elementType = element.getType();
-        auto resolvedType = elementType.transform(*this);
+        auto resolvedType = elementType.transformRec(*this);
 
         // If this is a single-element tuple with pack expansion
         // variable inside, let's unwrap it if pack is flattened.
@@ -4264,7 +4264,7 @@ struct TypeSimplifier {
       }
     }
 
-    if (auto expansion = dyn_cast<PackExpansionType>(type.getPointer())) {
+    if (auto expansion = dyn_cast<PackExpansionType>(type)) {
       auto patternType = expansion->getPatternType();
       // First, let's check whether pattern type has all of the type variables
       // that represent packs resolved, otherwise we don't have enough information
@@ -4279,11 +4279,11 @@ struct TypeSimplifier {
             }
             return false;
           })) {
-        return expansion;
+        return std::nullopt;
       }
 
       // Transform the count type, ignoring any active pack expansions.
-      auto countType = expansion->getCountType().transform(
+      auto countType = expansion->getCountType().transformRec(
           TypeSimplifier(CS, GetFixedTypeFn));
 
       if (!countType->is<PackType>() &&
@@ -4308,7 +4308,7 @@ struct TypeSimplifier {
           ActivePackExpansions.back().isPackExpansion =
             (countExpansion != nullptr);
 
-          auto elt = expansion->getPatternType().transform(*this);
+          auto elt = expansion->getPatternType().transformRec(*this);
           if (countExpansion)
             elt = PackExpansionType::get(elt, countExpansion->getCountType());
           elts.push_back(elt);
@@ -4322,7 +4322,7 @@ struct TypeSimplifier {
         return PackType::get(CS.getASTContext(), elts);
       } else {
         ActivePackExpansions.push_back({true, 0});
-        auto patternType = expansion->getPatternType().transform(*this);
+        auto patternType = expansion->getPatternType().transformRec(*this);
         ActivePackExpansions.pop_back();
         return PackExpansionType::get(patternType, countType);
       }
@@ -4330,9 +4330,9 @@ struct TypeSimplifier {
 
     // If this is a dependent member type for which we end up simplifying
     // the base to a non-type-variable, perform lookup.
-    if (auto depMemTy = dyn_cast<DependentMemberType>(type.getPointer())) {
+    if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
       // Simplify the base.
-      Type newBase = depMemTy->getBase().transform(*this);
+      Type newBase = depMemTy->getBase().transformRec(*this);
 
       if (newBase->isPlaceholder()) {
         return PlaceholderType::get(CS.getASTContext(), depMemTy);
@@ -4340,7 +4340,7 @@ struct TypeSimplifier {
 
       // If nothing changed, we're done.
       if (newBase.getPointer() == depMemTy->getBase().getPointer())
-        return type;
+        return std::nullopt;
 
       // Dependent member types should only be created for associated types.
       auto assocType = depMemTy->getAssocType();
@@ -4379,7 +4379,7 @@ struct TypeSimplifier {
       return DependentMemberType::get(lookupBaseType, assocType);
     }
 
-    return type;
+    return std::nullopt;
   }
 };
 
@@ -4387,7 +4387,7 @@ struct TypeSimplifier {
 
 Type ConstraintSystem::simplifyTypeImpl(Type type,
     llvm::function_ref<Type(TypeVariableType *)> getFixedTypeFn) {
-  return type.transform(TypeSimplifier(*this, getFixedTypeFn));
+  return type.transformRec(TypeSimplifier(*this, getFixedTypeFn));
 }
 
 Type ConstraintSystem::simplifyType(Type type) {
@@ -4426,9 +4426,10 @@ Type Solution::simplifyType(Type type) const {
   // Placeholders shouldn't be reachable through a solution, they are only
   // useful to determine what went wrong exactly.
   if (resolvedType->hasPlaceholder()) {
-    return resolvedType.transform([&](Type type) {
-      return type->isPlaceholder() ? Type(cs.getASTContext().TheUnresolvedType)
-                                   : type;
+    return resolvedType.transformRec([&](Type type) -> std::optional<Type> {
+      if (type->isPlaceholder())
+        return Type(cs.getASTContext().TheUnresolvedType);
+      return std::nullopt;
     });
   }
 
@@ -4446,15 +4447,15 @@ Type Solution::simplifyTypeForCodeCompletion(Type Ty) const {
 
   // Next, replace all placeholders by type variables. We know that all type
   // variables now in the type originate from placeholders.
-  Ty = Ty.transform([](Type type) -> Type {
+  Ty = Ty.transformRec([](Type type) -> std::optional<Type> {
     if (auto *placeholder = type->getAs<PlaceholderType>()) {
       if (auto *typeVar =
               placeholder->getOriginator().dyn_cast<TypeVariableType *>()) {
-        return typeVar;
+        return Type(typeVar);
       }
     }
 
-    return type;
+    return std::nullopt;
   });
 
   // Replace all type variables (which must come from placeholders) by their
@@ -6684,7 +6685,7 @@ ASTNode ConstraintSystem::includingParentApply(ASTNode node) {
 }
 
 Type Solution::resolveInterfaceType(Type type) const {
-  auto resolvedType = type.transform([&](Type type) -> Type {
+  auto resolvedType = type.transformRec([&](Type type) -> std::optional<Type> {
     if (auto *tvt = type->getAs<TypeVariableType>()) {
       // If this type variable is for a generic parameter, return that.
       if (auto *gp = tvt->getImpl().getGenericParameter())
@@ -6702,7 +6703,7 @@ Type Solution::resolveInterfaceType(Type type) const {
       assert(dmt->getAssocType());
       return DependentMemberType::get(newBase, dmt->getAssocType());
     }
-    return type;
+    return std::nullopt;
   });
 
   assert(!resolvedType->hasArchetype());
@@ -7672,10 +7673,10 @@ Type ConstraintSystem::getVarType(const VarDecl *var) {
   if (!isForCodeCompletion())
     return type;
 
-  return type.transform([&](Type type) {
+  return type.transformRec([&](Type type) -> std::optional<Type> {
     if (!type->is<ErrorType>())
-      return type;
-    return PlaceholderType::get(Context, const_cast<VarDecl *>(var));
+      return std::nullopt;
+    return Type(PlaceholderType::get(Context, const_cast<VarDecl *>(var)));
   });
 }
 

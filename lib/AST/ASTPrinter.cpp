@@ -6134,11 +6134,11 @@ public:
       // FIXME: We need to replace nested existential metatypes so that
       // we don't print duplicate 'any'. This will be unnecessary once
       // ExistentialMetatypeType is split into ExistentialType(MetatypeType).
-      printWithParensIfNotSimple(instanceType.transform([](Type type) -> Type {
-        if (auto existential = type->getAs<ExistentialMetatypeType>())
+      printWithParensIfNotSimple(instanceType.transformRec([](Type t) -> std::optional<Type> {
+        if (auto existential = t->getAs<ExistentialMetatypeType>())
           return MetatypeType::get(existential->getInstanceType());
 
-        return type;
+        return std::nullopt;
       }));
     } else {
       assert(T->is<MetatypeType>());

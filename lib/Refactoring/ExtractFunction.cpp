@@ -21,11 +21,11 @@ using namespace swift::refactoring;
 
 static Type sanitizeType(Type Ty) {
   // Transform lvalue type to inout type so that we can print it properly.
-  return Ty.transform([](Type Ty) {
+  return Ty.transformRec([](Type Ty) -> std::optional<Type> {
     if (Ty->is<LValueType>()) {
       return Type(InOutType::get(Ty->getRValueType()->getCanonicalType()));
     }
-    return Ty;
+    return std::nullopt;
   });
 }
 

@@ -3477,12 +3477,12 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
 
 /// Map a type within the signature of a declaration.
 static Type mapSignatureType(ASTContext &ctx, Type type) {
-  return type.transform([&](Type type) -> Type {
+  return type.transformRec([&](Type type) -> std::optional<Type> {
       if (type->is<FunctionType>()) {
         return mapSignatureFunctionType(ctx, type, false, false, false, 1);
       }
 
-      return type;
+      return std::nullopt;
     });
 }
 

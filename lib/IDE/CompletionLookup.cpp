@@ -574,14 +574,14 @@ Type CompletionLookup::eraseArchetypes(Type type, GenericSignature genericSig) {
         genericFuncType->getExtInfo());
   }
 
-  return type.transform([&](Type t) -> Type {
+  return type.transformRec([&](Type t) -> std::optional<Type> {
     // FIXME: Code completion should only deal with one or the other,
     // and not both.
     if (auto *archetypeType = t->getAs<ArchetypeType>()) {
       // Don't erase opaque archetype.
       if (isa<OpaqueTypeArchetypeType>(archetypeType) &&
           archetypeType->isRoot())
-        return t;
+        return std::nullopt;
 
       auto genericSig = archetypeType->getGenericEnvironment()->getGenericSignature();
       auto upperBound = genericSig->getUpperBound(
@@ -603,7 +603,7 @@ Type CompletionLookup::eraseArchetypes(Type type, GenericSignature genericSig) {
         return upperBound;
     }
 
-    return t;
+    return std::nullopt;
   });
 }
 
@@ -2062,15 +2062,15 @@ void CompletionLookup::onLookupNominalTypeMembers(NominalTypeDecl *NTD,
 }
 
 Type CompletionLookup::normalizeTypeForDuplicationCheck(Type Ty) {
-  return Ty.transform([](Type T) {
+  return Ty.transformRec([](Type T) -> std::optional<Type> {
     if (auto opaque = T->getAs<OpaqueTypeArchetypeType>()) {
       /// Opaque type has a _invisible_ substitution map. Since IDE can't
       /// differentiate them, replace it with empty substitution map.
-      return OpaqueTypeArchetypeType::get(opaque->getDecl(),
-                                          opaque->getInterfaceType(),
-                                          /*Substitutions=*/{});
+      return Type(OpaqueTypeArchetypeType::get(opaque->getDecl(),
+                                               opaque->getInterfaceType(),
+                                               /*Substitutions=*/{}));
     }
-    return T;
+    return std::nullopt;
   });
 }
 

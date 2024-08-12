@@ -855,7 +855,7 @@ bool SILType::isDifferentiable(SILModule &M) const {
 
 Type
 TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) const {
-  return Type(const_cast<TypeBase *>(this)).transform([&](Type t) -> Type {
+  return Type(const_cast<TypeBase *>(this)).transformRec([&](TypeBase *t) -> std::optional<Type> {
     if (auto *f = t->getAs<SILFunctionType>()) {
       auto sft = f->getUnsubstitutedType(M);
       
@@ -907,7 +907,7 @@ TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) cons
                                   SubstitutionMap(),
                                   M.getASTContext());
     }
-    return t;
+    return std::nullopt;
   });
 }
 

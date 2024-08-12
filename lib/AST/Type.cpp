@@ -750,10 +750,10 @@ Type TypeBase::getRValueType() {
   if (!hasLValueType())
     return this;
 
-  return Type(this).transform([](Type t) -> Type {
-      if (auto *lvalueTy = dyn_cast<LValueType>(t.getPointer()))
+  return Type(this).transformRec([](TypeBase *t) -> std::optional<Type> {
+      if (auto *lvalueTy = dyn_cast<LValueType>(t))
         return lvalueTy->getObjectType();
-      return t;
+      return std::nullopt;
     });
 }
 
@@ -1863,7 +1863,7 @@ CanType TypeBase::getReducedType(GenericSignature sig) {
 }
 
 CanType TypeBase::getMinimalCanonicalType(const DeclContext *useDC) const {
-  const auto MinimalTy = getCanonicalType().transform([useDC](Type Ty) -> Type {
+  const auto MinimalTy = getCanonicalType().transformRec([useDC](TypeBase *Ty) -> std::optional<Type> {
     const CanType CanTy = CanType(Ty);
 
     if (const auto ET = dyn_cast<ExistentialType>(CanTy)) {
@@ -1899,15 +1899,15 @@ CanType TypeBase::getMinimalCanonicalType(const DeclContext *useDC) const {
       return Composition->getMinimalCanonicalType(useDC);
     }
 
-    return CanTy;
+    return std::nullopt;
   });
 
   return CanType(MinimalTy);
 }
 
 TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
-  auto Func = [Recursive](Type Ty) -> Type {
-    if (auto boundGeneric = dyn_cast<BoundGenericType>(Ty.getPointer())) {
+  auto Func = [Recursive](TypeBase *Ty) -> std::optional<Type> {
+    if (auto boundGeneric = dyn_cast<BoundGenericType>(Ty)) {
 
       auto getGenericArg = [&](unsigned i) -> Type {
         auto arg = boundGeneric->getGenericArgs()[i];
@@ -1917,27 +1917,30 @@ TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
       };
 
       if (boundGeneric->isArray())
-        return ArraySliceType::get(getGenericArg(0));
+        return Type(ArraySliceType::get(getGenericArg(0)));
       if (boundGeneric->isDictionary())
-        return DictionaryType::get(getGenericArg(0), getGenericArg(1));
+        return Type(DictionaryType::get(getGenericArg(0), getGenericArg(1)));
       if (boundGeneric->isOptional())
-        return OptionalType::get(getGenericArg(0));
+        return Type(OptionalType::get(getGenericArg(0)));
     }
-    return Ty;
+    return std::nullopt;
   };
   if (Recursive)
-    return Type(this).transform(Func).getPointer();
-  else
-    return Func(this).getPointer();
+    return Type(this).transformRec(Func).getPointer();
+
+  if (auto result = Func(this))
+    return result->getPointer();
+
+  return this;
 }
 
 TypeBase *TypeBase::getWithoutSyntaxSugar() {
-  auto Func = [](Type Ty) -> Type {
-    if (auto *syntaxSugarType = dyn_cast<SyntaxSugarType>(Ty.getPointer()))
+  auto Func = [](TypeBase *Ty) -> std::optional<Type> {
+    if (auto *syntaxSugarType = dyn_cast<SyntaxSugarType>(Ty))
       return syntaxSugarType->getSinglyDesugaredType()->getWithoutSyntaxSugar();
-    return Ty;
+    return std::nullopt;
   };
-  return Type(this).transform(Func).getPointer();
+  return Type(this).transformRec(Func).getPointer();
 }
 
 #define TYPE(Id, Parent)
@@ -4154,23 +4157,6 @@ static bool transformSILParameter(
     param = param.getWithInterfaceType(canTransType);
   }
   return false;
-}
-
-Type Type::transform(llvm::function_ref<Type(Type)> fn) const {
-  return transformWithPosition(
-      TypePosition::Invariant,
-      [fn](TypeBase *type, auto) -> std::optional<Type> {
-        Type transformed = fn(Type(type));
-        if (!transformed)
-          return Type();
-
-        // If the function didn't change the type at
-        // all, let transformRec() recurse.
-        if (transformed.getPointer() == type)
-          return std::nullopt;
-
-        return transformed;
-      });
 }
 
 static PackType *getTransformedPack(Type substType) {
