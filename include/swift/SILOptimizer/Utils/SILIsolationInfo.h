@@ -323,6 +323,12 @@ public:
     return (kind == Task || kind == Actor) && bool(isolatedValue);
   }
 
+  SILValue maybeGetIsolatedValue() const {
+    if (!hasIsolatedValue())
+      return {};
+    return getIsolatedValue();
+  }
+
   static SILIsolationInfo getDisconnected(bool isUnsafeNonIsolated) {
     return {Kind::Disconnected,
             isUnsafeNonIsolated ? Flag::UnsafeNonIsolated : Flag::None};
