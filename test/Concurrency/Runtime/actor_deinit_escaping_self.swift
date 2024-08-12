@@ -4,6 +4,7 @@
 // REQUIRES: libdispatch
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
+// REQUIRES: swift_stdlib_asserts
 // UNSUPPORTED: back_deployment_runtime
 
 import _Concurrency
@@ -35,8 +36,7 @@ actor EscapeLocked {
     // Ideally these tests should be compile-time errors
     let tests = TestSuite("EscapingSelf")
     tests.test("escape while locked") {
-      // TODO: Investigate failure on Linux and re-enable this test
-      // _ = EscapeLocked()
+      _ = EscapeLocked()
     }
     await runAllTestsAsync()
   }
