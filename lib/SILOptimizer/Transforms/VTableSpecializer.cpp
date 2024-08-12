@@ -150,6 +150,26 @@ static bool specializeVTablesOfSuperclasses(SILModule &module,
   return changed;
 }
 
+static SubstitutionMap getMethodSubs(SILFunction *method, SubstitutionMap classContextSubs) {
+  GenericSignature genericSig =
+    method->getLoweredFunctionType()->getInvocationGenericSignature();
+
+  if (!genericSig || genericSig->areAllParamsConcrete())
+    return SubstitutionMap();
+
+  return SubstitutionMap::get(genericSig,
+           QuerySubstitutionMap{classContextSubs},
+           LookUpConformanceInModule());
+}
+
+static bool hasInvalidConformance(SubstitutionMap subs) {
+  for (auto substConf : subs.getConformances()) {
+    if (substConf.isInvalid())
+      return true;
+  }
+  return false;
+}
+
 SILVTable *swift::specializeVTableForType(SILType classTy, SILModule &module,
                                 SILTransform *transform) {
   CanType astType = classTy.getASTType();
@@ -182,8 +202,20 @@ SILVTable *swift::specializeVTableForType(SILType classTy, SILModule &module,
 
   for (const SILVTableEntry &entry : origVtable->getEntries()) {
     SILFunction *origMethod = entry.getImplementation();
+
+    auto methodSubs = getMethodSubs(origMethod, subs);
+
+    // If the resulting substitution map is not valid this means that the method
+    // itself has generic parameters.
+    if (hasInvalidConformance(methodSubs)) {
+      module.getASTContext().Diags.diagnose(
+          entry.getMethod().getDecl()->getLoc(), diag::non_final_generic_class_function);
+      continue;
+    }
+
     SILFunction *specializedMethod =
-        specializeVTableMethod(origMethod, subs, module, transform);
+        specializeVTableMethod(origMethod, methodSubs, module, transform);
+
     newEntries.push_back(SILVTableEntry(entry.getMethod(), specializedMethod,
                                         entry.getKind(),
                                         entry.isNonOverridden()));
