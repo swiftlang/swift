@@ -17,6 +17,11 @@
 // RUN: %target-run %t/E %t/%target-library-name(Swiftskell) \
 // RUN:     | %FileCheck %s --implicit-check-not destroy
 
+// RUN: %target-build-swift -O -I%t -L%t -lSwiftskell -parse-as-library %s \
+// RUN:                     -module-name Opt -o %t/Opt %target-rpath(%t)
+// RUN: %target-codesign %t/Opt
+// RUN: %target-run %t/Opt %t/%target-library-name(Swiftskell) | %FileCheck %s --implicit-check-not destroy
+
 // REQUIRES: executable_test
 
 // Temporarily disable for back-deployment (rdar://128544927)
