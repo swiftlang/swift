@@ -1244,6 +1244,7 @@ STRESSTEST_PACKAGE_DIR="${WORKSPACE}/swift-stress-tester"
 XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
 FOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 FOUNDATION_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
+FOUNDATION_MACROS_SOURCE_DIR="${WORKSPACE}/swift-foundation/Sources/FoundationMacros"
 FOUNDATION_SWIFTFOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-foundation"
 FOUNDATION_SWIFTFOUNDATIONICU_SOURCE_DIR="${WORKSPACE}/swift-foundation-icu"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
@@ -1261,6 +1262,7 @@ SWIFT_SYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 [[ "${SKIP_BUILD_STATIC_LIBDISPATCH}" ]] || PRODUCTS+=(libdispatch_static)
 # llbuild and XCTest depend on Foundation, so Foundation must
 # be added to the list of build products first.
+[[ "${SKIP_BUILD_FOUNDATION}" ]] || PRODUCTS+=(foundation_macros)
 [[ "${SKIP_BUILD_FOUNDATION}" ]] || PRODUCTS+=(foundation)
 [[ "${SKIP_BUILD_STATIC_FOUNDATION}" ]] || PRODUCTS+=(foundation_static)
 [[ "${SKIP_BUILD_LLBUILD}" ]] || PRODUCTS+=(llbuild)
@@ -1336,7 +1338,7 @@ function build_directory_bin() {
             xctest)
                 echo "${root}/${XCTEST_BUILD_TYPE}/bin"
                 ;;
-            foundation|foundation_static)
+            foundation|foundation_static|foundation_macros)
                 echo "${root}/${FOUNDATION_BUILD_TYPE}/bin"
                 ;;
             libdispatch|libdispatch_static)
@@ -1474,7 +1476,7 @@ function cmake_config_opt() {
             xctest)
                 echo "--config ${XCTEST_BUILD_TYPE}"
                 ;;
-            foundation|foundation_static)
+            foundation|foundation_static|foundation_macros)
                 echo "--config ${FOUNDATION_BUILD_TYPE}"
                 ;;
             libdispatch|libdispatch_static)
@@ -1675,7 +1677,7 @@ for host in "${ALL_HOSTS[@]}"; do
     fi
 
     for product in "${PRODUCTS[@]}"; do
-        [[ $(should_execute_action "${host}-${product/_static}-build") ]] || continue
+        [[ $(should_execute_action "${host}-${product%%_*}-build") ]] || continue
 
         source_dir_var="$(toupper ${product})_SOURCE_DIR"
         source_dir=${!source_dir_var}
@@ -1688,7 +1690,7 @@ for host in "${ALL_HOSTS[@]}"; do
         module_cache="${build_dir}/module-cache"
 
         # Add any specific cmake options specified by build-script
-        product_cmake_options_name=$(to_varname "${product/_static}")_CMAKE_OPTIONS
+        product_cmake_options_name=$(to_varname "${product%%_*}")_CMAKE_OPTIONS
         product_cmake_options=(${!product_cmake_options_name}) # convert to array
         cmake_options+=("${product_cmake_options[@]}")
 
@@ -2402,6 +2404,40 @@ for host in "${ALL_HOSTS[@]}"; do
                 esac
 
                 ;;
+            foundation_macros)
+                if [[ ${host} == "macosx"* ]]; then
+                    echo "Skipping Foundation Macros on OS X -- Foundation is part of the OS on this platform"
+                    continue
+                fi
+
+                if [[ "${SKIP_CLEAN_FOUNDATION}" == "0" ]]
+                then
+                  # The Swift project might have been changed, but CMake might
+                  # not be aware and will not rebuild.
+                  echo "Cleaning the Foundation Macros build directory"
+                  call rm -rf "${build_dir}"
+                fi
+
+                cmake_options=(
+                    ${cmake_options[@]}
+                    -DCMAKE_BUILD_TYPE:STRING=${FOUNDATION_BUILD_TYPE}
+                    -DCMAKE_C_COMPILER:PATH=${CLANG_BIN}/clang
+                    -DCMAKE_CXX_COMPILER:PATH=${CLANG_BIN}/clang++
+                    -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
+                    -DCMAKE_Swift_FLAGS:STRING="$(common_swift_flags)"
+                    -DCMAKE_INSTALL_PREFIX:PATH=$(get_host_install_prefix ${host})
+
+                    -DSwiftSyntax_DIR=$(build_directory ${host} swift)/cmake/modules
+
+                    -DBUILD_SHARED_LIBS=YES
+                    -DCMAKE_C_FLAGS="$(swift_c_flags ${host}) $(maybe_lfts ${host})"
+                )
+
+                if [[ $(is_cross_tools_host ${host}) ]] ; then
+                    cmake_options+=("${SWIFT_TARGET_CMAKE_OPTIONS[@]}")
+                fi
+
+                ;;
             foundation|foundation_static)
                 # The configuration script requires knowing about XCTest's
                 # location for building and running the tests. Note that XCTest
@@ -2409,7 +2445,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
 
                 if [[ ${host} == "macosx"* ]]; then
-                    echo "Skipping Foundation on OS X -- use the Xcode project instead"
+                    echo "Skipping Foundation on OS X -- Foundation is part of the OS on this platform"
                     continue
                 fi
 
@@ -2496,7 +2532,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=$(build_directory ${host} libdispatch)
                   -Ddispatch_DIR=$(build_directory ${host} libdispatch)/cmake/modules
 
-                  -DSwiftSyntax_DIR=$(build_directory ${host} swift)/cmake/modules
+                  -DSwiftFoundation_MACRO=$(build_directory ${LOCAL_HOST} foundation_macros)/lib
 
                   -D_SwiftFoundation_SourceDIR=${FOUNDATION_SWIFTFOUNDATION_SOURCE_DIR}
                   -D_SwiftFoundationICU_SourceDIR=${FOUNDATION_SWIFTFOUNDATIONICU_SOURCE_DIR}
@@ -2825,7 +2861,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
                 esac
                 ;;
-            foundation|foundation_static)
+            foundation|foundation_static|foundation_macros)
               continue
             ;;
             libdispatch)
@@ -2943,7 +2979,7 @@ for host in "${ALL_HOSTS[@]}"; do
     set_build_options_for_host $host
 
     for product in "${PRODUCTS[@]}"; do
-        [[ $(should_execute_action "${host}-${product/_static}-install") ]] || continue
+        [[ $(should_execute_action "${host}-${product%%_*}-install") ]] || continue
         if [[ -z "${INSTALL_DESTDIR}" ]] ; then
             echo "--install-destdir is required to install products."
             exit 1
@@ -2991,10 +3027,10 @@ for host in "${ALL_HOSTS[@]}"; do
                 esac
 
                 ;;
-            foundation|foundation_static)
+            foundation|foundation_static|foundation_macros)
                 # FIXME: Foundation doesn't build from the script on OS X
                 if [[ ${host} == "macosx"* ]]; then
-                    echo "Skipping Foundation on OS X -- use the Xcode project instead"
+                    echo "Skipping Foundation on OS X -- Foundation does not build for this platform"
                     continue
                 fi
 
