@@ -283,6 +283,16 @@ bb0(%0 : $*T):
   return %r : $()
 }
 
+// CHECK-LABEL: sil @test_non_ossa :
+// CHECK:         destroy_addr %0
+// CHECK:       } // end sil function 'test_non_ossa'
+sil @test_non_ossa : $@convention(thin) (@in S1) -> () {
+bb0(%0 : $*S1):
+  destroy_addr %0 : $*S1
+  %r = tuple()
+  return %r : $()
+}
+
 sil @s1_deinit : $@convention(method) (@owned S1) -> ()
 sil @s2_deinit : $@convention(method) (@owned S2) -> ()
 sil @s3_deinit : $@convention(method) <T> (@in S3<T>) -> ()
