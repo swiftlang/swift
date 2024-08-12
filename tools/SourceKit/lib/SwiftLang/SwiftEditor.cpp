@@ -2633,6 +2633,11 @@ void SwiftLangSupport::getSemanticTokens(
     void cancelled() override {
       Receiver(RequestResult<SemanticTokensResult>::cancelled());
     }
+
+    void failed(StringRef Error) override {
+      LOG_WARN_FUNC("semantic tokens failed: " << Error);
+      Receiver(RequestResult<SemanticTokensResult>::fromError(Error));
+    }
   };
 
   auto Consumer = std::make_shared<SemanticTokensConsumer>(InputBufferName,

@@ -1811,6 +1811,11 @@ static void computeDiagnostics(
     void cancelled() override {
       Receiver(RequestResult<DiagnosticsResult>::cancelled());
     }
+
+    void failed(StringRef Error) override {
+      LOG_WARN_FUNC("diagnostics failed: " << Error);
+      Receiver(RequestResult<DiagnosticsResult>::fromError(Error));
+    }
   };
 
   auto Consumer = std::make_shared<DiagnosticsConsumer>(std::move(Receiver));
