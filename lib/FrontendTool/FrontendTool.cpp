@@ -1643,6 +1643,13 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     return writeSIL(*SM, PSPs, Instance, Invocation.getSILOptions());
   }
 
+  // In lazy typechecking mode, SILGen may have triggered requests which
+  // resulted in errors. We don't want to proceed with optimization or
+  // serialization if there were errors since the SIL may be incomplete or
+  // invalid.
+  if (Context.TypeCheckerOpts.EnableLazyTypecheck && Context.hadError())
+    return true;
+
   if (Action == FrontendOptions::ActionType::EmitSIBGen) {
     serializeSIB(SM.get(), PSPs, Context, MSF);
     return Context.hadError();
