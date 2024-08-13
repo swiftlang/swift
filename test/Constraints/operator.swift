@@ -332,7 +332,9 @@ enum I60954 {
 
 // https://github.com/swiftlang/swift/issues/72533
 func f_72533() {
+  Int.min..<Int16.max
+  // expected-error@-1{{binary operator '..<' cannot be applied to operands of type 'Int' and 'Int16'}}
   let foo: Int = 1
   Int(foo)..<Int16.max
-  // expected-error@-1{{conflicting arguments to generic parameter 'Self'}}
+  // expected-error@-1{{binary operator '..<' cannot be applied to operands of type 'Int' and 'Int16'}}
 }
