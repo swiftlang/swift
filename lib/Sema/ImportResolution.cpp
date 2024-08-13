@@ -836,7 +836,7 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
   // packages that cannot be resilient.
   if (import.options.contains(ImportFlags::ImplementationOnly) &&
       import.implementationOnlyRange.isValid()) {
-    if (SF.getParentModule()->isResilient()) {
+    if (SF.getParentModule()->getResilienceStrategy() != ResilienceStrategy::Default) {
       // Encourage replacing `@_implementationOnly` with `internal import`.
       if (!topLevelModule.get()->isNonSwiftModule()) {
         auto inFlight =

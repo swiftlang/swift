@@ -170,7 +170,13 @@ enum class ResilienceStrategy : unsigned {
   /// Non-inlinable function bodies: resilient
   ///
   /// This is the behavior with -enable-library-evolution.
-  Resilient
+  Resilient,
+
+  /// Public nominal types: fragile, all public stored members
+  /// Non-inlinable function bodies: resilient
+  ///
+  /// This is the behavior with -nonresilient-hide-dependencies
+  Fragile
 };
 
 class OverlayFile;
@@ -693,10 +699,14 @@ public:
   }
 
   ResilienceStrategy getResilienceStrategy() const {
-    return ResilienceStrategy(Bits.ModuleDecl.RawResilienceStrategy);
+    return ResilienceStrategy(
+      Bits.ModuleDecl.NonResilientHideDependencies << 1
+      | Bits.ModuleDecl.RawResilienceStrategy);
   }
+  
   void setResilienceStrategy(ResilienceStrategy strategy) {
-    Bits.ModuleDecl.RawResilienceStrategy = unsigned(strategy);
+    Bits.ModuleDecl.RawResilienceStrategy = unsigned(strategy) & 1;
+    Bits.ModuleDecl.NonResilientHideDependencies = unsigned(strategy) >> 1;
   }
 
   /// Distribution level of the module.
@@ -827,7 +837,7 @@ public:
   ModuleDecl *getTopLevelModule(bool overlay = false);
 
   bool isResilient() const {
-    return getResilienceStrategy() != ResilienceStrategy::Default;
+    return getResilienceStrategy() == ResilienceStrategy::Resilient;
   }
 
   /// True if this module is resilient AND also does _not_ allow
