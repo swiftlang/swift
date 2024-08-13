@@ -2205,6 +2205,7 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   _swift_task_clearCurrent();
 }
 
+#if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
 namespace {
 /// Job that allows to use executor API to schedule a block of task-less
 /// synchronous code.
@@ -2233,6 +2234,7 @@ public:
   }
 };
 } // namespace
+#endif
 
 SWIFT_CC(swift)
 static void swift_task_deinitOnExecutorImpl(void *object,
@@ -2253,8 +2255,12 @@ static void swift_task_deinitOnExecutorImpl(void *object,
     return work(object); // 'return' forces tail call
   }
 
-  // Optimize deallocation of the default actors
+#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+  // In this mode taking actor lock is the only possible implementation
+#else
+  // Otherwise, it is an optimisation applied when deinitializing default actors
   if (newExecutor.isDefaultActor() && object == newExecutor.getIdentity()) {
+#endif
     // Try to take the lock. This should always succeed, unless someone is
     // running the actor using unsafe unowned reference.
     if (asImpl(newExecutor.getDefaultActor())->tryLock(false)) {
@@ -2284,7 +2290,7 @@ static void swift_task_deinitOnExecutorImpl(void *object,
 
       // `work` is a synchronous function, it cannot call swift_task_switch()
       // If it calls any synchronous API that may change executor inside
-      // tracking info, that API is also responsible for changing it back.
+      // tracking info, that API is also responsible for changing it back.
       assert(newExecutor == trackingInfo.getActiveExecutor());
       assert(taskExecutor == trackingInfo.getTaskExecutor());
 
@@ -2294,7 +2300,12 @@ static void swift_task_deinitOnExecutorImpl(void *object,
       // Give up the current actor.
       asImpl(newExecutor.getDefaultActor())->unlock(true);
       return;
+    } else {
+#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+      assert(false && "Should not enqueue onto default actor in actor as locks model");
+#endif
     }
+#if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
   }
 
   auto currentTask = swift_task_getCurrent();
@@ -2303,6 +2314,7 @@ static void swift_task_deinitOnExecutorImpl(void *object,
 
   auto job = new IsolatedDeinitJob(priority, object, work);
   swift_task_enqueue(job, newExecutor);
+#endif
 }
 
 /*****************************************************************************/
