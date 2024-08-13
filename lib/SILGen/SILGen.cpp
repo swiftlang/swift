@@ -95,6 +95,11 @@ SILGenModule::~SILGenModule() {
       f.setLinkage(SILLinkage::PublicExternal);
   }
 
+  // Skip verification if a lazy typechecking error occurred.
+  auto &ctx = getASTContext();
+  if (ctx.TypeCheckerOpts.EnableLazyTypecheck && ctx.hadError())
+    return;
+
   M.verifyIncompleteOSSA();
 }
 

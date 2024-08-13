@@ -7,7 +7,7 @@
 // RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 5 -package-name TestPackage -enable-experimental-feature MemberImportVisibility -verify-additional-prefix member-visibility-
 
 import members_C
-// expected-member-visibility-note 11{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
+// expected-member-visibility-note 12{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
 
 
 func testExtensionMembers(x: X, y: Y<Z>) {
@@ -70,7 +70,7 @@ func testTopLevelTypes() {
 
 class DerivedFromClassInC: DerivedClassInC {
   override func methodInA() {}
-  override func methodInB() {} // expected-member-visibility-error{{method does not override any method from its superclass}}
+  override func methodInB() {} // expected-member-visibility-error{{instance method 'methodInB()' is not available due to missing import of defining module 'members_B'}}
   override func methodInC() {}
 }
 
