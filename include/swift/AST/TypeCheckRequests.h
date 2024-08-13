@@ -4684,6 +4684,24 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Get the declaration that actually provides a doc comment for another.
+class DocCommentProvidingDeclRequest
+    : public SimpleRequest<DocCommentProvidingDeclRequest,
+                           const Decl *(const Decl *), RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  const Decl *evaluate(Evaluator &evaluator, const Decl *D) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+};
+
 /// Retrieve the brief portion of a declaration's document comment, potentially
 /// walking to find the comment providing decl if needed.
 class SemanticBriefCommentRequest
