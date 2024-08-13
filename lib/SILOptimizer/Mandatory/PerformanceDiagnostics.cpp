@@ -805,6 +805,11 @@ private:
   void run() override {
     SILModule *module = getModule();
 
+    // Skip all performance/embedded diagnostics if asked. This is used from
+    // SourceKit to avoid reporting false positives when WMO is turned off for
+    // indexing purposes.
+    if (!module->getOptions().EnablePerformanceDiagnostics) return;
+
     PerformanceDiagnostics diagnoser(*module, getAnalysis<BasicCalleeAnalysis>());
 
     // Check that @_section, @_silgen_name is only on constant globals
