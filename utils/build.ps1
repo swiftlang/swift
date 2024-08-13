@@ -1481,8 +1481,8 @@ function Build-CURL([Platform]$Platform, $Arch) {
 
   Build-CMakeProject `
     -Src $SourceCache\curl `
-    -Bin "$($Arch.BinaryCache)\$Platform\curl-8.5.0" `
-    -InstallTo "$LibraryRoot\curl-8.5.0\usr" `
+    -Bin "$($Arch.BinaryCache)\$Platform\curl-8.9.1" `
+    -InstallTo "$LibraryRoot\curl-8.9.1\usr" `
     -Arch $Arch `
     -Platform $Platform `
     -UseMSVCCompilers C `
@@ -1493,6 +1493,8 @@ function Build-CURL([Platform]$Platform, $Arch) {
       CMAKE_INSTALL_LIBDIR = "lib/$Platform/$ArchName";
       CMAKE_SYSTEM_NAME = $Platform.ToString();
       BUILD_CURL_EXE = "NO";
+      BUILD_LIBCURL_DOCS = "NO";
+      BUILD_MISC_DOCS = "NO";
       CURL_CA_BUNDLE = "none";
       CURL_CA_FALLBACK = "NO";
       CURL_CA_PATH = "none";
@@ -1501,6 +1503,7 @@ function Build-CURL([Platform]$Platform, $Arch) {
       CURL_DISABLE_AWS = "YES";
       CURL_DISABLE_BASIC_AUTH = "NO";
       CURL_DISABLE_BEARER_AUTH = "NO";
+      CURL_DISABLE_BINDLOCAL = "NO";
       CURL_DISABLE_COOKIES = "NO";
       CURL_DISABLE_DICT = "YES";
       CURL_DISABLE_DIGEST_AUTH = "NO";
@@ -1510,6 +1513,7 @@ function Build-CURL([Platform]$Platform, $Arch) {
       CURL_DISABLE_FTP = "YES";
       CURL_DISABLE_GETOPTIONS = "NO";
       CURL_DISABLE_GOPHER = "YES";
+      CURL_DISABLE_HEADERS_API = "YES";
       CURL_DISABLE_HSTS = "NO";
       CURL_DISABLE_HTTP = "NO";
       CURL_DISABLE_HTTP_AUTH = "NO";
@@ -1551,19 +1555,22 @@ function Build-CURL([Platform]$Platform, $Arch) {
       CURL_ZSTD = "NO";
       ENABLE_ARES = "NO";
       ENABLE_CURLDEBUG = "NO";
+      ENABLE_CURL_MANUAL = "NO";
       ENABLE_DEBUG = "NO";
       ENABLE_IPV6 = "YES";
-      ENABLE_MANUAL = "NO";
       ENABLE_THREADED_RESOLVER = "NO";
       ENABLE_UNICODE = "YES";
       ENABLE_UNIX_SOCKETS = "NO";
       ENABLE_WEBSOCKETS = "YES";
       HAVE_POLL_FINE = "NO";
+      USE_ECH = "NO";
+      USE_HTTPSRR = "NO";
       USE_IDN2 = "NO";
       USE_MSH3 = "NO";
       USE_NGHTTP2 = "NO";
       USE_NGTCP2 = "NO";
       USE_QUICHE = "NO";
+      USE_OPENSSL_QUIC = "NO";
       USE_WIN32_IDN = if ($Platform -eq "Windows") { "YES" } else { "NO" };
       USE_WIN32_LARGE_FILES = if ($Platform -eq "Windows") { "YES" } else { "NO" };
       USE_WIN32_LDAP = "NO";
@@ -1694,7 +1701,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         -BuildTargets $Targets `
         -Defines (@{
           FOUNDATION_BUILD_TOOLS = if ($Platform -eq "Windows") { "YES" } else { "NO" };
-          CURL_DIR = "$LibraryRoot\curl-8.5.0\usr\lib\$Platform\$ShortArch\cmake\CURL";
+          CURL_DIR = "$LibraryRoot\curl-8.9.1\usr\lib\$Platform\$ShortArch\cmake\CURL";
           LIBXML2_LIBRARY = if ($Platform -eq "Windows") {
             "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\libxml2s.lib";
           } else {
