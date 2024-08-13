@@ -150,6 +150,10 @@ public:
   /// Enables SIL-level diagnostics for NonescapableTypes.
   bool EnableLifetimeDependenceDiagnostics = true;
 
+  /// Enables SIL-level performance diagnostics (for @noLocks, @noAllocation
+  /// annotations and for Embedded Swift).
+  bool EnablePerformanceDiagnostics = true;
+
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
 
