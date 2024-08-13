@@ -1458,6 +1458,12 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     }
     if (Invocation.getFrontendOptions().EnableLibraryEvolution)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
+    if (Invocation.getFrontendOptions().NonResilientHideDependencies)
+      MainModule->setResilienceStrategy(ResilienceStrategy::Fragile);
+    if (Invocation.getFrontendOptions().EnableLibraryEvolution 
+      && Invocation.getFrontendOptions().NonResilientHideDependencies)
+      // TODO: Error here, you should not be able to set both flags
+      exit(1);
     if (Invocation.getLangOptions().isSwiftVersionAtLeast(6))
       MainModule->setIsConcurrencyChecked(true);
     if (Invocation.getLangOptions().EnableCXXInterop &&

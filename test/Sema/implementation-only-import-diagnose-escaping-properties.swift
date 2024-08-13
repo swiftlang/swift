@@ -2,10 +2,10 @@
 // RUN: %target-swift-frontend -emit-module -o %t/NormalLibrary.swiftmodule %S/Inputs/implementation-only-import-in-decls-public-helper.swift
 // RUN: %target-swift-frontend -emit-module -o %t/BADLibrary.swiftmodule %S/Inputs/implementation-only-import-in-decls-helper.swift -I %t
 
-// RUN: %target-typecheck-verify-swift -swift-version 5 -I %t -diagnose-escaping-implementation-only-properties
+// RUN: %target-typecheck-verify-swift -swift-version 5 -I %t -non-resilient-hide-internal-dependencies
 
 @_implementationOnly import BADLibrary
-// expected-warning @-1 {{using '@_implementationOnly' without enabling library evolution for 'main' may lead to instability during execution}}
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 
 public protocol TestOpaqueReturnProto {}
 extension BadStruct: TestOpaqueReturnProto {} // okay bc internal

@@ -735,7 +735,7 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -808,6 +808,10 @@ protected:
 
     /// Whether this module has enabled `ExtensibleEnums` feature.
     ExtensibleEnums : 1
+
+    /// Whether this module is fragile and doesn't transitively import non-
+    /// public dependencies
+    NonResilientHideDependencies : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
