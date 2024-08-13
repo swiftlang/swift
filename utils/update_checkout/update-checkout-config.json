@@ -318,7 +318,7 @@
                 "swift-sdk-generator": "main",
                 "wasi-libc": "wasi-sdk-20",
                 "wasmkit": "0.0.3",
-                "curl": "curl-8_5_0",
+                "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1"
             }
@@ -695,7 +695,7 @@
                 "swift-experimental-string-processing": "swift/main",
                 "wasi-libc": "wasi-sdk-20",
                 "wasmkit": "0.0.3",
-                "curl": "curl-8_5_0",
+                "curl": "curl-8_9_1",
                 "icu": "maint/maint-69",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1"
