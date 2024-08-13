@@ -488,7 +488,9 @@ public:
   TypeSubstituter(unsigned level, InFlightSubstitution &IFS)
     : level(level), IFS(IFS) {}
 
-  std::optional<Type> transform(TypeBase *type, TypePosition position);
+  std::optional<Type> transform(TypeBase *type, TypePosition pos);
+
+  Type transformPackExpansion(PackExpansionType *expand, TypePosition pos);
 
   SubstitutionMap transformSubstitutionMap(SubstitutionMap subs);
 
@@ -505,13 +507,6 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
           !isa<SILFunctionType>(type)) &&
          "should not be doing AST type-substitution on a lowered SIL type;"
          "use SILType::subst");
-
-  if (auto packExpansionTy = dyn_cast<PackExpansionType>(type)) {
-    auto eltTys = IFS.expandPackExpansionType(packExpansionTy);
-    if (eltTys.size() == 1)
-      return eltTys[0];
-    return Type(PackType::get(packExpansionTy->getASTContext(), eltTys));
-  }
 
   auto oldLevel = level;
   SWIFT_DEFER { level = oldLevel; };
@@ -587,6 +582,14 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
   return getMemberForBaseType(IFS, origArchetype->getParent(), substParent,
                               assocType, assocType->getName(),
                               level);
+}
+
+Type TypeSubstituter::transformPackExpansion(PackExpansionType *expand,
+                                             TypePosition pos) {
+  auto eltTys = IFS.expandPackExpansionType(expand);
+  if (eltTys.size() == 1)
+    return eltTys[0];
+  return Type(PackType::get(expand->getASTContext(), eltTys));
 }
 
 SubstitutionMap TypeSubstituter::transformSubstitutionMap(SubstitutionMap subs) {

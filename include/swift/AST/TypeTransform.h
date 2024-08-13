@@ -586,30 +586,8 @@ case TypeKind::Id:
     }
 
     case TypeKind::PackExpansion: {
-      auto expand = cast<PackExpansionType>(base);
-
-      // Substitution completely replaces this.
-
-      Type transformedPat = doIt(expand->getPatternType(), pos);
-      if (!transformedPat)
-        return Type();
-
-      Type transformedCount = doIt(expand->getCountType(), TypePosition::Shape);
-      if (!transformedCount)
-        return Type();
-
-      if (transformedPat.getPointer() == expand->getPatternType().getPointer() &&
-          transformedCount.getPointer() == expand->getCountType().getPointer())
-        return t;
-
-      // // If we transform the count to a pack type, expand the pattern.
-      // // This is necessary because of how we piece together types in
-      // // the constraint system.
-      // if (auto countPack = transformedCount->getAs<PackType>()) {
-      //   return PackExpansionType::expand(transformedPat, countPack);
-      // }
-
-      return PackExpansionType::get(transformedPat, transformedCount);
+      auto *expand = cast<PackExpansionType>(base);
+      return asDerived().transformPackExpansion(expand, pos);
     }
 
     case TypeKind::PackElement: {
@@ -1004,6 +982,24 @@ case TypeKind::Id:
 
   CanType transformSILField(CanType fieldTy, TypePosition pos) {
     return doIt(fieldTy, pos)->getCanonicalType();
+  }
+
+  Type transformPackExpansion(PackExpansionType *expand, TypePosition pos) {
+    // Substitution completely replaces this.
+
+    Type transformedPat = doIt(expand->getPatternType(), pos);
+    if (!transformedPat)
+      return Type();
+
+    Type transformedCount = doIt(expand->getCountType(), TypePosition::Shape);
+    if (!transformedCount)
+      return Type();
+
+    if (transformedPat.getPointer() == expand->getPatternType().getPointer() &&
+        transformedCount.getPointer() == expand->getCountType().getPointer())
+      return expand;
+
+    return PackExpansionType::get(transformedPat, transformedCount);
   }
 };
 
