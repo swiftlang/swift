@@ -22,9 +22,19 @@ func ASYNC___2___() async -> Int {
 // CHECK: ret void
 // CHECK-NEXT: }
 
+// CHECK-LABEL: define {{.*}} @__swift_async_resume_get_context
+// CHECK-NOT: !dbg
+// CHECK: ret ptr
+// CHECK-NEXT: }
+
 // CHECK-LABEL: define {{.*}} @"$s1M12ASYNC___2___SiyYaF.1"
 // CHECK-NOT: !dbg
 // CHECK: ret void
+// CHECK-NEXT: }
+
+// CHECK-LABEL: define {{.*}} @__swift_async_resume_project_context
+// CHECK-NOT: !dbg
+// CHECK: ret ptr
 // CHECK-NEXT: }
 
 // CHECK-LABEL: define {{.*}} @"$s1M12ASYNC___2___SiyYaF.0"
