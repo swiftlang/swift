@@ -1542,6 +1542,8 @@ collectExportedImports(const ModuleDecl *topLevelModule,
   stack.push_back(topLevelModule);
   while (!stack.empty()) {
     const ModuleDecl *module = stack.pop_back_val();
+    if (module->isNonSwiftModule())
+      continue;
 
     for (const FileUnit *file : module->getFiles()) {
       if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
