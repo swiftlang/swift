@@ -193,32 +193,20 @@ case TypeKind::Id:
     
     case TypeKind::SILFunction: {
       auto fnTy = cast<SILFunctionType>(base);
-      bool changed = false;
-      auto updateSubs = [&](SubstitutionMap &subs) -> bool {
-        // This interface isn't suitable for doing most transformations on
-        // a substituted SILFunctionType, but it's too hard to come up with
-        // an assertion that meaningfully captures what restrictions are in
-        // place.  Generally the restriction that you can't naively substitute
-        // a SILFunctionType using AST mechanisms will have to be good enough.
-        SmallVector<Type, 4> newReplacements;
-        for (Type type : subs.getReplacementTypes()) {
-          auto transformed = doIt(type, TypePosition::Invariant);
-          newReplacements.push_back(transformed->getCanonicalType());
-          if (!type->isEqual(transformed))
-            changed = true;
-        }
-
-        if (changed) {
-          subs = SubstitutionMap::get(subs.getGenericSignature(),
-                                      newReplacements,
-                                      subs.getConformances());
-        }
-
-        return changed;
-      };
 
       if (fnTy->isPolymorphic())
         return fnTy;
+
+      auto updateSubs = [&](SubstitutionMap &subs) -> bool {
+        auto newSubs = asDerived().transformSubMap(subs);
+        if (subs && !newSubs)
+          return false;
+        if (subs == newSubs)
+          return false;
+
+        subs = newSubs;
+        return true;
+      };
 
       if (auto subs = fnTy->getInvocationSubstitutions()) {
         if (updateSubs(subs)) {
@@ -233,6 +221,8 @@ case TypeKind::Id:
         }
         return fnTy;
       }
+
+      bool changed = false;
 
       SmallVector<SILParameterInfo, 8> transInterfaceParams;
       for (SILParameterInfo param : fnTy->getParameters()) {

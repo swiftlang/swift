@@ -513,20 +513,6 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
     return Type(PackType::get(packExpansionTy->getASTContext(), eltTys));
   }
 
-  if (auto silFnTy = dyn_cast<SILFunctionType>(type)) {
-    if (silFnTy->isPolymorphic())
-      return std::nullopt;
-    if (auto subs = silFnTy->getInvocationSubstitutions()) {
-      auto newSubs = subs.subst(IFS);
-      return silFnTy->withInvocationSubstitutions(newSubs);
-    }
-    if (auto subs = silFnTy->getPatternSubstitutions()) {
-      auto newSubs = subs.subst(IFS);
-      return silFnTy->withPatternSubstitutions(newSubs);
-    }
-    return std::nullopt;
-  }
-
   auto oldLevel = level;
   SWIFT_DEFER { level = oldLevel; };
 
