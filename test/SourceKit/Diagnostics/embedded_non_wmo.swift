@@ -3,11 +3,11 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %sourcekitd-test -req=diags %t/file1.swift -- %t/file1.swift %t/file2.swift -enable-experimental-feature Embedded | %FileCheck %s
+// RUN: %sourcekitd-test -req=diags %t/file1.swift -- %t/file1.swift %t/file2.swift -enable-experimental-feature Embedded -target %target-cpu-apple-macos14 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: embedded_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx
 
 //--- file1.swift
 
