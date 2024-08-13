@@ -46,7 +46,7 @@ public class ASwiftType {
 // CHECKA: key.modulename: "LibA"
 // CHECKA: key.decl_lang: source.lang.swift
 
-//--- frameworks/LibA.framework/module.map
+//--- frameworks/LibA.framework/Modules/module.modulemap
 framework module LibA {
   header "LibA.h"
   export *
@@ -113,7 +113,7 @@ public class CType {}
 // CHECKD: key.modulename: "LibD"
 // CHECKD: key.decl_lang: source.lang.objc
 
-//--- mods/module.map
+//--- mods/module.modulemap
 module LibD {
   header "LibD.h"
   export *
