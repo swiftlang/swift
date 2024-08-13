@@ -489,6 +489,8 @@ public:
     : level(level), IFS(IFS) {}
 
   std::optional<Type> transform(TypeBase *type, TypePosition position);
+
+  SubstitutionMap transformSubstitutionMap(SubstitutionMap subs);
 };
 
 }
@@ -622,6 +624,11 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
   return getMemberForBaseType(IFS, origArchetype->getParent(), substParent,
                               assocType, assocType->getName(),
                               level);
+}
+
+SubstitutionMap TypeSubstituter::transformSubstitutionMap(SubstitutionMap subs) {
+  // FIXME: Take level into account? Move level down into IFS?
+  return subs.subst(IFS);
 }
 
 Type Type::subst(SubstitutionMap substitutions,
