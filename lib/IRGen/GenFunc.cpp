@@ -2899,9 +2899,6 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
   dispatch->setDoesNotThrow();
   dispatch->addFnAttr(llvm::Attribute::AlwaysInline);
   IRGenFunction dispatchIGF(IGM, dispatch);
-  // Don't emit debug info if we are generating a function for the prologue.
-  if (IGM.DebugInfo && Builder.getCurrentDebugLocation())
-    IGM.DebugInfo->emitOutlinedFunction(dispatchIGF, dispatch, CurFn->getName());
   auto &Builder = dispatchIGF.Builder;
   auto it = dispatchIGF.CurFn->arg_begin(), end = dispatchIGF.CurFn->arg_end();
   llvm::Value *fnPtrArg = &*(it++);
@@ -2987,9 +2984,6 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
   suspendFn->setDoesNotThrow();
   suspendFn->addFnAttr(llvm::Attribute::AlwaysInline);
   IRGenFunction suspendIGF(IGM, suspendFn);
-  if (IGM.DebugInfo)
-    IGM.DebugInfo->emitOutlinedFunction(suspendIGF, suspendFn,
-                                        CurFn->getName());
   auto &Builder = suspendIGF.Builder;
 
   llvm::Value *resumeFunction = suspendFn->getArg(0);
