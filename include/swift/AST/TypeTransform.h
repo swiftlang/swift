@@ -164,24 +164,22 @@ case TypeKind::Id:
     case TypeKind::SILBox: {
       bool changed = false;
       auto boxTy = cast<SILBoxType>(base);
-  #ifndef NDEBUG
-      // This interface isn't suitable for updating the substitution map in a
-      // generic SILBox.
-      for (Type type : boxTy->getSubstitutions().getReplacementTypes()) {
-        assert(type->isEqual(
-                   doIt(type, TypePosition::Invariant)) &&
-               "SILBoxType substitutions can't be transformed");
-      }
-  #endif
+
       SmallVector<SILField, 4> newFields;
       auto *l = boxTy->getLayout();
       for (auto f : l->getFields()) {
         auto fieldTy = f.getLoweredType();
-        auto transformed = doIt(fieldTy, TypePosition::Invariant)
-                ->getCanonicalType();
+        auto transformed = asDerived().transformSILField(
+          fieldTy, TypePosition::Invariant);
         changed |= fieldTy != transformed;
         newFields.push_back(SILField(transformed, f.isMutable()));
       }
+
+      auto oldSubMap = boxTy->getSubstitutions();
+      auto newSubMap = asDerived().transformSubMap(oldSubMap);
+      if (oldSubMap && !newSubMap)
+        return Type();
+      changed |= (oldSubMap != newSubMap);
       if (!changed)
         return t;
       boxTy = SILBoxType::get(ctx,
@@ -189,7 +187,7 @@ case TypeKind::Id:
                                              l->getGenericSignature(),
                                              newFields,
                                              l->capturesGenericEnvironment()),
-                              boxTy->getSubstitutions());
+                              newSubMap);
       return boxTy;
     }
     
@@ -1012,6 +1010,10 @@ case TypeKind::Id:
     return SubstitutionMap::get(sig,
         QueryReplacementTypeArray{sig, newSubs},
         LookUpConformanceInModule());
+  }
+
+  CanType transformSILField(CanType fieldTy, TypePosition pos) {
+    return doIt(fieldTy, pos)->getCanonicalType();
   }
 };
 

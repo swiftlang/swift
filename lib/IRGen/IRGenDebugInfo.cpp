@@ -103,6 +103,8 @@ public:
   };
 };
 
+/// FIXME: This should be removed in favor of fixing ASTDemangler to wrap types in
+/// ExistentialType where appropriate.
 static bool equalWithoutExistentialTypes(Type t1, Type t2) {
   static Type (*withoutExistentialTypes)(Type) = [](Type type) -> Type {
     return type.transformRec([](TypeBase *type) -> std::optional<Type> {

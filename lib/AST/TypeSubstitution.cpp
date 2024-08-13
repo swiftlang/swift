@@ -491,6 +491,8 @@ public:
   std::optional<Type> transform(TypeBase *type, TypePosition position);
 
   SubstitutionMap transformSubstitutionMap(SubstitutionMap subs);
+
+  CanType transformSILField(CanType fieldTy, TypePosition pos);
 };
 
 }
@@ -503,17 +505,6 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
           !isa<SILFunctionType>(type)) &&
          "should not be doing AST type-substitution on a lowered SIL type;"
          "use SILType::subst");
-
-  // Special-case handle SILBoxTypes and substituted SILFunctionTypes;
-  // we want to structurally substitute the substitutions.
-  if (auto boxTy = dyn_cast<SILBoxType>(type)) {
-    auto subMap = boxTy->getSubstitutions();
-    auto newSubMap = subMap.subst(IFS);
-
-    return SILBoxType::get(boxTy->getASTContext(),
-                           boxTy->getLayout(),
-                           newSubMap);
-  }
 
   if (auto packExpansionTy = dyn_cast<PackExpansionType>(type)) {
     auto eltTys = IFS.expandPackExpansionType(packExpansionTy);
@@ -615,6 +606,13 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
 SubstitutionMap TypeSubstituter::transformSubstitutionMap(SubstitutionMap subs) {
   // FIXME: Take level into account? Move level down into IFS?
   return subs.subst(IFS);
+}
+
+CanType TypeSubstituter::transformSILField(CanType fieldTy, TypePosition pos) {
+  // Type substitution does not walk into the SILBoxType's field types, because
+  // that's written with respect to the generic signature of the box type,
+  // and not the input generic signature of the substitution.
+  return fieldTy;
 }
 
 Type Type::subst(SubstitutionMap substitutions,
