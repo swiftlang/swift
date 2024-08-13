@@ -469,6 +469,32 @@ std::string ide::extractPlainTextFromComment(const StringRef Text) {
   return getLineListFromComment(SourceMgr, MC, Text).str();
 }
 
+static DocComment *getCascadingDocComment(swift::markup::MarkupContext &MC,
+                                          const Decl *D) {
+  auto *docD = D->getDocCommentProvidingDecl();
+  if (!docD)
+    return nullptr;
+
+  auto *doc = getSingleDocComment(MC, docD);
+  assert(doc && "getDocCommentProvidingDecl() returned decl with no comment");
+
+  // If the doc-comment is inherited from other decl, add a note about it.
+  if (docD != D) {
+    doc->setDecl(D);
+    if (auto baseD = docD->getDeclContext()->getSelfNominalTypeDecl()) {
+      doc->addInheritanceNote(MC, baseD);
+
+      // If the doc is inherited from protocol requirement, associate the
+      // requirement with the doc-comment.
+      // FIXME: This is to keep the old behavior.
+      if (isa<ProtocolDecl>(baseD))
+        doc->setDecl(docD);
+    }
+  }
+
+  return doc;
+}
+
 bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS,
                                        TypeOrExtensionDecl SynthesizedTarget) {
   auto MaybeClangNode = D->getClangNode();
@@ -519,7 +545,7 @@ bool ide::getRawDocumentationComment(const Decl *D, raw_ostream &OS) {
     return true;
   }
 
-  const Decl *docD = getDocCommentProvidingDecl(D);
+  const Decl *docD = D->getDocCommentProvidingDecl();
   if (!docD) {
     return false;
   }

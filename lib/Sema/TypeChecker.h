@@ -487,6 +487,13 @@ void diagnoseDuplicateCaptureVars(CaptureListExpr *expr);
 Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
                                  ReferenceOwnershipAttr *attr);
 
+/// Checks if the given witness can structurally match the requirement, ie.
+/// whether it has a matching kind like static vs. non-static, matching decl,
+/// etc. It does not check if the types of the witness is able to satisfy the
+/// requirement.
+/// If there is a matching failure, returns a `false`, otherwise return `true`.
+bool witnessStructureMatches(ValueDecl *req, const ValueDecl *witness);
+
 /// Infer default value witnesses for all requirements in the given protocol.
 void inferDefaultWitnesses(ProtocolDecl *proto);
 

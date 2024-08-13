@@ -727,7 +727,7 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
     // If we've been asked to skip protocol implementations, filter them out here.
     if (Walker.Options.SkipProtocolImplementations && getProtocolRequirement(VD)) {
       // Allow them to stay if they have their own doc comment
-      const auto *DocCommentProvidingDecl = getDocCommentProvidingDecl(VD);
+      const auto *DocCommentProvidingDecl = VD->getDocCommentProvidingDecl();
       if (DocCommentProvidingDecl != VD)
         return true;
     }
