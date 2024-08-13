@@ -536,20 +536,6 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
     return std::nullopt;
   }
 
-  // Special-case TypeAliasType; we need to substitute conformances.
-  if (auto aliasTy = dyn_cast<TypeAliasType>(type)) {
-    Type parentTy;
-    if (auto origParentTy = aliasTy->getParent())
-      parentTy = doIt(origParentTy, TypePosition::Invariant);
-    auto underlyingTy = doIt(aliasTy->getSinglyDesugaredType(),
-                             TypePosition::Invariant);
-    if (parentTy && parentTy->isExistentialType())
-      return underlyingTy;
-    auto subMap = aliasTy->getSubstitutionMap().subst(IFS);
-    return Type(TypeAliasType::get(aliasTy->getDecl(), parentTy,
-                                   subMap, underlyingTy));
-  }
-
   auto oldLevel = level;
   SWIFT_DEFER { level = oldLevel; };
 

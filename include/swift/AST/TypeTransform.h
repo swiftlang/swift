@@ -433,23 +433,28 @@ case TypeKind::Id:
         if (!newParentType) return newUnderlyingTy;
       }
 
-      auto subMap = alias->getSubstitutionMap();
-      for (Type oldReplacementType : subMap.getReplacementTypes()) {
-        Type newReplacementType = doIt(oldReplacementType, TypePosition::Invariant);
-        if (!newReplacementType)
-          return newUnderlyingTy;
+      if (newParentType && newParentType->isExistentialType())
+        return newUnderlyingTy;
 
-        // If anything changed with the replacement type, we lose the sugar.
-        // FIXME: This is really unfortunate.
-        if (newReplacementType.getPointer() != oldReplacementType.getPointer())
-          return newUnderlyingTy;
-      }
+      auto oldSubMap = alias->getSubstitutionMap();
+      auto newSubMap = asDerived().transformSubMap(oldSubMap);
+      if (oldSubMap && !newSubMap)
+        return Type();
 
       if (oldParentType.getPointer() == newParentType.getPointer() &&
-          oldUnderlyingTy.getPointer() == newUnderlyingTy.getPointer())
+          oldUnderlyingTy.getPointer() == newUnderlyingTy.getPointer() &&
+          oldSubMap == newSubMap)
         return t;
 
-      return TypeAliasType::get(alias->getDecl(), newParentType, subMap,
+      // Don't leave local archetypes and type variables behind in sugar
+      // if they don't appear in the underlying type, to avoid confusion.
+      auto props = newSubMap.getRecursiveProperties();
+      if (props.hasLocalArchetype() && !newUnderlyingTy->hasLocalArchetype())
+        return newUnderlyingTy;
+      if (props.hasTypeVariable() && !newUnderlyingTy->hasTypeVariable())
+        return newUnderlyingTy;
+
+      return TypeAliasType::get(alias->getDecl(), newParentType, newSubMap,
                                 newUnderlyingTy);
     }
 
