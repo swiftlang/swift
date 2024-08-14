@@ -787,6 +787,10 @@ void importer::getNormalInvocationArguments(
     invocationArgStrs.push_back("-iapinotes-modules");
     invocationArgStrs.push_back(path.str().str());
   }
+
+  if (importerOpts.LoadVersionIndependentAPINotes)
+    invocationArgStrs.insert(invocationArgStrs.end(),
+                             {"-fswift-version-independent-apinotes"});
 }
 
 static void
