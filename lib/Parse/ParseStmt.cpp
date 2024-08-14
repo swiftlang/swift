@@ -648,8 +648,8 @@ ParserResult<Stmt> Parser::parseStmt(bool fromASTGen) {
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
 
-    return makeParserResult(
-        new (Context) FallthroughStmt(consumeToken(tok::kw_fallthrough)));
+    auto loc = consumeToken(tok::kw_fallthrough);
+    return makeParserResult(FallthroughStmt::createParsed(loc, CurDeclContext));
   }
   case tok::pound_assert:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);

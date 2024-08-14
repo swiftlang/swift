@@ -742,6 +742,25 @@ ContinueTargetRequest::evaluate(Evaluator &evaluator,
       CS->getTargetName(), CS->getTargetLoc(), /*isContinue*/ true, DC);
 }
 
+FallthroughSourceAndDest
+FallthroughSourceAndDestRequest::evaluate(Evaluator &evaluator,
+                                          const FallthroughStmt *FS) const {
+  auto *SF = FS->getDeclContext()->getParentSourceFile();
+  auto &ctx = SF->getASTContext();
+  auto loc = FS->getLoc();
+
+  auto [src, dest] = ASTScope::lookupFallthroughSourceAndDest(SF, loc);
+  if (!src) {
+    ctx.Diags.diagnose(loc, diag::fallthrough_outside_switch);
+    return {};
+  }
+  if (!dest) {
+    ctx.Diags.diagnose(loc, diag::fallthrough_from_last_case);
+    return {};
+  }
+  return {src, dest};
+}
+
 static Expr *getDeclRefProvidingExpressionForHasSymbol(Expr *E) {
   // Strip coercions, which are necessary in source to disambiguate overloaded
   // functions or generic functions, e.g.
@@ -925,12 +944,18 @@ static bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
   return false;
 }
 
-/// Verify that the pattern bindings for the cases that we're falling through
-/// from and to are equivalent.
-static void checkFallthroughPatternBindingsAndTypes(
-    ASTContext &ctx,
-    CaseStmt *caseBlock, CaseStmt *previousBlock,
-    FallthroughStmt *fallthrough) {
+/// Check the correctness of a 'fallthrough' statement.
+///
+/// \returns true if an error occurred.
+bool swift::checkFallthroughStmt(FallthroughStmt *FS) {
+  auto &ctx = FS->getDeclContext()->getASTContext();
+  auto *caseBlock = FS->getFallthroughDest();
+  auto *previousBlock = FS->getFallthroughSource();
+  if (!previousBlock || !caseBlock)
+    return true;
+
+  // Verify that the pattern bindings for the cases that we're falling through
+  // from and to are equivalent.
   auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
   SmallVector<VarDecl *, 4> vars;
   firstPattern->collectVariables(vars);
@@ -969,36 +994,10 @@ static void checkFallthroughPatternBindingsAndTypes(
 
     if (!matched) {
       ctx.Diags.diagnose(
-          fallthrough->getLoc(), diag::fallthrough_into_case_with_var_binding,
+          FS->getLoc(), diag::fallthrough_into_case_with_var_binding,
           expected->getName());
     }
   }
-}
-
-/// Check the correctness of a 'fallthrough' statement.
-///
-/// \returns true if an error occurred.
-bool swift::checkFallthroughStmt(DeclContext *dc, FallthroughStmt *stmt) {
-  CaseStmt *fallthroughSource;
-  CaseStmt *fallthroughDest;
-  ASTContext &ctx = dc->getASTContext();
-  auto sourceFile = dc->getParentSourceFile();
-  std::tie(fallthroughSource, fallthroughDest) =
-      ASTScope::lookupFallthroughSourceAndDest(sourceFile, stmt->getLoc());
-
-  if (!fallthroughSource) {
-    ctx.Diags.diagnose(stmt->getLoc(), diag::fallthrough_outside_switch);
-    return true;
-  }
-  if (!fallthroughDest) {
-    ctx.Diags.diagnose(stmt->getLoc(), diag::fallthrough_from_last_case);
-    return true;
-  }
-  stmt->setFallthroughSource(fallthroughSource);
-  stmt->setFallthroughDest(fallthroughDest);
-
-  checkFallthroughPatternBindingsAndTypes(
-      ctx, fallthroughDest, fallthroughSource, stmt);
   return false;
 }
 
@@ -1457,7 +1456,7 @@ public:
   }
 
   Stmt *visitFallthroughStmt(FallthroughStmt *S) {
-    if (checkFallthroughStmt(DC, S))
+    if (checkFallthroughStmt(S))
       return nullptr;
 
     return S;

@@ -1433,7 +1433,7 @@ LabeledStmt *findBreakOrContinueStmtTarget(ASTContext &ctx,
 /// Check the correctness of a 'fallthrough' statement.
 ///
 /// \returns true if an error occurred.
-bool checkFallthroughStmt(DeclContext *dc, FallthroughStmt *stmt);
+bool checkFallthroughStmt(FallthroughStmt *stmt);
 
 /// Check for restrictions on the use of the @unknown attribute on a
 /// case statement.

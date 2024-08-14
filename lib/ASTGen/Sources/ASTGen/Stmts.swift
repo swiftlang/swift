@@ -339,8 +339,8 @@ extension ASTGenVisitor {
 
   func generate(fallThroughStmt node: FallThroughStmtSyntax) -> BridgedFallthroughStmt {
     return .createParsed(
-      self.ctx,
-      loc: self.generateSourceLoc(node.fallthroughKeyword)
+      loc: self.generateSourceLoc(node.fallthroughKeyword),
+      declContext: self.declContext
     )
   }
 
