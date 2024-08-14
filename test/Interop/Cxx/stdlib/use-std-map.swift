@@ -28,6 +28,49 @@ StdMapTestSuite.test("init") {
   expectTrue(m.empty())
 }
 
+StdMapTestSuite.test("Map.init(_: Dictionary<Int, Int>)") {
+  let swiftDict: [Int32 : Int32] = [-1: 2, 2: 3, 33: 44]
+  let m = Map(swiftDict)
+  expectEqual(m.size(), 3)
+
+  expectEqual(m[-1], 2)
+  expectEqual(m[2], 3)
+  expectEqual(m[33], 44)
+
+  let emptySwiftDict: [Int32 : Int32] = [:]
+  let emptyM = Map(emptySwiftDict)
+  expectEqual(emptyM.size(), 0)
+}
+
+/// Same as above, but for std::unordered_map.
+StdMapTestSuite.test("UnorderedMap.init(_: Dictionary<Int, Int>)") {
+  let swiftDict: [Int32 : Int32] = [-1 : 2, 2 : 3, 33 : 44]
+  let m = UnorderedMap(swiftDict)
+  expectEqual(m.size(), 3)
+
+  expectEqual(m[-1], 2)
+  expectEqual(m[2], 3)
+  expectEqual(m[33], 44)
+
+  let emptySwiftDict: [Int32 : Int32] = [:]
+  let emptyM = UnorderedMap(emptySwiftDict)
+  expectEqual(emptyM.size(), 0)
+}
+
+StdMapTestSuite.test("MapStrings.init(_: Dictionary<std.string, std.string>)") {
+  let swiftDict = [std.string("abc") : std.string("123"),
+                   std.string() : std.string("empty")]
+  let m = MapStrings(swiftDict)
+  expectEqual(m.size(), 2)
+
+  expectEqual(m[std.string("abc")], std.string("123"))
+  expectEqual(m[std.string()], std.string("empty"))
+
+  let emptySwiftDict: [std.string : std.string] = [:]
+  let emptyM = MapStrings(emptySwiftDict)
+  expectEqual(emptyM.size(), 0)
+}
+
 StdMapTestSuite.test("Map.subscript") {
   // This relies on the `std::map` conformance to `CxxDictionary` protocol.
   var m = initMap()
