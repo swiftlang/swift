@@ -2447,7 +2447,7 @@ public:
   }
 
   TypeLookupErrorOr<BuiltType> createNegativeIntegerType(intptr_t value) {
-    return BuiltType(-value);
+    return BuiltType(value);
   }
 };
 
