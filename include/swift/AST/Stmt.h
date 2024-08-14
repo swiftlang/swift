@@ -1613,6 +1613,7 @@ public:
   }
 
   DeclContext *getDeclContext() const { return DC; }
+  void setDeclContext(DeclContext *newDC) { DC = newDC; }
 
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Break;
@@ -1648,6 +1649,7 @@ public:
   }
 
   DeclContext *getDeclContext() const { return DC; }
+  void setDeclContext(DeclContext *newDC) { DC = newDC; }
 
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Continue;
