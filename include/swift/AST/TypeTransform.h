@@ -592,15 +592,7 @@ case TypeKind::Id:
 
     case TypeKind::PackElement: {
       auto element = cast<PackElementType>(base);
-
-      Type transformedPack = doIt(element->getPackType(), pos);
-      if (!transformedPack)
-        return Type();
-
-      if (transformedPack.getPointer() == element->getPackType().getPointer())
-        return t;
-
-      return PackElementType::get(transformedPack, element->getLevel());
+      return asDerived().transformPackElement(element, pos);
     }
 
     case TypeKind::Tuple: {
@@ -1000,6 +992,17 @@ case TypeKind::Id:
       return expand;
 
     return PackExpansionType::get(transformedPat, transformedCount);
+  }
+
+  Type transformPackElement(PackElementType *element, TypePosition pos) {
+    Type transformedPack = doIt(element->getPackType(), pos);
+    if (!transformedPack)
+      return Type();
+
+    if (transformedPack.getPointer() == element->getPackType().getPointer())
+      return element;
+
+    return PackElementType::get(transformedPack, element->getLevel());
   }
 };
 

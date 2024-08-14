@@ -492,6 +492,8 @@ public:
 
   Type transformPackExpansion(PackExpansionType *expand, TypePosition pos);
 
+  Type transformPackElement(PackElementType *element, TypePosition pos);
+
   SubstitutionMap transformSubstitutionMap(SubstitutionMap subs);
 
   CanType transformSILField(CanType fieldTy, TypePosition pos);
@@ -507,14 +509,6 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
           !isa<SILFunctionType>(type)) &&
          "should not be doing AST type-substitution on a lowered SIL type;"
          "use SILType::subst");
-
-  auto oldLevel = level;
-  SWIFT_DEFER { level = oldLevel; };
-
-  if (auto elementTy = dyn_cast<PackElementType>(type)) {
-    type = elementTy->getPackType().getPointer();
-    level += elementTy->getLevel();
-  }
 
   // We only substitute for substitutable types and dependent member types.
   
@@ -590,6 +584,13 @@ Type TypeSubstituter::transformPackExpansion(PackExpansionType *expand,
   if (eltTys.size() == 1)
     return eltTys[0];
   return Type(PackType::get(expand->getASTContext(), eltTys));
+}
+
+Type TypeSubstituter::transformPackElement(PackElementType *element,
+                                           TypePosition pos) {
+  SWIFT_DEFER { level -= element->getLevel(); };
+  level += element->getLevel();
+  return doIt(element->getPackType(), pos);
 }
 
 SubstitutionMap TypeSubstituter::transformSubstitutionMap(SubstitutionMap subs) {
