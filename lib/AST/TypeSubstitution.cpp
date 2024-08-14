@@ -494,6 +494,8 @@ public:
 
   Type transformPackElement(PackElementType *element, TypePosition pos);
 
+  Type transformDependentMember(DependentMemberType *dependent, TypePosition pos);
+
   SubstitutionMap transformSubstitutionMap(SubstitutionMap subs);
 
   CanType transformSILField(CanType fieldTy, TypePosition pos);
@@ -510,19 +512,6 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
          "should not be doing AST type-substitution on a lowered SIL type;"
          "use SILType::subst");
 
-  // We only substitute for substitutable types and dependent member types.
-  
-  // For dependent member types, we may need to look up the member if the
-  // base is resolved to a non-dependent type.
-  if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
-    auto newBase = doIt(depMemTy->getBase(), TypePosition::Invariant);
-    return getMemberForBaseType(IFS,
-                                depMemTy->getBase(), newBase,
-                                depMemTy->getAssocType(),
-                                depMemTy->getName(),
-                                level);
-  }
-  
   auto substOrig = dyn_cast<SubstitutableType>(type);
   if (!substOrig)
     return std::nullopt;
@@ -591,6 +580,16 @@ Type TypeSubstituter::transformPackElement(PackElementType *element,
   SWIFT_DEFER { level -= element->getLevel(); };
   level += element->getLevel();
   return doIt(element->getPackType(), pos);
+}
+
+Type TypeSubstituter::transformDependentMember(DependentMemberType *dependent,
+                                               TypePosition pos) {
+  auto newBase = doIt(dependent->getBase(), TypePosition::Invariant);
+  return getMemberForBaseType(IFS,
+                              dependent->getBase(), newBase,
+                              dependent->getAssocType(),
+                              dependent->getName(),
+                              level);
 }
 
 SubstitutionMap TypeSubstituter::transformSubstitutionMap(SubstitutionMap subs) {

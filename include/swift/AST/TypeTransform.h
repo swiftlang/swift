@@ -658,17 +658,7 @@ case TypeKind::Id:
 
     case TypeKind::DependentMember: {
       auto dependent = cast<DependentMemberType>(base);
-      auto dependentBase = doIt(dependent->getBase(), pos);
-      if (!dependentBase)
-        return Type();
-
-      if (dependentBase.getPointer() == dependent->getBase().getPointer())
-        return t;
-
-      if (auto assocType = dependent->getAssocType())
-        return DependentMemberType::get(dependentBase, assocType);
-
-      return DependentMemberType::get(dependentBase, dependent->getName());
+      return asDerived().transformDependentMember(dependent, pos);
     }
 
     case TypeKind::GenericFunction:
@@ -1003,6 +993,20 @@ case TypeKind::Id:
       return element;
 
     return PackElementType::get(transformedPack, element->getLevel());
+  }
+
+  Type transformDependentMember(DependentMemberType *dependent, TypePosition pos) {
+    auto dependentBase = doIt(dependent->getBase(), pos);
+    if (!dependentBase)
+      return Type();
+
+    if (dependentBase.getPointer() == dependent->getBase().getPointer())
+      return dependent;
+
+    if (auto assocType = dependent->getAssocType())
+      return DependentMemberType::get(dependentBase, assocType);
+
+    return DependentMemberType::get(dependentBase, dependent->getName());
   }
 };
 
