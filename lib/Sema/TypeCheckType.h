@@ -87,6 +87,9 @@ enum class TypeResolutionFlags : uint16_t {
 
   /// Whether the immediate context has an @escaping attribute.
   DirectEscaping = 1 << 14,
+
+  /// We are in @yield_once coroutine declaration
+  Coroutine = 1 << 14,
 };
 
 /// Type resolution contexts that require special handling.

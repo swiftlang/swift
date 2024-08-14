@@ -1125,7 +1125,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
 
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(SILDeclRef(fd));
   emitProlog(fd, captureInfo, fd->getParameters(), fd->getImplicitSelfDecl(),
-             fd->getResultInterfaceType(), fd->getEffectiveThrownErrorType(),
+             fd->getResultInterfaceTypeWithoutYields(), fd->getEffectiveThrownErrorType(),
              fd->getThrowsLoc());
 
   if (fd->isDistributedActorFactory()) {
@@ -1133,7 +1133,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
     emitDistributedActorFactory(fd);
   } else {
     prepareEpilog(fd,
-                  fd->getResultInterfaceType(),
+                  fd->getResultInterfaceTypeWithoutYields(),
                   fd->getEffectiveThrownErrorType(),
                   CleanupLocation(fd));
 
