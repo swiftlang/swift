@@ -437,36 +437,162 @@ class NotSendable {}
 
       // MARK: - Multiple consumers
 
-      tests.test("finish behavior with multiple consumers") {
+      tests.test("FIFO delivery order with multiple consumers") {
         let (stream, continuation) = AsyncStream<Int>.makeStream()
-        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
-        var controlIterator = controlStream.makeAsyncIterator()
-
-        func makeConsumingTaskWithIndex(_ index: Int) -> Task<Void, Never> {
-          Task { @MainActor in
-            controlContinuation.yield(index)
-            for await i in stream {
-              controlContinuation.yield(i)
-            }
-          }
-        }
+        let (observerStream, observerContinuation) = AsyncStream<String>.makeStream()
+        var observerIterator = observerStream.makeAsyncIterator()
 
         // Set up multiple consumers
-        let consumer1 = makeConsumingTaskWithIndex(1)
-        expectEqual(await controlIterator.next(isolation: #isolation), 1)
+        let consumers = await makeConsumingTasks(
+          for: stream,
+          count: 3,
+          observerStreamIterator: &observerIterator,
+          observerContinuation: observerContinuation
+        )
 
-        let consumer2 = makeConsumingTaskWithIndex(2)
-        expectEqual(await controlIterator.next(isolation: #isolation), 2)
+        // Yield the elements & complete
+        continuation.yield(1)
+        continuation.yield(2)
+        continuation.yield(3)
+        continuation.finish()
 
-        // Ensure the iterators are suspended
-        await MainActor.run {}
+        // Results may be propagated through the observer stream in an arbitrary order,
+        // but the continuation resumption order from the stream under test should be
+        // correctly encoded in the string values, so we use a Set here.
+        var results: Set<String> = []
+        for _ in consumers {
+          let next = await observerIterator.next(isolation: #isolation)!
+          results.insert(next)
+        }
+
+        expectEqual(results, [
+          "consumer 1 got: 1",
+          "consumer 2 got: 2",
+          "consumer 3 got: 3",
+        ])
+
+        // Ensure the consuming Tasks complete
+        for consumer in consumers {
+          _ = await consumer.value
+        }
+      }
+
+      tests.test("FIFO delivery order with multiple consumers throwing") {
+        let (stream, continuation) = AsyncThrowingStream<Int, Error>.makeStream()
+        let (observerStream, observerContinuation) = AsyncStream<String>.makeStream()
+        var observerIterator = observerStream.makeAsyncIterator()
+
+        // Set up multiple consumers
+        let consumers = await makeConsumingTasks(
+          for: stream,
+          count: 4,
+          observerStreamIterator: &observerIterator,
+          observerContinuation: observerContinuation,
+          // have each consuming task only listen for one stream element to avoid
+          // trying to micro-manage races b/w normal element consumption and
+          // termination with an error
+          shouldEndConsumptionUponElementReceipt: true
+        )
+
+        // Emit some elements then terminate by throwing
+        continuation.yield(1)
+        continuation.yield(2)
+        continuation.finish(throwing: SomeError(value: 42))
+
+        var results: Set<String> = []
+        for _ in consumers {
+          let next = await observerIterator.next(isolation: #isolation)!
+          results.insert(next)
+        }
+
+        expectEqual(results, [
+          "consumer 1 got: 1",
+          "consumer 2 got: 2",
+          "consumer 3 got error: 42",
+          "consumer 4 got error: 42",
+        ])
+
+        // Ensure the consuming Tasks complete
+        for consumer in consumers {
+          _ = await consumer.value
+        }
+      }
+
+      tests.test("finish behavior with multiple consumers") {
+        let (stream, continuation) = AsyncStream<Int>.makeStream()
+        let (observerStream, observerContinuation) = AsyncStream<String>.makeStream()
+        var observerIterator = observerStream.makeAsyncIterator()
+
+        // Set up multiple consumers
+        let consumers = await makeConsumingTasks(
+          for: stream,
+          count: 2,
+          observerStreamIterator: &observerIterator,
+          observerContinuation: observerContinuation
+        )
 
         // Terminate the stream
         continuation.finish()
 
         // Ensure the consuming Tasks both complete
-        _ = await consumer1.value
-        _ = await consumer2.value
+        for consumer in consumers {
+          _ = await consumer.value
+        }
+      }
+
+      tests.test("finish behavior with multiple consumers throwing error") {
+        let (stream, continuation) = AsyncThrowingStream<Int, Error>.makeStream()
+        let (observerStream, observerContinuation) = AsyncStream<String>.makeStream()
+        var observerIterator = observerStream.makeAsyncIterator()
+
+        // Set up multiple consumers
+        let consumers = await makeConsumingTasks(
+          for: stream,
+          count: 2,
+          observerStreamIterator: &observerIterator,
+          observerContinuation: observerContinuation
+        )
+
+        // Terminate the stream with an error
+        continuation.finish(throwing: SomeError(value: 42))
+
+        var results: [String] = []
+        for _ in consumers {
+          let next = await observerIterator.next(isolation: #isolation)
+          results.append(next!)
+        }
+
+        expectEqual(Set(results), [
+          "consumer 1 got error: 42",
+          "consumer 2 got error: 42",
+        ])
+
+        // Ensure the consuming Tasks both complete
+        for consumer in consumers {
+          _ = await consumer.value
+        }
+      }
+
+      tests.test("finish behavior with multiple consumers throwing no error") {
+        let (stream, continuation) = AsyncThrowingStream<Int, Error>.makeStream()
+        let (observerStream, observerContinuation) = AsyncStream<String>.makeStream()
+        var observerIterator = observerStream.makeAsyncIterator()
+
+        // Set up multiple consumers
+        let consumers = await makeConsumingTasks(
+          for: stream,
+          count: 2,
+          observerStreamIterator: &observerIterator,
+          observerContinuation: observerContinuation
+        )
+
+        // Terminate the stream
+        continuation.finish()
+
+        // Ensure the consuming Tasks both complete
+        for consumer in consumers {
+          _ = await consumer.value
+        }
       }
 
       await runAllTestsAsync()
@@ -474,4 +600,94 @@ class NotSendable {}
   }
 }
 
+// MARK: - Utilities
 
+@globalActor
+actor EvenActor {
+  static let shared = EvenActor()
+  static func run() async { await Task { @EvenActor in () }.value }
+}
+
+@globalActor
+actor OddActor {
+  static let shared = OddActor()
+  static func run() async { await Task { @OddActor in () }.value }
+}
+
+/// Sets up a consuming task with an observer stream that reports on its progress
+private func makeConsumingTaskWithIndex<S: AsyncSequence>(
+  _ index: Int,
+  sequence: S,
+  observerContinuation: AsyncStream<String>.Continuation,
+  shouldEndConsumptionUponElementReceipt: Bool = false
+) -> Task<Void, Never> 
+where S.Element == Int
+{
+  let task: Task<Void, Never>
+  // Task bodies here are duplicated & inlined to ensure the only
+  // potential suspension point is the iteration of the sequence
+  if index % 2 == 0 {
+    task = Task { @EvenActor in
+      observerContinuation.yield("started task: \(index)")
+      do {
+        for try await i in sequence {
+          observerContinuation.yield("consumer \(index) got: \(i)")
+          if shouldEndConsumptionUponElementReceipt { break }
+        }
+      } catch let error as SomeError {
+        observerContinuation.yield("consumer \(index) got error: \(error.value)")
+      } catch {
+        expectUnreachable("caught unexpected error")
+      }
+    }
+  } else {
+    task = Task { @OddActor in
+      observerContinuation.yield("started task: \(index)")
+      do {
+        for try await i in sequence {
+          observerContinuation.yield("consumer \(index) got: \(i)")
+          if shouldEndConsumptionUponElementReceipt { break }
+        }
+      } catch let error as SomeError {
+        observerContinuation.yield("consumer \(index) got error: \(error.value)")
+      } catch {
+        expectUnreachable("caught unexpected error")
+      }
+    }
+  }
+
+  return task
+}
+
+/// Sets up `count` consuming tasks. The Task index's parity determines which global
+/// actor it will be isolated to.
+private func makeConsumingTasks<S: AsyncSequence>(
+  for sequence: S,
+  count: Int,
+  observerStreamIterator: inout AsyncStream<String>.Iterator,
+  observerContinuation: AsyncStream<String>.Continuation,
+  shouldEndConsumptionUponElementReceipt: Bool = false
+) async -> [Task<Void, Never>]
+where S.Element == Int
+{
+  var results: [Task<Void, Never>] = []
+  for i in 1...count {
+    let task = makeConsumingTaskWithIndex(
+      i,
+      sequence: sequence,
+      observerContinuation: observerContinuation,
+      shouldEndConsumptionUponElementReceipt: shouldEndConsumptionUponElementReceipt
+    )
+
+    // Wait for the Task to start
+    expectEqual(await observerStreamIterator.next(isolation: #isolation), "started task: \(i)")
+
+    results.append(task)
+  }
+
+  // Ensure the iterators are suspended
+  await EvenActor.run()
+  await OddActor.run()
+
+  return results
+}
