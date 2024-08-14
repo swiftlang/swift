@@ -32,6 +32,10 @@
 // Because of the use of 'sed' in this test.
 // REQUIRES: shell
 
+// rdar://133393259 fails in optimized tests.
+// UNSUPPORTED: swift_test_mode_optimize
+// UNSUPPORTED: swift_test_mode_optimize_size
+
 import Darwin
 import Foundation
 
