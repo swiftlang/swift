@@ -987,6 +987,63 @@ func return4() throws -> Int {
   return i
 }
 
+// https://github.com/swiftlang/swift/issues/75880
+func fallthrough1() throws {
+  switch Bool.random() {
+  case true:
+    let _ = if .random() {
+      if .random () {
+        fallthrough // expected-error {{cannot use 'fallthrough' to transfer control out of 'if' expression}}
+      }
+      throw Err()
+    } else {
+      0
+    }
+  case false:
+    break
+  }
+}
+
+func fallthrough2() throws -> Int {
+  let x = switch Bool.random() {
+  case true:
+    if .random() {
+      if .random () {
+        fallthrough // expected-error {{cannot use 'fallthrough' to transfer control out of 'if' expression}}
+      }
+      throw Err()
+    } else {
+      0
+    }
+  case false:
+    1
+  }
+  return x
+}
+
+func fallthrough3() -> Int {
+  let x = switch Bool.random() {
+  case true:
+    if .random() {
+      fallthrough // expected-error {{cannot use 'fallthrough' to transfer control out of 'if' expression}}
+    } else {
+      0
+    }
+  case false:
+    1
+  }
+  return x
+}
+
+func fallthrough4() -> Int {
+  let x = if .random() {
+    fallthrough // expected-error {{'fallthrough' is only allowed inside a switch}}
+  } else {
+    0
+  }
+  return x
+}
+
 // MARK: Effect specifiers
 
 func tryIf1() -> Int {

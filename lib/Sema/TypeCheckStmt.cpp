@@ -3022,11 +3022,14 @@ namespace {
 /// An ASTWalker that searches for any break/continue/return statements that
 /// jump out of the context the walker starts at.
 class JumpOutOfContextFinder : public ASTWalker {
+  const Stmt *ParentStmt;
   TinyPtrVector<Stmt *> &Jumps;
   SmallPtrSet<Stmt *, 4> ParentLabeledStmts;
+  SmallPtrSet<CaseStmt *, 4> ParentCaseStmts;
 
 public:
-  JumpOutOfContextFinder(TinyPtrVector<Stmt *> &jumps) : Jumps(jumps) {}
+  JumpOutOfContextFinder(const Stmt *parentStmt, TinyPtrVector<Stmt *> &jumps)
+      : ParentStmt(parentStmt), Jumps(jumps) {}
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::Expansion;
@@ -3035,9 +3038,11 @@ public:
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (auto *LS = dyn_cast<LabeledStmt>(S))
       ParentLabeledStmts.insert(LS);
+    if (auto *CS = dyn_cast<CaseStmt>(S))
+      ParentCaseStmts.insert(CS);
 
-    // Cannot 'break', 'continue', or 'return' out of the statement. A jump to
-    // a statement within a branch however is fine.
+    // Cannot 'break', 'continue', 'fallthrough' or 'return' out of the
+    // statement. A jump to a statement within a branch however is fine.
     if (auto *BS = dyn_cast<BreakStmt>(S)) {
       if (!ParentLabeledStmts.contains(BS->getTarget()))
         Jumps.push_back(BS);
@@ -3045,6 +3050,17 @@ public:
     if (auto *CS = dyn_cast<ContinueStmt>(S)) {
       if (!ParentLabeledStmts.contains(CS->getTarget()))
         Jumps.push_back(CS);
+    }
+    if (auto *FS = dyn_cast<FallthroughStmt>(S)) {
+      // The source must either be in the parent statement, or must be a
+      // nested CaseStmt we've seen. If there's no source, we will have
+      // already diagnosed.
+      if (auto *source = FS->getFallthroughSource()) {
+        if (source->getParentStmt() != ParentStmt &&
+            !ParentCaseStmts.contains(source)) {
+          Jumps.push_back(FS);
+        }
+      }
     }
     if (isa<ReturnStmt>(S) || isa<FailStmt>(S))
       Jumps.push_back(S);
@@ -3054,6 +3070,11 @@ public:
   PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
     if (auto *LS = dyn_cast<LabeledStmt>(S)) {
       auto removed = ParentLabeledStmts.erase(LS);
+      assert(removed);
+      (void)removed;
+    }
+    if (auto *CS = dyn_cast<CaseStmt>(S)) {
+      auto removed = ParentCaseStmts.erase(CS);
       assert(removed);
       (void)removed;
     }
@@ -3072,10 +3093,11 @@ public:
 } // end anonymous namespace
 
 IsSingleValueStmtResult
-areBranchesValidForSingleValueStmt(ASTContext &ctx, ArrayRef<Stmt *> branches) {
+areBranchesValidForSingleValueStmt(ASTContext &ctx, const Stmt *parentStmt,
+                                   ArrayRef<Stmt *> branches) {
   TinyPtrVector<Stmt *> invalidJumps;
   TinyPtrVector<Stmt *> unterminatedBranches;
-  JumpOutOfContextFinder jumpFinder(invalidJumps);
+  JumpOutOfContextFinder jumpFinder(parentStmt, invalidJumps);
 
   // Must have a single expression brace, and non-single-expression branches
   // must end with a throw.
@@ -3145,17 +3167,19 @@ IsSingleValueStmtRequest::evaluate(Evaluator &eval, const Stmt *S,
       return IsSingleValueStmtResult::nonExhaustiveIf();
 
     SmallVector<Stmt *, 4> scratch;
-    return areBranchesValidForSingleValueStmt(ctx, IS->getBranches(scratch));
+    return areBranchesValidForSingleValueStmt(ctx, IS,
+                                              IS->getBranches(scratch));
   }
   if (auto *SS = dyn_cast<SwitchStmt>(S)) {
     SmallVector<Stmt *, 4> scratch;
-    return areBranchesValidForSingleValueStmt(ctx, SS->getBranches(scratch));
+    return areBranchesValidForSingleValueStmt(ctx, SS,
+                                              SS->getBranches(scratch));
   }
   if (auto *DS = dyn_cast<DoStmt>(S)) {
     if (!ctx.LangOpts.hasFeature(Feature::DoExpressions))
       return IsSingleValueStmtResult::unhandledStmt();
 
-    return areBranchesValidForSingleValueStmt(ctx, DS->getBody());
+    return areBranchesValidForSingleValueStmt(ctx, DS, DS->getBody());
   }
   if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
     if (!ctx.LangOpts.hasFeature(Feature::DoExpressions))
@@ -3165,7 +3189,8 @@ IsSingleValueStmtRequest::evaluate(Evaluator &eval, const Stmt *S,
       return IsSingleValueStmtResult::nonExhaustiveDoCatch();
 
     SmallVector<Stmt *, 4> scratch;
-    return areBranchesValidForSingleValueStmt(ctx, DCS->getBranches(scratch));
+    return areBranchesValidForSingleValueStmt(ctx, DCS,
+                                              DCS->getBranches(scratch));
   }
   return IsSingleValueStmtResult::unhandledStmt();
 }

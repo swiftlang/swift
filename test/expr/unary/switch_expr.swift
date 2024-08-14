@@ -1212,6 +1212,16 @@ func fallthrough5() -> Int {
   return x
 }
 
+func fallthrough6() -> Int {
+  let x = switch true {
+  case true:
+    0
+  case false:
+    fallthrough // expected-error {{'fallthrough' without a following 'case' or 'default' block}}
+  }
+  return x
+}
+
 func breakAfterNeverExpr() -> String {
   // We avoid turning this into a switch expression because of the 'break'.
   switch Bool.random() {

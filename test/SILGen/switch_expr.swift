@@ -197,6 +197,23 @@ func testFallthrough2() -> Int {
 // CHECK:       dealloc_stack [[RESULT]] : $*Int
 // CHECK:       return [[VAL_RESULT:[%0-9]+]] : $Int
 
+func testFallthrough3() throws -> Int {
+  switch Bool.random() {
+  case true:
+    switch Bool.random() {
+    case true:
+      if .random() {
+        fallthrough
+      }
+      throw Err()
+    case false:
+      1
+    }
+  case false:
+    0
+  }
+}
+
 func testClosure() throws -> Int {
   let fn = {
     switch Bool.random() {
