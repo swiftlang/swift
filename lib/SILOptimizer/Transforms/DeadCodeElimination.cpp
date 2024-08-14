@@ -47,12 +47,9 @@ namespace {
 // FIXME: Reconcile the similarities between this and
 //        isInstructionTriviallyDead.
 static bool seemsUseful(SILInstruction *I) {
-  // Even though begin_access/destroy_value/copy_value/end_lifetime have
-  // side-effects, they can be DCE'ed if they do not have useful
-  // dependencies/reverse dependencies
-  if (isa<BeginAccessInst>(I) || isa<CopyValueInst>(I) ||
-      isa<DestroyValueInst>(I) || isa<EndLifetimeInst>(I) ||
-      isa<EndBorrowInst>(I))
+  // Even though begin_access/copy_value have side-effects, they can be DCE'ed
+  // if they do not have useful dependencies.
+  if (isa<BeginAccessInst>(I) || isa<CopyValueInst>(I))
     return false;
 
   // A load [copy] is okay to be DCE'ed if there are no useful dependencies
