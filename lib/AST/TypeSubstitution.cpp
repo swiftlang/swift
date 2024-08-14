@@ -493,13 +493,26 @@ public:
 
   std::optional<Type> transform(TypeBase *type, TypePosition pos);
 
-  Type transformGenericTypeParam(GenericTypeParamType *param, TypePosition pos);
+  Type transformGenericTypeParamType(GenericTypeParamType *param,
+                                     TypePosition pos);
 
-  Type transformPackExpansion(PackExpansionType *expand, TypePosition pos);
+  Type transformPackExpansionType(PackExpansionType *expand,
+                                  TypePosition pos);
 
-  Type transformPackElement(PackElementType *element, TypePosition pos);
+  Type transformPackElementType(PackElementType *element,
+                                TypePosition pos);
 
-  Type transformDependentMember(DependentMemberType *dependent, TypePosition pos);
+  Type transformDependentMemberType(DependentMemberType *dependent,
+                                    TypePosition pos);
+
+  Type transformPrimaryArchetypeType(ArchetypeType *primary,
+                                     TypePosition pos);
+
+  std::optional<Type> transformOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *opaque,
+                                                       TypePosition pos);
+
+  std::optional<Type> transformLocalArchetypeType(LocalArchetypeType *local,
+                                                  TypePosition pos);
 
   SubstitutionMap transformSubstitutionMap(SubstitutionMap subs);
 
@@ -517,64 +530,116 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
          "should not be doing AST type-substitution on a lowered SIL type;"
          "use SILType::subst");
 
-  auto substOrig = dyn_cast<ArchetypeType>(type);
-  if (!substOrig)
-    return std::nullopt;
+  return std::nullopt;
+}
 
-  // Opaque types can't normally be directly substituted unless we
-  // specifically were asked to substitute them.
-  if (!IFS.shouldSubstituteOpaqueArchetypes()
-      && isa<OpaqueTypeArchetypeType>(substOrig))
-    return std::nullopt;
-
-  // Local types can't normally be directly substituted unless we
-  // specifically were asked to substitute them.
-  if (!IFS.shouldSubstituteLocalArchetypes()
-      && isa<LocalArchetypeType>(substOrig))
-    return std::nullopt;
-
+Type TypeSubstituter::transformPrimaryArchetypeType(ArchetypeType *primary,
+                                                    TypePosition position) {
   // If we have a substitution for this type, use it.
-  if (auto known = IFS.substType(substOrig, level)) {
-    if (IFS.shouldSubstituteOpaqueArchetypes() &&
-        isa<OpaqueTypeArchetypeType>(substOrig) &&
-        known->getCanonicalType() == substOrig->getCanonicalType())
-      return std::nullopt; // Recursively process the substitutions of the
-                           // opaque type archetype.
+  if (auto known = IFS.substType(primary, level))
     return known;
-  }
 
-  if (substOrig->isRoot()) {
-    // Root opened archetypes are not required to be substituted. Other root
-    // archetypes must already have been substituted above.
-    if (isa<LocalArchetypeType>(substOrig)) {
-      return Type(type);
-    } else {
-      return ErrorType::get(type);
-    }
-  }
+  if (primary->isRoot())
+    return ErrorType::get(primary);
 
   // For nested archetypes, we can substitute the parent.
-  Type origParent = substOrig->getParent();
+  Type origParent = primary->getParent();
   assert(origParent && "Not a nested archetype");
 
   // Substitute into the parent type.
   Type substParent = doIt(origParent, TypePosition::Invariant);
 
   // If the parent didn't change, we won't change.
-  if (substParent.getPointer() == substOrig->getParent())
-    return Type(type);
+  if (substParent.getPointer() == origParent.getPointer())
+    return Type(primary);
 
   // Get the associated type reference from a child archetype.
-  AssociatedTypeDecl *assocType = substOrig->getInterfaceType()
+  AssociatedTypeDecl *assocType = primary->getInterfaceType()
       ->castTo<DependentMemberType>()->getAssocType();
 
-  return getMemberForBaseType(IFS, substOrig->getParent(), substParent,
+  return getMemberForBaseType(IFS, origParent, substParent,
                               assocType, assocType->getName(),
                               level);
 }
 
-Type TypeSubstituter::transformGenericTypeParam(GenericTypeParamType *param,
-                                                TypePosition pos) {
+std::optional<Type>
+TypeSubstituter::transformOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *opaque,
+                                                  TypePosition position) {
+  // Opaque types can't normally be directly substituted unless we
+  // specifically were asked to substitute them.
+  if (!IFS.shouldSubstituteOpaqueArchetypes())
+    return std::nullopt;
+
+  // If we have a substitution for this type, use it.
+  if (auto known = IFS.substType(opaque, level)) {
+    if (known->getCanonicalType() == opaque->getCanonicalType())
+      return std::nullopt; // Recursively process the substitutions of the
+                           // opaque type archetype.
+    return known;
+  }
+
+  if (opaque->isRoot())
+    return ErrorType::get(opaque);
+
+  // For nested archetypes, we can substitute the parent.
+  Type origParent = opaque->getParent();
+  assert(origParent && "Not a nested archetype");
+
+  // Substitute into the parent type.
+  Type substParent = doIt(origParent, TypePosition::Invariant);
+
+  // If the parent didn't change, we won't change.
+  if (substParent.getPointer() == origParent.getPointer())
+    return Type(opaque);
+
+  // Get the associated type reference from a child archetype.
+  AssociatedTypeDecl *assocType = opaque->getInterfaceType()
+      ->castTo<DependentMemberType>()->getAssocType();
+
+  return getMemberForBaseType(IFS, origParent, substParent,
+                              assocType, assocType->getName(),
+                              level);
+}
+
+std::optional<Type>
+TypeSubstituter::transformLocalArchetypeType(LocalArchetypeType *local,
+                                             TypePosition position) {
+  // Local types can't normally be directly substituted unless we
+  // specifically were asked to substitute them.
+  if (!IFS.shouldSubstituteLocalArchetypes())
+    return std::nullopt;
+
+  // If we have a substitution for this type, use it.
+  if (auto known = IFS.substType(local, level))
+    return known;
+
+  // FIXME: Change remaining callers to always substitute all local
+  // archetypes.
+  if (local->isRoot())
+    return Type(local);
+
+  // For nested archetypes, we can substitute the parent.
+  Type origParent = local->getParent();
+  assert(origParent && "Not a nested archetype");
+
+  // Substitute into the parent type.
+  Type substParent = doIt(origParent, TypePosition::Invariant);
+
+  // If the parent didn't change, we won't change.
+  if (substParent.getPointer() == origParent.getPointer())
+    return Type(local);
+
+  // Get the associated type reference from a child archetype.
+  AssociatedTypeDecl *assocType = local->getInterfaceType()
+      ->castTo<DependentMemberType>()->getAssocType();
+
+  return getMemberForBaseType(IFS, origParent, substParent,
+                              assocType, assocType->getName(),
+                              level);
+}
+
+Type TypeSubstituter::transformGenericTypeParamType(GenericTypeParamType *param,
+                                                    TypePosition pos) {
   // If we have a substitution for this type, use it.
   if (auto known = IFS.substType(param, level))
     return known;
@@ -583,23 +648,23 @@ Type TypeSubstituter::transformGenericTypeParam(GenericTypeParamType *param,
   return ErrorType::get(param);
 }
 
-Type TypeSubstituter::transformPackExpansion(PackExpansionType *expand,
-                                             TypePosition pos) {
+Type TypeSubstituter::transformPackExpansionType(PackExpansionType *expand,
+                                                 TypePosition pos) {
   auto eltTys = IFS.expandPackExpansionType(expand);
   if (eltTys.size() == 1)
     return eltTys[0];
   return Type(PackType::get(expand->getASTContext(), eltTys));
 }
 
-Type TypeSubstituter::transformPackElement(PackElementType *element,
-                                           TypePosition pos) {
+Type TypeSubstituter::transformPackElementType(PackElementType *element,
+                                               TypePosition pos) {
   SWIFT_DEFER { level -= element->getLevel(); };
   level += element->getLevel();
   return doIt(element->getPackType(), pos);
 }
 
-Type TypeSubstituter::transformDependentMember(DependentMemberType *dependent,
-                                               TypePosition pos) {
+Type TypeSubstituter::transformDependentMemberType(DependentMemberType *dependent,
+                                                   TypePosition pos) {
   auto newBase = doIt(dependent->getBase(), TypePosition::Invariant);
   return getMemberForBaseType(IFS,
                               dependent->getBase(), newBase,
