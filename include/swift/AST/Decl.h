@@ -8596,8 +8596,14 @@ public:
     return FnRetType.getSourceRange();
   }
 
-  /// Retrieve the result interface type of this function.
+  /// Retrieve the full result interface type of this function, including yields
   Type getResultInterfaceType() const;
+
+  /// Same as above, but without @yields
+  Type getResultInterfaceTypeWithoutYields() const;
+
+  /// Same as above, but only yields
+  Type getYieldsInterfaceType() const;
 
   /// Returns the result interface type of this function if it has already been
   /// computed, otherwise `nullopt`. This should only be used for dumping.

@@ -7330,6 +7330,20 @@ Expected<Type> DESERIALIZE_TYPE(NOMINAL_TYPE)(
   return NominalType::get(nominal, parentTy.get(), MF.getContext());
 }
 
+Expected<Type> DESERIALIZE_TYPE(YIELDS_TYPE)(ModuleFile &MF,
+                                             SmallVectorImpl<uint64_t> &scratch,
+                                             StringRef blobData) {
+  TypeID yieldResultTyID;
+  bool isIonOut = false;
+  decls_block::YieldResultTypeLayout::readRecord(scratch, yieldResultTyID, isIonOut);
+
+  auto yieldResultTy = MF.getTypeChecked(yieldResultTyID);
+  if (!yieldResultTy)
+    return yieldResultTy.takeError();
+
+  return YieldResultType::get(yieldResultTy.get(), isIonOut);
+}
+
 Expected<Type> DESERIALIZE_TYPE(TUPLE_TYPE)(ModuleFile &MF,
                                             SmallVectorImpl<uint64_t> &scratch,
                                             StringRef blobData) {
@@ -7367,7 +7381,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                                            StringRef blobData, bool isGeneric) {
   TypeID resultID;
   uint8_t rawRepresentation, rawDiffKind;
-  bool noescape = false, sendable, async, throws, hasSendingResult;
+  bool noescape = false, sendable, async, throws, hasSendingResult, coro;
   TypeID thrownErrorID;
   GenericSignature genericSig;
   TypeID clangTypeID;
@@ -7377,12 +7391,12 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     decls_block::FunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, clangTypeID, noescape, sendable,
         async, throws, thrownErrorID, rawDiffKind, rawIsolation,
-        hasSendingResult);
+        hasSendingResult, coro);
   } else {
     GenericSignatureID rawGenericSig;
     decls_block::GenericFunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, sendable, async, throws,
-        thrownErrorID, rawDiffKind, rawIsolation, hasSendingResult,
+        thrownErrorID, rawDiffKind, rawIsolation, hasSendingResult, coro,
         rawGenericSig);
     genericSig = MF.getGenericSignature(rawGenericSig);
     clangTypeID = 0;
@@ -7438,6 +7452,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                   /*LifetimeDependenceInfo */ {}, hasSendingResult)
                   .withSendable(sendable)
                   .withAsync(async)
+                  .withCoroutine(coro)
                   .build();
 
   auto resultTy = MF.getTypeChecked(resultID);

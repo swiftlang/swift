@@ -1366,6 +1366,18 @@ bool AbstractFunctionDecl::isTransparent() const {
   return false;
 }
 
+bool AbstractFunctionDecl::isCoroutine() const {
+  // Check if the declaration had the attribute.
+  if (getAttrs().hasAttribute<CoroutineAttr>())
+    return true;
+
+  // If this is an accessor, then check if its a coroutine.
+  if (const auto *AD = dyn_cast<AccessorDecl>(this))
+    return AD->isCoroutine();
+
+  return false;
+}
+
 bool ParameterList::hasInternalParameter(StringRef Prefix) const {
   for (auto param : *this) {
     if (param->hasName() && param->getNameStr().starts_with(Prefix))
@@ -11622,6 +11634,67 @@ Type FuncDecl::getResultInterfaceType() const {
 std::optional<Type> FuncDecl::getCachedResultInterfaceType() const {
   auto mutableThis = const_cast<FuncDecl *>(this);
   return ResultTypeRequest{mutableThis}.getCachedResult();
+}
+
+Type FuncDecl::getResultInterfaceTypeWithoutYields() const {
+  auto resultType = getResultInterfaceType();
+  if (resultType->hasError())
+    return resultType;
+
+  // Coroutine result type should either be a yield result
+  // or a tuple containing both yielded and normal result types.
+  // In both cases, strip the @yield result types
+  if (isCoroutine()) {
+    if (auto *tupleResTy = resultType->getAs<TupleType>()) {
+      // Strip @yield results on the first level of tuple
+      SmallVector<TupleTypeElt, 4> elements;
+      for (const auto &elt : tupleResTy->getElements()) {
+        Type eltTy = elt.getType();
+        if (eltTy->is<YieldResultType>())
+          continue;
+        elements.push_back(eltTy);
+      }
+
+      // Handle vanishing tuples --  flatten to produce the
+      // element type.
+      if (elements.size() == 1)
+          resultType = elements[0].getType();
+      else
+          resultType = TupleType::get(elements, getASTContext());
+    } else {
+      assert(resultType->is<YieldResultType>());
+      resultType = TupleType::getEmpty(getASTContext());
+    }
+  }
+
+  return resultType;
+}
+
+Type FuncDecl::getYieldsInterfaceType() const {
+  auto resultType = getResultInterfaceType();
+  if (resultType->hasError())
+    return resultType;
+
+  if (!isCoroutine())
+    return TupleType::getEmpty(getASTContext());
+
+  // Coroutine result type should either be a yield result
+  // or a tuple containing both yielded and normal result types.
+  // In both cases, strip the @yield result types
+  if (auto *tupleResTy = resultType->getAs<TupleType>()) {
+    // Keep @yield results on the first level of tuple
+    for (const auto &elt : tupleResTy->getElements()) {
+      Type eltTy = elt.getType();
+      if (eltTy->is<YieldResultType>())
+        return eltTy;
+      }
+
+    llvm_unreachable("coroutine must have a yield result");
+  } else {
+    assert(resultType->is<YieldResultType>());
+  }
+
+  return resultType;
 }
 
 bool FuncDecl::isUnaryOperator() const {

@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 984; // @_lifetime attribute isFromAnnotation flag
+const uint16_t SWIFTMODULE_VERSION_MINOR = 985; // coro AST
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1357,6 +1357,12 @@ namespace decls_block {
     TypeIDField         // type
   >;
 
+  TYPE_LAYOUT(YieldResultTypeLayout,
+    YIELDS_TYPE,
+    TypeIDField, // inner type
+    BCFixed<1>   // inout?
+  );
+
   TYPE_LAYOUT(FunctionTypeLayout,
     FUNCTION_TYPE,
     TypeIDField,                     // output
@@ -1369,7 +1375,8 @@ namespace decls_block {
     TypeIDField,                     // thrown error
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
-    BCFixed<1>                       // has sending result
+    BCFixed<1>,                      // has sending result
+    BCFixed<1>                       // coroutine?
     // trailed by parameters
     // Optionally lifetime dependence info
   );
@@ -1471,6 +1478,7 @@ namespace decls_block {
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
     BCFixed<1>,                      // has sending result
+    BCFixed<1>,                       // coroutine?
     GenericSignatureIDField          // generic signature
 
     // trailed by parameters

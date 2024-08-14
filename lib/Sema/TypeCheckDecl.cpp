@@ -2035,7 +2035,8 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
     auto *storage = accessor->getStorage();
 
-    switch (accessor->getAccessorKind()) {
+    auto kind = accessor->getAccessorKind();
+    switch (kind) {
     // For getters, set the result type to the value type.
     case AccessorKind::Get:
     case AccessorKind::DistributedGet:
@@ -2058,13 +2059,13 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case AccessorKind::MutableAddress:
       return buildAddressorResultType(accessor, storage->getValueInterfaceType());
 
-    // Coroutine accessors don't mention the value type directly.
-    // If we add yield types to the function type, we'll need to update this.
+    // Coroutine accessors yield storage value types
     case AccessorKind::Read:
     case AccessorKind::YieldingBorrow:
     case AccessorKind::Modify:
     case AccessorKind::YieldingMutate:
-      return TupleType::getEmpty(ctx);
+      return YieldResultType::get(storage->getValueInterfaceType(),
+                                  isYieldingMutableAccessor(kind));
     }
   }
 
@@ -2110,6 +2111,9 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       TypeResolutionOptions(TypeResolverContext::FunctionResult);
   if (decl->preconcurrency())
     options |= TypeResolutionFlags::Preconcurrency;
+  if (const auto *const funcDecl = dyn_cast<FuncDecl>(decl))
+    if (funcDecl->isCoroutine())
+      options |= TypeResolutionFlags::Coroutine;
 
   auto *const dc = decl->getInnermostDeclContext();
   return TypeResolution::forInterface(dc, options,
@@ -2550,6 +2554,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
         infoBuilder = infoBuilder.withNoEscape(fd->isDeferBody());
         if (fd->hasSendingResult())
           infoBuilder = infoBuilder.withSendingResult();
+        infoBuilder = infoBuilder.withCoroutine(fd->isCoroutine());
       }
 
       // Lifetime dependencies only apply to the outer function type.

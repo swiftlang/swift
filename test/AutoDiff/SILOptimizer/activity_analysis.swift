@@ -765,7 +765,7 @@ func testClassModifyAccessor(_ c: inout C) {
 // CHECK: [VARIED]   %7 = load [copy] %6 : $*C
 // CHECK: [VARIED]   %9 = class_method %7 : $C, #C.float!getter : (C) -> () -> Float, $@convention(method) (@guaranteed C) -> Float
 // CHECK: [VARIED]   %10 = apply %9(%7) : $@convention(method) (@guaranteed C) -> Float
-// CHECK: [VARIED]   %12 = class_method %4 : $C, #C.float!modify : (C) -> () -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
+// CHECK: [VARIED]   %12 = class_method %4 : $C, #C.float!modify : (C) -> @yield_once () -> inout @yields Float, $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
 // CHECK: [VARIED] (**%13**, %14) = begin_apply %12(%4) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
 // CHECK: [VARIED] (%13, **%14**) = begin_apply %12(%4) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
 // CHECK: [NONE]   // function_ref static Float.*= infix(_:_:)

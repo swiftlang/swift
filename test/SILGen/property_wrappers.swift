@@ -1006,7 +1006,7 @@ struct S_58201 {
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
 // CHECK-NEXT:  #ClassUsingWrapper.x!getter: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter
 // CHECK-NEXT:  #ClassUsingWrapper.x!setter: (ClassUsingWrapper) -> (Int) -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivs // ClassUsingWrapper.x.setter
-// CHECK-NEXT:  #ClassUsingWrapper.x!modify: (ClassUsingWrapper) -> () -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivM    // ClassUsingWrapper.x.modify
+// CHECK-NEXT:  #ClassUsingWrapper.x!modify: (ClassUsingWrapper) -> @yield_once () -> inout @yields Int : @$s17property_wrappers17ClassUsingWrapperC1xSivM    // ClassUsingWrapper.x.modify
 // CHECK-NEXT:  #ClassUsingWrapper.init!allocator: (ClassUsingWrapper.Type) -> () -> ClassUsingWrapper : @$s17property_wrappers17ClassUsingWrapperCACycfC
 // CHECK-NEXT: #ClassUsingWrapper.deinit!deallocator: @$s17property_wrappers17ClassUsingWrapperCfD
 // CHECK-NEXT:  }

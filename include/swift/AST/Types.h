@@ -1751,10 +1751,13 @@ public:
 };
 
 BEGIN_CAN_TYPE_WRAPPER(YieldResultType, Type)
-PROXY_CAN_TYPE_SIMPLE_GETTER(getResultType)
-static CanYieldResultType get(CanType type, bool InOut) {
-  return CanYieldResultType(YieldResultType::get(type, InOut));
-}
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getResultType)
+  bool isInOut() const {
+    return getPointer()->isInOut();
+  }
+  static CanYieldResultType get(CanType type, bool InOut) {
+    return CanYieldResultType(YieldResultType::get(type, InOut));
+  }
 END_CAN_TYPE_WRAPPER(YieldResultType, Type)
   
 /// BuiltinType - An abstract class for all the builtin types.
