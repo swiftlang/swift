@@ -1972,6 +1972,12 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     GenericArgs.push_back(blocklist);
   }
 
+  // Inherit APINotes processing method
+  if (clangImporterOpts.LoadVersionIndependentAPINotes) {
+    GenericArgs.push_back("-version-independent-apinotes");
+    genericSubInvocation.getClangImporterOptions().LoadVersionIndependentAPINotes = true;
+  }  
+
   // Inherit the C++ interoperability mode.
   if (langOpts.EnableCXXInterop) {
     // Modelled after a reverse of validateCxxInteropCompatibilityMode
