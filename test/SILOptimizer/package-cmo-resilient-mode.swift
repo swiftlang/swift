@@ -536,7 +536,7 @@ final package class FinalPkgKlass {
 // CHECK-NONRES-LABEL: sil_vtable [serialized] PubKlass {
 // CHECK-COMMON-NEXT:   #PubKlass.data!getter: (PubKlass) -> () -> Int : @$s3Lib8PubKlassC4dataSivg
 // CHECK-COMMON-NEXT:   #PubKlass.data!setter: (PubKlass) -> (Int) -> () : @$s3Lib8PubKlassC4dataSivs
-// CHECK-COMMON-NEXT:   #PubKlass.data!modify: (PubKlass) -> () -> () : @$s3Lib8PubKlassC4dataSivM
+// CHECK-COMMON-NEXT:   #PubKlass.data!modify: (PubKlass) ->  @yield_once () -> inout @yields Int : @$s3Lib8PubKlassC4dataSivM
 // CHECK-COMMON-NEXT:   #PubKlass.init!allocator: (PubKlass.Type) -> (Int) -> PubKlass : @$s3Lib8PubKlassCyACSicfC
 // CHECK-COMMON-NEXT:   #PubKlass.pubfunc: (PubKlass) -> (Int) -> Int : @$s3Lib8PubKlassC7pubfuncyS2iF
 // CHECK-COMMON-NEXT:   #PubKlass.deinit!deallocator: @$s3Lib8PubKlassCfD
@@ -549,7 +549,7 @@ final package class FinalPkgKlass {
 // CHECK-RES-LABEL: sil_vtable [serialized_for_package] PkgKlass {
 // CHECK-RES-NEXT:   #PkgKlass.data!getter: (PkgKlass) -> () -> Int : @$s3Lib8PkgKlassC4dataSivg
 // CHECK-RES-NEXT:   #PkgKlass.data!setter: (PkgKlass) -> (Int) -> () : @$s3Lib8PkgKlassC4dataSivs
-// CHECK-RES-NEXT:   #PkgKlass.data!modify: (PkgKlass) -> () -> () : @$s3Lib8PkgKlassC4dataSivM
+// CHECK-RES-NEXT:   #PkgKlass.data!modify: (PkgKlass) -> @yield_once () -> inout @yields Int : @$s3Lib8PkgKlassC4dataSivM
 // CHECK-RES-NEXT:   #PkgKlass.init!allocator: (PkgKlass.Type) -> (Int) -> PkgKlass : @$s3Lib8PkgKlassCyACSicfC
 // CHECK-RES-NEXT:   #PkgKlass.pkgfunc: (PkgKlass) -> (Int) -> Int : @$s3Lib8PkgKlassC7pkgfuncyS2iF
 // CHECK-RES-NEXT:   #PkgKlass.deinit!deallocator: @$s3Lib8PkgKlassCfD
@@ -562,11 +562,11 @@ final package class FinalPkgKlass {
 // CHECK-NONRES-LABEL: sil_witness_table [serialized] PubKlass: PubProto module Lib {
 // CHECK-COMMON-NEXT:   method #PubProto.data!getter: <Self where Self : PubProto> (Self) -> () -> Int : @$s3Lib8PubKlassCAA0B5ProtoA2aDP4dataSivgTW
 // CHECK-COMMON-NEXT:   method #PubProto.data!setter: <Self where Self : PubProto> (inout Self) -> (Int) -> () : @$s3Lib8PubKlassCAA0B5ProtoA2aDP4dataSivsTW
-// CHECK-COMMON-NEXT:   method #PubProto.data!modify: <Self where Self : PubProto> (inout Self) -> () -> () : @$s3Lib8PubKlassCAA0B5ProtoA2aDP4dataSivMTW
+// CHECK-COMMON-NEXT:   method #PubProto.data!modify: <Self where Self : PubProto> (inout Self) -> @yield_once () -> inout @yields Int : @$s3Lib8PubKlassCAA0B5ProtoA2aDP4dataSivMTW
 // CHECK-COMMON-NEXT:   method #PubProto.pubfunc: <Self where Self : PubProto> (Self) -> (Int) -> Int : @$s3Lib8PubKlassCAA0B5ProtoA2aDP7pubfuncyS2iFTW
 
 // CHECK-RES-LABEL: sil_witness_table package [serialized_for_package] PkgKlass: PkgProto module Lib {
 // CHECK-RES-NEXT:   method #PkgProto.data!getter: <Self where Self : PkgProto> (Self) -> () -> Int : @$s3Lib8PkgKlassCAA0B5ProtoA2aDP4dataSivgTW
 // CHECK-RES-NEXT:   method #PkgProto.data!setter: <Self where Self : PkgProto> (inout Self) -> (Int) -> () : @$s3Lib8PkgKlassCAA0B5ProtoA2aDP4dataSivsTW
-// CHECK-RES-NEXT:   method #PkgProto.data!modify: <Self where Self : PkgProto> (inout Self) -> () -> () : @$s3Lib8PkgKlassCAA0B5ProtoA2aDP4dataSivMTW
+// CHECK-RES-NEXT:   method #PkgProto.data!modify: <Self where Self : PkgProto> (inout Self) -> @yield_once () -> inout @yields Int : @$s3Lib8PkgKlassCAA0B5ProtoA2aDP4dataSivMTW
 // CHECK-RES-NEXT:   method #PkgProto.pkgfunc: <Self where Self : PkgProto> (Self) -> (Int) -> Int : @$s3Lib8PkgKlassCAA0B5ProtoA2aDP7pkgfuncyS2iFTW

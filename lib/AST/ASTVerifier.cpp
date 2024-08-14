@@ -1100,7 +1100,7 @@ public:
       bool hasInOutResult = false;
 
       if (auto *FD = dyn_cast<FuncDecl>(func)) {
-        resultType = FD->getResultInterfaceType();
+        resultType = FD->getResultInterfaceTypeWithoutYields();
         resultType = FD->mapTypeIntoContext(resultType);
         hasInOutResult = FD->getInterfaceType()
                              ->castTo<AnyFunctionType>()
