@@ -283,14 +283,14 @@ public func useLayoutPrespecializedEntryPointWithExistential(_ p: any SomeRefere
   publicPrespecialized(p)
 }
 
-// OPT-macosx: sil [available 10.50] @$s22pre_specialize_layouts40usePrespecializedEntryPointsAvailabilityyyF : $@convention(thin) () -> () {
+// OPT-macosx: sil [available 50] @$s22pre_specialize_layouts40usePrespecializedEntryPointsAvailabilityyyF : $@convention(thin) () -> () {
 // OPT-macosx:  [[F1:%.*]] = function_ref @$s30pre_specialized_module_layouts20publicPrespecializedyyxlFAA8SomeDataV_Ts5 : $@convention(thin) (SomeData) -> ()
 // OPT-macosx:  apply [[F1]](
 // OPT-macosx:  [[F2:%.*]] = function_ref @$s30pre_specialized_module_layouts20publicPrespecializedyyxlFyXl_Ts5 : $@convention(thin) (@guaranteed AnyObject) -> ()
 // OPT-macosx:  [[A1:%.*]] = unchecked_ref_cast {{%.*}} : $SomeClass to $AnyObject
 // OPT-macosx:  apply [[F2]]([[A1]]) : $@convention(thin) (@guaranteed AnyObject) -> ()
 // OPT-macosx: } // end sil function '$s22pre_specialize_layouts40usePrespecializedEntryPointsAvailabilityyyF'
-@available(macOS 10.50, *)
+@available(macOS 50, *)
 public func usePrespecializedEntryPointsAvailability() {
   publicPrespecialized(SomeData())
   publicPrespecialized(SomeClass())
