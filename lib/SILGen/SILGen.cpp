@@ -1203,8 +1203,9 @@ void SILGenModule::emitOrDelayFunction(SILDeclRef constant) {
   auto emitAfter = lastEmittedFunction;
 
   // Implicit decls may be delayed if they can't be used externally.
-  auto linkage = constant.getLinkage(ForDefinition);
-  bool mayDelay = !constant.hasUserWrittenCode() &&
+  auto linkage = constant.getLinkage(ForDefinition);;
+  bool mayDelay = !constant.shouldBeEmittedForDebugger() &&
+                  !constant.hasUserWrittenCode() &&
                   !constant.isDynamicallyReplaceable() &&
                   !isPossiblyUsedExternally(linkage, M.isWholeModule());
 
