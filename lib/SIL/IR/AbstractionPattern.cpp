@@ -1038,6 +1038,13 @@ AbstractionPattern::getParameterizedProtocolArgType(unsigned argIndex) const {
             cast<ParameterizedProtocolType>(getType()).getArgs()[argIndex]);
 }
 
+AbstractionPattern AbstractionPattern::getYieldResultType() const {
+  assert(getKind() == Kind::Type);
+  return AbstractionPattern(getGenericSubstitutions(),
+                            getGenericSignature(),
+                            cast<YieldResultType>(getType()).getResultType());
+}
+
 AbstractionPattern AbstractionPattern::removingMoveOnlyWrapper() const {
   switch (getKind()) {
   case Kind::Invalid:
@@ -2729,6 +2736,13 @@ public:
   CanType visitPackElementType(CanPackElementType packElement,
                                AbstractionPattern pattern) {
     llvm_unreachable("shouldn't encounter pack element by itself");
+  }
+
+  CanType visitYieldResultType(CanYieldResultType yield,
+                               AbstractionPattern pattern) {
+    auto resultType = visit(yield.getResultType(), pattern.getYieldResultType());
+    return YieldResultType::get(resultType, yield->isInOut())
+      ->getCanonicalType();
   }
 
   CanType handlePackExpansion(AbstractionPattern origExpansion,

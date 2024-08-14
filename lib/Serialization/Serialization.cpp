@@ -5663,8 +5663,13 @@ public:
     visitBuiltinTypeImpl(ty);
   }
 
-  void visitYieldResultType(const YieldResultType *) {
-    llvm_unreachable("implemented me");
+  void visitYieldResultType(const YieldResultType *ty) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[YieldResultTypeLayout::Code];
+
+    YieldResultTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                      S.addTypeRef(ty->getResultType()),
+                                      ty->isInOut());
   }
 
   void visitTypeAliasType(const TypeAliasType *alias) {
@@ -5943,7 +5948,8 @@ public:
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         isolation,
-        fnTy->hasSendingResult());
+        fnTy->hasSendingResult(),
+        fnTy->isCoroutine());
 
     serializeFunctionTypeParams(fnTy);
 
@@ -5965,7 +5971,7 @@ public:
         fnTy->isSendable(), fnTy->isAsync(), fnTy->isThrowing(),
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
-        isolation, fnTy->hasSendingResult(),
+        isolation, fnTy->hasSendingResult(), fnTy->isCoroutine(),
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
@@ -6399,6 +6405,8 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<DeclNameRefLayout>();
 
   registerDeclTypeAbbr<ClangTypeLayout>();
+
+  registerDeclTypeAbbr<YieldResultTypeLayout>();
 
   registerDeclTypeAbbr<TypeAliasLayout>();
   registerDeclTypeAbbr<GenericTypeParamTypeLayout>();

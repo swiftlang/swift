@@ -1417,6 +1417,10 @@ public:
       return;
     }
 
+    // Skip yields, they should've already processed elsewhere
+    if (isa<YieldResultType>(substType))
+      return;
+
     auto &substResultTLForConvention = TC.getTypeLowering(
         origType, substType, TypeExpansionContext::minimal());
     auto &substResultTL = TC.getTypeLowering(origType, substType,
@@ -2317,23 +2321,22 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
          "iterating over loweredCaptures.getCaptures().");
 }
 
-static AccessorDecl *
-getAsCoroutineAccessor(std::optional<SILDeclRef> constant) {
+static FuncDecl *getAsCoroutine(std::optional<SILDeclRef> constant) {
   if (!constant || !constant->hasDecl())
     return nullptr;;
 
-  auto accessor = dyn_cast<AccessorDecl>(constant->getDecl());
-  if (!accessor || !accessor->isCoroutine())
+  auto fd = dyn_cast<FuncDecl>(constant->getDecl());
+  if (!fd || !fd->isCoroutine())
     return nullptr;
 
-  return accessor;
+  return fd;
 }
 
 static void destructureYieldsForReadAccessor(TypeConverter &TC,
-                                         TypeExpansionContext expansion,
-                                         AbstractionPattern origType,
-                                         CanType valueType,
-                                         SmallVectorImpl<SILYieldInfo> &yields){
+                                             TypeExpansionContext expansion,
+                                             AbstractionPattern origType,
+                                             CanType valueType,
+                                             SmallVectorImpl<SILYieldInfo> &yields){
   // Recursively destructure tuples.
   if (origType.isTuple()) {
     auto valueTupleType = cast<TupleType>(valueType);
@@ -2365,17 +2368,12 @@ static void destructureYieldsForReadAccessor(TypeConverter &TC,
 
 static void destructureYieldsForCoroutine(TypeConverter &TC,
                                           TypeExpansionContext expansion,
-                                          std::optional<SILDeclRef> constant,
                                           AbstractionPattern origType,
                                           CanType canValueType,
-                                          SmallVectorImpl<SILYieldInfo> &yields,
-                                          SILCoroutineKind &coroutineKind) {
-  auto accessor = getAsCoroutineAccessor(constant);
-  if (!accessor)
-    return;
-
+                                          bool isInOutYield,
+                                          SmallVectorImpl<SILYieldInfo> &yields) {
   // 'modify' yields an inout of the target type.
-  if (isYieldingMutableAccessor(accessor->getAccessorKind())) {
+  if (isInOutYield) {
     auto loweredValueTy =
         TC.getLoweredType(origType, canValueType, expansion);
     yields.push_back(SILYieldInfo(loweredValueTy.getASTType(),
@@ -2383,7 +2381,6 @@ static void destructureYieldsForCoroutine(TypeConverter &TC,
   } else {
     // 'read' yields a borrowed value of the target type, destructuring
     // tuples as necessary.
-    assert(isYieldingImmutableAccessor(accessor->getAccessorKind()));
     destructureYieldsForReadAccessor(TC, expansion, origType, canValueType,
                                      yields);
   }
@@ -2511,37 +2508,44 @@ static CanSILFunctionType getSILFunctionType(
 
   bool hasSendingResult = substFnInterfaceType->getExtInfo().hasSendingResult();
 
-  // Get the yield type for an accessor coroutine.
+  // Get the yield type for coroutine.
   SILCoroutineKind coroutineKind = SILCoroutineKind::None;
   AbstractionPattern coroutineOrigYieldType = AbstractionPattern::getInvalid();
   CanType coroutineSubstYieldType;
   
-  if (auto accessor = getAsCoroutineAccessor(constant)) {
-    auto origAccessor = cast<AccessorDecl>(origConstant->getDecl());
-    auto &ctx = origAccessor->getASTContext();
-    coroutineKind =
+  bool isInOutYield = false;
+  if (auto fd = getAsCoroutine(constant)) {
+    auto origFd = cast<FuncDecl>(origConstant->getDecl());
+    auto &ctx = origFd->getASTContext();
+    if (auto accessor = dyn_cast<AccessorDecl>(origFd)) {
+      coroutineKind =
         (requiresFeatureCoroutineAccessors(accessor->getAccessorKind()) &&
          ctx.SILOpts.CoroutineAccessorsUseYieldOnce2)
-            ? SILCoroutineKind::YieldOnce2
-            : SILCoroutineKind::YieldOnce;
-
+        ? SILCoroutineKind::YieldOnce2
+        : SILCoroutineKind::YieldOnce;
+    } else {
+      // FIXME: Decide we'd directly go to YieldOnce2 for non-accessor coroutines
+      coroutineKind = SILCoroutineKind::YieldOnce;
+    }
+    
     // Coroutine accessors are always native, so fetch the native
     // abstraction pattern.
-    auto origStorage = origAccessor->getStorage();
-    coroutineOrigYieldType = TC.getAbstractionPattern(origStorage,
-                                                      /*nonobjc*/ true)
-                               .getReferenceStorageReferentType();
+    auto sig = origFd->getGenericSignatureOfContext()
+      .getCanonicalSignature();
+    auto origYieldType = origFd->getYieldsInterfaceType()->castTo<YieldResultType>();
+    auto reducedYieldType = sig.getReducedType(origYieldType->getResultType());
+    coroutineOrigYieldType = AbstractionPattern(sig, reducedYieldType);
 
-    auto storage = accessor->getStorage();
-    auto valueType = storage->getValueInterfaceType();
-
+    auto yieldType = fd->getYieldsInterfaceType()->castTo<YieldResultType>();
+    auto valueType = yieldType->getResultType();
+    isInOutYield = yieldType->isInOut();
     if (reqtSubs) {
       valueType = valueType.subst(*reqtSubs);
       coroutineSubstYieldType = valueType->getReducedType(
           genericSig);
     } else {
       coroutineSubstYieldType = valueType->getReducedType(
-          accessor->getGenericSignature());
+          fd->getGenericSignature());
     }
   }
 
@@ -2566,7 +2570,8 @@ static CanSILFunctionType getSILFunctionType(
     // for class override thunks.  This is required to make the yields
     // match in abstraction to the base method's yields, which is necessary
     // to make the extracted continuation-function signatures match.
-    if (constant != origConstant && getAsCoroutineAccessor(constant))
+    if (constant != origConstant &&
+        coroutineKind != SILCoroutineKind::None)
       return true;
 
     // We don't currently use substituted function types for generic function
@@ -2670,10 +2675,12 @@ static CanSILFunctionType getSILFunctionType(
 
   // Destructure the coroutine yields.
   SmallVector<SILYieldInfo, 8> yields;
-  destructureYieldsForCoroutine(TC, expansionContext, constant,
-                                coroutineOrigYieldType, coroutineSubstYieldType,
-                                yields, coroutineKind);
-  
+  if (coroutineKind != SILCoroutineKind::None) {
+    destructureYieldsForCoroutine(TC, expansionContext,
+                                  coroutineOrigYieldType, coroutineSubstYieldType,
+                                  isInOutYield, yields);
+  }
+
   // Destructure the result tuple type.
   SmallVector<SILResultInfo, 8> results;
   {
@@ -4977,6 +4984,8 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
     extInfo = extInfo.withThrows(true, innerExtInfo.getThrownError());
   if (innerExtInfo.isAsync())
     extInfo = extInfo.withAsync(true);
+  if (innerExtInfo.isCoroutine())
+    extInfo = extInfo.withCoroutine(true);
 
   // Distributed thunks are always `async throws`
   if (constant.isDistributedThunk()) {

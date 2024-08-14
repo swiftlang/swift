@@ -96,7 +96,7 @@ public:
   Type getBodyResultType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       if (auto *FD = dyn_cast<FuncDecl>(AFD))
-        return FD->mapTypeIntoContext(FD->getResultInterfaceType());
+        return FD->mapTypeIntoContext(FD->getResultInterfaceTypeWithoutYields());
       return TupleType::getEmpty(AFD->getASTContext());
     }
     return cast<AbstractClosureExpr *>(TheFunction)->getResultType();
