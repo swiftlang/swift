@@ -846,10 +846,10 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
           return true;
 
         if (VD->isLet()) {
-          // If this `let` is in an `@_objcImplementation extension`, don't
+          // If this `let` is in an `@implementation extension`, don't
           // infer `final` unless it is written explicitly.
           auto ed = dyn_cast<ExtensionDecl>(VD->getDeclContext());
-          if (!explicitFinalAttr && ed && ed->isObjCImplementation())
+          if (!explicitFinalAttr && ed && ed->isImplementation())
             return false;
 
           if (VD->getFormalAccess() == AccessLevel::Open) {

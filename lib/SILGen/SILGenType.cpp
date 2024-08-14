@@ -1407,8 +1407,7 @@ public:
         if (pd->isStatic())
           SGM.emitGlobalInitialization(pd, i);
         else if (isa<ExtensionDecl>(pd->getDeclContext()) &&
-                 cast<ExtensionDecl>(pd->getDeclContext())
-                     ->isObjCImplementation())
+                 cast<ExtensionDecl>(pd->getDeclContext())->isImplementation())
           SGM.emitStoredPropertyInitialization(pd, i);
       }
     }

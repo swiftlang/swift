@@ -896,7 +896,7 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
     // don't think of these as Swift classes.
     if (!nominal) {
       ASSERT(isa<ExtensionDecl>(d->getDeclContext()) &&
-             cast<ExtensionDecl>(d->getDeclContext())->isObjCImplementation());
+             cast<ExtensionDecl>(d->getDeclContext())->isImplementation());
       return IsNotSerialized;
     }
 

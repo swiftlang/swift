@@ -167,7 +167,7 @@ static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
 
 static bool isInObjCImpl(const ValueDecl *VD) {
   auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext());
-  return ED && ED->isObjCImplementation();
+  return ED && ED->isImplementation();
 }
 
 /// Triggering type checking requests while printing is desirable in compiler
@@ -1293,7 +1293,7 @@ void PrintAST::printAttributes(const Decl *D) {
 
   // If we are suppressing @implementation, also suppress @objc on extensions.
   if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-    if (ED->isObjCImplementation() &&
+    if (ED->isImplementation() &&
             Options.excludeAttrKind(DeclAttrKind::Implementation)) {
       Options.ExcludeAttrList.push_back(DeclAttrKind::ObjC);
     }

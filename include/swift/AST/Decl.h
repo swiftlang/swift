@@ -1019,10 +1019,16 @@ public:
   /// attribute macro expansion.
   DeclAttributes getSemanticAttrs() const;
 
-  /// True if this declaration provides an implementation for an imported
-  /// Objective-C declaration. This implies various restrictions and special
+  /// True if this declaration ought to provide an implementation for an
+  /// imported clang declaration. This implies various restrictions and special
   /// behaviors for it and, if it's an extension, its members.
-  bool isObjCImplementation() const;
+  ///
+  /// Note that this returns \c false for the members of an \c @objc
+  /// \c @implementation extension, as it is the entire extension that's the
+  /// implementation there.
+  ///
+  /// \seeAlso ValueDecl::isObjCMemberImplementation()
+  bool isImplementation() const;
 
   using AuxiliaryDeclCallback = llvm::function_ref<void(Decl *)>;
 
@@ -1268,7 +1274,7 @@ public:
   /// returns the imported declaration. (If there are several, only the main
   /// class body will be returned.) Otherwise return \c nullptr.
   ///
-  /// \seeAlso ExtensionDecl::isObjCInterface()
+  /// \seeAlso Decl::isImplementation()
   Decl *getImplementedObjCDecl() const {
     auto impls = getAllImplementedObjCDecls();
     if (impls.empty())
@@ -1280,13 +1286,13 @@ public:
   /// returns the imported declarations. (There may be several for a main class
   /// body; if so, the first will be the class itself.) Otherwise return an empty list.
   ///
-  /// \seeAlso ExtensionDecl::isObjCInterface()
+  /// \seeAlso Decl::isImplementation()
   llvm::TinyPtrVector<Decl *> getAllImplementedObjCDecls() const;
 
   /// If this is the ObjC interface of a declaration implemented in Swift,
   /// returns the implementating declaration. Otherwise return \c nullptr.
   ///
-  /// \seeAlso ExtensionDecl::isObjCInterface()
+  /// \seeAlso Decl::isImplementation()
   Decl *getObjCImplementationDecl() const;
 
   bool getCachedLacksObjCInterfaceOrImplementation() const {
@@ -2911,7 +2917,7 @@ public:
   /// Asserts if this is not a member of a protocol.
   bool isProtocolRequirement() const;
 
-  /// Return true if this is a member implementation for an \c @_objcImplementation
+  /// Return true if this is a member implementation for an \c @implementation
   /// extension.
   bool isObjCMemberImplementation() const;
 

@@ -1934,7 +1934,7 @@ bool ExtensionDecl::isAddingConformanceToInvertible() const {
   return false;
 }
 
-bool Decl::isObjCImplementation() const {
+bool Decl::isImplementation() const {
   return getAttrs().hasAttribute<ImplementationAttr>(/*AllowInvalid=*/true);
 }
 
@@ -4603,7 +4603,7 @@ static bool
 isObjCMemberImplementation(const ValueDecl *VD,
                            llvm::function_ref<AccessLevel()> getAccessLevel) {
   if (auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext()))
-    if (ED->isObjCImplementation() && !isa<TypeDecl>(VD)) {
+    if (ED->isImplementation() && !isa<TypeDecl>(VD)) {
       auto attrDecl = isa<AccessorDecl>(VD)
                     ? cast<AccessorDecl>(VD)->getStorage()
                     : VD;
@@ -4639,10 +4639,9 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   // a context where we would access its storage directly, forbid access. Name
   // lookups will instead find and use the matching interface decl.
   // FIXME: Passing `true` for `isAccessOnSelf` may cause false positives.
-  if ((VD->isObjCImplementation() ||
-         isObjCMemberImplementation(VD, getAccessLevel)) &&
-      VD->getAccessSemanticsFromContext(useDC, /*isAccessOnSelf=*/true)
-          != AccessSemantics::DirectToStorage)
+  if ((VD->isImplementation() || isObjCMemberImplementation(VD, getAccessLevel))
+        && VD->getAccessSemanticsFromContext(useDC, /*isAccessOnSelf=*/true)
+              != AccessSemantics::DirectToStorage)
     return false;
 
   if (VD->getASTContext().isAccessControlDisabled())

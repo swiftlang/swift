@@ -10087,7 +10087,7 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       return false;
 
     if (auto *ED = dyn_cast<ExtensionDecl>(dc))
-      return !ED->isObjCImplementation();
+      return !ED->isImplementation();
 
     return true;
   };

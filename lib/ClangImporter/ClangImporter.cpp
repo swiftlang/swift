@@ -6068,8 +6068,7 @@ findContextInterfaceAndImplementation(DeclContext *dc) {
   // And the implementations.
   llvm::TinyPtrVector<Decl *> implDecls;
   for (ExtensionDecl *ext : classDecl->getExtensions()) {
-    if (ext->isObjCImplementation()
-          && ext->getObjCCategoryName() == categoryName
+    if (ext->isImplementation() && ext->getObjCCategoryName() == categoryName
           && isImplValid(ext))
       implDecls.push_back(ext);
   }
@@ -6104,7 +6103,7 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
 
   // If this isn't either a clang import or an implementation, there's no point
   // doing any work here.
-  if (!func->hasClangNode() && !func->isObjCImplementation())
+  if (!func->hasClangNode() && !func->isImplementation())
     return {};
 
   OptionalEnum<AccessorKind> accessorKind;
@@ -6145,7 +6144,7 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
         return {};
       }
       interface = result;
-    } else if (resultFunc->isObjCImplementation()) {
+    } else if (resultFunc->isImplementation()) {
       impls.push_back(result);
     }
   }

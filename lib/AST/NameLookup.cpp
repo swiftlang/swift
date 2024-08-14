@@ -2224,9 +2224,9 @@ NominalTypeDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
   return stored.Methods;
 }
 
-static bool inObjCImplExtension(AbstractFunctionDecl *newDecl) {
+static bool inImplExtension(AbstractFunctionDecl *newDecl) {
   if (auto ext = dyn_cast<ExtensionDecl>(newDecl->getDeclContext()))
-    return ext->isObjCImplementation();
+    return ext->isImplementation();
   return false;
 }
 
@@ -2238,7 +2238,7 @@ shouldDiagnoseConflict(NominalTypeDecl *ty, AbstractFunctionDecl *newDecl,
   // Conflicts between member implementations and their interfaces, or
   // inherited inits and their overrides in @_objcImpl extensions, are spurious.
   if (newDecl->isObjCMemberImplementation()
-      || (isa<ConstructorDecl>(newDecl) && inObjCImplExtension(newDecl)
+      || (isa<ConstructorDecl>(newDecl) && inImplExtension(newDecl)
           && newDecl->getAttrs().hasAttribute<OverrideAttr>()))
     return false;
 

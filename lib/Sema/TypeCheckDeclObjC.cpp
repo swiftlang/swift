@@ -1263,7 +1263,7 @@ static bool isMemberOfObjCClassExtension(const ValueDecl *VD) {
 
 static bool isMemberOfObjCImplementationExtension(const ValueDecl *VD) {
   return isMemberOfObjCClassExtension(VD) &&
-      cast<ExtensionDecl>(VD->getDeclContext())->isObjCImplementation();
+      cast<ExtensionDecl>(VD->getDeclContext())->isImplementation();
 }
 
 /// Whether this declaration is a member of a class with the `@objcMembers`
@@ -3246,7 +3246,7 @@ private:
   }
 
   void addCandidates(ExtensionDecl *ext) {
-    assert(ext->isObjCImplementation());
+    assert(ext->isImplementation());
     for (Decl *member : ext->getMembers()) {
       // Skip accessors; we'll match their storage instead.
       if (isa<AccessorDecl>(member))
@@ -3605,7 +3605,7 @@ private:
 
     // Check only applies to members of implementations, not implementations in
     // their own right.
-    if (!cand->isObjCImplementation() &&
+    if (!cand->isImplementation() &&
           getCategoryName(cand->getDeclContext()->getImplementedObjCContext())
                != getCategoryName(req->getDeclContext()))
       return MatchOutcome::WrongCategory;
