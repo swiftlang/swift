@@ -1646,7 +1646,7 @@ public:
 private:
   static bool isImplementation(NominalTypeDecl *NTD) {
     if (NTD)
-      return NTD->getObjCImplementationDecl();
+      return NTD->getImplementationDecl();
     return false;
   }
   static bool isImplementation(CanType ty) {

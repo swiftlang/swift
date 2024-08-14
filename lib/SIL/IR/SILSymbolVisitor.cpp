@@ -631,7 +631,7 @@ public:
 
     auto declaredType = NTD->getDeclaredType()->getCanonicalType();
 
-    if (!NTD->getObjCImplementationDecl()) {
+    if (!NTD->getImplementationDecl()) {
       Visitor.addNominalTypeDescriptor(NTD);
 
       // Generic types do not get metadata directly, only through the function.
@@ -733,8 +733,8 @@ public:
     if (canSkipNominal(nominal))
       return;
 
-    if (auto CD = dyn_cast_or_null<ClassDecl>(ED->getImplementedObjCDecl())) {
-      // @_objcImplementation extensions generate the class metadata symbols.
+    if (auto CD = dyn_cast_or_null<ClassDecl>(ED->getImplementedDecl())) {
+      // @objc @implementation extensions generate the class metadata symbols.
       (void)addClassMetadata(CD);
     }
 

@@ -5962,7 +5962,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
 }
 
 IterableDeclContext *IterableDeclContext::getImplementationContext() {
-  if (auto implDecl = getDecl()->getObjCImplementationDecl())
+  if (auto implDecl = getDecl()->getImplementationDecl())
     if (auto implExt = dyn_cast<ExtensionDecl>(implDecl))
       return implExt;
 
@@ -5993,12 +5993,12 @@ struct OrderDecls {
 };
 }
 
-static ObjCInterfaceAndImplementation
+static InterfaceAndImplementation
 constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
                 llvm::TinyPtrVector<Decl *> &impls,
                 Decl *diagnoseOn, Identifier categoryName) {
   if (interfaces.empty() || impls.empty())
-    return ObjCInterfaceAndImplementation();
+    return InterfaceAndImplementation();
 
   if (impls.size() > 1) {
     llvm::sort(impls, OrderDecls());
@@ -6020,7 +6020,7 @@ constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
     }
   }
 
-  return ObjCInterfaceAndImplementation(interfaces, impls.front());
+  return InterfaceAndImplementation(interfaces, impls.front());
 }
 
 static bool isImplValid(ExtensionDecl *ext) {
@@ -6037,7 +6037,7 @@ static bool isImplValid(ExtensionDecl *ext) {
   return !attr->isCategoryNameInvalid();
 }
 
-static ObjCInterfaceAndImplementation
+static InterfaceAndImplementation
 findContextInterfaceAndImplementation(DeclContext *dc) {
   if (!dc)
     return {};
@@ -6096,7 +6096,7 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
   }
 }
 
-static ObjCInterfaceAndImplementation
+static InterfaceAndImplementation
 findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
   if (!func)
     return {};
@@ -6158,7 +6158,7 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
                          /*categoryName=*/Identifier());
 }
 
-ObjCInterfaceAndImplementation ObjCInterfaceAndImplementationRequest::
+InterfaceAndImplementation InterfaceAndImplementationRequest::
 evaluate(Evaluator &evaluator, Decl *decl) const {
   // Types and extensions have direct links to their counterparts through the
   // `@_objcImplementation` attribute. Let's resolve that.
@@ -6175,7 +6175,7 @@ evaluate(Evaluator &evaluator, Decl *decl) const {
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           const ObjCInterfaceAndImplementation &pair) {
+                           const InterfaceAndImplementation &pair) {
   if (pair.empty()) {
     out << "no clang interface or @_objcImplementation";
     return;
@@ -6188,35 +6188,35 @@ void swift::simple_display(llvm::raw_ostream &out,
 }
 
 SourceLoc
-swift::extractNearestSourceLoc(const ObjCInterfaceAndImplementation &pair) {
-  if (pair.implementationDecl)
+swift::extractNearestSourceLoc(const InterfaceAndImplementation &pair) {
+  if (!pair.implementationDecl)
     return SourceLoc();
   return extractNearestSourceLoc(pair.implementationDecl);
 }
 
-llvm::TinyPtrVector<Decl *> Decl::getAllImplementedObjCDecls() const {
+llvm::TinyPtrVector<Decl *> Decl::getAllImplementedDecls() const {
   if (hasClangNode())
     // This *is* the interface, if there is one.
     return {};
 
-  ObjCInterfaceAndImplementationRequest req{const_cast<Decl *>(this)};
+  InterfaceAndImplementationRequest req{const_cast<Decl *>(this)};
   auto result = evaluateOrDefault(getASTContext().evaluator, req, {});
   return result.interfaceDecls;
 }
 
 DeclContext *DeclContext::getImplementedObjCContext() const {
   if (auto ED = dyn_cast<ExtensionDecl>(this))
-    if (auto impl = dyn_cast_or_null<DeclContext>(ED->getImplementedObjCDecl()))
+    if (auto impl = dyn_cast_or_null<DeclContext>(ED->getImplementedDecl()))
       return impl;
   return const_cast<DeclContext *>(this);
 }
 
-Decl *Decl::getObjCImplementationDecl() const {
+Decl *Decl::getImplementationDecl() const {
   if (!hasClangNode())
     // This *is* the implementation, if it has one.
     return nullptr;
 
-  ObjCInterfaceAndImplementationRequest req{const_cast<Decl *>(this)};
+  InterfaceAndImplementationRequest req{const_cast<Decl *>(this)};
   auto result = evaluateOrDefault(getASTContext().evaluator, req, {});
   return result.implementationDecl;
 }

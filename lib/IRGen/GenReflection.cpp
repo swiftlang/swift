@@ -1754,7 +1754,7 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
   }
 
   if (auto *CD = dyn_cast<ClassDecl>(D)) {
-    if (CD->getObjCImplementationDecl())
+    if (CD->getImplementationDecl())
       needsFieldDescriptor = false;
   }
 

@@ -165,7 +165,7 @@ namespace {
       auto theClass = classType.getClassOrBoundGenericClass();
       assert(theClass);
 
-      if (theClass->getObjCImplementationDecl())
+      if (theClass->getImplementationDecl())
         Options |= ClassMetadataFlags::ClassHasObjCImplementation;
 
       if (theClass->isGenericContext() && !theClass->hasClangNode())
@@ -227,7 +227,7 @@ namespace {
                                bool superclass) {
       if (theClass->hasClangNode() && !theClass->isForeignReferenceType()) {
         Options |= ClassMetadataFlags::ClassHasObjCAncestry;
-        if (!theClass->getObjCImplementationDecl())
+        if (!theClass->getImplementationDecl())
           return;
       }
 
@@ -1308,9 +1308,9 @@ namespace {
     /// protocol conformances.
     void visitConformances(const IterableDeclContext *idc) {
       auto decl = idc->getDecl();
-      if (decl->getImplementedObjCDecl()) {
+      if (decl->getImplementedDecl()) {
         // We want to use the conformance lists imported from the ObjC header.
-        for (auto interface : decl->getAllImplementedObjCDecls()) {
+        for (auto interface : decl->getAllImplementedDecls()) {
           visitConformances(cast<IterableDeclContext>(interface));
         }
         return;
@@ -1450,7 +1450,7 @@ namespace {
       // If this is truly an imported ObjC class, with no @_objcImplementation,
       // someone else will emit the ObjC metadata symbol and we simply want to
       // use it.
-      if (theClass->hasClangNode() && !theClass->getObjCImplementationDecl())
+      if (theClass->hasClangNode() && !theClass->getImplementationDecl())
         return IGM.getAddrOfObjCClass(theClass, NotForDefinition);
 
       // Note that getClassMetadataStrategy() will return
@@ -2566,7 +2566,7 @@ static llvm::Function *emitObjCMetadataUpdateFunction(IRGenModule &IGM,
   (void) params.claimAll();
 
   llvm::Value *metadata;
-  if (D->getObjCImplementationDecl()) {
+  if (D->getImplementationDecl()) {
     // This is an @objc @implementation class, so it has no metadata completion
     // function. We must do the completion function's work here, taking care to
     // fetch the address of the ObjC class without going through either runtime.

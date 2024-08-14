@@ -22,14 +22,14 @@
 
 using namespace swift;
 
-std::optional<ObjCInterfaceAndImplementation>
-ObjCInterfaceAndImplementationRequest::getCachedResult() const {
+std::optional<InterfaceAndImplementation>
+InterfaceAndImplementationRequest::getCachedResult() const {
   auto passedDecl = std::get<0>(getStorage());
   if (!passedDecl) {
     return {};
   }
 
-  if (passedDecl->getCachedLacksObjCInterfaceOrImplementation()) {
+  if (passedDecl->getCachedLacksInterfaceOrImplementation()) {
     // We've computed this request and found that this is a normal declaration.
     return {};
   }
@@ -59,7 +59,7 @@ ObjCInterfaceAndImplementationRequest::getCachedResult() const {
   if (implDecl) {
     auto iter = impl.InterfacesByImplementation.find(implDecl);
     if (iter != impl.InterfacesByImplementation.end()) {
-      return ObjCInterfaceAndImplementation(iter->second, implDecl);
+      return InterfaceAndImplementation(iter->second, implDecl);
     }
   }
 
@@ -67,13 +67,13 @@ ObjCInterfaceAndImplementationRequest::getCachedResult() const {
   return std::nullopt;
 }
 
-void ObjCInterfaceAndImplementationRequest::
-cacheResult(ObjCInterfaceAndImplementation value) const {
+void InterfaceAndImplementationRequest::
+cacheResult(InterfaceAndImplementation value) const {
   Decl *passedDecl = std::get<0>(getStorage());
 
   if (value.empty()) {
     // `decl` is neither an interface nor an implementation; remember this.
-    passedDecl->setCachedLacksObjCInterfaceOrImplementation(true);
+    passedDecl->setCachedLacksInterfaceOrImplementation(true);
     return;
   }
 
@@ -90,7 +90,7 @@ cacheResult(ObjCInterfaceAndImplementation value) const {
 
   // If this was a duplicate implementation, cache a null so we don't recompute.
   if (!passedDecl->hasClangNode() && passedDecl != value.implementationDecl) {
-    passedDecl->setCachedLacksObjCInterfaceOrImplementation(true);
+    passedDecl->setCachedLacksInterfaceOrImplementation(true);
   }
 }
 

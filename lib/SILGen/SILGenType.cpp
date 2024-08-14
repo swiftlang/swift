@@ -1320,9 +1320,9 @@ public:
       visit(member);
     }
 
-    // If this is a main-interface @_objcImplementation extension and the class
+    // If this is a main-interface @objc @implementation extension and the class
     // has a synthesized destructor, emit it now.
-    if (auto cd = dyn_cast_or_null<ClassDecl>(e->getImplementedObjCDecl())) {
+    if (auto cd = dyn_cast_or_null<ClassDecl>(e->getImplementedDecl())) {
       auto dd = cd->getDestructor();
       if (dd->getDeclContext() == cd)
         visit(dd);
@@ -1418,8 +1418,7 @@ public:
       if (!vd->isStatic()) {
         // Is this a stored property of an @_objcImplementation extension?
         auto ed = cast<ExtensionDecl>(vd->getDeclContext());
-        if (auto cd =
-                dyn_cast_or_null<ClassDecl>(ed->getImplementedObjCDecl())) {
+        if (auto cd = dyn_cast_or_null<ClassDecl>(ed->getImplementedDecl())) {
           // Act as though we declared it on the class.
           SILGenType(SGM, cd).visitVarDecl(vd);
           return;

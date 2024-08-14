@@ -1655,7 +1655,7 @@ visitImplementationAttr(ImplementationAttr *attr) {
       return;
     }
 
-    if (!attr->isCategoryNameInvalid() && !ED->getImplementedObjCDecl()) {
+    if (!attr->isCategoryNameInvalid() && !ED->getImplementedDecl()) {
       diagnose(attr->getLocation(),
                diag::attr_objc_implementation_category_not_found,
                ED->getObjCCategoryName(), CD);
@@ -1709,7 +1709,7 @@ visitImplementationAttr(ImplementationAttr *attr) {
 
     // FIXME: if (AFD->getCDeclName().empty())
 
-    if (!AFD->getImplementedObjCDecl()) {
+    if (!AFD->getImplementedDecl()) {
       diagnose(attr->getLocation(),
                diag::attr_objc_implementation_func_not_found,
                AFD->getCDeclName(), AFD);

@@ -381,10 +381,10 @@ protected:
     /// Whether the set of semantic attributes has been computed.
     SemanticAttrsComputed : 1,
 
-    /// True if \c ObjCInterfaceAndImplementationRequest has been computed
+    /// True if \c InterfaceAndImplementationRequest has been computed
     /// and did \em not find anything. This is the fast path where we can bail
     /// out without checking other caches or computing anything.
-    LacksObjCInterfaceOrImplementation : 1,
+    LacksInterfaceOrImplementation : 1,
 
     /// True if we're in the common case where the ExpandMemberAttributeMacros
     /// request returned an empty array.
@@ -920,7 +920,7 @@ protected:
     Bits.Decl.Implicit = false;
     Bits.Decl.FromClang = false;
     Bits.Decl.Hoisted = false;
-    Bits.Decl.LacksObjCInterfaceOrImplementation = false;
+    Bits.Decl.LacksInterfaceOrImplementation = false;
     Bits.Decl.NoMemberAttributeMacros = false;
     Bits.Decl.NoGlobalActorAttribute = false;
     Bits.Decl.NoSPIGroups = false;
@@ -1275,8 +1275,8 @@ public:
   /// class body will be returned.) Otherwise return \c nullptr.
   ///
   /// \seeAlso Decl::isImplementation()
-  Decl *getImplementedObjCDecl() const {
-    auto impls = getAllImplementedObjCDecls();
+  Decl *getImplementedDecl() const {
+    auto impls = getAllImplementedDecls();
     if (impls.empty())
       return nullptr;
     return impls.front();
@@ -1287,20 +1287,20 @@ public:
   /// body; if so, the first will be the class itself.) Otherwise return an empty list.
   ///
   /// \seeAlso Decl::isImplementation()
-  llvm::TinyPtrVector<Decl *> getAllImplementedObjCDecls() const;
+  llvm::TinyPtrVector<Decl *> getAllImplementedDecls() const;
 
   /// If this is the ObjC interface of a declaration implemented in Swift,
   /// returns the implementating declaration. Otherwise return \c nullptr.
   ///
   /// \seeAlso Decl::isImplementation()
-  Decl *getObjCImplementationDecl() const;
+  Decl *getImplementationDecl() const;
 
-  bool getCachedLacksObjCInterfaceOrImplementation() const {
-    return Bits.Decl.LacksObjCInterfaceOrImplementation;
+  bool getCachedLacksInterfaceOrImplementation() const {
+    return Bits.Decl.LacksInterfaceOrImplementation;
   }
 
-  void setCachedLacksObjCInterfaceOrImplementation(bool value) {
-    Bits.Decl.LacksObjCInterfaceOrImplementation = value;
+  void setCachedLacksInterfaceOrImplementation(bool value) {
+    Bits.Decl.LacksInterfaceOrImplementation = value;
   }
 
   /// Return the GenericContext if the Decl has one.

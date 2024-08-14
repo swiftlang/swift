@@ -1262,8 +1262,8 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
       if (isNativeToForeignThunk()) {
         // If this is an @implementation @_cdecl, mangle it like the clang
         // function it implements.
-        if (auto objcInterface = getDecl()->getImplementedObjCDecl()) {
-          auto clangMangling = mangleClangDecl(objcInterface, isForeign);
+        if (auto clangInterface = getDecl()->getImplementedDecl()) {
+          auto clangMangling = mangleClangDecl(clangInterface, isForeign);
           if (!clangMangling.empty())
             return clangMangling;
         }

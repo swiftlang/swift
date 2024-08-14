@@ -2720,7 +2720,7 @@ static void resolveObjCCategoryConflict(
 
     // If the best extension has an implementation that's also in the list,
     // remove the implementation; it's not a conflict.
-    if (ext == best->getObjCImplementationDecl())
+    if (ext == best->getImplementationDecl())
       return true;
 
     // If there's an @implementation attribute but something about the category
@@ -2798,7 +2798,7 @@ bool swift::diagnoseObjCCategoryConflicts(SourceFile &sf) {
 
         auto bestCat = resolvedCategories.front();
         if (auto implCat = dyn_cast_or_null<ExtensionDecl>(
-                                       bestCat->getObjCImplementationDecl()))
+                                       bestCat->getImplementationDecl()))
           if (implCat != catToCheck)
             bestCat = implCat;
 
@@ -2938,7 +2938,7 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
 }
 
 void TypeChecker::checkObjCImplementation(Decl *D) {
-  if (!D->getImplementedObjCDecl())
+  if (!D->getImplementedDecl())
     return;
 
   evaluateOrDefault(D->getASTContext().evaluator,
@@ -3081,7 +3081,7 @@ public:
 
     if (auto func = dyn_cast<AbstractFunctionDecl>(D)) {
       addCandidate(D);
-      addRequirement(D->getImplementedObjCDecl());
+      addRequirement(D->getImplementedDecl());
 
       return;
     }
@@ -3103,7 +3103,7 @@ public:
 
     // Did we actually match this extension to an interface? (In invalid code,
     // we might not have.)
-    auto interfaceDecls = ext->getAllImplementedObjCDecls();
+    auto interfaceDecls = ext->getAllImplementedDecls();
     if (interfaceDecls.empty())
       return;
 

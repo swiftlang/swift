@@ -5089,7 +5089,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   auto isPrespecialized = concreteTypeDecl &&
                           concreteTypeDecl->isGenericContext();
   bool isObjCImpl = concreteTypeDecl &&
-                    concreteTypeDecl->getObjCImplementationDecl();
+                    concreteTypeDecl->getImplementationDecl();
 
   if (isPattern) {
     assert(isConstant && "Type metadata patterns must be constant");
@@ -5221,7 +5221,7 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   } else if (nominal) {
     // The symbol for native non-generic nominal type metadata is generated at
     // the aliased address point (see defineTypeMetadata() above).
-    if (nominal->getObjCImplementationDecl()) {
+    if (nominal->getImplementationDecl()) {
       defaultVarTy = ObjCClassStructTy;
     } else {
       assert(!nominal->hasClangNode());
@@ -5268,7 +5268,7 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   switch (canonicality) {
   case TypeMetadataCanonicality::Canonical: {
     auto classDecl = concreteType->getClassOrBoundGenericClass();
-    if (classDecl && classDecl->getObjCImplementationDecl()) {
+    if (classDecl && classDecl->getImplementationDecl()) {
       entity = LinkEntity::forObjCClass(classDecl);
     } else {
       entity = LinkEntity::forTypeMetadata(

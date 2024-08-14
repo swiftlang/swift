@@ -3985,9 +3985,9 @@ public:
 
     TypeChecker::checkDeclAttributes(ED);
 
-    // If this is an @_objcImplementation of a class, set up some aspects of the
-    // class.
-    if (auto CD = dyn_cast_or_null<ClassDecl>(ED->getImplementedObjCDecl())) {
+    // If this is an @objc @implementation of a class, set up some aspects of
+    // the class.
+    if (auto CD = dyn_cast_or_null<ClassDecl>(ED->getImplementedDecl())) {
       // Force lowering of stored properties.
       (void) CD->getStoredProperties();
 

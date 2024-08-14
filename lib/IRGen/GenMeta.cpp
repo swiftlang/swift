@@ -2976,7 +2976,7 @@ emitInitializeFieldOffsetVector(SILType T, llvm::Value *metadata,
   // @objc @implementation classes don't actually have a field vector; for them,
   // we're just trying to update the direct field offsets.
   if (!isa<ClassDecl>(target)
-        || !cast<ClassDecl>(target)->getObjCImplementationDecl()) {
+        || !cast<ClassDecl>(target)->getImplementationDecl()) {
     fieldVector = emitAddressOfFieldOffsetVector(*this, metadata, target)
       .getAddress();
   }
@@ -3745,7 +3745,7 @@ createSingletonInitializationMetadataAccessFunction(IRGenModule &IGM,
                                               DynamicMetadataRequest request,
                                               llvm::Constant *cacheVariable) {
     if (auto CD = dyn_cast<ClassDecl>(typeDecl)) {
-      if (CD->getObjCImplementationDecl()) {
+      if (CD->getImplementationDecl()) {
         // Use the Objective-C runtime symbol instead of the Swift one.
         llvm::Value *descriptor =
           IGF.IGM.getAddrOfObjCClass(CD, NotForDefinition);
@@ -5055,7 +5055,7 @@ namespace {
 static void emitObjCClassSymbol(IRGenModule &IGM, ClassDecl *classDecl,
                                 llvm::Constant *metadata,
                                 llvm::Type *metadataTy) {
-  if (classDecl->getObjCImplementationDecl())
+  if (classDecl->getImplementationDecl())
     // Should already have this symbol.
     return;
 
