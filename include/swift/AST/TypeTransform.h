@@ -104,10 +104,6 @@ public:
 case TypeKind::Id:
 #define TYPE(Id, Parent)
 #include "swift/AST/TypeNodes.def"
-    case TypeKind::PrimaryArchetype:
-    case TypeKind::OpenedArchetype:
-    case TypeKind::PackArchetype:
-    case TypeKind::ElementArchetype:
     case TypeKind::Error:
     case TypeKind::Unresolved:
     case TypeKind::TypeVariable:
@@ -117,9 +113,41 @@ case TypeKind::Id:
     case TypeKind::BuiltinTuple:
       return t;
 
+    case TypeKind::PrimaryArchetype:
+    case TypeKind::PackArchetype: {
+      auto *archetype = cast<ArchetypeType>(base);
+      return asDerived().transformPrimaryArchetypeType(archetype, pos);
+    }
+
+    case TypeKind::OpaqueTypeArchetype: {
+      auto *opaque = cast<OpaqueTypeArchetypeType>(base);
+      if (auto result = asDerived().transformOpaqueTypeArchetypeType(opaque, pos))
+        return *result;
+
+      auto subMap = opaque->getSubstitutions();
+      auto newSubMap = asDerived().transformSubMap(subMap);
+      if (newSubMap == subMap)
+        return t;
+      if (!newSubMap)
+        return Type();
+
+      return OpaqueTypeArchetypeType::get(opaque->getDecl(),
+                                          opaque->getInterfaceType(),
+                                          newSubMap);
+    }
+
+    case TypeKind::OpenedArchetype:
+    case TypeKind::ElementArchetype: {
+      auto *local = cast<LocalArchetypeType>(base);
+      if (auto result = asDerived().transformLocalArchetypeType(local, pos))
+        return *result;
+
+      return local;
+    }
+
     case TypeKind::GenericTypeParam: {
       auto *param = cast<GenericTypeParamType>(base);
-      return asDerived().transformGenericTypeParam(param, pos);
+      return asDerived().transformGenericTypeParamType(param, pos);
     }
 
     case TypeKind::Enum:
@@ -140,7 +168,7 @@ case TypeKind::Id:
 
       return t;
     }
-        
+
     case TypeKind::SILBlockStorage: {
       auto storageTy = cast<SILBlockStorageType>(base);
       Type transCap = doIt(storageTy->getCaptureType(),
@@ -194,7 +222,7 @@ case TypeKind::Id:
                               newSubMap);
       return boxTy;
     }
-    
+
     case TypeKind::SILFunction: {
       auto fnTy = cast<SILFunctionType>(base);
 
@@ -355,20 +383,6 @@ case TypeKind::Id:
         return t;
 
       return BoundGenericType::get(bound->getDecl(), substParentTy, substArgs);
-    }
-        
-    case TypeKind::OpaqueTypeArchetype: {
-      auto opaque = cast<OpaqueTypeArchetypeType>(base);
-      auto subMap = opaque->getSubstitutions();
-      auto newSubMap = asDerived().transformSubMap(subMap);
-      if (newSubMap == subMap)
-        return t;
-      if (!newSubMap)
-        return Type();
-
-      return OpaqueTypeArchetypeType::get(opaque->getDecl(),
-                                          opaque->getInterfaceType(),
-                                          newSubMap);
     }
 
     case TypeKind::ExistentialMetatype: {
@@ -591,12 +605,12 @@ case TypeKind::Id:
 
     case TypeKind::PackExpansion: {
       auto *expand = cast<PackExpansionType>(base);
-      return asDerived().transformPackExpansion(expand, pos);
+      return asDerived().transformPackExpansionType(expand, pos);
     }
 
     case TypeKind::PackElement: {
       auto element = cast<PackElementType>(base);
-      return asDerived().transformPackElement(element, pos);
+      return asDerived().transformPackElementType(element, pos);
     }
 
     case TypeKind::Tuple: {
@@ -662,7 +676,7 @@ case TypeKind::Id:
 
     case TypeKind::DependentMember: {
       auto dependent = cast<DependentMemberType>(base);
-      return asDerived().transformDependentMember(dependent, pos);
+      return asDerived().transformDependentMemberType(dependent, pos);
     }
 
     case TypeKind::GenericFunction:
@@ -859,7 +873,7 @@ case TypeKind::Id:
       auto objectTy = doIt(inout->getObjectType(), TypePosition::Invariant);
       if (!objectTy || objectTy->hasError())
         return objectTy;
-      
+
       return objectTy.getPointer() == inout->getObjectType().getPointer() ?
         t : InOutType::get(objectTy);
     }
@@ -892,10 +906,10 @@ case TypeKind::Id:
         if (substMember.getPointer() != member.getPointer())
           anyChanged = true;
       }
-      
+
       if (!anyChanged)
         return t;
-      
+
       return ProtocolCompositionType::get(ctx,
                                           substMembers,
                                           pc->getInverses(),
@@ -936,7 +950,7 @@ case TypeKind::Id:
           substArgs);
     }
     }
-    
+
     llvm_unreachable("Unhandled type in transformation");
   }
 
@@ -970,11 +984,11 @@ case TypeKind::Id:
     return doIt(fieldTy, pos)->getCanonicalType();
   }
 
-  Type transformGenericTypeParam(GenericTypeParamType *param, TypePosition pos) {
+  Type transformGenericTypeParamType(GenericTypeParamType *param, TypePosition pos) {
     return param;
   }
 
-  Type transformPackExpansion(PackExpansionType *expand, TypePosition pos) {
+  Type transformPackExpansionType(PackExpansionType *expand, TypePosition pos) {
     // Substitution completely replaces this.
 
     Type transformedPat = doIt(expand->getPatternType(), pos);
@@ -992,7 +1006,7 @@ case TypeKind::Id:
     return PackExpansionType::get(transformedPat, transformedCount);
   }
 
-  Type transformPackElement(PackElementType *element, TypePosition pos) {
+  Type transformPackElementType(PackElementType *element, TypePosition pos) {
     Type transformedPack = doIt(element->getPackType(), pos);
     if (!transformedPack)
       return Type();
@@ -1003,7 +1017,7 @@ case TypeKind::Id:
     return PackElementType::get(transformedPack, element->getLevel());
   }
 
-  Type transformDependentMember(DependentMemberType *dependent, TypePosition pos) {
+  Type transformDependentMemberType(DependentMemberType *dependent, TypePosition pos) {
     auto dependentBase = doIt(dependent->getBase(), pos);
     if (!dependentBase)
       return Type();
@@ -1015,6 +1029,21 @@ case TypeKind::Id:
       return DependentMemberType::get(dependentBase, assocType);
 
     return DependentMemberType::get(dependentBase, dependent->getName());
+  }
+
+  Type transformPrimaryArchetypeType(ArchetypeType *primary,
+                                     TypePosition pos) {
+    return primary;
+  }
+
+  std::optional<Type> transformOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *opaque,
+                                                       TypePosition pos) {
+    return std::nullopt;
+  }
+
+  std::optional<Type> transformLocalArchetypeType(LocalArchetypeType *opaque,
+                                                  TypePosition pos) {
+    return std::nullopt;
   }
 };
 
