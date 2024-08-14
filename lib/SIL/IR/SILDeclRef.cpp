@@ -387,6 +387,39 @@ bool SILDeclRef::hasUserWrittenCode() const {
   llvm_unreachable("Unhandled case in switch!");
 }
 
+bool SILDeclRef::shouldBeEmittedForDebugger() const {
+  if (!isFunc())
+    return false;
+
+  if (getASTContext().SILOpts.OptMode != OptimizationMode::NoOptimization)
+    return false;;
+
+  if (!getASTContext().SILOpts.ShouldFunctionsBePreservedToDebugger)
+    return false;
+
+  if (getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
+  ValueDecl *decl = getDecl();
+  DeclAttributes &attrs = decl->getAttrs();
+  if (attrs.hasSemanticsAttr("no.preserve.debugger"))
+    return false;
+
+  if (getLinkage(ForDefinition) == SILLinkage::Shared)
+    return false;
+  
+  if (auto decl = getDecl()) 
+    if (!decl->isImplicit())
+      return true;
+
+  // Synthesized getters are still callable in the debugger.
+  if (auto *accessor = dyn_cast_or_null<AccessorDecl>(getFuncDecl())) {
+    return accessor->isSynthesized() && accessor->isGetterOrSetter();
+  };
+
+  return false;
+}
+
 namespace {
 enum class LinkageLimit {
   /// No limit.
