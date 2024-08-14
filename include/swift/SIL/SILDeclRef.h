@@ -576,6 +576,10 @@ struct SILDeclRef {
   /// for e.g a lazy variable getter.
   bool hasUserWrittenCode() const;
 
+  /// Returns true if this is a function that should be emitted because it is
+  /// accessible in the debugger.
+  bool shouldBeEmittedForDebugger() const;
+
   /// Return the scope in which the parent class of a method (i.e. class
   /// containing this declaration) can be subclassed, returning NotApplicable if
   /// this is not a method, there is no such class, or the class cannot be
