@@ -400,7 +400,7 @@ struct TestFailableInit {
     case true:
       0
     case false:
-      return nil // expected-error {{cannot 'return' in 'switch' when used as expression}}
+      return nil // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
     }
     _ = y
   }
@@ -757,7 +757,7 @@ func returnBranches1() -> Int {
 
 func returnBranchVoid() {
   return switch Bool.random() { case true: return case false: return () }
-  // expected-error@-1 2{{cannot 'return' in 'switch' when used as expression}}
+  // expected-error@-1 2{{cannot use 'return' to transfer control out of 'switch' expression}}
 }
 
 func returnBranchBinding() -> Int {
@@ -765,9 +765,9 @@ func returnBranchBinding() -> Int {
     // expected-warning@-1 {{constant 'x' inferred to have type 'Void', which may be unexpected}}
     // expected-note@-2 {{add an explicit type annotation to silence this warning}}
   case true:
-    return 0 // expected-error {{cannot 'return' in 'switch' when used as expression}}
+    return 0 // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
   case false:
-    return 1 // expected-error {{cannot 'return' in 'switch' when used as expression}}
+    return 1 // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
   }
   return x // expected-error {{cannot convert return expression of type 'Void' to return type 'Int'}}
 }
@@ -807,9 +807,9 @@ func returnBranches5() -> Int {
     // expected-warning@-1 {{constant 'i' inferred to have type 'Void', which may be unexpected}}
     // expected-note@-2 {{add an explicit type annotation to silence this warning}}
   case true:
-    return 0 // expected-error {{cannot 'return' in 'switch' when used as expression}}
+    return 0 // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
   case false:
-    return 1 // expected-error {{cannot 'return' in 'switch' when used as expression}}
+    return 1 // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
   }
   return i // expected-error {{cannot convert return expression of type 'Void' to return type 'Int'}}
 }
@@ -861,7 +861,7 @@ func returnBranches7() -> Int {
   let i = switch Bool.random() {
   case true:
     print("hello")
-    return 0 // expected-error {{cannot 'return' in 'switch' when used as expression}}
+    return 0 // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
   case false:
     1
   }
@@ -871,7 +871,7 @@ func returnBranches7() -> Int {
 func returnBranches8() -> Int {
   let i = switch Bool.random() {
   case true:
-    return 1 // expected-error {{cannot 'return' in 'switch' when used as expression}}
+    return 1 // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
   case false:
     0
   }
@@ -1173,7 +1173,7 @@ func fallthrough2() -> Int {
     if .random() {
       fallthrough
     }
-    return 1 // expected-error {{cannot 'return' in 'switch' when used as expression}}
+    return 1 // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
   case false:
     0
   }
