@@ -11,12 +11,15 @@
 import os
 import platform
 
+
 from . import cmake
 from . import shell
 
 try:
+    from build_swift.build_swift.versions import Version
     from build_swift.build_swift.wrappers import xcrun
 except ImportError:
+    from build_swift.versions import Version
     from build_swift.wrappers import xcrun
 
 
@@ -113,7 +116,7 @@ class DarwinPlatform(Platform):
         """
         return self.is_embedded and not self.is_simulator
 
-    def sdk_supports_architecture(self, arch, toolchain):
+    def sdk_supports_architecture(self, arch, toolchain, args):
         """
         Convenience function for checking whether the SDK supports the
         target architecture.
@@ -122,7 +125,8 @@ class DarwinPlatform(Platform):
         # The names match up with the xcrun SDK names.
         xcrun_sdk_name = self.name
 
-        if (xcrun_sdk_name == 'watchos' and arch == 'armv7k'):
+        if (xcrun_sdk_name == 'watchos' and arch == 'armv7k' and
+           Version(args.darwin_deployment_version_watchos) < Version('9.0')):
             return True
 
         sdk_path = xcrun.sdk_path(sdk=xcrun_sdk_name, toolchain=toolchain)
