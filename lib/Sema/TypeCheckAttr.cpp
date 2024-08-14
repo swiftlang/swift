@@ -1378,7 +1378,9 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
       error = diag::invalid_objc_decl_context;
     else if (auto accessor = dyn_cast<AccessorDecl>(func))
       if (!accessor->isGetterOrSetter()) {
-        diagnoseAndRemoveAttr(attr, diag::objc_observing_accessor, accessor->getDescriptiveKind()).limitBehavior(behavior);
+        auto declKind = accessor->getDescriptiveKind();
+        diagnoseAndRemoveAttr(attr, diag::objc_observing_accessor, declKind)
+            .limitBehavior(behavior);
         reason.describe(D);
         return;
       }
@@ -2538,11 +2540,8 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
 
   if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
     if (!attr->isImplicit()) {
-      bool isProperty = false;
-      if (auto *VD = dyn_cast<VarDecl>(accessor->getStorage()))
-        isProperty = true;
       diagnose(attr->getLocation(), diag::final_not_on_accessors,
-               isProperty)
+               isa<VarDecl>(accessor->getStorage()))
         .fixItRemove(attr->getRange());
       return;
     }
