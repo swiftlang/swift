@@ -14,8 +14,8 @@
 // -- Back deployment thunk for genericFunc(_:)
 // CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy11genericFuncyxxlFTwb : $@convention(thin) <T> (@in_guaranteed T) -> @out T
 // CHECK: bb0([[OUT_ARG:%.*]] : $*T, [[IN_ARG:%.*]] : $*T):
-// CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 10
-// CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 52
+// CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 52
+// CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK:   [[PATCH:%.*]] = integer_literal $Builtin.Word, 0
 // CHECK:   [[OSVFN:%.*]] = function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
 // CHECK:   [[AVAIL:%.*]] = apply [[OSVFN]]([[MAJOR]], [[MINOR]], [[PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
@@ -36,8 +36,8 @@
 // CHECK:   return [[RESULT]] : $()
 
 // -- Original definition of genericFunc(_:)
-// CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy11genericFuncyxxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T
-@backDeployed(before: macOS 10.52)
+// CHECK-LABEL: sil [available 52.1] [ossa] @$s11back_deploy11genericFuncyxxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T
+@backDeployed(before: macOS 52.1)
 public func genericFunc<T>(_ t: T) -> T {
   return t
 }
@@ -52,8 +52,8 @@ public func genericFunc<T>(_ t: T) -> T {
 // -- Back deployment thunk for genericFuncWithOwnedParam(_:)
 // CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy25genericFuncWithOwnedParamyyxnlFTwb : $@convention(thin) <T> (@in T) -> ()
 // CHECK: bb0([[IN_ARG:%.*]] : $*T):
-// CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 10
-// CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 52
+// CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 52
+// CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK:   [[PATCH:%.*]] = integer_literal $Builtin.Word, 0
 // CHECK:   [[OSVFN:%.*]] = function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
 // CHECK:   [[AVAIL:%.*]] = apply [[OSVFN]]([[MAJOR]], [[MINOR]], [[PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
@@ -75,8 +75,8 @@ public func genericFunc<T>(_ t: T) -> T {
 // CHECK:   return [[RESULT]] : $()
 
 // -- Original definition of genericFuncWithOwnedParam(_:)
-// CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy25genericFuncWithOwnedParamyyxnlF : $@convention(thin) <T> (@in T) -> ()
-@backDeployed(before: macOS 10.52)
+// CHECK-LABEL: sil [available 52.1] [ossa] @$s11back_deploy25genericFuncWithOwnedParamyyxnlF : $@convention(thin) <T> (@in T) -> ()
+@backDeployed(before: macOS 52.1)
 public func genericFuncWithOwnedParam<T>(_ t: __owned T) { }
 
 struct S {}
