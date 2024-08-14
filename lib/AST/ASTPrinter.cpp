@@ -368,7 +368,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       DeclAttrKind::AccessControl,
       DeclAttrKind::SetterAccess,
       DeclAttrKind::Lazy,
-      DeclAttrKind::ObjCImplementation,
+      DeclAttrKind::Implementation,
       DeclAttrKind::StaticInitializeObjCMetadata,
       DeclAttrKind::RestatedObjCConformance,
       DeclAttrKind::NonSendable,
@@ -1294,7 +1294,7 @@ void PrintAST::printAttributes(const Decl *D) {
   // If we are suppressing @implementation, also suppress @objc on extensions.
   if (auto ED = dyn_cast<ExtensionDecl>(D)) {
     if (ED->isObjCImplementation() &&
-            Options.excludeAttrKind(DeclAttrKind::ObjCImplementation)) {
+            Options.excludeAttrKind(DeclAttrKind::Implementation)) {
       Options.ExcludeAttrList.push_back(DeclAttrKind::ObjC);
     }
   }

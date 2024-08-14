@@ -1935,7 +1935,7 @@ bool ExtensionDecl::isAddingConformanceToInvertible() const {
 }
 
 bool Decl::isObjCImplementation() const {
-  return getAttrs().hasAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
+  return getAttrs().hasAttribute<ImplementationAttr>(/*AllowInvalid=*/true);
 }
 
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,

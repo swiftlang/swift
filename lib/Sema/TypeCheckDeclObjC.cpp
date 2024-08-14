@@ -41,7 +41,7 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
   switch(reason) {
   case ObjCReason::MemberOfObjCImplementationExtension:
     // If they're using the old syntax, soften to a warning.
-    if (cast<ObjCImplementationAttr>(reason.getAttr())->isEarlyAdopter())
+    if (cast<ImplementationAttr>(reason.getAttr())->isEarlyAdopter())
       return DiagnosticBehavior::Warning;
 
     LLVM_FALLTHROUGH;
@@ -1504,7 +1504,7 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
     if (canInferImplicitObjC(/*allowAnyAccess*/true)) {
       auto ext = VD->getDeclContext()->getAsDecl();
       auto attr = ext->getAttrs()
-                   .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
+                   .getAttribute<ImplementationAttr>(/*AllowInvalid=*/true);
       return ObjCReason(ObjCReason::MemberOfObjCImplementationExtension, attr);
     }
   }
@@ -2725,7 +2725,7 @@ static void resolveObjCCategoryConflict(
 
     // If there's an @implementation attribute but something about the category
     // name has already been diagnosed, don't diagnose a conflict.
-    auto implAttr = ext->getAttrs().getAttribute<ObjCImplementationAttr>(
+    auto implAttr = ext->getAttrs().getAttribute<ImplementationAttr>(
                                                          /*AllowInvalid=*/true);
     if (implAttr && implAttr->isCategoryNameInvalid())
       return true;
@@ -2942,8 +2942,7 @@ void TypeChecker::checkObjCImplementation(Decl *D) {
     return;
 
   evaluateOrDefault(D->getASTContext().evaluator,
-                    TypeCheckObjCImplementationRequest{D},
-                    evaluator::SideEffect());
+                    TypeCheckImplementationRequest{D}, evaluator::SideEffect());
 }
 
 static std::optional<Located<StaticSpellingKind>>
@@ -3041,12 +3040,12 @@ fixDeclarationStaticSpelling(InFlightDiagnostic &diag, ValueDecl *VD,
 }
 
 namespace {
-class ObjCImplementationChecker {
+class ImplementationChecker {
   Decl *decl;
 
-  ObjCImplementationAttr *getAttr() const {
+  ImplementationAttr *getAttr() const {
     return decl->getAttrs()
-               .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
+               .getAttribute<ImplementationAttr>(/*AllowInvalid=*/true);
   }
 
   template<typename Loc, typename ...ArgTypes>
@@ -3075,7 +3074,7 @@ class ObjCImplementationChecker {
   bool hasDiagnosed = false;
 
 public:
-  ObjCImplementationChecker(Decl *D)
+  ImplementationChecker(Decl *D)
       : decl(D), hasDiagnosed(getAttr()->isInvalid())
   {
     assert(!D->hasClangNode() && "passed interface, not impl, to checker");
@@ -3165,7 +3164,7 @@ private:
                               .getAttribute<ObjCAttr>(/*AllowInvalid=*/true);
     if (!attr)
       attr = member->getDeclContext()->getAsDecl()->getAttrs()
-                 .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
+                 .getAttribute<ImplementationAttr>(/*AllowInvalid=*/true);
     assert(attr && "expected @_objcImplementation on context of member checked "
                    "by ObjCImplementationChecker");
     if (attr->isInvalid())
@@ -3882,7 +3881,7 @@ public:
 };
 }
 
-evaluator::SideEffect TypeCheckObjCImplementationRequest::
+evaluator::SideEffect TypeCheckImplementationRequest::
 evaluate(Evaluator &evaluator, Decl *D) const {
   PrettyStackTraceDecl trace("checking member implementations of", D);
 
@@ -3893,7 +3892,7 @@ evaluate(Evaluator &evaluator, Decl *D) const {
   // candidates we considered to all unmatched requirements in the module, and
   // vice versa. The tricky bit is making sure we only diagnose for candidates
   // and requirements in our primary files!
-  ObjCImplementationChecker checker(D);
+  ImplementationChecker checker(D);
 
   checker.matchRequirements();
   checker.diagnoseUnmatchedCandidates();

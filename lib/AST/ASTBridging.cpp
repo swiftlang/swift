@@ -789,10 +789,10 @@ BridgedObjCAttr BridgedObjCAttr_createParsedSelector(
       cLParenLoc.unbridged(), nameLocs, names, cLParenLoc.unbridged());
 }
 
-BridgedObjCImplementationAttr BridgedObjCImplementationAttr_createParsed(
+BridgedImplementationAttr BridgedImplementationAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedIdentifier cName, bool isEarlyAdopter) {
-  return new (cContext.unbridged()) ObjCImplementationAttr(
+  return new (cContext.unbridged()) ImplementationAttr(
       cName.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
       isEarlyAdopter);
 }

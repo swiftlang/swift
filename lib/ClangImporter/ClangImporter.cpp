@@ -6005,7 +6005,7 @@ constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
 
     auto &diags = interfaces.front()->getASTContext().Diags;
     for (auto extraImpl : llvm::ArrayRef<Decl *>(impls).drop_front()) {
-      auto attr = extraImpl->getAttrs().getAttribute<ObjCImplementationAttr>();
+      auto attr = extraImpl->getAttrs().getAttribute<ImplementationAttr>();
       attr->setInvalid();
 
       // @objc @implementations for categories are diagnosed as category
@@ -6024,13 +6024,13 @@ constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
 }
 
 static bool isImplValid(ExtensionDecl *ext) {
-  auto attr = ext->getAttrs().getAttribute<ObjCImplementationAttr>();
+  auto attr = ext->getAttrs().getAttribute<ImplementationAttr>();
 
   if (!attr)
     return false;
 
   // Clients using the stable syntax shouldn't have a category name on the attr.
-  // This is diagnosed in AttributeChecker::visitObjCImplementationAttr().
+  // This is diagnosed in AttributeChecker::visitImplementationAttr().
   if (!attr->isEarlyAdopter() && !attr->CategoryName.empty())
     return false;
   

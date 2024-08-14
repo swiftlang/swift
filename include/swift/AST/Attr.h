@@ -184,7 +184,7 @@ protected:
       isUnchecked : 1
     );
 
-    SWIFT_INLINE_BITFIELD(ObjCImplementationAttr, DeclAttribute, 2,
+    SWIFT_INLINE_BITFIELD(ImplementationAttr, DeclAttribute, 2,
       isCategoryNameInvalid : 1,
       isEarlyAdopter : 1
     );
@@ -2420,39 +2420,39 @@ public:
   }
 };
 
-class ObjCImplementationAttr final : public DeclAttribute {
+class ImplementationAttr final : public DeclAttribute {
 public:
   /// Name of the category being implemented. This should only be used with
   /// the early adopter \@\_objcImplementation syntax, but we support it there
   /// for backwards compatibility.
   Identifier CategoryName;
 
-  ObjCImplementationAttr(Identifier CategoryName, SourceLoc AtLoc,
-                         SourceRange Range, bool isEarlyAdopter = false,
-                         bool Implicit = false,
-                         bool isCategoryNameInvalid = false)
-      : DeclAttribute(DeclAttrKind::ObjCImplementation, AtLoc, Range, Implicit),
+  ImplementationAttr(Identifier CategoryName, SourceLoc AtLoc,
+                     SourceRange Range, bool isEarlyAdopter = false,
+                     bool Implicit = false,
+                     bool isCategoryNameInvalid = false)
+      : DeclAttribute(DeclAttrKind::Implementation, AtLoc, Range, Implicit),
         CategoryName(CategoryName) {
-    Bits.ObjCImplementationAttr.isCategoryNameInvalid = isCategoryNameInvalid;
-    Bits.ObjCImplementationAttr.isEarlyAdopter = isEarlyAdopter;
+    Bits.ImplementationAttr.isCategoryNameInvalid = isCategoryNameInvalid;
+    Bits.ImplementationAttr.isEarlyAdopter = isEarlyAdopter;
   }
 
   /// Early adopters use the \c \@_objcImplementation spelling. For backwards
   /// compatibility, issues with them are diagnosed as warnings, not errors.
   bool isEarlyAdopter() const {
-    return Bits.ObjCImplementationAttr.isEarlyAdopter;
+    return Bits.ImplementationAttr.isEarlyAdopter;
   }
 
   bool isCategoryNameInvalid() const {
-    return Bits.ObjCImplementationAttr.isCategoryNameInvalid;
+    return Bits.ImplementationAttr.isCategoryNameInvalid;
   }
 
   void setCategoryNameInvalid(bool newValue = true) {
-    Bits.ObjCImplementationAttr.isCategoryNameInvalid = newValue;
+    Bits.ImplementationAttr.isCategoryNameInvalid = newValue;
   }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DeclAttrKind::ObjCImplementation;
+    return DA->getKind() == DeclAttrKind::Implementation;
   }
 };
 

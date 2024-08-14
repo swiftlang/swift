@@ -251,7 +251,7 @@ public:
 
   void visitObjCAttr(ObjCAttr *attr);
   void visitNonObjCAttr(NonObjCAttr *attr);
-  void visitObjCImplementationAttr(ObjCImplementationAttr *attr);
+  void visitImplementationAttr(ImplementationAttr *attr);
   void visitObjCMembersAttr(ObjCMembersAttr *attr);
 
   void visitOptionalAttr(OptionalAttr *attr);
@@ -1540,8 +1540,8 @@ void AttributeChecker::visitNonObjCAttr(NonObjCAttr *attr) {
   }
 }
 
-static bool hasObjCImplementationFeature(Decl *D, ObjCImplementationAttr *attr,
-                                         Feature requiredFeature) {
+static bool hasImplementationFeature(Decl *D, ImplementationAttr *attr,
+                                     Feature requiredFeature) {
   auto &ctx = D->getASTContext();
 
   if (ctx.LangOpts.hasFeature(requiredFeature))
@@ -1573,7 +1573,7 @@ static SourceRange getArgListRange(ASTContext &Ctx, DeclAttribute *attr) {
 }
 
 void AttributeChecker::
-visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
+visitImplementationAttr(ImplementationAttr *attr) {
   DeclAttribute * langAttr =
     D->getAttrs().getAttribute<ObjCAttr>(/*AllowInvalid=*/true);
   if (!langAttr)
@@ -1596,7 +1596,7 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
   }
 
   if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-    if (!hasObjCImplementationFeature(D, attr, Feature::ObjCImplementation))
+    if (!hasImplementationFeature(D, attr, Feature::ObjCImplementation))
       return;
 
     auto objcLangAttr = dyn_cast<ObjCAttr>(langAttr);
@@ -1691,7 +1691,7 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
     }
   }
   else if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    if (!hasObjCImplementationFeature(D, attr, Feature::CImplementation))
+    if (!hasImplementationFeature(D, attr, Feature::CImplementation))
       return;
 
     if (!attr->CategoryName.empty()) {

@@ -3622,7 +3622,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     Attributes.add(attr);
     break;
   }
-  case DeclAttrKind::ObjCImplementation: {
+  case DeclAttrKind::Implementation: {
     SourceRange range;
     auto name = parseSingleAttrOptionIdentifier(*this, Loc, range, AttrName, DK,
                                                 /*allowOmitted=*/true);
@@ -3630,8 +3630,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return makeParserSuccess();
 
     bool isEarlyAdopter = (AttrName != "implementation");
-    Attributes.add(new (Context) ObjCImplementationAttr(*name, AtLoc, range,
-                                                        isEarlyAdopter));
+    Attributes.add(new (Context) ImplementationAttr(*name, AtLoc, range,
+                                                    isEarlyAdopter));
     break;
   }
   case DeclAttrKind::ObjCRuntimeName: {
@@ -7168,7 +7168,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // @implementation requires an explicit @objc attribute, but
   // @_objcImplementation didn't. Insert one if necessary.
-  auto implAttr = Attributes.getAttribute<ObjCImplementationAttr>();
+  auto implAttr = Attributes.getAttribute<ImplementationAttr>();
   if (implAttr && implAttr->isEarlyAdopter()
         && !Attributes.hasAttribute<ObjCAttr>()) {
     ObjCAttr *objcAttr;

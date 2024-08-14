@@ -4748,8 +4748,8 @@ public:
 /// Checks that all of a class's \c \@objcImplementation extensions provide
 /// complete and correct implementations for their corresponding interfaces.
 /// This is done on all of a class's implementations at once to improve diagnostics.
-class TypeCheckObjCImplementationRequest
-    : public SimpleRequest<TypeCheckObjCImplementationRequest,
+class TypeCheckImplementationRequest
+    : public SimpleRequest<TypeCheckImplementationRequest,
                            evaluator::SideEffect(Decl *),
                            RequestFlags::Cached> {
 public:
