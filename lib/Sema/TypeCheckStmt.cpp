@@ -3071,18 +3071,6 @@ public:
 };
 } // end anonymous namespace
 
-/// Whether the given brace statement ends with a 'throw'.
-static bool doesBraceEndWithThrow(BraceStmt *BS) {
-  if (BS->empty())
-    return false;
-
-  auto *S = BS->getLastElement().dyn_cast<Stmt *>();
-  if (!S)
-    return false;
-
-  return isa<ThrowStmt>(S);
-}
-
 IsSingleValueStmtResult
 areBranchesValidForSingleValueStmt(ASTContext &ctx, ArrayRef<Stmt *> branches) {
   TinyPtrVector<Stmt *> invalidJumps;
@@ -3108,8 +3096,20 @@ areBranchesValidForSingleValueStmt(ASTContext &ctx, ArrayRef<Stmt *> branches) {
       continue;
     }
 
-    // If there was no result, the branch must end in a 'throw'.
-    if (!doesBraceEndWithThrow(BS))
+    // If there was no result, the branch must end in a 'throw' or
+    // 'fallthrough'.
+    auto endsInJump = [&]() {
+      if (BS->empty())
+        return false;
+
+      auto *S = BS->getLastElement().dyn_cast<Stmt *>();
+      if (!S)
+        return false;
+
+      return isa<ThrowStmt>(S) || isa<FallthroughStmt>(S);
+    }();
+
+    if (!endsInJump)
       unterminatedBranches.push_back(BS);
   }
 

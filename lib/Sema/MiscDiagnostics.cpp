@@ -4478,7 +4478,7 @@ private:
           // default.
           Diags.diagnose(branch->getEndLoc(),
                          diag::single_value_stmt_branch_must_end_in_result,
-                         S->getKind());
+                         S->getKind(), isa<SwitchStmt>(S));
         }
         break;
       }

@@ -820,7 +820,7 @@ func returnBranches6() -> Int {
   case true:
     print("hello")
     0 // expected-warning {{integer literal is unused}}
-    // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw'}}
+    // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw' or 'fallthrough'}}
   case false:
     1
   }
@@ -835,7 +835,7 @@ func returnBranches6PoundIf() -> Int {
     print("hello")
     0 // expected-warning {{integer literal is unused}}
     #endif
-    // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw'}}
+    // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw' or 'fallthrough'}}
   case false:
     1
   }
@@ -850,7 +850,7 @@ func returnBranches6PoundIf2() -> Int {
     print("hello")
     0
     #endif
-    // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw'}}
+    // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw' or 'fallthrough'}}
   case false:
     1
   }
@@ -882,7 +882,7 @@ func returnBranches9() -> Int {
   let i = switch Bool.random() {
   case true:
     print("hello")
-    if .random() {} // expected-error {{non-expression branch of 'switch' expression may only end with a 'throw'}}
+    if .random() {} // expected-error {{non-expression branch of 'switch' expression may only end with a 'throw' or 'fallthrough'}}
   case false:
     1
   }
@@ -898,7 +898,7 @@ func returnBranches10() -> Int {
       0 // expected-warning {{integer literal is unused}}
     case false:
       2 // expected-warning {{integer literal is unused}}
-    } // expected-error {{non-expression branch of 'switch' expression may only end with a 'throw'}}
+    } // expected-error {{non-expression branch of 'switch' expression may only end with a 'throw' or 'fallthrough'}}
   case false:
     1
   }
@@ -914,7 +914,7 @@ func returnBranches11() -> Int {
       "" // expected-warning {{string literal is unused}}
     case false:
       2 // expected-warning {{integer literal is unused}}
-    } // expected-error {{non-expression branch of 'switch' expression may only end with a 'throw'}}
+    } // expected-error {{non-expression branch of 'switch' expression may only end with a 'throw' or 'fallthrough'}}
   case false:
     1
   }
@@ -1059,7 +1059,7 @@ func testPoundIfBranch3() -> Int {
     #if false
     0
     #endif
-  // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw'}}
+  // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw' or 'fallthrough'}}
   case false:
     0
   }
@@ -1100,7 +1100,7 @@ func testPoundIfBranch6() -> Int {
     0
     #endif
     0 // expected-warning {{integer literal is unused}}
-    // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw'}}
+    // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw' or 'fallthrough'}}
   case false:
     1
   }
@@ -1174,6 +1174,38 @@ func fallthrough2() -> Int {
       fallthrough
     }
     return 1 // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
+  case false:
+    0
+  }
+  return x
+}
+
+func fallthrough3() -> Int {
+  let x = switch true {
+  case true:
+    fallthrough
+  case false:
+    0
+  }
+  return x
+}
+
+func fallthrough4() -> Int {
+  let x = switch true {
+  case true:
+    fallthrough
+    return 0 // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
+  case false:
+    0
+  }
+  return x
+}
+
+func fallthrough5() -> Int {
+  let x = switch true {
+  case true:
+    fallthrough
+    print(0) // expected-error {{non-expression branch of 'switch' expression may only end with a 'throw' or 'fallthrough'}}
   case false:
     0
   }
