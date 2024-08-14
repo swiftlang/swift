@@ -5,7 +5,7 @@
 // REQUIRES: OS=macosx
 // REQUIRES: concurrency
 
-@available(macOS 10.51, *)
+@available(macOS 51.0, *)
 @usableFromInline func otherFunc() async {}
 
 // -- Fallback definition of asyncFunc()
@@ -19,8 +19,8 @@
 // -- Back deployment thunk for trivialFunc()
 // CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy9asyncFuncyyYaFTwb : $@convention(thin) @async () -> ()
 // CHECK: bb0:
-// CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 10
-// CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 52
+// CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 52
+// CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK:   [[PATCH:%.*]] = integer_literal $Builtin.Word, 0
 // CHECK:   [[OSVFN:%.*]] = function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
 // CHECK:   [[AVAIL:%.*]] = apply [[OSVFN]]([[MAJOR]], [[MINOR]], [[PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
@@ -41,15 +41,15 @@
 // CHECK:   return [[RESULT]] : $()
 
 // -- Original definition of trivialFunc()
-// CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy9asyncFuncyyYaF : $@convention(thin) @async () -> ()
-@available(macOS 10.51, *)
-@backDeployed(before: macOS 10.52)
+// CHECK-LABEL: sil [available 52.1] [ossa] @$s11back_deploy9asyncFuncyyYaF : $@convention(thin) @async () -> ()
+@available(macOS 51.0, *)
+@backDeployed(before: macOS 52.1)
 public func asyncFunc() async {
   await otherFunc()
 }
 
-// CHECK-LABEL: sil hidden [available 10.51] [ossa] @$s11back_deploy6calleryyYaF : $@convention(thin) @async () -> ()
-@available(macOS 10.51, *)
+// CHECK-LABEL: sil hidden [available 51.0] [ossa] @$s11back_deploy6calleryyYaF : $@convention(thin) @async () -> ()
+@available(macOS 51.0, *)
 func caller() async {
   // -- Verify the thunk is called
   // CHECK: {{%.*}} = function_ref @$s11back_deploy9asyncFuncyyYaFTwb : $@convention(thin) @async () -> ()

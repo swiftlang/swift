@@ -1,7 +1,7 @@
 
 
 public func isMacOSAfterFarFutureOriOSAfterFarFuture() -> Bool {
-  if #available(macOS 10.50, iOS 50.0, *) {
+  if #available(macOS 50, iOS 50.0, *) {
     return true
   }
 
@@ -9,7 +9,7 @@ public func isMacOSAfterFarFutureOriOSAfterFarFuture() -> Bool {
 }
 
 public func isMacOSAfterFarFutureOriOSAfterDistantPast() -> Bool {
-  if #available(macOS 10.50, iOS 1.0, *) {
+  if #available(macOS 50, iOS 1.0, *) {
     return true
   }
 
