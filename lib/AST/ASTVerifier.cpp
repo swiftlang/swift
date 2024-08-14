@@ -1016,7 +1016,7 @@ public:
         if (!D->getASTContext().isAccessControlDisabled()) {
           if (D->getFormalAccessScope().isPublic() &&
               D->getFormalAccess() < AccessLevel::Public &&
-              !D->isPackageEffectivelyPublic()) {
+              !D->isInterfacePackageEffectivelyPublic()) {
             Out << "non-public decl has no formal access scope\n";
             D->dump(Out);
             abort();

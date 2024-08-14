@@ -2979,7 +2979,7 @@ public:
   /// - Has a @usableFromInline (or other inlinable) attribute,
   /// - And is defined in a module built from a public or private
   ///   interface that does not contain package-name.
-  bool isPackageEffectivelyPublic() const;
+  bool isInterfacePackageEffectivelyPublic() const;
 
   /// Returns \c true if this declaration is *not* intended to be used directly
   /// by application developers despite the visibility.

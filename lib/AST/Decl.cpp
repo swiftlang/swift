@@ -4212,7 +4212,7 @@ bool ValueDecl::isUsableFromInline() const {
   return false;
 }
 
-bool ValueDecl::isPackageEffectivelyPublic() const {
+bool ValueDecl::isInterfacePackageEffectivelyPublic() const {
   // If a package decl has a @usableFromInline (or other inlinable)
   // attribute, and is defined in a module built from interface, it
   // can be referenced by another module that imports it even though
@@ -4319,7 +4319,7 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
   if (useDC && VD->getASTContext().isAccessControlDisabled())
     return getMaximallyOpenAccessFor(VD);
 
-  if (VD->isPackageEffectivelyPublic())
+  if (VD->isInterfacePackageEffectivelyPublic())
     return AccessLevel::Public;
 
   if (treatUsableFromInlineAsPublic &&
@@ -4504,7 +4504,7 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   case AccessLevel::Package: {
     auto pkg = resultDC->getPackageContext(/*lookupIfNotCurrent*/ true);
     if (!pkg) {
-      if (VD->isPackageEffectivelyPublic())
+      if (VD->isInterfacePackageEffectivelyPublic())
         return AccessScope::getPublic();
       // Instead of reporting and failing early, return the scope of resultDC to
       // allow continuation (should still non-zero exit later if in script mode)
@@ -4641,7 +4641,7 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   if (VD->getASTContext().isAccessControlDisabled())
     return true;
 
-  if (VD->isPackageEffectivelyPublic())
+  if (VD->isInterfacePackageEffectivelyPublic())
     return true;
 
   auto access = getAccessLevel();
