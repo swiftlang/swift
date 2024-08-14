@@ -490,6 +490,8 @@ public:
 
   std::optional<Type> transform(TypeBase *type, TypePosition pos);
 
+  Type transformGenericTypeParam(GenericTypeParamType *param, TypePosition pos);
+
   Type transformPackExpansion(PackExpansionType *expand, TypePosition pos);
 
   Type transformPackElement(PackElementType *element, TypePosition pos);
@@ -512,7 +514,7 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
          "should not be doing AST type-substitution on a lowered SIL type;"
          "use SILType::subst");
 
-  auto substOrig = dyn_cast<SubstitutableType>(type);
+  auto substOrig = dyn_cast<ArchetypeType>(type);
   if (!substOrig)
     return std::nullopt;
 
@@ -532,15 +534,10 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
     return known;
   }
 
-  // If we failed to substitute a generic type parameter, give up.
-  if (isa<GenericTypeParamType>(substOrig))
-    return ErrorType::get(type);
-
-  auto origArchetype = cast<ArchetypeType>(substOrig);
-  if (origArchetype->isRoot()) {
+  if (substOrig->isRoot()) {
     // Root opened archetypes are not required to be substituted. Other root
     // archetypes must already have been substituted above.
-    if (isa<LocalArchetypeType>(origArchetype)) {
+    if (isa<LocalArchetypeType>(substOrig)) {
       return Type(type);
     } else {
       return ErrorType::get(type);
@@ -548,23 +545,33 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
   }
 
   // For nested archetypes, we can substitute the parent.
-  Type origParent = origArchetype->getParent();
+  Type origParent = substOrig->getParent();
   assert(origParent && "Not a nested archetype");
 
   // Substitute into the parent type.
   Type substParent = doIt(origParent, TypePosition::Invariant);
 
   // If the parent didn't change, we won't change.
-  if (substParent.getPointer() == origArchetype->getParent())
+  if (substParent.getPointer() == substOrig->getParent())
     return Type(type);
 
   // Get the associated type reference from a child archetype.
-  AssociatedTypeDecl *assocType = origArchetype->getInterfaceType()
+  AssociatedTypeDecl *assocType = substOrig->getInterfaceType()
       ->castTo<DependentMemberType>()->getAssocType();
 
-  return getMemberForBaseType(IFS, origArchetype->getParent(), substParent,
+  return getMemberForBaseType(IFS, substOrig->getParent(), substParent,
                               assocType, assocType->getName(),
                               level);
+}
+
+Type TypeSubstituter::transformGenericTypeParam(GenericTypeParamType *param,
+                                                TypePosition pos) {
+  // If we have a substitution for this type, use it.
+  if (auto known = IFS.substType(param, level))
+    return known;
+
+  // If we failed to substitute a generic type parameter, give up.
+  return ErrorType::get(param);
 }
 
 Type TypeSubstituter::transformPackExpansion(PackExpansionType *expand,

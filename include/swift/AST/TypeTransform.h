@@ -112,11 +112,15 @@ case TypeKind::Id:
     case TypeKind::Unresolved:
     case TypeKind::TypeVariable:
     case TypeKind::Placeholder:
-    case TypeKind::GenericTypeParam:
     case TypeKind::SILToken:
     case TypeKind::Module:
     case TypeKind::BuiltinTuple:
       return t;
+
+    case TypeKind::GenericTypeParam: {
+      auto *param = cast<GenericTypeParamType>(base);
+      return asDerived().transformGenericTypeParam(param, pos);
+    }
 
     case TypeKind::Enum:
     case TypeKind::Struct:
@@ -964,6 +968,10 @@ case TypeKind::Id:
 
   CanType transformSILField(CanType fieldTy, TypePosition pos) {
     return doIt(fieldTy, pos)->getCanonicalType();
+  }
+
+  Type transformGenericTypeParam(GenericTypeParamType *param, TypePosition pos) {
+    return param;
   }
 
   Type transformPackExpansion(PackExpansionType *expand, TypePosition pos) {
