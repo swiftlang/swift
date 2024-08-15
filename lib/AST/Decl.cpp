@@ -11704,7 +11704,7 @@ Type FuncDecl::getResultInterfaceTypeWithoutYields() const {
         Type eltTy = elt.getType();
         if (eltTy->is<YieldResultType>())
           continue;
-        elements.push_back(eltTy);
+        elements.push_back(elt);
       }
 
       // Handle vanishing tuples --  flatten to produce the

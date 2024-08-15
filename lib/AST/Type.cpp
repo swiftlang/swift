@@ -4797,6 +4797,39 @@ AnyFunctionType *AnyFunctionType::withSendable(bool newValue) const {
   return withExtInfo(info);
 }
 
+AnyFunctionType *AnyFunctionType::getWithoutYields() const {
+  auto resultType = getResult();
+
+  if (auto *tupleResTy = resultType->getAs<TupleType>()) {
+    // Strip @yield results on the first level of tuple
+    SmallVector<TupleTypeElt, 4> elements;
+    for (const auto &elt : tupleResTy->getElements()) {
+      Type eltTy = elt.getType();
+      if (eltTy->is<YieldResultType>())
+        continue;
+      elements.push_back(elt);
+    }
+
+    // Handle vanishing tuples --  flatten to produce the
+    // normal coroutine result type
+    if (elements.size() == 1 && isCoroutine())
+      resultType = elements[0].getType();
+    else
+      resultType = TupleType::get(elements, getASTContext());
+  } else if (resultType->is<YieldResultType>()) {
+    resultType = TupleType::getEmpty(getASTContext());
+  }
+  
+  auto noCoroExtInfo = getExtInfo().intoBuilder()
+                           .withCoroutine(false)
+                           .build();
+  if (isa<FunctionType>(this))
+    return FunctionType::get(getParams(), resultType, noCoroExtInfo);
+  assert(isa<GenericFunctionType>(this));
+  return GenericFunctionType::get(getOptGenericSignature(), getParams(),
+                                  resultType, noCoroExtInfo);
+}
+
 std::optional<Type> AnyFunctionType::getEffectiveThrownErrorType() const {
   // A non-throwing function... has no thrown interface type.
   if (!isThrowing())
