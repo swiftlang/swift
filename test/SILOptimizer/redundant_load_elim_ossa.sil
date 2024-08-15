@@ -1382,8 +1382,6 @@ bb0(%0 : $B, %1 : $*Agg1):
   return %10 : $()
 }
 
-// TODO: When RLE uses TBAA it should remove the second load.
-//
 // CHECK-LABEL: sil @tbaa_struct
 // CHECK:         [[L:%.*]] = load
 // CHECK:         store

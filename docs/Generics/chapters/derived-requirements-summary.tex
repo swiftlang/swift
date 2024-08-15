@@ -12,21 +12,21 @@ Let $G$ be a \index{generic signature!summary}generic signature. We generate the
 \toprule
 \textbf{Symbol}&\textbf{Description}\\
 \midrule
-\texttt{T}, \texttt{U}, and \texttt{V}&\index{type parameter!summary}type parameters\\
-\texttt{Self.U} and \texttt{Self.V}&type parameters rooted in the \Index{protocol Self type@protocol \texttt{Self} type!summary}protocol \texttt{Self} type\\
+\tT, \tU, and \tV&\index{type parameter!summary}type parameters\\
+\texttt{Self.U} and \texttt{Self.V}&type parameters rooted in the \Index{protocol Self type@protocol \tSelf\ type!summary}protocol \tSelf\ type\\
 \texttt{X}&a concrete type\\
 \texttt{C}&a concrete \index{class type!summary}class type\\
-$\Xprime$ and $\Cprime$&obtained from \texttt{X} and \texttt{C} by replacing \texttt{Self} with \texttt{T}\\
-\texttt{P} and \texttt{Q}&protocols\\
-\texttt{A}&the name of an \index{associated type declaration!summary}associated type of \texttt{P}\\
-\texttt{[P]A}&an associated type declaration of \texttt{P}\\
+$\Xprime$ and $\Cprime$&obtained from \texttt{X} and \texttt{C} by replacing \tSelf\ with \tT\\
+\tP\ and \tQ&protocols\\
+\nA&the name of an \index{associated type declaration!summary}associated type of \tP\\
+\texttt{[P]A}&an associated type declaration of \tP\\
 \texttt{T.[P]A} and \texttt{T.A}&\index{bound dependent member type!summary}bound and \index{unbound dependent member type!summary}unbound dependent member type\\
-$\ConfReq{T}{P}$&a \index{conformance requirement!summary}conformance requirement\\
-$\SameReq{T}{U}$&a \index{same-type requirement!summary}same-type requirement between type parameters\\
-$\SameReq{T}{X}$&a concrete same-type requirement\\
-$\ConfReq{T}{C}$&a \index{superclass requirement!summary}superclass requirement\\
-$\ConfReq{T}{AnyObject}$&a \index{layout requirement!summary}layout requirement\\
-$\ConfReq{Self.U}{Q}_\texttt{P}$&an \index{associated requirement!summary}associated requirement of protocol \texttt{P}\\
+$\TP$&a \index{conformance requirement!summary}conformance requirement\\
+$\TU$&a \index{same-type requirement!summary}same-type requirement between type parameters\\
+$\TX$&a concrete same-type requirement\\
+$\TC$&a \index{superclass requirement!summary}superclass requirement\\
+$\TAnyObject$&a \index{layout requirement!summary}layout requirement\\
+$\AssocConfReq{Self.U}{Q}{P}$&an \index{associated requirement!summary}associated requirement of protocol \tP\\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -48,13 +48,13 @@ For \IndexStepTwo{Conf}{summary}\IndexStepTwo{Same}{summary}\IndexStepTwo{Concre
 
 \index{requirement signature!summary}
 \paragraph{Requirement signatures.}
-Assume $G\vdash\ConfReq{T}{P}$. For \IndexStepTwo{AssocName}{summary}\IndexStepTwo{AssocDecl}{summary}\IndexStepTwo{AssocBind}{summary}each associated type~\texttt{A} of~\texttt{P}:
+Assume $G\vdash\TP$. For \IndexStepTwo{AssocName}{summary}\IndexStepTwo{AssocDecl}{summary}\IndexStepTwo{AssocBind}{summary}each associated type~\nA\ of~\tP:
 \begin{gather*}
 \AssocNameStepDef\\
 \AssocDeclStepDef\\
 \AssocBindStepDef
 \end{gather*}
-For each \IndexStepTwo{AssocConf}{summary}\IndexStepTwo{AssocSame}{summary}\IndexStepTwo{AssocConcrete}{summary}\IndexStepTwo{AssocSuper}{summary}\IndexStepTwo{AssocLayout}{summary}associated requirement of~\texttt{P} by kind:
+For each \IndexStepTwo{AssocConf}{summary}\IndexStepTwo{AssocSame}{summary}\IndexStepTwo{AssocConcrete}{summary}\IndexStepTwo{AssocSuper}{summary}\IndexStepTwo{AssocLayout}{summary}associated requirement of~\tP\ by kind:
 \begin{gather*}
 \AssocConfStepDef\\
 \AssocSameStepDef\\

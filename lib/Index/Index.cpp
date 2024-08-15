@@ -1056,6 +1056,26 @@ private:
     return {{line, col, inGeneratedBuffer}};
   }
 
+  bool shouldIndexImplicitDecl(const ValueDecl *D, bool IsRef) const {
+    // We index implicit constructors.
+    if (isa<ConstructorDecl>(D))
+      return true;
+
+    // Allow references to implicit getter & setter AccessorDecls on
+    // non-implicit storage, these are "pseudo accessors".
+    if (auto *AD = dyn_cast<AccessorDecl>(D)) {
+      if (!IsRef)
+        return false;
+
+      auto Kind = AD->getAccessorKind();
+      if (Kind != AccessorKind::Get && Kind != AccessorKind::Set)
+        return false;
+
+      return shouldIndex(AD->getStorage(), IsRef);
+    }
+    return false;
+  }
+
   bool shouldIndex(const ValueDecl *D, bool IsRef) const {
     if (D->isImplicit() && isa<VarDecl>(D) && IsRef) {
       // Bypass the implicit VarDecls introduced in CaseStmt bodies by using the
@@ -1063,7 +1083,7 @@ private:
       D = cast<VarDecl>(D)->getCanonicalVarDecl();
     }
 
-    if (D->isImplicit() && !isa<ConstructorDecl>(D))
+    if (D->isImplicit() && !shouldIndexImplicitDecl(D, IsRef))
       return false;
 
     // Do not handle non-public imported decls.

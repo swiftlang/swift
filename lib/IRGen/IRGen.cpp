@@ -211,6 +211,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   bool RunSwiftSpecificLLVMOptzns =
       !Opts.DisableSwiftSpecificLLVMOptzns && !Opts.DisableLLVMOptzns;
 
+  bool DoHotColdSplit = false;
   PTO.CallGraphProfile = false;
 
   llvm::OptimizationLevel level = llvm::OptimizationLevel::O0;
@@ -221,6 +222,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
     PTO.LoopVectorization = true;
     PTO.SLPVectorization = true;
     PTO.MergeFunctions = true;
+    DoHotColdSplit = Opts.EnableHotColdSplit;
     level = llvm::OptimizationLevel::Os;
   } else {
     level = llvm::OptimizationLevel::O0;
@@ -258,6 +260,8 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
   ModulePassManager MPM;
+
+  PB.setEnableHotColdSplitting(DoHotColdSplit);
 
   if (RunSwiftSpecificLLVMOptzns) {
     PB.registerScalarOptimizerLateEPCallback(
@@ -1030,6 +1034,22 @@ static void initLLVMModule(const IRGenModule &IGM, SILModule &SIL) {
       assert(Module->getSDKVersion() == *IGM.Context.LangOpts.SDKVersion);
   }
 
+  if (!IGM.VariantTriple.str().empty()) {
+    if (Module->getDarwinTargetVariantTriple().empty()) {
+      Module->setDarwinTargetVariantTriple(IGM.VariantTriple.str());
+    } else {
+      assert(Module->getDarwinTargetVariantTriple() == IGM.VariantTriple.str());
+    }
+  }
+
+  if (IGM.Context.LangOpts.VariantSDKVersion) {
+    if (Module->getDarwinTargetVariantSDKVersion().empty())
+      Module->setDarwinTargetVariantSDKVersion(*IGM.Context.LangOpts.VariantSDKVersion);
+    else
+      assert(Module->getDarwinTargetVariantSDKVersion() ==
+               *IGM.Context.LangOpts.VariantSDKVersion);
+  }
+
   // Set the module's string representation.
   Module->setDataLayout(IGM.DataLayout.getStringRepresentation());
 
@@ -1192,12 +1212,10 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
         if (auto *synthSFU = file->getSynthesizedFile()) {
           IGM.emitSynthesizedFileUnit(*synthSFU);
         }
-      } else {
-        file->collectLinkLibraries([&IGM](LinkLibrary LinkLib) {
-          IGM.addLinkLibrary(LinkLib);
-        });
       }
     }
+
+    IGM.addLinkLibraries();
 
     // Okay, emit any definitions that we suddenly need.
     irgen.emitLazyDefinitions();
@@ -1413,7 +1431,6 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
     IRGenModule *IGM = new IRGenModule(
         irgen, std::move(targetMachine), nextSF, desc.ModuleName, *OutputIter++,
         nextSF->getFilename(), nextSF->getPrivateDiscriminator().str());
-    IGMcreated = true;
 
     initLLVMModule(*IGM, *SILMod);
     if (!DidRunSILCodeGenPreparePasses) {
@@ -1424,6 +1441,11 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
     }
 
     (void)layoutStringsEnabled(*IGM, /*diagnose*/ true);
+
+    // Only need to do this once.
+    if (!IGMcreated)
+      IGM->addLinkLibraries();
+    IGMcreated = true;
   }
   
   if (!IGMcreated) {
@@ -1443,13 +1465,9 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
       }
       
       if (auto *synthSFU = File->getSynthesizedFile()) {
-        CurrentIGMPtr IGM = irgen.getGenModule(&synthSFU->getFileUnit());
+        CurrentIGMPtr IGM = irgen.getGenModule(synthSFU);
         IGM->emitSynthesizedFileUnit(*synthSFU);
       }
-    } else {
-      File->collectLinkLibraries([&](LinkLibrary LinkLib) {
-        irgen.getPrimaryIGM()->addLinkLibrary(LinkLib);
-      });
     }
   }
   

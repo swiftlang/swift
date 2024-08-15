@@ -41,7 +41,6 @@ public:
   /// corresponds to the given structure or enum declaration.
   void printValueTypeDecl(const NominalTypeDecl *typeDecl,
                           llvm::function_ref<void(void)> bodyPrinter,
-
                           DeclAndTypePrinter &declAndTypePrinter);
 
   /// Print the use of a C++ struct/enum parameter value as it's passed to the

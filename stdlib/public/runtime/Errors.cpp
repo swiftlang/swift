@@ -102,25 +102,31 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
   // providing failure status instead of just returning the original string like
   // swift demangle.
 #if defined(_WIN32)
-  char szUndName[1024];
-  DWORD dwResult;
-  dwResult = _swift_win32_withDbgHelpLibrary([&] (HANDLE hProcess) -> DWORD {
-    if (!hProcess) {
-      return 0;
-    }
+  const char *szSymbolName = syminfo.getSymbolName();
 
-    DWORD dwFlags = UNDNAME_COMPLETE;
+  // UnDecorateSymbolName() will not fail for Swift symbols, so detect them
+  // up-front and let Swift handle them.
+  if (!Demangle::isMangledName(szSymbolName)) {
+    char szUndName[1024];
+    DWORD dwResult;
+    dwResult = _swift_win32_withDbgHelpLibrary([&] (HANDLE hProcess) -> DWORD {
+      if (!hProcess) {
+        return 0;
+      }
+
+      DWORD dwFlags = UNDNAME_COMPLETE;
 #if !defined(_WIN64)
-    dwFlags |= UNDNAME_32_BIT_DECODE;
+      dwFlags |= UNDNAME_32_BIT_DECODE;
 #endif
 
-    return UnDecorateSymbolName(syminfo.getSymbolName(), szUndName,
-                                sizeof(szUndName), dwFlags);
-  });
+      return UnDecorateSymbolName(szSymbolName, szUndName,
+                                  sizeof(szUndName), dwFlags);
+    });
 
-  if (dwResult) {
-    symbolName += szUndName;
-    return true;
+    if (dwResult) {
+      symbolName += szUndName;
+      return true;
+    }
   }
 #else
   int status;
@@ -151,6 +157,9 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
 #if SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING && SWIFT_STDLIB_HAS_DLADDR
   auto syminfo = SymbolInfo::lookup(framePC);
   if (!syminfo.has_value()) {
+    constexpr const char *format = "%-4u %-34s 0x%0.16tx\n";
+    fprintf(stderr, format, index, "<unknown>",
+            reinterpret_cast<uintptr_t>(framePC));
     return;
   }
 
@@ -159,7 +168,12 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
   // is not provided in the header so that it requires linking with
   // libSupport.a.
   llvm::StringRef libraryName{syminfo->getFilename()};
+
+#ifdef _WIN32
+  libraryName = libraryName.substr(libraryName.rfind('\\')).substr(1);
+#else
   libraryName = libraryName.substr(libraryName.rfind('/')).substr(1);
+#endif
 
   // Next we get the symbol name that we are going to use in our backtrace.
   std::string symbolName;
@@ -179,6 +193,11 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
     symbolName = "<unavailable>";
   }
 
+  const char *libraryNameStr = libraryName.data();
+
+  if (!libraryNameStr)
+    libraryNameStr = "<unknown>";
+
   // We do not use %p here for our pointers since the format is implementation
   // defined. This makes it logically impossible to check the output. Forcing
   // hexadecimal solves this issue.
@@ -187,11 +206,11 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
   // This gives enough info to reconstruct identical debugging target after
   // this process terminates.
   if (shortOutput) {
-    fprintf(stderr, "%s`%s + %td", libraryName.data(), symbolName.c_str(),
+    fprintf(stderr, "%s`%s + %td", libraryNameStr, symbolName.c_str(),
             offset);
   } else {
     constexpr const char *format = "%-4u %-34s 0x%0.16" PRIxPTR " %s + %td\n";
-    fprintf(stderr, format, index, libraryName.data(), symbolAddr,
+    fprintf(stderr, format, index, libraryNameStr, symbolAddr,
             symbolName.c_str(), offset);
   }
 #else

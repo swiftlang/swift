@@ -22,21 +22,21 @@ class X<T> where T == X {
 protocol CircularAssocTypeDefault {
   associatedtype Z = Z // expected-error{{associated type 'Z' references itself}}
   // expected-note@-1{{type declared here}}
-  // expected-note@-2{{protocol requires nested type 'Z'; add nested type 'Z' for conformance}}
+  // expected-note@-2{{protocol requires nested type 'Z'}}
 
   associatedtype Z2 = Z3
-  // expected-note@-1{{protocol requires nested type 'Z2'; add nested type 'Z2' for conformance}}
+  // expected-note@-1{{protocol requires nested type 'Z2'}}
   associatedtype Z3 = Z2
-  // expected-note@-1{{protocol requires nested type 'Z3'; add nested type 'Z3' for conformance}}
+  // expected-note@-1{{protocol requires nested type 'Z3'}}
 
   associatedtype Z4 = Self.Z4 // expected-error{{associated type 'Z4' references itself}}
   // expected-note@-1{{type declared here}}
-  // expected-note@-2{{protocol requires nested type 'Z4'; add nested type 'Z4' for conformance}}
+  // expected-note@-2{{protocol requires nested type 'Z4'}}
 
   associatedtype Z5 = Self.Z6
-  // expected-note@-1{{protocol requires nested type 'Z5'; add nested type 'Z5' for conformance}}
+  // expected-note@-1{{protocol requires nested type 'Z5'}}
   associatedtype Z6 = Self.Z5
-  // expected-note@-1{{protocol requires nested type 'Z6'; add nested type 'Z6' for conformance}}
+  // expected-note@-1{{protocol requires nested type 'Z6'}}
 }
 
 struct ConformsToCircularAssocTypeDefault : CircularAssocTypeDefault { }

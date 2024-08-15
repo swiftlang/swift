@@ -804,7 +804,7 @@ the ``@yields`` attribute.  A yielded value may have a convention attribute,
 taken from the set of parameter attributes and interpreted as if the yield
 site were calling back to the calling function.
 
-Currently, a coroutine may not have normal results.
+In addition to yielded values a coroutine could also have normal results.
 
 Coroutine functions may be used in many of the same ways as normal
 function values.  However, they cannot be called with the standard
@@ -5652,7 +5652,7 @@ strong reference count is greater than 1.
 A discussion of the semantics can be found here:
 `is_unique instruction <arcopts_is_unique_>`_
 
-.. _arcopts_is_unique: https://github.com/apple/swift/blob/main/docs/ARCOptimization.md#is_unique-instruction
+.. _arcopts_is_unique: https://github.com/swiftlang/swift/blob/main/docs/ARCOptimization.md#is_unique-instruction
 
 begin_cow_mutation
 ``````````````````
@@ -6329,6 +6329,16 @@ callee function (and thus said signature). Instead:
    obtained from ``partial_apply`` will not own its underlying value.  The
    ``@inout_aliasable`` parameter convention is used when a ``@noescape``
    closure captures an ``inout`` argument.
+
+**Coroutines** ``partial_apply`` could be used to create closures over
+coroutines. Overall, the ``partial_apply`` of a coroutine is straightforward: it
+is another coroutine that captures arguments passed to the ``partial_apply``
+instruction. This closure applies the original coroutine (similar to the
+``begin_apply`` instruction) for yields (suspend) and yields the resulting
+values. Then it calls the original coroutine continuation for return or unwind,
+and forwards the results (if any) to the caller as well. Currently only the
+autodiff transformation produces ``partial_apply`` for coroutines while
+differentiating modify accessors.
 
 **NOTE:** If the callee is generic, all of its generic parameters must be bound
 by the given substitution list. The arguments are given with these generic
@@ -7023,7 +7033,7 @@ presence or value of the ``enum_extensibility`` Clang attribute.
 
 (See `SE-0192`__ for more information about non-frozen enums.)
 
-__ https://github.com/apple/swift-evolution/blob/main/proposals/0192-non-exhaustive-enums.md
+__ https://github.com/swiftlang/swift-evolution/blob/main/proposals/0192-non-exhaustive-enums.md
 
 enum
 ````

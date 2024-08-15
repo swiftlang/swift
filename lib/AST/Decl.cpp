@@ -23,6 +23,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/CaptureInfo.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -565,8 +566,9 @@ Decl::getIntroducedOSVersion(PlatformKind Kind) const {
 }
 
 std::optional<llvm::VersionTuple>
-Decl::getBackDeployedBeforeOSVersion(ASTContext &Ctx) const {
-  if (auto *attr = getAttrs().getBackDeployed(Ctx)) {
+Decl::getBackDeployedBeforeOSVersion(ASTContext &Ctx,
+                                     bool forTargetVariant) const {
+  if (auto *attr = getAttrs().getBackDeployed(Ctx, forTargetVariant)) {
     auto version = attr->Version;
     StringRef ignoredPlatformString;
     AvailabilityInference::updateBeforePlatformForFallback(
@@ -582,13 +584,22 @@ Decl::getBackDeployedBeforeOSVersion(ASTContext &Ctx) const {
 
   // Accessors may inherit `@backDeployed`.
   if (auto *AD = dyn_cast<AccessorDecl>(this))
-    return AD->getStorage()->getBackDeployedBeforeOSVersion(Ctx);
+    return AD->getStorage()->getBackDeployedBeforeOSVersion(Ctx,
+                                                            forTargetVariant);
 
   return std::nullopt;
 }
 
 bool Decl::isBackDeployed(ASTContext &Ctx) const {
-  return getBackDeployedBeforeOSVersion(Ctx) != std::nullopt;
+  if (getBackDeployedBeforeOSVersion(Ctx))
+    return true;
+
+  if (Ctx.LangOpts.TargetVariant) {
+    if (getBackDeployedBeforeOSVersion(Ctx, /*forTargetVariant=*/true))
+      return true;
+  }
+
+  return false;
 }
 
 bool Decl::hasBackDeployedAttr() const {
@@ -4231,6 +4242,21 @@ bool ValueDecl::isUsableFromInline() const {
   return false;
 }
 
+bool ValueDecl::isInterfacePackageEffectivelyPublic() const {
+  // If a package decl has a @usableFromInline (or other inlinable)
+  // attribute, and is defined in a module built from interface, it
+  // can be referenced by another module that imports it even though
+  // the defining interface module does not have package-name (such
+  // as public or private interface); in such case, the decl is treated
+  // as public and access checks in sema are skipped.
+  // We might need to add another check here to ensure the interface
+  // was part of the same package before the package-name was removed.
+  return getFormalAccess() == AccessLevel::Package &&
+         isUsableFromInline() &&
+         getModuleContext()->getPackageName().empty() &&
+         getModuleContext()->isBuiltFromInterface();
+}
+
 bool ValueDecl::shouldHideFromEditor() const {
   // Hide private stdlib declarations.
   if (isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic*/ false) ||
@@ -4322,6 +4348,9 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
   // access level of the current declaration to be as open as possible.
   if (useDC && VD->getASTContext().isAccessControlDisabled())
     return getMaximallyOpenAccessFor(VD);
+
+  if (VD->isInterfacePackageEffectivelyPublic())
+    return AccessLevel::Public;
 
   if (treatUsableFromInlineAsPublic &&
       access < AccessLevel::Public &&
@@ -4426,23 +4455,14 @@ bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
 }
 
 bool ValueDecl::bypassResilienceInPackage(ModuleDecl *accessingModule) const {
+  // If the defining module is built with package-cmo, bypass
+  // resilient access from the use site that belongs to a module
+  // in the same package.
   auto declModule = getModuleContext();
-  if (declModule->inSamePackage(accessingModule) &&
-      declModule->allowNonResilientAccess()) {
-    // If the defining module is built with package-cmo,
-    // allow direct access from the use site that belongs
-    // to accessingModule (client module).
-    if (declModule->isResilient() &&
-        declModule->serializePackageEnabled())
-      return true;
-
-    // If not, check if the client can still opt in to
-    // have a direct access to this decl from the use
-    // site with a flag.
-    // FIXME: serialize this flag to Module and get it via accessingModule.
-    return getASTContext().LangOpts.EnableBypassResilienceInPackage;
-  }
-  return false;
+  return declModule->inSamePackage(accessingModule) &&
+         declModule->isResilient() &&
+         declModule->allowNonResilientAccess() &&
+         declModule->serializePackageEnabled();
 }
 
 /// Given the formal access level for using \p VD, compute the scope where
@@ -4514,6 +4534,8 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   case AccessLevel::Package: {
     auto pkg = resultDC->getPackageContext(/*lookupIfNotCurrent*/ true);
     if (!pkg) {
+      if (VD->isInterfacePackageEffectivelyPublic())
+        return AccessScope::getPublic();
       // Instead of reporting and failing early, return the scope of resultDC to
       // allow continuation (should still non-zero exit later if in script mode)
       return AccessScope(resultDC);
@@ -4647,6 +4669,9 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return false;
 
   if (VD->getASTContext().isAccessControlDisabled())
+    return true;
+
+  if (VD->isInterfacePackageEffectivelyPublic())
     return true;
 
   auto access = getAccessLevel();
@@ -5158,8 +5183,8 @@ NominalTypeDecl::canConformTo(InvertibleProtocolKind ip) const {
   Type selfTy = getDeclaredInterfaceType();
   assert(selfTy);
 
-  auto conformance = ModuleDecl::lookupConformance(selfTy, proto,
-      /*allowMissing=*/false);
+  auto conformance = swift::lookupConformance(selfTy, proto,
+                                              /*allowMissing=*/false);
 
   if (conformance.isInvalid())
     return TypeDecl::CanBeInvertible::Never;
@@ -11334,10 +11359,15 @@ bool VarDecl::isSelfParamCaptureIsolated() const {
 }
 
 ActorIsolation swift::getActorIsolation(ValueDecl *value) {
+  return getInferredActorIsolation(value).isolation;
+}
+
+InferredActorIsolation
+swift::getInferredActorIsolation(ValueDecl *value) {
   auto &ctx = value->getASTContext();
   return evaluateOrDefault(
       ctx.evaluator, ActorIsolationRequest{value},
-      ActorIsolation::forUnspecified());
+      InferredActorIsolation::forUnspecified());
 }
 
 ActorIsolation swift::getActorIsolationOfContext(
@@ -11677,7 +11707,7 @@ ActorIsolation::forActorInstanceParameter(Expr *actor,
     auto baseType =
         memberRef->getBase()->getType()->getMetatypeInstanceType();
     if (auto globalActor = ctx.getProtocol(KnownProtocolKind::GlobalActor)) {
-      auto conformance = ModuleDecl::checkConformance(baseType, globalActor);
+      auto conformance = checkConformance(baseType, globalActor);
       if (conformance &&
           conformance.getWitnessByName(baseType, ctx.Id_shared) == declRef) {
         return ActorIsolation::forGlobalActor(baseType);

@@ -2,7 +2,7 @@
 // RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 protocol Fooable {
-  associatedtype Foo // expected-note{{protocol requires nested type 'Foo'; add nested type 'Foo' for conformance}}
+  associatedtype Foo // expected-note{{protocol requires nested type 'Foo'}}
 
   var foo: Foo { get }
 }
@@ -169,7 +169,7 @@ rdar19137463(1)
 
 struct Brunch<U : Fooable> where U.Foo == X {}
 
-struct BadFooable : Fooable { // expected-error{{type 'BadFooable' does not conform to protocol 'Fooable'}}
+struct BadFooable : Fooable { // expected-error{{type 'BadFooable' does not conform to protocol 'Fooable'}} expected-note {{add stubs for conformance}}
   typealias Foo = DoesNotExist // expected-error{{cannot find type 'DoesNotExist' in scope}}
   var foo: Foo { while true {} }
 }

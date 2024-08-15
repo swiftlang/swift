@@ -4,16 +4,16 @@
 
 import Foundation
 
-class A: NSObjectProtocol { } // expected-error{{cannot declare conformance to 'NSObjectProtocol' in Swift; 'A' should inherit 'NSObject' instead}}{{10-26=NSObject}}
+class A: NSObjectProtocol { } // expected-error{{cannot declare conformance to 'NSObjectProtocol' in Swift; 'A' should inherit 'NSObject' instead}}{{10-26=NSObject}} expected-note {{add stubs for conformance}}
 
 @objc protocol Other: NSObjectProtocol { }
 
-class B: Other { } // expected-error{{cannot declare conformance to 'NSObjectProtocol' in Swift; 'B' should inherit 'NSObject' instead}}
+class B: Other { } // expected-error{{cannot declare conformance to 'NSObjectProtocol' in Swift; 'B' should inherit 'NSObject' instead}} expected-note {{add stubs for conformance}}
 
 class C { }
 
-class D: C, NSObjectProtocol { } // expected-error{{cannot declare conformance to 'NSObjectProtocol' in Swift; 'D' should inherit 'NSObject' instead}}
+class D: C, NSObjectProtocol { } // expected-error{{cannot declare conformance to 'NSObjectProtocol' in Swift; 'D' should inherit 'NSObject' instead}} expected-note {{add stubs for conformance}}
 
 class E { }
 
-extension E: NSObjectProtocol { } // expected-error{{cannot declare conformance to 'NSObjectProtocol' in Swift; 'E' should inherit 'NSObject' instead}}
+extension E: NSObjectProtocol { } // expected-error{{cannot declare conformance to 'NSObjectProtocol' in Swift; 'E' should inherit 'NSObject' instead}} expected-note {{add stubs for conformance}}

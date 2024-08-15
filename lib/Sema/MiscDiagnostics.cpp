@@ -20,6 +20,7 @@
 #include "TypeCheckInvertible.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
@@ -168,10 +169,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (isa<TypeExpr>(Base))
         checkUseOfMetaTypeName(Base);
 
-      if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
-        // raise an error if this KeyPath contains an effectful member.
-        checkForEffectfulKeyPath(KPE);
-      }
+      if (auto *KPE = dyn_cast<KeyPathExpr>(E))
+        checkForInvalidKeyPath(KPE);
 
       // Check function calls, looking through implicit conversions on the
       // function and inspecting the arguments directly.
@@ -364,11 +363,15 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     }
 
     /// Visit each component of the keypath and emit a diagnostic if they
-    /// refer to a member that has effects.
-    void checkForEffectfulKeyPath(KeyPathExpr *keyPath) {
+    /// refer to a member that meets any of the following:
+    ///   - has effects.
+    ///   - is a noncopyable type.
+    void checkForInvalidKeyPath(KeyPathExpr *keyPath) {
       for (const auto &component : keyPath->getComponents()) {
         if (component.hasDeclRef()) {
           auto decl = component.getDeclRef().getDecl();
+
+          // Check for effects
           if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
             if (auto getter = asd->getEffectfulGetAccessor()) {
               Ctx.Diags.diagnose(component.getLoc(),
@@ -377,6 +380,13 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
               Ctx.Diags.diagnose(asd->getLoc(), diag::kind_declared_here,
                                  asd->getDescriptiveKind());
             }
+          }
+
+          // Check for the ability to copy.
+          if (component.getComponentType()->isNoncopyable()) {
+            Ctx.Diags.diagnose(component.getLoc(),
+                               diag::expr_keypath_noncopyable_type,
+                               component.getComponentType()->getRValueType());
           }
         }
       }
@@ -428,6 +438,56 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                                                 consumeExpr->getSubExpr());
       for (auto &diag : diags)
         diag.emit(Ctx);
+
+      // As of now, SE-366 is not correctly implemented (rdar://102780553),
+      // so warn about certain consume's being no-ops today that will no longer
+      // be a no-op in the future once we fix this.
+      if (auto ty = consumeExpr->getType()) {
+        bool shouldWarn = true;
+
+        // Look through any load.
+        auto *expr = consumeExpr->getSubExpr();
+        if (auto *load = dyn_cast<LoadExpr>(expr))
+          expr = load->getSubExpr();
+
+        // Don't warn if explicit ownership was provided on a parameter.
+        // Those seem to be checked just fine in SIL.
+        if (auto *declRef = dyn_cast<DeclRefExpr>(expr)) {
+          if (auto *decl = declRef->getDecl()) {
+            if (auto *paramDecl = dyn_cast<ParamDecl>(decl)) {
+              switch (paramDecl->getSpecifier()) {
+              case ParamSpecifier::InOut:
+              case ParamSpecifier::Borrowing:
+              case ParamSpecifier::Consuming:
+              case ParamSpecifier::ImplicitlyCopyableConsuming:
+                shouldWarn = false;
+                break;
+              case ParamSpecifier::Default:
+              case ParamSpecifier::LegacyShared:
+              case ParamSpecifier::LegacyOwned:
+                break; // warn
+              }
+            }
+          }
+        }
+
+        // Only warn about obviously concrete BitwiseCopyable types, since we
+        // know those won't get checked for consumption.
+        if (diags.empty() &&
+            shouldWarn &&
+            !ty->hasError() &&
+            !ty->hasTypeParameter() &&
+            !ty->hasUnboundGenericType() &&
+            !ty->hasArchetype()) {
+          auto bitCopy = Ctx.getProtocol(KnownProtocolKind::BitwiseCopyable);
+          if (checkConformance(ty, bitCopy)) {
+            Ctx.Diags.diagnose(consumeExpr->getLoc(),
+                               diag::consume_of_bitwisecopyable_noop, ty)
+                   .fixItRemoveChars(consumeExpr->getStartLoc(),
+                                     consumeExpr->getSubExpr()->getStartLoc());
+          }
+        }
+      }
     }
 
     void checkCopyExpr(CopyExpr *copyExpr) {
@@ -3412,7 +3472,7 @@ public:
                   .getRequirements(),
               [&exprType](auto requirement) {
                 if (requirement.getKind() == RequirementKind::Conformance) {
-                  auto conformance = ModuleDecl::checkConformance(
+                  auto conformance = checkConformance(
                       exprType->getRValueType(),
                       requirement.getProtocolDecl(),
                       /*allowMissing=*/false);

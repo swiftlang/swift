@@ -207,29 +207,21 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     return;
 
   // Report where it was imported from.
-  if (contextAccessScope.isPublic() ||
-      contextAccessScope.isPackage()) {
-    auto SF = useDC->getParentSourceFile();
+  if (contextAccessScope.isPublicOrPackage()) {
     auto report = [&](const DeclRefTypeRepr *typeRepr, const ValueDecl *VD) {
-      ImportAccessLevel import = VD->getImportAccessFrom(useDC);
-      if (import.has_value()) {
-        if (SF) {
-          auto useLevel = contextAccessScope.isPublic() ? AccessLevel::Public
-                                                        : AccessLevel::Package;
-          SF->registerAccessLevelUsingImport(import.value(), useLevel);
-        }
-
-        if (Context.LangOpts.EnableModuleApiImportRemarks) {
-          SourceLoc diagLoc = typeRepr? typeRepr->getLoc()
-                                      : extractNearestSourceLoc(useDC);
-          ModuleDecl *importedVia = import->module.importedModule,
-                     *sourceModule = VD->getModuleContext();
-          Context.Diags.diagnose(diagLoc, diag::module_api_import,
-                                 VD, importedVia, sourceModule,
-                                 importedVia == sourceModule,
-                                 /*isImplicit*/!typeRepr);
-        }
-      }
+      // Remember that the module defining the decl must be imported publicly.
+      recordRequiredImportAccessLevelForDecl(
+          VD, useDC, contextAccessScope.accessLevelForDiagnostics(),
+          [&](AttributedImport<ImportedModule> attributedImport) {
+            SourceLoc diagLoc =
+                typeRepr ? typeRepr->getLoc() : extractNearestSourceLoc(useDC);
+            ModuleDecl *importedVia = attributedImport.module.importedModule,
+                       *sourceModule = VD->getModuleContext();
+            Context.Diags.diagnose(diagLoc, diag::module_api_import, VD,
+                                   importedVia, sourceModule,
+                                   importedVia == sourceModule,
+                                   /*isImplicit*/ !typeRepr);
+          });
     };
 
     if (typeRepr) {
@@ -2255,7 +2247,8 @@ public:
     // declaration slipped in when the compiler wasn't able to diagnose it and
     // can't be changed.
     if (nominal->getName().is("AnyColorBox") &&
-        nominal->getModuleContext()->getName().is("SwiftUI"))
+        (nominal->getModuleContext()->getName().is("SwiftUI") ||
+         nominal->getModuleContext()->getName().is("SwiftUICore")))
       flags |= DeclAvailabilityFlag::
           AllowPotentiallyUnavailableAtOrBelowDeploymentTarget;
 
@@ -2389,30 +2382,24 @@ public:
                                   !ED->getInherited().empty());
     checkConstrainedExtensionRequirements(ED, hasExportedMembers);
 
-    if (!hasExportedMembers &&
-        !ED->getInherited().empty()) {
-      // If we haven't already visited the extended nominal visit it here.
-      // This logic is too wide but prevents false reports of an unused public
-      // import. We should instead check for public generic requirements
-      // similarly to ShouldPrintForModuleInterface::shouldPrint.
+    // If we haven't already visited the extended nominal visit it here.
+    // This logic is too wide but prevents false reports of an unused public
+    // import. We should instead check for public generic requirements
+    // similarly to ShouldPrintForModuleInterface::shouldPrint.
+    if (!hasExportedMembers && !ED->getInherited().empty()) {
       auto DC = Where.getDeclContext();
-      ImportAccessLevel import = extendedType->getImportAccessFrom(DC);
-      if (import.has_value()) {
-        auto SF = DC->getParentSourceFile();
-        if (SF)
-          SF->registerAccessLevelUsingImport(import.value(),
-                                             AccessLevel::Public);
 
-        auto &ctx = DC->getASTContext();
-        if (ctx.LangOpts.EnableModuleApiImportRemarks) {
-          ModuleDecl *importedVia = import->module.importedModule,
-                     *sourceModule = ED->getModuleContext();
-          ED->diagnose(diag::module_api_import,
-                       ED, importedVia, sourceModule,
-                       importedVia == sourceModule,
-                       /*isImplicit*/false);
-        }
-      }
+      // Remember that the module defining the extended type must be imported
+      // publicly.
+      recordRequiredImportAccessLevelForDecl(
+          extendedType, DC, AccessLevel::Public,
+          [&](AttributedImport<ImportedModule> attributedImport) {
+            ModuleDecl *importedVia = attributedImport.module.importedModule,
+                       *sourceModule = ED->getModuleContext();
+            ED->diagnose(diag::module_api_import, ED, importedVia, sourceModule,
+                         importedVia == sourceModule,
+                         /*isImplicit*/ false);
+          });
     }
   }
 
@@ -2509,6 +2496,32 @@ DisallowedOriginKind swift::getDisallowedOriginKind(const Decl *decl,
   return getDisallowedOriginKind(decl, where, downgradeToWarning);
 }
 
+void swift::recordRequiredImportAccessLevelForDecl(
+    const Decl *decl, const DeclContext *dc, AccessLevel accessLevel,
+    RequiredImportAccessLevelCallback remark) {
+  auto sf = dc->getParentSourceFile();
+  if (!sf)
+    return;
+
+  auto definingModule = decl->getModuleContext();
+  if (definingModule == dc->getParentModule())
+    return;
+
+  sf->registerRequiredAccessLevelForModule(definingModule, accessLevel);
+
+  if (auto attributedImport = sf->getImportAccessLevel(definingModule)) {
+    auto importedModule = attributedImport->module.importedModule;
+
+    // If the defining module is transitively imported, mark the responsible
+    // module as requiring the minimum access level too.
+    if (importedModule != definingModule)
+      sf->registerRequiredAccessLevelForModule(importedModule, accessLevel);
+
+    if (dc->getASTContext().LangOpts.EnableModuleApiImportRemarks)
+      remark(*attributedImport);
+  }
+}
+
 void swift::diagnoseUnnecessaryPublicImports(SourceFile &SF) {
   ASTContext &ctx = SF.getASTContext();
   if (ctx.TypeCheckerOpts.SkipFunctionBodies != FunctionBodySkipping::None)
@@ -2576,23 +2589,18 @@ void registerPackageAccessForPackageExtendedType(ExtensionDecl *ED) {
     return;
 
   DeclContext *DC = ED->getDeclContext();
-  ImportAccessLevel import = extendedType->getImportAccessFrom(DC);
-  if (import.has_value()) {
-    auto SF = DC->getParentSourceFile();
-    if (SF)
-      SF->registerAccessLevelUsingImport(import.value(),
-                                         AccessLevel::Package);
 
-    auto &ctx = DC->getASTContext();
-    if (ctx.LangOpts.EnableModuleApiImportRemarks) {
-      ModuleDecl *importedVia = import->module.importedModule,
-                 *sourceModule = ED->getModuleContext();
-      ED->diagnose(diag::module_api_import,
-                   ED, importedVia, sourceModule,
-                   importedVia == sourceModule,
-                   /*isImplicit*/false);
-    }
-  }
+  // Remember that the module defining the decl must be imported with at least
+  // package visibility.
+  recordRequiredImportAccessLevelForDecl(
+      extendedType, DC, AccessLevel::Package,
+      [&](AttributedImport<ImportedModule> attributedImport) {
+        ModuleDecl *importedVia = attributedImport.module.importedModule,
+                   *sourceModule = ED->getModuleContext();
+        ED->diagnose(diag::module_api_import, ED, importedVia, sourceModule,
+                     importedVia == sourceModule,
+                     /*isImplicit*/ false);
+      });
 }
 
 void swift::checkAccessControl(Decl *D) {

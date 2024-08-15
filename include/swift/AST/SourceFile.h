@@ -15,6 +15,7 @@
 
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/FileUnit.h"
+#include "swift/AST/IfConfigClauseRangeInfo.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/Basic/Debug.h"
@@ -47,44 +48,6 @@ enum class RestrictedImportKind {
 
 /// Import that limits the access level of imported entities.
 using ImportAccessLevel = std::optional<AttributedImport<ImportedModule>>;
-
-/// Stores range information for a \c #if block in a SourceFile.
-class IfConfigClauseRangeInfo final {
-public:
-  enum ClauseKind {
-    // Active '#if', '#elseif', or '#else' clause.
-    ActiveClause,
-    // Inactive '#if', '#elseif', or '#else' clause.
-    InactiveClause,
-    // '#endif' directive.
-    EndDirective,
-  };
-
-private:
-  /// Source location of '#if', '#elseif', etc.
-  SourceLoc DirectiveLoc;
-  /// Character source location of body starts.
-  SourceLoc BodyLoc;
-  /// Location of the end of the body.
-  SourceLoc EndLoc;
-
-  ClauseKind Kind;
-
-public:
-  IfConfigClauseRangeInfo(SourceLoc DirectiveLoc, SourceLoc BodyLoc,
-                          SourceLoc EndLoc, ClauseKind Kind)
-      : DirectiveLoc(DirectiveLoc), BodyLoc(BodyLoc), EndLoc(EndLoc),
-        Kind(Kind) {
-    assert(DirectiveLoc.isValid() && BodyLoc.isValid() && EndLoc.isValid());
-  }
-
-  SourceLoc getStartLoc() const { return DirectiveLoc; }
-  CharSourceRange getDirectiveRange(const SourceManager &SM) const;
-  CharSourceRange getWholeRange(const SourceManager &SM) const;
-  CharSourceRange getBodyRange(const SourceManager &SM) const;
-
-  ClauseKind getKind() const { return Kind; }
-};
 
 /// A file containing Swift source code.
 ///
@@ -158,6 +121,16 @@ private:
 
   /// The highest access level of declarations referencing each import.
   llvm::DenseMap<const ModuleDecl *, AccessLevel> ImportsUseAccessLevel;
+
+  /// Imports that should be printed in the module interface even though they
+  /// were not written in the source file.
+  llvm::SmallDenseSet<ImportedModule> ImplicitImportsForModuleInterface;
+
+  /// Associates a list of source locations to the member declarations that must
+  /// be diagnosed as being out of scope due to a missing import.
+  using DelayedMissingImportForMemberDiags =
+      llvm::SmallDenseMap<const ValueDecl *, std::vector<SourceLoc>>;
+  DelayedMissingImportForMemberDiags MissingImportForMemberDiagnostics;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
@@ -440,9 +413,11 @@ public:
   AccessLevel
   getMaxAccessLevelUsingImport(const ModuleDecl *import) const;
 
-  /// Register the use of \p import from an API with \p accessLevel.
-  void registerAccessLevelUsingImport(AttributedImport<ImportedModule> import,
-                                      AccessLevel accessLevel);
+  /// Register the requirement that \p mod be imported with an access level
+  /// that is at least as permissive as \p accessLevel in order to satisfy
+  /// access or exportability checking constraints.
+  void registerRequiredAccessLevelForModule(ModuleDecl *mod,
+                                            AccessLevel accessLevel);
 
   enum ImportQueryKind {
     /// Return the results for testable or private imports.
@@ -461,8 +436,11 @@ public:
   /// If not, we can fast-path module checks.
   bool hasImportsWithFlag(ImportFlags flag) const;
 
-  /// Returns the import flags that are active on imports of \p module.
-  ImportFlags getImportFlags(const ModuleDecl *module) const;
+  /// Enumerates each of the direct imports of \p module in the file.
+  using AttributedImportCallback =
+      llvm::function_ref<void(AttributedImport<ImportedModule> &)>;
+  void forEachImportOfModule(const ModuleDecl *module,
+                             AttributedImportCallback callback);
 
   /// Get the most permissive restriction applied to the imports of \p module.
   RestrictedImportKind getRestrictedImportKind(const ModuleDecl *module) const;
@@ -477,9 +455,6 @@ public:
   lookupImportedSPIGroups(
                 const ModuleDecl *importedModule,
                 llvm::SmallSetVector<Identifier, 4> &spiGroups) const override;
-
-  /// Is \p module imported as \c @_weakLinked by this file?
-  bool importsModuleAsWeakLinked(const ModuleDecl *module) const override;
 
   // Is \p targetDecl accessible as an explicitly imported SPI from this file?
   bool isImportedAsSPI(const ValueDecl *targetDecl) const;
@@ -511,10 +486,37 @@ public:
 
   SWIFT_DEBUG_DUMPER(dumpSeparatelyImportedOverlays());
 
-  llvm::SmallDenseSet<ImportedModule> MissingImportedModules;
+  /// Record an import that should be printed in the module interface even
+  /// though it was not written in the source file. These imports are needed in
+  /// Swift 5 mode to preserve the integrity of swiftinterface files when code
+  /// publicly use declarations from modules that were \c `@_implementationOnly`
+  /// imported in other source files.
+  void addImplicitImportForModuleInterface(ImportedModule module) {
+    ImplicitImportsForModuleInterface.insert(module);
+  }
 
-  void addMissingImportedModule(ImportedModule module) const {
-     const_cast<SourceFile *>(this)->MissingImportedModules.insert(module);
+  /// Gather implicit imports that should printed in swiftinterfaces for
+  /// compatibility with code in some Swift 5 modules.
+  void getImplicitImportsForModuleInterface(
+      SmallVectorImpl<ImportedModule> &imports) const override;
+
+  /// Add a source location for which a delayed missing import for member
+  /// diagnostic should be emited.
+  void addDelayedMissingImportForMemberDiagnostic(const ValueDecl *decl,
+                                                  SourceLoc loc) {
+    MissingImportForMemberDiagnostics[decl].push_back(loc);
+  }
+
+  /// Returns true if there is a pending missing import diagnostic for \p decl.
+  bool hasDelayedMissingImportForMemberDiagnostic(const ValueDecl *decl) const {
+    return MissingImportForMemberDiagnostics.contains(decl);
+  }
+
+  DelayedMissingImportForMemberDiags
+  takeDelayedMissingImportForMemberDiagnostics() {
+    DelayedMissingImportForMemberDiags diags;
+    std::swap(diags, MissingImportForMemberDiagnostics);
+    return diags;
   }
 
   /// Record the source range info for a parsed \c #if clause.
@@ -528,10 +530,10 @@ public:
   ArrayRef<IfConfigClauseRangeInfo>
   getIfConfigClausesWithin(SourceRange outer) const;
 
-  void getMissingImportedModules(
-         SmallVectorImpl<ImportedModule> &imports) const override;
-
+  /// Record visible declarations for use in code completion and refactoring.
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
+
+  /// Retrieve visible declarations for use in code completion and refactoring.
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
 
   virtual void lookupValue(DeclName name, NLKind lookupKind,

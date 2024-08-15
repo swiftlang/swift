@@ -46,6 +46,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Parse/Parser.h"
@@ -65,6 +66,7 @@
 #include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/FrontendActions.h"
+#include "clang/Frontend/FrontendOptions.h"
 #include "clang/Frontend/IncludeTreePPActions.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Frontend/Utils.h"
@@ -696,9 +698,18 @@ void importer::getNormalInvocationArguments(
     } else {
       // On Darwin, Clang uses -isysroot to specify the include
       // system root. On other targets, it seems to use --sysroot.
-      invocationArgStrs.push_back(triple.isOSDarwin() ? "-isysroot"
-                                                      : "--sysroot");
-      invocationArgStrs.push_back(searchPathOpts.getSDKPath().str());
+      if (triple.isOSDarwin()) {
+        invocationArgStrs.push_back("-isysroot");
+        invocationArgStrs.push_back(searchPathOpts.getSDKPath().str());
+      } else {
+        if (auto sysroot = searchPathOpts.getSysRoot()) {
+          invocationArgStrs.push_back("--sysroot");
+          invocationArgStrs.push_back(sysroot->str());
+        } else {
+          invocationArgStrs.push_back("--sysroot");
+          invocationArgStrs.push_back(searchPathOpts.getSDKPath().str());
+        }
+      }
     }
   }
 
@@ -744,31 +755,6 @@ void importer::getNormalInvocationArguments(
   invocationArgStrs.push_back((llvm::Twine(searchPathOpts.RuntimeResourcePath) +
                                llvm::sys::path::get_separator() +
                                "apinotes").str());
-
-  auto CASOpts = ctx.CASOpts;
-  if (CASOpts.EnableCaching) {
-    invocationArgStrs.push_back("-Xclang");
-    invocationArgStrs.push_back("-fno-pch-timestamp");
-    if (!CASOpts.CASOpts.CASPath.empty()) {
-      invocationArgStrs.push_back("-Xclang");
-      invocationArgStrs.push_back("-fcas-path");
-      invocationArgStrs.push_back("-Xclang");
-      invocationArgStrs.push_back(CASOpts.CASOpts.CASPath);
-    }
-    if (!CASOpts.CASOpts.PluginPath.empty()) {
-      invocationArgStrs.push_back("-Xclang");
-      invocationArgStrs.push_back("-fcas-plugin-path");
-      invocationArgStrs.push_back("-Xclang");
-      invocationArgStrs.push_back(CASOpts.CASOpts.PluginPath);
-      for (auto Opt : CASOpts.CASOpts.PluginOptions) {
-        invocationArgStrs.push_back("-Xclang");
-        invocationArgStrs.push_back("-fcas-plugin-option");
-        invocationArgStrs.push_back("-Xclang");
-        invocationArgStrs.push_back(
-            (llvm::Twine(Opt.first) + "=" + Opt.second).str());
-      }
-    }
-  }
 }
 
 static void
@@ -858,6 +844,22 @@ importer::addCommonInvocationArguments(
     // Enable double wide atomic intrinsics on every x86_64 target.
     // (This is the default on Darwin, but not so on other platforms.)
     invocationArgStrs.push_back("-mcx16");
+  }
+
+  if (triple.isOSDarwin()) {
+    if (auto variantTriple = ctx.LangOpts.TargetVariant) {
+      // Passing the -target-variant along to clang causes clang's
+      // CodeGenerator to emit zippered .o files.
+      invocationArgStrs.push_back("-darwin-target-variant");
+      invocationArgStrs.push_back(variantTriple->str());
+    }
+
+    if (ctx.LangOpts.VariantSDKVersion) {
+      invocationArgStrs.push_back("-Xclang");
+      invocationArgStrs.push_back(
+        ("-darwin-target-variant-sdk-version=" +
+         ctx.LangOpts.VariantSDKVersion->getAsString()));
+    }
   }
 
   if (std::optional<StringRef> R = ctx.SearchPathOpts.getWinSDKRoot()) {
@@ -1145,8 +1147,21 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
     // to reduce the number of argument passing on the command-line and swift
     // compiler can be more efficient to compute swift cache key without having
     // the knowledge about clang command-line options.
-    if (ctx.CASOpts.EnableCaching)
+    if (ctx.CASOpts.EnableCaching) {
       CI->getCASOpts() = ctx.CASOpts.CASOpts;
+      // When clangImporter is used to compile (generate .pcm or .pch), need to
+      // inherit the include tree from swift args (last one wins) and clear the
+      // input file.
+      if ((CI->getFrontendOpts().ProgramAction ==
+               clang::frontend::ActionKind::GenerateModule ||
+           CI->getFrontendOpts().ProgramAction ==
+               clang::frontend::ActionKind::GeneratePCH) &&
+          ctx.ClangImporterOpts.HasClangIncludeTreeRoot) {
+        CI->getFrontendOpts().CASIncludeTreeID =
+            ctx.CASOpts.ClangIncludeTrees.back();
+        CI->getFrontendOpts().Inputs.clear();
+      }
+    }
 
     // If clang target is ignored, using swift target.
     if (ignoreClangTarget)
@@ -4281,8 +4296,10 @@ ModuleDecl *ClangModuleUnit::getOverlayModule() const {
     }
     // If this Clang module is a part of the C++ stdlib, and we haven't loaded
     // the overlay for it so far, it is a split libc++ module (e.g. std_vector).
-    // Load the CxxStdlib overlay explicitly.
-    if (!overlay && importer::isCxxStdModule(clangModule)) {
+    // Load the CxxStdlib overlay explicitly, if building with the
+    // platform-default C++ stdlib.
+    if (!overlay && importer::isCxxStdModule(clangModule) &&
+        Ctx.LangOpts.isUsingPlatformDefaultCXXStdlib()) {
       ImportPath::Module::Builder builder(Ctx.Id_CxxStdlib);
       overlay = owner.loadModule(SourceLoc(), std::move(builder).get());
     }
@@ -6068,14 +6085,15 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
   else
     swiftName = func->getName();
 
+  NLOptions options = NL_IgnoreAccessControl | NL_IgnoreMissingImports;
   if (auto ty = func->getDeclContext()->getSelfNominalTypeDecl()) {
     ty->lookupQualified({ ty }, DeclNameRef(swiftName), func->getLoc(),
-                        NL_QualifiedDefault | NL_IgnoreAccessControl, results);
+                        NL_QualifiedDefault | options, results);
   }
   else {
     auto mod = func->getDeclContext()->getParentModule();
     mod->lookupQualified(mod, DeclNameRef(swiftName), func->getLoc(),
-                         NL_RemoveOverridden | NL_IgnoreAccessControl, results);
+                         NL_RemoveOverridden | options, results);
   }
 }
 
@@ -7348,6 +7366,10 @@ static bool hasNonCopyableAttr(const clang::RecordDecl *decl) {
 /// Recursively checks that there are no pointers in any fields or base classes.
 /// Does not check C++ records with specific API annotations.
 static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
+  clang::PrettyStackTraceDecl trace(decl, clang::SourceLocation(),
+                                    decl->getASTContext().getSourceManager(),
+                                    "looking for pointers in subobjects of");
+
   // Probably a class template that has not yet been specialized:
   if (!decl->getDefinition())
     return false;

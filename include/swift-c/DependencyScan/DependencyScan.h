@@ -217,6 +217,10 @@ SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_textual_detail_get_module_cache_key(
     swiftscan_module_details_t details);
 
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_swift_textual_detail_get_user_module_version(
+    swiftscan_module_details_t details);
+
 //=== Swift Binary Module Details query APIs ------------------------------===//
 
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
@@ -251,6 +255,9 @@ SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_binary_detail_get_module_cache_key(
     swiftscan_module_details_t details);
 
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_swift_binary_detail_get_user_module_version(
+    swiftscan_module_details_t details);
 //=== Swift Placeholder Module Details query APIs -------------------------===//
 
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t

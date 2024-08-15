@@ -80,7 +80,7 @@ Minimization machines have a temporary lifetime, scoped to one of the requests f
 
 \item The rule builder also collects rewrite rules from those protocols referenced by this signature; we call these the \IndexDefinition{imported rule}\emph{imported rules}.
 
-\item We run the \index{completion}\emph{completion procedure} (\ChapRef{completion}) with our local and imported rules. Completion introduces new local rules which are ``consequences'' of other rules. This gives us a \index{convergent rewrite system}\emph{convergent rewrite system}.
+\item We run the \index{completion}\emph{completion procedure} (\ChapRef{completion}) with our local and imported rules. Completion introduces new local rules which are ``consequences'' of other rules. This gives us a \index{convergent rewriting system}\emph{convergent rewriting system}.
 
 \item We construct the property map data structure, to be used for generic signature queries (\ChapRef{propertymap}). 
 
@@ -133,7 +133,7 @@ This equivalence almost always holds true, except for these four situations wher
 
 \item As we will see in \SecRef{word problem}, we may fail to construct a string rewrite system if the user-written requirements are too complex to reason about. In this case the minimization machine will include all rewrite rules that were added up to the point of failure, but the set of minimal requirements will be empty.
 
-\item If a conformance requirement is made redundant by a same-type requirement that fixes a type parameter to a concrete type (such as $\SameReq{T}{S}$ and $\ConfReq{T}{P}$ where \texttt{S} is a concrete type and $\ConfReq{S}{P}$ is a concrete conformance), the rewrite system cannot be reused for technical reasons; we will talk about this in \ChapRef{concrete conformances}.
+\item If a conformance requirement is made redundant by a same-type requirement that fixes a type parameter to a concrete type (such as $\SameReq{T}{S}$ and $\TP$ where \texttt{S} is a concrete type and $\ConfReq{S}{P}$ is a concrete conformance), the rewrite system cannot be reused for technical reasons; we will talk about this in \ChapRef{concrete conformances}.
 \end{enumerate}
 
 The first three only occur with invalid code, and are accompanied by diagnostics. The fourth is not an error, just a rare edge case where our optimization cannot be performed. All conditions are checked for during minimization, and recorded in the form of a flags field. We cannot install the minimization machine if any of these flags are set; doing so would associate a generic signature with a minimization machine that contains rewrite rules not explained by the generic signature itself. This would confuse subsequent generic signature queries. In the event that the above does not cover some other unforeseen scenario where equivalence fails to hold, the \IndexFlag{disable-requirement-machine-reuse}\texttt{-disable-requirement-machine-reuse} frontend flag forces minimization machines to be discarded immediately after use, instead of being installed.
@@ -207,10 +207,10 @@ The Requirement Machine was first used for generic signature queries in \IndexSw
 
 \section{Protocol Components}\label{protocol component}
 
-Now we will give a full account of how imported rules work in the Requirement Machine. We recall the definition of the protocol dependency graph from \SecRef{recursive conformances}: we take the \index{vertex}vertex set of all protocol declarations, and \index{edge}edge set of all \index{associated conformance requirement}associated conformance requirements, with the endpoints defined follows for an arbitrary edge $\ConfReq{Self.A}{P}_\texttt{Q}$:
+Now we will give a full account of how imported rules work in the Requirement Machine. We recall the definition of the protocol dependency graph from \SecRef{recursive conformances}: we take the \index{vertex}vertex set of all protocol declarations, and \index{edge}edge set of all \index{associated conformance requirement}associated conformance requirements, with the endpoints defined follows for an arbitrary edge $\AssocConfReq{Self.A}{P}{Q}$:
 \begin{align*}
-\Src(\ConfReq{Self.A}{P}_\texttt{Q})&=\protosym{Q},\\
-\Dst(\ConfReq{Self.A}{P}_\texttt{Q})&=\protosym{P}.
+\Src(\AssocConfReq{Self.A}{P}{Q})&=\protosym{Q},\\
+\Dst(\AssocConfReq{Self.A}{P}{Q})&=\protosym{P}.
 \end{align*}
 We will show that the protocols that can appear in the \index{derived requirement}derivations of a given generic signature are precisely those reachable from an initial set in the \index{protocol dependency graph}protocol dependency graph. We begin by considering protocol dependencies between protocols first. Along the way, we also introduce the \emph{protocol component graph} to get around complications caused by circular dependencies.
 
@@ -222,7 +222,7 @@ A protocol $\protosym{P}$ \emph{depends on} a protocol $\protosym{Q}$ (or has a 
 
 \smallskip
 
-Let $f$ be the canonical projection from the \index{conformance path graph}conformance path graph of $\GP$ into the protocol dependency graph. Recall that $f$ maps an \index{abstract conformance}abstract conformance $\ConfReq{T}{P}$ to the protocol $\protosym{P}$; we previously used $f$ to study recursive conformances. Not only is $f$ a \index{graph homomorphism}graph homomorphism, but it is also a \IndexDefinition{covering map}\emph{covering map}, because if we take some abstract conformance $\ConfReq{T}{P}$, the set of \index{edge}edges with \index{source vertex}source $\ConfReq{T}{P}$ is in one-to-one correspondence with the set of edges with source $f(\ConfReq{T}{P})=\protosym{P}$. In fact, by definition both sets of edges are indexed by the \index{associated conformance requirement}associated conformance requirements defined in $\protosym{P}$.
+Let $f$ be the canonical projection from the \index{conformance path graph}conformance path graph of $\GP$ into the protocol dependency graph. Recall that $f$ maps an \index{abstract conformance}abstract conformance $\TP$ to the protocol $\protosym{P}$; we previously used $f$ to study recursive conformances. Not only is $f$ a \index{graph homomorphism}graph homomorphism, but it is also a \IndexDefinition{covering map}\emph{covering map}, because if we take some abstract conformance $\TP$, the set of \index{edge}edges with \index{source vertex}source $\TP$ is in one-to-one correspondence with the set of edges with source $f(\TP)=\protosym{P}$. In fact, by definition both sets of edges are indexed by the \index{associated conformance requirement}associated conformance requirements defined in $\protosym{P}$.
 
 The theory is explained in \cite{godsil2001algebraic}, but here is a quick example to help with the intuition. We can wind the infinite ray around a cycle of length four, infinitely many times, mapping each integer $n\mapsto n \bmod 4$; every vertex has a single successor in both graphs:
 \begin{center}
@@ -394,7 +394,7 @@ Tarjan's algorithm requires that the input graph be specified in the form of a f
 
 \item If the protocol is part of a \index{serialized module}serialized module, we evaluate the \index{structural requirements request}\Request{requirement signature request} and collect the protocols appearing on the right-hand side of the protocol's minimal requirements.
 \end{itemize}
-%Note that if some user-written conformance requirement $\ConfReq{Self.U}{Q}_\texttt{P}$ is redundant, the first set will contain \texttt{Q}, while the second might not.  This ``extra'' edge will not change the strongly connected components of the graph, because \texttt{P} must already be reachable from \texttt{Q} if this requirement is redundant.
+%Note that if some user-written conformance requirement $\AssocConfReq{Self.U}{Q}{P}$ is redundant, the first set will contain \texttt{Q}, while the second might not.  This ``extra'' edge will not change the strongly connected components of the graph, because \texttt{P} must already be reachable from \texttt{Q} if this requirement is redundant.
 
 \newcommand{\Number}[1]{\texttt{NUMBER}(#1)}
 \newcommand{\Lowlink}[1]{\texttt{LOWLINK}(#1)}
@@ -513,7 +513,7 @@ After the outermost recursive call returns, the stack will always be empty. Note
 The idea of a protocol having a dependency relationship on another protocol generalizes to a generic signature depending on a protocol. The protocol dependencies of a generic signature are those that may appear in a derivation.
 
 \begin{definition}
-A generic signature $G$ has a \IndexDefinition{protocol dependency}\emph{protocol dependency} on a protocol $\protosym{P}$, denoted \index{$\prec$}\index{$\prec$!z@\igobble|seealso{protocol dependency}}$G\prec\protosym{P}$, if we can derive a conformance to $\protosym{P}$ from $G$; that is, $G\vdash\ConfReq{T}{P}$. The \emph{protocol dependency set} of a generic signature $G$ is the set of all protocols $\protosym{P}$ such that $G\prec\protosym{P}$.
+A generic signature $G$ has a \IndexDefinition{protocol dependency}\emph{protocol dependency} on a protocol $\protosym{P}$, denoted \index{$\prec$}\index{$\prec$!z@\igobble|seealso{protocol dependency}}$G\prec\protosym{P}$, if we can derive a conformance to $\protosym{P}$ from $G$; that is, $G\vdash\TP$. The \emph{protocol dependency set} of a generic signature $G$ is the set of all protocols $\protosym{P}$ such that $G\prec\protosym{P}$.
 
 \end{definition}
 
@@ -522,7 +522,7 @@ This new form of $\prec$ is not a binary relation by our prior definition, becau
 Now, consider the protocols that appear on the right-hand sides of the \emph{minimal} (that is, explicit) conformance requirements of our generic signature $G$; call these the \emph{successors} of $G$, by analogy with the successors of a protocol in the protocol dependency graph. If we consider all protocols reachable via paths originating from the successors of~$G$, we arrive at the complete set of protocol dependencies of~$G$.
 
 We end this section with the algorithm to collect imported rules for a new requirement machine. We find all protocols reachable from an initial set, compute their strongly connected components, collect the requirement machines for each component, and finally, \index{imported rule}collect the local rules from each requirement machine.
-\begin{algorithm}[Importing rules from protocol components]\label{importing rules}
+\begin{algorithm}[Import rules from protocol components]\label{importing rules}
 Takes a list of protocols that are the immediate successors of a generic signature or protocol. Outputs a list of imported rules.
 \begin{enumerate}
 \item (Initialize) Initialize a worklist and add all given protocols to the worklist in any order. Initialize \texttt{S} to an empty set of visited protocols. Initialize \texttt{M} to an empty set of requirement machines (compared by pointer equality).

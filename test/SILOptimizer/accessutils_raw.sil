@@ -8,14 +8,14 @@
 sil_stage raw
 
 import Builtin
+import Swift
 
 class List {
   var x: Builtin.Int64
   let next: List
 }
 
-@_moveOnly
-struct MoveOnlyPair {
+struct MoveOnlyPair: ~Copyable {
   var lhs: List
   var rhs: List
 }

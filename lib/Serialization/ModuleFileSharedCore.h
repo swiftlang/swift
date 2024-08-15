@@ -391,10 +391,14 @@ private:
     /// Whether this module is built with C++ interoperability enabled.
     unsigned HasCxxInteroperability : 1;
 
-    /// Whether this module is built with -experimental-allow-non-resilient-access.
+    /// Whether this module uses the platform default C++ stdlib, or an
+    /// overridden C++ stdlib.
+    unsigned CXXStdlibKind : 8;
+
+    /// Whether this module is built with -allow-non-resilient-access.
     unsigned AllowNonResilientAccess : 1;
 
-    /// Whether this module is built with -experimental-package-cmo.
+    /// Whether this module is built with -package-cmo.
     unsigned SerializePackageEnabled : 1;
 
     // Explicitly pad out to the next word boundary.
@@ -623,6 +627,10 @@ public:
     return Bits.IsStaticLibrary;
   }
 
+  llvm::VersionTuple getUserModuleVersion() const {
+    return UserModuleVersion;
+  }
+
   /// If the module-defining `.swiftinterface` file is an SDK-relative path,
   /// resolve it to be absolute to the specified SDK.
   std::string resolveModuleDefiningFilePath(const StringRef SDKPath) const;
@@ -642,8 +650,8 @@ public:
 
   /// How should \p dependency be loaded for a transitive import via \c this?
   ///
-  /// If \p debuggerMode, more transitive dependencies should try to be loaded
-  /// as they can be useful in debugging.
+  /// If \p importNonPublicDependencies, more transitive dependencies
+  /// should try to be loaded as they can be useful in debugging.
   ///
   /// If \p isPartialModule, transitive dependencies should be loaded as we're
   /// in merge-module mode.
@@ -655,12 +663,9 @@ public:
   /// import. Reports non-public dependencies as required for a testable
   /// client so it can access internal details, which in turn can reference
   /// those non-public dependencies.
-  ModuleLoadingBehavior
-  getTransitiveLoadingBehavior(const Dependency &dependency,
-                               bool debuggerMode,
-                               bool isPartialModule,
-                               StringRef packageName,
-                               bool forTestable) const;
+  ModuleLoadingBehavior getTransitiveLoadingBehavior(
+      const Dependency &dependency, bool importNonPublicDependencies,
+      bool isPartialModule, StringRef packageName, bool forTestable) const;
 };
 
 template <typename T, typename RawData>

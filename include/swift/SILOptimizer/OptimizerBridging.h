@@ -64,21 +64,28 @@ struct BridgedPassContext;
 struct BridgedAliasAnalysis {
   swift::AliasAnalysis * _Nonnull aa;
 
-  BRIDGED_INLINE BridgedMemoryBehavior getMemBehavior(BridgedInstruction inst, BridgedValue addr) const;
+  // Workaround for a compiler bug.
+  // When this unused function is removed, the compiler gives an error.
+  BRIDGED_INLINE bool unused(BridgedValue address1, BridgedValue address2) const;
 
+  typedef void (* _Nonnull InitFn)(BridgedAliasAnalysis aliasAnalysis, SwiftInt size);
+  typedef void (* _Nonnull DestroyFn)(BridgedAliasAnalysis aliasAnalysis);
   typedef BridgedMemoryBehavior (* _Nonnull GetMemEffectFn)(
-        BridgedPassContext context, BridgedValue, BridgedInstruction, SwiftInt);
+        BridgedPassContext context, BridgedAliasAnalysis aliasAnalysis,
+        BridgedValue, BridgedInstruction);
   typedef bool (* _Nonnull Escaping2InstFn)(
-        BridgedPassContext context, BridgedValue, BridgedInstruction, SwiftInt);
-  typedef bool (* _Nonnull Escaping2ValFn)(
-        BridgedPassContext context, BridgedValue, BridgedValue);
+        BridgedPassContext context, BridgedAliasAnalysis aliasAnalysis, BridgedValue, BridgedInstruction);
   typedef bool (* _Nonnull Escaping2ValIntFn)(
-        BridgedPassContext context, BridgedValue, BridgedValue, SwiftInt);
+        BridgedPassContext context, BridgedAliasAnalysis aliasAnalysis, BridgedValue, BridgedValue);
+  typedef bool (* _Nonnull MayAliasFn)(
+        BridgedPassContext context, BridgedAliasAnalysis aliasAnalysis, BridgedValue, BridgedValue);
 
-  static void registerAnalysis(GetMemEffectFn getMemEffectsFn,
+  static void registerAnalysis(InitFn initFn,
+                               DestroyFn destroyFn,
+                               GetMemEffectFn getMemEffectsFn,
                                Escaping2InstFn isObjReleasedFn,
                                Escaping2ValIntFn isAddrVisibleFromObjFn,
-                               Escaping2ValFn mayPointToSameAddrFn);
+                               MayAliasFn mayAliasFn);
 };
 
 struct BridgedCalleeAnalysis {
@@ -385,6 +392,8 @@ BridgedDynamicCastResult classifyDynamicCastBridged(BridgedType sourceTy, Bridge
                                                     bool sourceTypeIsExact);
 
 BridgedDynamicCastResult classifyDynamicCastBridged(BridgedInstruction inst);
+
+void verifierError(BridgedStringRef message, OptionalBridgedInstruction atInstruction, OptionalBridgedArgument atArgument);
 
 //===----------------------------------------------------------------------===//
 //                          Pass registration

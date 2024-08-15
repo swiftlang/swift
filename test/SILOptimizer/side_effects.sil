@@ -73,7 +73,7 @@ sil @unknown_func : $@convention(thin) () -> ()
 sil @unknown_func_with_in_arg : $@convention(thin) (@in X) -> ()
 sil @unknown_func_with_in_guaranteed_arg : $@convention(thin) (@in_guaranteed X) -> ()
 sil @unknown_func_with_inout_arg : $@convention(thin) (@inout SP) -> ()
-sil @unknown_func_with_trivial_args : $@convention(thin) (@in Int32, Int32) -> ()
+sil @unknown_func_with_trivial_args : $@convention(thin) (@in_guaranteed Int32, Int32) -> ()
 
 
 sil @$s4test1XCfD : $@convention(method) (@owned X) -> () {
@@ -249,8 +249,8 @@ bb0:
 // CHECK-NEXT:  {{^[^[]}}
 sil @call_unknown_func_with_trivial_args : $@convention(thin) (@in Int32, Int32) -> () {
 bb0(%0 : $*Int32, %1 : $Int32):
-  %2 = function_ref @unknown_func_with_trivial_args : $@convention(thin) (@in Int32, Int32) -> ()
-  %3 = apply %2(%0, %1) : $@convention(thin) (@in Int32, Int32) -> ()
+  %2 = function_ref @unknown_func_with_trivial_args : $@convention(thin) (@in_guaranteed Int32, Int32) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) (@in_guaranteed Int32, Int32) -> ()
 
   %r = tuple ()
   return %r : $()

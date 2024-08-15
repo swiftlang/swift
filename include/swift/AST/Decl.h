@@ -722,7 +722,7 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -780,10 +780,14 @@ protected:
     /// Whether this module has been built with C++ interoperability enabled.
     HasCxxInteroperability : 1,
 
-    /// Whether this module has been built with -experimental-allow-non-resilient-access.
+    /// Whether this module uses the platform default C++ stdlib, or an
+    /// overridden C++ stdlib.
+    CXXStdlibKind : 8,
+
+    /// Whether this module has been built with -allow-non-resilient-access.
     AllowNonResilientAccess : 1,
 
-    /// Whether this module has been built with -experimental-package-cmo.
+    /// Whether this module has been built with -package-cmo.
     SerializePackageEnabled : 1
   );
 
@@ -1067,7 +1071,8 @@ public:
   /// Returns the OS version in which the decl became ABI as specified by the
   /// `@backDeployed` attribute.
   std::optional<llvm::VersionTuple>
-  getBackDeployedBeforeOSVersion(ASTContext &Ctx) const;
+  getBackDeployedBeforeOSVersion(ASTContext &Ctx,
+                                 bool forTargetVariant = false) const;
 
   /// Returns true if the decl has an active `@backDeployed` attribute for the
   /// given context.
@@ -1200,6 +1205,9 @@ public:
   std::optional<StringRef> getSourceFileName() const;
 
   std::optional<unsigned> getSourceOrder() const;
+
+  /// Get the declaration that actually provides a doc comment for another.
+  const Decl *getDocCommentProvidingDecl() const;
 
   /// \returns The brief comment attached to this declaration, or the brief
   /// comment attached to the comment providing decl.
@@ -2968,6 +2976,14 @@ public:
   /// Returns \c true if this value decl is inlinable with attributes
   /// \c \@usableFromInline, \c \@inlinalbe, and \c \@_alwaysEmitIntoClient
   bool isUsableFromInline() const;
+
+  /// Treat as public and allow skipping access checks if the following conditions
+  /// are met:
+  /// - This decl has a package access level,
+  /// - Has a @usableFromInline (or other inlinable) attribute,
+  /// - And is defined in a module built from a public or private
+  ///   interface that does not contain package-name.
+  bool isInterfacePackageEffectivelyPublic() const;
 
   /// Returns \c true if this declaration is *not* intended to be used directly
   /// by application developers despite the visibility.

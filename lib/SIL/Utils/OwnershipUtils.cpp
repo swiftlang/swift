@@ -103,7 +103,7 @@ namespace swift::test {
 // - the value
 // - whether it has a pointer escape
 static FunctionTest OwnershipUtilsHasPointerEscape(
-    "has-pointer-escape", [](auto &function, auto &arguments, auto &test) {
+    "has_pointer_escape", [](auto &function, auto &arguments, auto &test) {
       auto value = arguments.takeValue();
       auto has = findPointerEscape(value);
       value->print(llvm::outs());
@@ -2144,7 +2144,7 @@ namespace swift::test {
 // - function
 // - the enclosing defs
 static FunctionTest FindEnclosingDefsTest(
-    "find-enclosing-defs", [](auto &function, auto &arguments, auto &test) {
+    "find_enclosing_defs", [](auto &function, auto &arguments, auto &test) {
       function.print(llvm::outs());
       llvm::outs() << "Enclosing Defs:\n";
       visitEnclosingDefs(arguments.takeValue(), [](SILValue def) {
@@ -2169,7 +2169,7 @@ namespace swift::test {
 // - function
 // - the borrow introducers
 static FunctionTest FindBorrowIntroducers(
-    "find-borrow-introducers", [](auto &function, auto &arguments, auto &test) {
+    "find_borrow_introducers", [](auto &function, auto &arguments, auto &test) {
       function.print(llvm::outs());
       llvm::outs() << "Introducers:\n";
       visitBorrowIntroducers(arguments.takeValue(), [](SILValue def) {
@@ -2288,7 +2288,7 @@ namespace swift::test {
 // - function
 // - the adjacent phis
 static FunctionTest VisitInnerAdjacentPhisTest(
-    "visit-inner-adjacent-phis",
+    "visit_inner_adjacent_phis",
     [](auto &function, auto &arguments, auto &test) {
       function.print(llvm::outs());
       visitInnerAdjacentPhis(cast<SILPhiArgument>(arguments.takeValue()),

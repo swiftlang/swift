@@ -2549,195 +2549,190 @@ Parser::parseMacroRoleAttribute(
   bool sawNames = false;
   SmallVector<MacroIntroducedDeclName, 2> names;
   SmallVector<TypeExpr *, 2> conformances;
-  auto argumentsStatus = parseList(tok::r_paren, lParenLoc, rParenLoc,
-                                   /*AllowSepAfterLast=*/false,
-                                   diag::expected_rparen_expr_list,
-                                   [&] {
-    ParserStatus status;
+  auto argumentsStatus = parseList(
+      tok::r_paren, lParenLoc, rParenLoc,
+      /*AllowSepAfterLast=*/false, diag::expected_rparen_expr_list, [&] {
+        ParserStatus status;
 
-    if (consumeIf(tok::code_complete)) {
-      status.setHasCodeCompletionAndIsError();
-      if (!sawRole) {
-        sawRole = true;
-        if (this->CodeCompletionCallbacks) {
-          this->CodeCompletionCallbacks->completeDeclAttrParam(
-              getCustomSyntaxAttributeKind(isAttached), 0, /*HasLabel=*/false);
+        if (consumeIf(tok::code_complete)) {
+          status.setHasCodeCompletionAndIsError();
+          if (!sawRole) {
+            sawRole = true;
+            if (this->CodeCompletionCallbacks) {
+              this->CodeCompletionCallbacks->completeDeclAttrParam(
+                  getCustomSyntaxAttributeKind(isAttached), 0,
+                  /*HasLabel=*/false);
+            }
+          } else if (!sawNames) {
+            if (this->CodeCompletionCallbacks) {
+              this->CodeCompletionCallbacks->completeDeclAttrParam(
+                  getCustomSyntaxAttributeKind(isAttached), 1,
+                  /*HasLabel=*/false);
+            }
+          }
         }
-      } else if (!sawNames) {
-        if (this->CodeCompletionCallbacks) {
-          this->CodeCompletionCallbacks->completeDeclAttrParam(
-              getCustomSyntaxAttributeKind(isAttached), 1, /*HasLabel=*/false);
+
+        // Parse the argment label, if there is one.
+        Identifier fieldName;
+        SourceLoc fieldNameLoc;
+        parseOptionalArgumentLabel(fieldName, fieldNameLoc);
+
+        // If there is a field name, it better be 'names'.
+        if (!(fieldName.empty() || fieldName.is("names") ||
+              fieldName.is("conformances"))) {
+          diagnose(fieldNameLoc, diag::macro_attribute_unknown_label,
+                   isAttached, fieldName);
+          status.setIsParseError();
+          return status;
         }
-      }
-    }
 
-    // Parse the argment label, if there is one.
-    Identifier fieldName;
-    SourceLoc fieldNameLoc;
-    parseOptionalArgumentLabel(fieldName, fieldNameLoc);
+        // If there is no field name and we haven't seen either names or the
+        // role, this is the role.
+        if (fieldName.empty() && !sawConformances && !sawNames && !sawRole) {
+          // Whether we saw anything we tried to treat as a role.
+          sawRole = true;
 
-    // If there is a field name, it better be 'names'.
-    if (!(fieldName.empty() || fieldName.is("names") ||
-          fieldName.is("conformances"))) {
-      diagnose(
-         fieldNameLoc, diag::macro_attribute_unknown_label, isAttached,
-         fieldName);
-      status.setIsParseError();
-      return status;
-    }
+          auto diagKind =
+              isAttached ? diag::macro_role_attr_expected_attached_kind
+                         : diag::macro_role_attr_expected_freestanding_kind;
+          Identifier roleName;
+          SourceLoc roleNameLoc;
+          if (Tok.is(tok::kw_extension)) {
+            roleNameLoc = consumeToken();
+            role = MacroRole::Extension;
+          } else if (parseIdentifier(roleName, roleNameLoc, diagKind,
+                                     /*diagnoseDollarPrefix=*/true)) {
+            status.setIsParseError();
+            return status;
+          }
 
-    // If there is no field name and we haven't seen either names or the role,
-    // this is the role.
-    if (fieldName.empty() && !sawConformances && !sawNames && !sawRole) {
-      // Whether we saw anything we tried to treat as a role.
-      sawRole = true;
+          if (!role)
+            role = getMacroRole(roleName.str());
 
-      auto diagKind = isAttached
-        ? diag::macro_role_attr_expected_attached_kind
-        : diag::macro_role_attr_expected_freestanding_kind;
-      Identifier roleName;
-      SourceLoc roleNameLoc;
-      if (Tok.is(tok::kw_extension)) {
-        roleNameLoc = consumeToken();
-        role = MacroRole::Extension;
-      } else if (parseIdentifier(roleName, roleNameLoc, diagKind,
-                                 /*diagnoseDollarPrefix=*/true)) {
-        status.setIsParseError();
+          if (!role) {
+            diagnose(roleNameLoc, diag::macro_role_attr_expected_kind,
+                     isAttached);
+            status.setIsParseError();
+            return status;
+          }
+          if (!isMacroSupported(*role, Context)) {
+            diagnose(roleNameLoc, diag::macro_experimental, roleName.str(), "");
+            status.setIsParseError();
+            return status;
+          }
+
+          // Check that the role makes sense.
+          if (isAttached == !isAttachedMacro(*role)) {
+            diagnose(roleNameLoc, diag::macro_role_syntax_mismatch, isAttached,
+                     roleName);
+
+            status.setIsParseError();
+            return status;
+          }
+
+          return status;
+        }
+
+        if (fieldName.is("conformances") ||
+            (fieldName.empty() && sawConformances && !sawNames)) {
+          if (fieldName.is("conformances") && sawConformances) {
+            diagnose(fieldNameLoc.isValid() ? fieldNameLoc : Tok.getLoc(),
+                     diag::macro_attribute_duplicate_label, isAttached,
+                     "conformances");
+          }
+
+          sawConformances = true;
+
+          // Parse the introduced conformances
+          auto type = parseType();
+          auto *typeExpr = new (Context) TypeExpr(type.get());
+          conformances.push_back(typeExpr);
+
+          return status;
+        }
+
+        // If the field name is empty and we haved seen "names", or the field
+        // name is "names" but we've already seen the argument label, complain.
+        if (fieldName.empty() != sawNames) {
+          diagnose(fieldNameLoc.isValid() ? fieldNameLoc : Tok.getLoc(),
+                   sawNames ? diag::macro_attribute_duplicate_label
+                            : diag::macro_attribute_missing_label,
+                   isAttached, "names");
+        }
+        sawNames = true;
+
+        // Parse the introduced name kind.
+        Identifier introducedNameKind;
+        SourceLoc introducedNameKindLoc;
+        if (consumeIf(tok::code_complete)) {
+          status.setHasCodeCompletionAndIsError();
+          if (this->CodeCompletionCallbacks) {
+            this->CodeCompletionCallbacks->completeDeclAttrParam(
+                getCustomSyntaxAttributeKind(isAttached), 1, /*HasLabel=*/true);
+          }
+        } else if (parseIdentifier(introducedNameKind, introducedNameKindLoc,
+                                   diag::macro_attribute_unknown_argument_form,
+                                   /*diagnoseDollarPrefix=*/true)) {
+          status.setIsParseError();
+          return status;
+        }
+
+        auto introducedKind =
+            getMacroIntroducedDeclNameKind(introducedNameKind);
+        if (!introducedKind) {
+          diagnose(introducedNameKindLoc,
+                   diag::macro_attribute_unknown_name_kind, introducedNameKind);
+          status.setIsParseError();
+          return status;
+        }
+
+        // If we don't need an argument, we're done.
+        if (!macroIntroducedNameRequiresArgument(*introducedKind)) {
+          // If there is an argument, complain about it.
+          if (Tok.is(tok::l_paren)) {
+            diagnose(Tok,
+                     diag::macro_attribute_introduced_name_requires_no_argument,
+                     introducedNameKind);
+            skipSingle();
+          }
+
+          names.push_back(MacroIntroducedDeclName(*introducedKind));
+          return status;
+        }
+
+        if (!Tok.is(tok::l_paren)) {
+          diagnose(Tok, diag::macro_attribute_introduced_name_requires_argument,
+                   introducedNameKind);
+          status.setIsParseError();
+          return status;
+        }
+
+        // Parse the name.
+        (void)consumeToken(tok::l_paren);
+        DeclNameLoc nameLoc;
+        DeclNameRef name = parseDeclNameRef(
+            nameLoc, diag::macro_attribute_unknown_argument_form,
+            (DeclNameFlag::AllowOperators | DeclNameFlag::AllowKeywords |
+             DeclNameFlag::AllowKeywordsUsingSpecialNames |
+             DeclNameFlag::AllowCompoundNames |
+             DeclNameFlag::AllowZeroArgCompoundNames));
+        if (!name) {
+          status.setIsParseError();
+          return status;
+        }
+
+        SourceLoc rParenLoc;
+        if (!consumeIf(tok::r_paren, rParenLoc)) {
+          diagnose(Tok, diag::attr_expected_rparen, attrName, false);
+          rParenLoc = Tok.getLoc();
+        }
+
+        // Add the name we introduced.
+        names.push_back(
+            MacroIntroducedDeclName(*introducedKind, name.getFullName()));
+
         return status;
-      }
-
-      if (!role)
-        role = getMacroRole(roleName.str());
-
-      if (!role) {
-        diagnose(roleNameLoc, diag::macro_role_attr_expected_kind, isAttached);
-        status.setIsParseError();
-        return status;
-      }
-      if (!isMacroSupported(*role, Context)) {
-        diagnose(roleNameLoc, diag::macro_experimental, roleName.str(), "");
-        status.setIsParseError();
-        return status;
-      }
-
-      // Check that the role makes sense.
-      if (isAttached == !isAttachedMacro(*role)) {
-        diagnose(
-            roleNameLoc, diag::macro_role_syntax_mismatch, isAttached, roleName
-        );
-
-        status.setIsParseError();
-        return status;
-      }
-
-      return status;
-    }
-
-    if (fieldName.is("conformances") ||
-        (fieldName.empty() && sawConformances && !sawNames)) {
-      if (fieldName.is("conformances") && sawConformances) {
-        diagnose(fieldNameLoc.isValid() ? fieldNameLoc : Tok.getLoc(),
-                 diag::macro_attribute_duplicate_label,
-                 isAttached,
-                 "conformances");
-      }
-
-      sawConformances = true;
-
-      // Parse the introduced conformances
-      auto type = parseType();
-      auto *typeExpr = new (Context) TypeExpr(type.get());
-      conformances.push_back(typeExpr);
-
-      return status;
-    }
-
-    // If the field name is empty and we haved seen "names", or the field name
-    // is "names" but we've already seen the argument label, complain.
-    if (fieldName.empty() != sawNames) {
-      diagnose(fieldNameLoc.isValid() ? fieldNameLoc : Tok.getLoc(),
-               sawNames ? diag::macro_attribute_duplicate_label
-                        : diag::macro_attribute_missing_label,
-               isAttached,
-               "names");
-    }
-    sawNames = true;
-
-    // Parse the introduced name kind.
-    Identifier introducedNameKind;
-    SourceLoc introducedNameKindLoc;
-    if (consumeIf(tok::code_complete)) {
-      status.setHasCodeCompletionAndIsError();
-      if (this->CodeCompletionCallbacks) {
-        this->CodeCompletionCallbacks->completeDeclAttrParam(
-            getCustomSyntaxAttributeKind(isAttached), 1, /*HasLabel=*/true);
-      }
-    } else if (parseIdentifier(introducedNameKind, introducedNameKindLoc,
-                               diag::macro_attribute_unknown_argument_form,
-                               /*diagnoseDollarPrefix=*/true)) {
-      status.setIsParseError();
-      return status;
-    }
-
-    auto introducedKind = getMacroIntroducedDeclNameKind(introducedNameKind);
-    if (!introducedKind) {
-      diagnose(
-          introducedNameKindLoc, diag::macro_attribute_unknown_name_kind,
-          introducedNameKind
-      );
-      status.setIsParseError();
-      return status;
-    }
-
-    // If we don't need an argument, we're done.
-    if (!macroIntroducedNameRequiresArgument(*introducedKind)) {
-      // If there is an argument, complain about it.
-      if (Tok.is(tok::l_paren)) {
-        diagnose(
-            Tok, diag::macro_attribute_introduced_name_requires_no_argument,
-            introducedNameKind);
-        skipSingle();
-      }
-
-      names.push_back(MacroIntroducedDeclName(*introducedKind));
-      return status;
-    }
-
-    if (!Tok.is(tok::l_paren)) {
-      diagnose(
-          Tok, diag::macro_attribute_introduced_name_requires_argument,
-          introducedNameKind);
-      status.setIsParseError();
-      return status;
-    }
-
-    // Parse the name.
-    (void)consumeToken(tok::l_paren);
-    DeclNameLoc nameLoc;
-    DeclNameRef name = parseDeclNameRef(
-        nameLoc, diag::macro_attribute_unknown_argument_form,
-        (DeclNameFlag::AllowOperators |
-         DeclNameFlag::AllowKeywords |
-         DeclNameFlag::AllowKeywordsUsingSpecialNames |
-         DeclNameFlag::AllowCompoundNames |
-         DeclNameFlag::AllowZeroArgCompoundNames));
-    if (!name) {
-      status.setIsParseError();
-      return status;
-    }
-
-    SourceLoc rParenLoc;
-    if (!consumeIf(tok::r_paren, rParenLoc)) {
-      diagnose(Tok, diag::attr_expected_rparen, attrName, false);
-      rParenLoc = Tok.getLoc();
-    }
-
-    // Add the name we introduced.
-    names.push_back(
-        MacroIntroducedDeclName(*introducedKind, name.getFullName()));
-
-    return status;
-  });
+      });
 
   if (argumentsStatus.isErrorOrHasCompletion())
     return argumentsStatus;
@@ -4039,6 +4034,15 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return makeParserSuccess();
       }
       
+      bool movesAsLike = false;
+
+      // @_rawLayout(likeArrayOf: T, count: N, movesAsLike)
+      if (consumeIf(tok::comma) && Tok.isAny(tok::identifier) &&
+          !parseSpecificIdentifier("movesAsLike",
+            diag::attr_rawlayout_expected_label, "movesAsLike")) {
+        movesAsLike = true;
+      }
+
       SourceLoc rParenLoc;
       if (!consumeIf(tok::r_paren, rParenLoc)) {
         diagnose(Tok.getLoc(), diag::attr_expected_rparen,
@@ -4046,7 +4050,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return makeParserSuccess();
       }
       
-      attr = new (Context) RawLayoutAttr(likeType.get(), count,
+      attr = new (Context) RawLayoutAttr(likeType.get(), count, movesAsLike,
                                          AtLoc, SourceRange(Loc, rParenLoc));
     } else {
       diagnose(Loc, diag::attr_rawlayout_expected_label,
@@ -5611,11 +5615,13 @@ static void diagnoseOperatorFixityAttributes(Parser &P,
 
 static unsigned skipUntilMatchingRBrace(Parser &P,
                                         bool &HasPoundDirective,
+                                        bool &HasPoundSourceLocation,
                                         bool &HasOperatorDeclarations,
                                         bool &HasNestedClassDeclarations,
                                         bool &HasNestedTypeDeclarations,
                                         bool &HasPotentialRegexLiteral) {
   HasPoundDirective = false;
+  HasPoundSourceLocation = false;
   HasOperatorDeclarations = false;
   HasNestedClassDeclarations = false;
   HasNestedTypeDeclarations = false;
@@ -5637,8 +5643,11 @@ static unsigned skipUntilMatchingRBrace(Parser &P,
 
     HasNestedClassDeclarations |= P.Tok.is(tok::kw_class);
 
-    HasPoundDirective |= P.Tok.isAny(tok::pound_sourceLocation, tok::pound_line,
-      tok::pound_if, tok::pound_else, tok::pound_endif, tok::pound_elseif);
+    HasPoundSourceLocation |= P.Tok.isAny(tok::pound_sourceLocation,
+                                          tok::pound_line);
+    HasPoundDirective |= HasPoundSourceLocation;
+    HasPoundDirective |= P.Tok.isAny(tok::pound_if, tok::pound_else,
+                                     tok::pound_endif, tok::pound_elseif);
 
     HasNestedTypeDeclarations |= P.Tok.isAny(tok::kw_class, tok::kw_struct,
                                              tok::kw_enum, tok::kw_typealias,
@@ -6766,11 +6775,14 @@ ParserStatus Parser::parseInheritance(
 
   ParserStatus Status;
   SourceLoc prevComma;
-  bool HasNextType;
+  bool HasComma;
+  bool IsEndOfList;
   do {
     SWIFT_DEFER {
       // Check for a ',', which indicates that there are more protocols coming.
-      HasNextType = consumeIf(tok::comma, prevComma);
+      HasComma = consumeIf(tok::comma, prevComma);
+      IsEndOfList = (Context.LangOpts.hasFeature(Feature::TrailingComma) &&
+                     (Tok.is(tok::l_brace) || Tok.is(tok::kw_where)));
     };
     // Parse the 'class' keyword for a class requirement.
     if (Tok.is(tok::kw_class)) {
@@ -6823,7 +6835,7 @@ ParserStatus Parser::parseInheritance(
     // Record the type if its a single type.
     if (ParsedTypeResult.isNonNull())
       Inherited.push_back(InheritedEntry(ParsedTypeResult.get()));
-  } while (HasNextType);
+  } while (HasComma && !IsEndOfList);
 
   return Status;
 }
@@ -7071,25 +7083,27 @@ bool Parser::canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
   // If explicitly disabled, respect the flag.
   if (!isDelayedParsingEnabled())
     return false;
-  // Recovering parser status later for #sourceLocation is not-trivial and
-  // it may not worth it.
-  if (InPoundLineEnvironment)
-    return false;
 
   // Skip until the matching right curly bracket; if we find a pound directive,
   // we can't lazily parse.
   CancellableBacktrackingScope BackTrack(*this);
   bool HasPoundDirective;
+  bool HasPoundSourceLocation;
   bool HasNestedTypeDeclarations;
   bool HasPotentialRegexLiteral;
   skipUntilMatchingRBrace(*this,
                           HasPoundDirective,
+                          HasPoundSourceLocation,
                           HasOperatorDeclarations,
                           HasNestedClassDeclarations,
                           HasNestedTypeDeclarations,
                           HasPotentialRegexLiteral);
-  if (!HasPoundDirective && !HasPotentialRegexLiteral)
+  if (!HasPoundDirective && !HasPotentialRegexLiteral) {
+    // If we didn't see any pound directive, we must not have seen
+    // #sourceLocation either.
+    ASSERT(!HasPoundSourceLocation);
     BackTrack.cancelBacktrack();
+  }
   return !BackTrack.willBacktrack();
 }
 
@@ -7685,17 +7699,20 @@ bool Parser::canDelayFunctionBodyParsing(bool &HasNestedTypeDeclarations) {
     return false;
 
   // Skip until the matching right curly bracket; If it has a potential regex
-  // literal, we can't skip. We don't care others, so just ignore them;
+  // literal, we can't skip. If there's a `#sourceLocation`, we also can't skip
+  // since we rely on setting and restoring state in the parser. Other cases we
+  // can handle.
   CancellableBacktrackingScope BackTrack(*this);
   consumeToken(tok::l_brace);
   bool HasPoundDirectives;
+  bool HasPoundSourceLocation;
   bool HasOperatorDeclarations;
   bool HasNestedClassDeclarations;
   bool HasPotentialRegexLiteral;
-  skipUntilMatchingRBrace(*this, HasPoundDirectives, HasOperatorDeclarations,
-                          HasNestedClassDeclarations, HasNestedTypeDeclarations,
-                          HasPotentialRegexLiteral);
-  if (HasPotentialRegexLiteral)
+  skipUntilMatchingRBrace(*this, HasPoundDirectives, HasPoundSourceLocation,
+                          HasOperatorDeclarations, HasNestedClassDeclarations,
+                          HasNestedTypeDeclarations, HasPotentialRegexLiteral);
+  if (HasPoundSourceLocation || HasPotentialRegexLiteral)
     return false;
 
   BackTrack.cancelBacktrack();
@@ -8004,35 +8021,6 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
   bool parsingLimitedSyntax = Flags.contains(PD_InProtocol) ||
                               SF.Kind == SourceFileKind::SIL;
 
-  // If the body is completely empty, preserve it. This is at best a getter with
-  // an implicit fallthrough off the end.
-  if (peekToken().is(tok::r_brace)) {
-    accessors.LBLoc = consumeToken(tok::l_brace);
-    accessors.RBLoc = consumeToken(tok::r_brace);
-
-    // In the limited syntax, fall out and let the caller handle it.
-    if (parsingLimitedSyntax)
-      return makeParserSuccess();
-
-    if (ResultType != nullptr) {
-      // An error type at this point means we couldn't parse
-      // the result type for subscript correctly which will be
-      // already diagnosed as missing result type in declaration.
-      if (ResultType->getKind() == TypeReprKind::Error)
-        return makeParserError();
-
-      diagnose(accessors.RBLoc, diag::missing_accessor_return_decl,
-               /*subscript*/ Indices != nullptr, ResultType);
-    } else {
-      // This is supposed to be a computed property, but we don't
-      // have a result type representation which indicates this is probably not
-      // a well-formed computed property. So we can assume that empty braces
-      // are unexpected at this position for this declaration.
-      diagnose(accessors.LBLoc, diag::unexpected_curly_braces_in_decl);
-    }
-    return makeParserError();
-  }
-
   auto parseImplicitGetter = [&]() {
     assert(Tok.is(tok::l_brace));
     accessors.LBLoc = Tok.getLoc();
@@ -8045,6 +8033,23 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
     parseAbstractFunctionBody(getter);
     accessors.RBLoc = getter->getEndLoc();
   };
+
+  // If the body is completely empty, preserve it. This is at best a getter with
+  // an implicit fallthrough off the end.
+  if (peekToken().is(tok::r_brace)) {
+    if (parsingLimitedSyntax) {
+      // In the limited syntax, fall out and let the caller handle it.
+      accessors.LBLoc = consumeToken(tok::l_brace);
+      accessors.RBLoc = consumeToken(tok::r_brace);
+    } else {
+      // Otherwise, treat the empty braces as a valid implicit getter. We need
+      // more information to determine whether missing return diagnostics are
+      // necessary.
+      parseImplicitGetter();
+    }
+
+    return makeParserSuccess();
+  }
 
   // Prepare backtracking for implicit getter.
   std::optional<CancellableBacktrackingScope> backtrack;

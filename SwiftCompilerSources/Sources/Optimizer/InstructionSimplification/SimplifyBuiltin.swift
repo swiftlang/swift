@@ -32,8 +32,15 @@ extension BuiltinInst : OnoneSimplifyable {
            .Strideof,
            .Alignof:
         optimizeTargetTypeConst(context)
-      case .DestroyArray,
-           .CopyArray,
+      case .DestroyArray:
+        if let elementType = substitutionMap.replacementTypes[0],
+           elementType.isTrivial(in: parentFunction)
+        {
+          context.erase(instruction: self)
+          return
+        }
+        optimizeArgumentToThinMetatype(argument: 0, context)
+      case .CopyArray,
            .TakeArrayNoAlias,
            .TakeArrayFrontToBack,
            .TakeArrayBackToFront,
@@ -200,7 +207,7 @@ private extension BuiltinInst {
       return
     }
     
-    let instanceType = type.instanceTypeOfMetatype(in: parentFunction)
+    let instanceType = type.loweredInstanceTypeOfMetatype(in: parentFunction)
     let builder = Builder(before: self, context)
     let newMetatype = builder.createMetatype(of: instanceType, representation: .Thin)
     operands[argument].set(to: newMetatype, context)
@@ -277,8 +284,8 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
   if lhsMetatype.isDynamicSelfMetatype != rhsMetatype.isDynamicSelfMetatype {
     return nil
   }
-  let lhsTy = lhsMetatype.instanceTypeOfMetatype(in: function)
-  let rhsTy = rhsMetatype.instanceTypeOfMetatype(in: function)
+  let lhsTy = lhsMetatype.loweredInstanceTypeOfMetatype(in: function)
+  let rhsTy = rhsMetatype.loweredInstanceTypeOfMetatype(in: function)
 
   // Do we know the exact types? This is not the case e.g. if a type is passed as metatype
   // to the function.
@@ -286,7 +293,12 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
                       rhsExistential.metatype is MetatypeInst
 
   if typesAreExact {
-    if lhsTy == rhsTy {
+    // We need to compare the not lowered types, because function types may differ in their original version
+    // but are equal in the lowered version, e.g.
+    //   ((Int, Int) -> ())
+    //   (((Int, Int)) -> ())
+    //
+    if lhsMetatype == rhsMetatype {
       return true
     }
     // Comparing types of different classes which are in a sub-class relation is not handled by the

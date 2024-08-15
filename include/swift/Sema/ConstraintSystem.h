@@ -1975,6 +1975,10 @@ struct MemberLookupResult {
     /// The member is inaccessible (e.g. a private member in another file).
     UR_Inaccessible,
 
+    /// The member is not visible because it comes from a module that was not
+    /// imported.
+    UR_MissingImport,
+
     /// This is a `WritableKeyPath` being used to look up read-only member,
     /// used in situations involving dynamic member lookup via keypath,
     /// because it's not known upfront what access capability would the
@@ -5398,19 +5402,11 @@ private:
 public:
   /// Pre-check the target, validating any types that occur in it
   /// and folding sequence expressions.
-  ///
-  /// \param replaceInvalidRefsWithErrors Indicates whether it's allowed
-  /// to replace any discovered invalid member references with `ErrorExpr`.
-  static bool preCheckTarget(SyntacticElementTarget &target,
-                             bool replaceInvalidRefsWithErrors);
+  static bool preCheckTarget(SyntacticElementTarget &target);
 
   /// Pre-check the expression, validating any types that occur in the
   /// expression and folding sequence expressions.
-  ///
-  /// \param replaceInvalidRefsWithErrors Indicates whether it's allowed
-  /// to replace any discovered invalid member references with `ErrorExpr`.
-  static bool preCheckExpression(Expr *&expr, DeclContext *dc,
-                                 bool replaceInvalidRefsWithErrors);
+  static bool preCheckExpression(Expr *&expr, DeclContext *dc);
 
   /// Solve the system of constraints generated from provided target.
   ///

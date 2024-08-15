@@ -37,7 +37,7 @@ class C3: ConcurrentProtocol {
 
 // Conform but forget to supply either. Also an error.
 // FIXME: Suppress one of the notes?
-class C4: ConcurrentProtocol { // expected-error{{type 'C4' does not conform to protocol 'ConcurrentProtocol'}}
+class C4: ConcurrentProtocol { // expected-error{{type 'C4' does not conform to protocol 'ConcurrentProtocol'}} expected-note {{add stubs for conformance}}
 }
 
 class C5 {

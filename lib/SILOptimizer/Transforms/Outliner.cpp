@@ -13,7 +13,7 @@
 #define DEBUG_TYPE "sil-outliner"
 
 #include "swift/AST/ASTMangler.h"
-#include "swift/AST/Module.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
@@ -159,8 +159,7 @@ static SILDeclRef getBridgeToObjectiveC(CanType NativeType) {
   auto Proto = Ctx.getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
   if (!Proto)
     return SILDeclRef();
-  auto ConformanceRef =
-      ModuleDecl::lookupConformance(NativeType, Proto);
+  auto ConformanceRef = lookupConformance(NativeType, Proto);
   if (ConformanceRef.isInvalid())
     return SILDeclRef();
 
@@ -182,8 +181,7 @@ SILDeclRef getBridgeFromObjectiveC(CanType NativeType) {
   auto Proto = Ctx.getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
   if (!Proto)
     return SILDeclRef();
-  auto ConformanceRef =
-      ModuleDecl::lookupConformance(NativeType, Proto);
+  auto ConformanceRef = lookupConformance(NativeType, Proto);
   if (ConformanceRef.isInvalid())
     return SILDeclRef();
   auto Conformance = ConformanceRef.getConcrete();

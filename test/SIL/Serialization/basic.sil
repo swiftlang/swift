@@ -5,6 +5,7 @@
 // RUN: %target-sil-opt %t/tmp.2.sib -module-name borrow -emit-sorted-sil | %FileCheck %s
 
 import Builtin
+import Swift
 
 class TestArrayStorage {
   @_hasStorage var count: Int32
@@ -23,7 +24,7 @@ struct Int32 {
 
 struct EmptyStruct {}
 
-@_moveOnly struct MoveOnlyStruct {
+struct MoveOnlyStruct: ~Copyable {
   @_hasStorage var i: Int32
   deinit
 }

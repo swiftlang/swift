@@ -13,6 +13,7 @@
 #include "TypeChecker.h"
 #include "TypeCheckConcurrency.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
@@ -188,8 +189,7 @@ DerivedConformance::storedPropertiesNotConformingToProtocol(
     if (!type)
       nonconformingProperties.push_back(propertyDecl);
 
-    if (!ModuleDecl::checkConformance(DC->mapTypeIntoContext(type),
-                                      protocol)) {
+    if (!checkConformance(DC->mapTypeIntoContext(type), protocol)) {
       nonconformingProperties.push_back(propertyDecl);
     }
   }
@@ -294,7 +294,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
 
-    auto conformance = ModuleDecl::lookupConformance(
+    auto conformance = lookupConformance(
         nominal->getDeclaredInterfaceType(), proto);
     if (conformance) {
       auto DC = conformance.getConcrete()->getDeclContext();
@@ -498,7 +498,7 @@ DerivedConformance::createBuiltinCall(ASTContext &ctx,
 
 CallExpr *DerivedConformance::createDiagnoseUnavailableCodeReachedCallExpr(
     ASTContext &ctx) {
-  FuncDecl *diagnoseDecl = ctx.getDiagnoseUnavailableCodeReachedDecl();
+  FuncDecl *diagnoseDecl = ctx.getDiagnoseUnavailableCodeReached();
   assert(diagnoseDecl);
   auto diagnoseDeclRefExpr =
       new (ctx) DeclRefExpr(diagnoseDecl, DeclNameLoc(), true);
@@ -599,20 +599,18 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
                               getProtocolType());
     Nominal->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
 
-    // In editor mode, try to insert a stub.
-    if (Context.LangOpts.DiagnosticsEditorMode) {
-      auto Extension = cast<ExtensionDecl>(getConformanceContext());
-      auto FixitLocation = Extension->getBraces().Start;
-      llvm::SmallString<128> Text;
-      {
-        llvm::raw_svector_ostream SS(Text);
-        swift::printRequirementStub(synthesizing, Nominal,
-                                    Nominal->getDeclaredType(),
-                                    Extension->getStartLoc(), SS);
-        if (!Text.empty()) {
-          ConformanceDecl->diagnose(diag::missing_witnesses_general)
-            .fixItInsertAfter(FixitLocation, Text.str());
-        }
+    // Try to insert a stub.
+    auto Extension = cast<ExtensionDecl>(getConformanceContext());
+    auto FixitLocation = Extension->getBraces().Start;
+    llvm::SmallString<128> Text;
+    {
+      llvm::raw_svector_ostream SS(Text);
+      swift::printRequirementStub(synthesizing, Nominal,
+                                  Nominal->getDeclaredType(),
+                                  Extension->getStartLoc(), SS);
+      if (!Text.empty()) {
+        ConformanceDecl->diagnose(diag::missing_witnesses_general)
+          .fixItInsertAfter(FixitLocation, Text.str());
       }
     }
     return true;
@@ -836,8 +834,7 @@ DerivedConformance::associatedValuesNotConformingToProtocol(
 
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
-      if (ModuleDecl::checkConformance(DC->mapTypeIntoContext(type),
-                                       protocol).isInvalid()) {
+      if (checkConformance(DC->mapTypeIntoContext(type), protocol).isInvalid()) {
         nonconformingAssociatedValues.push_back(param);
       }
     }
@@ -936,7 +933,7 @@ CaseStmt *DerivedConformance::unavailableEnumElementCaseStmt(
   // If the stdlib isn't new enough to contain the helper function for
   // diagnosing execution of unavailable code then just synthesize this case
   // normally.
-  if (!C.getDiagnoseUnavailableCodeReachedDecl())
+  if (!C.getDiagnoseUnavailableCodeReached())
     return nullptr;
 
   auto createElementPattern = [&]() -> EnumElementPattern * {

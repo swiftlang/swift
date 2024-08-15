@@ -3389,6 +3389,10 @@ public:
     // Otherwise, infer based on the method family.
     if (isImplicitPlusOneCFResult())
       return ResultConvention::Owned;
+
+    if (tl.getLoweredType().isForeignReferenceType())
+      return ResultConvention::Unowned;
+
     return ResultConvention::Autoreleased;
   }
 

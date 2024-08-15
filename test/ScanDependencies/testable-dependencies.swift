@@ -17,7 +17,7 @@
 // RUN:   %t/A.swift
 
 /// Import testable build, should use binary but no extra dependencies.
-// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-serialized -module-name Test %t/main.swift \
+// RUN: %target-swift-frontend -scan-dependencies -scanner-module-validation -module-load-mode prefer-serialized -module-name Test %t/main.swift \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:   -o %t/deps1.json -I %t/testable -swift-version 5 -Rmodule-loading
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps1.json Test directDependencies | %FileCheck %s --check-prefix TEST1
@@ -26,7 +26,7 @@
 // EMPTY-NOT: B
 
 /// Import regular build, should use binary.
-// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-serialized -module-name Test %t/main.swift \
+// RUN: %target-swift-frontend -scan-dependencies -scanner-module-validation -module-load-mode prefer-serialized -module-name Test %t/main.swift \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:   -o %t/deps2.json -I %t/regular -swift-version 5 -Rmodule-loading
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps2.json Test directDependencies | %FileCheck %s --check-prefix TEST2
@@ -34,7 +34,7 @@
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps2.json swiftPrebuiltExternal:A directDependencies | %FileCheck %s --check-prefix EMPTY --allow-empty
 
 /// Testable import testable build, should use binary, even interface is preferred.
-// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-name Test %t/testable.swift \
+// RUN: %target-swift-frontend -scan-dependencies -scanner-module-validation -module-load-mode prefer-interface -module-name Test %t/testable.swift \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -enable-testing \
 // RUN:   -o %t/deps3.json -I %t/testable -I %t/internal -swift-version 5 -Rmodule-loading
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps3.json Test directDependencies | %FileCheck %s --check-prefix TEST3
@@ -43,7 +43,7 @@
 // TEST3-A:  "swift": "B"
 
 /// Testable import sees non-testable module first, keep searching.
-// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-name Test %t/testable.swift \
+// RUN: %target-swift-frontend -scan-dependencies -scanner-module-validation -module-load-mode prefer-interface -module-name Test %t/testable.swift \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -enable-testing \
 // RUN:   -o %t/deps4.json -I %t/regular -I %t/testable -I %t/internal -swift-version 5 -Rmodule-loading 2>&1 | %FileCheck %s --check-prefix WARN
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps4.json Test directDependencies | %FileCheck %s --check-prefix TEST4
@@ -52,7 +52,7 @@
 // TEST4-A:  "swift": "B"
 
 /// Testable import non-testable build enable testing, warning about the finding then error out.
-// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-name Test %t/testable.swift \
+// RUN: %target-swift-frontend -scan-dependencies -scanner-module-validation -module-load-mode prefer-interface -module-name Test %t/testable.swift \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -enable-testing \
 // RUN:   -o %t/deps5.json -I %t/regular -swift-version 5 -Rmodule-loading 2>&1 | %FileCheck %s --check-prefix WARN --check-prefix ERROR
 // WARN: warning: ignore swiftmodule built without '-enable-testing'
@@ -60,7 +60,7 @@
 
 /// Regular import a testable module with no interface, don't load optional dependencies.
 // RUN: rm %t/testable/A.swiftinterface
-// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-name Test %t/main.swift \
+// RUN: %target-swift-frontend -scan-dependencies -scanner-module-validation -module-load-mode prefer-interface -module-name Test %t/main.swift \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -enable-testing \
 // RUN:   -o %t/deps6.json -I %t/testable -swift-version 5 -Rmodule-loading
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps6.json Test directDependencies | %FileCheck %s --check-prefix TEST6

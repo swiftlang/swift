@@ -6,18 +6,14 @@
 // RUN:   -module-name Dep -swift-version 5 -I %t \
 // RUN:   -package-name myPkg \
 // RUN:   -enable-library-evolution \
+// RUN:   -disable-print-package-name-for-non-package-interface \
 // RUN:   -emit-module-path %t/Dep.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Dep.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/Dep.private.swiftinterface
 
-// TEST Dep private interface should contain the package name
-// RUN: %target-swift-typecheck-module-from-interface(%t/Dep.private.swiftinterface) -module-name Dep -I %t
-// RUN: %FileCheck %s --check-prefix=CHECK-DEP-PRIVATE < %t/Dep.private.swiftinterface
-// CHECK-DEP-PRIVATE: -package-name myPkg
-
 // TEST Dep.swiftmodule should contain package name and package symbols
 // RUN: llvm-bcanalyzer --dump %t/Dep.swiftmodule | %FileCheck %s --check-prefix=CHECK-DEP-BC
-// CHECK-DEP-BC: <MODULE_PACKAGE_NAME abbrevid=6/> blob data = 'myPkg'
+// CHECK-DEP-BC: <MODULE_PACKAGE_NAME {{.*}}> blob data = 'myPkg'
 
 // TEST Lib should load Dep.swiftmodule and access package decls if in the same package and error if not
 // RUN: %target-swift-frontend -typecheck %t/Lib.swift -package-name myPkg -I %t
@@ -39,9 +35,9 @@
 // RUN:   -module-name Dep -I %t \
 // RUN:   -o %t/Dep.swiftmodule
 
-// TEST Dep binary built from interface should contain package name but no package symbols
+// TEST Dep binary built from interface should not contain package name or package symbols.
 // RUN: llvm-bcanalyzer --dump %t/Dep.swiftmodule | %FileCheck %s --check-prefix=CHECK-DEP-INTER-BC
-// CHECK-DEP-INTER-BC: <MODULE_PACKAGE_NAME abbrevid=7/> blob data = 'myPkg'
+// CHECK-DEP-INTER-BC-NOT: <MODULE_PACKAGE_NAME {{.*}}> blob data = 'myPkg'
 
 // TEST Lib should error on loading Dep built from interface and accessing package symbols (unless usableFromInline or inlinable)
 // RUN: %target-swift-frontend -typecheck %t/Lib.swift -package-name myPkg -I %t -verify
@@ -59,6 +55,7 @@
 // RUN:   -module-name LibPass -swift-version 5 -I %t \
 // RUN:   -package-name myPkg \
 // RUN:   -enable-library-evolution \
+// RUN:   -disable-print-package-name-for-non-package-interface \
 // RUN:   -emit-module-path %t/LibPass.swiftmodule \
 // RUN:   -emit-module-interface-path %t/LibPass.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/LibPass.private.swiftinterface
@@ -86,8 +83,11 @@
 @usableFromInline
 package class PackageKlassUFI {
   @usableFromInline package init() {}
-  @usableFromInline package var packageVarUFI: String = "pkgUFI"
   package var packageVar: String = "pkg"
+
+  @usableFromInline package var packageVarUFI: String = "pkgUFI"
+  // expected-note@-1 * {{'packageVarUFI' declared here}}
+  // expected-error@-1 * {{'packageVarUFI' declared here}}
 }
 
 package func packageFunc() {
@@ -109,7 +109,7 @@ public func publicFuncInlinable() {
 }
 
 //--- Lib.swift
-import Dep // expected-error {{module 'Dep' is in package 'myPkg' but was built from a non-package interface; modules of the same package can only be loaded if built from source or package interface}}
+import Dep
 
 public func libFunc() {
   publicFuncInlinable()
@@ -118,8 +118,7 @@ public func libFunc() {
   packageFunc() // expected-error {{cannot find 'packageFunc' in scope}}
   let x = PackageKlassUFI()
   let y = x.packageVarUFI
-  let z = x.packageVar // expected-error {{value of type 'PackageKlassUFI' has no member 'packageVar'}}
-  print(x, y, z)
+  print(x, y)
 }
 
 

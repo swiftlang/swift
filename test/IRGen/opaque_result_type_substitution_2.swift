@@ -71,7 +71,7 @@ extension Thing {
   }
 }
 
-struct OutterThing<Content : Thing> : Thing {
+struct OuterThing<Content : Thing> : Thing {
   let content: Content
 
   init(_ c: Content) {

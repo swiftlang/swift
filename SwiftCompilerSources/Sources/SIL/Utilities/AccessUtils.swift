@@ -237,6 +237,15 @@ public enum AccessBase : CustomStringConvertible, Hashable {
       }
     }
 
+    func hasDifferentType(_ lhs: Value, _ rhs: Value) -> Bool {
+      return lhs.type != rhs.type &&
+             // If the types have unbound generic arguments then we don't know
+             // the possible range of the type. A type such as $Array<Int> may
+             // alias $Array<T>.  Right now we are conservative and we assume
+             // that $UnsafeMutablePointer<T> and $Int may alias.
+             !lhs.type.hasArchetype && !rhs.type.hasArchetype
+    }
+
     func argIsDistinct(_ arg: FunctionArgument, from other: AccessBase) -> Bool {
       if arg.convention.isExclusiveIndirect {
         // Exclusive indirect arguments cannot alias with an address for which we know that it
@@ -252,16 +261,19 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     // First handle all pairs of the same kind (except `yield` and `pointer`).
     case (.box(let pb), .box(let otherPb)):
       return pb.fieldIndex != otherPb.fieldIndex ||
-        isDifferentAllocation(pb.box.referenceRoot, otherPb.box.referenceRoot)
+        isDifferentAllocation(pb.box.referenceRoot, otherPb.box.referenceRoot) ||
+        hasDifferentType(pb.box, otherPb.box)
     case (.stack(let asi), .stack(let otherAsi)):
       return asi != otherAsi
     case (.global(let global), .global(let otherGlobal)):
       return global != otherGlobal
     case (.class(let rea), .class(let otherRea)):
       return rea.fieldIndex != otherRea.fieldIndex ||
-             isDifferentAllocation(rea.instance, otherRea.instance)
+             isDifferentAllocation(rea.instance, otherRea.instance) ||
+             hasDifferentType(rea.instance, otherRea.instance)
     case (.tail(let rta), .tail(let otherRta)):
-      return isDifferentAllocation(rta.instance, otherRta.instance)
+      return isDifferentAllocation(rta.instance, otherRta.instance) ||
+             hasDifferentType(rta.instance, otherRta.instance)
     case (.argument(let arg), .argument(let otherArg)):
       return (arg.convention.isExclusiveIndirect || otherArg.convention.isExclusiveIndirect) && arg != otherArg
       
@@ -274,11 +286,11 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     case (.storeBorrow(let arg), .storeBorrow(let otherArg)):
       return arg.allocStack != otherArg.allocStack
 
-    // A StoreBorrow location can only be used by other StoreBorrows.
-    case (.storeBorrow, _):
-      return true
-    case (_, .storeBorrow):
-      return true
+    // Handle the special case of store_borrow - alloc_stack, because that would give a false result in the default case.
+    case (.storeBorrow(let sbi), .stack(let asi)):
+      return sbi.allocStack != asi
+    case (.stack(let asi), .storeBorrow(let sbi)):
+      return sbi.allocStack != asi
 
     default:
       // As we already handled pairs of the same kind, here we handle pairs with different kinds.
@@ -323,7 +335,7 @@ public struct AccessPath : CustomStringConvertible {
   /// Returns true if this access addresses the same memory location as `other` or if `other`
   /// is a sub-field of this access.
 
-  /// Note that this access _contains_ `other` if `other` has a _larger_ projection path than this acccess.
+  /// Note that this access _contains_ `other` if `other` has a _larger_ projection path than this access.
   /// For example:
   ///   `%value.s0` contains `%value.s0.s1`
   public func isEqualOrContains(_ other: AccessPath) -> Bool {
@@ -422,6 +434,17 @@ private extension PointerToAddressInst {
     }
     return walker.result
   }
+
+  var resultOfGlobalAddressorCall: GlobalVariable? {
+    if isStrict,
+       let apply = pointer as? ApplyInst,
+       let callee = apply.referencedFunction,
+       let global = callee.globalOfGlobalInitFunction
+    {
+      return global
+    }
+    return nil
+  }
 }
 
 /// The `EnclosingScope` of an access is the innermost `begin_access`
@@ -495,6 +518,9 @@ private struct AccessPathWalker : AddressUseDefWalker {
     if let p2ai = address as? PointerToAddressInst {
       if let originatingAddr = p2ai.originatingAddress {
         return walkUp(address: originatingAddr, path: path)
+      } else if let global = p2ai.resultOfGlobalAddressorCall {
+        self.result = AccessPath(base: .global(global), projectionPath: path.projectionPath)
+        return .continueWalk
       } else {
         self.result = AccessPath(base: .pointer(p2ai), projectionPath: path.projectionPath)
         return .continueWalk
@@ -614,5 +640,17 @@ extension ValueUseDefWalker where Path == SmallProjectionPath {
       case .stack, .global, .argument, .yield, .storeBorrow, .pointer, .unidentified:
         return false
     }
+  }
+}
+
+extension Function {
+  public var globalOfGlobalInitFunction: GlobalVariable? {
+    if isGlobalInitFunction,
+       let ret = returnInstruction,
+       let atp = ret.returnedValue as? AddressToPointerInst,
+       let ga = atp.address as? GlobalAddrInst {
+      return ga.global
+    }
+    return nil
   }
 }

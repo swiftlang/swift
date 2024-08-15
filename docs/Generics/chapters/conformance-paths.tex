@@ -193,10 +193,10 @@ First, let's assume we already have the means to obtain a conformance path for a
 We now show the algorithms for local conformance lookup and dependent member type substitution. In the next section, we will build up some more theory in anticipation of revealing \AlgRef{find conformance path algorithm} for actually finding conformance paths.
 
 \begin{algorithm}[Local conformance lookup]\label{local conformance lookup algorithm}
-As input, takes a substitution map $\Sigma$, and an abstract conformance $\ConfReq{T}{P}$.
+As input, takes a substitution map $\Sigma$, and an abstract conformance $\TP$.
 \begin{enumerate}
 \item Let \texttt{C} be an invalid conformance. This will be the return value.
-\item Find a conformance path $s_n\otimes \cdots \otimes s_1\otimes s_0$ for $\ConfReq{T}{P}$ using \AlgRef{find conformance path algorithm}.
+\item Find a conformance path $s_n\otimes \cdots \otimes s_1\otimes s_0$ for $\TP$ using \AlgRef{find conformance path algorithm}.
 \item (Initialize) Let $i := 1$.
 \item (Root) Suppose $s_0$ is the root abstract conformance $\ConfReq{$\texttt{T}_0$}{$\texttt{P}_0$}$. Project the root conformance corresponding to $\ConfReq{$\texttt{T}_0$}{$\texttt{P}_0$}$ from $\Sigma$, and assign the result to \texttt{C}.
 \item (Check) If $i=n+1$, return \texttt{C}.
@@ -206,13 +206,13 @@ As input, takes a substitution map $\Sigma$, and an abstract conformance $\ConfR
 \end{algorithm}
 
 In Step~6, \texttt{C} must be a conformance to $\texttt{P}_{i-1}$ for the projection to make sense; also, we expect that on the last iteration, $\texttt{P}_n$ is equal to $\texttt{P}$, the conformed protocol of the original abstract conformance. This gives us a validity condition on conformance paths, which we will explore in the next section. For now, we again assume that \AlgRef{find conformance path algorithm} gives us such a path.
-\begin{algorithm}[Dependent member type substitution]\label{dependent member type substitution}
+\begin{algorithm}[Substitute dependent member type]\label{dependent member type substitution}
 As input, takes a \index{dependent member type}dependent member type \texttt{T.[P]A} and a substitution map $\Sigma$. The dependent member type is understood to be a \index{valid type parameter}valid type parameter in the substitution map's \index{input generic signature}input generic signature. Outputs the substituted type $\texttt{T.[P]A}\otimes\Sigma$.
 \begin{enumerate}
 \item Let \texttt{A} be the associated type declaration referenced by the dependent member type. (This algorithm does not support \index{unbound dependent member type}unbound dependent member types.)
 \item Let \texttt{P} be the protocol containing this associated type declaration.
 \item Let \texttt{T} be the base type parameter of the dependent member type. (This could be another dependent member type, or a generic parameter.)
-\item (Lookup) Construct the abstract conformance $\ConfReq{T}{P}$ and invoke \AlgRef{local conformance lookup algorithm} to perform the local conformance lookup $\ConfReq{T}{P}\otimes\Sigma$.
+\item (Lookup) Construct the abstract conformance $\TP$ and invoke \AlgRef{local conformance lookup algorithm} to perform the local conformance lookup $\TP\otimes\Sigma$.
 \item (Project) Apply the type witness projection $\AssocType{[P]A}$ to this conformance and return the result.
 \end{enumerate}
 \end{algorithm}
@@ -239,7 +239,7 @@ In our example, $\ConfReq{U}{Sequence}$ and $\ConfReq{T.SubSequence}{Sequence}$ 
 \item How do we find a conformance path for a valid abstract conformance?
 \end{enumerate}
 We will answer (1) and (2) first, and present an algorithm for (3) in the next section. We begin with an algorithm for directly evaluating a conformance path to an abstract conformance, without a substitution map. This is called \emph{simplifying} a conformance path. Studying the preconditions of this algorithm leads to a notion of validity for conformance paths. This algorithm is also later used by \AlgRef{find conformance path algorithm}.
-\begin{algorithm}[Simplifying a conformance path]\label{invertconformancepath}
+\begin{algorithm}[Simplify conformance path]\label{invertconformancepath}
 Takes a generic signature and a conformance path $s_n\otimes\cdots\otimes s_1\otimes s_0$. Outputs an abstract conformance. This conformance will have the same conformed protocol as the last step of the conformance path.
 \begin{enumerate}
 \item (Initialize) Let \texttt{C} be an invalid conformance. This will be the return value. Also let $i := 1$.
@@ -256,7 +256,7 @@ Every step $s_i$ in a conformance path names a protocol on the right hand side; 
 \item Every subsequent step $s_i$ is an associated conformance projection defined in the protocol $\texttt{P}_{i-1}$.
 \end{itemize}
 
-Recall that an \index{valid abstract conformance}abstract conformance $\ConfReq{T}{P}$ is valid in a generic signature $G$ if the conformance requirement $\ConfReq{T}{P}$ can be \index{derived requirement}derived in $G$. To show that a valid conformance path simplifies to a valid abstract conformance, we construct a special kind of derivation, called a \IndexDefinition{primitive derivation}\emph{primitive derivation}, from the conformance path.
+Recall that an \index{valid abstract conformance}abstract conformance $\TP$ is valid in a generic signature $G$ if the conformance requirement $\TP$ can be \index{derived requirement}derived in $G$. To show that a valid conformance path simplifies to a valid abstract conformance, we construct a special kind of derivation, called a \IndexDefinition{primitive derivation}\emph{primitive derivation}, from the conformance path.
 
 The first step of the conformance path translates to a \textsc{Conf} derivation step (recall that a conformance path begins with a \index{root abstract conformance}\emph{root} abstract conformance, and not an arbitrary abstract conformance, for otherwise we could not make use of the \textsc{Conf} derivation step):
 \begin{gather*}
@@ -287,20 +287,20 @@ We saw that $\ConfReq{T.SubSequence}{Sequence}$ is equivalent to $\ConfReq{U}{Se
 (5),\,(6)\vdash\ConfReq{U}{Sequence}\tag{7}
 \end{gather*}
 
-\paragraph{Existence.} The above procedure always works in general. If we receive a conformance path for $\ConfReq{T}{P}$, and the conformance path simplifies to $\ConfReq{$\texttt{T}^\prime$}{P}$ for a possibly different type parameter $\texttt{T}^\prime$,
-then we can construct a primitive derivation for $\ConfReq{$\texttt{T}^\prime$}{P}$. We also know that \texttt{T} and $\texttt{T}^\prime$ must be equivalent, so there exists a derivation for the same-type requirement $\SameReq{T}{$\texttt{T}^\prime$}$. From these two derivations, we get a derivation for $\ConfReq{T}{P}$.
+\paragraph{Existence.} The above procedure always works in general. If we receive a conformance path for $\TP$, and the conformance path simplifies to $\ConfReq{$\texttt{T}^\prime$}{P}$ for a possibly different type parameter $\texttt{T}^\prime$,
+then we can construct a primitive derivation for $\ConfReq{$\texttt{T}^\prime$}{P}$. We also know that \texttt{T} and $\texttt{T}^\prime$ must be equivalent, so there exists a derivation for the same-type requirement $\SameReq{T}{$\texttt{T}^\prime$}$. From these two derivations, we get a derivation for $\TP$.
 
-Now, we will go in the other direction. First, observe that a primitive derivation defines a conformance path, as follows: the initial \textsc{GenSig} derivation step becomes the root abstract conformance at the start of the path, and each subsequent \textsc{ReqSig} derivation step becomes an associated conformance projection. Then, the next theorem shows a derivation of a conformance requirement $\ConfReq{T}{P}$ always splits into two parts: a primitive derivation $\ConfReq{$\texttt{T}^\prime$}{P}$, together with a same-type requirement $\SameReq{T}{$\texttt{T}^\prime$}$. Since a derived conformance requirement defines an abstract conformance, and a primitive derivation defines a conformance path, we can conclude that every abstract conformance has a conformance path. 
+Now, we will go in the other direction. First, observe that a primitive derivation defines a conformance path, as follows: the initial \textsc{GenSig} derivation step becomes the root abstract conformance at the start of the path, and each subsequent \textsc{ReqSig} derivation step becomes an associated conformance projection. Then, the next theorem shows a derivation of a conformance requirement $\TP$ always splits into two parts: a primitive derivation $\ConfReq{$\texttt{T}^\prime$}{P}$, together with a same-type requirement $\SameReq{T}{$\texttt{T}^\prime$}$. Since a derived conformance requirement defines an abstract conformance, and a primitive derivation defines a conformance path, we can conclude that every abstract conformance has a conformance path. 
 
-We now look at more ways of building new derivations from existing ones; we will use these results in \SecRef{conformance paths exist}. Recall that we can take a same-type requirement $\SameReq{T}{U}$ from $\ConfReq{U}{P}$ and $\SameReq{T.[P]A}{U.[P]A}$, where protocol \texttt{P} declares an associated type \texttt{A}. By iterated application of the \textsc{Member} step, we perform a construction with \emph{any} valid type parameter \texttt{Self.V} in the protocol generic signature \verb|<Self where Self: P>|, to obtain a derived requirement $\SameReq{T.V}{U.V}$.
+We now look at more ways of building new derivations from existing ones; we will use these results in \SecRef{conformance paths exist}. Recall that we can take a same-type requirement $\TU$ from $\ConfReq{U}{P}$ and $\SameReq{T.[P]A}{U.[P]A}$, where protocol \texttt{P} declares an associated type \texttt{A}. By iterated application of the \textsc{Member} step, we perform a construction with \emph{any} valid type parameter \texttt{Self.V} in the protocol generic signature \verb|<Self where Self: P>|, to obtain a derived requirement $\SameReq{T.V}{U.V}$.
 
 \begin{lemma}\label{general member type}
-Let $G$ be a well-formed generic signature, and suppose that $G\vDash\SameReq{T}{U}$ for type parameters \texttt{T} and \texttt{U}. If $\texttt{T}^\prime$ is any valid type parameter having \texttt{T} as a prefix, then $G\vDash\SameReq{$\texttt{T}^\prime$}{$\texttt{U}^\prime$}$, where $\texttt{U}^\prime$ is the type parameter obtained by replacing \texttt{T} with \texttt{U} in $\texttt{T}^\prime$.
+Let $G$ be a well-formed generic signature, and suppose that $G\vDash\TU$ for type parameters \texttt{T} and \texttt{U}. If $\texttt{T}^\prime$ is any valid type parameter having \texttt{T} as a prefix, then $G\vDash\SameReq{$\texttt{T}^\prime$}{$\texttt{U}^\prime$}$, where $\texttt{U}^\prime$ is the type parameter obtained by replacing \texttt{T} with \texttt{U} in $\texttt{T}^\prime$.
 \end{lemma}
 \begin{proof}
 We proceed by \index{induction}induction on the \index{type parameter length}length of $\texttt{T}^\prime$, building the desired same-type requirement by repeated application of the \IndexStep{SameDecl}\textsc{SameDecl} or \IndexStep{SameName}\textsc{SameName} derivation step.
 
-\BaseCase When $\texttt{T}^\prime$ has the same length as \texttt{T}, they must in fact be identical, since the latter is a prefix of the former, and thus $\texttt{U}^\prime$ is also the same as \texttt{U}. We have the necessary derivation $G\vDash\SameReq{T}{U}$ by assumption.
+\BaseCase When $\texttt{T}^\prime$ has the same length as \texttt{T}, they must in fact be identical, since the latter is a prefix of the former, and thus $\texttt{U}^\prime$ is also the same as \texttt{U}. We have the necessary derivation $G\vDash\TU$ by assumption.
 
 \InductiveStep We write $\texttt{T}^\prime$ as a dependent member type \texttt{$\texttt{T}^{\prime\prime}$.[P]A} or \texttt{$\texttt{T}^{\prime\prime}$.A}, with base type $\texttt{T}^{\prime\prime}$ and associated type~\texttt{A}. We have $G\vDash\texttt{T}^\prime$ by assumption, and so $G\vDash\texttt{T}^{\prime\prime}$ by \PropRef{prefix prop}. By the inductive hypothesis, we have a derivation $G\vDash\SameReq{$\texttt{T}^{\prime\prime}$}{$\texttt{U}^{\prime\prime}$}$.
 
@@ -317,35 +317,35 @@ If $\texttt{T}^\prime$ is unbound, we just change the final step to a \textsc{Sa
 In both cases, we get the desired derivation $G\vDash\SameReq{$\texttt{T}^\prime$}{$\texttt{U}^\prime$}$.
 \end{proof}
 
-\begin{theorem}\label{conformance paths theorem} Let $G$ be a valid generic signature, with \texttt{T} a type parameter and \texttt{P} some protocol. If $G\vDash\ConfReq{T}{P}$, then there exists at least one conformance path for $\ConfReq{T}{P}$. In other words, there exists a type parameter $\texttt{T}^\prime\in\TypeObj{G}$, such that:
+\begin{theorem}\label{conformance paths theorem} Let $G$ be a valid generic signature, with \texttt{T} a type parameter and \texttt{P} some protocol. If $G\vDash\TP$, then there exists at least one conformance path for $\TP$. In other words, there exists a type parameter $\texttt{T}^\prime\in\TypeObj{G}$, such that:
 \begin{enumerate}
 \item $G\vDash\ConfReq{$\texttt{T}^\prime$}{P}$, via a primitive derivation.
 \item $G\vDash\SameReq{T}{$\texttt{T}^\prime$}$.
 \end{enumerate}
 \end{theorem}
 \begin{proof}
-The proof relies on a few results developed in \SecRef{generic signature validity}. Let's call the two requisite derivations $D_1$ and $D_2$. We do a \index{structural induction}structural induction on the derivation for $\ConfReq{T}{P}$, building up $D_1$ and $D_2$ step by step. We only need to consider the derivation steps which produce new conformance requirements:
+The proof relies on a few results developed in \SecRef{generic signature validity}. Let's call the two requisite derivations $D_1$ and $D_2$. We do a \index{structural induction}structural induction on the derivation for $\TP$, building up $D_1$ and $D_2$ step by step. We only need to consider the derivation steps which produce new conformance requirements:
 \begin{enumerate}
-\item \IndexStep{Conf}\textsc{Conf} steps: $\vdash\ConfReq{T}{P}$.
-\item \IndexStep{SameConf}\textsc{SameConf} steps: $\SameReq{T}{U},\,\ConfReq{U}{P}\vdash\ConfReq{T}{P}$.
+\item \IndexStep{Conf}\textsc{Conf} steps: $\vdash\TP$.
+\item \IndexStep{SameConf}\textsc{SameConf} steps: $\TU,\,\ConfReq{U}{P}\vdash\TP$.
 \item \IndexStep{AssocConf}\textsc{AssocConf} steps: $\ConfReq{U}{P},\,\ConfReq{Self.V}{Q}\vdash\ConfReq{U.V}{Q}$.
 \end{enumerate}
 
 \noindent \textbf{First case.} Notice that a \textsc{Conf} step is the \index{base case}base case of our structural induction, because there are no assumptions on the left-hand side of $\vdash$. We set $\texttt{T}^\prime := \texttt{T}$. A derivation of a single explicit conformance requirement is already primitive by our definition, so $D_1$ is just:
 \begin{gather*}
-\vdash\ConfReq{T}{P}\tag{1}
+\vdash\TP\tag{1}
 \end{gather*}
-To construct $D_2$, we recall that $G$ is well-formed, thus $G\vDash\texttt{T}$, since \texttt{T} appears in $\ConfReq{T}{P}$. We then derive $\SameReq{T}{T}$ via an \IndexStep{Ident}\textsc{Ident} derivation step:
+To construct $D_2$, we recall that $G$ is well-formed, thus $G\vDash\texttt{T}$, since \texttt{T} appears in $\TP$. We then derive $\SameReq{T}{T}$ via an \IndexStep{Ident}\textsc{Ident} derivation step:
 \begin{gather*}
 \ldots\vdash\texttt{T}\tag{1}\\
 (2)\vdash\SameReq{T}{T}\tag{2}
 \end{gather*}
 
 \noindent \textbf{Second case.} We have a \textsc{SameConf} derivation step:
-\[\SameReq{T}{U},\,\ConfReq{U}{P}\vdash\ConfReq{T}{P}\]
+\[\TU,\,\ConfReq{U}{P}\vdash\TP\]
 By the \index{inductive step}inductive hypothesis, we can assume the derivation of $\ConfReq{U}{P}$ has already been split up into two derivations: a primitive derivation $D_1^\prime$ of $G\vDash\ConfReq{$\texttt{U}^\prime$}{P}$, and a derivation $D_2^\prime$ of $G\vDash\SameReq{U}{$\texttt{U}^\prime$}$. We set $D_1:=D_1^\prime$. Then, we construct $D_2$ from $D_2^\prime$ by adding an \textsc{Equiv} derivation step:
 \begin{gather*}
-\ldots\SameReq{T}{U}\tag{1}\\
+\ldots\TU\tag{1}\\
 \ldots\SameReq{U}{$\texttt{U}^\prime$}\tag{2}\\
 (1),\,(2)\vdash\SameReq{T}{$\texttt{U}^\prime$}\tag{3}
 \end{gather*}
@@ -372,7 +372,7 @@ The \IndexDefinition{conformance path graph}\emph{conformance path graph} of a g
 \item The \index{vertex}vertices are the \index{reduced abstract conformance}reduced abstract conformances of $G$.
 \item The \index{edge}edges are the \index{associated conformance projection}associated conformance projections.
 
-That is, if $\ConfReq{T}{P}$ is an abstract conformance and $\AssocConf{Self.V}{Q}$ is an \index{associated conformance requirement}associated conformance requirement of \texttt{P}, we form the abstract conformance $\AssocConf{Self.V}{Q}\otimes \ConfReq{T}{P}=\ConfReq{T.V}{Q}$. If \texttt{U} is the reduced type of \texttt{T.V}, there is an edge with \index{source vertex}source vertex $\ConfReq{T}{P}$ and \index{destination vertex}destination vertex $\ConfReq{U}{Q}$.
+That is, if $\TP$ is an abstract conformance and $\AssocConf{Self.V}{Q}$ is an \index{associated conformance requirement}associated conformance requirement of \texttt{P}, we form the abstract conformance $\AssocConf{Self.V}{Q}\otimes \TP=\ConfReq{T.V}{Q}$. If \texttt{U} is the reduced type of \texttt{T.V}, there is an edge with \index{source vertex}source vertex $\TP$ and \index{destination vertex}destination vertex $\ConfReq{U}{Q}$.
 \end{itemize}
 
 \vfill
@@ -484,7 +484,7 @@ We saw that two distinct conformance paths can simplify to equivalent abstract c
 \end{algorithm}
 Note that this is a linear order, because in Step~6, \AlgRef{requirement order} cannot return ``$\bot$'', since protocol conformance requirements are always linearly ordered with respect to each other. Much like the type parameter order of \AlgRef{type parameter order}, this is a special case of a shortlex order, which we generalize in \SecRef{rewritesystemintro}.
 
-\paragraph{Enumeration.} The conformance path graph from our previous example has a finite set of vertices, but this is not true in general. However, it is true that each vertex only has finitely many \index{successor}successors, as there can only be finitely many associated conformance requirements. (This is also true in the \index{type parameter graph}type parameter graph, where successors are given by associated \emph{type} declarations). A graph with this property is said to be \index{locally finite graph}\emph{locally finite}. A locally finite graph only has finitely many paths of any fixed length $n\in\mathbb{N}$ (this can be shown by induction on path length). This implies that the conformance path order is \index{well-founded order}well-founded (by the same argument as \PropRef{well founded type order}). It follows that every equivalence class of conformance paths contains a reduced conformance path. Hence, enumerating conformance paths in increasing order performs a \index{breadth-first search}breadth-first search which visits every path, and always visits the reduced conformance paths first.
+\paragraph{Enumeration.} The conformance path graph from our previous example has a finite set of vertices, but this is not true in general. However, it is true that each vertex only has finitely many \index{successor}successors, as there can only be finitely many associated conformance requirements. (This is also true in the \index{type parameter graph}type parameter graph, where successors are given by associated \emph{type} declarations). A graph with this property is said to be \index{locally finite graph}\emph{locally finite}. A locally finite graph only has finitely many paths of any fixed length $n\in\NN$ (this can be shown by induction on path length). This implies that the conformance path order is \index{well-founded order}well-founded (by the same argument as \PropRef{well founded type order}). It follows that every equivalence class of conformance paths contains a reduced conformance path. Hence, enumerating conformance paths in increasing order performs a \index{breadth-first search}breadth-first search which visits every path, and always visits the reduced conformance paths first.
 
 \ThmRef{conformance paths theorem} provides a necessary \index{termination}termination condition for our search. This is actually also sufficient; the only other potential source of non-termination is the reduced type computation using the \IndexQuery{getReducedType}$\Query{getReducedType}{}$ generic signature query, but the theory of rewrite systems will give us that guarantee in \SecRef{rewritesystemintro}. Thus, we can always find a conformance path in a finite number of steps. This exhaustive enumeration is relatively inefficient, but we can improve upon it with two modifications:
 \begin{enumerate}
@@ -499,15 +499,15 @@ Putting everything together, we finally get an algorithm to find conformance pat
 \item A growable array $\texttt{B}^\prime$ storing all conformance paths of length $\texttt{N}+1$. Initially empty.
 \end{itemize}
 
-\begin{algorithm}[Finding a conformance path]\label{find conformance path algorithm}
-Takes a generic signature $G$ and an abstract conformance $\ConfReq{T}{P}$ valid in $G$ as input. Outputs a conformance path for $\ConfReq{T}{P}$.
+\begin{algorithm}[Find conformance path]\label{find conformance path algorithm}
+Takes a generic signature $G$ and an abstract conformance $\TP$ valid in $G$ as input. Outputs a conformance path for $\TP$.
 
 \begin{enumerate}
 \item (Precondition) Check that \IndexQuery{requiresProtocol}$\Query{requiresProtocol}{G,\,\texttt{T},\,\texttt{P}}$. If this is not true, signal an error. This guarantees termination below.
 
 \item (Reduce) Set \IndexQuery{getReducedType}$\texttt{T}\leftarrow\Query{getReducedType}{G,\,\texttt{T}}$.
 
-\item (Check) If the table contains an entry for $\ConfReq{T}{P}$, return the conformance path associated with this entry.
+\item (Check) If the table contains an entry for $\TP$, return the conformance path associated with this entry.
 
 \item (Initialize) If $\texttt{N}=0$, initialize \texttt{B} with a conformance path of length~1 for each of the generic signature's root abstract conformances, and set $\texttt{N}=1$.
 
@@ -564,11 +564,11 @@ We saw a generic signature with an infinite type parameter graph in \SecRef{type
 This allows us to define an \IndexDefinition{infinite generic signature}\emph{infinite generic signature} as one satisfying the equivalent conditions above.
 \end{proposition}
 \begin{proof}
-For $(1)\Rightarrow(2)$, note that the set of generic parameter types is always finite, so it suffices to only consider reduced \index{dependent member type}dependent member types. Suppose we're given an infinite set of reduced dependent member types; we must produce an infinite set of abstract conformances. Each dependent member type \texttt{T.[P]A} is equivalent to an ordered pair consisting of a type witness projection $\AssocType{[P]A}$ and an abstract conformance $\ConfReq{T}{P}$; the first element of the pair is drawn from a finite set, so a counting argument shows that the mapping that takes the second element of each pair must give us an infinite set of abstract conformances.
+For $(1)\Rightarrow(2)$, note that the set of generic parameter types is always finite, so it suffices to only consider reduced \index{dependent member type}dependent member types. Suppose we're given an infinite set of reduced dependent member types; we must produce an infinite set of abstract conformances. Each dependent member type \texttt{T.[P]A} is equivalent to an ordered pair consisting of a type witness projection $\AssocType{[P]A}$ and an abstract conformance $\TP$; the first element of the pair is drawn from a finite set, so a counting argument shows that the mapping that takes the second element of each pair must give us an infinite set of abstract conformances.
 
 Furthermore, these abstract conformances must be reduced, meaning their subject types are reduced. To see why, note that whenever \texttt{T.[P]A} is a reduced dependent member type, its base type \texttt{T} must be reduced as well (otherwise, if $G\vDash\SameReq{$\texttt{T}^\prime$}{T}$ with $\texttt{T}^\prime<\texttt{T}$, we could construct from this a derivation of $\SameReq{$\texttt{T}^\prime$.[P]A}{T.[P]A}$ with $\texttt{$\texttt{T}^\prime$.[P]A} < \texttt{T.[P]A}$, contradicting the assumption that \texttt{T.[P]A} is reduced).
 
-A similar argument establishes $(2)\Rightarrow(1)$. We're given an infinite set of reduced abstract conformances, and we must produce an infinite set of reduced type parameters. Each abstract conformance $\ConfReq{T}{P}$ uniquely determines an ordered pair, consisting of a \index{protocol declaration}protocol declaration $\protosym{P}$ and a type parameter \texttt{T}. The set of protocol declarations is finite, so again, taking the second element of each pair gives us an infinite set of reduced type parameters.
+A similar argument establishes $(2)\Rightarrow(1)$. We're given an infinite set of reduced abstract conformances, and we must produce an infinite set of reduced type parameters. Each abstract conformance $\TP$ uniquely determines an ordered pair, consisting of a \index{protocol declaration}protocol declaration $\protosym{P}$ and a type parameter \texttt{T}. The set of protocol declarations is finite, so again, taking the second element of each pair gives us an infinite set of reduced type parameters.
 \end{proof}
 
 Next, we will characterize infinite generic signatures by way of another directed graph.
@@ -1048,7 +1048,7 @@ Note that while termination checking is undecidable in full generality, we can s
 \index{Emil Post}Emil~L.~Post introduced tag systems in a 1943 paper \cite{posttag}. A tag system consists of the following three parts:
 \begin{itemize}
 \item A finite alphabet of symbols.
-\item A fixed $n\in\mathbb{N}$, called the \emph{deletion number}.
+\item A fixed $n\in\NN$, called the \emph{deletion number}.
 \item A table associating a \emph{production}---a string of zero or more symbols---to each symbol of the alphabet.
 \end{itemize}
 A tag system operates on an input string, also written with the symbols of the alphabet. The evaluation rule transforms the input string into an output string by repeated application of the following steps:
@@ -1062,14 +1062,14 @@ A tag system operates on an input string, also written with the symbols of the a
 
 It is not immediately apparent from the definition that tag systems are a universal form of computation in the Church-Turing sense. Post himself wondered if there is a computable algorithm to determine if, for an arbitrary input string, a given tag system will halt. This remained an open question until 1961, when it was discovered that indeed, it is possible to encode a Turing machine as a tag system, in such a manner that the tag system halts if and only if the Turing machine halts. Thus, tag systems have equal expressive power to Turing machines, the lambda calculus, and everything else, and furthermore, the halting problem for tag systems is also undecidable \cite{turingtag}. Tag systems constructed from Turing machines require a large alphabet, so we merely note that it is possible to do so, without showing an explicit example. Instead, we will focus on a much simpler tag system, which nonetheless demonstrates the expressivity of the formalism.
 
-\paragraph{The Collatz conjecture.} The \index{Collatz conjecture}\emph{Collatz conjecture}, named after \index{Lothar Collatz}Lothar~Collatz, is a famous unsolved problem in number theory. Consider the following function, $f\colon\mathbb{N}\rightarrow\mathbb{N}$:
+\paragraph{The Collatz conjecture.} The \index{Collatz conjecture}\emph{Collatz conjecture}, named after \index{Lothar Collatz}Lothar~Collatz, is a famous unsolved problem in number theory. Consider the following function, $f\colon\NN\rightarrow\NN$:
 \[
 f(n) = \begin{cases}
 n/2 &\qquad \mbox{$n$ even}\\
 3n+1 &\qquad \mbox{$n$ odd}
 \end{cases}
 \]
-For any $n\in\mathbb{N}$, we can construct an infinite sequence of natural numbers, by repeated application of $f$ to $n$, called the \emph{Collatz sequence} for $n$:
+For any $n\in\NN$, we can construct an infinite sequence of natural numbers, by repeated application of $f$ to $n$, called the \emph{Collatz sequence} for $n$:
 \[n,\,f(n),\,f(f(n)),\,f(f(f(n))),\,\ldots\]
 For example, if we take $n=3$, then we get the Collatz sequence
 \[3,\,10,\,5,\,16,\,8,\,4,\,2,\,1,\,4,\,2,\,1,\,\ldots\]
@@ -1082,7 +1082,7 @@ b &\mapsto a\\
 c &\mapsto aaa
 \end{align*}
 
-To evaluate the Collatz sequence for $n\in\mathbb{N}$, we take the input string to be $n$ repetitions of the symbol ``$a$''. Since the deletion number is 2, the evaluation rule stops when the input string has fewer than 2 symbols; in particular, it stops if the input string is just ``$a$'', corresponding to the number 1. Let's look at the evaluation of this tag system with the input string ``$aaaa$''; at each step, we look at the first symbol, add the corresponding production at the end, and finally delete the first two symbols:
+To evaluate the Collatz sequence for $n\in\NN$, we take the input string to be $n$ repetitions of the symbol ``$a$''. Since the deletion number is 2, the evaluation rule stops when the input string has fewer than 2 symbols; in particular, it stops if the input string is just ``$a$'', corresponding to the number 1. Let's look at the evaluation of this tag system with the input string ``$aaaa$''; at each step, we look at the first symbol, add the corresponding production at the end, and finally delete the first two symbols:
 \begin{enumerate}
 \item $\underline{a}aaa \Rightarrow aaaa\underline{bc} \Rightarrow aabc$
 \item $\underline{a}abc \Rightarrow aabc\underline{bc} \Rightarrow bcbc$

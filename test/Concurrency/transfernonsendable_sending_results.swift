@@ -70,6 +70,26 @@ enum MainActorIsolatedEnum {
   case second(NonSendableKlass)
 }
 
+struct GenericNonSendableStruct<T> {
+  var t: T
+  var t2: T?
+  var x: NonSendableKlass
+}
+
+class GenericNonSendableKlass<T> {
+  var t: T
+  var t2: T?
+  var x: NonSendableKlass?
+
+  init(_ inputT: T) {
+    t = inputT
+    t2 = nil
+    x = NonSendableKlass()
+  }
+}
+
+func sendParameter<T>(_ t: sending T) {}
+
 /////////////////
 // MARK: Tests //
 /////////////////
@@ -177,7 +197,7 @@ extension MainActorIsolatedEnum {
     }
     return nil
   } // expected-warning {{sending 'ns.some' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'ns.some' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}} 
+  // expected-note @-1 {{main actor-isolated 'ns.some' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 
   func testIfLetReturnNoTransfer() -> NonSendableKlass? {
     if case .second(let ns) = self {
@@ -214,7 +234,7 @@ func asyncLetReabstractionThunkTest() async {
 func asyncLetReabstractionThunkTest2() async {
   // We emit the error here since we are returning a main actor isolated value.
   async let newValue: NonSendableKlass = await getMainActorValueAsync()
-  // expected-warning @-1 {{non-sendable type 'NonSendableKlass' returned by implicitly asynchronous call to main actor-isolated function cannot cross actor boundary}}
+  // expected-warning @-1 {{non-sendable result type 'NonSendableKlass' cannot be sent from main actor-isolated context in call to global function 'getMainActorValueAsync()'}}
 
   let _ = await newValue
 
@@ -237,11 +257,41 @@ func asyncLetReabstractionThunkTest2() async {
 @MainActor func asyncLetReabstractionThunkTestGlobalActor2() async {
   // We emit the error here since we are returning a main actor isolated value.
   async let newValue: NonSendableKlass = await getMainActorValueAsync()
-  // expected-warning @-1 {{non-sendable type 'NonSendableKlass' returned by implicitly asynchronous call to main actor-isolated function cannot cross actor boundary}}
+  // expected-warning @-1 {{non-sendable result type 'NonSendableKlass' cannot be sent from main actor-isolated context in call to global function 'getMainActorValueAsync()'}}
 
   let _ = await newValue
 
   // Without thunk.
   async let newValue2: NonSendableKlass = await getMainActorValueAsyncTransferring()
   let _ = await newValue2
+}
+
+///////////////////////////////////
+// MARK: Indirect Sending Result //
+///////////////////////////////////
+
+func indirectSending<T>(_ t: T) -> sending T {
+  return t // expected-warning {{returning task-isolated 't' as a 'sending' result risks causing data races}}
+  // expected-note @-1 {{returning task-isolated 't' risks causing data races since the caller assumes that 't' can be safely sent to other isolation domains}}
+}
+
+func indirectSendingStructField<T>(_ t: GenericNonSendableStruct<T>) -> sending T {
+  return t.t // expected-warning {{returning task-isolated 't.t' as a 'sending' result risks causing data races}}
+  // expected-note @-1 {{returning task-isolated 't.t' risks causing data races since the caller assumes that 't.t' can be safely sent to other isolation domains}}
+}
+
+func indirectSendingStructOptionalField<T>(_ t: GenericNonSendableStruct<T>) -> sending T {
+  return t.t2! // expected-warning {{returning task-isolated 't.t2.some' as a 'sending' result risks causing data races}}
+  // expected-note @-1 {{returning task-isolated 't.t2.some' risks causing data races since the caller assumes that 't.t2.some' can be safely sent to other isolation domains}}
+}
+
+func indirectSendingClassField<T>(_ t: GenericNonSendableKlass<T>) -> sending T {
+  return t.t // expected-warning {{returning task-isolated 't.t' as a 'sending' result risks causing data races}}
+  // expected-note @-1 {{returning task-isolated 't.t' risks causing data races since the caller assumes that 't.t' can be safely sent to other isolation domains}}
+}
+
+func indirectSendingOptionalClassField<T>(_ t: GenericNonSendableKlass<T>) -> sending T {
+  return t.t2! // expected-warning {{returning a task-isolated 'Optional<T>' value as a 'sending' result risks causing data races}}
+  // expected-note @-1 {{returning a task-isolated 'Optional<T>' value risks causing races since the caller assumes the value can be safely sent to other isolation domains}}
+  // expected-note @-2 {{'Optional<T>' is a non-Sendable type}}
 }

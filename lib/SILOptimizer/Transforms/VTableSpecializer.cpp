@@ -73,7 +73,7 @@ static bool specializeVTablesInFunction(SILFunction &func, SILModule &module,
                                             transform) != nullptr);
       } else if (auto *metatype = dyn_cast<MetatypeInst>(&inst)) {
         changed |= (specializeVTableForType(
-                        metatype->getType().getInstanceTypeOfMetatype(&func),
+                        metatype->getType().getLoweredInstanceTypeOfMetatype(&func),
                         module, transform) != nullptr);
       } else if (auto *cm = dyn_cast<ClassMethodInst>(&inst)) {
         changed |= specializeClassMethodInst(cm);
@@ -153,16 +153,19 @@ static bool specializeVTablesOfSuperclasses(SILModule &module,
 SILVTable *swift::specializeVTableForType(SILType classTy, SILModule &module,
                                 SILTransform *transform) {
   CanType astType = classTy.getASTType();
-  BoundGenericClassType *genClassTy = dyn_cast<BoundGenericClassType>(astType);
-  if (!genClassTy) return nullptr;
+  if (!astType->isSpecialized())
+    return nullptr;
+  NominalOrBoundGenericNominalType *genClassTy = dyn_cast<NominalOrBoundGenericNominalType>(astType);
+  ClassDecl *classDecl = astType->getClassOrBoundGenericClass();
+  if (!classDecl)
+    return nullptr;
 
   if (module.lookUpSpecializedVTable(classTy)) return nullptr;
 
   LLVM_DEBUG(llvm::errs() << "specializeVTableFor "
-                          << genClassTy->getDecl()->getName() << ' '
+                          << classDecl->getName() << ' '
                           << genClassTy->getString() << '\n');
 
-  ClassDecl *classDecl = genClassTy->getDecl();
   SILVTable *origVtable = module.lookUpVTable(classDecl);
   if (!origVtable) {
     // This cannot occur in regular builds - only if built without wmo, which
@@ -244,8 +247,8 @@ bool swift::specializeClassMethodInst(ClassMethodInst *cm) {
   SILValue instance = cm->getOperand();
   SILType classTy = instance->getType();
   CanType astType = classTy.getASTType();
-  BoundGenericClassType *genClassTy = dyn_cast<BoundGenericClassType>(astType);
-  if (!genClassTy) return false;
+  if (!astType->isSpecialized())
+    return false;
 
   SubstitutionMap subs = astType->getContextSubstitutionMap();
 

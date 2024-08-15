@@ -15,6 +15,7 @@
 #include "SILGenFunction.h"
 #include "SILGenFunctionBuilder.h"
 #include "SwitchEnumBuilder.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -335,28 +336,6 @@ void SILGenFunction::emitDeallocatingMoveOnlyDestructor(DestructorDecl *dd) {
   B.createReturn(loc, emitEmptyTuple(loc));
 }
 
-bool Lowering::needsIsolatingDestructor(DestructorDecl *dd) {
-  auto ai = swift::getActorIsolation(dd);
-  if (!ai.isActorIsolated()) {
-    return false;
-  }
-  DestructorDecl *firstIsolated = dd;
-  while (true) {
-    DestructorDecl *next = firstIsolated->getSuperDeinit();
-    if (!next)
-      break;
-    auto ai = swift::getActorIsolation(next);
-    if (!ai.isActorIsolated())
-      break;
-    firstIsolated = next;
-  }
-
-  // If isolation was introduced in ObjC code, then we assume that ObjC code
-  // also overrides retain/release to make sure that dealloc is called on the
-  // correct executor in the first place.
-  return firstIsolated->getClangNode().isNull();
-}
-
 void SILGenFunction::emitIsolatingDestructor(DestructorDecl *dd) {
   MagicFunctionName = DeclName(SGM.M.getASTContext().getIdentifier("deinit"));
 
@@ -405,7 +384,7 @@ void SILGenFunction::emitIsolatingDestructor(DestructorDecl *dd) {
     CanType anyObjectType = getASTContext().getAnyObjectType();
     SILType anyObjectLoweredType =
         getTypeLowering(anyObjectType).getLoweredType();
-    auto conformances = SGM.M.getSwiftModule()->collectExistentialConformances(
+    auto conformances = collectExistentialConformances(
         selfType->getCanonicalType(), anyObjectType);
     auto castedSelf = B.createInitExistentialRef(
         loc, anyObjectLoweredType, selfType, selfValue, conformances);

@@ -585,8 +585,10 @@ func testRequireExprPattern(_ a : Int) {
 func testRequireOptional1(_ a : Int?) -> Int {
 
   // CHECK: [[SOME]]([[PAYLOAD:%.*]] : $Int):
-  // CHECK-NEXT:   debug_value [[PAYLOAD]] : $Int, let, name "t"
-  // CHECK-NEXT:   return [[PAYLOAD]] : $Int
+  // CHECK-NEXT:   [[MV_PAYLOAD:%.*]] = move_value [var_decl] [[PAYLOAD]] : $Int
+  // CHECK-NEXT:   debug_value [[MV_PAYLOAD]] : $Int, let, name "t"
+  // CHECK-NEXT:   extend_lifetime [[MV_PAYLOAD]] : $Int
+  // CHECK-NEXT:   return [[MV_PAYLOAD]] : $Int
   guard let t = a else { abort() }
 
   // CHECK: [[NONE]]:
@@ -770,8 +772,12 @@ func let_else_tuple_binding(_ a : (Int, Int)?) -> Int {
 
   // CHECK: [[SOME_BB]]([[PAYLOAD:%.*]] : $(Int, Int)):
   // CHECK-NEXT:   ([[PAYLOAD_1:%.*]], [[PAYLOAD_2:%.*]]) = destructure_tuple [[PAYLOAD]]
-  // CHECK-NEXT:   debug_value [[PAYLOAD_1]] : $Int, let, name "x"
-  // CHECK-NEXT:   debug_value [[PAYLOAD_2]] : $Int, let, name "y"
-  // CHECK-NEXT:   return [[PAYLOAD_1]] : $Int
+  // CHECK-NEXT:   [[MV_1:%.*]] = move_value [var_decl] [[PAYLOAD_1]] : $Int
+  // CHECK-NEXT:   debug_value [[MV_1]] : $Int, let, name "x"
+  // CHECK-NEXT:   [[MV_2:%.*]] = move_value [var_decl] [[PAYLOAD_2]] : $Int
+  // CHECK-NEXT:   debug_value [[MV_2]] : $Int, let, name "y"
+  // CHECK-NEXT:   extend_lifetime [[MV_2]] : $Int
+  // CHECK-NEXT:   extend_lifetime [[MV_1]] : $Int
+  // CHECK-NEXT:   return [[MV_1]] : $Int
 }
 

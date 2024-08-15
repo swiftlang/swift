@@ -624,7 +624,8 @@ func genericFuncWithConversion<T: C>(list : [T]) {
 // CHECK: switch_enum [[NEXT_RESULT]] : $Optional<Int>, case #Optional.some!enumelt: [[BB_SOME:bb.*]], case
 // CHECK: [[BB_SOME]]([[X_PRE_BINDING:%.*]] : $Int):
 // CHECK: [[X_BINDING:%.*]] = enum $Optional<Int>, #Optional.some!enumelt, [[X_PRE_BINDING]] : $Int
-// CHECK: debug_value [[X_BINDING]] : $Optional<Int>, let, name "x"
+// CHECK: [[MVX_BINDING:%.*]] = move_value [var_decl] [[X_BINDING]] : $Optional<Int>
+// CHECK: debug_value [[MVX_BINDING]] : $Optional<Int>, let, name "x"
 func injectForEachElementIntoOptional(_ xs: [Int]) {
   for x : Int? in xs {}
 }

@@ -168,7 +168,7 @@ internal struct DumpGenericMetadata: ParsableCommand {
   }
 
   private func dumpText(process: any RemoteProcess, generics: [Metadata]) throws {
-    var errorneousMetadata: [(ptr: swift_reflection_ptr_t, name: String)] = []
+    var erroneousMetadata: [(ptr: swift_reflection_ptr_t, name: String)] = []
     var output = try Output(genericMetadataOptions.outputFile)
     print("\(process.processName)(\(process.processIdentifier)):\n", to: &output)
     print("Address", "Allocation", "Size", "Offset", "isArrayOfClass", "Name", separator: "\t", to: &output)
@@ -178,7 +178,7 @@ internal struct DumpGenericMetadata: ParsableCommand {
         print("\(hex: allocation.ptr)\t\(allocation.size)\t\(offset)", terminator: "\t", to: &output)
       } else {
         if $0.garbage {
-          errorneousMetadata.append((ptr: $0.ptr, name: $0.name))
+          erroneousMetadata.append((ptr: $0.ptr, name: $0.name))
         }
         print("???\t??\t???", terminator: "\t", to: &output)
       }
@@ -189,9 +189,9 @@ internal struct DumpGenericMetadata: ParsableCommand {
       }
     }
 
-    if errorneousMetadata.count > 0 {
+    if erroneousMetadata.count > 0 {
       print("Warning: The following metadata was not found in any DATA or AUTH segments, may be garbage.", to: &output)
-      errorneousMetadata.forEach {
+      erroneousMetadata.forEach {
         print("\(hex: $0.ptr)\t\($0.name)", to: &output)
       }
     }

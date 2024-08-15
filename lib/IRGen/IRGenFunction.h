@@ -358,6 +358,15 @@ public:
                                               llvm::Value *minor,
                                               llvm::Value *patch);
 
+  llvm::Value *emitTargetVariantOSVersionAtLeastCall(llvm::Value *major,
+                                                     llvm::Value *minor,
+                                                     llvm::Value *patch);
+
+  llvm::Value *emitTargetOSVersionOrVariantOSVersionAtLeastCall(
+      llvm::Value *major, llvm::Value *minor, llvm::Value *patch,
+      llvm::Value *variantMajor, llvm::Value *variantMinor,
+      llvm::Value *variantPatch);
+
   llvm::Value *emitProjectBoxCall(llvm::Value *box, llvm::Value *typeMetadata);
 
   llvm::Value *emitAllocEmptyBoxCall();

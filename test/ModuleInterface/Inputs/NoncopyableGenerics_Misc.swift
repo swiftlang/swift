@@ -142,3 +142,12 @@ public struct RegularTwice: ~Copyable, ~Copyable {}
 public struct Continuation<T: ~Copyable, E: Error> {
   public func resume(returning value: consuming T) where E == Never {}
 }
+
+// coverage for rdar://132453000 (Can't make a type both conditionally Copyable and conditionally Escapable)
+@frozen
+public enum Moptional<Wrapped: ~Copyable & ~Escapable>: ~Copyable, ~Escapable {
+  case none
+  case some(Wrapped)
+}
+extension Moptional: Copyable where Wrapped: Copyable {}
+extension Moptional: Escapable where Wrapped: Escapable {}

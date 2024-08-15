@@ -232,7 +232,7 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
 private func removeBridgingCodeInPredecessors(of block: BasicBlock, _ context: FunctionPassContext) {
   for pred in block.predecessors {
     let branch = pred.terminator as! BranchInst
-    let builder = Builder(after: branch, context)
+    let builder = Builder(atEndOf: branch.parentBlock, location: branch.location, context)
     builder.createBranch(to: block)
     
     let en = branch.operands[0].value as! EnumInst

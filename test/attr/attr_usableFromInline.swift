@@ -2,10 +2,10 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -disable-objc-attr-requires-foundation-module -enable-objc-interop -enable-testing -package-name myPkg
 
 @usableFromInline private func privateVersioned() {}
-// expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but 'privateVersioned()' is private}}
+// expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but global function 'privateVersioned()' is private}}
 
 @usableFromInline fileprivate func fileprivateVersioned() {}
-// expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but 'fileprivateVersioned()' is fileprivate}}
+// expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but global function 'fileprivateVersioned()' is fileprivate}}
 
 @usableFromInline internal func internalVersioned() {}
 // OK
@@ -17,7 +17,7 @@
 // OK
 
 @usableFromInline public func publicVersioned() {}
-// expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but 'publicVersioned()' is public}}
+// expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but global function 'publicVersioned()' is public}}
 
 // expected-note@+1 3{{global function 'internalFunc()' is not '@usableFromInline' or public}}
 internal func internalFunc() {}
@@ -55,13 +55,13 @@ package func packageInlinableFunc() {
 package class PackageClass {
   // expected-note@-1 *{{type declared here}}
   @usableFromInline public func publicVersioned() {}
-  // expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but 'publicVersioned()' is public}}
+  // expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but instance method 'publicVersioned()' is public}}
 }
 
 internal class InternalClass {
   // expected-note@-1 2{{type declared here}}
   @usableFromInline public func publicVersioned() {}
-  // expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but 'publicVersioned()' is public}}
+  // expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but instance method 'publicVersioned()' is public}}
 }
 
 fileprivate class filePrivateClass {
@@ -333,4 +333,22 @@ public struct TestGenericSubscripts {
 
   @usableFromInline package func pkgNonGenericWhereClause() where T : PackageProtocol {}
   // expected-error@-1 {{type referenced from a generic requirement of a '@usableFromInline' instance method must be '@usableFromInline' or public}}
+}
+
+public struct IncorrectInitUse {
+  public var x: Int {
+    @usableFromInline
+    // expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but getter for property 'x' is public}}
+    get { 0 }
+
+    @usableFromInline
+    // expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but setter for property 'x' is public}}
+    set { }
+  }
+
+  @usableFromInline
+  // expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but initializer 'init(x:)' is public}}
+  public init(x: Int) {
+    self.x = x
+  }
 }

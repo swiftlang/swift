@@ -111,7 +111,7 @@ struct ValidateAllUsesWithinLiveness : public AccessUseVisitor {
     if (isa<EndAccessInst>(user))
       return true;
 
-    if (liveness.isWithinBoundary(user)) {
+    if (liveness.isWithinBoundary(user, /*deadEndBlocks=*/nullptr)) {
       LLVM_DEBUG(llvm::dbgs() << "User in boundary: " << *user);
       diagnose(op->getUser(),
                diag::sil_referencebinding_src_used_within_inout_scope);

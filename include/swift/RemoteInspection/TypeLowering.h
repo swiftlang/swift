@@ -428,6 +428,7 @@ private:
   const TypeInfo *getThickFunctionTypeInfo();
   const TypeInfo *getAnyMetatypeTypeInfo();
   const TypeInfo *getDefaultActorStorageTypeInfo();
+  const TypeInfo *getRawUnsafeContinuationTypeInfo();
   const TypeInfo *getEmptyTypeInfo();
 
   template <typename TypeInfoTy, typename... Args>

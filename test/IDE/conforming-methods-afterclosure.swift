@@ -8,7 +8,7 @@ public struct MyStruct {
 
     public func returnSomeP -> some TargetP { ConcreteP() }
     public func returnConcreteP -> ConcreteP { ConcreteP() }
-    public func reutrnInt -> Int { 1 }
+    public func returnInt -> Int { 1 }
 }
 
 func test() {

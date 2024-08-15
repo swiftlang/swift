@@ -1087,7 +1087,7 @@ unsigned NominalTypeTrait::getDepth() const {
   if (auto P = Parent) {
     switch (P->getKind()) {
     case TypeRefKind::Nominal:
-      return 1 + cast<NominalTypeRef>(P)->getDepth();
+      return cast<NominalTypeRef>(P)->getDepth();
     case TypeRefKind::BoundGeneric:
       return 1 + cast<BoundGenericTypeRef>(P)->getDepth();
     default:

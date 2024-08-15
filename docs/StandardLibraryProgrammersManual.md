@@ -2,9 +2,9 @@
 
 This is meant to be a guide to people working on the standard library. It covers coding standards, code organization, best practices, internal annotations, and provides a guide to standard library internals. This document is inspired by LLVM's excellent [programmer's manual](http://llvm.org/docs/ProgrammersManual.html) and [coding standards](http://llvm.org/docs/CodingStandards.html).
 
-TODO: Should this subsume or link to [StdlibRationales.rst](https://github.com/apple/swift/blob/main/docs/StdlibRationales.rst)?
+TODO: Should this subsume or link to [StdlibRationales.rst](https://github.com/swiftlang/swift/blob/main/docs/StdlibRationales.rst)?
 
-TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.com/apple/swift/blob/main/docs/AccessControlInStdlib.rst)
+TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.com/swiftlang/swift/blob/main/docs/AccessControlInStdlib.rst)
 
 In this document, "stdlib" refers to the core standard library (`stdlib/public/core`), our Swift overlays for system frameworks (`stdlib/public/Darwin/*`, `stdlib/public/Windows/*`, etc.), as well as the auxiliary and prototype libraries under `stdlib/private`.
 
@@ -242,7 +242,7 @@ extension Foo {
 
 #### Core Standard Library
 
-All new public API additions to the core Standard Library must go through the [Swift Evolution Process](https://github.com/apple/swift-evolution/blob/main/process.md). The Core Team must have approved the additions by the time we merge them into the stdlib codebase.
+All new public API additions to the core Standard Library must go through the [Swift Evolution Process](https://github.com/swiftlang/swift-evolution/blob/main/process.md). The Core Team must have approved the additions by the time we merge them into the stdlib codebase.
 
 All public APIs should come with documentation comments describing their purpose and behavior. It is highly recommended to use big-oh notation to document any guaranteed performance characteristics. (CPU and/or memory use, number of accesses to some underlying collection, etc.)
 
@@ -442,7 +442,7 @@ let theBits = unsafeBitCast(&x, ...)
 
 Should only be used if necessary. This has the effect of forcing inlining to occur before any dataflow analyses take place. Unless you specifically need this behavior, use `@_inline(__always)` or some other mechanism. Its primary purpose is to force the compiler's static checks to peer into the body for diagnostic purposes.
 
-Use of this attribute imposes limitations on what can be in the body. For more details, refer to the [documentation](https://github.com/apple/swift/blob/main/docs/TransparentAttr.md).
+Use of this attribute imposes limitations on what can be in the body. For more details, refer to the [documentation](https://github.com/swiftlang/swift/blob/main/docs/TransparentAttr.md).
 
 #### `@unsafe_no_objc_tagged_pointer`
 
@@ -480,10 +480,6 @@ The standard library cannot import the Darwin module (much less an ICU module), 
 
 ### Internal structures
 
-#### `_FixedArray16`
-
-The standard library has an internal array type of fixed size 16. This provides fast random access into contiguous (usually stack-allocated) memory. See [FixedArray.swift](https://github.com/apple/swift/blob/main/stdlib/public/core/FixedArray.swift) for implementation.
-
 #### Thread Local Storage
 
 The standard library utilizes thread local storage (TLS) to cache expensive computations or operations in a thread-safe fashion. This is currently used for tracking some ICU state for Strings. Adding new things to this struct is a little more involved, as Swift lacks some of the features required for it to be expressed elegantly (e.g. move-only structs):
@@ -492,7 +488,7 @@ The standard library utilizes thread local storage (TLS) to cache expensive comp
 2. If the member is not trivially initializable, update `_initializeThreadLocalStorage` and `_ThreadLocalStorage.init`.
 3. If the field is not trivially destructable, update `_destroyTLS` to properly destroy the value.
 
-See [ThreadLocalStorage.swift](https://github.com/apple/swift/blob/main/stdlib/public/core/ThreadLocalStorage.swift) for more details.
+See [ThreadLocalStorage.swift](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/ThreadLocalStorage.swift) for more details.
 
 
 ## Working with Resilience

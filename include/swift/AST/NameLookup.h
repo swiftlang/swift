@@ -249,7 +249,10 @@ enum class UnqualifiedLookupFlags {
   ModuleLookup           = 1 << 8,
   /// This lookup should discard 'Self' requirements in protocol extension
   /// 'where' clauses.
-  DisregardSelfBounds    = 1 << 9
+  DisregardSelfBounds    = 1 << 9,
+  /// This lookup should include members that would otherwise be filtered out
+  /// because they come from a module that has not been imported.
+  IgnoreMissingImports = 1 << 10,
 };
 
 using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;

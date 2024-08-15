@@ -158,6 +158,9 @@ enum class NameLookupFlags {
   IncludeUsableFromInline = 1 << 2,
   /// This lookup should exclude any names introduced by macro expansions.
   ExcludeMacroExpansions = 1 << 3,
+  /// Whether to include members that would otherwise be filtered out because
+  /// they come from a module that has not been imported.
+  IgnoreMissingImports = 1 << 4,
 };
 
 /// A set of options that control name lookup.
@@ -290,11 +293,7 @@ Type getOptionalType(SourceLoc loc, Type elementType);
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression.  Context is the DeclContext used
 /// for the lookup.
-///
-/// \param replaceInvalidRefsWithErrors Indicates whether it's allowed
-/// to replace any discovered invalid member references with `ErrorExpr`.
-Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
-                         bool replaceInvalidRefsWithErrors);
+Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
 
 /// Check for invalid existential types in the given declaration.
 void checkExistentialTypes(Decl *decl);
@@ -488,6 +487,13 @@ void diagnoseDuplicateCaptureVars(CaptureListExpr *expr);
 Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
                                  ReferenceOwnershipAttr *attr);
 
+/// Checks if the given witness can structurally match the requirement, ie.
+/// whether it has a matching kind like static vs. non-static, matching decl,
+/// etc. It does not check if the types of the witness is able to satisfy the
+/// requirement.
+/// If there is a matching failure, returns a `false`, otherwise return `true`.
+bool witnessStructureMatches(ValueDecl *req, const ValueDecl *witness);
+
 /// Infer default value witnesses for all requirements in the given protocol.
 void inferDefaultWitnesses(ProtocolDecl *proto);
 
@@ -576,10 +582,6 @@ void addImplicitConstructors(NominalTypeDecl *typeDecl);
 /// Fold the given sequence expression into an (unchecked) expression
 /// tree.
 Expr *foldSequence(SequenceExpr *expr, DeclContext *dc);
-
-/// Given an pre-folded expression, find LHS from the expression if a binary
-/// operator \c name appended to the expression.
-Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
 
 /// Type check the given expression.
 ///
@@ -1527,9 +1529,30 @@ public:
   }
 };
 
+using RequiredImportAccessLevelCallback =
+    std::function<void(AttributedImport<ImportedModule>)>;
+
+/// Make a note that uses of \p decl in \p dc require that the decl's defining
+/// module be imported with an access level that is at least as permissive as \p
+/// accessLevel.
+void recordRequiredImportAccessLevelForDecl(
+    const Decl *decl, const DeclContext *dc, AccessLevel accessLevel,
+    RequiredImportAccessLevelCallback remark);
+
 /// Report imports that are marked public but are not used in API.
 void diagnoseUnnecessaryPublicImports(SourceFile &SF);
 
+/// Emit or delay a diagnostic that suggests adding a missing import that is
+/// necessary to bring \p decl into scope in the containing source file. If
+/// delayed, the diagnostic will instead be emitted after type checking the
+/// entire file and will include an appropriate fix-it. Returns true if a
+/// diagnostic was emitted (and not delayed).
+bool maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
+                                         const DeclContext *dc, SourceLoc loc);
+
+/// Emit delayed diagnostics regarding imports that should be added to the
+/// source file.
+void diagnoseMissingImports(SourceFile &sf);
 } // end namespace swift
 
 #endif

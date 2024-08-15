@@ -429,6 +429,8 @@ internal var _objectPointerIsObjCBit: UInt {
     return 0x4000_0000_0000_0000
 #elseif _pointerBitWidth(_32)
     return 0x0000_0002
+#elseif _pointerBitWidth(_16)
+    return 0x0000
 #else
 #error("Unknown platform")
 #endif

@@ -400,10 +400,12 @@ struct BridgedType {
   BRIDGED_INLINE bool isEnumOrBoundGenericEnum() const;
   BRIDGED_INLINE bool isFunction() const;
   BRIDGED_INLINE bool isMetatype() const;
+  BRIDGED_INLINE bool isClassExistential() const;
   BRIDGED_INLINE bool isNoEscapeFunction() const;
   BRIDGED_INLINE bool containsNoEscapeFunction() const;
   BRIDGED_INLINE bool isThickFunction() const;
   BRIDGED_INLINE bool isAsyncFunction() const;
+  BRIDGED_INLINE bool isVoid() const;
   BRIDGED_INLINE bool isEmpty(BridgedFunction f) const;
   BRIDGED_INLINE TraitResult canBeClass() const;
   BRIDGED_INLINE bool isMoveOnly() const;
@@ -415,7 +417,7 @@ struct BridgedType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBuiltinVectorElementType() const;
   BRIDGED_INLINE bool isBuiltinFixedWidthInteger(SwiftInt width) const;
   BRIDGED_INLINE bool isExactSuperclassOf(BridgedType t) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getInstanceTypeOfMetatype(BridgedFunction f) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getLoweredInstanceTypeOfMetatype(BridgedFunction f) const;
   BRIDGED_INLINE bool isDynamicSelfMetatype() const;
   BRIDGED_INLINE MetatypeRepresentation getRepresentationOfMetatype(BridgedFunction f) const;
   BRIDGED_INLINE bool isCalleeConsumedFunction() const;
@@ -941,12 +943,15 @@ struct BridgedInstruction {
   BRIDGED_INLINE OptionalBridgedValue StructInst_getUniqueNonTrivialFieldValue() const;
   BRIDGED_INLINE SwiftInt StructElementAddrInst_fieldIndex() const;
   BRIDGED_INLINE bool BeginBorrow_isLexical() const;
+  BRIDGED_INLINE bool BeginBorrow_hasPointerEscape() const;
   BRIDGED_INLINE bool BeginBorrow_isFromVarDecl() const;
   BRIDGED_INLINE bool MoveValue_isLexical() const;
+  BRIDGED_INLINE bool MoveValue_hasPointerEscape() const;
   BRIDGED_INLINE bool MoveValue_isFromVarDecl() const;
 
   BRIDGED_INLINE SwiftInt ProjectBoxInst_fieldIndex() const;
   BRIDGED_INLINE bool EndCOWMutationInst_doKeepUnique() const;
+  BRIDGED_INLINE bool DestroyValueInst_isDeadEnd() const;
   BRIDGED_INLINE SwiftInt EnumInst_caseIndex() const;
   BRIDGED_INLINE SwiftInt UncheckedEnumDataInst_caseIndex() const;
   BRIDGED_INLINE SwiftInt InitEnumDataAddrInst_caseIndex() const;
@@ -956,6 +961,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool RefElementAddrInst_fieldIsLet() const;
   BRIDGED_INLINE bool RefElementAddrInst_isImmutable() const;
   BRIDGED_INLINE void RefElementAddrInst_setImmutable(bool isImmutable) const;
+  BRIDGED_INLINE bool RefTailAddrInst_isImmutable() const;
   BRIDGED_INLINE SwiftInt PartialApplyInst_numArguments() const;
   BRIDGED_INLINE SwiftInt ApplyInst_numArguments() const;
   BRIDGED_INLINE bool ApplyInst_getNonThrowing() const;
@@ -983,6 +989,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE void MarkDependenceInst_resolveToNonEscaping() const;
   BRIDGED_INLINE SwiftInt BeginAccessInst_getAccessKind() const;
   BRIDGED_INLINE bool BeginAccessInst_isStatic() const;
+  BRIDGED_INLINE bool BeginAccessInst_isUnsafe() const;
   BRIDGED_INLINE bool CopyAddrInst_isTakeOfSrc() const;
   BRIDGED_INLINE bool CopyAddrInst_isInitializationOfDest() const;
   BRIDGED_INLINE bool ExplicitCopyAddrInst_isTakeOfSrc() const;
@@ -1066,6 +1073,14 @@ struct BridgedArgument {
 
 struct OptionalBridgedArgument {
   OptionalSwiftObject obj;
+
+#ifdef USED_IN_CPP_SOURCE
+  swift::SILArgument * _Nullable unbridged() const {
+    if (!obj)
+      return nullptr;
+    return static_cast<swift::SILArgument *>(obj);
+  }
+#endif
 };
 
 struct OptionalBridgedBasicBlock {

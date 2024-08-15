@@ -50,7 +50,7 @@ import Swift
 /// If you call `addTask(priority:operation:)` to create a new task in a canceled group,
 /// that task is immediately canceled after creation.
 /// Alternatively, you can call `addTaskUnlessCancelled(priority:operation:)`,
-/// which doesn't create the task if the group has already been canceled
+/// which doesn't create the task if the group has already been canceled.
 /// Choosing between these two functions
 /// lets you control how to react to cancellation within a group:
 /// some child tasks need to run regardless of cancellation,
@@ -67,7 +67,7 @@ import Swift
 @backDeployed(before: SwiftStdlib 6.0)
 @inlinable
 public func withTaskGroup<ChildTaskResult, GroupResult>(
-  of childTaskResultType: ChildTaskResult.Type,
+  of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
   returning returnType: GroupResult.Type = GroupResult.self,
   isolation: isolated (any Actor)? = #isolation,
   body: (inout TaskGroup<ChildTaskResult>) async -> GroupResult
@@ -90,11 +90,17 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
   #endif
 }
 
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+//
+// This function also doubles as an ABI-compatibility shim predating the
+// introduction of #isolation.
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("$ss13withTaskGroup2of9returning4bodyq_xm_q_mq_ScGyxGzYaXEtYar0_lF")
 @_unsafeInheritExecutor // for ABI compatibility
 @inlinable
-public func withTaskGroup<ChildTaskResult, GroupResult>(
+public func _unsafeInheritExecutor_withTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout TaskGroup<ChildTaskResult>) async -> GroupResult
@@ -155,7 +161,7 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 /// If you call `addTask(priority:operation:)` to create a new task in a canceled group,
 /// that task is immediately canceled after creation.
 /// Alternatively, you can call `addTaskUnlessCancelled(priority:operation:)`,
-/// which doesn't create the task if the group has already been canceled
+/// which doesn't create the task if the group has already been canceled.
 /// Choosing between these two functions
 /// lets you control how to react to cancellation within a group:
 /// some child tasks need to run regardless of cancellation,
@@ -196,7 +202,7 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 @backDeployed(before: SwiftStdlib 6.0)
 @inlinable
 public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
-  of childTaskResultType: ChildTaskResult.Type,
+  of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
   returning returnType: GroupResult.Type = GroupResult.self,
   isolation: isolated (any Actor)? = #isolation,
   body: (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
@@ -228,11 +234,16 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   #endif
 }
 
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+//
+// This function also doubles as an ABI-compatibility shim predating the
+// introduction of #isolation.
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("$ss21withThrowingTaskGroup2of9returning4bodyq_xm_q_mq_Scgyxs5Error_pGzYaKXEtYaKr0_lF")
 @_unsafeInheritExecutor // for ABI compatibility
-@usableFromInline
-internal func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
+public func _unsafeInheritExecutor_withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
@@ -821,7 +832,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// Instead, the corresponding call to `ThrowingTaskGroup.next()` rethrows that error.
   ///
   /// - Parameters:
-  ///   - overridingPriority: The priority of the operation task.
+  ///   - priority: The priority of the operation task.
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
@@ -852,7 +863,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// Instead, the corresponding call to `ThrowingTaskGroup.next()` rethrows that error.
   ///
   /// - Parameters:
-  ///   - overridingPriority: The priority of the operation task.
+  ///   - priority: The priority of the operation task.
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.

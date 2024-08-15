@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "clang/Driver/Driver.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Frontend/Frontend.h"
@@ -232,8 +233,35 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   if (LangOpts.hasFeature(Feature::Embedded))
     LibSubDir = "embedded";
 
-  llvm::sys::path::append(LibPath, LibSubDir);
   SearchPathOpts.RuntimeLibraryPaths.clear();
+
+#if defined(_WIN32)
+  // Resource path looks like this:
+  //
+  //   C:\...\Swift\Toolchains\6.0.0+Asserts\usr\lib\swift
+  //
+  // The runtimes are in
+  //
+  //   C:\...\Swift\Runtimes\6.0.0\usr\bin
+  //
+  llvm::SmallString<128> RuntimePath(LibPath);
+
+  llvm::sys::path::remove_filename(RuntimePath);
+  llvm::sys::path::remove_filename(RuntimePath);
+  llvm::sys::path::remove_filename(RuntimePath);
+
+  llvm::SmallString<128> VersionWithAttrs(llvm::sys::path::filename(RuntimePath));
+  size_t MaybePlus = VersionWithAttrs.find_first_of('+');
+  StringRef Version = VersionWithAttrs.substr(0, MaybePlus);
+
+  llvm::sys::path::remove_filename(RuntimePath);
+  llvm::sys::path::remove_filename(RuntimePath);
+  llvm::sys::path::append(RuntimePath, "Runtimes", Version, "usr", "bin");
+
+  SearchPathOpts.RuntimeLibraryPaths.push_back(std::string(RuntimePath.str()));
+#endif
+
+  llvm::sys::path::append(LibPath, LibSubDir);
   SearchPathOpts.RuntimeLibraryPaths.push_back(std::string(LibPath.str()));
   if (Triple.isOSDarwin())
     SearchPathOpts.RuntimeLibraryPaths.push_back(DARWIN_OS_LIBRARY_PATH);
@@ -333,6 +361,43 @@ setBridgingHeaderFromFrontendOptions(ClangImporterOptions &ImporterOpts,
 
   ImporterOpts.BridgingHeader =
       FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput();
+}
+
+void CompilerInvocation::computeCXXStdlibOptions() {
+  auto [clangDriver, clangDiagEngine] =
+      ClangImporter::createClangDriver(LangOpts, ClangImporterOpts);
+  auto clangDriverArgs = ClangImporter::createClangArgs(
+      ClangImporterOpts, SearchPathOpts, clangDriver);
+  auto &clangToolchain =
+      clangDriver.getToolChain(clangDriverArgs, LangOpts.Target);
+  auto cxxStdlibKind = clangToolchain.GetCXXStdlibType(clangDriverArgs);
+  auto cxxDefaultStdlibKind = clangToolchain.GetDefaultCXXStdlibType();
+
+  auto toCXXStdlibKind =
+      [](clang::driver::ToolChain::CXXStdlibType clangCXXStdlibType)
+      -> CXXStdlibKind {
+    switch (clangCXXStdlibType) {
+    case clang::driver::ToolChain::CST_Libcxx:
+      return CXXStdlibKind::Libcxx;
+    case clang::driver::ToolChain::CST_Libstdcxx:
+      return CXXStdlibKind::Libstdcxx;
+    }
+  };
+
+  // The MSVC driver in Clang is not aware of the C++ stdlib, and currently
+  // always assumes libstdc++, which is incorrect: the Microsoft stdlib is
+  // normally used.
+  if (LangOpts.Target.isOSWindows()) {
+    // In the future, we should support libc++ on Windows. That would require
+    // the MSVC driver to support it first
+    // (see https://reviews.llvm.org/D101479).
+    LangOpts.CXXStdlib = CXXStdlibKind::Msvcprt;
+    LangOpts.PlatformDefaultCXXStdlib = CXXStdlibKind::Msvcprt;
+  }
+  if (LangOpts.Target.isOSLinux() || LangOpts.Target.isOSDarwin()) {
+    LangOpts.CXXStdlib = toCXXStdlibKind(cxxStdlibKind);
+    LangOpts.PlatformDefaultCXXStdlib = toCXXStdlibKind(cxxDefaultStdlibKind);
+  }
 }
 
 void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
@@ -786,10 +851,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnablePackageInterfaceLoad = Args.hasArg(OPT_experimental_package_interface_load) ||
                                     ::getenv("SWIFT_ENABLE_PACKAGE_INTERFACE_LOAD");
 
-  Opts.EnableBypassResilienceInPackage =
-      Args.hasArg(OPT_experimental_package_bypass_resilience) ||
-      Opts.hasFeature(Feature::ClientBypassResilientAccessInPackage);
-
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
   if (Args.hasArg(OPT_check_api_availability_only))
@@ -1168,6 +1229,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.WarnImplicitOverrides =
     Args.hasArg(OPT_warn_implicit_overrides);
 
+  Opts.WarnSoftDeprecated = Args.hasArg(OPT_warn_soft_deprecated);
+
   Opts.EnableNSKeyedArchiverDiagnostics =
       Args.hasFlag(OPT_enable_nskeyedarchiver_diagnostics,
                    OPT_disable_nskeyedarchiver_diagnostics,
@@ -1239,13 +1302,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.AllowNonResilientAccess =
       Args.hasArg(OPT_experimental_allow_non_resilient_access) ||
+      Args.hasArg(OPT_allow_non_resilient_access) ||
       Opts.hasFeature(Feature::AllowNonResilientAccessInPackage);
   if (Opts.AllowNonResilientAccess) {
     // Override the option to skip non-exportable decls.
     if (Opts.SkipNonExportableDecls) {
       Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
                      "-experimental-skip-non-exportable-decls",
-                     "-experimental-allow-non-resilient-access");
+                     "-allow-non-resilient-access");
       Opts.SkipNonExportableDecls = false;
     }
     // If built from interface, non-resilient access should not be allowed.
@@ -1254,7 +1318,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
             FrontendOpts.RequestedAction)) {
       Diags.diagnose(
           SourceLoc(), diag::warn_ignore_option_overriden_by,
-          "-experimental-allow-non-resilient-access",
+          "-allow-non-resilient-access",
           "-compile-module-from-interface or -typecheck-module-from-interface");
       Opts.AllowNonResilientAccess = false;
     }
@@ -1576,7 +1640,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       HadError = true;
     }
 
-    if (!FrontendOpts.InputsAndOutputs.isWholeModule()) {
+    if (!FrontendOpts.InputsAndOutputs.isWholeModule() && FrontendOptions::doesActionGenerateSIL(FrontendOpts.RequestedAction)) {
       Diags.diagnose(SourceLoc(), diag::wmo_with_embedded);
       HadError = true;
     }
@@ -1606,10 +1670,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DisableDynamicActorIsolation |=
       Args.hasArg(OPT_disable_dynamic_actor_isolation);
-
-  // @DebugDescription uses @_section and @_used attributes.
-  if (Opts.hasFeature(Feature::DebugDescriptionMacro))
-    Opts.enableFeature(Feature::SymbolLinkageMarkers);
 
 #if SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION
   /// Enable round trip parsing via the new swift parser unless it is disabled
@@ -1671,7 +1731,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
     if (LangOpts.AllowNonResilientAccess)
       Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
                      "-experimental-skip-non-inlinable-function-bodies-without-types",
-                     "-experimental-allow-non-resilient-access");
+                     "-allow-non-resilient-access");
     else
       Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinableWithoutTypes;
   }
@@ -1682,7 +1742,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
     if (LangOpts.AllowNonResilientAccess)
       Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
                      "-experimental-skip-non-inlinable-function-bodies",
-                     "-experimental-allow-non-resilient-access");
+                     "-allow-non-resilient-access");
     else
       Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinable;
   }
@@ -1691,7 +1751,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
     if (LangOpts.AllowNonResilientAccess)
       Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
                      "-tbd-is-installapi",
-                     "-experimental-allow-non-resilient-access");
+                     "-allow-non-resilient-access");
     else
       Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinable;
   }
@@ -1700,7 +1760,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
     if (LangOpts.AllowNonResilientAccess)
       Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
                      "-experimental-skip-all-function-bodies",
-                     "-experimental-allow-non-resilient-access");
+                     "-allow-non-resilient-access");
     else
       Opts.SkipFunctionBodies = FunctionBodySkipping::All;
   }
@@ -1774,7 +1834,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
       Opts.EnableLazyTypecheck) {
     Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
                    "-experimental-lazy-typecheck",
-                   "-experimental-allow-non-resilient-access");
+                   "-allow-non-resilient-access");
     Opts.EnableLazyTypecheck = false;
   }
 
@@ -2010,6 +2070,7 @@ static bool validateSwiftModuleFileArgumentAndAdd(const std::string &swiftModule
 
 static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
                                 DiagnosticEngine &Diags,
+                                const CASOptions &CASOpts,
                                 StringRef workingDirectory) {
   using namespace options;
   namespace path = llvm::sys::path;
@@ -2113,6 +2174,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_visualc_tools_version))
     Opts.setVCToolsVersion(A->getValue());
 
+  if (const Arg *A = Args.getLastArg(OPT_sysroot))
+    Opts.setSysRoot(A->getValue());
+
   if (const Arg *A = Args.getLastArg(OPT_resource_dir))
     Opts.RuntimeResourcePath = A->getValue();
 
@@ -2150,8 +2214,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     Opts.ScannerPrefixMapper.push_back(Opt.str());
   }
 
-  Opts.NoScannerModuleValidation |=
-      Args.hasArg(OPT_no_scanner_module_validation);
+  // rdar://132340493 disable scanner-side validation for non-caching builds
+  Opts.ScannerModuleValidation |= Args.hasFlag(OPT_scanner_module_validation,
+                                               OPT_no_scanner_module_validation,
+                                               CASOpts.EnableCaching);
 
   std::optional<std::string> forceModuleLoadingMode;
   if (auto *A = Args.getLastArg(OPT_module_load_mode))
@@ -2595,24 +2661,28 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       OPT_enable_sil_opaque_values, OPT_disable_sil_opaque_values, false);
   Opts.EnableSpeculativeDevirtualization |= Args.hasArg(OPT_enable_spec_devirt);
   Opts.EnableAsyncDemotion |= Args.hasArg(OPT_enable_async_demotion);
+  Opts.EnableThrowsPrediction = Args.hasFlag(
+      OPT_enable_throws_prediction, OPT_disable_throws_prediction,
+      Opts.EnableThrowsPrediction);
   Opts.EnableActorDataRaceChecks |= Args.hasFlag(
       OPT_enable_actor_data_race_checks,
       OPT_disable_actor_data_race_checks, /*default=*/false);
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);
   if (Args.hasArg(OPT_CrossModuleOptimization)) {
     Opts.CMOMode = CrossModuleOptimizationMode::Aggressive;
-  } else if (Args.hasArg(OPT_EnbaleDefaultCMO)) {
-    Opts.CMOMode = CrossModuleOptimizationMode::Default;  
-  } else if (Args.hasArg(OPT_EnbaleCMOEverything)) {
+  } else if (Args.hasArg(OPT_EnableDefaultCMO)) {
+    Opts.CMOMode = CrossModuleOptimizationMode::Default;
+  } else if (Args.hasArg(OPT_EnableCMOEverything)) {
     Opts.CMOMode = CrossModuleOptimizationMode::Everything;
   }
 
   if (Args.hasArg(OPT_ExperimentalPackageCMO) ||
+      Args.hasArg(OPT_PackageCMO) ||
       LangOpts.hasFeature(Feature::PackageCMO)) {
     if (!LangOpts.AllowNonResilientAccess) {
       Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
-                     "-experimental-package-cmo",
-                     "-experimental-allow-non-resilient-access");
+                     "-package-cmo",
+                     "-allow-non-resilient-access");
     } else {
       Opts.EnableSerializePackage = true;
       Opts.CMOMode = CrossModuleOptimizationMode::Default;
@@ -3356,6 +3426,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_fragile_resilient_protocol_witnesses,
                  OPT_disable_fragile_resilient_protocol_witnesses,
                  Opts.UseFragileResilientProtocolWitnesses);
+  Opts.EnableHotColdSplit =
+      Args.hasFlag(OPT_enable_split_cold_code,
+                   OPT_disable_split_cold_code,
+                   Opts.EnableHotColdSplit);
   Opts.EnableLargeLoadableTypesReg2Mem =
       Args.hasFlag(OPT_enable_large_loadable_types_reg2mem,
                    OPT_disable_large_loadable_types_reg2mem,
@@ -3557,7 +3631,7 @@ bool CompilerInvocation::parseArgs(
   ParseSymbolGraphArgs(SymbolGraphOpts, ParsedArgs, Diags, LangOpts);
 
   if (ParseSearchPathArgs(SearchPathOpts, ParsedArgs, Diags,
-                          workingDirectory)) {
+                          CASOpts, workingDirectory)) {
     return true;
   }
 
@@ -3593,6 +3667,7 @@ bool CompilerInvocation::parseArgs(
   // Now that we've parsed everything, setup some inter-option-dependent state.
   setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);
   setBridgingHeaderFromFrontendOptions(ClangImporterOpts, FrontendOpts);
+  computeCXXStdlibOptions();
   if (LangOpts.hasFeature(Feature::Embedded)) {
     IRGenOpts.InternalizeAtLink = true;
     IRGenOpts.DisableLegacyTypeInfo = true;

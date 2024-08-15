@@ -28,18 +28,12 @@ class RegionAnalysisValueMap;
 
 namespace regionanalysisimpl {
 
-#ifndef NDEBUG
 /// Global bool set only when asserts are enabled to ease debugging by causing
 /// unknown pattern errors to cause an assert so we drop into the debugger.
 extern bool AbortOnUnknownPatternMatchError;
-#endif
 
 static inline bool shouldAbortOnUnknownPatternMatchError() {
-#ifndef NDEBUG
   return AbortOnUnknownPatternMatchError;
-#else
-  return false;
-#endif
 }
 
 using TransferringOperandSetFactory = Partition::TransferringOperandSetFactory;
@@ -114,7 +108,6 @@ private:
 
 class TrackableValue;
 class TrackableValueState;
-class RepresentativeValue;
 
 enum class TrackableValueFlag {
   /// Base value that says a value is uniquely represented and is
@@ -208,53 +201,6 @@ private:
   }
 };
 
-/// The representative value of the equivalence class that makes up a tracked
-/// value.
-///
-/// We use a wrapper struct here so that we can inject "fake" actor isolated
-/// values into the regions of values that become merged into an actor by
-/// calling a function without a non-sendable result.
-class regionanalysisimpl::RepresentativeValue {
-  friend llvm::DenseMapInfo<RepresentativeValue>;
-
-  using InnerType = PointerUnion<SILValue, SILInstruction *>;
-
-  /// If this is set to a SILValue then it is the actual represented value. If
-  /// it is set to a SILInstruction, then this is a "fake" representative value
-  /// used to inject actor isolatedness. The instruction stored is the
-  /// instruction that introduced the actor isolated-ness.
-  InnerType value;
-
-public:
-  RepresentativeValue() : value() {}
-  RepresentativeValue(SILValue value) : value(value) {}
-  RepresentativeValue(SILInstruction *actorRegionInst)
-      : value(actorRegionInst) {}
-
-  operator bool() const { return bool(value); }
-
-  void print(llvm::raw_ostream &os) const {
-    if (auto *inst = value.dyn_cast<SILInstruction *>()) {
-      os << "ActorRegionIntroducingInst: " << *inst;
-      return;
-    }
-
-    os << *value.get<SILValue>();
-  }
-
-  SILValue getValue() const { return value.get<SILValue>(); }
-  SILValue maybeGetValue() const { return value.dyn_cast<SILValue>(); }
-  bool hasRegionIntroducingInst() const { return value.is<SILInstruction *>(); }
-  SILInstruction *getActorRegionIntroducingInst() const {
-    return value.get<SILInstruction *>();
-  }
-
-  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
-
-private:
-  RepresentativeValue(InnerType value) : value(value) {}
-};
-
 /// A tuple consisting of a base value and its value state.
 ///
 /// DISCUSSION: We are computing regions among equivalence classes of values
@@ -336,7 +282,6 @@ public:
   using Region = PartitionPrimitives::Region;
   using TrackableValue = regionanalysisimpl::TrackableValue;
   using TrackableValueState = regionanalysisimpl::TrackableValueState;
-  using RepresentativeValue = regionanalysisimpl::RepresentativeValue;
 
 private:
   /// A map from the representative of an equivalence class of values to their
@@ -364,6 +309,10 @@ public:
   /// Returns the value for this instruction. If it is a fake "representative
   /// value" returns an empty SILValue.
   SILValue maybeGetRepresentative(Element trackableValueID) const;
+
+  /// Returns the value for this instruction if it isn't a fake "represenative
+  /// value" to inject actor isolatedness. Asserts in such a case.
+  RepresentativeValue getRepresentativeValue(Element trackableValueID) const;
 
   /// Returns the fake "representative value" for this element if it
   /// exists. Returns nullptr otherwise.
@@ -575,38 +524,5 @@ public:
 };
 
 } // namespace swift
-
-namespace llvm {
-
-inline llvm::raw_ostream &
-operator<<(llvm::raw_ostream &os,
-           const swift::regionanalysisimpl::RepresentativeValue &value) {
-  value.print(os);
-  return os;
-}
-
-template <>
-struct DenseMapInfo<swift::regionanalysisimpl::RepresentativeValue> {
-  using RepresentativeValue = swift::regionanalysisimpl::RepresentativeValue;
-  using InnerType = RepresentativeValue::InnerType;
-  using InnerDenseMapInfo = DenseMapInfo<InnerType>;
-
-  static RepresentativeValue getEmptyKey() {
-    return RepresentativeValue(InnerDenseMapInfo::getEmptyKey());
-  }
-  static RepresentativeValue getTombstoneKey() {
-    return RepresentativeValue(InnerDenseMapInfo::getTombstoneKey());
-  }
-
-  static unsigned getHashValue(RepresentativeValue value) {
-    return InnerDenseMapInfo::getHashValue(value.value);
-  }
-
-  static bool isEqual(RepresentativeValue LHS, RepresentativeValue RHS) {
-    return InnerDenseMapInfo::isEqual(LHS.value, RHS.value);
-  }
-};
-
-} // namespace llvm
 
 #endif

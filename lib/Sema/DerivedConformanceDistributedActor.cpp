@@ -19,6 +19,7 @@
 #include "TypeChecker.h"
 #include "swift/Strings.h"
 #include "TypeCheckDistributed.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
@@ -652,8 +653,6 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
   // }
   ASTContext &ctx = getter->getASTContext();
 
-  auto *module = getter->getParentModule();
-
   // Produce an empty brace statement on failure.
   auto failure = [&]() -> std::pair<BraceStmt *, bool> {
     auto body = BraceStmt::create(
@@ -690,8 +689,8 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
   Expr *selfForIsLocalArg = DerivedConformance::createSelfDeclRef(getter);
   selfForIsLocalArg->setType(selfType);
 
-  auto conformances = module->collectExistentialConformances(selfType->getCanonicalType(),
-                                                             ctx.getAnyObjectType());
+  auto conformances = collectExistentialConformances(selfType->getCanonicalType(),
+                                                     ctx.getAnyObjectType());
   auto *argListForIsLocal =
       ArgumentList::forImplicitSingle(ctx, Identifier(),
                                       ErasureExpr::create(ctx, selfForIsLocalArg,

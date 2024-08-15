@@ -10,7 +10,16 @@
 // RUN: -emit-tbd -emit-tbd-path %t/libCore.tbd \
 // RUN: -Xfrontend -tbd-install_name=libCore.dylib -Xfrontend -validate-tbd-against-ir=all
 
-/// Build without -experimental-allow-non-resilient-access
+/// Build with -allow-non-resilient-access
+// RUN: %target-build-swift %t/Core.swift \
+// RUN: -module-name=Core -package-name Pkg \
+// RUN: -Xfrontend -allow-non-resilient-access \
+// RUN: -enable-library-evolution -O -wmo \
+// RUN: -emit-ir -o %t/Core2.ir \
+// RUN: -emit-tbd -emit-tbd-path %t/libCore2.tbd \
+// RUN: -Xfrontend -tbd-install_name=libCore2.dylib -Xfrontend -validate-tbd-against-ir=all
+
+/// Build without -allow-non-resilient-access
 // RUN: %target-build-swift %t/Core.swift \
 // RUN: -module-name=Core -package-name Pkg \
 // RUN: -enable-library-evolution -O -wmo \
@@ -19,7 +28,9 @@
 // RUN: -Xfrontend -tbd-install_name=libCoreRes.dylib -Xfrontend -validate-tbd-against-ir=all
 
 // RUN: %FileCheck %s --check-prefixes=CHECK-COMMON,CHECK-OPT < %t/Core.ir
+// RUN: %FileCheck %s --check-prefixes=CHECK-COMMON,CHECK-OPT < %t/Core2.ir
 // RUN: %FileCheck %s --check-prefixes=CHECK-TBD-COMMON,CHECK-TBD-OPT < %t/libCore.tbd
+// RUN: %FileCheck %s --check-prefixes=CHECK-TBD-COMMON,CHECK-TBD-OPT < %t/libCore2.tbd
 // RUN: %FileCheck %s --check-prefixes=CHECK-COMMON,CHECK-RES < %t/CoreRes.ir
 // RUN: %FileCheck %s --check-prefixes=CHECK-TBD-COMMON,CHECK-TBD-RES < %t/libCoreRes.tbd
 

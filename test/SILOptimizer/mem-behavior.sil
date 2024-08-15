@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -aa-kind=basic-aa -dump-mem-behavior -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -dump-mem-behavior -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
@@ -23,14 +23,17 @@ class Parent {
   @_hasStorage var child: C { get set }
 }
 
-sil @unknown_func : $@convention(thin) (Int32, @in Int32) -> ()
-sil @single_indirect_arg : $@convention(thin) (@in Int32) -> Int32
+sil @unknown_func : $@convention(thin) (Int32, @in_guaranteed Int32) -> ()
+sil @single_indirect_arg : $@convention(thin) (@in_guaranteed Int32) -> Int32
 sil @single_indirect_arg_and_error : $@convention(thin) (@in Int32) -> (Int32, @error Error)
 sil @single_indirect_arg_coroutine : $@yield_once @convention(thin) (@in Int32) -> @yields Int32
-sil @indirect_arg_and_ptr : $@convention(thin) (@in Int32, Builtin.RawPointer) -> Int32
+sil @indirect_arg_and_ptr : $@convention(thin) (@in_guaranteed Int32, Builtin.RawPointer) -> Int32
 sil @single_reference : $@convention(thin) (@guaranteed X) -> Int32
+sil @indirect_yield_coroutine : $@yield_once @convention(thin) (@inout Int32) -> @yields @inout Int32
 sil @nouser_func : $@convention(thin) () -> ()
 sil @in_ptr : $@convention(thin) (@in Builtin.RawPointer) -> ()
+sil @init_C : $@convention(thin) () -> @out C
+sil @read_C : $@convention(thin) (@in_guaranteed C) -> ()
 
 sil @store_to_int : $@convention(thin) (Int32, @inout Int32) -> () {
 [%1: write v**]
@@ -70,17 +73,17 @@ bb0(%0 : $Builtin.RawPointer):
 
 // CHECK-LABEL: @call_unknown_func
 // CHECK:     PAIR #0.
-// CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @in Int32) -> ()
-// CHECK-NEXT:   %1 = argument of bb0 : $*Int32{{.*}}                  // user: %4
+// CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @in_guaranteed Int32) -> ()
+// CHECK-NEXT:   %1 = argument of bb0 : $*Int32{{.*}}
 // CHECK-NEXT:  r=1,w=0
 // CHECK:     PAIR #1.
-// CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @in Int32) -> ()
+// CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @in_guaranteed Int32) -> ()
 // CHECK-NEXT:   %2 = argument of bb0 : $*Int32
 // CHECK-NEXT:  r=0,w=0
 sil @call_unknown_func : $@convention(thin) (Int32, @in Int32, @in Int32) -> () {
 bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
-  %3 = function_ref @unknown_func : $@convention(thin) (Int32, @in Int32) -> ()
-  %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @in Int32) -> ()
+  %3 = function_ref @unknown_func : $@convention(thin) (Int32, @in_guaranteed Int32) -> ()
+  %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @in_guaranteed Int32) -> ()
 
   %r = tuple ()
   return %r : $()
@@ -89,7 +92,7 @@ bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
 // CHECK-LABEL: @call_store_to_int_not_aliased
 // CHECK:     PAIR #0.
 // CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
-// CHECK-NEXT:   %1 = argument of bb0 : $*Int32{{.*}}                  // user: %4
+// CHECK-NEXT:   %1 = argument of bb0 : $*Int32{{.*}}
 // CHECK-NEXT:  r=0,w=1
 // CHECK:     PAIR #1.
 // CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
@@ -107,7 +110,7 @@ bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
 // CHECK-LABEL: @call_store_to_int_aliased
 // CHECK:     PAIR #0.
 // CHECK-NEXT:   %6 = apply %5(%0, %3) : $@convention(thin) (Int32, @inout Int32) -> ()
-// CHECK-NEXT:   %3 = ref_element_addr %1 : $X, #X.a{{.*}}             // user: %6
+// CHECK-NEXT:   %3 = ref_element_addr %1 : $X, #X.a{{.*}}
 // CHECK-NEXT:  r=0,w=1
 // CHECK:     PAIR #1.
 // CHECK-NEXT:   %6 = apply %5(%0, %3) : $@convention(thin) (Int32, @inout Int32) -> ()
@@ -184,15 +187,15 @@ bb0(%0 : $X, %1 : $X):
 // CHECK-LABEL: @allocstack_apply_no_side_effect
 // CHECK:     PAIR #0
 // CHECK-NEXT:   %3 = apply %2() : $@convention(thin) () -> ()
-// CHECK-NEXT:   %1 = alloc_stack $Int32{{.*}}                         // user: %5
+// CHECK-NEXT:   %1 = alloc_stack $Int32{{.*}}
 // CHECK-NEXT:  r=0,w=0
 sil @allocstack_apply_no_side_effect : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
-  %1 = alloc_stack $Int32                         // user: %5
-  %2 = function_ref @nouser_func : $@convention(thin) () -> () // user: %3
+  %1 = alloc_stack $Int32
+  %2 = function_ref @nouser_func : $@convention(thin) () -> ()
   %3 = apply %2() : $@convention(thin) () -> ()
-  %4 = tuple ()                                   // user: %6
-  dealloc_stack %1 : $*Int32     // id: %5
+  %4 = tuple ()
+  dealloc_stack %1 : $*Int32
   return %4 : $()
 }
 
@@ -203,43 +206,43 @@ bb0(%0 : $Int32):
 // CHECK-NEXT:  r=0,w=1
 sil @allocstack_apply_side_effect : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
-  %1 = alloc_stack $Int32                         // users: %3, %5
+  %1 = alloc_stack $Int32
   // function_ref store_to_int
-  %2 = function_ref @store_to_int : $@convention(thin) (Int32, @inout Int32) -> () // user: %3
+  %2 = function_ref @store_to_int : $@convention(thin) (Int32, @inout Int32) -> ()
   %3 = apply %2(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
-  %4 = tuple ()                                   // user: %6
-  dealloc_stack %1 : $*Int32     // id: %5
-  return %4 : $()                                 // id: %6
+  %4 = tuple ()
+  dealloc_stack %1 : $*Int32
+  return %4 : $()
 }
 
 // CHECK-LABEL: @allocstack_apply_no_escaping
 // CHECK: PAIR #0.
 // CHECK-NEXT:   %3 = apply %2() : $@convention(thin) () -> ()
-// CHECK-NEXT:   %1 = alloc_stack $Int32{{.*}}                    // users: %7, %5
+// CHECK-NEXT:   %1 = alloc_stack $Int32{{.*}}
 // CHECK-NEXT:  r=0,w=0
 sil @allocstack_apply_no_escaping : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
-  %1 = alloc_stack $Int32                         // users: %3, %5
-  %2 = function_ref @nouser_func : $@convention(thin) () -> () // user: %3
+  %1 = alloc_stack $Int32
+  %2 = function_ref @nouser_func : $@convention(thin) () -> ()
   %3 = apply %2() : $@convention(thin) () -> ()
-  %4 = function_ref @store_to_int: $@convention(thin) (Int32, @inout Int32) -> () // user: %3
+  %4 = function_ref @store_to_int: $@convention(thin) (Int32, @inout Int32) -> ()
   %5 = apply %4(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
-  %6 = tuple ()                                   // user: %6
-  dealloc_stack %1 : $*Int32     // id: %5
-  return %6 : $()                                 // id: %6
+  %6 = tuple ()
+  dealloc_stack %1 : $*Int32
+  return %6 : $()
 }
 
 // CHECK-LABEL: @allocstack_apply_read_only
 // CHECK:     PAIR #1.
-// CHECK-NEXT:   %4 = apply %3(%1) : $@convention(thin) (@in X) -> ()
-// CHECK-NEXT:   %1 = alloc_stack $X{{.*}}                      // users: %5, %4, %2
+// CHECK-NEXT:   %4 = apply %3(%1) : $@convention(thin) (@in_guaranteed X) -> ()
+// CHECK-NEXT:   %1 = alloc_stack $X{{.*}}
 // CHECK-NEXT: r=1,w=0
 sil @allocstack_apply_read_only : $@convention(thin) (X) -> () {
 bb0(%0 : $X):
   %1 = alloc_stack $X
   store %0 to %1 : $*X
-  %3 = function_ref @load_from_in : $@convention(thin) (@in X) -> ()
-  %4 = apply %3(%1) : $@convention(thin) (@in X) -> ()
+  %3 = function_ref @load_from_in : $@convention(thin) (@in_guaranteed X) -> ()
+  %4 = apply %3(%1) : $@convention(thin) (@in_guaranteed X) -> ()
   dealloc_stack %1 : $*X
   %6 = tuple ()
   return %6 : $()
@@ -247,47 +250,47 @@ bb0(%0 : $X):
 
 // CHECK-LABEL:  @allocstack_and_copyaddr
 // CHECK:        PAIR #2.
-// CHECK-NEXT:     %4 = apply %3(%0) : $@convention(thin) (@in Int32) -> Int32
+// CHECK-NEXT:     %4 = apply %3(%0) : $@convention(thin) (@in_guaranteed Int32) -> Int32
 // CHECK-NEXT:     %0 = argument of bb0 : $*Int32
 // CHECK-NEXT:     r=1,w=0
 // CHECK:        PAIR #3.
-// CHECK-NEXT:     %4 = apply %3(%0) : $@convention(thin) (@in Int32) -> Int32
+// CHECK-NEXT:     %4 = apply %3(%0) : $@convention(thin) (@in_guaranteed Int32) -> Int32
 // CHECK-NEXT:     %1 = alloc_stack $Int32
 // CHECK-NEXT:     r=0,w=0
 sil @allocstack_and_copyaddr : $@convention(thin) (@in Int32) -> Int32 {
 bb0(%0 : $*Int32):
   %1 = alloc_stack $Int32
   copy_addr %0 to %1 : $*Int32
-  %3 = function_ref @single_indirect_arg : $@convention(thin) (@in Int32) -> Int32
-  %4 = apply %3(%0) : $@convention(thin) (@in Int32) -> Int32
+  %3 = function_ref @single_indirect_arg : $@convention(thin) (@in_guaranteed Int32) -> Int32
+  %4 = apply %3(%0) : $@convention(thin) (@in_guaranteed Int32) -> Int32
   dealloc_stack %1 : $*Int32
   return %4 : $Int32
 }
 
 // CHECK-LABEL:  @inout_and_copyaddr
 // CHECK:        PAIR #2.
-// CHECK-NEXT:       %4 = apply %3(%0) : $@convention(thin) (@in Int32) -> Int32
+// CHECK-NEXT:       %4 = apply %3(%0) : $@convention(thin) (@in_guaranteed Int32) -> Int32
 // CHECK-NEXT:     %0 = argument of bb0 : $*Int32
 // CHECK-NEXT:     r=1,w=0
 // CHECK:        PAIR #3.
-// CHECK-NEXT:       %4 = apply %3(%0) : $@convention(thin) (@in Int32) -> Int32
+// CHECK-NEXT:       %4 = apply %3(%0) : $@convention(thin) (@in_guaranteed Int32) -> Int32
 // CHECK-NEXT:     %1 = argument of bb0 : $*Int32
 // CHECK-NEXT:     r=0,w=0
 sil @inout_and_copyaddr : $@convention(thin) (@in Int32, @inout Int32) -> Int32 {
 bb0(%0 : $*Int32, %1 : $*Int32):
   copy_addr %0 to %1 : $*Int32
-  %3 = function_ref @single_indirect_arg : $@convention(thin) (@in Int32) -> Int32
-  %4 = apply %3(%0) : $@convention(thin) (@in Int32) -> Int32
+  %3 = function_ref @single_indirect_arg : $@convention(thin) (@in_guaranteed Int32) -> Int32
+  %4 = apply %3(%0) : $@convention(thin) (@in_guaranteed Int32) -> Int32
   return %4 : $Int32
 }
 
 // CHECK-LABEL:  @escaping_allocstack_and_copyaddr
-// CHECK:        PAIR #3.
-// CHECK-NEXT:       %5 = apply %4(%0, %3) : $@convention(thin) (@in Int32, Builtin.RawPointer) -> Int32
+// CHECK:        PAIR #2.
+// CHECK-NEXT:       %5 = apply %4(%0, %3) : $@convention(thin) (@in_guaranteed Int32, Builtin.RawPointer) -> Int32
 // CHECK-NEXT:     %0 = argument of bb0 : $*Int32
 // CHECK-NEXT:     r=1,w=0
-// CHECK:        PAIR #4.
-// CHECK-NEXT:       %5 = apply %4(%0, %3) : $@convention(thin) (@in Int32, Builtin.RawPointer) -> Int32
+// CHECK:        PAIR #3.
+// CHECK-NEXT:       %5 = apply %4(%0, %3) : $@convention(thin) (@in_guaranteed Int32, Builtin.RawPointer) -> Int32
 // CHECK-NEXT:       %1 = alloc_stack $Int32
 // CHECK-NEXT:     r=1,w=1
 sil @escaping_allocstack_and_copyaddr : $@convention(thin) (@in Int32) -> Int32 {
@@ -295,16 +298,16 @@ bb0(%0 : $*Int32):
   %1 = alloc_stack $Int32
   copy_addr %0 to %1 : $*Int32
   %3 = address_to_pointer %1 : $*Int32 to $Builtin.RawPointer
-  %4 = function_ref @indirect_arg_and_ptr : $@convention(thin) (@in Int32, Builtin.RawPointer) -> Int32
-  %5 = apply %4(%0, %3) : $@convention(thin) (@in Int32, Builtin.RawPointer) -> Int32
+  %4 = function_ref @indirect_arg_and_ptr : $@convention(thin) (@in_guaranteed Int32, Builtin.RawPointer) -> Int32
+  %5 = apply %4(%0, %3) : $@convention(thin) (@in_guaranteed Int32, Builtin.RawPointer) -> Int32
   dealloc_stack %1 : $*Int32
   return %5 : $Int32
 }
 
 // CHECK-LABEL:  @escaping_allocstack_to_known_function
-// CHECK:        PAIR #2.
-// CHECK-NEXT:       %5 = apply %4(%3) : $@convention(thin) (Builtin.RawPointer) -> UInt8 // user: %7
-// CHECK-NEXT:       %1 = alloc_stack $UInt8                         // users: %6, %3, %2
+// CHECK:        PAIR #1.
+// CHECK-NEXT:       %5 = apply %4(%3) : $@convention(thin) (Builtin.RawPointer) -> UInt8
+// CHECK-NEXT:       %1 = alloc_stack $UInt8
 // CHECK-NEXT:     r=1,w=0
 sil @escaping_allocstack_to_known_function : $@convention(thin) (UInt8) -> UInt8 {
 bb0(%0 : $UInt8):
@@ -321,7 +324,7 @@ bb0(%0 : $UInt8):
 // CHECK:        PAIR #2.
 // CHECK-NEXT:       try_apply %3(%0) : $@convention(thin) (@in Int32) -> (Int32, @error any Error), normal bb1, error bb2
 // CHECK-NEXT:     %0 = argument of bb0 : $*Int32
-// CHECK-NEXT:     r=1,w=0
+// CHECK-NEXT:     r=1,w=1
 // CHECK:        PAIR #3.
 // CHECK-NEXT:       try_apply %3(%0) : $@convention(thin) (@in Int32) -> (Int32, @error any Error), normal bb1, error bb2
 // CHECK-NEXT:       %1 = alloc_stack $Int32
@@ -343,7 +346,7 @@ bb2(%8 : $Error):
 // CHECK:        PAIR #2.
 // CHECK-NEXT:       (%4, %5) = begin_apply %3(%0) : $@yield_once @convention(thin) (@in Int32) -> @yields Int32
 // CHECK-NEXT:     %0 = argument of bb0 : $*Int32
-// CHECK-NEXT:     r=1,w=0
+// CHECK-NEXT:     r=1,w=1
 // CHECK:        PAIR #3.
 // CHECK-NEXT:       (%4, %5) = begin_apply %3(%0) : $@yield_once @convention(thin) (@in Int32) -> @yields Int32
 // CHECK-NEXT:       %1 = alloc_stack $Int32
@@ -351,7 +354,7 @@ bb2(%8 : $Error):
 // CHECK:        PAIR #4.
 // CHECK-NEXT:       end_apply %5
 // CHECK-NEXT:     %0 = argument of bb0 : $*Int32
-// CHECK-NEXT:     r=1,w=0
+// CHECK-NEXT:     r=1,w=1
 // CHECK:        PAIR #5.
 // CHECK-NEXT:       end_apply %5
 // CHECK-NEXT:       %1 = alloc_stack $Int32
@@ -359,7 +362,7 @@ bb2(%8 : $Error):
 // CHECK:        PAIR #6.
 // CHECK-NEXT:       abort_apply %5
 // CHECK-NEXT:     %0 = argument of bb0 : $*Int32
-// CHECK-NEXT:     r=1,w=0
+// CHECK-NEXT:     r=1,w=1
 // CHECK:        PAIR #7.
 // CHECK-NEXT:       abort_apply %5
 // CHECK-NEXT:       %1 = alloc_stack $Int32
@@ -380,6 +383,24 @@ bb2:
   unreachable
 }
 
+// CHECK-LABEL:  @test_indirect_yield
+// CHECK:        PAIR #3.
+// CHECK-NEXT:       store %0 to %4 : $*Int32
+// CHECK-NEXT:       %1 = alloc_stack $Int32
+// CHECK-NEXT:     r=0,w=1
+sil @test_indirect_yield : $@convention(thin) (Int32) -> () {
+bb0(%0 : $Int32):
+  %1 = alloc_stack $Int32
+  store %0 to %1 : $*Int32
+  %3 = function_ref @indirect_yield_coroutine : $@yield_once @convention(thin) (@inout Int32) -> @yields @inout Int32
+  (%4, %5) = begin_apply %3(%1) : $@yield_once @convention(thin) (@inout Int32) -> @yields @inout Int32
+  store %0 to %4 : $*Int32
+  end_apply %5 as $()
+  dealloc_stack %1 : $*Int32
+  %9 = tuple ()
+  return %9 : $()
+}
+
 // CHECK-LABEL: @refelementaddr_and_reference
 // CHECK:       PAIR #0.
 // CHECK-NEXT:      %3 = apply %2(%0) : $@convention(thin) (@guaranteed X) -> Int32
@@ -395,7 +416,7 @@ bb0(%0 : $X):
 
 // CHECK-LABEL: @apply_and_begin_access
 // CHECK:       PAIR #8.
-// CHECK-NEXT:      %6 = apply %5(%1) : $@convention(thin) (@in Int32) -> Int32
+// CHECK-NEXT:      %6 = apply %5(%1) : $@convention(thin) (@in_guaranteed Int32) -> Int32
 // CHECK-NEXT:    %0 = argument of bb0 : $*Int32
 // CHECK-NEXT:    r=0,w=0
 sil @apply_and_begin_access : $@convention(thin) (@in Int32) -> Int32 {
@@ -404,13 +425,13 @@ bb0(%0 : $*Int32):
   %2 = begin_access [read] [static] %0 : $*Int32
   copy_addr %2 to %1 : $*Int32
   end_access %2 : $*Int32
-  %5 = function_ref @single_indirect_arg : $@convention(thin) (@in Int32) -> Int32
-  %6 = apply %5(%1) : $@convention(thin) (@in Int32) -> Int32
+  %5 = function_ref @single_indirect_arg : $@convention(thin) (@in_guaranteed Int32) -> Int32
+  %6 = apply %5(%1) : $@convention(thin) (@in_guaranteed Int32) -> Int32
   dealloc_stack %1 : $*Int32
   return %6 : $Int32
 }
 
-sil @load_from_in : $@convention(thin) (@in X) -> () {
+sil @load_from_in : $@convention(thin) (@in_guaranteed X) -> () {
 bb0(%0 : $*X):
   %1 = load %0 : $*X
   %2 = tuple ()
@@ -449,23 +470,23 @@ bb0:
 
 // CHECK-LABEL:  @non_overlapping_struct_fields
 // CHECK:        PAIR #0.
-// CHECK-NEXT:       %4 = apply %3(%1) : $@convention(thin) (@in Int32) -> Int32
+// CHECK-NEXT:       %4 = apply %3(%1) : $@convention(thin) (@in_guaranteed Int32) -> Int32
 // CHECK-NEXT:     %0 = argument of bb0 : $*TwoInts
 // CHECK-NEXT:     r=1,w=0
 // CHECK:        PAIR #1.
-// CHECK-NEXT:       %4 = apply %3(%1) : $@convention(thin) (@in Int32) -> Int32
+// CHECK-NEXT:       %4 = apply %3(%1) : $@convention(thin) (@in_guaranteed Int32) -> Int32
 // CHECK-NEXT:       %1 = struct_element_addr %0 : $*TwoInts, #TwoInts.i1
 // CHECK-NEXT:     r=1,w=0
 // CHECK:        PAIR #2.
-// CHECK-NEXT:       %4 = apply %3(%1) : $@convention(thin) (@in Int32) -> Int32
+// CHECK-NEXT:       %4 = apply %3(%1) : $@convention(thin) (@in_guaranteed Int32) -> Int32
 // CHECK-NEXT:       %2 = struct_element_addr %0 : $*TwoInts, #TwoInts.i2
 // CHECK-NEXT:     r=0,w=0
 sil @non_overlapping_struct_fields : $@convention(thin) (@in TwoInts) -> Int32 {
 bb0(%0 : $*TwoInts):
   %1 = struct_element_addr %0 : $*TwoInts, #TwoInts.i1
   %2 = struct_element_addr %0 : $*TwoInts, #TwoInts.i2
-  %3 = function_ref @single_indirect_arg : $@convention(thin) (@in Int32) -> Int32
-  %4 = apply %3(%1) : $@convention(thin) (@in Int32) -> Int32
+  %3 = function_ref @single_indirect_arg : $@convention(thin) (@in_guaranteed Int32) -> Int32
+  %4 = apply %3(%1) : $@convention(thin) (@in_guaranteed Int32) -> Int32
   return %4 : $Int32
 }
 
@@ -502,17 +523,17 @@ bb0(%0 : $*Int):
 // CHECK-LABEL: @testLetSideEffects
 //
 // The store does not affect the let-load (ref_element_addr).
-// CHECK: PAIR #2.
+// CHECK: PAIR #6.
 // CHECK-NEXT:    %6 = begin_access [modify] [static] %1 : $*Builtin.Int32
 // CHECK-NEXT:    %10 = ref_element_addr %9 : $C, #C.prop
 // CHECK-NEXT:  r=0,w=0
 //
 // Any unknown instructions with side effects does affect the let-load.
-// CHECK: PAIR #18.
+// CHECK: PAIR #22.
 // CHECK-NEXT:     end_borrow %{{.*}} : $C
 // CHECK-NEXT:     ref_element_addr %{{.*}} : $C, #C.prop
 // CHECK-NEXT:   r=1,w=1
-// CHECK: PAIR #30.
+// CHECK: PAIR #34.
 // CHECK-NEXT:     destroy_value %0 : $Parent
 // CHECK-NEXT:     ref_element_addr %{{.*}} : $C, #C.prop
 // CHECK-NEXT:   r=1,w=1
@@ -661,6 +682,10 @@ bb0(%0 : @guaranteed $X):
 // CHECK:      PAIR #4.
 // CHECK-NEXT:     %6 = apply %5() : $@convention(thin) () -> ()
 // CHECK-NEXT:     %3 = begin_access [modify] [dynamic] %2 : $*Int32
+// CHECK-NEXT:   r=1,w=0
+// CHECK:      PAIR #8.
+// CHECK-NEXT:     %8 = apply %5() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %3 = begin_access [modify] [dynamic] %2 : $*Int32
 // CHECK-NEXT:   r=1,w=1
 sil [ossa] @testModifyAccessOfClassProperty : $@convention(thin) (@guaranteed X, Int32) -> () {
 bb0(%0 : @guaranteed $X, %1 : $Int32):
@@ -670,8 +695,9 @@ bb0(%0 : @guaranteed $X, %1 : $Int32):
   %5 = function_ref @nouser_func : $@convention(thin) () -> ()
   %6 = apply %5() : $@convention(thin) () -> ()
   end_access %3 : $*Int32
-  %8 = tuple ()
-  return %8 : $()
+  %8 = apply %5() : $@convention(thin) () -> ()
+  %9 = tuple ()
+  return %9 : $()
 }
 
 // CHECK-LABEL: @testImmutableRefWithGuaranteedParam
@@ -818,8 +844,25 @@ sil hidden @testGlobalLet : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @globalC : $*C
   %1 = load %0 : $*C
-  %2 = function_ref @nouser_func : $@convention(thin) () -> () // user: %3
+  %2 = function_ref @nouser_func : $@convention(thin) () -> ()
   %3 = apply %2() : $@convention(thin) () -> ()
+  %4 = function_ref @read_C : $@convention(thin) (@in_guaranteed C) -> ()
+  %5 = apply %4(%0) : $@convention(thin) (@in_guaranteed C) -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: @testInitGlobalLet
+// CHECK:      PAIR #0.
+// CHECK-NEXT:     %2 = apply %1(%0) : $@convention(thin) () -> @out C
+// CHECK-NEXT:     %0 = global_addr @globalC : $*C
+// CHECK-NEXT:   r=1,w=1
+sil hidden @testInitGlobalLet : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalC : $*C
+  %1 = function_ref @init_C : $@convention(thin) () -> @out C
+  %2 = apply %1(%0) : $@convention(thin) () -> @out C
+  %3 = load %0 : $*C
   %8 = tuple ()
   return %8 : $()
 }
@@ -833,10 +876,85 @@ sil hidden @testGlobalVar : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @globalCVar : $*C
   %1 = load %0 : $*C
-  %2 = function_ref @nouser_func : $@convention(thin) () -> () // user: %3
+  %2 = function_ref @nouser_func : $@convention(thin) () -> ()
   %3 = apply %2() : $@convention(thin) () -> ()
   %8 = tuple ()
   return %8 : $()
+}
+
+sil [global_init] @addressor_of_globalC : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %0 = global_addr @globalC : $*C
+  %1 = address_to_pointer %0 : $*C to $Builtin.RawPointer
+  return %1 : $Builtin.RawPointer
+}
+
+sil [global_init] @addressor_of_globalCVar : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %0 = global_addr @globalCVar : $*C
+  %1 = address_to_pointer %0 : $*C to $Builtin.RawPointer
+  return %1 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: @testGlobalViaAddressorLet
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     %5 = apply %4() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*C
+// CHECK-NEXT:   r=1,w=0
+sil @testGlobalViaAddressorLet : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @addressor_of_globalC : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*C
+  %3 = load %2 : $*C
+  %4 = function_ref @nouser_func : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  %6 = function_ref @read_C : $@convention(thin) (@in_guaranteed C) -> ()
+  %7 = apply %6(%2) : $@convention(thin) (@in_guaranteed C) -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: @testGlobalViaAddressorVar
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     %5 = apply %4() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*C
+// CHECK-NEXT:   r=1,w=1
+sil @testGlobalViaAddressorVar : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @addressor_of_globalCVar : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*C
+  %3 = load %2 : $*C
+  %4 = function_ref @nouser_func : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: @testGlobalAliasing
+// CHECK:      PAIR #6.
+// CHECK-NEXT:     store %0 to %3 : $*C
+// CHECK-NEXT:     %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*C
+// CHECK-NEXT:   r=0,w=1
+// CHECK:      PAIR #7.
+// CHECK-NEXT:     store %0 to %3 : $*C
+// CHECK-NEXT:     %6 = pointer_to_address %5 : $Builtin.RawPointer to [strict] $*C
+// CHECK-NEXT:   r=0,w=0
+sil @testGlobalAliasing : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : $C):
+  %1 = function_ref @addressor_of_globalCVar : $@convention(thin) () -> Builtin.RawPointer
+  %2 = apply %1() : $@convention(thin) () -> Builtin.RawPointer
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*C
+  %4 = function_ref @addressor_of_globalC : $@convention(thin) () -> Builtin.RawPointer
+  %5 = apply %4() : $@convention(thin) () -> Builtin.RawPointer
+  %6 = pointer_to_address %5 : $Builtin.RawPointer to [strict] $*C
+  %7 = global_addr @globalCVar : $*C
+  store %0 to %3 : $*C
+  fix_lifetime %3 : $*C
+  fix_lifetime %6 : $*C
+  %9 = tuple ()
+  return %9 : $()
 }
 
 // ===-----------------------------------------------------------------------===
@@ -848,7 +966,7 @@ bb0:
 // CHECK:      PAIR #3.
 // CHECK-NEXT:     load %{{.*}} : $*C
 // CHECK-NEXT:     begin_access [deinit] [static] %{{.*}} : $*Builtin.Int32
-// CHECK-NEXT:   r=1,w=0
+// CHECK-NEXT:   r=0,w=0
 sil hidden @testDeinitInstVsNonAddressValue : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : $C):
   %1 = global_addr @globalC : $*C
@@ -872,8 +990,8 @@ struct Int64Wrapper {
 
 // CHECK-LABEL: @testNestedAccessWithInterposedProjection
 // CHECK: PAIR #2.
-// CHECK-NEXT:   %1 = begin_access [modify] [static] %0 : $*Int64Wrapper // users: %7, %2
-// CHECK-NEXT:   %3 = begin_access [read] [static] %2 : $*Int64  // users: %6, %4
+// CHECK-NEXT:   %1 = begin_access [modify] [static] %0 : $*Int64Wrapper
+// CHECK-NEXT:   %3 = begin_access [read] [static] %2 : $*Int64
 // CHECK-NEXT: r=1,w=1
 sil @testNestedAccessWithInterposedProjection : $@convention(thin) (@inout Int64Wrapper) -> () {
 bb0(%0 : $*Int64Wrapper):
@@ -920,7 +1038,7 @@ bb0(%0 : $*C, %1 : $*C, %2: $*C):
 // CHECK:      PAIR #2.
 // CHECK-NEXT:   copy_addr %1 to %0 : $*C
 // CHECK-NEXT:   %2 = argument of bb0 : $*C
-// CHECK-NEXT:   r=1,w=1
+// CHECK-NEXT:   r=0,w=0
 sil @test_copy_addr_assign : $@convention(thin) (@inout C, @inout C, @inout C) -> () {
 bb0(%0 : $*C, %1 : $*C, %2: $*C):
   copy_addr %1 to %0 : $*C
@@ -964,6 +1082,36 @@ bb0 (%0 : $*C):
   destroy_addr %0 : $*C
   %2 = tuple()
   return %2 : $()
+}
+
+// CHECK-LABEL: @test_destroy_value_with_effects
+// CHECK:       PAIR #1.
+// CHECK-NEXT:     destroy_value %0 : $X
+// CHECK-NEXT:     %2 = ref_element_addr %1 : $X, #X.x
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @test_destroy_value_with_effects : $@convention(thin) (@owned X) -> () {
+bb0 (%0 : @owned $X):
+  %1 = begin_borrow %0 : $X
+  %2 = ref_element_addr %1 : $X, #X.x
+  fix_lifetime %2 : $*X
+  end_borrow %1 : $X
+  destroy_value %0 : $X
+  unreachable
+}
+
+// CHECK-LABEL: @test_deadend_destroy_value
+// CHECK:       PAIR #1.
+// CHECK-NEXT:      destroy_value [dead_end] %0 : $X
+// CHECK-NEXT:      %2 = ref_element_addr %1 : $X, #X.x
+// CHECK-NEXT:    r=0,w=0
+sil [ossa] @test_deadend_destroy_value : $@convention(thin) (@owned X) -> () {
+bb0 (%0 : @owned $X):
+  %1 = begin_borrow %0 : $X
+  %2 = ref_element_addr %1 : $X, #X.x
+  fix_lifetime %2 : $*X
+  end_borrow %1 : $X
+  destroy_value [dead_end] %0 : $X
+  unreachable
 }
 
 // CHECK-LABEL: @test_copy_value
@@ -1068,10 +1216,15 @@ bb0:
 // CHECK:       PAIR #2.
 // CHECK-NEXT:      store %2 to [assign] %0 : $*C
 // CHECK-NEXT:      %3 = global_addr @globalC : $*C
+// CHECK-NEXT:    r=0,w=0
+// CHECK:       PAIR #3.
+// CHECK-NEXT:      store %2 to [assign] %0 : $*C
+// CHECK-NEXT:      %4 = global_addr @globalCVar : $*C
 // CHECK-NEXT:    r=1,w=1
 sil [ossa] @test_store_assign : $@convention(thin) (@inout C, @inout C, @owned C) -> () {
 bb0(%0 : $*C, %1 : $*C, %2 : @owned $C):
   %3 = global_addr @globalC : $*C
+  %4 = global_addr @globalCVar : $*C
   store %2 to [assign] %0 : $*C
   %r = tuple ()
   return %r : $()
@@ -1226,9 +1379,9 @@ bb0:
 }
 
 // CHECK-LABEL: @test_stored_pointer
-// CHECK:       PAIR #3.
+// CHECK:       PAIR #2.
 // CHECK-NEXT:      %5 = apply %4(%2) : $@convention(thin) (@in Builtin.RawPointer) -> ()
-// CHECK-NEXT:      %0 = alloc_stack $Int                           // users: %7, %1
+// CHECK-NEXT:      %0 = alloc_stack $Int
 // CHECK-NEXT:    r=1,w=1
 sil @test_stored_pointer : $@convention(thin) () -> () {
 bb0:
@@ -1243,3 +1396,209 @@ bb0:
   %8 = tuple ()
   return %8 : $()
 }
+
+// CHECK-LABEL: @test_store_borrow
+// CHECK:      PAIR #0.
+// CHECK-NEXT:     %2 = store_borrow %0 to %1 : $*X
+// CHECK-NEXT:     %1 = alloc_stack $X
+// CHECK-NEXT:   r=0,w=1
+// CHECK:      PAIR #1.
+// CHECK-NEXT:     end_borrow %2 : $*X
+// CHECK-NEXT:     %1 = alloc_stack $X
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     end_borrow %2 : $*X
+// CHECK-NEXT:     %2 = store_borrow %0 to %1 : $*X
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @test_store_borrow : $@convention(thin) (@guaranteed X) -> () {
+bb0(%0 :  @guaranteed $X):
+  %1 = alloc_stack $X
+  %2 = store_borrow %0 to %1 : $*X
+  end_borrow %2 : $*X
+  dealloc_stack %1 : $*X
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: @test_end_borrow1
+// CHECK:      PAIR #0.
+// CHECK-NEXT:     end_borrow %1 : $X
+// CHECK-NEXT:     %2 = alloc_stack $X
+// CHECK-NEXT:   r=0,w=0
+// CHECK:      PAIR #1.
+// CHECK-NEXT:     end_borrow %1 : $X
+// CHECK-NEXT:     %4 = ref_element_addr %1 : $X, #X.a
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     end_borrow %1 : $X
+// CHECK-NEXT:     %6 = pointer_to_address %5 : $Builtin.RawPointer to $*Int32
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @test_end_borrow1 : $@convention(thin) (@owned X) -> @owned X {
+bb0(%0 : @owned $X):
+  %1 = begin_borrow %0 : $X
+  %2 = alloc_stack $X
+  dealloc_stack %2 : $*X
+  %4 = ref_element_addr %1 : $X, #X.a
+  %5 = address_to_pointer %4 : $*Int32 to $Builtin.RawPointer
+  %6 = pointer_to_address %5 : $Builtin.RawPointer to $*Int32
+  end_borrow %1 : $X
+  return %0 : $X
+}
+
+// CHECK-LABEL: @test_end_borrow2
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     end_borrow %3 : $X
+// CHECK-NEXT:     %1 = ref_element_addr %0 : $X, #X.x
+// CHECK-NEXT:   r=0,w=0
+sil [ossa] @test_end_borrow2 : $@convention(thin) (@guaranteed X) -> Int32 {
+bb0(%0 : @guaranteed $X):
+  %1 = ref_element_addr %0 : $X, #X.x
+  %2 = load [copy] %1 : $*X
+  %3 = begin_borrow %2 : $X
+  %4 = function_ref @single_reference : $@convention(thin) (@guaranteed X) -> Int32
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed X) -> Int32
+  end_borrow %3 : $X
+  destroy_value %2 : $X
+  return %5 : $Int32
+}
+
+// CHECK-LABEL: @test_load_borrow
+// CHECK:      PAIR #0.
+// CHECK-NEXT:     %1 = load_borrow %0 : $*X
+// CHECK-NEXT:   %0 = argument of bb0 : $*X
+// CHECK-NEXT:   r=1,w=0
+// CHECK:      PAIR #1.
+// CHECK-NEXT:     %1 = load_borrow %0 : $*X
+// CHECK-NEXT:     %2 = alloc_stack $X
+// CHECK-NEXT:   r=0,w=0
+// CHECK:      PAIR #4.
+// CHECK-NEXT:     end_borrow %1 : $X
+// CHECK-NEXT:   %0 = argument of bb0 : $*X
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #5.
+// CHECK-NEXT:     end_borrow %1 : $X
+// CHECK-NEXT:     %2 = alloc_stack $X
+// CHECK-NEXT:   r=0,w=0
+// CHECK:      PAIR #6.
+// CHECK-NEXT:     end_borrow %1 : $X
+// CHECK-NEXT:     %4 = ref_element_addr %1 : $X, #X.a
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #7.
+// CHECK-NEXT:     end_borrow %1 : $X
+// CHECK-NEXT:     %6 = pointer_to_address %5 : $Builtin.RawPointer to $*Int32
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @test_load_borrow : $@convention(thin) (@inout X) -> () {
+bb0(%0 : $*X):
+  %1 = load_borrow %0 : $*X
+  %2 = alloc_stack $X
+  dealloc_stack %2 : $*X
+  %4 = ref_element_addr %1 : $X, #X.a
+  %5 = address_to_pointer %4 : $*Int32 to $Builtin.RawPointer
+  %6 = pointer_to_address %5 : $Builtin.RawPointer to $*Int32
+  end_borrow %1 : $X
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: @test_immutable_end_borrow
+// CHECK:      PAIR #0.
+// CHECK-NEXT:     end_borrow %1 : $X
+// CHECK-NEXT:     %2 = alloc_stack $X
+// CHECK-NEXT:   r=0,w=0
+// CHECK:      PAIR #1.
+// CHECK-NEXT:     end_borrow %1 : $X
+// CHECK-NEXT:     %4 = ref_element_addr [immutable] %1 : $X, #X.a
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     end_borrow %1 : $X
+// CHECK-NEXT:     %6 = pointer_to_address %5 : $Builtin.RawPointer to $*Int32
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @test_immutable_end_borrow : $@convention(thin) (@owned X) -> @owned X {
+bb0(%0 : @owned $X):
+  %1 = begin_borrow %0 : $X
+  %2 = alloc_stack $X
+  dealloc_stack %2 : $*X
+  %4 = ref_element_addr [immutable] %1 : $X, #X.a
+  %5 = address_to_pointer %4 : $*Int32 to $Builtin.RawPointer
+  %6 = pointer_to_address %5 : $Builtin.RawPointer to $*Int32
+  end_borrow %1 : $X
+  %8 = tuple ()
+  return %0 : $X
+}
+
+sil @indirect_X : $@convention(thin) (@in_guaranteed X) -> ()
+
+// CHECK-LABEL: @test_escaping_partial_apply
+// CHECK:      PAIR #0.
+// CHECK-NEXT:   %2 = partial_apply %1(%0) : $@convention(thin) (@in_guaranteed X) -> ()
+// CHECK-NEXT:   %0 = argument of bb0 : $*X
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @test_escaping_partial_apply : $@convention(thin) (@in X) -> () {
+bb0(%0 :  $*X):
+  %1 = function_ref @indirect_X : $@convention(thin) (@in_guaranteed X) -> ()
+  %2 = partial_apply %1(%0) : $@convention(thin) (@in_guaranteed X) -> ()
+  destroy_value %2 : $@callee_owned () -> () 
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: @test_non_escaping_partial_apply
+// CHECK:      PAIR #0.
+// CHECK-NEXT:   %2 = partial_apply [on_stack] %1(%0) : $@convention(thin) (@in_guaranteed X) -> ()
+// CHECK-NEXT:   %0 = argument of bb0 : $*X
+// CHECK-NEXT:   r=1,w=0
+// CHECK:      PAIR #1.
+// CHECK-NEXT:     destroy_value %2 : $@noescape @callee_owned () -> ()
+// CHECK-NEXT:   %0 = argument of bb0 : $*X
+// CHECK-NEXT:   r=0,w=0
+sil [ossa] @test_non_escaping_partial_apply : $@convention(thin) (@in X) -> () {
+bb0(%0 :  $*X):
+  %1 = function_ref @indirect_X : $@convention(thin) (@in_guaranteed X) -> ()
+  %2 = partial_apply [on_stack] %1(%0) : $@convention(thin) (@in_guaranteed X) -> ()
+  destroy_value %2 : $@noescape @callee_owned () -> () 
+  destroy_addr %0 : $*X
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: @test_is_unique
+// CHECK:      PAIR #0.
+// CHECK-NEXT:     %2 = is_unique %0 : $*X
+// CHECK-NEXT:   %0 = argument of bb0 : $*X
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #1.
+// CHECK-NEXT:     %2 = is_unique %0 : $*X
+// CHECK-NEXT:   %1 = argument of bb0 : $*X
+// CHECK-NEXT:   r=0,w=0
+sil [ossa] @test_is_unique : $@convention(thin) (@in X, @in X) -> () {
+bb0(%0 :  $*X, %1 :  $*X):
+  %2 = is_unique %0 : $*X
+  destroy_addr %0 : $*X
+  destroy_addr %1 : $*X
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: @test_unchecked_addr_cast
+// CHECK:      PAIR #0.
+// CHECK-NEXT:     %2 = load [copy] %1 : $*C
+// CHECK-NEXT:   %0 = argument of bb0 : $*X
+// CHECK-NEXT:   r=1,w=0
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     %3 = is_unique %1 : $*C
+// CHECK-NEXT:   %0 = argument of bb0 : $*X
+// CHECK-NEXT:   r=1,w=0
+// CHECK:      PAIR #4.
+// CHECK-NEXT:     %4 = load_borrow %1 : $*C
+// CHECK-NEXT:   %0 = argument of bb0 : $*X
+// CHECK-NEXT:   r=1,w=0
+sil [ossa] @test_unchecked_addr_cast : $@convention(thin) (@in_guaranteed X) -> @owned C {
+bb0(%0 :  $*X):
+  %1 = unchecked_addr_cast %0 : $*X to $*C
+  %2 = load [copy] %1 : $*C
+  %3 = is_unique %1 : $*C
+  %4 = load_borrow %1 : $*C
+  end_borrow %4 : $C
+  return %2 : $C
+}
+

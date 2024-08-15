@@ -358,6 +358,11 @@ inferIsolationInfoForTempAllocStack(AllocStackInst *asi) {
 
 SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   if (auto fas = FullApplySite::isa(inst)) {
+    // Check if we have SIL based "faked" isolation crossings that we use for
+    // testing purposes.
+    //
+    // NOTE: Please do not use getWithIsolationCrossing in more places! We only
+    // want to use it here!
     if (auto crossing = fas.getIsolationCrossing()) {
       if (auto info = SILIsolationInfo::getWithIsolationCrossing(*crossing))
         return info;
@@ -754,19 +759,6 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     }
   }
 
-  // Try to infer using SIL first since we might be able to get the source name
-  // of the actor.
-  if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>()) {
-    if (auto crossing = apply->getIsolationCrossing()) {
-      if (auto info = SILIsolationInfo::getWithIsolationCrossing(*crossing))
-        return info;
-
-      if (crossing->getCalleeIsolation().isNonisolated()) {
-        return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
-      }
-    }
-  }
-
   if (auto *asi = dyn_cast<AllocStackInst>(inst)) {
     if (asi->isFromVarDecl()) {
       if (auto *varDecl = asi->getLoc().getAsASTNode<VarDecl>()) {
@@ -797,6 +789,23 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
             }
           }
         }
+      }
+    }
+  }
+
+  // Check if we have an ApplyInst with nonisolated.
+  //
+  // NOTE: We purposely avoid using other isolation info from an ApplyExpr since
+  // when we use the isolation crossing on the ApplyExpr at this point,w e are
+  // unable to find out what the appropriate instance is (since we would have
+  // found it earlier if we could). This ensures that we can eliminate a case
+  // where we get a SILIsolationInfo with actor isolation and without a SILValue
+  // actor instance. This prevents a class of bad SILIsolationInfo merge errors
+  // caused by the actor instances not matching.
+  if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>()) {
+    if (auto crossing = apply->getIsolationCrossing()) {
+      if (crossing->getCalleeIsolation().isNonisolated()) {
+        return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
       }
     }
   }
@@ -879,8 +888,14 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   if (auto functionIsolation = fArg->getFunction()->getActorIsolation()) {
     if (functionIsolation.isActorIsolated()) {
       assert(functionIsolation.isGlobalActor());
-      return SILIsolationInfo::getGlobalActorIsolated(
-          fArg, functionIsolation.getGlobalActor());
+      if (functionIsolation.isGlobalActor()) {
+        return SILIsolationInfo::getGlobalActorIsolated(
+            fArg, functionIsolation.getGlobalActor());
+      }
+
+      return SILIsolationInfo::getActorInstanceIsolated(
+          fArg, ActorInstance::getForActorAccessorInit(),
+          functionIsolation.getActor());
     }
   }
 
@@ -943,6 +958,12 @@ void SILIsolationInfo::print(llvm::raw_ostream &os) const {
         printOptions(os);
         os << '\n';
         os << "instance: actor accessor init\n";
+        return;
+      case ActorInstance::Kind::CapturedActorSelf:
+        os << "'self'-isolated";
+        printOptions(os);
+        os << '\n';
+        os << "instance: captured actor instance self\n";
         return;
       }
     }
@@ -1062,6 +1083,9 @@ void SILIsolationInfo::printForDiagnostics(llvm::raw_ostream &os) const {
       case ActorInstance::Kind::ActorAccessorInit:
         os << "'self'-isolated";
         return;
+      case ActorInstance::Kind::CapturedActorSelf:
+        os << "'self'-isolated";
+        return;
       }
     }
 
@@ -1102,7 +1126,11 @@ void SILIsolationInfo::printForOneLineLogging(llvm::raw_ostream &os) const {
         break;
       }
       case ActorInstance::Kind::ActorAccessorInit:
-        os << "'self'-isolated";
+        os << "'self'-isolated (actor-accessor-init)";
+        printOptions(os);
+        return;
+      case ActorInstance::Kind::CapturedActorSelf:
+        os << "'self'-isolated (captured-actor-self)";
         printOptions(os);
         return;
       }
@@ -1254,7 +1282,7 @@ namespace swift::test {
 // Dumps:
 // - The inferred isolation.
 static FunctionTest
-    IsolationInfoInferrence("sil-isolation-info-inference",
+    IsolationInfoInferrence("sil_isolation_info_inference",
                             [](auto &function, auto &arguments, auto &test) {
                               auto value = arguments.takeValue();
 

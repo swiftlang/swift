@@ -166,10 +166,6 @@ func canImportVersioned() {
 #if canImport(A, unknown: 2.2) // expected-error {{2nd parameter of canImport should be labeled as _version or _underlyingVersion}}
   let a = 1
 #endif
-
-#if canImport(A,) // expected-error {{unexpected ',' separator}}
-  let a = 1
-#endif
   
 #if canImport(A, 2.2) // expected-error {{2nd parameter of canImport should be labeled as _version or _underlyingVersion}}
   let a = 1

@@ -26,7 +26,8 @@ struct MyType2 {
 }
 
 func testA(ns: NS, mt: MyType, mt2: MyType2, sc: StrictClass, nsc: NonStrictClass) async {
-  Task { // expected-tns-warning {{task-isolated value of type '() async -> ()' passed as a strongly transferred parameter; later accesses could race}}
+  Task { // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races; this is an error in the Swift 6 language mode}}
+    // expected-tns-note @-1 {{Passing task-isolated value of non-Sendable type '() async -> ()' as a 'sending' parameter risks causing races inbetween task-isolated uses and uses reachable from the callee}}
     print(ns)
     print(mt) // no warning by default: MyType is Sendable because we suppressed NonStrictClass's warning
     print(mt2)

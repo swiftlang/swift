@@ -20,6 +20,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Basic/Assertions.h"
 #include "clang/Basic/Diagnostic.h"
+#include "clang/CAS/CASOptions.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/FrontendOptions.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
@@ -241,6 +242,10 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     depsInvocation.getFrontendOpts().ModuleCacheKeys.clear();
     depsInvocation.getFrontendOpts().PathPrefixMappings.clear();
     depsInvocation.getFrontendOpts().OutputFile.clear();
+
+    // Reset CASOptions since that should be coming from swift.
+    depsInvocation.getCASOpts() = clang::CASOptions();
+    depsInvocation.getFrontendOpts().CASIncludeTreeID.clear();
 
     // FIXME: workaround for rdar://105684525: find the -ivfsoverlay option
     // from clang scanner and pass to swift.

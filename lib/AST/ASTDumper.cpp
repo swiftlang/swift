@@ -1347,6 +1347,14 @@ namespace {
       printStorageImpl(VD);
       printFlag(VD->getAttrs().hasAttribute<KnownToBeLocalAttr>(),
                 "known_to_be_local", DeclModifierColor);
+      if (auto *nonisolatedAttr =
+              VD->getAttrs().getAttribute<NonisolatedAttr>()) {
+        if (nonisolatedAttr->isUnsafe()) {
+          printFlag(true, "nonisolated(unsafe)", DeclModifierColor);
+        } else {
+          printFlag(true, "nonisolated", DeclModifierColor);
+        }
+      }
 
       printAccessors(VD);
       
@@ -3979,8 +3987,8 @@ namespace {
         printFlag("error_expr");
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         printRec(DMT, "dependent_member_type");
-      } else if (originator.is<PlaceholderTypeRepr *>()) {
-        printFlag("placeholder_type_repr");
+      } else if (originator.is<TypeRepr *>()) {
+        printFlag("type_repr");
       } else {
         assert(false && "unknown originator");
       }

@@ -28,19 +28,21 @@ This book is divided into five parts. \PartRef{part syntax} gives a high-level o
 
 \item \ChapRef{genericenv} defines \emph{archetypes} and \emph{generic environments}, two abstractions used throughout the compiler. Also describes the \emph{type parameter graph} that gives us an intuitive visualization of a generic signature.
 \end{itemize}
-\PartRef{part specialties} further develops the theory of derived requirements and type substitution:
+
+\PartRef{part specialties} explores the implementation of various compiler subsystems, while further developing the derived requirements formalism and type substitution:
 \begin{itemize}
-\item \ChapRef{typeresolution} details how \emph{type resolution} uses name lookup and type substitution to resolve syntactic type representations to semantic types.
+\item \ChapRef{typeresolution} details \emph{type resolution}, which uses name lookup and substitution to resolve syntactic representations to semantic types. Checking if a substitution map satisfies the requirements of its generic signature links our two formalisms.
 
 \item \ChapRef{extensions} discusses extension declarations, which add members and conformances to existing types. Extensions can also declare \emph{conditional conformances}, which have some interesting behaviors.
 
-\item \ChapRef{building generic signatures} explains how we build a generic signature from the syntactic representations of its requirements. The most important step is \emph{requirement minimization}, which eliminates requirements proved redundant.
+\item \ChapRef{building generic signatures} explains how we build a generic signature from the syntax written in source, via the process of \emph{requirement minimization}, which eliminates requirements proved redundant. This chapter also shows how invalid requirements are diagnosed. A \emph{well-formed generic signature} is one that satisfies the validity condition, and its theoretical properties have nice practical consequences.
 
-\item \ChapRef{conformance paths} completes the type substitution algebra with \emph{conformance paths}. The concept of a \emph{recursive conformance} is explored, and finally, the type substitution algebra is shown to be Turing-complete.
+\item \ChapRef{conformance paths} fills out the remainder of the type substitution algebra, explaining  \emph{conformance paths}. The concept of a \emph{recursive conformance} is explored, and finally, the type substitution algebra is shown to be Turing-complete.
 \end{itemize}
+
 \PartRef{part supplements} is currently unfinished. It will describe opaque return types (\ChapRef{opaqueresult}), existential types (\ChapRef{existentialtypes}), and subclassing (\ChapRef{classinheritance}).
 
-\PartRef{part rqm} describes The Requirement Machine, a \emph{decision procedure} for the derived requirements formalism. The original contribution here is that generic signature queries and requirement minimization are problems in the theory of \emph{string rewriting}:
+\PartRef{part rqm} describes the Requirement Machine, a \emph{decision procedure} for the derived requirements formalism. The original contribution here is that generic signature queries and requirement minimization are problems in the theory of \emph{string rewriting}:
 \begin{itemize}
 \item \ChapRef{rqm basic operation} describes the entry points for generic signature queries and requirement minimization, and how they recursively build a \emph{requirement machine} for a generic signature from the requirement machines of its \emph{protocol components}.
 
@@ -48,13 +50,13 @@ This book is divided into five parts. \PartRef{part syntax} gives a high-level o
 
 \item \ChapRef{symbols terms rules} goes in the other direction and shows that a generic signature can be encoded in the form of a finitely-presented monoid, such that generic signature queries become word problems. Therefore, derived requirements are \emph{at most} as expressive as the word problem---which can be solved in many cases using known techniques. This is the heart of our decision procedure.
 
-\item \ChapRef{completion} describes the Knuth-Bendix algorithm, which attempts to solve the word problem by constructing a \emph{convergent rewrite system}. Fundamental generic signature queries can then be answered via the \emph{normal form algorithm}. This is the brain of our decision procedure.
+\item \ChapRef{completion} describes the Knuth-Bendix algorithm, which attempts to solve the word problem by constructing a \emph{convergent rewriting system}. Fundamental generic signature queries can then be answered via the \emph{normal form algorithm}. This is the brain of our decision procedure.
 
-\item \ChapRef{propertymap} is unfinished. It will describe the construction of a \emph{property map} from a rewrite system;  the property map answers trickier generic signature queries.
+\item \ChapRef{propertymap} is unfinished. It will describe the construction of a \emph{property map} from a convergent rewriting system; the property map answers trickier generic signature queries.
 
-\item \ChapRef{concrete conformances} is unfinished. It will describe the handling of concrete types in the requirement machine rewrite system.
+\item \ChapRef{concrete conformances} is unfinished. It will describe the handling of concrete types in the Requirement Machine.
 
-\item \ChapRef{rqm minimization} is unfinished. It will present the algorithm for rewrite system minimization, which is the final step in building a new generic signature.
+\item \ChapRef{rqm minimization} is unfinished. It will present the algorithm for rewrite rule minimization, which is the final step in building a new generic signature.
 \end{itemize}
 
 The Swift compiler is written in \index{C++}C++. To avoid incidental complexity, concepts are described without direct reference to the source code. Instead, some chapters end with a \textbf{Source Code Reference} section, structured like an API reference. You can skip this material if you're only interested in the theory. No knowledge of C++ is assumed outside of these sections.

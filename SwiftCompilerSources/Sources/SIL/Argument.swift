@@ -248,13 +248,22 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
     return convention.parameters[paramIdx]
   }
 
-  /// Return a dependence of the function results on the indexed parameter.
-  public subscript(resultDependsOn argumentIndex: Int)
-    -> LifetimeDependenceConvention? {
-    guard let paramIdx = parameterIndex(for: argumentIndex) else {
+  public subscript(parameterDependencies targetArgumentIndex: Int) -> FunctionConvention.LifetimeDependencies? {
+    guard let targetParamIdx = parameterIndex(for: targetArgumentIndex) else {
       return nil
     }
-    return convention.resultDependencies?[paramIdx]
+    return convention.parameterDependencies(for: targetParamIdx)
+  }
+
+  /// Return a dependence of the function results on the indexed parameter.
+  public subscript(resultDependsOn argumentIndex: Int) -> LifetimeDependenceConvention? {
+    findDependence(source: argumentIndex, in: convention.resultDependencies)
+  }
+
+  /// Return a dependence of the target argument on the source argument.
+  public func getDependence(target targetArgumentIndex: Int, source sourceArgumentIndex: Int)
+    -> LifetimeDependenceConvention? {
+    findDependence(source: sourceArgumentIndex, in: self[parameterDependencies: targetArgumentIndex])
   }
 
   /// Number of SIL arguments for the function type's results
@@ -282,8 +291,11 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
     }
     for idx in indirectSILResultCount..<endIndex {
       str += "\n[\(idx)]        parameter: " + self[idx].description
+      if let deps = self[parameterDependencies: idx] {
+        str += "\n          lifetime: \(deps)"
+      }
       if let dep = self[resultDependsOn: idx] {
-        str += "resultDependsOn: " + dep.description
+        str += "\n   result dependence: " + dep.description
       }
     }
     return str
@@ -294,6 +306,14 @@ extension ArgumentConventions {
   private func parameterIndex(for argIdx: Int) -> Int? {
     let firstParamIdx = firstParameterIndex  // bridging call
     return argIdx < firstParamIdx ? nil : argIdx - firstParamIdx
+  }
+
+  private func findDependence(source argumentIndex: Int, in dependencies: FunctionConvention.LifetimeDependencies?)
+    -> LifetimeDependenceConvention? {
+    guard let paramIdx = parameterIndex(for: argumentIndex) else {
+      return nil
+    }
+    return dependencies?[paramIdx]
   }
 }
 
@@ -548,6 +568,12 @@ public enum ArgumentConvention : CustomStringConvertible {
 extension BridgedArgument {
   public var argument: Argument { obj.getAs(Argument.self) }
   public var functionArgument: FunctionArgument { obj.getAs(FunctionArgument.self) }
+}
+
+extension Optional where Wrapped == Argument {
+  public var bridged: OptionalBridgedArgument {
+    OptionalBridgedArgument(obj: self?.bridged.obj)
+  }
 }
 
 extension BridgedArgumentConvention {

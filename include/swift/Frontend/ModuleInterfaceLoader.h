@@ -688,7 +688,7 @@ public:
                                   SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
                                        ArrayRef<StringRef>, ArrayRef<StringRef>,
-                                       StringRef)> action) override;
+                                       StringRef, StringRef)> action) override;
   std::error_code runInSubCompilerInstance(StringRef moduleName,
                                            StringRef interfacePath,
                                            StringRef sdkPath,

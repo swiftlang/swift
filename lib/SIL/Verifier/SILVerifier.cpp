@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTSynthesis.h"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -93,6 +94,58 @@ static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
 static llvm::cl::opt<bool> AllowCriticalEdges("allow-critical-edges",
                                               llvm::cl::init(true));
 extern llvm::cl::opt<bool> SILPrintDebugInfo;
+
+void swift::verificationFailure(const Twine &complaint,
+              const SILInstruction *atInstruction,
+              const SILArgument *atArgument,
+              const std::function<void()> &extraContext) {
+  const SILFunction *f = nullptr;
+  StringRef funcName = "?";
+  if (atInstruction) {
+    f = atInstruction->getFunction();
+    funcName = f->getName();
+  } else if (atArgument) {
+    f = atArgument->getFunction();
+    funcName = f->getName();
+  }
+  if (ContinueOnFailure) {
+    llvm::dbgs() << "Begin Error in function " << funcName << "\n";
+  }
+
+  llvm::dbgs() << "SIL verification failed: " << complaint << "\n";
+  if (extraContext)
+    extraContext();
+
+  if (atInstruction) {
+    llvm::dbgs() << "Verifying instruction:\n";
+    atInstruction->printInContext(llvm::dbgs());
+  } else if (atArgument) {
+    llvm::dbgs() << "Verifying argument:\n";
+    atArgument->printInContext(llvm::dbgs());
+  }
+  if (ContinueOnFailure) {
+    llvm::dbgs() << "End Error in function " << funcName << "\n";
+    return;
+  }
+
+  if (f) {
+    llvm::dbgs() << "In function:\n";
+    f->print(llvm::dbgs());
+    if (DumpModuleOnFailure) {
+      // Don't do this by default because modules can be _very_ large.
+      llvm::dbgs() << "In module:\n";
+      f->getModule().print(llvm::dbgs());
+    }
+  }
+
+  // We abort by default because we want to always crash in
+  // the debugger.
+  if (AbortOnFailure)
+    abort();
+  else
+    exit(1);
+}
+
 
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
 // prevent release builds from triggering spurious unused variable warnings.
@@ -922,45 +975,7 @@ public:
                 const std::function<void()> &extraContext = nullptr) {
     if (condition) return;
 
-    StringRef funcName;
-    if (CurInstruction)
-      funcName = CurInstruction->getFunction()->getName();
-    else if (CurArgument)
-      funcName = CurArgument->getFunction()->getName();
-    if (ContinueOnFailure) {
-      llvm::dbgs() << "Begin Error in function " << funcName << "\n";
-    }
-
-    llvm::dbgs() << "SIL verification failed: " << complaint << "\n";
-    if (extraContext)
-      extraContext();
-
-    if (CurInstruction) {
-      llvm::dbgs() << "Verifying instruction:\n";
-      CurInstruction->printInContext(llvm::dbgs());
-    } else if (CurArgument) {
-      llvm::dbgs() << "Verifying argument:\n";
-      CurArgument->printInContext(llvm::dbgs());
-    }
-    if (ContinueOnFailure) {
-      llvm::dbgs() << "End Error in function " << funcName << "\n";
-      return;
-    }
-
-    llvm::dbgs() << "In function:\n";
-    F.print(llvm::dbgs());
-    if (DumpModuleOnFailure) {
-      // Don't do this by default because modules can be _very_ large.
-      llvm::dbgs() << "In module:\n";
-      F.getModule().print(llvm::dbgs());
-    }
-
-    // We abort by default because we want to always crash in
-    // the debugger.
-    if (AbortOnFailure)
-      abort();
-    else
-      exit(1);
+    verificationFailure(complaint, CurInstruction, CurArgument, extraContext);
   }
 #define require(condition, complaint) \
   _require(bool(condition), complaint ": " #condition)
@@ -2702,19 +2717,24 @@ public:
   }
 
   void checkExtendLifetimeInst(ExtendLifetimeInst *I) {
-    require(!I->getOperand()->getType().isTrivial(*I->getFunction()),
-            "Source value should be non-trivial");
     require(F.hasOwnership(),
             "extend_lifetime is only valid in functions with qualified "
             "ownership");
+    // In Raw SIL, extend_lifetime marks the end of variable scopes.
+    if (F.getModule().getStage() == SILStage::Raw)
+      return;
+
+    require(!I->getOperand()->getType().isTrivial(*I->getFunction()),
+            "Source value should be non-trivial after diagnostics");
     require(getDeadEndBlocks().isDeadEnd(I->getParent()),
-            "extend_lifetime in non-dead-end!?");
+            "extend_lifetime in non-dead-end after diagnostics");
+
     auto value = I->getOperand();
     LinearLiveness linearLiveness(value,
                                   LinearLiveness::DoNotIncludeExtensions);
     linearLiveness.compute();
     auto &liveness = linearLiveness.getLiveness();
-    require(!liveness.isWithinBoundary(I),
+    require(!liveness.isWithinBoundary(I, /*deadEndBlocks=*/nullptr),
             "extend_lifetime use within unextended linear liveness boundary!?");
     PrunedLivenessBoundary boundary;
     liveness.computeBoundary(boundary);
@@ -2789,7 +2809,8 @@ public:
       if (scopedAddress.isScopeEndingUse(use)) {
         continue;
       }
-      if (!scopedAddressLiveness->isWithinBoundary(user)) {
+      if (!scopedAddressLiveness->isWithinBoundary(user,
+                                                   /*deadEndBlocks=*/nullptr)) {
         llvm::errs() << "User found outside scope: " << *user;
         return false;
       }
@@ -3402,7 +3423,8 @@ public:
   void checkDestroyValueInst(DestroyValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(!I->getOperand()->getType().isTrivial(*I->getFunction()),
+    require(!I->getOperand()->getType().isTrivial(*I->getFunction())
+            || I->getOperand()->isFromVarDecl(),
             "Source value should be non-trivial");
     require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "destroy_value is only valid in functions with qualified "
@@ -6279,12 +6301,6 @@ public:
         }
         return packElementType;
       };
-      auto substConformances = [&](CanType dependentType,
-                                   Type conformingType,
-                                   ProtocolDecl *protocol) -> ProtocolConformanceRef {
-        // FIXME: This violates the spirit of this verifier check.
-        return ModuleDecl::lookupConformance(conformingType, protocol);
-      };
 
       // If the pack components and expected element types are SIL types,
       // we need to perform SIL substitution.
@@ -6295,13 +6311,16 @@ public:
           SILType::getPrimitiveObjectType(indexedElementType);
         auto substTargetElementSILType =
           targetElementSILType.subst(F.getModule(),
-                                     substTypes, substConformances);
+                                     substTypes,
+                                     LookUpConformanceInModule(),
+                                     CanGenericSignature(),
+                                     SubstFlags::PreservePackExpansionLevel);
         requireSameType(indexedElementSILType, substTargetElementSILType,
                         "lanewise-substituted pack element type didn't "
                         "match expected element type");
       } else {
         auto substTargetElementType =
-          targetElementType.subst(substTypes, substConformances)
+          targetElementType.subst(substTypes, LookUpConformanceInModule())
                            ->getCanonicalType();
         requireSameType(indexedElementType, substTargetElementType,
                         "lanewise-substituted pack element type didn't "
@@ -6778,6 +6797,9 @@ public:
 
         } else if (i.isDeallocatingStack()) {
           SILValue op = i.getOperand(0);
+          while (auto *mvi = dyn_cast<MoveValueInst>(op)) {
+            op = mvi->getOperand();
+          }
           require(!state.Stack.empty(),
                   "stack dealloc with empty stack");
           if (op != state.Stack.back()) {

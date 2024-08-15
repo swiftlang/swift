@@ -20,9 +20,11 @@ func requiresMainActor() -> Int { 0 }
 func requiresSomeGlobalActor() -> Int { 0 }
 
 class C1 {
-  // expected-note@+1 2 {{'self.x' not initialized}}
+  // expected-note@+2 {{main actor-isolated default value of 'self.x' cannot be used in a nonisolated initalizer}}
+  // expected-note@+1 {{main actor-isolated default value of 'self.x' cannot be used in a global actor 'SomeGlobalActor'-isolated initalizer}}
   @MainActor var x = requiresMainActor()
-  // expected-note@+1 2 {{'self.y' not initialized}}
+  // expected-note@+2 {{global actor 'SomeGlobalActor'-isolated default value of 'self.y' cannot be used in a nonisolated initalizer}}
+  // expected-note@+1 {{global actor 'SomeGlobalActor'-isolated default value of 'self.y' cannot be used in a main actor-isolated initalizer}}
   @SomeGlobalActor var y = requiresSomeGlobalActor()
   var z = 10
 

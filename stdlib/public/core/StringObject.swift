@@ -107,7 +107,7 @@ internal struct _StringObject {
     self._object = Builtin.valueToBridgeObject(UInt64(0)._value)
   }
 
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
  
   @usableFromInline @frozen
   internal enum Variant {
@@ -188,7 +188,7 @@ internal struct _StringObject {
   internal mutating func _setCountAndFlags(to value: CountAndFlags) {
 #if _pointerBitWidth(_64)
     self._countAndFlagsBits = value._storage
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     self._count = value.count
     self._flags = value.flags
 #else
@@ -256,7 +256,7 @@ extension _StringObject {
     self.init(rawUncheckedValue: bits)
     _invariantCheck()
   }
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
   // On 32-bit platforms, raw bit conversion is one-way only and uses the same
   // layout as on 64-bit platforms.
   @usableFromInline
@@ -283,7 +283,7 @@ extension _StringObject {
   internal var discriminatedObjectRawBits: UInt64 {
 #if _pointerBitWidth(_64)
     return Builtin.reinterpretCast(_object)
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     let low32: UInt
     switch _variant {
     case .immortal(let bitPattern):
@@ -451,6 +451,10 @@ extension _StringObject {
     return 32
 #elseif _pointerBitWidth(_32)
     return 20
+#elseif _pointerBitWidth(_16)
+    // TODO: we need to revisit all of this when we decide on efficient
+    // structures for storing String on 16-bit platforms
+    return 12
 #else
 #error("Unknown platform")
 #endif
@@ -612,7 +616,7 @@ extension _StringObject {
 #if _pointerBitWidth(_64)
     // On 64-bit, we copy the raw bits (to host byte order).
     self.init(rawValue: (word1, word2))
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     // On 32-bit, we need to unpack the small string.
     let smallStringDiscriminatorAndCount: UInt64 = 0xFF00_0000_0000_0000
 
@@ -666,7 +670,7 @@ extension _StringObject {
 #if _pointerBitWidth(_64)
     self._countAndFlagsBits = 0
     self._object = Builtin.valueToBridgeObject(Nibbles.emptyString._value)
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     self.init(
       count: 0,
       variant: .immortal(0),
@@ -996,7 +1000,7 @@ extension _StringObject {
     _internalInvariant(hasNativeStorage)
     let unmanaged = Unmanaged<__StringStorage>.fromOpaque(largeAddress)
     return unmanaged.takeUnretainedValue()
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     guard case .native(let storage) = _variant else {
       _internalInvariantFailure()
     }
@@ -1020,7 +1024,7 @@ extension _StringObject {
     _internalInvariant(hasNativeStorage)
     let unmanaged = Unmanaged<__StringStorage>.fromOpaque(largeAddress)
     return unmanaged._withUnsafeGuaranteedRef { body($0) }
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     // FIXME: Do this properly.
     return body(nativeStorage)
 #else
@@ -1035,7 +1039,7 @@ extension _StringObject {
     _internalInvariant(hasSharedStorage)
     let unmanaged = Unmanaged<__SharedStringStorage>.fromOpaque(largeAddress)
     return unmanaged.takeUnretainedValue()
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     guard case .native(let storage) = _variant else {
       _internalInvariantFailure()
     }
@@ -1058,7 +1062,7 @@ extension _StringObject {
     _internalInvariant(hasSharedStorage)
     let unmanaged = Unmanaged<__SharedStringStorage>.fromOpaque(largeAddress)
     return unmanaged._withUnsafeGuaranteedRef { body($0) }
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     // FIXME: Do this properly.
     return body(sharedStorage)
 #else
@@ -1075,7 +1079,7 @@ extension _StringObject {
     _internalInvariant(largeIsCocoa && !isImmortal)
     let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
     return unmanaged.takeUnretainedValue()
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     guard case .bridged(let object) = _variant else {
       _internalInvariantFailure()
     }
@@ -1100,7 +1104,7 @@ extension _StringObject {
     )
     let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
     return unmanaged._withUnsafeGuaranteedRef { body($0) }
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     // FIXME: Do this properly.
     return body(cocoaObject)
 #else
@@ -1239,7 +1243,7 @@ extension _StringObject {
       pointerBits: UInt64(truncatingIfNeeded: biasedAddress),
       discriminator: Nibbles.largeImmortal(),
       countAndFlags: countAndFlags)
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     self.init(
       variant: .immortal(start: bufPtr.baseAddress._unsafelyUnwrappedUnchecked),
       discriminator: Nibbles.largeImmortal(),
@@ -1261,7 +1265,7 @@ extension _StringObject {
       object: castStorage,
       discriminator: Nibbles.largeMortal(),
       countAndFlags: storage._countAndFlags)
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     self.init(
       variant: .native(castStorage),
       discriminator: Nibbles.largeMortal(),
@@ -1282,7 +1286,7 @@ extension _StringObject {
       object: castStorage,
       discriminator: Nibbles.largeMortal(),
       countAndFlags: storage._countAndFlags)
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     self.init(
       variant: .native(castStorage),
       discriminator: Nibbles.largeMortal(),
@@ -1306,7 +1310,7 @@ extension _StringObject {
     _internalInvariant(self.largeAddressBits == Builtin.reinterpretCast(cocoa))
     _internalInvariant(self.providesFastUTF8 == providesFastUTF8)
     _internalInvariant(self.largeCount == length)
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     self.init(
       variant: .bridged(cocoa),
       discriminator: discriminator,
@@ -1333,7 +1337,7 @@ extension _StringObject {
     _internalInvariant(self.largeAddressBits == Builtin.reinterpretCast(cocoa))
     _internalInvariant(self.providesFastUTF8 == providesFastUTF8)
     _internalInvariant(self.largeCount == length)
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     self.init(
       variant: .bridged(cocoa),
       discriminator: discriminator,
@@ -1355,7 +1359,7 @@ extension _StringObject {
     _internalInvariant(MemoryLayout<_StringObject>.size == 16)
 
     _internalInvariant(MemoryLayout<_StringObject?>.size == 16)
-    #elseif _pointerBitWidth(_32)
+    #elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     _internalInvariant(MemoryLayout<_StringObject>.size == 12)
     _internalInvariant(MemoryLayout<_StringObject>.stride == 12)
     _internalInvariant(MemoryLayout<_StringObject>.alignment == 4)
@@ -1425,7 +1429,7 @@ extension _StringObject {
       }
     }
 
-    #if _pointerBitWidth(_32)
+    #if _pointerBitWidth(_32) || _pointerBitWidth(_16)
     switch _variant {
     case .immortal:
       _internalInvariant(isImmortal)
@@ -1447,7 +1451,7 @@ extension _StringObject {
     let word1 = ("0000000000000000" + String(raw.1, radix: 16)).suffix(16)
 #if _pointerBitWidth(_64)
     print("StringObject(<\(word0) \(word1)>)")
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     print("""
       StringObject(\
       <\(word0) \(word1)> \

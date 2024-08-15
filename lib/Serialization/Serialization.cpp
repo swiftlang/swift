@@ -414,7 +414,7 @@ namespace {
     using offset_type = unsigned;
 
     hash_value_type ComputeHash(key_type_ref key) {
-      return llvm::hash_value(static_cast<uint32_t>(key));
+      return key;
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -459,7 +459,7 @@ namespace {
     using offset_type = unsigned;
 
     hash_value_type ComputeHash(key_type_ref key) {
-      return llvm::hash_value(static_cast<uint32_t>(key));
+      return key;
     }
 
     std::pair<unsigned, unsigned>
@@ -853,6 +853,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, MODULE_ABI_NAME);
   BLOCK_RECORD(options_block, IS_CONCURRENCY_CHECKED);
   BLOCK_RECORD(options_block, HAS_CXX_INTEROPERABILITY_ENABLED);
+  BLOCK_RECORD(options_block, CXX_STDLIB_KIND);
   BLOCK_RECORD(options_block, MODULE_PACKAGE_NAME);
   BLOCK_RECORD(options_block, MODULE_EXPORT_AS_NAME);
   BLOCK_RECORD(options_block, PLUGIN_SEARCH_OPTION);
@@ -1134,6 +1135,10 @@ void Serializer::writeHeader() {
         options_block::HasCxxInteroperabilityEnabledLayout
             CxxInteroperabilityEnabled(Out);
         CxxInteroperabilityEnabled.emit(ScratchRecord);
+
+        options_block::CXXStdlibKindLayout CXXStdlibKind(Out);
+        CXXStdlibKind.emit(ScratchRecord,
+                           static_cast<uint8_t>(M->getCXXStdlibKind()));
       }
 
       if (Options.SerializeOptionsForDebugging) {

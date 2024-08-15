@@ -67,7 +67,7 @@ class Class2 {
   init()
 }
 
-@_moveOnly struct MoveOnlyStruct {
+struct MoveOnlyStruct: ~Copyable {
   @_hasStorage var i: Int
   deinit
 }

@@ -99,9 +99,6 @@ def _apply_default_arguments(args):
     if args.libdispatch_build_variant is None:
         args.libdispatch_build_variant = args.build_variant
 
-    if args.libicu_build_variant is None:
-        args.libicu_build_variant = args.build_variant
-
     if args.libxml2_build_variant is None:
         args.libxml2_build_variant = args.build_variant
 
@@ -216,6 +213,7 @@ def _apply_default_arguments(args):
         args.test_android = False
         args.test_cmark = False
         args.test_swiftpm = False
+        args.test_foundation = False
         args.test_swift_driver = False
         args.test_swiftsyntax = False
         args.test_indexstoredb = False
@@ -811,6 +809,16 @@ def create_argument_parser():
     option(['--wasmkit'], toggle_true('build_wasmkit'),
            help='build WasmKit')
 
+    option('--swift-testing', toggle_true('build_swift_testing'),
+           help='build Swift Testing')
+    option('--install-swift-testing', toggle_true('install_swift_testing'),
+           help='install Swift Testing')
+    option('--swift-testing-macros', toggle_true('build_swift_testing_macros'),
+           help='build Swift Testing macro plugin')
+    option('--install-swift-testing-macros',
+           toggle_true('install_swift_testing_macros'),
+           help='install Swift Testing macro plugin')
+
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
 
@@ -819,9 +827,6 @@ def create_argument_parser():
 
     option('--libdispatch', toggle_true('build_libdispatch'),
            help='build libdispatch')
-
-    option('--libicu', toggle_true('build_libicu'),
-           help='build libicu')
 
     option('--static-libxml2', toggle_true('build_libxml2'), default=False,
            help='build static libxml2')
@@ -945,10 +950,6 @@ def create_argument_parser():
     option('--debug-libdispatch', store('libdispatch_build_variant'),
            const='Debug',
            help='build the Debug variant of libdispatch')
-
-    option('--debug-libicu', store('libicu_build_variant'),
-           const='Debug',
-           help='build the Debug variant of libicu')
 
     option('--debug-libxml2', store('libxml2_build_variant'),
            const='Debug',
@@ -1147,6 +1148,10 @@ def create_argument_parser():
     option('--build-swift-stdlib-static-print', toggle_true,
            help='Build constant-folding print() support')
 
+    option('--build-embedded-stdlib', toggle_true,
+           default=True,
+           help='Build embedded stdlib')
+
     option('--build-embedded-stdlib-cross-compiling', toggle_true,
            help='Build embedded stdlib for cross-compiling targets.')
 
@@ -1322,6 +1327,8 @@ def create_argument_parser():
            help='skip testing cmark')
     option('--skip-test-swiftpm', toggle_false('test_swiftpm'),
            help='skip testing swiftpm')
+    option('--skip-test-foundation', toggle_false('test_foundation'),
+           help='skip testing Foundation')
     option('--skip-test-swift-driver', toggle_false('test_swift_driver'),
            help='skip testing Swift driver')
     option('--skip-test-swiftsyntax', toggle_false('test_swiftsyntax'),
@@ -1403,7 +1410,7 @@ def create_argument_parser():
 
     option('--android-arch', store,
            choices=['armv7', 'aarch64', 'x86_64'],
-           default='armv7',
+           default='aarch64',
            help='The target architecture when building for Android. '
                 'Currently, only armv7, aarch64, and x86_64 are supported. '
                 '%(default)s is the default.')
@@ -1583,7 +1590,6 @@ SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift.
                      /swift-corelibs-xctest      (optional)
                      /swift-corelibs-foundation  (optional)
                      /swift-corelibs-libdispatch (optional)
-                     /icu                        (optional)
                      /libxml2                    (optional)
                      /zlib                       (optional)
                      /curl                       (optional)

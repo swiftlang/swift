@@ -23,6 +23,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Comment.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
@@ -363,11 +364,6 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
           if (!shouldPrint(element, optionsCopy))
             return false;
         }
-      }
-
-      if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
-        if (accessor->isInitAccessor() && !options.PrintForSIL)
-          return false;
       }
 
       return ShouldPrintChecker::shouldPrint(D, options);
@@ -760,7 +756,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
   void printSwiftDocumentationComment(const Decl *D) {
     if (Options.CascadeDocComment)
-      D = getDocCommentProvidingDecl(D);
+      D = D->getDocCommentProvidingDecl();
     if (!D)
       return;
     auto RC = D->getRawComment();
@@ -1836,7 +1832,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
         return type;
       },
       [&](CanType depType, Type substType, ProtocolDecl *proto) {
-        return ModuleDecl::lookupConformance(substType, proto);
+        return lookupConformance(substType, proto);
       });
   };
 
@@ -2059,6 +2055,9 @@ void PrintAST::printRequirement(const Requirement &req) {
   SmallVector<Type, 2> rootParameterPacks;
   getTransformedType(req.getFirstType())
       ->getTypeParameterPacks(rootParameterPacks);
+  if (req.getKind() != RequirementKind::Layout)
+    getTransformedType(req.getSecondType())
+        ->getTypeParameterPacks(rootParameterPacks);
   bool isPackRequirement = !rootParameterPacks.empty();
 
   switch (req.getKind()) {
@@ -5916,8 +5915,8 @@ public:
         Printer << "error_expr";
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         visit(DMT);
-      } else if (originator.is<PlaceholderTypeRepr *>()) {
-        Printer << "placeholder_type_repr";
+      } else if (originator.is<TypeRepr *>()) {
+        Printer << "type_repr";
       } else {
         assert(false && "unknown originator");
       }
@@ -7223,7 +7222,7 @@ public:
       }
 
       // Print based on the type.
-      Printer << "some ";
+      Printer.printKeyword("some", Options, /*Suffix=*/" ");
       auto archetypeType = decl->getDeclContext()->mapTypeIntoContext(
           decl->getDeclaredInterfaceType())->castTo<ArchetypeType>();
       auto constraintType = archetypeType->getExistentialType();

@@ -19,6 +19,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
@@ -461,7 +462,7 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
     // couldn't be computed, so assume they conform in such cases.
     if (!BaseTy->hasUnboundGenericType()) {
       if (auto res = Conformance->getConditionalRequirementsIfAvailable()) {
-        if (!res->empty() && !ModuleDecl::checkConformance(BaseTy, Proto))
+        if (!res->empty() && !checkConformance(BaseTy, Proto))
           continue;
       }
     }
@@ -831,7 +832,7 @@ static Type getBaseTypeForMember(const ValueDecl *OtherVD,
                                  Type BaseTy) {
   if (auto *Proto = OtherVD->getDeclContext()->getSelfProtocolDecl()) {
     if (BaseTy->getClassOrBoundGenericClass()) {
-      if (auto Conformance = ModuleDecl::lookupConformance(BaseTy, Proto)) {
+      if (auto Conformance = lookupConformance(BaseTy, Proto)) {
         auto *Superclass = Conformance.getConcrete()
                                ->getRootConformance()
                                ->getType()

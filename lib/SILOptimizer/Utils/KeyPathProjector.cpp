@@ -136,16 +136,7 @@ public:
         while (Ref->getType().getClassOrBoundGenericClass() !=
                storedProperty->getDeclContext()) {
           SILType superCl = Ref->getType().getSuperclass();
-          if (!superCl) {
-            // This should never happen, because the property should be in the
-            // decl or in a superclass of it. Just handle this to be on the safe
-            // side.
-            callback(SILValue());
-            if (Borrow) {
-              builder.createEndBorrow(loc, Borrow);
-            }
-            return;
-          }
+          ASSERT(superCl && "the property should be in the decl or in a superclass of it");
           Ref = builder.createUpcast(loc, Ref, superCl);
         }
         
@@ -701,15 +692,28 @@ KeyPathProjector::create(SILValue keyPath, SILValue root,
   // Check if the keypath only contains patterns which we support.
   auto components = kpInst->getPattern()->getComponents();
   for (const KeyPathPatternComponent &comp : components) {
-    if (comp.getKind() == KeyPathPatternComponent::Kind::GettableProperty ||
-        comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty) {
-      if (!comp.getExternalSubstitutions().empty() ||
-          !comp.getSubscriptIndices().empty()) {
-        // TODO: right now we can't optimize computed properties that require
-        // additional context for subscript indices or generic environment
-        // See https://github.com/apple/swift/pull/28799#issuecomment-570299845
-        return nullptr;
+    switch (comp.getKind()) {
+      case KeyPathPatternComponent::Kind::GettableProperty:
+      case KeyPathPatternComponent::Kind::SettableProperty:
+        if (!comp.getExternalSubstitutions().empty() ||
+            !comp.getSubscriptIndices().empty()) {
+          // TODO: right now we can't optimize computed properties that require
+          // additional context for subscript indices or generic environment
+          // See https://github.com/apple/swift/pull/28799#issuecomment-570299845
+          return nullptr;
+        }
+        break;
+      case KeyPathPatternComponent::Kind::StoredProperty: {
+        auto *declCtxt = comp.getStoredPropertyDecl()->getDeclContext();
+        if (!isa<StructDecl>(declCtxt) && !isa<ClassDecl>(declCtxt)) {
+          // This can happen, e.g. for ObjectiveC class properties, which are
+          // defined in an extension.
+          return nullptr;
+        }
+        break;
       }
+      default:
+        break;
     }
   }
 

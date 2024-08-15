@@ -7,7 +7,7 @@ func foo() {}
 public class ExplicitInitClass {
   // ExplicitInitClass.s.getter
   // CHECK-LABEL: sil{{.*}}@$s4Test17ExplicitInitClassC1sAA1SVvg
-  // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:(ss36_diagnoseUnavailableCodeReached_aeics5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb)]] : $@convention(thin) () -> Never
+  // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:(ss31_diagnoseUnavailableCodeReacheds5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb)]] : $@convention(thin) () -> Never
   // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
   // CHECK:         load
   // CHECK:       } // end sil function '$s4Test17ExplicitInitClassC1sAA1SVvg'

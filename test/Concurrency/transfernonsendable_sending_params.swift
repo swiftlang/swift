@@ -180,7 +180,8 @@ actor MyActor {
 }
 
 @MainActor func canAssignTransferringIntoGlobalActor3(_ x: sending NonSendableKlass) async {
-  await transferToCustom(globalKlass) // expected-warning {{sending main actor-isolated value of type 'NonSendableKlass' with later accesses to global actor 'CustomActor'-isolated context risks causing data races}}
+  await transferToCustom(globalKlass) // expected-warning {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
+  // expected-note @-1 {{sending main actor-isolated value of non-Sendable type 'NonSendableKlass' to global actor 'CustomActor'-isolated global function 'transferToCustom' risks causing races in between main actor-isolated and global actor 'CustomActor'-isolated uses}}
 }
 
 func canTransferAssigningIntoLocal(_ x: sending NonSendableKlass) async {

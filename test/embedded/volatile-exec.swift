@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-parse-as-library -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -enable-experimental-feature Extern -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none) | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test

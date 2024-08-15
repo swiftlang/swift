@@ -184,9 +184,6 @@ enum Sally: Copyable, ~Copyable, NeedsCopyable {} // expected-error {{enum 'Sall
 
 class NiceTry: ~Copyable, Copyable {} // expected-error {{classes cannot be '~Copyable'}}
 
-@_moveOnly class NiceTry2: Copyable {} // expected-error {{'@_moveOnly' attribute is only valid on structs or enums}}
-
-
 struct Extendo: ~Copyable {}
 extension Extendo: Copyable, ~Copyable {} // expected-error {{cannot suppress 'Copyable' in extension}}
 // expected-error@-1 {{struct 'Extendo' required to be 'Copyable' but is marked with '~Copyable'}}

@@ -337,7 +337,7 @@ bool LoadBorrowImmutabilityAnalysis::isImmutableInScope(
       continue;
     }
 
-    if (borrowLiveness.isWithinBoundary(write)) {
+    if (borrowLiveness.isWithinBoundary(write, /*deadEndBlocks=*/nullptr)) {
       llvm::errs() << "Write: " << *write;
       return false;
     }

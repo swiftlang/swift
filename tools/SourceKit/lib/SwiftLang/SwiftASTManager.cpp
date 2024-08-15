@@ -42,8 +42,6 @@ using namespace SourceKit;
 using namespace swift;
 using namespace swift::sys;
 
-void SwiftASTConsumer::failed(StringRef Error) { }
-
 //===----------------------------------------------------------------------===//
 // SwiftInvocation
 //===----------------------------------------------------------------------===//
@@ -174,13 +172,13 @@ namespace SourceKit {
   void ASTUnit::Implementation::consumeAsync(SwiftASTConsumerRef ConsumerRef,
                                              ASTUnitRef ASTRef) {
 #if defined(_WIN32)
-	// Windows uses more up for stack space (why?) than macOS/Linux which
-	// causes stack overflows in a dispatch thread with 64k stack. Passing
-	// useDeepStack=true means it's given a _beginthreadex thread with an 8MB
-	// stack.
-	bool useDeepStack = true;
+    // Windows uses more up for stack space (why?) than macOS/Linux which
+    // causes stack overflows in a dispatch thread with 64k stack. Passing
+    // useDeepStack=true means it's given a _beginthreadex thread with an 8MB
+    // stack.
+    bool useDeepStack = true;
 #else
-	bool useDeepStack = false;
+    bool useDeepStack = ConsumerRef->requiresDeepStack();
 #endif
     Queue.dispatch([ASTRef, ConsumerRef]{
       SwiftASTConsumer &ASTConsumer = *ConsumerRef;
@@ -315,7 +313,7 @@ class ASTBuildOperation
   const std::vector<FileContent> FileContents;
 
   /// Guards \c DependencyStamps. This prevents reading from \c DependencyStamps
-  /// while it is being modified. It does not provide any ordering gurantees
+  /// while it is being modified. It does not provide any ordering guarantees
   /// that \c DependencyStamps have been computed in \c buildASTUnit before they
   /// are accessed in \c matchesSourceState but that's fine (see comment on
   /// \c DependencyStamps).
@@ -1219,6 +1217,11 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
       // flag and might thus fail, which SILGen cannot handle.
       llvm::SaveAndRestore<std::shared_ptr<std::atomic<bool>>> DisableCancellationDuringSILGen(CompIns.getASTContext().CancellationFlag, nullptr);
       SILOptions SILOpts = Invocation.getSILOptions();
+
+      // Disable PerformanceDiagnostics SIL pass, which in some cases requires
+      // WMO (e.g. for Embedded Swift diags) but SourceKit compiles without WMO.
+      SILOpts.EnablePerformanceDiagnostics = false;
+
       auto &TC = CompIns.getSILTypes();
       std::unique_ptr<SILModule> SILMod = performASTLowering(*SF, TC, SILOpts);
       if (CancellationFlag->load(std::memory_order_relaxed)) {

@@ -7,9 +7,6 @@ import P
 import FooBar
 
 
-// There is a use-after-free in ScanDependencies rdar://131388478
-// XFAIL: asan
-
 // CHECK:      {{.*}}{{/|\\}}error_source_locations.swift:7:8: error: Unable to find module dependency: 'FooBar'
 // CHECK-NEXT: 5 |
 // CHECK-NEXT: 6 | import P

@@ -1,8 +1,5 @@
 // RUN: %empty-directory(%t)
 
-// Due to SE427NoInferenceOnExtension not being in production
-// REQUIRES: asserts
-
 // RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:     -enable-experimental-feature NonescapableTypes \
@@ -159,6 +156,11 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC-NEXT: }
 
 // CHECK-MISC-NEXT: public struct Continuation<T, E> where E : Swift.Error, T : ~Copyable {
+
+// CHECK-MISC: @frozen public enum Moptional<Wrapped> : ~Swift.Copyable, ~Swift.Escapable where Wrapped : ~Copyable, Wrapped : ~Escapable {
+// CHECK-MISC: extension {{.*}}.Moptional : Swift.Copyable where Wrapped : Swift.Copyable {
+// CHECK-MISC: extension {{.*}}.Moptional : Swift.Escapable where Wrapped : Swift.Escapable {
+
 // CHECK-MISC-NOT:  ~
 
 // NOTE: below are extensions emitted at the end of NoncopyableGenerics_Misc.swift

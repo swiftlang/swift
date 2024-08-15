@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 ///
-/// SIL operates on three kinds of addressible memory:
+/// SIL operates on three kinds of addressable memory:
 ///
 /// 1. Temporary RValues. These are recognied by AddressInitializationWalker. These largely disappear with opaque SIL
 /// values.
@@ -35,12 +35,13 @@ private func log(_ message: @autoclosure () -> String) {
 
 // Local variables are accessed in one of these ways.
 //
-// Note: @in is only immutable up to when it is destroyed, so still requies a local live range.
+// Note: @in is only immutable up to when it is destroyed, so still requires a local live range.
 struct LocalVariableAccess: CustomStringConvertible {
   enum Kind {
     case incomingArgument // @in, @inout, @inout_aliasable
     case outgoingArgument // @inout, @inout_aliasable
-    case beginAccess // Reading or reassinging a 'var'
+    case inoutYield       // indirect yield from this accessor
+    case beginAccess // Reading or reassigning a 'var'
     case load        // Reading a 'let'. Returning 'var' from an initializer.
     case store       // 'var' initialization and destruction
     case apply       // indirect arguments
@@ -77,7 +78,7 @@ struct LocalVariableAccess: CustomStringConvertible {
       }
     case .load:
       return false
-    case .incomingArgument, .outgoingArgument, .store:
+    case .incomingArgument, .outgoingArgument, .store, .inoutYield:
       return true
     case .apply:
       let apply = instruction as! FullApplySite
@@ -108,6 +109,8 @@ struct LocalVariableAccess: CustomStringConvertible {
       str += "incomingArgument"
     case .outgoingArgument:
       str += "outgoingArgument"
+    case .inoutYield:
+      str += "inoutYield"
     case .beginAccess:
       str += "beginAccess"
     case .load:
@@ -133,7 +136,7 @@ class LocalVariableAccessInfo: CustomStringConvertible {
   private var _isFullyAssigned: Bool?
 
   /// Cache whether the allocation has escaped prior to this access.
-  /// For alloc_box, this returns `nil` until reachability is computed.
+  /// This returns `nil` until reachability is computed.
   var hasEscaped: Bool?
 
   init(localAccess: LocalVariableAccess) {
@@ -149,7 +152,11 @@ class LocalVariableAccessInfo: CustomStringConvertible {
     case .load:
       self._isFullyAssigned = false
     case .store:
-      self._isFullyAssigned = true
+      if let store = localAccess.instruction as? StoringInstruction {
+        self._isFullyAssigned = LocalVariableAccessInfo.isBase(address: store.destination)
+      } else {
+        self._isFullyAssigned = true
+      }
     case .apply:
       let apply = localAccess.instruction as! FullApplySite
       if let convention = apply.convention(of: localAccess.operand!) {
@@ -160,6 +167,8 @@ class LocalVariableAccessInfo: CustomStringConvertible {
     case .escape:
       self._isFullyAssigned = false
       self.hasEscaped = true
+    case .inoutYield:
+      self._isFullyAssigned = false
     case .incomingArgument, .outgoingArgument:
       fatalError("Function arguments are never mapped to LocalVariableAccessInfo")
     }
@@ -191,9 +200,21 @@ class LocalVariableAccessInfo: CustomStringConvertible {
     return "full-assign: \(_isFullyAssigned == nil ? "unknown" : String(describing: _isFullyAssigned!)) "
       + "\(access)"
   }
+
+  // Does this address correspond to the local variable's base address? Any writes to this address will be a full
+  // assignment. This should match any instructions that the LocalVariableAccessMap initializer below recognizes as an
+  // allocation.
+  static private func isBase(address: Value) -> Bool {
+    switch address {
+    case is AllocBoxInst, is AllocStackInst, is BeginAccessInst:
+      return true
+    default:
+      return false
+    }
+  }
 }
 
-/// Model the formal accesses of an addressible variable introduced by an alloc_box, alloc_stack, or indirect
+/// Model the formal accesses of an addressable variable introduced by an alloc_box, alloc_stack, or indirect
 /// FunctionArgument.
 ///
 /// This instantiates a unique LocalVariableAccessInfo instances for each access instruction, caching it an an access
@@ -363,24 +384,14 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
     return .continueWalk
   }
 
-  // Handle storage type projections, like MarkUninitializedInst. Path projections should not be visited. They only
-  // occur inside the access.
+  // Handle storage type projections, like MarkUninitializedInst. Path projections are visited for field
+  // initialization because SILGen does not emit begin_access [init] consistently.
   //
-  // Exception: stack-allocated temporaries may be treated like local variables for the purpose of finding all
-  // uses. Such temporaries do not have access scopes, so we need to walk down any projection that may be used to
-  // initialize the temporary.
+  // Stack-allocated temporaries are also treated like local variables for the purpose of finding all uses. Such
+  // temporaries do not have access scopes, so we need to walk down any projection that may be used to initialize the
+  // temporary.
   mutating func projectedAddressUse(of operand: Operand, into value: Value) -> WalkResult {
-    // TODO: we need an abstraction for path projections. For local variables, these cannot occur outside of an access.
-    switch operand.instruction {
-    case is StructElementAddrInst, is TupleElementAddrInst, is IndexAddrInst, is TailAddrInst,
-         is UncheckedTakeEnumDataAddrInst, is OpenExistentialAddrInst:
-      return .abortWalk
-    // Projections used to initialize a temporary
-    case is InitEnumDataAddrInst, is InitExistentialAddrInst:
-      fallthrough
-    default:
-      return walkDownAddressUses(address: value)
-    }
+    return walkDownAddressUses(address: value)
   }
 
   mutating func scopedAddressUse(of operand: Operand) -> WalkResult {
@@ -424,6 +435,11 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
 
   mutating func appliedAddressUse(of operand: Operand, by apply: FullApplySite) -> WalkResult {
     visit(LocalVariableAccess(.apply, operand))
+    return .continueWalk
+  }
+
+  mutating func yieldedAddressUse(of operand: Operand) -> WalkResult {
+    visit(LocalVariableAccess(.inoutYield, operand))
     return .continueWalk
   }
 

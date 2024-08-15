@@ -786,10 +786,6 @@ public:
   /// representation. Class existentials do not always qualify.
   bool isHeapObjectReferenceType() const;
 
-  /// Returns true if this SILType is an aggregate that contains \p Ty
-  bool aggregateContainsRecord(SILType Ty, SILModule &SILMod,
-                               TypeExpansionContext context) const;
-
   /// Returns true if this SILType is an aggregate with unreferenceable storage,
   /// meaning it cannot be fully destructured in SIL.
   bool aggregateHasUnreferenceableStorage() const;
@@ -944,7 +940,7 @@ public:
     return getSILBoxFieldType(fn).isMoveOnlyWrapped();
   }
 
-  SILType getInstanceTypeOfMetatype(SILFunction *function) const;
+  SILType getLoweredInstanceTypeOfMetatype(SILFunction *function) const;
 
   MetatypeRepresentation getRepresentationOfMetatype(SILFunction *function) const;
 

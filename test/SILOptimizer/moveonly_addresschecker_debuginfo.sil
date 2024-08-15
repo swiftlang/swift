@@ -2,10 +2,11 @@
 
 sil_stage raw
 
+import Swift
+
 public class CopyableKlass {}
 
-@_moveOnly
-public struct NonTrivialStruct {
+public struct NonTrivialStruct: ~Copyable {
   var k: CopyableKlass
 }
 

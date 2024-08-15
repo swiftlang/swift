@@ -124,11 +124,11 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
 }
 
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
-                       bool isDistributed, bool isKnownToBeLocal,
+                       bool isDistributedThunk, bool isKnownToBeLocal,
                        bool isRuntimeAccessible,
                        SILDeclRef::BackDeploymentKind backDeploymentKind,
                        AutoDiffDerivativeFunctionIdentifier *derivativeId)
-    : loc(vd), kind(kind), isForeign(isForeign), isDistributed(isDistributed),
+    : loc(vd), kind(kind), isForeign(isForeign), distributedThunk(isDistributedThunk),
       isKnownToBeLocal(isKnownToBeLocal),
       isRuntimeAccessible(isRuntimeAccessible),
       backDeploymentKind(backDeploymentKind), defaultArgIndex(0),
@@ -186,7 +186,7 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
   }
 
   isForeign = asForeign;
-  isDistributed = asDistributed;
+  distributedThunk = asDistributed;
   isKnownToBeLocal = asDistributedKnownToBeLocal;
 }
 
@@ -386,6 +386,39 @@ bool SILDeclRef::hasUserWrittenCode() const {
     return false;
   }
   llvm_unreachable("Unhandled case in switch!");
+}
+
+bool SILDeclRef::shouldBeEmittedForDebugger() const {
+  if (!isFunc())
+    return false;
+
+  if (getASTContext().SILOpts.OptMode != OptimizationMode::NoOptimization)
+    return false;;
+
+  if (!getASTContext().SILOpts.ShouldFunctionsBePreservedToDebugger)
+    return false;
+
+  if (getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
+  ValueDecl *decl = getDecl();
+  DeclAttributes &attrs = decl->getAttrs();
+  if (attrs.hasSemanticsAttr("no.preserve.debugger"))
+    return false;
+
+  if (getLinkage(ForDefinition) == SILLinkage::Shared)
+    return false;
+  
+  if (auto decl = getDecl()) 
+    if (!decl->isImplicit())
+      return true;
+
+  // Synthesized getters are still callable in the debugger.
+  if (auto *accessor = dyn_cast_or_null<AccessorDecl>(getFuncDecl())) {
+    return accessor->isSynthesized() && accessor->isGetterOrSetter();
+  };
+
+  return false;
 }
 
 namespace {
@@ -858,7 +891,17 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
   // marked as @frozen.
   if (isStoredPropertyInitializer() || (isPropertyWrapperBackingInitializer() &&
                                         d->getDeclContext()->isTypeContext())) {
-    auto *nominal = cast<NominalTypeDecl>(d->getDeclContext()->getImplementedObjCContext());
+    auto *nominal = dyn_cast<NominalTypeDecl>(d->getDeclContext());
+
+    // If this isn't in a nominal, it must be in an @objc @implementation
+    // extension. We don't serialize those since clients outside the module
+    // don't think of these as Swift classes.
+    if (!nominal) {
+      ASSERT(isa<ExtensionDecl>(d->getDeclContext()) &&
+             cast<ExtensionDecl>(d->getDeclContext())->isObjCImplementation());
+      return IsNotSerialized;
+    }
+
     auto scope =
       nominal->getFormalAccessScope(/*useDC=*/nullptr,
                                     /*treatUsableFromInlineAsPublic=*/true);
@@ -1064,9 +1107,19 @@ bool SILDeclRef::isNativeToForeignThunk() const {
 }
 
 bool SILDeclRef::isDistributedThunk() const {
-  if (!isDistributed)
+  if (!distributedThunk)
     return false;
   return kind == Kind::Func;
+}
+bool SILDeclRef::isDistributed() const {
+  if (!hasFuncDecl())
+    return false;
+
+  if (auto decl = getFuncDecl()) {
+    return decl->isDistributed();
+  }
+
+  return false;
 }
 
 bool SILDeclRef::isBackDeploymentFallback() const {

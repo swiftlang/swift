@@ -574,6 +574,10 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
     Invocation.getSearchPathOptions().dump(LangOpts.Target.isOSDarwin());
   }
 
+  if (LangOpts.OpenSourcesAsVolatile) {
+    this->getSourceMgr().setOpenSourcesAsVolatile();
+  }
+
   // If we expect an implicit stdlib import, load in the standard library. If we
   // either fail to find it or encounter an error while loading it, bail early. Continuing will at best
   // trigger a bunch of other errors due to the stdlib being missing, or at
@@ -691,15 +695,21 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
 }
 
 void CompilerInstance::setUpLLVMArguments() {
-  // Honor -Xllvm.
-  if (!Invocation.getFrontendOptions().LLVMArgs.empty()) {
-    llvm::SmallVector<const char *, 4> Args;
-    Args.push_back("swift (LLVM option parsing)");
-    for (unsigned i = 0, e = Invocation.getFrontendOptions().LLVMArgs.size();
-         i != e; ++i)
-      Args.push_back(Invocation.getFrontendOptions().LLVMArgs[i].c_str());
-    Args.push_back(nullptr);
-    llvm::cl::ParseCommandLineOptions(Args.size()-1, Args.data());
+  // Dependency scanning has no need for LLVM options, and
+  // must not use `llvm::cl::` utilities operating on global state
+  // since dependency scanning is multi-threaded.
+  if (Invocation.getFrontendOptions().RequestedAction !=
+      FrontendOptions::ActionType::ScanDependencies) {
+    // Honor -Xllvm.
+    if (!Invocation.getFrontendOptions().LLVMArgs.empty()) {
+      llvm::SmallVector<const char *, 4> Args;
+      Args.push_back("swift (LLVM option parsing)");
+      for (unsigned i = 0, e = Invocation.getFrontendOptions().LLVMArgs.size();
+           i != e; ++i)
+        Args.push_back(Invocation.getFrontendOptions().LLVMArgs[i].c_str());
+      Args.push_back(nullptr);
+      llvm::cl::ParseCommandLineOptions(Args.size()-1, Args.data());
+    }
   }
 }
 
@@ -1459,6 +1469,8 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     if (Invocation.getLangOptions().EnableCXXInterop &&
         Invocation.getLangOptions().RequireCxxInteropToImportCxxInteropModule)
       MainModule->setHasCxxInteroperability();
+    if (Invocation.getLangOptions().EnableCXXInterop)
+      MainModule->setCXXStdlibKind(Invocation.getLangOptions().CXXStdlib);
     if (Invocation.getLangOptions().AllowNonResilientAccess)
       MainModule->setAllowNonResilientAccess();
     if (Invocation.getSILOptions().EnableSerializePackage)

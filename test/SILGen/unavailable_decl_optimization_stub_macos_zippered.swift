@@ -3,7 +3,7 @@
 // REQUIRES: OS=macosx
 
 // CHECK-LABEL:     sil{{.*}}@$s4Test15unavailableFuncyyF
-// CHECK:             [[FNREF:%.*]] = function_ref @$ss36_diagnoseUnavailableCodeReached_aeics5NeverOyF : $@convention(thin) () -> Never
+// CHECK:             [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb : $@convention(thin) () -> Never
 // CHECK-NEXT:        [[APPLY:%.*]] = apply [[FNREF]]()
 // CHECK:           } // end sil function '$s4Test15unavailableFuncyyF'
 @available(*, unavailable)

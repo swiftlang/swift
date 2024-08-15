@@ -6,6 +6,8 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
+// REQUIRES: executable_test
+
 //--- module.modulemap
 
 module CModule {

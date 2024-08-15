@@ -31,6 +31,13 @@ struct MyStruct4<T> {
   }
 }
 
+struct MyStruct5<T> {
+}
+
+extension MyStruct5 where T == Never {
+  @_used @_section("__TEXT,__mysection") static let static3: Int = 1 // ok
+}
+
 @_section("__TEXT,__mysection") // expected-error {{'@_section' attribute cannot be applied to this declaration}}
 struct SomeStruct {}
 

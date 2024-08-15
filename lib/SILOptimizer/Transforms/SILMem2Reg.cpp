@@ -2146,7 +2146,8 @@ void MemoryToRegisters::canonicalizeValueLifetimes(
   }
   CanonicalizeOSSALifetime canonicalizer(
       PruneDebugInsts, MaximizeLifetime_t(!f.shouldOptimize()), &f,
-      accessBlockAnalysis, domInfo, calleeAnalysis, deleter);
+      accessBlockAnalysis, deadEndBlocksAnalysis, domInfo, calleeAnalysis,
+      deleter);
   for (auto value : owned) {
     if (isa<SILUndef>(value) || value->isMarkedAsDeleted())
       continue;
@@ -2201,6 +2202,12 @@ bool MemoryToRegisters::promoteAllocation(AllocStackInst *alloc,
     LLVM_DEBUG(llvm::dbgs() << "*** Deleting store-only AllocStack: "<< *alloc);
     deleter.forceDeleteWithUsers(alloc);
     return true;
+  }
+
+  // The value stored into an alloc_stack whose type address-only can never be
+  // represented in a register.  Bail out.
+  if (alloc->getType().isAddressOnly(f)) {
+    return false;
   }
 
   // For AllocStacks that are only used within a single basic blocks, use
@@ -2289,8 +2296,10 @@ class SILMem2Reg : public SILFunctionTransform {
     bool madeChange = MemoryToRegisters(*f, da->get(f), deb,
                                         accessBlockAnalysis, calleeAnalysis)
                           .run();
-    if (madeChange)
+    if (madeChange) {
+      updateBorrowedFrom(getPassManager(), f);
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    }
   }
 };
 

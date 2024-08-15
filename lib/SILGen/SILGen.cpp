@@ -18,6 +18,7 @@
 #include "SILGenFunctionBuilder.h"
 #include "SILGenTopLevel.h"
 #include "Scope.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Evaluator.h"
@@ -93,6 +94,11 @@ SILGenModule::~SILGenModule() {
     if (f.getLinkage() == SILLinkage::Private && f.isExternalDeclaration())
       f.setLinkage(SILLinkage::PublicExternal);
   }
+
+  // Skip verification if a lazy typechecking error occurred.
+  auto &ctx = getASTContext();
+  if (ctx.TypeCheckerOpts.EnableLazyTypecheck && ctx.hadError())
+    return;
 
   M.verifyIncompleteOSSA();
 }
@@ -318,7 +324,7 @@ SILGenModule::getConformanceToObjectiveCBridgeable(SILLocation loc, Type type) {
   if (!proto) return nullptr;
 
   // Find the conformance to _ObjectiveCBridgeable.
-  auto result = ModuleDecl::lookupConformance(type, proto);
+  auto result = lookupConformance(type, proto);
   if (result.isInvalid())
     return nullptr;
 
@@ -363,7 +369,7 @@ SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
     return ProtocolConformanceRef::forInvalid();
 
   // Find the conformance to _BridgedStoredNSError.
-  return ModuleDecl::lookupConformance(type, proto);
+  return lookupConformance(type, proto);
 }
 
 static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C, StringRef name) {
@@ -519,8 +525,7 @@ ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
     return nullptr;
   }
 
-  auto conformance =
-    ModuleDecl::lookupConformance(nsErrorTy, cast<ProtocolDecl>(error));
+  auto conformance = lookupConformance(nsErrorTy, cast<ProtocolDecl>(error));
 
   if (conformance.isConcrete())
     NSErrorConformanceToError = conformance.getConcrete();
@@ -1206,8 +1211,9 @@ void SILGenModule::emitOrDelayFunction(SILDeclRef constant) {
   auto emitAfter = lastEmittedFunction;
 
   // Implicit decls may be delayed if they can't be used externally.
-  auto linkage = constant.getLinkage(ForDefinition);
-  bool mayDelay = !constant.hasUserWrittenCode() &&
+  auto linkage = constant.getLinkage(ForDefinition);;
+  bool mayDelay = !constant.shouldBeEmittedForDebugger() &&
+                  !constant.hasUserWrittenCode() &&
                   !constant.isDynamicallyReplaceable() &&
                   !isPossiblyUsedExternally(linkage, M.isWholeModule());
 

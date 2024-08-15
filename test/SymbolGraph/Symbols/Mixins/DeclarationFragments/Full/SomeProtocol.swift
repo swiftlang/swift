@@ -57,8 +57,16 @@ public func doSomethingElse(with param: some SomeProtocol & OtherProtocol) {}
 // CHECK-NEXT:          "spelling": "param"
 // CHECK-NEXT:        },
 // CHECK-NEXT:        {
-// CHECK-NEXT:          "kind": "text",
-// CHECK-NEXT:          "spelling": ": some "
+// CHECK-NEXT:            "kind": "text",
+// CHECK-NEXT:            "spelling": ": "
+// CHECK-NEXT:        },
+// CHECK-NEXT:        {
+// CHECK-NEXT:            "kind": "keyword",
+// CHECK-NEXT:            "spelling": "some"
+// CHECK-NEXT:        },
+// CHECK-NEXT:        {
+// CHECK-NEXT:            "kind": "text",
+// CHECK-NEXT:            "spelling": " "
 // CHECK-NEXT:        },
 // CHECK-NEXT:        {
 // CHECK-NEXT:          "kind": "typeIdentifier",
@@ -107,8 +115,16 @@ public func doSomethingElse(with param: some SomeProtocol & OtherProtocol) {}
 // MULTI-NEXT:          "spelling": "param"
 // MULTI-NEXT:        },
 // MULTI-NEXT:        {
-// MULTI-NEXT:          "kind": "text",
-// MULTI-NEXT:          "spelling": ": some "
+// MULTI-NEXT:            "kind": "text",
+// MULTI-NEXT:            "spelling": ": "
+// MULTI-NEXT:        },
+// MULTI-NEXT:        {
+// MULTI-NEXT:            "kind": "keyword",
+// MULTI-NEXT:            "spelling": "some"
+// MULTI-NEXT:        },
+// MULTI-NEXT:        {
+// MULTI-NEXT:            "kind": "text",
+// MULTI-NEXT:            "spelling": " "
 // MULTI-NEXT:        },
 // MULTI-NEXT:        {
 // MULTI-NEXT:          "kind": "typeIdentifier",

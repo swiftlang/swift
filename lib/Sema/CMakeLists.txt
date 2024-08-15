@@ -2,6 +2,7 @@
 add_swift_host_library(swiftSema STATIC
   AssociatedTypeInference.cpp
   BuilderTransform.cpp
+  Comment.cpp
   CSApply.cpp
   CSBindings.cpp
   CSSyntacticElement.cpp

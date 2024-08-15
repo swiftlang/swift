@@ -3,9 +3,6 @@
 // REQUIRES: objc_interop
 // RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4 2>&1 | %FileCheck %s
 
-// There is a use-after-free in ScanDependencies rdar://131388478
-// XFAIL: asan
-
 import P
 
 // CHECK:      {{.*}}{{/|\\}}Z.swiftinterface:3:8: error: Unable to find module dependency: 'missing_module'

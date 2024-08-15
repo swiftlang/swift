@@ -114,7 +114,7 @@ void TestRunner::run() {
 // Arguments: NONE
 // Dumps:
 // - the function
-static FunctionTest DumpFunctionTest("dump-function",
+static FunctionTest DumpFunctionTest("dump_function",
                                      [](auto &function, auto &, auto &) {
                                        function.print(llvm::outs());
                                      });

@@ -222,14 +222,15 @@ struct ConsumeOperatorCopyableValuesChecker {
   InstructionDeleter deleter;
   CanonicalizeOSSALifetime canonicalizer;
 
-  ConsumeOperatorCopyableValuesChecker(SILFunction *fn,
-                                       DominanceInfo *dominance,
-                                       BasicCalleeAnalysis *calleeAnalysis)
+  ConsumeOperatorCopyableValuesChecker(
+      SILFunction *fn, DominanceInfo *dominance,
+      BasicCalleeAnalysis *calleeAnalysis,
+      DeadEndBlocksAnalysis *deadEndBlocksAnalysis)
       : fn(fn), dominance(dominance),
         canonicalizer(DontPruneDebugInsts,
                       MaximizeLifetime_t(!fn->shouldOptimize()), fn,
-                      /*accessBlockAnalysis=*/nullptr, dominance,
-                      calleeAnalysis, deleter) {}
+                      /*accessBlockAnalysis=*/nullptr, deadEndBlocksAnalysis,
+                      dominance, calleeAnalysis, deleter) {}
 
   bool check();
 
@@ -427,7 +428,9 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
   for (auto &block : *fn) {
     for (auto &ii : block) {
       if (auto *mvi = dyn_cast<MoveValueInst>(&ii)) {
-        if (mvi->isFromVarDecl() && !mvi->getType().isMoveOnly()) {
+        if (mvi->isFromVarDecl()
+            && mvi->getOwnershipKind() != OwnershipKind::None
+            && !mvi->getType().isMoveOnly()) {
           LLVM_DEBUG(llvm::dbgs()
                      << "Found lexical lifetime to check: " << *mvi);
           valuesToCheck.insert(mvi);
@@ -498,7 +501,8 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
         mvi->setAllowsDiagnostics(false);
 
         LLVM_DEBUG(llvm::dbgs() << "Move Value: " << *mvi);
-        if (livenessInfo.liveness->isWithinBoundary(mvi)) {
+        if (livenessInfo.liveness->isWithinBoundary(
+                mvi, /*deadEndBlocks=*/nullptr)) {
           LLVM_DEBUG(llvm::dbgs() << "    WithinBoundary: Yes!\n");
           emitDiagnosticForMove(lexicalValue, varName, mvi);
         } else {
@@ -588,8 +592,9 @@ class ConsumeOperatorCopyableValuesCheckerPass : public SILFunctionTransform {
     auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
     auto *dominance = dominanceAnalysis->get(fn);
     auto *calleeAnalysis = getAnalysis<BasicCalleeAnalysis>();
-    ConsumeOperatorCopyableValuesChecker checker(getFunction(), dominance,
-                                                 calleeAnalysis);
+    auto *deadEndBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
+    ConsumeOperatorCopyableValuesChecker checker(
+        getFunction(), dominance, calleeAnalysis, deadEndBlocksAnalysis);
     auto *loopAnalysis = getAnalysis<SILLoopAnalysis>();
 
     if (checker.check()) {

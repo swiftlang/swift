@@ -745,13 +745,6 @@ struct PrintOptions {
     return CurrentPrintabilityChecker->shouldPrint(P, *this);
   }
 
-  /// Retrieve the print options that are suitable to print the testable interface.
-  static PrintOptions printTestableInterface(bool printFullConvention) {
-    PrintOptions result = printInterface(printFullConvention);
-    result.AccessFilter = AccessLevel::Internal;
-    return result;
-  }
-
   /// Retrieve the print options that are suitable to print interface for a
   /// swift file.
   static PrintOptions printSwiftFileInterface(bool printFullConvention) {

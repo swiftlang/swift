@@ -322,6 +322,7 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   if (!Ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation))
     diagnoseUnnecessaryPreconcurrencyImports(*SF);
   diagnoseUnnecessaryPublicImports(*SF);
+  diagnoseMissingImports(*SF);
 
   // Check to see if there are any inconsistent imports.
   // Whole-module @_implementationOnly imports.
@@ -571,9 +572,9 @@ bool swift::typeCheckForCodeCompletion(
                                                  callback);
 }
 
-Expr *swift::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
-                                bool replaceInvalidRefsWithErrors) {
-  return TypeChecker::resolveDeclRefExpr(UDRE, Context, replaceInvalidRefsWithErrors);
+Expr *swift::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
+                                DeclContext *Context) {
+  return TypeChecker::resolveDeclRefExpr(UDRE, Context);
 }
 
 void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {

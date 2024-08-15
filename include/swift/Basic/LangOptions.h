@@ -19,6 +19,7 @@
 #define SWIFT_BASIC_LANGOPTIONS_H
 
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/FixedBitSet.h"
 #include "swift/Basic/FunctionBodySkipping.h"
@@ -187,9 +188,6 @@ namespace swift {
     /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
 
-    /// Enable optimization to bypass resilience checks in a package
-    bool EnableBypassResilienceInPackage = false;
-
     /// Optimization mode for unavailable declarations.
     std::optional<UnavailableDeclOptimization> UnavailableDeclOptimizationMode;
 
@@ -267,6 +265,10 @@ namespace swift {
     /// Enable features useful for running in the debugger.
     bool DebuggerSupport = false;
 
+    /// Used only by the debugger. When set, the module loader will try to
+    /// import non-public transitive dependencies.
+    bool ImportNonPublicDependencies = false;
+
     /// Enable the MemoryBufferSerializedModuleImporter.
     /// Only used by lldb-moduleimport-test.
     bool EnableMemoryBufferImporter = false;
@@ -323,6 +325,16 @@ namespace swift {
 
     void setCxxInteropFromArgs(llvm::opt::ArgList &Args,
                                swift::DiagnosticEngine &Diags);
+
+    /// The C++ standard library used for the current build. This can differ
+    /// from the default C++ stdlib on a particular platform when `-Xcc
+    /// -stdlib=xyz` was passed to the compiler.
+    CXXStdlibKind CXXStdlib = CXXStdlibKind::Unknown;
+    CXXStdlibKind PlatformDefaultCXXStdlib = CXXStdlibKind::Unknown;
+
+    bool isUsingPlatformDefaultCXXStdlib() const {
+      return CXXStdlib == PlatformDefaultCXXStdlib;
+    }
 
     bool CForeignReferenceTypes = false;
 
@@ -462,6 +474,9 @@ namespace swift {
     /// Diagnose implicit 'override'.
     bool WarnImplicitOverrides = false;
 
+    /// Diagnose use of declarations that are soft-deprecated.
+    bool WarnSoftDeprecated = false;
+
     /// Diagnose uses of NSCoding with classes that have unstable mangled names.
     bool EnableNSKeyedArchiverDiagnostics = true;
 
@@ -495,6 +510,12 @@ namespace swift {
 
     /// Enable verification when every SubstitutionMap is constructed.
     bool VerifyAllSubstitutionMaps = false;
+
+    /// If set to true, the source manager will avoid memory mapping source files
+    /// with the expectation they may change on disk. This is most useful when
+    /// opening files under sourcekitd on Windows, as memory mapping on Windows
+    /// prevents files from being written.
+    bool OpenSourcesAsVolatile = false;
 
     /// Load swiftmodule files in memory as volatile and avoid mmap.
     bool EnableVolatileModules = false;
@@ -583,7 +604,7 @@ namespace swift {
     /// Skips decls that cannot be referenced externally.
     bool SkipNonExportableDecls = false;
 
-    /// True if -experimental-allow-non-resilient-access is passed and built
+    /// True if -allow-non-resilient-access is passed and built
     /// from source.
     bool AllowNonResilientAccess = false;
 
@@ -724,18 +745,23 @@ namespace swift {
       switch (maxWidth) {
       case 128:
         AtomicBitWidths.emplace_back("_128");
+        AtomicBitWidthValues.push_back(128);
         LLVM_FALLTHROUGH;
       case 64:
         AtomicBitWidths.emplace_back("_64");
+        AtomicBitWidthValues.push_back(64);
         LLVM_FALLTHROUGH;
       case 32:
         AtomicBitWidths.emplace_back("_32");
+        AtomicBitWidthValues.push_back(32);
         LLVM_FALLTHROUGH;
       case 16:
         AtomicBitWidths.emplace_back("_16");
+        AtomicBitWidthValues.push_back(16);
         LLVM_FALLTHROUGH;
       case 8:
         AtomicBitWidths.emplace_back("_8");
+        AtomicBitWidthValues.push_back(8);
         break;
       default:
         return;
@@ -745,6 +771,11 @@ namespace swift {
     /// Removes all atomic bit widths.
     void clearAtomicBitWidths() {
       AtomicBitWidths.clear();
+      AtomicBitWidthValues.clear();
+    }
+
+    llvm::ArrayRef<unsigned> getAtomicBitWidthValues() const {
+      return AtomicBitWidthValues;
     }
 
     /// Returns true if the given platform condition argument represents
@@ -785,6 +816,7 @@ namespace swift {
 
   private:
     llvm::SmallVector<std::string, 2> AtomicBitWidths;
+    llvm::SmallVector<unsigned, 2> AtomicBitWidthValues;
     llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 10>
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;

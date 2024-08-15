@@ -30,6 +30,7 @@ includeSwiftSyntax()
 
 set(compiler_swiftsyntax_libs
   _CompilerSwiftSyntax
+  _CompilerSwiftIfConfig
   _CompilerSwiftOperators
   _CompilerSwiftSyntaxBuilder
   _CompilerSwiftParser

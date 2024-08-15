@@ -80,9 +80,6 @@ if #unavailable(OSX 10.51, iOS 8.0) {
 if #unavailable(OSX 10.51, { // expected-error {{expected platform name}} // expected-error {{expected ')'}} expected-note {{to match this opening '('}}
 }
 
-if #unavailable(OSX 10.51,) { // expected-error {{expected platform name}}
-}
-
 if #unavailable(OSX 10.51, iOS { // expected-error {{expected version number}} // expected-error {{expected ')'}} expected-note {{to match this opening '('}}
 }
 

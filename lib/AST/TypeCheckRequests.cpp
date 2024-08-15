@@ -1318,25 +1318,6 @@ void AssociatedConformanceRequest::cacheResult(
 }
 
 //----------------------------------------------------------------------------//
-// PreCheckResultBuilderRequest computation.
-//----------------------------------------------------------------------------//
-
-void swift::simple_display(llvm::raw_ostream &out,
-                           ResultBuilderBodyPreCheck value) {
-  switch (value) {
-  case ResultBuilderBodyPreCheck::Okay:
-    out << "okay";
-    break;
-  case ResultBuilderBodyPreCheck::HasReturnStmt:
-    out << "has return statement";
-    break;
-  case ResultBuilderBodyPreCheck::Error:
-    out << "error";
-    break;
-  }
-}
-
-//----------------------------------------------------------------------------//
 // HasCircularInheritedProtocolsRequest computation.
 //----------------------------------------------------------------------------//
 
@@ -1804,19 +1785,20 @@ ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
 }
 
 void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
-                                         StringRef openingQuotationMark) const {
+                                         StringRef openingQuotationMark,
+                                         bool asNoun) const {
   switch (*this) {
   case ActorIsolation::ActorInstance:
-    os << "actor-isolated";
+    os << "actor" << (asNoun ? " isolation" : "-isolated");
     break;
 
   case ActorIsolation::GlobalActor: {
     if (isMainActor()) {
-      os << "main actor-isolated";
+      os << "main actor" << (asNoun ? " isolation" : "-isolated");
     } else {
       Type globalActor = getGlobalActor();
       os << "global actor " << openingQuotationMark << globalActor.getString()
-         << openingQuotationMark << "-isolated";
+         << openingQuotationMark << (asNoun ? " isolation" : "-isolated");
     }
     break;
   }
@@ -1939,6 +1921,52 @@ void swift::simple_display(
         out << state.getGlobalActor().getString();
       }
       break;
+  }
+}
+
+void IsolationSource::printForDiagnostics(
+    llvm::raw_ostream &os,
+    StringRef openingQuotationMark) const {
+  switch (this->kind) {
+  case IsolationSource::Explicit:
+    os << "explicit isolation";
+    return;
+
+  case IsolationSource::None:
+    os << "unspecified isolation";
+    return;
+
+  case IsolationSource::MainFunction:
+    os << "@main";
+    return;
+
+  case IsolationSource::TopLevelCode:
+    os << "top-level code";
+    return;
+
+  case IsolationSource::LexicalContext:
+    os << "enclosing context";
+    return;
+
+  case IsolationSource::Override:
+    os << "overridden superclass method";
+    return;
+
+  case IsolationSource::Conformance:
+    os << "conformance to ";
+    break;
+
+  case IsolationSource::Superclass:
+    os << "inheritance from ";
+    break;
+  }
+
+  auto *decl = inferenceSource.dyn_cast<Decl *>();
+  os << Decl::getDescriptiveKindName(decl->getDescriptiveKind());
+  if (auto *vd = dyn_cast<ValueDecl>(decl)) {
+    os << " " << openingQuotationMark;
+    vd->getName().printPretty(os);
+    os << openingQuotationMark;
   }
 }
 

@@ -1012,8 +1012,16 @@ static void formatDiagnosticArgument(StringRef Modifier,
         << FormatOpts.ClosingQuotationMark;
     break;
   case DiagnosticArgumentKind::ActorIsolation: {
-    assert(Modifier.empty() && "Improper modifier for ActorIsolation argument");
+    assert((Modifier.empty() || Modifier == "noun") &&
+           "Improper modifier for ActorIsolation argument");
     auto isolation = Arg.getAsActorIsolation();
+    isolation.printForDiagnostics(Out, FormatOpts.OpeningQuotationMark,
+                                  /*asNoun*/ Modifier == "noun");
+    break;
+  }
+  case DiagnosticArgumentKind::IsolationSource: {
+    assert(Modifier.empty() && "Improper modifier for IsolationSource argument");
+    auto isolation = Arg.getAsIsolationSource();
     isolation.printForDiagnostics(Out, FormatOpts.OpeningQuotationMark);
     break;
   }

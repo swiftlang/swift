@@ -37,6 +37,7 @@
 #include "IRGenModule.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1421,8 +1422,7 @@ getFunctionTypeFlags(CanFunctionType type) {
       // protocols.
       auto proto =
         type->getASTContext().getProtocol(KnownProtocolKind::Copyable);
-      if (proto &&
-          ModuleDecl::lookupConformance(type, proto).isInvalid())
+      if (proto && lookupConformance(type, proto).isInvalid())
         InvertedProtocols.insert(invertibleKind);
       break;
     }

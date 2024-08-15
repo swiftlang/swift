@@ -1536,7 +1536,7 @@ public:
 /// Determine the actor isolation for the given declaration.
 class ActorIsolationRequest :
     public SimpleRequest<ActorIsolationRequest,
-                         ActorIsolation(ValueDecl *),
+                         InferredActorIsolation(ValueDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1544,7 +1544,8 @@ public:
 private:
   friend SimpleRequest;
 
-  ActorIsolation evaluate(Evaluator &evaluator, ValueDecl *value) const;
+  InferredActorIsolation evaluate(Evaluator &evaluator,
+                                  ValueDecl *value) const;
 
 public:
   // Caching
@@ -3028,61 +3029,8 @@ public:
   void cacheResult(ProtocolConformanceRef value) const;
 };
 
-struct PreCheckResultBuilderDescriptor {
-  AnyFunctionRef Fn;
-  bool SuppressDiagnostics;
-
-private:
-  // NOTE: Since source tooling (e.g. code completion) might replace the body,
-  // we need to take the body into account to calculate 'hash_value' and '=='.
-  // Also, we cannot 'getBody()' inside 'hash_value' and '==' because it invokes
-  // another request (even if it's cached).
-  BraceStmt *Body;
-
-public:
-  PreCheckResultBuilderDescriptor(AnyFunctionRef Fn, bool suppressDiagnostics)
-      : Fn(Fn), SuppressDiagnostics(suppressDiagnostics), Body(Fn.getBody()) {}
-
-  friend llvm::hash_code
-  hash_value(const PreCheckResultBuilderDescriptor &owner) {
-    return llvm::hash_combine(owner.Fn, owner.Body);
-  }
-
-  friend bool operator==(const PreCheckResultBuilderDescriptor &lhs,
-                         const PreCheckResultBuilderDescriptor &rhs) {
-    return lhs.Fn == rhs.Fn && lhs.Body == rhs.Body;
-  }
-
-  friend bool operator!=(const PreCheckResultBuilderDescriptor &lhs,
-                         const PreCheckResultBuilderDescriptor &rhs) {
-    return !(lhs == rhs);
-  }
-
-  friend SourceLoc extractNearestSourceLoc(PreCheckResultBuilderDescriptor d) {
-    return extractNearestSourceLoc(d.Fn);
-  }
-
-  friend void simple_display(llvm::raw_ostream &out,
-                             const PreCheckResultBuilderDescriptor &d) {
-    simple_display(out, d.Fn);
-  }
-};
-
-enum class ResultBuilderBodyPreCheck : uint8_t {
-  /// There were no problems pre-checking the closure.
-  Okay,
-
-  /// There was an error pre-checking the closure.
-  Error,
-
-  /// The closure has a return statement.
-  HasReturnStmt,
-};
-
-class PreCheckResultBuilderRequest
-    : public SimpleRequest<PreCheckResultBuilderRequest,
-                           ResultBuilderBodyPreCheck(
-                               PreCheckResultBuilderDescriptor),
+class BraceHasReturnRequest
+    : public SimpleRequest<BraceHasReturnRequest, bool(const BraceStmt *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3091,8 +3039,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ResultBuilderBodyPreCheck
-  evaluate(Evaluator &evaluator, PreCheckResultBuilderDescriptor owner) const;
+  bool evaluate(Evaluator &evaluator, const BraceStmt *BS) const;
 
 public:
   // Separate caching.
@@ -4737,6 +4684,24 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Get the declaration that actually provides a doc comment for another.
+class DocCommentProvidingDeclRequest
+    : public SimpleRequest<DocCommentProvidingDeclRequest,
+                           const Decl *(const Decl *), RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  const Decl *evaluate(Evaluator &evaluator, const Decl *D) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+};
+
 /// Retrieve the brief portion of a declaration's document comment, potentially
 /// walking to find the comment providing decl if needed.
 class SemanticBriefCommentRequest
@@ -4783,7 +4748,6 @@ void simple_display(llvm::raw_ostream &out, ASTNode node);
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
-void simple_display(llvm::raw_ostream &out, ResultBuilderBodyPreCheck pck);
 
 /// Computes whether a module is part of the stdlib or contained within the
 /// SDK. If no SDK was specified, falls back to whether the module was

@@ -142,10 +142,13 @@ class LLVM(cmake_product.CMakeProduct):
                     if not os.path.isfile(dest_lib_path):
                         if os.path.isfile(host_lib_path):
                             if _os == 'tvos':
+                                print('{} -> {} (stripping i386)'.format(
+                                    host_lib_path, dest_lib_path))
                                 self.copy_lib_stripping_architecture(host_lib_path,
                                                                      dest_lib_path,
                                                                      'i386')
                             else:
+                                print('{} -> {}'.format(host_lib_path, dest_lib_path))
                                 shutil.copy(host_lib_path, dest_lib_path)
                         elif self.args.verbose_build:
                             print('no file exists at {}'.format(host_lib_path))
@@ -161,9 +164,13 @@ class LLVM(cmake_product.CMakeProduct):
                             if _os == 'tvos':
                                 # This is to avoid strip failures when generating
                                 # a toolchain
+                                print('{} -> {} (stripping i386)'.format(
+                                    host_sim_lib_path, dest_sim_lib_path))
                                 self.copy_lib_stripping_architecture(
                                     host_sim_lib_path, dest_sim_lib_path, 'i386')
                             else:
+                                print('{} -> {}'.format(
+                                    host_sim_lib_path, dest_sim_lib_path))
                                 shutil.copy(host_sim_lib_path, dest_sim_lib_path)
 
                         elif os.path.isfile(host_lib_path):
@@ -181,6 +188,8 @@ class LLVM(cmake_product.CMakeProduct):
                                 shell.call(['lipo', '-remove', 'i386', host_lib_path,
                                             '-output', dest_sim_lib_path])
                             else:
+                                print('{} -> {}'.format(host_lib_path,
+                                                        dest_sim_lib_path))
                                 shutil.copy(host_lib_path, dest_sim_lib_path)
                         elif self.args.verbose_build:
                             print('no file exists at {}', host_sim_lib_path)
@@ -195,6 +204,7 @@ class LLVM(cmake_product.CMakeProduct):
                     dest_lib_path = os.path.join(dest_builtins_dir, lib_name)
                     if not os.path.isfile(dest_lib_path):
                         if os.path.isfile(host_lib_path):
+                            print('{} -> {}'.format(host_lib_path, dest_lib_path))
                             shutil.copy(host_lib_path, dest_lib_path)
                         elif self.args.verbose_build:
                             print('no file exists at {}'.format(host_lib_path))
@@ -285,6 +295,12 @@ class LLVM(cmake_product.CMakeProduct):
         llvm_cmake_options.define('LLVM_INCLUDE_DOCS:BOOL', 'TRUE')
         llvm_cmake_options.define('LLVM_ENABLE_LTO:STRING', self.args.lto_type)
         llvm_cmake_options.define('COMPILER_RT_INTERCEPT_LIBDISPATCH', 'ON')
+
+        if system() == 'Darwin':
+            # Ask for Mach-O cross-compilation builtins (for Embedded Swift)
+            llvm_cmake_options.define(
+                'COMPILER_RT_FORCE_BUILD_BAREMETAL_MACHO_BUILTINS_ARCHS:STRING',
+                'armv6 armv6m armv7 armv7m armv7em')
 
         llvm_enable_projects = ['clang']
 

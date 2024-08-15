@@ -17,8 +17,7 @@ struct NCContainer : ~Copyable {
 struct View : ~Escapable {
   let ptr: UnsafeRawBufferPointer
   let c: Int
-  @_unsafeNonescapableResult
-  init(_ ptr: UnsafeRawBufferPointer, _ c: Int) {
+  init(_ ptr: UnsafeRawBufferPointer, _ c: Int) -> dependsOn(p) Self {
     self.ptr = ptr
     self.c = c
   }

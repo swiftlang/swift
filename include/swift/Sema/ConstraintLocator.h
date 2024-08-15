@@ -985,13 +985,13 @@ public:
 };
 
 class LocatorPathElt::PlaceholderType final
-    : public StoredPointerElement<PlaceholderTypeRepr> {
+    : public StoredPointerElement<TypeRepr> {
 public:
-  PlaceholderType(PlaceholderTypeRepr *placeholderRepr)
+  PlaceholderType(TypeRepr *placeholderRepr)
       : StoredPointerElement(PathElementKind::PlaceholderType,
                              placeholderRepr) {}
 
-  PlaceholderTypeRepr *getPlaceholderRepr() const { return getStoredPointer(); }
+  TypeRepr *getPlaceholderRepr() const { return getStoredPointer(); }
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::PlaceholderType;

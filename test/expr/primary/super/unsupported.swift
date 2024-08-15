@@ -42,8 +42,7 @@ class Derived: Base {
     // expected-error@+1 {{'super' may be used only to access a superclass member, subscript, or initializer}}
     let _ = self[super]
 
-    // FIXME: Duplicate diagnostic because expression is re-pre-checked after folding initial sequence expression.
-    // expected-error@+1 2 {{'super' may be used only to access a superclass member, subscript, or initializer}}
+    // expected-error@+1 {{'super' may be used only to access a superclass member, subscript, or initializer}}
     _ = (0, super)
 
     func nested() {

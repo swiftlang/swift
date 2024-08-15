@@ -79,7 +79,6 @@ split_embedded_sources(
   EMBEDDED ErrorType.swift
   EMBEDDED ExistentialCollection.swift
     NORMAL Filter.swift
-    NORMAL FixedArray.swift
     NORMAL FlatMap.swift
     NORMAL Flatten.swift
   EMBEDDED FloatingPoint.swift
@@ -180,7 +179,7 @@ split_embedded_sources(
   EMBEDDED StringRangeReplaceableCollection.swift
   EMBEDDED StringStorage.swift
   EMBEDDED StringStorageBridge.swift
-    NORMAL StringSwitch.swift
+  EMBEDDED StringSwitch.swift
   EMBEDDED StringTesting.swift
   EMBEDDED StringUnicodeScalarView.swift
   EMBEDDED StringUTF16View.swift

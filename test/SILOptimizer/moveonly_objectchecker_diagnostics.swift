@@ -6,8 +6,7 @@
 
 public class CopyableKlass {}
 
-@_moveOnly
-public final class Klass {
+public final class Klass: ~Copyable {
     var intField: Int
     var k: Klass
     init() {
@@ -35,8 +34,7 @@ public func consumeVal(_ x: __owned AggGenericStruct<String>) {}
 public func consumeVal<T>(_ x: __owned AggGenericStruct<T>) {}
 public func consumeVal(_ x: __owned EnumTy) {}
 
-@_moveOnly
-public final class FinalKlass {
+public final class FinalKlass: ~Copyable {
     var k: Klass = Klass()
 }
 

@@ -22,6 +22,7 @@
 #include "TypeCheckMacros.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -1077,17 +1078,17 @@ Type ConstraintSystem::replaceInferableTypesWithTypeVars(
         return openUnboundGenericType(unbound->getDecl(), unbound->getParent(),
                                       locator, /*isTypeResolution=*/false);
       } else if (auto *placeholderTy = type->getAs<PlaceholderType>()) {
-        if (auto *placeholderRepr = placeholderTy->getOriginator()
-                                        .dyn_cast<PlaceholderTypeRepr *>()) {
-
-          return createTypeVariable(
-              getConstraintLocator(
-                  locator, LocatorPathElt::PlaceholderType(placeholderRepr)),
-              TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
-                  TVO_CanBindToHole);
-        }
-
-        if (auto *var = placeholderTy->getOriginator().dyn_cast<VarDecl *>()) {
+        if (auto *typeRepr =
+                placeholderTy->getOriginator().dyn_cast<TypeRepr *>()) {
+          if (isa<PlaceholderTypeRepr>(typeRepr)) {
+            return createTypeVariable(
+                getConstraintLocator(locator,
+                                     LocatorPathElt::PlaceholderType(typeRepr)),
+                TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
+                    TVO_CanBindToHole);
+          }
+        } else if (auto *var =
+                       placeholderTy->getOriginator().dyn_cast<VarDecl *>()) {
           if (var->getName().hasDollarPrefix()) {
             auto *repr =
                 new (type->getASTContext()) PlaceholderTypeRepr(var->getLoc());
@@ -7779,7 +7780,7 @@ ConstraintSystem::lookupConformance(Type type, ProtocolDecl *protocol) {
     return cachedConformance->second;
 
   auto conformance =
-      ModuleDecl::lookupConformance(type, protocol, /*allowMissing=*/true);
+      swift::lookupConformance(type, protocol, /*allowMissing=*/true);
   Conformances[cacheKey] = conformance;
   return conformance;
 }

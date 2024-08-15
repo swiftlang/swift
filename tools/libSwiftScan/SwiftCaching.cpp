@@ -246,7 +246,7 @@ bool swiftscan_cas_prune_ondisk_data(swiftscan_cas_t cas,
   return false;
 }
 
-/// Expand the invocation if there is repsonseFile into Args that are passed in
+/// Expand the invocation if there is responseFile into Args that are passed in
 /// the parameter. Return swift-frontend arguments in an ArrayRef, which has the
 /// first "-frontend" option dropped if needed.
 static llvm::ArrayRef<const char *>
@@ -276,16 +276,8 @@ computeCacheKey(llvm::cas::ObjectStore &CAS, llvm::ArrayRef<const char *> Args,
   swift::CompilerInvocation Invocation;
   swift::SourceManager SourceMgr;
   swift::DiagnosticEngine Diags(SourceMgr);
-  llvm::SmallString<128> workingDirectory;
-  llvm::sys::fs::current_path(workingDirectory);
-  llvm::SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 4>
-      configurationFileBuffers;
 
-  std::string MainExecutablePath = llvm::sys::fs::getMainExecutable(
-      "swift-frontend", (void *)swiftscan_cache_replay_compilation);
-
-  if (Invocation.parseArgs(Args, Diags, &configurationFileBuffers,
-                           workingDirectory, MainExecutablePath))
+  if (Invocation.parseArgs(Args, Diags, nullptr, {}))
     return llvm::createStringError(llvm::inconvertibleErrorCode(),
                                    "Argument parsing failed");
 
@@ -826,11 +818,7 @@ swiftscan_cache_replay_instance_create(int argc, const char **argv,
   swift::DiagnosticEngine DE(SrcMgr);
   DE.addConsumer(Diags);
 
-  std::string MainExecutablePath = llvm::sys::fs::getMainExecutable(
-      "swift-frontend", (void *)swiftscan_cache_replay_compilation);
-
-  if (Instance->Invocation.parseArgs(Args, DE, nullptr, {},
-                                     MainExecutablePath)) {
+  if (Instance->Invocation.parseArgs(Args, DE, nullptr, {})) {
     delete Instance;
     *error = swift::c_string_utils::create_clone(err_msg.c_str());
     return nullptr;
@@ -966,7 +954,7 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
               return Proxy.takeError();
 
             if (Kind == file_types::ID::TY_CachedDiagnostics) {
-              assert(!DiagnosticsOutput && "more than 1 diagnotics found");
+              assert(!DiagnosticsOutput && "more than 1 diagnostics found");
               DiagnosticsOutput = std::move(*Proxy);
             } else
               OutputProxies.emplace_back(
@@ -981,8 +969,11 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
     DH.initDiagConsumers(Invocation);
     DH.beginMessage(Invocation, Instance.Args);
 
-    if (auto E = CDP->replayCachedDiagnostics(DiagnosticsOutput->getData()))
+    if (auto E = CDP->replayCachedDiagnostics(DiagnosticsOutput->getData())) {
+      DH.endMessage(/*ReturnCode=*/1);
+      Inst.getDiags().finishProcessing();
       return E;
+    }
 
     if (Remarks)
       Inst.getDiags().diagnose(SourceLoc(), diag::replay_output,

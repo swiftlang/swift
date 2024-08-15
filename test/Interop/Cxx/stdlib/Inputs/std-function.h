@@ -5,7 +5,8 @@
 #include <string>
 
 using FunctionIntToInt = std::function<int(int)>;
-using FunctionStringToString = std::function<std::string(const std::string&)>;
+using FunctionStringToString = std::function<std::string(std::string)>;
+using FunctionStringToStringConstRef = std::function<std::string(const std::string&)>;
 
 inline FunctionIntToInt getIdentityFunction() {
   return [](int x) { return x; };
@@ -16,6 +17,10 @@ inline bool isEmptyFunction(FunctionIntToInt f) { return !(bool)f; }
 inline int invokeFunction(FunctionIntToInt f, int x) { return f(x); }
 
 std::string invokeFunctionTwice(FunctionStringToString f, std::string s) {
+  return f(f(s));
+}
+
+std::string invokeFunctionTwiceConstRef(FunctionStringToStringConstRef f, std::string s) {
   return f(f(s));
 }
 

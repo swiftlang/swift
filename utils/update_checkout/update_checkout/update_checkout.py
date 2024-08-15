@@ -544,7 +544,7 @@ def full_target_name(repository, target):
 
 def skip_list_for_platform(config, all_repos):
     """Computes a list of repositories to skip when updating or cloning, if not
-    overriden by `--all-repositories` CLI argument.
+    overridden by `--all-repositories` CLI argument.
 
     Args:
         config (Dict[str, Any]): deserialized `update-checkout-config.json`

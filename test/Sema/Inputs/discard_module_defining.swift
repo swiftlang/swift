@@ -1,5 +1,4 @@
-@_moveOnly
-public struct Regular {
+public struct Regular: ~Copyable {
   private let sorry = 0
   // FIXME: rdar://108933330 (cannot define struct deinit with -enable-library-evolution)
 //  deinit {}
@@ -12,8 +11,7 @@ public extension Regular {
   }
 }
 
-@_moveOnly
-@frozen public struct Frozen {
+@frozen public struct Frozen: ~Copyable {
   private let lotfan = 0
   deinit {}
 }

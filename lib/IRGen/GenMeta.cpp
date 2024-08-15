@@ -942,8 +942,12 @@ namespace {
       SILDeclRef func(entry.getFunction());
 
       // Emit the dispatch thunk.
-      if (Resilient || IGM.getOptions().WitnessMethodElimination)
+      auto shouldEmitDispatchThunk =
+          (Resilient || IGM.getOptions().WitnessMethodElimination) &&
+          !func.isDistributed();
+      if (shouldEmitDispatchThunk) {
         IGM.emitDispatchThunk(func);
+      }
 
       {
         auto *requirement = cast<AbstractFunctionDecl>(func.getDecl());
@@ -1009,23 +1013,29 @@ namespace {
       }
 
       for (auto &entry : pi.getWitnessEntries()) {
+        if (entry.isFunction() &&
+            entry.getFunction().getDecl()->isDistributedGetAccessor()) {
+          // We avoid emitting _distributed_get accessors, as they cannot be
+          // referred to anyway
+          continue;
+        }
+
         if (Resilient) {
           if (entry.isFunction()) {
             // Define the method descriptor.
             SILDeclRef func(entry.getFunction());
+
+            /// Distributed thunks don't need resilience.
+            if (func.isDistributedThunk()) {
+              continue;
+            }
+
             auto *descriptor =
               B.getAddrOfCurrentPosition(
                 IGM.ProtocolRequirementStructTy);
             IGM.defineMethodDescriptor(func, Proto, descriptor,
                                        IGM.ProtocolRequirementStructTy);
           }
-        }
-
-        if (entry.isFunction() &&
-            entry.getFunction().getDecl()->isDistributedGetAccessor()) {
-          // We avoid emitting _distributed_get accessors, as they cannot be
-          // referred to anyway
-          continue;
         }
 
         if (entry.isAssociatedType()) {
@@ -6878,6 +6888,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::CxxUniqueSet:
   case KnownProtocolKind::CxxVector:
   case KnownProtocolKind::CxxSpan:
+  case KnownProtocolKind::CxxMutableSpan:
   case KnownProtocolKind::UnsafeCxxInputIterator:
   case KnownProtocolKind::UnsafeCxxMutableInputIterator:
   case KnownProtocolKind::UnsafeCxxRandomAccessIterator:

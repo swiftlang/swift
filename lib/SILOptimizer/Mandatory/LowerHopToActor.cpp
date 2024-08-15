@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "insert-hop-to-executor"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/SILBuilder.h"
@@ -249,7 +250,7 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
       actor = B.createOpenExistentialRef(loc, actor, loweredActorType);
     }
 
-    auto actorConf = ModuleDecl::lookupConformance(actorType, actorProtocol);
+    auto actorConf = lookupConformance(actorType, actorProtocol);
     assert(actorConf &&
            "hop_to_executor with actor that doesn't conform to Actor or DistributedActor");
 

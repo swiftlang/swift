@@ -5,10 +5,10 @@
 typealias Tuple<each T> = (repeat each T)
 
 protocol P1 {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; add type alias 'A' with underlying type '(repeat (each T).A)' for conformance}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'}}
 }
 
-extension Tuple: P1 where repeat each T: P1 {} // expected-error {{type '(repeat each T)' does not conform to protocol 'P1'}}
+extension Tuple: P1 where repeat each T: P1 {} // expected-error {{type '(repeat each T)' does not conform to protocol 'P1'}} expected-note {{add stubs for conformance}}
 
 protocol P2 {
   associatedtype B = Int

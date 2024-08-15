@@ -90,12 +90,6 @@ public:
 
   ConstraintLocator *getLocator() const { return Locator; }
 
-  SourceLoc getBestAddImportFixItLocation(const Decl *Member,
-                                          SourceFile *sourceFile) const {
-    auto &engine = Member->getASTContext().Diags;
-    return engine.getBestAddImportFixItLoc(Member, sourceFile);
-  }
-
   Type getType(ASTNode node, bool wantRValue = true) const;
 
   /// Get type associated with a given ASTNode without resolving it,
@@ -1638,11 +1632,13 @@ private:
 /// ```
 class InaccessibleMemberFailure final : public FailureDiagnostic {
   ValueDecl *Member;
+  bool IsMissingImport;
 
 public:
   InaccessibleMemberFailure(const Solution &solution, ValueDecl *member,
-                            ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator), Member(member) {}
+                            ConstraintLocator *locator, bool isMissingImport)
+      : FailureDiagnostic(solution, locator), Member(member),
+        IsMissingImport(isMissingImport) {}
 
   bool diagnoseAsError() override;
 };
@@ -3125,12 +3121,25 @@ public:
 /// \endcode
 class ConcreteTypeSpecialization final : public FailureDiagnostic {
   Type ConcreteType;
+  ValueDecl *Decl;
 
 public:
   ConcreteTypeSpecialization(const Solution &solution, Type concreteTy,
-                             ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator),
-        ConcreteType(resolveType(concreteTy)) {}
+                             ValueDecl *decl, ConstraintLocator *locator,
+                             FixBehavior fixBehavior)
+      : FailureDiagnostic(solution, locator, fixBehavior),
+        ConcreteType(resolveType(concreteTy)), Decl(decl) {}
+
+  bool diagnoseAsError() override;
+};
+
+class GenericFunctionSpecialization final : public FailureDiagnostic {
+  ValueDecl *Decl;
+
+public:
+  GenericFunctionSpecialization(const Solution &solution, ValueDecl *decl,
+                                ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), Decl(decl) {}
 
   bool diagnoseAsError() override;
 };

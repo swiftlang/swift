@@ -17,6 +17,7 @@
 #include "GenArchetype.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
@@ -415,7 +416,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
       IGM.getSwiftModule()->getASTContext().getProtocol(
           KnownProtocolKind::BitwiseCopyable);
   // The protocol won't be present in swiftinterfaces from older SDKs.
-  if (bitwiseCopyableProtocol && ModuleDecl::checkConformance(
+  if (bitwiseCopyableProtocol && checkConformance(
                                      archetype, bitwiseCopyableProtocol)) {
     return BitwiseCopyableTypeInfo::create(storageType, abiAccessible);
   }

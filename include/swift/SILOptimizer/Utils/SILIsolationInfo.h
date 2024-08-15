@@ -46,11 +46,18 @@ public:
     /// access to the self value and instead have access indirectly to the
     /// storage associated with the accessor.
     ActorAccessorInit = 0x1,
+
+    /// An actor instance that is represented by "self" being captured in a
+    /// closure of some sort. In such a case, we do not know which of the
+    /// parameters are the true "self" (since the closure is a thin
+    /// function)... so we just use an artificial ActorInstance to represent
+    /// self in this case.
+    CapturedActorSelf = 0x2,
   };
 
-  /// Set to (SILValue(), ActorAccessorInit) if we have an ActorAccessorInit. Is
-  /// null if we have (SILValue(), Kind::Value).
-  llvm::PointerIntPair<SILValue, 1> value;
+  /// Set to (SILValue(), $KIND) if we have an ActorAccessorInit|CapturedSelf.
+  /// Is null if we have (SILValue(), Kind::Value).
+  llvm::PointerIntPair<SILValue, 2> value;
 
   ActorInstance(SILValue value, Kind kind)
       : value(value, std::underlying_type<Kind>::type(kind)) {}
@@ -68,8 +75,16 @@ public:
     return ActorInstance(value, Kind::Value);
   }
 
+  /// See Kind::ActorAccessorInit for explanation on what a ActorAccessorInit
+  /// is.
   static ActorInstance getForActorAccessorInit() {
     return ActorInstance(SILValue(), Kind::ActorAccessorInit);
+  }
+
+  /// See Kind::CapturedActorSelf for explanation on what a CapturedActorSelf
+  /// is.
+  static ActorInstance getForCapturedSelf() {
+    return ActorInstance(SILValue(), Kind::CapturedActorSelf);
   }
 
   explicit operator bool() const { return bool(value.getOpaqueValue()); }
@@ -91,6 +106,10 @@ public:
 
   bool isAccessorInit() const { return getKind() == Kind::ActorAccessorInit; }
 
+  bool isCapturedActorSelf() const {
+    return getKind() == Kind::CapturedActorSelf;
+  }
+
   bool operator==(const ActorInstance &other) const {
     // If both are null, return true.
     if (!bool(*this) && !bool(other))
@@ -105,6 +124,7 @@ public:
     case Kind::Value:
       return getValue() == other.getValue();
     case Kind::ActorAccessorInit:
+    case Kind::CapturedActorSelf:
       return true;
     }
   }
@@ -120,15 +140,26 @@ public:
 /// matching.
 class SILIsolationInfo {
 public:
-  /// The lattice is:
+  /// This forms a lattice of semantics. The lattice progresses from left ->
+  /// right below:
   ///
   /// Unknown -> Disconnected -> TransferringParameter -> Task -> Actor.
   ///
-  /// Unknown means no information. We error when merging on it.
   enum Kind : uint8_t {
+    /// Unknown means no information. We error when merging on it.
     Unknown,
+
+    /// An entity with disconnected isolation can be freely transferred into
+    /// another isolation domain. These are associated with "use after transfer"
+    /// diagnostics.
     Disconnected,
+
+    /// An entity that is in the same region as a task-isolated value. Cannot be
+    /// sent into another isolation domain.
     Task,
+
+    /// An entity that is in the same region as an actor-isolated value. Cannot
+    /// be sent into another isolation domain.
     Actor,
   };
 
@@ -292,6 +323,12 @@ public:
     return (kind == Task || kind == Actor) && bool(isolatedValue);
   }
 
+  SILValue maybeGetIsolatedValue() const {
+    if (!hasIsolatedValue())
+      return {};
+    return getIsolatedValue();
+  }
+
   static SILIsolationInfo getDisconnected(bool isUnsafeNonIsolated) {
     return {Kind::Disconnected,
             isUnsafeNonIsolated ? Flag::UnsafeNonIsolated : Flag::None};
@@ -313,18 +350,6 @@ public:
                                 ActorIsolation actorIsolation) {
     return {isolatedValue, SILValue(), actorIsolation,
             Flag::UnappliedIsolatedAnyParameter};
-  }
-
-  /// Only use this as a fallback if we cannot find better information.
-  static SILIsolationInfo
-  getWithIsolationCrossing(ApplyIsolationCrossing crossing) {
-    if (crossing.getCalleeIsolation().isActorIsolated()) {
-      // SIL level, just let it through
-      return SILIsolationInfo(SILValue(), SILValue(),
-                              crossing.getCalleeIsolation());
-    }
-
-    return {};
   }
 
   static SILIsolationInfo getActorInstanceIsolated(SILValue isolatedValue,
@@ -432,6 +457,20 @@ public:
 
 private:
   void printOptions(llvm::raw_ostream &os) const;
+
+  /// This is used only to let through apply isolation crossings that we define
+  /// in SIL just for testing. Do not use this in any other contexts!
+  static SILIsolationInfo
+  getWithIsolationCrossing(ApplyIsolationCrossing crossing) {
+    if (!crossing.getCalleeIsolation().isActorIsolated())
+      return {};
+
+    // SIL level, just let it through without an actor instance. We assume since
+    // we are using this for SIL tests that we do not need to worry about having
+    // a null actor instance.
+    return SILIsolationInfo(SILValue(), SILValue(),
+                            crossing.getCalleeIsolation());
+  }
 };
 
 /// A SILIsolationInfo that has gone through merging and represents the dynamic
@@ -492,5 +531,23 @@ public:
 };
 
 } // namespace swift
+
+namespace llvm {
+
+inline llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os,
+           const swift::SILIsolationInfo &isolationInfo) {
+  isolationInfo.printForOneLineLogging(os);
+  return os;
+}
+
+inline llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os,
+           const swift::SILDynamicMergedIsolationInfo &isolationInfo) {
+  isolationInfo.printForOneLineLogging(os);
+  return os;
+}
+
+} // namespace llvm
 
 #endif

@@ -987,3 +987,25 @@ bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
   // allocation methods because they may have been overridden.
   return theClass->getObjectModel() == ReferenceCounting::ObjC;
 }
+
+bool Lowering::needsIsolatingDestructor(DestructorDecl *dd) {
+  auto ai = swift::getActorIsolation(dd);
+  if (!ai.isActorIsolated()) {
+    return false;
+  }
+  DestructorDecl *firstIsolated = dd;
+  while (true) {
+    DestructorDecl *next = firstIsolated->getSuperDeinit();
+    if (!next)
+      break;
+    auto ai = swift::getActorIsolation(next);
+    if (!ai.isActorIsolated())
+      break;
+    firstIsolated = next;
+  }
+
+  // If isolation was introduced in ObjC code, then we assume that ObjC code
+  // also overrides retain/release to make sure that dealloc is called on the
+  // correct executor in the first place.
+  return firstIsolated->getClangNode().isNull();
+}

@@ -378,6 +378,8 @@ private:
   std::optional<std::string> VCToolsRoot = std::nullopt;
   std::optional<std::string> VCToolsVersion = std::nullopt;
 
+  std::optional<StringRef> SysRoot = std::nullopt;
+
 public:
   StringRef getSDKPath() const { return SDKPath; }
 
@@ -414,6 +416,11 @@ public:
   std::optional<StringRef> getVCToolsVersion() const { return VCToolsVersion; }
   void setVCToolsVersion(StringRef version) {
     VCToolsVersion = version;
+  }
+
+  std::optional<StringRef> getSysRoot() const { return SysRoot; }
+  void setSysRoot(StringRef sysroot) {
+    SysRoot = sysroot;
   }
 
   ArrayRef<std::string> getImportSearchPaths() const {
@@ -535,8 +542,9 @@ public:
   /// Specify the module loading behavior of the compilation.
   ModuleLoadingMode ModuleLoadMode = ModuleLoadingMode::PreferSerialized;
 
-  /// Legacy scanner search behavior.
-  bool NoScannerModuleValidation = false;
+  /// New scanner search behavior. Validate up-to-date existing Swift module
+  /// dependencies in the scanner itself.
+  bool ScannerModuleValidation = false;
 
   /// Return all module search paths that (non-recursively) contain a file whose
   /// name is in \p Filenames.
@@ -586,7 +594,7 @@ public:
                         hash_combine_range(RuntimeLibraryImportPaths.begin(),
                                            RuntimeLibraryImportPaths.end()),
                         DisableModulesValidateSystemDependencies,
-                        NoScannerModuleValidation,
+                        ScannerModuleValidation,
                         ModuleLoadMode);
   }
 

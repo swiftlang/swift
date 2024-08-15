@@ -53,7 +53,7 @@ Adding this attribute to a type leads to remarks being emitted for all methods.
 
 ## `@_backDeploy(before: ...)`
 
-The spelling of `@backDeployed(before:)` prior to the acceptance of [SE-0376](https://github.com/apple/swift-evolution/blob/main/proposals/0376-function-back-deployment.md).
+The spelling of `@backDeployed(before:)` prior to the acceptance of [SE-0376](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0376-function-back-deployment.md).
 
 ## `@_borrowed`
 
@@ -465,6 +465,10 @@ Also similar to `@_silgen_name`, but a function declared with
 `@_extern(c)` is assumed to use the C ABI, while `@_silgen_name`
 assumes the Swift ABI.
 
+It is always better to refer to C declarations by importing their
+native declarations from a header or module using Swift's C interop
+support when possible.
+
 ## `@_fixed_layout`
 
 Same as `@frozen` but also works for classes.
@@ -658,7 +662,7 @@ also work as a generic type constraint.
 Indicates that a protocol is a marker protocol. Marker protocols represent some
 meaningful property at compile-time but have no runtime representation.
 
-For more details, see [](https://github.com/apple/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md#marker-protocols), which introduces marker protocols.
+For more details, see [](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md#marker-protocols), which introduces marker protocols.
 At the moment, the language only has one marker protocol: `Sendable`.
 
 Fun fact: Rust has a very similar concept called
@@ -1029,15 +1033,17 @@ forms are currently accepted:
 
 - `@_rawLayout(size: N, alignment: M)` specifies the type's size and alignment
   in bytes.
-- `@_rawLayout(like: T)` specifies the type's size and alignment should be
-  equal to the type `T`'s.
-- `@_rawLayout(likeArrayOf: T, count: N)` specifies the type's size should be
-  `MemoryLayout<T>.stride * N` and alignment should match `T`'s, like an
-  array of N contiguous elements of `T` in memory.
-- `@_rawLayout(like: T, movesAsLike)` specifies the type's size and alignment
-  should be equal to the type `T`'s. It also guarantees that moving a value of
-  this raw layout type will have the same move semantics as the type it's like.
-  This is important for things like ObjC weak references and non-trivial move
+- `@_rawLayout(like: T(, movesAsLike))` specifies the type's size and alignment
+  should be equal to the type `T`'s. An optional `movesAsLike` parameter can be
+  passed to guarantee that moving a value of this raw layout type will have the
+  same move semantics as the type it's like. This is important for things like
+  ObjC weak references and non-trivial move constructors in C++.
+- `@_rawLayout(likeArrayOf: T, count: N(, movesAsLike))` specifies the type's
+  size should be `MemoryLayout<T>.stride * N` and alignment should match `T`'s,
+  like an array of N contiguous elements of `T` in memory. An optional
+  `movesAsLike` parameter can be passed to guarantee that moving a value of this
+  raw layout type will have the same move semantics as the type it's like. This
+  is important for things like ObjC weak references and non-trivial move
   constructors in C++.
 
 A notable difference between `@_rawLayout(like: T)` and
@@ -1106,12 +1112,46 @@ Darwin) is maintained, unless "raw:" is used, in which case the name provided is
 expected to already be mangled.
 
 Since this has label-like behavior, it may not correspond to any declaration;
-if so, it is assumed that the function/global is implemented in C.
+if so, it is assumed that the function/global is implemented possibly
+in some other language; that implementation however is assumed to use
+the Swift ABI as if it were defined in Swift.
 
-A function defined by `@_silgen_name` is assumed to use the Swift ABI.
+There are very few legitimate uses for this attribute. There are many
+ways to misuse it:
+
+- Don't use `@_silgen_name` to access C functions, since those use the C ABI.
+  Import a header or C module to access C functions.
+- Don't use `@_silgen_name` to export Swift functions to C/ObjC. `@_cdecl` or
+  `@objc` can do that.
+- Don't use `@_silgen_name` to link to `swift_*` symbols from the Swift runtime.
+  Calls to these functions have special semantics to the compiler, and accessing
+  them directly will lead to unpredictable compiler crashes and undefined
+  behavior. Use language features, or if you must, the `Builtin` module, instead.
+- Don't use `@_silgen_name` for dynamic linker discovery. Swift symbols cannot
+  be reliably recovered through C interfaces like `dlsym`. If you want to
+  implement a plugin-style interface, use `Bundle`/`NSBundle` if available, or
+  export your plugin entry points as C entry points using `@_cdecl`.
+  
+Legitimate uses may include:
+
+- Use `@_silgen_name` if you're implementing the Swift runtime.
+- Use `@_silgen_name` if you need to make a change to an ABI-stable
+  declaration's signature that would normally alter its mangled name, but you
+  need to preserve the old mangled name for ABI compatibility. You will need
+  to be careful that the change doesn't materially affect the actual calling
+  convention of the function in an incompatible way.
+- Use `@_silgen_name` if certain declarations need to have predictable symbol
+  names, such as to be easily referenced by linker scripts or other highly
+  customized build environments (and it's OK for those predictable symbols to
+  reference functions with a Swift ABI).
+- Use `@_silgen_name` to interface build products that must be linked
+  together but built completely separately, such that one can't import the other
+  normally. For this to work, the declaration(s) and definition must exactly
+  match, using the exact same definitions of any referenced types or other
+  declarations. The compiler can't help you if you mismatch.
 
 For more details, see the
-[Standard Library Programmer's Manual](https://github.com/apple/swift/blob/main/docs/StandardLibraryProgrammersManual.md#_silgen_name).
+[Standard Library Programmer's Manual](https://github.com/swiftlang/swift/blob/main/docs/StandardLibraryProgrammersManual.md#_silgen_name).
 
 ## `@_specialize(...)`
 

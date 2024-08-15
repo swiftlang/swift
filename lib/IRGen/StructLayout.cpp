@@ -111,7 +111,19 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
       SpareBits.extendWithClearBits(MinimumSize.getValueInBits());
       IsFixedLayout = true;
       IsKnownAlwaysFixedSize = IsFixedSize;
-    } else if (auto likeType = rawLayout->getResolvedScalarLikeType(sd)) {
+    } else {
+      std::optional<Type> likeType = std::nullopt;
+      unsigned count = 0;
+
+      if (auto like = rawLayout->getResolvedScalarLikeType(sd)) {
+        likeType = like;
+      }
+
+      if (auto like = rawLayout->getResolvedArrayLikeTypeAndCount(sd)) {
+        likeType = like->first;
+        count = like->second;
+      }
+
       // If our likeType is dependent, then all calls to try and lay it out will
       // be non-fixed, but in a concrete case we want a fixed layout, so try to
       // substitute it out.
@@ -121,15 +133,21 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
                                       
       // Take layout attributes from the like type.
       if (const FixedTypeInfo *likeFixedType = dyn_cast<FixedTypeInfo>(&likeTypeInfo)) {
-        MinimumSize = likeFixedType->getFixedSize();
+        // If we have no count, treat this as a scalar.
+        if (count == 0) {
+          MinimumSize = likeFixedType->getFixedSize();
+        } else {
+          MinimumSize = likeFixedType->getFixedStride() * count;
+        }
+
         SpareBits.extendWithClearBits(MinimumSize.getValueInBits());
         MinimumAlign = likeFixedType->getFixedAlignment();
         IsFixedLayout = true;
         IsKnownAlwaysFixedSize = IsFixedSize;
 
-        // @_rawLayout(like: T) has an optional `movesAsLike` which enforces that
-        // a value of this raw layout type should have the same move semantics
-        // as the like its like.
+        // @_rawLayout has an optional `movesAsLike` which enforces that a value
+        // of this raw layout type should have the same move semantics as the
+        // type its like.
         if (rawLayout->shouldMoveAsLikeType()) {
           IsKnownTriviallyDestroyable = likeFixedType->isTriviallyDestroyable(ResilienceExpansion::Maximal);
           IsKnownBitwiseTakable = likeFixedType->isBitwiseTakable(ResilienceExpansion::Maximal);
@@ -147,29 +165,6 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
           IsKnownBitwiseTakable = IsNotBitwiseTakable;
         }
       }
-    } else if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(sd)) {
-      auto elementType = likeArray->first;
-      unsigned count = likeArray->second;
-      
-      auto subs = (*type)->getContextSubstitutionMap();
-      auto loweredElementType = IGM.getLoweredType(elementType.subst(subs));
-      const TypeInfo &likeTypeInfo = IGM.getTypeInfo(loweredElementType);
-      
-      // Take layout attributes from the like type.
-      if (const FixedTypeInfo *likeFixedType = dyn_cast<FixedTypeInfo>(&likeTypeInfo)) {
-        MinimumSize = likeFixedType->getFixedStride() * count;
-        SpareBits.extendWithClearBits(MinimumSize.getValueInBits());
-        MinimumAlign = likeFixedType->getFixedAlignment();
-        IsFixedLayout = true;
-        IsKnownAlwaysFixedSize = IsFixedSize;
-      } else {
-        MinimumSize = Size(0);
-        MinimumAlign = Alignment(1);
-        IsFixedLayout = false;
-        IsKnownAlwaysFixedSize = IsNotFixedSize;
-      }
-    } else {
-      llvm_unreachable("unhandled raw layout variant?");
     }
     
     // Set the LLVM struct type for a fixed layout according to the stride and

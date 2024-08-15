@@ -126,7 +126,7 @@ void SILInstruction::moveBefore(SILInstruction *Later) {
 }
 
 namespace swift::test {
-FunctionTest MoveBeforeTest("instruction-move-before",
+FunctionTest MoveBeforeTest("instruction_move_before",
                             [](auto &function, auto &arguments, auto &test) {
                               auto *inst = arguments.takeInstruction();
                               auto *other = arguments.takeInstruction();

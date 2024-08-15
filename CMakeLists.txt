@@ -93,7 +93,7 @@ include(CheckSymbolExists)
 include(CMakeDependentOption)
 include(CheckLanguage)
 include(GNUInstallDirs)
-include(SwiftImplicitImport)
+include(SwiftCompilerCapability)
 include(FetchContent)
 
 # Enable Swift for the host compiler build if we have the language. It is
@@ -414,9 +414,9 @@ set(SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY
 
 
 if(BRIDGING_MODE STREQUAL "DEFAULT" OR NOT BRIDGING_MODE)
-  if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "${SWIFT_HOST_VARIANT_SDK}" MATCHES "WINDOWS|ANDROID" OR (CMAKE_Swift_COMPILER AND CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.8))
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS" OR (CMAKE_Swift_COMPILER AND CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.8))
     # In debug builds, to workaround a problem with LLDB's `po` command (rdar://115770255).
-    # On Windows and Android, to workaround a build problem.
+    # On Windows, to workaround a build problem.
     # If the host Swift version is less than 5.8, use pure mode to workaround a C++ interop compiler crash.
     set(BRIDGING_MODE "PURE")
   else()
@@ -682,7 +682,7 @@ option(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
 
 option(SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP
   "Enable experimental C++ interop modules"
-  FALSE)
+  TRUE)
 
 option(SWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER
   "Install the <swift/bridging> C++ interoperability header alongside compiler"
@@ -850,6 +850,10 @@ if (CMAKE_Swift_COMPILER)
   swift_supports_implicit_module("backtracing"
     SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT)
   message(STATUS "  Implicit 'backtracing' import: ${SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT}")
+
+  swift_get_package_cmo_support(
+    Swift_COMPILER_PACKAGE_CMO_SUPPORT)
+  message(STATUS "  Package CMO: ${Swift_COMPILER_PACKAGE_CMO_SUPPORT}")
 else()
   message(STATUS "Swift Compiler (None).")
 endif()
@@ -936,7 +940,7 @@ if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
   set(SWIFT_EXEC_FOR_SWIFT_MODULES "${CMAKE_Swift_COMPILER}")
   if(NOT SWIFT_EXEC_FOR_SWIFT_MODULES)
-    message(WARNING "BOOSTRAPPING set to OFF because no Swift compiler is defined")
+    message(WARNING "BOOTSTRAPPING set to OFF because no Swift compiler is defined")
     set(BOOTSTRAPPING_MODE "OFF")
   endif()
 elseif(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")

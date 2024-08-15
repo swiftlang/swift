@@ -134,9 +134,9 @@ private:
     if (auto *record = dyn_cast<clang::CXXRecordDecl>(typeDecl))
       return record->isTrivial();
 
-    // FIXME: If we can get plain clang::RecordDecls here, we need to figure out
-    //        how nontrivial (i.e. ARC) fields work.
-    assert(!isa<clang::RecordDecl>(typeDecl));
+    // Structs with ARC members are not considered trivial.
+    if (auto *record = dyn_cast<clang::RecordDecl>(typeDecl))
+      return !record->hasObjectMember();
 
     // C-family enums are always trivial.
     return isa<clang::EnumDecl>(typeDecl);
@@ -1659,6 +1659,10 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
     Type resultTy, bool isDefinition,
     std::optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo) {
   assert(accessor->isGetter());
+  // operator[] with multiple parameters only supported C++23 and up.
+  bool multiParam = accessor->getParameters()->size() > 1;
+  if (multiParam)
+    os << "#if __cplusplus >= 202302L\n";
   FunctionSignatureModifiers modifiers;
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
@@ -1671,6 +1675,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
   declAndTypePrinter.printAvailability(os, accessor->getStorage());
   if (!isDefinition) {
     os << ";\n";
+    if (multiParam)
+      os << "#endif // #if __cplusplus >= 202302L\n";
     return;
   }
   os << " {\n";
@@ -1680,6 +1686,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
       accessor->getModuleContext(), resultTy, accessor->getParameters(),
       /*hasThrows=*/false, nullptr, /*isStatic=*/false, dispatchInfo);
   os << "  }\n";
+  if (multiParam)
+    os << "#endif // #if __cplusplus >= 202302L\n";
 }
 
 bool DeclAndTypeClangFunctionPrinter::hasKnownOptionalNullableCxxMapping(
@@ -1759,4 +1767,14 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
       FunctionSignatureTypeUse::TypeReference);
   return typePrinter.visit(ty, OptionalTypeKind::OTK_None,
                            /*isInOutParam=*/false);
+}
+
+void DeclAndTypeClangFunctionPrinter::printTypeName(
+    Type ty, const ModuleDecl *moduleContext) {
+  CFunctionSignatureTypePrinterModifierDelegate delegate;
+  CFunctionSignatureTypePrinter typePrinter(
+      os, cPrologueOS, typeMapping, OutputLanguageMode::Cxx, interopContext,
+      delegate, moduleContext, declPrinter,
+      FunctionSignatureTypeUse::TypeReference);
+  typePrinter.visit(ty, std::nullopt, /*isInOut=*/false);
 }

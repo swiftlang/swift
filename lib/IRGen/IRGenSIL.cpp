@@ -2114,6 +2114,19 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
       getNativeCCEntryPointArgumentEmission(IGF, *entry, allParamValues);
   auto funcTy = IGF.CurSILFn->getLoweredFunctionType();
 
+  // Coroutine context should be the first parameter.
+  // Indirect returns (if present) follow it.
+  switch (funcTy->getCoroutineKind()) {
+  case SILCoroutineKind::None:
+    break;
+  case SILCoroutineKind::YieldOnce:
+    emitYieldOnceCoroutineEntry(IGF, funcTy, *emission);
+    break;
+  case SILCoroutineKind::YieldMany:
+    emitYieldManyCoroutineEntry(IGF, funcTy, *emission);
+    break;
+  }
+  
   // Map the indirect return if present.
   ArrayRef<SILArgument *> params = emitEntryPointIndirectReturn(
       *emission, IGF, entry, funcTy, [&](SILType retType) -> bool {
@@ -2128,18 +2141,6 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   if (funcTy->getRepresentation() == SILFunctionTypeRepresentation::WitnessMethod) {
     collectTrailingWitnessMetadata(IGF, *IGF.CurSILFn, *emission,
                                    witnessMetadata);
-  }
-
-  // The coroutine context should be the first parameter.
-  switch (funcTy->getCoroutineKind()) {
-  case SILCoroutineKind::None:
-    break;
-  case SILCoroutineKind::YieldOnce:
-    emitYieldOnceCoroutineEntry(IGF, funcTy, *emission);
-    break;
-  case SILCoroutineKind::YieldMany:
-    emitYieldManyCoroutineEntry(IGF, funcTy, *emission);
-    break;
   }
 
   SILFunctionConventions fnConv(funcTy, IGF.getSILModule());
@@ -2175,8 +2176,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
       auto &errorTI = cast<FixedTypeInfo>(IGF.getTypeInfo(inContextErrorType));
       auto &native = resultTI.nativeReturnValueSchema(IGF.IGM);
       auto &nativeError = errorTI.nativeReturnValueSchema(IGF.IGM);
-      if (funcTy->isAsync() || fnConv.hasIndirectSILResults() ||
-          native.requiresIndirect() ||
+      if (fnConv.hasIndirectSILResults() || native.requiresIndirect() ||
           nativeError.shouldReturnTypedErrorIndirectly()) {
         IGF.setCallerTypedErrorResultSlot(
             Address(emission->getCallerTypedErrorResultArgument(),
@@ -3869,8 +3869,8 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
       // See below.
       Builder.CreateStore(nullError, calleeErrorSlot);
     }
-    auto hasTypedDirectError = substConv.isTypedError() &&
-      !substConv.hasIndirectSILErrorResults();
+    auto hasTypedDirectError =
+        substConv.isTypedError() && !substConv.hasIndirectSILErrorResults();
     llvm::BasicBlock *typedErrorLoadBB = nullptr;
     if (hasTypedDirectError) {
       typedErrorLoadBB = createBasicBlock("typed.error.load");
@@ -3885,9 +3885,18 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     // FIXME: Remove this when the following radar is fixed: rdar://116636601
     Builder.CreatePtrToInt(errorValue, IGM.IntPtrTy);
 
+    // Emit profile metadata if available.
+    llvm::MDNode *Weights = nullptr;
+    auto NormalBBCount = tryApplyInst->getNormalBBCount();
+    auto ErrorBBCount = tryApplyInst->getErrorBBCount();
+    if (NormalBBCount || ErrorBBCount)
+      Weights = IGM.createProfileWeights(ErrorBBCount ? ErrorBBCount.getValue() : 0,
+                                         NormalBBCount ? NormalBBCount.getValue() : 0);
+
     Builder.CreateCondBr(hasError,
                          typedErrorLoadBB ? typedErrorLoadBB : errorDest.bb,
-                         normalDest.bb);
+                         normalDest.bb,
+                         Weights);
 
     // Set up the PHI nodes on the normal edge.
     unsigned firstIndex = 0;
@@ -3912,7 +3921,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
       auto &resultSchema = resultTI.nativeReturnValueSchema(IGM);
       auto &errorSchema = errorTI.nativeReturnValueSchema(IGM);
 
-      if (isAsync() || substConv.hasIndirectSILResults() ||
+      if (substConv.hasIndirectSILResults() ||
           substConv.hasIndirectSILErrorResults() ||
           resultSchema.requiresIndirect() ||
           errorSchema.shouldReturnTypedErrorIndirectly()) {
@@ -4372,6 +4381,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     if (fnType->hasErrorResult()) {
       error.add(getNullErrorValue());
     }
+
     emitAsyncReturn(IGF, asyncLayout, funcResultType, fnType, result, error);
   } else {
     auto funcLang = IGF.CurSILFn->getLoweredFunctionType()->getLanguage();
@@ -4412,6 +4422,48 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
                               getSILModule());
   assert(!conv.hasIndirectSILErrorResults());
 
+  auto buildDirectError = [=](const CombinedResultAndErrorType &combined,
+                              const NativeConventionSchema &errorSchema,
+                              SILType silErrorTy, Explosion &errorResult,
+                              bool forAsync, Explosion &out) {
+    if (combined.combinedTy->isVoidTy()) {
+      return;
+    }
+
+    llvm::Value *expandedResult = llvm::UndefValue::get(combined.combinedTy);
+    auto *structTy = dyn_cast<llvm::StructType>(combined.combinedTy);
+
+    if (!errorSchema.getExpandedType(IGM)->isVoidTy()) {
+      auto nativeError =
+          errorSchema.mapIntoNative(IGM, *this, errorResult, silErrorTy, false);
+
+      if (structTy) {
+        for (unsigned i : combined.errorValueMapping) {
+          llvm::Value *elt = nativeError.claimNext();
+          auto *nativeTy = structTy->getElementType(i);
+          elt = convertForDirectError(*this, elt, nativeTy,
+                                      /*forExtraction*/ false);
+          expandedResult = Builder.CreateInsertValue(expandedResult, elt, i);
+        }
+        if (forAsync) {
+          emitAllExtractValues(expandedResult, structTy, out);
+        } else {
+          out = expandedResult;
+        }
+      } else if (!errorSchema.getExpandedType(IGM)->isVoidTy()) {
+        out =
+            convertForDirectError(*this, nativeError.claimNext(),
+                                  combined.combinedTy, /*forExtraction*/ false);
+      }
+    } else {
+      if (forAsync && structTy) {
+        emitAllExtractValues(expandedResult, structTy, out);
+      } else {
+        out = expandedResult;
+      }
+    }
+  };
+
   if (!isAsync()) {
     auto fnTy = CurFn->getFunctionType();
     auto retTy = fnTy->getReturnType();
@@ -4442,53 +4494,12 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
                              false);
         } else {
           auto combined =
-                combineResultAndTypedErrorType(IGM, resultSchema, errorSchema);
+              combineResultAndTypedErrorType(IGM, resultSchema, errorSchema);
+          Explosion nativeAgg;
+          buildDirectError(combined, errorSchema, silErrorTy, errorResult,
+                           /*forAsync*/ false, nativeAgg);
 
-          if (combined.combinedTy->isVoidTy()) {
-            Builder.CreateRetVoid();
-            return;
-          }
-
-          llvm::Value *expandedResult = llvm::UndefValue::get(combined.combinedTy);
-
-          if (!errorSchema.getExpandedType(IGM)->isVoidTy()) {
-            auto nativeError = errorSchema.mapIntoNative(IGM, *this, errorResult,
-                                                         silErrorTy, false);
-
-            auto convertIfNecessary = [&](llvm::Type *nativeTy,
-                                          llvm::Value *elt) -> llvm::Value * {
-              auto *eltTy = elt->getType();
-              if (nativeTy->isIntOrPtrTy() && eltTy->isIntOrPtrTy() &&
-                  nativeTy->getPrimitiveSizeInBits() !=
-                      eltTy->getPrimitiveSizeInBits()) {
-                assert(nativeTy->getPrimitiveSizeInBits() >
-                       eltTy->getPrimitiveSizeInBits());
-
-                if (eltTy->isPointerTy()) {
-                  return elt = Builder.CreatePtrToInt(elt, nativeTy);
-                }
-
-                return Builder.CreateZExt(elt, nativeTy);
-              }
-              return elt;
-            };
-
-            if (auto *structTy = dyn_cast<llvm::StructType>(combined.combinedTy)) {
-              for (unsigned i : combined.errorValueMapping) {
-                llvm::Value *elt = nativeError.claimNext();
-                auto *nativeTy = structTy->getElementType(i);
-                elt = convertIfNecessary(nativeTy, elt);
-                expandedResult = Builder.CreateInsertValue(expandedResult, elt, i);
-              }
-            } else if (!errorSchema.getExpandedType(IGM)->isVoidTy()) {
-              expandedResult =
-                  convertIfNecessary(combined.combinedTy, nativeError.claimNext());
-            }
-          }
-
-          Explosion nativeAgg = Explosion(expandedResult);
           emitScalarReturn(combined.combinedTy, nativeAgg);
-
           return;
         }
       }
@@ -4514,11 +4525,44 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
         conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
 
     if (conv.isTypedError()) {
-      auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(conv.getSILErrorType(
-            IGM.getMaximalTypeExpansionContext())));
-      ti.initialize(*this, exn, getCallerTypedErrorResultSlot(), false);
+      auto silErrorTy =
+          conv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
+      auto &errorTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(silErrorTy));
+
+      auto silResultTy =
+          conv.getSILResultType(IGM.getMaximalTypeExpansionContext());
+      auto &resultTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(silResultTy));
+      auto &resultSchema = resultTI.nativeReturnValueSchema(IGM);
+      auto &errorSchema = errorTI.nativeReturnValueSchema(IGM);
+
       llvm::Constant *flag = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
       flag = llvm::ConstantExpr::getIntToPtr(flag, IGM.Int8PtrTy);
+
+      if (conv.hasIndirectSILResults() || conv.hasIndirectSILErrorResults() ||
+          resultSchema.requiresIndirect() ||
+          errorSchema.shouldReturnTypedErrorIndirectly()) {
+        errorTI.initialize(*this, exn, getCallerTypedErrorResultSlot(), false);
+      } else {
+        Explosion nativeAgg;
+        auto combined =
+            combineResultAndTypedErrorType(IGM, resultSchema, errorSchema);
+        buildDirectError(combined, errorSchema, silErrorTy, exn,
+                         /*forAsync*/ true, nativeAgg);
+        assert(exn.empty() && "Unclaimed typed error results");
+
+        SmallVector<llvm::Value *, 16> nativeResultArgs;
+        while (!nativeAgg.empty()) {
+          nativeResultArgs.push_back(nativeAgg.claimNext());
+        }
+        nativeResultArgs.push_back(flag);
+
+        emitAsyncReturn(*this, layout,
+                        i->getFunction()->getLoweredFunctionType(),
+                        nativeResultArgs);
+
+        return;
+      }
+
       assert(exn.empty() && "Unclaimed typed error results");
       exn.reset();
       exn.add(flag);
@@ -4599,6 +4643,12 @@ void IRGenSILFunction::visitYieldInst(swift::YieldInst *i) {
   // Branch to the appropriate destination.
   auto unwindBB = getLoweredBB(i->getUnwindBB()).bb;
   auto resumeBB = getLoweredBB(i->getResumeBB()).bb;
+
+  // Predict no unwind happens.
+  isUnwind =
+      IGM.getSILModule().getOptions().EnableThrowsPrediction ?
+      Builder.CreateExpectCond(IGM, isUnwind, false) : isUnwind;
+
   Builder.CreateCondBr(isUnwind, unwindBB, resumeBB);
 }
 
@@ -6832,8 +6882,12 @@ void IRGenSILFunction::visitConvertFunctionInst(swift::ConvertFunctionInst *i) {
       fnType->getRepresentation() != SILFunctionType::Representation::Block) {
     auto *fn = temp.claimNext();
     Explosion res;
-    auto sig = IGM.getSignature(fnType);
-    res.add(Builder.CreateBitCast(fn, sig.getType()->getPointerTo()));
+    auto &fnTI = IGM.getTypeInfoForLowered(fnType);
+    auto &fnNative = fnTI.nativeReturnValueSchema(IGM);
+    llvm::Value *newFn =
+        Builder.CreateBitCast(fn, fnNative.getExpandedType(IGM));
+    extractScalarResults(*this, newFn->getType(), newFn, res);
+
     setLoweredExplosion(i, res);
     return;
   }

@@ -20,6 +20,7 @@
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -104,7 +105,7 @@ void SILGenFunction::emitDistributedIfRemoteBranch(SILLocation Loc,
     assert(isRemoteFn && "Could not find 'is remote' function, is the "
                          "'Distributed' module available?");
 
-    auto conformances = SGM.M.getSwiftModule()->collectExistentialConformances(
+    auto conformances = collectExistentialConformances(
         selfTy->getCanonicalType(), ctx.getAnyObjectType());
 
     ManagedValue selfAnyObject = B.createInitExistentialRef(
@@ -136,8 +137,7 @@ static SILArgument *findFirstDistributedActorSystemArg(SILFunction &F) {
     Type argTy = arg->getType().getASTType();
     auto argDecl = arg->getDecl();
 
-    auto conformsToSystem =
-        ModuleDecl::lookupConformance(argDecl->getInterfaceType(), DAS);
+    auto conformsToSystem = lookupConformance(argDecl->getInterfaceType(), DAS);
 
     // Is it a protocol that conforms to DistributedActorSystem?
     if (argTy->isEqual(systemTy) || conformsToSystem) {
@@ -145,7 +145,7 @@ static SILArgument *findFirstDistributedActorSystemArg(SILFunction &F) {
     }
 
     // Is it some specific DistributedActorSystem?
-    auto result = ModuleDecl::lookupConformance(argTy, DAS);
+    auto result = lookupConformance(argTy, DAS);
     if (!result.isInvalid()) {
       return arg;
     }

@@ -185,7 +185,6 @@ BASELINE_LANGUAGE_FEATURE(RetroactiveAttribute, 364, "@retroactive")
 BASELINE_LANGUAGE_FEATURE(ExtensionMacroAttr, 0, "@attached(extension)")
 BASELINE_LANGUAGE_FEATURE(TypedThrows, 413, "Typed throws")
 BASELINE_LANGUAGE_FEATURE(OptionalIsolatedParameters, 420, "Optional isolated parameters")
-BASELINE_LANGUAGE_FEATURE(Extern, 0, "@_extern")
 BASELINE_LANGUAGE_FEATURE(ExpressionMacroDefaultArguments, 422, "Expression macro as caller-side default argument")
 BASELINE_LANGUAGE_FEATURE(BuiltinStoreRaw, 0, "Builtin.storeRaw")
 BASELINE_LANGUAGE_FEATURE(BuiltinCreateTask, 0, "Builtin.createTask and Builtin.createDiscardingTask")
@@ -232,6 +231,7 @@ EXPERIMENTAL_FEATURE(CodeItemMacros, false)
 EXPERIMENTAL_FEATURE(PreambleMacros, false)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
 EXPERIMENTAL_FEATURE(FullTypedThrows, false)
+EXPERIMENTAL_FEATURE(SameElementRequirements, false)
 
 // Whether to enable @_used and @_section attributes
 EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
@@ -248,6 +248,7 @@ EXPERIMENTAL_FEATURE(OldOwnershipOperatorSpellings, true)
 EXPERIMENTAL_FEATURE(MoveOnlyEnumDeinits, true)
 EXPERIMENTAL_FEATURE(MoveOnlyTuples, true)
 EXPERIMENTAL_FEATURE(MoveOnlyPartialReinitialization, true)
+EXPERIMENTAL_FEATURE(ConsumeSelfInDeinit, true)
 
 EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
 EXPERIMENTAL_FEATURE(LayoutPrespecialization, true)
@@ -393,7 +394,12 @@ EXPERIMENTAL_FEATURE(DebugDescriptionMacro, true)
 
 EXPERIMENTAL_FEATURE(ReinitializeConsumeInMultiBlockDefer, false)
 
-EXPERIMENTAL_FEATURE(SE427NoInferenceOnExtension, false)
+EXPERIMENTAL_FEATURE(SE427NoInferenceOnExtension, true)
+
+EXPERIMENTAL_FEATURE(Extern, true)
+
+// Enable trailing comma for comma-separated lists.
+EXPERIMENTAL_FEATURE(TrailingComma, false)
 
 SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated/async deinit")
 

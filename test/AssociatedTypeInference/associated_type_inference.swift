@@ -129,11 +129,11 @@ struct XProp0b : PropertyP0 { // expected-error{{type 'XProp0b' does not conform
 // Inference from subscripts
 protocol SubscriptP0 {
   associatedtype Index
-  // expected-note@-1 2 {{protocol requires nested type 'Index'; add nested type 'Index' for conformance}}
+  // expected-note@-1 2 {{protocol requires nested type 'Index'}}
 
   associatedtype Element : PSimple
   // expected-note@-1 {{unable to infer associated type 'Element' for protocol 'SubscriptP0'}}
-  // expected-note@-2 2 {{protocol requires nested type 'Element'; add nested type 'Element' for conformance}}
+  // expected-note@-2 2 {{protocol requires nested type 'Element'}}
 
   subscript (i: Index) -> Element { get }
 }
@@ -148,21 +148,23 @@ struct XSubP0b : SubscriptP0 {
 }
 
 struct XSubP0c : SubscriptP0 {
-// expected-error@-1 {{type 'XSubP0c' does not conform to protocol 'SubscriptP0'}}
+// expected-error@-1 {{type 'XSubP0c' does not conform to protocol 'SubscriptP0'}} 
+// expected-note@-2 {{add stubs for conformance}}
   subscript (i: Index) -> Element { get { } }
 }
 
 struct XSubP0d : SubscriptP0 {
-// expected-error@-1 {{type 'XSubP0d' does not conform to protocol 'SubscriptP0'}}
+// expected-error@-1 {{type 'XSubP0d' does not conform to protocol 'SubscriptP0'}} 
+// expected-note@-2 {{add stubs for conformance}}
   subscript (i: XSubP0d.Index) -> XSubP0d.Element { get { } }
 }
 
 // Inference from properties and subscripts
 protocol CollectionLikeP0 {
   associatedtype Index
-  // expected-note@-1 {{protocol requires nested type 'Index'; add nested type 'Index' for conformance}}
+  // expected-note@-1 {{protocol requires nested type 'Index'}}
   associatedtype Element
-  // expected-note@-1 {{protocol requires nested type 'Element'; add nested type 'Element' for conformance}}
+  // expected-note@-1 {{protocol requires nested type 'Element'}}
 
   var startIndex: Index { get }
   var endIndex: Index { get }
@@ -183,6 +185,7 @@ struct XCollectionLikeP0a<T> : CollectionLikeP0 {
 
 struct XCollectionLikeP0b : CollectionLikeP0 {
 // expected-error@-1 {{type 'XCollectionLikeP0b' does not conform to protocol 'CollectionLikeP0'}}
+// expected-note@-2 {{add stubs for conformance}}
   var startIndex: XCollectionLikeP0b.Index
   // There was an error @-1 ("'startIndex' used within its own type"),
   // but it disappeared and doesn't seem like much of a loss.
@@ -195,7 +198,7 @@ public protocol Thenable {
     func then(_ success: (_: T) -> T) -> Self
 }
 
-public class CorePromise<U> : Thenable { // expected-error{{type 'CorePromise<U>' does not conform to protocol 'Thenable'}}
+public class CorePromise<U> : Thenable { // expected-error{{type 'CorePromise<U>' does not conform to protocol 'Thenable'}} expected-note {{add stubs for conformance}}
     public func then(_ success: @escaping (_ t: U, _: CorePromise<U>) -> U) -> Self {
         return self.then() { (t: U) -> U in // expected-error{{contextual closure type '(U, CorePromise<U>) -> U' expects 2 arguments, but 1 was used in closure body}}
             return success(t: t, self)
@@ -358,7 +361,7 @@ struct X12 : P12 {
 // the associated type
 protocol Cookie {
   associatedtype Dough
-  // expected-note@-1 {{protocol requires nested type 'Dough'; add nested type 'Dough' for conformance}}
+  // expected-note@-1 {{protocol requires nested type 'Dough'}}
 
   init(t: Dough)
 }
@@ -369,6 +372,7 @@ extension Cookie {
 
 struct Thumbprint : Cookie {}
 // expected-error@-1 {{type 'Thumbprint' does not conform to protocol 'Cookie'}}
+// expected-note@-2 {{add stubs for conformance}}
 
 // Looking through typealiases
 protocol Vector {
@@ -385,11 +389,11 @@ struct Int8Vector : Vector {
 // https://github.com/apple/swift/issues/47063
 
 protocol P13 {
-  associatedtype Arg // expected-note{{protocol requires nested type 'Arg'; add nested type 'Arg' for conformance}}
+  associatedtype Arg // expected-note{{protocol requires nested type 'Arg'}}
   func foo(arg: Arg)
 }
 
-struct S13 : P13 { // expected-error{{type 'S13' does not conform to protocol 'P13'}}
+struct S13 : P13 { // expected-error{{type 'S13' does not conform to protocol 'P13'}} expected-note {{add stubs for conformance}}
   func foo(arg: inout Int) {}
 }
 
@@ -432,7 +436,7 @@ protocol P15f {
 }
 
 protocol P15g: P15c, P15f {
-  associatedtype A // expected-note{{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype A // expected-note{{protocol requires nested type 'A'}}
 }
 
 
@@ -443,7 +447,7 @@ struct X15d : P15d { }
 
 // Ambiguity.
 // FIXME: Better diagnostic here?
-struct X15g : P15g { } // expected-error{{type 'X15g' does not conform to protocol 'P15g'}}
+struct X15g : P15g { } // expected-error{{type 'X15g' does not conform to protocol 'P15g'}} expected-note {{add stubs for conformance}}
 
 // Associated type defaults in overidden associated types that require
 // substitution.
@@ -503,10 +507,10 @@ struct Foo: RefinesAssocWithDefault {
 }
 
 protocol P20 {
-  associatedtype T // expected-note{{protocol requires nested type 'T'; add nested type 'T' for conformance}}
+  associatedtype T // expected-note{{protocol requires nested type 'T'}}
   typealias TT = T?
 }
-struct S19 : P20 {  // expected-error{{type 'S19' does not conform to protocol 'P20'}}
+struct S19 : P20 {  // expected-error{{type 'S19' does not conform to protocol 'P20'}} expected-note {{add stubs for conformance}}
   typealias TT = Int?
 }
 
@@ -538,12 +542,12 @@ protocol P32 {
   var bar: B { get }
 }
 protocol P33 {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'}}
 
   var baz: A { get }
 }
 protocol P34 {
-  associatedtype A  // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype A  // expected-note {{protocol requires nested type 'A'}}
 
   func boo() -> A
 }
@@ -555,11 +559,11 @@ extension S31 where T == Int {
 extension S31 where T: Equatable {
   var bar: Bool { true }
 }
-extension S31: P33 where T == Never {} // expected-error {{type 'S31<T>' does not conform to protocol 'P33'}}
+extension S31: P33 where T == Never {} // expected-error {{type 'S31<T>' does not conform to protocol 'P33'}} expected-note {{add stubs for conformance}}
 extension S31 where T == String {
   var baz: Bool { true }
 }
-extension S31: P34 {} // expected-error {{type 'S31<T>' does not conform to protocol 'P34'}}
+extension S31: P34 {} // expected-error {{type 'S31<T>' does not conform to protocol 'P34'}} expected-note {{add stubs for conformance}}
 extension S31 where T: P32 {
   func boo() -> Void {}
 }
@@ -572,7 +576,8 @@ protocol P35a {
   associatedtype B // expected-note {{protocol requires nested type 'B'}}
 }
 protocol P35b: P35a where B == A {}
-// expected-error@+1 {{type 'S35' does not conform to protocol 'P35a'}}
+// expected-error@+2 {{type 'S35' does not conform to protocol 'P35a'}}
+// expected-note@+1 {{add stubs for conformance}}
 struct S35: P35b {}
 
 // Circular reference through a value witness.
@@ -584,8 +589,9 @@ protocol P36a {
 protocol P36b: P36a {
   associatedtype B = (Self) -> A // expected-note {{protocol requires nested type 'B'}}
 }
-// expected-error@+2 {{type 'S36' does not conform to protocol 'P36a'}}
-// expected-error@+1 {{type 'S36' does not conform to protocol 'P36b'}}
+// expected-error@+3 {{type 'S36' does not conform to protocol 'P36a'}}
+// expected-error@+2 {{type 'S36' does not conform to protocol 'P36b'}}
+// expected-note@+1 {{add stubs for conformance}}
 struct S36: P36b {
   func foo(arg: Array<B>) {}
 }
@@ -626,13 +632,14 @@ protocol P40a {
   func foo(arg: A)
 }
 protocol P40b: P40a {
-  associatedtype C = (A, B.A, D.D, E) -> Self // expected-note {{protocol requires nested type 'C'; add nested type 'C' for conformance}}
-  associatedtype D: P40b // expected-note {{protocol requires nested type 'D'; add nested type 'D' for conformance}}
-  associatedtype E: Equatable // expected-note {{protocol requires nested type 'E'; add nested type 'E' for conformance}}
+  associatedtype C = (A, B.A, D.D, E) -> Self // expected-note {{protocol requires nested type 'C'}}
+  associatedtype D: P40b // expected-note {{protocol requires nested type 'D'}}
+  associatedtype E: Equatable // expected-note {{protocol requires nested type 'E'}}
 }
 protocol P40c: P40b where D == S40<Never> {}
 struct S40<E: Equatable>: P40c {
   // expected-error@-1 {{type 'S40<E>' does not conform to protocol 'P40b'}}
+  // expected-note@-2 {{add stubs for conformance}}
   func foo(arg: Never) {}
 
   typealias B = Self
@@ -710,5 +717,6 @@ protocol FIXME_P1a {
   associatedtype B: FIXME_P1a // expected-note {{protocol requires nested type 'B'}}
 }
 protocol FIXME_P1b: FIXME_P1a where B == FIXME_S1<A> {}
-// expected-error@+1 {{type 'FIXME_S1<T>' does not conform to protocol 'FIXME_P1a'}}
+// expected-error@+2 {{type 'FIXME_S1<T>' does not conform to protocol 'FIXME_P1a'}}
+// expected-note@+1 {{add stubs for conformance}}
 struct FIXME_S1<T: Equatable>: FIXME_P1b {}

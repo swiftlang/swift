@@ -13,6 +13,7 @@
 #include "swift/IDE/CompletionLookup.h"
 #include "CodeCompletionResultBuilder.h"
 #include "ExprContextAnalysis.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
@@ -720,6 +721,35 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
       if (MaybeNominalType->hasUnboundGenericType())
         return T;
 
+      // If we are doing implicit member lookup on a protocol and we have found
+      // a declaration in an extension, use the extension's `Self` type for the
+      // generic substitution.
+      // Eg in the following, the `Self` type returned by `qux` is
+      // `MyGeneric<Int>`, not `MyProto` because of the `Self` type restriction.
+      // ```
+      // protocol MyProto {}
+      // struct MyGeneric<T>: MyProto {}
+      // extension MyProto where Self == MyGeneric<Int> {
+      //   static func qux() -> Self { .init() }
+      // }
+      // func takeMyProto(_: any MyProto)  {}
+      // func test() {
+      //   takeMyProto(.#^COMPLETE^#)
+      // }
+      // ```
+      if (MaybeNominalType->isExistentialType()) {
+        Type SelfType;
+        if (auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
+          SelfType = ED->getGenericSignature()->getConcreteType(
+              ED->getSelfInterfaceType());
+        }
+        if (SelfType) {
+          MaybeNominalType = SelfType;
+        } else {
+          return T;
+        }
+      }
+
       // For everything else, substitute in the base type.
       auto Subs = MaybeNominalType->getMemberSubstitutionMap(VD);
 
@@ -749,7 +779,7 @@ Type CompletionLookup::getAssociatedTypeType(const AssociatedTypeDecl *ATD) {
   if (BaseTy) {
     BaseTy = BaseTy->getInOutObjectType()->getMetatypeInstanceType();
     if (auto NTD = BaseTy->getAnyNominal()) {
-      auto Conformance = ModuleDecl::lookupConformance(BaseTy, ATD->getProtocol());
+      auto Conformance = lookupConformance(BaseTy, ATD->getProtocol());
       if (Conformance.isConcrete()) {
         return Conformance.getConcrete()->getTypeWitness(
             const_cast<AssociatedTypeDecl *>(ATD));
@@ -2602,7 +2632,7 @@ void CompletionLookup::addTypeRelationFromProtocol(
 
     // Check for conformance to the literal protocol.
     if (T->getAnyNominal()) {
-      if (ModuleDecl::lookupConformance(T, PD)) {
+      if (lookupConformance(T, PD)) {
         literalType = T;
         break;
       }

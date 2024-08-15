@@ -19,7 +19,6 @@
 #include "DemanglerAssert.h"
 #include "RemanglerBase.h"
 #include "swift/AST/Ownership.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
@@ -1985,7 +1984,7 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
   Node *PatternSubs = nullptr;
   Node *InvocationSubs = nullptr;
   for (NodePointer Child : *node) {
-    switch (auto kind = Child->getKind()) {
+    switch (Child->getKind()) {
     case Node::Kind::ImplParameter:
     case Node::Kind::ImplResult:
     case Node::Kind::ImplYield:

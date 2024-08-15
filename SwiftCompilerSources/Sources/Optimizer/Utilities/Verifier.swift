@@ -13,13 +13,16 @@
 import SIL
 import OptimizerBridging
 
-private protocol VerifyableInstruction : Instruction {
+private protocol VerifiableInstruction : Instruction {
   func verify(_ context: FunctionPassContext)
 }
 
-private func require(_ condition: Bool, _ message: @autoclosure () -> String) {
+private func require(_ condition: Bool, _ message: @autoclosure () -> String, atInstruction: Instruction? = nil) {
   if !condition {
-    fatalError(message())
+    let msg = message()
+    msg._withBridgedStringRef { stringRef in
+      verifierError(stringRef, atInstruction.bridged, Optional<Argument>.none.bridged)
+    }
   }
 }
 
@@ -33,8 +36,8 @@ extension Function {
 
         inst.checkForwardingConformance()
 
-        if let verifyableInst = inst as? VerifyableInstruction {
-          verifyableInst.verify(context)
+        if let verifiableInst = inst as? VerifiableInstruction {
+          verifiableInst.verify(context)
         }
       }
     }
@@ -51,7 +54,7 @@ private extension Instruction {
   }
 }
 
-extension BorrowedFromInst : VerifyableInstruction {
+extension BorrowedFromInst : VerifiableInstruction {
   func verify(_ context: FunctionPassContext) {
     var computedEVs = Stack<Value>(context)
     defer { computedEVs.deinitialize() }
@@ -64,7 +67,7 @@ extension BorrowedFromInst : VerifyableInstruction {
     var existingEVs = ValueSet(insertContentsOf: enclosingValues, context)
     defer { existingEVs.deinitialize() }
 
-    for computedEV in enclosingValues {
+    for computedEV in computedEVs {
       require(existingEVs.contains(computedEV),
                    "\(computedEV)\n  missing in enclosing values of \(self)")
     }

@@ -22,6 +22,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -290,14 +291,14 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     break;
 
   case MappedCTypeKind::UnsignedWord:
-    if (ClangTypeSize != 64 && ClangTypeSize != 32)
+    if (ClangTypeSize != 64 && ClangTypeSize != 32 && ClangTypeSize != 16)
       return std::make_pair(Type(), "");
     if (!ClangType->isUnsignedIntegerType())
       return std::make_pair(Type(), "");
     break;
 
   case MappedCTypeKind::SignedWord:
-    if (ClangTypeSize != 64 && ClangTypeSize != 32)
+    if (ClangTypeSize != 64 && ClangTypeSize != 32 && ClangTypeSize != 16)
       return std::make_pair(Type(), "");
     if (!ClangType->isSignedIntegerType())
       return std::make_pair(Type(), "");
@@ -8088,7 +8089,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
 
         // Don't synthesize a conformance if one already exists.
         auto ty = nominal->getDeclaredInterfaceType();
-        if (ModuleDecl::lookupConformance(ty, protocol))
+        if (lookupConformance(ty, protocol))
           continue;
         auto conformance = SwiftContext.getNormalConformance(
             ty, protocol, nominal->getLoc(), nominal->getDeclContextForModule(),

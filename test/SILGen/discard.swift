@@ -7,7 +7,7 @@
 
 func invokedDeinit() {}
 
-@_moveOnly enum MaybeFile {
+enum MaybeFile: ~Copyable {
   case some(File)
   case none
 
@@ -41,7 +41,7 @@ func invokedDeinit() {}
   // CHECK-SIL:    release_value [[FILE]] : $File
 }
 
-@_moveOnly struct File {
+struct File: ~Copyable {
   let fd: Int
   static var nextFD: Int = 0
 
@@ -71,7 +71,7 @@ func invokedDeinit() {}
   }
 }
 
-@_moveOnly struct PointerTree {
+struct PointerTree: ~Copyable {
   let left: UnsafePointer<UInt>?
   let file: Int = 0
   lazy var popularity: Int = 0
@@ -145,7 +145,7 @@ final class Wallet {
   var numCards = 0
 }
 
-@_moveOnly enum Ticket {
+enum Ticket: ~Copyable {
   case empty
   case within(Wallet)
 

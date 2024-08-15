@@ -1557,7 +1557,9 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::PackArchetype:
     case TypeKind::ElementArchetype:
     case TypeKind::OpenedArchetype:
-      llvm_unreachable("Cannot mangle free-standing archetypes");
+      llvm::errs() << "Cannot mangle free-standing archetype: ";
+      tybase->dump(llvm::errs());
+      abort();
 
     case TypeKind::OpaqueTypeArchetype: {
       auto opaqueType = cast<OpaqueTypeArchetypeType>(tybase);

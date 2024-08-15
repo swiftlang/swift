@@ -41,10 +41,11 @@ func foo(_ x: Float) -> Float {
 // CHECK-SIL:   [[ADD_JVP_FN:%.*]] = differentiable_function_extract [jvp] [[ADD_DIFF_FN]]
 // CHECK-SIL:   [[ADD_RESULT:%.*]] = apply [[ADD_JVP_FN]]([[X]], [[X]], {{.*}})
 // CHECK-SIL:   ([[ORIG_RES:%.*]], [[ADD_DF:%.*]]) = destructure_tuple [[ADD_RESULT]]
+// CHECK-SIL:   [[MV_RES:%.*]] = move_value [var_decl] [[ORIG_RES]] : $Float
 // CHECK-SIL:   [[DF_STRUCT:%.*]] = tuple ([[ADD_DF]] : $@callee_guaranteed (Float, Float) -> Float)
 // CHECK-SIL:   [[DF_REF:%.*]] = function_ref @fooTJdSpSr : $@convention(thin) (Float, @owned (_: @callee_guaranteed (Float, Float) -> Float)) -> Float
 // CHECK-SIL:   [[DF_FN:%.*]] = partial_apply [callee_guaranteed] [[DF_REF]]([[DF_STRUCT]])
-// CHECK-SIL:   [[VJP_RESULT:%.*]] = tuple ([[ORIG_RES]] : $Float, [[DF_FN]] : $@callee_guaranteed (Float) -> Float)
+// CHECK-SIL:   [[VJP_RESULT:%.*]] = tuple ([[MV_RES]] : $Float, [[DF_FN]] : $@callee_guaranteed (Float) -> Float)
 // CHECK-SIL:   return [[VJP_RESULT]] : $(Float, @callee_guaranteed (Float) -> Float)
 // CHECK-SIL: }
 
@@ -67,7 +68,7 @@ func foo(_ x: Float) -> Float {
 // CHECK-SIL:   ([[ORIG_RES:%.*]], [[ADD_PB:%.*]]) = destructure_tuple [[ADD_RESULT]]
 // CHECK-SIL:   [[PB_REF:%.*]] = function_ref @fooTJpSpSr : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> Float
 // CHECK-SIL:   [[PB_FN:%.*]] = partial_apply [callee_guaranteed] [[PB_REF]]([[ADD_PB]])
-// CHECK-SIL:   [[VJP_RESULT:%.*]] = tuple ([[ORIG_RES]] : $Float, [[PB_FN]] : $@callee_guaranteed (Float) -> Float)
+// CHECK-SIL:   [[VJP_RESULT:%.*]] = tuple ([[MV_RES]] : $Float, [[PB_FN]] : $@callee_guaranteed (Float) -> Float)
 // CHECK-SIL:   return [[VJP_RESULT]] : $(Float, @callee_guaranteed (Float) -> Float)
 // CHECK-SIL: }
 

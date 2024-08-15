@@ -10,7 +10,7 @@ func foo() {}
 @objc public class C: NSObject {
   // C.__allocating_init()
   // CHECK-LABEL: sil{{.*}}@$s4Test1CCACycfC
-  // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:(ss36_diagnoseUnavailableCodeReached_aeics5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb)]] : $@convention(thin) () -> Never
+  // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:(ss31_diagnoseUnavailableCodeReacheds5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb)]] : $@convention(thin) () -> Never
   // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
   // CHECK:         {{%.*}} = function_ref @$s4Test1CCACycfcTD
   // CHECK:       } // end sil function '$s4Test1CCACycfC'

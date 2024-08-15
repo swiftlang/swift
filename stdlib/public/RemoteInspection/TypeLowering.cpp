@@ -327,9 +327,7 @@ BitMask BuiltinTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) cons
     auto mask = BitMask::oneMask(getSize());
     mask.keepOnlyMostSignificantBits(getSize() * 8 - intSize);
     return mask;
-  } else if (
-    Name == "ypXp" || // Any.Type
-    Name == "yyXf" // 'yyXf' =  @thin () -> Void function
+  } else if (Name == "ypXp" // Any.Type
   ) {
     // Builtin types that expose pointer spare bits
     auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
@@ -413,15 +411,22 @@ bool RecordTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
 }
 
 BitMask RecordTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const {
+  // Start with all spare bits; we'll mask them out as we go...
   auto mask = BitMask::oneMask(getSize());
   switch (SubKind) {
   case RecordKind::Invalid:
-    return mask;    // FIXME: Should invalid have all spare bits?  Or none?  Does it matter?
+    // FIXME: Should invalid have all spare bits?  Or none?  Does it matter?
+    return mask;
   case RecordKind::Tuple:
   case RecordKind::Struct:
+    // Regular aggregates inherit spare bits from their fields
     break;
   case RecordKind::ThickFunction:
-    break;
+    // Thick functions have two fields:
+    // * Code pointer that might be signed and/or misaligned
+    // * Context that could be a tagged pointer
+    mask.makeZero(); // No spare bits
+    return mask;
   case RecordKind::OpaqueExistential: {
     // Existential storage isn't recorded as a field,
     // so we handle it specially here...
@@ -429,12 +434,19 @@ BitMask RecordTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const
     BitMask submask = BitMask::zeroMask(pointerSize * 3);
     mask.andMask(submask, 0);
     hasAddrOnly = true;
+    // Mask the rest of the fields as usual...
     break;
   }
   case RecordKind::ClassExistential:
-    break;
-  case RecordKind::ExistentialMetatype:
-    break; // Field 0 is metadata pointer, a Builtin of type 'yyXf'
+    // Class existential is a data pointer that does expose spare bits
+    // ... so we can fall through ...
+  case RecordKind::ExistentialMetatype: {
+    // Initial metadata pointer has spare bits
+    auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
+    mask.andMask(mpePointerSpareBits, 0);
+    mask.keepOnlyLeastSignificantBytes(TC.targetPointerSize());
+    return mask;
+  }
   case RecordKind::ErrorExistential:
     break;
   case RecordKind::ClassInstance:
@@ -1071,7 +1083,20 @@ public:
   BitMask getMultiPayloadTagBitsMask() const {
     auto payloadTagValues = NumEffectivePayloadCases - 1;
     if (getNumCases() > NumEffectivePayloadCases) {
-      payloadTagValues += 1;
+      // How many payload bits are there?
+      auto payloadBits = spareBitsMask;
+      payloadBits.complement(); // Non-spare bits are payload bits
+      auto numPayloadBits = payloadBits.countSetBits();
+
+      if (numPayloadBits >= 32) {
+	// Lots of payload bits!!  We only need one extra tag value
+	payloadTagValues += 1;
+      } else {
+	// We may need multiple tag values to cover all the non-payload cases
+	auto numNonPayloadCasesPerTag = 1ULL << numPayloadBits;
+	auto numNonPayloadCases = getNumCases() - NumEffectivePayloadCases;
+	payloadTagValues += (numNonPayloadCases + numNonPayloadCasesPerTag - 1) / numNonPayloadCasesPerTag;
+      }
     }
     int payloadTagBits = 0;
     while (payloadTagValues > 0) {
@@ -1575,6 +1600,12 @@ const TypeInfo *TypeConverter::getDefaultActorStorageTypeInfo() {
       /*NumExtraInhabitants*/ 0, /*BitwiseTakable*/ true);
 
   return DefaultActorStorageTI;
+}
+
+const TypeInfo *TypeConverter::getRawUnsafeContinuationTypeInfo() {
+  // An UnsafeContinuation is (essentially) a strong pointer to heap data
+  return getReferenceTypeInfo(ReferenceKind::Strong,
+				 ReferenceCounting::Native);
 }
 
 const TypeInfo *TypeConverter::getEmptyTypeInfo() {
@@ -2183,6 +2214,8 @@ public:
                                      ReferenceCounting::Unknown);
     } else if (B->getMangledName() == "BD") {
       return TC.getDefaultActorStorageTypeInfo();
+    } else if (B->getMangledName() == "Bc") {
+      return TC.getRawUnsafeContinuationTypeInfo();
     }
 
     /// Otherwise, get the fixed layout information from reflection

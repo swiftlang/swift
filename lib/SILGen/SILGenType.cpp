@@ -22,6 +22,7 @@
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
@@ -401,14 +402,6 @@ template<typename T> class SILGenWitnessTable : public SILWitnessVisitor<T> {
 
 public:
   void addMethod(SILDeclRef requirementRef) {
-    // TODO: here the requirement is thunk_decl of the protocol; it is a FUNC
-    // detect here that it is a func dec + thunk.
-    // walk up to DC, and find storage.
-    // e  requirementRef->getDecl()->dump()
-    //(func_decl implicit "distributedVariable()" interface type="<Self where Self : WorkerProtocol> (Self) -> () async throws -> String" access=internal nonisolated distributed_thunk
-    //  (parameter "self")
-    //  (parameter_list))
-
     auto reqDecl = requirementRef.getDecl();
 
     // Static functions can be witnessed by enum cases with payload
@@ -473,7 +466,6 @@ public:
     // Here we notice a `distributed var` thunk requirement,
     // and witness it with the distributed thunk -- the "getter thunk".
     if (requirementRef.isDistributedThunk()) {
-
       return addMethodImplementation(
           requirementRef, getWitnessRef(requirementRef, witnessStorage->getDistributedThunk()),
           witness);
@@ -691,10 +683,8 @@ public:
   void addConditionalRequirements() {
     SILWitnessTable::enumerateWitnessTableConditionalConformances(
         Conformance, [&](unsigned, CanType type, ProtocolDecl *protocol) {
-          auto conformance = (type->isTypeParameter()
-                              ? ProtocolConformanceRef(protocol)
-                              : ModuleDecl::lookupConformance(type, protocol,
-                                                              /*allowMissing=*/true));
+          auto conformance = lookupConformance(type, protocol,
+                                               /*allowMissing=*/true);
           assert(conformance &&
                  "unable to find conformance that should be known");
 

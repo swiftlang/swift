@@ -101,7 +101,7 @@ option(SWIFT_STDLIB_EMIT_API_DESCRIPTORS
 
 option(SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES
        "Build only the core subset of the standard library,
-       ignoring additional libraries such as Concurrency, Distributed and StringProcessing.
+       ignoring additional libraries such as Distributed, Observation and Synchronization.
        This is an option meant for internal configurations inside Apple
        that need to build the standard libraries in chunks when constructing an SDK"
        FALSE)

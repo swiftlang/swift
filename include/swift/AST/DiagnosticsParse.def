@@ -253,11 +253,6 @@ ERROR(enum_case_dot_prefix,none,
 ERROR(static_var_decl_global_scope,none,
       "%select{%error|static properties|class properties}0 may only be declared on a type",
       (StaticSpellingKind))
-ERROR(unexpected_curly_braces_in_decl, none,
-      "unexpected '{' in declaration", ())
-ERROR(missing_accessor_return_decl,none,
-      "missing return in %select{accessor|subscript}0 expected to return %1",
-      (bool, TypeRepr*))
 ERROR(expected_getset_in_protocol,none,
       "expected get or set in a protocol property", ())
 ERROR(unexpected_getset_implementation_in_protocol,none,
@@ -310,9 +305,6 @@ ERROR(observing_accessor_in_subscript,none,
       "%select{'willSet'|'didSet'}0 is not allowed in subscripts", (unsigned))
 ERROR(getset_cannot_be_implied,none,
       "variable with implied type cannot have implied getter/setter", ())
-
-ERROR(init_accessor_expected_name,none,
-      "expected property name in init accessor effect", ())
 
 // Import
 ERROR(decl_expected_module_name,none,
@@ -673,8 +665,6 @@ ERROR(sil_keypath_index_operand_type_conflict,none,
 ERROR(sil_keypath_no_use_of_operand_in_pattern,none,
       "operand %0 is not referenced by any component in the pattern",
       (unsigned))
-ERROR(sil_movevalue_invalid_optional_attribute,none,
-      "Optional attribute '[%0]' can not be applied to move_value", (StringRef))
 ERROR(sil_markmustcheck_invalid_attribute,none,
       "Attribute '[%0]' can not be applied to mark_value_as_moveonly", (StringRef))
 ERROR(sil_markmustcheck_requires_attribute,none,
@@ -736,8 +726,6 @@ ERROR(sil_vtable_expect_rsquare,none,
       "expected ']' after vtable entry kind", ())
 
 // SIL MoveOnlyDeinit
-ERROR(expected_sil_moveonlydeinit_colon,none,
-      "expected ':' in a MoveOnlyDeinit entry", ())
 ERROR(sil_moveonlydeinit_func_not_found,none,
       "sil function not found %0", (Identifier))
 ERROR(sil_moveonlydeinit_nominal_not_found,none,
@@ -1364,10 +1352,6 @@ ERROR(expected_rsquare_array_expr,PointsToFirstBadToken,
 ERROR(expected_arg_list_in_object_literal,PointsToFirstBadToken,
       "expected argument list in object literal", ())
 
-// Unknown pound expression.
-ERROR(unknown_pound_expr,none,
-      "use of unknown directive '#%0'", (StringRef))
-
 // Ternary expressions
 ERROR(expected_expr_after_ternary_question,none,
       "expected expression after '?' in ternary expression", ())
@@ -1375,8 +1359,6 @@ ERROR(expected_colon_after_ternary_question,none,
       "expected ':' after '? ...' in ternary expression", ())
 ERROR(expected_expr_after_ternary_colon,none,
       "expected expression after '? ... :' in ternary expression", ())
-ERROR(expected_expr_after_try, none,
-      "expected expression after 'try'", ())
 ERROR(expected_expr_after_await, none,
       "expected expression after 'await'", ())
 ERROR(expected_expr_after_move, none,
@@ -1492,9 +1474,6 @@ WARNING(warning_in_effects_attribute,none,
 ERROR(expected_in_attribute_list,none,
       "expected ']' or ',' in attribute list", ())
 
-ERROR(expected_depends_on,none,
-      "expected 'depends_on'", ())
-
 ERROR(type_attribute_applied_to_decl,none,
       "attribute can only be applied to types, not declarations", ())
 ERROR(decl_attribute_applied_to_type,none,
@@ -1521,9 +1500,6 @@ ERROR(attr_expected_comma,none,
 
 ERROR(attr_expected_string_literal,none,
 "expected string literal in '%0' attribute", (StringRef))
-
-ERROR(attr_expected_integer_literal,none,
-"expected integer literal in '%0' attribute", (StringRef))
 
 ERROR(attr_expected_option_such_as,none,
       "expected '%0' option such as '%1'", (StringRef, StringRef))
@@ -1782,8 +1758,6 @@ ERROR(attr_differentiable_kind_not_supported,PointsToFirstBadToken,
       "unsupported differentiability kind '%0'; only 'reverse' is supported", (StringRef))
 ERROR(attr_differentiable_unknown_kind,PointsToFirstBadToken,
       "unknown differentiability kind '%0'; only 'reverse' is supported", (StringRef))
-ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
-      "expected a list of parameters to differentiate with respect to", ())
 ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
       "use 'wrt:' to specify parameters to differentiate with respect to", ())
 ERROR(attr_differentiable_expected_label,none,
@@ -1833,10 +1807,6 @@ ERROR(sil_inst_autodiff_expected_function_type_operand,PointsToFirstBadToken,
 ERROR(sil_inst_autodiff_expected_differentiability_witness_kind,PointsToFirstBadToken,
       "expected a differentiability witness kind, which can be one of '[jvp]', "
       "'[vjp]', or '[transpose]'", ())
-ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
-      "expected witness_generic signature '%0' does not have same generic "
-      "parameters as original function generic signature '%1'",
-      (StringRef, StringRef))
 
 WARNING(warn_attr_unsafe_removed,none,
         "'%0' attribute has been removed in favor of @preconcurrency",
@@ -2068,23 +2038,6 @@ ERROR(associatedtype_cannot_be_variadic,none,
       "associated types cannot be variadic", ())
 ERROR(type_parameter_pack_ellipsis,none,
       "ellipsis operator cannot be used with a type parameter pack", ())
-
-//------------------------------------------------------------------------------
-// MARK: syntax parsing diagnostics
-//------------------------------------------------------------------------------
-ERROR(unknown_syntax_entity, PointsToFirstBadToken,
-      "unknown %0 syntax exists in the source", (StringRef))
-
-//------------------------------------------------------------------------------
-// MARK: multiple trailing closures diagnostics
-//------------------------------------------------------------------------------
-ERROR(expected_argument_label_followed_by_closure_literal,none,
-      "expected an argument label followed by a closure literal", ())
-ERROR(expected_closure_literal,none,
-      "expected a closure literal", ())
-
-ERROR(expected_multiple_closures_block_rbrace,none,
-      "expected '}' at the end of a trailing closures block", ())
 
 //------------------------------------------------------------------------------
 // MARK: macros

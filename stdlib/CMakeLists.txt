@@ -230,7 +230,7 @@ swift_create_stdlib_targets("swift-test-libexec" "" FALSE)
 
 # Check whether the Swift compiler we're using supports
 # -disable-implicit-backtracing-module-import
-include(SwiftImplicitImport)
+include(SwiftCompilerCapability)
 
 swift_supports_implicit_module("backtracing" SWIFT_COMPILER_SUPPORTS_BACKTRACING)
 

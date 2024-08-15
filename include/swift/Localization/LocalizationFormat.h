@@ -71,7 +71,7 @@ public:
   using hash_value_type = uint32_t;
   using offset_type = uint32_t;
 
-  hash_value_type ComputeHash(key_type_ref key) { return llvm::hash_code(key); }
+  hash_value_type ComputeHash(key_type_ref key) { return key; }
 
   std::pair<offset_type, offset_type> EmitKeyDataLength(llvm::raw_ostream &out,
                                                         key_type_ref key,
@@ -113,9 +113,7 @@ public:
     return lhs == rhs;
   }
 
-  hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::hash_code(key);
-  }
+  hash_value_type ComputeHash(internal_key_type key) { return key; }
 
   static std::pair<offset_type, offset_type>
   ReadKeyDataLength(const unsigned char *&data) {

@@ -6,7 +6,7 @@
 // REQUIRES: OS=macosx
 
 // CHECK-LABEL:     sil{{.*}}@$s4Test15unavailableFuncyyF
-// CHECK-SWIFT5_8:    [[FNREF:%.*]] = function_ref @$ss36_diagnoseUnavailableCodeReached_aeics5NeverOyF : $@convention(thin) () -> Never
+// CHECK-SWIFT5_8:    [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb : $@convention(thin) () -> Never
 // CHECK-SWIFT5_9:    [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyF : $@convention(thin) () -> Never
 // CHECK-NEXT:        [[APPLY:%.*]] = apply [[FNREF]]()
 // CHECK:           } // end sil function '$s4Test15unavailableFuncyyF'
@@ -14,7 +14,7 @@
 public func unavailableFunc() {}
 
 // CHECK-LABEL:     sil{{.*}}@$s4Test24unavailableInlinableFuncyyF
-// CHECK-SWIFT5_8:    [[FNREF:%.*]] = function_ref @$ss36_diagnoseUnavailableCodeReached_aeics5NeverOyF : $@convention(thin) () -> Never
+// CHECK-SWIFT5_8:    [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb : $@convention(thin) () -> Never
 // CHECK-SWIFT5_9:    [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb : $@convention(thin) () -> Never
 // CHECK-NEXT:        [[APPLY:%.*]] = apply [[FNREF]]()
 // CHECK:           } // end sil function '$s4Test24unavailableInlinableFuncyyF'
@@ -22,7 +22,7 @@ public func unavailableFunc() {}
 @inlinable public func unavailableInlinableFunc() {}
 
 // CHECK-LABEL:     sil{{.*}}@$s4Test22unavailableOnMacOSFuncyyF
-// CHECK-SWIFT5_8:    [[FNREF:%.*]] = function_ref @$ss36_diagnoseUnavailableCodeReached_aeics5NeverOyF : $@convention(thin) () -> Never
+// CHECK-SWIFT5_8:    [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb : $@convention(thin) () -> Never
 // CHECK-SWIFT5_9:    [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyF : $@convention(thin) () -> Never
 // CHECK-NEXT:        [[APPLY:%.*]] = apply [[FNREF]]()
 // CHECK:           } // end sil function '$s4Test22unavailableOnMacOSFuncyyF'
@@ -36,7 +36,7 @@ public func unavailableOnMacOSFunc() {}
 public func unavailableOnMacOSExtensionFunc() {}
 
 // CHECK-LABEL:     sil{{.*}}@$s4Test021unavailableOnMacOSAndD15OSExtensionFuncyyF
-// CHECK-SWIFT5_8:    [[FNREF:%.*]] = function_ref @$ss36_diagnoseUnavailableCodeReached_aeics5NeverOyF : $@convention(thin) () -> Never
+// CHECK-SWIFT5_8:    [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb : $@convention(thin) () -> Never
 // CHECK-SWIFT5_9:    [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyF : $@convention(thin) () -> Never
 // CHECK-NEXT:        [[APPLY:%.*]] = apply [[FNREF]]()
 // CHECK:           } // end sil function '$s4Test021unavailableOnMacOSAndD15OSExtensionFuncyyF'

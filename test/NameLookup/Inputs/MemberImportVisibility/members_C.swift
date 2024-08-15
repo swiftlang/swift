@@ -21,3 +21,11 @@ extension Y {
 public enum EnumInC {
   case caseInC
 }
+
+open class DerivedClassInC: DerivedClassInB {
+  open func methodInC() {}
+}
+
+extension ProtocolInA {
+  public func defaultedRequirementInC() { }
+}

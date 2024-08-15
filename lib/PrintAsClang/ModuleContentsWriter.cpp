@@ -117,11 +117,7 @@ public:
 };
 
 class ModuleWriter {
-  enum class EmissionState {
-    NotYetDefined = 0,
-    DefinitionRequested,
-    Defined
-  };
+  enum class EmissionState { NotYetDefined = 0, DefinitionRequested, Defined };
 
   raw_ostream &os;
   SmallPtrSetImpl<ImportModuleTy> &imports;
@@ -288,11 +284,10 @@ public:
     if (!isa<clang::TypeDecl>(typeDecl->getClangDecl()))
       return;
     // Get the underlying clang type from a type alias decl or record decl.
-    auto clangType =
-        clang::QualType(
-            cast<clang::TypeDecl>(typeDecl->getClangDecl())->getTypeForDecl(),
-            0)
-            .getCanonicalType();
+    auto clangDecl = typeDecl->getClangDecl();
+    auto clangType = clangDecl->getASTContext()
+                         .getTypeDeclType(cast<clang::TypeDecl>(clangDecl))
+                         .getCanonicalType();
     if (!isa<clang::RecordType>(clangType.getTypePtr()))
       return;
     auto it = seenClangTypes.insert(clangType.getTypePtr());
@@ -309,7 +304,7 @@ public:
 
   void forwardDeclareType(const TypeDecl *TD) {
     if (outputLangMode == OutputLanguageMode::Cxx) {
-      if (isa<StructDecl>(TD) || isa<EnumDecl>(TD)) {
+      if (isa<StructDecl>(TD) || isa<EnumDecl>(TD) || isa<ClassDecl>(TD)) {
         auto *NTD = cast<NominalTypeDecl>(TD);
         if (!addImport(NTD))
           forwardDeclareCxxValueTypeIfNeeded(NTD);
@@ -474,7 +469,12 @@ public:
       return false;
 
     (void)forwardDeclareMemberTypes(CD->getMembers(), CD);
-    seenTypes[CD] = { EmissionState::Defined, true };
+    auto [it, inserted] =
+        seenTypes.try_emplace(CD, EmissionState::NotYetDefined, false);
+    if (outputLangMode == OutputLanguageMode::Cxx &&
+        (inserted || !it->second.second))
+      ClangValueTypePrinter::forwardDeclType(os, CD, printer);
+    it->second = {EmissionState::Defined, true};
     os << '\n';
     printer.print(CD);
     return true;

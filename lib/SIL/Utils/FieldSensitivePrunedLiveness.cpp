@@ -1212,7 +1212,7 @@ namespace swift::test {
 // locations. In that case, the def nodes may be stores and the uses may be
 // destroy_addrs.
 static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
-    "fieldsensitive-multidefuse-liverange",
+    "fieldsensitive_multidefuse_liverange",
     [](auto &function, auto &arguments, auto &test) {
       SmallVector<SILBasicBlock *, 8> discoveredBlocks;
       auto value = arguments.takeValue();

@@ -95,7 +95,7 @@ toolchain as a one-off, there are a couple of differences:
      cd swift
      utils/update-checkout --clone
      ```
-   > **Note**  
+   > **Important**\
    > If you've already forked the project on GitHub at this stage, **do not
    > clone your fork** to start off. We describe [how to setup your fork](#setting-up-your-fork)
    > in a subsection below.
@@ -121,7 +121,7 @@ toolchain as a one-off, there are a couple of differences:
    Detailed branching information, including names for release branches, can
    be found in [Branches.md](/docs/Branches.md).
 
-> **Note**  
+> [!NOTE]
 > The commands used in the rest of this guide assumes that the absolute path
 > to your working directory is something like `/path/to/swift-project/swift`.
 > Double-check that running `pwd` prints a path ending with `swift`.
@@ -135,9 +135,6 @@ toolchain as a one-off, there are a couple of differences:
 - Before running `update-checkout`, double-check that `swift` is the only
   repository inside the `swift-project` directory. Otherwise,
   `update-checkout` may not clone the necessary dependencies.
-- Running `update-checkout` may fail if the `git-lfs` dependency is not
-  installed. This may report as an error related to `icu`. A workaround is
-  passing `--skip-repository icu` to `update-checkout`.
 
 ## Installing dependencies
 
@@ -193,7 +190,7 @@ toolchain as a one-off, there are a couple of differences:
      sudo chmod +x /usr/local/bin/sccache
      ```
 
-> **Note**  
+> [!NOTE]
 > LLDB currently requires at least `swig-1.3.40` but will successfully build
 > with version 2 shipped with Ubuntu.
 
@@ -209,7 +206,7 @@ toolchain as a one-off, there are a couple of differences:
 * If you installed and want to use Sccache: Run `sccache --version`; check
   that this succeeds.
 
-> **Note**  
+> [!NOTE]
 > If you are running on Apple Silicon hardware (M1, M2, etc), ensure you have
 > the native arm64 build of these dependencies installed and configured in your PATH.
 >
@@ -250,8 +247,9 @@ to understand what the different tools do:
    is a high-level automation script that handles configuration (via CMake),
    building (via Ninja), caching (via Sccache), running tests and more.
 
-> **Pro Tip**: Most tools support `--help` flags describing the options they
-> support. Additionally, both Clang and the Swift compiler have hidden flags
+> [!TIP]
+> Most tools support `--help` flags describing the options they support.
+> Additionally, both Clang and the Swift compiler have hidden flags
 > (`clang --help-hidden`/`swiftc --help-hidden`) and frontend flags
 > (`clang -cc1 --help`/`swiftc -frontend --help`) and the Swift compiler
 > even has hidden frontend flags (`swiftc -frontend --help-hidden`). Sneaky!
@@ -265,8 +263,8 @@ Build the toolchain with optimizations, debuginfo, and assertions, using Ninja:
 - macOS:
   ```sh
   utils/build-script --skip-build-benchmarks \
-    --skip-ios --skip-watchos --skip-tvos --skip-xros --swift-darwin-supported-archs "$(uname -m)" \
-    --sccache --release-debuginfo --swift-disable-dead-stripping \
+    --swift-darwin-supported-archs "$(uname -m)" \
+    --release-debuginfo --swift-disable-dead-stripping \
     --bootstrapping=hosttools
   ```
 - Linux:
@@ -311,23 +309,19 @@ You will need to slightly tweak the paths for other build configurations.
   In many situations, there are several errors, so scrolling further back
   and looking at the first error may be more helpful than simply looking
   at the last error.
-- Check if others have encountered the same issue on the [Swift Forums](https://forums.swift.org/c/development/compiler) or on [Swift repository 'Issues' tab][Swift Issues]. Here is a list of threads that describe common issues:
-  * [Problems with `build-script` building compiler with `–xcode`](https://forums.swift.org/t/problems-with-build-script-building-compiler-with-xcode/53477)
-  * [Error building the compiler (even with ninja)](https://forums.swift.org/t/error-building-the-compiler-even-with-ninja/54834)
-  * [Build failure on Apple MacBook Pro with Apple M1 Chip](https://forums.swift.org/t/build-failure-on-apple-silicon-m1-mac-mini/45011)
-  * [CMake cannot compile a test program](https://forums.swift.org/t/build-failure-locally/55695)
-  * [Building Swift compiler from source fails when not using Ninja](https://forums.swift.org/t/building-swift-compiler-from-source-fails-when-not-using-ninja/54656)
-  * [ALL_BUILD Target failing at validation](https://forums.swift.org/t/help-building-swift-in-xcode-error/49728)
-  * [“gtest/gtest.h” not found while compiling the compiler](https://forums.swift.org/t/gtest-gtest-h-not-found-in-typeref-cpp-while-compiling-the-compiler/44399)
-- If you still could not find a solution to your issue, feel free to create a new Swift Forums thread in the [Development/Compiler](https://forums.swift.org/c/development/compiler) category: 
-  - Include information about your configuration and the errors you are seeing.
+- Check if others have encountered the same issue on the
+  [Swift forums][build-script-issues-forums] or in
+  [our issues][build-script-issues-github].
+- If you still could not find a solution to your issue, feel free to create a new Swift forums thread in the [Development/Compiler](https://forums.swift.org/c/development/compiler) category:
+  - Include the command, information about your environment, and the errors
+    you are seeing.
   - You can [create a gist](https://gist.github.com) with the entire build
     output and link it, while highlighting the most important part of the
     build log in the post.
   - Include the output of `utils/update-checkout --dump-hashes`.
 
-[Swift Issues]: https://github.com/swiftlang/swift/issues
-[Swift Forums]: https://forums.swift.org
+[build-script-issues-forums]: https://forums.swift.org/search?q=tags%3Abuild-script%2Bhelp-needed
+[build-script-issues-github]: https://github.com/swiftlang/swift/issues?q=is%3Aissue+label%3Abuild-script+label%3Abug
 
 ## Editing code
 
@@ -367,9 +361,9 @@ whenever the heading is modified.
 This workflow enables you to edit, build, run, and debug in Xcode. The
 following steps assume that you have already [built the toolchain with Ninja](#the-actual-build).
 
-> **Note**  
+> [!NOTE]
 > A seamless LLDB debugging experience requires that your `build-script`
-  invocation for Ninja is tuned to produce build rules for the
+  invocation for Ninja is tuned to generate build rules for the
   [debug variant](#debugging-issues) of the component you intend to debug.
 
 * <p id="generate-xcode">
@@ -382,21 +376,26 @@ following steps assume that you have already [built the toolchain with Ninja](#t
   This can take a few minutes due to metaprogrammed sources that depend on LLVM
   tools that are built from source.
   </p>
-* Create an empty Xcode workspace.
-* Add `build/Xcode-*/swift-macosx-*/Swift.xcodeproj` to the workspace. If Xcode
-  prompts to autocreate schemes, select *Manually Manage Schemes* and don't
-  create any schemes just yet.
+* Create an empty Xcode workspace and open it.
+* Add `build/Xcode-*/swift-macosx-*/Swift.xcodeproj` to the workspace by
+  selecting the Project navigator and choosing
+  *File > Add Files to "\<workspace name>"*.
 
-  This project includes the sources for almost everything in the repository,
-  including the compiler, standard library and runtime. If you intend to work on
-  a compiler subcomponent that is written in Swift and has a `Package.swift`
-  file (e.g. `lib/ASTGen`), first choose *Product > Scheme > Manage Schemes...*
-  and select the *Autocreate schemes* checkbox, then add the package directory
-  to the workspace by choosing *File > Add Files to "\<workspace name>"*. Xcode
-  will automatically create schemes for package manifest.
+  > **Important**\
+  > If upon addition Xcode prompts to autocreate schemes, select *Manually
+    Manage Schemes*.
+
+  This Xcode project includes the sources for almost everything in the
+  repository, including the compiler, standard library and runtime.
+  If you intend to work on a compiler subcomponent that is written in Swift and
+  has a `Package.swift` file, e.g. `lib/ASTGen`, first choose
+  *Product > Scheme > Manage Schemes* and select the *Autocreate schemes*
+  checkbox, then add the package directory to the workspace the same way you
+  added the Xcode project.
+  Xcode will automatically create schemes for the package manifest.
 * Create an Xcode project using the _External Build System_ template, and add
   it to the workspace.
-* Create a target in the new project, using the _External Build System_
+* Create a target in the new Xcode project, using the _External Build System_
   template.
 * In the _Info_ pane of the target settings, set
   * _Build Tool_ to the absolute path of the `ninja` executable (the output of
@@ -706,3 +705,5 @@ If you see mistakes in the documentation (including typos, not just major
 errors) or identify gaps that you could potentially improve the contributing
 experience, please start a discussion on the forums, submit a pull request
 or file a bug report on [Swift repository 'Issues' tab][Swift Issues]. Thanks!
+
+[Swift Issues]: https://github.com/swiftlang/swift/issues

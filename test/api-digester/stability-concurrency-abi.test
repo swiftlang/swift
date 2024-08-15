@@ -118,6 +118,12 @@ Func TaskLocal.withValue(_:operation:file:line:) has parameter 1 type change fro
 Func TaskLocal.withValue(_:operation:file:line:) has parameter 1 type change from () throws -> τ_1_0 to () async throws -> τ_1_0
 Func TaskLocal.withValue(_:operation:file:line:) has parameter 2 type change from Swift.String to (any _Concurrency.Actor)?
 Func TaskLocal.withValue(_:operation:file:line:) has parameter 3 type change from Swift.UInt to Swift.String
+Func withTaskGroup(of:returning:body:) has parameter 2 type change from (inout _Concurrency.TaskGroup<τ_0_0>) async -> τ_0_1 to (any _Concurrency.Actor)?
+Func withThrowingTaskGroup(of:returning:body:) has been renamed to Func withThrowingTaskGroup(of:returning:isolation:body:)
+Func withThrowingTaskGroup(of:returning:body:) has mangled name changing from '_Concurrency.withThrowingTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, body: (inout Swift.ThrowingTaskGroup<A, Swift.Error>) async throws -> B) async throws -> B' to '_Concurrency.withThrowingTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Optional<Swift.Actor>, body: (inout Swift.ThrowingTaskGroup<A, Swift.Error>) async throws -> B) async throws -> B'
+Func withThrowingTaskGroup(of:returning:body:) has parameter 2 type change from (inout _Concurrency.ThrowingTaskGroup<τ_0_0, any Swift.Error>) async throws -> τ_0_1 to (any _Concurrency.Actor)?
+Func withTaskGroup(of:returning:body:) has been renamed to Func withTaskGroup(of:returning:isolation:body:)
+Func withTaskGroup(of:returning:body:) has mangled name changing from '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, body: (inout Swift.TaskGroup<A>) async -> B) async -> B' to '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Optional<Swift.Actor>, body: (inout Swift.TaskGroup<A>) async -> B) async -> B'
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 

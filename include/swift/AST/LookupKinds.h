@@ -60,6 +60,10 @@ enum NLOptions : unsigned {
   /// This lookup should only return macro declarations.
   NL_OnlyMacros = 1 << 8,
 
+  /// Include members that would otherwise be filtered out because they come
+  /// from a module that has not been imported.
+  NL_IgnoreMissingImports = 1 << 9,
+
   /// The default set of options used for qualified name lookup.
   ///
   /// FIXME: Eventually, add NL_ProtocolMembers to this, once all of the

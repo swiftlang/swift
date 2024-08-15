@@ -364,7 +364,7 @@ static bool isStoreCopy(SILValue value) {
     if (summary.innerBorrowKind != InnerBorrowKind::Contained) {
       return true;
     }
-    if (!liveness.isWithinBoundary(storeInst)) {
+    if (!liveness.isWithinBoundary(storeInst, /*deadEndBlocks=*/nullptr)) {
       return true;
     }
     return false;

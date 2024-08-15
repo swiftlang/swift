@@ -442,7 +442,9 @@ bool inhibitsAllocStackHoisting(SILInstruction *I) {
     return Apply->hasSemantics(semantics::AVAILABILITY_OSVERSION);
   }
   if (auto *bi = dyn_cast<BuiltinInst>(I)) {
-    return bi->getBuiltinInfo().ID == BuiltinValueKind::TargetOSVersionAtLeast;
+    return bi->getBuiltinInfo().ID == BuiltinValueKind::TargetOSVersionAtLeast
+        || bi->getBuiltinInfo().ID == BuiltinValueKind::TargetVariantOSVersionAtLeast
+        || bi->getBuiltinInfo().ID == BuiltinValueKind::TargetOSVersionOrVariantOSVersionAtLeast;
   }
   if (isa<HasSymbolInst>(I)) {
     return true;

@@ -191,58 +191,6 @@ TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E,
   return nullptr;
 }
 
-/// Find LHS as if we append binary operator to existing pre-folded expression.
-/// Returns found expression, or \c nullptr if the operator is not applicable.
-///
-/// For example, given '(== R (* A B))':
-/// 'findLHS(DC, expr, "+")' returns '(* A B)'.
-/// 'findLHS(DC, expr, "<<")' returns 'B'.
-/// 'findLHS(DC, expr, '==')' returns nullptr.
-Expr *TypeChecker::findLHS(DeclContext *DC, Expr *E, Identifier name) {
-  auto right = lookupPrecedenceGroupForOperator(DC, name, E->getEndLoc());
-  if (!right)
-    return nullptr;
-
-  while (true) {
-
-    // Look through implicit conversions.
-    if (auto ICE = dyn_cast<ImplicitConversionExpr>(E)) {
-      E = ICE->getSyntacticSubExpr();
-      continue;
-    }
-    if (auto ACE = dyn_cast<AutoClosureExpr>(E)) {
-      E = ACE->getSingleExpressionBody();
-      continue;
-    }
-
-    auto left = lookupPrecedenceGroupForInfixOperator(DC, E, /*diagnose=*/true);
-    if (!left)
-      // LHS is not binary expression.
-      return E;
-    switch (DC->getASTContext().associateInfixOperators(left, right)) {
-      case swift::Associativity::None:
-        return nullptr;
-      case swift::Associativity::Left:
-        return E;
-      case swift::Associativity::Right:
-        break;
-    }
-    // Find the RHS of the current binary expr.
-    if (auto *assignExpr = dyn_cast<AssignExpr>(E)) {
-      E = assignExpr->getSrc();
-    } else if (auto *ternary = dyn_cast<TernaryExpr>(E)) {
-      E = ternary->getElseExpr();
-    } else if (auto *binaryExpr = dyn_cast<BinaryExpr>(E)) {
-      E = binaryExpr->getRHS();
-    } else {
-      // E.g. 'fn() as Int << 2'.
-      // In this case '<<' has higher precedence than 'as', but the LHS should
-      // be 'fn() as Int' instead of 'Int'.
-      return E;
-    }
-  }
-}
-
 // The way we compute isEndOfSequence relies on the assumption that
 // the sequence-folding algorithm never recurses with a prefix of the
 // entire sequence.
@@ -470,12 +418,8 @@ static Expr *foldSequence(DeclContext *DC,
     }
     
     // Pull out the next binary operator.
-    Op op2{S[0], TypeChecker::lookupPrecedenceGroupForInfixOperator(
-                     DC, S[0], /*diagnose=*/true)};
-
-    // If the second operator's precedence is lower than the
-    // precedence bound, break out of the loop.
-    if (!precedenceBound.shouldConsider(op2.precedence)) break;
+    Op op2 = getNextOperator();
+    if (!op2) break;
 
     // If we're missing precedence info for either operator, treat them
     // as non-associative.
@@ -687,6 +631,15 @@ swift::DefaultTypeRequest::evaluate(Evaluator &evaluator,
 }
 
 Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
+  // First resolve any unresolved decl references in operator positions.
+  for (auto i : indices(expr->getElements())) {
+    if (i % 2 == 0)
+      continue;
+    auto *elt = expr->getElement(i);
+    if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(elt))
+      elt = TypeChecker::resolveDeclRefExpr(UDRE, dc);
+    expr->setElement(i, elt);
+  }
   ArrayRef<Expr*> Elts = expr->getElements();
   assert(Elts.size() > 1 && "inadequate number of elements in sequence");
   assert((Elts.size() & 1) == 1 && "even number of elements in sequence");

@@ -244,6 +244,10 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back(inputArgs.MakeArgString(A->getValue()));
   }
 
+  if (const Arg *A = inputArgs.getLastArg(options::OPT_sysroot)) {
+    arguments.push_back("-sysroot");
+    arguments.push_back(inputArgs.MakeArgString(A->getValue()));
+  }
 
   if (llvm::sys::Process::StandardErrHasColors()) {
     arguments.push_back("-color-diagnostics");
@@ -303,6 +307,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_suppress_remarks);
   inputArgs.AddLastArg(arguments, options::OPT_experimental_package_bypass_resilience);
   inputArgs.AddLastArg(arguments, options::OPT_ExperimentalPackageCMO);
+  inputArgs.AddLastArg(arguments, options::OPT_PackageCMO);
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_use);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);

@@ -14,6 +14,9 @@
 
 import ArgumentParser
 import SwiftRemoteMirror
+#if canImport(string_h)
+import string_h
+#endif
 
 struct DumpConcurrency: ParsableCommand {
   static let configuration = CommandConfiguration(
@@ -313,20 +316,20 @@ fileprivate class ConcurrencyDumper {
     let taskToThread: [swift_addr_t: UInt64] =
         Dictionary(threadCurrentTasks.map{ ($1, $0) }, uniquingKeysWith: { $1 })
 
-    var lastChilds: [Bool] = []
+    var lastChildFlags: [Bool] = []
 
     let hierarchy = taskHierarchy()
     for (i, (level, lastChild, task)) in hierarchy.enumerated() {
-      lastChilds.removeSubrange(level...)
-      lastChilds.append(lastChild)
+      lastChildFlags.removeSubrange(level...)
+      lastChildFlags.append(lastChild)
 
       let prevEntry = i > 0 ? hierarchy[i - 1] : nil
 
       let levelDidIncrease = level > (prevEntry?.level ?? -1)
 
       var prefix = ""
-      for lastChild in lastChilds {
-        prefix += lastChild ? "     " : "   | "
+      for lastChildFlag in lastChildFlags {
+        prefix += lastChildFlag ? "     " : "   | "
       }
       prefix += "   "
       let firstPrefix = String(prefix.dropLast(5) + (

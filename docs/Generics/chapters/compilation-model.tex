@@ -148,7 +148,7 @@ Unqualified lookup is an important part of type resolution (\SecRef{identtyperep
 \paragraph{Qualified lookup.}
 A qualified lookup searches in a list of type declarations for a member with the given name. Qualified lookup recursively visits the conformed protocols of each struct, enum and class declaration, and the superclass of each class declaration. If the found member was from a protocol or superclass, we apply a substitution map, which will be described in \SecRef{member type repr}. The primitive operation, which searches inside a single type declaration and its extensions only, is called \index{direct lookup}\emph{direct lookup}  (\SecRef{direct lookup}).
 
-\paragraph{Module lookup.} \IndexDefinition{module lookup}A qualified lookup where the base is a module declaration searches for a top-level declaration in the given module and any other modules that it re-exports via \texttt{@\_exported import}.
+\paragraph{Module lookup.} \IndexDefinition{module lookup}A qualified lookup where the base is a module declaration searches for a top-level declaration in the given module and any other modules that it re-exports via ``\verb|@_exported import|''.
 
 \paragraph{Dynamic lookup.} A qualified lookup whose base is the \texttt{AnyObject} type implements the legacy \index{Objective-C}Objective-C behavior of a message send to \texttt{id}, which can invoke any method defined in any Objective-C class or protocol. In Swift, the so-called \IndexDefinition{AnyObject lookup@\texttt{AnyObject} lookup|see{dynamic lookup}}\IndexDefinition{dynamic lookup}\emph{dynamic lookup} searches a global lookup table constructed to contain all \texttt{@objc} members of all classes and protocols:
 \begin{itemize}
@@ -216,7 +216,7 @@ As explained in the previous section, operator functions are visible globally, e
 \paragraph{Dynamic  lookup.}
 \index{dynamic lookup}
 \index{Objective-C}
-The situation with dynamic lookup is similar, since a method call on a value of type \texttt{AnyObject} must consult a global lookup table constructed from \texttt{@objc} members of classes, and the (implicitly \texttt{@objc}) members of \texttt{@objc} protocols.  Unlike operator functions, classes and \texttt{@objc} protocols are quite common in Swift programs, so it would be unfortunate to penalize compile-time performance when \texttt{AnyObject} is a rarely-used feature. Instead, the solution is to eagerly parse classes and \texttt{@objc} protocols the first time a frontend job encounters a dynamic \texttt{AnyObject} method call.
+The situation with dynamic lookup is similar, since a method call on a value of type \texttt{AnyObject} must consult a global lookup table constructed from \texttt{@objc} members of classes, and the (implicitly \texttt{@objc}) members of \texttt{@objc} protocols.  Unlike operator functions, classes and \texttt{@objc} protocols are quite common in Swift programs, however \texttt{AnyObject} lookup itself is rarely used. The first time a frontend job encounters a dynamic \texttt{AnyObject} method call, all class bodies flagged as potentially containing \texttt{@objc} methods are eagerly parsed.
 
 There's actually one more complication here. Classes can be nested inside of other types, whose bodies are skipped if they appear in a secondary file. This is resolved with the same trick as operator lookup. When skipping the body of a type, the parser looks for occurrences of the ``\texttt{class}'' keyword. If the body contains this keyword, this type is parsed and its members visited recursively when building the \texttt{AnyObject} global lookup table.
 
@@ -273,7 +273,7 @@ For this reason, we want to minimize time spent type checking declarations in se
 
 Thus, the work of type checking is split up into small, fine-grained \IndexDefinition{request}\emph{requests} which are evaluated on demand, instead of sequentially. There is still a semantic analysis pass that visits the declarations of each primary file in source order, but it merely kicks off requests and emits diagnostics.
 
-Concretely, the request evaluator is a framework for performing queries performed against the \index{abstract syntax tree}abstract syntax tree. A \emph{request} packages a list of input parameters together with an \IndexDefinition{evaluation function}\emph{evaluation function}. With the exception of emitting diagnostics, the evaluation function should be referentially transparent. Only the request evaluator should directly invoke the evaluation function; the request evaluator caches the result of the evaluation function for subsequent requests. The request evaluator also detects request cycles automatically, and tracks dependency information for incremental builds.
+Concretely, a \emph{request} packages a list of input parameters together with an \IndexDefinition{evaluation function}\emph{evaluation function}. With the exception of emitting diagnostics, the request function's result should only depend on those inputs, and the results of other requests. The request evaluator directly invokes the evaluation function, and caches the result. Clients only evaluate the request via the request evaluator framework, which returns the cached value if present, detects request cycles automatically, and tracks dependency information for incremental builds.
 
 \IndexDefinition{type-check source file request}
 \IndexDefinition{AST lowering request}
@@ -281,7 +281,7 @@ Concretely, the request evaluator is a framework for performing queries performe
 \index{generic signature request}
 \IndexDefinition{qualified lookup request}
 \IndexDefinition{unqualified lookup request}
-The Swift frontend defines several hundred request kinds; for our purposes, the most important are:
+The Swift frontend defines hundreds of request kinds; for our purposes, the most important ones are:
 \begin{itemize}
 \item The \Request{type-check source file request} visits each declaration in a primary source file. It is responsible for kicking off enough requests to ensure that SILGen can proceed if all requests succeeded without emitting diagnostics.
 \item The \Request{AST lowering request} is the entry point into \index{SILGen}SILGen, generating SIL from the abstract syntax tree for a source file.

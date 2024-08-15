@@ -17,6 +17,8 @@
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
+#elseif canImport(Bionic)
+import Bionic
 #elseif canImport(Musl)
 import Musl
 #elseif canImport(ucrt)
@@ -67,11 +69,11 @@ public func handleMessage(
 
 /// Singleton "plugin server".
 struct InProcPluginServer {
-  private let handler: CompilerPluginMessageHandler<LibraryPluginProvider>
+  private let handler: PluginProviderMessageHandler<LibraryPluginProvider>
 
   @MainActor
   private init() {
-    self.handler = CompilerPluginMessageHandler(
+    self.handler = PluginProviderMessageHandler(
       provider: LibraryPluginProvider.shared
     )
   }

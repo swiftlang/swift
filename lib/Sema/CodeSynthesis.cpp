@@ -24,6 +24,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Availability.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1152,7 +1153,8 @@ static void collectNonOveriddenSuperclassInits(
   superclassDecl->synthesizeSemanticMembersIfNeeded(
     DeclBaseName::createConstructor());
 
-  NLOptions subOptions = (NL_QualifiedDefault | NL_IgnoreAccessControl);
+  NLOptions subOptions =
+      (NL_QualifiedDefault | NL_IgnoreAccessControl | NL_IgnoreMissingImports);
   SmallVector<ValueDecl *, 4> lookupResults;
   subclass->lookupQualified(
       superclassDecl, DeclNameRef::createConstructor(),
@@ -1380,8 +1382,7 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
       return false;
 
     auto targetType = target->getDeclaredInterfaceType();
-    auto ref = ModuleDecl::lookupConformance(
-        targetType, protocol);
+    auto ref = lookupConformance(targetType, protocol);
     if (ref.isInvalid()) {
       return false;
     }

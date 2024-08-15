@@ -347,6 +347,9 @@ static DetailedTaskDescription constructDetailedTaskDescription(
     ArrayRef<const char *> Args, bool isEmitModuleOnly = false) {
   // Command line and arguments
   std::string Executable = Invocation.getFrontendOptions().MainExecutablePath;
+  // If main executable path is never set, use `swift-frontend` as placeholder.
+  if (Executable.empty())
+    Executable = "swift-frontend";
   SmallVector<std::string, 16> Arguments;
   std::string CommandLine;
   SmallVector<CommandInput, 4> Inputs;

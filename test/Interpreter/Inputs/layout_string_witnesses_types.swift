@@ -620,13 +620,45 @@ public enum MultiPayloadError {
 }
 
 public enum TwoPayloadInner {
-    case x(AnyObject)
-    case y(Int)
+    case x(Int)
+    case y(AnyObject)
 }
 
 public enum TwoPayloadOuter {
     case x(Int)
     case y(TwoPayloadInner)
+}
+
+public enum OneExtraTagValue {
+    public enum E0 {
+        case a(Bool)
+        case b(Bool)
+    }
+
+    public enum E1 {
+        case a(E0)
+        case b(Bool)
+    }
+    public enum E2 {
+        case a(E1)
+        case b(Bool)
+    }
+    public enum E3 {
+        case a(E2)
+        case b(Bool)
+    }
+
+    public enum E4 {
+        case a(E3)
+        case b(Bool)
+    }
+
+    case x0(E4, Int8, Int16, Int32)
+    case x1(E4, Int8, Int16, Int32)
+    case x2(E4, Int8, Int16, Int32)
+    case x3(E4, Int8, Int16, Int32)
+    case y(SimpleClass)
+    case z
 }
 
 @inline(never)

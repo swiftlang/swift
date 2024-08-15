@@ -12,7 +12,7 @@
 
 // RUN: %target-swift-frontend -typecheck %t/ClientDefault.swift -I %t -swift-version 5 -package-name mypkg -verify
 
-// RUN: %target-swift-frontend -typecheck %t/ClientOptimized.swift -I %t -swift-version 5 -package-name mypkg -experimental-package-bypass-resilience -verify
+// RUN: %target-swift-frontend -typecheck %t/ClientDefault.swift -I %t -swift-version 5 -package-name mypkg -experimental-package-bypass-resilience -verify
 
 //--- Utils.swift
 
@@ -163,63 +163,3 @@ public func k(_ arg: FrozenPublicEnum) -> Int {
   }
 }
 
-
-//--- ClientOptimized.swift
-import Utils
-
-// With optimization enabled to bypass resilience checks within
-// a package boundary, public (non-frozen) or package (non-frozen)
-// enums no longer require `@unknown default` in switch stmts.
-package func f(_ arg: PkgEnum) -> Int {
-  switch arg { // no-warning
-  case .one:
-    return 1
-  case .two(let val):
-    return 2 + val
-  }
-}
-
-package func m(_ arg: FrozenPkgEnum) -> Int {
-  switch arg { // no-warning
-  case .one:
-    return 1
-  case .two(let val):
-    return 2 + val
-  }
-}
-
-package func n(_ arg: FrozenUfiPkgEnum) -> Int {
-  switch arg { // no-warning
-  case .one:
-    return 1
-  case .two(let val):
-    return 2 + val
-  }
-}
-
-package func g(_ arg: UfiPkgEnum) -> Int {
-  switch arg { // no-warning
-  case .one:
-    return 1
-  case .two(let val):
-    return 2 + val
-  }
-}
-
-public func h(_ arg: PublicEnum) -> Int {
-  switch arg { // no-warning
-  case .one:
-    return 1
-  case .two(let val):
-    return 2 + val
-  }
-}
-
-public func k(_ arg: FrozenPublicEnum) -> Int {
-  switch arg { // no-warning
-  case .one:
-    return 1
-  case .two(let val):
-    return 2 + val
-  }
-}

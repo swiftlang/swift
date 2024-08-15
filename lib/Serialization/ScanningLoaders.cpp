@@ -154,13 +154,13 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
       realModuleName.str(), moduleInterfacePath.str(), sdkPath,
       StringRef(), SourceLoc(),
       [&](ASTContext &Ctx, ModuleDecl *mainMod, ArrayRef<StringRef> BaseArgs,
-          ArrayRef<StringRef> PCMArgs, StringRef Hash) {
+          ArrayRef<StringRef> PCMArgs, StringRef Hash, StringRef UserModVer) {
         assert(mainMod);
         std::string InPath = moduleInterfacePath.str();
         auto compiledCandidates =
             getCompiledCandidates(Ctx, realModuleName.str(), InPath);
         if (!compiledCandidates.empty() &&
-            !Ctx.SearchPathOpts.NoScannerModuleValidation) {
+            Ctx.SearchPathOpts.ScannerModuleValidation) {
           assert(compiledCandidates.size() == 1 &&
                  "Should only have 1 candidate module");
           auto BinaryDep = scanModuleFile(compiledCandidates[0], isFramework,
@@ -247,7 +247,7 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
         Result = ModuleDependencyInfo::forSwiftInterfaceModule(
             outputPathBase.str().str(), InPath, compiledCandidatesRefs,
             ArgsRefs, linkLibraries, PCMArgs, Hash, isFramework, isStatic, {},
-            /*module-cache-key*/ "");
+            /*module-cache-key*/ "", UserModVer);
 
         if (Ctx.CASOpts.EnableCaching) {
           std::vector<std::string> clangDependencyFiles;

@@ -89,6 +89,10 @@ enum class SendableCheckReason {
 /// overridden declaration.
 void checkOverrideActorIsolation(ValueDecl *value);
 
+/// Diagnose global state that is not either immutable plus Sendable or isolated
+/// to a global actor.
+void checkGlobalIsolation(VarDecl *var);
+
 /// Determine whether the given context requires strict concurrency checking,
 /// e.g., because it uses concurrency features directly or because it's in
 /// code where strict checking has been enabled.
@@ -643,11 +647,6 @@ bool isLetAccessibleAnywhere(const ModuleDecl *fromModule,
 bool isPotentiallyIsolatedActor(
     VarDecl *var, llvm::function_ref<bool(ParamDecl *)> isIsolated =
                       [](ParamDecl *P) { return P->isIsolated(); });
-
-/// Check whether the given ApplyExpr makes an unsatisfied isolation jump
-/// and if so, emit diagnostics for any nonsendable arguments to the apply
-bool diagnoseApplyArgSendability(
-    swift::ApplyExpr *apply, const DeclContext *declContext);
 
 /// If the enclosing function has @_unsafeInheritExecutorAttr, return it.
 AbstractFunctionDecl *enclosingUnsafeInheritsExecutor(const DeclContext *dc);
