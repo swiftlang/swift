@@ -10,12 +10,6 @@
 #
 #===----------------------------------------------------------------------===#
 
-if(SWIFT_BUILD_SDK_OVERLAY)
-set(swift_distributed_darwin_dependencies Darwin)
-else()
-set(swift_distributed_darwin_dependencies)
-endif()
-
 set(swift_distributed_link_libraries
   swiftCore)
 
@@ -30,10 +24,6 @@ add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
   DistributedMetadata.swift
   LocalTestingDistributedActorSystem.swift
 
-  SWIFT_MODULE_DEPENDS_IOS ${swift_distributed_darwin_dependencies}
-  SWIFT_MODULE_DEPENDS_OSX ${swift_distributed_darwin_dependencies}
-  SWIFT_MODULE_DEPENDS_TVOS ${swift_distributed_darwin_dependencies}
-  SWIFT_MODULE_DEPENDS_WATCHOS ${swift_distributed_darwin_dependencies}
   SWIFT_MODULE_DEPENDS_ANDROID Android
   SWIFT_MODULE_DEPENDS_LINUX Glibc
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc

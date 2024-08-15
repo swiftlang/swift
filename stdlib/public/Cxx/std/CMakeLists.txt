@@ -19,15 +19,6 @@ add_dependencies(sdk-overlay CxxStdlib-apinotes)
 add_dependencies(compiler CxxStdlib-apinotes)
 
 
-# Swift compiler currently assumes that the Darwin overlay is a dependency of
-# CxxStdlib, and fails to build CxxStdlib if Darwin.swiftmodule in build dir
-# is built with a different (older) version of the compiler. To workaround this,
-# declare the Darwin overlay as a dependency of CxxStdlib.
-set(swift_cxxstdlib_darwin_dependencies)
-if(SWIFT_BUILD_STDLIB AND SWIFT_BUILD_SDK_OVERLAY)
-  set(swift_cxxstdlib_darwin_dependencies Darwin)
-endif()
-
 #
 # C++ Standard Library Overlay.
 #
@@ -39,12 +30,6 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     String.swift
 
     SWIFT_MODULE_DEPENDS Cxx
-    SWIFT_MODULE_DEPENDS_IOS ${swift_cxxstdlib_darwin_dependencies}
-    SWIFT_MODULE_DEPENDS_OSX ${swift_cxxstdlib_darwin_dependencies}
-    SWIFT_MODULE_DEPENDS_TVOS ${swift_cxxstdlib_darwin_dependencies}
-    SWIFT_MODULE_DEPENDS_WATCHOS ${swift_cxxstdlib_darwin_dependencies}
-    SWIFT_MODULE_DEPENDS_XROS ${swift_cxxstdlib_darwin_dependencies}
-    SWIFT_MODULE_DEPENDS_MACCATALYST ${swift_cxxstdlib_darwin_dependencies}
     SWIFT_MODULE_DEPENDS_ANDROID Android
 
     SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}

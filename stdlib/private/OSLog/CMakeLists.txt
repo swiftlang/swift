@@ -1,7 +1,4 @@
 set(swift_oslog_darwin_dependencies "")
-if(SWIFT_BUILD_SDK_OVERLAY)
-    list(APPEND swift_oslog_darwin_dependencies "Darwin")
-endif()
 if (SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
     list(APPEND swift_oslog_darwin_dependencies "_Concurrency")
 endif()

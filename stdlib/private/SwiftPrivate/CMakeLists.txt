@@ -2,12 +2,6 @@ set(swift_swiftprivate_compile_flags
     "-parse-stdlib"
     "-Xfrontend" "-disable-access-control")
 
-if(SWIFT_BUILD_SDK_OVERLAY)
-set(swift_swiftprivate_darwin_dependencies Darwin)
-else()
-set(swift_swiftprivate_darwin_dependencies)
-endif()
-
 add_swift_target_library(swiftSwiftPrivate ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the
   # filename.
@@ -21,11 +15,6 @@ add_swift_target_library(swiftSwiftPrivate ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   GYB_SOURCES
     AtomicInt.swift.gyb
 
-  SWIFT_MODULE_DEPENDS_OSX ${swift_swiftprivate_darwin_dependencies}
-  SWIFT_MODULE_DEPENDS_IOS ${swift_swiftprivate_darwin_dependencies}
-  SWIFT_MODULE_DEPENDS_TVOS ${swift_swiftprivate_darwin_dependencies}
-  SWIFT_MODULE_DEPENDS_WATCHOS ${swift_swiftprivate_darwin_dependencies}
-  SWIFT_MODULE_DEPENDS_MACCATALYST ${swift_swiftprivate_darwin_dependencies}
   SWIFT_MODULE_DEPENDS_FREESTANDING "${SWIFT_FREESTANDING_TEST_DEPENDENCIES}"
   SWIFT_MODULE_DEPENDS_ANDROID Android
   SWIFT_MODULE_DEPENDS_LINUX Glibc

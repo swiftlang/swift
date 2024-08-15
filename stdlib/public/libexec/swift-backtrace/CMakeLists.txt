@@ -1,12 +1,10 @@
 # If we're building overlays, make sure we mention the ones we need.
 # Otherwise, assume they already exist.
-set(darwin)
 set(wincrt_sdk)
 set(glibc)
 set(musl)
 
 if(SWIFT_BUILD_SDK_OVERLAY)
-  set(darwin Darwin)
   set(wincrt_sdk CRT WinSDK)
   set(glibc Glibc)
   set(musl Musl)
@@ -51,7 +49,6 @@ add_swift_target_executable(swift-backtrace BUILD_WITH_LIBEXEC
 
   SWIFT_MODULE_DEPENDS         ${backtracing}
 
-  SWIFT_MODULE_DEPENDS_OSX          ${darwin}
   SWIFT_MODULE_DEPENDS_WINDOWS      ${wincrt_sdk}
   SWIFT_MODULE_DEPENDS_LINUX        ${glibc}
   SWIFT_MODULE_DEPENDS_LINUX_STATIC ${musl}
@@ -80,7 +77,6 @@ if(static_target_sdks)
 
     SWIFT_MODULE_DEPENDS         ${backtracing}
 
-    SWIFT_MODULE_DEPENDS_OSX          ${darwin}
     SWIFT_MODULE_DEPENDS_WINDOWS      ${wincrt_sdk}
     SWIFT_MODULE_DEPENDS_LINUX        ${glibc}
     SWIFT_MODULE_DEPENDS_LINUX_STATIC ${musl}

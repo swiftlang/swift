@@ -38,7 +38,7 @@ if(swift_build_freestanding AND (SWIFT_FREESTANDING_FLAVOR STREQUAL "apple"))
   configure_target_variant(FREESTANDING-R  "FREESTANDING Release"         FREESTANDING R  "Release")
   configure_target_variant(FREESTANDING-S  "FREESTANDING MinSizeRelease"  FREESTANDING S  "MinSizeRelease")
 
-  set(SWIFT_FREESTANDING_TEST_DEPENDENCIES "Darwin")
+  set(SWIFT_FREESTANDING_TEST_DEPENDENCIES "")
 endif()
 
 # Compatible cross-compile SDKS for Darwin OSes: IOS, IOS_SIMULATOR, TVOS,
