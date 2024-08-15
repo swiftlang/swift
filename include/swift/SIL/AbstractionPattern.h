@@ -1549,13 +1549,9 @@ public:
   /// type, return the abstraction pattern for one of its argument types.
   AbstractionPattern getParameterizedProtocolArgType(unsigned i) const;
 
-  /// Given that the value being abstracted is a yield result type,
-  /// return the abstraction pattern for corresponding type.
-  AbstractionPattern getYieldResultType() const;
-
   /// Given that the value being abstracted is a function, return the
   /// abstraction pattern for its result type.
-  AbstractionPattern getFunctionResultType() const;
+  AbstractionPattern getFunctionResultType(bool withoutYields = false) const;
 
   /// Given that the value being abstracted is a function, return the
   /// abstraction pattern for its thrown error type.

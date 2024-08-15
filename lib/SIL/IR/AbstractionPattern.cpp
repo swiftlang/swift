@@ -1085,13 +1085,6 @@ AbstractionPattern::getParameterizedProtocolArgType(unsigned argIndex) const {
             cast<ParameterizedProtocolType>(getType()).getArgs()[argIndex]);
 }
 
-AbstractionPattern AbstractionPattern::getYieldResultType() const {
-  assert(getKind() == Kind::Type);
-  return AbstractionPattern(getGenericSubstitutions(),
-                            getGenericSignature(),
-                            cast<YieldResultType>(getType()).getResultType());
-}
-
 AbstractionPattern AbstractionPattern::removingMoveOnlyWrapper() const {
   switch (getKind()) {
   case Kind::Invalid:
@@ -1227,11 +1220,15 @@ AbstractionPattern::getCXXMethodSelfPattern(CanType selfType) const {
       getGenericSignatureForFunctionComponent(), selfType);
 }
 
-static CanType getResultType(CanType type) {
-  return cast<AnyFunctionType>(type).getResult();
+static CanType getResultType(CanType type, bool withoutYields) {
+  auto aft = cast<AnyFunctionType>(type);
+  if (withoutYields)
+    aft = CanAnyFunctionType(aft->getWithoutYields());
+  
+  return aft.getResult();
 }
 
-AbstractionPattern AbstractionPattern::getFunctionResultType() const {
+AbstractionPattern AbstractionPattern::getFunctionResultType(bool withoutYields) const {
   switch (getKind()) {
   case Kind::Invalid:
     llvm_unreachable("querying invalid abstraction pattern!");
@@ -1245,7 +1242,7 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
       return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSubstitutions(),
                               getGenericSignatureForFunctionComponent(),
-                              getResultType(getType()));
+                              getResultType(getType(), withoutYields));
   case Kind::Discard:
     llvm_unreachable("don't need to discard function abstractions yet");
   case Kind::ClangType:
@@ -1255,33 +1252,34 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
     auto clangFunctionType = getClangFunctionType(getClangType());
     return AbstractionPattern(getGenericSubstitutions(),
                               getGenericSignatureForFunctionComponent(),
-                              getResultType(getType()),
+                              getResultType(getType(), withoutYields),
                               clangFunctionType->getReturnType().getTypePtr());    
   }
   case Kind::CXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
     return AbstractionPattern(getGenericSubstitutions(),
                               getGenericSignatureForFunctionComponent(),
-                              getResultType(getType()),
+                              getResultType(getType(), withoutYields),
                               getCXXMethod()->getReturnType().getTypePtr());
   case Kind::CurriedObjCMethodType:
     return getPartialCurriedObjCMethod(
                               getGenericSubstitutions(),
                               getGenericSignatureForFunctionComponent(),
-                              getResultType(getType()),
+                              getResultType(getType(), withoutYields),
                               getObjCMethod(),
                               getEncodedForeignInfo());
   case Kind::CurriedCFunctionAsMethodType:
     return getPartialCurriedCFunctionAsMethod(
                                       getGenericSubstitutions(),
                                       getGenericSignatureForFunctionComponent(),
-                                      getResultType(getType()),
+                                      getResultType(getType(), withoutYields),
                                       getClangType(),
                                       getImportAsMemberStatus());
   case Kind::CurriedCXXMethodType:
     return getPartialCurriedCXXMethod(getGenericSubstitutions(),
                                       getGenericSignatureForFunctionComponent(),
-                                      getResultType(getType()), getCXXMethod(),
+                                      getResultType(getType(), withoutYields),
+                                      getCXXMethod(),
                                       getImportAsMemberStatus());
   case Kind::PartialCurriedObjCMethodType:
   case Kind::ObjCMethodType: {
@@ -1338,7 +1336,8 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
         
         return AbstractionPattern(getGenericSubstitutions(),
                                   getGenericSignatureForFunctionComponent(),
-                                  getResultType(getType()), clangResultType);
+                                  getResultType(getType(), withoutYields),
+                                  clangResultType);
       }
           
       default:
@@ -1348,14 +1347,15 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
         return AbstractionPattern::getObjCCompletionHandlerArgumentsType(
                       getGenericSubstitutions(),
                       getGenericSignatureForFunctionComponent(),
-                      getResultType(getType()), callbackParamTy,
+                      getResultType(getType(), withoutYields),
+                      callbackParamTy,
                       getEncodedForeignInfo());
       }
     }
     
     return AbstractionPattern(getGenericSubstitutions(),
                               getGenericSignatureForFunctionComponent(),
-                              getResultType(getType()),
+                              getResultType(getType(), withoutYields),
                               getObjCMethod()->getReturnType().getTypePtr());
   }
   case Kind::OpaqueFunction:
@@ -2828,13 +2828,6 @@ public:
     llvm_unreachable("shouldn't encounter pack element by itself");
   }
 
-  CanType visitYieldResultType(CanYieldResultType yield,
-                               AbstractionPattern pattern) {
-    auto resultType = visit(yield.getResultType(), pattern.getYieldResultType());
-    return YieldResultType::get(resultType, yield->isInOut())
-      ->getCanonicalType();
-  }
-
   CanType handlePackExpansion(AbstractionPattern origExpansion,
                               CanType candidateSubstType) {
     // When we're within a pack expansion, pack references matching that
@@ -3011,10 +3004,9 @@ public:
         addParam(param.getOrigFlags(), expansionType);
       }
     });
-    
-    if (yieldType) {
+
+    if (yieldType)
       substYieldType = visit(yieldType, yieldPattern);
-    }
 
     CanType newErrorType;
 
@@ -3024,8 +3016,8 @@ public:
       newErrorType = visit(errorType, errorPattern);
     }
 
-    auto newResultTy = visit(func.getResult(),
-                             pattern.getFunctionResultType());
+    auto newResultTy = visit(func->getWithoutYields()->getResult()->getCanonicalType(),
+                             pattern.getFunctionResultType(/* withoutYields */ true));
 
     std::optional<FunctionType::ExtInfo> extInfo;
     if (func->hasExtInfo())
@@ -3036,6 +3028,10 @@ public:
         extInfo = FunctionType::ExtInfo();
       extInfo = extInfo->withThrows(true, newErrorType);
     }
+
+    // Yields were substituted separately
+    if (extInfo)
+      extInfo = extInfo->withCoroutine(false);
 
     return CanFunctionType::get(FunctionType::CanParamArrayRef(newParams),
                                 newResultTy, extInfo);
