@@ -16,6 +16,8 @@
 // RUN:   -sil-verify-all -module-name=test -emit-sil \
 // RUN:       | %FileCheck --check-prefix CHECK-DISABLED %s
 
+// UNSUPPORTED: CPU=armv7k
+
 // CHECK-DISABLED-NOT: normal_count
 
 enum MyError: Error { case err }
