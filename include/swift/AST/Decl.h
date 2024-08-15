@@ -4741,6 +4741,15 @@ public:
   /// \sa isEffectivelyExhaustive
   bool isFormallyExhaustive(const DeclContext *useDC) const;
 
+  /// True if \s isFormallyExhaustive is true or the use site's module belongs
+  /// to the same package as this enum's defining module. If in same package
+  /// even though `isFormallyExhaustive` is false, we can skip requiring
+  /// `@unknown default` at the use site switch stmts because package modules
+  /// are expected to be built together whether they are resiliently built or
+  /// not. Used for diagnostics during typechecks only; if
+  /// `isFormallyExhaustive` is false, it should be reflected in SILgen.
+  bool treatAsExhaustiveForDiags(const DeclContext *useDC) const;
+
   /// True if the enum can be exhaustively switched within a function defined
   /// within \p M, with \p expansion specifying whether the function is
   /// inlinable.
