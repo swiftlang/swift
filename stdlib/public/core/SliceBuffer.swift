@@ -430,12 +430,24 @@ internal struct _SliceBuffer<Element>
   internal typealias Indices = Range<Int>
 
   //===--- misc -----------------------------------------------------------===//
+  // Superseded by the typed-throws version of this function, but retained
+  // for ABI reasons.
+  @inlinable
+  @_silgen_name("$ss12_SliceBufferV010withUnsafeB7Pointeryqd__qd__SRyxGKXEKlF")
+  internal func __abi_withUnsafeBufferPointer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R {
+    defer { _fixLifetime(self) }
+    return try body(UnsafeBufferPointer(start: firstElementAddress,
+      count: count))
+  }
+
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.
   @inlinable
-  internal func withUnsafeBufferPointer<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R {
+  internal func withUnsafeBufferPointer<R, E>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R {
     defer { _fixLifetime(self) }
     return try body(UnsafeBufferPointer(start: firstElementAddress,
       count: count))
