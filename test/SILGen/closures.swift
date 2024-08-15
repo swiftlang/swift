@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-emit-silgen -module-name closures -parse-stdlib -parse-as-library %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -module-name closures -parse-stdlib -parse-as-library  %s | %FileCheck %s --check-prefix=GUARANTEED
+// RUN: %target-swift-emit-silgen -module-name closures -parse-stdlib -parse-as-library %s -enable-experimental-feature ValueGenerics | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name closures -parse-stdlib -parse-as-library %s -enable-experimental-feature ValueGenerics | %FileCheck %s --check-prefix=GUARANTEED
 
 import Swift
 
@@ -875,3 +875,11 @@ func test() {
     assert(k.x == k2.x)
 }
 
+struct ValueGenericType<let N: Int> {
+  // CHECK-LABEL: @$s8closures16ValueGenericTypeV9somethingSiycyFSiycfU_ : $@convention(thin) <let N : Int> () -> Int
+  // CHECK: type_value $Int for N
+  // CHECK-NOT: type_value $Int for @error_type N
+  func something() -> (() -> Int) {
+    { N }
+  }
+}
