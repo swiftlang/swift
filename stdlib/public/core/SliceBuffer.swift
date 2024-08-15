@@ -445,6 +445,7 @@ internal struct _SliceBuffer<Element>
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.
   @inlinable
+  @_alwaysEmitIntoClient
   internal func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {

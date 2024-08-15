@@ -586,6 +586,7 @@ extension _ArrayBuffer {
   /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
   @inlinable
+  @_alwaysEmitIntoClient
   internal func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
