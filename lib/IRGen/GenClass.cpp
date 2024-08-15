@@ -1447,7 +1447,7 @@ namespace {
     llvm::Constant *getClassMetadataRef() {
       auto *theClass = getClass();
 
-      // If this is truly an imported ObjC class, with no @_objcImplementation,
+      // If this is truly an imported ObjC class, with no @implementation,
       // someone else will emit the ObjC metadata symbol and we simply want to
       // use it.
       if (theClass->hasClangNode() && !theClass->getImplementationDecl())

@@ -3738,7 +3738,7 @@ public:
       }
     }
 
-    TypeChecker::checkObjCImplementation(FD);
+    TypeChecker::checkImplementationAttr(FD);
   }
 
   void visitModuleDecl(ModuleDecl *) { }
@@ -3997,7 +3997,7 @@ public:
       // FIXME: Should we duplicate any other logic from visitClassDecl()?
     }
 
-    TypeChecker::checkObjCImplementation(ED);
+    TypeChecker::checkImplementationAttr(ED);
 
     for (Decl *Member : ED->getMembers())
       visit(Member);
@@ -4181,7 +4181,7 @@ public:
     checkDefaultArguments(CD->getParameters());
     checkVariadicParameters(CD->getParameters(), CD);
 
-    TypeChecker::checkObjCImplementation(CD);
+    TypeChecker::checkImplementationAttr(CD);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {

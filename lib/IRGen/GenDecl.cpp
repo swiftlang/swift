@@ -5147,13 +5147,13 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   unsigned adjustmentIndex = MetadataAdjustmentIndex::ValueType;
 
   if (auto nominal = concreteType->getAnyNominal()) {
-    // Keep type metadata around for all types (except @_objcImplementation,
+    // Keep type metadata around for all types (except @objc @implementation,
     // since we're using ObjC metadata for that).
     if (!isObjCImpl)
       addRuntimeResolvableType(nominal);
 
-    // Don't define the alias for foreign type metadata, prespecialized
-    // generic metadata, or @_objcImplementation classes, since they're not ABI.
+    // Don't define the alias for foreign type metadata, prespecialized generic
+    // metadata, or @objc @implementation classes, since they're not ABI.
     if (requiresForeignTypeMetadata(nominal) || isPrespecialized || isObjCImpl)
       return var;
 
@@ -5803,7 +5803,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     return;
 
   if (ext->isImplementation() && ext->getObjCCategoryName().empty()) {
-    // This is the @_objcImplementation for the class--generate its class
+    // This is the @objc @implementation for the class--generate its class
     // metadata.
     emitClassDecl(origClass);
   } else if (shouldEmitCategory(*this, ext)) {

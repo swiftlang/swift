@@ -4745,9 +4745,10 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Checks that all of a class's \c \@objcImplementation extensions provide
-/// complete and correct implementations for their corresponding interfaces.
-/// This is done on all of a class's implementations at once to improve diagnostics.
+/// Checks that a decl using \c \@implementation  provides a complete and
+/// correct implementation of its corresponding interface. For
+/// \c \@implementation extensions, this includes checking its member
+/// implementations.
 class TypeCheckImplementationRequest
     : public SimpleRequest<TypeCheckImplementationRequest,
                            evaluator::SideEffect(Decl *),

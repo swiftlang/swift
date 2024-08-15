@@ -2852,7 +2852,7 @@ static bool hasExposeAttr(const ValueDecl *VD) {
   return false;
 }
 
-/// Skip \c \@objcImplementation functions, \c extension member
+/// Skip \c @implementation functions, \c extension member
 /// implementations, and overrides. They are already declared in handwritten
 /// headers, and they may have attributes that aren't allowed in a category.
 ///

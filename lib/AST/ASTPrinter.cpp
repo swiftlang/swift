@@ -267,7 +267,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
             return false;
         }
 
-        // Skip member implementations and @objc overrides in @objcImpl
+        // Skip member implementations and @objc overrides in @implementation
         // extensions.
         if (VD->isObjCMemberImplementation()
             || (isInObjCImpl(VD) && VD->getOverriddenDecl() && VD->isObjC())) {
@@ -1228,7 +1228,7 @@ void PrintAST::printAttributes(const Decl *D) {
     if (auto vd = dyn_cast<VarDecl>(D)) {
       // Don't print @_hasInitialValue if we're printing an initializer
       // expression, if the storage is resilient, or if it's in an
-      // @objcImplementation extension (where final properties should appear
+      // @implementation extension (where final properties should appear
       // computed).
       if (vd->isInitExposedToClients() || vd->isResilient() || isInObjCImpl(vd))
         Options.ExcludeAttrList.push_back(DeclAttrKind::HasInitialValue);
@@ -2329,7 +2329,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   // Don't print accessors for trivially stored properties...
   if (impl.isSimpleStored()) {
     // ...unless we're printing for SIL, which expects a { get set? } on
-    //    trivial properties, or in an @objcImpl extension, which treats
+    //    trivial properties, or in an @implementation extension, which treats
     //    final stored properties as computed.
     if (Options.PrintForSIL || isInObjCImpl(ASD)) {
       Printer << " { get " << (impl.supportsMutation() ? "set }" : "}");

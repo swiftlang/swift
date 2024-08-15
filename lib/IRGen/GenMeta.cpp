@@ -3032,7 +3032,7 @@ emitInitializeFieldOffsetVector(SILType T, llvm::Value *metadata,
     case ClassMetadataStrategy::Singleton:
       // Call swift_initClassMetadata().
       assert(fieldVector && "Singleton/Resilient strategies not supported for "
-                            "objcImplementation");
+                            "@objc @implementation");
       dependency = Builder.CreateCall(
             IGM.getInitClassMetadata2FunctionPointer(),
             {metadata, IGM.getSize(Size(uintptr_t(flags))), numFieldsV,
@@ -4324,7 +4324,7 @@ namespace {
     llvm::Constant *getROData() { return emitClassPrivateData(IGM, Target); }
 
     uint64_t getClassDataPointerHasSwiftMetadataBits() {
-      // objcImpl classes should not have the Swift bit set.
+      // @objc @implementation classes should not have the Swift bit set.
       if (isPureObjC())
         return 0;
       return IGM.UseDarwinPreStableABIBit ? 1 : 2;
@@ -4548,7 +4548,8 @@ namespace {
 
     void layout() {
       assert(!FieldLayout.hasObjCImplementation()
-                && "Resilient class metadata not supported for @objcImpl");
+                && "Resilient class metadata not supported for "
+                   "@objc @implementation");
       emitNominalTypeDescriptor();
 
       addRelocationFunction();
@@ -4643,10 +4644,10 @@ namespace {
     }
 
     void layoutHeader() {
-      // @_objcImplementation on true (non-ObjC) generic classes doesn't make
+      // @objc @implementation on true (non-ObjC) generic classes doesn't make
       // much sense, and we haven't updated this builder to handle it.
       assert(!FieldLayout.hasObjCImplementation()
-             && "Generic metadata not supported for @objcImpl");
+             && "Generic metadata not supported for @objc @implementation");
 
       super::layoutHeader();
 

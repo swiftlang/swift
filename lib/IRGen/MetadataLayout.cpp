@@ -283,7 +283,7 @@ Address irgen::emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
                                               NominalTypeDecl *decl) {
   assert(!isa<ClassDecl>(decl)
             || !cast<ClassDecl>(decl)->getImplementationDecl()
-                && "objcImpl classes don't have a field offset vector");
+         && "@objc @implementation classes don't have a field offset vector");
 
   auto &layout = IGF.IGM.getMetadataLayout(decl);
   auto offset = [&]() {

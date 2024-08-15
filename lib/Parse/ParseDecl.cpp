@@ -10080,7 +10080,7 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   // extensions that provide objc implementations.
   //
   // Later in the type checker, we validate that structs/enums are noncopyable
-  // and that @objcImplementations are main-body.
+  // and that @objc @implementations are main-body.
   auto rejectDestructor = [](DeclContext *dc) {
     if (isa<StructDecl>(dc) || isa<EnumDecl>(dc) ||
         isa<ClassDecl>(dc))

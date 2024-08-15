@@ -96,8 +96,8 @@ enum class ClassMetadataFlags {
   /// known at compile time.
   ClassHasObjCAncestry = (1 << 6),
 
-  /// Is the class implemented by an \c @_objcImplementation extension? If so,
-  /// we should generate pure ObjC-compatible metadata.
+  /// Is the class implemented by an \c @objc \c @implementation extension? If
+  /// so, we should generate pure ObjC-compatible metadata.
   ClassHasObjCImplementation = (1 << 7)
 };
 
@@ -216,8 +216,9 @@ public:
     return std::make_pair(AllFieldAccesses[index], AllElements[index]);
   }
 
-  /// Returns true if the class is implemented by an \c @_objcImplementation
-  /// extension, and therefore should not have any Swift-specific metadata.
+  /// Returns true if the class is implemented by an \c @objc
+  /// \c @implementation extension, and therefore should not have any
+  /// Swift-specific metadata.
   bool hasObjCImplementation() const {
     return Options.contains(ClassMetadataFlags::ClassHasObjCImplementation);
   }

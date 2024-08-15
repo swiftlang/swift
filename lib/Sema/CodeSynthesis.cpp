@@ -1112,7 +1112,7 @@ static ValueDecl *findImplementedObjCDecl(ValueDecl *VD) {
   if (auto vdSelector = VD->getObjCRuntimeName()) {
     // and it's in an extension...
     if (auto implED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
-      // and that extension is the @objcImplementation of a class's main body...
+      // and that extension is the @implementation of a class's main body...
       if (auto interfaceCD =
               dyn_cast_or_null<ClassDecl>(implED->getImplementedDecl())) {
         // Find the initializer in the class's main body that matches VD.
@@ -1163,7 +1163,7 @@ static void collectNonOveriddenSuperclassInits(
       subOptions, lookupResults);
 
   for (auto decl : lookupResults) {
-    // HACK: If an @objcImplementation extension declares an initializer, its
+    // HACK: If an @objc @implementation extension declares an initializer, its
     // interface usually also has a declaration. We need the interface decl for
     // access control computations, but the name lookup returns the
     // implementation decl because it's in the Swift module. Go find the

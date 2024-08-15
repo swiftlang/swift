@@ -259,7 +259,7 @@ static bool isInSourceFile(IterableDeclContext *idc) {
 ArrayRef<VarDecl *>
 StoredPropertiesRequest::evaluate(Evaluator &evaluator,
                                   NominalTypeDecl *decl) const {
-  // If this is an imported class with an @_objcImplementation extension, get
+  // If this is an imported class with an @implementation extension, get
   // members from the extension instead.
   IterableDeclContext *implDecl = decl->getImplementationContext();
 
@@ -285,7 +285,7 @@ StoredPropertiesRequest::evaluate(Evaluator &evaluator,
 ArrayRef<Decl *>
 StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
                                                    NominalTypeDecl *decl) const {
-  // If this is an imported class with an @_objcImplementation extension, get
+  // If this is an imported class with an @implementation extension, get
   // members from the extension instead.
   IterableDeclContext *implDecl = decl->getImplementationContext();
 

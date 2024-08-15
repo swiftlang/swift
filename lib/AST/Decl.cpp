@@ -4596,7 +4596,7 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
 
 /// Checks if \p VD is an ObjC member implementation:
 ///
-/// \li It's in an \c \@_objcImplementation extension
+/// \li It's in an \c \@implementation extension
 /// \li It's not explicitly \c final
 /// \li Its access level is not \c private or \c fileprivate
 static bool
@@ -4635,7 +4635,7 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
                         bool forConformance,
                         bool includeInlineable,
                         llvm::function_ref<AccessLevel()> getAccessLevel) {
-  // If this is an @_objcImplementation member implementation, and we aren't in
+  // If this is an @implementation member implementation, and we aren't in
   // a context where we would access its storage directly, forbid access. Name
   // lookups will instead find and use the matching interface decl.
   // FIXME: Passing `true` for `isAccessOnSelf` may cause false positives.

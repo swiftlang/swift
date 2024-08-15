@@ -2235,8 +2235,8 @@ static bool inImplExtension(AbstractFunctionDecl *newDecl) {
 static bool
 shouldDiagnoseConflict(NominalTypeDecl *ty, AbstractFunctionDecl *newDecl,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &vec) {
-  // Conflicts between member implementations and their interfaces, or
-  // inherited inits and their overrides in @_objcImpl extensions, are spurious.
+  // Conflicts between member implementations and their interfaces, or inherited
+  // inits and their overrides in @implementation extensions, are spurious.
   if (newDecl->isObjCMemberImplementation()
       || (isa<ConstructorDecl>(newDecl) && inImplExtension(newDecl)
           && newDecl->getAttrs().hasAttribute<OverrideAttr>()))

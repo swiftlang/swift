@@ -1313,7 +1313,7 @@ public:
     PrettyStackTraceDecl("silgen emitExtension", e);
 
     // Arguably, we should divert to SILGenType::emitType() here if it's an
-    // @_objcImplementation extension, but we don't actually need to do any of
+    // @objc @implementation extension, but we don't actually need to do any of
     // the stuff that it currently does.
 
     for (Decl *member : e->getABIMembers()) {
@@ -1416,7 +1416,7 @@ public:
   void visitVarDecl(VarDecl *vd) {
     if (vd->hasStorage()) {
       if (!vd->isStatic()) {
-        // Is this a stored property of an @_objcImplementation extension?
+        // Is this a stored property of an @objc @implementation extension?
         auto ed = cast<ExtensionDecl>(vd->getDeclContext());
         if (auto cd = dyn_cast_or_null<ClassDecl>(ed->getImplementedDecl())) {
           // Act as though we declared it on the class.

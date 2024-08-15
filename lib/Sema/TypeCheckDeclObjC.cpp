@@ -870,7 +870,8 @@ bool swift::isRepresentableInObjC(
         ASTExtInfoBuilder(FunctionTypeRepresentation::Block, false, Type())
           .build());
 
-    // @objcImpl member implementations need to allow a nil completion handler.
+    // @objc @implementation member implementations need to allow a nil
+    // completion handler.
     if (AFD->isObjCMemberImplementation())
       completionHandlerType = OptionalType::get(completionHandlerType);
 
@@ -2645,8 +2646,8 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
                                      conflict.selector);
       diag.warnUntilSwiftVersionIf(breakingInSwift5, 6);
 
-      // Temporarily soften selector conflicts in objcImpl extensions; we're
-      // seeing some that are caused by ObjCImplementationChecker improvements.
+      // Temporarily soften selector conflicts in @implementation extensions;
+      // some are caused by ImplementationChecker improvements.
       if (conflictingDecl->getDeclContext()->getAsDecl()->getImplementedDecl())
         diag.wrapIn(diag::wrap_objc_implementation_will_become_error);
 
@@ -2936,7 +2937,7 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
   return anyDiagnosed;
 }
 
-void TypeChecker::checkObjCImplementation(Decl *D) {
+void TypeChecker::checkImplementationAttr(Decl *D) {
   if (!D->getImplementedDecl())
     return;
 
@@ -3056,7 +3057,7 @@ class ImplementationChecker {
     auto diag = diags.diagnose(loc, diagID, std::forward<ArgTypes>(Args)...);
 
     // Early adopters using the '@_objcImplementation' syntax may have had the
-    // ObjCImplementationChecker evolve out from under them. Soften their errors
+    // ImplementationChecker evolve out from under them. Soften their errors
     // to warnings so we don't break their projects.
     if (getAttr()->isEarlyAdopter()
          && diags.declaredDiagnosticKindFor(diagID.ID) == DiagnosticKind::Error)
@@ -3106,7 +3107,7 @@ public:
     if (interfaceDecls.empty())
       return;
 
-    // Add the @_objcImplementation extension's members as candidates.
+    // Add the @implementation extension's members as candidates.
     addCandidates(ext);
 
     // Add its interface's members as requirements.
@@ -3158,14 +3159,14 @@ private:
     // Don't diagnose if we already diagnosed an unrelated ObjC interop issue,
     // like an un-representable type. If there's an `@objc` attribute on the
     // member, this will be indicated by its `isInvalid()` bit; otherwise we'll
-    // use the enclosing extension's `@_objcImplementation` attribute.
+    // use the enclosing extension's `@implementation` attribute.
     DeclAttribute *attr = afd->getAttrs()
                               .getAttribute<ObjCAttr>(/*AllowInvalid=*/true);
     if (!attr)
       attr = member->getDeclContext()->getAsDecl()->getAttrs()
                  .getAttribute<ImplementationAttr>(/*AllowInvalid=*/true);
-    assert(attr && "expected @_objcImplementation on context of member checked "
-                   "by ObjCImplementationChecker");
+    assert(attr && "expected @implementation on context of member checked "
+                   "by ImplementationChecker");
     if (attr->isInvalid())
       return;
 
@@ -3255,7 +3256,7 @@ private:
         // Skip non-member implementations.
         // FIXME: Should we consider them if only rejected for access level?
         if (!VD->isObjCMemberImplementation()) {
-          // No member of an `@_objcImplementation` extension should need a
+          // No member of an `@implementation` extension should need a
           // vtable entry.
           diagnoseVTableUse(VD);
           continue;
@@ -3393,7 +3394,7 @@ private:
       auto &candExplicitObjCName = pair.second;
 
       PrettyStackTraceDecl t1(
-            "checking @objcImplementation matches to candidate", cand);
+            "checking @implementation matches to candidate", cand);
       BestMatchList matchedRequirements{threshold};
 
       for (ValueDecl *req : unmatchedRequirements) {

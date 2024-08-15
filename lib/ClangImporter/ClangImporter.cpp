@@ -6044,7 +6044,7 @@ findContextInterfaceAndImplementation(DeclContext *dc) {
 
   ClassDecl *classDecl = dc->getSelfClassDecl();
   if (!classDecl || !classDecl->hasClangNode())
-    // Only extensions of ObjC classes can have @_objcImplementations.
+    // In this path, only extensions of ObjC classes can have @implementations.
     return {};
 
   // We know the class we're trying to work with. Next, the category name.
@@ -6160,8 +6160,8 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
 
 InterfaceAndImplementation InterfaceAndImplementationRequest::
 evaluate(Evaluator &evaluator, Decl *decl) const {
-  // Types and extensions have direct links to their counterparts through the
-  // `@_objcImplementation` attribute. Let's resolve that.
+  // @implementation extensions have (or don't have) a category name in their
+  // @objc attribute. Use that to match them to a type or category.
   // (Also directing nulls here, where they'll early-return.)
   if (auto ty = dyn_cast_or_null<NominalTypeDecl>(decl))
     return findContextInterfaceAndImplementation(ty);
@@ -6177,7 +6177,7 @@ evaluate(Evaluator &evaluator, Decl *decl) const {
 void swift::simple_display(llvm::raw_ostream &out,
                            const InterfaceAndImplementation &pair) {
   if (pair.empty()) {
-    out << "no clang interface or @_objcImplementation";
+    out << "no clang interface or @implementation";
     return;
   }
 
