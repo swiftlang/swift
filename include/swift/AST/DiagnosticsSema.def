@@ -864,9 +864,10 @@ ERROR(serialization_module_incompatible_revision,Fatal,
       "rebuild %1 and try again: %2",
       (StringRef, Identifier, StringRef))
 ERROR(serialization_module_incompatible_channel,Fatal,
-      "compiled module was created for a different distribution channel '%0' "
-      "than the local compiler '%1', "
-      "please ensure %2 is found from the expected path: %3",
+      "the binary module for %2 was compiled for '%0', "
+      "it cannot be imported by the current compiler "
+      "which is aligned with '%1'. "
+      "Binary module loaded from path: %3",
       (StringRef, StringRef, Identifier, StringRef))
 ERROR(serialization_missing_single_dependency,Fatal,
       "missing required module '%0'", (StringRef))
