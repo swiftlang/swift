@@ -563,35 +563,15 @@ TypeSubstituter::transformOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *opaqu
   if (!IFS.shouldSubstituteOpaqueArchetypes())
     return std::nullopt;
 
-  // If we have a substitution for this type, use it.
-  if (auto known = IFS.substType(opaque, level)) {
-    if (known->getCanonicalType() == opaque->getCanonicalType())
-      return std::nullopt; // Recursively process the substitutions of the
-                           // opaque type archetype.
-    return known;
-  }
+  auto known = IFS.substType(opaque, level);
+  ASSERT(known && "Opaque type replacement shouldn't fail");
 
-  if (opaque->isRoot())
-    return ErrorType::get(opaque);
-
-  // For nested archetypes, we can substitute the parent.
-  Type origParent = opaque->getParent();
-  assert(origParent && "Not a nested archetype");
-
-  // Substitute into the parent type.
-  Type substParent = doIt(origParent, TypePosition::Invariant);
-
-  // If the parent didn't change, we won't change.
-  if (substParent.getPointer() == origParent.getPointer())
-    return Type(opaque);
-
-  // Get the associated type reference from a child archetype.
-  AssociatedTypeDecl *assocType = opaque->getInterfaceType()
-      ->castTo<DependentMemberType>()->getAssocType();
-
-  return getMemberForBaseType(IFS, origParent, substParent,
-                              assocType, assocType->getName(),
-                              level);
+  // If we return an opaque archetype unchanged, recurse into its substitutions
+  // as a special case.
+  if (known->getCanonicalType() == opaque->getCanonicalType())
+    return std::nullopt; // Recursively process the substitutions of the
+                         // opaque type archetype.
+  return known;
 }
 
 std::optional<Type>
