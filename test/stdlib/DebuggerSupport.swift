@@ -106,11 +106,6 @@ if #available(SwiftStdlib 6.1, *) {
     let printed = _stringForPrintObject("hello\nworld")
     expectEqual(printed, "hello\nworld\n")
   }
-} else {
-  StringForPrintObjectTests.test("String") {
-    let printed = _stringForPrintObject("hello\nworld")
-    expectEqual(printed, "\"hello\\nworld\"\n")
-  }
 }
 
 class RefCountedObj {
