@@ -783,10 +783,6 @@ public:
   /// Determine whether the type is an opened existential type with Error inside
   bool isOpenedExistentialWithError();
 
-  /// Retrieve the set of root opened archetypes that occur within this type.
-  void getRootOpenedExistentials(
-      SmallVectorImpl<OpenedArchetypeType *> &rootOpenedArchetypes) const;
-
   /// Retrieve the set of type parameter packs that occur within this type.
   void getTypeParameterPacks(SmallVectorImpl<Type> &rootParameterPacks);
 

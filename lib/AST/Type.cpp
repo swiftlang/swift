@@ -531,25 +531,6 @@ bool TypeBase::hasLocalArchetypeFromEnvironment(
   });
 }
 
-void TypeBase::getRootOpenedExistentials(
-    SmallVectorImpl<OpenedArchetypeType *> &rootOpenedArchetypes) const {
-  if (!hasOpenedExistential())
-    return;
-
-  SmallPtrSet<OpenedArchetypeType *, 4> known;
-  getCanonicalType().findIf([&](Type type) -> bool {
-    auto *archetype = dyn_cast<OpenedArchetypeType>(type.getPointer());
-    if (!archetype)
-      return false;
-
-    auto *root = archetype->getRoot();
-    if (known.insert(root).second)
-      rootOpenedArchetypes.push_back(root);
-
-    return false;
-  });
-}
-
 Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
   if (!dc->isTypeContext())
     return this;
