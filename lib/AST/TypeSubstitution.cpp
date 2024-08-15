@@ -589,31 +589,10 @@ TypeSubstituter::transformLocalArchetypeType(LocalArchetypeType *local,
   if (!IFS.shouldSubstituteLocalArchetypes())
     return std::nullopt;
 
-  // If we have a substitution for this type, use it.
-  if (auto known = IFS.substType(local, level))
-    return known;
+  auto known = IFS.substType(local, level);
+  ASSERT(known && "Local type replacement shouldn't fail");
 
-  if (local->isRoot())
-    return ErrorType::get(local);
-
-  // For nested archetypes, we can substitute the parent.
-  Type origParent = local->getParent();
-  assert(origParent && "Not a nested archetype");
-
-  // Substitute into the parent type.
-  Type substParent = doIt(origParent, TypePosition::Invariant);
-
-  // If the parent didn't change, we won't change.
-  if (substParent.getPointer() == origParent.getPointer())
-    return Type(local);
-
-  // Get the associated type reference from a child archetype.
-  AssociatedTypeDecl *assocType = local->getInterfaceType()
-      ->castTo<DependentMemberType>()->getAssocType();
-
-  return getMemberForBaseType(IFS, origParent, substParent,
-                              assocType, assocType->getName(),
-                              level);
+  return known;
 }
 
 Type TypeSubstituter::transformGenericTypeParamType(GenericTypeParamType *param,
