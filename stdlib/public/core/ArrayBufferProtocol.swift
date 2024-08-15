@@ -90,13 +90,20 @@ where Indices == Range<Int> {
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R
 
+  // Superseded by the typed-throws version of this function, but retained
+  // for ABI reasons.
+  mutating func withUnsafeMutableBufferPointer<R>(
+    _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R
+
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.
   ///
   /// - Precondition: Such contiguous storage exists or the buffer is empty.
-  mutating func withUnsafeMutableBufferPointer<R>(
-    _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R
+  @available(SwiftStdlib 6.1, *)
+  mutating func withUnsafeMutableBufferPointer<R, E>(
+    _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R
 
   /// The number of elements the buffer stores.
   override var count: Int { get set }

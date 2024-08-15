@@ -467,12 +467,24 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
       count: count))
   }
 
-  /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
-  /// over the underlying contiguous storage.
+  // Superseded by the typed-throws version of this function, but retained
+  // for ABI reasons.
   @inlinable
-  internal mutating func withUnsafeMutableBufferPointer<R>(
+  @_silgen_name("$ss22_ContiguousArrayBufferV017withUnsafeMutableC7Pointeryqd__qd__SryxGKXEKlF")
+  internal mutating func __abi_withUnsafeMutableBufferPointer<R>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
+    defer { _fixLifetime(self) }
+    return try body(
+      UnsafeMutableBufferPointer(start: firstElementAddress, count: count))
+  }
+
+  /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
+  /// over the underlying contiguous storage.
+  @_alwaysEmitIntoClient
+  internal mutating func withUnsafeMutableBufferPointer<R, E>(
+    _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R {
     defer { _fixLifetime(self) }
     return try body(
       UnsafeMutableBufferPointer(start: firstElementAddress, count: count))

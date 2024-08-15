@@ -1211,6 +1211,21 @@ extension ArraySlice {
     return try _buffer.withUnsafeBufferPointer(body)
   }
 
+  // Superseded by the typed-throws version of this function, but retained
+  // for ABI reasons.
+  @_semantics("array.withUnsafeMutableBufferPointer")
+  @inlinable // FIXME(inline-always)
+  @inline(__always) // Performance: This method should get inlined into the
+  // caller such that we can combine the partial apply with the apply in this
+  // function saving on allocating a closure context. This becomes unnecessary
+  // once we allocate noescape closures on the stack.
+  @_silgen_name("$ss10ArraySliceV30withUnsafeMutableBufferPointeryqd__qd__SryxGzKXEKlF")
+  mutating func __abi_withUnsafeMutableBufferPointer<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R {
+    return try withUnsafeMutableBufferPointer(body)
+  }
+
   /// Calls the given closure with a pointer to the array's mutable contiguous
   /// storage.
   ///
@@ -1248,14 +1263,14 @@ extension ArraySlice {
   ///   method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_semantics("array.withUnsafeMutableBufferPointer")
-  @inlinable // FIXME(inline-always)
+  @_alwaysEmitIntoClient
   @inline(__always) // Performance: This method should get inlined into the
   // caller such that we can combine the partial apply with the apply in this
   // function saving on allocating a closure context. This becomes unnecessary
   // once we allocate noescape closures on the stack.
-  public mutating func withUnsafeMutableBufferPointer<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R {
+  public mutating func withUnsafeMutableBufferPointer<R, E>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R {
     let count = self.count
     // Ensure unique storage
     _makeMutableAndUnique()

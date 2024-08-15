@@ -597,14 +597,25 @@ extension _ArrayBuffer {
     return try ContiguousArray(self).withUnsafeBufferPointer(body)
   }
 
+  // Superseded by the typed-throws version of this function, but retained
+  // for ABI reasons.
+  @inlinable
+  @_silgen_name("$ss12_ArrayBufferV017withUnsafeMutableB7Pointeryqd__qd__SryxGKXEKlF")
+  internal mutating func __abi_withUnsafeMutableBufferPointer<R>(
+    _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R {
+    return try withUnsafeMutableBufferPointer(body)
+  }
+
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.
   ///
   /// - Precondition: Such contiguous storage exists or the buffer is empty.
   @inlinable
-  internal mutating func withUnsafeMutableBufferPointer<R>(
-    _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R {
+  @_alwaysEmitIntoClient
+  internal mutating func withUnsafeMutableBufferPointer<R, E>(
+    _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R {
     _internalInvariant(
       _isNative || count == 0,
       "Array is bridging an opaque NSArray; can't get a pointer to the elements"
