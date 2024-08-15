@@ -167,15 +167,6 @@ long double _stdlib_squareRootl(long double _self) {
 }
 #endif
 
-// Apple's math.h does not declare lgamma_r() etc by default, but they're
-// unconditionally exported by libsystem_m.dylib in all OS versions that
-// support Swift development; we simply need to provide declarations here.
-#if defined(__APPLE__)
-float lgammaf_r(float x, int *psigngam);
-double lgamma_r(double x, int *psigngam);
-long double lgammal_r(long double x, int *psigngam);
-#endif // defined(__APPLE__)
-
 #ifdef __cplusplus
 } // extern "C"
 #endif
