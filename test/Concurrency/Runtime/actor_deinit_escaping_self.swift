@@ -4,12 +4,15 @@
 // REQUIRES: libdispatch
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
-// REQUIRES: swift_stdlib_asserts
 // UNSUPPORTED: back_deployment_runtime
 
 import _Concurrency
 import Dispatch
 import StdlibUnittest
+
+func formatAddr(_ obj: AnyObject) -> String {
+  "0x" + String(unsafeBitCast(obj, to: UInt.self), radix: 16)
+}
 
 actor EscapeLocked {
   var k: Int = 1
@@ -27,7 +30,7 @@ actor EscapeLocked {
     }
     let r = g.wait(timeout: .now() + .milliseconds(500))
     expectEqual(r, .timedOut)
-    expectCrashLater(withMessage: "Assertion failed: (!oldState.getFirstUnprioritisedJob() && \"actor has queued jobs at destruction\"), function destroy")
+    expectCrashLater(withMessage: "Object \(formatAddr(self)) of class EscapeLocked deallocated with non-zero retain count 2. This object's deinit, or something called from it, may have created a strong reference to self which outlived deinit, resulting in a dangling reference.")
   }
 }
 

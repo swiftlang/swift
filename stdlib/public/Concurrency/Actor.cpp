@@ -1653,6 +1653,22 @@ void ProcessOutOfLineJob::process(Job *job) {
 #endif /* !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS */
 
 void DefaultActorImpl::destroy() {
+  HeapObject *object = asAbstract(this);
+  size_t retainCount = swift_retainCount(object);
+  if (SWIFT_UNLIKELY(retainCount > 1)) {
+    auto descriptor = object->metadata->getTypeContextDescriptor();
+
+    swift_Concurrency_fatalError(0,
+                      "Object %p of class %s deallocated with non-zero retain "
+                      "count %zd. This object's deinit, or something called "
+                      "from it, may have created a strong reference to self "
+                      "which outlived deinit, resulting in a dangling "
+                      "reference.\n",
+                      object,
+                      descriptor ? descriptor->Name.get() : "<unknown>",
+                      retainCount);
+  }
+
 #if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
   // TODO (rokhinip): Do something to assert that the lock is unowned
 #else
