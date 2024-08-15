@@ -3750,6 +3750,17 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
   (void)claim<NoMetadataTypeAttr>(attrs);
   // TODO: add proper validation
 
+  if (auto yield = claim<YieldsTypeAttr>(attrs)) {
+    (void)yield;
+    // FIXME: What additional checks should we do here?
+    // FIXME: Turn into diagnostics
+    assert(options.contains(TypeResolutionFlags::Coroutine));
+    // SIL yields are represented directly, no need to wrap them into special type
+    if (!options.contains(TypeResolutionFlags::SILType))
+        ty = YieldResultType::get(ty,
+                                  options.is(TypeResolverContext::InoutFunctionInput));
+  }
+  
   // There are a bunch of attributes in SIL that are essentially new
   // type constructors.  Some of these are allowed even in AST positions;
   // other are only allowed in lowered types.
@@ -4248,6 +4259,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   }
 
   bool sendable = claim<SendableTypeAttr>(attrs);
+  bool coroutine = claim<YieldOnceTypeAttr>(attrs);
 
   auto isolation = FunctionTypeIsolation::forNonIsolated();
 
@@ -4438,6 +4450,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
 
   auto resultOptions = options.withoutContext();
   resultOptions.setContext(TypeResolverContext::FunctionResult);
+  if (coroutine)
+    resultOptions |= TypeResolutionFlags::Coroutine;
   auto outputTy = resolveType(repr->getResultTypeRepr(), resultOptions);
   if (outputTy->hasError()) {
     return ErrorType::get(ctx);
@@ -4500,6 +4514,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                      .withSendable(sendable)
                      .withAsync(repr->isAsync())
                      .withClangFunctionType(clangFnType)
+                     .withCoroutine(coroutine)
                      .build();
 
   // SIL uses polymorphic function types to resolve overloaded member functions.
@@ -4610,6 +4625,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     default:
       llvm_unreachable("bad TypeAttrKind for TAR_SILCoroutine");
     }
+    options |= TypeResolutionFlags::Coroutine;
   }
 
   ParameterConvention callee = ParameterConvention::Direct_Unowned;
@@ -5332,12 +5348,20 @@ NeverNullType
 TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
                                        TypeResolutionOptions options) {
   auto ownershipRepr = dyn_cast<OwnershipTypeRepr>(repr);
-  // ownership is only valid for (non-Subscript and non-EnumCaseDecl)
-  // function parameters.
-  if (!options.is(TypeResolverContext::FunctionInput) ||
-      options.hasBase(TypeResolverContext::SubscriptDecl) ||
-      options.hasBase(TypeResolverContext::EnumElementDecl)) {
 
+  // ownership is only valid for (non-Subscript and non-EnumCaseDecl)
+  // function parameters or coroutine results (yields)
+  bool isCoroutineInOutYield =
+    (options.hasBase(TypeResolverContext::FunctionResult) || // decls
+     options.is(TypeResolverContext::FunctionResult)) && // function types
+    options.contains(TypeResolutionFlags::Coroutine) &&
+    (ownershipRepr &&
+     ownershipRepr->getSpecifier() == ParamSpecifier::InOut);
+
+  if (!(options.is(TypeResolverContext::FunctionInput) &&
+        !options.hasBase(TypeResolverContext::SubscriptDecl) &&
+        !options.hasBase(TypeResolverContext::EnumElementDecl)) &&
+      !isCoroutineInOutYield) {
     decltype(diag::attr_only_on_parameters) diagID;
     if (options.hasBase(TypeResolverContext::SubscriptDecl) ||
         options.hasBase(TypeResolverContext::EnumElementDecl)) {
@@ -6018,6 +6042,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   auto elementOptions = options;
   if (!repr->isParenType()) {
+    elementOptions = elementOptions.withBaseContext(options.getContext());
     elementOptions = elementOptions.withoutContext(true);
     elementOptions = elementOptions.withContext(TypeResolverContext::TupleElement);
   }

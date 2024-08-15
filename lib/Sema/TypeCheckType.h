@@ -89,7 +89,7 @@ enum class TypeResolutionFlags : uint16_t {
   DirectEscaping = 1 << 14,
 
   /// We are in @yield_once coroutine declaration
-  Coroutine = 1 << 14,
+  Coroutine = 1 << 15,
 };
 
 /// Type resolution contexts that require special handling.
@@ -557,6 +557,13 @@ public:
   TypeResolutionOptions withContext(TypeResolverContext context) const {
     auto copy = *this;
     copy.setContext(context);
+    return copy;
+  }
+
+  inline
+  TypeResolutionOptions withBaseContext(TypeResolverContext context) const {
+    auto copy = *this;
+    copy.base = context;
     return copy;
   }
 };
