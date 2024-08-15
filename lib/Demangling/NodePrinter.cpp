@@ -626,6 +626,8 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
     case Node::Kind::DefaultOverride:
     case Node::Kind::BorrowAccessor:
     case Node::Kind::MutateAccessor:
+    case Node::Kind::YieldResult:
+    case Node::Kind::Coroutine:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -1817,6 +1819,14 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
 #include "swift/AST/ReferenceStorage.def"
   case Node::Kind::InOut:
     Printer << "inout ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::YieldResult:
+    Printer << "@yields ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::Coroutine:
+    Printer << "@yield_once ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::Isolated:

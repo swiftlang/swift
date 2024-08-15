@@ -586,8 +586,8 @@ public:
 
   bool isContextualYieldKeyword() {
     return (Tok.isContextualKeyword("yield") &&
-            isa<AccessorDecl>(CurDeclContext) &&
-            cast<AccessorDecl>(CurDeclContext)->isCoroutine());
+            (isa<AbstractFunctionDecl>(CurDeclContext) &&
+             cast<AbstractFunctionDecl>(CurDeclContext)->isCoroutine()));
   }
 
   /// Whether the current token is the contextual keyword for a \c then

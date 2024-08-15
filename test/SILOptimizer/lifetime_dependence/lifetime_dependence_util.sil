@@ -151,7 +151,7 @@ entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
 // CHECK-NEXT: ends:        end_borrow {{.*}} : $D
 // CHECK: dependence_scope: lifetime_dependence_scope with: %guaranteed_mark
 
-  %m = class_method %2 : $D, #D.field!read : (D) -> () -> (), $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
+  %m = class_method %2 : $D, #D.field!read : (D) -> @yield_once () -> @yields C, $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
   (%yield, %token) = begin_apply %m(%2) : $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
   %yield_mark = mark_dependence [nonescaping] %guaranteed_mark : $C on %yield : $C
   specify_test "lifetime_dependence_scope %yield_mark"

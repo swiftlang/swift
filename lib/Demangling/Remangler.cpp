@@ -842,6 +842,14 @@ ManglingError Remangler::mangleNoEscapeFunctionType(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleCoroutine(Node *node,
+                                         unsigned depth) {
+  RETURN_IF_ERROR(
+      mangleChildNodesReversed(node, depth + 1)); // argument tuple, result type
+  Buffer << "Xy";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleBoundGenericClass(Node *node, unsigned depth) {
   return mangleAnyNominalType(node, depth + 1);
 }
@@ -2347,6 +2355,12 @@ ManglingError Remangler::mangleOwned(Node *node, unsigned depth) {
 ManglingError Remangler::mangleNoDerivative(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Yk";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleYieldResult(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
+  Buffer << "Yy";
   return ManglingError::Success;
 }
 
