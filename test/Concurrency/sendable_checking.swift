@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -verify -strict-concurrency=targeted -verify-additional-prefix targeted-and-complete- -emit-sil -o /dev/null %s
-// RUN: %target-swift-frontend -verify -strict-concurrency=complete -verify-additional-prefix tns- -verify-additional-prefix complete-and-tns- -emit-sil -o /dev/null %s
+// RUN: %target-swift-frontend -target %target-swift-abi-5.0-triple -verify -strict-concurrency=targeted -verify-additional-prefix targeted-and-complete- -emit-sil -o /dev/null %s
+// RUN: %target-swift-frontend -target %target-swift-abi-5.0-triple -verify -strict-concurrency=complete -verify-additional-prefix tns- -verify-additional-prefix complete-and-tns- -emit-sil -o /dev/null %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
