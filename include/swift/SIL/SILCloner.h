@@ -19,6 +19,7 @@
 
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
@@ -32,21 +33,49 @@ namespace swift {
 
 struct SubstitutionMapWithLocalArchetypes {
   std::optional<SubstitutionMap> SubsMap;
-  TypeSubstitutionMap LocalArchetypeSubs;
+  llvm::DenseMap<GenericEnvironment *, GenericEnvironment *> LocalArchetypeSubs;
+  GenericSignature BaseGenericSig;
+  llvm::ArrayRef<GenericEnvironment *> CapturedEnvs;
   bool IncorrectBehaviorForCSE = false;
+
+  bool hasLocalArchetypes() const {
+    return !LocalArchetypeSubs.empty() || !CapturedEnvs.empty();
+  }
 
   SubstitutionMapWithLocalArchetypes() {}
   SubstitutionMapWithLocalArchetypes(SubstitutionMap subs) : SubsMap(subs) {}
 
   Type operator()(SubstitutableType *type) {
     if (auto *local = dyn_cast<LocalArchetypeType>(type)) {
-      auto found = LocalArchetypeSubs.find(local);
+      auto *origEnv = local->getGenericEnvironment();
+
+      // Special handling of captured environments, which don't appear in
+      // LocalArchetypeSubs. This only happens with the LocalArchetypeTransform
+      // in SILGenLocalArchetype.cpp.
+      auto found = LocalArchetypeSubs.find(origEnv);
       if (found == LocalArchetypeSubs.end()) {
-        if (local->isRoot() && IncorrectBehaviorForCSE)
-          return type;
-        return Type();
+        if (std::find(CapturedEnvs.begin(), CapturedEnvs.end(), origEnv)
+            == CapturedEnvs.end()) {
+          if (IncorrectBehaviorForCSE)
+            return local;
+          return ErrorType::get(local->getASTContext());
+        }
+
+        // Map the local archetype to an interface type in the new generic
+        // signature.
+        MapLocalArchetypesOutOfContext mapOutOfContext(BaseGenericSig,
+                                                       CapturedEnvs);
+        auto interfaceTy = mapOutOfContext(local);
+
+        // Map this interface type into the new generic environment to get
+        // a primary archetype.
+        return interfaceTy.subst(*SubsMap);
       }
-      return found->second;
+
+      auto *newEnv = found->second;
+
+      auto interfaceTy = local->getInterfaceType();
+      return newEnv->mapTypeIntoContext(interfaceTy);
     }
 
     if (SubsMap)
@@ -218,10 +247,9 @@ public:
   }
 
   /// Register a re-mapping for local archetypes such as opened existentials.
-  void registerLocalArchetypeRemapping(ArchetypeType *From,
-                                       ArchetypeType *To) {
-    auto result = Functor.LocalArchetypeSubs.insert(
-        std::make_pair(CanArchetypeType(From), CanType(To)));
+  void registerLocalArchetypeRemapping(GenericEnvironment *From,
+                                       GenericEnvironment *To) {
+    auto result = Functor.LocalArchetypeSubs.insert(std::make_pair(From, To));
     assert(result.second);
     (void)result;
   }
@@ -352,13 +380,16 @@ public:
   }
 
   void remapRootOpenedType(CanOpenedArchetypeType archetypeTy) {
-    assert(archetypeTy->isRoot());
-
-    auto origExistentialTy = archetypeTy->getExistentialType()
+    auto *origEnv = archetypeTy->getGenericEnvironment();
+    auto sig = origEnv->getOpenedExistentialParentSignature();
+    auto origExistentialTy = origEnv->getOpenedExistentialType()
         ->getCanonicalType();
+
     auto substExistentialTy = getOpASTType(origExistentialTy);
-    auto replacementTy = OpenedArchetypeType::get(substExistentialTy);
-    registerLocalArchetypeRemapping(archetypeTy, replacementTy);
+    auto *newEnv = GenericEnvironment::forOpenedExistential(
+        substExistentialTy, sig, UUID::fromTime());
+
+    registerLocalArchetypeRemapping(origEnv, newEnv);
   }
 
   /// SILCloner will take care of debug scope on the instruction
@@ -477,7 +508,7 @@ protected:
   SILType remapType(SILType Ty) {
     if (Functor.SubsMap || Ty.hasLocalArchetype()) {
       SubstOptions options(std::nullopt);
-      if (!Functor.LocalArchetypeSubs.empty())
+      if (Functor.hasLocalArchetypes())
         options |= SubstFlags::SubstituteLocalArchetypes;
 
       Ty = Ty.subst(Builder.getModule(), Functor, Functor,
@@ -502,7 +533,7 @@ protected:
   CanType remapASTType(CanType ty) {
     if (Functor.SubsMap || ty->hasLocalArchetype()) {
       SubstOptions options(std::nullopt);
-      if (!Functor.LocalArchetypeSubs.empty())
+      if (Functor.hasLocalArchetypes())
         options |= SubstFlags::SubstituteLocalArchetypes;
 
       ty = ty.subst(Functor, Functor, options)->getCanonicalType();
@@ -526,7 +557,7 @@ protected:
   ProtocolConformanceRef remapConformance(Type Ty, ProtocolConformanceRef C) {
     if (Functor.SubsMap || Ty->hasLocalArchetype()) {
       SubstOptions options(std::nullopt);
-      if (!Functor.LocalArchetypeSubs.empty())
+      if (Functor.hasLocalArchetypes())
         options |= SubstFlags::SubstituteLocalArchetypes;
 
       C = C.subst(Ty, Functor, Functor, options);
@@ -549,9 +580,9 @@ protected:
 
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
     // If we have local archetypes to substitute, do so now.
-    if (Subs.getRecursiveProperties().hasLocalArchetype() || Functor.SubsMap) {
+    if (Functor.SubsMap || Subs.getRecursiveProperties().hasLocalArchetype()) {
       SubstOptions options(std::nullopt);
-      if (!Functor.LocalArchetypeSubs.empty())
+      if (Functor.hasLocalArchetypes())
         options |= SubstFlags::SubstituteLocalArchetypes;
 
       Subs = Subs.subst(Functor, Functor, options);
@@ -2917,20 +2948,7 @@ void SILCloner<ImplClass>::visitOpenPackElementInst(
                                          openedShapeClass,
                                          newContextSubs);
 
-  // Associate the old opened archetypes with the new ones.
-  SmallVector<ArchetypeType*, 4> oldOpenedArchetypes;
-  origEnv->forEachPackElementArchetype([&](ElementArchetypeType *oldType) {
-    oldOpenedArchetypes.push_back(oldType);
-  });
-  {
-    size_t nextOldIndex = 0;
-    newEnv->forEachPackElementArchetype([&](ElementArchetypeType *newType) {
-      ArchetypeType *oldType = oldOpenedArchetypes[nextOldIndex++];
-      registerLocalArchetypeRemapping(oldType, newType);
-    });
-    assert(nextOldIndex == oldOpenedArchetypes.size() &&
-           "different opened archetype count");
-  }
+  registerLocalArchetypeRemapping(origEnv, newEnv);
 
   recordClonedInstruction(
       Inst, getBuilder().createOpenPackElement(loc, newIndexValue, newEnv));

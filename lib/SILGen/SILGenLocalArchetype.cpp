@@ -46,33 +46,10 @@ public:
     // index and depth.
     Functor.SubsMap = env->getForwardingSubstitutionMap();
 
-    // Local archetypes map to generic parameters at higher depths.
-    MapLocalArchetypesOutOfContext mapOutOfContext(sig.baseGenericSig,
-                                                   sig.capturedEnvs);
-
-    // For each captured environment...
-    for (auto *capturedEnv : sig.capturedEnvs) {
-      // For each introduced generic parameter...
-      auto localParams = capturedEnv->getGenericSignature()
-          .getInnermostGenericParams();
-      for (auto *gp : localParams) {
-        // Get the local archetype from the captured environment.
-        auto origArchetypeTy = capturedEnv->mapTypeIntoContext(gp)
-            ->castTo<LocalArchetypeType>();
-
-        // Map the local archetype to an interface type in the new generic
-        // signature.
-        auto substInterfaceTy = mapOutOfContext(origArchetypeTy);
-
-        // Map this interface type into the new generic environment to get
-        // a primary archetype.
-        auto substArchetypeTy = env->mapTypeIntoContext(substInterfaceTy)
-            ->castTo<PrimaryArchetypeType>();
-
-        // Remember this correspondence.
-        registerLocalArchetypeRemapping(origArchetypeTy, substArchetypeTy);
-      }
-    }
+    // Captured local archetypes map to primary archetypes at higher
+    // depths.
+    Functor.BaseGenericSig = sig.baseGenericSig;
+    Functor.CapturedEnvs = sig.capturedEnvs;
   }
 
   void doIt() {
