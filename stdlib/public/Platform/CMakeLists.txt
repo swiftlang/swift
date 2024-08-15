@@ -16,56 +16,6 @@ if(SWIFT_ENABLE_REFLECTION)
   list(APPEND swift_platform_compile_flags "-DSWIFT_ENABLE_REFLECTION")
 endif()
 
-if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
-  set(SWIFT_ENABLE_REFLECTION OFF)
-
-  add_custom_target(embedded-darwin)
-  add_dependencies(embedded-libraries embedded-darwin)
-  foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
-    string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
-    list(GET list 0 arch)
-    list(GET list 1 mod)
-    list(GET list 2 triple)
-
-    if(NOT "${mod}" MATCHES "-macos$")
-      continue()
-    endif()
-
-    set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
-    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
-    set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
-    set(SWIFT_SDK_embedded_PATH ${SWIFT_SDK_OSX_PATH})
-    set(SWIFT_SDK_embedded_ARCH_${arch}_PATH ${SWIFT_SDK_OSX_PATH})
-    set(SWIFT_SDK_embedded_USE_ISYSROOT TRUE)
-    add_swift_target_library_single(
-      embedded-darwin-${mod}
-      swiftDarwin
-      ONLY_SWIFTMODULE
-      IS_SDK_OVERLAY IS_FRAGILE
-
-      Platform.swift
-      TiocConstants.swift
-      POSIXError.swift
-      MachError.swift
-
-      GYB_SOURCES
-        tgmath.swift.gyb
-        Darwin.swift.gyb
-      
-      SWIFT_COMPILE_FLAGS
-        -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding -enable-experimental-feature Embedded
-      C_COMPILE_FLAGS
-        -D__MACH__ -D__APPLE__ -ffreestanding
-      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
-      SDK "embedded"
-      ARCHITECTURE "${arch}"
-      DEPENDS embedded-stdlib-${mod}
-      INSTALL_IN_COMPONENT stdlib
-      )
-    add_dependencies(embedded-darwin embedded-darwin-${mod})
-  endforeach()
-endif()
-
 set(swiftGlibc_target_sdks CYGWIN FREEBSD OPENBSD LINUX HAIKU)
 if(SWIFT_FREESTANDING_FLAVOR STREQUAL "linux")
   set(swiftGlibc_target_sdks CYGWIN FREEBSD OPENBSD LINUX HAIKU FREESTANDING)
