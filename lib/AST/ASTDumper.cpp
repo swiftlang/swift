@@ -2805,6 +2805,7 @@ namespace {
     void printCommonFD(FuncDecl *FD, const char *type, Label label) {
       printCommonAFD(FD, type, label);
       printFlag(FD->isStatic(), "static", DeclModifierColor);
+      printFlag(FD->isCoroutine(), "@yield_once", DeclModifierColor);
     }
 
     void visitFuncDecl(FuncDecl *FD, Label label) {
