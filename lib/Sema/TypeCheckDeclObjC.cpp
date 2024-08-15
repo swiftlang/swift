@@ -2647,8 +2647,7 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
 
       // Temporarily soften selector conflicts in objcImpl extensions; we're
       // seeing some that are caused by ObjCImplementationChecker improvements.
-      if (conflictingDecl->getDeclContext()->getImplementedObjCContext()
-            != conflictingDecl->getDeclContext())
+      if (conflictingDecl->getDeclContext()->getAsDecl()->getImplementedDecl())
         diag.wrapIn(diag::wrap_objc_implementation_will_become_error);
 
       auto objcAttr = getObjCAttrIfFromAccessNote(conflictingDecl);
@@ -3606,8 +3605,8 @@ private:
     // Check only applies to members of implementations, not implementations in
     // their own right.
     if (!cand->isImplementation() &&
-          getCategoryName(cand->getDeclContext()->getImplementedObjCContext())
-               != getCategoryName(req->getDeclContext()))
+          getCategoryName(cand->getDeclContext())
+            != getCategoryName(req->getDeclContext()))
       return MatchOutcome::WrongCategory;
 
     if (cand->getKind() != req->getKind())
@@ -3696,8 +3695,7 @@ private:
     case MatchOutcome::WrongCategory:
       diagnose(cand, diag::objc_implementation_wrong_category,
                cand, getCategoryName(req->getDeclContext()),
-               getCategoryName(cand->getDeclContext()->
-                                 getImplementedObjCContext()));
+               getCategoryName(cand->getDeclContext()));
       return;
 
     case MatchOutcome::WrongDeclKind:
@@ -3801,10 +3799,9 @@ public:
       if (isOptionalObjCProtocolRequirement(req))
         continue;
 
-      auto ext = cast<IterableDeclContext>(req->getDeclContext()->getAsDecl())
-                        ->getImplementationContext();
+      auto ext = req->getDeclContext()->getAsDecl()->getImplementationDecl();
 
-      diagnose(ext->getDecl(), diag::objc_implementation_missing_impl,
+      diagnose(ext, diag::objc_implementation_missing_impl,
                getCategoryName(req->getDeclContext()), req);
 
       // FIXME: Should give fix-it to add stub implementation

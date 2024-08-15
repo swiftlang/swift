@@ -1427,7 +1427,7 @@ emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl, Pattern *pattern) {
                                            fieldTy.getAddressType());
     } else {
       assert(isa<ClassDecl>(field->getDeclContext()->
-                                getImplementedObjCContext()));
+                                getImplementedContext()));
       slot = SGF.B.createRefElementAddr(pattern, self.forward(SGF), field,
                                         fieldTy.getAddressType());
     }

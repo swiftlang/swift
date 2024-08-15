@@ -1392,7 +1392,7 @@ public:
       SGM.emitObjCConstructorThunk(cd);
   }
   void visitDestructorDecl(DestructorDecl *dd) {
-    auto contextInterface = dd->getDeclContext()->getImplementedObjCContext();
+    auto contextInterface = dd->getDeclContext()->getImplementedContext();
     if (auto cd = dyn_cast<ClassDecl>(contextInterface)) {
       SGM.emitDestructor(cd, dd);
       return;

@@ -451,7 +451,7 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
       // (or the same file) to add vtable entries, we can re-evaluate this
       // restriction.
       if (!decl->isSynthesized() &&
-          isa<ExtensionDecl>(dc->getImplementedObjCContext()) &&
+          isa<ExtensionDecl>(dc->getImplementedContext()) &&
           !(decl->getAttrs().hasAttribute<DynamicReplacementAttr>())) {
 
         if (classDcl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
@@ -1041,7 +1041,7 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
                                      AbstractFunctionDecl *decl) const {
   auto *dc = decl->getDeclContext();
 
-  if (!isa<ClassDecl>(dc->getImplementedObjCContext()))
+  if (!isa<ClassDecl>(dc->getImplementedContext()))
     return false;
 
   // Destructors always use a fixed vtable entry.
@@ -2865,7 +2865,7 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     return ctx.AllocateCopy(result);
   }
 
-  auto nominal = dyn_cast<NominalTypeDecl>(dc->getImplementedObjCContext());
+  auto nominal = dyn_cast_or_null<NominalTypeDecl>(dc->getImplementedContext());
 
   if (nominal) {
     // We need to add implicit initializers because they

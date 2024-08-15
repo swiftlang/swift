@@ -1796,7 +1796,7 @@ namespace {
     /// Destructors need to be collected into the instance methods
     /// list 
     void visitDestructorDecl(DestructorDecl *destructor) {
-      auto classDecl = cast<ClassDecl>(destructor->getDeclContext()->getImplementedObjCContext());
+      auto classDecl = destructor->getDeclContext()->getSelfClassDecl();
       if (Lowering::usesObjCAllocator(classDecl) &&
           hasObjCDeallocDefinition(destructor)) {
         InstanceMethods.push_back(destructor);

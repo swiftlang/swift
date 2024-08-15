@@ -6204,7 +6204,7 @@ llvm::TinyPtrVector<Decl *> Decl::getAllImplementedDecls() const {
   return result.interfaceDecls;
 }
 
-DeclContext *DeclContext::getImplementedObjCContext() const {
+DeclContext *DeclContext::getImplementedContext() const {
   if (auto ED = dyn_cast<ExtensionDecl>(this))
     if (auto impl = dyn_cast_or_null<DeclContext>(ED->getImplementedDecl()))
       return impl;

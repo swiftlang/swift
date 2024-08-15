@@ -4189,7 +4189,7 @@ public:
     // if our destructor is not marked as invalid.
     if (!DD->isInvalid()) {
       auto *nom = dyn_cast<NominalTypeDecl>(
-                             DD->getDeclContext()->getImplementedObjCContext());
+                             DD->getDeclContext()->getImplementedContext());
       if (!nom || !isa<ClassDecl, StructDecl, EnumDecl>(nom)) {
         DD->diagnose(diag::destructor_decl_outside_class_or_noncopyable);
       }

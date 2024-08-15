@@ -78,7 +78,9 @@ public:
     // has a synthesized destructor, visit it now.
     if (auto cd = dyn_cast_or_null<ClassDecl>(D)) {
       auto dd = cd->getDestructor();
-      if (dd->getDeclContext() == cd && cd->getImplementationContext() != cd)
+      // FIXME: This code path may be dead now that
+      // GetDestructorRequest::evaluate adds its destructor to the impl.
+      if (dd->getDeclContext() == cd && cd->getImplementationDecl())
         asImpl().visit(dd);
     }
   }

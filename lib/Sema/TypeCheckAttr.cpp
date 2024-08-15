@@ -3126,10 +3126,11 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
   // Only classes can have required constructors.
   if (parentTy->getClassOrBoundGenericClass() &&
       !parentTy->getClassOrBoundGenericClass()->isActor()) {
-    // The constructor must be declared within the class itself.
+    // The constructor must be declared within the class itself, or for an
+    // @objc @implementation class, the main body implementation.
     // FIXME: Allow an SDK overlay to add a required initializer to a class
     // defined in Objective-C
-    if (!isa<ClassDecl>(ctor->getDeclContext()->getImplementedObjCContext()) &&
+    if (!isa<ClassDecl>(ctor->getDeclContext()->getImplementedContext()) &&
         !isObjCClassExtensionInOverlay(ctor->getDeclContext())) {
       diagnose(ctor, diag::required_initializer_in_extension, parentTy)
         .highlight(attr->getLocation());

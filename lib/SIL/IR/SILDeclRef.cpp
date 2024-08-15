@@ -628,7 +628,7 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
   // their nominal.
   if (isStoredPropertyInitializer())
     decl = cast<NominalTypeDecl>(
-               decl->getDeclContext()->getImplementedObjCContext());
+               decl->getDeclContext()->getImplementedContext());
 
   // Compute the effective access level, taking e.g testable into consideration.
   auto effectiveAccess = decl->getEffectiveAccess();
