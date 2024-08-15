@@ -1142,7 +1142,7 @@ namespace {
     }
 
     hash_value_type ComputeHash(key_type_ref key) {
-      return static_cast<unsigned>(key.Kind) + llvm::djbHash(key.Name);
+      return static_cast<hash_value_type>(key.Kind) + llvm::djbHash(key.Name);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -1236,7 +1236,8 @@ namespace {
     }
 
     hash_value_type ComputeHash(key_type_ref key) {
-      return static_cast<unsigned>(key.first) + llvm::djbHash(key.second);
+      return static_cast<hash_value_type>(key.first) +
+             llvm::djbHash(key.second);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -1421,7 +1422,7 @@ namespace {
     }
 
     hash_value_type ComputeHash(internal_key_type key) {
-      return static_cast<unsigned>(key.Kind) + llvm::djbHash(key.Name);
+      return static_cast<hash_value_type>(key.Kind) + llvm::djbHash(key.Name);
     }
 
     static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -1506,7 +1507,7 @@ namespace {
     }
 
     hash_value_type ComputeHash(internal_key_type key) {
-      return static_cast<unsigned>(key.first) + llvm::djbHash(key.second);
+      return static_cast<hash_value_type>(key.first) + llvm::djbHash(key.second);
     }
 
     static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {

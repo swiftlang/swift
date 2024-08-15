@@ -112,9 +112,7 @@ public:
     return lhs == rhs;
   }
 
-  hash_value_type ComputeHash(internal_key_type key) {
-    return key;
-  }
+  hash_value_type ComputeHash(internal_key_type key) { return key; }
 
   static std::pair<offset_type, offset_type>
   ReadKeyDataLength(const unsigned char *&data) {
