@@ -6422,13 +6422,13 @@ Type ExplicitCaughtTypeRequest::evaluate(
   llvm_unreachable("Unhandled catch node");
 }
 
-bool swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
+void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
                                llvm::function_ref<void(Type)> diagnose) {
-  if (!ctx.LangOpts.hasFeature(Feature::DisallowUnsafe))
-    return false;
+  if (!ctx.LangOpts.hasFeature(Feature::WarnUnsafe))
+    return;
 
   if (!type->isUnsafe())
-    return false;
+    return;
 
   // Look for a specific @unsafe nominal type.
   Type specificType;
@@ -6436,7 +6436,7 @@ bool swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
     if (auto typeDecl = type->getAnyNominal()) {
       if (typeDecl->isUnsafe()) {
         specificType = type;
-        return true;
+        return false;
       }
     }
 
@@ -6450,6 +6450,4 @@ bool swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
       specificTypeDecl->diagnose(diag::unsafe_decl_here, specificTypeDecl);
     }
   }
-
-  return true;
 }

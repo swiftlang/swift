@@ -405,8 +405,8 @@ EXPERIMENTAL_FEATURE(TrailingComma, false)
 /// Allow the @unsafe attribute.
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AllowUnsafeAttribute, true)
 
-/// Disallow use of unsafe code.
-EXPERIMENTAL_FEATURE(DisallowUnsafe, true)
+/// Warn on use of unsafe constructs.
+EXPERIMENTAL_FEATURE(WarnUnsafe, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

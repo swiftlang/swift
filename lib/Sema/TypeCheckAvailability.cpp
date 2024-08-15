@@ -3886,21 +3886,20 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
   // If the declaration itself is "safe" but we don't disallow unsafe uses,
   // check whether it traffics in unsafe types.
   ASTContext &ctx = D->getASTContext();
-  if (ctx.LangOpts.hasFeature(Feature::DisallowUnsafe) && !D->isUnsafe()) {
+  if (ctx.LangOpts.hasFeature(Feature::WarnUnsafe) && !D->isUnsafe()) {
     auto type = D->getInterfaceType();
     if (auto subs = declRef.getSubstitutions())
       type = type.subst(subs);
     if (type->isUnsafe()) {
-      if (diagnoseUnsafeType(
-              ctx, R.Start, type,
-              [&](Type specificType) {
-                ctx.Diags.diagnose(
-                    R.Start, diag::reference_to_unsafe_typed_decl,
-                    call != nullptr && !isa<ParamDecl>(D), D,
-                    specificType);
-                D->diagnose(diag::decl_declared_here, D);
-              }))
-        return true;
+      diagnoseUnsafeType(
+          ctx, R.Start, type,
+          [&](Type specificType) {
+            ctx.Diags.diagnose(
+                R.Start, diag::reference_to_unsafe_typed_decl,
+                call != nullptr && !isa<ParamDecl>(D), D,
+                specificType);
+            D->diagnose(diag::decl_declared_here, D);
+          });
     }
   }
 
@@ -3966,21 +3965,20 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
 }
 
 /// Diagnose uses of unsafe declarations.
-static bool
+static void
 diagnoseDeclUnsafe(const ValueDecl *D, SourceRange R,
                    const Expr *call, const ExportContext &Where) {
   ASTContext &ctx = D->getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::DisallowUnsafe))
-    return false;
+  if (!ctx.LangOpts.hasFeature(Feature::WarnUnsafe))
+    return;
 
   if (!D->isUnsafe())
-    return false;
+    return;
 
   SourceLoc diagLoc = call ? call->getLoc() : R.Start;
   ctx.Diags
     .diagnose(diagLoc, diag::reference_to_unsafe_decl, call != nullptr, D);
   D->diagnose(diag::decl_declared_here, D);
-  return true;
 }
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
@@ -4019,8 +4017,7 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   if (diagnoseDeclAsyncAvailability(D, R, call, Where))
     return true;
 
-  if (diagnoseDeclUnsafe(D, R, call, Where))
-    return true;
+  diagnoseDeclUnsafe(D, R, call, Where);
 
   // Make sure not to diagnose an accessor's deprecation if we already
   // complained about the property/subscript.

@@ -2430,7 +2430,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
 
   // @unchecked conformances are considered unsafe in strict concurrency mode.
   if (conformance->isUnchecked() &&
-      Context.LangOpts.hasFeature(Feature::DisallowUnsafe) &&
+      Context.LangOpts.hasFeature(Feature::WarnUnsafe) &&
       Context.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete) {
     Context.Diags.diagnose(ComplainLoc, diag::unchecked_conformance_is_unsafe);
   }
@@ -5032,7 +5032,7 @@ void ConformanceChecker::resolveValueWitnesses() {
 
       // If we're disallowing unsafe code, check for an unsafe witness to a
       // safe requirement.
-      if (C.LangOpts.hasFeature(Feature::DisallowUnsafe) &&
+      if (C.LangOpts.hasFeature(Feature::WarnUnsafe) &&
           witness->isUnsafe() && !requirement->isUnsafe()) {
         witness->diagnose(diag::witness_unsafe,
                           witness->getDescriptiveKind(),

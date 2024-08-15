@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/unsafe_swift_decls.swiftmodule %S/Inputs/unsafe_swift_decls.swift -enable-experimental-feature AllowUnsafeAttribute
 
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature DisallowUnsafe -I %t
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe -I %t
 
 // Make sure everything compiles without error when unsafe code is allowed.
 // RUN: %target-swift-frontend -typecheck -enable-experimental-feature AllowUnsafeAttribute %s -I %t
@@ -17,7 +17,7 @@ protocol P {
 }
 
 struct XP: P {
-  @unsafe func f() { } // expected-error{{unsafe instance method 'f()' cannot satisfy safe requirement}}
+  @unsafe func f() { } // expected-warning{{unsafe instance method 'f()' cannot satisfy safe requirement}}
   @unsafe func g() { }
 }
 
@@ -29,7 +29,7 @@ protocol Ptrable2 {
   associatedtype Ptr // expected-note{{'Ptr' declared here}}
 }
 
-extension HasAPointerType: Ptrable2 { } // expected-error{{unsafe type 'HasAPointerType.Ptr' (aka 'PointerType') cannot satisfy safe associated type 'Ptr'}}
+extension HasAPointerType: Ptrable2 { } // expected-warning{{unsafe type 'HasAPointerType.Ptr' (aka 'PointerType') cannot satisfy safe associated type 'Ptr'}}
 
 // -----------------------------------------------------------------------
 // Overrides
@@ -49,7 +49,7 @@ class Sub: Super {
 // -----------------------------------------------------------------------
 struct SuperHolder {
   unowned var s1: Super
-  unowned(unsafe) var s2: Super // expected-error{{unowned(unsafe) involves unsafe code}}
+  unowned(unsafe) var s2: Super // expected-warning{{unowned(unsafe) involves unsafe code}}
 }
 
 // -----------------------------------------------------------------------
@@ -59,7 +59,7 @@ struct SuperHolder {
   func f() { } // expected-note{{'f()' declared here}}
 };
 
-class UnsafeSub: UnsafeSuper { } // expected-error{{reference to unsafe class 'UnsafeSuper'}}
+class UnsafeSub: UnsafeSuper { } // expected-warning{{reference to unsafe class 'UnsafeSuper'}}
 
 // -----------------------------------------------------------------------
 // Declaration references
@@ -68,14 +68,14 @@ class UnsafeSub: UnsafeSuper { } // expected-error{{reference to unsafe class 'U
 @unsafe var unsafeVar: Int = 0 // expected-note{{'unsafeVar' declared here}}
 
 func testMe(
-  _ pointer: PointerType, // expected-error{{reference to unsafe struct 'PointerType'}}
-  _ unsafeSuper: UnsafeSuper // expected-error{{reference to unsafe class 'UnsafeSuper'}}
+  _ pointer: PointerType, // expected-warning{{reference to unsafe struct 'PointerType'}}
+  _ unsafeSuper: UnsafeSuper // expected-warning{{reference to unsafe class 'UnsafeSuper'}}
   // expected-note@-1{{'unsafeSuper' declared here}}
 ) { 
-  unsafeF() // expected-error{{call to unsafe global function 'unsafeF'}}
-  _ = unsafeVar // expected-error{{reference to unsafe var 'unsafeVar'}}
-  unsafeSuper.f() // expected-error{{call to unsafe instance method 'f'}}
-  // expected-error@-1{{reference to parameter 'unsafeSuper' involves unsafe type 'UnsafeSuper'}}
+  unsafeF() // expected-warning{{call to unsafe global function 'unsafeF'}}
+  _ = unsafeVar // expected-warning{{reference to unsafe var 'unsafeVar'}}
+  unsafeSuper.f() // expected-warning{{call to unsafe instance method 'f'}}
+  // expected-warning@-1{{reference to parameter 'unsafeSuper' involves unsafe type 'UnsafeSuper'}}
 
-  _ = getPointers() // expected-error{{call to global function 'getPointers' involves unsafe type 'PointerType'}}
+  _ = getPointers() // expected-warning{{call to global function 'getPointers' involves unsafe type 'PointerType'}}
 }

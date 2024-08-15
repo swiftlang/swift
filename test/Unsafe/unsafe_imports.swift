@@ -1,11 +1,11 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature DisallowUnsafe -I %S/Inputs
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe -I %S/Inputs
 
 import unsafe_decls
 
-func testUnsafe(_ ut: UnsafeType) { // expected-error{{reference to unsafe struct 'UnsafeType'}}
-  unsafe_c_function() // expected-error{{call to unsafe global function 'unsafe_c_function'}}
+func testUnsafe(_ ut: UnsafeType) { // expected-warning{{reference to unsafe struct 'UnsafeType'}}
+  unsafe_c_function() // expected-warning{{call to unsafe global function 'unsafe_c_function'}}
 
   var array: [CInt] = [1, 2, 3, 4, 5]
   print_ints(&array, CInt(array.count))
-  // expected-error@-1{{call to global function 'print_ints' involves unsafe type 'UnsafeMutablePointer<Int32>'}}  
+  // expected-warning@-1{{call to global function 'print_ints' involves unsafe type 'UnsafeMutablePointer<Int32>'}}
 }

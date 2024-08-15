@@ -230,7 +230,7 @@ static bool usesFeatureAllowUnsafeAttribute(Decl *decl) {
   return decl->getAttrs().hasAttribute<UnsafeAttr>();
 }
 
-UNINTERESTING_FEATURE(DisallowUnsafe)
+UNINTERESTING_FEATURE(WarnUnsafe)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

@@ -4900,7 +4900,7 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
 
   // unowned(unsafe) is unsafe (duh).
   if (ownershipKind == ReferenceOwnership::Unmanaged &&
-      ctx.LangOpts.hasFeature(Feature::DisallowUnsafe)) {
+      ctx.LangOpts.hasFeature(Feature::WarnUnsafe)) {
     Diags.diagnose(attr->getLocation(), diag::unowned_unsafe_is_unsafe);
   }
 
@@ -7100,7 +7100,7 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
 
   // nonisolated(unsafe) is unsafe, but only under strict concurrency.
   if (attr->isUnsafe() &&
-      Ctx.LangOpts.hasFeature(Feature::DisallowUnsafe) &&
+      Ctx.LangOpts.hasFeature(Feature::WarnUnsafe) &&
       Ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete)
     Ctx.Diags.diagnose(attr->getLocation(), diag::nonisolated_unsafe_is_unsafe);
 

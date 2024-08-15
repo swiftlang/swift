@@ -1733,7 +1733,7 @@ namespace  {
     void visitObjCAttr(ObjCAttr *attr) {}
 
     void visitUnsafeAttr(UnsafeAttr *attr) {
-      if (!Base->getASTContext().LangOpts.hasFeature(Feature::DisallowUnsafe))
+      if (!Base->getASTContext().LangOpts.hasFeature(Feature::WarnUnsafe))
         return;
 
       if (Override->isUnsafe() && !Base->isUnsafe()) {

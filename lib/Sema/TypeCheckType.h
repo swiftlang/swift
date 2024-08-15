@@ -688,10 +688,7 @@ bool diagnoseMissingOwnership(ParamSpecifier ownership,
 
 /// If the given type involves an unsafe type, diagnose it by calling the
 /// diagnose function with the most specific unsafe type that can be provided.
-///
-/// \returns \c true if the type was unsafe and we are diagnosing unsafe types
-/// here.
-bool diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
+void diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
                         llvm::function_ref<void(Type)> diagnose);
 
 } // end namespace swift

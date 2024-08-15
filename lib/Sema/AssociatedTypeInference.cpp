@@ -346,7 +346,7 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
   }
 
   // If we're disallowing unsafe code, check for an unsafe type witness.
-  if (ctx.LangOpts.hasFeature(Feature::DisallowUnsafe) &&
+  if (ctx.LangOpts.hasFeature(Feature::WarnUnsafe) &&
       !assocType->isUnsafe() && type->isUnsafe()) {
     SourceLoc loc = typeDecl->getLoc();
     if (loc.isInvalid())
