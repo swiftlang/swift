@@ -28,6 +28,8 @@
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
+#include "llvm/Support/ConvertUTF.h"
+#include "llvm/Support/Windows/WindowsSupport.h"
 #include <windows.h>
 #else
 #include <dlfcn.h>
@@ -40,6 +42,46 @@
 #endif
 
 using namespace swift;
+
+namespace {
+void *loadLibrary(const char *path, std::string *err);
+void *getAddressOfSymbol(void *handle, const char *symbol);
+
+#if defined(_WIN32)
+void *loadLibrary(const char *path, std::string *err) {
+  SmallVector<wchar_t, MAX_PATH> pathUnicode;
+  if (std::error_code ec = llvm::sys::windows::UTF8ToUTF16(path, pathUnicode)) {
+    SetLastError(ec.value());
+    llvm::MakeErrMsg(err, std::string(path) + ": Can't convert to UTF-16");
+    return nullptr;
+  }
+
+  HMODULE handle = LoadLibraryW(pathUnicode.data());
+  if (handle == NULL) {
+    llvm::MakeErrMsg(err, std::string(path) + ": Can't open");
+    return nullptr;
+  }
+  return (void *)handle;
+}
+
+void *getAddressOfSymbol(void *handle, const char *symbol) {
+  return (void *)uintptr_t(GetProcAddress((HMODULE)handle, symbol));
+}
+
+#else
+void *loadLibrary(const char *path, std::string *err) {
+  void *handle = ::dlopen(path, RTLD_LAZY | RTLD_LOCAL);
+  if (!handle)
+    *err = ::dlerror();
+  return handle;
+}
+
+void *getAddressOfSymbol(void *handle, const char *symbol) {
+  return ::dlsym(handle, symbol);
+}
+
+#endif
+} // namespace
 
 PluginRegistry::PluginRegistry() {
   dumpMessaging = ::getenv("SWIFT_DUMP_PLUGIN_MESSAGING") != nullptr;
@@ -54,13 +96,13 @@ CompilerPlugin::~CompilerPlugin() {
 llvm::Expected<std::unique_ptr<InProcessPlugins>>
 InProcessPlugins::create(const char *serverPath) {
   std::string err;
-  auto server = llvm::sys::DynamicLibrary::getLibrary(serverPath, &err);
-  if (!server.isValid()) {
+  auto server = loadLibrary(serverPath, &err);
+  if (!server) {
     return llvm::createStringError(llvm::inconvertibleErrorCode(), err);
   }
 
   auto funcPtr =
-      server.getAddressOfSymbol("swift_inproc_plugins_handle_message");
+      getAddressOfSymbol(server, "swift_inproc_plugins_handle_message");
   if (!funcPtr) {
     return llvm::createStringError(llvm::inconvertibleErrorCode(),
                                    "entry point not found in '%s'", serverPath);
