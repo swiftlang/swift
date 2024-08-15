@@ -5,7 +5,7 @@ struct Strukt {
   // CHECK: (var_decl {{.*}} "dynamicStorageOnlyVar" interface_type="Int" access=internal dynamic readImpl=stored writeImpl=stored readWriteImpl=stored
   // CHECK: (accessor_decl {{.*}} access=internal dynamic get for="dynamicStorageOnlyVar"
   // CHECK: (accessor_decl {{.*}} access=internal dynamic set for="dynamicStorageOnlyVar"
-  // CHECK: (accessor_decl {{.*}} access=internal _modify for="dynamicStorageOnlyVar"
+  // CHECK: (accessor_decl {{.*}} access=internal @yield_once _modify for="dynamicStorageOnlyVar"
   dynamic var dynamicStorageOnlyVar : Int = 0
 
   // CHECK: (var_decl {{.*}} "computedVar" interface_type="Int" access=internal dynamic readImpl=getter immutable
@@ -25,7 +25,7 @@ struct Strukt {
   // CHECK: (var_decl {{.*}} "computedVarGetterSetter" interface_type="Int" access=internal dynamic readImpl=getter writeImpl=setter readWriteImpl=materialize_to_temporary
   // CHECK: (accessor_decl {{.*}} access=internal dynamic get for="computedVarGetterSetter"
   // CHECK: (accessor_decl {{.*}} access=internal dynamic set for="computedVarGetterSetter"
-  // CHECK: (accessor_decl {{.*}} access=internal _modify for="computedVarGetterSetter"
+  // CHECK: (accessor_decl {{.*}} access=internal @yield_once _modify for="computedVarGetterSetter"
   dynamic var computedVarGetterSetter : Int {
     get {
       return 0
@@ -36,7 +36,7 @@ struct Strukt {
 
   // CHECK: (var_decl {{.*}} "computedVarGetterModify" interface_type="Int" access=internal dynamic readImpl=getter writeImpl=modify_coroutine readWriteImpl=modify_coroutine
   // CHECK: (accessor_decl {{.*}} access=internal dynamic get for="computedVarGetterModify"
-  // CHECK: (accessor_decl {{.*}} access=internal dynamic _modify for="computedVarGetterModify"
+  // CHECK: (accessor_decl {{.*}} access=internal dynamic @yield_once _modify for="computedVarGetterModify"
   // CHECK: (accessor_decl {{.*}} access=internal set for="computedVarGetterModify"
   dynamic var computedVarGetterModify : Int {
     get {
@@ -47,10 +47,10 @@ struct Strukt {
   }
 
   // CHECK: (var_decl {{.*}} "computedVarReadSet" interface_type="Int" access=internal dynamic readImpl=read_coroutine writeImpl=setter readWriteImpl=materialize_to_temporary
-  // CHECK: (accessor_decl {{.*}} access=internal dynamic _read for="computedVarReadSet"
+  // CHECK: (accessor_decl {{.*}} access=internal dynamic @yield_once _read for="computedVarReadSet"
   // CHECK: (accessor_decl {{.*}} access=internal dynamic set for="computedVarReadSet"
   // CHECK: (accessor_decl {{.*}} access=internal get for="computedVarReadSet"
-  // CHECK: (accessor_decl {{.*}} access=internal _modify for="computedVarReadSet"
+  // CHECK: (accessor_decl {{.*}} access=internal @yield_once _modify for="computedVarReadSet"
   dynamic var computedVarReadSet : Int {
     _read {
     }
@@ -59,8 +59,8 @@ struct Strukt {
   }
 
   // CHECK: (var_decl {{.*}} "computedVarReadModify" interface_type="Int" access=internal dynamic readImpl=read_coroutine writeImpl=modify_coroutine readWriteImpl=modify_coroutine
-  // CHECK: (accessor_decl {{.*}} access=internal dynamic _read for="computedVarReadModify"
-  // CHECK: (accessor_decl {{.*}} access=internal dynamic _modify for="computedVarReadModify"
+  // CHECK: (accessor_decl {{.*}} access=internal dynamic @yield_once _read for="computedVarReadModify"
+  // CHECK: (accessor_decl {{.*}} access=internal dynamic @yield_once _modify for="computedVarReadModify"
   // CHECK: (accessor_decl {{.*}} access=internal get for="computedVarReadModify"
   // CHECK: (accessor_decl {{.*}} access=internal set for="computedVarReadModify"
   dynamic var computedVarReadModify : Int {
@@ -74,7 +74,7 @@ struct Strukt {
   // CHECK: (accessor_decl {{.*}}access=private dynamic didSet for="storedWithObserver"
   // CHECK: (accessor_decl {{.*}}access=internal dynamic get for="storedWithObserver"
   // CHECK: (accessor_decl {{.*}}access=internal set for="storedWithObserver"
-  // CHECK: (accessor_decl {{.*}}access=internal _modify for="storedWithObserver"
+  // CHECK: (accessor_decl {{.*}}access=internal @yield_once _modify for="storedWithObserver"
   dynamic var storedWithObserver : Int {
     didSet {
     }
@@ -88,7 +88,7 @@ struct Strukt {
   // CHECK: (subscript_decl {{.*}} "subscript(_:)" {{.*}} access=internal dynamic readImpl=getter writeImpl=setter readWriteImpl=materialize_to_temporary
   // CHECK: (accessor_decl {{.*}} access=internal dynamic get for="subscript(_:)"
   // CHECK: (accessor_decl {{.*}} access=internal dynamic set for="subscript(_:)"
-  // CHECK: (accessor_decl {{.*}} access=internal _modify for="subscript(_:)"
+  // CHECK: (accessor_decl {{.*}} access=internal @yield_once _modify for="subscript(_:)"
   dynamic subscript(_ index: Int) -> Int {
     get {
       return 1
@@ -99,7 +99,7 @@ struct Strukt {
 
   // CHECK: (subscript_decl {{.*}} "subscript(_:)" {{.*}} access=internal dynamic readImpl=getter writeImpl=modify_coroutine readWriteImpl=modify_coroutine
   // CHECK: (accessor_decl {{.*}} access=internal dynamic get for="subscript(_:)"
-  // CHECK: (accessor_decl {{.*}} access=internal dynamic _modify for="subscript(_:)"
+  // CHECK: (accessor_decl {{.*}} access=internal dynamic @yield_once _modify for="subscript(_:)"
   // CHECK: (accessor_decl {{.*}} access=internal set for="subscript(_:)"
   dynamic subscript(_ index: Float) -> Int {
     get {
@@ -110,8 +110,8 @@ struct Strukt {
   }
 
   // CHECK: (subscript_decl {{.*}} "subscript(_:)" {{.*}} access=internal dynamic readImpl=read_coroutine writeImpl=modify_coroutine readWriteImpl=modify_coroutine
-  // CHECK: (accessor_decl {{.*}} access=internal dynamic _read for="subscript(_:)"
-  // CHECK: (accessor_decl {{.*}} access=internal dynamic _modify for="subscript(_:)"
+  // CHECK: (accessor_decl {{.*}} access=internal dynamic @yield_once _read for="subscript(_:)"
+  // CHECK: (accessor_decl {{.*}} access=internal dynamic @yield_once _modify for="subscript(_:)"
   // CHECK: (accessor_decl {{.*}} access=internal get for="subscript(_:)"
   // CHECK: (accessor_decl {{.*}} access=internal set for="subscript(_:)"
   dynamic subscript(_ index: Double) -> Int {
@@ -122,10 +122,10 @@ struct Strukt {
   }
 
   // CHECK: (subscript_decl {{.*}} "subscript(_:)" {{.*}} access=internal dynamic readImpl=read_coroutine writeImpl=setter readWriteImpl=materialize_to_temporary
-  // CHECK: (accessor_decl {{.*}} access=internal dynamic _read for="subscript(_:)"
+  // CHECK: (accessor_decl {{.*}} access=internal dynamic @yield_once _read for="subscript(_:)"
   // CHECK: (accessor_decl {{.*}} access=internal dynamic set for="subscript(_:)"
   // CHECK: (accessor_decl {{.*}} access=internal get for="subscript(_:)"
-  // CHECK: (accessor_decl {{.*}} access=internal _modify for="subscript(_:)"
+  // CHECK: (accessor_decl {{.*}} access=internal @yield_once _modify for="subscript(_:)"
   dynamic subscript(_ index: Strukt) -> Int {
     _read {
     }
@@ -139,7 +139,7 @@ class Klass {
   // CHECK: (var_decl {{.*}} "dynamicStorageOnlyVar" interface_type="Int" access=internal dynamic readImpl=stored writeImpl=stored readWriteImpl=stored
   // CHECK: (accessor_decl {{.*}} access=internal dynamic get for="dynamicStorageOnlyVar"
   // CHECK: (accessor_decl {{.*}} access=internal dynamic set for="dynamicStorageOnlyVar"
-  // CHECK: (accessor_decl {{.*}} access=internal _modify for="dynamicStorageOnlyVar"
+  // CHECK: (accessor_decl {{.*}} access=internal @yield_once _modify for="dynamicStorageOnlyVar"
   dynamic var dynamicStorageOnlyVar : Int = 0
 
   // CHECK: (var_decl {{.*}} "computedVar" interface_type="Int" access=internal dynamic readImpl=getter immutable
@@ -159,7 +159,7 @@ class Klass {
   // CHECK: (var_decl {{.*}} "computedVarGetterSetter" interface_type="Int" access=internal dynamic readImpl=getter writeImpl=setter readWriteImpl=materialize_to_temporary
   // CHECK: (accessor_decl {{.*}} access=internal dynamic get for="computedVarGetterSetter"
   // CHECK: (accessor_decl {{.*}} access=internal dynamic set for="computedVarGetterSetter"
-  // CHECK: (accessor_decl {{.*}} access=internal _modify for="computedVarGetterSetter"
+  // CHECK: (accessor_decl {{.*}} access=internal @yield_once _modify for="computedVarGetterSetter"
   dynamic var computedVarGetterSetter : Int {
     get {
       return 0
@@ -170,7 +170,7 @@ class Klass {
 
   // CHECK: (var_decl {{.*}} "computedVarGetterModify" interface_type="Int" access=internal dynamic readImpl=getter writeImpl=modify_coroutine readWriteImpl=modify_coroutine
   // CHECK: (accessor_decl {{.*}} access=internal dynamic get for="computedVarGetterModify"
-  // CHECK: (accessor_decl {{.*}} access=internal dynamic _modify for="computedVarGetterModify"
+  // CHECK: (accessor_decl {{.*}} access=internal dynamic @yield_once _modify for="computedVarGetterModify"
   // CHECK: (accessor_decl {{.*}} access=internal set for="computedVarGetterModify"
   dynamic var computedVarGetterModify : Int {
     get {
@@ -181,10 +181,10 @@ class Klass {
   }
 
   // CHECK: (var_decl {{.*}} "computedVarReadSet" interface_type="Int" access=internal dynamic readImpl=read_coroutine writeImpl=setter readWriteImpl=materialize_to_temporary
-  // CHECK: (accessor_decl {{.*}} access=internal dynamic _read for="computedVarReadSet"
+  // CHECK: (accessor_decl {{.*}} access=internal dynamic @yield_once _read for="computedVarReadSet"
   // CHECK: (accessor_decl {{.*}} access=internal dynamic set for="computedVarReadSet"
   // CHECK: (accessor_decl {{.*}} access=internal get for="computedVarReadSet"
-  // CHECK: (accessor_decl {{.*}} access=internal _modify for="computedVarReadSet"
+  // CHECK: (accessor_decl {{.*}} access=internal @yield_once _modify for="computedVarReadSet"
   dynamic var computedVarReadSet : Int {
     _read {
     }
@@ -193,8 +193,8 @@ class Klass {
   }
 
   // CHECK: (var_decl {{.*}} "computedVarReadModify" interface_type="Int" access=internal dynamic readImpl=read_coroutine writeImpl=modify_coroutine readWriteImpl=modify_coroutine
-  // CHECK: (accessor_decl {{.*}} access=internal dynamic _read for="computedVarReadModify"
-  // CHECK: (accessor_decl {{.*}} access=internal dynamic _modify for="computedVarReadModify"
+  // CHECK: (accessor_decl {{.*}} access=internal dynamic @yield_once _read for="computedVarReadModify"
+  // CHECK: (accessor_decl {{.*}} access=internal dynamic @yield_once _modify for="computedVarReadModify"
   // CHECK: (accessor_decl {{.*}} access=internal get for="computedVarReadModify"
   // CHECK: (accessor_decl {{.*}} access=internal set for="computedVarReadModify"
   dynamic var computedVarReadModify : Int {
@@ -231,7 +231,7 @@ class Klass {
   // CHECK: (accessor_decl {{.*}} access=internal dynamic get for="subscript(_:)"
   // CHECK: (accessor_decl {{.*}} access=internal dynamic unsafeMutableAddress for="subscript(_:)"
   // CHECK: (accessor_decl {{.*}} access=internal set for="subscript(_:)"
-  // CHECK: (accessor_decl {{.*}} access=internal _modify for="subscript(_:)"
+  // CHECK: (accessor_decl {{.*}} access=internal @yield_once _modify for="subscript(_:)"
   dynamic subscript(_ index: Float) -> Int {
     get {
       return 1
@@ -242,11 +242,11 @@ class Klass {
   }
 
   // CHECK: (subscript_decl {{.*}} "subscript(_:)" {{.*}} access=internal dynamic readImpl=read_coroutine writeImpl=mutable_addressor readWriteImpl=mutable_addressor
-  // CHECK: (accessor_decl {{.*}} access=internal dynamic _read for="subscript(_:)"
+  // CHECK: (accessor_decl {{.*}} access=internal dynamic @yield_once _read for="subscript(_:)"
   // CHECK: (accessor_decl {{.*}} access=internal dynamic unsafeMutableAddress for="subscript(_:)"
   // CHECK: (accessor_decl {{.*}} access=internal get for="subscript(_:)"
   // CHECK: (accessor_decl {{.*}} access=internal set for="subscript(_:)"
-  // CHECK: (accessor_decl {{.*}} access=internal _modify for="subscript(_:)"
+  // CHECK: (accessor_decl {{.*}} access=internal @yield_once _modify for="subscript(_:)"
   dynamic subscript(_ index: Double) -> Int {
     _read {
     }
@@ -259,7 +259,7 @@ class Klass {
   // CHECK: (accessor_decl {{.*}} access=internal dynamic unsafeAddress for="subscript(_:)"
   // CHECK: (accessor_decl {{.*}} access=internal dynamic set for="subscript(_:)"
   // CHECK: (accessor_decl {{.*}} access=internal get for="subscript(_:)"
-  // CHECK: (accessor_decl {{.*}} access=internal _modify for="subscript(_:)"
+  // CHECK: (accessor_decl {{.*}} access=internal @yield_once _modify for="subscript(_:)"
   dynamic subscript(_ index: Int8) -> Int {
     unsafeAddress {
       fatalError()
@@ -270,7 +270,7 @@ class Klass {
 
   // CHECK: (subscript_decl {{.*}} "subscript(_:)" {{.*}} access=internal dynamic readImpl=addressor writeImpl=modify_coroutine readWriteImpl=modify_coroutine
   // CHECK: (accessor_decl {{.*}} access=internal dynamic unsafeAddress for="subscript(_:)"
-  // CHECK: (accessor_decl {{.*}} access=internal dynamic _modify for="subscript(_:)"
+  // CHECK: (accessor_decl {{.*}} access=internal dynamic @yield_once _modify for="subscript(_:)"
   // CHECK: (accessor_decl {{.*}} access=internal get for="subscript(_:)"
   // CHECK: (accessor_decl {{.*}} access=internal set for="subscript(_:)"
   dynamic subscript(_ index: Int16) -> Int {

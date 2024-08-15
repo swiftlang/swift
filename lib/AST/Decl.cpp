@@ -1378,6 +1378,58 @@ bool AbstractFunctionDecl::isCoroutine() const {
   return false;
 }
 
+ArrayRef<AnyFunctionType::Yield>
+AnyFunctionRef::getYieldResultsImpl(SmallVectorImpl<AnyFunctionType::Yield> &buffer,
+                                    bool mapIntoContext) const {
+  assert(buffer.empty());
+  if (auto *AFD = getAbstractFunctionDecl()) {
+    if (auto *AD = dyn_cast<AccessorDecl>(AFD)) {
+      // FIXME: AccessorDecl case is not necessary
+      if (AD->isCoroutine()) {
+        auto valueTy = AD->getStorage()->getValueInterfaceType()
+                                       ->getReferenceStorageReferent();
+        if (mapIntoContext)
+          valueTy = AFD->mapTypeIntoEnvironment(valueTy);
+        YieldTypeFlags flags(isYieldingMutableAccessor(AD->getAccessorKind())
+                             ? ParamSpecifier::InOut
+                             : ParamSpecifier::LegacyShared);
+        buffer.push_back(AnyFunctionType::Yield(valueTy, flags));
+        return buffer;
+      }
+    } else if (AFD->isCoroutine()) {
+      auto resType = AFD->getInterfaceType()->castTo<FunctionType>()->getResult();
+      if (auto *resFnType = resType->getAs<FunctionType>())
+        resType = resFnType->getResult();
+
+      if (resType->hasError())
+        return {};
+
+      auto addYieldInfo =
+        [&](const YieldResultType *yieldResultTy) {
+          Type valueTy = yieldResultTy->getResultType();
+          if (mapIntoContext)
+            valueTy = AFD->mapTypeIntoEnvironment(valueTy);
+          YieldTypeFlags flags(yieldResultTy->isInOut() ?
+                               ParamSpecifier::InOut : ParamSpecifier::LegacyShared);
+            buffer.push_back(AnyFunctionType::Yield(valueTy, flags));
+        };
+
+      if (auto *tupleResTy = resType->getAs<TupleType>())
+        for (const auto &elt : tupleResTy->getElements()) {
+          Type eltTy = elt.getType();
+          if (auto *yieldResTy = eltTy->getAs<YieldResultType>())
+            addYieldInfo(yieldResTy);
+        }
+      else
+        addYieldInfo(resType->castTo<YieldResultType>());
+
+      return buffer;
+    }
+  }
+  return {};
+}
+
+
 bool ParameterList::hasInternalParameter(StringRef Prefix) const {
   for (auto param : *this) {
     if (param->hasName() && param->getNameStr().starts_with(Prefix))
