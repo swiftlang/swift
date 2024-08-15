@@ -662,14 +662,14 @@ class BuildScriptInvocation(object):
         # Begin the post build-script-impl build phase.
         builder.begin_pipeline()
 
-        builder.add_product(products.SwiftPM,
-                            is_enabled=self.args.build_swiftpm)
-        builder.add_product(products.SwiftSyntax,
-                            is_enabled=self.args.build_swiftsyntax)
         builder.add_product(products.SwiftTestingMacros,
                             is_enabled=self.args.build_swift_testing_macros)
         builder.add_product(products.SwiftTesting,
                             is_enabled=self.args.build_swift_testing)
+        builder.add_product(products.SwiftPM,
+                            is_enabled=self.args.build_swiftpm)
+        builder.add_product(products.SwiftSyntax,
+                            is_enabled=self.args.build_swiftsyntax)
         builder.add_product(products.SwiftFormat,
                             is_enabled=self.args.build_swiftformat)
         builder.add_product(products.SKStressTester,
