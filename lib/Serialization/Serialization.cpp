@@ -414,7 +414,7 @@ namespace {
     using offset_type = unsigned;
 
     hash_value_type ComputeHash(key_type_ref key) {
-      return llvm::hash_value(static_cast<uint32_t>(key));
+      return key;
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -459,7 +459,7 @@ namespace {
     using offset_type = unsigned;
 
     hash_value_type ComputeHash(key_type_ref key) {
-      return llvm::hash_value(static_cast<uint32_t>(key));
+      return key;
     }
 
     std::pair<unsigned, unsigned>

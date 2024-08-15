@@ -330,7 +330,7 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::hash_value(key);
+    return key;
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -580,7 +580,7 @@ public:
   internal_key_type GetInternalKey(external_key_type ID) { return ID; }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::hash_value(key);
+    return key;
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
