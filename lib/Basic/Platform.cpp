@@ -60,10 +60,17 @@ bool swift::tripleInfersSimulatorEnvironment(const llvm::Triple &triple) {
 bool swift::triplesAreValidForZippering(const llvm::Triple &target,
                                         const llvm::Triple &targetVariant) {
   // The arch and vendor must match.
-  if (target.getArchName() != targetVariant.getArchName() ||
-      target.getArch() != targetVariant.getArch() ||
-      target.getSubArch() != targetVariant.getSubArch() ||
+  if (target.getArch() != targetVariant.getArch() ||
       target.getVendor() != targetVariant.getVendor()) {
+    return false;
+  }
+
+  // Subarch must match, except that for arm64 we allow the case where
+  // one of them is arm64e and the other isn't.
+  if (target.getSubArch() != targetVariant.getSubArch() &&
+      (target.getArch() != llvm::Triple::aarch64 ||
+       (target.getSubArch() != llvm::Triple::AArch64SubArch_arm64e &&
+        targetVariant.getSubArch() != llvm::Triple::AArch64SubArch_arm64e))) {
     return false;
   }
 
