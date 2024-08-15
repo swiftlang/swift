@@ -2288,6 +2288,7 @@ bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
   SourceLoc RightLoc;
   ParserStatus Status;
   bool SuppressLaterDiags = false;
+  bool VersionListWasEmpty = true;
   llvm::SmallVector<PlatformAndVersion, 4> PlatformAndVersions;
 
   {
@@ -2312,6 +2313,7 @@ bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
                                  return parsePlatformVersionInList(
                                      AtAttrName, PlatformAndVersions);
                                });
+        VersionListWasEmpty = false;
       } while (Result == ParseListItemResult::Continue);
     }
   }
@@ -2324,12 +2326,14 @@ bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
     return false;
   }
 
-  if (PlatformAndVersions.empty()) {
+  // We can't just check PlatformAndVersions.empty(), because it's possible
+  // that the list contained entries we didn't understand, in which case this
+  // diagnostic would be incorrect.
+  if (VersionListWasEmpty) {
     diagnose(Loc, diag::attr_availability_need_platform_version, AtAttrName);
     return false;
   }
 
-  assert(!PlatformAndVersions.empty());
   auto AttrRange = SourceRange(Loc, RightLoc);
   for (auto &Item : PlatformAndVersions) {
     Attributes.add(new (Context) BackDeployedAttr(AtLoc, AttrRange, Item.first,
@@ -3445,6 +3449,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     StringRef AttrName = "@_originallyDefinedIn";
     bool SuppressLaterDiags = false;
+    bool VersionListWasEmpty = true;
     if (parseList(tok::r_paren, LeftLoc, RightLoc, false,
                   diag::originally_defined_in_missing_rparen,
                   [&]() -> ParserStatus {
@@ -3488,6 +3493,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
             parsePlatformVersionInList(AttrName, PlatformAndVersions);
         if (ListItemStatus.isErrorOrHasCompletion())
           SuppressLaterDiags = true;
+        VersionListWasEmpty = false;
         return ListItemStatus;
       }
       }
@@ -3499,13 +3505,16 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       diagnose(AtLoc, diag::originally_defined_in_need_nonempty_module_name);
       return makeParserSuccess();
     }
-    if (PlatformAndVersions.empty()) {
+
+    // We can't just check PlatformAndVersions.empty(), because it's possible
+    // that the list contained entries we didn't understand, in which case this
+    // diagnostic would be incorrect.
+    if (VersionListWasEmpty) {
       diagnose(AtLoc, diag::attr_availability_need_platform_version, AttrName);
       return makeParserSuccess();
     }
 
     assert(!OriginalModuleName.empty());
-    assert(!PlatformAndVersions.empty());
     assert(NK == NextSegmentKind::PlatformVersion);
     AttrRange = SourceRange(Loc, RightLoc);
     for (auto &Item: PlatformAndVersions) {
