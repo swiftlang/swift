@@ -11651,6 +11651,10 @@ ActorIsolation::ActorIsolation(Kind kind, Expr *actor,
     : actorInstance(actor), kind(kind), isolatedByPreconcurrency(false),
       silParsed(false), parameterIndex(parameterIndex) {}
 
+ActorIsolation::ActorIsolation(Kind kind, Type globalActor)
+    : globalActor(globalActor), kind(kind), isolatedByPreconcurrency(false),
+      silParsed(false), parameterIndex(0) {}
+
 ActorIsolation
 ActorIsolation::forActorInstanceParameter(Expr *actor,
                                           unsigned parameterIndex) {
@@ -11701,18 +11705,21 @@ ActorIsolation ActorIsolation::forActorInstanceSelf(NominalTypeDecl *selfDecl) {
 }
 
 NominalTypeDecl *ActorIsolation::getActor() const {
-  assert(getKind() == ActorInstance ||
-         getKind() == GlobalActor);
+  assert(getKind() == ActorInstance || getKind() == GlobalActor);
 
   if (silParsed)
     return nullptr;
+
+  if (getKind() == GlobalActor) {
+    return getGlobalActor()->getAnyNominal();
+  }
 
   Type actorType;
 
   if (auto *instance = actorInstance.dyn_cast<VarDecl *>()) {
     actorType = instance->getTypeInContext();
-  } else if (auto *instance = actorInstance.dyn_cast<Expr *>()) {
-    actorType = instance->getType();
+  } else if (auto *expr = actorInstance.dyn_cast<Expr *>()) {
+    actorType = expr->getType();
   }
 
   if (actorType) {
@@ -11721,31 +11728,6 @@ NominalTypeDecl *ActorIsolation::getActor() const {
     }
     return actorType
         ->getReferenceStorageReferent()->getAnyActor();
-  }
-
-  return actorInstance.get<NominalTypeDecl *>();
-}
-
-NominalTypeDecl *ActorIsolation::getActorOrNullPtr() const {
-  if (getKind() != ActorInstance || getKind() != GlobalActor)
-    return nullptr;
-
-  if (silParsed)
-    return nullptr;
-
-  Type actorType;
-
-  if (auto *instance = actorInstance.dyn_cast<VarDecl *>()) {
-    actorType = instance->getTypeInContext();
-  } else if (auto *instance = actorInstance.dyn_cast<Expr *>()) {
-    actorType = instance->getType();
-  }
-
-  if (actorType) {
-    if (auto wrapped = actorType->getOptionalObjectType()) {
-      actorType = wrapped;
-    }
-    return actorType->getReferenceStorageReferent()->getAnyActor();
   }
 
   return actorInstance.get<NominalTypeDecl *>();
@@ -11785,7 +11767,10 @@ bool ActorIsolation::isDistributedActor() const {
   if (silParsed)
     return false;
 
-  return getKind() == ActorInstance && getActor()->isDistributedActor();
+  if (getKind() != ActorInstance)
+    return false;
+
+  return getActor()->isDistributedActor();
 }
 
 bool ActorIsolation::isEqual(const ActorIsolation &lhs,

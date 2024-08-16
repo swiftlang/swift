@@ -1823,6 +1823,52 @@ static bool wasLegacyEscapingUseRestriction(AbstractFunctionDecl *fn) {
   return !(fn->hasAsync()); // basic case: not async = had restriction.
 }
 
+/// Note that while a direct access to the actor isolated property is not legal
+/// you may want to consider introducing an accessing method for a mutation.
+static void
+maybeNoteMutatingMethodSuggestion(ASTContext &C,
+                                  ValueDecl const *member,
+                                  SourceLoc memberLoc,
+                                  DeclContext const *refCxt,
+                                  ActorIsolation isolation,
+                                  std::optional<VarRefUseEnv> useKind) {
+  if (!member || !isa<VarDecl>(member))
+      return; // we only offer the note property mutations
+
+  if (!(isolation.getKind() == ActorIsolation::Kind::ActorInstance ||
+        isolation.getKind() == ActorIsolation::Kind::GlobalActor)) {
+      return;
+  }
+
+  if (useKind != VarRefUseEnv::Mutating) {
+      // This note is tailored for the 'mutating' access, i.e. when
+      // attempting to mutate a property, they should instead make an actor method to perform the mutation. Reading properties does not have the same restriction.
+      return;
+  }
+
+  if (!refCxt->isAsyncContext()) {
+      // don't suggest creating method when in sync context, as we won't be able
+      // to invoke it anyway so this would not be helpful to suggest
+      return;
+  }
+
+  if (auto actor = isolation.getActor()) {
+      // TODO: isolation is printing without the type name for instance actors,
+      //  it'd be nicer to print with type name and avoid this switch
+      if (isolation.getKind() == swift::ActorIsolation::ActorInstance) {
+        C.Diags.diagnose(
+            memberLoc,
+            diag::note_consider_method_for_isolated_property_mutation,
+            actor, isolation);
+      } else if (isolation.getKind() == swift::ActorIsolation::GlobalActor) {
+        C.Diags.diagnose(
+            memberLoc,
+            diag::note_consider_method_for_global_actor_isolated_property_mutation,
+            isolation);
+      }
+  }
+}
+
 /// Note that the given actor member is isolated.
 static void noteIsolatedActorMember(ValueDecl const *decl,
                                     std::optional<VarRefUseEnv> useKind) {
@@ -1944,20 +1990,23 @@ static bool memberAccessHasSpecialPermissionInSwift5(
     }
 
     // Otherwise, it's definitely going to be illegal, so warn and permit.
-    auto &diags = refCxt->getASTContext().Diags;
+    auto &C = refCxt->getASTContext();
+    auto &diags = C.Diags;
     auto useKindInt = static_cast<unsigned>(
         useKind.value_or(VarRefUseEnv::Read));
 
+    auto isolation = getActorIsolation(const_cast<ValueDecl *>(member));
     diags.diagnose(
         memberLoc, diag::actor_isolated_non_self_reference,
         member,
         useKindInt,
         baseActor.kind + 1,
         baseActor.globalActor,
-        getActorIsolation(const_cast<ValueDecl *>(member)))
+        isolation)
     .warnUntilSwiftVersion(6);
 
     noteIsolatedActorMember(member, useKind);
+    maybeNoteMutatingMethodSuggestion(C, member, memberLoc, refCxt, isolation, useKind);
     return true;
   }
 
@@ -4438,6 +4487,8 @@ namespace {
               refKind + 1, refGlobalActor,
               result.isolation)
           .warnUntilSwiftVersionIf(preconcurrencyContext, 6);
+          maybeNoteMutatingMethodSuggestion(ctx, decl, loc, getDeclContext(), result.isolation,
+                                            kindOfUsage(decl, context).value_or(VarRefUseEnv::Read));
 
           if (derivedConformanceType) {
             auto *decl = dyn_cast<ValueDecl>(getDeclContext()->getAsDecl());
