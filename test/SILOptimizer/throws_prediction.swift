@@ -16,7 +16,7 @@
 // RUN:   -sil-verify-all -module-name=test -emit-sil \
 // RUN:       | %FileCheck --check-prefix CHECK-DISABLED %s
 
-// UNSUPPORTED: CPU=armv7k
+// UNSUPPORTED: CPU=armv7k || CPU=arm64_32
 
 // CHECK-DISABLED-NOT: normal_count
 
