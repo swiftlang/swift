@@ -200,13 +200,13 @@ extension DoesNotImposeClassReq_2 where Self : AnyObject {
   var wrappingProperty1: String {
     get { property }
     set { property = newValue } // expected-error {{cannot assign to property: 'self' is immutable}}
-    // expected-note@-1 {{mark accessor 'mutating' to make 'self' mutable}}{{5-5=mutating }}
+    // expected-note@-1 {{mark setter 'mutating' to make 'self' mutable}}{{5-5=mutating }}
   }
   
   var wrappingProperty2: String {
     get { property }
     nonmutating set { property = newValue } // expected-error {{cannot assign to property: 'self' is immutable}}
-    // expected-note@-1 {{mark accessor 'mutating' to make 'self' mutable}}{{5-16=mutating}}
+    // expected-note@-1 {{mark setter 'mutating' to make 'self' mutable}}{{5-16=mutating}}
   }
   
   var wrappingProperty3: String {
