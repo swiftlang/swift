@@ -7,6 +7,7 @@
 
 // CHECK: define{{.*}}foo_static_method{{.*}} !dbg ![[FOO_STATIC_METHOD_DEF_DBG:[0-9]+]]
 // CHECK: define{{.*}}foo_method{{.*}} !dbg ![[FOO_METHOD_DEF_DBG:[0-9]+]]
+// CHECK: define{{.*}}s1a3FooVACycfcyycfU_To{{.*}} !dbg ![[COMPILER_GEN_METHOD_DEF_DBG:[0-9]+]]
 // CHECK: define{{.*}}bar_static_method{{.*}} !dbg ![[BAR_STATIC_METHOD_DEF_DBG:[0-9]+]]
 // CHECK: define{{.*}}bar_method{{.*}} !dbg ![[BAR_METHOD_DEF_DBG:[0-9]+]]
 // CHECK: define{{.*}}a_function{{.*}} !dbg ![[FUNC_DEF_DBG:[0-9]+]]
@@ -20,10 +21,8 @@ public struct Foo {
 // CHECK-DAG: ![[FOO_METHOD_DEF_DBG]] = distinct !DISubprogram(name: "foo_method"{{.*}}, scope: ![[FOO_DBG]]{{.*}}DISPFlagDefinition{{.*}}, declaration: ![[FOO_METHOD_DECL_DBG:[0-9]+]]
 // CHECK-DAG: ![[FOO_METHOD_DECL_DBG]] = !DISubprogram(name: "foo_method"{{.*}}, scope: ![[FOO_DBG]]
     func foo_method() {}
-
-// CHECK-DAG: !DISubprogram(linkageName: "$s1a3FooVACycfcyycfU_To"
-// CHECK-SAME: scope: ![[FOO_DBG]]
-// CHECK-SAME: declaration: !
+// CHECK-DAG: ![[COMPILER_GEN_METHOD_DEF_DBG]] = distinct !DISubprogram(linkageName: "$s1a3FooVACycfcyycfU_To"{{.*}}, scope: ![[FOO_DBG]]{{.*}}DISPFlagDefinition{{.*}}, declaration: ![[COMPILER_GEN_METHOD_DECL_DBG:[0-9]+]]
+// CHECK-DAG: ![[COMPILER_GEN_METHOD_DECL_DBG]] = !DISubprogram(linkageName: "$s1a3FooVACycfcyycfU_To"{{.*}}, scope: ![[FOO_DBG]]
     init() {
         let _ = ObjCGoo(myVal:{})
     }
