@@ -739,10 +739,7 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
   QueryInterfaceTypeSubstitutions mapIntoContext(this);
   return type.subst(
       [&](SubstitutableType *type) {
-        auto *genericParam = type->getAs<GenericTypeParamType>();
-        if (!genericParam)
-          return Type();
-
+        auto *genericParam = cast<GenericTypeParamType>(type);
         if (genericParam->getDepth() == elementDepth) {
           genericParam = members[genericParam->getIndex()];
           assert(genericParam->isParameterPack());
@@ -772,7 +769,7 @@ public:
 
 Type BuildForwardingSubstitutions::operator()(SubstitutableType *type) const {
   if (auto resultType = Query(type)) {
-    auto param = type->castTo<GenericTypeParamType>();
+    auto param = cast<GenericTypeParamType>(type);
     if (!param->isParameterPack())
       return resultType;
     if (resultType->is<PackType>())

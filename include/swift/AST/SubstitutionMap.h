@@ -277,7 +277,7 @@ private:
   /// Note that this only finds replacements for maps that are directly
   /// stored inside the map. In most cases, you should call Type::subst()
   /// instead, since that will resolve member types also.
-  Type lookupSubstitution(CanSubstitutableType type) const;
+  Type lookupSubstitution(GenericTypeParamType *type) const;
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,

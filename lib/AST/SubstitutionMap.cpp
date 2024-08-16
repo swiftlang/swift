@@ -154,10 +154,7 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
     return SubstitutionMap();
 
   return SubstitutionMap::get(genericSig,
-           [&](SubstitutableType *type) -> Type {
-             return substitutions.lookupSubstitution(
-                cast<SubstitutableType>(type->getCanonicalType()));
-           },
+           QuerySubstitutionMap{substitutions},
            LookUpConformanceInSubstitutionMap(substitutions));
 }
 
@@ -213,29 +210,13 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
   return SubstitutionMap(genericSig, replacementTypes, conformances);
 }
 
-Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
+Type SubstitutionMap::lookupSubstitution(GenericTypeParamType *genericParam) const {
   if (empty())
     return Type();
-
-  // If we have an archetype, map out of the context so we can compute a
-  // conformance access path.
-  if (auto archetype = dyn_cast<ArchetypeType>(type)) {
-    // Only consider root archetypes.
-    if (!archetype->isRoot())
-      return Type();
-
-    if (!isa<PrimaryArchetypeType>(archetype) &&
-        !isa<PackArchetypeType>(archetype))
-      return Type();
-
-    type = cast<GenericTypeParamType>(
-      archetype->getInterfaceType()->getCanonicalType());
-  }
 
   // Find the index of the replacement type based on the generic parameter we
   // have.
   GenericSignature genericSig = getGenericSignature();
-  auto genericParam = cast<GenericTypeParamType>(type);
   auto genericParams = genericSig.getGenericParams();
   auto replacementIndex =
     GenericParamKey(genericParam).findIndexIn(genericParams);
