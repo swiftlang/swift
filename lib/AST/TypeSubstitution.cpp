@@ -55,8 +55,7 @@ Type QueryTypeSubstitutionMap::operator()(SubstitutableType *type) const {
 }
 
 Type QuerySubstitutionMap::operator()(SubstitutableType *type) const {
-  auto key = cast<SubstitutableType>(type->getCanonicalType());
-  return subMap.lookupSubstitution(key);
+  return subMap.lookupSubstitution(cast<GenericTypeParamType>(type));
 }
 
 FunctionType *
