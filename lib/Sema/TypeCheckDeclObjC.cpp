@@ -681,7 +681,8 @@ bool swift::isRepresentableInObjC(
       // willSet/didSet implementations are never exposed to objc, they are
       // always directly dispatched from the synthesized setter.
       diagnoseAndRemoveAttr(accessor, Reason.getAttr(),
-                            diag::objc_observing_accessor)
+                            diag::objc_observing_accessor,
+                            accessor->getDescriptiveKind())
           .limitBehavior(behavior);
       Reason.describe(accessor);
       return false;

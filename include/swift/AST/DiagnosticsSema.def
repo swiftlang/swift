@@ -3963,8 +3963,8 @@ ERROR(attr_incompatible_with_objc,none,
       (DeclAttribute, DescriptiveDeclKind))
 
 ERROR(final_not_on_accessors,none,
-      "'final' cannot be applied to accessors, it must be put on the "
-      "%select{var|let|subscript}0", (unsigned))
+      "only the %select{property|subscript}0 itself can be marked as 'final'"
+      ,(bool))
 
 ERROR(override_rethrows_with_non_rethrows,none,
       "override of 'rethrows' %select{method|initializer}0 should also "
@@ -4996,8 +4996,8 @@ NOTE(candidate_is_not_assignable,none,
      (const ValueDecl *))
 
 NOTE(change_to_mutating,none,
-     "mark %select{method|accessor}0 'mutating' to make 'self' mutable",
-     (bool))
+     "mark %select{method|%1}0 'mutating' to make 'self' mutable",
+     (bool, StringRef))
 NOTE(masked_mutable_property,none,
      "add explicit '%0' to refer to mutable %1 of %2",
      (StringRef, DescriptiveDeclKind, Type))
@@ -6361,9 +6361,8 @@ NOTE(objc_witness_objc_requirement,none,
 ERROR(no_opaque_return_type_of,none,
       "unable to resolve type for _opaqueReturnTypeOf attribute", ())
 
-
 ERROR(objc_observing_accessor, none,
-      "observing accessors are not allowed to be marked @objc", ())
+      "observers (%0) are not allowed to be marked '@objc'", (DescriptiveDeclKind))
 ERROR(objc_init_accessor, none,
       "init accessors cannot be marked @objc", ())
 ERROR(objc_addressor, none,
@@ -7180,8 +7179,8 @@ ERROR(property_wrapper_computed, none,
       "property wrapper cannot be applied to a computed property",
       ())
 ERROR(property_wrapper_effectful,none,
-    "property wrappers currently cannot define an 'async' or 'throws' accessor",
-    ())
+      "property wrapper's 'wrappedValue' property cannot define an 'async' or 'throws' %0",
+    (DescriptiveDeclKind))
 
 ERROR(property_with_wrapper_conflict_attribute,none,
       "property %0 with a wrapper cannot also be "
@@ -7593,7 +7592,7 @@ ERROR(invalid_decl_in_macro_expansion,none,
       "macro expansion cannot introduce %0",
       (DescriptiveDeclKind))
 ERROR(let_accessor_expansion,none,
-      "cannot expand accessors on variable declared with 'let'",
+      "cannot expand accessor macro on variable declared with 'let'",
       ())
 ERROR(invalid_main_type_in_macro_expansion,none,
       "macro expansion cannot introduce '@main' type",
