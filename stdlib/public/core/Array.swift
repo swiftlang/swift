@@ -1642,6 +1642,42 @@ extension Array {
     return try body(&inoutBufferPointer)
   }
 
+  /// Calls the given closure with a pointer to the array's mutable contiguous
+  /// storage.
+  ///
+  /// Often, the optimizer can eliminate bounds checks within an array
+  /// algorithm, but when that fails, invoking the same algorithm on the
+  /// buffer pointer passed into your closure lets you trade safety for speed.
+  ///
+  /// The following example shows how modifying the contents of the
+  /// `UnsafeMutableBufferPointer` argument to `body` alters the contents of
+  /// the array:
+  ///
+  ///     var numbers = [1, 2, 3, 4, 5]
+  ///     numbers.withUnsafeMutableBufferPointer { buffer in
+  ///         for i in stride(from: buffer.startIndex, to: buffer.endIndex - 1, by: 2) {
+  ///             buffer.swapAt(i, i + 1)
+  ///         }
+  ///     }
+  ///     print(numbers)
+  ///     // Prints "[2, 1, 4, 3, 5]"
+  ///
+  /// The pointer passed as an argument to `body` is valid only during the
+  /// execution of `withUnsafeMutableBufferPointer(_:)`. Do not store or
+  /// return the pointer for later use.
+  ///
+  /// - Warning: Do not rely on anything about the array that is the target of
+  ///   this method during execution of the `body` closure; it might not
+  ///   appear to have its correct value. Instead, use only the
+  ///   `UnsafeMutableBufferPointer` argument to `body`.
+  ///
+  /// - Parameter body: A closure with an `UnsafeMutableBufferPointer`
+  ///   parameter that points to the contiguous storage for the array.
+  ///    If no such storage exists, it is created. If `body` has a return value, that value is also
+  ///   used as the return value for the `withUnsafeMutableBufferPointer(_:)`
+  ///   method. The pointer argument is valid only for the duration of the
+  ///   method's execution.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   @_semantics("array.withUnsafeMutableBufferPointer")
   @_effects(notEscaping self.value**)
   @_alwaysEmitIntoClient
