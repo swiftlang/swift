@@ -155,6 +155,12 @@ public:
     return value.get<SILInstruction *>();
   }
 
+  bool operator==(SILValue other) const {
+    if (hasRegionIntroducingInst())
+      return false;
+    return getValue() == other;
+  }
+
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
 private:
