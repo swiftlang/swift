@@ -407,6 +407,7 @@ function Get-TargetProjectBinaryCache($Arch, [TargetComponent]$Project) {
 enum HostComponent {
   Compilers = 5
   FoundationMacros = 10
+  TestingMacros
   System
   ToolsSupportCore
   LLBuild
@@ -425,7 +426,6 @@ enum HostComponent {
   LMDB
   SymbolKit
   DocC
-  SwiftTestingMacros
 }
 
 function Get-HostProjectBinaryCache([HostComponent]$Project) {
@@ -440,6 +440,7 @@ enum BuildComponent {
   BuildTools
   Compilers
   FoundationMacros
+  TestingMacros
 }
 
 function Get-BuildProjectBinaryCache([BuildComponent]$Project) {
@@ -1843,8 +1844,7 @@ function Build-SwiftTesting([Platform]$Platform, $Arch, [switch]$Test = $false) 
         BUILD_SHARED_LIBS = "YES";
         CMAKE_BUILD_WITH_INSTALL_RPATH = "YES";
         SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
-        # FIXME: Build the plugin for the builder and specify the path.
-        SwiftTesting_MACRO = "NO";
+        SwiftTesting_MACRO = "$(Get-BuildProjectBinaryCache TestingMacros)\TestingMacros.dll";
       })
   }
 }
@@ -2250,16 +2250,48 @@ function Build-SourceKitLSP($Arch) {
     }
 }
 
-function Build-SwiftTestingMacros($Arch) {
+function Build-TestingMacros() {
+  [CmdletBinding(PositionalBinding = $false)]
+  param
+  (
+    [Parameter(Position = 0, Mandatory = $true)]
+    [Platform]$Platform,
+    [Parameter(Position = 1, Mandatory = $true)]
+    [hashtable]$Arch,
+    [switch] $Build = $false
+  )
+
+  $TestingMacrosBinaryCache = if ($Build) {
+    Get-BuildProjectBinaryCache TestingMacros
+  } else {
+    Get-HostProjectBinaryCache TestingMacros
+  }
+
+  $SwiftSDK = $null
+  if ($Build) {
+    $SwiftSDK = $HostArch.SDKInstallRoot
+  }
+
+  $Targets = if ($Build) {
+    @("default")
+  } else {
+    @("default", "install")
+  }
+
+  $InstallDir = $null
+  if (-not $Build) {
+    $InstallDir = "$($Arch.ToolchainInstallRoot)\usr"
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\swift-testing\Sources\TestingMacros `
-    -Bin (Get-HostProjectBinaryCache SwiftTestingMacros) `
-    -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
+    -Bin $TestingMacrosBinaryCache `
+    -InstallTo:$InstallDir  `
     -Arch $Arch `
-    -Platform Windows `
+    -Platform $Platform `
     -UseBuiltCompilers Swift `
-    -SwiftSDK (Get-HostSwiftSDK) `
-    -BuildTargets default `
+    -SwiftSDK:$SwiftSDK `
+    -BuildTargets $Targets `
     -Defines @{
       SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
     }
@@ -2419,7 +2451,9 @@ if (-not $SkipBuild) {
     # Build platform: SDK, Redist and XCTest
     Invoke-BuildStep Build-Runtime Windows $Arch
     Invoke-BuildStep Build-Dispatch Windows $Arch
+    # FIXME(compnerd) ensure that the _build_ is the first arch and don't rebuild on each arch
     Invoke-BuildStep Build-FoundationMacros -Build Windows $BuildArch
+    Invoke-BuildStep Build-TestingMacros -Build Windows $BuildArch
     Invoke-BuildStep Build-Foundation Windows $Arch
     Invoke-BuildStep Build-XCTest Windows $Arch
     Invoke-BuildStep Build-SwiftTesting Windows $Arch
@@ -2445,6 +2479,7 @@ if (-not $SkipBuild) {
 if (-not $SkipBuild) {
   # Build Macros for distribution
   Invoke-BuildStep Build-FoundationMacros Windows $HostArch
+  Invoke-BuildStep Build-TestingMacros Windows $HostArch
 }
 
 if (-not $ToBatch) {
@@ -2466,8 +2501,6 @@ if (-not $ToBatch) {
 }
 
 if (-not $SkipBuild) {
-  # TestingMacros can't be built before the standard library for the host as it is required for the Swift code.
-  Invoke-BuildStep Build-SwiftTestingMacros $HostArch
   Invoke-BuildStep Build-SQLite $HostArch
   Invoke-BuildStep Build-System $HostArch
   Invoke-BuildStep Build-ToolsSupportCore $HostArch
