@@ -108,7 +108,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
 
   // The property may not have any effects right now.
   if (auto getter = var->getEffectfulGetAccessor()) {
-    getter->diagnose(diag::property_wrapper_effectful);
+    getter->diagnose(diag::property_wrapper_effectful, getter->getDescriptiveKind());
     return nullptr;
   }
 
