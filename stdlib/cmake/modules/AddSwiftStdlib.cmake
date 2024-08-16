@@ -1929,6 +1929,7 @@ function(add_swift_target_library name)
         SWIFT_COMPILE_FLAGS_WATCHOS
         SWIFT_COMPILE_FLAGS_XROS
         SWIFT_COMPILE_FLAGS_LINUX
+        SWIFT_COMPILE_FLAGS_LINUX_STATIC
         SWIFT_MODULE_DEPENDS
         SWIFT_MODULE_DEPENDS_ANDROID
         SWIFT_MODULE_DEPENDS_CYGWIN
@@ -1959,6 +1960,7 @@ function(add_swift_target_library name)
         SWIFT_SOURCES_DEPENDS_FREEBSD
         SWIFT_SOURCES_DEPENDS_OPENBSD
         SWIFT_SOURCES_DEPENDS_LINUX
+        SWIFT_SOURCES_DEPENDS_LINUX_STATIC
         SWIFT_SOURCES_DEPENDS_CYGWIN
         SWIFT_SOURCES_DEPENDS_HAIKU
         SWIFT_SOURCES_DEPENDS_WASI
@@ -2212,6 +2214,9 @@ function(add_swift_target_library name)
     elseif(sdk STREQUAL "LINUX")
       list(APPEND swiftlib_swift_compile_flags_all
            ${SWIFTLIB_SWIFT_COMPILE_FLAGS_LINUX})
+    elseif(sdk STREQUAL "LINUX_STATIC")
+      list(APPEND swiftlib_swift_compile_flags_all
+           ${SWIFTLIB_SWIFT_COMPILE_FLAGS_LINUX_STATIC})
     elseif(sdk STREQUAL "WINDOWS")
       # FIXME: https://github.com/apple/swift/issues/44614
       # static and shared are not mutually exclusive; however since we do a
@@ -2256,6 +2261,8 @@ function(add_swift_target_library name)
       list(APPEND sources ${SWIFTLIB_SWIFT_SOURCES_DEPENDS_OPENBSD})
     elseif(sdk STREQUAL "LINUX" OR sdk STREQUAL "ANDROID")
       list(APPEND sources ${SWIFTLIB_SWIFT_SOURCES_DEPENDS_LINUX})
+    elseif(sdk STREQUAL "LINUX_STATIC")
+      list(APPEND sources ${SWIFTLIB_SWIFT_SOURCES_DEPENDS_LINUX_STATIC})
     elseif(sdk STREQUAL "CYGWIN")
       list(APPEND sources ${SWIFTLIB_SWIFT_SOURCES_DEPENDS_CYGWIN})
     elseif(sdk STREQUAL "HAIKU")
