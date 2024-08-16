@@ -14,6 +14,11 @@ extension Task where Failure == Never {
   public static func fakeInit(
     @_implicitSelfCapture operation: sending @escaping () async -> Success
   ) {}
+
+  // This matches the current impl
+  public static func fakeInit2(
+    @_implicitSelfCapture @_inheritActorContext operation: sending @escaping @isolated(any) () async -> Success
+  ) {}
 }
 
 func useValue<T>(_ t: T) {}
@@ -25,10 +30,19 @@ func useValue<T>(_ t: T) {}
 @MainActor func testGlobalFakeInit() {
   let ns = NonSendableKlass()
 
-  // Will be resolved once @MainActor is @Sendable
-  Task.fakeInit { @MainActor in
-    // expected-error @-1 {{sending value of non-Sendable type '@MainActor @Sendable () async -> ()' risks causing data races}}
-    // expected-note @-2 {{Passing main actor-isolated value of non-Sendable type '@MainActor @Sendable () async -> ()' as a 'sending' parameter to static method 'fakeInit(operation:)' risks causing races inbetween main actor-isolated uses and uses reachable from 'fakeInit(operation:)'}}
+  // Will be resolved once @MainActor is @Sendable.
+  Task.fakeInit { @MainActor in // expected-error {{passing closure as a 'sending' parameter risks causing data races between main actor-isolated code and concurrent execution of the closure}}
+    print(ns) // expected-note {{closure captures 'ns' which is accessible to main actor-isolated code}}
+  }
+
+  useValue(ns)
+}
+
+@MainActor func testGlobalFakeInit2() {
+  let ns = NonSendableKlass()
+
+  // We shouldn't error here.
+  Task.fakeInit2 { @MainActor in
     print(ns)
   }
 
