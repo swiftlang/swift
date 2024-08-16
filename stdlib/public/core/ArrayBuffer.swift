@@ -569,7 +569,7 @@ extension _ArrayBuffer {
 
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
-  @inlinable
+  @usableFromInline
   @_silgen_name("$ss12_ArrayBufferV010withUnsafeB7Pointeryqd__qd__SRyxGKXEKlF")
   internal func __abi_withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
@@ -585,7 +585,6 @@ extension _ArrayBuffer {
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
-  @inlinable
   @_alwaysEmitIntoClient
   internal func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
@@ -600,7 +599,7 @@ extension _ArrayBuffer {
 
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
-  @inlinable
+  @usableFromInline
   @_silgen_name("$ss12_ArrayBufferV017withUnsafeMutableB7Pointeryqd__qd__SryxGKXEKlF")
   internal mutating func __abi_withUnsafeMutableBufferPointer<R>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
@@ -612,7 +611,6 @@ extension _ArrayBuffer {
   /// over the underlying contiguous storage.
   ///
   /// - Precondition: Such contiguous storage exists or the buffer is empty.
-  @inlinable
   @_alwaysEmitIntoClient
   internal mutating func withUnsafeMutableBufferPointer<R, E>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> R

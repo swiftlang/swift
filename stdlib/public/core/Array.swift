@@ -1604,7 +1604,6 @@ extension Array {
   ///   for the `withUnsafeBufferPointer(_:)` method. The pointer argument is
   ///   valid only for the duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable
   @_alwaysEmitIntoClient
   public func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
@@ -1616,11 +1615,8 @@ extension Array {
   // for ABI reasons.
   @_semantics("array.withUnsafeMutableBufferPointer")
   @_effects(notEscaping self.value**)
-  @inlinable // FIXME(inline-always)
-  @inline(__always) // Performance: This method should get inlined into the
-  // caller such that we can combine the partial apply with the apply in this
-  // function saving on allocating a closure context. This becomes unnecessary
-  // once we allocate noescape closures on the stack.
+  @usableFromInline
+  @inline(__always)
   @_silgen_name("$sSa30withUnsafeMutableBufferPointeryqd__qd__SryxGzKXEKlF")
   mutating func __abi_withUnsafeMutableBufferPointer<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
