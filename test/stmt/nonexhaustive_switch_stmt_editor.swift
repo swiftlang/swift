@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -diagnostics-editor-mode -enable-library-evolution -enable-nonfrozen-enum-exhaustivity-diagnostics
+// RUN: %target-typecheck-verify-swift -enable-library-evolution -enable-nonfrozen-enum-exhaustivity-diagnostics
 
 public enum NonExhaustive {
   case a, b

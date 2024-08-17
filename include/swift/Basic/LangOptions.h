@@ -458,10 +458,6 @@ namespace swift {
     /// [TODO: Clang-type-plumbing] Turn on for feature rollout.
     bool UseClangFunctionTypes = false;
 
-    /// If set to true, the diagnosis engine can assume the emitted diagnostics
-    /// will be used in editor. This usually leads to more aggressive fixit.
-    bool DiagnosticsEditorMode = false;
-
     /// Access or distribution level of the whole module being parsed.
     LibraryLevel LibraryLevel = LibraryLevel::Other;
 

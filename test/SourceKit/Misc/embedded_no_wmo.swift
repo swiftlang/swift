@@ -1,9 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// TODO: This test passes locally on my machine, but fails for an unknown reason in CI
-// REQUIRES: rdar130167087
-
 //--- secondary.swift
 
 final public class X<T> {
@@ -16,7 +13,11 @@ final public class X<T> {
 
 //--- primary.swift
 
-// RUN: %sourcekitd-test  -req=diags %t/primary.swift -- %t/primary.swift %t/secondary.swift -enable-experimental-feature Embedded
+// RUN: %sourcekitd-test  -req=diags %t/primary.swift -- %t/primary.swift %t/secondary.swift -enable-experimental-feature Embedded -target %target-cpu-apple-macos14
+
+// REQUIRES: swift_in_compiler
+// REQUIRES: embedded_stdlib
+// REQUIRES: OS=macosx
 
 // check that SourceKit does not crash on this
 
