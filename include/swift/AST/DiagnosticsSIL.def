@@ -813,6 +813,13 @@ NOTE(discard_nontrivial_implicit_storage_note,none,
      (Type, Type))
 
 
+///// New Move-checking Diagnostics
+ERROR(movechecker_consume_of_borrow, none,
+      "'%0' is borrowed%select{| by this closure| by this deferred block}2,"
+      " so it cannot be consumed here%select{|; you must 'copy %0' before consumption}1",
+      (StringRef, bool, unsigned))
+////////////////////////////////////////////////////////////////////////////////
+
 /// Move Checking / Noncopyable types diagnostics
 
 ERROR(sil_movechecking_owned_value_consumed_more_than_once, none,
