@@ -613,11 +613,11 @@ static bool isInterestingTypealias(Type type) {
 /// declaration and end up presenting the parameter in τ_0_0 format on
 /// diagnostic.
 static Type getAkaTypeForDisplay(Type type) {
-  return type.transform([](Type visitTy) -> Type {
-    if (isa<SugarType>(visitTy.getPointer()) &&
-        !isa<GenericTypeParamType>(visitTy.getPointer()))
+  return type.transformRec([&](TypeBase *visitTy) -> std::optional<Type> {
+    if (isa<SugarType>(visitTy) &&
+        !isa<GenericTypeParamType>(visitTy))
       return getAkaTypeForDisplay(visitTy->getDesugaredType());
-    return visitTy;
+    return std::nullopt;
   });
 }
 
