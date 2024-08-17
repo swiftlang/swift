@@ -18,9 +18,14 @@ import SwiftSyntax
 
 /// A build configuration that uses the compiler's ASTContext to answer
 /// queries.
-struct CompilerBuildConfiguration: BuildConfiguration {
+final class CompilerBuildConfiguration: BuildConfiguration {
   let ctx: BridgedASTContext
-  let conditionLoc: BridgedSourceLoc
+  var conditionLoc: BridgedSourceLoc
+
+  init(ctx: BridgedASTContext, conditionLoc: BridgedSourceLoc) {
+    self.ctx = ctx
+    self.conditionLoc = conditionLoc
+  }
 
   func isCustomConditionSet(name: String) throws -> Bool {
     var name = name
