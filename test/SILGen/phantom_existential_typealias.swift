@@ -18,3 +18,10 @@ protocol P {
 func test1(p: any P) -> [Int] {
   return p.x.f { $0.y }
 }
+
+func callee(_: () -> ()) {}
+
+func test2(p: any P) {
+  let a = p.x
+  callee { _ = a }
+}
