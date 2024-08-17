@@ -779,9 +779,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.UseMalloc |= Args.hasArg(OPT_use_malloc);
 
-  Opts.DiagnosticsEditorMode |= Args.hasArg(OPT_diagnostics_editor_mode,
-                                            OPT_serialize_diagnostics_path);
-
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
 
