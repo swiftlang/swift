@@ -84,13 +84,6 @@ The correct spelling of this feature is "fix-it" rather than "fixit". In [camelc
 
   [camelcased]: https://en.wikipedia.org/wiki/Camel_case
 
-
-### "Editor Mode" ###
-
-The Swift compiler has a setting (under LangOptions) called `DiagnosticsEditorMode`. When set, diagnostics should be customized for an interactive editor that can display and apply complex fix-its, and worry less about the appearance in build logs and command-line environments.
-
-Most diagnostics have no reason to change behavior under editor mode. An example of an exception is the "protocol requirements not satisfied diagnostic"; on the command line, it may be better to show all unsatisfied requirements, while in an IDE a single multi-line fix-it would be preferred.
-
 ### Educational Notes ###
 
 Educational notes are short-form documentation attached to a diagnostic which explain relevant language concepts. They are intended to further Swift's goal of progressive disclosure by providing a learning resource at the point of use when encountering an error message for the first time. In very limited circumstances, they also allow the main diagnostic message to use precise terminology (e.g. nominal types) which would otherwise be too unfriendly for beginners.

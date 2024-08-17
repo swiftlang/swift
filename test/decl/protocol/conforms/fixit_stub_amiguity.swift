@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/Inputs/fixit_stub_ambiguity_module.swift -module-name Ambiguous -emit-module -parse-as-library -o %t
 
-// RUN: %target-swift-frontend -typecheck %s -I %t -verify -diagnostics-editor-mode
+// RUN: %target-swift-frontend -typecheck %s -I %t -verify
 
 import Ambiguous
 

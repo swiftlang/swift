@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -enable-library-evolution -enable-nonfrozen-enum-exhaustivity-diagnostics -diagnostics-editor-mode -verify -swift-version 6
+// RUN: %target-swift-frontend -emit-sil %s -enable-library-evolution -enable-nonfrozen-enum-exhaustivity-diagnostics -verify -swift-version 6
 
 enum Runcible {
   case spoon
