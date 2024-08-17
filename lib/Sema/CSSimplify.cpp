@@ -11093,13 +11093,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                                 ConstraintLocator *locator) -> SolutionKind {
       // Let's check whether there are any generic parameters associated with
       // base type, and record potential holes if so.
-      simplifyType(baseTy).transform([&](Type type) -> Type {
+      simplifyType(baseTy).visit([&](Type type) {
         if (auto *typeVar = type->getAs<TypeVariableType>()) {
-          if (typeVar->getImpl().hasRepresentativeOrFixed())
-            return type;
-          recordPotentialHole(typeVar);
+          if (!typeVar->getImpl().hasRepresentativeOrFixed())
+            recordPotentialHole(typeVar);
         }
-        return type;
       });
 
       auto success = [&]() -> SolutionKind {

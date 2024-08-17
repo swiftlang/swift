@@ -3723,10 +3723,10 @@ ASTMangler::dropProtocolsFromAssociatedTypes(Type type,
   if (!type->hasDependentMember())
     return type;
 
-  return type.transform([&](Type t) -> Type {
-    if (auto *dmt = dyn_cast<DependentMemberType>(t.getPointer()))
+  return type.transformRec([&](TypeBase *t) -> std::optional<Type> {
+    if (auto *dmt = dyn_cast<DependentMemberType>(t))
       return dropProtocolFromAssociatedType(dmt, sig);
-    return t;
+    return std::nullopt;
   });
 }
 

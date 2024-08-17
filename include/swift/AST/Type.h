@@ -253,16 +253,6 @@ public:
   /// Transform the given type by recursively applying the user-provided
   /// function to each node.
   ///
-  /// \param fn A function object with the signature \c Type(Type) , which
-  /// accepts a type and returns either a transformed type or a null type
-  /// (which will propagate out the null type).
-  ///
-  /// \returns the result of transforming the type.
-  Type transform(llvm::function_ref<Type(Type)> fn) const;
-
-  /// Transform the given type by recursively applying the user-provided
-  /// function to each node.
-  ///
   /// \param fn A function object which accepts a type pointer and returns a
   /// transformed type, a null type (which will propagate out the null type),
   /// or None (to indicate that the transform operation should recursively
