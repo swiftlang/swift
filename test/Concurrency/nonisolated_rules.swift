@@ -167,3 +167,14 @@ class KlassA {
 @MainActor
 nonisolated struct Conflict {}
 // expected-error@-1 {{struct 'Conflict' has multiple actor-isolation attributes ('nonisolated' and 'MainActor')}}
+
+struct B: Sendable {
+  // expected-error@+1 {{'nonisolated' can not be applied to variable with non-'Sendable' type 'NonSendable}}
+  nonisolated let test: NonSendable
+}
+
+final class KlassB: Sendable {
+  // expected-note@+2 {{convert 'test' to a 'let' constant or consider declaring it 'nonisolated(unsafe)' if manually managing concurrency safety}}
+  // expected-error@+1 {{'nonisolated' cannot be applied to mutable stored properties}}
+  nonisolated var test: Int = 1
+}
