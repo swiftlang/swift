@@ -698,7 +698,7 @@ Type GenericSignatureImpl::getUpperBound(Type type,
       // If we have constrained all primary associated types, create a
       // parameterized protocol type. During code completion, we might call
       // `getExistentialType` (which calls this method) on a generic parameter
-      // that doesn't have all parameters specified, e.g. to get a consise
+      // that doesn't have all parameters specified, e.g. to get a concise
       // description of the parameter type to the following function.
       //
       // func foo<P: Publisher>(p: P) where P.Failure == Never

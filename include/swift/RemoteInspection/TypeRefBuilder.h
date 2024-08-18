@@ -1001,7 +1001,7 @@ public:
 
     // Soundness:  Verify that the generic params per level add
     // up exactly to the number of args we were provided, and
-    // that we don't have a rediculous number of either one
+    // that we don't have a ridiculous number of either one
     auto genericParamsPerLevel = *maybeGenericParamsPerLevel;
     if (genericParamsPerLevel.size() > 1000 || args.size() > 1000) {
       return nullptr;
@@ -1712,7 +1712,7 @@ private:
       }
       auto protocolNameOffset = (const uint32_t *)protocolNameOffsetBytes.get();
 
-      // Using the offset above, compute the address of the name field itsel
+      // Using the offset above, compute the address of the name field itself
       // and read it.
       auto protocolNameAddress =
           detail::applyRelativeOffset((const char *)protocolNameOffsetAddress,

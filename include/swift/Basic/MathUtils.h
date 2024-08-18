@@ -41,7 +41,7 @@ static inline size_t roundUpToAlignMask(size_t size, size_t alignMask) {
 
 static inline unsigned popcount(unsigned value) {
 #if SWIFT_COMPILER_IS_MSVC && (defined(_M_IX86) || defined(_M_X64))
-  // The __popcnt intrinsic is only available when targetting x86{_64} with MSVC.
+  // The __popcnt intrinsic is only available when targeting x86{_64} with MSVC.
   return __popcnt(value);
 #elif __has_builtin(__builtin_popcount)
   return __builtin_popcount(value);

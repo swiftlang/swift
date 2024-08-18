@@ -428,7 +428,7 @@ class SILInstruction : public llvm::ilist_node<SILInstruction> {
 
   /// Total number of created and deleted SILInstructions.
   ///
-  /// Ideally, those counters would be inside SILModules to allow mutiple
+  /// Ideally, those counters would be inside SILModules to allow multiple
   /// SILModules (e.g. in different threads).
   static int NumCreatedInstructions;
   static int NumDeletedInstructions;
@@ -872,7 +872,7 @@ public:
   bool isTriviallyDuplicatable() const;
 
   /// Returns true if the instruction is only relevant for debug
-  /// informations and has no other impact on program semantics.
+  /// information and has no other impact on program semantics.
   bool isDebugInstruction() const {
     return getKind() == SILInstructionKind::DebugValueInst;
   }
@@ -5200,7 +5200,7 @@ class AssignOrInitInst
   VarDecl *Property;
 
   /// Marks all of the properties in `initializes(...)` list that
-  /// have been initialized before this intruction to help Raw SIL
+  /// have been initialized before this instruction to help Raw SIL
   /// lowering to emit destroys.
   llvm::BitVector Assignments;
 
@@ -5740,7 +5740,7 @@ public:
 /// memory region, before binding it to a contiguous region of type $T. This
 /// token has no purpose unless it is consumed be a rebind_memory instruction.
 ///
-/// Semantics: changes the type information assocated with a memory region. This
+/// Semantics: changes the type information associated with a memory region. This
 /// affects all memory operations that alias with the given region of memory,
 /// regardless of their type or address provenance. For optimizations that query
 /// side effects, this is equivalent to writing and immediately reading an
@@ -8007,7 +8007,7 @@ public:
 /// All of these instructions produce a Builtin.PackIndex value which
 /// can only be used in packs with a specific shape class.  In
 /// principle, that shape class could be reflected into the result type,
-/// but we actually need more structue than that in order to get the
+/// but we actually need more structure than that in order to get the
 /// type-safety properties we want.  It therefore makes more sense to
 /// enforce structural properties on pack-index derivation than try
 /// to go all-in on dependent types.
@@ -9851,7 +9851,7 @@ public:
   /// the payload.
   ///
   /// Postcondition: if the result is non-null, then each successor has zero or
-  /// one block arguments which represents the forwaded result.
+  /// one block arguments which represents the forwarded result.
   const Operand *forwardedOperand() const;
 
   Operand *forwardedOperand() {

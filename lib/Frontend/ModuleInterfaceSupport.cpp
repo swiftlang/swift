@@ -325,7 +325,7 @@ static void printImports(raw_ostream &out,
   M->getImportedModules(publicImports, allImportFilter);
   publicImportSet.insert(publicImports.begin(), publicImports.end());
 
-  // Used to determine whether `package import` should be overriden below.
+  // Used to determine whether `package import` should be overridden below.
   llvm::SmallSet<ImportedModule, 8, ImportedModule::Order> packageOnlyImportSet;
   if (Opts.printPackageInterface()) {
     SmallVector<ImportedModule, 8> packageOnlyImports;

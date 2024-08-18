@@ -1313,7 +1313,7 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   // dominating its uses).
   //
   // Handling cases where the new value does not dominate the old borrow scope
-  // would require signficant complexity and such cases are currently impossible
+  // would require significant complexity and such cases are currently impossible
   // to test. Consideration would be required for handling a new value within an
   // inner loop, while the old borrow scope is introduced outside that
   // loop. Since it generally makes no sense to do this kind of replacement,

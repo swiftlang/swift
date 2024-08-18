@@ -115,7 +115,7 @@ enum class NodeMatchReason: uint8_t {
   // a type declaration.
   Sequential,
 
-  // The first node is a function and it chanaged to a property as the second
+  // The first node is a function and it changed to a property as the second
   // node.
   FuncToProperty,
 
@@ -362,7 +362,7 @@ class SDKNodeDecl: public SDKNode {
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
   // In ABI mode, this field is populated as a user-friendly version of GenericSig.
-  // Diagnostic preferes the sugared versions if they differ as well.
+  // Diagnostic prefers the sugared versions if they differ as well.
   StringRef SugaredGenericSig;
   std::optional<uint8_t> FixedBinaryOrder;
   PlatformIntroVersion introVersions;

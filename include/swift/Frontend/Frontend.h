@@ -683,7 +683,7 @@ public:
   /// Whether this compiler instance supports caching.
   bool supportCaching() const;
 
-  /// Whether errors during interface verification can be downgrated
+  /// Whether errors during interface verification can be downgraded
   /// to warnings.
   bool downgradeInterfaceVerificationErrors() const;
 

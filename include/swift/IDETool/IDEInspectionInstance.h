@@ -129,7 +129,7 @@ class IDEInspectionInstance {
           Callback);
 
   /// Calls \p Callback with new \c CompilerInstance for the completion
-  /// request. The \c CompilerInstace passed to the callback already performed
+  /// request. The \c CompilerInstance passed to the callback already performed
   /// the first pass.
   /// Returns \c false if it fails to setup the \c CompilerInstance.
   void performNewOperation(
@@ -143,7 +143,7 @@ class IDEInspectionInstance {
           Callback);
 
   /// Calls \p Callback with a \c CompilerInstance which is prepared for the
-  /// second pass. \p Callback is resposible to perform the second pass on it.
+  /// second pass. \p Callback is responsible to perform the second pass on it.
   /// The \c CompilerInstance may be reused from the previous completions,
   /// and may be cached for the next completion.
   /// In case of failure or cancellation, the callback receives the
@@ -152,7 +152,7 @@ class IDEInspectionInstance {
   /// If \p CancellationFlag is not \c nullptr, code completion can be cancelled
   /// by setting the flag to \c true.
   /// IMPORTANT: If \p CancellationFlag is not \c nullptr, then completion might
-  /// be cancelled in the secon pass that's invoked inside \p Callback.
+  /// be cancelled in the second pass that's invoked inside \p Callback.
   /// Therefore, \p Callback MUST check whether completion was cancelled before
   /// interpreting the results, since invalid results may be returned in case
   /// of cancellation.

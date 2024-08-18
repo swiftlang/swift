@@ -1024,7 +1024,7 @@ void ClangImporter::addClangInvovcationDependencies(
   addFiles(invocation.getHeaderSearchOpts().VFSOverlayFiles);
   // FIXME: Should not depend on working directory. Build system/swift driver
   // should not pass working directory here but if that option is passed,
-  // repect that and add that into CASFS.
+  // respect that and add that into CASFS.
   auto CWD = invocation.getFileSystemOpts().WorkingDir;
   if (!CWD.empty())
     files.push_back(CWD);
@@ -7694,7 +7694,7 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
     if (isForeignReferenceType(method->getReturnType()))
       return true;
 
-    // begin and end methods likely return an interator, so they're unsafe. This
+    // begin and end methods likely return an iterator, so they're unsafe. This
     // is required so that automatic the conformance to RAC works properly.
     if (method->getNameAsString() == "begin" ||
         method->getNameAsString() == "end")
@@ -7737,7 +7737,7 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
         }
 
         // A projection of a view type (such as a string_view) from a self
-        // contained parent is a proejction (unsafe).
+        // contained parent is a projection (unsafe).
         if (!anySubobjectsSelfContained(cxxRecordReturnType) &&
             isViewType(cxxRecordReturnType)) {
           return !parentIsSelfContained;

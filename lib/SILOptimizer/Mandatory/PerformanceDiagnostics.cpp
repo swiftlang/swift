@@ -73,7 +73,7 @@ class PerformanceDiagnostics {
   struct LocWithParent {
     SourceLoc loc;
     
-    /// Null if this is the top-leve location.
+    /// Null if this is the top-level location.
     LocWithParent *parent;
     
     LocWithParent(SourceLoc loc, LocWithParent *parent) :

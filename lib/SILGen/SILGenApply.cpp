@@ -2998,7 +2998,7 @@ static void emitDelayedArguments(SILGenFunction &SGF,
   // If any of the delayed arguments are isolated default arguments,
   // argument evaluation happens in the following order:
   //
-  //   1. Left-to-right evalution of explicit r-value arguments
+  //   1. Left-to-right evaluation of explicit r-value arguments
   //   2. Left-to-right evaluation of formal access arguments
   //   3. Hop to the callee's isolation domain
   //   4. Left-to-right evaluation of default arguments

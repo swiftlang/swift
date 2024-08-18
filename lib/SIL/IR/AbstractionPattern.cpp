@@ -2016,7 +2016,7 @@ bool AbstractionPattern::hasSameBasicTypeStructure(CanType l, CanType r) {
   if (lObject && rObject) {
     return hasSameBasicTypeStructure(lObject, rObject);
   } else if (lObject || rObject) {
-    // Allow optionality mis-matches, but require the underlying types to match.
+    // Allow optionality mismatches, but require the underlying types to match.
     return hasSameBasicTypeStructure(lObject ? lObject : l,
                                      rObject ? rObject : r);
   }

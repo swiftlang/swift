@@ -3432,7 +3432,7 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
 void PrintAST::visitEnumDecl(EnumDecl *decl) {
   if (const auto *namespaceDecl =
           dyn_cast_or_null<clang::NamespaceDecl>(decl->getClangDecl())) {
-    // Enum that correponds to the C++ namespace should only be printed once.
+    // Enum that corresponds to the C++ namespace should only be printed once.
     if (!Printer.shouldPrintRedeclaredClangDecl(
             namespaceDecl->getOriginalNamespace()))
       return;
@@ -6894,7 +6894,7 @@ public:
     // FIXME: The desugared type is used here only to support
     // existential types with protocol typealiases in Swift
     // interfaces. Verifying that the underlying type of a
-    // protocol typealias is a constriant type is fundamentally
+    // protocol typealias is a constraint type is fundamentally
     // circular, so the desugared type should be written in source.
     if (Options.DesugarExistentialConstraint && !T->isAnyObject()) {
       visit(T->getConstraintType()->getDesugaredType());

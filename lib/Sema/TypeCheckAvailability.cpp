@@ -584,7 +584,7 @@ private:
 
   /// Constructs a placeholder TRC node that should be expanded later. This is
   /// useful for postponing unnecessary work (and request triggers) when
-  /// initally building out the TRC subtree under a declaration. Lazy nodes
+  /// initially building out the TRC subtree under a declaration. Lazy nodes
   /// constructed here will be expanded by
   /// ExpandChildTypeRefinementContextsRequest. Returns true if a node was
   /// created.
@@ -664,7 +664,7 @@ private:
     // As a special case, extension decls are treated as effectively as
     // available as the nominal type they extend, up to the deployment target.
     // This rule is a convenience for library authors who have written
-    // extensions without specifying availabilty on the extension itself.
+    // extensions without specifying availability on the extension itself.
     if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
       auto ET = ED->getExtendedType();
       if (ET && !hasActiveAvailableAttribute(D, Context)) {

@@ -205,7 +205,7 @@ inline synthesizeMetatypeRepresentation(RepresentationSynthesizer rep) {
   switch (rep) {
   case _thin: return MetatypeRepresentation::Thin;
   case _thick: return MetatypeRepresentation::Thick;
-  // TOOD: maybe add _objc?
+  // TODO: maybe add _objc?
   }
   llvm_unreachable("bad kind");
 }

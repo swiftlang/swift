@@ -39,7 +39,7 @@ class FileUnit : public DeclContext, public ASTAllocated<FileUnit> {
   friend class DirectOperatorLookupRequest;
   friend class DirectPrecedenceGroupLookupRequest;
 
-  // The pointer is FileUnit insted of SynthesizedFileUnit to break circularity.
+  // The pointer is FileUnit instead of SynthesizedFileUnit to break circularity.
   llvm::PointerIntPair<FileUnit *, 3, FileUnitKind> SynthesizedFileAndKind;
 
 protected:
@@ -326,7 +326,7 @@ public:
   /// The 'real name' is the actual binary name of the module, which can be different from the 'name'
   /// if module aliasing was used (via -module-alias flag).
   ///
-  /// This is usually the module real name which can be overriden by an
+  /// This is usually the module real name which can be overridden by an
   /// `export_as` definition of a clang module, or `-export-as` flag on an
   /// imported Swift module. Swift modules built from source do not apply
   /// their own `-export-as` flag, this way the swiftinterface can be

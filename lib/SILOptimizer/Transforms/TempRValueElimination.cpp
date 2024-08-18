@@ -405,7 +405,7 @@ bool TempRValueOptPass::extendAccessScopes(
       if (aa->mayAlias(copySrc, endAccess->getSource()) &&
 
           // There cannot be any aliasing modifying accesses within the
-          // liverange of the temporary, because we would have cought this in
+          // liverange of the temporary, because we would have caught this in
           // `getLastUseWhileSourceIsNotModified`.
           // But there are cases where `AliasAnalysis::isNoAlias` is less
           // precise than `AliasAnalysis::mayWriteToMemory`. Therefore, just
@@ -962,7 +962,7 @@ void TempRValueOptPass::run() {
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
-  // Call the utlity to complete ossa lifetime.
+  // Call the utility to complete ossa lifetime.
   OSSALifetimeCompletion completion(function, da->get(function), deBlocks);
   for (auto it : valuesToComplete) {
     completion.completeOSSALifetime(it,

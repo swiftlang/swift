@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //===----------------------------------------------------------------------===//
-// A BinaryStream which stores data in a single continguous memory buffer.
+// A BinaryStream which stores data in a single contiguous memory buffer.
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_SUPPORT_BINARYBYTESTREAM_H

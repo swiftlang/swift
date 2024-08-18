@@ -112,11 +112,11 @@ struct BridgedCalleeAnalysis {
   SWIFT_IMPORT_UNSAFE CalleeList getDestructors(BridgedType type, bool isExactType) const;
 
   typedef bool (* _Nonnull IsDeinitBarrierFn)(BridgedInstruction, BridgedCalleeAnalysis bca);
-  typedef BridgedMemoryBehavior (* _Nonnull GetMemBehvaiorFn)(
+  typedef BridgedMemoryBehavior (* _Nonnull GetMemBehaviorFn)(
         BridgedInstruction apply, bool observeRetains, BridgedCalleeAnalysis bca);
 
   static void registerAnalysis(IsDeinitBarrierFn isDeinitBarrierFn,
-                               GetMemBehvaiorFn getEffectsFn);
+                               GetMemBehaviorFn getEffectsFn);
 };
 
 struct BridgedDeadEndBlocksAnalysis {
@@ -421,7 +421,7 @@ void SILCombine_registerInstructionPass(BridgedStringRef instClassName,
                                         BridgedInstructionPassRunFn runFn);
 
 #ifndef PURE_BRIDGING_MODE
-// In _not_ PURE_BRIDGING_MODE, briding functions are inlined and therefore inluded in the header file.
+// In _not_ PURE_BRIDGING_MODE, briding functions are inlined and therefore included in the header file.
 #include "OptimizerBridgingImpl.h"
 #else
 // For fflush and stdout

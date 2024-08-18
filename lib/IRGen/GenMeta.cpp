@@ -1335,7 +1335,7 @@ namespace {
       B.addInt(IGM.Int16Ty, protocols.rawBits());
 
       // Create placeholders for the counts of the conditional requirements
-      // for each conditional conformance to a supressible protocol.
+      // for each conditional conformance to a suppressible protocol.
       unsigned numProtocols = countBitsUsed(protocols.rawBits());
       using PlaceholderPosition =
           ConstantAggregateBuilderBase::PlaceholderPosition;
@@ -6554,7 +6554,7 @@ namespace {
       //
       // As of Swift 5.1, the runtime will fill in a default VWT during
       // allocation of foreign class metadata.  We rely on this for correctness
-      // on COFF, where we can't necessarily reference the stanard VWT from the
+      // on COFF, where we can't necessarily reference the standard VWT from the
       // metadata candidate, but it is a good optimization everywhere.
       //
       // The default VWT uses ObjC-compatible reference counting if ObjC interop

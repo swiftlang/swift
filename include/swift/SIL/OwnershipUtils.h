@@ -630,7 +630,7 @@ struct BorrowedValue {
 
   /// Add this scope's live blocks into the PrunedLiveness result. This
   /// includes reborrow scopes that are reachable from this borrow scope but not
-  /// necessarilly dominated by the borrow scope.
+  /// necessarily dominated by the borrow scope.
   void computeTransitiveLiveness(MultiDefPrunedLiveness &liveness) const;
 
   /// Returns true if \p uses are completely within this borrow introducer's
@@ -717,7 +717,7 @@ struct BorrowedValue {
   }
 
   // Helpers to allow a BorrowedValue to easily be used as a SILValue
-  // programatically.
+  // programmatically.
   SILValue operator->() { return value; }
   SILValue operator->() const { return value; }
   SILValue operator*() { return value; }

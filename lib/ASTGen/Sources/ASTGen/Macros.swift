@@ -530,7 +530,7 @@ func expandFreestandingMacroImpl(
       expandedSource = _expandedSource
       diagnostics = _diagnostics
     default:
-      throw PluginError.invalidReponseKind
+      throw PluginError.invalidResponseKind
     }
 
     // Process the result.
@@ -825,7 +825,7 @@ func expandAttachedMacroImpl(
       diagnostics = _diagnostics
       break
     default:
-      throw PluginError.invalidReponseKind
+      throw PluginError.invalidResponseKind
     }
 
     // Process the result.

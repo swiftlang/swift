@@ -5105,7 +5105,7 @@ private:
   /// Solving this constraint is delayed until the element type is fully
   /// resolved with no type variables. The element type is then mapped out
   /// of the opened element context and into the context of the surrounding
-  /// function, effecively substituting opened element archetypes with their
+  /// function, effectively substituting opened element archetypes with their
   /// corresponding pack archetypes, and bound to the second type.
   SolutionKind
   simplifyPackElementOfConstraint(Type first, Type second,

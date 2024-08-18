@@ -91,7 +91,7 @@ enum class ModuleDependencyKind : int8_t {
   LastKind = SwiftPlaceholder + 1
 };
 
-/// This is used to idenfity a specific macro plugin dependency.
+/// This is used to identify a specific macro plugin dependency.
 struct MacroPluginDependency {
   std::string LibraryPath;
   std::string ExecutablePath;
@@ -672,7 +672,7 @@ public:
     return storage->optionalModuleImports;
   }
 
-  /// Retreive the module-level dependencies.
+  /// Retrieve the module-level dependencies.
   const ArrayRef<ModuleDependencyID> getDirectModuleDependencies() const {
     assert(storage->resolved);
     return storage->resolvedDirectModuleDependencies;

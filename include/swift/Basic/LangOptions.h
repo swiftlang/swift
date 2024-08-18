@@ -205,7 +205,7 @@ namespace swift {
     /// Should access control be respected?
     bool EnableAccessControl = true;
 
-    /// Enable loading a package interface if both client and depdency module are in the
+    /// Enable loading a package interface if both client and dependency module are in the
     /// same package determined by `package-name` flag.
     bool EnablePackageInterfaceLoad = false;
 
@@ -400,7 +400,7 @@ namespace swift {
     /// Enable experimental eager Clang module diagnostics.
     bool EnableExperimentalEagerClangModuleDiagnostics = false;
 
-    /// Force ClangImporter's import-as-member extensions to load thier members
+    /// Force ClangImporter's import-as-member extensions to load their members
     /// immediately, bypassing their SwiftLookupTables. This emulates an
     /// implementation quirk of previous compilers.
     bool DisableNamedLazyImportAsMemberLoading = false;
@@ -915,7 +915,7 @@ namespace swift {
     /// Defer typechecking of declarations to their use at runtime
     bool DeferToRuntime = false;
 
-    /// Allow request evalutation to perform type checking lazily, instead of
+    /// Allow request evaluation to perform type checking lazily, instead of
     /// eagerly typechecking source files after parsing.
     bool EnableLazyTypecheck = false;
   };

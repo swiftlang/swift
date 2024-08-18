@@ -29,7 +29,7 @@ import BasicBridging
 ///                   lexed past.
 ///   - mustBeRegex: A bool value whether an error during lexing should be
 ///                  considered a regex literal, or some thing else. If true
-///                  advace the curPtrPtr and emit the diagnostic. If false,
+///                  advance the curPtrPtr and emit the diagnostic. If false,
 ///                  curPtrPtr won't be modified.
 ///   - bridgedDiagnosticEngine: Diagnostic engine to emit diagnostics.
 ///

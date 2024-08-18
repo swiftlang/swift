@@ -3194,7 +3194,7 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
             << "        Lifetime ending use! Recording final consume!\n");
         // If we have a consuming use, when we stop at the consuming use we want
         // the value to still be around. We only want the value to be
-        // invalidated once the consume operation has occured. Thus we always
+        // invalidated once the consume operation has occurred. Thus we always
         // place the debug_value undef strictly after the consuming operation.
         if (auto *ti = dyn_cast<TermInst>(inst)) {
           for (auto *succBlock : ti->getSuccessorBlocks()) {
@@ -3293,7 +3293,7 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
       // check was an init but not consumable, then do not destroy that
       // def. This is b/c we are in some sort of class initialization and we are
       // looking at the initial part of the live range before the initialization
-      // has occured. This is our way of makinmg this fit the model that the
+      // has occurred. This is our way of makinmg this fit the model that the
       // checker expects (which is that values are always initialized at the def
       // point).
       if (markedValue && markedValue->getCheckKind() ==
@@ -3432,7 +3432,7 @@ void MoveOnlyAddressCheckerPImpl::rewriteUses(
       // destroy_value and use then to create a new load_borrow scope.
       SILBuilderWithScope builder(li);
       auto *lbi = builder.createLoadBorrow(li->getLoc(), li->getOperand());
-      // We use this auxillary list to avoid iterator invalidation of
+      // We use this auxiliary list to avoid iterator invalidation of
       // li->getConsumingUse();
       StackList<DestroyValueInst *> toDelete(lbi->getFunction());
       for (auto *consumeUse : li->getConsumingUses()) {

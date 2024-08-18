@@ -79,7 +79,7 @@ struct ResolvedLoc {
   /// - Declaration labels contain the first name and the second name, excluding
   ///   the trivia on their sides
   /// - For function arguments that don't have a label, this is an empty range
-  ///   that points to the start of the argument (exculding trivia).
+  ///   that points to the start of the argument (excluding trivia).
   ///
   /// See documentation on `DeclNameLocation.Argument` in swift-syntax for more
   /// background.

@@ -1990,7 +1990,7 @@ ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
   auto roles = macroRef.getMacroRoles();
 
   // When a macro is not found for a custom attribute, it may be a non-macro.
-  // So bail out to prevent diagnostics from the contraint system.
+  // So bail out to prevent diagnostics from the constraint system.
   if (macroRef.getAttr()) {
     auto foundMacros = namelookup::lookupMacros(dc, macroRef.getModuleName(),
                                                 macroRef.getMacroName(), roles);

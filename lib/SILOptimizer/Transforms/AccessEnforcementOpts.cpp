@@ -1157,7 +1157,7 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
 
     // Perform the access merging
-    // The inital version of the optimization requires a postDomTree
+    // The initial version of the optimization requires a postDomTree
     PostDominanceAnalysis *postDomAnalysis =
         getAnalysis<PostDominanceAnalysis>();
     PostDominanceInfo *postDomTree = postDomAnalysis->get(F);

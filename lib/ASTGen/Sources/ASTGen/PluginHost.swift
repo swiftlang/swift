@@ -19,7 +19,7 @@ enum PluginError: String, Error, CustomStringConvertible {
   case stalePlugin = "plugin is stale"
   case failedToSendMessage = "failed to send request to plugin"
   case failedToReceiveMessage = "failed to receive result from plugin"
-  case invalidReponseKind = "plugin returned invalid result"
+  case invalidResponseKind = "plugin returned invalid result"
 
   var description: String { rawValue }
 }
@@ -73,7 +73,7 @@ func swift_ASTGen_pluginServerLoadLibraryPlugin(
       .loadPluginLibrary(libraryPath: libraryPath, moduleName: moduleName)
     )
     guard case .loadPluginLibraryResult(let loaded, let diagnostics) = result else {
-      throw PluginError.invalidReponseKind
+      throw PluginError.invalidResponseKind
     }
     if loaded {
       assert(diagnostics.isEmpty)
@@ -160,7 +160,7 @@ struct CompilerPlugin {
     let request = HostToPluginMessage.getCapability(capability: hostCapability)
     let response = try self.sendMessageAndWaitWithoutLock(request)
     guard case .getCapabilityResult(let capability) = response else {
-      throw PluginError.invalidReponseKind
+      throw PluginError.invalidResponseKind
     }
 
     deinitializePluginCapabilityIfExist()

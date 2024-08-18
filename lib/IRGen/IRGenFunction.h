@@ -827,7 +827,7 @@ public:
   LocalTypeDataCache const *getLocalTypeData() { return LocalTypeData; }
 #endif
 
-  /// A forwardable argument is a load that is immediately preceeds the apply it
+  /// A forwardable argument is a load that is immediately precedes the apply it
   /// is used as argument to. If there is no side-effecting instructions between
   /// said load and the apply, we can memcpy the loads address to the apply's
   /// indirect argument alloca.

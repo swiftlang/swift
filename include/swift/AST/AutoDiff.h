@@ -407,7 +407,7 @@ public:
   enum class Kind {
     /// Original function type has no semantic results.
     NoSemanticResults,
-    /// Differentiability parmeter indices are empty.
+    /// Differentiability parameter indices are empty.
     NoDifferentiabilityParameters,
     /// A differentiability parameter does not conform to `Differentiable`.
     NonDifferentiableDifferentiabilityParameter,

@@ -547,7 +547,7 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
 
       if (IGM.IRGen.Opts.ConditionalRuntimeRecords) {
         // Allow dead-stripping `var` (the runtime record from the global list)
-        // when `handle` / `elt` (the underlaying entity) is not referenced.
+        // when `handle` / `elt` (the underlying entity) is not referenced.
         IGM.appendLLVMUsedConditionalEntry(var, elt->stripPointerCasts());
       }
     }
@@ -3673,7 +3673,7 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
                                       global,
                                       llvm::Twine("got.") + globalName);
   
-  // rdar://problem/53836960: i386 ld64 also mis-links relative references
+  // rdar://problem/53836960: i386 ld64 also mislinks relative references
   // to GOT entries.
   // rdar://problem/59782487: issue with on-device JITd expressions.
   // The JIT gets confused by private vars accessed across object files.

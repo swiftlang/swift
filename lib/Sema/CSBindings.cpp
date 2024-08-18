@@ -703,7 +703,7 @@ bool BindingSet::finalize(
       // Note that even though key path literal maybe be invalid it's
       // still the best course of action to use contextual function type
       // bindings because they allow to propagate type information from
-      // the key path into the context, so key path bindings are addded
+      // the key path into the context, so key path bindings are added
       // only if there is absolutely no other choice.
       if (updatedBindings.empty()) {
         auto rootTy = CS.getKeyPathRootType(keyPath);
@@ -726,7 +726,7 @@ bool BindingSet::finalize(
           // If key path is structurally correct and has a resolved root
           // type, let's promote the fallback type into a binding because
           // root would have been inferred from explicit type already and
-          // it's benefitial for diagnostics to assign a non-placeholder
+          // it's beneficial for diagnostics to assign a non-placeholder
           // type to key path literal to propagate root/value to the context.
           if (!keyPath->hasSingleInvalidComponent() &&
               (keyPath->getParsedRoot() ||
@@ -1321,7 +1321,7 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
     return boundType->lookThroughAllOptionalTypes()->is<TypeVariableType>();
   }
 
-  // If this is a collection literal type, it's preferrable to bind it
+  // If this is a collection literal type, it's preferable to bind it
   // early (unless it's delayed) to connect all of its elements even
   // if it doesn't have any bindings.
   if (TypeVar->getImpl().isCollectionLiteralType())
@@ -2570,7 +2570,7 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
       }
       // Not being able to infer the type of a variable in a pattern binding
       // decl is more dramatic than anything that could happen inside the
-      // expression because we want to preferrably point the diagnostic to a
+      // expression because we want to preferably point the diagnostic to a
       // part of the expression that caused us to be unable to infer the
       // variable's type.
       ConstraintFix *fix =

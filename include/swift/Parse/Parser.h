@@ -612,7 +612,7 @@ public:
   SourceLoc consumeAttributeLParen();
 
   /// If the next token is a '(' that's not on a new line consume it, and error
-  /// (Swift 6) or warn (Swift <6) that the attribute must not be separted from
+  /// (Swift 6) or warn (Swift <6) that the attribute must not be separated from
   /// the '(' by a space.
   ///
   /// If the next token is not '(' or it's on a new line, return false.

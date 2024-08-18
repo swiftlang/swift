@@ -340,10 +340,10 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(
     llvm::SmallString<64> Buffer;
     llvm::raw_svector_ostream OS(Buffer);
     // Empty compatible version indicates using the current compatible version.
-    StringRef ComptibleVersion = "";
+    StringRef CompatibleVersion = "";
     OS << "$ld$previous$";
     OS << InstallName << "$";
-    OS << ComptibleVersion << "$";
+    OS << CompatibleVersion << "$";
     OS << std::to_string(static_cast<uint8_t>(PlatformNumber)) << "$";
     static auto getMinor = [](std::optional<unsigned> Minor) {
       return Minor.has_value() ? *Minor : 0;
@@ -569,8 +569,8 @@ enum DylibVersionKind_t: unsigned {
 /// └───────────────────┴──────────┴──────────┘
 ///
 /// If an individual component is greater than the highest number that can be
-/// represented in its alloted space, it will be truncated to the maximum value
-/// that fits in the alloted space, which matches the behavior of the linker.
+/// represented in its allotted space, it will be truncated to the maximum value
+/// that fits in the allotted space, which matches the behavior of the linker.
 static std::optional<llvm::MachO::PackedVersion>
 parsePackedVersion(DylibVersionKind_t kind, StringRef versionString,
                    ASTContext &ctx) {

@@ -368,7 +368,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
   } else {
     os << "() noexcept {}\n";
   }
-  // Print out '_make' function which returns an unitialized instance for
+  // Print out '_make' function which returns an uninitialized instance for
   // passing to Swift.
   os << "  static ";
   printer.printInlineForThunk();

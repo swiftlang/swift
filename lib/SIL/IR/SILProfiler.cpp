@@ -99,7 +99,7 @@ static bool shouldProfile(SILDeclRef Constant) {
 
     // Do not profile generated code. This includes macro expansions, which we
     // otherwise consider to be "written by the user", because they wrote the
-    // macro attribute or expr. We may want to revist this in the future. We'll
+    // macro attribute or expr. We may want to revisit this in the future. We'll
     // need to figure out how we'll be writing out the macro expansions though,
     // such that they can be referenced by llvm-cov.
     // Note we check `getSourceFileContainingLocation` instead of
@@ -1132,7 +1132,7 @@ private:
 
   /// Mark \c S as a terminator, starting a zero region.
   void terminateRegion(ASTNode S) {
-    assert(!RegionStack.empty() && "Cannot terminate non-existant region");
+    assert(!RegionStack.empty() && "Cannot terminate non-existent region");
 
     // Walk up the region stack and cut short regions until we reach a region
     // for an AST node. This ensures we correctly handle new regions that have
@@ -1550,7 +1550,7 @@ public:
     // all. This is inconsistent with property initializers, which are
     // effectively default values too. Seems like coverage doesn't offer much
     // benefit in these cases, as they're unlikely to have side effects, and
-    // the values can be exercized explicitly, but we should probably at least
+    // the values can be exercised explicitly, but we should probably at least
     // have a consistent behavior for both no matter what we choose here.
     return Action::SkipNode();
   }

@@ -2391,7 +2391,7 @@ void AttributeChecker::visitExternAttr(ExternAttr *attr) {
     } else if (!attr->Name.has_value() && !clang::isValidAsciiIdentifier(cName)) {
       // Warn non ASCII identifiers if it's *implicitly* specified. The C standard allows
       // Universal Character Names in identifiers, but clang doesn't provide
-      // an easy way to validate them, so we warn identifers that is potentially
+      // an easy way to validate them, so we warn identifiers that is potentially
       // invalid. If it's explicitly specified, we assume the user knows what
       // they are doing, and don't warn.
       diagnose(attr->getLocation(), diag::extern_c_maybe_invalid_name, cName)

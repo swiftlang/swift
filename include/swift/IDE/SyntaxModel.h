@@ -53,7 +53,7 @@ enum class SyntaxNodeKind : uint8_t {
   PoundDirectiveKeyword,
   /// Any occurrence of '@<attribute-name>' anywhere.
   AttributeId,
-  /// A "resolved/active" attribute. Mis-applied attributes will be AttributeId.
+  /// A "resolved/active" attribute. Misapplied attributes will be AttributeId.
   AttributeBuiltin,
   /// An editor placeholder string <#like this#>.
   EditorPlaceholder,

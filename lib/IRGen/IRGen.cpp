@@ -341,7 +341,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   if (Opts.shouldOptimize()) {
     PB.registerPipelineStartEPCallback(
         [](ModulePassManager &MPM, OptimizationLevel level) {
-          // Run this before SROA to avoid un-neccessary expansion of dead
+          // Run this before SROA to avoid un-necessary expansion of dead
           // loads.
           MPM.addPass(createModuleToFunctionPassAdaptor(DCEPass()));
         });

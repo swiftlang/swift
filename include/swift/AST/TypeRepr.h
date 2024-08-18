@@ -1014,7 +1014,7 @@ public:
   SourceRange getCompositionRange() const { return CompositionRange; }
 
   /// 'Any' is understood as CompositionTypeRepr by the compiler but its type array will be empty
-  ///  becasue it is a  nonspecific type
+  ///  because it is a  nonspecific type
   bool isTypeReprAny() {
         return getTypes().size() == 0 ?  true : false;
   }

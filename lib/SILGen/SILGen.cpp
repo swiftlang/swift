@@ -482,7 +482,7 @@ FuncDecl *SILGenModule::getExit() {
   if (!exitFunction) {
     // No go, look for it in any loaded module. Several of the internal
     // Swift modules or swift-corelibs modules may have absorbed <stdlib.h>
-    // when buliding without fully specified clang modules in the OS/SDK.
+    // when building without fully specified clang modules in the OS/SDK.
     for (const auto &loadedModuleVector : C.getLoadedModules()) {
       if (loadedModuleVector.first == mostLikelyIdentifier) {
         continue;

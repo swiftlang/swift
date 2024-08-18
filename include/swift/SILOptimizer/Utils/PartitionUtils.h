@@ -414,7 +414,7 @@ struct TransferringOperandState {
   /// The dynamic isolation history at this point.
   IsolationHistory isolationHistory;
 
-  /// Set to true if the element associated with the operand's vlaue is closure
+  /// Set to true if the element associated with the operand's value is closure
   /// captured by the user. In such a case, if our element is a sendable var of
   /// a non-Sendable type, we cannot access it since we could race against an
   /// assignment to the var in a closure.
@@ -763,7 +763,7 @@ public:
   /// for.
   ///
   /// NOTE: This can only be used if one has cleared transfer state using
-  /// Partition::clearTransferState or constructed a new Partiton using
+  /// Partition::clearTransferState or constructed a new Partition using
   /// Partition::withoutTransferState(). This is because history rewinding
   /// doesn't use transfer information so just to be careful around potential
   /// invariants being broken, we just require the elimination of the transfer
@@ -806,7 +806,7 @@ public:
 
   /// Return a vector of the transferred values in this partition.
   std::vector<Element> getTransferredVals() const {
-    // For effeciency, this could return an iterator not a vector.
+    // For efficiency, this could return an iterator not a vector.
     std::vector<Element> transferredVals;
     for (auto [i, _] : elementToRegionMap)
       if (isTransferred(i))
@@ -817,7 +817,7 @@ public:
   /// Return a vector of the non-transferred regions in this partition, each
   /// represented as a vector of values.
   std::vector<std::vector<Element>> getNonTransferredRegions() const {
-    // For effeciency, this could return an iterator not a vector.
+    // For efficiency, this could return an iterator not a vector.
     std::map<Region, std::vector<Element>> buckets;
 
     for (auto [i, label] : elementToRegionMap)
@@ -908,7 +908,7 @@ private:
   /// Pop one history node. Multiple history nodes can make up one PartitionOp
   /// worth of history, so this is called by popHistory.
   ///
-  /// Returns true if we succesfully popped a single history node.
+  /// Returns true if we successfully popped a single history node.
   bool popHistoryOnce(SmallVectorImpl<IsolationHistory> &foundJoinHistoryNodes);
 
   /// A canonical region is defined to have its region number as equal to the
@@ -1252,7 +1252,7 @@ public:
 
       // Next see if we are disconnected and have the same isolation. In such a
       // case, we do not transfer since the disconnected value is allowed to be
-      // resued after we return.
+      // reused after we return.
       if (transferredRegionIsolation.isDisconnected() && calleeIsolationInfo &&
           transferredRegionIsolation.hasSameIsolation(calleeIsolationInfo))
         return;
@@ -1544,7 +1544,7 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
       SILFunctionArgument *destValue, Element srcElement, SILValue srcValue,
       SILDynamicMergedIsolationInfo srcIsolationRegionInfo) const {}
 
-  /// Used to signify an "unknown code pattern" has occured while performing
+  /// Used to signify an "unknown code pattern" has occurred while performing
   /// dataflow.
   ///
   /// DISCUSSION: Our dataflow cannot emit errors itself so this is a callback

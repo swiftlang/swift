@@ -1811,7 +1811,7 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Request to obtain a list of computed properties with init accesors
+/// Request to obtain a list of computed properties with init accessors
 /// in the given nominal type.
 class InitAccessorPropertiesRequest :
     public SimpleRequest<InitAccessorPropertiesRequest,
@@ -3537,7 +3537,7 @@ public:
 
    // Evaluation.
   /// \p SelfNominalType is \c VD->getDeclContext()->getSelfNominalType().
-  /// Passed as a parameter in here so this request doesn't tigger self nominal
+  /// Passed as a parameter in here so this request doesn't trigger self nominal
   /// type computation.
   evaluator::SideEffect evaluate(Evaluator &evaluator, ValueDecl *VD,
                                  NominalTypeDecl *SelfNominalType) const;

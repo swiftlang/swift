@@ -1169,7 +1169,7 @@ void CompletionLookup::addPoundKeyPath(bool needPound) {
 
 SemanticContextKind
 CompletionLookup::getSemanticContextKind(const ValueDecl *VD) {
-  // FIXME: to get the corect semantic context we need to know how lookup
+  // FIXME: to get the correct semantic context we need to know how lookup
   // would have found the VD. For now, just infer a reasonable semantics.
 
   if (!VD)
@@ -1383,8 +1383,8 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
     trivialTrailingClosure = hasTrivialTrailingClosure(FD, AFT);
 
   std::optional<ContextualNotRecommendedReason> NotRecommended;
-  bool implictlyAsync = false;
-  analyzeActorIsolation(FD, AFT, implictlyAsync, NotRecommended);
+  bool implicitlyAsync = false;
+  analyzeActorIsolation(FD, AFT, implicitlyAsync, NotRecommended);
 
   // Add the method, possibly including any default arguments.
   auto addMethodImpl = [&](bool includeDefaultArgs = true,
@@ -1425,14 +1425,14 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
       Builder.addRightParen();
     } else if (trivialTrailingClosure) {
       Builder.addBraceStmtWithCursor(" { code }");
-      addEffectsSpecifiers(Builder, AFT, FD, implictlyAsync);
+      addEffectsSpecifiers(Builder, AFT, FD, implicitlyAsync);
     } else {
       Builder.addLeftParen();
       addCallArgumentPatterns(Builder, AFT, FD->getParameters(),
                               FD->getGenericSignatureOfContext(),
                               includeDefaultArgs);
       Builder.addRightParen();
-      addEffectsSpecifiers(Builder, AFT, FD, implictlyAsync);
+      addEffectsSpecifiers(Builder, AFT, FD, implicitlyAsync);
     }
 
     // Build type annotation.
@@ -1644,8 +1644,8 @@ void CompletionLookup::addSubscriptCall(const SubscriptDecl *SD,
     return;
 
   std::optional<ContextualNotRecommendedReason> NotRecommended;
-  bool implictlyAsync = false;
-  analyzeActorIsolation(SD, subscriptType, implictlyAsync, NotRecommended);
+  bool implicitlyAsync = false;
+  analyzeActorIsolation(SD, subscriptType, implicitlyAsync, NotRecommended);
 
   CodeCompletionResultBuilder Builder =
       makeResultBuilder(CodeCompletionResultKind::Declaration,
@@ -1678,7 +1678,7 @@ void CompletionLookup::addSubscriptCall(const SubscriptDecl *SD,
     resultTy = OptionalType::get(resultTy);
   }
 
-  if (implictlyAsync)
+  if (implicitlyAsync)
     Builder.addAnnotatedAsync();
 
   addTypeAnnotation(Builder, resultTy, SD->getGenericSignatureOfContext());
@@ -3355,13 +3355,13 @@ void CompletionLookup::getToplevelCompletions(CodeCompletionFilter Filter) {
   NeedLeadingDot = false;
 
   // If we have 'addinitstotoplevel' enabled, calling `foundDecl` on `this`
-  // can cause macros to get expanded, which can then cause new members ot get
+  // can cause macros to get expanded, which can then cause new members to get
   // added to 'TopLevelValues', invalidating iterator over `TopLevelDecls` in
   // `SourceLookupCache::lookupVisibleDecls`.
   //
   // Technically `foundDecl` should not expand macros or discover new top level
   // members in any way because those newly discovered decls will not be added
-  // to the code completion results. However, it's preferrable to miss results
+  // to the code completion results. However, it's preferable to miss results
   // than to silently invalidate a collection, resulting in hard-to-diagnose
   // crashes.
   // Thus, store all the decls found by `CurrModule->lookupVisibleDecls` in a

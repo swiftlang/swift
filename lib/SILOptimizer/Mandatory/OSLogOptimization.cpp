@@ -808,7 +808,7 @@ getEndPointsOfDataDependentChain(SingleValueInstruction *value, SILFunction *fun
   SmallVector<SILInstruction *, 16> transitiveUsers;
   // Get transitive users of value, ignoring use-def chain going through
   // branches. These transitive users define the end points of the constant
-  // evaluation. Igoring use-def chains through branches causes constant
+  // evaluation. Ignoring use-def chains through branches causes constant
   // evaluation to miss some constant folding opportunities. This can be
   // relaxed in the future, if necessary.
   getTransitiveUsers(value, transitiveUsers);

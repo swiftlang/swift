@@ -87,7 +87,7 @@
 /// Note that the forceDelete* APIs only invoke notifyWillBeDeletedFunc() when
 /// an operand's definition will become dead after force-deleting the specified
 /// instruction. Some clients force-delete related instructions one at a
-/// time. It is the client's responsiblity to invoke notifyWillBeDeletedFunc()
+/// time. It is the client's responsibility to invoke notifyWillBeDeletedFunc()
 /// on those explicitly deleted instructions if needed.
 ///
 //===----------------------------------------------------------------------===//

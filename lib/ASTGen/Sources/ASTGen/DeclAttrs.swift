@@ -262,7 +262,7 @@ extension ASTGenVisitor {
 
         return self.generateSimpleDeclAttr(attribute: node, kind: attrKind)
 
-      // Modifers.
+      // Modifiers.
       case .accessControl:
         // TODO: Diagnose and generateAccessControl().
         fatalError("unimplemented")

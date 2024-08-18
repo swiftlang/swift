@@ -1447,8 +1447,8 @@ JVPCloner::~JVPCloner() { delete &impl; }
 
 void JVPCloner::Implementation::initializeDifferentialTupleElements(
   SILBasicBlock *origBB, SILInstructionResultArray values) {
-  auto *diffTupleTyple = differentialInfo.getLinearMapTupleType(origBB);
-  assert(diffTupleTyple->getNumElements() == values.size() &&
+  auto *diffTupleType = differentialInfo.getLinearMapTupleType(origBB);
+  assert(diffTupleType->getNumElements() == values.size() &&
          "The number of differential tuple fields must equal the number of "
          "differential struct element values");
   auto res = differentialTupleElements.insert({origBB, values});

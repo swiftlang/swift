@@ -111,7 +111,7 @@ void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
 
   // Check that the ranges are non-overlapping. If the files really are all
   // distinct, this should be trivially true, but if it's ever not we might end
-  // up mis-filing diagnostics.
+  // up misfiling diagnostics.
   assert(ConsumersOrderedByRange.end() ==
              std::adjacent_find(ConsumersOrderedByRange.begin(),
                                 ConsumersOrderedByRange.end(),

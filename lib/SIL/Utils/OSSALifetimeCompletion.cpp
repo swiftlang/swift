@@ -201,7 +201,7 @@ private:
   void computeRegion(const SSAPrunedLiveness &liveness);
 
   /// Iterative dataflow to determine availability for each block in `region`.
-  void propagateAvailablity(Result &result);
+  void propagateAvailability(Result &result);
 
   /// Visit the terminators of blocks on the boundary of availability.
   void visitAvailabilityBoundary(Result const &result, Visit visit);
@@ -254,7 +254,7 @@ void AvailabilityBoundaryVisitor::visit(const SSAPrunedLiveness &liveness,
                                         Result &result, Visit visit) {
   computeRegion(liveness);
 
-  propagateAvailablity(result);
+  propagateAvailability(result);
 
   visitAvailabilityBoundary(result, visit);
 }
@@ -316,7 +316,7 @@ void AvailabilityBoundaryVisitor::computeRegion(
   }
 }
 
-void AvailabilityBoundaryVisitor::propagateAvailablity(Result &result) {
+void AvailabilityBoundaryVisitor::propagateAvailability(Result &result) {
   // Initialize per-block state.
   // - all blocks outside of the region are ::Unavailable (automatically
   //   initialized)

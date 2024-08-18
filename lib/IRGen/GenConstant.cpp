@@ -236,7 +236,7 @@ static bool isPowerOfTwo(unsigned x) {
 }
 
 /// Replace i24, i40, i48 and i56 constants in `e` with the corresponding byte values.
-/// Such unaligned integer constants are not correctly layed out in the data section.
+/// Such unaligned integer constants are not correctly laid out in the data section.
 static Explosion replaceUnalignedIntegerValues(IRGenModule &IGM, Explosion e) {
   Explosion out;
   while (!e.empty()) {

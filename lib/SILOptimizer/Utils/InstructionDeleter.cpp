@@ -125,7 +125,7 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst,
       //
       // FIXME: Even with fixLifetimes enabled, InstructionDeleter does not know
       // how to cleanup arguments captured by address. This should be as simple
-      // as inserting a destroy_addr. But the analagous code in
+      // as inserting a destroy_addr. But the analogous code in
       // tryDeleteDeadClosure() and keepArgsOfPartialApplyAlive() mysteriously
       // creates new alloc_stack's and invalidates stack nesting. So we
       // conservatively bail-out until we understand why that hack exists.

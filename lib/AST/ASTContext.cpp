@@ -742,7 +742,7 @@ ASTContext *ASTContext::get(
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
     llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend) {
-  // If more than two data structures are concatentated, then the aggregate
+  // If more than two data structures are concatenated, then the aggregate
   // size math needs to become more complicated due to per-struct alignment
   // constraints.
   auto align = std::max(alignof(ASTContext), alignof(Implementation));
@@ -4224,7 +4224,7 @@ ExistentialMetatypeType *
 ExistentialMetatypeType::get(Type T, std::optional<MetatypeRepresentation> repr,
                              const ASTContext &ctx) {
   // If we're creating an existential metatype from an
-  // existential type, wrap the constraint type direcly.
+  // existential type, wrap the constraint type directly.
   if (auto existential = T->getAs<ExistentialType>())
     T = existential->getConstraintType();
 

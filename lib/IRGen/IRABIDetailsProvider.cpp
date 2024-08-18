@@ -229,8 +229,8 @@ public:
       return MethodDispatchInfo::direct();
     // If this is an override of an existing method, then lookup
     // its base method in its base class.
-    if (auto *overridenDecl = funcDecl->getOverriddenDecl())
-      funcDecl = overridenDecl;
+    if (auto *overriddenDecl = funcDecl->getOverriddenDecl())
+      funcDecl = overriddenDecl;
     auto *parentClass = dyn_cast<ClassDecl>(funcDecl->getDeclContext());
     if (!parentClass)
       return MethodDispatchInfo::direct();

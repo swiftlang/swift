@@ -319,7 +319,7 @@ struct RowToSpecialize {
   /// Whether the row will be irrefutable after this specialization.
   bool Irrefutable;
 
-  /// Profile Count of hte row we intend to specialize.
+  /// Profile Count of the row we intend to specialize.
   ProfileCounter Count;
 };
 

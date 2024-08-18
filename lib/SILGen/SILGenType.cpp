@@ -858,7 +858,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
 
   // If the conformance is marked as `@preconcurrency` instead of
   // emitting a hop to the executor (when needed) emit a dynamic check
-  // to make sure that witness has been unsed in the expected context.
+  // to make sure that witness has been used in the expected context.
   bool isPreconcurrency = false;
   if (conformance.isConcrete()) {
     if (auto *C =

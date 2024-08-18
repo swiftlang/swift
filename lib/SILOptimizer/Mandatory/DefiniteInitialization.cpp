@@ -2251,12 +2251,12 @@ bool LifetimeChecker::diagnoseReturnWithoutInitializingStoredProperties(
     const StructDecl *theStruct = selfTy->getStructOrBoundGenericStruct();
     assert(theStruct);
 
-    bool fullyUnitialized;
-    (void)isInitializedAtUse(Use, nullptr, nullptr, &fullyUnitialized);
+    bool fullyUninitialized;
+    (void)isInitializedAtUse(Use, nullptr, nullptr, &fullyUninitialized);
 
     diagnose(Module, loc,
              diag::designated_init_in_cross_module_extension,
-             selfTy, !fullyUnitialized,
+             selfTy, !fullyUninitialized,
              theStruct->getParentModule()->getName(),
              theStruct->hasClangNode());
   } else {

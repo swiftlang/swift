@@ -47,7 +47,7 @@
 
     Conversions between UTF32, UTF-16, and UTF-8.  Header file.
 
-    Several funtions are included here, forming a complete set of
+    Several functions are included here, forming a complete set of
     conversions between the three formats.  UTF-7 is not included
     here, but is handled in a separate source file.
 

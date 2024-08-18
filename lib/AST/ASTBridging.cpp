@@ -32,7 +32,7 @@
 
 #ifdef PURE_BRIDGING_MODE
 // In PURE_BRIDGING_MODE, bridging functions are not inlined and therefore
-// inluded in the cpp file.
+// included in the cpp file.
 #include "swift/AST/ASTBridgingImpl.h"
 #endif
 

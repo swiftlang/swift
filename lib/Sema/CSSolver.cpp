@@ -2519,9 +2519,9 @@ Constraint *ConstraintSystem::selectConjunction() {
 
   auto &SM = getASTContext().SourceMgr;
 
-  // Conjunctions should be solved in order of their apperance in the source.
+  // Conjunctions should be solved in order of their appearance in the source.
   // This is important because once a conjunction is solved, we don't re-visit
-  // it, so we need to make sure we don't solve it before another conjuntion
+  // it, so we need to make sure we don't solve it before another conjunction
   // that could provide it with necessary type information. Source order
   // provides an easy to reason about and quick way of establishing this.
   return *std::min_element(

@@ -348,7 +348,7 @@ void LinearMapInfo::generateDifferentiationDataStructures(
   //
   // Now we need to be very careful as we're having a very subtle
   // chicken-and-egg problem. We need lowered branch trace enum type for the
-  // linear map typle type. However branch trace enum type lowering depends on
+  // linear map tuple type. However branch trace enum type lowering depends on
   // the lowering of its elements (at very least, the type classification of
   // being trivial / non-trivial). As the lowering is cached we need to ensure
   // we compute lowered type for the branch trace enum when the corresponding

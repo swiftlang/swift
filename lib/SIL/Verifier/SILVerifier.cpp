@@ -6215,7 +6215,7 @@ public:
   /// components must have the same shape as the pack substitutions.
   /// The lowered element type is a valid type for this index if, for
   /// each component of this shape, there is a substitution which
-  /// (optionally) replaces archetypes in S with the correponding
+  /// (optionally) replaces archetypes in S with the corresponding
   /// component type (pattern types for expansions) of the pack
   /// substitution to get the corresponding component type (pattern
   /// type for expansions) of the pack operand.
@@ -6536,7 +6536,7 @@ public:
     // Address-type drop_deinit has no special structural requirements. It just
     // sits there and blocks optimization on the allocation and downstream uses
     // of the address. If we want to optimize around address-type drop_deinit,
-    // then we need a seperate verifier for its requirements.
+    // then we need a separate verifier for its requirements.
     if (ddi->getType().isAddress())
       return;
 
@@ -7001,7 +7001,7 @@ public:
       if (SI.getLoc().getKind() == SILLocation::CleanupKind)
         continue;
       // FIXME: These still leave holes in the scopes. We should make them
-      // inherit the sourrounding scope in IRGenSIL.
+      // inherit the surrounding scope in IRGenSIL.
       if (SI.getLoc().getKind() == SILLocation::MandatoryInlinedKind)
         continue;
       // FIXME: There are situations where the execution legitimately goes
@@ -7110,12 +7110,12 @@ public:
       visitSILBasicBlock(&BB);
     }
 
-    verifyPredecessorSucessorStructure(F);
+    verifyPredecessorSuccessorStructure(F);
   }
 
   // Make sure that each of the successors/predecessors of a basic block
   // have this basic block in its predecessor/successor list.
-  void verifyPredecessorSucessorStructure(SILFunction *f) {
+  void verifyPredecessorSuccessorStructure(SILFunction *f) {
     using PredSuccPair = std::pair<SILBasicBlock *, SILBasicBlock *>;
     llvm::DenseSet<PredSuccPair> foundSuccessors;
     llvm::DenseSet<PredSuccPair> foundPredecessors;

@@ -199,7 +199,7 @@ CallbackClassifier::classifyCallbackCondition(const CallbackCondition &Cond,
       return std::nullopt;
     break;
   case ConditionType::SUCCESS_PATTERN:
-  case ConditionType::FAILURE_PATTEN:
+  case ConditionType::FAILURE_PATTERN:
     if (SubjectParam != Params.getResultParam())
       return std::nullopt;
     break;
@@ -216,7 +216,7 @@ CallbackClassifier::classifyCallbackCondition(const CallbackCondition &Cond,
   switch (CondType) {
   case ConditionType::NIL:
   case ConditionType::IS_FALSE:
-  case ConditionType::FAILURE_PATTEN:
+  case ConditionType::FAILURE_PATTERN:
     Path = flippedConditionPath(Path);
     break;
   case ConditionType::IS_TRUE:

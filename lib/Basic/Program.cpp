@@ -86,7 +86,7 @@ struct Pipe {
   Pipe() {
     int fds[2];
     if (pipe(fds) == -1) {
-      read = write = -1; // '-1' to inidicate the failure.
+      read = write = -1; // '-1' to indicate the failure.
     }
     read = fds[0];
     write = fds[1];

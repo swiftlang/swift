@@ -5160,7 +5160,7 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
     // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
     if (ctx.isSwiftVersionAtLeast(5)) {
       // Mark this repr as invalid. This is the only way to indicate that
-      // something went wrong without supressing checking other reprs in
+      // something went wrong without suppressing checking other reprs in
       // the same type. For example:
       //
       // struct S<T, U> { ... }
@@ -5646,7 +5646,7 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
   if (constraintType->hasError())
     return ErrorType::get(getASTContext());
 
-  //TO-DO: generalize this and emit the same erorr for some P?
+  //TO-DO: generalize this and emit the same error for some P?
   if (!constraintType->isConstraintType()) {
     // Emit a tailored diagnostic for the incorrect optional
     // syntax 'any P?' with a fix-it to add parenthesis.
@@ -5985,7 +5985,7 @@ public:
 
 private:
   /// Returns a Boolean value indicating whether the insertion of `any` before
-  /// a type representation with the given parent requires paretheses.
+  /// a type representation with the given parent requires parentheses.
   static bool anySyntaxNeedsParens(TypeRepr *parent) {
     switch (parent->getKind()) {
     case TypeReprKind::Optional:

@@ -3394,7 +3394,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   case IsReabstractionThunk: OS << "[reabstraction_thunk] "; break;
   }
   if (isDynamicallyReplaceable()) {
-    OS << "[dynamically_replacable] ";
+    OS << "[dynamically_replaceable] ";
   }
   if (isDistributed()) {
     OS << "[distributed] ";

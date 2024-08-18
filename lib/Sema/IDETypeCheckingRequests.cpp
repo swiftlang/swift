@@ -117,7 +117,7 @@ public:
 /// that conforms to `PD`.
 ///
 /// In these cases, it is possible to access static members defined in the
-/// extension when perfoming unresolved member lookup in a type context of
+/// extension when performing unresolved member lookup in a type context of
 /// `PD`.
 static bool isExtensionWithSelfBound(const ExtensionDecl *ED,
                                      ProtocolDecl *PD) {

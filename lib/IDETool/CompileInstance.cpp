@@ -55,14 +55,14 @@ struct ModInfo {
 static bool collectModifiedFunctions(ArrayRef<Decl *> r1, ArrayRef<Decl *> r2,
                                      llvm::SmallVectorImpl<ModInfo> &result) {
   assert(r1.size() == r2.size() &&
-         "interface fingerprint matches but diffrent number of children");
+         "interface fingerprint matches but different number of children");
 
   for (auto i1 = r1.begin(), i2 = r2.begin(), e1 = r1.end(), e2 = r2.end();
        i1 != e1 && i2 != e2; ++i1, ++i2) {
     auto &d1 = *i1, &d2 = *i2;
 
     assert(d1->getKind() == d2->getKind() &&
-           "interface fingerprint matches but diffrent structure");
+           "interface fingerprint matches but different structure");
 
     /// FIXME: Nested types.
     ///   func foo() {
@@ -233,10 +233,10 @@ bool CompileInstance::performCachedSemaIfPossible(DiagnosticConsumer *DiagC) {
 
   // Collect modified function body.
   SmallVector<ModInfo, 2> modifiedFuncDecls;
-  bool isNotResuable = CI->forEachFileToTypeCheck([&](SourceFile &oldSF) {
+  bool isNotReusable = CI->forEachFileToTypeCheck([&](SourceFile &oldSF) {
     return getModifiedFunctionDeclList(oldSF, tmpSM, modifiedFuncDecls);
   });
-  if (isNotResuable)
+  if (isNotReusable)
     return true;
 
   // OK, we can reuse the AST.

@@ -784,7 +784,7 @@ public:
                             SmallVectorImpl<SILValue> &directResultsBuffer,
                             SmallVectorImpl<CleanupHandle> &cleanups);
 
-  /// Check to see if an initalization for a SingleValueStmtExpr is active, and
+  /// Check to see if an initialization for a SingleValueStmtExpr is active, and
   /// if the provided expression is for one of its branches. If so, returns the
   /// initialization to use for the expression. Otherwise returns \c nullptr.
   std::unique_ptr<Initialization> getSingleValueStmtInit(Expr *E);
@@ -878,7 +878,7 @@ public:
 
   /// Generates code for the given init accessor represented by AccessorDecl.
   /// This emits the body code and replaces all `self.<property>` references
-  /// with either argument (if property appears in `acesses` list`) or result
+  /// with either argument (if property appears in `accesses` list`) or result
   /// value assignment.
   void emitInitAccessor(AccessorDecl *accessor);
 
@@ -1004,7 +1004,7 @@ public:
   ///
   /// \param isPreconcurrency If the conformance is marked as `@preconcurrency`
   /// instead of a hop (when entering isolation) emit a dynamic check to make
-  /// sure that witness has been unsed in the expected context.
+  /// sure that witness has been used in the expected context.
   void emitProtocolWitness(AbstractionPattern reqtOrigTy,
                            CanAnyFunctionType reqtSubstTy,
                            SILDeclRef requirement, SubstitutionMap reqtSubs,
@@ -2900,7 +2900,7 @@ public:
   ///   The first parameter is the current index within the expansion
   ///   component, a value of type Builtin.Word.  The second parameter is
   ///   that index as a pack indexing instruction that indexes into packs
-  ///   with the shape of the pack expasion.  The third parameter is the
+  ///   with the shape of the pack expansion.  The third parameter is the
   ///   current pack index within the overall pack, a pack indexing instruction
   ///   that indexes into packs with the shape of formalPackType.
   ///

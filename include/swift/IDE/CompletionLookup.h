@@ -530,7 +530,7 @@ public:
   /// Add code completion results after an expression of type \p ExprType.
   /// This includes members as well as call patterns if \p ExprType is a
   /// function type.
-  /// If \p IsDeclUnapplied is \c true, we are completing after a refernce to
+  /// If \p IsDeclUnapplied is \c true, we are completing after a reference to
   /// \p VD that hasn't been called yet. Thus, \p VD has type \p ExprType and we
   /// can use \p VD to enrich call pattern completions of \p ExprType.
   void getValueExprCompletions(Type ExprType, ValueDecl *VD = nullptr,
@@ -614,7 +614,7 @@ public:
 
   void getPoundAvailablePlatformCompletions();
 
-  /// \p Loc is the location of the code completin token.
+  /// \p Loc is the location of the code completion token.
   /// \p isForDeclResult determines if were are spelling out the result type
   /// of a declaration.
   void getSelfTypeCompletionInDeclContext(SourceLoc Loc, bool isForDeclResult);

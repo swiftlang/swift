@@ -302,7 +302,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValuePhiArg(
     SILValue incomingValue, ValueSet &visitedValues) {
   // We use pushSnapShot to run recursively and if we fail to find a
   // value, we just pop our list to the last snapshot end of list. If we
-  // succeed, we do not pop and just return recusive value. Our user
+  // succeed, we do not pop and just return recursive value. Our user
   // will consume variableNamePath at this point.
   LLVM_DEBUG(llvm::dbgs() << "Before pushing a snap shot!\n";
              variableNamePath.print(llvm::dbgs()));
