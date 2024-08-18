@@ -96,6 +96,8 @@ if '@SWIFT_STDLIB_ENABLE_LTO@'.lower() in ['full', 'thin']:
 
 if "@LLVM_ENABLE_ASSERTIONS@" == "TRUE":
     config.available_features.add('asserts')
+    # Tests that require -swift-version 7 can only run with asserts compilers
+    config.available_features.add('swift7')
 else:
     config.available_features.add('no_asserts')
 
