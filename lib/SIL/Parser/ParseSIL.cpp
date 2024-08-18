@@ -700,7 +700,7 @@ static bool parseDeclSILOptional(
       *serializedKind = IsSerialized;
     else if (serializedKind && SP.P.Tok.getText() == "serialized_for_package")
       *serializedKind = IsSerializedForPackage;
-    else if (isDynamic && SP.P.Tok.getText() == "dynamically_replaceable")
+    else if (isDynamic && SP.P.Tok.getText() == "dynamically_replacable")
       *isDynamic = IsDynamic;
     else if (isDistributed && SP.P.Tok.getText() == "distributed")
       *isDistributed = IsDistributed;

@@ -1248,7 +1248,7 @@ public:
         constant, captureInfo, subs);
 
     // Check whether we have to dispatch to the original implementation of a
-    // dynamically_replaceable inside of a dynamic_replacement(for:) function.
+    // dynamically_replacable inside of a dynamic_replacement(for:) function.
     ApplyExpr *thisCallSite = (selfApply ? selfApply : callSite);
     bool isObjCReplacementSelfCall = false;
     auto *unaryArg = thisCallSite->getArgs()->getUnaryExpr();

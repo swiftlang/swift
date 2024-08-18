@@ -662,7 +662,7 @@ public:
   }
 
   // Creates a dynamic_function_ref or function_ref depending on whether f is
-  // dynamically_replaceable.
+  // dynamically_replacable.
   FunctionRefBaseInst *createFunctionRefFor(SILLocation Loc, SILFunction *f) {
     if (f->isDynamicallyReplaceable())
       return createDynamicFunctionRef(Loc, f);

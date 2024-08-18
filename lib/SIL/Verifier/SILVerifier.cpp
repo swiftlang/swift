@@ -2485,18 +2485,18 @@ public:
     if (isa<FunctionRefInst>(FRI))
       require(
           !RefF->isDynamicallyReplaceable(),
-          "function_ref cannot reference a [dynamically_replaceable] function");
+          "function_ref cannot reference a [dynamically_replacable] function");
     else if (isa<PreviousDynamicFunctionRefInst>(FRI)) {
       require(!RefF->isDynamicallyReplaceable(),
               "previous_function_ref cannot reference a "
-              "[dynamically_replaceable] function");
+              "[dynamically_replacable] function");
       require(RefF->getDynamicallyReplacedFunction(),
               "previous_function_ref must reference a "
               "[dynamic_replacement_for:...] function");
     } else if (isa<DynamicFunctionRefInst>(FRI))
       require(RefF->isDynamicallyReplaceable(),
               "dynamic_function_ref must reference a "
-              "[dynamically_replaceable] function");
+              "[dynamically_replacable] function");
 
     // In canonical SIL, direct reference to a shared_external declaration
     // is an error; we should have deserialized a body. In raw SIL, including

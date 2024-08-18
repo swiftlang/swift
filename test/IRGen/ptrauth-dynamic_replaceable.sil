@@ -3,26 +3,26 @@
 // REQUIRES: objc_interop
 // REQUIRES: CPU=arm64e
 
-// CHECK: @test_dynamically_replaceableTX = global %swift.dyn_repl_link_entry { ptr{{.*}} @test_dynamically_replaceable.ptrauth, ptr null }
-// CHECK: @test_dynamically_replaceable.ptrauth = private constant { ptr, i32, i64, i64 } { ptr @test_dynamically_replaceable, i32 0, i64 ptrtoint (ptr @test_dynamically_replaceableTX to i64), i64 679 }, section "llvm.ptrauth"
-// CHECK: @test_dynamically_replaceableTx = constant %swift.dyn_repl_key { i32 trunc ([[INTPTR:i[0-9]+]] sub ([[INTPTR]] ptrtoint (ptr @test_dynamically_replaceableTX to [[INTPTR]]), [[INTPTR]] ptrtoint (ptr @test_dynamically_replaceableTx to [[INTPTR]])) to i32), i32 679 }, section "__TEXT,__const"
+// CHECK: @test_dynamically_replacableTX = global %swift.dyn_repl_link_entry { ptr{{.*}} @test_dynamically_replacable.ptrauth, ptr null }
+// CHECK: @test_dynamically_replacable.ptrauth = private constant { ptr, i32, i64, i64 } { ptr @test_dynamically_replacable, i32 0, i64 ptrtoint (ptr @test_dynamically_replacableTX to i64), i64 679 }, section "llvm.ptrauth"
+// CHECK: @test_dynamically_replacableTx = constant %swift.dyn_repl_key { i32 trunc ([[INTPTR:i[0-9]+]] sub ([[INTPTR]] ptrtoint (ptr @test_dynamically_replacableTX to [[INTPTR]]), [[INTPTR]] ptrtoint (ptr @test_dynamically_replacableTx to [[INTPTR]])) to i32), i32 679 }, section "__TEXT,__const"
 // CHECK: @test_replacementTX = global %swift.dyn_repl_link_entry zeroinitializer
 // CHECK: @test_replacement_for_externalTX = global %swift.dyn_repl_link_entry zeroinitializer
-// CHECK: @external_test_dynamically_replaceableTx = external global %swift.dyn_repl_key
-// CHECK: @got.external_test_dynamically_replaceableTx = private unnamed_addr constant ptr @external_test_dynamically_replaceableTx.ptrauth
-// CHECK: @external_test_dynamically_replaceableTx.ptrauth = private constant { ptr, i32, i64, i64 } { ptr @external_test_dynamically_replaceableTx, i32 2, i64 ptrtoint (ptr @got.external_test_dynamically_replaceableTx to i64), i64 11389 }, section "llvm.ptrauth"
+// CHECK: @external_test_dynamically_replacableTx = external global %swift.dyn_repl_key
+// CHECK: @got.external_test_dynamically_replacableTx = private unnamed_addr constant ptr @external_test_dynamically_replacableTx.ptrauth
+// CHECK: @external_test_dynamically_replacableTx.ptrauth = private constant { ptr, i32, i64, i64 } { ptr @external_test_dynamically_replacableTx, i32 2, i64 ptrtoint (ptr @got.external_test_dynamically_replacableTx to i64), i64 11389 }, section "llvm.ptrauth"
 
 // CHECK: @"\01l_unnamed_dynamic_replacements" = private constant { i32, i32, [2 x { i32, i32, i32, i32 }] }
 // CHECK: { i32 0,
 // CHECK:   i32 2,
 // CHECK:  [2 x { i32, i32, i32, i32 }]
 // CHECK:  [{ i32, i32, i32, i32 }
-// CHECK:  ptr @test_dynamically_replaceableTx
+// CHECK:  ptr @test_dynamically_replacableTx
 // CHECK:  @test_replacement
 // CHECK:  ptr @test_replacementTX
 // CHECK:  i32 0 },
 // CHECK: { i32, i32, i32, i32 }
-// CHECK:  ptr @got.external_test_dynamically_replaceableTx
+// CHECK:  ptr @got.external_test_dynamically_replacableTx
 // CHECK:  @test_replacement_for_external
 // CHECK:  ptr @test_replacement_for_externalTX
 // CHECK:  i32 0 }] }, section "__TEXT,__const"
@@ -32,20 +32,20 @@
 // CHECK: [2 x i32] [{{.*}}@"\01l_unnamed_dynamic_replacements"{{.*}}, i32 0]
 // CHECK: }, section "__TEXT, __swift5_replace, regular, no_dead_strip"
 
-// CHECK-LABEL: define swiftcc void @test_dynamically_replaceable()
+// CHECK-LABEL: define swiftcc void @test_dynamically_replacable()
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   [[FUN_PTR:%.*]] = call ptr @swift_getFunctionReplacement{{.*}}({{.*}} @test_dynamically_replaceableTX
+// CHECK-NEXT:   [[FUN_PTR:%.*]] = call ptr @swift_getFunctionReplacement{{.*}}({{.*}} @test_dynamically_replacableTX
 // CHECK-NEXT:   [[CMP:%.*]] = icmp eq ptr [[FUN_PTR]], null
 // CHECK-NEXT:   br i1 [[CMP]], label %original_entry, label %forward_to_replaced
 // CHECK:      forward_to_replaced:
-// CHECK-NEXT:   [[BLEND:%.*]] = call i64 @llvm.ptrauth.blend(i64 ptrtoint (ptr @test_dynamically_replaceableTX to i64), i64 679)
+// CHECK-NEXT:   [[BLEND:%.*]] = call i64 @llvm.ptrauth.blend(i64 ptrtoint (ptr @test_dynamically_replacableTX to i64), i64 679)
 // CHECK-NEXT:   tail call swiftcc void [[FUN_PTR]]() [ "ptrauth"(i32 0, i64 [[BLEND]]) ]
 // CHECK-NEXT:   ret void
 // CHECK:      original_entry:
 // CHECK-NEXT:   ret void
 // CHECK-NEXT: }
 
-sil [dynamically_replacable] @test_dynamically_replaceable : $@convention(thin) () -> () {
+sil [dynamically_replacable] @test_dynamically_replacable : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
@@ -65,7 +65,7 @@ bb0:
 // CHECK-NEXT:   call swiftcc void [[FUN_PTR]]() [ "ptrauth"(i32 0, i64 [[BLEND]]) ]
 // CHECK:   ret void
 // CHECK: }
-sil [dynamic_replacement_for "test_dynamically_replaceable"] @test_replacement : $@convention(thin) () -> () {
+sil [dynamic_replacement_for "test_dynamically_replacable"] @test_replacement : $@convention(thin) () -> () {
 bb0:
   %0 = prev_dynamic_function_ref @test_replacement : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
@@ -75,21 +75,21 @@ bb0:
 
 // CHECK-LABEL: define swiftcc void @test_dynamic_call()
 // CHECK: entry:
-// CHECK:   call swiftcc void @test_dynamically_replaceable()
+// CHECK:   call swiftcc void @test_dynamically_replacable()
 // CHECK:   ret void
 // CHECK: }
 sil @test_dynamic_call : $@convention(thin) () -> () {
 bb0:
-  %0 = dynamic_function_ref @test_dynamically_replaceable : $@convention(thin) () -> ()
+  %0 = dynamic_function_ref @test_dynamically_replacable : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
   %2 = tuple ()
   return %2 : $()
 }
 
 
-sil [dynamically_replacable] @external_test_dynamically_replaceable : $@convention(thin) () -> ()
+sil [dynamically_replacable] @external_test_dynamically_replacable : $@convention(thin) () -> ()
 
-sil [dynamic_replacement_for "external_test_dynamically_replaceable"] @test_replacement_for_external : $@convention(thin) () -> () {
+sil [dynamic_replacement_for "external_test_dynamically_replacable"] @test_replacement_for_external : $@convention(thin) () -> () {
 bb0:
   %0 = prev_dynamic_function_ref @test_replacement : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()

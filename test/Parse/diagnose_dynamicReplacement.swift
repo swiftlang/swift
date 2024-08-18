@@ -14,7 +14,7 @@ func test_dynamic_replacement_for() {
 func test_dynamic_replacement_for2() {
 }
 
-@_dynamicReplacement(for: dynamically_replaceable() // expected-note {{to match this opening '('}}
+@_dynamicReplacement(for: dynamically_replacable() // expected-note {{to match this opening '('}}
 func test_dynamic_replacement_for3() {
 // expected-error@-1 {{expected ')' after function name for @_dynamicReplacement}}
 }

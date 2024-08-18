@@ -5783,15 +5783,15 @@ Creates a reference to a `dynamically_replacable` SIL function. A
 
 For the following Swift code::
 
-  dynamic func test_dynamically_replaceable() {}
+  dynamic func test_dynamically_replacable() {}
 
   func test_dynamic_call() {
-    test_dynamically_replaceable()
+    test_dynamically_replacable()
   }
 
 We will generate::
 
-  sil [dynamically_replacable] @test_dynamically_replaceable : $@convention(thin) () -> () {
+  sil [dynamically_replacable] @test_dynamically_replacable : $@convention(thin) () -> () {
   bb0:
     %0 = tuple ()
     return %0 : $()
@@ -5799,7 +5799,7 @@ We will generate::
 
   sil @test_dynamic_call : $@convention(thin) () -> () {
   bb0:
-    %0 = dynamic_function_ref @test_dynamically_replaceable : $@convention(thin) () -> ()
+    %0 = dynamic_function_ref @test_dynamically_replacable : $@convention(thin) () -> ()
     %1 = apply %0() : $@convention(thin) () -> ()
     %2 = tuple ()
     return %2 : $()
@@ -5820,14 +5820,14 @@ function.
 
 For the following Swift code::
 
-  @_dynamicReplacement(for: test_dynamically_replaceable())
+  @_dynamicReplacement(for: test_dynamically_replacable())
   func test_replacement() {
-    test_dynamically_replaceable() // calls previous implementation
+    test_dynamically_replacable() // calls previous implementation
   }
 
 We  will generate::
 
-  sil [dynamic_replacement_for "test_dynamically_replaceable"] @test_replacement : $@convention(thin) () -> () {
+  sil [dynamic_replacement_for "test_dynamically_replacable"] @test_replacement : $@convention(thin) () -> () {
   bb0:
     %0 = prev_dynamic_function_ref @test_replacement : $@convention(thin) () -> ()
     %1 = apply %0() : $@convention(thin) () -> ()

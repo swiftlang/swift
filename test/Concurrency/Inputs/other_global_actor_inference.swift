@@ -1,5 +1,5 @@
 
-// dynamically_replaceable
+// dynamically_replacable
 @MainActor
 public dynamic func dynamicOnMainActor() { }
 
