@@ -528,31 +528,23 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
 
 Type TypeSubstituter::transformPrimaryArchetypeType(ArchetypeType *primary,
                                                     TypePosition position) {
-  // If we have a substitution for this type, use it.
-  if (auto known = IFS.substType(primary, level))
-    return known;
+  // If we're not in one of the special modes, map the primary archetype out
+  // of context, and substitute that instead.
+  if (!IFS.shouldSubstitutePrimaryArchetypes() &&
+      !IFS.shouldSubstituteOpaqueArchetypes() &&
+      !IFS.shouldSubstituteLocalArchetypes()) {
+    return doIt(primary->getInterfaceType(), position);
+  }
 
-  if (primary->isRoot())
-    return ErrorType::get(primary);
+  // Primary types can't normally be directly substituted unless we
+  // specifically were asked to substitute them.
+  if (!IFS.shouldSubstitutePrimaryArchetypes())
+    return primary;
 
-  // For nested archetypes, we can substitute the parent.
-  Type origParent = primary->getParent();
-  assert(origParent && "Not a nested archetype");
+  auto known = IFS.substType(primary, level);
+  ASSERT(known && "Opaque type replacement shouldn't fail");
 
-  // Substitute into the parent type.
-  Type substParent = doIt(origParent, TypePosition::Invariant);
-
-  // If the parent didn't change, we won't change.
-  if (substParent.getPointer() == origParent.getPointer())
-    return Type(primary);
-
-  // Get the associated type reference from a child archetype.
-  AssociatedTypeDecl *assocType = primary->getInterfaceType()
-      ->castTo<DependentMemberType>()->getAssocType();
-
-  return getMemberForBaseType(IFS, origParent, substParent,
-                              assocType, assocType->getName(),
-                              level);
+  return known;
 }
 
 std::optional<Type>
