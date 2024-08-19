@@ -168,6 +168,52 @@ func testFallthrough() throws -> Int {
 // CHECK:       dealloc_stack [[RESULT]] : $*Int
 // CHECK:       return [[VAL]] : $Int
 
+func testFallthrough2() -> Int {
+  let x = switch Bool.random() {
+  case true:
+    fallthrough
+  case false:
+    1
+  }
+  return x
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s11switch_expr16testFallthrough2SiyF : $@convention(thin) () -> Int {
+// CHECK:       [[RESULT:%[0-9]+]] = alloc_stack $Int
+// CHECK:       switch_value {{%[0-9]+}} : $Builtin.Int1, case {{%[0-9]+}}: [[TRUEBB:bb[0-9]+]], case {{%[0-9]+}}: [[FALSEBB:bb[0-9]+]]
+//
+// CHECK:       [[TRUEBB]]:
+// CHECK-NEXT:  br [[ENDBB:bb[0-9]+]]
+//
+// CHECK:       [[FALSEBB]]:
+// CHECK-NEXT:  br [[ENDBB]]
+//
+// CHECK:       [[ENDBB]]:
+// CHECK:       [[ONELIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 1
+// CHECK:       [[ONE:%[0-9]+]] = apply {{%[0-9]+}}([[ONELIT]], {{%[0-9]+}})
+// CHECK:       store [[ONE]] to [trivial] [[RESULT]] : $*Int
+// CHECK:       [[VAL:%[0-9]+]] = load [trivial] [[RESULT]] : $*Int
+// CHECK:       [[VAL_RESULT:%[0-9]+]] = move_value [var_decl] [[VAL]] : $Int
+// CHECK:       dealloc_stack [[RESULT]] : $*Int
+// CHECK:       return [[VAL_RESULT:[%0-9]+]] : $Int
+
+func testFallthrough3() throws -> Int {
+  switch Bool.random() {
+  case true:
+    switch Bool.random() {
+    case true:
+      if .random() {
+        fallthrough
+      }
+      throw Err()
+    case false:
+      1
+    }
+  case false:
+    0
+  }
+}
+
 func testClosure() throws -> Int {
   let fn = {
     switch Bool.random() {

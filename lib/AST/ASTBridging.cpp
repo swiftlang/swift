@@ -2005,9 +2005,9 @@ BridgedDoCatchStmt BridgedDoCatchStmt_createParsed(
 }
 
 BridgedFallthroughStmt
-BridgedFallthroughStmt_createParsed(BridgedASTContext cContext,
-                                    BridgedSourceLoc cLoc) {
-  return new (cContext.unbridged()) FallthroughStmt(cLoc.unbridged());
+BridgedFallthroughStmt_createParsed(BridgedSourceLoc cLoc,
+                                    BridgedDeclContext cDC) {
+  return FallthroughStmt::createParsed(cLoc.unbridged(), cDC.unbridged());
 }
 
 BridgedForEachStmt BridgedForEachStmt_createParsed(

@@ -989,6 +989,23 @@ LabeledStmt *ContinueStmt::getTarget() const {
   return evaluateOrDefault(eval, ContinueTargetRequest{this}, nullptr);
 }
 
+FallthroughStmt *FallthroughStmt::createParsed(SourceLoc Loc, DeclContext *DC) {
+  auto &ctx = DC->getASTContext();
+  return new (ctx) FallthroughStmt(Loc, DC);
+}
+
+CaseStmt *FallthroughStmt::getFallthroughSource() const {
+  auto &eval = getDeclContext()->getASTContext().evaluator;
+  return evaluateOrDefault(eval, FallthroughSourceAndDestRequest{this}, {})
+      .Source;
+}
+
+CaseStmt *FallthroughStmt::getFallthroughDest() const {
+  auto &eval = getDeclContext()->getASTContext().evaluator;
+  return evaluateOrDefault(eval, FallthroughSourceAndDestRequest{this}, {})
+      .Dest;
+}
+
 SourceLoc swift::extractNearestSourceLoc(const Stmt *S) {
   return S->getStartLoc();
 }
