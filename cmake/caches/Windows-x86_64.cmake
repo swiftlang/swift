@@ -136,6 +136,7 @@ set(LLVM_TOOLCHAIN_TOOLS
       llvm-dwp
       llvm-lib
       llvm-lipo
+      llvm-ml
       llvm-mt
       llvm-nm
       llvm-objcopy
