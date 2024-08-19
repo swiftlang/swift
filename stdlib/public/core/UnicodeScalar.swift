@@ -382,9 +382,9 @@ extension UInt64 {
 
 /// Extends `UInt8` providing initialization from a Unicode scalar.
 extension UInt8 {
-  /// Converts a UInt8 value into a UnicodeScalar
+  /// Converts a UInt8 ASCII value into a UnicodeScalar
   @_transparent @_alwaysEmitIntoClient
-  var ascii: Unicode.Scalar? {
+  var asciiScalar: Unicode.Scalar? {
     guard self < 0x80 else { return nil }
     return Unicode.Scalar(self)
   }
@@ -409,31 +409,19 @@ extension UInt8 {
   /// - Returns: `true` when the `UInt8` is equal to the provided Unicode scalar; otherwise, `false`.
   @_transparent @_alwaysEmitIntoClient
   public static func == (i: Self, s: Unicode.Scalar) -> Bool {
-    #if DEBUG
-    return i == UInt8(ascii: s)
-    #else
     return i == UInt8(ifASCII: s)
-    #endif
   }
 
   /// Returns a Boolean indicating whether the `UInt8` is not equal to the provided Unicode scalar.
   @_transparent @_alwaysEmitIntoClient
   public static func != (i: Self, s: Unicode.Scalar) -> Bool {
-    #if DEBUG
-    return i != UInt8(ascii: s)
-    #else
     return i != UInt8(ifASCII: s)
-    #endif
   }
 
   /// Enables pattern matching of Unicode scalars in switch statements.
   @_transparent @_alwaysEmitIntoClient
   public static func ~= (s: Unicode.Scalar, i: Self) -> Bool {
-    #if DEBUG
-    return i == UInt8(ascii: s)
-    #else
     return i == UInt8(ifASCII: s)
-    #endif
   }
 }
 
@@ -447,31 +435,19 @@ extension UInt8? {
   /// - Returns: `true` if the optional `UInt8` is equal to the provided Unicode scalar; otherwise, `false`.
   @_transparent @_alwaysEmitIntoClient
   public static func == (i: Self, s: Unicode.Scalar) -> Bool {
-    #if DEBUG
-    return i == UInt8(ascii: s)
-    #else
     return i == UInt8(ifASCII: s)
-    #endif
   }
 
   /// Returns a Boolean value indicating whether the optional `UInt8` is not equal to the provided Unicode scalar.
   @_transparent @_alwaysEmitIntoClient
   public static func != (i: Self, s: Unicode.Scalar) -> Bool {
-    #if DEBUG
-    return i != UInt8(ascii: s)
-    #else
     return i != UInt8(ifASCII: s)
-    #endif
   }
 
   /// Allows pattern matching of Unicode scalars in switch statements.
   @_transparent @_alwaysEmitIntoClient
   public static func ~= (s: Unicode.Scalar, i: Self) -> Bool {
-    #if DEBUG
-    return i == UInt8(ascii: s)
-    #else
     return i == UInt8(ifASCII: s)
-    #endif
   }
 }
 
