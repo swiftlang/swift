@@ -1794,7 +1794,7 @@ private:
   }
 
   ASTNode visitFallthroughStmt(FallthroughStmt *fallthroughStmt) {
-    if (checkFallthroughStmt(context.getAsDeclContext(), fallthroughStmt))
+    if (checkFallthroughStmt(fallthroughStmt))
       hadError = true;
     return fallthroughStmt;
   }

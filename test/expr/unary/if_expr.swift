@@ -340,7 +340,7 @@ struct TestFailableInit {
     let y = if x {
       0
     } else {
-      return nil // expected-error {{cannot 'return' in 'if' when used as expression}}
+      return nil // expected-error {{cannot use 'return' to transfer control out of 'if' expression}}
     }
     _ = y
   }
@@ -605,16 +605,16 @@ func returnBranches1() -> Int {
 
 func returnBranchVoid() {
   return if .random() { return } else { return () }
-  // expected-error@-1 2{{cannot 'return' in 'if' when used as expression}}
+  // expected-error@-1 2{{cannot use 'return' to transfer control out of 'if' expression}}
 }
 
 func returnBranchBinding() -> Int {
   let x = if .random() {
     // expected-warning@-1 {{constant 'x' inferred to have type 'Void', which may be unexpected}}
     // expected-note@-2 {{add an explicit type annotation to silence this warning}}
-    return 0 // expected-error {{cannot 'return' in 'if' when used as expression}}
+    return 0 // expected-error {{cannot use 'return' to transfer control out of 'if' expression}}
   } else {
-    return 1 // expected-error {{cannot 'return' in 'if' when used as expression}}
+    return 1 // expected-error {{cannot use 'return' to transfer control out of 'if' expression}}
   }
   return x // expected-error {{cannot convert return expression of type 'Void' to return type 'Int'}}
 }
@@ -648,9 +648,9 @@ func returnBranches5() throws -> Int {
   let i = if .random() {
     // expected-warning@-1 {{constant 'i' inferred to have type 'Void', which may be unexpected}}
     // expected-note@-2 {{add an explicit type annotation to silence this warning}}
-    return 0 // expected-error {{cannot 'return' in 'if' when used as expression}}
+    return 0 // expected-error {{cannot use 'return' to transfer control out of 'if' expression}}
   } else {
-    return 1 // expected-error {{cannot 'return' in 'if' when used as expression}}
+    return 1 // expected-error {{cannot use 'return' to transfer control out of 'if' expression}}
   }
   let j = if .random() {
     // expected-warning@-1 {{constant 'j' inferred to have type 'Void', which may be unexpected}}
@@ -702,7 +702,7 @@ func returnBranches6PoundIf2() -> Int {
 func returnBranches7() -> Int {
   let i = if .random() {
     print("hello")
-    return 0  // expected-error {{cannot 'return' in 'if' when used as expression}}
+    return 0  // expected-error {{cannot use 'return' to transfer control out of 'if' expression}}
   } else {
     1
   }
@@ -710,7 +710,7 @@ func returnBranches7() -> Int {
 }
 
 func returnBranches8() -> Int {
-  let i = if .random() { return 1 } else { 0 }  // expected-error {{cannot 'return' in 'if' when used as expression}}
+  let i = if .random() { return 1 } else { 0 }  // expected-error {{cannot use 'return' to transfer control out of 'if' expression}}
   return i
 }
 
@@ -914,7 +914,7 @@ func break1() -> Int {
   switch true {
   case true:
     let j = if .random() {
-      break // expected-error {{cannot 'break' in 'if' when used as expression}}
+      break // expected-error {{cannot use 'break' to transfer control out of 'if' expression}}
     } else {
       0
     }
@@ -927,7 +927,7 @@ func break1() -> Int {
 func continue1() -> Int {
   for _ in 0 ... 5 {
     let i = if true { continue } else { 1 }
-    // expected-error@-1 {{cannot 'continue' in 'if' when used as expression}}
+    // expected-error@-1 {{cannot use 'continue' to transfer control out of 'if' expression}}
     return i
   }
 }
@@ -941,7 +941,7 @@ func return1() -> Int {
         while true {
           switch 0 {
           default:
-            return 0 // expected-error {{cannot 'return' in 'if' when used as expression}}
+            return 0 // expected-error {{cannot use 'return' to transfer control out of 'if' expression}}
           }
         }
       }
@@ -985,6 +985,63 @@ func return4() throws -> Int {
     0
   }
   return i
+}
+
+// https://github.com/swiftlang/swift/issues/75880
+func fallthrough1() throws {
+  switch Bool.random() {
+  case true:
+    let _ = if .random() {
+      if .random () {
+        fallthrough // expected-error {{cannot use 'fallthrough' to transfer control out of 'if' expression}}
+      }
+      throw Err()
+    } else {
+      0
+    }
+  case false:
+    break
+  }
+}
+
+func fallthrough2() throws -> Int {
+  let x = switch Bool.random() {
+  case true:
+    if .random() {
+      if .random () {
+        fallthrough // expected-error {{cannot use 'fallthrough' to transfer control out of 'if' expression}}
+      }
+      throw Err()
+    } else {
+      0
+    }
+  case false:
+    1
+  }
+  return x
+}
+
+func fallthrough3() -> Int {
+  let x = switch Bool.random() {
+  case true:
+    if .random() {
+      fallthrough // expected-error {{cannot use 'fallthrough' to transfer control out of 'if' expression}}
+    } else {
+      0
+    }
+  case false:
+    1
+  }
+  return x
+}
+
+func fallthrough4() -> Int {
+  let x = if .random() {
+    fallthrough // expected-error {{'fallthrough' is only allowed inside a switch}}
+  } else {
+    0
+  }
+  return x
 }
 
 // MARK: Effect specifiers
