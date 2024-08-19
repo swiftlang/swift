@@ -206,6 +206,10 @@ operator()(CanType dependentType, Type conformingReplacementType,
         /*allowMissing=*/true);
   }
 
+  if (isa<PrimaryArchetypeType>(dependentType) ||
+      isa<PackArchetypeType>(dependentType))
+    dependentType = dependentType->mapTypeOutOfContext()->getCanonicalType();
+
   auto result = Subs.lookupConformance(dependentType, conformedProtocol);
   if (!result.isInvalid())
     return result;

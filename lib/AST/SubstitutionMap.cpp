@@ -11,14 +11,11 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines the SubstitutionMap class. A SubstitutionMap packages
-// together a set of replacement types and protocol conformances for
-// specializing generic types.
+// together a set of replacement types and protocol conformances, given by
+// the generic parameters and conformance requirements of the substitution map's
+// input generic signature.
 //
-// SubstitutionMaps either have type parameters or archetypes as keys,
-// based on whether they were built from a GenericSignature or a
-// GenericEnvironment.
-//
-// To specialize a type, call Type::subst() with the right SubstitutionMap.
+// To substitute a type, call Type::subst() with the right SubstitutionMap.
 //
 //===----------------------------------------------------------------------===//
 
@@ -238,20 +235,9 @@ Type SubstitutionMap::lookupSubstitution(GenericTypeParamType *genericParam) con
 
 ProtocolConformanceRef
 SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
+  ASSERT(type->isTypeParameter());
+
   if (empty())
-    return ProtocolConformanceRef::forInvalid();
-
-  // If we have an archetype, map out of the context so we can compute a
-  // conformance access path.
-  if (auto archetype = dyn_cast<ArchetypeType>(type)) {
-    if (!isa<OpaqueTypeArchetypeType>(archetype)) {
-      type = archetype->getInterfaceType()->getCanonicalType();
-    }
-  }
-
-  // Error path: if we don't have a type parameter, there is no conformance.
-  // FIXME: Query concrete conformances in the generic signature?
-  if (!type->isTypeParameter())
     return ProtocolConformanceRef::forInvalid();
 
   auto genericSig = getGenericSignature();
