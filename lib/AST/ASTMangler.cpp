@@ -22,6 +22,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
@@ -2248,12 +2249,15 @@ void ASTMangler::appendOpaqueTypeArchetype(ArchetypeType *archetype,
 
     appendOperator("Qo", Index(genericParam->getIndex()));
   } else {
+    auto *env = archetype->getGenericEnvironment();
+    appendType(env->mapTypeIntoContext(interfaceType->getRootGenericParam()),
+               sig, forDecl);
+
     // Mangle associated types of opaque archetypes like dependent member
     // types, so that they can be accurately demangled at runtime.
-    appendType(Type(archetype->getRoot()), sig, forDecl);
     bool isAssocTypeAtDepth = false;
     appendAssocType(
-        archetype->getInterfaceType()->castTo<DependentMemberType>(),
+        interfaceType->castTo<DependentMemberType>(),
         sig, isAssocTypeAtDepth);
     appendOperator(isAssocTypeAtDepth ? "QX" : "Qx");
   }

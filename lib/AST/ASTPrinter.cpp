@@ -7012,16 +7012,17 @@ public:
     Printer << "each ";
   }
 
-  void printArchetypeCommon(Type interfaceTy, ArchetypeType *archetypeTy) {
+  void printArchetypeCommon(Type interfaceTy, GenericEnvironment *env) {
     if (auto *paramTy = interfaceTy->getAs<GenericTypeParamType>()) {
-      assert(archetypeTy->isRoot());
-
       if (Options.AlternativeTypeNames) {
-        auto found = Options.AlternativeTypeNames->find(CanType(archetypeTy));
-        if (found != Options.AlternativeTypeNames->end()) {
-          if (paramTy->isParameterPack()) printEach();
-          Printer << found->second.str();
-          return;
+        auto archetypeTy = env->mapTypeIntoContext(paramTy)->getAs<GenericTypeParamType>();
+        if (archetypeTy) {
+          auto found = Options.AlternativeTypeNames->find(CanType(archetypeTy));
+          if (found != Options.AlternativeTypeNames->end()) {
+            if (paramTy->isParameterPack()) printEach();
+            Printer << found->second.str();
+            return;
+          }
         }
       }
 
@@ -7030,10 +7031,10 @@ public:
     }
 
     auto *memberTy = interfaceTy->castTo<DependentMemberType>();
-    if (memberTy->getBase()->is<GenericTypeParamType>())
-      visitParentType(archetypeTy->getRoot());
+    if (auto *paramTy = memberTy->getBase()->getAs<GenericTypeParamType>())
+      visitParentType(env->mapTypeIntoContext(paramTy));
     else {
-      printArchetypeCommon(memberTy->getBase(), archetypeTy->getRoot());
+      printArchetypeCommon(memberTy->getBase(), env);
       Printer << ".";
     }
 
@@ -7041,7 +7042,7 @@ public:
   }
 
   void visitPrimaryArchetypeType(PrimaryArchetypeType *T) {
-    printArchetypeCommon(T->getInterfaceType(), T);
+    printArchetypeCommon(T->getInterfaceType(), T->getGenericEnvironment());
   }
 
   void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
@@ -7050,7 +7051,7 @@ public:
 
     if (!paramTy) {
       assert(interfaceTy->is<DependentMemberType>());
-      printArchetypeCommon(interfaceTy, T);
+      printArchetypeCommon(interfaceTy, T->getGenericEnvironment());
       return;
     }
 
@@ -7135,7 +7136,7 @@ public:
   }
 
   void visitPackArchetypeType(PackArchetypeType *T) {
-    printArchetypeCommon(T->getInterfaceType(), T);
+    printArchetypeCommon(T->getInterfaceType(), T->getGenericEnvironment());
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {
