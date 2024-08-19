@@ -20,25 +20,16 @@ extension std.string {
   /// - Complexity: O(*n*), where *n* is the number of UTF-8 code units in the
   ///   Swift string.
   public init(_ string: String) {
-    self.init()
-    let utf8 = string.utf8
-    self.reserve(utf8.count)
-    for char in utf8 {
-      self.push_back(value_type(bitPattern: char))
+    self = string.withCString(encodedAs: UTF8.self) { buffer in
+      std.string(buffer, string.utf8.count, .init())
     }
   }
 
   public init(_ string: UnsafePointer<CChar>?) {
-    self.init()
-
-    guard let str = string else {
-      return
-    }
-
-    let len = UTF8._nullCodeUnitOffset(in: str)
-    for i in 0..<len {
-      let char = UInt8(str[i])
-      self.push_back(value_type(bitPattern: char))
+    if let str = string {
+      self.init(str, UTF8._nullCodeUnitOffset(in: str), .init())
+    } else {
+      self.init()
     }
   }
 }
