@@ -1764,11 +1764,7 @@ void WitnessTableBuilderBase::defineAssociatedTypeWitnessTableAccessFunction(
                                 CanType associatedType,
                                 ProtocolConformanceRef associatedConformance) {
   bool hasArchetype = associatedType->hasArchetype();
-  OpaqueTypeArchetypeType *associatedRootOpaqueType = nullptr;
-  if (auto assocArchetype = dyn_cast<ArchetypeType>(associatedType)) {
-    associatedRootOpaqueType = dyn_cast<OpaqueTypeArchetypeType>(
-                                                     assocArchetype->getRoot());
-  }
+  bool isOpaqueArchetype = isa<OpaqueTypeArchetypeType>(associatedType);
 
   assert(isa<NormalProtocolConformance>(Conformance) && "has associated type");
 
@@ -1827,7 +1823,7 @@ void WitnessTableBuilderBase::defineAssociatedTypeWitnessTableAccessFunction(
   }
 
   // If there are no archetypes, return a reference to the table.
-  if (!hasArchetype && !associatedRootOpaqueType) {
+  if (!hasArchetype && !isOpaqueArchetype) {
     auto wtable = conformanceI->getTable(IGF, &associatedTypeMetadata);
     IGF.Builder.CreateRet(wtable);
     return;

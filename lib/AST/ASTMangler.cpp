@@ -3752,10 +3752,12 @@ void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt,
 
 void ASTMangler::appendClosureEntity(
                               const SerializedAbstractClosureExpr *closure) {
-  assert(!closure->getType()->hasLocalArchetype() &&
+  auto canType = closure->getType()->getCanonicalType();
+  assert(!canType->hasLocalArchetype() &&
          "Not enough information here to handle this case");
 
-  appendClosureComponents(closure->getType(), closure->getDiscriminator(),
+  appendClosureComponents(canType,
+                          closure->getDiscriminator(),
                           closure->isImplicit(), closure->getParent(),
                           ArrayRef<GenericEnvironment *>());
 }
@@ -3769,17 +3771,18 @@ void ASTMangler::appendClosureEntity(const AbstractClosureExpr *closure) {
   // code; the type-checker currently isn't strict about producing typed
   // expression nodes when it fails. Once we enforce that, we can remove this.
   if (!type)
-    type = ErrorType::get(closure->getASTContext());
+    type = CanType(ErrorType::get(closure->getASTContext()));
 
-  if (type->hasLocalArchetype())
+  auto canType = type->getCanonicalType();
+  if (canType->hasLocalArchetype())
     capturedEnvs = closure->getCaptureInfo().getGenericEnvironments();
 
-  appendClosureComponents(type, closure->getDiscriminator(),
+  appendClosureComponents(canType, closure->getDiscriminator(),
                           isa<AutoClosureExpr>(closure), closure->getParent(),
                           capturedEnvs);
 }
 
-void ASTMangler::appendClosureComponents(Type Ty, unsigned discriminator,
+void ASTMangler::appendClosureComponents(CanType Ty, unsigned discriminator,
                                          bool isImplicit,
                                          const DeclContext *parentContext,
                                          ArrayRef<GenericEnvironment *> capturedEnvs) {
@@ -3793,9 +3796,9 @@ void ASTMangler::appendClosureComponents(Type Ty, unsigned discriminator,
 
   Ty = Ty.subst(MapLocalArchetypesOutOfContext(Sig, capturedEnvs),
                 MakeAbstractConformanceForGenericType(),
-                SubstFlags::PreservePackExpansionLevel);
+                SubstFlags::PreservePackExpansionLevel)->getCanonicalType();
 
-  appendType(Ty->getCanonicalType(), Sig);
+  appendType(Ty, Sig);
   appendOperator(isImplicit ? "fu" : "fU", Index(discriminator));
 }
 

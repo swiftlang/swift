@@ -367,30 +367,13 @@ case TypeKind::Id:
         
     case TypeKind::OpaqueTypeArchetype: {
       auto opaque = cast<OpaqueTypeArchetypeType>(base);
-      if (opaque->getSubstitutions().empty())
+      auto subMap = opaque->getSubstitutions();
+      auto newSubMap = asDerived().transformSubMap(subMap);
+      if (newSubMap == subMap)
         return t;
-      
-      SmallVector<Type, 4> newSubs;
-      bool anyChanged = false;
-      for (auto replacement : opaque->getSubstitutions().getReplacementTypes()) {
-        Type newReplacement = doIt(replacement, TypePosition::Invariant);
-        if (!newReplacement)
-          return Type();
-        newSubs.push_back(newReplacement);
-        if (replacement.getPointer() != newReplacement.getPointer())
-          anyChanged = true;
-      }
-      
-      if (!anyChanged)
-        return t;
-      
-      // FIXME: This re-looks-up conformances instead of transforming them in
-      // a systematic way.
-      auto sig = opaque->getDecl()->getGenericSignature();
-      auto newSubMap =
-        SubstitutionMap::get(sig,
-          QueryReplacementTypeArray{sig, newSubs},
-          LookUpConformanceInModule());
+      if (!newSubMap)
+        return Type();
+
       return OpaqueTypeArchetypeType::get(opaque->getDecl(),
                                           opaque->getInterfaceType(),
                                           newSubMap);
@@ -998,6 +981,32 @@ case TypeKind::Id:
     }
     
     llvm_unreachable("Unhandled type in transformation");
+  }
+
+  // If original was non-empty and transformed is empty, we're
+  // signaling failure, that is, a Type() return from doIt().
+  SubstitutionMap transformSubMap(SubstitutionMap subs) {
+    if (subs.empty())
+      return subs;
+
+    SmallVector<Type, 4> newSubs;
+    bool anyChanged = false;
+    for (auto replacement : subs.getReplacementTypes()) {
+      Type newReplacement = doIt(replacement, TypePosition::Invariant);
+      if (!newReplacement)
+        return SubstitutionMap();
+      newSubs.push_back(newReplacement);
+      if (replacement.getPointer() != newReplacement.getPointer())
+        anyChanged = true;
+    }
+
+    if (!anyChanged)
+      return subs;
+
+    auto sig = subs.getGenericSignature();
+    return SubstitutionMap::get(sig,
+        QueryReplacementTypeArray{sig, newSubs},
+        LookUpConformanceInModule());
   }
 };
 
