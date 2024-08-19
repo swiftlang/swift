@@ -114,6 +114,7 @@ param(
   [string] $ProductVersion = "0.0.0",
   [string] $PinnedBuild = "",
   [string] $PinnedSHA256 = "",
+  [string] $PinnedVersion = "",
   [string] $PythonVersion = "3.9.10",
   [string] $AndroidNDKVersion = "r26b",
   [string] $WinSDKVersion = "",
