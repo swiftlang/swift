@@ -629,7 +629,8 @@ function Fetch-Dependencies {
     (
         [string]$ZipFileName,
         [string]$BinaryCache,
-        [string]$ExtractPath
+        [string]$ExtractPath,
+        [bool]$CreateExtractPath = $true
     )
 
     $source = Join-Path -Path $BinaryCache -ChildPath $ZipFileName
@@ -646,10 +647,13 @@ function Fetch-Dependencies {
         }
     }
 
+    $destination = if ($CreateExtractPath) { $destination } else { $BinaryCache }
+
     Write-Output "Extracting '$ZipFileName' ..."
     New-Item -ItemType Directory -ErrorAction Ignore -Path $BinaryCache | Out-Null
     Expand-Archive -Path $source -DestinationPath $destination -Force
   }
+
 
   function Extract-Toolchain {
     param
@@ -727,7 +731,7 @@ function Fetch-Dependencies {
     $NDKHash = "A478D43D4A45D0D345CDA6BE50D79642B92FB175868D9DC0DFC86181D80F691E"
     DownloadAndVerify $NDKURL "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDKHash
 
-    Extract-ZipFile -ZipFileName "android-ndk-$AndroidNDKVersion-windows.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-$AndroidNDKVersion"
+    Extract-ZipFile -ZipFileName "android-ndk-$AndroidNDKVersion-windows.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-$AndroidNDKVersion" -CreateExtractPath $false
   }
 
   if ($WinSDKVersion) {
