@@ -20,6 +20,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/RegionIsolation.h"
 #include "swift/SILOptimizer/Utils/SILIsolationInfo.h"
 
 #include "llvm/ADT/MapVector.h"
@@ -35,32 +36,6 @@
 namespace swift {
 
 namespace PartitionPrimitives {
-
-extern bool REGIONBASEDISOLATION_ENABLE_LOGGING;
-
-#ifdef REGIONBASEDISOLATION_LOG
-#error "REGIONBASEDISOLATION_LOG already defined?!"
-#endif
-
-#define REGIONBASEDISOLATION_LOG(...)                                          \
-  do {                                                                         \
-    if (PartitionPrimitives::REGIONBASEDISOLATION_ENABLE_LOGGING) {            \
-      __VA_ARGS__;                                                             \
-    }                                                                          \
-  } while (0);
-
-extern bool REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING;
-
-#ifdef REGIONBASEDISOLATION_VERBOSE_LOG
-#error "REGIONBASEDISOLATION_VERBOSE_LOG already defined?!"
-#endif
-
-#define REGIONBASEDISOLATION_VERBOSE_LOG(...)                                  \
-  do {                                                                         \
-    if (PartitionPrimitives::REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING) {    \
-      __VA_ARGS__;                                                             \
-    }                                                                          \
-  } while (0);
 
 struct Element {
   unsigned num;
