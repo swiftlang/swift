@@ -388,10 +388,14 @@ void CompilerInvocation::computeCXXStdlibOptions() {
   // always assumes libstdc++, which is incorrect: the Microsoft stdlib is
   // normally used.
   if (LangOpts.Target.isOSWindows()) {
-    // In the future, we should support libc++ on Windows. That would require
-    // the MSVC driver to support it first
-    // (see https://reviews.llvm.org/D101479).
-    LangOpts.CXXStdlib = CXXStdlibKind::Msvcprt;
+    // Even though the MSVC driver doesn't explicitly support libc++
+    // on Windows, libc++ can be used with Swift on Windows
+    // by passing a custom libc++ path to the Clang importer using the
+    // -cxx-isystem Clang flag.
+    if (cxxStdlibKind == clang::driver::ToolChain::CST_Libcxx)
+      LangOpts.CXXStdlib = CXXStdlibKind::Libcxx;
+    else
+      LangOpts.CXXStdlib = CXXStdlibKind::Msvcprt;
     LangOpts.PlatformDefaultCXXStdlib = CXXStdlibKind::Msvcprt;
   }
   if (LangOpts.Target.isOSLinux() || LangOpts.Target.isOSDarwin()) {

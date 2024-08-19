@@ -577,6 +577,10 @@ swift::dependencies::registerCxxInteropLibraries(
     // Only link with CxxStdlib on platforms where the overlay is available.
     switch (Target.getOS()) {
     case llvm::Triple::Win32: {
+      // Do not try to link CxxStdlib with a module that uses a custom libc++
+      // on windows, as they're not compatible.
+      if (cxxStdlibKind != CXXStdlibKind::Msvcprt)
+        break;
       RegistrationCallback(
           LinkLibrary(hasStaticCxxStdlib ? "libswiftCxxStdlib" : "swiftCxxStdlib",
                       LibraryKind::Library));

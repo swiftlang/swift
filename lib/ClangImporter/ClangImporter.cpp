@@ -1189,6 +1189,14 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
     llvm::SmallVector<const char *> invocationArgs;
     invocationArgs.reserve(driverArgs.size());
     llvm::for_each(driverArgs, [&](const std::string &Arg) {
+      if (ctx.LangOpts.Target.isOSWindows() &&
+          ctx.LangOpts.CXXStdlib != ctx.LangOpts.PlatformDefaultCXXStdlib &&
+          StringRef(Arg).starts_with("-stdlib=")) {
+        // Drop the -stdlib argument when using libc++ on Windows, as the
+        // windows Clang driver doesn't explicitly support custom libc++,
+        // and thus warns about unused -stdlib flag.
+        return;
+      }
       invocationArgs.push_back(Arg.c_str());
     });
 
@@ -2391,6 +2399,11 @@ ModuleDecl *ClangImporter::Implementation::loadModule(
       path.front().Item.str().starts_with("std_"))
     return nullptr;
   if (path.front().Item == ctx.Id_CxxStdlib) {
+    // The 'CxxStdlib' module is not importable when using a custom
+    // C++ standard libary on Windows, as it supports the MSVC ABI only.
+    if (ctx.LangOpts.Target.isOSWindows() &&
+        ctx.LangOpts.CXXStdlib != ctx.LangOpts.PlatformDefaultCXXStdlib)
+      return nullptr;
     ImportPath::Builder adjustedPath(ctx.getIdentifier("std"), importLoc);
     adjustedPath.append(path.getSubmodulePath());
     path = adjustedPath.copyTo(ctx).getModulePath(ImportKind::Module);
@@ -2772,6 +2785,25 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   auto &cacheEntry = ModuleWrappers[underlying];
   if (ClangModuleUnit *cached = cacheEntry.getPointer())
     return cached;
+
+  // Ensure system's C++ stdlib modules aren't imported when
+  // using a custom libc++ on Windows. This is specifically needed
+  // on Windows, as the MSVC C++ module is located in a directory
+  // shared with other system modules, and thus could be still found using
+  // Clang's header search. We use the 'std' module name as we assume
+  // that the custom libc++ doesn't provide its own 'std' module (as such
+  // module would fail to get built due to a module name ambiguity between
+  // MSVC 'std' and libc++'s 'std'). That generally means that the module
+  // map shipped with custom libc++ is expected to be broken into 'std_*'
+  // top level modules, and also have a renamed top-level 'std' module.
+  if (SwiftContext.LangOpts.Target.isOSWindows() &&
+      SwiftContext.LangOpts.CXXStdlib != SwiftContext.LangOpts.PlatformDefaultCXXStdlib &&
+      isCxxStdModule(underlying) &&
+      underlying->Name == "std") {
+    diagnose(SourceLoc(),
+             diag::libcxx_custom_prohibits_system_cxxstdlib_module,
+              underlying->Name);
+  }
 
   // FIXME: Handle hierarchical names better.
   Identifier name = underlying->Name == "std"
@@ -7947,6 +7979,8 @@ bool importer::isCxxStdModule(StringRef moduleName, bool IsSystem) {
   // modules (std_vector, std_utility, etc).
   if (IsSystem && moduleName.starts_with("std_")) {
     if (moduleName == "std_errno_h")
+      return false;
+    if (moduleName == "std_stdint_h")
       return false;
     return true;
   }
