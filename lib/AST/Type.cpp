@@ -520,19 +520,14 @@ bool TypeBase::isSpecialized() {
   return false;
 }
 
-bool TypeBase::hasOpenedExistentialWithRoot(
-    const OpenedArchetypeType *root) const {
-  assert(root->isRoot() && "Expected a root archetype");
-
-  if (!hasOpenedExistential())
+bool TypeBase::hasLocalArchetypeFromEnvironment(
+    GenericEnvironment *env) const {
+  if (!hasLocalArchetype())
     return false;
 
   return getCanonicalType().findIf([&](Type type) -> bool {
-    auto *opened = dyn_cast<OpenedArchetypeType>(type.getPointer());
-    if (!opened)
-      return false;
-
-    return opened->getRoot() == root;
+    auto *local = dyn_cast<LocalArchetypeType>(type.getPointer());
+    return local && local->getGenericEnvironment() == env;
   });
 }
 

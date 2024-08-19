@@ -956,7 +956,10 @@ namespace {
       // If we had a return type of 'Self', erase it.
       Type resultTy;
       resultTy = cs.getType(result);
-      if (resultTy->hasOpenedExistentialWithRoot(record.Archetype)) {
+
+      auto *env = record.Archetype->getGenericEnvironment();
+
+      if (resultTy->hasLocalArchetypeFromEnvironment(env)) {
         Type erasedTy = constraints::typeEraseOpenedArchetypesWithRoot(
             resultTy, record.Archetype);
         auto range = result->getSourceRange();
