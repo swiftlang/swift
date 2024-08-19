@@ -261,6 +261,20 @@ class BuildScriptInvocation(object):
                 args.extra_cmake_options.append(
                     '-DSWIFTSYNTAX_ENABLE_ASSERTIONS:BOOL=TRUE')
 
+        if args.build_early_swift_driver:
+            configuration = 'release' if str(args.swift_build_variant) in [
+                'Release',
+                'RelWithDebInfo'
+            ] else 'debug'
+            directory = 'earlyswiftdriver-{}'.format(self.args.host_target)
+
+            swift_driver_build = os.path.join(self.workspace.build_root,
+                                              directory,
+                                              configuration,
+                                              'bin')
+            args.extra_cmake_options.append(
+                '-DSWIFT_EARLY_SWIFT_DRIVER_BUILD={}'.format(swift_driver_build))
+
         # Then add subproject install flags that either skip building them /or/
         # if we are going to build them and install_all is set, we also install
         # them.
@@ -275,7 +289,7 @@ class BuildScriptInvocation(object):
             (args.build_libdispatch, "libdispatch"),
             (args.build_libxml2, 'libxml2'),
             (args.build_zlib, 'zlib'),
-            (args.build_curl, 'curl')
+            (args.build_curl, 'curl'),
         ]
         for (should_build, string_name) in conditional_subproject_configs:
             if not should_build and not self.args.infer_dependencies:
