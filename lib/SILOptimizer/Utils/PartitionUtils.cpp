@@ -20,37 +20,9 @@
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 
-#include "llvm/Support/CommandLine.h"
-
 using namespace swift;
 using namespace swift::PatternMatch;
 using namespace swift::PartitionPrimitives;
-
-//===----------------------------------------------------------------------===//
-//                               MARK: Logging
-//===----------------------------------------------------------------------===//
-
-bool swift::PartitionPrimitives::REGIONBASEDISOLATION_ENABLE_LOGGING;
-
-static llvm::cl::opt<bool, true> // The parser
-    RegionBasedIsolationLog(
-        "sil-regionbasedisolation-log",
-        llvm::cl::desc("Enable logging for SIL region based isolation "
-                       "diagnostics"),
-        llvm::cl::Hidden,
-        llvm::cl::location(
-            swift::PartitionPrimitives::REGIONBASEDISOLATION_ENABLE_LOGGING));
-
-bool swift::PartitionPrimitives::REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING;
-
-static llvm::cl::opt<bool, true> // The parser
-    RegionBasedIsolationVerboseLog(
-        "sil-regionbasedisolation-verbose-log",
-        llvm::cl::desc("Enable verbose logging for SIL region based isolation "
-                       "diagnostics"),
-        llvm::cl::Hidden,
-        llvm::cl::location(swift::PartitionPrimitives::
-                               REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING));
 
 //===----------------------------------------------------------------------===//
 //                             MARK: PartitionOp
