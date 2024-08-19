@@ -67,7 +67,7 @@ public struct ObjectIdentifier: Sendable {
   }
 
   @_alwaysEmitIntoClient
-  public init(_ x: any ~Copyable.Type) {
+  public init(_ x: any (~Copyable & ~Escapable).Type) {
     self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)
   }
 }
@@ -85,7 +85,7 @@ public struct ObjectIdentifier: Sendable {
   }
 
   @inlinable
-  public init<T: ~Copyable>(_ x: T.Type) {
+  public init<T: ~Copyable & ~Escapable>(_ x: T.Type) {
     self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)
   }
 }
