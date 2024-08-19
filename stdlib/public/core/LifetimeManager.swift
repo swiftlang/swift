@@ -10,6 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// Extends the lifetime of the given instance.
+///
+/// - Parameters:
+///   - x: An instance to preserve until this function returns.
+@_alwaysEmitIntoClient
+public func extendLifetime<T: ~Copyable & ~Escapable>(
+  _ x: borrowing T
+) {
+  Builtin.fixLifetime(x)
+}
+
 /// Evaluates a closure while ensuring that the given instance is not destroyed
 /// before the closure returns.
 ///
@@ -20,7 +31,11 @@
 ///     return value for the `withExtendedLifetime(_:_:)` method.
 /// - Returns: The return value, if any, of the `body` closure parameter.
 @_alwaysEmitIntoClient
-public func withExtendedLifetime<T: ~Copyable, E: Error, Result: ~Copyable>(
+public func withExtendedLifetime<
+  T: ~Copyable & ~Escapable,
+  E: Error,
+  Result: ~Copyable
+>(
   _ x: borrowing T,
   _ body: () throws(E) -> Result
 ) throws(E) -> Result {
@@ -32,7 +47,8 @@ public func withExtendedLifetime<T: ~Copyable, E: Error, Result: ~Copyable>(
 @_silgen_name("$ss20withExtendedLifetimeyq_x_q_yKXEtKr0_lF")
 @usableFromInline
 internal func __abi_withExtendedLifetime<T, Result>(
-  _ x: T, _ body: () throws -> Result
+  _ x: T,
+  _ body: () throws -> Result
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
   return try body()
@@ -48,7 +64,11 @@ internal func __abi_withExtendedLifetime<T, Result>(
 ///     return value for the `withExtendedLifetime(_:_:)` method.
 /// - Returns: The return value, if any, of the `body` closure parameter.
 @_alwaysEmitIntoClient
-public func withExtendedLifetime<T: ~Copyable, E: Error, Result: ~Copyable>(
+public func withExtendedLifetime<
+  T: ~Copyable & ~Escapable,
+  E: Error,
+  Result: ~Copyable
+>(
   _ x: borrowing T,
   _ body: (borrowing T) throws(E) -> Result
 ) throws(E) -> Result {
@@ -70,7 +90,7 @@ internal func __abi_withExtendedLifetime<T, Result>(
 // shorten the lifetime of x to be before this point.
 @_transparent
 @_preInverseGenerics
-public func _fixLifetime<T: ~Copyable>(_ x: borrowing T) {
+public func _fixLifetime<T: ~Copyable & ~Escapable>(_ x: borrowing T) {
   Builtin.fixLifetime(x)
 }
 
