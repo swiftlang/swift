@@ -1,5 +1,3 @@
-// REQUIRES: rdar133257179
-
 // Tests that a C++ class can conform to a Swift protocol.
 
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop
