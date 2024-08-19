@@ -1588,6 +1588,14 @@ namespace {
         for (auto *CaseVar : CS->getCaseBodyVariablesOrEmptyArray())
           CaseVar->setDeclContext(NewDC);
       }
+      // A few statements store DeclContexts, update them.
+      if (auto *BS = dyn_cast<BreakStmt>(S))
+        BS->setDeclContext(NewDC);
+      if (auto *CS = dyn_cast<ContinueStmt>(S))
+        CS->setDeclContext(NewDC);
+      if (auto *FS = dyn_cast<FallthroughStmt>(S))
+        FS->setDeclContext(NewDC);
+
       return Action::Continue(S);
     }
 
