@@ -378,7 +378,8 @@ Type TypeBase::mapTypeOutOfContext() {
   return Type(this).subst(MapTypeOutOfContext(),
     MakeAbstractConformanceForGenericType(),
     SubstFlags::AllowLoweredTypes |
-    SubstFlags::PreservePackExpansionLevel);
+    SubstFlags::PreservePackExpansionLevel |
+    SubstFlags::SubstitutePrimaryArchetypes);
 }
 
 class GenericEnvironment::NestedTypeStorage
@@ -718,6 +719,7 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
     MakeAbstractConformanceForGenericType(),
     SubstFlags::AllowLoweredTypes |
     SubstFlags::PreservePackExpansionLevel |
+    SubstFlags::SubstitutePrimaryArchetypes |
     SubstFlags::SubstituteLocalArchetypes);
 
   auto shapeClass = elementEnv->getOpenedElementShapeClass();

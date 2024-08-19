@@ -3910,6 +3910,7 @@ getAnyFunctionRefInterfaceType(TypeConverter &TC,
         MapLocalArchetypesOutOfContext(sig.baseGenericSig, sig.capturedEnvs),
         MakeAbstractConformanceForGenericType(),
         SubstFlags::PreservePackExpansionLevel |
+        SubstFlags::SubstitutePrimaryArchetypes |
         SubstFlags::SubstituteLocalArchetypes);
     funcType = cast<FunctionType>(substType->getCanonicalType());
   }
@@ -4993,6 +4994,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
       MakeAbstractConformanceForGenericType(),
       SubstFlags::PreservePackExpansionLevel |
       SubstFlags::AllowLoweredTypes |
+      SubstFlags::SubstitutePrimaryArchetypes |
       SubstFlags::SubstituteLocalArchetypes)->getCanonicalType();
 
   // If the type is not dependent at all, we can form a concrete box layout.

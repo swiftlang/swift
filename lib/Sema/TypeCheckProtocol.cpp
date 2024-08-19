@@ -1007,7 +1007,8 @@ findMissingGenericRequirementForSolutionFix(
       [&](SubstitutableType *type) -> Type {
         return env->mapTypeIntoContext(type->mapTypeOutOfContext());
       },
-      LookUpConformanceInModule());
+      LookUpConformanceInModule(),
+      SubstFlags::SubstitutePrimaryArchetypes);
   }
 
   auto missingRequirementMatch = [&](Type type) -> RequirementMatch {

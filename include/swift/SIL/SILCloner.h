@@ -510,7 +510,7 @@ protected:
 
   SILType remapType(SILType Ty) {
     if (Functor.SubsMap || Ty.hasLocalArchetype()) {
-      SubstOptions options(std::nullopt);
+      SubstOptions options = SubstFlags::SubstitutePrimaryArchetypes;
       if (Functor.hasLocalArchetypes())
         options |= SubstFlags::SubstituteLocalArchetypes;
 
@@ -535,7 +535,7 @@ protected:
 
   CanType remapASTType(CanType ty) {
     if (Functor.SubsMap || ty->hasLocalArchetype()) {
-      SubstOptions options(std::nullopt);
+      SubstOptions options = SubstFlags::SubstitutePrimaryArchetypes;
       if (Functor.hasLocalArchetypes())
         options |= SubstFlags::SubstituteLocalArchetypes;
 
@@ -559,7 +559,7 @@ protected:
 
   ProtocolConformanceRef remapConformance(Type Ty, ProtocolConformanceRef C) {
     if (Functor.SubsMap || Ty->hasLocalArchetype()) {
-      SubstOptions options(std::nullopt);
+      SubstOptions options = SubstFlags::SubstitutePrimaryArchetypes;
       if (Functor.hasLocalArchetypes())
         options |= SubstFlags::SubstituteLocalArchetypes;
 
@@ -584,7 +584,7 @@ protected:
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
     // If we have local archetypes to substitute, do so now.
     if (Functor.SubsMap || Subs.getRecursiveProperties().hasLocalArchetype()) {
-      SubstOptions options(std::nullopt);
+      SubstOptions options = SubstFlags::SubstitutePrimaryArchetypes;
       if (Functor.hasLocalArchetypes())
         options |= SubstFlags::SubstituteLocalArchetypes;
 
