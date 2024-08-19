@@ -234,19 +234,6 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   if (empty())
     return ProtocolConformanceRef::forInvalid();
 
-  // If we have an archetype, map out of the context so we can compute a
-  // conformance access path.
-  if (auto archetype = dyn_cast<ArchetypeType>(type)) {
-    if (!isa<OpaqueTypeArchetypeType>(archetype)) {
-      type = archetype->getInterfaceType()->getCanonicalType();
-    }
-  }
-
-  // Error path: if we don't have a type parameter, there is no conformance.
-  // FIXME: Query concrete conformances in the generic signature?
-  if (!type->isTypeParameter())
-    return ProtocolConformanceRef::forInvalid();
-
   auto genericSig = getGenericSignature();
 
   auto getSignatureConformance =
