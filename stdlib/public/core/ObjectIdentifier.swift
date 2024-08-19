@@ -65,6 +65,11 @@ public struct ObjectIdentifier: Sendable {
   public init(_ x: Any.Type) {
     self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)
   }
+
+  @_alwaysEmitIntoClient
+  public init(_ x: any ~Copyable.Type) {
+    self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)
+  }
 }
 
 #else
@@ -79,8 +84,8 @@ public struct ObjectIdentifier: Sendable {
     self._value = Builtin.bridgeToRawPointer(x)
   }
 
-  @inlinable // trivial-implementation
-  public init<Object>(_ x: Object.Type) {
+  @inlinable
+  public init<T: ~Copyable>(_ x: T.Type) {
     self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)
   }
 }
