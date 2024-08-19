@@ -46,6 +46,16 @@ default:
 }
 
 // CHECK: OK
+switch d?.asciiScalar {
+case "a":
+  print("OK")
+case "b":
+  fallthrough
+default:
+  print("FAIL")
+}
+
+// CHECK: OK
 if UInt8(unicode: "a") == "a" {
   print("OK")
 }
