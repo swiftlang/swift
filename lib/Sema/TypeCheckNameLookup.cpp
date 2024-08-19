@@ -830,15 +830,26 @@ diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
 
   llvm::SmallString<64> importText;
 
+  // Add flags that must be used consistently on every import in every file.
   auto fixItInfo = fixItCache.getInfo(definingModule);
   if (fixItInfo.flags.contains(ImportFlags::ImplementationOnly))
     importText += "@_implementationOnly ";
   if (fixItInfo.flags.contains(ImportFlags::WeakLinked))
     importText += "@_weakLinked ";
-  if (fixItInfo.flags.contains(ImportFlags::SPIOnly))
-    importText += "@_spiOnly ";
 
-  // @_spi imports.
+  auto explicitAccessLevel = fixItInfo.accessLevel;
+  bool isPublicImport =
+      explicitAccessLevel
+          ? *explicitAccessLevel >= AccessLevel::Public
+          : !ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault);
+
+  // Add flags that are only appropriate on public imports.
+  if (isPublicImport) {
+    if (fixItInfo.flags.contains(ImportFlags::SPIOnly))
+      importText += "@_spiOnly ";
+  }
+
+  // Add @_spi groups if needed for the declaration.
   if (decl->isSPI()) {
     auto spiGroups = decl->getSPIGroups();
     if (!spiGroups.empty()) {
@@ -848,8 +859,8 @@ diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
     }
   }
 
-  if (auto accessLevel = fixItInfo.accessLevel) {
-    importText += getAccessLevelSpelling(*accessLevel);
+  if (explicitAccessLevel) {
+    importText += getAccessLevelSpelling(*explicitAccessLevel);
     importText += " ";
   }
 
