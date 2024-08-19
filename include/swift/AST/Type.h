@@ -124,17 +124,20 @@ enum class SubstFlags {
   AllowLoweredTypes = 0x01,
   /// Map member types to their desugared witness type.
   DesugarMemberTypes = 0x02,
+  /// Allow primary archetypes to themselves be the subject of substitution.
+  /// Otherwise, we map them out of context first.
+  SubstitutePrimaryArchetypes = 0x04,
   /// Allow opaque archetypes to themselves be the subject of substitution,
-  /// used when erasing them to their underlying types. otherwise, we
+  /// used when erasing them to their underlying types. Otherwise, we
   /// recursively substitute their substitutions, instead, preserving the
   /// opaque archetype.
-  SubstituteOpaqueArchetypes = 0x04,
+  SubstituteOpaqueArchetypes = 0x08,
   /// Allow local archetypes to themselves be the subject of substitution.
-  SubstituteLocalArchetypes = 0x08,
+  SubstituteLocalArchetypes = 0x10,
   /// Don't increase pack expansion level for free pack references.
   /// Do not introduce new usages of this flag.
   /// FIXME: Remove this.
-  PreservePackExpansionLevel = 0x10,
+  PreservePackExpansionLevel = 0x20,
 };
 
 /// Options for performing substitutions into a type.

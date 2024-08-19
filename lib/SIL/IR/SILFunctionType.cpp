@@ -1970,6 +1970,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
     t = t.subst(MapLocalArchetypesOutOfContext(origGenericSig, capturedEnvs),
                 MakeAbstractConformanceForGenericType(),
                 SubstFlags::PreservePackExpansionLevel |
+                SubstFlags::SubstitutePrimaryArchetypes |
                 SubstFlags::SubstituteLocalArchetypes);
 
     LLVM_DEBUG(llvm::dbgs() << "-- maps to " << t->getCanonicalType() << "\n");
@@ -3010,6 +3011,7 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
         t.subst(mapOutOfContext,
                 MakeAbstractConformanceForGenericType(),
                 SubstFlags::PreservePackExpansionLevel |
+                SubstFlags::SubstitutePrimaryArchetypes |
                 SubstFlags::SubstituteLocalArchetypes))
                ->getCanonicalType();
   };
@@ -3020,6 +3022,7 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
           Type(t).subst(mapOutOfContext,
                         MakeAbstractConformanceForGenericType(),
                         SubstFlags::PreservePackExpansionLevel |
+                        SubstFlags::SubstitutePrimaryArchetypes |
                         SubstFlags::SubstituteLocalArchetypes |
                         SubstFlags::AllowLoweredTypes))
               ->getCanonicalType());
