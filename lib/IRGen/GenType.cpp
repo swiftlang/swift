@@ -1981,11 +1981,8 @@ ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
 
   assert(isa<PrimaryArchetypeType>(t) || isa<PackArchetypeType>(t));
 
-  // Get the root archetype.
-  auto root = t->getRoot();
-
   // Retrieve the generic environment of the archetype.
-  auto genericEnv = root->getGenericEnvironment();
+  auto genericEnv = t->getGenericEnvironment();
 
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
@@ -2815,11 +2812,10 @@ void IRGenFunction::setDynamicSelfMetadata(CanType selfClass,
 
 #ifndef NDEBUG
 bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
-  auto primary = arch->getRoot();
-  if (!isa<PrimaryArchetypeType>(primary) &&
-      !isa<PackArchetypeType>(primary))
+  if (!isa<PrimaryArchetypeType>(arch) &&
+      !isa<PackArchetypeType>(arch))
     return true;
-  auto genericEnv = primary->getGenericEnvironment();
+  auto genericEnv = arch->getGenericEnvironment();
 
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
