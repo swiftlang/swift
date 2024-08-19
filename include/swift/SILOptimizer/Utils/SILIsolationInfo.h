@@ -290,6 +290,12 @@ public:
     return isolatedValue;
   }
 
+  SILValue maybeGetIsolatedValue() const {
+    if (kind != Task && kind != Actor)
+      return SILValue();
+    return getIsolatedValue();
+  }
+
   /// Return the specific SILValue for the actor that our isolated value is
   /// isolated to if one exists.
   ActorInstance getActorInstance() const {

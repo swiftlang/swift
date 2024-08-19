@@ -1211,8 +1211,8 @@ void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
   if (transferOpToRequireInstMultiMap.empty())
     return;
 
-  REGIONBASEDISOLATION_LOG(llvm::dbgs()
-                           << "Emitting use after transfer diagnostics.\n");
+  REGIONBASEDISOLATION_LOG(
+      llvm::dbgs() << "Emitting Error. Kind: Use After Send diagnostics.\n");
 
   for (auto [transferOp, requireInsts] :
        transferOpToRequireInstMultiMap.getRange()) {
@@ -1964,8 +1964,8 @@ void TransferNonSendableImpl::emitTransferredNonTransferrableDiagnostics() {
   if (transferredNonTransferrableInfoList.empty())
     return;
 
-  REGIONBASEDISOLATION_LOG(
-      llvm::dbgs() << "Emitting transfer non transferrable diagnostics.\n");
+  REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                           << "Emitting Error. Kind: Send Never Sendable.\n");
 
   for (auto info : transferredNonTransferrableInfoList) {
     TransferNonTransferrableDiagnosticInferrer diagnosticInferrer(
@@ -2367,7 +2367,7 @@ struct DiagnosticEvaluator final
     auto rep = info->getValueMap().getRepresentative(transferredVal);
     REGIONBASEDISOLATION_LOG(
         llvm::dbgs()
-        << "    Emitting Use After Transfer Error!\n"
+        << "    Emitting Error. Kind: Use After Send\n"
         << "        Transferring Inst: " << *transferringOp->getUser()
         << "        Transferring Op Value: " << transferringOp->get()
         << "        Require Inst: " << *partitionOp.getSourceInst()
@@ -2383,7 +2383,7 @@ struct DiagnosticEvaluator final
       const PartitionOp &partitionOp, Element transferredVal,
       SILDynamicMergedIsolationInfo isolationRegionInfo) const {
     REGIONBASEDISOLATION_LOG(
-        llvm::dbgs() << "    Emitting TransferNonTransferrable Error!\n"
+        llvm::dbgs() << "    Emitting Error. Kind: Send Non Sendable\n"
                      << "        ID:  %%" << transferredVal << "\n"
                      << "        Rep: "
                      << *info->getValueMap().getRepresentative(transferredVal)
@@ -2402,7 +2402,8 @@ struct DiagnosticEvaluator final
       const PartitionOp &partitionOp, Element inoutSendingVal,
       SILDynamicMergedIsolationInfo isolationRegionInfo) const {
     REGIONBASEDISOLATION_LOG(
-        llvm::dbgs() << "    Emitting InOut Sending ActorIsolated at end of "
+        llvm::dbgs() << "    Emitting Error. Kind: InOut Sending ActorIsolated "
+                        "at end of "
                         "Function Error!\n"
                      << "        ID:  %%" << inoutSendingVal << "\n"
                      << "        Rep: "
@@ -2424,7 +2425,7 @@ struct DiagnosticEvaluator final
       Element actualNonTransferrableValue,
       SILDynamicMergedIsolationInfo isolationRegionInfo) const {
     REGIONBASEDISOLATION_LOG(
-        llvm::dbgs() << "    Emitting TransferNonTransferrable Error!\n"
+        llvm::dbgs() << "    Emitting Error. Kind: Send Non Sendable\n"
                      << "        ID:  %%" << transferredVal << "\n"
                      << "        Rep: "
                      << *info->getValueMap().getRepresentative(transferredVal)
@@ -2469,7 +2470,7 @@ struct DiagnosticEvaluator final
     auto srcRep = info->getValueMap().getRepresentativeValue(srcElement);
     REGIONBASEDISOLATION_LOG(
         llvm::dbgs()
-        << "    Emitting Error! Kind: Assign Isolated Into Sending Result!\n"
+        << "    Emitting Error. Kind: Assign Isolated Into Sending Result!\n"
         << "        Assign Inst: " << *partitionOp.getSourceInst()
         << "        Dest Value: " << *destValue
         << "        Dest Element: " << destElement << '\n'
@@ -2488,7 +2489,8 @@ struct DiagnosticEvaluator final
     auto rep = info->getValueMap().getRepresentative(inoutSendingVal);
     REGIONBASEDISOLATION_LOG(
         llvm::dbgs()
-        << "    Emitting InOut Not Reinitialized At End Of Function!\n"
+        << "    Emitting Error. Kind: InOut Not Reinitialized At End Of "
+           "Function\n"
         << "        Transferring Inst: " << *transferringOp->getUser()
         << "        Transferring Op Value: " << transferringOp->get()
         << "        Require Inst: " << *partitionOp.getSourceInst()
