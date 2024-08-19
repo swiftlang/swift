@@ -489,6 +489,8 @@ public:
     : level(level), IFS(IFS) {}
 
   std::optional<Type> transform(TypeBase *type, TypePosition position);
+
+  SubstitutionMap transformSubstitutionMap(SubstitutionMap subs);
 };
 
 }
@@ -622,6 +624,11 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
   return getMemberForBaseType(IFS, origArchetype->getParent(), substParent,
                               assocType, assocType->getName(),
                               level);
+}
+
+SubstitutionMap TypeSubstituter::transformSubstitutionMap(SubstitutionMap subs) {
+  // FIXME: Take level into account? Move level down into IFS?
+  return subs.subst(IFS);
 }
 
 Type Type::subst(SubstitutionMap substitutions,
@@ -1038,18 +1045,6 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
 // Replacing opaque result archetypes with their underlying types
 //===----------------------------------------------------------------------===//
 
-static std::optional<std::pair<ArchetypeType *, OpaqueTypeArchetypeType *>>
-getArchetypeAndRootOpaqueArchetype(Type maybeOpaqueType) {
-  auto archetype = dyn_cast<ArchetypeType>(maybeOpaqueType.getPointer());
-  if (!archetype)
-    return std::nullopt;
-  auto opaqueRoot = dyn_cast<OpaqueTypeArchetypeType>(archetype->getRoot());
-  if (!opaqueRoot)
-    return std::nullopt;
-
-  return std::make_pair(archetype, opaqueRoot);
-}
-
 OpaqueSubstitutionKind
 ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
     OpaqueTypeDecl *opaque) const {
@@ -1187,19 +1182,20 @@ ReplaceOpaqueTypesWithUnderlyingTypes::ReplaceOpaqueTypesWithUnderlyingTypes(
 
 Type ReplaceOpaqueTypesWithUnderlyingTypes::
 operator()(SubstitutableType *maybeOpaqueType) const {
-  auto archetypeAndRoot = getArchetypeAndRootOpaqueArchetype(maybeOpaqueType);
-  if (!archetypeAndRoot)
+  auto *archetype = dyn_cast<OpaqueTypeArchetypeType>(maybeOpaqueType);
+  if (!archetype)
     return maybeOpaqueType;
 
-  auto archetype = archetypeAndRoot->first;
-  auto opaqueRoot = archetypeAndRoot->second;
+  auto *genericEnv = archetype->getGenericEnvironment();
+  auto *decl = genericEnv->getOpaqueTypeDecl();
+  auto outerSubs = genericEnv->getOpaqueSubstitutions();
 
-  auto substitutionKind = shouldPerformSubstitution(opaqueRoot->getDecl());
+  auto substitutionKind = shouldPerformSubstitution(decl);
   if (substitutionKind == OpaqueSubstitutionKind::DontSubstitute) {
     return maybeOpaqueType;
   }
 
-  auto subs = opaqueRoot->getDecl()->getUniqueUnderlyingTypeSubstitutions();
+  auto subs = decl->getUniqueUnderlyingTypeSubstitutions();
   // If the body of the opaque decl providing decl has not been type checked we
   // don't have a underlying substitution.
   if (!subs.has_value())
@@ -1231,11 +1227,11 @@ operator()(SubstitutableType *maybeOpaqueType) const {
   // for its type arguments. We perform this substitution after checking for
   // visibility, since we do not want the result of the visibility check to
   // depend on the substitutions previously applied.
-  auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
+  auto substTy = partialSubstTy.subst(outerSubs);
 
   // If the type changed, but still contains opaque types, recur.
   if (!substTy->isEqual(maybeOpaqueType) && substTy->hasOpaqueArchetype()) {
-    SeenDecl seenKey(opaqueRoot->getDecl(), opaqueRoot->getSubstitutions());
+    SeenDecl seenKey(decl, outerSubs);
     if (auto *alreadySeen = this->seenDecls) {
       // Detect substitution loops. If we find one, just bounce the original
       // type back to the caller. This substitution will fail at runtime
@@ -1305,8 +1301,8 @@ operator()(CanType maybeOpaqueType, Type replacementType,
            ProtocolDecl *protocol) const {
   auto abstractRef = ProtocolConformanceRef(protocol);
   
-  auto archetypeAndRoot = getArchetypeAndRootOpaqueArchetype(maybeOpaqueType);
-  if (!archetypeAndRoot) {
+  auto archetype = dyn_cast<OpaqueTypeArchetypeType>(maybeOpaqueType);
+  if (!archetype) {
     if (maybeOpaqueType->isTypeParameter() ||
         maybeOpaqueType->is<ArchetypeType>())
       return abstractRef;
@@ -1320,15 +1316,16 @@ operator()(CanType maybeOpaqueType, Type replacementType,
     llvm_unreachable("origType should have been an opaque type or type parameter");
   }
 
-  auto archetype = archetypeAndRoot->first;
-  auto opaqueRoot = archetypeAndRoot->second;
+  auto *genericEnv = archetype->getGenericEnvironment();
+  auto *decl = genericEnv->getOpaqueTypeDecl();
+  auto outerSubs = genericEnv->getOpaqueSubstitutions();
 
-  auto substitutionKind = shouldPerformSubstitution(opaqueRoot->getDecl());
+  auto substitutionKind = shouldPerformSubstitution(decl);
   if (substitutionKind == OpaqueSubstitutionKind::DontSubstitute) {
     return abstractRef;
   }
 
-  auto subs = opaqueRoot->getDecl()->getUniqueUnderlyingTypeSubstitutions();
+  auto subs = decl->getUniqueUnderlyingTypeSubstitutions();
   // If the body of the opaque decl providing decl has not been type checked we
   // don't have a underlying substitution.
   if (!subs.has_value())
@@ -1359,16 +1356,16 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   // for its type arguments. We perform this substitution after checking for
   // visibility, since we do not want the result of the visibility check to
   // depend on the substitutions previously applied.
-  auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
+  auto substTy = partialSubstTy.subst(outerSubs);
 
   auto partialSubstRef =
       abstractRef.subst(archetype->getInterfaceType(), *subs);
   auto substRef =
-      partialSubstRef.subst(partialSubstTy, opaqueRoot->getSubstitutions());
+      partialSubstRef.subst(partialSubstTy, outerSubs);
 
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
-    SeenDecl seenKey(opaqueRoot->getDecl(), opaqueRoot->getSubstitutions());
+    SeenDecl seenKey(decl, outerSubs);
     
     if (auto *alreadySeen = this->seenDecls) {
       // Detect substitution loops. If we find one, just bounce the original
