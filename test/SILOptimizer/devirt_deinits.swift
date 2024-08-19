@@ -20,6 +20,8 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: embedded_stdlib
 
+// UNSUPPORTED: use_os_stdlib
+
 @inline(never)
 func log(_ s: StaticString) {
   print(s)
