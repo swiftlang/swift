@@ -208,9 +208,12 @@ public:
   /// actually possible to do ABI operations on it from this current SILModule.
   /// See SILModule::isTypeABIAccessible.
   ///
-  /// All fixed-size types are currently ABI-accessible, although this would
+  /// Almost all fixed-size types are currently ABI-accessible, although this would
   /// not be difficult to change (e.g. if we had an archetype size constraint
   /// that didn't say anything about triviality).
+  /// The exception to this is non-copyable types, non-copyable types need to be
+  /// able to call the metadata to get to the deinit and so their type metadata
+  /// needs to be accessible.
   IsABIAccessible_t isABIAccessible() const {
     return IsABIAccessible_t(Bits.TypeInfo.ABIAccessible);
   }

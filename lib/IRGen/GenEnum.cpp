@@ -659,7 +659,15 @@ namespace {
     void consume(IRGenFunction &IGF, Explosion &src,
                  Atomicity atomicity,
                  SILType T) const override {
-      if (tryEmitConsumeUsingDeinit(IGF, src, T)) {
+      if (ElementsAreABIAccessible &&
+          tryEmitConsumeUsingDeinit(IGF, src, T)) {
+        return;
+      }
+
+      if (!ElementsAreABIAccessible) {
+        auto temporary = TI->allocateStack(IGF, T, "deinit.arg").getAddress();
+        cast<LoadableTypeInfo>(TI)->initialize(IGF, src, temporary, /*outlined*/false);
+        emitDestroyCall(IGF, T, temporary);
         return;
       }
 
@@ -674,10 +682,11 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
                  bool isOutlined) const override {
-      if (tryEmitDestroyUsingDeinit(IGF, addr, T)) {
+      if (ElementsAreABIAccessible &&
+          tryEmitDestroyUsingDeinit(IGF, addr, T)) {
         return;
       }
-                 
+
       if (getSingleton() &&
           !getSingleton()->isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         if (!ElementsAreABIAccessible) {
@@ -1986,6 +1995,7 @@ namespace {
 
       // If the payload is TriviallyDestroyable, then we can use TriviallyDestroyable value semantics.
       auto &payloadTI = *ElementsWithPayload[0].ti;
+
       if (!payloadTI.isABIAccessible()) {
         CopyDestroyKind = ABIInaccessible;
       } else if (payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
@@ -2848,9 +2858,18 @@ namespace {
 
     void consume(IRGenFunction &IGF, Explosion &src,
                  Atomicity atomicity, SILType T) const override {
-      if (tryEmitConsumeUsingDeinit(IGF, src, T)) {
+      if (ElementsAreABIAccessible &&
+          tryEmitConsumeUsingDeinit(IGF, src, T)) {
         return;
       }
+
+      if (!ElementsAreABIAccessible) {
+        auto temporary = TI->allocateStack(IGF, T, "deinit.arg").getAddress();
+        cast<LoadableTypeInfo>(TI)->initialize(IGF, src, temporary, /*outlined*/false);
+        emitDestroyCall(IGF, T, temporary);
+        return;
+      }
+
       assert(TIK >= Loadable);
 
       switch (CopyDestroyKind) {
@@ -2968,7 +2987,8 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
                  bool isOutlined) const override {
-      if (tryEmitDestroyUsingDeinit(IGF, addr, T)) {
+      if (ElementsAreABIAccessible &&
+          tryEmitDestroyUsingDeinit(IGF, addr, T)) {
         return;
       }
 
@@ -4879,9 +4899,18 @@ namespace {
 
     void consume(IRGenFunction &IGF, Explosion &src,
                  Atomicity atomicity, SILType T) const override {
-      if (tryEmitConsumeUsingDeinit(IGF, src, T)) {
+      if (ElementsAreABIAccessible &&
+          tryEmitConsumeUsingDeinit(IGF, src, T)) {
         return;
       }
+
+      if (!ElementsAreABIAccessible) {
+        auto temporary = TI->allocateStack(IGF, T, "deinit.arg").getAddress();
+        cast<LoadableTypeInfo>(TI)->initialize(IGF, src, temporary, /*outlined*/false);
+        emitDestroyCall(IGF, T, temporary);
+        return;
+      }
+
       assert(TIK >= Loadable);
       switch (CopyDestroyKind) {
       case TriviallyDestroyable:
@@ -5230,7 +5259,8 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
                  bool isOutlined) const override {
-      if (tryEmitDestroyUsingDeinit(IGF, addr, T)) {
+      if (ElementsAreABIAccessible &&
+          tryEmitDestroyUsingDeinit(IGF, addr, T)) {
         return;
       }
 
@@ -6407,7 +6437,6 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   // fixed-size from this resilience scope.
   ResilienceExpansion layoutScope =
       TC.IGM.getResilienceExpansionForLayout(theEnum);
-
   for (auto elt : theEnum->getAllElements()) {
     ++numElements;
 
@@ -6652,8 +6681,6 @@ namespace {
   public:
     using EnumTypeInfoBase<Base>::Strategy;
 
-    /// \group Methods delegated to the EnumImplStrategy
-
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
       return Strategy.getFixedExtraInhabitantCount(IGM);
     }
@@ -6693,10 +6720,11 @@ namespace {
                       IsTriviallyDestroyable_t isTriviallyDestroyable,
                       IsBitwiseTakable_t isBT,
                       IsCopyable_t copyable,
-                      IsFixedSize_t alwaysFixedSize)
+                      IsFixedSize_t alwaysFixedSize,
+                      IsABIAccessible_t isABIAccessible)
       : FixedEnumTypeInfoBase(strategy, T, S, std::move(SB), A,
                               isTriviallyDestroyable, isBT, copyable,
-                              alwaysFixedSize) {}
+                              alwaysFixedSize, isABIAccessible) {}
   };
 
   /// TypeInfo for loadable enum types.
@@ -6708,10 +6736,11 @@ namespace {
                          Alignment A,
                          IsTriviallyDestroyable_t isTriviallyDestroyable,
                          IsCopyable_t copyable,
-                         IsFixedSize_t alwaysFixedSize)
+                         IsFixedSize_t alwaysFixedSize,
+                         IsABIAccessible_t isABIAccessible)
       : FixedEnumTypeInfoBase(strategy, T, S, std::move(SB), A,
                               isTriviallyDestroyable, copyable,
-                              alwaysFixedSize) {}
+                              alwaysFixedSize, isABIAccessible) {}
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                           Size offset) const override {
@@ -6821,7 +6850,8 @@ EnumImplStrategy::getFixedEnumTypeInfo(llvm::StructType *T, Size S,
                                        Alignment A,
                                        IsTriviallyDestroyable_t isTriviallyDestroyable,
                                        IsBitwiseTakable_t isBT,
-                                       IsCopyable_t isCopyable) {
+                                       IsCopyable_t isCopyable,
+                                       IsABIAccessible_t abiAccessible) {
   TypeInfo *mutableTI;
   switch (TIK) {
   case Opaque:
@@ -6831,14 +6861,16 @@ EnumImplStrategy::getFixedEnumTypeInfo(llvm::StructType *T, Size S,
                                       isTriviallyDestroyable,
                                       isBT,
                                       isCopyable,
-                                      AlwaysFixedSize);
+                                      AlwaysFixedSize,
+                                      abiAccessible);
     break;
   case Loadable:
     assert(isBT && "loadable enum not bitwise takable?!");
     mutableTI = new LoadableEnumTypeInfo(*this, T, S, std::move(SB), A,
                                          isTriviallyDestroyable,
                                          isCopyable,
-                                         AlwaysFixedSize);
+                                         AlwaysFixedSize,
+                                         abiAccessible);
     break;
   }
   TI = mutableTI;
@@ -6859,7 +6891,8 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                  alignment,
                  TriviallyDestroyable,
                  Copyable,
-                 AlwaysFixedSize));
+                 AlwaysFixedSize,
+                 IsABIAccessible));
   } else {
     const TypeInfo &eltTI = *getSingleton();
 
@@ -6886,13 +6919,19 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
       auto alignment = fixedEltTI.getFixedAlignment();
       applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
 
+      IsABIAccessible_t isABIAccessible = IsABIAccessible;
+      if (Type.getASTType()->isNoncopyable() &&
+          !IGM.getSILModule().isTypeMetadataAccessible(Type.getASTType()))
+        isABIAccessible = IsNotABIAccessible;
+
       return getFixedEnumTypeInfo(enumTy,
         fixedEltTI.getFixedSize(),
         fixedEltTI.getSpareBits(),
         alignment,
         TriviallyDestroyable,
         BitwiseTakable,
-        Copyable);
+        Copyable,
+        isABIAccessible);
     }
   }
 }
@@ -6927,7 +6966,8 @@ NoPayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                               alignment,
                               TriviallyDestroyable,
                               Copyable,
-                              AlwaysFixedSize));
+                              AlwaysFixedSize,
+                              IsABIAccessible));
 }
 
 TypeInfo *
@@ -6976,7 +7016,8 @@ CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                                                alignment,
                                                IsTriviallyDestroyable,
                                                IsCopyable,
-                                               IsFixedSize));
+                                               IsFixedSize,
+                                               IsABIAccessible));
 }
 
 TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
@@ -7044,11 +7085,18 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto copyable = !theEnum->canBeCopyable()
     ? IsNotCopyable : IsCopyable;
+
+  IsABIAccessible_t isABIAccessible = IsABIAccessible;
+  if (Type.getASTType()->isNoncopyable() &&
+      !IGM.getSILModule().isTypeMetadataAccessible(Type.getASTType()))
+    isABIAccessible = IsNotABIAccessible;
+
   getFixedEnumTypeInfo(
       enumTy, Size(sizeWithTag), spareBits.build(), alignment,
       deinit & payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
       payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal),
-      copyable);
+      copyable, isABIAccessible);
+
   if (TIK >= Loadable && CopyDestroyKind == Normal) {
     computePayloadTypesAndTagType(TC.IGM, *TI, PayloadTypesAndTagType);
     loweredType = Type;
@@ -7255,9 +7303,15 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   
   applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/ true, worstAlignment);
 
+  IsABIAccessible_t isABIAccessible = IsABIAccessible;
+  if (Type.getASTType()->isNoncopyable() &&
+      !IGM.getSILModule().isTypeMetadataAccessible(Type.getASTType()))
+    isABIAccessible = IsNotABIAccessible;
+
   getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
                        worstAlignment, isTriviallyDestroyable, isBT,
-                       isCopyable);
+                       isCopyable, isABIAccessible);
+
   if (TIK >= Loadable &&
       (CopyDestroyKind == Normal || CopyDestroyKind == BitwiseTakable)) {
     computePayloadTypesAndTagType(TC.IGM, *TI, PayloadTypesAndTagType);

@@ -970,7 +970,7 @@ namespace {
       : ScalarTypeInfo(ty, Size(0), SpareBitVector{}, Alignment(1),
                        IsTriviallyDestroyable,
                        IsCopyable,
-                       IsFixedSize) {}
+                       IsFixedSize, IsABIAccessible) {}
     unsigned getExplosionSize() const override { return 0; }
     void getSchema(ExplosionSchema &schema) const override {}
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
@@ -1138,7 +1138,8 @@ namespace {
       : ScalarTypeInfo(storage, size, std::move(spareBits), align,
                        IsTriviallyDestroyable,
                        IsCopyable,
-                       IsFixedSize),
+                       IsFixedSize,
+                       IsABIAccessible),
         ScalarTypes(std::move(scalarTypes))
     {}
     
@@ -1329,7 +1330,7 @@ namespace {
                               IsNotTriviallyDestroyable,
                               IsNotBitwiseTakable,
                               IsNotCopyable,
-                              IsFixedSize) {}
+                              IsFixedSize, IsABIAccessible) {}
   };
 
   /// A TypeInfo implementation for address-only types which can never
@@ -2541,7 +2542,8 @@ public:
                     IsNotTriviallyDestroyable, /* irrelevant */
                     IsNotBitwiseTakable, /* irrelevant */
                     IsCopyable, /* irrelevant */
-                    IsFixedSize /* irrelevant */),
+                    IsFixedSize /* irrelevant */,
+                    IsABIAccessible),
       NumExtraInhabitants(node.NumExtraInhabitants) {}
 
   TypeLayoutEntry

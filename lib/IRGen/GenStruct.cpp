@@ -155,6 +155,7 @@ namespace {
     using super::asImpl;
 
   public:
+
     const FieldInfoType &getFieldInfo(VarDecl *field) const {
       // FIXME: cache the physical field index in the VarDecl.
       for (auto &fieldInfo : asImpl().getFields()) {
@@ -275,6 +276,12 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address address, SILType T,
                  bool isOutlined) const override {
+
+      if (!asImpl().areFieldsABIAccessible()) {
+        emitDestroyCall(IGF, T, address);
+        return;
+      }
+
       // If the struct has a deinit declared, then call it to destroy the
       // value.
       if (!tryEmitDestroyUsingDeinit(IGF, address, T)) {
@@ -390,11 +397,11 @@ namespace {
                                 Alignment align,
                                 const clang::RecordDecl *clangDecl)
         : StructTypeInfoBase(StructTypeInfoKind::LoadableClangRecordTypeInfo,
-                             fields, explosionSize, storageType, size,
-                             std::move(spareBits), align,
+                             fields, explosionSize, FieldsAreABIAccessible,
+                             storageType, size, std::move(spareBits), align,
                              IsTriviallyDestroyable,
                              IsCopyable,
-                             IsFixedSize),
+                             IsFixedSize, IsABIAccessible),
           ClangDecl(clangDecl) {}
 
     TypeLayoutEntry
@@ -484,13 +491,14 @@ namespace {
                                          Alignment align,
                                          const clang::RecordDecl *clangDecl)
         : StructTypeInfoBase(StructTypeInfoKind::AddressOnlyClangRecordTypeInfo,
-                             fields, storageType, size,
+                             fields, FieldsAreABIAccessible, storageType, size,
                              // We can't assume any spare bits in a C++ type
                              // with user-defined special member functions.
                              SpareBitVector(std::optional<APInt>{
                                  llvm::APInt(size.getValueInBits(), 0)}),
                              align, IsNotTriviallyDestroyable,
-                             IsNotBitwiseTakable, IsCopyable, IsFixedSize),
+                             IsNotBitwiseTakable, IsCopyable, IsFixedSize,
+                             IsABIAccessible),
           clangDecl(clangDecl) {
       (void)clangDecl;
     }
@@ -666,7 +674,7 @@ namespace {
                                       Alignment align,
                                       const clang::RecordDecl *clangDecl)
         : StructTypeInfoBase(StructTypeInfoKind::AddressOnlyClangRecordTypeInfo,
-                             fields, storageType, size,
+                             fields, FieldsAreABIAccessible, storageType, size,
                              // We can't assume any spare bits in a C++ type
                              // with user-defined special member functions.
                              SpareBitVector(std::optional<APInt>{
@@ -675,7 +683,7 @@ namespace {
                              IsNotBitwiseTakable,
                              // TODO: Set this appropriately for the type's
                              // C++ import behavior.
-                             IsCopyable, IsFixedSize),
+                             IsCopyable, IsFixedSize, IsABIAccessible),
           ClangDecl(clangDecl) {
       (void)ClangDecl;
     }
@@ -865,21 +873,24 @@ namespace {
   class LoadableStructTypeInfo final
       : public StructTypeInfoBase<LoadableStructTypeInfo, LoadableTypeInfo> {
     using super = StructTypeInfoBase<LoadableStructTypeInfo, LoadableTypeInfo>;
+
   public:
     LoadableStructTypeInfo(ArrayRef<StructFieldInfo> fields,
+                           FieldsAreABIAccessible_t areFieldsABIAccessible,
                            unsigned explosionSize,
                            llvm::Type *storageType, Size size,
                            SpareBitVector &&spareBits,
                            Alignment align,
                            IsTriviallyDestroyable_t isTriviallyDestroyable,
                            IsCopyable_t isCopyable,
-                           IsFixedSize_t alwaysFixedSize)
+                           IsFixedSize_t alwaysFixedSize,
+                           IsABIAccessible_t isABIAccessible)
       : StructTypeInfoBase(StructTypeInfoKind::LoadableStructTypeInfo,
-                           fields, explosionSize,
+                           fields, explosionSize, areFieldsABIAccessible,
                            storageType, size, std::move(spareBits),
                            align, isTriviallyDestroyable,
                            isCopyable,
-                           alwaysFixedSize)
+                           alwaysFixedSize, isABIAccessible)
     {}
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
@@ -942,6 +953,13 @@ namespace {
     
     void consume(IRGenFunction &IGF, Explosion &explosion,
                  Atomicity atomicity, SILType T) const override {
+      if (!areFieldsABIAccessible()) {
+        auto temporary = allocateStack(IGF, T, "deinit.arg").getAddress();
+        initialize(IGF, explosion, temporary, /*outlined*/false);
+        emitDestroyCall(IGF, T, temporary);
+        return;
+      }
+
       // If the struct has a deinit declared, then call it to consume the
       // value.
       if (tryEmitConsumeUsingDeinit(IGF, explosion, T)) {
@@ -960,17 +978,21 @@ namespace {
                                                    FixedTypeInfo>> {
   public:
     // FIXME: Spare bits between struct members.
-    FixedStructTypeInfo(ArrayRef<StructFieldInfo> fields, llvm::Type *T,
+    FixedStructTypeInfo(ArrayRef<StructFieldInfo> fields,
+                        FieldsAreABIAccessible_t areFieldsABIAccessible,
+                        llvm::Type *T,
                         Size size, SpareBitVector &&spareBits,
                         Alignment align,
                         IsTriviallyDestroyable_t isTriviallyDestroyable,
                         IsBitwiseTakable_t isBT,
                         IsCopyable_t isCopyable,
-                        IsFixedSize_t alwaysFixedSize)
+                        IsFixedSize_t alwaysFixedSize,
+                        IsABIAccessible_t isABIAccessible)
       : StructTypeInfoBase(StructTypeInfoKind::FixedStructTypeInfo,
-                           fields, T, size, std::move(spareBits), align,
+                           fields, areFieldsABIAccessible,
+                           T, size, std::move(spareBits), align,
                            isTriviallyDestroyable, isBT, isCopyable,
-                           alwaysFixedSize)
+                           alwaysFixedSize, isABIAccessible)
     {}
 
     TypeLayoutEntry
@@ -1242,9 +1264,15 @@ namespace {
     }
 
     LoadableStructTypeInfo *createLoadable(ArrayRef<StructFieldInfo> fields,
+                                           FieldsAreABIAccessible_t areFieldsABIAccessible,
                                            StructLayout &&layout,
                                            unsigned explosionSize) {
+      IsABIAccessible_t isABIAccessible = IsABIAccessible;
+      if (TheStruct->isNoncopyable() &&
+          !IGM.getSILModule().isTypeMetadataAccessible(TheStruct))
+        isABIAccessible = IsNotABIAccessible;
       return LoadableStructTypeInfo::create(fields,
+                                            areFieldsABIAccessible,
                                             explosionSize,
                                             layout.getType(),
                                             layout.getSize(),
@@ -1252,23 +1280,31 @@ namespace {
                                             layout.getAlignment(),
                                             layout.isTriviallyDestroyable(),
                                             layout.isCopyable(),
-                                            layout.isAlwaysFixedSize());
+                                            layout.isAlwaysFixedSize(),
+                                            isABIAccessible);
     }
 
     FixedStructTypeInfo *createFixed(ArrayRef<StructFieldInfo> fields,
+                                     FieldsAreABIAccessible_t areFieldsABIAccessible,
                                      StructLayout &&layout) {
-      return FixedStructTypeInfo::create(fields, layout.getType(),
+      IsABIAccessible_t isABIAccessible = IsABIAccessible;
+      if (TheStruct->isNoncopyable() &&
+          !IGM.getSILModule().isTypeMetadataAccessible(TheStruct))
+        isABIAccessible = IsNotABIAccessible;
+      return FixedStructTypeInfo::create(fields, areFieldsABIAccessible,
+                                         layout.getType(),
                                          layout.getSize(),
                                          std::move(layout.getSpareBits()),
                                          layout.getAlignment(),
                                          layout.isTriviallyDestroyable(),
                                          layout.isBitwiseTakable(),
                                          layout.isCopyable(),
-                                         layout.isAlwaysFixedSize());
+                                         layout.isAlwaysFixedSize(),
+                                         isABIAccessible);
     }
 
     NonFixedStructTypeInfo *createNonFixed(ArrayRef<StructFieldInfo> fields,
-                                     FieldsAreABIAccessible_t fieldsAccessible,
+                                           FieldsAreABIAccessible_t fieldsAccessible,
                                            StructLayout &&layout) {
       auto structAccessible = IsABIAccessible_t(
         IGM.getSILModule().isTypeMetadataAccessible(TheStruct));
