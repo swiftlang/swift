@@ -4678,6 +4678,16 @@ namespace {
       if (!src)
         return nullptr;
 
+      /// All assignments consume the source expression.
+//      if (canAddExplicitConsume(dc->getParentModule(), cs, src)) {
+//        auto srcTy = cs.getType(src);
+//        src = ConsumeExpr::createImplicit(cs.getASTContext(),
+//                                          src->getLoc(),
+//                                          src,
+//                                          srcTy);
+//        cs.setType(src, srcTy);
+//      }
+
       expr->setSrc(src);
 
       if (!SuppressDiagnostics) {
