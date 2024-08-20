@@ -2449,15 +2449,14 @@ Type constraints::typeEraseOpenedExistentialReference(
       /*force=*/false);
 }
 
-Type constraints::typeEraseOpenedArchetypesWithRoot(
-    Type type, const OpenedArchetypeType *root) {
-  assert(root->isRoot() && "Expected a root archetype");
+Type constraints::typeEraseOpenedArchetypesFromEnvironment(
+    Type type, GenericEnvironment *env) {
+  assert(env->getKind() == GenericEnvironment::Kind::OpenedExistential);
 
-  auto *env = root->getGenericEnvironment();
   auto sig = env->getGenericSignature();
 
   return typeEraseExistentialSelfReferences(
-      type, root->getExistentialType(), TypePosition::Covariant, sig,
+      type, env->getOpenedExistentialType(), TypePosition::Covariant, sig,
       /*containsFn=*/[](Type t) {
         return t->hasOpenedExistential();
       },

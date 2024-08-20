@@ -259,19 +259,13 @@ void CompletionLookup::foundFunction(const AnyFunctionType *AFT) {
 
 bool CompletionLookup::canBeUsedAsRequirementFirstType(Type selfTy,
                                                        TypeAliasDecl *TAD) {
-  auto T = TAD->getDeclaredInterfaceType();
-  auto subMap = selfTy->getMemberSubstitutionMap(TAD);
-  T = T.subst(subMap)->getCanonicalType();
-
-  ArchetypeType *archeTy = T->getAs<ArchetypeType>();
-  if (!archeTy)
+  if (TAD->isGeneric())
     return false;
-  archeTy = archeTy->getRoot();
 
-  // For protocol, the 'archeTy' should match with the 'baseTy' which is the
-  // dynamic 'Self' type of the protocol. For nominal decls, 'archTy' should
-  // be one of the generic params in 'selfTy'. Search 'archeTy' in 'baseTy'.
-  return selfTy.findIf([&](Type T) { return archeTy->isEqual(T); });
+  auto T = TAD->getDeclaredInterfaceType();
+  auto subMap = selfTy->getContextSubstitutionMap(TAD->getDeclContext());
+
+  return T.subst(subMap)->is<ArchetypeType>();
 }
 
 CompletionLookup::CompletionLookup(CodeCompletionResultSink &Sink,

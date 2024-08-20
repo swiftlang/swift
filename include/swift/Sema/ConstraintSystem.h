@@ -5972,8 +5972,8 @@ Type typeEraseOpenedExistentialReference(Type type, Type existentialBaseType,
 /// Given a type that includes opened existential archetypes derived from
 /// the given generic environment, replace the archetypes with their upper
 /// bounds.
-Type typeEraseOpenedArchetypesWithRoot(Type type,
-                                       const OpenedArchetypeType *root);
+Type typeEraseOpenedArchetypesFromEnvironment(Type type,
+                                              GenericEnvironment *env);
 
 /// Returns true if a reference to a member on a given base type will apply
 /// its curried self parameter, assuming it has one.

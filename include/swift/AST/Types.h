@@ -752,9 +752,9 @@ public:
     return getRecursiveProperties().hasParameterizedExistential();
   }
 
-  /// Determine whether the type involves the given opened existential
-  /// archetype.
-  bool hasOpenedExistentialWithRoot(const OpenedArchetypeType *root) const;
+  /// Determine whether the type involves a local archetype from the given
+  /// environment.
+  bool hasLocalArchetypeFromEnvironment(GenericEnvironment *env) const;
 
   /// Determine whether the type involves an opaque type.
   bool hasOpaqueArchetype() const {
