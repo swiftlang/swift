@@ -3056,6 +3056,15 @@ suppressingFeatureBitwiseCopyable2(PrintOptions &options,
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
+static void
+suppressingFeatureAllowUnsafeAttribute(PrintOptions &options,
+                                       llvm::function_ref<void()> action) {
+  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
+  options.ExcludeAttrList.push_back(DeclAttrKind::Unsafe);
+  action();
+  options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {

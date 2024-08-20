@@ -8105,6 +8105,14 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         continue;
       }
 
+      if (swiftAttr->getAttribute() == "unsafe") {
+        if (!SwiftContext.LangOpts.hasFeature(Feature::AllowUnsafeAttribute))
+          continue;
+        auto attr = new (SwiftContext) UnsafeAttr(/*implicit=*/false);
+        MappedDecl->getAttrs().add(attr);
+        continue;
+      }
+
       // Dig out a buffer with the attribute text.
       unsigned bufferID = getClangSwiftAttrSourceBuffer(
           swiftAttr->getAttribute());

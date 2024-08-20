@@ -185,7 +185,10 @@ public:
     /// Contains a PackArchetypeType. Also implies HasPrimaryArchetype.
     HasPackArchetype = 0x20000,
 
-    Last_Property = HasPackArchetype
+    /// Whether this type contains an unsafe type.
+    IsUnsafe = 0x040000,
+
+    Last_Property = IsUnsafe
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -265,6 +268,8 @@ public:
   bool hasPack() const { return Bits & HasPack; }
 
   bool hasPackArchetype() const { return Bits & HasPackArchetype; }
+
+  bool isUnsafe() const { return Bits & IsUnsafe; }
 
   /// Does a type with these properties structurally contain a
   /// parameterized existential type?
@@ -431,12 +436,12 @@ protected:
     NumProtocols : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+29,
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+28,
     /// Type variable options.
     Options : 7,
     : NumPadBits,
     /// The unique number assigned to this type variable.
-    ID : 29
+    ID : 28
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ErrorUnionType, TypeBase, 32,
@@ -707,6 +712,11 @@ public:
   /// Whether the type contains a PackArchetypeType.
   bool hasPackArchetype() const {
     return getRecursiveProperties().hasPackArchetype();
+  }
+
+  /// Whether the type contains an @unsafe type in it anywhere.
+  bool isUnsafe() const {
+    return getRecursiveProperties().isUnsafe();
   }
 
   /// Determine whether the type involves a primary, pack or local archetype.
@@ -6637,7 +6647,8 @@ private:
                        GenericEnvironment *GenericEnv,
                        Type InterfaceType,
                        ArrayRef<ProtocolDecl *> ConformsTo,
-                       Type Superclass, LayoutConstraint Layout);
+                       Type Superclass, LayoutConstraint Layout,
+                       RecursiveTypeProperties Properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(PrimaryArchetypeType, ArchetypeType)
 END_CAN_TYPE_WRAPPER(PrimaryArchetypeType, ArchetypeType)
@@ -6918,7 +6929,8 @@ public:
 private:
   PackArchetypeType(const ASTContext &Ctx, GenericEnvironment *GenericEnv,
                     Type InterfaceType, ArrayRef<ProtocolDecl *> ConformsTo,
-                    Type Superclass, LayoutConstraint Layout, PackShape Shape);
+                    Type Superclass, LayoutConstraint Layout, PackShape Shape,
+                    RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(PackArchetypeType, ArchetypeType)
 END_CAN_TYPE_WRAPPER(PackArchetypeType, ArchetypeType)

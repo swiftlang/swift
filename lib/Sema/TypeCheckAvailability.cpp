@@ -18,6 +18,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckObjC.h"
+#include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -3882,6 +3883,26 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
   if (diagnoseDeclAvailability(D, R, call, Where, Flags))
       return true;
 
+  // If the declaration itself is "safe" but we don't disallow unsafe uses,
+  // check whether it traffics in unsafe types.
+  ASTContext &ctx = D->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::WarnUnsafe) && !D->isUnsafe()) {
+    auto type = D->getInterfaceType();
+    if (auto subs = declRef.getSubstitutions())
+      type = type.subst(subs);
+    if (type->isUnsafe()) {
+      diagnoseUnsafeType(
+          ctx, R.Start, type,
+          [&](Type specificType) {
+            ctx.Diags.diagnose(
+                R.Start, diag::reference_to_unsafe_typed_decl,
+                call != nullptr && !isa<ParamDecl>(D), D,
+                specificType);
+            D->diagnose(diag::decl_declared_here, D);
+          });
+    }
+  }
+
   if (R.isValid()) {
     if (diagnoseSubstitutionMapAvailability(R.Start, declRef.getSubstitutions(),
                                             Where)) {
@@ -3943,6 +3964,23 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
   return true;
 }
 
+/// Diagnose uses of unsafe declarations.
+static void
+diagnoseDeclUnsafe(const ValueDecl *D, SourceRange R,
+                   const Expr *call, const ExportContext &Where) {
+  ASTContext &ctx = D->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::WarnUnsafe))
+    return;
+
+  if (!D->isUnsafe())
+    return;
+
+  SourceLoc diagLoc = call ? call->getLoc() : R.Start;
+  ctx.Diags
+    .diagnose(diagLoc, diag::reference_to_unsafe_decl, call != nullptr, D);
+  D->diagnose(diag::decl_declared_here, D);
+}
+
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
@@ -3978,6 +4016,8 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
 
   if (diagnoseDeclAsyncAvailability(D, R, call, Where))
     return true;
+
+  diagnoseDeclUnsafe(D, R, call, Where);
 
   // Make sure not to diagnose an accessor's deprecation if we already
   // complained about the property/subscript.

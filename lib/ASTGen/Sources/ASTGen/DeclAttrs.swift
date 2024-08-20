@@ -252,6 +252,7 @@ extension ASTGenVisitor {
         .testable,
         .transparent,
         .uiApplicationMain,
+        .unsafe,
         .unsafeInheritExecutor,
         .unsafeNoObjCTaggedPointer,
         .unsafeNonEscapableResult,

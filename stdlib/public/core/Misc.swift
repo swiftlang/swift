@@ -155,6 +155,7 @@ public func _getTypeByMangledNameInContext(
 /// Prevents performance diagnostics in the passed closure.
 @_alwaysEmitIntoClient
 @_semantics("no_performance_analysis")
+@unsafe
 public func _unsafePerformance<T>(_ c: () -> T) -> T {
   return c()
 }
