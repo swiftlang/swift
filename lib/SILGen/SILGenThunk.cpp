@@ -383,7 +383,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       if (checkedBridging) {
         FormalEvaluationScope scope(SGF);
 
-        auto underlyingValueTy = OpenedArchetypeType::get(ctx.TheAnyType, sig);
+        auto underlyingValueTy = OpenedArchetypeType::get(ctx.TheAnyType);
 
         auto underlyingValueAddr = SGF.emitOpenExistential(
             loc, ManagedValue::forTrivialAddressRValue(continuationAddr),

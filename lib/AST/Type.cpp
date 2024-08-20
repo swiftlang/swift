@@ -4424,23 +4424,6 @@ SILBoxType::SILBoxType(ASTContext &C,
   assert(Substitutions.isCanonical());
 }
 
-Type TypeBase::openAnyExistentialType(OpenedArchetypeType *&opened,
-                                      GenericSignature parentSig) {
-  assert(isAnyExistentialType());
-  if (auto metaty = getAs<ExistentialMetatypeType>()) {
-    opened = OpenedArchetypeType::get(
-        metaty->getExistentialInstanceType()->getCanonicalType(),
-        parentSig.getCanonicalSignature());
-    if (metaty->hasRepresentation())
-      return MetatypeType::get(opened, metaty->getRepresentation());
-    else
-      return MetatypeType::get(opened);
-  }
-  opened = OpenedArchetypeType::get(getCanonicalType(),
-                                    parentSig.getCanonicalSignature());
-  return opened;
-}
-
 AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
   SmallVector<Param, 8> newParams;
   for (auto &param : getParams()) {

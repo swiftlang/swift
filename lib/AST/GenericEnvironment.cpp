@@ -149,53 +149,6 @@ UUID GenericEnvironment::getOpenedElementUUID() const {
   return getTrailingObjects<OpenedElementEnvironmentData>()->uuid;
 }
 
-namespace {
-
-struct FindOpenedElementParam {
-  ArrayRef<Type> openedPacks;
-  ArrayRef<GenericTypeParamType *> packElementParams;
-
-  FindOpenedElementParam(const GenericEnvironment *env,
-                         ArrayRef<Type> openedPacks)
-    : openedPacks(openedPacks),
-      packElementParams(
-        env->getGenericSignature().getInnermostGenericParams()) {
-    assert(openedPacks.size() == packElementParams.size());
-  }
-
-  GenericTypeParamType *operator()(Type packParam) {
-    for (auto i : indices(openedPacks)) {
-      if (openedPacks[i]->isEqual(packParam))
-        return packElementParams[i];
-    }
-    llvm_unreachable("parameter was not an opened pack parameter");
-  }
-};
-
-struct FindElementArchetypeForOpenedPackParam {
-  FindOpenedElementParam findElementParam;
-  QueryInterfaceTypeSubstitutions getElementArchetype;
-
-  FindElementArchetypeForOpenedPackParam(const GenericEnvironment *env,
-                                         ArrayRef<Type> openedPacks)
-    : findElementParam(env, openedPacks), getElementArchetype(env) {}
-
-
-  Type operator()(Type interfaceType) {
-    assert(interfaceType->isTypeParameter());
-    if (auto member = interfaceType->getAs<DependentMemberType>()) {
-      auto baseArchetype = (*this)(member->getBase())
-             ->castTo<ElementArchetypeType>();
-      return baseArchetype->getNestedType(member->getAssocType())
-               ->castTo<ElementArchetypeType>();
-    }
-    assert(interfaceType->is<GenericTypeParamType>());
-    return getElementArchetype(findElementParam(interfaceType));
-  }
-};
-
-}
-
 void GenericEnvironment::forEachPackElementArchetype(
           llvm::function_ref<void(ElementArchetypeType *)> function) const {
   auto packElements = getGenericSignature().getInnermostGenericParams();
@@ -650,6 +603,41 @@ Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
   if (!result)
     return ErrorType::get(type);
   return result;
+}
+
+namespace {
+
+struct FindElementArchetypeForOpenedPackParam {
+  ArrayRef<Type> openedPacks;
+  ArrayRef<GenericTypeParamType *> packElementParams;
+  const GenericEnvironment *env;
+
+  FindElementArchetypeForOpenedPackParam(const GenericEnvironment *env,
+                                         ArrayRef<Type> openedPacks)
+    : openedPacks(openedPacks),
+      packElementParams(env->getGenericSignature().getInnermostGenericParams()),
+      env(env) {}
+
+  Type getInterfaceType(Type interfaceType) const {
+    if (auto member = interfaceType->getAs<DependentMemberType>()) {
+      return DependentMemberType::get(getInterfaceType(member->getBase()),
+                                      member->getAssocType());
+    }
+
+    assert(interfaceType->is<GenericTypeParamType>());
+    for (auto i : indices(openedPacks)) {
+      if (openedPacks[i]->isEqual(interfaceType))
+        return packElementParams[i];
+    }
+
+    llvm_unreachable("parameter was not an opened pack parameter");
+  }
+
+  Type operator()(Type interfaceType) const {
+    return env->mapTypeIntoContext(getInterfaceType(interfaceType));
+  }
+};
+
 }
 
 /// So this expects a type written with the archetypes of the original generic
