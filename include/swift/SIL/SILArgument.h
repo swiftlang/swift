@@ -424,9 +424,7 @@ public:
     sharedUInt32().SILFunctionArgument.lifetimeAnnotation = newValue;
   }
 
-  bool isSending() const {
-    return getKnownParameterInfo().hasOption(SILParameterInfo::Sending);
-  }
+  bool isSending() const;
 
   Lifetime getLifetime() const {
     return getType()

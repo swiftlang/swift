@@ -1976,6 +1976,7 @@ public:
     // For non-self parameters, gather all of the transferring parameters and
     // gather our non-transferring parameters.
     SmallVector<Operand *, 8> nonTransferringParameters;
+    SmallVector<Operand *, 8> sendingIndirectResults;
     if (fas.getNumArguments()) {
       // NOTE: We want to process indirect parameters as if they are
       // parameters... so we process them in nonTransferringParameters.
@@ -1984,12 +1985,16 @@ public:
         if (fas.isCalleeOperand(op))
           continue;
 
-        if (!fas.getArgumentConvention(op).isIndirectOutParameter() &&
-            fas.getArgumentParameterInfo(op).hasOption(
-                SILParameterInfo::Sending)) {
+        if (fas.isSending(op)) {
+          if (fas.isIndirectResultOperand(op)) {
+            sendingIndirectResults.push_back(&op);
+            continue;
+          }
+
           if (auto value = tryToTrackValue(op.get())) {
             builder.addRequire(value->getRepresentative().getValue());
             builder.addTransfer(value->getRepresentative().getValue(), &op);
+            continue;
           }
         } else {
           nonTransferringParameters.push_back(&op);
@@ -2041,8 +2046,17 @@ public:
     // override isolation, then perform assign fresh.
     ArrayRef<SILValue> empty;
     translateSILMultiAssign(empty, nonTransferringParameters, {});
+
+    // Sending direct results.
     for (SILValue result : applyResults) {
       if (auto value = tryToTrackValue(result)) {
+        builder.addAssignFresh(value->getRepresentative().getValue());
+      }
+    }
+
+    // Sending indirect results.
+    for (Operand *op : sendingIndirectResults) {
+      if (auto value = tryToTrackValue(op->get())) {
         builder.addAssignFresh(value->getRepresentative().getValue());
       }
     }
@@ -2073,8 +2087,9 @@ public:
       return translateIsolationCrossingSILApply(cast);
     if (auto cast = dyn_cast<BeginApplyInst>(inst))
       return translateIsolationCrossingSILApply(cast);
-    if (auto cast = dyn_cast<TryApplyInst>(inst))
+    if (auto cast = dyn_cast<TryApplyInst>(inst)) {
       return translateIsolationCrossingSILApply(cast);
+    }
 
     llvm_unreachable("Only ApplyInst, BeginApplyInst, and TryApplyInst should "
                      "cross isolation domains");
