@@ -372,6 +372,22 @@ struct DebugInfoPropagator {
 
 } // namespace
 
+/// The MoveChecker leaves behind nonsense SIL involving
+/// explicit_copy_*'s of noncopyable types, after it diagnosed an error
+/// about that value. So, ignore those to workaround a problem where this
+/// pass injects debug_value's after the point at which the copied-value
+/// is considered consumed, according to the LinearLifetimeChecker.
+///
+/// \see \c swift::siloptimizer::cleanupNonCopyableCopiesAfterEmittingDiagnostic
+static bool isForIllegalSILCode(DebugVarCarryingInst const &debugInst) {
+  SILValue taggedValue = debugInst.getOperandForDebugValueClone();
+
+  if (auto explicitCopy = dyn_cast<ExplicitCopyValueInst>(taggedValue))
+    return explicitCopy->getType().isMoveOnly(/*orWrapped=*/false);
+
+  return false;
+}
+
 void DebugInfoPropagator::performInitialLocalDataflow() {
   // Map from SILDebugVariable index to the last DebugVarCarryingInst mapped to
   // that SILDebugVariable in the block we are processing.
@@ -422,6 +438,15 @@ void DebugInfoPropagator::performInitialLocalDataflow() {
         LLVM_DEBUG(
             llvm::dbgs()
             << "    Found a moved debug that was moved... continuing!\n");
+        continue;
+      }
+
+      if (isForIllegalSILCode(debugInst)) {
+        LLVM_DEBUG(llvm::dbgs()
+                       << "    Found debug info for a noncopyable value "
+                          "already diagnosed as an error by MoveChecker"
+                          "... continuing!\n";
+        );
         continue;
       }
 
@@ -670,7 +695,8 @@ bool DebugInfoPropagator::applyDataflow() {
 
       // Check if we have a debug inst that we need to update.
       auto debugInst = DebugVarCarryingInst(&inst);
-      if (!debugInst || !debugInst.getWasMoved())
+      if (!debugInst || !debugInst.getWasMoved()
+          || isForIllegalSILCode(debugInst))
         continue;
 
       auto debugInfo = debugInst.getVarInfo();
