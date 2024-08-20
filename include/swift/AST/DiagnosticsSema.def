@@ -8026,6 +8026,9 @@ ERROR(missing_value_generic_type,none,
       "value generic %0 must have an explicit value type declared", (Identifier))
 ERROR(value_generics_missing_feature,none,
       "value generics require '-enable-experimental-feature ValueGenerics'", ())
+ERROR(availability_value_generic_type_only_version_newer, none,
+      "values in generic types are only available in %0 %1 or newer",
+      (StringRef, llvm::VersionTuple))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -72,12 +72,13 @@ FEATURE(SwiftExceptionPersonality,                      (6, 0))
 FEATURE(IsolatedAny,                                    (6, 0))
 
 FEATURE(NoncopyableGenerics,                            (6, 0))
+FEATURE(InitRawStructMetadata,                          (6, 0))
 
 FEATURE(TaskExecutor,                                   FUTURE)
 FEATURE(Differentiation,                                FUTURE)
-FEATURE(InitRawStructMetadata,                          FUTURE)
 FEATURE(ClearSensitive,                                 FUTURE)
 FEATURE(UpdatePureObjCClassMetadata,                    FUTURE)
+FEATURE(ValueGenericType,                               FUTURE)
 
 #undef FEATURE
 #undef FUTURE

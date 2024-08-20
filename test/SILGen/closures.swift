@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-emit-silgen -module-name closures -parse-stdlib -parse-as-library %s -enable-experimental-feature ValueGenerics | %FileCheck %s
-// RUN: %target-swift-emit-silgen -module-name closures -parse-stdlib -parse-as-library %s -enable-experimental-feature ValueGenerics | %FileCheck %s --check-prefix=GUARANTEED
+// RUN: %target-swift-emit-silgen -module-name closures -parse-stdlib -parse-as-library %s -enable-experimental-feature ValueGenerics -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name closures -parse-stdlib -parse-as-library %s -enable-experimental-feature ValueGenerics -disable-availability-checking | %FileCheck %s --check-prefix=GUARANTEED
 
 import Swift
 

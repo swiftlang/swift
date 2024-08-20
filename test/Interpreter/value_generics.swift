@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature ValueGenerics) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature ValueGenerics -Xfrontend  -disable-availability-checking) | %FileCheck %s
 
 // REQUIRES: executable_test
 
