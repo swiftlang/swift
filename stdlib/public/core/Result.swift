@@ -13,7 +13,7 @@
 /// A value that represents either a success or a failure, including an
 /// associated value in each case.
 @frozen
-public enum Result<Success: ~Copyable, Failure: Error> {
+public enum Result<Success: ~Copyable & ~Escapable, Failure: Error> {
   /// A success, storing a `Success` value.
   case success(Success)
 
@@ -21,9 +21,11 @@ public enum Result<Success: ~Copyable, Failure: Error> {
   case failure(Failure)
 }
 
-extension Result: Copyable where Success: Copyable {}
+extension Result: Copyable where Success: Copyable /*& ~Escapable*/ {}
 
-extension Result: Sendable where Success: Sendable & ~Copyable {}
+extension Result: Escapable where Success: Escapable /*& ~Copyable*/ {}
+
+extension Result: Sendable where Success: Sendable & ~Copyable & ~Escapable {}
 
 extension Result: Equatable where Success: Equatable, Failure: Equatable {}
 
@@ -62,7 +64,9 @@ extension Result {
       return .failure(failure)
     }
   }
+}
 
+extension Result {
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @_silgen_name("$ss6ResultO3mapyAByqd__q_Gqd__xXElF")
   @usableFromInline
@@ -106,7 +110,7 @@ extension Result where Success: ~Copyable {
   }
 }
 
-extension Result where Success: ~Copyable {
+extension Result where Success: ~Copyable & ~Escapable {
   /// Returns a new result, mapping any failure value using the given
   /// transformation.
   ///
@@ -202,7 +206,9 @@ extension Result {
       return .failure(failure)
     }
   }
+}
 
+extension Result {
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @_silgen_name("$ss6ResultO7flatMapyAByqd__q_GADxXElF")
   @usableFromInline
@@ -246,7 +252,7 @@ extension Result where Success: ~Copyable {
   }
 }
 
-extension Result where Success: ~Copyable {
+extension Result where Success: ~Copyable & ~Escapable {
   /// Returns a new result, mapping any failure value using the given
   /// transformation and unwrapping the produced result.
   ///
@@ -283,7 +289,7 @@ extension Result {
   }
 }
 
-extension Result where Success: ~Copyable {
+extension Result where Success: ~Copyable & ~Escapable {
   /// Returns the success value as a throwing expression.
   ///
   /// Use this method to retrieve the value of this result if it represents a
@@ -311,21 +317,6 @@ extension Result where Success: ~Copyable {
   }
 }
 
-extension Result where Success: ~Copyable {
-  /// Creates a new result by evaluating a throwing closure, capturing the
-  /// returned value as a success, or any thrown error as a failure.
-  ///
-  /// - Parameter body: A potentially throwing closure to evaluate.
-  @_alwaysEmitIntoClient
-  public init(catching body: () throws(Failure) -> Success) {
-    do {
-      self = .success(try body())
-    } catch {
-      self = .failure(error)
-    }
-  }
-}
-
 extension Result {
   /// ABI: Historical get() throws
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
@@ -340,6 +331,22 @@ extension Result {
     }
   }
 
+}
+
+extension Result where Success: ~Copyable {
+  /// Creates a new result by evaluating a throwing closure, capturing the
+  /// returned value as a success, or any thrown error as a failure.
+  ///
+  /// - Parameter body: A potentially throwing closure to evaluate.
+  @_alwaysEmitIntoClient
+  public init(catching body: () throws(Failure) -> Success) {
+    // FIXME: This should allow a non-escapable `Success` -- but what's `self`'s lifetime dependence in that case?
+    do {
+      self = .success(try body())
+    } catch {
+      self = .failure(error)
+    }
+  }
 }
 
 extension Result where Failure == Swift.Error {
