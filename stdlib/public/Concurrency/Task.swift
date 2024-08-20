@@ -1033,6 +1033,7 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) async throws -> 
 /// [concurrency]: https://docs.swift.org/swift-book/LanguageGuide/Concurrency.html
 /// [tspl]: https://docs.swift.org/swift-book/
 @available(SwiftStdlib 5.1, *)
+@unsafe
 public struct UnsafeCurrentTask {
   internal let _task: Builtin.NativeObject
 

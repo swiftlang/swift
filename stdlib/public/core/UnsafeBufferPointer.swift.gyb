@@ -30,6 +30,7 @@
 /// collection with an `${Self}` instance copies the instances out of the
 /// referenced memory and into the new collection.
 @frozen // unsafe-performance
+@unsafe
 public struct Unsafe${Mutable}BufferPointer<Element: ~Copyable>: Copyable {
 
   @usableFromInline
