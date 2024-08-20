@@ -773,8 +773,7 @@ ConstraintLocator *ConstraintSystem::getOpenOpaqueLocator(
 std::pair<Type, OpenedArchetypeType *> ConstraintSystem::openExistentialType(
     Type type, ConstraintLocator *locator) {
   OpenedArchetypeType *opened = nullptr;
-  auto sig = DC->getGenericSignatureOfContext();
-  Type result = type->openAnyExistentialType(opened, sig);
+  Type result = type->openAnyExistentialType(opened);
   assert(OpenedExistentialTypes.count(locator) == 0);
   OpenedExistentialTypes.insert({locator, opened});
   return {result, opened};
@@ -2876,8 +2875,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     }
   } else if (baseObjTy->isExistentialType()) {
     auto openedArchetype =
-        OpenedArchetypeType::get(baseObjTy->getCanonicalType(),
-                                 GenericSignature());
+        OpenedArchetypeType::get(baseObjTy->getCanonicalType());
     OpenedExistentialTypes.insert(
         {getConstraintLocator(locator), openedArchetype});
     baseOpenedTy = openedArchetype;

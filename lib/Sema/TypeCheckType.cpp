@@ -2864,7 +2864,6 @@ TypeResolver::resolveOpenedExistentialArchetype(
     // into a new opened generic environment.
     archetypeType = OpenedArchetypeType::get(constraintType->getCanonicalType(),
                                              interfaceType,
-                                             GenericSignature(),
                                              openedAttr->getUUID());
   }
 

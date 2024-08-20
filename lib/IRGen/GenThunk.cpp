@@ -263,11 +263,8 @@ Callee IRGenThunk::lookupMethod() {
   if (selfTy.is<MetatypeType>()) {
     metadata = selfValue;
   } else {
-    auto &Types = IGF.IGM.getSILModule().Types;
-    auto *env = Types.getConstantGenericEnvironment(declRef);
-    auto sig = env ? env->getGenericSignature() : GenericSignature();
     metadata = emitHeapMetadataRefForHeapObject(IGF, selfValue, selfTy,
-                                                sig, /*suppress cast*/ true);
+                                                /*suppress cast*/ true);
   }
 
   // Find the method we're interested in.

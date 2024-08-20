@@ -11421,8 +11421,7 @@ ConstraintSystem::simplifyValueWitnessConstraint(
   // conformance.
   if (baseObjectType->isExistentialType()) {
     baseObjectType =
-        OpenedArchetypeType::get(baseObjectType->getCanonicalType(),
-                                 useDC->getGenericSignatureOfContext());
+        OpenedArchetypeType::get(baseObjectType->getCanonicalType());
   }
 
   // Check conformance to the protocol. If it doesn't conform, this constraint
