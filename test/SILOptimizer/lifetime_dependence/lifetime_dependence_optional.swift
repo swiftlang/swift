@@ -39,6 +39,20 @@ extension Nillable where Wrapped: ~Copyable & ~Escapable {
   public init(_ some: consuming Wrapped) { self = .some(some) }
 }
 
+extension Nillable where Wrapped: ~Escapable {
+  // Requires local variable analysis over switch_enum_addr.
+  public func map<E: Error, U: ~Copyable>(
+    _ transform: (Wrapped) throws(E) -> U
+  ) throws(E) -> U? {
+    switch self {
+    case .some(let y):
+      return .some(try transform(y))
+    case .none:
+      return .none
+    }
+  }
+}
+
 extension Nillable where Wrapped: ~Copyable {
   public consuming func _consumingMap<U: ~Copyable, E: Error>(
     _ transform: (consuming Wrapped) throws(E) -> U
