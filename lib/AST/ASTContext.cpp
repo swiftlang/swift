@@ -5347,9 +5347,11 @@ CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
   if (!knownID)
     knownID = UUID::fromTime();
 
+  auto generalization = ExistentialTypeGeneralization::get(existential);
+
   auto *genericEnv =
     GenericEnvironment::forOpenedExistential(
-      existential, SubstitutionMap(), *knownID);
+      generalization.Shape, generalization.Generalization, *knownID);
 
   // Map the interface type into that environment.
   auto result = genericEnv->mapTypeIntoContext(interfaceType)
@@ -5564,7 +5566,7 @@ GenericEnvironment::forOpenedExistential(
 
   if (found != environments.end()) {
     auto *existingEnv = found->second;
-    assert(existingEnv->getOpenedExistentialType()->isEqual(existential));
+    assert(existingEnv->getOrigExistentialType()->isEqual(existential));
     assert(existingEnv->getOuterSubstitutions() == subs);
     assert(existingEnv->getOpenedExistentialUUID() == uuid);
 

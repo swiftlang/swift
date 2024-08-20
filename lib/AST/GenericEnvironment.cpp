@@ -134,9 +134,13 @@ GenericEnvironment::getOpenedElementShapeClass() const {
   return environmentData->shapeClass;
 }
 
-Type GenericEnvironment::getOpenedExistentialType() const {
+Type GenericEnvironment::getOrigExistentialType() const {
   assert(getKind() == Kind::OpenedExistential);
   return getTrailingObjects<OpenedExistentialEnvironmentData>()->existential;
+}
+
+Type GenericEnvironment::getOpenedExistentialType() const {
+  return getOrigExistentialType().subst(getOuterSubstitutions());
 }
 
 UUID GenericEnvironment::getOpenedExistentialUUID() const {
@@ -337,13 +341,12 @@ Type
 GenericEnvironment::maybeApplyOuterContextSubstitutions(Type type) const {
   switch (getKind()) {
   case Kind::Primary:
-  case Kind::OpenedExistential:
     return type;
 
+  case Kind::OpenedExistential:
   case Kind::OpenedElement:
   case Kind::Opaque: {
-    auto packElements = getGenericSignature().getInnermostGenericParams();
-    auto elementDepth = packElements.front()->getDepth();
+    auto elementDepth = getGenericSignature()->getMaxDepth();
     SubstituteOuterFromSubstitutionMap replacer{
         getOuterSubstitutions(), elementDepth};
     return type.subst(replacer, replacer);

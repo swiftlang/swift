@@ -177,7 +177,12 @@ public:
 
   ArrayRef<GenericTypeParamType *> getGenericParams() const;
 
-  /// Retrieve the existential type for an opened existential environment.
+  /// Retrieve the generalized existential type for an opened existential
+  /// environment.
+  Type getOrigExistentialType() const;
+
+  /// Retrieve the substituted existential type for an opened existential
+  /// environment.
   Type getOpenedExistentialType() const;
 
   /// Retrieve the UUID for an opened existential environment.
