@@ -50,21 +50,27 @@
 namespace swift {
 namespace version {
 
-/// Print a string of the form "LLVM xxxxx, Swift zzzzz", where each placeholder
+/// Get a string of the form "LLVM xxxxx, Swift zzzzz", where each placeholder
 /// is the revision for the associated repository.
-static void printFullRevisionString(raw_ostream &out) {
+static SmallString<256> getFullRevisionString(void) {
+  SmallString<256> buf;
+
   // Arbitrarily truncate to 15 characters. This should be enough to unique Git
   // hashes while keeping the REPL version string from overflowing 80 columns.
 #if defined(LLVM_REVISION)
-  out << "LLVM " << StringRef(LLVM_REVISION).slice(0, 15);
+  buf += "LLVM ";
+  buf += StringRef(LLVM_REVISION).slice(0, 15);
 # if defined(SWIFT_REVISION)
-  out << ", ";
+  buf += ", ";
 # endif
 #endif
 
 #if defined(SWIFT_REVISION)
-  out << "Swift " << StringRef(SWIFT_REVISION).slice(0, 15);
+  buf += "Swift ";
+  buf += StringRef(SWIFT_REVISION).slice(0, 15);
 #endif
+
+  return buf;
 }
 
 Version Version::getCurrentLanguageVersion() {
@@ -258,39 +264,43 @@ std::pair<unsigned, unsigned> getSwiftNumericVersion() {
   return { SWIFT_VERSION_MAJOR, SWIFT_VERSION_MINOR };
 }
 
-std::string getSwiftFullVersion(Version effectiveVersion) {
-  std::string buf;
-  llvm::raw_string_ostream OS(buf);
+static SmallString<256> getSwiftFullVersionImpl(Version effectiveVersion) {
+  SmallString<256> buf;
 
 #ifdef SWIFT_VENDOR
-  OS << SWIFT_VENDOR " ";
+  buf += SWIFT_VENDOR " ";
 #endif
 
-  OS << "Swift version " SWIFT_VERSION_STRING;
+  buf += "Swift version " SWIFT_VERSION_STRING;
 #ifndef SWIFT_COMPILER_VERSION
-  OS << "-dev";
+  buf += "-dev";
 #endif
 
   if (effectiveVersion != Version::getCurrentLanguageVersion()) {
-    OS << " effective-" << effectiveVersion;
+    buf += " effective-" << effectiveVersion;
   }
 
 #if defined(SWIFT_COMPILER_VERSION)
-  OS << " (swiftlang-" SWIFT_COMPILER_VERSION;
+  buf += " (swiftlang-" SWIFT_COMPILER_VERSION;
 #if defined(CLANG_COMPILER_VERSION)
-  OS << " clang-" CLANG_COMPILER_VERSION;
+  buf += " clang-" CLANG_COMPILER_VERSION;
 #endif
-  OS << ")";
+  buf += ")";
 #elif defined(LLVM_REVISION) || defined(SWIFT_REVISION)
-  OS << " (";
-  printFullRevisionString(OS);
-  OS << ")";
+  buf += " (";
+  buf += getFullRevisionString();
+  buf += ")";
 #endif
 
   // Suppress unused function warning
-  (void)&printFullRevisionString;
+  (void)&getFullRevisionString;
 
-  return OS.str();
+  return buf;
+}
+
+std::string getSwiftFullVersion(Version effectiveVersion) {
+  auto result = getSwiftFullVersionImpl(effectiveVersion);
+  return static_cast<std::string>(result);
 }
 
 StringRef getSwiftRevision() {
@@ -337,6 +347,11 @@ StringRef getCurrentCompilerChannel() {
 
 unsigned getUpcomingCxxInteropCompatVersion() {
   return SWIFT_VERSION_MAJOR + 1;
+}
+
+char *_swift_copyFullVersion(void) {
+  auto result = getSwiftFullVersionImpl(Version::getCurrentLanguageVersion());
+  return ::strdup(result.c_str());
 }
 
 } // end namespace version

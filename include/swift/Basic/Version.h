@@ -20,6 +20,7 @@
 #define SWIFT_BASIC_VERSION_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/shims/Visibility.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/VersionTuple.h"
@@ -186,6 +187,14 @@ StringRef getCurrentCompilerChannel();
 /// version that's going to be presented as some new concrete version to the
 /// users.
 unsigned getUpcomingCxxInteropCompatVersion();
+
+/// Copy the full version of the Swift runtime (as would be returned from
+/// `getSwiftFullVersion()`.)
+///
+/// - Returns: A UTF-8 C string containing the full version of the Swift
+///   runtime. The caller is responsible for `free()`ing this string when done.
+SWIFT_RUNTIME_STDLIB_SPI
+char *_swift_copyFullVersion(void);
 
 } // end namespace version
 } // end namespace swift
