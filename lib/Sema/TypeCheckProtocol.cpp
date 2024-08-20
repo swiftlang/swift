@@ -2428,6 +2428,13 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       ComplainLoc, diag::unchecked_conformance_not_special, ProtoType);
   }
 
+  // @unchecked conformances are considered unsafe in strict concurrency mode.
+  if (conformance->isUnchecked() &&
+      Context.LangOpts.hasFeature(Feature::WarnUnsafe) &&
+      Context.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete) {
+    Context.Diags.diagnose(ComplainLoc, diag::unchecked_conformance_is_unsafe);
+  }
+
   bool allowImpliedConditionalConformance = false;
   if (Proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
     // In -swift-version 5 mode, a conditional conformance to a protocol can imply
@@ -5021,6 +5028,15 @@ void ConformanceChecker::resolveValueWitnesses() {
             requirement,
             Conformance->getWitnessUncached(requirement)
               .withEnterIsolation(*enteringIsolation));
+      }
+
+      // If we're disallowing unsafe code, check for an unsafe witness to a
+      // safe requirement.
+      if (C.LangOpts.hasFeature(Feature::WarnUnsafe) &&
+          witness->isUnsafe() && !requirement->isUnsafe()) {
+        witness->diagnose(diag::witness_unsafe,
+                          witness->getDescriptiveKind(),
+                          witness->getName());
       }
 
       // Objective-C checking for @objc requirements.

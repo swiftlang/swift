@@ -480,6 +480,7 @@ extension JobPriority: Comparable {
 /// without making other changes.
 @available(SwiftStdlib 5.1, *)
 @frozen
+@unsafe
 public struct UnsafeContinuation<T, E: Error>: Sendable {
   @usableFromInline internal var context: Builtin.RawUnsafeContinuation
 
@@ -683,6 +684,7 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
+@unsafe
 public func withUnsafeContinuation<T>(
   isolation: isolated (any Actor)? = #isolation,
   _ fn: (UnsafeContinuation<T, Never>) -> Void
@@ -719,6 +721,7 @@ public func withUnsafeContinuation<T>(
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
+@unsafe
 public func withUnsafeThrowingContinuation<T>(
   isolation: isolated (any Actor)? = #isolation,
   _ fn: (UnsafeContinuation<T, Error>) -> Void

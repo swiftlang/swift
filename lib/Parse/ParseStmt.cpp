@@ -393,8 +393,6 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
             // Don't hoist nested '#if'.
             continue;
           Entries.push_back(Entry);
-          if (Entry.is<Decl *>())
-            Entry.get<Decl *>()->setEscapedFromIfConfig(true);
         }
       } else {
         NeedParseErrorRecovery = true;
