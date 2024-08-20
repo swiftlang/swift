@@ -249,6 +249,9 @@ public:
   /// Register a re-mapping for local archetypes such as opened existentials.
   void registerLocalArchetypeRemapping(GenericEnvironment *From,
                                        GenericEnvironment *To) {
+    ASSERT(From->getGenericSignature()->getMaxDepth()
+           == To->getGenericSignature()->getMaxDepth());
+
     auto result = Functor.LocalArchetypeSubs.insert(std::make_pair(From, To));
     assert(result.second);
     (void)result;
