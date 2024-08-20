@@ -218,6 +218,44 @@ class SubClassOverridingPotentiallyUnavailableMethod : ClassWithPotentiallyUnava
   }
 }
 
+protocol BaseProto {
+  associatedtype A
+
+  var property: A { get set } // expected-note {{overridden declaration is here}}
+
+  @available(OSX 10.51, *)
+  var newProperty: A { get set } // expected-note {{overridden declaration is here}}
+
+  func method() // expected-note {{overridden declaration is here}}
+}
+
+protocol RefinesBaseProto_AsAvailableOverrides: BaseProto {
+  var property: A { get set }
+
+  @available(OSX 10.51, *)
+  var newProperty: A { get set }
+
+  func method()
+}
+
+protocol RefinesBaseProto_LessAvailableOverrides: BaseProto {
+  @available(OSX 10.52, *)
+  var property: A { get set } // expected-error {{overriding 'property' must be as available as declaration it overrides}}
+
+  @available(OSX 10.52, *)
+  var newProperty: A { get set } // expected-error {{overriding 'newProperty' must be as available as declaration it overrides}}
+
+  @available(OSX 10.52, *)
+  func method()  // expected-error {{overriding 'method' must be as available as declaration it overrides}}
+}
+
+@available(OSX 10.52, *)
+protocol RefinesBaseProto_LessAvailable: BaseProto {
+  var property: A { get set }
+  var newProperty: A { get set }
+  func method()
+}
+
 class ClassWithPotentiallyUnavailableOverloadedMethod {
   @available(OSX, introduced: 10.9)
   func overloadedMethod() {}

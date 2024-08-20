@@ -1774,9 +1774,9 @@ static bool isAvailabilitySafeForOverride(ValueDecl *override,
 
   // Allow overrides that are not as available as the base decl as long as the
   // override is as available as its context.
-  auto overrideTypeAvailability = AvailabilityInference::inferForType(
-      override->getDeclContext()->getSelfTypeInContext());
-  
+  auto overrideTypeAvailability = AvailabilityInference::availableRange(
+      override->getDeclContext()->getSelfNominalTypeDecl(), ctx);
+
   return overrideTypeAvailability.isContainedIn(overrideInfo);
 }
 
