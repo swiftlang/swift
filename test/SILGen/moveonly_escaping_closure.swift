@@ -431,14 +431,11 @@ func testGlobalClosureCaptureLet() {
 // CHECK: } // end sil function '$s16moveonly_closure026testLocalLetClosureCaptureE0yyFyycfU_'
 func testLocalLetClosureCaptureLet() {
     let x = SingleElt()
-    // expected-error @-1 {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
-    // expected-error @-2 {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
-    // expected-error @-3 {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
     let f = {
         borrowVal(x)
-        consumeVal(x) // expected-note {{consumed here}}
-        consumeVal(x) // expected-note {{consumed here}}
-        borrowConsumeVal(x, x) // expected-note {{consumed here}}
+        consumeVal(x) // expected-error{{'x' is borrowed by this closure, so it cannot be consumed here}}
+        consumeVal(x) // expected-error{{'x' is borrowed by this closure, so it cannot be consumed here}}
+        borrowConsumeVal(x, x) // expected-error{{'x' is borrowed by this closure, so it cannot be consumed here}}
     }
     f()
 }
@@ -1207,14 +1204,11 @@ func testGlobalClosureCaptureOwned(_ x: __owned SingleElt) {
 // CHECK:   apply {{%.*}}([[LOADED_READ]], [[LOADED_TAKE]])
 // CHECK: } // end sil function '$s16moveonly_closure31testLocalLetClosureCaptureOwnedyyAA9SingleEltVnFyycfU_'
 func testLocalLetClosureCaptureOwned(_ x: __owned SingleElt) {
-    // expected-error @-1 {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
-    // expected-error @-2 {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
-    // expected-error @-3 {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
     let f = {
         borrowVal(x)
-        consumeVal(x) // expected-note {{consumed here}}
-        consumeVal(x) // expected-note {{consumed here}}
-        borrowConsumeVal(x, x) // expected-note {{consumed here}}
+        consumeVal(x) // expected-error{{'x' is borrowed by this closure, so it cannot be consumed here}}
+        consumeVal(x) // expected-error{{'x' is borrowed by this closure, so it cannot be consumed here}}
+        borrowConsumeVal(x, x) // expected-error{{'x' is borrowed by this closure, so it cannot be consumed here}}
     }
     f()
 }
@@ -1381,8 +1375,17 @@ struct ClosureHolder {
     }
 }
 
-func closureCoroutineAssignmentLetBorrowingArgument(_ e: borrowing Empty) { // expected-error {{'e' cannot be captured by an escaping closure since it is a borrowed parameter}}
-    let f: () -> () = { // expected-note {{closure capturing 'e' here}}
+func closureCoroutineAssignmentLetBorrowingArgument(_ e: borrowing Empty) {
+    let f: () -> () = {
+        let _ = e // expected-error {{'e' is borrowed by this closure, so it cannot be consumed here}}
+    }
+    var c = ClosureHolder()
+    c.fCoroutine = f
+}
+
+/// FIXME: '_ = e' is not viewed as a consume in general, but it should be (rdar://109958008)
+func closureCoroutineIgnoredAssignmentLetBorrowingArgument(_ e: borrowing Empty) {
+    let f: () -> () = {
         _ = e
     }
     var c = ClosureHolder()
