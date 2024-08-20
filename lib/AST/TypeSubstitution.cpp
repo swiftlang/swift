@@ -1123,14 +1123,8 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
                                   bool isContextWholeModule) {
   TypeDecl *typeDecl = ty->getAnyNominal();
   if (!typeDecl) {
-    // The referenced type might be a different opaque result type.
-
-    // First, unwrap any nested associated types to get the root archetype.
-    if (auto nestedTy = ty->getAs<ArchetypeType>())
-      ty = nestedTy->getRoot();
-
-    // If the root archetype is an opaque result type, check that its
-    // descriptor is accessible.
+    // If the referenced type is a different opaque result type,
+    // check that its descriptor is accessible.
     if (auto opaqueTy = ty->getAs<OpaqueTypeArchetypeType>())
       typeDecl = opaqueTy->getDecl();
   }

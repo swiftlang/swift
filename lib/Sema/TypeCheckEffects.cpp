@@ -810,17 +810,17 @@ static Type typeEraseOpenedArchetypes(Type type) {
   if (!type || !type->hasOpenedExistential())
     return type;
 
-  const OpenedArchetypeType *root = nullptr;
+  GenericEnvironment *env = nullptr;
   type.visit([&](Type type) {
     if (auto opened = dyn_cast<OpenedArchetypeType>(type.getPointer())) {
-      root = opened->getRoot();
+      env = opened->getGenericEnvironment();
     }
   });
 
-  if (!root)
+  if (!env)
     return type;
 
-  return constraints::typeEraseOpenedArchetypesWithRoot(type, root);
+  return constraints::typeEraseOpenedArchetypesFromEnvironment(type, env);
 }
 
 /// A type expressing the result of classifying whether a call or function
