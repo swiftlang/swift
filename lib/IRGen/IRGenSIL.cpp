@@ -4265,7 +4265,7 @@ void IRGenSILFunction::visitUnreachableInst(swift::UnreachableInst *i) {
 }
 
 void IRGenFunction::emitCoroutineOrAsyncExit(bool isUnwind) {
-  // LLVM's retcon lowering is a bit imcompatible with Swift
+  // LLVM's retcon lowering is a bit incompatible with Swift
   // model. Essentially it assumes that unwind destination is kind of terminal -
   // it cannot return back to caller and must somehow terminate the process /
   // thread. Therefore we are always use normal LLVM coroutine termination.
@@ -5582,7 +5582,7 @@ static Address canForwardIndirectResultAlloca(const TypeInfo &TI,
                                               Explosion &argSrc,
                                               llvm::Instruction * &insertPt) {
   // Check that the store stores the result of and apply instruction immediately
-  // preceeding the store.
+  // preceding the store.
   auto *apply = dyn_cast<ApplyInst>(store->getSrc());
   auto *allocStack = dyn_cast<AllocStackInst>(store->getDest());
   if (!apply || !allocStack || apply->getParent() != store->getParent() ||
@@ -6333,7 +6333,7 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
   SmallVector<std::pair<SILType, llvm::Value *>, 4> TailArrays;
   buildTailArrays(*this, TailArrays, i);
 
-  llvm::Value *alloced = emitClassAllocation(*this, i->getType(), i->isObjC(), i->isBare(),
+  llvm::Value *allocated = emitClassAllocation(*this, i->getType(), i->isObjC(), i->isBare(),
                                              StackAllocSize, TailArrays);
   if (StackAllocSize >= 0) {
     // Remember that this alloc_ref allocates the object on the stack.
@@ -6342,7 +6342,7 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
     EstimatedStackSize += StackAllocSize;
   }
   Explosion e;
-  e.add(alloced);
+  e.add(allocated);
   setLoweredExplosion(i, e);
 }
 
@@ -6360,7 +6360,7 @@ void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
 
   Explosion metadata = getLoweredExplosion(i->getMetatypeOperand());
   auto metadataValue = metadata.claimNext();
-  llvm::Value *alloced = emitClassAllocationDynamic(*this, metadataValue,
+  llvm::Value *allocated = emitClassAllocationDynamic(*this, metadataValue,
                                                     i->getType(), i->isObjC(),
                                                     StackAllocSize,
                                                     TailArrays);
@@ -6372,7 +6372,7 @@ void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
   }
 
   Explosion e;
-  e.add(alloced);
+  e.add(allocated);
   setLoweredExplosion(i, e);
 }
 

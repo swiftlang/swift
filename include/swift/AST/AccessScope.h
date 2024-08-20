@@ -39,7 +39,7 @@ class AccessScope {
   ///  <FileUnit*, true>             Private            private
   ///
   /// For example, if a decl with `public` access level is referenced outside of
-  /// its defining module, it will be maped to the <nullptr, false> pair during
+  /// its defining module, it will be mapped to the <nullptr, false> pair during
   /// the access scope check. This pair is determined based on the decl's access
   /// level in  \c getAccessScopeForFormalAccess and passed to
   /// \c checkAccessUsingAccessScope which compares access scope of the

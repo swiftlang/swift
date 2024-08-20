@@ -211,7 +211,7 @@ extension DeclGroupSyntax {
     return standins
   }
   
-  func hasMemberFunction(equvalentTo other: FunctionDeclSyntax) -> Bool {
+  func hasMemberFunction(equivalentTo other: FunctionDeclSyntax) -> Bool {
     for member in memberBlock.members {
       if let function = member.decl.as(FunctionDeclSyntax.self) {
         if function.isEquivalent(to: other) {
@@ -245,7 +245,7 @@ extension DeclGroupSyntax {
   func addIfNeeded(_ decl: DeclSyntax?, to declarations: inout [DeclSyntax]) {
     guard let decl else { return }
     if let fn = decl.as(FunctionDeclSyntax.self) {
-      if !hasMemberFunction(equvalentTo: fn) {
+      if !hasMemberFunction(equivalentTo: fn) {
         declarations.append(decl)
       }
     } else if let property = decl.as(VariableDeclSyntax.self) {

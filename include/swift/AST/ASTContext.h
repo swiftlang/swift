@@ -849,7 +849,7 @@ public:
   AvailabilityContext getSwiftAvailability(unsigned major, unsigned minor) const;
 
   // For each feature defined in FeatureAvailability, define two functions;
-  // the latter, with the suffix RuntimeAvailabilty, is for use with
+  // the latter, with the suffix RuntimeAvailability, is for use with
   // AvailabilityContext::forRuntimeTarget(), and only looks at the Swift
   // runtime version.
 #define FEATURE(N, V)                                                       \

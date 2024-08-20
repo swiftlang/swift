@@ -31,7 +31,7 @@ static llvm::cl::list<ARCTransformKind> TransformsToPerform(
     llvm::cl::values(
         clEnumValN(ARCTransformKind::AllPeepholes,
                    "sil-semantic-arc-peepholes-all",
-                   "Perform All ARC canonicalizations and peepholes"),
+                   "Perform All ARC canonicalization and peepholes"),
         clEnumValN(ARCTransformKind::LoadCopyToLoadBorrowPeephole,
                    "sil-semantic-arc-peepholes-loadcopy-to-loadborrow",
                    "Perform the load [copy] to load_borrow peephole"),

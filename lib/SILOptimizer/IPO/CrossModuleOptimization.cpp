@@ -211,7 +211,7 @@ bool CrossModuleOptimization::isPackageOrPublic(AccessLevel accessLevel) {
 /// is otherwise illegal. It's also used to determine during SIL deserialization whether
 /// loadable types in a serialized function can be allowed in the client module that
 /// imports the module built with Package CMO. If the client contains a [serialized]
-/// function due to `@inlinable`, funtions with [serialized_for_package] from
+/// function due to `@inlinable`, functions with [serialized_for_package] from
 /// the imported module are not allowed being inlined into the client function, which
 /// is the correct behavior.
 bool CrossModuleOptimization::isSerializedWithRightKind(const SILModule &mod,
@@ -291,7 +291,7 @@ void CrossModuleOptimization::trySerializeFunctions(
 }
 
 void CrossModuleOptimization::serializeFunctionsInModule(SILPassManager *manager) {
-  // Reorder SIL funtions in the module bottom up so we can serialize
+  // Reorder SIL functions in the module bottom up so we can serialize
   // the most nested referenced functions first and avoid unnecessary
   // recursive checks.
   BasicCalleeAnalysis *BCA = manager->getAnalysis<BasicCalleeAnalysis>();
@@ -318,7 +318,7 @@ void CrossModuleOptimization::serializeWitnessTablesInModule() {
       // references. If they are serialized, they are set to
       // a shared linkage. If they can't be serialized, we set
       // the linkage to package so that the witness table itself
-      // can still be serialized, thus giving a chance for entires
+      // can still be serialized, thus giving a chance for entries
       // that _are_ serialized to be accessed directly.
       for (const SILWitnessTable::Entry &entry: unserializedWTMethodRange) {
         if (entry.getMethodWitness().Witness->getLinkage() == SILLinkage::Private)
@@ -835,7 +835,7 @@ void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
   // resulting in an internal type getting @usableFromInline, which is
   // incorrect.
   // For example, for `let q = P() as? Q`, where Q is an internal class
-  // inherting a public class P, Q is not visited in the canSerialize*
+  // inheriting a public class P, Q is not visited in the canSerialize*
   // checks, thus resulting in `@usableFromInline class Q`; this is not
   // the intended behavior in the conservative mode as it modifies AST.
   //

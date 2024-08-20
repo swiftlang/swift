@@ -223,7 +223,7 @@ public:
   const GeneratedSourceInfo *getGeneratedSourceInfo(unsigned bufferID) const;
 
   /// Retrieve the list of ancestors of the given source buffer, starting with
-  /// the root buffer and proceding to the given buffer ID at the end.
+  /// the root buffer and proceeding to the given buffer ID at the end.
   ///
   /// The scratch parameter will be used to avoid allocation in the case where
   /// the given buffer ID is the top-level buffer, in which case bufferID will
@@ -457,7 +457,7 @@ public:
   void verifyAllBuffers() const;
 
   /// Translate line and column pair to the offset.
-  /// If the column number is the maximum unsinged int, return the offset of the end of the line.
+  /// If the column number is the maximum unsigned int, return the offset of the end of the line.
   std::optional<unsigned> resolveFromLineCol(unsigned BufferId, unsigned Line,
                                              unsigned Col) const;
 

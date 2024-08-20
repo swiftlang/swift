@@ -1942,7 +1942,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     // explicit Swift module build tasks will not rely on them and they may be
     // source-target-context-specific and hinder module sharing across
     // compilation source targets.
-    // Clang module dependecies of this Swift dependency will be distinguished
+    // Clang module dependencies of this Swift dependency will be distinguished
     // by their context hash for different variants, so would still cause a
     // difference in the Swift compile commands, when different.
     inheritedParentContextClangArgs =

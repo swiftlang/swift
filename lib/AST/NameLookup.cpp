@@ -3616,7 +3616,7 @@ createOpaqueParameterGenericParams(GenericContext *genericContext, GenericParamL
     if (!typeRepr)
       continue;
 
-    // Plain protocols should imply 'some' with experimetal feature
+    // Plain protocols should imply 'some' with experimental feature
     CollectedOpaqueReprs typeReprs;
     typeReprs = collectOpaqueTypeReprs(typeRepr, ctx, dc);
 

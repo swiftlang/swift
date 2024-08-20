@@ -51,7 +51,7 @@ public:
 
   ClangSyntaxPrinter(raw_ostream &os) : os(os) {}
 
-  /// Print a given identifier. If the identifer conflicts with a keyword, add a
+  /// Print a given identifier. If the identifier conflicts with a keyword, add a
   /// trailing underscore.
   void printIdentifier(StringRef name) const;
 

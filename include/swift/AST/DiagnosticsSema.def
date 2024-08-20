@@ -4318,7 +4318,7 @@ ERROR(diff_params_clause_param_not_differentiable,none,
       "can only differentiate with respect to parameters that conform to "
       "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
 
-// completionHanderAsync attribute
+// completionHandlerAsync attribute
 WARNING(warn_use_async_alternative,none,
         "consider using asynchronous alternative function",())
 
@@ -7920,7 +7920,7 @@ ERROR(lifetime_dependence_only_on_function_method_init_result, none,
 ERROR(lifetime_dependence_invalid_type, none,
       "lifetime dependence can only be specified on ~Escapable types", ())
 ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
-      "cannot infer lifetime dependence %0, multiple parameters qualifiy as a candidate", (StringRef))
+      "cannot infer lifetime dependence %0, multiple parameters qualify as a candidate", (StringRef))
  ERROR(lifetime_dependence_cannot_infer_no_candidates, none,
        "cannot infer lifetime dependence%0, no parameters found that are either "
        "~Escapable or Escapable with a borrowing ownership", (StringRef))

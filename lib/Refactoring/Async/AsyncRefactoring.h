@@ -274,7 +274,7 @@ enum class ConditionType {
   IS_TRUE,         // if b
   IS_FALSE,        // if !b
   SUCCESS_PATTERN, // case .success
-  FAILURE_PATTEN   // case .failure
+  FAILURE_PATTERN  // case .failure
 };
 
 /// Indicates whether a condition describes a success or failure path. For
@@ -311,7 +311,7 @@ struct CallbackCondition {
   ///   - `let bind = try? <Subject>.get()`
   CallbackCondition(const Pattern *P, const Expr *Init);
 
-  /// Initializes a `CallbackCondtion` from a case statement inside a switch
+  /// Initializes a `CallbackCondition` from a case statement inside a switch
   /// on `Subject` with `Result` type, ie.
   /// ```
   /// switch <Subject> {
@@ -714,7 +714,7 @@ struct ClassifiedBlocks {
   ClassifiedBlock ErrorBlock;
 };
 
-/// Classifer of callback closure statements that that have either multiple
+/// Classifier of callback closure statements that that have either multiple
 /// non-Result parameters or a single Result parameter and return Void.
 ///
 /// It performs a (possibly incorrect) best effort and may give up in certain
@@ -834,7 +834,7 @@ public:
   /// references that we don't want to shadow with hoisted declarations.
   ///
   /// Also collect all declarations that are \c DeclContexts, which is an
-  /// over-appoximation but let's us ignore them elsewhere.
+  /// over-approximation but let's us ignore them elsewhere.
   static void collect(ASTNode Target, BraceStmt *Scope, SourceFile &SF,
                       llvm::DenseSet<const Decl *> &Decls);
 
@@ -953,7 +953,7 @@ class AsyncConverter : private SourceEntityWalker {
         : Names(), ContinuationName(ContinuationName) {}
 
     /// Whether this scope is wrapped in a \c withChecked(Throwing)Continuation.
-    bool isWrappedInContination() const { return !ContinuationName.empty(); }
+    bool isWrappedInContinuation() const { return !ContinuationName.empty(); }
   };
   SourceFile *SF;
   SourceManager &SM;
@@ -980,7 +980,7 @@ class AsyncConverter : private SourceEntityWalker {
   llvm::DenseSet<const Decl *> Placeholders;
 
   // Mapping from decl -> name, used as the name of possible new local
-  // declarations of old completion handler parametes, as well as the
+  // declarations of old completion handler parameters, as well as the
   // replacement for other hoisted declarations and their references
   llvm::DenseMap<const Decl *, Identifier> Names;
 
@@ -1116,14 +1116,14 @@ private:
   ///
   /// Wrapping a node in a continuation is necessary if the following conditions
   /// are satisfied:
-  ///  - It contains a reference to the \c TopHandler's completion hander,
+  ///  - It contains a reference to the \c TopHandler's completion handler,
   ///    because these completion handler calls need to be promoted to \c return
   ///    statements in the refactored method, but
   ///  - We cannot hoist the completion handler of \p Node, because it doesn't
   ///    have an async alternative by our heuristics (e.g. because of a
   ///    completion handler name mismatch or because it also returns a value
   ///    synchronously).
-  void wrapScopeInContinationIfNecessary(ASTNode Node);
+  void wrapScopeInContinuationIfNecessary(ASTNode Node);
 
   bool walkToPatternPre(Pattern *P) override;
 
@@ -1174,7 +1174,7 @@ private:
   /// depending on it.
   /// \p AddConvertedHandlerCall needs to add the converted version of the
   /// completion handler. Depending on the given \c HandlerResult, it must be
-  /// intepreted as a success or error call.
+  /// interpreted as a success or error call.
   /// \p AddConvertedErrorCall must add the converted equivalent of returning an
   /// error. The passed \c StringRef contains the name of a variable that is of
   /// type 'Error'.
@@ -1333,7 +1333,7 @@ private:
   void addDefaultValueOrPlaceholder(Type T);
 
   /// Adds the \c Index -th parameter to the completion handler described by \p
-  /// HanderDesc.
+  /// HandlerDesc.
   /// If \p ResultName is not empty, it is assumed that a variable with that
   /// name contains the result returned from the async alternative. If the
   /// callback also takes an error parameter, \c nil passed to the completion

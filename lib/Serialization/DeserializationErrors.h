@@ -630,7 +630,7 @@ public:
   }
 };
 
-// Decl was not deserialized because it's an internal detail maked as unsafe
+// Decl was not deserialized because it's an internal detail marked as unsafe
 // at serialization.
 class UnsafeDeserializationError : public llvm::ErrorInfo<UnsafeDeserializationError, DeclDeserializationError> {
   friend ErrorInfo;

@@ -405,7 +405,7 @@ private:
   std::vector<ResolvedCursorInfoPtr> getResult(ASTNode Node, DeclContext *DC,
                                                SourceFile *SrcFile,
                                                NodeFinder &Finder) const {
-    // Type check the statemnt containing E and listen for solutions.
+    // Type check the statement containing E and listen for solutions.
     CursorInfoTypeCheckSolutionCallback Callback(*DC, RequestedLoc);
     {
       llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(

@@ -205,7 +205,7 @@ bool OwnershipUseVisitor<Impl>::visitLifetimeEndingUses(SILValue ssaDef) {
   case OwnershipKind::Any:
   case OwnershipKind::None:
   case OwnershipKind::Unowned:
-    llvm_unreachable("requires an owned or guaranteed orignalDef");
+    llvm_unreachable("requires an owned or guaranteed originalDef");
   }
   return true;
 }
@@ -361,7 +361,7 @@ bool OwnershipUseVisitor<Impl>::visitInteriorUses(SILValue ssaDef) {
   case OwnershipKind::Any:
   case OwnershipKind::None:
   case OwnershipKind::Unowned:
-    llvm_unreachable("requires an owned or guaranteed orignalDef");
+    llvm_unreachable("requires an owned or guaranteed originalDef");
   }
 }
 

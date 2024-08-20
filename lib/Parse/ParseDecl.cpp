@@ -2540,7 +2540,7 @@ Parser::parseMacroRoleAttribute(
     return makeParserError();
   }
 
-  // Parse the argments.
+  // Parse the arguments.
   SourceLoc lParenLoc = consumeAttributeLParen();
   SourceLoc rParenLoc;
   std::optional<MacroRole> role;
@@ -2572,7 +2572,7 @@ Parser::parseMacroRoleAttribute(
           }
         }
 
-        // Parse the argment label, if there is one.
+        // Parse the argument label, if there is one.
         Identifier fieldName;
         SourceLoc fieldNameLoc;
         parseOptionalArgumentLabel(fieldName, fieldNameLoc);
@@ -2651,7 +2651,7 @@ Parser::parseMacroRoleAttribute(
           return status;
         }
 
-        // If the field name is empty and we haved seen "names", or the field
+        // If the field name is empty and we have seen "names", or the field
         // name is "names" but we've already seen the argument label, complain.
         if (fieldName.empty() != sawNames) {
           diagnose(fieldNameLoc.isValid() ? fieldNameLoc : Tok.getLoc(),

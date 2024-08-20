@@ -194,7 +194,7 @@ bool replayCachedCompilerOutputs(
             ObjFile = OutputPath->second;
 
           if (Kind == file_types::ID::TY_CachedDiagnostics) {
-            assert(!DiagnosticsOutput && "more than 1 diagnotics found");
+            assert(!DiagnosticsOutput && "more than 1 diagnostics found");
             DiagnosticsOutput = OutputEntry{OutputPath->second, OutID, *Proxy};
           } else
             OutputProxies.emplace_back(

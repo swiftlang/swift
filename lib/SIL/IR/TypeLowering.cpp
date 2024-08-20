@@ -3051,7 +3051,7 @@ void TypeConverter::verifyLexicalLowering(const TypeLowering &lowering,
           if (tyLowering.isTrivial())
             return true;
 
-          // We're visiting a non-trival leaf of a type whose lowering is
+          // We're visiting a non-trivial leaf of a type whose lowering is
           // not lexical.  The leaf must be annotated @_eagerMove.
           // Otherwise, the whole type would be lexical.
 
@@ -4631,7 +4631,7 @@ TypeConverter::checkForABIDifferences(SILModule &M,
       // Async/synchronous conversions always need a thunk.
       if (fnTy1->isAsync() != fnTy2->isAsync())
         return ABIDifference::NeedsThunk;
-      // Usin an async function without an error result in place of an async
+      // Using an async function without an error result in place of an async
       // function that needs an error result is not ABI compatible.
       if (fnTy2->isAsync() && !fnTy1->hasErrorResult() &&
           fnTy2->hasErrorResult())

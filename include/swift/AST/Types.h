@@ -6118,7 +6118,7 @@ public:
   /// given set of members.
   ///
   /// This presents a syntactic view of the world, where an empty composition
-  /// has implicit Copyable and Escapable members, unless they are supressed
+  /// has implicit Copyable and Escapable members, unless they are suppressed
   /// with the Inverses field.
   ///
   /// The list of members consists of zero or more ProtocolType,

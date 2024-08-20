@@ -46,7 +46,7 @@ class OSSALifetimeCompletion {
 
   DeadEndBlocks &deadEndBlocks;
 
-  // Cache intructions already handled by the recursive algorithm to avoid
+  // Cache instructions already handled by the recursive algorithm to avoid
   // recomputing their lifetimes.
   ValueSet completedValues;
 
@@ -88,7 +88,7 @@ public:
   /// values or borrow introducers.
   ///
   /// Currently \p boundary == {Boundary::Availability} is used by Mem2Reg and
-  /// TempRValueOpt and PredicatbleMemOpt to complete lexical enum values on
+  /// TempRValueOpt and PredictableMemOpt to complete lexical enum values on
   /// trivial paths.
   ///
   /// Returns true if any new instructions were created to complete the

@@ -102,7 +102,7 @@ private:
   /// whether this changed the exit partition.
   ///
   /// NOTE: This method ignored errors that arise. We process separately later
-  /// to discover if an error occured.
+  /// to discover if an error occurred.
   bool recomputeExitFromEntry(PartitionOpTranslator &translator);
 };
 
@@ -302,7 +302,7 @@ private:
 public:
   RegionAnalysisValueMap(SILFunction *fn) : fn(fn) { }
 
-  /// Returns the value for this instruction if it isn't a fake "represenative
+  /// Returns the value for this instruction if it isn't a fake "representative
   /// value" to inject actor isolatedness. Asserts in such a case.
   SILValue getRepresentative(Element trackableValueID) const;
 

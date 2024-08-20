@@ -1129,7 +1129,7 @@ static ValueDecl *findImplementedObjCDecl(ValueDecl *VD) {
   return VD;
 }
 
-static void collectNonOveriddenSuperclassInits(
+static void collectNonOverriddenSuperclassInits(
     ClassDecl *subclass, SmallVectorImpl<ConstructorDecl *> &results) {
   auto *superclassDecl = subclass->getSuperclassDecl();
   assert(superclassDecl);
@@ -1218,7 +1218,7 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
       !defaultInitable && !foundDesignatedInit;
 
   SmallVector<ConstructorDecl *, 4> nonOverriddenSuperclassCtors;
-  collectNonOveriddenSuperclassInits(decl, nonOverriddenSuperclassCtors);
+  collectNonOverriddenSuperclassInits(decl, nonOverriddenSuperclassCtors);
 
   bool inheritDesignatedInits = canInheritDesignatedInits(ctx.evaluator, decl);
   for (auto *superclassCtor : nonOverriddenSuperclassCtors) {
@@ -1320,7 +1320,7 @@ InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
   // Otherwise we need to check whether the user has overridden all of the
   // superclass' designed inits.
   SmallVector<ConstructorDecl *, 4> nonOverriddenSuperclassCtors;
-  collectNonOveriddenSuperclassInits(decl, nonOverriddenSuperclassCtors);
+  collectNonOverriddenSuperclassInits(decl, nonOverriddenSuperclassCtors);
 
   auto allDesignatedInitsOverridden =
       llvm::none_of(nonOverriddenSuperclassCtors, [](ConstructorDecl *ctor) {

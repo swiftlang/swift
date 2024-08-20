@@ -955,7 +955,7 @@ public:
   void getLiveLeafTypes(llvm::SmallVectorImpl<SILType> &OutArray) const {
     for (unsigned LeafIndex : LiveLeafIndices) {
       const ProjectionTreeNode *Node = getNode(LeafIndex);
-      assert(Node->IsLive && "We are only interested in leafs that are live");
+      assert(Node->IsLive && "We are only interested in leaves that are live");
       OutArray.push_back(Node->getType());
     }
   }
@@ -964,20 +964,20 @@ public:
       llvm::SmallVectorImpl<const ProjectionTreeNode *> &Out) const {
     for (unsigned LeafIndex : LiveLeafIndices) {
       const ProjectionTreeNode *Node = getNode(LeafIndex);
-      assert(Node->IsLive && "We are only interested in leafs that are live");
+      assert(Node->IsLive && "We are only interested in leaves that are live");
       Out.push_back(Node);
     }
   }
 
-  /// Return the number of live leafs in the projection.
+  /// Return the number of live leaves in the projection.
   unsigned getLiveLeafCount() const { return LiveLeafIndices.size(); }
 
   void createTreeFromValue(SILBuilder &B, SILLocation Loc, SILValue NewBase,
-                           llvm::SmallVectorImpl<SILValue> &Leafs) const;
+                           llvm::SmallVectorImpl<SILValue> &Leaves) const;
 
   void
   replaceValueUsesWithLeafUses(SILBuilder &B, SILLocation Loc,
-                               llvm::SmallVectorImpl<SILValue> &Leafs);
+                               llvm::SmallVectorImpl<SILValue> &Leaves);
 
   void getUsers(SmallPtrSetImpl<SILInstruction *> &users) const;
 

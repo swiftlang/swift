@@ -539,7 +539,7 @@ static void updateProtocolRefs(IRGenModule &IGM,
       static_cast<ClangImporter *>(astContext.getClangModuleLoader());
   assert(clangImporter && "Must have a clang importer");
 
-  // Get the array containining the protocol refs.
+  // Get the array containing the protocol refs.
   unsigned protocolRefsSize = getProtocolRefsList(protocol).first;
   unsigned currentIdx = 0;
   auto inheritedObjCProtocols = getRuntimeProtocolList(objcProtocol->protocols());

@@ -171,7 +171,7 @@ enum SerializedKind_t : uint8_t {
   /// It's also used to determine during SIL deserialization whether loadable
   /// types in a serialized function can be allowed in the client module that
   /// imports the module built with Package CMO. If the client contains a [serialized]
-  /// function due to `@inlinable`, funtions with [serialized_for_package] from
+  /// function due to `@inlinable`, functions with [serialized_for_package] from
   /// the imported module are not allowed being inlined into the client function,
   /// which is the correct behavior.
   IsSerializedForPackage
@@ -306,7 +306,7 @@ inline bool hasPublicVisibility(SILLinkage linkage) {
 
 /// Opt in package linkage for visibility in case Package CMO is enabled.
 /// Used in SIL verification and other checks that determine inlinability to
-/// accomodate for the optimization.
+/// accommodate for the optimization.
 inline bool hasPublicOrPackageVisibility(SILLinkage linkage, bool includePackage) {
     switch (linkage) {
     case SILLinkage::Public:

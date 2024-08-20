@@ -517,7 +517,7 @@ matchWitnessStructureImpl(ValueDecl *req, ValueDecl *witness,
     //    and the payload types and labels match the function and the
     //    function returns `Self` or the type of the enum.
     //
-    // If there are any discrepencies, we'll diagnose it later. For now,
+    // If there are any discrepancies, we'll diagnose it later. For now,
     // let's assume the match is valid.
     if (!((isa<VarDecl>(req) || isa<FuncDecl>(req)) &&
           isa<EnumElementDecl>(witness)))
@@ -3803,7 +3803,7 @@ hasSatisfiedObjCSiblingRequirement(ProtocolDecl *proto,
                    ValueWitnessRequest{conformance, candidate}))
               return false;
 
-            // Otherwise, resolve the sibling cadidate; if its valid, don't
+            // Otherwise, resolve the sibling candidate; if its valid, don't
             // record a missing witness.
             return static_cast<bool>(conformance->getWitness(candidate));
           })) {

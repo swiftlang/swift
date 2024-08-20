@@ -32,7 +32,7 @@ private:
 public:
   /// Create a DiagnosticHelper class to emit diagnostics from frontend actions.
   /// OS is the stream to print diagnostics. useQuasiPID determines if using
-  /// real PID when priting parseable output.
+  /// real PID when printing parseable output.
   static DiagnosticHelper create(CompilerInstance &instance,
                                  llvm::raw_pwrite_stream &OS = llvm::errs(),
                                  bool useQuasiPID = false);

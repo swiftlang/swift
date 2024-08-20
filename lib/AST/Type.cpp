@@ -3681,9 +3681,9 @@ UUID ElementArchetypeType::getOpenedElementID() const {
 
 CanExistentialType CanExistentialType::get(CanType constraint) {
   assert(!(constraint->isAny() || constraint->isAnyObject()) &&
-         "Any(Object) may not apppear as canonical constraint type");
+         "Any(Object) may not appear as canonical constraint type");
   assert(!constraint->is<ExistentialMetatypeType>() &&
-         "Existential metatype may not apppear as canonical constraint type");
+         "Existential metatype may not appear as canonical constraint type");
   return CanExistentialType(
       ExistentialType::get(constraint)->castTo<ExistentialType>());
 }

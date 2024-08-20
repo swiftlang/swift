@@ -31,7 +31,7 @@
 //         - There are no forEach calls on the array.
 //         - The array is too large to unroll forEach calls. This check uses
 //            SILModule::UnrollThreshold parameter.
-//    If none of the above conditions hold, procede to unrolling every forEach
+//    If none of the above conditions hold, proceed to unrolling every forEach
 //    call on the array (Step 3). Step 2 is implemented in the function:
 //    `tryUnrollForEachCallsOverArrayLiteral`.
 //

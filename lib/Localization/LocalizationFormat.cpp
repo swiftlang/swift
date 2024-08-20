@@ -270,7 +270,7 @@ void StringsLocalizationProducer::readStringsFile(
           continue;
         }
 
-        // Leading `"` has been comsumed.
+        // Leading `"` has been consumed.
         assert(i > 0);
 
         // Let's check whether this `"` is escaped, and if so - continue

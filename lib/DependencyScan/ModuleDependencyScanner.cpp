@@ -109,7 +109,7 @@ diagnoseScannerFailure(const ScannerImportStatementInfo &moduleImport,
   if (dependencyOf.has_value()) {
     auto path = findPathToDependency(dependencyOf.value(), cache);
     // We may fail to construct a path in some cases, such as a Swift overlay of
-    // a Clang module dependnecy.
+    // a Clang module dependency.
     if (path.empty())
       path = {dependencyOf.value()};
 
@@ -629,7 +629,7 @@ void ModuleDependencyScanner::resolveImportDependencies(
   };
 
   // ACTDOO: Import refactor
-  // Enque asynchronous lookup tasks
+  // Enqueue asynchronous lookup tasks
   for (const auto &dependsOn : moduleDependencyInfo->getModuleImports()) {
     bool underlyingClangModuleLookup = moduleID.ModuleName == dependsOn.importIdentifier;
     bool isTestable = moduleDependencyInfo->isTestableImport(dependsOn.importIdentifier);
@@ -701,7 +701,7 @@ void ModuleDependencyScanner::resolveImportDependencies(
   // `<some_framework_search_path>/Foo.framework/Modules/module.modulemap`.
   // Which means that lookup of `Bar` alone from Swift will not be able to
   // locate the module in it. However, the lookup of Foo will itself bring in
-  // the auxiliary module becuase the Clang scanner instance scanning for clang
+  // the auxiliary module because the Clang scanner instance scanning for clang
   // module Foo will be able to find it in the corresponding framework module's
   // modulemap and register it as a dependency which means it will be registered
   // with the scanner's cache in the step above. To handle such cases, we
@@ -792,7 +792,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependencies(
     swiftOverlayLookupResult.insert_or_assign(moduleName, moduleDependencies);
   };
 
-  // Enque asynchronous lookup tasks
+  // Enqueue asynchronous lookup tasks
   for (const auto &clangDep : clangDependencies)
     ScanningThreadPool.async(scanForSwiftDependency, getModuleImportIdentifier(clangDep));
   ScanningThreadPool.wait();

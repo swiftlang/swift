@@ -38,7 +38,7 @@ class PostfixCompletionCallback : public TypeCheckCompletionCallback {
 
     /// If the expression we are completing on statically refers to a metatype,
     /// that is if it's something like 'MyType'. In such cases we want to offer
-    /// constructor call pattern completions and don't want to suggeste
+    /// constructor call pattern completions and don't want to suggest
     /// operators that work on metatypes.
     bool BaseIsStaticMetaType;
 
@@ -53,7 +53,7 @@ class PostfixCompletionCallback : public TypeCheckCompletionCallback {
     /// If the code completion expression occurs as e.g a single statement in a
     /// single-expression closure, where the return is implied. In such cases
     /// we don't want to disfavor results that produce 'Void' because the user
-    /// might intend to make the closure a multi-statment closure, in which case
+    /// might intend to make the closure a multi-statement closure, in which case
     /// this expression is no longer implicitly returned.
     bool IsImpliedResult;
 
@@ -90,7 +90,7 @@ public:
   /// \c sawSolution for each solution formed.
   void fallbackTypeCheck(DeclContext *DC) override;
 
-  /// Deliver code completion results that were discoverd by \c sawSolution to
+  /// Deliver code completion results that were discovered by \c sawSolution to
   /// \p Consumer.
   /// \param DotLoc If we are completing after a dot, the location of the dot,
   ///               otherwise an invalid SourceLoc.

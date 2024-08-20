@@ -4555,7 +4555,7 @@ ValueDecl::getFormalAccessScope(const DeclContext *useDC,
 /// to get the access scope of`Foo` returns a public scope based on its `public`
 /// access level, which is a wrapper around a nullptr DeclContext. Note that the
 /// useDC is still non-null (FileUnit) even though the use site itself also has
-/// a `public` acess level.
+/// a `public` access level.
 ///
 /// The `isChildOf` call compares the DeclContext hierarchy of the use site
 /// (useDC) and the decl (VD) site, and returns true in this case, since
@@ -4564,7 +4564,7 @@ ValueDecl::getFormalAccessScope(const DeclContext *useDC,
 /// ModuleDecl are constructed. For example, a top ClassDecl ctor takes FileUnit
 /// as its parent DeclContext and FileUnit ctor takes ModuleDecl as its parent
 /// DeclContext. There's an exception, however, for the case of PackageUnit.
-/// \see PackageUnit for details on how the hierachy between that and ModuleDecl
+/// \see PackageUnit for details on how the hierarchy between that and ModuleDecl
 ///      is created.
 /// \see DeclContext::ASTHierarchy
 /// \see AccessScope::getAccessScopeForFormalAccess

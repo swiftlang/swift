@@ -1096,8 +1096,8 @@ void Serializer::writeHeader() {
       }
 
       if (M->allowNonResilientAccess()) {
-        options_block::AllowNonResilientAccess AllowNonResAcess(Out);
-        AllowNonResAcess.emit(ScratchRecord);
+        options_block::AllowNonResilientAccess AllowNonResAccess(Out);
+        AllowNonResAccess.emit(ScratchRecord);
       }
 
       if (M->serializePackageEnabled()) {

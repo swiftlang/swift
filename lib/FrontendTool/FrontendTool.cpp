@@ -366,7 +366,7 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
 
   // If an explicit interface build was requested, bypass the creation of a new
   // sub-instance from the interface which will build it in a separate thread,
-  // and isntead directly use the current \c Instance for compilation.
+  // and instead directly use the current \c Instance for compilation.
   //
   // FIXME: -typecheck-module-from-interface is the exception here because
   // currently we need to ensure it still reads the flags written out
@@ -2055,7 +2055,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   CompilerInstance::HashingBackendPtrTy HashBackend = nullptr;
   if (Invocation.getFrontendOptions().DeterministicCheck) {
-    // Setup a verfication instance to run.
+    // Setup a verification instance to run.
     std::unique_ptr<CompilerInstance> VerifyInstance =
         std::make_unique<CompilerInstance>();
     std::string InstanceSetupError;

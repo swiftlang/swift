@@ -39,7 +39,7 @@ private:
 
   InterfaceSubContextDelegate &astDelegate;
 
-  /// Location where pre-built moduels are to be built into.
+  /// Location where pre-built modules are to be built into.
   std::string moduleOutputPath;
 
 public:

@@ -38,7 +38,7 @@ namespace irgen {
 
 enum class LayoutStringFlags : uint64_t {
   Empty = 0,
-  // TODO: Track other useful information tha can be used to optimize layout
+  // TODO: Track other useful information that can be used to optimize layout
   //       strings, like different reference kinds contained in the string
   //       number of ref counting operations (maybe up to 4), so we can
   //       use witness functions optimized for these cases.

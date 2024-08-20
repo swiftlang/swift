@@ -741,7 +741,7 @@ swiftscan_cache_replay_instance_create(int argc, const char **argv,
 SWIFTSCAN_PUBLIC void
     swiftscan_cache_replay_instance_dispose(swiftscan_cache_replay_instance_t);
 
-/// Replay the cached compilation using cached compliation replay instance.
+/// Replay the cached compilation using cached compilation replay instance.
 /// Returns replay result or nullptr if output not found or error occurs. If
 /// error, the error message is returned via \c error parameter and its caller
 /// needs to free the message using `swiftscan_string_dispose`.

@@ -174,7 +174,7 @@ static SourceLoc getLocForPresentation(SILLocation loc,
   llvm_unreachable("covered switch");
 }
 
-static bool instHasInferrableLoc(SILInstruction &inst) {
+static bool instHasInferableLoc(SILInstruction &inst) {
   if (isa<DeallocStackInst>(inst) || isa<StrongRetainInst>(inst) ||
       isa<StrongReleaseInst>(inst) || isa<RetainValueInst>(inst) ||
       isa<ReleaseValueInst>(inst) || isa<EndAccessInst>(inst))
@@ -195,7 +195,7 @@ inferOptRemarkSearchForwards(SILInstruction &i,
                              SourceLocPresentationKind presentationKind) {
   for (auto &inst :
        llvm::make_range(std::next(i.getIterator()), i.getParent()->end())) {
-    if (!instHasInferrableLoc(inst))
+    if (!instHasInferableLoc(inst))
       continue;
     // Skip instructions without a loc we care about since we move it around.
     auto newLoc = getLocForPresentation(inst.getLoc(), presentationKind);
@@ -219,7 +219,7 @@ inferOptRemarkSearchBackwards(SILInstruction &i,
                               SourceLocPresentationKind presentationKind) {
   for (auto &inst : llvm::make_range(std::next(i.getReverseIterator()),
                                      i.getParent()->rend())) {
-    if (!instHasInferrableLoc(inst))
+    if (!instHasInferableLoc(inst))
       continue;
     auto loc = inst.getLoc();
     if (auto inlinedLoc = inst.getDebugScope()->getOutermostInlineLocation())

@@ -352,7 +352,7 @@ extension BridgedDiagnosticSeverity {
   }
 }
 
-/// Register a source file wih the queued diagnostics.
+/// Register a source file with the queued diagnostics.
 @_cdecl("swift_ASTGen_addQueuedSourceFile")
 public func addQueuedSourceFile(
   queuedDiagnosticsPtr: UnsafeMutableRawPointer,

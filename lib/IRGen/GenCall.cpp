@@ -757,7 +757,7 @@ void SignatureExpansion::expandCoroutineResult(bool forContinuation) {
     case SILCoroutineKind::None:
       llvm_unreachable("should have been filtered out before here");
 
-    // Yield-once coroutines may optionaly return a value from the continuation.
+    // Yield-once coroutines may optionally return a value from the continuation.
     case SILCoroutineKind::YieldOnce: {
       // Ensure that no parameters were added before to correctly record their ABI
       // details.
@@ -4424,7 +4424,7 @@ void CallEmission::externalizeArguments(IRGenFunction &IGF, const Callee &callee
       Address forwardFromAddr = getForwardableAlloca(ti, isForwardableArgument,
                                                      in);
       // Try to forward the address from a `load` instruction "immediately"
-      // preceeding the apply.
+      // preceding the apply.
       if (isForwardableArgument && forwardFromAddr.isValid()) {
         ti.initializeWithTake(IGF, addr, forwardFromAddr,
                               paramType.getAddressType(), isOutlined,

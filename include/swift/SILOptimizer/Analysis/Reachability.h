@@ -339,7 +339,7 @@ public:
 
   /// Step 4 (Optional): Visit each barrier instruction, phi, and block.
   ///
-  /// Effects are requeried.
+  /// Effects are required.
   ///
   /// A barrier block here means the target block of a barrier edge.
   ///

@@ -58,18 +58,18 @@ void BasicCalleeAnalysis::print(llvm::raw_ostream &os) const {
 //===----------------------------------------------------------------------===//
 
 static BridgedCalleeAnalysis::IsDeinitBarrierFn instructionIsDeinitBarrierFunction;
-static BridgedCalleeAnalysis::GetMemBehvaiorFn getMemBehvaiorFunction = nullptr;
+static BridgedCalleeAnalysis::GetMemBehaviorFn getMemBehaviorFunction = nullptr;
 
 void BridgedCalleeAnalysis::registerAnalysis(IsDeinitBarrierFn instructionIsDeinitBarrierFn,
-                                             GetMemBehvaiorFn getMemBehvaiorFn) {
+                                             GetMemBehaviorFn getMemBehaviorFn) {
   instructionIsDeinitBarrierFunction = instructionIsDeinitBarrierFn;
-  getMemBehvaiorFunction = getMemBehvaiorFn;
+  getMemBehaviorFunction = getMemBehaviorFn;
 }
 
 MemoryBehavior BasicCalleeAnalysis::
 getMemoryBehavior(FullApplySite as, bool observeRetains) {
-  if (getMemBehvaiorFunction) {
-    auto b = getMemBehvaiorFunction({as.getInstruction()->asSILNode()},
+  if (getMemBehaviorFunction) {
+    auto b = getMemBehaviorFunction({as.getInstruction()->asSILNode()},
                                     observeRetains,
                                     {this});
     return (MemoryBehavior)b;

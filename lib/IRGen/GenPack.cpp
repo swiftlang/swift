@@ -841,7 +841,7 @@ llvm::Value *irgen::emitTypeMetadataPackElementRef(
   //      ----%inner---> ^^^
   //
   // In fact, we won't ever materialize %outer into any register.  Instead, we
-  // can just brach to materializing the metadata (and witness tables) once
+  // can just branch to materializing the metadata (and witness tables) once
   // we've determined which outer element's range contains %index.
   //
   // As for %inner, it will only be materialized in those blocks corresponding
@@ -910,7 +910,7 @@ llvm::Value *irgen::emitTypeMetadataPackElementRef(
   }
 
   IGF.Builder.SetInsertPoint(current);
-  // The previous checkBounds' block's comparision of %index.  Use it to emit a
+  // The previous checkBounds' block's comparison of %index.  Use it to emit a
   // branch to the current block or the previous block's metadata/wtable
   // emission block.
   llvm::Value *previousCondition = nullptr;
@@ -1311,7 +1311,7 @@ irgen::emitDynamicTupleTypeLabels(IRGenFunction &IGF, CanTupleType type,
       // The number of bytes to copy; add one for the space at the end.
       length = elt.getName().getLength() + 1;
 
-      // Desposit the label for this element in the dynamic label string.
+      // Deposit the label for this element in the dynamic label string.
       IGF.Builder.CreateMemCpy(eltAddr, srcAddr, Size(length));
 
       sawLabel = true;

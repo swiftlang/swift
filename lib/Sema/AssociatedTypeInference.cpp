@@ -1307,7 +1307,7 @@ public:
     if (witness->hasInterfaceType())
       return false;
 
-    // We call checkForPotentailCycle() multiple times with
+    // We call checkForPotentialCycle() multiple times with
     // different witnesses.
     found = false;
     this->witness = witness;

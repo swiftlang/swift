@@ -597,7 +597,7 @@ static bool isCheckExpectedExecutorIntrinsicAvailable(SILGenModule &SGM) {
   if (!checkExecutor)
     return false;
 
-  // Forego a check if instrinsic is unavailable, this could happen
+  // Forego a check if intrinsic is unavailable, this could happen
   // in main-actor context.
   auto &C = checkExecutor->getASTContext();
   if (!C.LangOpts.DisableAvailabilityChecking) {

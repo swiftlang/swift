@@ -231,7 +231,7 @@ public:
 
   /// Update this liveness result for a single use.
   ///
-  /// \p isUseBeforeDef is true if \p user occures before the first def in this
+  /// \p isUseBeforeDef is true if \p user occurs before the first def in this
   /// block. This indicates "liveness holes" inside the block, causing liveness
   /// to propagate to predecessors.
   IsLive updateForUse(SILInstruction *user, bool isUseBeforeDef) {
@@ -775,7 +775,7 @@ public:
   /// then the resulting liveness does not includes potentially non-dominated
   /// uses within the reborrow scope. If the summary returns something other
   /// than AddressUseKind::NonEscaping, then the resulting liveness does not
-  /// necessarilly encapsulate value ownership.
+  /// necessarily encapsulate value ownership.
   ///
   /// Warning: If OSSA lifetimes are incomplete, then destroy_values might not
   /// jointly-post dominate if dead-end blocks are present. Nested scopes may
@@ -865,7 +865,7 @@ public:
   /// then the resulting liveness does not includes potentially non-dominated
   /// uses within the reborrow scope. If the summary returns something other
   /// than AddressUseKind::NonEscaping, then the resulting liveness does not
-  /// necessarilly encapsulate value ownership.
+  /// necessarily encapsulate value ownership.
   ///
   /// Warning: If OSSA lifetimes are incomplete, then destroy_values might not
   /// jointly-post dominate if dead-end blocks are present. Nested scopes may

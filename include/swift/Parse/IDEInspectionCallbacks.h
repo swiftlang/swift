@@ -31,7 +31,7 @@ enum class ObjCSelectorContext {
 
 /// Attributes that have syntax which can't be modelled using a function call.
 /// This can't be \c DeclAttrKind because '@freestandig' and '@attached' have
-/// the same attribute kind but take different macro roles as arguemnts.
+/// the same attribute kind but take different macro roles as arguments.
 enum class CustomSyntaxAttributeKind {
   Available,
   FreestandingMacro,

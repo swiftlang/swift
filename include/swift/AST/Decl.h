@@ -1284,7 +1284,7 @@ public:
   llvm::TinyPtrVector<Decl *> getAllImplementedObjCDecls() const;
 
   /// If this is the ObjC interface of a declaration implemented in Swift,
-  /// returns the implementating declaration. Otherwise return \c nullptr.
+  /// returns the implementing declaration. Otherwise return \c nullptr.
   ///
   /// \seeAlso ExtensionDecl::isObjCInterface()
   Decl *getObjCImplementationDecl() const;
@@ -1402,7 +1402,7 @@ public:
   std::optional<std::pair<const AvailableAttr *, const Decl *>>
   getSemanticUnavailableAttr(bool ignoreAppExtensions = false) const;
 
-  /// Returns true if code associated with this declaration should be considerd
+  /// Returns true if code associated with this declaration should be considered
   /// unreachable at runtime because the declaration is unavailable in all
   /// execution contexts in which the code may run.
   bool isUnreachableAtRuntime() const;
@@ -5721,11 +5721,11 @@ enum class StorageMutability {
   /// to nor passed inout.
   Immutable,
 
-  /// The storage is mutable, meaning that it can be assigned and pased
+  /// The storage is mutable, meaning that it can be assigned and passed
   /// inout.
   Mutable,
 
-  /// The storage is immutable, but can be asigned for the purposes of
+  /// The storage is immutable, but can be assigned for the purposes of
   /// initialization.
   Initializable
 };

@@ -84,7 +84,7 @@ Type CompletionOverrideLookup::getOpaqueResultType(
   auto genericSig = VD->getDeclContext()->getGenericSignatureOfContext();
 
   if (genericSig->isConcreteType(ResultT))
-    // If it has same type requrement, we will emit the concrete type.
+    // If it has same type requirement, we will emit the concrete type.
     return nullptr;
 
   auto upperBound = genericSig->getUpperBound(

@@ -6790,7 +6790,7 @@ bool ConstraintSystem::repairFailures(
     std::tie(toObjectType, toUnwraps) = getObjectTypeAndNumUnwraps(rhs);
 
     // If the bound contextual type is more optional than the binding type, then
-    // propogate binding type to contextual type and attempt to solve.
+    // propagate binding type to contextual type and attempt to solve.
     if (fromUnwraps < toUnwraps) {
       (void)matchTypes(fromObjectType, toObjectType, ConstraintKind::Bind,
                        TMF_ApplyingFix, locator);
@@ -6828,7 +6828,7 @@ bool ConstraintSystem::repairFailures(
     break;
   }
   case ConstraintLocator::GlobalActorType: {
-    // Drop global actor element as it servers only to indentify the global
+    // Drop global actor element as it servers only to identify the global
     // actor matching.
     path.pop_back();
 
@@ -7186,12 +7186,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // match `$T3` and propagate `Pack{Int}` to `$T2`.
   //
   // This is also important for situations like: `$T2 conv (Int, $T_exp)`
-  // becuase expansion could be defaulted to an empty pack which means
+  // because expansion could be defaulted to an empty pack which means
   // that under substitution that element would disappear and the type
   // would be just `(Int)`.
   //
   // Notable exception here is `Any` which doesn't require wrapping and
-  // would be handled by existental promotion in cases where it's allowed.
+  // would be handled by existential promotion in cases where it's allowed.
   if (isTupleWithUnresolvedPackExpansion(origType1) ||
       isTupleWithUnresolvedPackExpansion(origType2)) {
     if (desugar1->is<TupleType>() != desugar2->is<TupleType>() &&
@@ -7502,7 +7502,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
 
     case TypeKind::DynamicSelf:
-      // FIXME: Deep equality? What is the rule between two DynamicSelfs?
+      // FIXME: Deep equality? What is the rule between two DynamicSelf?
       break;
        
     case TypeKind::Protocol:
@@ -8765,7 +8765,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       path.pop_back();
 
     // This is similar to `PackElement` but locator points to the requirement
-    // associted with pack expansion pattern (i.e. `repeat each T: P`) where
+    // associated with pack expansion pattern (i.e. `repeat each T: P`) where
     // the path is something like:
     // `... -> type req # -> pack expansion pattern`.
     if (path.back().is<LocatorPathElt::PackExpansionPattern>())
@@ -10917,7 +10917,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       auto *baseExpr = memberRef->getBase();
       // Handle `makeIterator` reference.
       if (getContextualTypePurpose(baseExpr) == CTP_ForEachSequence &&
-          isRefTo(memberRef, ctx.Id_makeIterator, /*lables=*/{})) {
+          isRefTo(memberRef, ctx.Id_makeIterator, /*labels=*/{})) {
         auto *sequenceProto = cast<ProtocolDecl>(
             getContextualType(baseExpr, /*forConstraint=*/false)
                 ->getAnyNominal());
@@ -13912,11 +13912,11 @@ ConstraintSystem::simplifyMaterializePackExpansionConstraint(
   auto formUnsolved = [&]() {
     // If we're supposed to generate constraints, do so.
     if (flags.contains(TMF_GenerateConstraints)) {
-      auto *explictGenericArgs =
+      auto *explicitGenericArgs =
           Constraint::create(*this, ConstraintKind::MaterializePackExpansion,
                              type1, type2, getConstraintLocator(locator));
 
-      addUnsolvedConstraint(explictGenericArgs);
+      addUnsolvedConstraint(explicitGenericArgs);
       return SolutionKind::Solved;
     }
 
@@ -13943,11 +13943,11 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   auto formUnsolved = [&]() {
     // If we're supposed to generate constraints, do so.
     if (flags.contains(TMF_GenerateConstraints)) {
-      auto *explictGenericArgs =
+      auto *explicitGenericArgs =
           Constraint::create(*this, ConstraintKind::ExplicitGenericArguments,
                              type1, type2, getConstraintLocator(locator));
 
-      addUnsolvedConstraint(explictGenericArgs);
+      addUnsolvedConstraint(explicitGenericArgs);
       return SolutionKind::Solved;
     }
 

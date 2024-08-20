@@ -229,7 +229,7 @@ void IRGenerator::emitCoverageMapping() {
   // parallel IRGen, where N is the number of output object files.
   //
   // Note we don't just dump all the coverage maps into the primary IGM as
-  // that would require creating unecessary name data entries, since the name
+  // that would require creating unnecessary name data entries, since the name
   // data is likely to already be present in the IGM that contains the entity
   // being profiled (unless it has been optimized out). Matching the coverage
   // map to its originating SourceFile also matches the behavior of a debug

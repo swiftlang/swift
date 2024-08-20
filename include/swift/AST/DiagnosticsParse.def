@@ -829,7 +829,7 @@ ERROR(function_type_argument_label,none,
       "function types cannot have argument labels; use '_' before %0",
       (Identifier))
 ERROR(expected_dynamic_func_attr,none,
-      "expected a dynamically_replaceable function", ())
+      "expected a dynamically_replacable function", ())
 ERROR(async_after_throws,none,
       "%select{'async'|'reasync'}0 must precede %select{'throws'|'rethrows'}1",
       (bool, bool))

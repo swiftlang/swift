@@ -169,8 +169,8 @@ private:
 
   void initializePullbackTupleElements(SILBasicBlock *origBB,
                                        SILInstructionResultArray values) {
-    auto *pbTupleTyple = getPullbackInfo().getLinearMapTupleType(origBB);
-    assert(pbTupleTyple->getNumElements() == values.size() &&
+    auto *pbTupleType = getPullbackInfo().getLinearMapTupleType(origBB);
+    assert(pbTupleType->getNumElements() == values.size() &&
            "The number of pullback tuple fields must equal the number of "
            "pullback tuple element values");
     auto res = pullbackTupleElements.insert({origBB, { values.begin(), values.end() }});
@@ -180,8 +180,8 @@ private:
 
   void initializePullbackTupleElements(SILBasicBlock *origBB,
                                        const llvm::ArrayRef<SILArgument *> &values) {
-    auto *pbTupleTyple = getPullbackInfo().getLinearMapTupleType(origBB);
-    assert(pbTupleTyple->getNumElements() == values.size() &&
+    auto *pbTupleType = getPullbackInfo().getLinearMapTupleType(origBB);
+    assert(pbTupleType->getNumElements() == values.size() &&
            "The number of pullback tuple fields must equal the number of "
            "pullback tuple element values");
     auto res = pullbackTupleElements.insert({origBB, { values.begin(), values.end() }});

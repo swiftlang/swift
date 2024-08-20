@@ -579,7 +579,7 @@ void RequirementFailure::maybeEmitRequirementNote(const Decl *anchor, Type lhs,
   if (req.getKind() == RequirementKind::SameShape) {
     // Same-shape requirements are broken down into two ShapeOf
     // constraints against the same type variable, so a failure is not
-    // necessarily ordered to match the original requriement. For now,
+    // necessarily ordered to match the original requirement. For now,
     // don't emit a note.
     return;
   }

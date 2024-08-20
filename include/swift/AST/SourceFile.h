@@ -226,7 +226,7 @@ private:
     /// All the \c #if source ranges in this file.
     std::vector<IfConfigClauseRangeInfo> Ranges;
 
-    /// Whether the elemnts in \c Ranges are sorted in source order within
+    /// Whether the elements in \c Ranges are sorted in source order within
     /// this file. We flip this to \c false any time a new range gets recorded,
     /// and lazily do the sorting when doing a query.
     bool IsSorted = false;

@@ -907,7 +907,7 @@ public:
                       vd->getASTContext().getErrorDecl() == vd);
             }),
         removedVDList.end());
-    // Sort the unavaiable decls by their name and kind.
+    // Sort the unavailable decls by their name and kind.
     llvm::sort(removedVDList, [](const ValueDecl *lhs, const ValueDecl *rhs) {
       auto getSortKey = [](const ValueDecl *vd) {
         std::string sortKey;

@@ -28,7 +28,7 @@
 ///
 /// 4. Find the "extended" boundary of liveness by walking out from the boundary
 ///    computed by PrunedLiveness out to destroys which aren't separated from
-///    the original destory by "interesting" instructions.
+///    the original destroy by "interesting" instructions.
 ///
 /// 5. Initializes `consumes` and inserts new destroy_value instructions.
 ///

@@ -2347,7 +2347,7 @@ ExpandedTupleInputGenerator::projectPackComponent(SILGenFunction &SGF,
   assert(isComponentExpansion == isa<PackExpansionType>(
             formalPackType.getElementType(componentIndex)));
 
-  // Deactive the cleanup for the outer pack value.
+  // Deactivate the cleanup for the outer pack value.
   CleanupCloner cloner(SGF, packValue);
   auto packAddr = packValue.forward(SGF);
 

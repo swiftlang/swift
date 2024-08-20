@@ -688,7 +688,7 @@ class ExpressionTypeCollector: public SourceEntityWalker {
     }
 
     // If we have already reported types for this source range, we shouldn't
-    // report again. This makes sure we always report the outtermost type of
+    // report again. This makes sure we always report the outermost type of
     // several overlapping expressions.
     auto &Bucket = AllPrintedTypes[Offset];
     if (Bucket.find(Length) != Bucket.end())

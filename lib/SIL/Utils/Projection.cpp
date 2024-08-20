@@ -1334,7 +1334,7 @@ computeUsesAndLiveness(SILValue Base) {
   }
 
   // Then setup the leaf list by iterating through our Nodes looking for live
-  // leafs. We use a DFS order, always processing the left leafs first so that
+  // leaves. We use a DFS order, always processing the left leaves first so that
   // we match the order in which we will lay out arguments.
   llvm::SmallVector<ProjectionTreeNode *, 8> Worklist;
   Worklist.push_back(getRoot());
@@ -1358,11 +1358,11 @@ computeUsesAndLiveness(SILValue Base) {
   }
 
 #ifndef NDEBUG
-  LLVM_DEBUG(llvm::dbgs() << "Final Leafs: \n");
+  LLVM_DEBUG(llvm::dbgs() << "Final Leaves: \n");
   llvm::SmallVector<SILType, 8> LeafTypes;
   getLiveLeafTypes(LeafTypes);
-  for (SILType Leafs : LeafTypes) {
-    LLVM_DEBUG(llvm::dbgs() << "    " << Leafs << "\n");
+  for (SILType Leaves : LeafTypes) {
+    LLVM_DEBUG(llvm::dbgs() << "    " << Leaves << "\n");
   }
 #endif
 }
@@ -1370,7 +1370,7 @@ computeUsesAndLiveness(SILValue Base) {
 void
 ProjectionTree::
 createTreeFromValue(SILBuilder &B, SILLocation Loc, SILValue NewBase,
-                    llvm::SmallVectorImpl<SILValue> &Leafs) const {
+                    llvm::SmallVectorImpl<SILValue> &Leaves) const {
   LLVM_DEBUG(llvm::dbgs() << "Recreating tree from value: " << NewBase);
 
   using WorklistEntry =
@@ -1411,7 +1411,7 @@ createTreeFromValue(SILBuilder &B, SILLocation Loc, SILValue NewBase,
 
       // Otherwise add it to our leaf list.
       LLVM_DEBUG(llvm::dbgs() << "    Is a Leaf! Adding to leaf list\n");
-      Leafs.push_back(V);
+      Leaves.push_back(V);
     }
   }
 }
@@ -1453,18 +1453,18 @@ getNextValidNode(llvm::SmallVectorImpl<ProjectionTreeNode *> &Worklist,
 void
 ProjectionTree::
 replaceValueUsesWithLeafUses(SILBuilder &Builder, SILLocation Loc,
-                             llvm::SmallVectorImpl<SILValue> &Leafs) {
-  assert(Leafs.size() == LiveLeafIndices.size() && "Leafs and leaf indices must "
+                             llvm::SmallVectorImpl<SILValue> &Leaves) {
+  assert(Leaves.size() == LiveLeafIndices.size() && "Leaves and leaf indices must "
          "equal in size.");
 
   NewAggregateBuilderMap AggBuilderMap(Builder, Loc);
   llvm::SmallVector<ProjectionTreeNode *, 8> Worklist;
 
-  LLVM_DEBUG(llvm::dbgs() << "Replacing all uses in callee with leafs!\n");
+  LLVM_DEBUG(llvm::dbgs() << "Replacing all uses in callee with leaves!\n");
 
   // For each Leaf we have as input...
-  for (unsigned i = 0, e = Leafs.size(); i != e; ++i) {
-    SILValue Leaf = Leafs[i];
+  for (unsigned i = 0, e = Leaves.size(); i != e; ++i) {
+    SILValue Leaf = Leaves[i];
     ProjectionTreeNode *Node = getNode(LiveLeafIndices[i]);
 
     LLVM_DEBUG(llvm::dbgs() << "    Visiting leaf: " << Leaf);

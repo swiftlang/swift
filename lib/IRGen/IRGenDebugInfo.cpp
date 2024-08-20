@@ -1127,7 +1127,7 @@ private:
 
   /// Creates debug info for a generic struct or class with archetypes (e.g.:
   /// Pair<τ_0_0, τ_0_1>). For types with unsubstituted generic type parameters,
-  /// debug info generation doesn't attempt to emit the size and aligment of
+  /// debug info generation doesn't attempt to emit the size and alignment of
   /// the type, as in the general case those are all dependent on substituting
   /// the type parameters in (some exceptions exist, like generic types that are
   /// class constrained). It also doesn't attempt to emit the offset of the

@@ -117,7 +117,7 @@ public:
   void resetCache();
   /// Query diagnostics consumed so far.
   std::vector<DependencyScanDiagnosticCollector::ScannerDiagnosticInfo> getDiagnostics();
-  /// Discared the collection of diagnostics encountered so far.
+  /// Discard the collection of diagnostics encountered so far.
   void resetDiagnostics();
 
   /// Using the specified invocation command, instantiate a CompilerInstance

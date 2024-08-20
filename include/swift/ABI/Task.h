@@ -562,7 +562,7 @@ public:
   }
 
   /// Returns true if the current task has any task preference record,
-  /// including if it has an initial task preference record or onces
+  /// including if it has an initial task preference record or one
   /// set during the lifetime of the task.
   bool hasTaskExecutorPreferenceRecord() const;
 

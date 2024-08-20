@@ -68,7 +68,7 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *rrpi) {
       return urci->use_empty() ? eraseInstFromFunction(*urci) : nullptr;
     }
 
-    // Otherwise, we ened to use an unchecked_trivial_bit_cast insert it at
+    // Otherwise, we need to use an unchecked_trivial_bit_cast insert it at
     // urci.
     //
     // (ref_to_raw_pointer (unchecked_ref_cast x))
@@ -347,7 +347,7 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
     }
   }
 
-  // The rest of these canonicalizations optimize the code around
+  // The rest of these canonicalization optimize the code around
   // pointer_to_address by leave in a pointer_to_address meaning that we do not
   // need to worry about moving addresses out of interior pointer scopes.
 

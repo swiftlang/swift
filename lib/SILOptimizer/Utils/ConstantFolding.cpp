@@ -1835,7 +1835,7 @@ static bool isFoldable(SILInstruction *I) {
          isa<StringLiteralInst>(I);
 }
 
-/// Given a buitin instruction calling globalStringTablePointer, check whether
+/// Given a builtin instruction calling globalStringTablePointer, check whether
 /// the string passed to the builtin is constructed from a literal and if so,
 /// replace the uses of the builtin instruction with the string_literal inst.
 /// Otherwise, emit diagnostics if the function containing the builtin is not a
