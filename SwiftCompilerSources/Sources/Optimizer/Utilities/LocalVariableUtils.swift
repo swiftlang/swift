@@ -420,7 +420,8 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
   mutating func leafAddressUse(of operand: Operand) -> WalkResult {
     switch operand.instruction {
     case is StoringInstruction, is SourceDestAddrInstruction, is DestroyAddrInst, is DeinitExistentialAddrInst,
-         is InjectEnumAddrInst, is TupleAddrConstructorInst, is InitBlockStorageHeaderInst, is PackElementSetInst:
+         is InjectEnumAddrInst, is SwitchEnumAddrInst, is TupleAddrConstructorInst, is InitBlockStorageHeaderInst,
+         is PackElementSetInst:
       // Handle instructions that initialize both temporaries and local variables.
       visit(LocalVariableAccess(.store, operand))
     case is DeallocStackInst:
