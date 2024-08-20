@@ -6586,7 +6586,9 @@ ForcedCheckedCastExpr *findForcedDowncast(ASTContext &ctx, Expr *expr);
 /// can I add `consume` around this expression?
 ///
 /// \param module represents the module in which the expr appears
-bool canAddExplicitConsume(ModuleDecl *module, Expr *expr);
+bool canAddExplicitConsume(ModuleDecl *module,
+                           constraints::ConstraintSystem const &cs,
+                           Expr *expr);
 
 // Count the number of overload sets present
 // in the expression and all of the children.

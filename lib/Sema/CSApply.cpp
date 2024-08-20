@@ -5604,7 +5604,7 @@ namespace {
       auto *module = dc->getParentModule();
       auto origType = cs.getType(injection->getSubExpr());
       if (willHaveConfusingConsumption(origType, locator, cs) &&
-          canAddExplicitConsume(module, injection->getSubExpr()))
+          canAddExplicitConsume(module, cs, injection->getSubExpr()))
         ConsumingCoercions.push_back(injection);
     }
 
@@ -5613,7 +5613,7 @@ namespace {
       auto *module = dc->getParentModule();
       auto fromType = cs.getType(fromExpr);
       if (willHaveConfusingConsumption(fromType, locator, cs) &&
-          canAddExplicitConsume(module, fromExpr)) {
+          canAddExplicitConsume(module, cs, fromExpr)) {
         ConsumingCoercions.push_back(toExpr);
       }
     }
