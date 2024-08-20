@@ -245,6 +245,12 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
       }
     }
 
+    // Any composition with an inverse will need the 6.0 runtime to demangle.
+    if (auto pct = dyn_cast<ProtocolCompositionType>(t)) {
+      if (pct->hasInverse())
+        return addRequirement(Swift_6_0);
+    }
+
     return false;
   });
 
