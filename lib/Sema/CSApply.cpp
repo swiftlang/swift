@@ -6084,10 +6084,22 @@ ArgumentList *ExprRewriter::coerceCallArguments(
         return placeholder;
       };
 
+  auto applyFlagsToArgument = [&paramInfo](unsigned paramIdx, Expr *argument) {
+    bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
+    bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
+    bool isPassedToSendingParameter = paramInfo.isSendingParameter(paramIdx);
+
+    applyContextualClosureFlags(argument, isImplicitSelfCapture,
+                                inheritsActorContext,
+                                isPassedToSendingParameter);
+  };
+
   // Quickly test if any further fix-ups for the argument types are necessary.
   auto matches = args->matches(params, [&](Expr *E) { return cs.getType(E); });
-  if (matches && !shouldInjectWrappedValuePlaceholder &&
-      !paramInfo.anyContextualInfo()) {
+  if (matches && !shouldInjectWrappedValuePlaceholder) {
+    for (unsigned paramIdx : indices(params)) {
+      applyFlagsToArgument(paramIdx, args->getExpr(paramIdx));
+    }
     return args;
   }
 
@@ -6204,15 +6216,10 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     // for things like trailing closures and args to property wrapper params.
     arg.setLabel(param.getLabel());
 
-    // Determine whether the closure argument should be treated as having
-    // implicit self capture or inheriting actor context.
-    bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
-    bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
-    bool isPassedToSendingParameter = paramInfo.isSendingParameter(paramIdx);
-
-    applyContextualClosureFlags(argExpr, isImplicitSelfCapture,
-                                inheritsActorContext,
-                                isPassedToSendingParameter);
+    // Determine whether the argument should be marked as having
+    // implicit self capture, inheriting actor context, is passed to a
+    // `sending` parameter etc.
+    applyFlagsToArgument(paramIdx, argExpr);
 
     // If the types exactly match, this is easy.
     auto paramType = param.getOldType();
