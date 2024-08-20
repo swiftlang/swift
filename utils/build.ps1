@@ -74,6 +74,9 @@ If set, debug information will be generated for the builds.
 .PARAMETER EnableCaching
 If true, use `sccache` to cache the build rules.
 
+.PARAMETER Cache
+The path to a directory where the `sccache` stores the cache. By default, it will point to `$BinaryCache\sccache`.
+
 .PARAMETER Clean
 If true, clean non-compiler builds while building.
 
@@ -129,6 +132,7 @@ param(
   [switch] $Clean,
   [switch] $DebugInfo,
   [switch] $EnableCaching,
+  [string] $Cache = "",
   [switch] $Summary,
   [switch] $ToBatch
 )
@@ -868,7 +872,11 @@ function Build-CMakeProject {
 
     if ($EnableCaching) {
       $env:SCCACHE_DIRECT = "true"
-      $env:SCCACHE_DIR = "$BinaryCache\sccache"
+      if ($Cache -eq "") {
+        $env:SCCACHE_DIR = "$BinaryCache\sccache"
+      } else {
+        $env:SCCACHE_DIR = $Cache
+      }
     }
     if ($UseSwiftSwiftDriver) {
       $env:SWIFT_DRIVER_SWIFT_FRONTEND_EXEC = ([IO.Path]::Combine($CompilersBinaryCache, "bin", "swift-frontend.exe"))
