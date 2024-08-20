@@ -402,7 +402,7 @@ enum TargetComponent {
   Dispatch
   Foundation
   XCTest
-  SwiftTesting
+  Testing
 }
 
 function Get-TargetProjectBinaryCache($Arch, [TargetComponent]$Project) {
@@ -1839,8 +1839,8 @@ function Build-XCTest([Platform]$Platform, $Arch, [switch]$Test = $false) {
   }
 }
 
-function Build-SwiftTesting([Platform]$Platform, $Arch, [switch]$Test = $false) {
-  $SwiftTestingBinaryCache = Get-TargetProjectBinaryCache $Arch SwiftTesting
+function Build-Testing([Platform]$Platform, $Arch, [switch]$Test = $false) {
+  $SwiftTestingBinaryCache = Get-TargetProjectBinaryCache $Arch Testing
 
   Isolate-EnvVars {
     if ($Test) {
@@ -2475,7 +2475,7 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-TestingMacros -Build Windows $BuildArch
     Invoke-BuildStep Build-Foundation Windows $Arch
     Invoke-BuildStep Build-XCTest Windows $Arch
-    Invoke-BuildStep Build-SwiftTesting Windows $Arch
+    Invoke-BuildStep Build-Testing Windows $Arch
     Invoke-BuildStep Write-PlatformInfoPlist $Arch
   }
 
@@ -2490,7 +2490,7 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-Dispatch Android $Arch
     Invoke-BuildStep Build-Foundation Android $Arch
     Invoke-BuildStep Build-XCTest Android $Arch
-    Invoke-BuildStep Build-SwiftTesting Android $Arch
+    Invoke-BuildStep Build-Testing Android $Arch
     Invoke-BuildStep Write-PlatformInfoPlist $Arch
   }
 }
@@ -2575,7 +2575,7 @@ if (-not $IsCrossCompiling) {
     Build-XCTest Windows $HostArch -Test
   }
   if ($Test -contains "testing") {
-    Build-SwiftTesting Windows $HostArch -Test
+    Build-Testing Windows $HostArch -Test
   }
   if ($Test -contains "llbuild") { Build-LLBuild $HostArch -Test }
   if ($Test -contains "swiftpm") { Test-PackageManager $HostArch }
