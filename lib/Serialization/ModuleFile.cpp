@@ -1398,3 +1398,7 @@ StringRef SerializedASTFile::getExportedModuleName() const {
     return name;
   return FileUnit::getExportedModuleName();
 }
+
+StringRef SerializedASTFile::getPublicModuleName() const {
+  return File.getPublicModuleName();
+}

@@ -100,6 +100,9 @@ class ModuleFileSharedCore {
   /// Module name to use when referenced in clients module interfaces.
   StringRef ModuleExportAsName;
 
+  /// Name to use in public facing diagnostics and documentation.
+  StringRef PublicModuleName;
+
   /// \c true if this module has incremental dependency information.
   bool HasIncrementalInfo = false;
 
