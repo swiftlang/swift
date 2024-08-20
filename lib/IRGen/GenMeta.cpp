@@ -3213,9 +3213,9 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
                                 IGM.getPointerSize() * numFields);
 }
 
-static void emitInitializeRawLayoutOld(IRGenFunction &IGF, SILType likeType,
-                                       llvm::Value *count, SILType T,
-                                       llvm::Value *metadata,
+static void emitInitializeRawLayoutOldOld(IRGenFunction &IGF, SILType likeType,
+                                          llvm::Value *count, SILType T,
+                                          llvm::Value *metadata,
                                        MetadataDependencyCollector *collector) {
   auto &IGM = IGF.IGM;
 
@@ -3296,11 +3296,11 @@ static void emitInitializeRawLayoutOld(IRGenFunction &IGF, SILType likeType,
   IGF.Builder.CreateLifetimeEnd(fieldLayouts, IGM.getPointerSize());
 }
 
-static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
-                                    llvm::Value *count, SILType T,
-                                    llvm::Value *metadata,
-                                    MetadataDependencyCollector *collector) {
-  // If our deployment target doesn't contain the new swift_initRawStructMetadata,
+static void emitInitializeRawLayoutOld(IRGenFunction &IGF, SILType likeType,
+                                       llvm::Value *count, SILType T,
+                                       llvm::Value *metadata,
+                                       MetadataDependencyCollector *collector) {
+  // If our deployment target doesn't contain the swift_initRawStructMetadata,
   // emit a call to the swift_initStructMetadata tricking it into thinking
   // we have a single field.
   auto deploymentAvailability =
@@ -3309,6 +3309,39 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
 
   if (!IGF.IGM.Context.LangOpts.DisableAvailabilityChecking &&
       !deploymentAvailability.isContainedIn(initRawAvail) &&
+      !IGF.IGM.getSwiftModule()->isStdlibModule()) {
+    emitInitializeRawLayoutOldOld(IGF, likeType, count, T, metadata, collector);
+    return;
+  }
+
+  auto &IGM = IGF.IGM;
+  auto likeTypeLayout = emitTypeLayoutRef(IGF, likeType, collector);
+  StructLayoutFlags flags = StructLayoutFlags::Swift5Algorithm;
+
+  // If we don't have a count, then we're the 'like:' variant and we need to
+  // pass '-1' to the runtime call.
+  if (!count) {
+    count = llvm::ConstantInt::get(IGF.IGM.Int32Ty, -1);
+  }
+
+  // Call swift_initRawStructMetadata().
+  IGF.Builder.CreateCall(IGM.getInitRawStructMetadataFunctionPointer(),
+                         {metadata, IGM.getSize(Size(uintptr_t(flags))),
+                          likeTypeLayout, count});
+}
+
+static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
+                                    llvm::Value *count, SILType T,
+                                    llvm::Value *metadata,
+                                    MetadataDependencyCollector *collector) {
+  // If our deployment target doesn't contain the swift_initRawStructMetadata2,
+  // emit a call to the older swift_initRawStructMetadata.
+  auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(IGF.IGM.Context);
+  auto initRaw2Avail = IGF.IGM.Context.getInitRawStructMetadata2Availability();
+
+  if (!IGF.IGM.Context.LangOpts.DisableAvailabilityChecking &&
+      !deploymentAvailability.isContainedIn(initRaw2Avail) &&
       !IGF.IGM.getSwiftModule()->isStdlibModule()) {
     emitInitializeRawLayoutOld(IGF, likeType, count, T, metadata, collector);
     return;
@@ -3331,8 +3364,8 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
     rawLayoutFlags |= RawLayoutFlags::IsArray;
   }
 
-  // Call swift_initRawStructMetadata().
-  IGF.Builder.CreateCall(IGM.getInitRawStructMetadataFunctionPointer(),
+  // Call swift_initRawStructMetadata2().
+  IGF.Builder.CreateCall(IGM.getInitRawStructMetadata2FunctionPointer(),
                          {metadata,
                           IGM.getSize(Size(uintptr_t(structLayoutflags))),
                           likeTypeLayout,

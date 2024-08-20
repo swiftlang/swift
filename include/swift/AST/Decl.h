@@ -587,10 +587,10 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(TypeDecl, ValueDecl);
 
-  SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, TypeDecl, 16+16+8+1,
+  SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, TypeDecl, 16+16+3+1,
     Depth : 16,
     Index : 16,
-    ParamKind : 8,
+    ParamKind : 3,
 
     /// Whether this generic parameter represents an opaque type.
     IsOpaqueType : 1
