@@ -39,9 +39,8 @@ void emitDistributedActorSystemWitnessCall(
 
   // If the base is an existential open it.
   if (systemASTType->isAnyExistentialType()) {
-    OpenedArchetypeType *opened;
-    systemASTType = systemASTType->openAnyExistentialType(opened)
-                        ->getCanonicalType();
+    systemASTType = OpenedArchetypeType::getAny(systemASTType)
+        ->getCanonicalType();
     base = B.createOpenExistentialAddr(
         loc, base, F.getLoweredType(systemASTType),
         OpenedExistentialAccess::Immutable);

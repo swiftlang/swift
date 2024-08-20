@@ -772,8 +772,12 @@ ConstraintLocator *ConstraintSystem::getOpenOpaqueLocator(
 
 std::pair<Type, OpenedArchetypeType *> ConstraintSystem::openExistentialType(
     Type type, ConstraintLocator *locator) {
-  OpenedArchetypeType *opened = nullptr;
-  Type result = type->openAnyExistentialType(opened);
+  Type result = OpenedArchetypeType::getAny(type);
+  Type t = result;
+  while (t->is<MetatypeType>())
+    t = t->getMetatypeInstanceType();
+  auto *opened = t->castTo<OpenedArchetypeType>();
+
   assert(OpenedExistentialTypes.count(locator) == 0);
   OpenedExistentialTypes.insert({locator, opened});
   return {result, opened};

@@ -298,7 +298,8 @@ emitDistributedActorIsolation(SILGenFunction &SGF, SILLocation loc,
                               ManagedValue actor, CanType actorType) {
   // First, open the actor type if it's an existential type.
   if (actorType->isExistentialType()) {
-    CanType openedType = OpenedArchetypeType::getAny(actorType);
+    CanType openedType = OpenedArchetypeType::getAny(actorType)
+        ->getCanonicalType();
     SILType loweredOpenedType = SGF.getLoweredType(openedType);
 
     actor = SGF.emitOpenExistential(loc, actor, loweredOpenedType,

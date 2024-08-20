@@ -5334,19 +5334,25 @@ CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
   return CanOpenedArchetypeType(result);
 }
 
-CanType OpenedArchetypeType::getAny(CanType existential, Type interfaceType) {
+Type OpenedArchetypeType::getAny(Type existential, Type interfaceTy) {
   assert(existential->isAnyExistentialType());
   if (auto metatypeTy = existential->getAs<ExistentialMetatypeType>()) {
     auto instanceTy =
         metatypeTy->getExistentialInstanceType()->getCanonicalType();
-    return CanMetatypeType::get(
-        OpenedArchetypeType::getAny(instanceTy, interfaceType));
+    auto openedInstanceTy = OpenedArchetypeType::getAny(
+        instanceTy, interfaceTy);
+    if (metatypeTy->hasRepresentation()) {
+      return MetatypeType::get(openedInstanceTy,
+                               metatypeTy->getRepresentation());
+    }
+    return MetatypeType::get(openedInstanceTy);
   }
   assert(existential->isExistentialType());
-  return OpenedArchetypeType::get(existential, interfaceType);
+  return OpenedArchetypeType::get(existential->getCanonicalType(),
+                                  interfaceTy);
 }
 
-CanType OpenedArchetypeType::getAny(CanType existential) {
+Type OpenedArchetypeType::getAny(Type existential) {
   auto interfaceTy = OpenedArchetypeType::getSelfInterfaceTypeFromContext(
       GenericSignature(), existential->getASTContext());
   return getAny(existential, interfaceTy);
