@@ -14,7 +14,7 @@
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -O \
 // RUN:   -o %t/deps-3.json -Xcc -fapplication-extension -I %t/include
 
-/// Check module hash for the swiftmodule. 1 and 2 should match, but not 3.
+/// Check module hash for the swiftmodule. They should all not match.
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps-1.json Library modulePath > %t/path-1
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps-2.json Library modulePath > %t/path-2
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps-3.json Library modulePath > %t/path-3
