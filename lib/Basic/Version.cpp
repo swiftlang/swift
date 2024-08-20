@@ -22,6 +22,8 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <array>
+#include <cstring>
 #include <vector>
 
 #define TOSTR2(X) #X
@@ -87,6 +89,26 @@ raw_ostream &operator<<(raw_ostream &os, const Version &version) {
   os << version[0];
   for (size_t i = 1, e = version.size(); i != e; ++i)
     os << '.' << version[i];
+  return os;
+}
+
+template <size_t InternalLen>
+static SmallString<InternalLen> &operator +=(SmallString<InternalLen> &buf, unsigned int value) {
+  std::array<char, 64> valueBuf;
+  snprintf(valueBuf.data(), valueBuf.size(), "%u", value);
+  buf += valueBuf.data();
+  return buf;
+}
+
+template <size_t InternalLen>
+static SmallString<InternalLen> &operator +=(SmallString<InternalLen> &buf, const Version &version) {
+  if (version.empty())
+    return buf;
+  buf += version[0];
+  for (size_t i = 1, e = version.size(); i != e; ++i) {
+    buf += ".";
+    buf += version[i];
+  }
   return os;
 }
 
@@ -277,7 +299,8 @@ static SmallString<256> getSwiftFullVersionImpl(Version effectiveVersion) {
 #endif
 
   if (effectiveVersion != Version::getCurrentLanguageVersion()) {
-    buf += " effective-" << effectiveVersion;
+    buf += " effective-";
+    buf += effectiveVersion;
   }
 
 #if defined(SWIFT_COMPILER_VERSION)
