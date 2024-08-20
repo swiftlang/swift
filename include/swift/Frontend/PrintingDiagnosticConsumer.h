@@ -42,9 +42,11 @@ class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   SmallVector<std::string, 1> BufferedEducationalNotes;
   bool SuppressOutput = false;
 
+#if SWIFT_BUILD_SWIFT_SYNTAX
   /// swift-syntax rendering
   DiagnosticBridge DiagBridge;
-
+#endif
+ 
 public:
   PrintingDiagnosticConsumer(llvm::raw_ostream &stream = llvm::errs());
   ~PrintingDiagnosticConsumer();
