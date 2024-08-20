@@ -360,3 +360,18 @@ Func ContiguousArray.withUnsafeBufferPointer(_:) is now without @rethrows
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has parameter 0 type change from (inout Swift.UnsafeMutableBufferPointer<Element>) throws -> R to (inout Swift.UnsafeMutableBufferPointer<Element>) throws(E) -> R
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) is now without @rethrows
+
+// Adoption of @unsafe
+Func unsafeBitCast(_:to:) is now with @unsafe
+Func unsafeDowncast(_:to:) is now with @unsafe
+Struct OpaquePointer is now with @unsafe
+Struct Unmanaged is now with @unsafe
+Struct UnsafeBufferPointer is now with @unsafe
+Struct UnsafeMutableBufferPointer is now with @unsafe
+Struct UnsafeMutablePointer is now with @unsafe
+Struct UnsafeMutableRawBufferPointer is now with @unsafe
+Struct UnsafeMutableRawPointer is now with @unsafe
+Struct UnsafePointer is now with @unsafe
+Struct UnsafeRawBufferPointer is now with @unsafe
+Struct UnsafeRawPointer is now with @unsafe
+Var Optional.unsafelyUnwrapped is now with @unsafe
