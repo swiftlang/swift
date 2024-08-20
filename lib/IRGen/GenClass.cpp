@@ -651,8 +651,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                       llvm::Value *base,
                                                       SILType baseType,
                                                       SILType fieldType,
-                                                      VarDecl *field,
-                                                      GenericSignature fnSig) {
+                                                      VarDecl *field) {
   // If the field is empty, its address doesn't matter.
   auto &fieldTI = IGF.getTypeInfo(fieldType);
   if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
@@ -686,7 +685,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
   }
     
   case FieldAccess::ConstantIndirect: {
-    auto metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType, fnSig);
+    auto metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType);
     auto offset = emitClassFieldOffset(IGF, baseClass, field, metadata);
     return emitAddressAtOffset(IGF, baseType, base, offset, field);
   }
@@ -728,8 +727,7 @@ irgen::getPhysicalClassMemberAccessStrategy(IRGenModule &IGM,
 
 Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
                                   SILType ClassType,
-                                  SILType TailType,
-                                  GenericSignature fnSig) {
+                                  SILType TailType) {
   const ClassTypeInfo &classTI = IGF.getTypeInfo(ClassType).as<ClassTypeInfo>();
 
   llvm::Value *Offset = nullptr;
@@ -745,8 +743,7 @@ Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
     Align = HeapObjAlign.alignmentAtOffset(ClassSize);
   } else {
     llvm::Value *metadata = emitHeapMetadataRefForHeapObject(IGF, Base,
-                                                             ClassType,
-                                                             fnSig);
+                                                             ClassType);
     Offset = emitClassResilientInstanceSizeAndAlignMask(IGF,
                                         ClassType.getClassOrBoundGenericClass(),
                                         metadata).first;
@@ -971,7 +968,6 @@ static void getInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                         SILType selfType,
                                         ClassDecl *selfClass,
                                         llvm::Value *selfValue,
-                                        GenericSignature fnSig,
                                         llvm::Value *&size,
                                         llvm::Value *&alignMask) {
   // Try to determine the size of the object we're deallocating.
@@ -988,7 +984,7 @@ static void getInstanceSizeAndAlignMask(IRGenFunction &IGF,
 
   // Otherwise, get them from the metadata.
   llvm::Value *metadata =
-    emitHeapMetadataRefForHeapObject(IGF, selfValue, selfType, fnSig);
+    emitHeapMetadataRefForHeapObject(IGF, selfValue, selfType);
   std::tie(size, alignMask)
     = emitClassResilientInstanceSizeAndAlignMask(IGF, selfClass, metadata);
 }
@@ -1000,8 +996,7 @@ static llvm::Value *emitCastToHeapObject(IRGenFunction &IGF,
 
 void irgen::emitClassDeallocation(IRGenFunction &IGF,
                                   SILType selfType,
-                                  llvm::Value *selfValue,
-                                  GenericSignature fnSig) {
+                                  llvm::Value *selfValue) {
   auto *theClass = selfType.getClassOrBoundGenericClass();
 
   // We want to deallocate default actors or potential default
@@ -1033,7 +1028,7 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF,
   }
 
   llvm::Value *size, *alignMask;
-  getInstanceSizeAndAlignMask(IGF, selfType, theClass, selfValue, fnSig,
+  getInstanceSizeAndAlignMask(IGF, selfType, theClass, selfValue,
                               size, alignMask);
 
   selfValue = emitCastToHeapObject(IGF, selfValue);
@@ -1043,13 +1038,12 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF,
 void irgen::emitPartialClassDeallocation(IRGenFunction &IGF,
                                          SILType selfType,
                                          llvm::Value *selfValue,
-                                         llvm::Value *metadataValue,
-                                         GenericSignature fnSig) {
+                                         llvm::Value *metadataValue) {
   auto *theClass = selfType.getClassOrBoundGenericClass();
   assert(theClass->getForeignClassKind() == ClassDecl::ForeignKind::Normal);
 
   llvm::Value *size, *alignMask;
-  getInstanceSizeAndAlignMask(IGF, selfType, theClass, selfValue, fnSig,
+  getInstanceSizeAndAlignMask(IGF, selfType, theClass, selfValue,
                               size, alignMask);
 
   selfValue = IGF.Builder.CreateBitCast(selfValue, IGF.IGM.RefCountedPtrTy);
@@ -3142,7 +3136,6 @@ irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                               SILType baseType,
                               SILDeclRef method,
                               CanSILFunctionType methodType,
-                              GenericSignature fnSig,
                               bool useSuperVTable) {
   // Find the metadata.
   llvm::Value *metadata;
@@ -3161,7 +3154,7 @@ irgen::emitVirtualMethodValue(IRGenFunction &IGF,
       metadata = base;
     } else {
       // Otherwise, load the class metadata from the 'self' value's isa pointer.
-      metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType, fnSig,
+      metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType,
                                                   /*suppress cast*/ true);
     }
   }
