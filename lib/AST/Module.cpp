@@ -1922,6 +1922,19 @@ ImportedModule::removeDuplicates(SmallVectorImpl<ImportedModule> &imports) {
   imports.erase(last, imports.end());
 }
 
+Identifier ModuleDecl::getPublicModuleName(bool mustBeVisible) const {
+  if (!PublicModuleName.empty()) {
+    if (!mustBeVisible)
+      return PublicModuleName;
+
+    bool publicModuleIsImported =
+      getASTContext().getModuleByIdentifier(PublicModuleName);
+    if (publicModuleIsImported)
+      return PublicModuleName;
+  }
+  return getName();
+}
+
 Identifier ModuleDecl::getRealName() const {
   // This will return the real name for an alias (if used) or getName()
   return getASTContext().getRealModuleName(getName());

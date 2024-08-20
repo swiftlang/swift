@@ -243,6 +243,8 @@ class ModuleDecl
   /// Module name to use when referenced in clients module interfaces.
   mutable Identifier ExportAsName;
 
+  mutable Identifier PublicModuleName;
+
 public:
   /// Produces the components of a given module's full name in reverse order.
   ///
@@ -502,6 +504,21 @@ public:
 
   void setExportAsName(Identifier name) {
     ExportAsName = name;
+  }
+
+  /// Public facing name for this module in diagnostics and documentation.
+  ///
+  /// This always returns a valid name as it defaults to the module name if
+  /// no public module name is set.
+  ///
+  /// If `mustBeVisible`, return the normal module name when the module
+  /// corresponding to the public module name isn't imported. Users working
+  /// in between both modules will then see the normal module name,
+  /// this may be more useful for diagnostics at that level.
+  Identifier getPublicModuleName(bool mustBeVisible) const;
+
+  void setPublicModuleName(Identifier name) {
+    PublicModuleName = name;
   }
 
   /// Retrieve the actual module name of an alias used for this module (if any).
