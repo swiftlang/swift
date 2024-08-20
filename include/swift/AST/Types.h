@@ -6574,10 +6574,6 @@ public:
   /// which the archetype conforms.
   Type getNestedTypeByName(Identifier name);
 
-  /// Retrieve the parent of this archetype, or null if this is a
-  /// primary archetype.
-  ArchetypeType *getParent() const;
-
   /// Return the archetype that represents the root generic parameter of its
   /// interface type.
   ArchetypeType *getRoot() const;
