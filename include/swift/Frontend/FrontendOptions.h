@@ -70,6 +70,9 @@ public:
   /// Module name to use when referenced in clients module interfaces.
   std::string ExportAsName;
 
+  /// The public facing name of the module to build.
+  std::string PublicModuleName;
+
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
 
