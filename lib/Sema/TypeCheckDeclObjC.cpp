@@ -1749,7 +1749,7 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
                                 diag::objc_override_method_selector_mismatch,
                                 *attr->getName(), overriddenSelector)
                       .limitBehavior(behavior));
-              fixDeclarationObjCName(diag, decl, attr->getName(),
+              fixDeclarationObjCName(diag, decl, attr->getName().value(),
                                      overriddenSelector);
             }
 
@@ -1839,8 +1839,9 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
         auto diag = decl->diagnose(diag::objc_ambiguous_inference_candidate,
                                    req, proto, *req->getObjCRuntimeName());
         fixDeclarationObjCName(diag, decl,
-                               decl->getObjCRuntimeName(/*skipIsObjC=*/true),
-                               req->getObjCRuntimeName());
+                               decl->getObjCRuntimeName(/*skipIsObjC=*/true)
+                                 .value_or(ObjCSelector()),
+                               req->getObjCRuntimeName().value());
       };
       diagnoseCandidate(firstReq);
       diagnoseCandidate(req);
@@ -2151,8 +2152,8 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
 
 bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag,
                                    const Decl *decl,
-                                   std::optional<ObjCSelector> nameOpt,
-                                   std::optional<ObjCSelector> targetNameOpt,
+                                   ObjCSelector name,
+                                   ObjCSelector targetName,
                                    bool ignoreImpliedName) {
   if (decl->isImplicit())
     return false;
@@ -2163,9 +2164,6 @@ bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag,
                      "@objc ");
     return false;
   }
-
-  auto name = *nameOpt;
-  auto targetName = *targetNameOpt;
 
   // Dig out the existing '@objc' attribute on the witness. We don't care
   // about implicit ones because they don't have useful source location
@@ -2213,7 +2211,7 @@ bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag,
 
     // If the names of the witness and requirement differ, we need to
     // specify the name.
-    if (name != targetName || ignoreImpliedName) {
+    if (targetName && (name != targetName || ignoreImpliedName)) {
       out << "(";
       out << targetName;
       out << ")";
@@ -2908,8 +2906,10 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
       // Fix the '@objc' attribute, if needed.
       if (!bestConflict->canInferObjCFromRequirement(req))
         fixDeclarationObjCName(diag, bestConflict,
-                               bestConflict->getObjCRuntimeName(),
-                               req->getObjCRuntimeName(),
+                               bestConflict->getObjCRuntimeName()
+                                  .value_or(ObjCSelector()),
+                               req->getObjCRuntimeName()
+                                  .value_or(ObjCSelector()),
                                /*ignoreImpliedName=*/true);
     }
 
@@ -3278,12 +3278,12 @@ private:
     return ObjCSelector();
   }
 
-  static std::optional<ObjCSelector> getObjCName(ValueDecl *VD) {
+  static ObjCSelector getObjCName(ValueDecl *VD) {
     if (!VD->getCDeclName().empty()) {
       auto ident = VD->getASTContext().getIdentifier(VD->getCDeclName());
       return ObjCSelector(VD->getASTContext(), 0, { ident });
     }
-    return VD->getObjCRuntimeName();
+    return VD->getObjCRuntimeName().value_or(ObjCSelector());
   }
 
 public:
@@ -3428,8 +3428,8 @@ private:
       for (auto req : matchedRequirements.matches) {
         auto diag =
             diagnose(cand, diag::objc_implementation_one_matched_requirement,
-                           req, *getObjCName(req), shouldOfferFix,
-                           getObjCName(req)->getString(scratch));
+                           req, getObjCName(req), shouldOfferFix,
+                           getObjCName(req).getString(scratch));
         if (shouldOfferFix) {
           fixDeclarationObjCName(diag, cand, getObjCName(cand),
                                  getObjCName(req), /*ignoreImpliedName=*/true);
@@ -3469,14 +3469,14 @@ private:
       auto ext =
           cast<ExtensionDecl>(reqIDC->getImplementationContext());
       diagnose(ext, diag::objc_implementation_multiple_matching_candidates,
-                    req, *getObjCName(req));
+                    req, getObjCName(req));
 
       for (auto cand : cands.matches) {
         bool shouldOfferFix = !unmatchedCandidates[cand];
         auto diag =
             diagnose(cand, diag::objc_implementation_candidate_impl_here,
                            cand, shouldOfferFix,
-                           getObjCName(req)->getString(scratch));
+                           getObjCName(req).getString(scratch));
 
         if (shouldOfferFix) {
           fixDeclarationObjCName(diag, cand, getObjCName(cand),
@@ -3651,7 +3651,7 @@ private:
 
   void diagnoseOutcome(MatchOutcome outcome, ValueDecl *req, ValueDecl *cand,
                        ObjCSelector explicitObjCName) {
-    auto reqObjCName = *getObjCName(req);
+    auto reqObjCName = getObjCName(req);
 
     switch (outcome) {
     case MatchOutcome::NoRelationship:
@@ -3668,7 +3668,7 @@ private:
     case MatchOutcome::WrongImplicitObjCName:
     case MatchOutcome::WrongExplicitObjCName: {
       auto diag = diagnose(cand, diag::objc_implementation_wrong_objc_name,
-                           *getObjCName(cand), cand, reqObjCName);
+                           getObjCName(cand), cand, reqObjCName);
       fixDeclarationObjCName(diag, cand, explicitObjCName, reqObjCName);
       return;
     }
