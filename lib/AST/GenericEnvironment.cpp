@@ -25,6 +25,19 @@
 using namespace swift;
 
 size_t GenericEnvironment::numTrailingObjects(
+    OverloadToken<SubstitutionMap>) const {
+  switch (getKind()) {
+  case Kind::Primary:
+    return 0;
+
+  case Kind::OpenedExistential:
+  case Kind::OpenedElement:
+  case Kind::Opaque:
+    return 1;
+  }
+}
+
+size_t GenericEnvironment::numTrailingObjects(
     OverloadToken<OpaqueEnvironmentData>) const {
   switch (getKind()) {
   case Kind::Primary:
@@ -104,21 +117,14 @@ GenericEnvironment::getGenericParams() const {
   return getGenericSignature().getGenericParams();
 }
 
+SubstitutionMap GenericEnvironment::getOuterSubstitutions() const {
+  assert(getKind() != Kind::Primary);
+  return *getTrailingObjects<SubstitutionMap>();
+}
+
 OpaqueTypeDecl *GenericEnvironment::getOpaqueTypeDecl() const {
   assert(getKind() == Kind::Opaque);
   return getTrailingObjects<OpaqueEnvironmentData>()->decl;
-}
-
-SubstitutionMap GenericEnvironment::getOpaqueSubstitutions() const {
-  assert(getKind() == Kind::Opaque);
-  return getTrailingObjects<OpaqueEnvironmentData>()->subMap;
-}
-
-SubstitutionMap
-GenericEnvironment::getPackElementContextSubstitutions() const {
-  assert(getKind() == Kind::OpenedElement);
-  auto environmentData = getTrailingObjects<OpenedElementEnvironmentData>();
-  return environmentData->outerSubstitutions;
 }
 
 CanGenericTypeParamType
@@ -136,12 +142,6 @@ Type GenericEnvironment::getOpenedExistentialType() const {
 UUID GenericEnvironment::getOpenedExistentialUUID() const {
   assert(getKind() == Kind::OpenedExistential);
   return getTrailingObjects<OpenedExistentialEnvironmentData>()->uuid;
-}
-
-GenericSignature
-GenericEnvironment::getOpenedExistentialParentSignature() const {
-  assert(getKind() == Kind::OpenedExistential);
-  return getTrailingObjects<OpenedExistentialEnvironmentData>()->parentSig;
 }
 
 UUID GenericEnvironment::getOpenedElementUUID() const {
@@ -212,11 +212,12 @@ GenericEnvironment::GenericEnvironment(GenericSignature signature)
 
 GenericEnvironment::GenericEnvironment(
     GenericSignature signature,
-    Type existential, GenericSignature parentSig, UUID uuid)
+    Type existential, SubstitutionMap subs, UUID uuid)
   : SignatureAndKind(signature, Kind::OpenedExistential)
 {
+  *getTrailingObjects<SubstitutionMap>() = subs;
   new (getTrailingObjects<OpenedExistentialEnvironmentData>())
-    OpenedExistentialEnvironmentData{ existential, parentSig, uuid };
+    OpenedExistentialEnvironmentData{ existential, uuid };
 
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
@@ -227,8 +228,9 @@ GenericEnvironment::GenericEnvironment(
       GenericSignature signature, OpaqueTypeDecl *opaque, SubstitutionMap subs)
   : SignatureAndKind(signature, Kind::Opaque)
 {
+  *getTrailingObjects<SubstitutionMap>() = subs;
   new (getTrailingObjects<OpaqueEnvironmentData>())
-    OpaqueEnvironmentData{opaque, subs};
+    OpaqueEnvironmentData{opaque};
 
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
@@ -241,8 +243,9 @@ GenericEnvironment::GenericEnvironment(GenericSignature signature,
                                        SubstitutionMap outerSubs)
   : SignatureAndKind(signature, Kind::OpenedElement)
 {
+  *getTrailingObjects<SubstitutionMap>() = outerSubs;
   new (getTrailingObjects<OpenedElementEnvironmentData>())
-    OpenedElementEnvironmentData{uuid, shapeClass, outerSubs};
+    OpenedElementEnvironmentData{uuid, shapeClass};
 
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
@@ -337,20 +340,12 @@ GenericEnvironment::maybeApplyOuterContextSubstitutions(Type type) const {
   case Kind::OpenedExistential:
     return type;
 
-  case Kind::OpenedElement: {
+  case Kind::OpenedElement:
+  case Kind::Opaque: {
     auto packElements = getGenericSignature().getInnermostGenericParams();
     auto elementDepth = packElements.front()->getDepth();
     SubstituteOuterFromSubstitutionMap replacer{
-        getPackElementContextSubstitutions(), elementDepth};
-    return type.subst(replacer, replacer);
-  }
-
-  case Kind::Opaque: {
-    // Substitute outer generic parameters of an opaque archetype environment.
-    unsigned opaqueDepth =
-      getOpaqueTypeDecl()->getOpaqueGenericParams().front()->getDepth();
-    SubstituteOuterFromSubstitutionMap replacer{
-        getOpaqueSubstitutions(), opaqueDepth};
+        getOuterSubstitutions(), elementDepth};
     return type.subst(replacer, replacer);
   }
   }
@@ -686,7 +681,7 @@ GenericEnvironment::mapPackTypeIntoElementContext(Type type) const {
   // Get a contextual type in the original generic environment, not the
   // substituted one, which is what mapContextualPackTypeIntoElementContext()
   // expects.
-  auto contextualType = getPackElementContextSubstitutions()
+  auto contextualType = getOuterSubstitutions()
     .getGenericSignature().getGenericEnvironment()->mapTypeIntoContext(type);
 
   contextualType = mapContextualPackTypeIntoElementContext(contextualType);

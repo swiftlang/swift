@@ -58,13 +58,11 @@ public:
 /// Extra data in a generic environment for an opaque type.
 struct OpaqueEnvironmentData {
   OpaqueTypeDecl *decl;
-  SubstitutionMap subMap;
 };
 
 /// Extra data in a generic environment for an opened existential.
 struct OpenedExistentialEnvironmentData {
   Type existential;
-  GenericSignature parentSig;
   UUID uuid;
 };
 
@@ -72,7 +70,6 @@ struct OpenedExistentialEnvironmentData {
 struct OpenedElementEnvironmentData {
   UUID uuid;
   CanGenericTypeParamType shapeClass;
-  SubstitutionMap outerSubstitutions;
 };
 
 /// Describes the mapping between archetypes and interface types for the
@@ -86,6 +83,7 @@ struct OpenedElementEnvironmentData {
 class alignas(1 << DeclAlignInBits) GenericEnvironment final
     : private llvm::TrailingObjects<
         GenericEnvironment,
+        SubstitutionMap,
         OpaqueEnvironmentData,
         OpenedExistentialEnvironmentData,
         OpenedElementEnvironmentData,
@@ -114,6 +112,7 @@ private:
   friend TrailingObjects;
   friend OpaqueTypeArchetypeType;
 
+  size_t numTrailingObjects(OverloadToken<SubstitutionMap>) const;
   size_t numTrailingObjects(OverloadToken<OpaqueEnvironmentData>) const;
   size_t numTrailingObjects(OverloadToken<OpenedExistentialEnvironmentData>) const;
   size_t numTrailingObjects(OverloadToken<OpenedElementEnvironmentData>) const;
@@ -147,8 +146,7 @@ private:
 
   /// Private constructor for opened existential environments.
   explicit GenericEnvironment(
-      GenericSignature signature,
-      Type existential, GenericSignature parentSig, UUID uuid);
+      GenericSignature signature, Type existential, SubstitutionMap subs, UUID uuid);
 
   /// Private constructor for opened element environments.
   explicit GenericEnvironment(GenericSignature signature,
@@ -185,20 +183,16 @@ public:
   /// Retrieve the UUID for an opened existential environment.
   UUID getOpenedExistentialUUID() const;
 
-  /// Retrieve the parent signature for an opened existential environment.
-  GenericSignature getOpenedExistentialParentSignature() const;
-
   /// Retrieve the opaque type declaration for a generic environment describing
   /// opaque types.
   OpaqueTypeDecl *getOpaqueTypeDecl() const;
 
-  /// Retrieve the substitutions applied to an opaque type declaration to
-  /// create a generic environment.
-  SubstitutionMap getOpaqueSubstitutions() const;
-
-  /// Retrieve the substitutions for the outer generic parameters of an
-  /// opened pack element generic environment.
-  SubstitutionMap getPackElementContextSubstitutions() const;
+  /// Retrieve the outer substitutions for an opaque or local environment.
+  ///
+  /// Applying a substitution map to a local or opaque archetype outputs
+  /// an archetype with the same interface type, and composed outer
+  /// substitutions.
+  SubstitutionMap getOuterSubstitutions() const;
 
   /// Retrieve the shape equivalence class for an opened element environment.
   /// This is always a pack parameter.
@@ -238,10 +232,11 @@ public:
   /// Create a new generic environment for an opened existential.
   ///
   /// \param existential The subject existential type
-  /// \param parentSig The signature of the context where this existential type is being opened
+  /// \param outerSubs The substitution map containing archetypes from the
+  /// outer generic context
   /// \param uuid The unique identifier for this opened existential
   static GenericEnvironment *
-  forOpenedExistential(Type existential, GenericSignature parentSig, UUID uuid);
+  forOpenedExistential(Type existential, SubstitutionMap outerSubs, UUID uuid);
 
   /// Create a new generic environment for an opened element.
   ///
@@ -251,7 +246,7 @@ public:
   /// \param uuid The unique identifier for this opened element
   /// \param shapeClass The shape equivalence class for the originating packs
   /// \param outerSubs The substitution map containing archetypes from the
-  /// outer generic context.
+  /// outer generic context
   static GenericEnvironment *
   forOpenedElement(GenericSignature signature,
                    UUID uuid, CanGenericTypeParamType shapeClass,
@@ -270,9 +265,6 @@ public:
   /// For an opaque or pack element archetype environment, apply the
   /// substitutions.
   Type maybeApplyOuterContextSubstitutions(Type type) const;
-
-  /// Compute the canonical interface type within this environment.
-  Type getCanonicalInterfaceType(Type interfaceType);
 
   /// Map an interface type to a contextual type.
   static Type mapTypeIntoContext(GenericEnvironment *genericEnv,

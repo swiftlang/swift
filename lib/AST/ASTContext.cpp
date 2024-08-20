@@ -606,6 +606,8 @@ struct ASTContext::Implementation {
     void dump(llvm::raw_ostream &out) const;
   };
 
+  using OpenedExistentialKey = std::pair<SubstitutionMap, UUID>;
+
   llvm::DenseMap<ModuleDecl*, ModuleType*> ModuleTypes;
   llvm::DenseMap<std::pair<unsigned, unsigned>, GenericTypeParamType *>
     GenericParamTypes;
@@ -618,7 +620,8 @@ struct ASTContext::Implementation {
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> IntegerTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
-  llvm::DenseMap<UUID, GenericEnvironment *> OpenedExistentialEnvironments;
+  llvm::DenseMap<OpenedExistentialKey, GenericEnvironment *>
+      OpenedExistentialEnvironments;
   llvm::DenseMap<UUID, GenericEnvironment *> OpenedElementEnvironments;
   llvm::FoldingSet<IndexSubset> IndexSubsets;
   llvm::FoldingSet<AutoDiffDerivativeFunctionIdentifier>
@@ -5295,7 +5298,7 @@ OpaqueTypeArchetypeType *OpaqueTypeArchetypeType::getNew(
     ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
     LayoutConstraint layout) {
   auto properties = getOpaqueTypeArchetypeProperties(
-      environment->getOpaqueSubstitutions());
+      environment->getOuterSubstitutions());
   auto arena = getArena(properties);
   auto size = OpaqueTypeArchetypeType::totalSizeToAlloc<
       ProtocolDecl *, Type, LayoutConstraint>(
@@ -5353,7 +5356,7 @@ CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
 
   auto *genericEnv =
     GenericEnvironment::forOpenedExistential(
-      existential, GenericSignature(), *knownID);
+      existential, SubstitutionMap(), *knownID);
 
   // Map the interface type into that environment.
   auto result = genericEnv->mapTypeIntoContext(interfaceType)
@@ -5508,10 +5511,11 @@ GenericEnvironment *GenericEnvironment::forPrimary(GenericSignature signature) {
 
   // Allocate and construct the new environment.
   unsigned numGenericParams = signature.getGenericParams().size();
-  size_t bytes = totalSizeToAlloc<OpaqueEnvironmentData,
+  size_t bytes = totalSizeToAlloc<SubstitutionMap,
+                                  OpaqueEnvironmentData,
                                   OpenedExistentialEnvironmentData,
                                   OpenedElementEnvironmentData, Type>(
-      0, 0, 0, numGenericParams);
+      0, 0, 0, 0, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
   return new (mem) GenericEnvironment(signature);
 }
@@ -5537,10 +5541,11 @@ GenericEnvironment *GenericEnvironment::forOpaqueType(
     // Allocate and construct the new environment.
     auto signature = opaque->getOpaqueInterfaceGenericSignature();
     unsigned numGenericParams = signature.getGenericParams().size();
-    size_t bytes = totalSizeToAlloc<OpaqueEnvironmentData,
+    size_t bytes = totalSizeToAlloc<SubstitutionMap,
+                                  OpaqueEnvironmentData,
                                     OpenedExistentialEnvironmentData,
                                     OpenedElementEnvironmentData, Type>(
-        1, 0, 0, numGenericParams);
+        1, 1, 0, 0, numGenericParams);
     void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment), arena);
     env = new (mem) GenericEnvironment(signature, opaque, subs);
 
@@ -5553,7 +5558,7 @@ GenericEnvironment *GenericEnvironment::forOpaqueType(
 /// Create a new generic environment for an opened archetype.
 GenericEnvironment *
 GenericEnvironment::forOpenedExistential(
-    Type existential, GenericSignature parentSig, UUID uuid) {
+    Type existential, SubstitutionMap subs, UUID uuid) {
   assert(existential->isExistentialType());
   // FIXME: Opened archetypes can't be transformed because the
   // the identity of the archetype has to be preserved. This
@@ -5567,32 +5572,36 @@ GenericEnvironment::forOpenedExistential(
 
   auto &ctx = existential->getASTContext();
 
+  auto key = std::make_pair(subs, uuid);
+
   auto &openedExistentialEnvironments =
       ctx.getImpl().OpenedExistentialEnvironments;
-  auto found = openedExistentialEnvironments.find(uuid);
+  auto found = openedExistentialEnvironments.find(key);
 
   if (found != openedExistentialEnvironments.end()) {
     auto *existingEnv = found->second;
     assert(existingEnv->getOpenedExistentialType()->isEqual(existential));
-    assert(existingEnv->getOpenedExistentialParentSignature().getPointer() == parentSig.getPointer());
+    assert(existingEnv->getOuterSubstitutions() == subs);
     assert(existingEnv->getOpenedExistentialUUID() == uuid);
 
     return existingEnv;
   }
 
+  auto parentSig = subs.getGenericSignature().getCanonicalSignature();
   auto signature = ctx.getOpenedExistentialSignature(existential, parentSig);
 
   // Allocate and construct the new environment.
   unsigned numGenericParams = signature.getGenericParams().size();
-  size_t bytes = totalSizeToAlloc<OpaqueEnvironmentData,
+  size_t bytes = totalSizeToAlloc<SubstitutionMap,
+                                  OpaqueEnvironmentData,
                                   OpenedExistentialEnvironmentData,
                                   OpenedElementEnvironmentData, Type>(
-      0, 1, 0, numGenericParams);
+      1, 0, 1, 0, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
   auto *genericEnv =
-      new (mem) GenericEnvironment(signature, existential, parentSig, uuid);
+      new (mem) GenericEnvironment(signature, existential, subs, uuid);
 
-  openedExistentialEnvironments[uuid] = genericEnv;
+  openedExistentialEnvironments[key] = genericEnv;
 
   return genericEnv;
 }
@@ -5621,11 +5630,12 @@ GenericEnvironment::forOpenedElement(GenericSignature signature,
   // Allocate and construct the new environment.
   unsigned numGenericParams = signature.getGenericParams().size();
   unsigned numOpenedParams = signature.getInnermostGenericParams().size();
-  size_t bytes = totalSizeToAlloc<OpaqueEnvironmentData,
+  size_t bytes = totalSizeToAlloc<SubstitutionMap,
+                                  OpaqueEnvironmentData,
                                   OpenedExistentialEnvironmentData,
                                   OpenedElementEnvironmentData,
                                   Type>(
-      0, 0, 1, numGenericParams + numOpenedParams);
+      1, 0, 0, 1, numGenericParams + numOpenedParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
   auto *genericEnv = new (mem) GenericEnvironment(signature,
                                                   uuid, shapeClass,

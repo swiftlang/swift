@@ -3569,7 +3569,7 @@ OpaqueTypeDecl *OpaqueTypeArchetypeType::getDecl() const {
 }
 
 SubstitutionMap OpaqueTypeArchetypeType::getSubstitutions() const {
-  return Environment->getOpaqueSubstitutions();
+  return Environment->getOuterSubstitutions();
 }
 
 OpenedArchetypeType::OpenedArchetypeType(
