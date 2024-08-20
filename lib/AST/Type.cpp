@@ -1304,7 +1304,7 @@ ParameterListInfo::ParameterListInfo(
   implicitSelfCapture.resize(params.size());
   inheritActorContext.resize(params.size());
   variadicGenerics.resize(params.size());
-  isPassedToSending.resize(params.size());
+  sendingParameters.resize(params.size());
 
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
@@ -1370,7 +1370,7 @@ ParameterListInfo::ParameterListInfo(
     }
 
     if (param->isSending()) {
-      isPassedToSending.set(i);
+      sendingParameters.set(i);
     }
   }
 }
@@ -1412,8 +1412,8 @@ bool ParameterListInfo::isVariadicGenericParameter(unsigned paramIdx) const {
       : false;
 }
 
-bool ParameterListInfo::isPassedToSendingParameter(unsigned paramIdx) const {
-  return paramIdx < isPassedToSending.size() ? isPassedToSending[paramIdx]
+bool ParameterListInfo::isSendingParameter(unsigned paramIdx) const {
+  return paramIdx < sendingParameters.size() ? sendingParameters[paramIdx]
                                              : false;
 }
 

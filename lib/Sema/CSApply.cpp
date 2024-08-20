@@ -6206,8 +6206,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     // implicit self capture or inheriting actor context.
     bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
     bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
-    bool isPassedToSendingParameter =
-        paramInfo.isPassedToSendingParameter(paramIdx);
+    bool isPassedToSendingParameter = paramInfo.isSendingParameter(paramIdx);
 
     applyContextualClosureFlags(argExpr, isImplicitSelfCapture,
                                 inheritsActorContext,
