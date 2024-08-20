@@ -426,12 +426,9 @@ void ExistentialTransform::populateThunkBody() {
     if (iter != ArgToGenericTypeMap.end() &&
         it != ExistentialArgDescriptor.end()) {
       ExistentialTransformArgumentDescriptor &ETAD = it->second;
-      OpenedArchetypeType *Opened;
       auto OrigOperand = ThunkBody->getArgument(ArgDesc.Index);
       auto SwiftType = ArgDesc.Arg->getType().getASTType();
-      auto OpenedType =
-          SwiftType
-              ->openAnyExistentialType(Opened, F->getGenericSignature())
+      auto OpenedType = OpenedArchetypeType::getAny(SwiftType)
               ->getCanonicalType();
       auto OpenedSILType = NewF->getLoweredType(OpenedType);
       SILValue archetypeValue;

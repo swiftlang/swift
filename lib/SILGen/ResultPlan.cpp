@@ -929,10 +929,6 @@ public:
 
         bool checkedBridging = ctx.LangOpts.UseCheckedAsyncObjCBridging;
 
-        auto env = SGF.F.getGenericEnvironment();
-        auto sig = env ? env->getGenericSignature().getCanonicalSignature()
-                       : CanGenericSignature();
-
         // Load unsafe or checked continuation from the block storage
         // and call _resume{Unsafe, Checked}ThrowingContinuationWithError.
 
@@ -944,7 +940,7 @@ public:
           FormalEvaluationScope scope(SGF);
 
           auto underlyingValueTy =
-              OpenedArchetypeType::get(ctx.TheAnyType, sig);
+              OpenedArchetypeType::get(ctx.TheAnyType);
 
           auto underlyingValueAddr = SGF.emitOpenExistential(
               loc, ManagedValue::forTrivialAddressRValue(continuationAddr),
@@ -961,7 +957,7 @@ public:
         }
 
         auto mappedOutContinuationTy =
-            continuationTy->mapTypeOutOfContext()->getReducedType(sig);
+            continuationTy->mapTypeOutOfContext()->getCanonicalType();
         auto resumeType =
             cast<BoundGenericType>(mappedOutContinuationTy).getGenericArgs()[0];
 
