@@ -357,7 +357,7 @@ protected:
   // for the inline bitfields.
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1+1+1+1+1+1+1,
     Kind : bitmax(NumDeclKindBits,8),
 
     /// Whether this declaration is invalid.
@@ -371,10 +371,6 @@ protected:
     ///
     /// Use getClangNode() to retrieve the corresponding Clang AST.
     FromClang : 1,
-
-    /// Whether this declaration was added to the surrounding
-    /// DeclContext of an active #if config clause.
-    EscapedFromIfConfig : 1,
 
     /// Whether this declaration is syntactically scoped inside of
     /// a local context, but should behave like a top-level
@@ -404,7 +400,13 @@ protected:
 
     /// True if we're in the common case where the SPIGroupsRequest
     /// request returned an empty array of identifiers.
-    NoSPIGroups : 1
+    NoSPIGroups : 1,
+
+    /// True if we have computed whether this declaration is unsafe.
+    IsUnsafeComputed : 1,
+
+    /// True if this declaration has been determined to be "unsafe".
+    IsUnsafe : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(PatternBindingDecl, Decl, 1+1+2+16,
@@ -722,7 +724,7 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -779,6 +781,10 @@ protected:
 
     /// Whether this module has been built with C++ interoperability enabled.
     HasCxxInteroperability : 1,
+
+    /// Whether this module uses the platform default C++ stdlib, or an
+    /// overridden C++ stdlib.
+    CXXStdlibKind : 8,
 
     /// Whether this module has been built with -allow-non-resilient-access.
     AllowNonResilientAccess : 1,
@@ -853,6 +859,7 @@ protected:
   friend class ExpandPeerMacroRequest;
   friend class GlobalActorAttributeRequest;
   friend class SPIGroupsRequest;
+  friend class IsUnsafeRequest;
 
 private:
   llvm::PointerUnion<DeclContext *, ASTContext *> Context;
@@ -912,12 +919,13 @@ protected:
     Bits.Decl.Invalid = false;
     Bits.Decl.Implicit = false;
     Bits.Decl.FromClang = false;
-    Bits.Decl.EscapedFromIfConfig = false;
     Bits.Decl.Hoisted = false;
     Bits.Decl.LacksObjCInterfaceOrImplementation = false;
     Bits.Decl.NoMemberAttributeMacros = false;
     Bits.Decl.NoGlobalActorAttribute = false;
     Bits.Decl.NoSPIGroups = false;
+    Bits.Decl.IsUnsafeComputed = false;
+    Bits.Decl.IsUnsafe = false;
   }
 
   /// Get the Clang node associated with this declaration.
@@ -1067,7 +1075,8 @@ public:
   /// Returns the OS version in which the decl became ABI as specified by the
   /// `@backDeployed` attribute.
   std::optional<llvm::VersionTuple>
-  getBackDeployedBeforeOSVersion(ASTContext &Ctx) const;
+  getBackDeployedBeforeOSVersion(ASTContext &Ctx,
+                                 bool forTargetVariant = false) const;
 
   /// Returns true if the decl has an active `@backDeployed` attribute for the
   /// given context.
@@ -1175,15 +1184,26 @@ public:
   /// Whether this declaration predates the introduction of concurrency.
   bool preconcurrency() const;
 
+  /// Whether this declaration is considered "unsafe", i.e., should not be
+  /// used in a "safe" dialect.
+  bool isUnsafe() const;
+
+private:
+  bool isUnsafeComputed() const {
+    return Bits.Decl.IsUnsafeComputed;
+  }
+
+  bool isUnsafeRaw() const {
+    return Bits.Decl.IsUnsafe;
+  }
+
+  void setUnsafe(bool value) {
+    assert(!Bits.Decl.IsUnsafeComputed);
+    Bits.Decl.IsUnsafe = value;
+    Bits.Decl.IsUnsafeComputed = true;
+  }
+
 public:
-  bool escapedFromIfConfig() const {
-    return Bits.Decl.EscapedFromIfConfig;
-  }
-
-  void setEscapedFromIfConfig(bool Escaped) {
-    Bits.Decl.EscapedFromIfConfig = Escaped;
-  }
-
   bool getSemanticAttrsComputed() const {
     return Bits.Decl.SemanticAttrsComputed;
   }
@@ -1200,6 +1220,9 @@ public:
   std::optional<StringRef> getSourceFileName() const;
 
   std::optional<unsigned> getSourceOrder() const;
+
+  /// Get the declaration that actually provides a doc comment for another.
+  const Decl *getDocCommentProvidingDecl() const;
 
   /// \returns The brief comment attached to this declaration, or the brief
   /// comment attached to the comment providing decl.
@@ -2965,6 +2988,14 @@ public:
   /// \c \@usableFromInline, \c \@inlinalbe, and \c \@_alwaysEmitIntoClient
   bool isUsableFromInline() const;
 
+  /// Treat as public and allow skipping access checks if the following conditions
+  /// are met:
+  /// - This decl has a package access level,
+  /// - Has a @usableFromInline (or other inlinable) attribute,
+  /// - And is defined in a module built from a public or private
+  ///   interface that does not contain package-name.
+  bool isInterfacePackageEffectivelyPublic() const;
+
   /// Returns \c true if this declaration is *not* intended to be used directly
   /// by application developers despite the visibility.
   bool shouldHideFromEditor() const;
@@ -4724,6 +4755,15 @@ public:
   ///
   /// \sa isEffectivelyExhaustive
   bool isFormallyExhaustive(const DeclContext *useDC) const;
+
+  /// True if \s isFormallyExhaustive is true or the use site's module belongs
+  /// to the same package as this enum's defining module. If in same package
+  /// even though `isFormallyExhaustive` is false, we can skip requiring
+  /// `@unknown default` at the use site switch stmts because package modules
+  /// are expected to be built together whether they are resiliently built or
+  /// not. Used for diagnostics during typechecks only; if
+  /// `isFormallyExhaustive` is false, it should be reflected in SILgen.
+  bool treatAsExhaustiveForDiags(const DeclContext *useDC) const;
 
   /// True if the enum can be exhaustively switched within a function defined
   /// within \p M, with \p expansion specifying whether the function is

@@ -467,7 +467,7 @@ def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
   HelpText<"Debug generic signatures">;
 
 def debug_inverse_requirements : Flag<["-"], "debug-inverse-requirements">,
-  HelpText<"Print real requirements in -debug_generic_signatures output">;
+  HelpText<"Print real requirements in -debug-generic-signatures output">;
 
 def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-prefix">,
   HelpText<"Triggers llvm fatal_error if typechecker tries to typecheck a decl "
@@ -539,6 +539,11 @@ def enable_spec_devirt : Flag<["-"], "enable-spec-devirt">,
 
 def enable_async_demotion : Flag<["-"], "enable-experimental-async-demotion">,
   HelpText<"Enables an optimization pass to demote async functions.">;
+
+def enable_throws_prediction : Flag<["-"], "enable-throws-prediction">,
+  HelpText<"Enables optimization assumption that functions rarely throw errors.">;
+def disable_throws_prediction : Flag<["-"], "disable-throws-prediction">,
+  HelpText<"Disables optimization assumption that functions rarely throw errors.">;
 
 def disable_access_control : Flag<["-"], "disable-access-control">,
   HelpText<"Don't respect access control restrictions">;
@@ -799,7 +804,7 @@ def warn_long_function_bodies_EQ : Joined<["-"], "warn-long-function-bodies=">,
 
 def warn_long_expression_type_checking : Separate<["-"], "warn-long-expression-type-checking">,
   MetaVarName<"<n>">,
-  HelpText<"Warns when type-checking a function takes longer than <n> ms">;
+  HelpText<"Warns when type-checking an expression takes longer than <n> ms">;
 def warn_long_expression_type_checking_EQ : Joined<["-"], "warn-long-expression-type-checking=">,
   Alias<warn_long_expression_type_checking>;
 
@@ -1305,6 +1310,13 @@ def disable_fragile_resilient_protocol_witnesses :
   Flag<["-"], "disable-fragile-relative-protocol-tables">,
   HelpText<"Disable relative protocol witness tables">;
 
+def enable_split_cold_code :
+  Flag<["-"], "enable-split-cold-code">,
+  HelpText<"Enable splitting of cold code when optimizing">;
+def disable_split_cold_code :
+  Flag<["-"], "disable-split-cold-code">,
+  HelpText<"Disable splitting of cold code when optimizing">;
+
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,
   HelpText<"Enable the new llvm pass manager">;
@@ -1386,6 +1398,8 @@ def disable_sending_args_and_results_with_region_isolation : Flag<["-"],
   HelpText<"Disable sending args and results when region based isolation is enabled. Only enabled with asserts">,
   Flags<[HelpHidden]>;
 
+def scanner_module_validation: Flag<["-"], "scanner-module-validation">,
+    HelpText<"Validate binary modules in the dependency scanner">;
 def no_scanner_module_validation: Flag<["-"], "no-scanner-module-validation">,
     HelpText<"Do not validate binary modules in scanner and delegate the validation to swift-frontend">;
 def module_load_mode: Separate<["-"], "module-load-mode">,

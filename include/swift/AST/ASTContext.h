@@ -734,6 +734,13 @@ public:
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl() const;
 
+  // Retrieve the declaration of Swift._stdlib_isVariantOSVersionAtLeast.
+  FuncDecl *getIsVariantOSVersionAtLeastDecl() const;
+
+  // Retrieve the declaration of
+  // Swift._stdlib_isOSVersionAtLeastOrVariantVersionAtLeast.
+  FuncDecl *getIsOSVersionAtLeastOrVariantVersionAtLeast() const;
+
   /// Look for the declaration with the given name within the
   /// passed in module.
   void lookupInModule(ModuleDecl *M, StringRef name,

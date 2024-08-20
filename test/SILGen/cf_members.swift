@@ -19,9 +19,10 @@ public func foo(_ x: Double) {
   // CHECK: [[GLOBALVAR:%.*]] = global_addr @IAMStruct1GlobalVar
   // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[GLOBALVAR]] : $*Double
   // CHECK: [[ZZ:%.*]] = load [trivial] [[READ]]
+  // CHECK: [[MV:%.*]] = move_value [var_decl] [[ZZ]] : $Double
   let zz = Struct1.globalVar
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[GLOBALVAR]] : $*Double
-  // CHECK: assign [[ZZ]] to [[WRITE]]
+  // CHECK: assign [[MV]] to [[WRITE]]
   Struct1.globalVar = zz
 
   // CHECK: [[Z:%.*]] = project_box
@@ -39,7 +40,7 @@ public func foo(_ x: Double) {
 
   // CHECK: [[FN:%.*]] = function_ref @$s10cf_members3fooyySdFSo10IAMStruct1VSdcfu_ : $@convention(thin) (Double) -> Struct1
   // CHECK: [[A:%.*]] = thin_to_thick_function [[FN]]
-  // CHECK: [[MOVED_A:%.*]] = move_value [var_decl] [[A]]
+  // CHECK: [[MOVED_A:%.*]] = move_value [lexical] [var_decl] [[A]]
   // CHECK: [[BORROWED_A:%.*]] = begin_borrow [[MOVED_A]]
   // CHECK: [[COPIED_A:%.*]] = copy_value [[BORROWED_A]]
   // CHECK: [[BORROWED_A:%.*]] = begin_borrow [[COPIED_A]]
@@ -81,7 +82,7 @@ public func foo(_ x: Double) {
   z = c(x)
   // CHECK: [[THUNK:%.*]] = function_ref @$s10cf_members3fooyySdFSo10IAMStruct1VSdcADcfu2_ : $@convention(thin) (Struct1) -> @owned @callee_guaranteed (Double) -> Struct1
   // CHECK: [[THICK:%.*]] = thin_to_thick_function [[THUNK]]
-  // CHECK: [[MOVED_THICK:%.*]] = move_value [var_decl] [[THICK]]
+  // CHECK: [[MOVED_THICK:%.*]] = move_value [lexical] [var_decl] [[THICK]]
   // CHECK: [[BORROWED_THICK:%.*]] = begin_borrow [[MOVED_THICK]]
   // CHECK: [[COPIED_THICK:%.*]] = copy_value [[BORROWED_THICK]]
   let d: (Struct1) -> (Double) -> Struct1 = Struct1.translate(radians:)
@@ -162,7 +163,7 @@ public func foo(_ x: Double) {
   var y = Struct1.staticMethod()
   // CHECK: [[THUNK:%.*]] = function_ref @$s10cf_members3fooyySdFs5Int32Vycfu8_ : $@convention(thin) () -> Int32 
   // CHECK: [[I2:%.*]] = thin_to_thick_function [[THUNK]]
-  // CHECK: [[MOVED_I2:%.*]] = move_value [var_decl] [[I2]]
+  // CHECK: [[MOVED_I2:%.*]] = move_value [lexical] [var_decl] [[I2]]
   // CHECK: [[BORROWED_I2:%.*]] = begin_borrow [[MOVED_I2]]
   // CHECK: [[COPIED_I2:%.*]] = copy_value [[BORROWED_I2]]
   let i = Struct1.staticMethod

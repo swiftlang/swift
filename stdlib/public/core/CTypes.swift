@@ -25,10 +25,14 @@ public typealias CUnsignedChar = UInt8
 public typealias CUnsignedShort = UInt16
 
 /// The C 'unsigned int' type.
+#if  _pointerBitWidth(_16)
+public typealias CUnsignedInt = UInt
+#else
 public typealias CUnsignedInt = UInt32
+#endif
 
 /// The C 'unsigned long' type.
-#if os(Windows) && (arch(x86_64) || arch(arm64))
+#if (os(Windows) && (arch(x86_64) || arch(arm64))) || _pointerBitWidth(_16)
 public typealias CUnsignedLong = UInt32
 #else
 public typealias CUnsignedLong = UInt
@@ -44,10 +48,14 @@ public typealias CSignedChar = Int8
 public typealias CShort = Int16
 
 /// The C 'int' type.
+#if  _pointerBitWidth(_16)
+public typealias CInt = Int
+#else
 public typealias CInt = Int32
+#endif
 
 /// The C 'long' type.
-#if os(Windows) && (arch(x86_64) || arch(arm64))
+#if (os(Windows) && (arch(x86_64) || arch(arm64))) || _pointerBitWidth(_16)
 public typealias CLong = Int32
 #else
 public typealias CLong = Int
@@ -142,6 +150,7 @@ public typealias CBool = Bool
 /// Opaque pointers are used to represent C pointers to types that
 /// cannot be represented in Swift, such as incomplete struct types.
 @frozen
+@unsafe
 public struct OpaquePointer {
   @usableFromInline
   internal var _rawValue: Builtin.RawPointer

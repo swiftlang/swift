@@ -23,6 +23,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Comment.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
@@ -351,11 +352,6 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
           if (!shouldPrint(element, optionsCopy))
             return false;
         }
-      }
-
-      if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
-        if (accessor->isInitAccessor() && !options.PrintForSIL)
-          return false;
       }
 
       return ShouldPrintChecker::shouldPrint(D, options);
@@ -748,7 +744,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
   void printSwiftDocumentationComment(const Decl *D) {
     if (Options.CascadeDocComment)
-      D = getDocCommentProvidingDecl(D);
+      D = D->getDocCommentProvidingDecl();
     if (!D)
       return;
     auto RC = D->getRawComment();
@@ -1804,7 +1800,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
         return type;
       },
       [&](CanType depType, Type substType, ProtocolDecl *proto) {
-        return ModuleDecl::lookupConformance(substType, proto);
+        return lookupConformance(substType, proto);
       });
   };
 
@@ -2027,6 +2023,9 @@ void PrintAST::printRequirement(const Requirement &req) {
   SmallVector<Type, 2> rootParameterPacks;
   getTransformedType(req.getFirstType())
       ->getTypeParameterPacks(rootParameterPacks);
+  if (req.getKind() != RequirementKind::Layout)
+    getTransformedType(req.getSecondType())
+        ->getTypeParameterPacks(rootParameterPacks);
   bool isPackRequirement = !rootParameterPacks.empty();
 
   switch (req.getKind()) {
@@ -3053,6 +3052,15 @@ suppressingFeatureBitwiseCopyable2(PrintOptions &options,
                                    llvm::function_ref<void()> action) {
   unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
   llvm::SaveAndRestore<bool> scope(options.SuppressBitwiseCopyable, true);
+  action();
+  options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
+static void
+suppressingFeatureAllowUnsafeAttribute(PrintOptions &options,
+                                       llvm::function_ref<void()> action) {
+  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
+  options.ExcludeAttrList.push_back(DeclAttrKind::Unsafe);
   action();
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
@@ -4285,13 +4293,15 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
     // Protocol extension initializers are modeled as convenience initializers,
     // but they're not written that way in source. Check if we're actually
     // printing onto a class.
-    ClassDecl *classDecl = CurrentType
-                               ? CurrentType->getClassOrBoundGenericClass()
-                               : decl->getDeclContext()->getSelfClassDecl();
-    if (classDecl) {
-      // Convenience intializers are also unmarked on actors.
-      if (!classDecl->isActor())
-        Printer.printKeyword("convenience", Options, " ");
+    bool isClassContext;
+    if (CurrentType) {
+      isClassContext = CurrentType->getClassOrBoundGenericClass() != nullptr;
+    } else {
+      const DeclContext *dc = decl->getDeclContext();
+      isClassContext = dc->getSelfClassDecl() != nullptr;
+    }
+    if (isClassContext) {
+      Printer.printKeyword("convenience", Options, " ");
     } else {
       assert(decl->getDeclContext()->getExtendedProtocolDecl() &&
              "unexpected convenience initializer");
@@ -5875,8 +5885,8 @@ public:
         Printer << "error_expr";
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         visit(DMT);
-      } else if (originator.is<PlaceholderTypeRepr *>()) {
-        Printer << "placeholder_type_repr";
+      } else if (originator.is<TypeRepr *>()) {
+        Printer << "type_repr";
       } else {
         assert(false && "unknown originator");
       }
@@ -6133,11 +6143,11 @@ public:
       // FIXME: We need to replace nested existential metatypes so that
       // we don't print duplicate 'any'. This will be unnecessary once
       // ExistentialMetatypeType is split into ExistentialType(MetatypeType).
-      printWithParensIfNotSimple(instanceType.transform([](Type type) -> Type {
-        if (auto existential = type->getAs<ExistentialMetatypeType>())
+      printWithParensIfNotSimple(instanceType.transformRec([](Type t) -> std::optional<Type> {
+        if (auto existential = t->getAs<ExistentialMetatypeType>())
           return MetatypeType::get(existential->getInstanceType());
 
-        return type;
+        return std::nullopt;
       }));
     } else {
       assert(T->is<MetatypeType>());
@@ -7182,7 +7192,7 @@ public:
       }
 
       // Print based on the type.
-      Printer << "some ";
+      Printer.printKeyword("some", Options, /*Suffix=*/" ");
       auto archetypeType = decl->getDeclContext()->mapTypeIntoContext(
           decl->getDeclaredInterfaceType())->castTo<ArchetypeType>();
       auto constraintType = archetypeType->getExistentialType();

@@ -10,44 +10,44 @@ import SwiftShims
 
 @inline(never) func log(_ s: StaticString)
 
-@_moveOnly struct S1 {
+struct S1: ~Copyable {
   deinit
 }
 
-@_moveOnly struct S2 {
+struct S2: ~Copyable {
   deinit
 }
 
-@_moveOnly struct S3<T> {
+struct S3<T>: ~Copyable {
   @_hasStorage let t: T
   deinit
 }
 
-@_moveOnly enum E1 {
+enum E1: ~Copyable {
   case A(Int)
   case B
   case C(S1)
 }
 
-@_moveOnly enum E2 {
+enum E2: ~Copyable {
   case A
   case B(E1)
   case C(S2)
 }
 
-@_moveOnly struct StrWithoutDeinit {
+struct StrWithoutDeinit: ~Copyable {
   @_hasStorage var a: S1
   @_hasStorage var b: S2
   @_hasStorage let c: Int
 }
 
-@_moveOnly struct S4 {
+struct S4: ~Copyable {
   @_hasStorage var a: S1
   @_hasStorage var b: S2
   deinit
 }
 
-@_moveOnly struct S5 {
+struct S5: ~Copyable {
   @_hasStorage let a: Int
   @_hasStorage let b: AnyObject
 }
@@ -280,6 +280,16 @@ sil [ossa] @nonCopyable_generic : $@convention(thin) <T where T : ~Copyable> (@i
 bb0(%0 : $*T):
   destroy_addr %0 : $*T
   %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_non_ossa :
+// CHECK:         destroy_addr %0
+// CHECK:       } // end sil function 'test_non_ossa'
+sil @test_non_ossa : $@convention(thin) (@in S1) -> () {
+bb0(%0 : $*S1):
+  destroy_addr %0 : $*S1
+  %r = tuple()
   return %r : $()
 }
 

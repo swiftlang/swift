@@ -359,6 +359,7 @@ func testExistentialPropertyRead<T: ExistentialProperty>(_ t: inout T) {
 // CHECK-NEXT: [[OPEN:%.*]] = open_existential_addr immutable_access [[P_TEMP]] : $*any PropertyWithGetterSetter to $*[[P_OPENED:@opened\(.*, any PropertyWithGetterSetter\) Self]]
 // CHECK-NEXT: [[B_GETTER:%.*]] = witness_method $[[P_OPENED]], #PropertyWithGetterSetter.b!getter
 // CHECK-NEXT: apply [[B_GETTER]]<[[P_OPENED]]>([[OPEN]])
+// CHECK-NEXT: move_value [var_decl]
 // CHECK-NEXT: debug_value
 // CHECK-NOT:  witness_method
 // CHECK:      return

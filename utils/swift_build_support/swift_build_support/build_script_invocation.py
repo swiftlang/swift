@@ -112,7 +112,6 @@ class BuildScriptInvocation(object):
             "--lldb-build-type", args.lldb_build_variant,
             "--foundation-build-type", args.foundation_build_variant,
             "--libdispatch-build-type", args.libdispatch_build_variant,
-            "--libicu-build-type", args.libicu_build_variant,
             "--xctest-build-type", args.build_variant,
             "--llbuild-build-type", args.build_variant,
             "--swift-enable-assertions", str(args.swift_assertions).lower(),
@@ -274,7 +273,6 @@ class BuildScriptInvocation(object):
             (args.build_llbuild, "llbuild"),
             (args.build_libcxx, "libcxx"),
             (args.build_libdispatch, "libdispatch"),
-            (args.build_libicu, "libicu"),
             (args.build_libxml2, 'libxml2'),
             (args.build_zlib, 'zlib'),
             (args.build_curl, 'curl')
@@ -310,7 +308,6 @@ class BuildScriptInvocation(object):
                 "--skip-test-xctest",
                 "--skip-test-foundation",
                 "--skip-test-libdispatch",
-                "--skip-test-libicu",
             ]
         if args.build_runtime_with_host_compiler:
             impl_args += ["--build-runtime-with-host-compiler"]
@@ -637,8 +634,6 @@ class BuildScriptInvocation(object):
 
         builder.add_impl_product(products.LibCXX,
                                  is_enabled=self.args.build_libcxx)
-        builder.add_impl_product(products.LibICU,
-                                 is_enabled=self.args.build_libicu)
         builder.add_impl_product(products.Swift,
                                  is_enabled=self.args.build_swift)
         builder.add_impl_product(products.LLDB,
@@ -677,8 +672,16 @@ class BuildScriptInvocation(object):
 
         builder.add_product(products.SwiftPM,
                             is_enabled=self.args.build_swiftpm)
+        builder.add_product(products.SwiftFoundationTests,
+                            is_enabled=self.args.build_foundation)
+        builder.add_product(products.FoundationTests,
+                            is_enabled=self.args.build_foundation)
         builder.add_product(products.SwiftSyntax,
                             is_enabled=self.args.build_swiftsyntax)
+        builder.add_product(products.SwiftTestingMacros,
+                            is_enabled=self.args.build_swift_testing_macros)
+        builder.add_product(products.SwiftTesting,
+                            is_enabled=self.args.build_swift_testing)
         builder.add_product(products.SwiftFormat,
                             is_enabled=self.args.build_swiftformat)
         builder.add_product(products.SKStressTester,

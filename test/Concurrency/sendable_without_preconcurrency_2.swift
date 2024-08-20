@@ -29,12 +29,12 @@ struct MyType2: Sendable {
 }
 
 func testA(ns: NS, mt: MyType, mt2: MyType2, sc: StrictClass, nsc: NonStrictClass) async {
-  Task { // expected-tns-warning {{task-isolated value of type '() async -> ()' passed as a strongly transferred parameter}}
+  Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
     print(ns)
     print(mt) // no warning with targeted: MyType is Sendable because we suppressed NonStrictClass's warning
     print(mt2)
     print(sc)
-    print(nsc)
+    print(nsc) // expected-tns-note {{closure captures 'nsc' which is accessible to code in the current task}}
   }
 }
 

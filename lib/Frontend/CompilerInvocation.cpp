@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "clang/Driver/Driver.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Frontend/Frontend.h"
@@ -232,8 +233,35 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   if (LangOpts.hasFeature(Feature::Embedded))
     LibSubDir = "embedded";
 
-  llvm::sys::path::append(LibPath, LibSubDir);
   SearchPathOpts.RuntimeLibraryPaths.clear();
+
+#if defined(_WIN32)
+  // Resource path looks like this:
+  //
+  //   C:\...\Swift\Toolchains\6.0.0+Asserts\usr\lib\swift
+  //
+  // The runtimes are in
+  //
+  //   C:\...\Swift\Runtimes\6.0.0\usr\bin
+  //
+  llvm::SmallString<128> RuntimePath(LibPath);
+
+  llvm::sys::path::remove_filename(RuntimePath);
+  llvm::sys::path::remove_filename(RuntimePath);
+  llvm::sys::path::remove_filename(RuntimePath);
+
+  llvm::SmallString<128> VersionWithAttrs(llvm::sys::path::filename(RuntimePath));
+  size_t MaybePlus = VersionWithAttrs.find_first_of('+');
+  StringRef Version = VersionWithAttrs.substr(0, MaybePlus);
+
+  llvm::sys::path::remove_filename(RuntimePath);
+  llvm::sys::path::remove_filename(RuntimePath);
+  llvm::sys::path::append(RuntimePath, "Runtimes", Version, "usr", "bin");
+
+  SearchPathOpts.RuntimeLibraryPaths.push_back(std::string(RuntimePath.str()));
+#endif
+
+  llvm::sys::path::append(LibPath, LibSubDir);
   SearchPathOpts.RuntimeLibraryPaths.push_back(std::string(LibPath.str()));
   if (Triple.isOSDarwin())
     SearchPathOpts.RuntimeLibraryPaths.push_back(DARWIN_OS_LIBRARY_PATH);
@@ -333,6 +361,43 @@ setBridgingHeaderFromFrontendOptions(ClangImporterOptions &ImporterOpts,
 
   ImporterOpts.BridgingHeader =
       FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput();
+}
+
+void CompilerInvocation::computeCXXStdlibOptions() {
+  auto [clangDriver, clangDiagEngine] =
+      ClangImporter::createClangDriver(LangOpts, ClangImporterOpts);
+  auto clangDriverArgs = ClangImporter::createClangArgs(
+      ClangImporterOpts, SearchPathOpts, clangDriver);
+  auto &clangToolchain =
+      clangDriver.getToolChain(clangDriverArgs, LangOpts.Target);
+  auto cxxStdlibKind = clangToolchain.GetCXXStdlibType(clangDriverArgs);
+  auto cxxDefaultStdlibKind = clangToolchain.GetDefaultCXXStdlibType();
+
+  auto toCXXStdlibKind =
+      [](clang::driver::ToolChain::CXXStdlibType clangCXXStdlibType)
+      -> CXXStdlibKind {
+    switch (clangCXXStdlibType) {
+    case clang::driver::ToolChain::CST_Libcxx:
+      return CXXStdlibKind::Libcxx;
+    case clang::driver::ToolChain::CST_Libstdcxx:
+      return CXXStdlibKind::Libstdcxx;
+    }
+  };
+
+  // The MSVC driver in Clang is not aware of the C++ stdlib, and currently
+  // always assumes libstdc++, which is incorrect: the Microsoft stdlib is
+  // normally used.
+  if (LangOpts.Target.isOSWindows()) {
+    // In the future, we should support libc++ on Windows. That would require
+    // the MSVC driver to support it first
+    // (see https://reviews.llvm.org/D101479).
+    LangOpts.CXXStdlib = CXXStdlibKind::Msvcprt;
+    LangOpts.PlatformDefaultCXXStdlib = CXXStdlibKind::Msvcprt;
+  }
+  if (LangOpts.Target.isOSLinux() || LangOpts.Target.isOSDarwin()) {
+    LangOpts.CXXStdlib = toCXXStdlibKind(cxxStdlibKind);
+    LangOpts.PlatformDefaultCXXStdlib = toCXXStdlibKind(cxxDefaultStdlibKind);
+  }
 }
 
 void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
@@ -713,9 +778,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.AttachCommentsToDecls |= Args.hasArg(OPT_dump_api_path);
 
   Opts.UseMalloc |= Args.hasArg(OPT_use_malloc);
-
-  Opts.DiagnosticsEditorMode |= Args.hasArg(OPT_diagnostics_editor_mode,
-                                            OPT_serialize_diagnostics_path);
 
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
@@ -1575,7 +1637,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       HadError = true;
     }
 
-    if (!FrontendOpts.InputsAndOutputs.isWholeModule()) {
+    if (!FrontendOpts.InputsAndOutputs.isWholeModule() && FrontendOptions::doesActionGenerateSIL(FrontendOpts.RequestedAction)) {
       Diags.diagnose(SourceLoc(), diag::wmo_with_embedded);
       HadError = true;
     }
@@ -1605,10 +1667,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DisableDynamicActorIsolation |=
       Args.hasArg(OPT_disable_dynamic_actor_isolation);
-
-  // @DebugDescription uses @_section and @_used attributes.
-  if (Opts.hasFeature(Feature::DebugDescriptionMacro))
-    Opts.enableFeature(Feature::SymbolLinkageMarkers);
 
 #if SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION
   /// Enable round trip parsing via the new swift parser unless it is disabled
@@ -2009,6 +2067,7 @@ static bool validateSwiftModuleFileArgumentAndAdd(const std::string &swiftModule
 
 static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
                                 DiagnosticEngine &Diags,
+                                const CASOptions &CASOpts,
                                 StringRef workingDirectory) {
   using namespace options;
   namespace path = llvm::sys::path;
@@ -2176,8 +2235,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     Opts.ScannerPrefixMapper.push_back(Opt.str());
   }
 
-  Opts.NoScannerModuleValidation |=
-      Args.hasArg(OPT_no_scanner_module_validation);
+  // rdar://132340493 disable scanner-side validation for non-caching builds
+  Opts.ScannerModuleValidation |= Args.hasFlag(OPT_scanner_module_validation,
+                                               OPT_no_scanner_module_validation,
+                                               CASOpts.EnableCaching);
 
   std::optional<std::string> forceModuleLoadingMode;
   if (auto *A = Args.getLastArg(OPT_module_load_mode))
@@ -2621,6 +2682,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       OPT_enable_sil_opaque_values, OPT_disable_sil_opaque_values, false);
   Opts.EnableSpeculativeDevirtualization |= Args.hasArg(OPT_enable_spec_devirt);
   Opts.EnableAsyncDemotion |= Args.hasArg(OPT_enable_async_demotion);
+  Opts.EnableThrowsPrediction = Args.hasFlag(
+      OPT_enable_throws_prediction, OPT_disable_throws_prediction,
+      Opts.EnableThrowsPrediction);
   Opts.EnableActorDataRaceChecks |= Args.hasFlag(
       OPT_enable_actor_data_race_checks,
       OPT_disable_actor_data_race_checks, /*default=*/false);
@@ -3383,6 +3447,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_fragile_resilient_protocol_witnesses,
                  OPT_disable_fragile_resilient_protocol_witnesses,
                  Opts.UseFragileResilientProtocolWitnesses);
+  Opts.EnableHotColdSplit =
+      Args.hasFlag(OPT_enable_split_cold_code,
+                   OPT_disable_split_cold_code,
+                   Opts.EnableHotColdSplit);
   Opts.EnableLargeLoadableTypesReg2Mem =
       Args.hasFlag(OPT_enable_large_loadable_types_reg2mem,
                    OPT_disable_large_loadable_types_reg2mem,
@@ -3584,7 +3652,7 @@ bool CompilerInvocation::parseArgs(
   ParseSymbolGraphArgs(SymbolGraphOpts, ParsedArgs, Diags, LangOpts);
 
   if (ParseSearchPathArgs(SearchPathOpts, ParsedArgs, Diags,
-                          workingDirectory)) {
+                          CASOpts, workingDirectory)) {
     return true;
   }
 
@@ -3620,6 +3688,7 @@ bool CompilerInvocation::parseArgs(
   // Now that we've parsed everything, setup some inter-option-dependent state.
   setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);
   setBridgingHeaderFromFrontendOptions(ClangImporterOpts, FrontendOpts);
+  computeCXXStdlibOptions();
   if (LangOpts.hasFeature(Feature::Embedded)) {
     IRGenOpts.InternalizeAtLink = true;
     IRGenOpts.DisableLegacyTypeInfo = true;

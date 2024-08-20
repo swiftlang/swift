@@ -5,8 +5,7 @@
 
 public protocol P {}
 
-@_moveOnly
-public struct M {
+public struct M: ~Copyable {
    private var x: P
    var other: CInt { 0 }
 

@@ -8,10 +8,10 @@ class C {}
 
 sil [ossa] @getC : $@convention(thin) () -> (@owned C)
 
-// CHECK-LABEL: begin running test 1 of 1 on phi_direct_no_lexical: is-lexical
+// CHECK-LABEL: begin running test 1 of 1 on phi_direct_no_lexical: is_lexical
 // CHECK: argument of bb3
 // CHECK: false
-// CHECK-LABEL: end running test 1 of 1 on phi_direct_no_lexical: is-lexical
+// CHECK-LABEL: end running test 1 of 1 on phi_direct_no_lexical: is_lexical
 sil [ossa] @phi_direct_no_lexical : $() -> () {
 entry:
   %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
@@ -23,16 +23,16 @@ right:
   %c2 = apply %getC() : $@convention(thin) () -> (@owned C)
   br exit(%c2 : $C)
 exit(%cm : @owned $C):
-  specify_test "is-lexical @block.argument"
+  specify_test "is_lexical @block.argument"
   destroy_value %cm : $C
   %retval = tuple ()
   return %retval : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on phi_direct_first_lexical: is-lexical
+// CHECK-LABEL: begin running test 1 of 1 on phi_direct_first_lexical: is_lexical
 // CHECK: argument of bb3
 // CHECK: true
-// CHECK-LABEL: end running test 1 of 1 on phi_direct_first_lexical: is-lexical
+// CHECK-LABEL: end running test 1 of 1 on phi_direct_first_lexical: is_lexical
 sil [ossa] @phi_direct_first_lexical : $() -> () {
 entry:
   %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
@@ -45,16 +45,16 @@ right:
   %c2 = apply %getC() : $@convention(thin) () -> (@owned C)
   br exit(%c2 : $C)
 exit(%cm : @owned $C):
-  specify_test "is-lexical @block.argument"
+  specify_test "is_lexical @block.argument"
   destroy_value %cm : $C
   %retval = tuple ()
   return %retval : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on phi_direct_second_lexical: is-lexical
+// CHECK-LABEL: begin running test 1 of 1 on phi_direct_second_lexical: is_lexical
 // CHECK: argument of bb3
 // CHECK: true
-// CHECK-LABEL: end running test 1 of 1 on phi_direct_second_lexical: is-lexical
+// CHECK-LABEL: end running test 1 of 1 on phi_direct_second_lexical: is_lexical
 sil [ossa] @phi_direct_second_lexical : $() -> () {
 entry:
   %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
@@ -67,16 +67,16 @@ right:
   %m2 = move_value [lexical] %c2 : $C
   br exit(%m2 : $C)
 exit(%cm : @owned $C):
-  specify_test "is-lexical @block.argument"
+  specify_test "is_lexical @block.argument"
   destroy_value %cm : $C
   %retval = tuple ()
   return %retval : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on phi_direct_both_lexical: is-lexical
+// CHECK-LABEL: begin running test 1 of 1 on phi_direct_both_lexical: is_lexical
 // CHECK: argument of bb3
 // CHECK: true
-// CHECK-LABEL: end running test 1 of 1 on phi_direct_both_lexical: is-lexical
+// CHECK-LABEL: end running test 1 of 1 on phi_direct_both_lexical: is_lexical
 sil [ossa] @phi_direct_both_lexical : $() -> () {
 entry:
   %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
@@ -90,16 +90,16 @@ right:
   %m2 = move_value [lexical] %c2 : $C
   br exit(%m2 : $C)
 exit(%cm : @owned $C):
-  specify_test "is-lexical @block.argument"
+  specify_test "is_lexical @block.argument"
   destroy_value %cm : $C
   %retval = tuple ()
   return %retval : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on phi_indirect_0000_lexical: is-lexical
+// CHECK-LABEL: begin running test 1 of 1 on phi_indirect_0000_lexical: is_lexical
 // CHECK: argument of bb9
 // CHECK: false
-// CHECK-LABEL: end running test 1 of 1 on phi_indirect_0000_lexical: is-lexical
+// CHECK-LABEL: end running test 1 of 1 on phi_indirect_0000_lexical: is_lexical
 sil [ossa] @phi_indirect_0000_lexical : $() -> () {
 entry:
   %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
@@ -128,16 +128,16 @@ rb(%cr : @owned $C):
   br exit(%cr : $C)
 
 exit(%cm : @owned $C):
-  specify_test "is-lexical @block.argument"
+  specify_test "is_lexical @block.argument"
   destroy_value %cm : $C
   %retval = tuple ()
   return %retval : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on phi_indirect_1000_lexical: is-lexical
+// CHECK-LABEL: begin running test 1 of 1 on phi_indirect_1000_lexical: is_lexical
 // CHECK: argument of bb9
 // CHECK: true
-// CHECK-LABEL: end running test 1 of 1 on phi_indirect_1000_lexical: is-lexical
+// CHECK-LABEL: end running test 1 of 1 on phi_indirect_1000_lexical: is_lexical
 sil [ossa] @phi_indirect_1000_lexical : $() -> () {
 entry:
   %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
@@ -167,16 +167,16 @@ rb(%cr : @owned $C):
   br exit(%cr : $C)
 
 exit(%cm : @owned $C):
-  specify_test "is-lexical @block.argument"
+  specify_test "is_lexical @block.argument"
   destroy_value %cm : $C
   %retval = tuple ()
   return %retval : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on phi_indirect_0100_lexical: is-lexical
+// CHECK-LABEL: begin running test 1 of 1 on phi_indirect_0100_lexical: is_lexical
 // CHECK: argument of bb9
 // CHECK: true
-// CHECK-LABEL: end running test 1 of 1 on phi_indirect_0100_lexical: is-lexical
+// CHECK-LABEL: end running test 1 of 1 on phi_indirect_0100_lexical: is_lexical
 sil [ossa] @phi_indirect_0100_lexical : $() -> () {
 entry:
   %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
@@ -206,16 +206,16 @@ rb(%cr : @owned $C):
   br exit(%cr : $C)
 
 exit(%cm : @owned $C):
-  specify_test "is-lexical @block.argument"
+  specify_test "is_lexical @block.argument"
   destroy_value %cm : $C
   %retval = tuple ()
   return %retval : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on phi_indirect_0010_lexical: is-lexical
+// CHECK-LABEL: begin running test 1 of 1 on phi_indirect_0010_lexical: is_lexical
 // CHECK: argument of bb9
 // CHECK: true
-// CHECK-LABEL: end running test 1 of 1 on phi_indirect_0010_lexical: is-lexical
+// CHECK-LABEL: end running test 1 of 1 on phi_indirect_0010_lexical: is_lexical
 sil [ossa] @phi_indirect_0010_lexical : $() -> () {
 entry:
   %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
@@ -245,16 +245,16 @@ rb(%cr : @owned $C):
   br exit(%cr : $C)
 
 exit(%cm : @owned $C):
-  specify_test "is-lexical @block.argument"
+  specify_test "is_lexical @block.argument"
   destroy_value %cm : $C
   %retval = tuple ()
   return %retval : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on phi_indirect_0001_lexical: is-lexical
+// CHECK-LABEL: begin running test 1 of 1 on phi_indirect_0001_lexical: is_lexical
 // CHECK: argument of bb9
 // CHECK: true
-// CHECK-LABEL: end running test 1 of 1 on phi_indirect_0001_lexical: is-lexical
+// CHECK-LABEL: end running test 1 of 1 on phi_indirect_0001_lexical: is_lexical
 sil [ossa] @phi_indirect_0001_lexical : $() -> () {
 entry:
   %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
@@ -284,7 +284,7 @@ rb(%cr : @owned $C):
   br exit(%cr : $C)
 
 exit(%cm : @owned $C):
-  specify_test "is-lexical @block.argument"
+  specify_test "is_lexical @block.argument"
   destroy_value %cm : $C
   %retval = tuple ()
   return %retval : $()

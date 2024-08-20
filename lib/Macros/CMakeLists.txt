@@ -37,6 +37,12 @@ function(add_swift_macro_library name)
     return()
   endif()
 
+  # FXIME: Importing package-cmo enabled '.swiftmodule' causes compiler crash :(
+  if(Swift_COMPILER_PACKAGE_CMO_SUPPORT)
+    target_compile_options(${name} PRIVATE
+      "SHELL:-Xfrontend -module-load-mode -Xfrontend prefer-interface")
+  endif()
+
   # Add rpath to 'lib/{platform}'
   file(RELATIVE_PATH relpath_to_lib
     "${SWIFT_HOST_PLUGINS_DEST_DIR}"

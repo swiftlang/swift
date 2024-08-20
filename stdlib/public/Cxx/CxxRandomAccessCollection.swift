@@ -44,6 +44,7 @@ extension CxxRandomAccessCollection {
       // Not using CxxIterator here to avoid making a copy of the collection.
       var rawIterator = __beginUnsafe()
       rawIterator += RawIterator.Distance(index)
+      precondition(__endUnsafe() - rawIterator > 0, "C++ iterator access out of bounds")  
       yield rawIterator.pointee
     }
   }

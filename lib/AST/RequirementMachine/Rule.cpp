@@ -74,6 +74,7 @@ const ProtocolDecl *Rule::isAnyConformanceRule() const {
     case Symbol::Kind::AssociatedType:
     case Symbol::Kind::GenericParam:
     case Symbol::Kind::Shape:
+    case Symbol::Kind::PackElement:
       break;
     }
 
@@ -143,6 +144,11 @@ bool Rule::isCircularConformanceRule() const {
     return false;
 
   return true;
+}
+
+/// Returns \c true if this rule is prefixed with the \c [element] symbol.
+bool Rule::isSameElementRule() const {
+  return LHS[0].getKind() == Symbol::Kind::PackElement;
 }
 
 /// A protocol typealias rule takes one of the following two forms,

@@ -13,6 +13,7 @@
 #include "SILGenFunction.h"
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILDeclRef.h"
 
@@ -50,6 +51,26 @@ static Type getResultInterfaceType(AbstractFunctionDecl *AFD) {
   llvm_unreachable("Unhandled AbstractFunctionDecl type");
 }
 
+static SILValue emitZipperedBackDeployIfAvailableBooleanTestValue(
+    SILGenFunction &SGF, AbstractFunctionDecl *AFD, SILLocation loc,
+    SILBasicBlock *availableBB, SILBasicBlock *unavailableBB) {
+  auto &ctx = SGF.getASTContext();
+  assert(ctx.LangOpts.TargetVariant);
+
+  VersionRange OSVersion = VersionRange::all();
+  if (auto version = AFD->getBackDeployedBeforeOSVersion(ctx)) {
+    OSVersion = VersionRange::allGTE(*version);
+  }
+
+  VersionRange VariantOSVersion = VersionRange::all();
+  if (auto version =
+          AFD->getBackDeployedBeforeOSVersion(ctx, /*forTargetVariant=*/true)) {
+    VariantOSVersion = VersionRange::allGTE(*version);
+  }
+
+  return SGF.emitZipperedOSVersionRangeCheck(loc, OSVersion, VariantOSVersion);
+}
+
 /// Emit the following branch SIL instruction:
 /// \verbatim
 /// if #available(OSVersion) {
@@ -63,6 +84,14 @@ static void emitBackDeployIfAvailableCondition(SILGenFunction &SGF,
                                                SILLocation loc,
                                                SILBasicBlock *availableBB,
                                                SILBasicBlock *unavailableBB) {
+  if (SGF.getASTContext().LangOpts.TargetVariant) {
+    SILValue booleanTestValue =
+        emitZipperedBackDeployIfAvailableBooleanTestValue(
+            SGF, AFD, loc, availableBB, unavailableBB);
+    SGF.B.createCondBranch(loc, booleanTestValue, availableBB, unavailableBB);
+    return;
+  }
+
   auto version = AFD->getBackDeployedBeforeOSVersion(SGF.SGM.getASTContext());
   VersionRange OSVersion = VersionRange::empty();
   if (version.has_value()) {
@@ -76,7 +105,10 @@ static void emitBackDeployIfAvailableCondition(SILGenFunction &SGF,
     SILType i1 = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
     booleanTestValue = SGF.B.createIntegerLiteral(loc, i1, 1);
   } else {
-    booleanTestValue = SGF.emitOSVersionRangeCheck(loc, OSVersion);
+    bool isMacCatalyst =
+        tripleIsMacCatalystEnvironment(SGF.getASTContext().LangOpts.Target);
+    booleanTestValue =
+        SGF.emitOSVersionRangeCheck(loc, OSVersion, isMacCatalyst);
   }
 
   SGF.B.createCondBranch(loc, booleanTestValue, availableBB, unavailableBB);

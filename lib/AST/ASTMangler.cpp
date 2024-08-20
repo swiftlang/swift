@@ -1557,7 +1557,9 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::PackArchetype:
     case TypeKind::ElementArchetype:
     case TypeKind::OpenedArchetype:
-      llvm_unreachable("Cannot mangle free-standing archetypes");
+      llvm::errs() << "Cannot mangle free-standing archetype: ";
+      tybase->dump(llvm::errs());
+      abort();
 
     case TypeKind::OpaqueTypeArchetype: {
       auto opaqueType = cast<OpaqueTypeArchetypeType>(tybase);
@@ -3721,10 +3723,10 @@ ASTMangler::dropProtocolsFromAssociatedTypes(Type type,
   if (!type->hasDependentMember())
     return type;
 
-  return type.transform([&](Type t) -> Type {
-    if (auto *dmt = dyn_cast<DependentMemberType>(t.getPointer()))
+  return type.transformRec([&](TypeBase *t) -> std::optional<Type> {
+    if (auto *dmt = dyn_cast<DependentMemberType>(t))
       return dropProtocolFromAssociatedType(dmt, sig);
-    return t;
+    return std::nullopt;
   });
 }
 
@@ -3750,10 +3752,12 @@ void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt,
 
 void ASTMangler::appendClosureEntity(
                               const SerializedAbstractClosureExpr *closure) {
-  assert(!closure->getType()->hasLocalArchetype() &&
+  auto canType = closure->getType()->getCanonicalType();
+  assert(!canType->hasLocalArchetype() &&
          "Not enough information here to handle this case");
 
-  appendClosureComponents(closure->getType(), closure->getDiscriminator(),
+  appendClosureComponents(canType,
+                          closure->getDiscriminator(),
                           closure->isImplicit(), closure->getParent(),
                           ArrayRef<GenericEnvironment *>());
 }
@@ -3767,17 +3771,18 @@ void ASTMangler::appendClosureEntity(const AbstractClosureExpr *closure) {
   // code; the type-checker currently isn't strict about producing typed
   // expression nodes when it fails. Once we enforce that, we can remove this.
   if (!type)
-    type = ErrorType::get(closure->getASTContext());
+    type = CanType(ErrorType::get(closure->getASTContext()));
 
-  if (type->hasLocalArchetype())
+  auto canType = type->getCanonicalType();
+  if (canType->hasLocalArchetype())
     capturedEnvs = closure->getCaptureInfo().getGenericEnvironments();
 
-  appendClosureComponents(type, closure->getDiscriminator(),
+  appendClosureComponents(canType, closure->getDiscriminator(),
                           isa<AutoClosureExpr>(closure), closure->getParent(),
                           capturedEnvs);
 }
 
-void ASTMangler::appendClosureComponents(Type Ty, unsigned discriminator,
+void ASTMangler::appendClosureComponents(CanType Ty, unsigned discriminator,
                                          bool isImplicit,
                                          const DeclContext *parentContext,
                                          ArrayRef<GenericEnvironment *> capturedEnvs) {
@@ -3791,9 +3796,9 @@ void ASTMangler::appendClosureComponents(Type Ty, unsigned discriminator,
 
   Ty = Ty.subst(MapLocalArchetypesOutOfContext(Sig, capturedEnvs),
                 MakeAbstractConformanceForGenericType(),
-                SubstFlags::PreservePackExpansionLevel);
+                SubstFlags::PreservePackExpansionLevel)->getCanonicalType();
 
-  appendType(Ty->getCanonicalType(), Sig);
+  appendType(Ty, Sig);
   appendOperator(isImplicit ? "fu" : "fU", Index(discriminator));
 }
 

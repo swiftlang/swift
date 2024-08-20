@@ -861,7 +861,7 @@ namespace {
                                              constElemSpaces);
               });
 
-          if (!E->isFormallyExhaustive(DC)) {
+          if (!E->treatAsExhaustiveForDiags(DC)) {
             arr.push_back(Space::forUnknown(/*allowedButNotRequired*/false));
           } else if (!E->getAttrs().hasAttribute<FrozenAttr>()) {
             arr.push_back(Space::forUnknown(/*allowedButNotRequired*/true));
@@ -1124,8 +1124,6 @@ namespace {
       llvm::SmallString<128> buffer;
       llvm::raw_svector_ostream OS(buffer);
 
-      bool InEditor = Context.LangOpts.DiagnosticsEditorMode;
-
       // Decide whether we want an error or a warning.
       std::optional<decltype(diag::non_exhaustive_switch)> mainDiagType =
           diag::non_exhaustive_switch;
@@ -1274,7 +1272,8 @@ namespace {
         }
       };
 
-      // If editing is enabled, emit a formatted error of the form:
+      // Emit a formatted note of the form, which has a Fix-It associated with
+      // it, primarily to be used in IDEs:
       //
       // switch must be exhaustive, do you want to add missing cases?
       //     case (.none, .some(_)):
@@ -1282,53 +1281,40 @@ namespace {
       //     case (.some(_), .none):
       //       <#code#>
       //
-      // else:
-      //
-      // switch must be exhaustive, consider adding missing cases:
+      // To also provide actionable output for command line errors, emit notes
+      // like the following:
       //
       // missing case '(.none, .some(_))'
       // missing case '(.some(_), .none)'
-      if (InEditor) {
-        buffer.clear();
+      SmallString<128> missingSeveralCasesFixIt;
+      int diagnosedCases = 0;
 
-        bool alreadyEmittedSomething = false;
-        processUncoveredSpaces([&](const Space &space,
-                                   bool onlyOneUncoveredSpace) {
-          if (space.getKind() == SpaceKind::UnknownCase) {
-            OS << "@unknown " << tok::kw_default;
-            if (onlyOneUncoveredSpace) {
-              OS << ":\n<#fatalError()#>\n";
-              DE.diagnose(startLoc, diag::missing_unknown_case)
-                .fixItInsert(insertLoc, buffer.str());
-              alreadyEmittedSomething = true;
-              return;
-            }
-          } else {
-            OS << tok::kw_case << " ";
-            space.show(OS);
-          }
-          OS << ":\n" << placeholder << "\n";
-        });
+      processUncoveredSpaces([&](const Space &space,
+                                 bool onlyOneUncoveredSpace) {
+        llvm::SmallString<64> fixItBuffer;
+        llvm::raw_svector_ostream fixItOS(fixItBuffer);
+        if (space.getKind() == SpaceKind::UnknownCase) {
+          fixItOS << "@unknown " << tok::kw_default << ":\n<#fatalError()#>\n";
+          DE.diagnose(startLoc, diag::missing_unknown_case)
+              .fixItInsert(insertLoc, fixItBuffer.str());
+        } else {
+          llvm::SmallString<64> spaceBuffer;
+          llvm::raw_svector_ostream spaceOS(spaceBuffer);
+          space.show(spaceOS);
 
-        if (!alreadyEmittedSomething) {
-          DE.diagnose(startLoc, diag::missing_several_cases, false)
-            .fixItInsert(insertLoc, buffer.str());
+          fixItOS << tok::kw_case << " " << spaceBuffer << ":\n"
+                  << placeholder << "\n";
+          DE.diagnose(startLoc, diag::missing_particular_case,
+                      spaceBuffer.str())
+              .fixItInsert(insertLoc, fixItBuffer);
         }
+        diagnosedCases += 1;
+        missingSeveralCasesFixIt += fixItBuffer;
+      });
 
-      } else {
-        processUncoveredSpaces([&](const Space &space,
-                                   bool onlyOneUncoveredSpace) {
-          if (space.getKind() == SpaceKind::UnknownCase) {
-            auto note = DE.diagnose(startLoc, diag::missing_unknown_case);
-            if (onlyOneUncoveredSpace)
-              note.fixItInsert(insertLoc, "@unknown default:\n<#fatalError#>()\n");
-            return;
-          }
-
-          buffer.clear();
-          space.show(OS);
-          DE.diagnose(startLoc, diag::missing_particular_case, buffer.str());
-        });
+      if (diagnosedCases > 1) {
+        DE.diagnose(startLoc, diag::missing_several_cases, false)
+            .fixItInsert(insertLoc, missingSeveralCasesFixIt.str());
       }
     }
 

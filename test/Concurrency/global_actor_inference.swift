@@ -68,6 +68,7 @@ protocol P2 {
 
 class C1: P1 {
   func method() { } // expected-note {{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-1 {{global actor 'SomeGlobalActor' isolation inferred from conformance to protocol 'P1'}}
 
   @OtherGlobalActor func testMethod() {
     method() // expected-error {{call to global actor 'SomeGlobalActor'-isolated instance method 'method()' in a synchronous global actor 'OtherGlobalActor'-isolated context}}
@@ -77,6 +78,8 @@ class C1: P1 {
 
 class C2: P2 {
   func method1() { }  // expected-note {{calls to instance method 'method1()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-1 {{global actor 'SomeGlobalActor' isolation inferred from conformance to protocol 'P2'}}
+
   func method2() { }
 
   @OtherGlobalActor func testMethod() {
@@ -88,7 +91,10 @@ class C2: P2 {
 
 struct AllInP1: P1 {
   func method() { } // expected-note {{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-1 {{global actor 'SomeGlobalActor' isolation inferred from conformance to protocol 'P1'}}
+
   func other() { } // expected-note {{calls to instance method 'other()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-1 {{global actor 'SomeGlobalActor' isolation inferred from conformance to protocol 'P1'}}
 }
 
 func testAllInP1(ap1: AllInP1) { // expected-note 2 {{add '@SomeGlobalActor' to make global function 'testAllInP1(ap1:)' part of global actor 'SomeGlobalActor'}}
@@ -102,6 +108,7 @@ struct NotAllInP1 {
 
 extension NotAllInP1: P1 {
   func method() { } // expected-note{{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-1 {{global actor 'SomeGlobalActor' isolation inferred from conformance to protocol 'P1'}}
 }
 
 func testNotAllInP1(nap1: NotAllInP1) { // expected-note{{add '@SomeGlobalActor' to make global function 'testNotAllInP1(nap1:)' part of global actor 'SomeGlobalActor'}}
@@ -136,10 +143,12 @@ extension C3 {
 
 class C4: C3 {
   func method3() { }  // expected-note {{calls to instance method 'method3()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-1 {{global actor 'SomeGlobalActor' isolation inferred from inheritance from class 'C3'}}
 }
 
 extension C4 {
   func method4() { }  // expected-note {{calls to instance method 'method4()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-1 {{global actor 'SomeGlobalActor' isolation inferred from inheritance from class 'C3'}}
 }
 
 class C5 {

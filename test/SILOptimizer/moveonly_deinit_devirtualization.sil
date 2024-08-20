@@ -5,37 +5,33 @@
 sil_stage raw
 
 import Builtin
+import Swift
 
 //===----------------------------------------------------------------------===//
 //                                Declarations
 //===----------------------------------------------------------------------===//
 
-@_moveOnly
-class Klass {
+class Klass: ~Copyable {
   deinit
 }
 
-@_moveOnly
-struct TrivialStruct {
+struct TrivialStruct: ~Copyable {
   var i: Builtin.Int32
 }
 
-@_moveOnly
-struct StructDeinit {
+struct StructDeinit: ~Copyable {
   var i: Builtin.Int32
 
   deinit
 }
 
-@_moveOnly
-struct SingleFieldNonTrivial {
+struct SingleFieldNonTrivial: ~Copyable {
   var k: Klass
 
   deinit
 }
 
-@_moveOnly
-struct ThreeNonTrivial {
+struct ThreeNonTrivial: ~Copyable {
   var k: Klass
   var i: Builtin.Int32
   var k2: Klass
@@ -43,21 +39,20 @@ struct ThreeNonTrivial {
   deinit
 }
 
-@_moveOnly
-struct ThreeNonTrivialNoDeinit {
+struct ThreeNonTrivialNoDeinit: ~Copyable {
   var k: Klass
   var i: Builtin.Int32
   var k2: Klass
 }
 
-@_moveOnly enum TrivialMoveOnlyEnum {
+enum TrivialMoveOnlyEnum: ~Copyable {
   case first
   case second(Builtin.Int32)
   case third(Builtin.Int64, Builtin.Int64)
   deinit
 }
 
-@_moveOnly enum NonTrivialMoveOnlyEnum {
+enum NonTrivialMoveOnlyEnum: ~Copyable {
   case first
   case second(Builtin.Int32)
   case third(Klass, Klass)

@@ -1,12 +1,12 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-build-swift %t/test.swift -I %t -o %t/out -Xfrontend -enable-experimental-cxx-interop -O
+// RUN: %target-build-swift %t/test.swift -I %t/Inputs -o %t/out -Xfrontend -enable-experimental-cxx-interop -O
 // RUN: %target-codesign %t/out
 // RUN: %target-run %t/out
 
 // Verify that a non-const ref value parameter can't implicitly receive
 // aborrowed value.
-// RUN: %target-swift-frontend -DBORROW_PASS_TO_VALUE_PARAM -emit-ir -o /dev/null -I %t %t/test.swift -enable-experimental-cxx-interop -verify
+// RUN: %target-swift-frontend -DBORROW_PASS_TO_VALUE_PARAM -emit-ir -o /dev/null -I %t/Inputs %t/test.swift -enable-experimental-cxx-interop -verify
 
 // REQUIRES: executable_test
 

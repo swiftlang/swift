@@ -617,7 +617,8 @@ const AvailableAttr *DeclAttributes::getNoAsync(const ASTContext &ctx) const {
 }
 
 const BackDeployedAttr *
-DeclAttributes::getBackDeployed(const ASTContext &ctx) const {
+DeclAttributes::getBackDeployed(const ASTContext &ctx,
+                                bool forTargetVariant) const {
   const BackDeployedAttr *bestAttr = nullptr;
 
   for (auto attr : *this) {
@@ -626,7 +627,7 @@ DeclAttributes::getBackDeployed(const ASTContext &ctx) const {
       continue;
 
     if (backDeployedAttr->isInvalid() ||
-        !backDeployedAttr->isActivePlatform(ctx))
+        !backDeployedAttr->isActivePlatform(ctx, forTargetVariant))
       continue;
 
     // We have an attribute that is active for the platform, but
@@ -2226,8 +2227,9 @@ bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
   return isPlatformActive(Platform, ctx.LangOpts);
 }
 
-bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx) const {
-  return isPlatformActive(Platform, ctx.LangOpts);
+bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
+                                        bool forTargetVariant) const {
+  return isPlatformActive(Platform, ctx.LangOpts, forTargetVariant);
 }
 
 AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {

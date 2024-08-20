@@ -293,13 +293,13 @@ func asyncLet_Let_ActorIsolated_CallBuriedInOtherExpr3() async {
   let _ = await y
 }
 
-// Make sure that we do not emit an error for transferToMainInt in the async val
-// function itself since we are sending the value to the same main actor
-// isolated use and transferring it into one async let variable.
 func asyncLet_Let_ActorIsolated_CallBuriedInOtherExpr4() async {
   let x = NonSendableKlass()
 
   async let y = useValue(transferToMainInt(x) + transferToMainInt(x))
+  // expected-warning @-1:26 {{sending 'x' risks causing data races}}
+  // expected-note @-2:26 {{sending 'x' to main actor-isolated global function 'transferToMainInt' risks causing data races between main actor-isolated and local nonisolated uses}}
+  // expected-note @-3:49 {{access can happen concurrently}}
 
   let _ = await y
 }
@@ -722,7 +722,7 @@ func asyncLetWithoutCapture() async {
   //
   // NOTE: Error below will go away in next commit.
   async let x: NonSendableKlass = await returnValueFromMain()
-  // expected-warning @-1 {{non-sendable type 'NonSendableKlass' returned by implicitly asynchronous call to main actor-isolated function cannot cross actor boundary}}
+  // expected-warning @-1 {{non-sendable result type 'NonSendableKlass' cannot be sent from main actor-isolated context in call to global function 'returnValueFromMain()'}}
   let y = await x
   await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
@@ -774,7 +774,7 @@ extension NonSendableStruct {
     async let subTask6: NonSendableStruct = self
     // expected-warning @-1 {{sending 'self' risks causing data races}}
     // expected-note @-2 {{sending 'actor'-isolated 'self' into async let risks causing data races between nonisolated and 'actor'-isolated uses}}
-    // expected-warning @-3 {{non-sendable type 'NonSendableStruct' returned by implicitly asynchronous call to nonisolated function cannot cross actor boundary}}
+    // expected-warning @-3 {{non-sendable result type 'NonSendableStruct' cannot be sent from nonisolated context in call to async function}}
     _ = await subTask6
   }
 }

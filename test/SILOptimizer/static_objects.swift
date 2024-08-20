@@ -36,7 +36,7 @@ public let c = C(x: 27)
 // CHECK:       } // end sil function '$s4test6testitAA1CCyF'
 
 // CHECK-LLVM-LABEL: define {{.*}} @"$s4test6testitAA1CCyF"
-// CHECK-LLVM:         [[C:%.*]] = tail call ptr @swift_initStaticObject({{.*}} getelementptr {{.*}}, ptr @"$s4test1c_WZTv_", i64 0, i32 1))
+// CHECK-LLVM:         [[C:%.*]] = tail call ptr @swift_initStaticObject({{.*}} getelementptr {{.*}}, ptr @"$s4test1c_WZTv_"
 // CHECK-LLVM-NEXT:    ret ptr [[C]]
 // CHECK-LLVM:       }
 @inline(never)

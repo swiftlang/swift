@@ -195,9 +195,8 @@ struct Clock {
 // We used to crash when inferring the type for the diagnostic below.
 @MainActor func testIndirectParametersHandledCorrectly() async {
   let c = Clock()
-  let _: Int = await c.measure { // expected-tns-warning {{sending main actor-isolated value of type '() async -> Int' with later accesses to nonisolated context risks causing data races}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type '() async -> Int' outside of main actor-isolated context may introduce data races}}
-    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  let _: Int = await c.measure { // expected-tns-warning {{sending value of non-Sendable type '() async -> Int' risks causing data races}}
+    // expected-tns-note @-1 {{sending main actor-isolated value of non-Sendable type '() async -> Int' to nonisolated instance method 'measure' risks causing races in between main actor-isolated and nonisolated uses}}
     try! await c.sleep()
   }
 }

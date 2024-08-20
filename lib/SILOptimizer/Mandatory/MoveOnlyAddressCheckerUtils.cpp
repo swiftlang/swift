@@ -1477,6 +1477,8 @@ struct MoveOnlyAddressCheckerPImpl {
   /// Information about destroys that we use when inserting destroys.
   ConsumeInfo consumes;
 
+  DeadEndBlocksAnalysis *deba;
+
   /// PostOrderAnalysis used by the BorrowToDestructureTransform.
   PostOrderAnalysis *poa;
 
@@ -1486,10 +1488,11 @@ struct MoveOnlyAddressCheckerPImpl {
   MoveOnlyAddressCheckerPImpl(
       SILFunction *fn, DiagnosticEmitter &diagnosticEmitter,
       DominanceInfo *domTree, PostOrderAnalysis *poa,
+      DeadEndBlocksAnalysis *deba,
       borrowtodestructure::IntervalMapAllocator &allocator)
-      : fn(fn), deleter(), canonicalizer(fn, domTree, deleter),
+      : fn(fn), deleter(), canonicalizer(fn, domTree, deba, deleter),
         addressUseState(domTree), diagnosticEmitter(diagnosticEmitter),
-        poa(poa), allocator(allocator) {
+        deba(deba), poa(poa), allocator(allocator) {
     deleter.setCallbacks(std::move(
         InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
           if (auto *mvi =
@@ -1817,7 +1820,21 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
   LLVM_DEBUG(llvm::dbgs() << "    Iter Type: " << iterType << '\n'
                           << "    Target Type: " << targetType << '\n');
 
+  // Allowing full object consumption in a deinit is still not allowed.
   if (iterType == targetType && !isa<DropDeinitInst>(user)) {
+    // Don't allow whole-value consumption of `self` from a `deinit`.
+    if (!fn->getModule().getASTContext().LangOpts
+            .hasFeature(Feature::ConsumeSelfInDeinit)
+        && kind == PartialMutation::Kind::Consume
+        && useState.sawDropDeinit
+        // TODO: Revisit this when we introduce deinits on enums.
+        && !targetType.getEnumOrBoundGenericEnum()) {
+      LLVM_DEBUG(llvm::dbgs() << "    IterType is TargetType in deinit! "
+                                 "Not allowed yet");
+      
+      return {PartialMutationError::consumeDuringDeinit(iterType)};
+    }
+
     LLVM_DEBUG(llvm::dbgs() << "    IterType is TargetType! Exiting early "
                                "without emitting error!\n");
     return {};
@@ -2049,7 +2066,9 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
     liveness->initializeDef(bai);
     liveness->computeSimple();
     for (auto *consumingUse : li->getConsumingUses()) {
-      if (!liveness->isWithinBoundary(consumingUse->getUser())) {
+      if (!liveness->isWithinBoundary(
+              consumingUse->getUser(),
+              moveChecker.deba->get(consumingUse->getFunction()))) {
         diagnosticEmitter.emitAddressExclusivityHazardDiagnostic(
             markedValue, consumingUse->getUser());
         emittedError = true;
@@ -3981,7 +4000,7 @@ bool MoveOnlyAddressChecker::check(
   assert(moveIntroducersToProcess.size() &&
          "Must have checks to process to call this function");
   MoveOnlyAddressCheckerPImpl pimpl(fn, diagnosticEmitter, domTree, poa,
-                                    allocator);
+                                    deadEndBlocksAnalysis, allocator);
 
 #ifndef NDEBUG
   static uint64_t numProcessed = 0;

@@ -25,7 +25,9 @@
 #include "swift/AST/Import.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BasicSourceInfo.h"
+#include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/OptionSet.h"
@@ -388,7 +390,7 @@ public:
   void setBypassResilience() { BypassResilience = true; }
 
   ArrayRef<FileUnit *> getFiles() {
-    assert(!Files.empty() || failedToLoad());
+    ASSERT(!Files.empty() || failedToLoad());
     return Files;
   }
   ArrayRef<const FileUnit *> getFiles() const {
@@ -704,6 +706,13 @@ public:
     Bits.ModuleDecl.HasCxxInteroperability = enabled;
   }
 
+  CXXStdlibKind getCXXStdlibKind() const {
+    return static_cast<CXXStdlibKind>(Bits.ModuleDecl.CXXStdlibKind);
+  }
+  void setCXXStdlibKind(CXXStdlibKind kind) {
+    Bits.ModuleDecl.CXXStdlibKind = static_cast<uint8_t>(kind);
+  }
+
   /// \returns true if this module is a system module; note that the StdLib is
   /// considered a system module.
   bool isSystemModule() const {
@@ -875,76 +884,6 @@ public:
                          DeclName name,
                          SmallVectorImpl<ValueDecl*> &results) const;
 
-  /// Global conformance lookup, does not check conditional requirements.
-  ///
-  /// \param type The type for which we are computing conformance.
-  ///
-  /// \param protocol The protocol to which we are computing conformance.
-  ///
-  /// \param allowMissing When \c true, the resulting conformance reference
-  /// might include "missing" conformances, which are synthesized for some
-  /// protocols as an error recovery mechanism.
-  ///
-  /// \returns An invalid conformance if the search failed, otherwise an
-  /// abstract, concrete or pack conformance, depending on the lookup type.
-  static ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *protocol,
-                                                  bool allowMissing = false);
-
-  /// Global conformance lookup, checks conditional requirements.
-  /// Requires a contextualized type.
-  ///
-  /// \param type The type for which we are computing conformance. Must not
-  /// contain type parameters.
-  ///
-  /// \param protocol The protocol to which we are computing conformance.
-  ///
-  /// \param allowMissing When \c true, the resulting conformance reference
-  /// might include "missing" conformances, which are synthesized for some
-  /// protocols as an error recovery mechanism.
-  ///
-  /// \returns An invalid conformance if the search failed, otherwise an
-  /// abstract, concrete or pack conformance, depending on the lookup type.
-  static ProtocolConformanceRef checkConformance(Type type, ProtocolDecl *protocol,
-                                                 // Note: different default from
-                                                 // lookupConformance
-                                                 bool allowMissing = true);
-
-  /// Global conformance lookup, checks conditional requirements.
-  /// Accepts interface types without context. If the conformance cannot be
-  /// definitively established without the missing context, returns \c nullopt.
-  ///
-  /// \param type The type for which we are computing conformance. Must not
-  /// contain type parameters.
-  ///
-  /// \param protocol The protocol to which we are computing conformance.
-  ///
-  /// \param allowMissing When \c true, the resulting conformance reference
-  /// might include "missing" conformances, which are synthesized for some
-  /// protocols as an error recovery mechanism.
-  ///
-  /// \returns An invalid conformance if the search definitively failed. An
-  /// abstract, concrete or pack conformance, depending on the lookup type,
-  /// if the search succeeded. `std::nullopt` if the type could have
-  /// conditionally conformed depending on the context of the interface types.
-  std::optional<ProtocolConformanceRef>
-  static checkConformanceWithoutContext(Type type,
-                                        ProtocolDecl *protocol,
-                                        // Note: different default from
-                                        // lookupConformance
-                                        bool allowMissing = true);
-
-
-  /// Look for the conformance of the given existential type to the given
-  /// protocol.
-  static ProtocolConformanceRef lookupExistentialConformance(Type type,
-                                                             ProtocolDecl *protocol);
-
-  /// Collect the conformances of \c fromType to each of the protocols of an
-  /// existential type's layout.
-  ArrayRef<ProtocolConformanceRef>
-  static collectExistentialConformances(CanType fromType, CanType existential,
-                                        bool allowMissing = false);
-
   /// Find a member named \p name in \p container that was declared in this
   /// module.
   ///
@@ -1033,8 +972,8 @@ public:
                           ImportFilter filter = ImportFilterKind::Exported) const;
 
   /// Lists modules that are not imported from a file and used in API.
-  void
-  getMissingImportedModules(SmallVectorImpl<ImportedModule> &imports) const;
+  void getImplicitImportsForModuleInterface(
+      SmallVectorImpl<ImportedModule> &imports) const;
 
   /// Looks up which modules are imported by this module, ignoring any that
   /// won't contain top-level decls.
@@ -1317,11 +1256,6 @@ inline bool DeclContext::isPackageContext() const {
 inline SourceLoc extractNearestSourceLoc(const ModuleDecl *mod) {
   return extractNearestSourceLoc(static_cast<const Decl *>(mod));
 }
-
-/// If the import that would make the given declaration visibile is absent,
-/// emit a diagnostic and a fix-it suggesting adding the missing import.
-bool diagnoseMissingImportForMember(const ValueDecl *decl,
-                                    const DeclContext *dc, SourceLoc loc);
 
 } // end namespace swift
 

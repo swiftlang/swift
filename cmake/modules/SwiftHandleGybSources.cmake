@@ -109,6 +109,7 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name)
   if (GYB_ARCH)
     set_if_arch_bitness(ptr_size
       ARCH "${GYB_ARCH}"
+      CASE_16_BIT "2"
       CASE_32_BIT "4"
       CASE_64_BIT "8")
     set(extra_gyb_flags "-DCMAKE_SIZEOF_VOID_P=${ptr_size}")

@@ -23,6 +23,7 @@ import Foo
 // CHECK-NEXT:      "directDependencies": [
 // CHECK:      "details": {
 // CHECK-NEXT:        "swiftPrebuiltExternal": {
-// CHECK-NEXT:          "compiledModulePath": 
+// CHECK-NEXT:          "compiledModulePath":
+// CHECK-NEXT:          "userModuleVersion":
 // CHECK-NEXT:          "isFramework": true
 // CHECK-NEXT:        }

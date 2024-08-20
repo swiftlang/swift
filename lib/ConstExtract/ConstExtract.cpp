@@ -166,6 +166,9 @@ parseProtocolListFromFile(StringRef protocolListFilePath,
   return true;
 }
 
+std::vector<std::shared_ptr<BuilderValue::BuilderMember>>
+getResultBuilderMembersFromBraceStmt(BraceStmt *braceStmt);
+
 static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr);
 
 static std::vector<FunctionParameter>
@@ -453,6 +456,16 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
       return std::make_shared<InterpolatedStringLiteralValue>(segments);
     }
 
+    case ExprKind::Closure: {
+      auto closureExpr = cast<ClosureExpr>(expr);
+      auto body = closureExpr->getBody();
+      auto resultBuilderMembers = getResultBuilderMembersFromBraceStmt(body);
+
+      if (!resultBuilderMembers.empty()) {
+        return std::make_shared<BuilderValue>(resultBuilderMembers);
+      }
+      break;
+    }
     default: {
       break;
     }
@@ -662,6 +675,10 @@ void writeLocationInformation(llvm::json::OStream &JSON, SourceLoc Loc,
                  ctx.SourceMgr.getPresumedLineAndColumnForLoc(Loc).first);
 }
 
+// Take BuilderValue, which is a representation of a result builder
+// and write the values
+void writeBuilderValue(llvm::json::OStream &JSON, BuilderValue *Value);
+
 void writeValue(llvm::json::OStream &JSON,
                 std::shared_ptr<CompileTimeValue> Value) {
   auto value = Value.get();
@@ -711,7 +728,8 @@ void writeValue(llvm::json::OStream &JSON,
   }
 
   case CompileTimeValue::ValueKind::Builder: {
-    JSON.attribute("valueKind", "Builder");
+    auto builderValue = cast<BuilderValue>(value);
+    writeBuilderValue(JSON, builderValue);
     break;
   }
 
@@ -913,15 +931,230 @@ void writeEnumCases(
   });
 }
 
-void writeResultBuilderInformation(llvm::json::OStream &JSON,
-                                   const swift::NominalTypeDecl *TypeDecl,
-                                   const swift::VarDecl *VarDecl) {
-  if (auto *attr = VarDecl->getAttachedResultBuilder()) {
-    JSON.attributeObject("resultBuilder", [&] {
-      JSON.attribute("type", toFullyQualifiedTypeNameString(attr->getType()));
+std::optional<std::shared_ptr<CompileTimeValue>>
+getResultBuilderElementFromASTNode(const ASTNode node) {
+  if (auto *D = node.dyn_cast<Decl *>()) {
+    if (auto *patternBinding = dyn_cast<PatternBindingDecl>(D)) {
+      if (auto originalInit = patternBinding->getOriginalInit(0)) {
+        return extractCompileTimeValue(originalInit);
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+BuilderValue::ConditionalMember
+getConditionalMemberFromIfStmt(const IfStmt *ifStmt) {
+  std::vector<std::shared_ptr<BuilderValue::BuilderMember>> IfElements;
+  std::vector<std::shared_ptr<BuilderValue::BuilderMember>> ElseElements;
+  if (auto thenBraceStmt = ifStmt->getThenStmt()) {
+    for (auto elem : thenBraceStmt->getElements()) {
+      if (auto memberElement = getResultBuilderElementFromASTNode(elem)) {
+        IfElements.push_back(std::make_shared<BuilderValue::SingleMember>(
+            memberElement.value()));
+      }
+    }
+  }
+
+  if (auto elseStmt = ifStmt->getElseStmt()) {
+    if (auto *elseIfStmt = dyn_cast<IfStmt>(elseStmt)) {
+      ElseElements.push_back(std::make_shared<BuilderValue::ConditionalMember>(
+          getConditionalMemberFromIfStmt(elseIfStmt)));
+    } else if (auto *elseBraceStmt = dyn_cast<BraceStmt>(elseStmt)) {
+      for (auto elem : elseBraceStmt->getElements()) {
+        if (auto memberElement = getResultBuilderElementFromASTNode(elem)) {
+          ElseElements.push_back(std::make_shared<BuilderValue::SingleMember>(
+              memberElement.value()));
+        }
+      }
+    }
+  }
+  BuilderValue::MemberKind memberKind = BuilderValue::Either;
+
+  if (ElseElements.size() == 0) {
+    memberKind = BuilderValue::Optional;
+  }
+  for (auto elt : ifStmt->getCond()) {
+    if (elt.getKind() == StmtConditionElement::CK_Availability) {
+      memberKind = BuilderValue::LimitedAvailability;
+      break;
+    }
+  }
+
+  return BuilderValue::ConditionalMember(memberKind, IfElements, ElseElements);
+}
+
+BuilderValue::ArrayMember
+getBuildArrayMemberFromForEachStmt(const ForEachStmt *forEachStmt) {
+  std::vector<std::shared_ptr<BuilderValue::BuilderMember>> MemberElements;
+  if (auto braceStmt = forEachStmt->getBody()) {
+    for (auto elem : braceStmt->getElements()) {
+      if (auto memberElement = getResultBuilderElementFromASTNode(elem)) {
+        MemberElements.push_back(std::make_shared<BuilderValue::SingleMember>(
+            memberElement.value()));
+      }
+    }
+  }
+  return BuilderValue::ArrayMember(MemberElements);
+}
+
+std::vector<std::shared_ptr<BuilderValue::BuilderMember>>
+getResultBuilderMembersFromBraceStmt(BraceStmt *braceStmt) {
+  std::vector<std::shared_ptr<BuilderValue::BuilderMember>>
+      ResultBuilderMembers;
+  for (auto elem : braceStmt->getElements()) {
+    if (auto resultBuilderElement = getResultBuilderElementFromASTNode(elem)) {
+      ResultBuilderMembers.push_back(
+          std::make_shared<BuilderValue::SingleMember>(
+              resultBuilderElement.value()));
+    } else if (auto *stmt = elem.dyn_cast<Stmt *>()) {
+      if (auto *ifStmt = dyn_cast<IfStmt>(stmt)) {
+        ResultBuilderMembers.push_back(
+            std::make_shared<BuilderValue::ConditionalMember>(
+                getConditionalMemberFromIfStmt(ifStmt)));
+      } else if (auto *doStmt = dyn_cast<DoStmt>(stmt)) {
+        if (auto body = doStmt->getBody()) {
+          for (auto elem : body->getElements()) {
+            if (auto *stmt = elem.dyn_cast<Stmt *>()) {
+              if (auto *forEachStmt = dyn_cast<ForEachStmt>(stmt)) {
+                ResultBuilderMembers.push_back(
+                    std::make_shared<BuilderValue::ArrayMember>(
+                        getBuildArrayMemberFromForEachStmt(forEachStmt)));
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return ResultBuilderMembers;
+}
+
+std::shared_ptr<BuilderValue>
+createBuilderCompileTimeValue(CustomAttr *AttachedResultBuilder,
+                              const swift::VarDecl *VarDecl) {
+  std::vector<std::shared_ptr<BuilderValue::BuilderMember>>
+      ResultBuilderMembers;
+  if (!VarDecl->getAllAccessors().empty()) {
+    if (auto accessor = VarDecl->getAllAccessors()[0]) {
+      if (auto braceStmt = accessor->getTypecheckedBody()) {
+        ResultBuilderMembers = getResultBuilderMembersFromBraceStmt(braceStmt);
+      }
+    }
+  }
+  return std::make_shared<BuilderValue>(AttachedResultBuilder,
+                                        ResultBuilderMembers);
+}
+
+void writeSingleBuilderMemberElement(
+    llvm::json::OStream &JSON, std::shared_ptr<CompileTimeValue> Element) {
+  switch (Element.get()->getKind()) {
+  case CompileTimeValue::ValueKind::Enum: {
+    auto enumValue = cast<EnumValue>(Element.get());
+    if (enumValue->getIdentifier() == "buildExpression") {
+      if (enumValue->getParameters().has_value()) {
+        auto params = enumValue->getParameters().value();
+        for (auto FP : params) {
+          writeValue(JSON, FP.Value);
+        }
+      }
+    }
+    break;
+  }
+  default: {
+    writeValue(JSON, Element);
+    break;
+  }
+  }
+}
+
+void writeBuilderMember(
+    llvm::json::OStream &JSON,
+    std::shared_ptr<BuilderValue::BuilderMember> BuilderMember) {
+  auto Member = BuilderMember.get();
+  switch (Member->getKind()) {
+  case BuilderValue::Expression: {
+    auto member = cast<BuilderValue::SingleMember>(Member);
+    JSON.attributeObject("element", [&] {
+      writeSingleBuilderMemberElement(JSON, member->getElement());
     });
 
-    return;
+    break;
+  }
+
+  case BuilderValue::Array: {
+    auto member = cast<BuilderValue::ArrayMember>(Member);
+    JSON.attributeArray("elements", [&] {
+      for (auto elem : member->getElements()) {
+        JSON.object([&] { writeBuilderMember(JSON, elem); });
+      }
+    });
+    break;
+  }
+
+  default: {
+    auto member = cast<BuilderValue::ConditionalMember>(Member);
+    JSON.attributeArray("ifElements", [&] {
+      for (auto elem : member->getIfElements()) {
+        JSON.object([&] { writeBuilderMember(JSON, elem); });
+      }
+    });
+    JSON.attributeArray("elseElements", [&] {
+      for (auto elem : member->getElseElements()) {
+        JSON.object([&] { writeBuilderMember(JSON, elem); });
+      }
+    });
+    break;
+  }
+  }
+}
+
+void writeBuilderValue(llvm::json::OStream &JSON, BuilderValue *Value) {
+  JSON.attribute("valueKind", "Builder");
+  JSON.attributeObject("value", [&] {
+    if (auto resultBuilderType = Value->getResultBuilderType()) {
+      JSON.attribute("type", toFullyQualifiedTypeNameString(
+                                 resultBuilderType.value()->getType()));
+    } else {
+      JSON.attribute("type", "");
+    }
+
+    JSON.attributeArray("members", [&] {
+      for (auto member : Value->getMembers()) {
+        JSON.object([&] {
+          switch (member->getKind()) {
+          case BuilderValue::Expression:
+            JSON.attribute("kind", "buildExpression");
+            break;
+          case BuilderValue::Either:
+            JSON.attribute("kind", "buildEither");
+            break;
+          case BuilderValue::Optional:
+            JSON.attribute("kind", "buildOptional");
+            break;
+          case BuilderValue::LimitedAvailability:
+            JSON.attribute("kind", "buildLimitedAvailability");
+            break;
+          case BuilderValue::Array:
+            JSON.attribute("kind", "buildArray");
+            break;
+          case BuilderValue::Unknown:
+            JSON.attribute("kind", "Unknown");
+            break;
+          }
+
+          writeBuilderMember(JSON, member);
+        });
+      }
+    });
+  });
+}
+
+std::optional<std::shared_ptr<BuilderValue>>
+extractBuilderValueIfExists(const swift::NominalTypeDecl *TypeDecl,
+                            const swift::VarDecl *VarDecl) {
+  if (auto *attr = VarDecl->getAttachedResultBuilder()) {
+    return createBuilderCompileTimeValue(attr, VarDecl);
   }
 
   for (ProtocolDecl *Decl :
@@ -936,16 +1169,13 @@ void writeResultBuilderInformation(llvm::json::OStream &JSON,
           continue;
 
         if (auto *attr = VD->getAttachedResultBuilder()) {
-          JSON.attributeObject("resultBuilder", [&] {
-            JSON.attribute("type",
-                           toFullyQualifiedTypeNameString(attr->getType()));
-          });
+          return createBuilderCompileTimeValue(attr, VarDecl);
         }
-
-        return;
       }
     }
   }
+  return std::nullopt;
+  ;
 }
 
 void writeAttrInformation(llvm::json::OStream &JSON,
@@ -1068,10 +1298,14 @@ void writeProperties(llvm::json::OStream &JSON,
         JSON.attribute("isComputed", !decl->hasStorage() ? "true" : "false");
         writeLocationInformation(JSON, decl->getLoc(),
                                  decl->getDeclContext()->getASTContext());
-        writeValue(JSON, PropertyInfo.Value);
+        if (auto builderValue =
+                extractBuilderValueIfExists(&NomTypeDecl, decl)) {
+          writeValue(JSON, builderValue.value());
+        } else {
+          writeValue(JSON, PropertyInfo.Value);
+        }
         writePropertyWrapperAttributes(JSON, PropertyInfo.PropertyWrappers,
                                        decl->getASTContext());
-        writeResultBuilderInformation(JSON, &NomTypeDecl, decl);
         writeAttrInformation(JSON, decl->getAttrs());
       });
     }

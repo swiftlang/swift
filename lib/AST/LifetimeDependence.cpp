@@ -12,6 +12,7 @@
 
 #include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Module.h"
@@ -20,6 +21,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Range.h"
 
 namespace swift {
 
@@ -80,6 +82,8 @@ getLifetimeDependenceKindFromType(Type sourceType) {
   return LifetimeDependenceKind::Inherit;
 }
 
+// Warning: this is incorrect for Setter 'newValue' parameters. It should only
+// be called for a Setter's 'self'.
 static ValueOwnership getLoweredOwnership(AbstractFunctionDecl *afd) {
   if (isa<ConstructorDecl>(afd)) {
     return ValueOwnership::Owned;
@@ -200,7 +204,7 @@ static bool isBitwiseCopyable(Type type, ASTContext &ctx) {
   if (!bitwiseCopyableProtocol) {
     return false;
   }
-  return (bool)(ModuleDecl::checkConformance(type, bitwiseCopyableProtocol));
+  return (bool)checkConformance(type, bitwiseCopyableProtocol);
 }
 
 std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::fromTypeRepr(
@@ -437,6 +441,23 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
     return std::nullopt;
   }
 
+  // Setters infer 'self' dependence on 'newValue'.
+  if (auto accessor = dyn_cast<AccessorDecl>(afd)) {
+    if (accessor->getAccessorKind() == AccessorKind::Set) {
+      return inferSetter(accessor);
+    }
+  } else if (auto *fd = dyn_cast<FuncDecl>(afd)) {
+    // Infer self dependence for a mutating function with no result.
+    //
+    // FIXME: temporary hack until we have dependsOn(self: param) syntax.
+    // Do not apply this to accessors (_modify). _modify is handled below like a
+    // mutating method.
+    if (fd->isMutating() && fd->getResultInterfaceType()->isVoid()
+        && !dc->getSelfTypeInContext()->isEscapable()) {
+      return inferMutatingSelf(afd);
+    }
+  }
+
   if (hasEscapableResultOrYield(afd)) {
     return std::nullopt;
   }
@@ -478,6 +499,11 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
       return std::nullopt;
     }
 
+    // Infer method dependence: result depends on self.
+    //
+    // This includes _modify. A _modify's yielded value depends on self. The
+    // caller of the _modify ensures that the 'self' depends on any value stored
+    // to the yielded address.
     return LifetimeDependenceInfo::getForIndex(
         afd, resultIndex, /*selfIndex */ afd->getParameters()->size(), kind);
   }
@@ -540,6 +566,53 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
 
   return LifetimeDependenceInfo::getForIndex(
       afd, resultIndex, *candidateParamIndex, *candidateLifetimeKind);
+}
+
+/// Infer LifetimeDependence on a setter where 'self' is nonescapable.
+std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::inferSetter(
+  AbstractFunctionDecl *afd) {
+
+  auto *param = afd->getParameters()->get(0);
+  Type paramTypeInContext =
+    afd->mapTypeIntoContext(param->getInterfaceType());
+  if (paramTypeInContext->hasError()) {
+    return std::nullopt;
+  }
+  if (paramTypeInContext->isEscapable()) {
+    return std::nullopt;
+  }
+  auto kind = getLifetimeDependenceKindFromType(paramTypeInContext);
+  return LifetimeDependenceInfo::getForIndex(
+    afd, /*selfIndex */ afd->getParameters()->size(), 0, kind);
+}
+
+/// Infer LifetimeDependenceInfo on a mutating method where 'self' is
+/// nonescapable and the result is 'void'. For now, we'll assume that 'self'
+/// depends on a single nonescapable argument.
+std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::inferMutatingSelf(
+  AbstractFunctionDecl *afd) {
+  std::optional<LifetimeDependenceInfo> dep;
+  for (unsigned paramIndex : range(afd->getParameters()->size())) {
+    auto *param = afd->getParameters()->get(paramIndex);
+    Type paramTypeInContext =
+      afd->mapTypeIntoContext(param->getInterfaceType());
+    if (paramTypeInContext->hasError()) {
+      continue;
+    }
+    if (paramTypeInContext->isEscapable()) {
+      continue;
+    }
+    if (dep) {
+      // Don't infer dependence on multiple nonescapable parameters. We may want
+      // to do this in the future if dependsOn(self: arg1, arg2) syntax is too
+      // cumbersome.
+      return std::nullopt;
+    }
+    int selfIndex = afd->getParameters()->size();
+    dep = LifetimeDependenceInfo::getForIndex(
+      afd, selfIndex, paramIndex, LifetimeDependenceKind::Inherit);
+  }
+  return dep;
 }
 
 std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>

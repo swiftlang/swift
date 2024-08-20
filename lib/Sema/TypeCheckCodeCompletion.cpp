@@ -221,10 +221,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
   if (needsPrecheck) {
     // First, pre-check the expression, validating any types that occur in the
     // expression and folding sequence expressions.
-    auto failedPreCheck =
-        ConstraintSystem::preCheckTarget(target,
-                                         /*replaceInvalidRefsWithErrors=*/true);
-
+    auto failedPreCheck = ConstraintSystem::preCheckTarget(target);
     if (failedPreCheck)
       return false;
   }
@@ -303,9 +300,7 @@ static std::optional<Type>
 getTypeOfCompletionContextExpr(DeclContext *DC, CompletionTypeCheckKind kind,
                                Expr *&parsedExpr,
                                ConcreteDeclRef &referencedDecl) {
-  if (constraints::ConstraintSystem::preCheckExpression(
-          parsedExpr, DC,
-          /*replaceInvalidRefsWithErrors=*/true))
+  if (constraints::ConstraintSystem::preCheckExpression(parsedExpr, DC))
     return std::nullopt;
 
   switch (kind) {

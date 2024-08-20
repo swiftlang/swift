@@ -85,6 +85,8 @@ class Swift(product.Product):
 
         self.cmake_options.extend(self._enable_stdlib_unicode_data)
 
+        self.cmake_options.extend(self._enable_embedded_stdlib)
+
         self.cmake_options.extend(self._enable_embedded_stdlib_cross_compiling)
 
         self.cmake_options.extend(
@@ -258,6 +260,11 @@ updated without updating swift.py?")
     def _enable_experimental_parser_validation(self):
         return [('SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION:BOOL',
                  self.args.enable_experimental_parser_validation)]
+
+    @property
+    def _enable_embedded_stdlib(self):
+        return [('SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB',
+                 self.args.build_embedded_stdlib)]
 
     @property
     def _enable_embedded_stdlib_cross_compiling(self):

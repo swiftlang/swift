@@ -578,3 +578,14 @@ Added: _concurrencyIsCurrentExecutorLegacyModeOverride
 
 //String.init<Encoding: Unicode.Encoding>(_immortalCocoaString: AnyObject, count: Int, encoding: Encoding.Type)
 Added: _$sSS20_immortalCocoaString5count8encodingSSyXl_Sixmtcs16_UnicodeEncodingRzlufC
+
+// Swift._stdlib_isVariantOSVersionAtLeast(Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+Added: _$ss33_stdlib_isVariantOSVersionAtLeastyBi1_Bw_BwBwtF
+
+// Typed throws for withUnsafeBufferPointer operations.
+Added: _$ss20_ArrayBufferProtocolP010withUnsafeB7Pointeryqd__qd__SRy7ElementQzGqd_0_YKXEqd_0_YKs5ErrorRd_0_r0_lFTj
+Added: _$ss20_ArrayBufferProtocolP010withUnsafeB7Pointeryqd__qd__SRy7ElementQzGqd_0_YKXEqd_0_YKs5ErrorRd_0_r0_lFTq
+
+// Typed throws for withUnsafeMutableBufferPointer operations.
+Added: _$ss20_ArrayBufferProtocolP017withUnsafeMutableB7Pointeryqd__qd__Sry7ElementQzGqd_0_YKXEqd_0_YKs5ErrorRd_0_r0_lFTj
+Added: _$ss20_ArrayBufferProtocolP017withUnsafeMutableB7Pointeryqd__qd__Sry7ElementQzGqd_0_YKXEqd_0_YKs5ErrorRd_0_r0_lFTq

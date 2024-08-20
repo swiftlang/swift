@@ -122,7 +122,7 @@ struct MyError: Error {
 
 // CHECK: define hidden swiftcc { float, i64, float } @"$s12typed_throws8mayThrow1x1ySf_s5Int32VSftSb_yXltAA7MyErrorVYKF"
 // CHECK:   [[CONVERTED:%.*]] = ptrtoint ptr {{%.*}} to i64
-// CEHCK:   insertvalue { float, i64, float } undef, i64 [[CONVERTED]], 1
+// CHECK:   insertvalue { float, i64, float } undef, i64 [[CONVERTED]], 1
 // CHECK: }
 @inline(never)
 func mayThrow(x: Bool, y: AnyObject) throws(MyError) -> (Float, Int32, Float) {
@@ -187,4 +187,32 @@ func throwsGenericAsync<T: Error>(x: Bool, y: T) async throws(T) -> Int {
   }
 
   return 32
+}
+
+enum TinyError: Error {
+  case a
+}
+
+@available(SwiftStdlib 6.0, *)
+func mayThrowAsyncTiny(x: Bool) async throws(TinyError) -> Bool {
+  guard x else {
+    throw .a
+  }
+  return false
+}
+
+@available(SwiftStdlib 6.0, *)
+func callsMayThrowAsyncTiny(x: Bool) async {
+  _ = try! await mayThrowAsyncTiny(x: x)
+}
+
+struct EmptyError: Error {}
+
+@available(SwiftStdlib 6.0, *)
+func mayThrowEmptyErrorAsync(x: Bool) async throws(EmptyError) -> String? {
+  guard x else {
+    throw EmptyError()
+  }
+
+  return ""
 }

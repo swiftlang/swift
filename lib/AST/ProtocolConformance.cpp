@@ -18,6 +18,7 @@
 #include "ConformanceLookupTable.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Availability.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/FileUnit.h"
@@ -1195,7 +1196,7 @@ bool NominalTypeDecl::lookupConformance(
 
   assert(!isa<ProtocolDecl>(this) &&
          "Self-conformances are only found by the higher-level "
-         "ModuleDecl::lookupConformance() entry point");
+         "swift::lookupConformance() entry point");
 
   prepareConformanceTable();
   return ConformanceTable->lookupConformance(
@@ -1282,7 +1283,7 @@ findSynthesizedConformance(
   if (!cvProto)
     return nullptr;
 
-  auto conformance = ModuleDecl::lookupConformance(
+  auto conformance = lookupConformance(
       nominal->getDeclaredInterfaceType(), cvProto);
   if (!conformance || !conformance.isConcrete())
     return nullptr;

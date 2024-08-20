@@ -31,12 +31,16 @@ DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningTool, swiftscan_scanner_t)
 //=== Private Cleanup Functions -------------------------------------------===//
 void swiftscan_macro_dependency_dispose(
     swiftscan_macro_dependency_set_t *macro) {
+  if (!macro)
+    return;
+
   for (unsigned i = 0; i < macro->count; ++i) {
     swiftscan_string_dispose(macro->macro_dependencies[i]->moduleName);
     swiftscan_string_dispose(macro->macro_dependencies[i]->libraryPath);
     swiftscan_string_dispose(macro->macro_dependencies[i]->executablePath);
     delete macro->macro_dependencies[i];
   }
+  delete[] macro->macro_dependencies;
   delete macro;
 }
 
@@ -70,6 +74,8 @@ void swiftscan_dependency_info_details_dispose(
         details_impl->swift_textual_details.module_cache_key);
     swiftscan_macro_dependency_dispose(
         details_impl->swift_textual_details.macro_dependencies);
+    swiftscan_string_dispose(
+        details_impl->swift_textual_details.user_module_version);
     break;
   case SWIFTSCAN_DEPENDENCY_INFO_SWIFT_BINARY:
     swiftscan_string_dispose(
@@ -84,6 +90,8 @@ void swiftscan_dependency_info_details_dispose(
         details_impl->swift_binary_details.header_dependency);
     swiftscan_string_dispose(
         details_impl->swift_binary_details.module_cache_key);
+    swiftscan_string_dispose(
+        details_impl->swift_binary_details.user_module_version);
     break;
   case SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER:
     swiftscan_string_dispose(
@@ -387,6 +395,11 @@ swiftscan_string_ref_t swiftscan_swift_textual_detail_get_module_cache_key(
   return details->swift_textual_details.module_cache_key;
 }
 
+swiftscan_string_ref_t swiftscan_swift_textual_detail_get_user_module_version(
+    swiftscan_module_details_t details) {
+  return details->swift_textual_details.user_module_version;
+}
+
 //=== Swift Binary Module Details query APIs ------------------------------===//
 
 swiftscan_string_ref_t swiftscan_swift_binary_detail_get_compiled_module_path(
@@ -433,6 +446,11 @@ swiftscan_string_ref_t swiftscan_swift_binary_detail_get_module_cache_key(
   return details->swift_binary_details.module_cache_key;
 }
 
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_swift_binary_detail_get_user_module_version(
+    swiftscan_module_details_t details) {
+  return details->swift_binary_details.user_module_version;
+}
 
 //=== Swift Placeholder Module Details query APIs -------------------------===//
 

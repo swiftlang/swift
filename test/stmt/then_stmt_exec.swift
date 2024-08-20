@@ -8,9 +8,9 @@
 // Required for experimental features
 // REQUIRES: asserts
 
-func testDefer(_ x: Bool) -> Int {
+func testDeferIf(_ x: Bool) -> Int {
   defer {
-    print("defer fn")
+    print("defer testDeferIf")
   }
   let x = if x {
     defer {
@@ -24,9 +24,55 @@ func testDefer(_ x: Bool) -> Int {
   print("after if")
   return x
 }
-_ = testDefer(true)
+_ = testDeferIf(true)
 
 // CHECK:      enter if
 // CHECK-NEXT: defer if
 // CHECK-NEXT: after if
-// CHECK-NEXT: defer fn
+// CHECK-NEXT: defer testDeferIf
+
+func testDeferSwitch(_ x: Bool) -> Int {
+  defer {
+    print("defer testDeferSwitch")
+  }
+  let x = switch x {
+  case true:
+    defer {
+      print("defer case true")
+    }
+    print("enter case true")
+    fallthrough
+  case false:
+    defer {
+      print("defer case false")
+    }
+    print("enter case false")
+    then 1
+  }
+  print("after switch")
+  return x
+}
+_ = testDeferSwitch(true)
+// CHECK:      enter case true
+// CHECK-NEXT: defer case true
+// CHECK-NEXT: enter case false
+// CHECK-NEXT: defer case false
+// CHECK-NEXT: after switch
+// CHECK-NEXT: defer testDeferSwitch
+
+func testFallthrough(_ x: Bool) -> Int {
+  var z = 0
+  let y: Int
+  let x = switch x {
+  case true:
+    z = 1
+    fallthrough
+  case false:
+    y = 2
+    then 3
+  }
+  return x + y + z
+}
+print("fallthrough: \(testFallthrough(true))")
+
+// CHECK: fallthrough: 6

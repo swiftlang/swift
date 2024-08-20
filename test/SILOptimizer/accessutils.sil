@@ -370,6 +370,85 @@ bb0:
 
 sil_global @global1 : $Int64
 sil_global @global2 : $Int64
+sil_global @somePointer : $Builtin.RawPointer
+
+sil [global_init] [ossa] @addressor_of_global1 : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %0 = global_addr @global1 : $*Int64
+  %1 = address_to_pointer %0 : $*Int64 to $Builtin.RawPointer
+  return %1 : $Builtin.RawPointer
+}
+
+sil [global_init] [ossa] @external_addressor_of_global1 : $@convention(thin) () -> Builtin.RawPointer
+
+sil [global_init] [ossa] @wrong_addressor_of_global1 : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %0 = global_addr @somePointer : $*Builtin.RawPointer
+  %1 = load [trivial] %0 : $*Builtin.RawPointer
+  return %1 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: Accesses for testSimpleGlobal
+// CHECK-NEXT:  Value:   %0 = global_addr @global1 : $*Int64
+// CHECK-NEXT:    Scope: base
+// CHECK-NEXT:    Base: global - @global1
+// CHECK-NEXT:    Path: ""
+// CHECK-NEXT:     no Storage paths
+// CHECK-NEXT:  End accesses for testSimpleGlobal
+sil [ossa] @testSimpleGlobal : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = global_addr @global1 : $*Int64
+  %1 = load [trivial] %0 : $*Int64
+  return %1 : $Int64
+}
+
+// CHECK-LABEL: Accesses for testGlobalViaAddressor
+// CHECK-NEXT:  Value:   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
+// CHECK-NEXT:    Scope: base
+// CHECK-NEXT:    Base: global - @global1
+// CHECK-NEXT:    Path: ""
+// CHECK-NEXT:     no Storage paths
+// CHECK-NEXT:  End accesses for testGlobalViaAddressor
+sil [ossa] @testGlobalViaAddressor : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = function_ref @addressor_of_global1 : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
+  %3 = load [trivial] %2 : $*Int64
+  return %3 : $Int64
+}
+
+// CHECK-LABEL: Accesses for testGlobalViaUnknwonAddressor
+// CHECK-NEXT:  Value:   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
+// CHECK-NEXT:    Scope: base
+// CHECK-NEXT:    Base: pointer -   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
+// CHECK-NEXT:    Path: ""
+// CHECK-NEXT:     no Storage paths
+// CHECK-NEXT:  End accesses for testGlobalViaUnknwonAddressor
+sil [ossa] @testGlobalViaUnknwonAddressor : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = function_ref @external_addressor_of_global1 : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
+  %3 = load [trivial] %2 : $*Int64
+  return %3 : $Int64
+}
+
+// CHECK-LABEL: Accesses for testGlobalViaWrongAddressor
+// CHECK-NEXT:  Value:   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
+// CHECK-NEXT:    Scope: base
+// CHECK-NEXT:    Base: pointer -   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
+// CHECK-NEXT:    Path: ""
+// CHECK-NEXT:     no Storage paths
+// CHECK-NEXT:  End accesses for testGlobalViaWrongAddressor
+sil [ossa] @testGlobalViaWrongAddressor : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = function_ref @wrong_addressor_of_global1 : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
+  %3 = load [trivial] %2 : $*Int64
+  return %3 : $Int64
+}
 
 sil @coro : $@yield_once @convention(thin) () -> @yields @inout Int64
 

@@ -247,7 +247,7 @@ static void
 writeMacroDependencies(llvm::raw_ostream &out,
                        const swiftscan_macro_dependency_set_t *macro_deps,
                        unsigned indentLevel, bool trailingComma) {
-  if (macro_deps->count == 0)
+  if (!macro_deps)
     return;
 
   out.indent(indentLevel * 2);
@@ -456,6 +456,9 @@ void writeJSON(llvm::raw_ostream &out,
                              swiftTextualDeps->module_cache_key, 5,
                              /*trailingComma=*/true);
       }
+      writeJSONSingleField(out, "userModuleVersion",
+                           swiftTextualDeps->user_module_version, 5,
+                           /*trailingComma=*/true);
       writeMacroDependencies(out, swiftTextualDeps->macro_dependencies, 5,
                              /*trailingComma=*/true);
       writeJSONSingleField(out, "isFramework", swiftTextualDeps->is_framework,
@@ -548,6 +551,10 @@ void writeJSON(llvm::raw_ostream &out,
 
       writeJSONSingleField(out, "compiledModulePath",
                            swiftBinaryDeps->compiled_module_path,
+                           /*indentLevel=*/5,
+                           /*trailingComma=*/true);
+      writeJSONSingleField(out, "userModuleVersion",
+                           swiftBinaryDeps->user_module_version,
                            /*indentLevel=*/5,
                            /*trailingComma=*/true);
       // Module doc file

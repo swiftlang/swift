@@ -91,6 +91,7 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 /// Returns: A new instance of type `U`, cast from `x`.
 @inlinable // unsafe-performance
 @_transparent
+@unsafe
 public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
   _precondition(MemoryLayout<T>.size == MemoryLayout<U>.size,
     "Can't unsafeBitCast between types of different sizes")
@@ -242,6 +243,7 @@ internal func _isClassOrObjCExistential<T>(_ x: T.Type) -> Bool {
 /// be either a class or a class protocol. Either T, U, or both may be
 /// optional references.
 @_transparent
+@unsafe
 public func _unsafeReferenceCast<T, U>(_ x: T, to: U.Type) -> U {
   return Builtin.castReference(x)
 }
@@ -265,12 +267,14 @@ public func _unsafeReferenceCast<T, U>(_ x: T, to: U.Type) -> U {
 ///   - type: The type `T` to which `x` is cast.
 /// - Returns: The instance `x`, cast to type `T`.
 @_transparent
+@unsafe
 public func unsafeDowncast<T: AnyObject>(_ x: AnyObject, to type: T.Type) -> T {
   _debugPrecondition(x is T, "invalid unsafeDowncast")
   return Builtin.castReference(x)
 }
 
 @_transparent
+@unsafe
 public func _unsafeUncheckedDowncast<T: AnyObject>(_ x: AnyObject, to type: T.Type) -> T {
   _internalInvariant(x is T, "invalid unsafeDowncast")
   return Builtin.castReference(x)
@@ -331,6 +335,7 @@ public func _onFastPath() {
 // Optimizer hint that the condition is true. The condition is unchecked.
 // The builtin acts as an opaque instruction with side-effects.
 @usableFromInline @_transparent
+@unsafe
 func _uncheckedUnsafeAssume(_ condition: Bool) {
   _ = Builtin.assume_Int1(condition._value)
 }
@@ -429,6 +434,8 @@ internal var _objectPointerIsObjCBit: UInt {
     return 0x4000_0000_0000_0000
 #elseif _pointerBitWidth(_32)
     return 0x0000_0002
+#elseif _pointerBitWidth(_16)
+    return 0x0000
 #else
 #error("Unknown platform")
 #endif

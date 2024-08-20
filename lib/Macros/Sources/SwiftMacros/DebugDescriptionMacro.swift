@@ -13,13 +13,40 @@
 import SwiftSyntax
 import SwiftSyntaxMacros
 import SwiftDiagnostics
+import _StringProcessing
 
 public enum DebugDescriptionMacro {}
 public enum _DebugDescriptionPropertyMacro {}
 
+/// The member role is used only to perform diagnostics. The member role ensures any diagnostics are emitted once per
+/// type. The macro's core behavior begins with the `MemberAttributeMacro` conformance.
+extension DebugDescriptionMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  )
+  throws -> [DeclSyntax]
+  {
+    guard !declaration.is(ProtocolDeclSyntax.self) else {
+      let message: ErrorMessage = "cannot be attached to a protocol"
+      context.diagnose(node: node, error: message)
+      return []
+    }
+
+    guard declaration.asProtocol(WithGenericParametersSyntax.self)?.genericParameterClause == nil else {
+      let message: ErrorMessage = "cannot be attached to a generic definition"
+      context.diagnose(node: node, error: message)
+      return []
+    }
+
+    return []
+  }
+}
+
 /// A macro which orchestrates conversion of a description property to an LLDB type summary.
 ///
-/// The job of conversion is split across two macros. This macro performs some analysis on the attached
+/// The process of conversion is split across multiple macros/roles. This role performs some analysis on the attached
 /// type, and then delegates to `@_DebugDescriptionProperty` to perform the conversion step.
 extension DebugDescriptionMacro: MemberAttributeMacro {
   public static func expansion(
@@ -31,8 +58,12 @@ extension DebugDescriptionMacro: MemberAttributeMacro {
   throws -> [AttributeSyntax]
   {
     guard !declaration.is(ProtocolDeclSyntax.self) else {
-      let message: ErrorMessage = "cannot be attached to a protocol"
-      context.diagnose(node: node, error: message)
+      // Diagnostics for this case are emitted by the `MemberMacro` conformance.
+      return []
+    }
+
+    guard declaration.asProtocol(WithGenericParametersSyntax.self)?.genericParameterClause == nil else {
+      // Diagnostics for this case are emitted by the `MemberMacro` conformance.
       return []
     }
 
@@ -158,12 +189,20 @@ extension _DebugDescriptionPropertyMacro: PeerMacro {
       return []
     }
 
+    // LLDB syntax is not allowed in debugDescription/description.
+    let allowLLDBSyntax = onlyBinding.name == "lldbDescription"
+
     // Iterate the string's segments, and convert property expressions into LLDB variable references.
     var summarySegments: [String] = []
     for segment in descriptionString.segments {
       switch segment {
       case let .stringSegment(segment):
-        summarySegments.append(segment.content.text)
+        var literal = segment.content.text
+        if !allowLLDBSyntax {
+          // To match debugDescription/description, escape `$` characters. LLDB must treat them as a literals they are.
+          literal = literal.escapedForLLDB()
+        }
+        summarySegments.append(literal)
       case let .expressionSegment(segment):
         guard let onlyLabeledExpr = segment.expressions.only, onlyLabeledExpr.label == nil else {
           // This catches `appendInterpolation` overrides.
@@ -232,7 +271,7 @@ extension _DebugDescriptionPropertyMacro: PeerMacro {
 
 /// The names of properties that can be converted to LLDB type summaries, in priority order.
 fileprivate let DESCRIPTION_PROPERTIES = [
-  "_debugDescription",
+  "lldbDescription",
   "debugDescription",
   "description",
 ]
@@ -470,6 +509,28 @@ extension String {
       return nil
     }
     self = string
+  }
+}
+
+extension String {
+  fileprivate func escapedForLLDB() -> String {
+    guard #available(macOS 13, *) else {
+      guard self.firstIndex(of: "$") != nil else {
+        return self
+      }
+
+      var result = ""
+      for char in self {
+        if char == "$" {
+          result.append("\\$")
+        } else {
+          result.append(char)
+        }
+      }
+      return result
+    }
+
+    return self.replacing("$", with: "\\$")
   }
 }
 

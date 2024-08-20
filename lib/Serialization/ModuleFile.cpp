@@ -309,11 +309,9 @@ ModuleFile::getTransitiveLoadingBehavior(const Dependency &dependency,
   // as a partial module.
   auto isPartialModule = mod->isMainModule();
 
-  return Core->getTransitiveLoadingBehavior(dependency.Core,
-                                            ctx.LangOpts.DebuggerSupport,
-                                            isPartialModule,
-                                            ctx.LangOpts.PackageName,
-                                            forTestable);
+  return Core->getTransitiveLoadingBehavior(
+      dependency.Core, ctx.LangOpts.ImportNonPublicDependencies,
+      isPartialModule, ctx.LangOpts.PackageName, forTestable);
 }
 
 bool ModuleFile::mayHaveDiagnosticsPointingAtBuffer() const {

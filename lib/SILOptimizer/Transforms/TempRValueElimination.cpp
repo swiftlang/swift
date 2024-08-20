@@ -402,7 +402,7 @@ bool TempRValueOptPass::extendAccessScopes(
       if (endAccessToMove)
         return false;
       // Is this the end of an access scope of the copy-source?
-      if (!aa->isNoAlias(copySrc, endAccess->getSource()) &&
+      if (aa->mayAlias(copySrc, endAccess->getSource()) &&
 
           // There cannot be any aliasing modifying accesses within the
           // liverange of the temporary, because we would have cought this in

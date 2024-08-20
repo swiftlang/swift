@@ -1,10 +1,10 @@
 // RUN: %target-typecheck-verify-swift
 
 protocol NeedsF0 {
-  func f0() // expected-note {{protocol requires function 'f0()' with type '() -> ()'; add a stub for conformance}}
+  func f0() // expected-note {{protocol requires function 'f0()' with type '() -> ()'}}
 }
 
-struct S0 : NeedsF0 {  // expected-error {{type 'S0' does not conform to protocol 'NeedsF0'}}
+struct S0 : NeedsF0 {  // expected-error {{type 'S0' does not conform to protocol 'NeedsF0'}} expected-note {{add stubs for conformance}}
   @_implements(NeedsF0, f0())
   func g0() -> Bool {  // expected-note {{candidate has non-matching type '() -> Bool'}}
     return true

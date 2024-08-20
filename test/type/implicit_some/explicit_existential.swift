@@ -7,10 +7,12 @@ protocol Foo { }
 var x: any Foo
 
 protocol SelfAsType {
-  var x: Self { get } // expected-note{{protocol requires property 'x' with type 'U'; add a stub for conformance}}
+  var x: Self { get } // expected-note{{protocol requires property 'x' with type 'U'}}
 }
 
-struct U : SelfAsType { // expected-error{{type 'U' does not conform to protocol 'SelfAsType'}}
+struct U : SelfAsType { 
+  // expected-error@-1{{type 'U' does not conform to protocol 'SelfAsType'}}
+  // expected-note@-2 {{add stubs for conformance}}
   var x: any SelfAsType { self } // expected-note {{candidate has non-matching type 'any SelfAsType'}}
 }
 
@@ -235,6 +237,7 @@ class C : any Empty {} // expected-error {{inheritance from non-protocol, non-cl
 enum E : any Empty { // expected-error {{raw type 'any Empty' is not expressible by a string, integer, or floating-point literal}}
 // expected-error@-1 {{'E' declares raw type 'any Empty', but does not conform to RawRepresentable and conformance could not be synthesized}}
 // expected-error@-2 {{RawRepresentable conformance cannot be synthesized because raw type 'any Empty' is not Equatable}}
+// expected-note@-3 {{add stubs for conformance}} 
   case hack
 }
 
@@ -242,6 +245,7 @@ enum EE : Equatable, any Empty { // expected-error {{raw type 'any Empty' is not
 // expected-error@-1 {{'EE' declares raw type 'any Empty', but does not conform to RawRepresentable and conformance could not be synthesized}}
 // expected-error@-2 {{RawRepresentable conformance cannot be synthesized because raw type 'any Empty' is not Equatable}}
 // expected-error@-3 {{raw type 'any Empty' must appear first in the enum inheritance clause}}
+// expected-note@-4 {{add stubs for conformance}} 
   case hack
 }
 

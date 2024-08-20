@@ -2012,22 +2012,22 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
 
     auto options = SILParameterInfo::Options();
 
-    Type type;
+    CanType type;
     VarDecl *varDecl = nullptr;
     if (auto *expr = capture.getPackElement()) {
-      type = expr->getType();
+      type = expr->getType()->getCanonicalType();
     } else {
       varDecl = cast<VarDecl>(capture.getDecl());
-      type = varDecl->getTypeInContext();
+      type = varDecl->getTypeInContext()->getCanonicalType();
 
       // If we're capturing a parameter pack, wrap it in a tuple.
-      if (type->is<PackExpansionType>()) {
+      if (isa<PackExpansionType>(type)) {
         assert(!cast<ParamDecl>(varDecl)->supportsMutation() &&
                "Cannot capture a pack as an lvalue");
 
         SmallVector<TupleTypeElt, 1> elts;
         elts.push_back(type);
-        type = TupleType::get(elts, TC.Context);
+        type = CanType(TupleType::get(elts, TC.Context));
       }
 
       if (isolatedParam == varDecl) {
@@ -3381,6 +3381,10 @@ public:
     // Otherwise, infer based on the method family.
     if (isImplicitPlusOneCFResult())
       return ResultConvention::Owned;
+
+    if (tl.getLoweredType().isForeignReferenceType())
+      return ResultConvention::Unowned;
+
     return ResultConvention::Autoreleased;
   }
 

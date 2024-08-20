@@ -164,7 +164,7 @@ struct InstructionSet : IntrusiveSet {
     var d = "{\n"
     for inst in function.instructions {
       if contains(inst) {
-        d += inst.description
+        d += inst.description + "\n"
       }
     }
     d += "}\n"

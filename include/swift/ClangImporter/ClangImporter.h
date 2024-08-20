@@ -26,6 +26,9 @@ namespace llvm {
   class Triple;
   class FileCollectorBase;
   template<typename Fn> class function_ref;
+  namespace opt {
+    class InputArgList;
+  }
   namespace vfs {
     class FileSystem;
     class OutputBackend;
@@ -51,6 +54,9 @@ namespace clang {
   class DeclarationName;
   class CompilerInvocation;
   class TargetOptions;
+  namespace driver {
+    class Driver;
+  }
 namespace tooling {
 namespace dependencies {
   struct ModuleDeps;
@@ -74,9 +80,11 @@ class EnumDecl;
 class FuncDecl;
 class ImportDecl;
 class IRGenOptions;
+class LangOptions;
 class ModuleDecl;
 struct ModuleDependencyID;
 class NominalTypeDecl;
+class SearchPathOptions;
 class StructDecl;
 class SwiftLookupTable;
 class TypeDecl;
@@ -195,6 +203,22 @@ public:
                         const ClangImporterOptions &importerOpts,
                         llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
                         const std::vector<std::string> &CC1Args);
+
+  /// Creates a Clang Driver based on the Swift compiler options.
+  ///
+  /// \return a pair of the Clang Driver and the diagnostic engine, which needs
+  /// to be alive during the use of the Driver.
+  static std::pair<clang::driver::Driver,
+                   llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine>>
+  createClangDriver(
+      const LangOptions &LangOpts,
+      const ClangImporterOptions &ClangImporterOpts,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr);
+
+  static llvm::opt::InputArgList
+  createClangArgs(const ClangImporterOptions &ClangImporterOpts,
+                  const SearchPathOptions &SearchPathOpts,
+                  clang::driver::Driver &clangDriver);
 
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;
@@ -517,8 +541,7 @@ public:
   std::string getClangModuleHash() const;
 
   /// Get clang import creation cc1 args for swift explicit module build.
-  std::vector<std::string>
-  getSwiftExplicitModuleDirectCC1Args(bool isInterface) const;
+  std::vector<std::string> getSwiftExplicitModuleDirectCC1Args() const;
 
   /// If we already imported a given decl successfully, return the corresponding
   /// Swift decl as an Optional<Decl *>, but if we previously tried and failed

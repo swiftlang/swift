@@ -253,7 +253,7 @@ $\genericsym{0}{0}.\assocsym{P}{B}$&$\protosym{Q}$, $\protosym{R}$, $\supersym{\
 
 \section[]{Substitution Simplification}\label{subst simplification}
 
-\begin{algorithm}[Substitution simplification]\label{subst simplification algo}
+\begin{algorithm}[Simplify substitution terms]\label{subst simplification algo}
 \end{algorithm}
 
 \section[]{Property Unification}
@@ -318,7 +318,7 @@ Next, I will describe the generic signature queries that return properties of ty
 \begin{definition}\label{minimalproto} A list of protocols $\{\proto{P}_i\}$ is \emph{minimal} if
 no
 protocol inherits from any other protocol in the list; that is, there do not exist $i,
-j\in\mathbb{N}$ such that $i\neq j$ and $\proto{P}_i$ inherits from $\proto{P}_j$. The list is
+j\in\NN$ such that $i\neq j$ and $\proto{P}_i$ inherits from $\proto{P}_j$. The list is
 \emph{canonical}
 if it is sorted in canonical protocol order.
 

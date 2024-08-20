@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -diagnostics-editor-mode -verify %s
+// RUN: %target-swift-frontend -typecheck -verify %s
 
 // Test that we emit fix-its to insert requirement stubs for the missing protocol conformance, in addition to adding the conformance.
 

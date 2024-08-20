@@ -173,17 +173,6 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
   auto ClangModuleCachePath = getModuleCachePathFromClang(
       ScanASTContext.getClangModuleLoader()->getClangInstance());
   auto &FEOpts = ScanCompilerInvocation.getFrontendOptions();
-
-  // Configure the filesystem to use the same shared `stat` cache as the Clang
-  // worker uses.
-  if (!globalScanningService.CacheFS) {
-    auto DepFS = llvm::makeIntrusiveRefCnt<
-        clang::tooling::dependencies::DependencyScanningWorkerFilesystem>(
-        globalScanningService.ClangScanningService->getSharedCache(),
-        ScanASTContext.SourceMgr.getFileSystem());
-    ScanASTContext.SourceMgr.setFileSystem(std::move(DepFS));
-  }
-
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   ScanningASTDelegate = std::make_unique<InterfaceSubContextDelegateImpl>(
       ScanASTContext.SourceMgr, &ScanASTContext.Diags,
@@ -383,8 +372,7 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
   std::vector<std::string> buildArgs;
   if (ScanASTContext.ClangImporterOpts.ClangImporterDirectCC1Scan) {
     buildArgs.push_back("-direct-clang-cc1-module-build");
-    for (auto &arg : clangImporter->getSwiftExplicitModuleDirectCC1Args(
-             /*isInterface=*/false)) {
+    for (auto &arg : clangImporter->getSwiftExplicitModuleDirectCC1Args()) {
       buildArgs.push_back("-Xcc");
       buildArgs.push_back(arg);
     }
@@ -963,7 +951,8 @@ void ModuleDependencyScanner::discoverCrossImportOverlayDependencies(
     mainDep.addAuxiliaryFile(entry.second);
     cmdCopy.push_back("-swift-module-cross-import");
     cmdCopy.push_back(entry.first);
-    cmdCopy.push_back(entry.second);
+    auto overlayPath = cache.getScanService().remapPath(entry.second);
+    cmdCopy.push_back(overlayPath);
   }
   mainDep.updateCommandLine(cmdCopy);
 

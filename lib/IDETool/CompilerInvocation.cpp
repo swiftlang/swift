@@ -223,8 +223,12 @@ bool ide::initCompilerInvocation(
 
   auto &LangOpts = Invocation.getLangOptions();
   LangOpts.AttachCommentsToDecls = true;
-  LangOpts.DiagnosticsEditorMode = true;
   LangOpts.CollectParsedToken = true;
+  #if defined(_WIN32)
+  // Source files that might be open in an editor should not be memory mapped on Windows,
+  // as they will become read-only.
+  LangOpts.OpenSourcesAsVolatile = true;
+  #endif
   if (LangOpts.PlaygroundTransform) {
     // The playground instrumenter changes the AST in ways that disrupt the
     // SourceKit functionality. Since we don't need the instrumenter, and all we

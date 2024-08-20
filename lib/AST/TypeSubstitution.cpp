@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -25,7 +26,9 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeTransform.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
 
 using namespace swift;
 
@@ -188,12 +191,9 @@ static Type getMemberForBaseType(InFlightSubstitution &IFS,
 ProtocolConformanceRef LookUpConformanceInModule::
 operator()(CanType dependentType, Type conformingReplacementType,
            ProtocolDecl *conformedProtocol) const {
-  if (conformingReplacementType->isTypeParameter())
-    return ProtocolConformanceRef(conformedProtocol);
-
-  return ModuleDecl::lookupConformance(conformingReplacementType,
-                                       conformedProtocol,
-                                       /*allowMissing=*/true);
+  return lookupConformance(conformingReplacementType,
+                           conformedProtocol,
+                           /*allowMissing=*/true);
 }
 
 ProtocolConformanceRef LookUpConformanceInSubstitutionMap::
@@ -202,7 +202,7 @@ operator()(CanType dependentType, Type conformingReplacementType,
   // Lookup conformances for archetypes that conform concretely
   // via a superclass.
   if (auto archetypeType = conformingReplacementType->getAs<ArchetypeType>()) {
-    return ModuleDecl::lookupConformance(
+    return lookupConformance(
         conformingReplacementType, conformedProtocol,
         /*allowMissing=*/true);
   }
@@ -216,7 +216,7 @@ operator()(CanType dependentType, Type conformingReplacementType,
   if (auto genericSig = Subs.getGenericSignature()) {
     if (genericSig->isValidTypeParameter(dependentType) &&
         genericSig->isConcreteType(dependentType)) {
-      return ModuleDecl::lookupConformance(
+      return lookupConformance(
           conformingReplacementType, conformedProtocol,
           /*allowMissing=*/true);
     }
@@ -255,7 +255,7 @@ operator()(CanType dependentType, Type conformingReplacementType,
   // concretely.
   if (auto *archetypeType = conformingReplacementType->getAs<ArchetypeType>()) {
     if (auto superclassType = archetypeType->getSuperclass()) {
-      return ModuleDecl::lookupConformance(archetypeType, conformedProtocol);
+      return lookupConformance(archetypeType, conformedProtocol);
     }
   }
   return ProtocolConformanceRef(conformedProtocol);
@@ -478,161 +478,184 @@ bool InFlightSubstitution::isInvariant(Type derivedType) const {
           || !derivedType->hasOpaqueArchetype());
 }
 
-static Type substType(Type derivedType, unsigned level,
-                      InFlightSubstitution &IFS) {
-  // Handle substitutions into generic function types.
-  if (auto genericFnType = derivedType->getAs<GenericFunctionType>()) {
-    return substGenericFunctionType(genericFnType, IFS);
+namespace {
+
+class TypeSubstituter : public TypeTransform<TypeSubstituter> {
+  unsigned level;
+  InFlightSubstitution &IFS;
+
+public:
+  TypeSubstituter(unsigned level, InFlightSubstitution &IFS)
+    : level(level), IFS(IFS) {}
+
+  std::optional<Type> transform(TypeBase *type, TypePosition position);
+
+  SubstitutionMap transformSubstitutionMap(SubstitutionMap subs);
+};
+
+}
+
+std::optional<Type>
+TypeSubstituter::transform(TypeBase *type, TypePosition position) {
+  // FIXME: Add SIL versions of mapTypeIntoContext() and
+  // mapTypeOutOfContext() and use them appropriately
+  assert((IFS.getOptions().contains(SubstFlags::AllowLoweredTypes) ||
+          !isa<SILFunctionType>(type)) &&
+         "should not be doing AST type-substitution on a lowered SIL type;"
+         "use SILType::subst");
+
+  // Special-case handle SILBoxTypes and substituted SILFunctionTypes;
+  // we want to structurally substitute the substitutions.
+  if (auto boxTy = dyn_cast<SILBoxType>(type)) {
+    auto subMap = boxTy->getSubstitutions();
+    auto newSubMap = subMap.subst(IFS);
+
+    return SILBoxType::get(boxTy->getASTContext(),
+                           boxTy->getLayout(),
+                           newSubMap);
   }
 
-  // FIXME: Change getTypeOfMember() to not pass GenericFunctionType here
-  if (IFS.isInvariant(derivedType))
-    return derivedType;
+  if (auto packExpansionTy = dyn_cast<PackExpansionType>(type)) {
+    auto eltTys = IFS.expandPackExpansionType(packExpansionTy);
+    if (eltTys.size() == 1)
+      return eltTys[0];
+    return Type(PackType::get(packExpansionTy->getASTContext(), eltTys));
+  }
 
-  return derivedType.transformRec([&](TypeBase *type) -> std::optional<Type> {
-    // FIXME: Add SIL versions of mapTypeIntoContext() and
-    // mapTypeOutOfContext() and use them appropriately
-    assert((IFS.getOptions().contains(SubstFlags::AllowLoweredTypes) ||
-            !isa<SILFunctionType>(type)) &&
-           "should not be doing AST type-substitution on a lowered SIL type;"
-           "use SILType::subst");
-
-    // Special-case handle SILBoxTypes and substituted SILFunctionTypes;
-    // we want to structurally substitute the substitutions.
-    if (auto boxTy = dyn_cast<SILBoxType>(type)) {
-      auto subMap = boxTy->getSubstitutions();
-      auto newSubMap = subMap.subst(IFS);
-
-      return SILBoxType::get(boxTy->getASTContext(),
-                             boxTy->getLayout(),
-                             newSubMap);
-    }
-
-    if (auto packExpansionTy = dyn_cast<PackExpansionType>(type)) {
-      auto eltTys = IFS.expandPackExpansionType(packExpansionTy);
-      if (eltTys.size() == 1)
-        return eltTys[0];
-      return Type(PackType::get(packExpansionTy->getASTContext(), eltTys));
-    }
-
-    if (auto silFnTy = dyn_cast<SILFunctionType>(type)) {
-      if (silFnTy->isPolymorphic())
-        return std::nullopt;
-      if (auto subs = silFnTy->getInvocationSubstitutions()) {
-        auto newSubs = subs.subst(IFS);
-        return silFnTy->withInvocationSubstitutions(newSubs);
-      }
-      if (auto subs = silFnTy->getPatternSubstitutions()) {
-        auto newSubs = subs.subst(IFS);
-        return silFnTy->withPatternSubstitutions(newSubs);
-      }
+  if (auto silFnTy = dyn_cast<SILFunctionType>(type)) {
+    if (silFnTy->isPolymorphic())
       return std::nullopt;
+    if (auto subs = silFnTy->getInvocationSubstitutions()) {
+      auto newSubs = subs.subst(IFS);
+      return silFnTy->withInvocationSubstitutions(newSubs);
     }
-
-    // Special-case TypeAliasType; we need to substitute conformances.
-    if (auto aliasTy = dyn_cast<TypeAliasType>(type)) {
-      Type parentTy;
-      if (auto origParentTy = aliasTy->getParent())
-        parentTy = substType(origParentTy, level, IFS);
-      auto underlyingTy = substType(aliasTy->getSinglyDesugaredType(),
-                                    level, IFS);
-      if (parentTy && parentTy->isExistentialType())
-        return underlyingTy;
-      auto subMap = aliasTy->getSubstitutionMap().subst(IFS);
-      return Type(TypeAliasType::get(aliasTy->getDecl(), parentTy,
-                                     subMap, underlyingTy));
+    if (auto subs = silFnTy->getPatternSubstitutions()) {
+      auto newSubs = subs.subst(IFS);
+      return silFnTy->withPatternSubstitutions(newSubs);
     }
+    return std::nullopt;
+  }
 
-    unsigned currentLevel = level;
-    if (auto elementTy = dyn_cast<PackElementType>(type)) {
-      type = elementTy->getPackType().getPointer();
-      currentLevel += elementTy->getLevel();
-    }
+  // Special-case TypeAliasType; we need to substitute conformances.
+  if (auto aliasTy = dyn_cast<TypeAliasType>(type)) {
+    Type parentTy;
+    if (auto origParentTy = aliasTy->getParent())
+      parentTy = doIt(origParentTy, TypePosition::Invariant);
+    auto underlyingTy = doIt(aliasTy->getSinglyDesugaredType(),
+                             TypePosition::Invariant);
+    if (parentTy && parentTy->isExistentialType())
+      return underlyingTy;
+    auto subMap = aliasTy->getSubstitutionMap().subst(IFS);
+    return Type(TypeAliasType::get(aliasTy->getDecl(), parentTy,
+                                   subMap, underlyingTy));
+  }
 
-    // We only substitute for substitutable types and dependent member types.
-    
-    // For dependent member types, we may need to look up the member if the
-    // base is resolved to a non-dependent type.
-    if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
-      auto newBase = substType(depMemTy->getBase(), currentLevel, IFS);
-      return getMemberForBaseType(IFS,
-                                  depMemTy->getBase(), newBase,
-                                  depMemTy->getAssocType(),
-                                  depMemTy->getName(),
-                                  currentLevel);
-    }
-    
-    auto substOrig = dyn_cast<SubstitutableType>(type);
-    if (!substOrig)
-      return std::nullopt;
+  auto oldLevel = level;
+  SWIFT_DEFER { level = oldLevel; };
 
-    // Opaque types can't normally be directly substituted unless we
-    // specifically were asked to substitute them.
-    if (!IFS.shouldSubstituteOpaqueArchetypes()
-        && isa<OpaqueTypeArchetypeType>(substOrig))
-      return std::nullopt;
+  if (auto elementTy = dyn_cast<PackElementType>(type)) {
+    type = elementTy->getPackType().getPointer();
+    level += elementTy->getLevel();
+  }
 
-    // If we have a substitution for this type, use it.
-    if (auto known = IFS.substType(substOrig, currentLevel)) {
-      if (IFS.shouldSubstituteOpaqueArchetypes() &&
-          isa<OpaqueTypeArchetypeType>(substOrig) &&
-          known->getCanonicalType() == substOrig->getCanonicalType())
-        return std::nullopt; // Recursively process the substitutions of the
-                             // opaque type archetype.
-      return known;
-    }
+  // We only substitute for substitutable types and dependent member types.
+  
+  // For dependent member types, we may need to look up the member if the
+  // base is resolved to a non-dependent type.
+  if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
+    auto newBase = doIt(depMemTy->getBase(), TypePosition::Invariant);
+    return getMemberForBaseType(IFS,
+                                depMemTy->getBase(), newBase,
+                                depMemTy->getAssocType(),
+                                depMemTy->getName(),
+                                level);
+  }
+  
+  auto substOrig = dyn_cast<SubstitutableType>(type);
+  if (!substOrig)
+    return std::nullopt;
 
-    // If we failed to substitute a generic type parameter, give up.
-    if (isa<GenericTypeParamType>(substOrig))
-      return ErrorType::get(type);
+  // Opaque types can't normally be directly substituted unless we
+  // specifically were asked to substitute them.
+  if (!IFS.shouldSubstituteOpaqueArchetypes()
+      && isa<OpaqueTypeArchetypeType>(substOrig))
+    return std::nullopt;
 
-    auto origArchetype = cast<ArchetypeType>(substOrig);
-    if (origArchetype->isRoot()) {
-      // Root opened archetypes are not required to be substituted. Other root
-      // archetypes must already have been substituted above.
-      if (isa<LocalArchetypeType>(origArchetype)) {
-        return Type(type);
-      } else {
-        return ErrorType::get(type);
-      }
-    }
+  // If we have a substitution for this type, use it.
+  if (auto known = IFS.substType(substOrig, level)) {
+    if (IFS.shouldSubstituteOpaqueArchetypes() &&
+        isa<OpaqueTypeArchetypeType>(substOrig) &&
+        known->getCanonicalType() == substOrig->getCanonicalType())
+      return std::nullopt; // Recursively process the substitutions of the
+                           // opaque type archetype.
+    return known;
+  }
 
-    // For nested archetypes, we can substitute the parent.
-    Type origParent = origArchetype->getParent();
-    assert(origParent && "Not a nested archetype");
+  // If we failed to substitute a generic type parameter, give up.
+  if (isa<GenericTypeParamType>(substOrig))
+    return ErrorType::get(type);
 
-    // Substitute into the parent type.
-    Type substParent = substType(origParent, currentLevel, IFS);
-
-    // If the parent didn't change, we won't change.
-    if (substParent.getPointer() == origArchetype->getParent())
+  auto origArchetype = cast<ArchetypeType>(substOrig);
+  if (origArchetype->isRoot()) {
+    // Root opened archetypes are not required to be substituted. Other root
+    // archetypes must already have been substituted above.
+    if (isa<LocalArchetypeType>(origArchetype)) {
       return Type(type);
+    } else {
+      return ErrorType::get(type);
+    }
+  }
 
-    // Get the associated type reference from a child archetype.
-    AssociatedTypeDecl *assocType = origArchetype->getInterfaceType()
-        ->castTo<DependentMemberType>()->getAssocType();
+  // For nested archetypes, we can substitute the parent.
+  Type origParent = origArchetype->getParent();
+  assert(origParent && "Not a nested archetype");
 
-    return getMemberForBaseType(IFS, origArchetype->getParent(), substParent,
-                                assocType, assocType->getName(),
-                                currentLevel);
-  });
+  // Substitute into the parent type.
+  Type substParent = doIt(origParent, TypePosition::Invariant);
+
+  // If the parent didn't change, we won't change.
+  if (substParent.getPointer() == origArchetype->getParent())
+    return Type(type);
+
+  // Get the associated type reference from a child archetype.
+  AssociatedTypeDecl *assocType = origArchetype->getInterfaceType()
+      ->castTo<DependentMemberType>()->getAssocType();
+
+  return getMemberForBaseType(IFS, origArchetype->getParent(), substParent,
+                              assocType, assocType->getName(),
+                              level);
+}
+
+SubstitutionMap TypeSubstituter::transformSubstitutionMap(SubstitutionMap subs) {
+  // FIXME: Take level into account? Move level down into IFS?
+  return subs.subst(IFS);
 }
 
 Type Type::subst(SubstitutionMap substitutions,
                  SubstOptions options) const {
   InFlightSubstitutionViaSubMap IFS(substitutions, options);
-  return substType(*this, /*level=*/0, IFS);
+  return subst(IFS);
 }
 
 Type Type::subst(TypeSubstitutionFn substitutions,
                  LookupConformanceFn conformances,
                  SubstOptions options) const {
   InFlightSubstitution IFS(substitutions, conformances, options);
-  return substType(*this, /*level=*/0, IFS);
+  return subst(IFS);
 }
 
 Type Type::subst(InFlightSubstitution &IFS) const {
-  return substType(*this, /*level=*/0, IFS);
+  // Handle substitutions into generic function types.
+  // FIXME: This should be banned.
+  if (auto genericFnType = getPointer()->getAs<GenericFunctionType>()) {
+    return substGenericFunctionType(genericFnType, IFS);
+  }
+
+  if (IFS.isInvariant(*this))
+    return *this;
+
+  TypeSubstituter transform(/*level=*/0, IFS);
+  return transform.doIt(*this, TypePosition::Invariant);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1022,18 +1045,6 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
 // Replacing opaque result archetypes with their underlying types
 //===----------------------------------------------------------------------===//
 
-static std::optional<std::pair<ArchetypeType *, OpaqueTypeArchetypeType *>>
-getArchetypeAndRootOpaqueArchetype(Type maybeOpaqueType) {
-  auto archetype = dyn_cast<ArchetypeType>(maybeOpaqueType.getPointer());
-  if (!archetype)
-    return std::nullopt;
-  auto opaqueRoot = dyn_cast<OpaqueTypeArchetypeType>(archetype->getRoot());
-  if (!opaqueRoot)
-    return std::nullopt;
-
-  return std::make_pair(archetype, opaqueRoot);
-}
-
 OpaqueSubstitutionKind
 ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
     OpaqueTypeDecl *opaque) const {
@@ -1112,14 +1123,8 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
                                   bool isContextWholeModule) {
   TypeDecl *typeDecl = ty->getAnyNominal();
   if (!typeDecl) {
-    // The referenced type might be a different opaque result type.
-
-    // First, unwrap any nested associated types to get the root archetype.
-    if (auto nestedTy = ty->getAs<ArchetypeType>())
-      ty = nestedTy->getRoot();
-
-    // If the root archetype is an opaque result type, check that its
-    // descriptor is accessible.
+    // If the referenced type is a different opaque result type,
+    // check that its descriptor is accessible.
     if (auto opaqueTy = ty->getAs<OpaqueTypeArchetypeType>())
       typeDecl = opaqueTy->getDecl();
   }
@@ -1171,19 +1176,20 @@ ReplaceOpaqueTypesWithUnderlyingTypes::ReplaceOpaqueTypesWithUnderlyingTypes(
 
 Type ReplaceOpaqueTypesWithUnderlyingTypes::
 operator()(SubstitutableType *maybeOpaqueType) const {
-  auto archetypeAndRoot = getArchetypeAndRootOpaqueArchetype(maybeOpaqueType);
-  if (!archetypeAndRoot)
+  auto *archetype = dyn_cast<OpaqueTypeArchetypeType>(maybeOpaqueType);
+  if (!archetype)
     return maybeOpaqueType;
 
-  auto archetype = archetypeAndRoot->first;
-  auto opaqueRoot = archetypeAndRoot->second;
+  auto *genericEnv = archetype->getGenericEnvironment();
+  auto *decl = genericEnv->getOpaqueTypeDecl();
+  auto outerSubs = genericEnv->getOpaqueSubstitutions();
 
-  auto substitutionKind = shouldPerformSubstitution(opaqueRoot->getDecl());
+  auto substitutionKind = shouldPerformSubstitution(decl);
   if (substitutionKind == OpaqueSubstitutionKind::DontSubstitute) {
     return maybeOpaqueType;
   }
 
-  auto subs = opaqueRoot->getDecl()->getUniqueUnderlyingTypeSubstitutions();
+  auto subs = decl->getUniqueUnderlyingTypeSubstitutions();
   // If the body of the opaque decl providing decl has not been type checked we
   // don't have a underlying substitution.
   if (!subs.has_value())
@@ -1215,11 +1221,11 @@ operator()(SubstitutableType *maybeOpaqueType) const {
   // for its type arguments. We perform this substitution after checking for
   // visibility, since we do not want the result of the visibility check to
   // depend on the substitutions previously applied.
-  auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
+  auto substTy = partialSubstTy.subst(outerSubs);
 
   // If the type changed, but still contains opaque types, recur.
   if (!substTy->isEqual(maybeOpaqueType) && substTy->hasOpaqueArchetype()) {
-    SeenDecl seenKey(opaqueRoot->getDecl(), opaqueRoot->getSubstitutions());
+    SeenDecl seenKey(decl, outerSubs);
     if (auto *alreadySeen = this->seenDecls) {
       // Detect substitution loops. If we find one, just bounce the original
       // type back to the caller. This substitution will fail at runtime
@@ -1289,8 +1295,8 @@ operator()(CanType maybeOpaqueType, Type replacementType,
            ProtocolDecl *protocol) const {
   auto abstractRef = ProtocolConformanceRef(protocol);
   
-  auto archetypeAndRoot = getArchetypeAndRootOpaqueArchetype(maybeOpaqueType);
-  if (!archetypeAndRoot) {
+  auto archetype = dyn_cast<OpaqueTypeArchetypeType>(maybeOpaqueType);
+  if (!archetype) {
     if (maybeOpaqueType->isTypeParameter() ||
         maybeOpaqueType->is<ArchetypeType>())
       return abstractRef;
@@ -1298,21 +1304,22 @@ operator()(CanType maybeOpaqueType, Type replacementType,
     // SIL type lowering may have already substituted away the opaque type, in
     // which case we'll end up "substituting" the same type.
     if (maybeOpaqueType->isEqual(replacementType)) {
-      return ModuleDecl::lookupConformance(replacementType, protocol);
+      return lookupConformance(replacementType, protocol);
     }
     
     llvm_unreachable("origType should have been an opaque type or type parameter");
   }
 
-  auto archetype = archetypeAndRoot->first;
-  auto opaqueRoot = archetypeAndRoot->second;
+  auto *genericEnv = archetype->getGenericEnvironment();
+  auto *decl = genericEnv->getOpaqueTypeDecl();
+  auto outerSubs = genericEnv->getOpaqueSubstitutions();
 
-  auto substitutionKind = shouldPerformSubstitution(opaqueRoot->getDecl());
+  auto substitutionKind = shouldPerformSubstitution(decl);
   if (substitutionKind == OpaqueSubstitutionKind::DontSubstitute) {
     return abstractRef;
   }
 
-  auto subs = opaqueRoot->getDecl()->getUniqueUnderlyingTypeSubstitutions();
+  auto subs = decl->getUniqueUnderlyingTypeSubstitutions();
   // If the body of the opaque decl providing decl has not been type checked we
   // don't have a underlying substitution.
   if (!subs.has_value())
@@ -1343,16 +1350,16 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   // for its type arguments. We perform this substitution after checking for
   // visibility, since we do not want the result of the visibility check to
   // depend on the substitutions previously applied.
-  auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
+  auto substTy = partialSubstTy.subst(outerSubs);
 
   auto partialSubstRef =
       abstractRef.subst(archetype->getInterfaceType(), *subs);
   auto substRef =
-      partialSubstRef.subst(partialSubstTy, opaqueRoot->getSubstitutions());
+      partialSubstRef.subst(partialSubstTy, outerSubs);
 
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
-    SeenDecl seenKey(opaqueRoot->getDecl(), opaqueRoot->getSubstitutions());
+    SeenDecl seenKey(decl, outerSubs);
     
     if (auto *alreadySeen = this->seenDecls) {
       // Detect substitution loops. If we find one, just bounce the original

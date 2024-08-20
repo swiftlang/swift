@@ -166,9 +166,6 @@ internal final class _IteratorBox<Base: IteratorProtocol>
   internal var _base: Base
 }
 
-@available(*, unavailable)
-extension _IteratorBox: Sendable {}
-
 //===--- Sequence ---------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
@@ -402,9 +399,6 @@ internal class _AnyCollectionBox<Element>: _AnySequenceBox<Element> {
   ) -> _AnyCollectionBox<Element> { _abstract() }
 }
 
-@available(*, unavailable)
-extension _AnyCollectionBox: Sendable {}
-
 @_fixed_layout
 @usableFromInline
 internal class _AnyBidirectionalCollectionBox<Element>
@@ -468,9 +462,6 @@ internal class _AnyBidirectionalCollectionBox<Element>
   internal func _formIndex(before i: _AnyIndexBox) { _abstract() }
 }
 
-@available(*, unavailable)
-extension _AnyBidirectionalCollectionBox: Sendable {}
-
 @_fixed_layout
 @usableFromInline
 internal class _AnyRandomAccessCollectionBox<Element>
@@ -527,9 +518,6 @@ internal class _AnyRandomAccessCollectionBox<Element>
     end end: _AnyIndexBox
   ) -> _AnyRandomAccessCollectionBox<Element> { _abstract() }
 }
-
-@available(*, unavailable)
-extension _AnyRandomAccessCollectionBox: Sendable {}
 
 @_fixed_layout
 @usableFromInline
@@ -622,9 +610,6 @@ internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
   @usableFromInline
   internal var _base: S
 }
-
-@available(*, unavailable)
-extension _SequenceBox: Sendable {}
 
 @_fixed_layout
 @usableFromInline
@@ -819,9 +804,6 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
   @usableFromInline
   internal var _base: S
 }
-
-@available(*, unavailable)
-extension _CollectionBox: Sendable {}
 
 @_fixed_layout
 @usableFromInline
@@ -1036,9 +1018,6 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
   internal var _base: S
 }
 
-@available(*, unavailable)
-extension _BidirectionalCollectionBox: Sendable {}
-
 @_fixed_layout
 @usableFromInline
 internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
@@ -1250,9 +1229,6 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
   @usableFromInline
   internal var _base: S
 }
-
-@available(*, unavailable)
-extension _RandomAccessCollectionBox: Sendable {}
 
 @usableFromInline
 @frozen

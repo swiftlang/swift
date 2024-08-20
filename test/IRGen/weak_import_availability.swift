@@ -115,14 +115,14 @@ public func useConditionallyAvailableMethod(s: ConditionallyAvailableStruct) {
 
 @available(macOS, unavailable)
 public func useUnavailableStruct() {
-  blackHole(UnvailableStruct.self)
+  blackHole(UnavailableStruct.self)
 }
 
-// CHECK-LABEL: declare extern_weak swiftcc %swift.metadata_response @"$s31weak_import_availability_helper16UnvailableStructVMa"(i64)
+// CHECK-LABEL: declare extern_weak swiftcc %swift.metadata_response @"$s31weak_import_availability_helper17UnavailableStructVMa"(i64)
 
 @available(macOS, unavailable)
-public func useUnavailableMethod(s: UnvailableStruct) {
+public func useUnavailableMethod(s: UnavailableStruct) {
   s.unavailableMethod()
 }
 
-// CHECK-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper16UnvailableStructV17unavailableMethodyyF"(ptr noalias swiftself)
+// CHECK-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper17UnavailableStructV17unavailableMethodyyF"(ptr noalias swiftself)

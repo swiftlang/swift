@@ -609,6 +609,9 @@ public:
   /// (it has a debug_value [trace] user).
   bool hasDebugTrace() const;
 
+  /// Does this SILValue begin a VarDecl scope? Only true in OSSA.
+  bool isFromVarDecl();
+
   static bool classof(SILNodePointer node) {
     return node->getKind() >= SILNodeKind::First_ValueBase &&
            node->getKind() <= SILNodeKind::Last_ValueBase;

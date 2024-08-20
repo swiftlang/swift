@@ -46,7 +46,7 @@ public func testClosureToFuncPtrReturnNonTrivial() {
 // CHECK: %[[V1:.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%{{.*}}, ptr @{{.*}}, i32 0, i32 2), i64 24, i64 7)
 // CHECK: %[[V2:.*]] = getelementptr inbounds <{ %{{.*}}, ptr }>, ptr %[[V1]], i32 0, i32 1
 // CHECK: store ptr %[[V0]], ptr %[[V2]], align 8
-// CHECK: %[[V3:.*]] = insertvalue { ptr, ptr } { ptr @"$sSo10NonTrivialVIetCX_ABIegn_TRTA", ptr undef }, ptr %[[V1]], 1
+// CHECK: %[[V3:.*]] = insertvalue { ptr, ptr } { ptr @"$sSo10NonTrivialVIetCX_ABIegn_TRTA{{(\.ptrauth)?}}", ptr undef }, ptr %[[V1]], 1
 // CHECK: ret { ptr, ptr } %[[V3]]
 
 // CHECK: define linkonce_odr hidden swiftcc void @"$sSo10NonTrivialVIetCX_ABIegn_TR"(ptr noalias dereferenceable(8) %[[V0:.*]], ptr %[[V1:.*]])

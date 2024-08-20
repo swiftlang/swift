@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -primary-file %s -parse-as-library -sil-verify-all -Xllvm -enable-deinit-devirtualizer -module-name=test -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -primary-file %s -parse-as-library -O -sil-verify-all -module-name=test -Xllvm -sil-disable-pass=function-signature-opts -emit-sil | %FileCheck %s
 
 // Also do an end-to-end test and check if the compiled executable works as expected.
-// RUN: %target-run-simple-swift(-target %target-cpu-apple-macos14 -Xllvm -enable-deinit-devirtualizer -parse-as-library) | %FileCheck -check-prefix CHECK-OUTPUT %s
+// RUN: %target-run-simple-swift(-target %target-cpu-apple-macos14 -parse-as-library -O -Xllvm -sil-disable-pass=function-signature-opts) | %FileCheck -check-prefix CHECK-OUTPUT %s
 
 // Check if it works in embedded mode.
 // RUN: %target-run-simple-swift(-target %target-cpu-apple-macos14 -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck -check-prefix CHECK-OUTPUT %s
@@ -19,6 +19,8 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: embedded_stdlib
+
+// UNSUPPORTED: use_os_stdlib
 
 @inline(never)
 func log(_ s: StaticString) {
@@ -98,8 +100,8 @@ func testTwoFieldDeinits(_ s: consuming StrWithoutDeinit) {
 }
 
 // CHECK-LABEL: sil hidden [noinline] @$s4test0A5Enum1yyAA2E1OnF :
-// CHECK:         switch_enum_addr
-// CHECK:       bb1:
+// CHECK:         switch_enum
+// CHECK:       bb1({{.*}}):
 // CHECK:         [[D:%.*]] = function_ref @$s4test2S1VfD :
 // CHECK:         apply [[D]]
 // CHECK:       } // end sil function '$s4test0A5Enum1yyAA2E1OnF'
@@ -109,13 +111,13 @@ func testEnum1(_ s: consuming E1) {
 }
 
 // CHECK-LABEL: sil hidden [noinline] @$s4test0A5Enum2yyAA2E2OnF :
-// CHECK:         switch_enum_addr
-// CHECK:       bb1:
+// CHECK:         switch_enum
+// CHECK:       bb1({{.*}}):
 // CHECK:         [[D:%.*]] = function_ref @$s4test2S2VfD :
 // CHECK:         apply [[D]]
-// CHECK:       bb2:
-// CHECK:         switch_enum_addr
-// CHECK:       bb3:
+// CHECK:       bb2({{.*}}):
+// CHECK:         switch_enum
+// CHECK:       bb3({{.*}}):
 // CHECK:         [[D:%.*]] = function_ref @$s4test2S1VfD :
 // CHECK:         apply [[D]]
 // CHECK:       } // end sil function '$s4test0A5Enum2yyAA2E2OnF'

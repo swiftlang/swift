@@ -15,8 +15,11 @@
 // declaration of members (such as constructors).
 //
 //===----------------------------------------------------------------------===//
+
+#include "TypeCheckAvailability.h"
 #include "TypeChecker.h"
 #include "TypoCorrection.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -154,8 +157,7 @@ namespace {
 
       // Dig out the protocol conformance.
       auto *foundProto = cast<ProtocolDecl>(foundDC);
-      auto conformance = ModuleDecl::lookupConformance(
-          conformingType, foundProto);
+      auto conformance = lookupConformance(conformingType, foundProto);
       if (conformance.isInvalid()) {
         if (foundInType->isExistentialType()) {
           // If there's no conformance, we have an existential
@@ -496,7 +498,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       // member entirely.
       auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
 
-      auto conformance = ModuleDecl::lookupConformance(type, protocol);
+      auto conformance = lookupConformance(type, protocol);
       if (!conformance) {
         // FIXME: This is an error path. Should we try to recover?
         continue;
@@ -753,4 +755,153 @@ TypoCorrectionResults::claimUniqueCorrection() {
   ClaimedCorrection = true;
 
   return SyntacticTypoCorrection(WrittenName, Loc, uniqueCorrectedName);
+}
+
+struct MissingImportFixItInfo {
+  OptionSet<ImportFlags> flags;
+  std::optional<AccessLevel> accessLevel;
+};
+
+class MissingImportFixItCache {
+  SourceFile &sf;
+  llvm::DenseMap<const ModuleDecl *, MissingImportFixItInfo> infos;
+
+public:
+  MissingImportFixItCache(SourceFile &sf) : sf(sf){};
+
+  MissingImportFixItInfo getInfo(const ModuleDecl *mod) {
+    auto existing = infos.find(mod);
+    if (existing != infos.end())
+      return existing->getSecond();
+
+    MissingImportFixItInfo info;
+
+    // Find imports of the defining module in other source files and aggregate
+    // the attributes and access level usage on those imports collectively. This
+    // information can be used to emit a fix-it that is consistent with
+    // how the module is imported in the rest of the module.
+    auto parentModule = sf.getParentModule();
+    bool foundImport = false;
+    bool anyImportHasAccessLevel = false;
+    for (auto file : parentModule->getFiles()) {
+      if (auto otherSF = dyn_cast<SourceFile>(file)) {
+        unsigned flagsInSourceFile = 0x0;
+        otherSF->forEachImportOfModule(
+            mod, [&](AttributedImport<ImportedModule> &import) {
+              foundImport = true;
+              anyImportHasAccessLevel |= import.accessLevelRange.isValid();
+              flagsInSourceFile |= import.options.toRaw();
+            });
+        info.flags |= ImportFlags(flagsInSourceFile);
+      }
+    }
+
+    // Add an appropriate access level as long as it would not conflict with
+    // existing imports that lack access levels.
+    if (!foundImport || anyImportHasAccessLevel)
+      info.accessLevel = sf.getMaxAccessLevelUsingImport(mod);
+
+    infos[mod] = info;
+    return info;
+  }
+};
+
+static void diagnoseMissingImportForMember(const ValueDecl *decl,
+                                           SourceFile *sf, SourceLoc loc) {
+  auto &ctx = sf->getASTContext();
+  auto definingModule = decl->getModuleContext();
+  ctx.Diags.diagnose(loc, diag::candidate_from_missing_import,
+                     decl->getDescriptiveKind(), decl->getName(),
+                     definingModule);
+}
+
+static void
+diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
+                                     SourceLoc loc,
+                                     MissingImportFixItCache &fixItCache) {
+
+  diagnoseMissingImportForMember(decl, sf, loc);
+
+  auto &ctx = sf->getASTContext();
+  auto definingModule = decl->getModuleContext();
+  SourceLoc bestLoc = ctx.Diags.getBestAddImportFixItLoc(decl, sf);
+  if (!bestLoc.isValid())
+    return;
+
+  llvm::SmallString<64> importText;
+
+  // Add flags that must be used consistently on every import in every file.
+  auto fixItInfo = fixItCache.getInfo(definingModule);
+  if (fixItInfo.flags.contains(ImportFlags::ImplementationOnly))
+    importText += "@_implementationOnly ";
+  if (fixItInfo.flags.contains(ImportFlags::WeakLinked))
+    importText += "@_weakLinked ";
+
+  auto explicitAccessLevel = fixItInfo.accessLevel;
+  bool isPublicImport =
+      explicitAccessLevel
+          ? *explicitAccessLevel >= AccessLevel::Public
+          : !ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault);
+
+  // Add flags that are only appropriate on public imports.
+  if (isPublicImport) {
+    if (fixItInfo.flags.contains(ImportFlags::SPIOnly))
+      importText += "@_spiOnly ";
+  }
+
+  // Add @_spi groups if needed for the declaration.
+  if (decl->isSPI()) {
+    auto spiGroups = decl->getSPIGroups();
+    if (!spiGroups.empty()) {
+      importText += "@_spi(";
+      importText += spiGroups[0].str();
+      importText += ") ";
+    }
+  }
+
+  if (explicitAccessLevel) {
+    importText += getAccessLevelSpelling(*explicitAccessLevel);
+    importText += " ";
+  }
+
+  importText += "import ";
+  importText += definingModule->getName().str();
+  importText += "\n";
+  ctx.Diags.diagnose(bestLoc, diag::candidate_add_import, definingModule)
+      .fixItInsert(bestLoc, importText);
+}
+
+bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
+                                                const DeclContext *dc,
+                                                SourceLoc loc) {
+  if (decl->findImport(dc))
+    return false;
+
+  auto sf = dc->getParentSourceFile();
+  if (!sf)
+    return false;
+
+  auto &ctx = dc->getASTContext();
+
+  // In lazy typechecking mode just emit the diagnostic immediately without a
+  // fix-it since there won't be an opportunity to emit delayed diagnostics.
+  if (ctx.TypeCheckerOpts.EnableLazyTypecheck) {
+    diagnoseMissingImportForMember(decl, sf, loc);
+    return true;
+  }
+
+  sf->addDelayedMissingImportForMemberDiagnostic(decl, loc);
+  return false;
+}
+
+void swift::diagnoseMissingImports(SourceFile &sf) {
+  auto delayedDiags = sf.takeDelayedMissingImportForMemberDiagnostics();
+  auto fixItCache = MissingImportFixItCache(sf);
+
+  for (auto declAndLocs : delayedDiags) {
+    for (auto loc : declAndLocs.second) {
+      diagnoseAndFixMissingImportForMember(declAndLocs.first, &sf, loc,
+                                           fixItCache);
+    }
+  }
 }

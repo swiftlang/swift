@@ -94,7 +94,7 @@ When an extension declares a nested generic type, the depth of the nested type's
 
 \end{tikzpicture}
 \end{quote}
-The \index{declared interface type}declared interface type of an extension is the declared interface type of the extended type; the \index{self interface type}self interface type of an extension is the self interface type of the extended type. The two concepts coincide except when the extended type is a \index{protocol extension}protocol, in which case the declared interface type is the protocol type, whereas the self interface type is the \Index{protocol Self type@protocol \texttt{Self} type}protocol \texttt{Self} type.
+The \index{declared interface type}declared interface type of an extension is the declared interface type of the extended type; the \index{self interface type}self interface type of an extension is the self interface type of the extended type. The two concepts coincide except when the extended type is a \index{protocol extension}protocol, in which case the declared interface type is the protocol type, whereas the self interface type is the \IndexSelf protocol \tSelf\ type.
 
 \paragraph{Other behaviors.} An extension member generally behaves as if were declared inside the extended type itself, with some differences:
 \begin{itemize}
@@ -146,7 +146,7 @@ All stored properties must be initialized by all declared constructors; extensio
 The extended type of an extension is given as a \index{type representation}type representation following the \texttt{extension} keyword. Extension members are made available to \index{qualified lookup}qualified lookup by the process of \IndexDefinition{extension binding}\emph{extension binding}, which resolves the type representation of an extension to its extended type, and adds the extension's members to the extended type's name lookup table.
 
 A complication is that the extended type of an extension can itself be declared inside of another extension. Extension binding cannot simply visit all extension declarations in a single pass in source order, because of ordering dependencies between extensions and nested types. Instead, multiple passes are performed; a failure to bind an extension is not a fatal condition, and instead failed extensions are revisited later after subsequent extensions are successfully bound. This process iterates until fixed point.
-\begin{algorithm}[Extension binding]\label{extension binding algorithm}
+\begin{algorithm}[Bind extensions]\label{extension binding algorithm}
 Takes a list of all extensions in the main module as input, in any order.
 \begin{enumerate}
 \item Initialize the pending list, adding all extension declarations.
@@ -537,16 +537,16 @@ extension G: Sequence where T: Sequence, T.Element: Hashable {...}
 \[\protosym{P}\otimes\texttt{T}=\ConfReq{$\texttt{T}_d$}{P}\otimes\Sigma\]
 If $\ConfReq{$\texttt{T}_d$}{P}$ is conditional though, we cannot take~$\Sigma$ to be the \index{context substitution map!for a declaration context}context substitution map of~\texttt{T}. The \index{type witness}type witnesses of $\ConfReq{$\texttt{T}_d$}{P}$ might contain type parameters of the constrained extension, and not just the conforming type; however the context substitution map of \texttt{T} has the generic signature of the conforming type. We must set $\Sigma$ to be the context substitution map of \texttt{T} for the generic signature of the constrained extension, as in \SecRef{member type repr}. Indeed, this is the same problem as member type resolution when the referenced type declaration is declared in a constrained extension; we must perform some additional \index{global conformance lookup}global conformance lookups to populate the substitution map completely.
 
-The conditional requirements of the specialized conformance $\ConfReq{T}{P}$ are the \index{substituted requirement}substituted requirements obtained by applying $\Sigma$ to each conditional requirement of \ConfReq{$\texttt{T}_d$}{P}. This makes the following \index{commutative diagram}diagram commute for each conditional requirement~$R$:
+The conditional requirements of the specialized conformance $\TP$ are the \index{substituted requirement}substituted requirements obtained by applying $\Sigma$ to each conditional requirement of \ConfReq{$\texttt{T}_d$}{P}. This makes the following \index{commutative diagram}diagram commute for each conditional requirement~$R$:
 \begin{quote}
 \newcommand{\GetConditionalRequirements}{\def\arraystretch{0.65}\arraycolsep=0pt\begin{array}{c}\text{get conditional}\\\text{requirement}\end{array}}
 \begin{tikzcd}[column sep=3cm,row sep=1cm]
-\ConfReq{$\texttt{T}_d$}{P} \arrow[d, "\GetConditionalRequirements"{left}] \arrow[r, "\text{apply $\Sigma$}"] &\ConfReq{T}{P} \arrow[d, "\GetConditionalRequirements"] \\
+\ConfReq{$\texttt{T}_d$}{P} \arrow[d, "\GetConditionalRequirements"{left}] \arrow[r, "\text{apply $\Sigma$}"] &\TP \arrow[d, "\GetConditionalRequirements"] \\
 R \arrow[r, "\text{apply $\Sigma$}"]&R\otimes\Sigma
 \end{tikzcd}
 \end{quote}
 
-Consider the $\ConfReq{Array<\ttgp{0}{0}>}{Equatable}$ conformance from the standard library. The generic signature of \texttt{Array} is just \texttt{<\ttgp{0}{0}>} with no requirements, while the conformance context is the constrained extension with signature \texttt{<\ttgp{0}{0} where \ttgp{0}{0}:~Equatable>}. The context substitution map of \texttt{Array<Int>} for the constrained extension is:
+Consider the $\ConfReq{Array<\ttgp{0}{0}>}{Equatable}$ conformance from the standard library. The generic signature of \texttt{Array} is \texttt{<\ttgp{0}{0}>} with no requirements, while the conformance context is the constrained extension with signature \texttt{<\ttgp{0}{0} where \ttgp{0}{0}:~Equatable>}. The context substitution map of \texttt{Array<Int>} for the constrained extension is:
 \[\Sigma := \SubstMapLongC{\SubstType{\ttgp{0}{0}}{Int}}{\SubstConf{\ttgp{0}{0}}{Int}{Equatable}}\]
 We compose this substitution map with the normal conformance, and obtain a specialized conditional conformance, denoted \ConfReq{Array<Int>}{Equatable}:
 \[
@@ -582,7 +582,7 @@ Thus, conditional requirements must always be checked by~\AlgRef{reqissatisfied}
 
 \paragraph{Protocol inheritance.}
 \index{inherited protocol}
-Protocol inheritance is modeled as an \index{associated conformance requirement}associated conformance requirement on \texttt{Self}, so for instance \verb|Derived| has an associated conformance requirement $\ConfReq{Self}{Base}$:
+Protocol inheritance is modeled as an \index{associated conformance requirement}associated conformance requirement on \tSelf, so for instance \verb|Derived| has an associated conformance requirement $\ConfReq{Self}{Base}$:
 \begin{Verbatim}
 protocol Base {...}
 protocol Derived: Base {...}
@@ -593,7 +593,7 @@ struct Pair<T, U> {}
 extension Pair: Derived {...}
 // implies `extension Pair: Base {}'
 \end{Verbatim}
-The nominal type's \index{conformance lookup table}conformance lookup table synthesizes these implied conformances and makes them available to global conformance lookup. With conditional conformances, such implied conformances are not synthesized because there is no way to guess what the conditional requirements should be. The conformance checker still checks the associated conformance requirement on \texttt{Self} though, so the user must first explicitly declare a conformance to each base protocol when writing a conditional conformance.
+The nominal type's \index{conformance lookup table}conformance lookup table synthesizes these implied conformances and makes them available to global conformance lookup. With conditional conformances, such implied conformances are not synthesized because there is no way to guess what the conditional requirements should be. The conformance checker still checks the associated conformance requirement on \tSelf\ though, so the user must first explicitly declare a conformance to each base protocol when writing a conditional conformance.
 
 Suppose we wish for \texttt{Pair} to conform to \texttt{Derived} when $\SameReq{\ttgp{0}{0}}{Int}$:
 \begin{Verbatim}
@@ -715,7 +715,7 @@ struct Bad: Sequence {
   typealias Iterator = Int  // error
 }
 \end{Verbatim}
-Now, the substitution map
+The substitution map
 $\Sigma:=\SubstMapC{\SubstType{\ttgp{0}{0}}{Bad}}{\SubstConf{\ttgp{0}{0}}{Bad}{Sequence}}$ satisfies all explicit requirements of its generic signature, but it does not satisfy the derived requirement $\ConfReq{\ttgp{0}{0}.[Sequence]Iterator}{IteratorProtocol}$. However, \emph{this} is not the soundness hole; we diagnose an error when we check the conformance, so the program is invalid.
 
 We now show an example where we can write down a substitution map that is not well-formed, and yet \AlgRef{check generic arguments algorithm} does not produce any diagnostics at all, including from checking conformances. We start with two protocols:
@@ -801,7 +801,7 @@ Represents an \IndexSource{extension declaration}extension declaration.
 \item \texttt{computeExtendedNominal()} actually evaluates the \IndexSource{extended nominal request}request which resolves the extended type to a nominal type declaration. Only used by extension binding.
 \item \texttt{getExtendedType()} returns the written \IndexSource{extended type}extended type, which might be a type alias type or a generic nominal type. This uses ordinary type resolution, so it only happens after extension binding. This is used to implement the syntax sugar described at the start of \SecRef{constrained extensions}.
 \item \texttt{getDeclaredInterfaceType()} returns the \IndexSource{declared interface type}declared interface type of the extended type declaration.
-\item \texttt{getSelfInterfaceType()} returns the \IndexSource{self interface type}self interface type of the extended type declaration. Different than the declared interface type for \IndexSource{protocol extension}protocol extensions, where the declared interface type is the protocol type, but the self interface type is the \IndexSource{protocol Self type@protocol \texttt{Self} type}protocol \texttt{Self} type.
+\item \texttt{getSelfInterfaceType()} returns the \IndexSource{self interface type}self interface type of the extended type declaration. Different than the declared interface type for \IndexSource{protocol extension}protocol extensions, where the declared interface type is the protocol type, but the self interface type is the \IndexSource{protocol Self type@protocol \tSelf\ type}protocol \tSelf\ type.
 \end{itemize}
 
 \subsection*{Extension Binding}

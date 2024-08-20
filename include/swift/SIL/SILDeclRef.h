@@ -187,7 +187,7 @@ struct SILDeclRef {
   /// True if this references a foreign entry point for the referenced decl.
   unsigned isForeign : 1;
   /// True if this references a distributed function.
-  unsigned isDistributed : 1;
+  unsigned distributedThunk : 1;
   /// True if this references a distributed function, but it is known to be local
   unsigned isKnownToBeLocal : 1;
   /// True is this reference to function that could be looked up via a special
@@ -231,7 +231,7 @@ struct SILDeclRef {
 
   /// Produces a null SILDeclRef.
   SILDeclRef()
-      : loc(), kind(Kind::Func), isForeign(0), isDistributed(0),
+      : loc(), kind(Kind::Func), isForeign(0), distributedThunk(0),
         isKnownToBeLocal(0), isRuntimeAccessible(0),
         backDeploymentKind(BackDeploymentKind::None), defaultArgIndex(0),
         isAsyncLetClosure(0) {}
@@ -406,13 +406,13 @@ struct SILDeclRef {
   friend llvm::hash_code hash_value(const SILDeclRef &ref) {
     return llvm::hash_combine(
         ref.loc.getOpaqueValue(), static_cast<int>(ref.kind), ref.isForeign,
-        ref.isDistributed, ref.defaultArgIndex, ref.isAsyncLetClosure);
+        ref.distributedThunk, ref.defaultArgIndex, ref.isAsyncLetClosure);
   }
 
   bool operator==(SILDeclRef rhs) const {
     return loc.getOpaqueValue() == rhs.loc.getOpaqueValue() &&
            kind == rhs.kind && isForeign == rhs.isForeign &&
-           isDistributed == rhs.isDistributed &&
+           distributedThunk == rhs.distributedThunk &&
            backDeploymentKind == rhs.backDeploymentKind &&
            defaultArgIndex == rhs.defaultArgIndex && pointer == rhs.pointer &&
            isAsyncLetClosure == rhs.isAsyncLetClosure;
@@ -468,7 +468,7 @@ struct SILDeclRef {
 
   /// Returns a copy of the decl with the given back deployment kind.
   SILDeclRef asBackDeploymentKind(BackDeploymentKind backDeploymentKind) const {
-    return SILDeclRef(loc.getOpaqueValue(), kind, isForeign, isDistributed,
+    return SILDeclRef(loc.getOpaqueValue(), kind, isForeign, distributedThunk,
                       isKnownToBeLocal, isRuntimeAccessible, backDeploymentKind,
                       defaultArgIndex, isAsyncLetClosure,
                       pointer.get<AutoDiffDerivativeFunctionIdentifier *>());
@@ -510,6 +510,9 @@ struct SILDeclRef {
 
   /// True if the decl ref references a thunk handling potentially distributed actor functions
   bool isDistributedThunk() const;
+
+  /// True if the decl references a 'distributed' function.
+  bool isDistributed() const;
 
   /// True if the decl ref references a thunk handling a call to a function that
   /// supports back deployment.
@@ -573,6 +576,10 @@ struct SILDeclRef {
   /// for e.g a lazy variable getter.
   bool hasUserWrittenCode() const;
 
+  /// Returns true if this is a function that should be emitted because it is
+  /// accessible in the debugger.
+  bool shouldBeEmittedForDebugger() const;
+
   /// Return the scope in which the parent class of a method (i.e. class
   /// containing this declaration) can be subclassed, returning NotApplicable if
   /// this is not a method, there is no such class, or the class cannot be
@@ -605,13 +612,13 @@ private:
   friend struct llvm::DenseMapInfo<swift::SILDeclRef>;
   /// Produces a SILDeclRef from an opaque value.
   explicit SILDeclRef(void *opaqueLoc, Kind kind, bool isForeign,
-                      bool isDistributed, bool isKnownToBeLocal,
+                      bool isDistributedThunk, bool isKnownToBeLocal,
                       bool isRuntimeAccessible,
                       BackDeploymentKind backDeploymentKind,
                       unsigned defaultArgIndex, bool isAsyncLetClosure,
                       AutoDiffDerivativeFunctionIdentifier *derivativeId)
       : loc(Loc::getFromOpaqueValue(opaqueLoc)), kind(kind),
-        isForeign(isForeign), isDistributed(isDistributed),
+        isForeign(isForeign), distributedThunk(isDistributedThunk),
         isKnownToBeLocal(isKnownToBeLocal),
         isRuntimeAccessible(isRuntimeAccessible),
         backDeploymentKind(backDeploymentKind),
@@ -655,7 +662,7 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
                     : 0;
     unsigned h4 = UnsignedInfo::getHashValue(Val.isForeign);
     unsigned h5 = PointerInfo::getHashValue(Val.pointer.getOpaqueValue());
-    unsigned h6 = UnsignedInfo::getHashValue(Val.isDistributed);
+    unsigned h6 = UnsignedInfo::getHashValue(Val.distributedThunk);
     unsigned h7 = UnsignedInfo::getHashValue(unsigned(Val.backDeploymentKind));
     unsigned h8 = UnsignedInfo::getHashValue(Val.isKnownToBeLocal);
     unsigned h9 = UnsignedInfo::getHashValue(Val.isRuntimeAccessible);

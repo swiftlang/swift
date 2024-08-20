@@ -1476,7 +1476,9 @@ static bool isGenericTypeDisambiguatingToken(Parser &P) {
   auto &tok = P.Tok;
   switch (tok.getKind()) {
   default:
-    return false;
+    // If this is the end of the expr (wouldn't match parseExprSequenceElement),
+    // prefer generic type list over an illegal unary postfix '>' operator.
+    return P.isStartOfSwiftDecl() || P.isStartOfStmt(/*prefer expr=*/true);
   case tok::r_paren:
   case tok::r_square:
   case tok::l_brace:

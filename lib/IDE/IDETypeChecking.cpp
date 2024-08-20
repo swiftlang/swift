@@ -15,6 +15,7 @@
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -66,7 +67,7 @@ void swift::getTopLevelDeclsForDisplay(
 
       auto proto = M->getASTContext().getProtocol(KnownProtocolKind::Sendable);
       if (proto)
-        (void)ModuleDecl::lookupConformance(NTD->getDeclaredInterfaceType(), proto);
+        (void) lookupConformance(NTD->getDeclaredInterfaceType(), proto);
     }
   }
 
@@ -646,7 +647,6 @@ collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
 
 /// This walker will traverse the AST and report types for every expression.
 class ExpressionTypeCollector: public SourceEntityWalker {
-  ModuleDecl &Module;
   SourceManager &SM;
   unsigned int BufferId;
   std::vector<ExpressionTypeInfo> &Results;
@@ -700,7 +700,7 @@ class ExpressionTypeCollector: public SourceEntityWalker {
 
     // Collecting protocols conformed by this expressions that are in the list.
     for (auto Proto: InterestedProtocols) {
-      if (Module.checkConformance(E->getType(), Proto.first)) {
+      if (checkConformance(E->getType(), Proto.first)) {
         Conformances.push_back(Proto.second);
       }
     }
@@ -728,7 +728,7 @@ public:
       llvm::MapVector<ProtocolDecl *, StringRef> &InterestedProtocols,
       std::vector<ExpressionTypeInfo> &Results, bool FullyQualified,
       bool CanonicalType, llvm::raw_ostream &OS)
-      : Module(*SF.getParentModule()), SM(SF.getASTContext().SourceMgr),
+      : SM(SF.getASTContext().SourceMgr),
         BufferId(*SF.getBufferID()), Results(Results), OS(OS),
         InterestedProtocols(InterestedProtocols),
         FullyQualified(FullyQualified), CanonicalType(CanonicalType) {}
@@ -1022,9 +1022,8 @@ swift::getShorthandShadows(CaptureListExpr *CaptureList, DeclContext *DC) {
     }
 
     if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(Init)) {
-      if (DC) {
-        Init = resolveDeclRefExpr(UDRE, DC, /*replaceInvalidRefsWithErrors=*/false);
-      }
+      if (DC)
+        Init = resolveDeclRefExpr(UDRE, DC);
     }
 
     auto *ReferencedVar = Init->getReferencedDecl().getDecl();
@@ -1045,9 +1044,8 @@ swift::getShorthandShadows(LabeledConditionalStmt *CondStmt, DeclContext *DC) {
 
     Expr *Init = Cond.getInitializer();
     if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(Init)) {
-      if (DC) {
-        Init = resolveDeclRefExpr(UDRE, DC, /*replaceInvalidRefsWithErrors=*/false);
-      }
+      if (DC)
+        Init = resolveDeclRefExpr(UDRE, DC);
     }
 
     auto ReferencedVar = Init->getReferencedDecl().getDecl();

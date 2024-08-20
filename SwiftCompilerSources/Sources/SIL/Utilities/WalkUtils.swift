@@ -360,9 +360,17 @@ extension ValueDefUseWalker {
         return unmatchedPath(value: operand, path: path)
       }
     case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
-         is UpcastInst, is UncheckedRefCastInst, is EndCOWMutationInst, is EndInitLetRefInst,
+         is UpcastInst, is EndCOWMutationInst, is EndInitLetRefInst,
          is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkUnresolvedNonCopyableValueInst:
       return walkDownUses(ofValue: (instruction as! SingleValueInstruction), path: path)
+    case let urc as UncheckedRefCastInst:
+      if urc.type.isClassExistential || urc.fromInstance.type.isClassExistential {
+        // Sometimes `unchecked_ref_cast` is misused to cast between AnyObject and a class (instead of
+        // init_existential_ref and open_existential_ref).
+        // We need to ignore this because otherwise the path wouldn't contain the right `existential` field kind.
+        return leafUse(value: operand, path: path)
+      }
+      return walkDownUses(ofValue: urc, path: path)
     case let beginDealloc as BeginDeallocRefInst:
       if operand.index == 0 {
         return walkDownUses(ofValue: beginDealloc, path: path)
@@ -562,7 +570,7 @@ extension AddressDefUseWalker {
 ///     to reflect that a further projection is needed to reach the value of interest from the new initial value.
 ///   2. If the instruction of the definition is a value construction such as `struct` and
 ///     the head of the path matches the instruction type then the walk continues
-///     with a call to `walkUp` with initial value the operand defintion denoted by the path
+///     with a call to `walkUp` with initial value the operand definition denoted by the path
 ///     and the suffix path as path since the target value can now be reached with fewer projections.
 ///     If the defining instruction of the value does not match the head of the path as in
 ///     `%t = tuple ...` and `"s0.t1"` then `unmatchedPath(%t, ...)` is called.
@@ -680,10 +688,18 @@ extension ValueUseDefWalker {
     case let oer as OpenExistentialRefInst:
       return walkUp(value: oer.existential, path: path.push(.existential, index: 0))
     case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
-         is UpcastInst, is UncheckedRefCastInst, is EndCOWMutationInst, is EndInitLetRefInst,
+         is UpcastInst, is EndCOWMutationInst, is EndInitLetRefInst,
          is BeginDeallocRefInst,
          is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkUnresolvedNonCopyableValueInst:
       return walkUp(value: (def as! Instruction).operands[0].value, path: path)
+    case let urc as UncheckedRefCastInst:
+      if urc.type.isClassExistential || urc.fromInstance.type.isClassExistential {
+        // Sometimes `unchecked_ref_cast` is misused to cast between AnyObject and a class (instead of
+        // init_existential_ref and open_existential_ref).
+        // We need to ignore this because otherwise the path wouldn't contain the right `existential` field kind.
+        return rootDef(value: urc, path: path)
+      }
+      return walkUp(value: urc.fromInstance, path: path)
     case let arg as Argument:
       if let phi = Phi(arg) {
         for incoming in phi.incomingValues {

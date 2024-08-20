@@ -15,7 +15,7 @@ form of access markers. `begin_access` identifies the address of the
 formal access and `end_access` delimits the scope of the access. At
 the language level, a formal access is an access to a local variable
 or class property. For details, see
-[SE-0176: Enforce Exclusive Access to Memory](https://github.com/apple/swift-evolution/blob/main/proposals/0176-enforce-exclusive-access-to-memory.md)
+[SE-0176: Enforce Exclusive Access to Memory](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0176-enforce-exclusive-access-to-memory.md)
 
 Access markers are preserved in SIL to:
 

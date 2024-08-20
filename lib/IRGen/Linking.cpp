@@ -1304,6 +1304,18 @@ bool LinkEntity::isText() const {
   }
 }
 
+bool LinkEntity::isDistributedThunk() const {
+  if (!hasDecl())
+    return false;
+
+  auto value = getDecl();
+  if (auto afd = dyn_cast<AbstractFunctionDecl>(value)) {
+    return afd->isDistributedThunk();
+  }
+
+  return false;
+}
+
 bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   switch (getKind()) {
   case Kind::SILGlobalVariable:

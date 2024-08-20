@@ -3,9 +3,9 @@
 sil_stage raw
 
 import Builtin
+import Swift
 
-@_moveOnly
-struct NonTrivialStruct {
+struct NonTrivialStruct: ~Copyable {
   var i: Builtin.Int32
 }
 

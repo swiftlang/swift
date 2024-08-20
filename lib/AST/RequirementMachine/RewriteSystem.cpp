@@ -555,7 +555,9 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
       }
 
       if (index != 0) {
-        ASSERT_RULE(symbol.getKind() != Symbol::Kind::GenericParam);
+        ASSERT_RULE(symbol.getKind() != Symbol::Kind::GenericParam ||
+                    (index == 1 &&
+                     lhs[index - 1].getKind() == Symbol::Kind::PackElement));
       }
 
       if (!rule.isLHSSimplified() &&
@@ -610,7 +612,9 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
       }
 
       if (index != 0) {
-        ASSERT_RULE(symbol.getKind() != Symbol::Kind::GenericParam);
+        ASSERT_RULE(symbol.getKind() != Symbol::Kind::GenericParam ||
+                    (index == 1 &&
+                     lhs[index - 1].getKind() == Symbol::Kind::PackElement));
       }
 
       if (!rule.isRHSSimplified() &&

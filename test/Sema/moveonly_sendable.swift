@@ -7,19 +7,16 @@
 struct CopyableStruct {}
 class Ref { var x = 0 } // expected-note 3{{class 'Ref' does not conform to the 'Sendable' protocol}}
 
-@_moveOnly
-struct FileDescriptor: Sendable {
+struct FileDescriptor: Sendable, ~Copyable {
   var id = 0
 }
 
-@_moveOnly
-enum MaybeFile { // should implicitly conform
+enum MaybeFile: ~Copyable { // should implicitly conform
   case available(FileDescriptor)
   case closed
 }
 
-@_moveOnly
-struct NotSendableMO { // expected-note {{consider making struct 'NotSendableMO' conform to the 'Sendable' protocol}}
+struct NotSendableMO: ~Copyable { // expected-note {{consider making struct 'NotSendableMO' conform to the 'Sendable' protocol}}
   // expected-complete-note @-1 {{consider making struct 'NotSendableMO' conform to the 'Sendable' protocol}}
   var ref: Ref
 }
@@ -51,7 +48,7 @@ func processFiles(_ a: A, _ anotherFile: borrowing FileDescriptor) async {
   await a.takeMaybeFile(.available(anotherFile))
   _ = A(.available(anotherFile))
 
-  let ns = await a.getRef() // expected-warning {{non-sendable type 'NotSendableMO' returned by call to actor-isolated function cannot cross actor boundary}}
+  let ns = await a.getRef() // expected-warning {{non-sendable result type 'NotSendableMO' cannot be sent from actor-isolated context in call to instance method 'getRef()'}}
   await takeNotSendable(ns) // expected-complete-warning {{passing argument of non-sendable type 'NotSendableMO' outside of main actor-isolated context may introduce data races}}
 
   switch (await a.giveFileDescriptor()) {
@@ -68,26 +65,22 @@ func caller() async {
 
 // now make sure you can't form a Sendable existential from a move-only type.
 
-@_moveOnly
-struct RefPair: Sendable {
+struct RefPair: Sendable, ~Copyable {
   var left: Ref // expected-warning {{stored property 'left' of 'Sendable'-conforming struct 'RefPair' has non-sendable type 'Ref'}}
   var right: Ref  // expected-warning {{stored property 'right' of 'Sendable'-conforming struct 'RefPair' has non-sendable type 'Ref'}}
 }
 
-@_moveOnly
-enum MaybeRef: Sendable {
+enum MaybeRef: Sendable, ~Copyable {
   case ref(Ref) // expected-warning {{associated value 'ref' of 'Sendable'-conforming enum 'MaybeRef' has non-sendable type 'Ref'}}
   case null
 }
 
-@_moveOnly
-enum OK_NoncopyableOption<T: Sendable> : Sendable {
+enum OK_NoncopyableOption<T: Sendable> : Sendable, ~Copyable {
   case some(T)
   case none
 }
 
-@_moveOnly
-enum Wrong_NoncopyableOption<T> : Sendable { // expected-note {{consider making generic parameter 'T' conform to the 'Sendable' protocol}}
+enum Wrong_NoncopyableOption<T> : Sendable, ~Copyable { // expected-note {{consider making generic parameter 'T' conform to the 'Sendable' protocol}}
   case some(T) // expected-warning {{associated value 'some' of 'Sendable'-conforming generic enum 'Wrong_NoncopyableOption' has non-sendable type 'T'}}
   case none
 }
@@ -132,12 +125,14 @@ func tryToCastIt(_ fd: borrowing FileDescriptor) {
 }
 
 protocol GiveSendable<T> {
-  associatedtype T: Sendable // expected-note {{protocol requires nested type 'T'; add nested type 'T' for conformance}}
+  associatedtype T: Sendable // expected-note {{protocol requires nested type 'T'}}
   func give() -> T
 }
 
 // make sure witnessing associatedtypes is still prevented, even though we meet the explicit constraint.
-class Bad: GiveSendable { // expected-error {{type 'Bad' does not conform to protocol 'GiveSendable'}}
+class Bad: GiveSendable { 
+  // expected-error@-1 {{type 'Bad' does not conform to protocol 'GiveSendable'}} 
+  // expected-note@-2 {{add stubs for conformance}}
   typealias T = FileDescriptor // expected-note {{possibly intended match 'Bad.T' (aka 'FileDescriptor') does not conform to 'Copyable'}}
   func give() -> FileDescriptor { return FileDescriptor(id: -1) }
 }
@@ -157,8 +152,7 @@ func createContainer(_ fd: borrowing FileDescriptor) {
   let _: Container<Sendable> = Container(CopyableStruct())
 }
 
-@_moveOnly
-struct PaperAirplaneFile {
+struct PaperAirplaneFile: ~Copyable {
   var fd: FileDescriptor
 }
 

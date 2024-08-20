@@ -115,7 +115,8 @@ void MoveOnlyChecker::checkObjects() {
 
   completeObjectLifetimes(moveIntroducersToProcess.getArrayRef());
 
-  MoveOnlyObjectChecker checker{diagnosticEmitter, domTree, poa, allocator};
+  MoveOnlyObjectChecker checker{diagnosticEmitter, domTree, deba, poa,
+                                allocator};
   madeChange |= checker.check(moveIntroducersToProcess);
 }
 

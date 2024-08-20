@@ -168,6 +168,7 @@
 ///       let numberPointer = UnsafeRawPointer(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen
+@unsafe
 public struct UnsafeRawPointer: _Pointer {
 
   public typealias Pointee = UInt8
@@ -773,6 +774,7 @@ extension UnsafeRawPointer {
 ///       let numberPointer = UnsafeMutableRawPointer(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen
+@unsafe
 public struct UnsafeMutableRawPointer: _Pointer {
 
   public typealias Pointee = UInt8

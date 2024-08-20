@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -297,7 +298,7 @@ computeSelfTypeRelationship(DeclContext *dc, ValueDecl *decl1,
 
   // If the model type does not conform to the protocol, the bases are
   // unrelated.
-  auto conformance = ModuleDecl::lookupConformance(modelTy, proto);
+  auto conformance = lookupConformance(modelTy, proto);
   if (conformance.isInvalid())
     return {SelfTypeRelationship::Unrelated, conformance};
 
@@ -811,8 +812,8 @@ Comparison TypeChecker::compareDeclarations(DeclContext *dc,
 }
 
 static Type getUnlabeledType(Type type, ASTContext &ctx) {
-  return type.transform([&](Type type) -> Type {
-    if (auto *tupleType = dyn_cast<TupleType>(type.getPointer())) {
+  return type.transformRec([&](TypeBase *type) -> std::optional<Type> {
+    if (auto *tupleType = dyn_cast<TupleType>(type)) {
       if (tupleType->getNumElements() == 1)
         return ParenType::get(ctx, tupleType->getElementType(0));
 
@@ -824,7 +825,7 @@ static Type getUnlabeledType(Type type, ASTContext &ctx) {
       return TupleType::get(elts, ctx);
     }
 
-    return type;
+    return std::nullopt;
   });
 }
 

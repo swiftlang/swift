@@ -16,6 +16,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -1061,6 +1062,15 @@ namespace {
 
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
+      if (B.getFunction().hasOwnership()
+          && B.getModule().getStage() == SILStage::Raw
+          && value->isFromVarDecl()) {
+        // Do not use destroy_value for trivial values. The lifetime introducer
+        // may be implicitly copied and used outside of its original scope,
+        // which violates the invariants of destroy_value.
+        B.createExtendLifetime(loc, value);
+        return;
+      }
       // Trivial
     }
   };
@@ -3077,7 +3087,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
   if (substType->hasTypeParameter())
     return;
 
-  auto conformance = M.checkConformance(substType, bitwiseCopyableProtocol);
+  auto conformance = checkConformance(substType, bitwiseCopyableProtocol);
 
   if (auto *nominal = substType.getAnyNominal()) {
     auto *module = nominal->getModuleContext();
@@ -3185,7 +3195,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
 
           // A BitwiseCopyable conformer appearing within its layout doesn't
           // explain why substType doesn't itself conform.
-          if (M.checkConformance(ty, bitwiseCopyableProtocol))
+          if (checkConformance(ty, bitwiseCopyableProtocol))
             return true;
 
           // ModuleTypes are trivial but don't warrant being given a
@@ -3302,7 +3312,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
         /*visit=*/
         [&](auto ty, auto origTy, auto *field, auto index) -> bool {
           // Return false to indicate visiting a type parameter.
-          assert(M.checkConformance(ty, bitwiseCopyableProtocol) &&
+          assert(checkConformance(ty, bitwiseCopyableProtocol) &&
                  "leaf of non-trivial BitwiseCopyable type that doesn't "
                  "conform to BitwiseCopyable!?");
 

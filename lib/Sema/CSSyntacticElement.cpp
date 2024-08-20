@@ -91,11 +91,11 @@ public:
           // it means that this is an invalid external declaration
           // relative to this element's context.
           if (CS.simplifyType(type)->hasTypeVariable()) {
-            auto transformedTy = type.transform([&](Type type) {
+            auto transformedTy = type.transformRec([&](Type type) -> std::optional<Type> {
               if (auto *typeVar = type->getAs<TypeVariableType>()) {
-                return ErrorType::get(CS.getASTContext());
+                return Type(ErrorType::get(CS.getASTContext()));
               }
-              return type;
+              return std::nullopt;
             });
 
             CS.setType(decl, transformedTy);
@@ -557,7 +557,7 @@ public:
   void visitExprPattern(ExprPattern *EP) {
     auto target = SyntacticElementTarget::forExprPattern(EP);
 
-    if (cs.preCheckTarget(target, /*replaceInvalidRefWithErrors=*/true)) {
+    if (cs.preCheckTarget(target)) {
       hadError = true;
       return;
     }
@@ -771,8 +771,7 @@ private:
           init, patternType, patternBinding, index,
           /*bindPatternVarsOneWay=*/false);
 
-      if (ConstraintSystem::preCheckTarget(
-              target, /*replaceInvalidRefsWithErrors=*/true))
+      if (ConstraintSystem::preCheckTarget(target))
         return std::nullopt;
 
       return target;
@@ -1795,7 +1794,7 @@ private:
   }
 
   ASTNode visitFallthroughStmt(FallthroughStmt *fallthroughStmt) {
-    if (checkFallthroughStmt(context.getAsDeclContext(), fallthroughStmt))
+    if (checkFallthroughStmt(fallthroughStmt))
       hadError = true;
     return fallthroughStmt;
   }

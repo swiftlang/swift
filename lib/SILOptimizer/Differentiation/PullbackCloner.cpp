@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/STLExtras.h"
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/SILOptimizer/Differentiation/PullbackCloner.h"
@@ -27,10 +26,12 @@
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
 #include "swift/SILOptimizer/Differentiation/VJPCloner.h"
 
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
@@ -130,6 +131,10 @@ private:
 
   /// Stack buffers allocated for storing local adjoint values.
   SmallVector<AllocStackInst *, 64> functionLocalAllocations;
+
+  /// Copies created to deal with destructive enum operations
+  /// (unchecked_take_enum_addr)
+  llvm::SmallDenseMap<InitEnumDataAddrInst*, SILValue> enumDataAdjCopies;
 
   /// A set used to remember local allocations that were destroyed.
   llvm::SmallDenseSet<SILValue> destroyedLocalAllocations;
@@ -1858,7 +1863,7 @@ public:
   /// Handle a sequence of `init_enum_data_addr` and `inject_enum_addr`
   /// instructions.
   ///
-  /// Original: y = init_enum_data_addr x
+  /// Original: x = init_enum_data_addr y : $*Enum, #Enum.Case
   ///           inject_enum_addr y
   ///
   ///  Adjoint: adj[x] += unchecked_take_enum_data_addr adj[y]
@@ -1878,6 +1883,10 @@ public:
       errorOccurred = true;
       return;
     }
+
+    // No associated value => no adjoint to propagate
+    if (!inject->getElement()->hasAssociatedValues())
+      return;
 
     InitEnumDataAddrInst *origData = nullptr;
     for (auto use : origEnum->getUses()) {
@@ -1900,9 +1909,9 @@ public:
       }
     }
 
-    SILValue adjStruct = getAdjointBuffer(bb, origEnum);
+    SILValue adjDest = getAdjointBuffer(bb, origEnum);
     StructDecl *adjStructDecl =
-        adjStruct->getType().getStructOrBoundGenericStruct();
+        adjDest->getType().getStructOrBoundGenericStruct();
 
     VarDecl *adjOptVar = nullptr;
     if (adjStructDecl) {
@@ -1922,7 +1931,7 @@ public:
 
     SILLocation loc = origData->getLoc();
     StructElementAddrInst *adjOpt =
-        builder.createStructElementAddr(loc, adjStruct, adjOptVar);
+        builder.createStructElementAddr(loc, adjDest, adjOptVar);
 
     // unchecked_take_enum_data_addr is destructive, so copy
     // Optional<T.TangentVector> to a new alloca.
@@ -1930,27 +1939,27 @@ public:
         createFunctionLocalAllocation(adjOpt->getType(), loc);
     builder.createCopyAddr(loc, adjOpt, adjOptCopy, IsNotTake,
                            IsInitialization);
+    // The Optional copy is invalidated, do not attempt to destroy it at the end
+    // of the pullback. The value returned from unchecked_take_enum_data_addr is
+    // destroyed in visitInitEnumDataAddrInst.
+    auto [_, inserted] = enumDataAdjCopies.try_emplace(origData, adjOptCopy);
+    assert(inserted && "expected single buffer");
 
     EnumElementDecl *someElemDecl = getASTContext().getOptionalSomeDecl();
     UncheckedTakeEnumDataAddrInst *adjData =
         builder.createUncheckedTakeEnumDataAddr(loc, adjOptCopy, someElemDecl);
 
-    setAdjointBuffer(bb, origData, adjData);
-
-    // The Optional copy is invalidated, do not attempt to destroy it at the end
-    // of the pullback. The value returned from unchecked_take_enum_data_addr is
-    // destroyed in visitInitEnumDataAddrInst.
-    destroyedLocalAllocations.insert(adjOptCopy);
+    addToAdjointBuffer(bb, origData, adjData, loc);
   }
 
   /// Handle `init_enum_data_addr` instruction.
   /// Destroy the value returned from `unchecked_take_enum_data_addr`.
   void visitInitEnumDataAddrInst(InitEnumDataAddrInst *init) {
-    auto bufIt = bufferMap.find({init->getParent(), SILValue(init)});
-    if (bufIt == bufferMap.end())
-      return;
-    SILValue adjData = bufIt->second;
-    builder.emitDestroyAddr(init->getLoc(), adjData);
+    SILValue adjOptCopy = enumDataAdjCopies.at(init);
+
+    builder.emitDestroyAddr(init->getLoc(), adjOptCopy);
+    destroyedLocalAllocations.insert(adjOptCopy);
+    enumDataAdjCopies.erase(init);
   }
 
   /// Handle `unchecked_ref_cast` instruction.
@@ -2567,6 +2576,12 @@ bool PullbackCloner::Implementation::run() {
       }
     }
   }
+  // Ensure all enum adjoint copeis have been cleaned up
+  for (const auto &enumData : enumDataAdjCopies) {
+    leakFound = true;
+    getADDebugStream() << "Found leaked temporary:\n" << enumData.second;
+  }
+
   // Ensure all local allocations have been cleaned up.
   for (auto localAlloc : functionLocalAllocations) {
     if (!destroyedLocalAllocations.count(localAlloc)) {
@@ -2699,7 +2714,7 @@ AllocStackInst *PullbackCloner::Implementation::createOptionalAdjoint(
   auto *diffProto =
       builder.getASTContext().getProtocol(KnownProtocolKind::Differentiable);
   auto diffConf =
-      ModuleDecl::lookupConformance(wrappedType.getASTType(), diffProto);
+      lookupConformance(wrappedType.getASTType(), diffProto);
   assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
   auto subMap = SubstitutionMap::get(
       initFn->getLoweredFunctionType()->getSubstGenericSignature(),
@@ -3607,10 +3622,10 @@ AllocStackInst *PullbackCloner::Implementation::getArrayAdjointElementBuffer(
   // %index_int = struct $Int (%index_literal)
   auto *eltIndexInt = builder.createStruct(loc, intType, {eltIndexLiteral});
   auto *diffProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto diffConf = ModuleDecl::lookupConformance(eltTanType, diffProto);
+  auto diffConf = lookupConformance(eltTanType, diffProto);
   assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
   auto *addArithProto = ctx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-  auto addArithConf = ModuleDecl::lookupConformance(eltTanType, addArithProto);
+  auto addArithConf = lookupConformance(eltTanType, addArithProto);
   assert(!addArithConf.isInvalid() &&
          "Missing conformance to `AdditiveArithmetic`");
   auto subMap = SubstitutionMap::get(subscriptFnGenSig, {eltTanType},

@@ -498,7 +498,7 @@ private:
   /// Recursively reads a pattern from \c DeclTypeCursor.
   llvm::Expected<Pattern *> readPattern(DeclContext *owningDC);
 
-  ParameterList *readParameterList();
+  llvm::Expected<ParameterList *> readParameterList();
   
   /// Reads a generic param list from \c DeclTypeCursor.
   ///
@@ -640,6 +640,11 @@ public:
   /// Whether this module was built with C++ interoperability enabled.
   bool hasCxxInteroperability() const {
     return Core->Bits.HasCxxInteroperability;
+  }
+
+  /// The kind of the C++ stdlib that this module was built with.
+  CXXStdlibKind getCXXStdlibKind() const {
+    return static_cast<CXXStdlibKind>(Core->Bits.CXXStdlibKind);
   }
 
   /// Whether the module is resilient. ('-enable-library-evolution')

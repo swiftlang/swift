@@ -21,6 +21,8 @@ func guaranteed_captures() {
   var mutableAddressOnly: P = C()
 
   // CHECK: [[IMMUTABLE_TRIVIAL:%.*]] = apply {{.*}} -> S
+  // CHECK: [[MV_IMMUTABLE_TRIVIAL:%.*]] = move_value [var_decl] [[IMMUTABLE_TRIVIAL]] : $S
+
   let immutableTrivial = S()
   // CHECK: [[IMMUTABLE_RETAINABLE:%.*]] = apply {{.*}} -> @owned C
   // CHECK: [[B_IMMUTABLE_RETAINABLE:%.*]] = move_value [lexical] [var_decl] [[IMMUTABLE_RETAINABLE]] : $C
@@ -40,7 +42,7 @@ func guaranteed_captures() {
 
   // CHECK: [[B_IMMUTABLE_RETAINABLE_BORROW:%.*]] = begin_borrow [[B_IMMUTABLE_RETAINABLE]] : $C
   // CHECK: [[FN:%.*]] = function_ref [[FN_NAME:@\$s26guaranteed_closure_context0A9_capturesyyF17captureEverythingL_yyF]]
-  // CHECK: apply [[FN]]([[MUTABLE_TRIVIAL_BOX_BORROW]], [[MUTABLE_RETAINABLE_BOX_LIFETIME]], [[MUTABLE_ADDRESS_ONLY_BOX_LIFETIME]], [[IMMUTABLE_TRIVIAL]], [[B_IMMUTABLE_RETAINABLE_BORROW]], [[IMMUTABLE_ADDRESS_ONLY]])
+  // CHECK: apply [[FN]]([[MUTABLE_TRIVIAL_BOX_BORROW]], [[MUTABLE_RETAINABLE_BOX_LIFETIME]], [[MUTABLE_ADDRESS_ONLY_BOX_LIFETIME]], [[MV_IMMUTABLE_TRIVIAL]], [[B_IMMUTABLE_RETAINABLE_BORROW]], [[IMMUTABLE_ADDRESS_ONLY]])
   captureEverything()
 
   // CHECK-NOT: copy_value [[MUTABLE_TRIVIAL_BOX]]
@@ -55,7 +57,7 @@ func guaranteed_captures() {
   // CHECK: [[MUTABLE_ADDRESS_ONLY_BOX_COPY:%.*]] = copy_value [[MUTABLE_ADDRESS_ONLY_BOX_LIFETIME]]
   // CHECK: [[IMMUTABLE_RETAINABLE_COPY:%.*]] = copy_value [[B_IMMUTABLE_RETAINABLE]]
   // CHECK: [[IMMUTABLE_ADDRESS:%.*]] = alloc_stack $any P
-  // CHECK: [[CLOSURE:%.*]] = partial_apply {{.*}}([[MUTABLE_TRIVIAL_BOX_COPY]], [[MUTABLE_RETAINABLE_BOX_COPY]], [[MUTABLE_ADDRESS_ONLY_BOX_COPY]], [[IMMUTABLE_TRIVIAL]], [[IMMUTABLE_RETAINABLE_COPY]], [[IMMUTABLE_ADDRESS]])
+  // CHECK: [[CLOSURE:%.*]] = partial_apply {{.*}}([[MUTABLE_TRIVIAL_BOX_COPY]], [[MUTABLE_RETAINABLE_BOX_COPY]], [[MUTABLE_ADDRESS_ONLY_BOX_COPY]], [[MV_IMMUTABLE_TRIVIAL]], [[IMMUTABLE_RETAINABLE_COPY]], [[IMMUTABLE_ADDRESS]])
   // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE]]
   // CHECK: apply {{.*}}[[CONVERT]]
 

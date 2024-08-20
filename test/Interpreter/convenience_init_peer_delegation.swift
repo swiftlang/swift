@@ -1,35 +1,43 @@
 // RUN: %empty-directory(%t)
 //
-// RUN: %target-build-swift %s -Xfrontend -disable-objc-attr-requires-foundation-module -o %t/main
+// RUN: %target-build-swift %s -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
 // RUN: %empty-directory(%t)
 //
 // RUN: sed -e 's/required//g' < %s > %t/without_required.swift
-// RUN: %target-build-swift %t/without_required.swift -Xfrontend -disable-objc-attr-requires-foundation-module -o %t/without_required
+// RUN: %target-build-swift %t/without_required.swift -o %t/without_required
 // RUN: %target-codesign %t/without_required
 // RUN: %target-run %t/without_required | %FileCheck %s
 
 // RUN: %empty-directory(%t)
 //
-// RUN: %target-build-swift %s -Xfrontend -disable-objc-attr-requires-foundation-module -o %t/main -swift-version 5
+// RUN: %target-build-swift %s -o %t/main -swift-version 5
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
 // RUN: %empty-directory(%t)
 //
 // RUN: sed -e 's/required//g' < %s > %t/without_required.swift
-// RUN: %target-build-swift %t/without_required.swift -Xfrontend -disable-objc-attr-requires-foundation-module -o %t/without_required -swift-version 5
+// RUN: %target-build-swift %t/without_required.swift -o %t/without_required -swift-version 5
 // RUN: %target-codesign %t/without_required
 // RUN: %target-run %t/without_required | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: foundation
 // XFAIL: CPU=arm64e
-// REQUIRES: rdar92102119
+
+// Because of the use of 'sed' in this test.
+// REQUIRES: shell
+
+// rdar://133393259 fails in optimized tests.
+// UNSUPPORTED: swift_test_mode_optimize
+// UNSUPPORTED: swift_test_mode_optimize_size
 
 import Darwin
+import Foundation
 
 class Base {
   init(swift: ()) {

@@ -27,7 +27,7 @@ bb0(%t : @owned $T, %box : $*Box<T>):
   // The destroy_value appears first in the textual SIL in order to be first in
   // the use list.  Before running AddressLowering, it's sunk to after the
   // end_access.
-  specify_test "instruction-move-before @instruction @instruction[+5]"
+  specify_test "instruction_move_before @instruction @instruction[+5]"
   destroy_value %t : $T
   %copy = copy_value %t : $T
   %field_addr = struct_element_addr %box : $*Box<T>, #Box._value

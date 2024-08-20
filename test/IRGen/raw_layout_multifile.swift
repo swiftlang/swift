@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/raw_layout_multifile.swift
-// RUN: %target-swift-frontend -enable-experimental-feature BuiltinModule -enable-experimental-feature RawLayout -emit-ir -O -disable-availability-checking %s %S/Inputs/raw_layout_multifile_b.swift | %FileCheck %t/raw_layout_multifile.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-experimental-feature BuiltinModule -enable-experimental-feature RawLayout -emit-ir -O -Xllvm -sil-disable-pass=deinit-devirtualizer -disable-availability-checking %s %S/Inputs/raw_layout_multifile_b.swift | %FileCheck %t/raw_layout_multifile.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 @_rawLayout(like: Int32)
 public struct Foo<T>: ~Copyable {}

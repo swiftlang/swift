@@ -64,7 +64,7 @@ func testEnumNoInit() {
 }
 
 func testEnumNoInitWithPayload() {
-    @_moveOnly struct Empty {}
+    struct Empty: ~Copyable {}
 
     enum E : ~Copyable {
         case first(Empty)
@@ -76,7 +76,7 @@ func testEnumNoInitWithPayload() {
 }
 
 func testEnumNoInitWithGenericPayload() {
-    @_moveOnly struct Empty {}
+    struct Empty: ~Copyable {}
 
     enum E<T> : ~Copyable {
         case first(Empty)

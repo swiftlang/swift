@@ -59,6 +59,7 @@ let package = Package(
       dependencies: [
         .product(name: "_SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
         .product(name: "SwiftDiagnostics", package: "swift-syntax"),
+        .product(name: "SwiftIfConfig", package: "swift-syntax"),
         .product(name: "SwiftOperators", package: "swift-syntax"),
         .product(name: "SwiftParser", package: "swift-syntax"),
         .product(name: "SwiftParserDiagnostics", package: "swift-syntax"),

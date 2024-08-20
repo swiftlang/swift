@@ -1,7 +1,7 @@
-// RUN: %swift -swift-version 4 -typecheck %s -verify -target x86_64-apple-ios12.0-macabi -parse-stdlib
-// RUN: %swift-ide-test -swift-version 4 -test-input-complete -source-filename=%s -target x86_64-apple-ios12.0-macabi
+// RUN: %swift -swift-version 4 -typecheck %s -verify -target %target-cpu-apple-ios12.0-macabi -parse-stdlib
+// RUN: %swift-ide-test -swift-version 4 -test-input-complete -source-filename=%s -target %target-cpu-apple-ios12.0-macabi
 
-// REQUIRES: maccatalyst_support
+// REQUIRES: OS=macosx || OS=maccatalyst
 
 #if targetEnvironment(macabi) // expected-warning {{'macabi' has been renamed to 'macCatalyst'}} {{23-29=macCatalyst}}
 func underMacABI() {

@@ -54,7 +54,7 @@ fileprivate struct _CapacityAndFlags {
   // in the bottom 48 bits, and flags in the top 16.
   fileprivate var _storage: UInt64
 
-#if _pointerBitWidth(_32)
+#if _pointerBitWidth(_32) || _pointerBitWidth(_16)
   fileprivate init(realCapacity: Int, flags: UInt16) {
     let realCapUInt = UInt64(UInt(bitPattern: realCapacity))
     _internalInvariant(realCapUInt == realCapUInt & _CountAndFlags.countMask)
@@ -263,7 +263,7 @@ final internal class __StringStorage
 
   @inline(__always)
   internal var count: Int { _countAndFlags.count }
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
   // The total allocated storage capacity. Note that this includes the required
   // nul-terminator.
   private var _realCapacity: Int
@@ -325,7 +325,7 @@ extension __StringStorage {
 #if _pointerBitWidth(_64)
     storage._capacityAndFlags = capAndFlags
     storage._countAndFlags = countAndFlags
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     storage._realCapacity = capAndFlags._realCapacity
     storage._count = countAndFlags.count
     storage._countFlags = countAndFlags.flags
@@ -372,7 +372,7 @@ extension __StringStorage {
     let countAndFlags = _CountAndFlags(mortalCount: count, isASCII: false)
     #if _pointerBitWidth(_64)
     storage._countAndFlags = countAndFlags
-    #elseif _pointerBitWidth(_32)
+    #elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     storage._count = countAndFlags.count
     storage._countFlags = countAndFlags.flags
     #else
@@ -527,7 +527,7 @@ extension __StringStorage {
       mortalCount: newCount, isASCII: newIsASCII)
 #if _pointerBitWidth(_64)
     self._countAndFlags = countAndFlags
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     self._count = countAndFlags.count
     self._countFlags = countAndFlags.flags
 #else
@@ -675,7 +675,7 @@ final internal class __SharedStringStorage
 
 #if _pointerBitWidth(_64)
   internal var _countAndFlags: _StringObject.CountAndFlags
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
   internal var _count: Int
   internal var _countFlags: UInt16
 
@@ -702,7 +702,7 @@ final internal class __SharedStringStorage
     self.immortal = true
 #if _pointerBitWidth(_64)
     self._countAndFlags = countAndFlags
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     self._count = countAndFlags.count
     self._countFlags = countAndFlags.flags
 #else
@@ -731,7 +731,7 @@ final internal class __SharedStringStorage
     self.immortal = false
 #if _pointerBitWidth(_64)
     self._countAndFlags = countAndFlags
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     self._count = countAndFlags.count
     self._countFlags = countAndFlags.flags
 #else

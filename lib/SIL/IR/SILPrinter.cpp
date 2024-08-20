@@ -1573,6 +1573,10 @@ public:
     visitApplyInstBase(AI);
     *this << ", normal " << Ctx.getID(AI->getNormalBB());
     *this << ", error " << Ctx.getID(AI->getErrorBB());
+    if (AI->getNormalBBCount())
+      *this << " !normal_count(" << AI->getNormalBBCount().getValue() << ")";
+    if (AI->getErrorBBCount())
+      *this << " !error_count(" << AI->getErrorBBCount().getValue() << ")";
   }
 
   void visitPartialApplyInst(PartialApplyInst *CI) {
@@ -3245,20 +3249,30 @@ void SILBasicBlock::print(SILPrintContext &Ctx) const {
   SILPrinter(Ctx).print(this);
 }
 
-#ifndef NDEBUG
 void SILBasicBlock::dumpID(bool newline) const {
+#ifndef NDEBUG
   printID(llvm::errs(), newline);
+#else
+  llvm::errs() << "NOASSERTS" << (newline ? "\n" : "");
+#endif
 }
 
 void SILBasicBlock::printID(llvm::raw_ostream &OS, bool newline) const {
+#ifndef NDEBUG
   SILPrintContext Ctx(OS);
   printID(Ctx, newline);
+#else
+  llvm::errs() << "NOASSERTS" << (newline ? "\n" : "");
+#endif
 }
 
 void SILBasicBlock::printID(SILPrintContext &Ctx, bool newline) const {
+#ifndef NDEBUG
   SILPrinter(Ctx).printID(this, newline);
-}
+#else
+  llvm::errs() << "NOASSERTS" << (newline ? "\n" : "");
 #endif
+}
 
 /// Pretty-print the SILFunction to errs.
 void SILFunction::dump(bool Verbose) const {

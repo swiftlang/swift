@@ -170,6 +170,9 @@ public:
                         DeclAndTypePrinter &declPrinter,
                         const ModuleDecl *emittedModule, Type ty);
 
+  /// Prints the name of the type including generic arguments.
+  void printTypeName(Type ty, const ModuleDecl *moduleContext);
+
 private:
   void printCxxToCFunctionParameterUse(Type type, StringRef name,
                                        const ModuleDecl *moduleContext,

@@ -85,7 +85,8 @@ func testCovariantSelfMethod2(p: any P) {
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantSelfMethod3 : <Self where Self : P> (Self) -> () -> Self.Type
 // CHECK: [[META:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @thick τ_0_0.Type
 // CHECK: [[EXIST_META:%[0-9]+]] = init_existential_metatype [[META]] : $@thick (@opened([[OPENED_ID]], any P) Self).Type, $@thick any P.Type
-// CHECK: debug_value [[EXIST_META]] : $@thick any P.Type, let, name "x"
+// CHECK: [[MV:%.*]] = move_value [var_decl] [[EXIST_META]] : $@thick any P.Type
+// CHECK: debug_value [[MV]] : $@thick any P.Type, let, name "x"
 func testCovariantSelfMethod3(p: any P) {
   let x = p.covariantSelfMethod3()
 }
@@ -170,7 +171,8 @@ func testCovariantSelfProperty2(p: any P) {
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantSelfProperty3!getter : <Self where Self : P> (Self) -> () -> Self.Type
 // CHECK: [[META:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @thick τ_0_0.Type
 // CHECK: [[EXIST_META:%[0-9]+]] = init_existential_metatype [[META]] : $@thick (@opened([[OPENED_ID]], any P) Self).Type, $@thick any P.Type
-// CHECK: debug_value [[EXIST_META]] : $@thick any P.Type, let, name "x"
+// CHECK: [[MV:%.*]] = move_value [var_decl] [[EXIST_META]] : $@thick any P.Type
+// CHECK: debug_value [[MV]] : $@thick any P.Type, let, name "x"
 func testCovariantSelfProperty3(p: any P) {
   let x = p.covariantSelfProperty3
 }
@@ -256,7 +258,8 @@ func testCovariantSelfSubscript2(p: any P) {
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.subscript!getter : <Self where Self : P> (Self) -> (()) -> Self.Type
 // CHECK: [[META:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @thick τ_0_0.Type
 // CHECK: [[EXIST_META:%[0-9]+]] = init_existential_metatype [[META]] : $@thick (@opened([[OPENED_ID]], any P) Self).Type, $@thick any P.Type
-// CHECK: debug_value [[EXIST_META]] : $@thick any P.Type, let, name "x"
+// CHECK: [[MV:%.*]] = move_value [var_decl] [[EXIST_META]] : $@thick any P.Type
+// CHECK: debug_value [[MV]] : $@thick any P.Type, let, name "x"
 func testCovariantSelfSubscript3(p: any P) {
   let x = p[covariantSelfSubscript3: ()]
 }
@@ -336,7 +339,8 @@ func testCovariantAssocMethod2(p: any P) {
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantAssocMethod3 : <Self where Self : P> (Self) -> () -> Self.A.Type
 // CHECK: [[META:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @thick τ_0_0.A.Type
 // CHECK: [[EXIST_META:%[0-9]+]] = init_existential_metatype [[META]] : $@thick (@opened([[OPENED_ID]], any P) Self.A).Type, $@thick any Any.Type
-// CHECK: debug_value [[EXIST_META]] : $@thick any Any.Type, let, name "x"
+// CHECK: [[MV:%.*]] = move_value [var_decl] [[EXIST_META]] : $@thick any Any.Type
+// CHECK: debug_value [[MV]] : $@thick any Any.Type, let, name "x"
 func testCovariantAssocMethod3(p: any P) {
   let x = p.covariantAssocMethod3()
 }
@@ -422,7 +426,8 @@ func testCovariantAssocProperty2(p: any P) {
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantAssocProperty3!getter : <Self where Self : P> (Self) -> () -> Self.A.Type
 // CHECK: [[META:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @thick τ_0_0.A.Type
 // CHECK: [[EXIST_META:%[0-9]+]] = init_existential_metatype [[META]] : $@thick (@opened([[OPENED_ID]], any P) Self.A).Type, $@thick any Any.Type
-// CHECK: debug_value [[EXIST_META]] : $@thick any Any.Type, let, name "x"
+// CHECK: [[MV:%.*]] = move_value [var_decl] [[EXIST_META]] : $@thick any Any.Type
+// CHECK: debug_value [[MV]] : $@thick any Any.Type, let, name "x"
 func testCovariantAssocProperty3(p: any P) {
   let x = p.covariantAssocProperty3
 }
@@ -507,7 +512,8 @@ func testCovariantAssocSubscript2(p: any P) {
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.subscript!getter : <Self where Self : P> (Self) -> (()) -> Self.A.Type
 // CHECK: [[META:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @thick τ_0_0.A.Type
 // CHECK: [[EXIST_META:%[0-9]+]] = init_existential_metatype [[META]] : $@thick (@opened([[OPENED_ID]], any P) Self.A).Type, $@thick any Any.Type
-// CHECK: debug_value [[EXIST_META]] : $@thick any Any.Type, let, name "x"
+// CHECK: [[MV:%.*]] = move_value [var_decl] [[EXIST_META]] : $@thick any Any.Type
+// CHECK: debug_value [[MV]] : $@thick any Any.Type, let, name "x"
 func testCovariantAssocSubscript3(p: any P) {
   let x = p[covariantAssocSubscript3: ()]
 }
@@ -594,7 +600,8 @@ func testCovariantAssocMethod2Constrained(p2: any P2) {
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P2) Self, #P.covariantAssocMethod3 : <Self where Self : P> (Self) -> () -> Self.A.Type
 // CHECK: [[META:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P2) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @thick τ_0_0.A.Type
 // CHECK: [[EXIST_META:%[0-9]+]] = init_existential_metatype [[META]] : $@thick (@opened([[OPENED_ID]], any P2) Self.A).Type, $@thick any (Class & P).Type
-// CHECK: debug_value [[EXIST_META]] : $@thick any (Class & P).Type, let, name "x"
+// CHECK: [[MV:%.*]] = move_value [var_decl] [[EXIST_META]]
+// CHECK: debug_value [[MV]] : $@thick any (Class & P).Type, let, name "x"
 func testCovariantAssocMethod3Constrained(p2: any P2) {
   let x = p2.covariantAssocMethod3()
 }
@@ -657,7 +664,8 @@ protocol P3: P where A == Bool {
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P3) Self, #P.covariantAssocMethod1 : <Self where Self : P> (Self) -> () -> Self.A
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P3) Self>([[BOOL_ADDR]], [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0.A
 // CHECK: [[BOOL:%[0-9]+]] = load [trivial] [[BOOL_ADDR]] : $*Bool
-// CHECK: debug_value [[BOOL]] : $Bool, let, name "x"
+// CHECK: [[MV:%.*]] = move_value [var_decl] [[BOOL]] : $Bool
+// CHECK: debug_value [[MV]] : $Bool, let, name "x"
 func testCovariantAssocMethod1Concrete(p3: any P3) {
   let x = p3.covariantAssocMethod1()
 }
@@ -672,7 +680,8 @@ func testContravariantAssocMethod1Concrete(p3: any P3) {
 // CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P3 to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P3) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P3) Self, #P3.invariantAssocMethod1 : <Self where Self : P3> (Self) -> () -> GenericStruct<Self.A>
 // CHECK: [[RESULT:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P3) Self>([[OPENED]]) : $@convention(witness_method: P3) <τ_0_0 where τ_0_0 : P3> (@in_guaranteed τ_0_0) -> GenericStruct<Bool>
-// CHECK: debug_value [[RESULT]] : $GenericStruct<Bool>, let, name "x"
+// CHECK: [[MV:%.*]] = move_value [var_decl] [[RESULT]] : $GenericStruct<Bool>
+// CHECK: debug_value [[MV]] : $GenericStruct<Bool>, let, name "x"
 // CHECK: } // end sil function '$s42existential_member_accesses_self_assoctype33testInvariantAssocMethod1Concrete2p3yAA2P3_p_tF'
 func testInvariantAssocMethod1Concrete(p3: any P3) {
   let x = p3.invariantAssocMethod1()

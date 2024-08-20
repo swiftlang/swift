@@ -553,8 +553,9 @@ public:
   /// Specify the module loading behavior of the compilation.
   ModuleLoadingMode ModuleLoadMode = ModuleLoadingMode::PreferSerialized;
 
-  /// Legacy scanner search behavior.
-  bool NoScannerModuleValidation = false;
+  /// New scanner search behavior. Validate up-to-date existing Swift module
+  /// dependencies in the scanner itself.
+  bool ScannerModuleValidation = false;
 
   /// Return all module search paths that (non-recursively) contain a file whose
   /// name is in \p Filenames.
@@ -604,7 +605,7 @@ public:
                         hash_combine_range(RuntimeLibraryImportPaths.begin(),
                                            RuntimeLibraryImportPaths.end()),
                         DisableModulesValidateSystemDependencies,
-                        NoScannerModuleValidation,
+                        ScannerModuleValidation,
                         ModuleLoadMode);
   }
 

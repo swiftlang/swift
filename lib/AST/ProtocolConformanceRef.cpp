@@ -18,6 +18,7 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Availability.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/Module.h"
@@ -111,8 +112,7 @@ ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
   // If the type is an existential, it must be self-conforming.
   if (substType->isExistentialType()) {
     auto optConformance =
-        proto->getModuleContext()->lookupExistentialConformance(substType,
-                                                                proto);
+        lookupConformance(substType, proto, /*allowMissing=*/true);
     if (optConformance)
       return optConformance;
 

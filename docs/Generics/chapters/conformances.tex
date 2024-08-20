@@ -66,8 +66,8 @@ Broken down into constituent parts, a normal conformance stores the following:
 \section{Conformance Lookup}\label{conformance lookup}
 
 \IndexDefinition{global conformance lookup}
-A conformance can be obtained via \emph{global conformance lookup}, an operation defined as taking a \index{protocol declaration}protocol declaration and a \IndexDefinition{conforming type}conforming type. Global conformance lookup can be understood as the action of a protocol declaration \texttt{P} on the left of a type \texttt{T}. We denote the protocol as $\protosym{P}$ to avoid confusion with the protocol \emph{type}, and use the notation $\ConfReq{T}{P}$ to represent the found conformance of \texttt{T} to \texttt{P}, whatever kind of conformance it may be:\index{$\otimes$}
-\[\protosym{P}\otimes\texttt{T} = \ConfReq{T}{P}\]
+A conformance can be obtained via \emph{global conformance lookup}, an operation defined as taking a \index{protocol declaration}protocol declaration and a \IndexDefinition{conforming type}conforming type. Global conformance lookup can be understood as the action of a protocol declaration \texttt{P} on the left of a type \texttt{T}. We denote the protocol as $\protosym{P}$ to avoid confusion with the protocol \emph{type}, and use the notation $\TP$ to represent the found conformance of \texttt{T} to \texttt{P}, whatever kind of conformance it may be:\index{$\otimes$}
+\[\protosym{P}\otimes\texttt{T} = \TP\]
 
 Global conformance lookup performs a case analysis on the given conforming type, returning one of several kinds of conformance:
 \begin{itemize}
@@ -77,10 +77,10 @@ Global conformance lookup performs a case analysis on the given conforming type,
 \item In any case not covered by the above, it returns an invalid conformance.
 \end{itemize}
 
-From a conformance $\ConfReq{T}{P}$, we can obtain the conformed protocol \texttt{P} and conforming type \texttt{T}. The conforming type of a valid conformance found by global conformance lookup is canonically equal to the type that was handed to the lookup operation (the two types might differ by type sugar, so are not required to be \index{type pointer equality}equal as type pointers). We can exhibit this with a \index{commutative diagram}\emph{commutative diagram}:
+From a conformance $\TP$, we can obtain the conformed protocol \texttt{P} and conforming type \texttt{T}. The conforming type of a valid conformance found by global conformance lookup is canonically equal to the type that was handed to the lookup operation (the two types might differ by type sugar, so are not required to be \index{type pointer equality}equal as type pointers). We can exhibit this with a \index{commutative diagram}\emph{commutative diagram}:
 \begin{quote}
 \begin{tikzcd}[column sep=3cm,row sep=1cm]
-\texttt{T} \arrow[r, bend left, "\text{look up conformance}"] &{\ConfReq{T}{P}}\arrow[l, bend left, "\text{get conforming type}"]
+\texttt{T} \arrow[r, bend left, "\text{look up conformance}"] &{\TP}\arrow[l, bend left, "\text{get conforming type}"]
 \end{tikzcd}
 \end{quote}
 A commutative diagram is a diagram where every path with the same start and end leads to the same result. The above commutative diagram shows two pairs of paths:
@@ -152,10 +152,10 @@ So far, we don't have any means to simplify the above expression further. Howeve
 \[
 \protosym{P} \otimes (\texttt{T}_d \otimes \Sigma) = (\protosym{P} \otimes \texttt{T}_d) \otimes \Sigma
 \]
-Now, we can simplify the right hand side, at least partially. We have $\protosym{P}\otimes\texttt{T}_d=\NormalConf$. This leaves us with the new kind of expression $\NormalConf\otimes\Sigma$ that we have not seen before; we need to apply a substitution map to a conformance. Just as applying $\Sigma$ to $\texttt{T}_d$ outputs the specialized type \texttt{T}, applying $\Sigma$ to the normal conformance $\NormalConf$ outputs a \IndexDefinition{specialized conformance}\emph{specialized conformance}, denoted $\ConfReq{T}{P}$, which describes how \texttt{T} meets the requirements of \texttt{P}:
-\[\protosym{P}\otimes\texttt{T}=\ConfReq{T}{P}=\NormalConf\otimes\Sigma\]
+Now, we can simplify the right hand side, at least partially. We have $\protosym{P}\otimes\texttt{T}_d=\NormalConf$. This leaves us with the new kind of expression $\NormalConf\otimes\Sigma$ that we have not seen before; we need to apply a substitution map to a conformance. Just as applying $\Sigma$ to $\texttt{T}_d$ outputs the specialized type \texttt{T}, applying $\Sigma$ to the normal conformance $\NormalConf$ outputs a \IndexDefinition{specialized conformance}\emph{specialized conformance}, denoted $\TP$, which describes how \texttt{T} meets the requirements of \texttt{P}:
+\[\protosym{P}\otimes\texttt{T}=\TP=\NormalConf\otimes\Sigma\]
 
-The behavior of a specialized conformance $\ConfReq{T}{P}$ can be specified entirely in terms of the underlying normal conformance $\NormalConf$, together with the \IndexDefinition{conformance substitution map}\emph{conformance substitution map} $\Sigma$. When \texttt{T} is not the declared interface type of some nominal type, we write $\ConfReq{T}{P}$ as a notational convenience, if it is clear that $\texttt{T}=\texttt{T}_d\otimes\Sigma$ for some $\texttt{T}_d$ and $\Sigma$. In the implementation, the ``formal'' pair $\NormalConf\otimes\Sigma$ is the more primitive notion.
+The behavior of a specialized conformance $\TP$ can be specified entirely in terms of the underlying normal conformance $\NormalConf$, together with the \IndexDefinition{conformance substitution map}\emph{conformance substitution map} $\Sigma$. When \texttt{T} is not the declared interface type of some nominal type, we write $\TP$ as a notational convenience, if it is clear that $\texttt{T}=\texttt{T}_d\otimes\Sigma$ for some $\texttt{T}_d$ and $\Sigma$. In the implementation, the ``formal'' pair $\NormalConf\otimes\Sigma$ is the more primitive notion.
 
 There is also a special case involving the identity substitution map. Suppose that the generic signature of $d$ is $G$. If the conformance substitution map is $1_G$, a specialized conformance is not constructed; substitution returns the original normal conformance:
 \[
@@ -173,10 +173,10 @@ To make this concrete, consider the specialized type \texttt{Array<Int>}. The no
 \qquad {} = \ConfReq{Array<Int>}{Sequence}
 \end{gather*}
 
-Going backwards, the conforming type of a specialized conformance $\ConfReq{T}{P}$ is defined as the conforming type of the normal conformance with the conformance substitution map $\Sigma$ applied. This is just $\texttt{T}=\texttt{T}_d\otimes\Sigma$. This fact is not \emph{completely} trivial; it makes our diagram commute:
+Going backwards, the conforming type of a specialized conformance $\TP$ is defined as the conforming type of the normal conformance with the conformance substitution map $\Sigma$ applied. This is just $\texttt{T}=\texttt{T}_d\otimes\Sigma$. This fact is not \emph{completely} trivial; it makes our diagram commute:
 \begin{quote}
 \begin{tikzcd}[column sep=3cm,row sep=1cm]
-\texttt{T} \arrow[r, bend left, "\text{conformance lookup}"] &\ConfReq{T}{P}\arrow[l, bend left, "\text{conforming type}"]
+\texttt{T} \arrow[r, bend left, "\text{conformance lookup}"] &\TP\arrow[l, bend left, "\text{conforming type}"]
 \end{tikzcd}
 \end{quote}
 For example, the conforming type of $\ConfReq{Array<Int>}{Sequence}$ is \texttt{Array<Int>}.
@@ -283,7 +283,7 @@ Given a conformance and an associated type of the conformed protocol, we can ask
 We denote a type witness projection by $\AssocType{[P]A}$, where \texttt{A} is some associated type declared in a protocol \texttt{P}. (Of course, $\pi$ here has nothing to do with the circle constant $\oldstylenums{3.1415926}\ldots\,$; rather, it means ``projection'', or perhaps ``protocol.'')
 
 A type witness projection $\AssocType{[P]A}$ can be applied to a conformance, as long as the conformance is to the same protocol \texttt{P}; so if \texttt{W} is the type witness (where ``\texttt{W}'' is understood as a placeholder for an arbitrary interface type, and not literally a referenced to some type declaration named ``\texttt{W}''), we define:
-\[\AssocType{[P]A}\otimes\ConfReq{T}{P}:=\texttt{W}\]
+\[\AssocType{[P]A}\otimes\TP:=\texttt{W}\]
 
 The type witnesses of a normal conformance are interface types which may contain type parameters from the generic signature of the conforming context. In other words, if $\NormalConf\in\ConfObj{G}$, then $\AssocType{[P]A}\otimes\NormalConf\in\TypeObj{G}$.
 
@@ -295,19 +295,19 @@ In \ListingRef{type witness listing}, we have the following:
 \AssocType{[P]T}\otimes\ConfReq{WithDefault}{P}=\texttt{Int}
 \end{gather*}
 
-The type witnesses of a specialized conformance are completely determined by the underlying normal conformance and conformance substitution map. Once again, only one possible definition leads to a self-consistent algebra. If $\ConfReq{T}{P} = \NormalConf\otimes\Sigma$:
+The type witnesses of a specialized conformance are completely determined by the underlying normal conformance and conformance substitution map. Once again, only one possible definition leads to a self-consistent algebra. If $\TP = \NormalConf\otimes\Sigma$:
 \[
-\AssocType{[P]A} \otimes \ConfReq{T}{P} = \AssocType{[P]A} \otimes \bigl(\NormalConf\otimes\Sigma\bigr) = \bigl(\AssocType{[P]A} \otimes\NormalConf\bigr)\otimes\Sigma
+\AssocType{[P]A} \otimes \TP = \AssocType{[P]A} \otimes \bigl(\NormalConf\otimes\Sigma\bigr) = \bigl(\AssocType{[P]A} \otimes\NormalConf\bigr)\otimes\Sigma
 \]
-Thus, if $\texttt{T}=\texttt{T}_d\otimes\Sigma$ and $\AssocType{[P]A}\otimes\NormalConf=\texttt{W}$, then $\AssocType{[P]A}\otimes\ConfReq{T}{P}=\texttt{W}\otimes\Sigma$. Also, note that if $\Sigma\in\SubMapObj{G}{G^\prime}$, then $\AssocType{[P]A} \otimes \ConfReq{T}{P}\in\TypeObj{G^\prime}$. So the type witnesses of a normal or specialized conformance are understood in relation to the \index{output generic signature}output generic signature of the conformance, just as the replacement types of a substitution map contain type parameters for the output generic signature of the substitution map.
+Thus, if $\texttt{T}=\texttt{T}_d\otimes\Sigma$ and $\AssocType{[P]A}\otimes\NormalConf=\texttt{W}$, then $\AssocType{[P]A}\otimes\TP=\texttt{W}\otimes\Sigma$. Also, note that if $\Sigma\in\SubMapObj{G}{G^\prime}$, then $\AssocType{[P]A} \otimes \TP\in\TypeObj{G^\prime}$. So the type witnesses of a normal or specialized conformance are understood in relation to the \index{output generic signature}output generic signature of the conformance, just as the replacement types of a substitution map contain type parameters for the output generic signature of the substitution map.
 
 We now study the relationship between global conformance lookup and type witness projection. Consider the ``general type witness expression'':
 \[\AssocType{[P]A}\otimes\protosym{P}\otimes\texttt{T}_d\otimes\Sigma\]
 There are three ways to place parentheses in this expression, and the key property is that the three different evaluation orders produce the same result:
 \begin{enumerate}
 \item We can look up the conformance of $\texttt{T}_d$ to \texttt{P} to get the normal conformance $\NormalConf$, project the type witness $\AssocType{[P]A}$ to get \texttt{W}, and apply $\Sigma$ to get $\texttt{W}\otimes\Sigma$.
-\item We can look up the conformance of $\texttt{T}_d$ to \texttt{P} to get the normal conformance $\NormalConf$, apply $\Sigma$ to get the specialized conformance $\ConfReq{T}{P}$, and project the type witness $\AssocType{[P]A}$ to get $\texttt{W}\otimes\Sigma$.
-\item We can apply $\Sigma$ to $\texttt{T}_d$ to get \texttt{T}, look up the conformance of \texttt{T} to \texttt{P} to get the specialized conformance $\ConfReq{T}{P}$, and project the type witness $\AssocType{[P]A}$ to get $\texttt{W}\otimes\Sigma$.
+\item We can look up the conformance of $\texttt{T}_d$ to \texttt{P} to get the normal conformance $\NormalConf$, apply $\Sigma$ to get the specialized conformance $\TP$, and project the type witness $\AssocType{[P]A}$ to get $\texttt{W}\otimes\Sigma$.
+\item We can apply $\Sigma$ to $\texttt{T}_d$ to get \texttt{T}, look up the conformance of \texttt{T} to \texttt{P} to get the specialized conformance $\TP$, and project the type witness $\AssocType{[P]A}$ to get $\texttt{W}\otimes\Sigma$.
 \end{enumerate}
 \FigRef{type witness diagram} exhibits the above in the form of a \index{commutative diagram}commutative diagram; the three paths from $\texttt{T}_d$ to $\texttt{W}\otimes\Sigma$ correspond to the three possible evaluations above.
 
@@ -315,7 +315,7 @@ There are three ways to place parentheses in this expression, and the key proper
 \begin{center}
 \begin{tikzcd}[column sep=3cm,row sep=1cm]
 \texttt{T}_d \arrow[d, "\protosym{P}"{left}] \arrow[r, "\Sigma"] &\texttt{T} \arrow[d, "\protosym{P}"] \\
-\NormalConf \arrow[r, "\Sigma"] \arrow[d, "\AssocType{[P]A}"{left}]&\ConfReq{T}{P} \arrow[d, "\AssocType{[P]A}"]\\
+\NormalConf \arrow[r, "\Sigma"] \arrow[d, "\AssocType{[P]A}"{left}]&\TP \arrow[d, "\AssocType{[P]A}"]\\
 \texttt{W} \arrow[r, "\Sigma"]&\texttt{W}\otimes\Sigma
 \end{tikzcd}
 \end{center}
@@ -342,19 +342,19 @@ If we take \IndexSetDefinition{assoctype}{\AssocTypeObj{P}}$\AssocTypeObj{P}$ to
 \section{Abstract Conformances}\label{abstract conformances}
 
 An \IndexDefinition{abstract conformance}\emph{abstract conformance} represents the conformance of a \index{type parameter}type parameter of some \index{generic signature}generic signature to a protocol. Unlike concrete conformances, abstract conformances do not refer to a specific declaration, nor do they store their type witnesses directly. They are to concrete conformances, what type parameters are to concrete types. If it is understood that \texttt{T} is a type parameter, we use the same notation for abstract conformances as for concrete conformances:
-\[\protosym{P}\otimes\texttt{T} = \ConfReq{T}{P}\]
+\[\protosym{P}\otimes\texttt{T} = \TP\]
 
-If the conformance \emph{requirement} $\ConfReq{T}{P}$ can be \index{derived requirement}derived in a generic signature $G$, then there is an abstract conformance $\ConfReq{T}{P}\in\ConfObj{G}$. (To put it another way, an abstract conformance $\ConfReq{T}{P}$ exists if the \IndexQuery{requiresProtocol}$\Query{requiresProtocol}{G,\,\texttt{T},\,\texttt{P}}$ is true.)
+If the conformance \emph{requirement} $\TP$ can be \index{derived requirement}derived in a generic signature $G$, then there is an abstract conformance $\TP\in\ConfObj{G}$. (To put it another way, an abstract conformance $\TP$ exists if the \IndexQuery{requiresProtocol}$\Query{requiresProtocol}{G,\,\texttt{T},\,\texttt{P}}$ is true.)
 
-To complete our type substitution algebra, we now define what it means to project a type witness from, or apply a substitution map to, an abstract conformance. Recall that a \index{bound dependent member type}\index{dependent member type}bound dependent member type \texttt{T.[P]A} is a valid type parameter if it can be derived by applying the \IndexStep{AssocDecl}\textsc{AssocDecl} inference rule to some derived conformance requirement $\ConfReq{T}{P}$:
+To complete our type substitution algebra, we now define what it means to project a type witness from, or apply a substitution map to, an abstract conformance. Recall that a \index{bound dependent member type}\index{dependent member type}bound dependent member type \texttt{T.[P]A} is a valid type parameter if it can be derived by applying the \IndexStep{AssocDecl}\textsc{AssocDecl} inference rule to some derived conformance requirement $\TP$:
 \begin{gather*}
 \AssocDeclStepDef
 \end{gather*}
-The derived conformance requirement $\ConfReq{T}{P}$ gives us the abstract conformance $\ConfReq{T}{P}$, and its type witness for \texttt{A} must be the dependent member type \texttt{T.[P]A}:
-\[\AssocType{[P]A} \otimes \ConfReq{T}{P} = \texttt{T.[P]A}\]
+The derived conformance requirement $\TP$ gives us the abstract conformance $\TP$, and its type witness for \texttt{A} must be the dependent member type \texttt{T.[P]A}:
+\[\AssocType{[P]A} \otimes \TP = \texttt{T.[P]A}\]
 
 As every valid dependent member type is the type witness of an abstract conformance, we can define the application of a substitution map to a dependent member type by factoring the dependent member type in this manner:
-\[\texttt{T.[P]A}\otimes\Sigma=\bigl(\AssocType{[P]A} \otimes \ConfReq{T}{P}\bigr)\otimes\Sigma=\AssocType{[P]A}\otimes\bigl(\ConfReq{T}{P}\otimes\Sigma\bigr)\]
+\[\texttt{T.[P]A}\otimes\Sigma=\bigl(\AssocType{[P]A} \otimes \TP\bigr)\otimes\Sigma=\AssocType{[P]A}\otimes\bigl(\TP\otimes\Sigma\bigr)\]
 
 We saw how normal and specialized conformances are substituted in \SecRef{conformance subst}. Now, it appears we need the ability to apply a substitution map to an abstract conformance. This operation is named \IndexDefinition{local conformance lookup}\emph{local conformance lookup} by analogy with \index{global conformance lookup}global conformance lookup. Local conformance lookup is \emph{compatible} with global conformance lookup, in this sense: a local conformance lookup with some \index{substitution map}substitution map $\Sigma$, type parameter \texttt{T} and protocol \texttt{P} must return the same conformance as performing a global conformance lookup of $\texttt{T}\otimes\Sigma$ to $\texttt{P}$. This can be expressed as an equation:
 \[(\protosym{P}\otimes\texttt{T})\otimes\Sigma=\protosym{P}\otimes(\texttt{T}\otimes\Sigma)\]
@@ -436,14 +436,14 @@ The second time around, the original subject type is itself a dependent member t
 \end{gather*}
 \end{example}
 
-\paragraph{Protocol substitution maps.} If \texttt{T} is any interface type (not just a type parameter) conforming to some protocol \texttt{P}, the normal, specialized or abstract conformance $\ConfReq{T}{P}$ defines a substitution map for the protocol generic signature \verb|<Self where Self: P>| in a natural way. This is the \IndexDefinition{protocol substitution map}\emph{protocol substitution map}, denoted by $\Sigma_{\ConfReq{T}{P}}$:
-\[\Sigma_{\ConfReq{T}{P}} := \SubstMapC{
+\paragraph{Protocol substitution maps.} If \texttt{T} is any interface type (not just a type parameter) conforming to some protocol \texttt{P}, the normal, specialized or abstract conformance $\TP$ defines a substitution map for the protocol generic signature \verb|<Self where Self: P>| in a natural way. This is the \IndexDefinition{protocol substitution map}\emph{protocol substitution map}, denoted by $\Sigma_{\TP}$:
+\[\Sigma_{\TP} := \SubstMapC{
 \SubstType{Self}{T}
 }{
 \SubstConf{Self}{T}{P}
 }\]
 Suppose that our protocol \texttt{P} declares an associated type \texttt{A}. Note that \texttt{Self.[P]A} is the declared interface type of the \index{associated type declaration}associated type \texttt{A}, and $\texttt{Self.[P]A}=\AssocType{[P]A}\otimes\ConfReq{Self}{P}$. Then applying the protocol substitution map to this dependent member type gives the same result as projecting the type witness from the conformance:
-\[\texttt{Self.[P]A}\otimes\Sigma_{\ConfReq{T}{P}}=\AssocType{[P]A}\otimes\bigl(\ConfReq{Self}{P}\otimes\Sigma\bigr)=\AssocType{[P]A}\otimes\ConfReq{T}{P}\]
+\[\texttt{Self.[P]A}\otimes\Sigma_{\TP}=\AssocType{[P]A}\otimes\bigl(\ConfReq{Self}{P}\otimes\Sigma\bigr)=\AssocType{[P]A}\otimes\TP\]
 
 \section{Associated Conformances}\label{associated conformances}
 The \index{conformance requirement}conformance requirements stated in a protocol's \index{requirement signature}requirement signature are known as \index{request}\IndexDefinition{associated conformance requirement}\emph{associated conformance requirements} and the concrete conformance corresponding to one is an \IndexDefinition{associated conformance}\emph{associated conformance}. There is an interesting duality between \index{substitution map}substitution maps and conformances:
@@ -464,17 +464,17 @@ Replacement conformance&$\Leftrightarrow$&Associated conformance\\
 \end{center}
 Generic signatures and requirement signatures are similar except that the former constrains generic parameters, while the latter constrains associated types. A substitution map records a replacement type for each generic parameter and a replacement conformance for each conformance requirement. A normal conformance records a type witness for each associated type and an associated conformance for each associated conformance requirement.
 
-Recall from \SecRef{requirement sig} that the printed representation of a requirement signature looks like a generic signature with a single \texttt{Self} generic parameter. For example, here is the abridged requirement signature of the standard library's \texttt{Collection} protocol:
+Recall from \SecRef{requirement sig} that the printed representation of a requirement signature looks like a generic signature with a single \tSelf\ generic parameter. For example, here is the abridged requirement signature of the standard library's \texttt{Collection} protocol:
 \begin{quote}
 \texttt{<Self where \ttbox{Self:\ Sequence}, \ttbox{Self.Index:\ Comparable}, ...>}
 \end{quote}
-The special case of an associated conformance requirement with a subject type of \texttt{Self} represents a \index{inherited protocol}protocol inheritance relationship, as you already saw in \SecRef{requirement sig}. Other associated conformance requirements constrain the protocol's associated types.
+The special case of an associated conformance requirement with a subject type of \tSelf\ represents a \index{inherited protocol}protocol inheritance relationship, as you already saw in \SecRef{requirement sig}. Other associated conformance requirements constrain the protocol's associated types.
 
 The associated conformances of a normal conformance are populated lazily by the \IndexDefinition{associated conformance request}\Request{associated conformance request}. The request computes the substituted subject type of an associated conformance requirement by applying the \index{protocol substitution map}protocol substitution map for the conformance, and then performs a global conformance lookup with this subject type. This is the same idea as when we do conformance lookups to populate a substitution map (\SecRef{buildingsubmaps}).
 
 The substituted subject type is obtained by applying the protocol substitution map to the subject type of each associated conformance requirement. For example, in the conformance of \texttt{Array<\ttgp{0}{0}>} to \texttt{Collection}, the substituted subject type of the requirement $\ConfReq{Self}{Sequence}$ is just the conforming type:
 \[
-\texttt{Self} \otimes \Sigma_{\ConfReq{Array<\ttgp{0}{0}>}{Collection}} = \texttt{Array<\ttgp{0}{0}>}
+\tSelf\ \otimes \Sigma_{\ConfReq{Array<\ttgp{0}{0}>}{Collection}} = \texttt{Array<\ttgp{0}{0}>}
 \]
 The substituted subject type of \verb|Self.Index| is the type witness for \verb|Index|, which is \verb|Int|:
 \begin{gather*}
@@ -487,7 +487,7 @@ With the substituted subject types on hand, the conformance checker then perform
 \protosym{Sequence} \otimes \texttt{Array<\ttgp{0}{0}>} = \ConfReq{Array<\ttgp{0}{0}>}{Sequence}\\
 \protosym{Comparable} \otimes \texttt{Int} = \ConfReq{Int}{Comparable}
 \end{gather*}
-\paragraph{Notation.} In the type substitution algebra, we will write an associated conformance requirement as $\AssocConf{Self.Index}{Comparable}$. Associated conformance requirements are quite different from abstract conformances, which use the notation $\ConfReq{T}{P}$. An abstract conformance states that a type parameter is known to conform to a protocol in some \emph{generic} signature (possibly as a non-trivial consequence of other requirements), whereas an associated conformance requirement is a \emph{specific} requirement directly appearing in a protocol's \emph{requirement} signature.
+\paragraph{Notation.} In the type substitution algebra, we will write an associated conformance requirement as $\AssocConf{Self.Index}{Comparable}$. Associated conformance requirements are quite different from abstract conformances, which use the notation $\TP$. An abstract conformance states that a type parameter is known to conform to a protocol in some \emph{generic} signature (possibly as a non-trivial consequence of other requirements), whereas an associated conformance requirement is a \emph{specific} requirement directly appearing in a protocol's \emph{requirement} signature.
 
 \paragraph{Projection.}
 Projecting an associated conformance from a normal conformance can be understood as the action of an associated conformance requirement (from a protocol's requirement signature) on the left of a normal conformance (to this protocol):
@@ -495,13 +495,13 @@ Projecting an associated conformance from a normal conformance can be understood
 
 With a specialized conformance, we do the same thing as when getting a type witness; first, we get the associated conformance from the underlying normal conformance, and then we apply the conformance substitution map:
 \begin{gather*}
-\AssocConf{Self.U}{Q}\otimes\ConfReq{T}{P}\\
+\AssocConf{Self.U}{Q}\otimes\TP\\
 \qquad {} = \AssocConf{Self.U}{Q}\otimes\bigl(\NormalConf\otimes\Sigma\bigr)\\
 \qquad {} = \bigl(\AssocConf{Self.U}{Q}\otimes\NormalConf\bigr)\otimes\Sigma
 \end{gather*}
 Now we can project associated conformances from normal conformances and specialized conformances. Last but not least, we need to define associated conformance projection from an abstract conformance. Just as the type witnesses of an abstract conformance are dependent member types, associated conformances of abstract conformances are other abstract conformances. In \SecRef{conformance paths exist}, we will show that \emph{all} abstract conformances can be defined this way:
 \[
-\AssocConf{Self.U}{Q} \otimes \ConfReq{T}{P} = \ConfReq{T.U}{Q}
+\AssocConf{Self.U}{Q} \otimes \TP = \ConfReq{T.U}{Q}
 \]
 
 If we define \IndexSetDefinition{assocconf}{\AssocConfObj{P}}$\AssocConfObj{P}$ as the set of all associated conformance requirements in a protocol \texttt{P}, then we get a new ``overload'' of the \index{$\otimes$}$\otimes$ \index{binary operation}binary operation:

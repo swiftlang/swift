@@ -14,6 +14,7 @@
 
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
@@ -21,14 +22,14 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 
@@ -445,14 +446,6 @@ static BuiltinInst *getEndAsyncLet(BuiltinInst *startAsyncLet) {
 /// a closure is used by \p closureUser.
 static void insertAfterClosureUser(SILInstruction *closureUser,
                                    function_ref<void(SILBuilder &)> insertFn) {
-  // Don't insert any destroy or deallocation right before an unreachable.
-  // It's not needed an will only add up to code size.
-  auto insertAtNonUnreachable = [&](SILBuilder &builder) {
-    if (isa<UnreachableInst>(builder.getInsertionPoint()))
-      return;
-    insertFn(builder);
-  };
-
   {
     SILInstruction *userForBorrow = closureUser;
     if (auto *m = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(userForBorrow))
@@ -468,7 +461,7 @@ static void insertAfterClosureUser(SILInstruction *closureUser,
 
       for (auto eb : endBorrows) {
         SILBuilderWithScope builder(std::next(eb->getIterator()));
-        insertAtNonUnreachable(builder);
+        insertFn(builder);
       }
       return;
     }
@@ -479,12 +472,12 @@ static void insertAfterClosureUser(SILInstruction *closureUser,
     if (!endAsyncLet)
       return;
     SILBuilderWithScope builder(std::next(endAsyncLet->getIterator()));
-    insertAtNonUnreachable(builder);
+    insertFn(builder);
     return;
   }
   FullApplySite fas = FullApplySite::isa(closureUser);
   assert(fas);
-  fas.insertAfterApplication(insertAtNonUnreachable);
+  fas.insertAfterApplication(insertFn);
 }
 
 static SILValue skipConvert(SILValue v) {
@@ -892,7 +885,8 @@ static SILValue tryRewriteToPartialApplyStack(
         if (!origUse->getUser()->mayWriteToMemory()) {
           return true;
         }
-        if (closureLiveness.isWithinBoundary(origUse->getUser())) {
+        if (closureLiveness.isWithinBoundary(origUse->getUser(),
+                                             /*deadEndBlocks=*/nullptr)) {
           origIsUnmodifiedDuringClosureLifetime = false;
           LLVM_DEBUG(llvm::dbgs() << "-- original has other possibly writing "
                                      "use during closure lifetime\n";
@@ -999,6 +993,7 @@ static SILValue tryRewriteToPartialApplyStack(
 
 static bool tryExtendLifetimeToLastUse(
     ConvertEscapeToNoEscapeInst *cvt, DominanceAnalysis *dominanceAnalysis,
+    DeadEndBlocksAnalysis *deadEndBlocksAnalysis,
     llvm::DenseMap<SILInstruction *, SILInstruction *> &memoized,
     llvm::DenseSet<SILBasicBlock *> &unreachableBlocks,
     InstructionDeleter &deleter, const bool &modifiedCFG) {
@@ -1047,10 +1042,22 @@ static bool tryExtendLifetimeToLastUse(
   cvt->setLifetimeGuaranteed();
   cvt->setOperand(closureCopy);
 
-  insertAfterClosureUser(singleUser, [closureCopy](SILBuilder &builder) {
-    auto loc = RegularLocation(builder.getInsertionPointLoc());
-    builder.createDestroyValue(loc, closureCopy);
-  });
+  auto *function = cvt->getFunction();
+  // The CFG may have been modified during this run, which would have made
+  // dead-end blocks analysis invalid.  Mark it invalid it now if that
+  // happened.  If the CFG hasn't been modified, this is a noop thanks to
+  // DeadEndBlocksAnalysis::shouldInvalidate.
+  deadEndBlocksAnalysis->invalidate(function,
+                                    analysisInvalidationKind(modifiedCFG));
+  auto *deadEndBlocks = deadEndBlocksAnalysis->get(function);
+
+  insertAfterClosureUser(
+      singleUser, [closureCopy, deadEndBlocks](SILBuilder &builder) {
+        auto loc = RegularLocation(builder.getInsertionPointLoc());
+        auto isDeadEnd = IsDeadEnd_t(
+            deadEndBlocks->isDeadEnd(builder.getInsertionPoint()->getParent()));
+        builder.createDestroyValue(loc, closureCopy, DontPoisonRefs, isDeadEnd);
+      });
   /*
   llvm::errs() << "after lifetime extension of\n";
   escapingClosure->dump();
@@ -1439,6 +1446,7 @@ static void computeUnreachableBlocks(
 
 static bool fixupClosureLifetimes(SILFunction &fn,
                                   DominanceAnalysis *dominanceAnalysis,
+                                  DeadEndBlocksAnalysis *deadEndBlocksAnalysis,
                                   bool &checkStackNesting, bool &modifiedCFG) {
   bool changed = false;
 
@@ -1475,7 +1483,8 @@ static bool fixupClosureLifetimes(SILFunction &fn,
         }
       }
 
-      if (tryExtendLifetimeToLastUse(cvt, dominanceAnalysis, memoizedQueries,
+      if (tryExtendLifetimeToLastUse(cvt, dominanceAnalysis,
+                                     deadEndBlocksAnalysis, memoizedQueries,
                                      unreachableBlocks, updater.getDeleter(),
                                      /*const*/ modifiedCFG)) {
         changed = true;
@@ -1515,9 +1524,11 @@ class ClosureLifetimeFixup : public SILFunctionTransform {
     bool modifiedCFG = false;
 
     auto *dominanceAnalysis = PM->getAnalysis<DominanceAnalysis>();
+    auto *deadEndBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
 
     if (fixupClosureLifetimes(*getFunction(), dominanceAnalysis,
-                              checkStackNesting, modifiedCFG)) {
+                              deadEndBlocksAnalysis, checkStackNesting,
+                              modifiedCFG)) {
       updateBorrowedFrom(getPassManager(), getFunction());
       if (checkStackNesting){
         modifiedCFG |=

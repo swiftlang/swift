@@ -148,8 +148,11 @@ std::string swift::importer::printClassTemplateSpecializationName(
         // Use import name here so builtin types such as "int" map to their
         // Swift equivalent ("CInt").
         if (arg.getKind() == clang::TemplateArgument::Type) {
-          auto ty = arg.getAsType().getTypePtr();
-          buffer << templateNamePrinter.Visit(ty);
+          auto ty = arg.getAsType();
+          buffer << templateNamePrinter.Visit(ty.getTypePtr());
+          if (ty.isConstQualified()) {
+            buffer << "_const";
+          }
           return;
         } else if (arg.getKind() == clang::TemplateArgument::Integral) {
           buffer << "_";

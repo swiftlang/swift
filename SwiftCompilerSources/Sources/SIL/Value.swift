@@ -198,9 +198,37 @@ extension Value {
     ProjectedValue(value: self, path: path)
   }
 
-  /// Returns a projected value, defined by this value and path containig a single field of `kind` and `index`.
+  /// Returns a projected value, defined by this value and path containing a single field of `kind` and `index`.
   public func at(_ kind: SmallProjectionPath.FieldKind, index: Int = 0) -> ProjectedValue {
     ProjectedValue(value: self, path: SmallProjectionPath(kind, index: index))
+  }
+
+  /// Projects all "contained" addresses of this value.
+  ///
+  /// If this value is an address, projects all sub-fields of the address, e.g. struct fields.
+  ///
+  /// If this value is not an address, projects all "interior" pointers of the value:
+  /// If this value is a class, "interior" pointer means: an address of any stored property of the class instance.
+  /// If this value is a struct or another value type, "interior" pointers refer to any stored propery addresses of
+  /// any class references in the struct or value type. For example:
+  ///
+  /// class C { var x: Int; var y: Int }
+  /// struct S { var c1: C; var c2: C }
+  /// let s: S
+  ///
+  /// `s.allContainedAddresss` refers to `s.c1.x`, `s.c1.y`, `s.c2.x` and `s.c2.y`
+  ///
+  public var allContainedAddresss: ProjectedValue {
+    if type.isAddress {
+      // This is the regular case: the path selects any sub-fields of an address.
+      return at(SmallProjectionPath(.anyValueFields))
+    }
+    if type.isClass {
+      // If the value is a (non-address) reference it means: all addresses within the class instance.
+      return at(SmallProjectionPath(.anyValueFields).push(.anyClassField))
+    }
+    // Any other non-address value means: all addresses of any referenced class instances within the value.
+    return at(SmallProjectionPath(.anyValueFields).push(.anyClassField).push(.anyValueFields))
   }
 }
 

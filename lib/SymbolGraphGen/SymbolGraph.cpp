@@ -725,11 +725,17 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
     // Special cases below.
 
     // If we've been asked to skip protocol implementations, filter them out here.
-    if (Walker.Options.SkipProtocolImplementations && getProtocolRequirement(VD)) {
-      // Allow them to stay if they have their own doc comment
-      const auto *DocCommentProvidingDecl = getDocCommentProvidingDecl(VD);
-      if (DocCommentProvidingDecl != VD)
-        return true;
+    if (Walker.Options.SkipProtocolImplementations) {
+      if (const auto *ProtocolRequirement = getProtocolRequirement(VD)) {
+        if (const auto *Protocol = ProtocolRequirement->getDeclContext()->getSelfProtocolDecl()) {
+          if (!Protocol->hasUnderscoredNaming()) {
+            // Allow them to stay if they have their own doc comment
+            const auto *DocCommentProvidingDecl = VD->getDocCommentProvidingDecl();
+            if (DocCommentProvidingDecl != VD)
+              return true;
+          }
+        }
+      }
     }
 
     // Symbols from exported-imported modules should only be included if they

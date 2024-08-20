@@ -193,8 +193,7 @@ extension UnownedJob: CustomStringConvertible {
 @available(SwiftStdlib 5.9, *)
 @available(*, deprecated, renamed: "ExecutorJob")
 @frozen
-@_moveOnly
-public struct Job: Sendable {
+public struct Job: Sendable, ~Copyable {
   internal var context: Builtin.Job
 
   @usableFromInline
@@ -262,8 +261,7 @@ extension Job {
 /// you don't generally interact with jobs directly.
 @available(SwiftStdlib 5.9, *)
 @frozen
-@_moveOnly
-public struct ExecutorJob: Sendable {
+public struct ExecutorJob: Sendable, ~Copyable {
   internal var context: Builtin.Job
 
   @usableFromInline
@@ -482,6 +480,7 @@ extension JobPriority: Comparable {
 /// without making other changes.
 @available(SwiftStdlib 5.1, *)
 @frozen
+@unsafe
 public struct UnsafeContinuation<T, E: Error>: Sendable {
   @usableFromInline internal var context: Builtin.RawUnsafeContinuation
 
@@ -685,6 +684,7 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
+@unsafe
 public func withUnsafeContinuation<T>(
   isolation: isolated (any Actor)? = #isolation,
   _ fn: (UnsafeContinuation<T, Never>) -> Void
@@ -721,6 +721,7 @@ public func withUnsafeContinuation<T>(
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
+@unsafe
 public func withUnsafeThrowingContinuation<T>(
   isolation: isolated (any Actor)? = #isolation,
   _ fn: (UnsafeContinuation<T, Error>) -> Void

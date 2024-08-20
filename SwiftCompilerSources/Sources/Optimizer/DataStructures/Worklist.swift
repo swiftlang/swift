@@ -76,3 +76,21 @@ typealias BasicBlockWorklist = Worklist<BasicBlockSet>
 typealias InstructionWorklist = Worklist<InstructionSet>
 typealias ValueWorklist = Worklist<ValueSet>
 typealias OperandWorklist = Worklist<OperandSet>
+
+extension InstructionWorklist {
+  mutating func pushPredecessors(of inst: Instruction, ignoring ignoreInst: SingleValueInstruction) {
+    if let prev = inst.previous {
+      if prev != ignoreInst {
+        pushIfNotVisited(prev)
+      }
+    } else {
+      for predBlock in inst.parentBlock.predecessors {
+        let termInst = predBlock.terminator
+        if termInst != ignoreInst {
+          pushIfNotVisited(termInst)
+        }
+      }
+    }
+  }
+}
+

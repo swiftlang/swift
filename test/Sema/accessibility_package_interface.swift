@@ -5,7 +5,7 @@
 // RUN:   -module-name Utils -swift-version 5 -I %t \
 // RUN:   -package-name swift-utils.log \
 // RUN:   -enable-library-evolution \
-// RUN:   -emit-module-path %t/Utils.swiftmodule \
+// RUN:   -disable-print-package-name-for-non-package-interface \
 // RUN:   -emit-module-interface-path %t/Utils.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/Utils.private.swiftinterface
 
@@ -18,7 +18,6 @@
 // CHECK-PUBLIC-UTILS-NOT: package class PackageKlass
 // CHECK-PUBLIC-UTILS-NOT: package var pkgVar
 // CHECK-PUBLIC-UTILS: -module-name Utils
-// CHECK-PUBLIC-UTILS: -package-name swift-utils.log
 // CHECK-PUBLIC-UTILS: public func publicFunc()
 // CHECK-PUBLIC-UTILS: @usableFromInline
 // CHECK-PUBLIC-UTILS: package func ufiPackageFunc()
@@ -39,7 +38,6 @@
 // CHECK-PRIVATE-UTILS-NOT: package class PackageKlass
 // CHECK-PRIVATE-UTILS-NOT: package var pkgVar
 // CHECK-PRIVATE-UTILS: -module-name Utils
-// CHECK-PRIVATE-UTILS: -package-name swift-utils.log
 // CHECK-PRIVATE-UTILS: public func publicFunc()
 // CHECK-PRIVATE-UTILS: @usableFromInline
 // CHECK-PRIVATE-UTILS: package func ufiPackageFunc()
@@ -51,20 +49,19 @@
 // CHECK-PRIVATE-UTILS: @usableFromInline
 // CHECK-PRIVATE-UTILS: package var ufiPkgVar
 
+// RUN: %target-swift-frontend -compile-module-from-interface %t/Utils.private.swiftinterface  -module-name Utils -I %t -o %t/Utils.swiftmodule
+
 // RUN: %target-swift-frontend -emit-module %t/Client.swift \
 // RUN:   -module-name Client -swift-version 5 -I %t \
 // RUN:   -package-name swift-utils.log \
 // RUN:   -enable-library-evolution \
+// RUN:   -disable-print-package-name-for-non-package-interface \
 // RUN:   -emit-module-path %t/Client.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Client.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/Client.private.swiftinterface
 
-// RUN: rm -rf %t/Utils.swiftmodule
-// RUN: rm -rf %t/Client.swiftmodule
-
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface) -I %t -verify
 // RUN: %FileCheck %s --check-prefix=CHECK-PUBLIC-CLIENT < %t/Client.swiftinterface
-// CHECK-PUBLIC-CLIENT: -package-name swift-utils.log
 // CHECK-PUBLIC-CLIENT: @inlinable public func clientFunc()
 // CHECK-PUBLIC-CLIENT: publicFunc()
 // CHECK-PUBLIC-CLIENT: ufiPackageFunc()
@@ -113,6 +110,7 @@ import Utils
 @inlinable public func clientFunc() -> String {
   publicFunc()
   ufiPackageFunc()
+//  return UfiPackageKlass().ufiPkgVar
   let u = UfiPackageKlass()
   return u.ufiPkgVar
 }

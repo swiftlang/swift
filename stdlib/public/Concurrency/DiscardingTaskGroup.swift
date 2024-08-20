@@ -52,7 +52,7 @@ import Swift
 /// If you call `addTask(priority:operation:)` to create a new task in a canceled group,
 /// that task is immediately canceled after creation.
 /// Alternatively, you can call `asyncUnlessCancelled(priority:operation:)`,
-/// which doesn't create the task if the group has already been canceled
+/// which doesn't create the task if the group has already been canceled.
 /// Choosing between these two functions
 /// lets you control how to react to cancellation within a group:
 /// some child tasks need to run regardless of cancellation,
@@ -66,7 +66,7 @@ import Swift
 /// For tasks that need to handle cancellation by throwing an error,
 /// use the `withThrowingDiscardingTaskGroup(returning:body:)` method instead.
 ///
-/// - SeeAlso: ``withThrowingDiscardingTaskGroup(returning:body:)
+/// - SeeAlso: ``withThrowingDiscardingTaskGroup(returning:body:)``
 @available(SwiftStdlib 5.9, *)
 @backDeployed(before: SwiftStdlib 6.0)
 @inlinable
@@ -90,11 +90,16 @@ public func withDiscardingTaskGroup<GroupResult>(
   return result
 }
 
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+//
+// This function also doubles as an ABI-compatibility shim predating the
+// introduction of #isolation.
 @available(SwiftStdlib 5.9, *)
-@usableFromInline
 @_unsafeInheritExecutor // for ABI compatibility
 @_silgen_name("$ss23withDiscardingTaskGroup9returning4bodyxxm_xs0bcD0VzYaXEtYalF")
-internal func __abi_withDiscardingTaskGroup<GroupResult>(
+public func _unsafeInheritExecutor_withDiscardingTaskGroup<GroupResult>(
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout DiscardingTaskGroup) async -> GroupResult
 ) async -> GroupResult {
@@ -545,7 +550,7 @@ extension DiscardingTaskGroup: Sendable { }
 /// If you call `addTask(priority:operation:)` to create a new task in a canceled group,
 /// that task is immediately canceled after creation.
 /// Alternatively, you can call `asyncUnlessCancelled(priority:operation:)`,
-/// which doesn't create the task if the group has already been canceled
+/// which doesn't create the task if the group has already been canceled.
 /// Choosing between these two functions
 /// lets you control how to react to cancellation within a group:
 /// some child tasks need to run regardless of cancellation,
@@ -637,10 +642,9 @@ public func withThrowingDiscardingTaskGroup<GroupResult>(
 }
 
 @available(SwiftStdlib 5.9, *)
-@usableFromInline
 @_unsafeInheritExecutor // for ABI compatibility
 @_silgen_name("$ss31withThrowingDiscardingTaskGroup9returning4bodyxxm_xs0bcdE0Vys5Error_pGzYaKXEtYaKlF")
-internal func __abi_withThrowingDiscardingTaskGroup<GroupResult>(
+public func _unsafeInheritExecutor_withThrowingDiscardingTaskGroup<GroupResult>(
     returning returnType: GroupResult.Type = GroupResult.self,
     body: (inout ThrowingDiscardingTaskGroup<Error>) async throws -> GroupResult
 ) async throws -> GroupResult {
@@ -709,7 +713,7 @@ internal func __abi_withThrowingDiscardingTaskGroup<GroupResult>(
 /// however a discarding group cannot poll child tasks for results and therefore assumes that child
 /// task throws are an indication of a group wide failure. In order to avoid such behavior,
 /// use a ``DiscardingTaskGroup`` instead of a throwing one, or catch specific errors in
-/// operations submitted using `addTask`
+/// operations submitted using `addTask`.
 ///
 /// Since a `ThrowingDiscardingTaskGroup` is a structured concurrency primitive, cancellation is
 /// automatically propagated through all of its child-tasks (and their child

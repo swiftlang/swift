@@ -860,7 +860,7 @@ namespace swift::test {
 // Dumps:
 // - function after value canonicalization
 static FunctionTest CanonicalizeBorrowScopeTest(
-    "canonicalize-borrow-scope",
+    "canonicalize_borrow_scope",
     [](auto &function, auto &arguments, auto &test) {
       auto value = arguments.takeValue();
       auto borrowedValue = BorrowedValue(value);

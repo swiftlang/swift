@@ -217,6 +217,7 @@ class MainActorPreconcurrency {}
 class InferMainActorPreconcurrency: MainActorPreconcurrency {
   static func predatesConcurrency() {}
   // expected-note@-1 {{calls to static method 'predatesConcurrency()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2 {{main actor isolation inferred from inheritance from class 'MainActorPreconcurrency'}}
 }
 
 nonisolated func blah() {
@@ -299,6 +300,36 @@ do {
     override var test4: (((any Sendable)?) -> Void)? {
       // expected-warning@-1 {{declaration 'test4' has a type with different sendability from any potential overrides; this is an error in the Swift 6 language mode}}
       nil
+    }
+  }
+}
+
+// rdar://132700409 - coercion PartialKeyPath & Sendable -> PartialKeyPath crashes in CSApply
+do {
+  struct Test {
+    enum KeyPath {
+      static var member: PartialKeyPath<Test> {
+        fatalError()
+      }
+    }
+  }
+
+  struct KeyPathComparator<Compared> {
+    @preconcurrency public let keyPath: any PartialKeyPath<Compared> & Sendable
+
+    func testDirect() {
+      switch keyPath { // Ok
+      case Test.KeyPath.member: break // Ok
+      default: break
+      }
+    }
+
+    func testErasure() {
+      let kp: PartialKeyPath<Compared> = keyPath
+      switch kp { // Ok
+      case Test.KeyPath.member: break // Ok
+      default: break
+      }
     }
   }
 }

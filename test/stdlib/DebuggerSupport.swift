@@ -101,7 +101,7 @@ StringForPrintObjectTests.test("DontBridgeThisStruct") {
 }
 #endif
 
-if #available(SwiftStdlib 6.0, *) {
+if #available(SwiftStdlib 6.1, *) {
   StringForPrintObjectTests.test("String") {
     let printed = _stringForPrintObject("hello\nworld")
     expectEqual(printed, "hello\nworld\n")

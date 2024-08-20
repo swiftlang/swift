@@ -98,6 +98,7 @@ public:
 private:
   llvm::SourceMgr LLVMSourceMgr;
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem;
+  bool OpenSourcesAsVolatile = false;
   unsigned IDEInspectionTargetBufferID = 0U;
   unsigned IDEInspectionTargetOffset;
 
@@ -168,6 +169,12 @@ public:
 
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem() const {
     return FileSystem;
+  }
+
+  // Setting this prevents SourceManager from memory mapping sources (via opening files
+  // with isVolatile=true);
+  void setOpenSourcesAsVolatile() {
+    OpenSourcesAsVolatile = true;
   }
 
   void setIDEInspectionTarget(unsigned BufferID, unsigned Offset) {

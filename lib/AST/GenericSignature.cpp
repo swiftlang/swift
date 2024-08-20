@@ -600,11 +600,11 @@ Type GenericSignatureImpl::getSugaredType(Type type) const {
   if (!type->hasTypeParameter())
     return type;
 
-  return type.transform([this](Type Ty) -> Type {
-    if (auto GP = dyn_cast<GenericTypeParamType>(Ty.getPointer())) {
+  return type.transformRec([this](TypeBase *Ty) -> std::optional<Type> {
+    if (auto GP = dyn_cast<GenericTypeParamType>(Ty)) {
       return Type(getSugaredType(GP));
     }
-    return Ty;
+    return std::nullopt;
   });
 }
 
@@ -936,6 +936,7 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
           llvm::errs() << "\n";
           dumpAndAbort();
         }
+
         if (compareDependentTypes(firstType, secondType) >= 0) {
           llvm::errs() << "Out-of-order type parameters: ";
           reqt.dump(llvm::errs());
@@ -1081,8 +1082,10 @@ static Requirement stripBoundDependentMemberTypes(Requirement req) {
   case RequirementKind::Superclass:
   case RequirementKind::SameType:
     return Requirement(req.getKind(), subjectType,
-                       req.getSecondType().transform([](Type t) {
-                         return stripBoundDependentMemberTypes(t);
+                       req.getSecondType().transformRec([](Type t) -> std::optional<Type> {
+                         if (t->isTypeParameter())
+                           return stripBoundDependentMemberTypes(t);
+                         return std::nullopt;
                        }));
 
   case RequirementKind::Layout:

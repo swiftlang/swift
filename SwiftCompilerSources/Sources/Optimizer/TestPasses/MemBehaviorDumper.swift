@@ -27,7 +27,7 @@ let memBehaviorDumper = FunctionPass(name: "dump-mem-behavior") {
 
     for value in values where value.definingInstruction != inst {
 
-      if value.type.isAddress || value is AddressToPointerInst {
+      if value.type.isAddress {
         let read = inst.mayRead(fromAddress: value, aliasAnalysis)
         let write = inst.mayWrite(toAddress: value, aliasAnalysis)
         print("PAIR #\(currentPair).")
@@ -57,21 +57,22 @@ private extension Function {
 private extension Instruction {
   var shouldTest: Bool {
     switch self {
-    case is ApplyInst,
-         is TryApplyInst,
+    case is ApplySite,
          is EndApplyInst,
-         is BeginApplyInst,
          is AbortApplyInst,
          is BeginAccessInst,
          is EndAccessInst,
          is EndCOWMutationInst,
          is CopyValueInst,
          is DestroyValueInst,
+         is IsUniqueInst,
          is EndBorrowInst,
          is LoadInst,
+         is LoadBorrowInst,
          is StoreInst,
          is CopyAddrInst,
          is BuiltinInst,
+         is StoreBorrowInst,
          is DebugValueInst:
       return true
     default:

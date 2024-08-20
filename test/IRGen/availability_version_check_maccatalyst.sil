@@ -1,0 +1,40 @@
+// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// The builtin is turned into a call into the compiler-rt runtime
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$useTargetVariantBuiltin"()
+sil @$useTargetVariantBuiltin : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %major = integer_literal $Builtin.Int32, 13
+  %minor = integer_literal $Builtin.Int32, 0
+  %patch = integer_literal $Builtin.Int32, 0
+  %result = builtin "targetVariantOSVersionAtLeast" (%major: $Builtin.Int32, %minor: $Builtin.Int32, %patch: $Builtin.Int32) : $Builtin.Int32
+// 2 is the platform ID for iOS (the variant OS).
+// CHECK:  call i32 @__isPlatformVersionAtLeast(i32 2, i32 13, i32 0, i32 0)
+  return %result : $Builtin.Int32
+// CHECK-NEXT:   ret i32
+}
+
+// This is the builtin used in zippered code.
+// It is turned into a call into the compiler-rt runtime.
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$useZipperedBuiltin"()
+sil @$useZipperedBuiltin : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %major = integer_literal $Builtin.Int32, 10
+  %minor = integer_literal $Builtin.Int32, 15
+  %patch = integer_literal $Builtin.Int32, 1
+  %variantMajor = integer_literal $Builtin.Int32, 13
+  %variantMinor = integer_literal $Builtin.Int32, 1
+  %variantPatch = integer_literal $Builtin.Int32, 2
+  %result = builtin "targetOSVersionOrVariantOSVersionAtLeast" (%major: $Builtin.Int32, %minor: $Builtin.Int32, %patch: $Builtin.Int32, %variantMajor: $Builtin.Int32, %variantMinor: $Builtin.Int32, %variantPatch: $Builtin.Int32) : $Builtin.Int32
+// 1 is the platform ID for macOS.
+// 2 is the platform ID for iOS.
+// CHECK:  call i32 @__isPlatformOrVariantPlatformVersionAtLeast(i32 1, i32 10, i32 15, i32 1, i32 2, i32 13, i32 1, i32 2)
+  return %result : $Builtin.Int32
+// CHECK-NEXT:   ret i32
+}
+

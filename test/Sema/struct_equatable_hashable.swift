@@ -122,7 +122,7 @@ func structWithoutExplicitConformance() {
 
 // Structs with non-hashable/equatable stored properties don't derive conformance.
 struct NotHashable {}
-struct StructWithNonHashablePayload: Hashable { // expected-error 2 {{does not conform}}
+struct StructWithNonHashablePayload: Hashable { // expected-error 2 {{does not conform}} expected-note {{add stubs for conformance}}
   let a: NotHashable // expected-note {{stored property type 'NotHashable' does not conform to protocol 'Hashable', preventing synthesized conformance of 'StructWithNonHashablePayload' to 'Hashable'}}
   // expected-note@-1 {{stored property type 'NotHashable' does not conform to protocol 'Equatable', preventing synthesized conformance of 'StructWithNonHashablePayload' to 'Equatable'}}
 }
@@ -184,7 +184,7 @@ struct NotExplicitlyHashableAndCannotDerive {
   let v: NotHashable // expected-note {{stored property type 'NotHashable' does not conform to protocol 'Hashable', preventing synthesized conformance of 'NotExplicitlyHashableAndCannotDerive' to 'Hashable'}}
   // expected-note@-1 {{stored property type 'NotHashable' does not conform to protocol 'Equatable', preventing synthesized conformance of 'NotExplicitlyHashableAndCannotDerive' to 'Equatable'}}
 }
-extension NotExplicitlyHashableAndCannotDerive : Hashable {}  // expected-error 2 {{does not conform}}
+extension NotExplicitlyHashableAndCannotDerive : Hashable {}  // expected-error 2 {{does not conform}} expected-note {{add stubs for conformance}}
 
 // A struct with no stored properties trivially derives conformance.
 struct NoStoredProperties: Hashable {}
@@ -198,7 +198,7 @@ extension OtherFileNonconforming: Hashable {
   func hash(into hasher: inout Hasher) {}
 }
 // ...but synthesis in a type defined in another file doesn't work yet.
-extension YetOtherFileNonconforming: Equatable {} // expected-error {{extension outside of file declaring struct 'YetOtherFileNonconforming' prevents automatic synthesis of '==' for protocol 'Equatable'}}
+extension YetOtherFileNonconforming: Equatable {} // expected-error {{extension outside of file declaring struct 'YetOtherFileNonconforming' prevents automatic synthesis of '==' for protocol 'Equatable'}} expected-note {{add stubs for conformance}}
 
 // Verify that we can add Hashable conformance in an extension by only
 // implementing hash(into:)
@@ -242,6 +242,7 @@ struct BadGenericDeriveExtension<T> {
 }
 extension BadGenericDeriveExtension: Equatable {}
 // expected-error@-1 {{type 'BadGenericDeriveExtension<T>' does not conform to protocol 'Equatable'}}
+// expected-note@-2 {{add stubs for conformance}}
 extension BadGenericDeriveExtension: Hashable where T: Equatable {}
 // expected-error@-1 {{type 'BadGenericDeriveExtension' does not conform to protocol 'Hashable'}}
 
@@ -256,6 +257,7 @@ extension UnusedGenericDeriveExtension: Hashable {}
 // Cross-file synthesis is still disallowed for conditional cases
 extension GenericOtherFileNonconforming: Equatable where T: Equatable {}
 // expected-error@-1{{extension outside of file declaring generic struct 'GenericOtherFileNonconforming' prevents automatic synthesis of '==' for protocol 'Equatable'}}
+// expected-note@-2 {{add stubs for conformance}}
 
 // rdar://problem/41852654
 

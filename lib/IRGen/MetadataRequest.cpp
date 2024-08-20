@@ -37,6 +37,7 @@
 #include "IRGenModule.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -517,11 +518,11 @@ static llvm::Value *emitObjCMetadataRef(IRGenFunction &IGF,
 CanType IRGenModule::getRuntimeReifiedType(CanType type) {
   // Leave type-erased ObjC generics with their generic arguments unbound, since
   // the arguments do not exist at runtime.
-  return CanType(type.transform([&](Type t) -> Type {
+  return CanType(type.transformRec([&](TypeBase *t) -> std::optional<Type> {
     if (CanType(t).isTypeErasedGenericClassType()) {
       return t->getAnyNominal()->getDeclaredType()->getCanonicalType();
     }
-    return t;
+    return std::nullopt;
   }));
 }
 
@@ -1421,8 +1422,7 @@ getFunctionTypeFlags(CanFunctionType type) {
       // protocols.
       auto proto =
         type->getASTContext().getProtocol(KnownProtocolKind::Copyable);
-      if (proto &&
-          ModuleDecl::lookupConformance(type, proto).isInvalid())
+      if (proto && lookupConformance(type, proto).isInvalid())
         InvertedProtocols.insert(invertibleKind);
       break;
     }

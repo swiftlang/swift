@@ -2,416 +2,740 @@
 
 \begin{document}
 
-\chapter{Symbols, Terms and Rules}\label{symbols terms rules}
+\chapter{Symbols, Terms, and Rules}\label{symbols terms rules}
 
 \IndexDefinition{rewrite system!in requirement machine}%
 \index{finitely-presented monoid}%
-\lettrine{H}{aving introduced} finitely-presented monoids and rewrite systems, we now move on from theory to practice. Our ultimate goal is to implement generic signature queries and requirement minimization on top of a rewrite system, and in this chapter we will describe the actual rewrite system used by the Swift generics implementation. We begin with the concrete representations of symbols, terms and rules. Then, we show how type parameters and generic requirements translate to terms and rules.
+\lettrine{O}{ur motivation} for encoding a finitely-presented monoid as a generic signature was theoretical---it gave us interesting test cases, and showed that there are limits to what we can accept. In comparison, the encoding of a generic signature as a finitely-presented monoid is an eminently practical matter---it solves generic signature queries. As with the derived requirements formalism in \SecRef{derived req}, we gradually reveal the full encoding. We begin with the core Swift generics model: \index{unbound type parameter}unbound type parameters, conformance requirements, and same-type requirements between type parameters. After we prove that the core model is correct, we will extend it to cover bound type parameters, and also layout, superclass, and concrete type requirements.
 
-Type parameters map to terms; we call them type-like terms.
-\begin{quote}
+\paragraph{Core model.}
+Let $G$ be a \index{generic signature}generic signature. We recall from \SecRef{protocol component} that if~\tP\ is some protocol, then $G\prec\tP$ means that $G$ \index{protocol dependency set}depends on~\tP. We now introduce a certain monoid presentation~$\AR$, called the \emph{requirement machine} for~$G$.
+
+We take our ``chewy'' recursive inputs---\index{type parameter}type parameters, conformance requirements, and same-type requirements---and cook them until the ``connective tissue'' breaks down. This yields a finite alphabet~$A$ where each \index{symbol!in requirement machine}symbol is one of the three kinds below:
+\begin{center}
 \begin{tabular}{lll}
 \toprule
-&\textbf{Type parameter}&\textbf{Term}\\
-\midrule
-in protocol \texttt{P}:&\texttt{Self}&$\protosym{P}$\\
-&\texttt{Self.A.B}&$\protosym{P}.\texttt{A}.\texttt{B}$\\
-&\texttt{Self.[P]A.[Q]B}&$\assocsym{P}{A}.\assocsym{Q}{B}$\\
-\midrule
-in generic signature:&\ttgp{0}{1}&$\ttgp{0}{1}$\\
-&\texttt{\ttgp{0}{1}.A}&$\ttgp{0}{1}.\texttt{A}$\\
-&\texttt{\ttgp{0}{1}.[P]A}&$\ttgp{0}{1}.\assocsym{P}{A}$\\
+$\ttgp{d}{i}$ & \index{generic parameter symbol}Generic parameter symbol& for some $d$, $i\in\NN$\\
+\texttt{A} & \index{name symbol}Name symbol& for some identifier \texttt{A}\\
+$\pP$ & \index{protocol symbol}Protocol symbol& for some \tP\ such that $G\prec\tP$\\
 \bottomrule
 \end{tabular}
-\end{quote}
+\end{center}
 
-blah blah blah
-\begin{quote}
-\begin{tabular}{lll}
+To get~$R$, we define a ``$\Term$'' function to translate a type parameter of~$G$ into a \index{term!in requirement machine}term, and a ``$\Rule$'' function to translate each \index{explicit requirement}explicit requirement of~$G$ into a \index{rewrite rule!in requirement machine}rewrite rule:
+\begin{center}
+\begin{tabular}{l@{ $:=$ }l}
 \toprule
-&\textbf{Requirement}&\textbf{Rule}\\
-\midrule
-conformance: &$\ConfReq{T}{P}$&$t.\protosym{P}\Rightarrow t$\\
-layout: &$\ConfReq{T}{AnyObject}$&$t.\layoutsym{AnyObject}\Rightarrow t$\\
-superclass: &$\ConfReq{T}{C}$&$t.\supersym{\texttt{C}}\Rightarrow t$\\
-concrete type: &$\SameReq{T}{C}$&$t.\concretesym{\texttt{C}}\Rightarrow t$\\
-same-type: &$\SameReq{T}{U}$&$u\Rightarrow t$ (if $t<u$)\\
-&&$t\Rightarrow u$ (if $u<t$)\\
+$\Term(\ttgp{d}{i})$&$\ttgp{d}{i}$\\
+$\Term(\texttt{U.A})$&$\Term(\tU)\cdot\texttt{A}$\\
 \bottomrule
 \end{tabular}
-\end{quote}
+\qquad
+\begin{tabular}{l@{ $:=$ }l}
+\toprule
+\index{conformance requirement!in requirement machine}$\Rule\, \TP$&$\Term(\tT)\cdot\pP\sim\Term(\tT)$\\
+\index{same-type requirement!in requirement machine}$\Rule\, \TU$&$\Term(\tT)\sim\Term(\tU)$\\
+\bottomrule
+\end{tabular}
+\end{center}
+In addition, for each protocol \tP\ such that $G\prec\tP$, we define a ``$\TermP{P}$'' function to translate a \index{protocol generic signature!in requirement machine}type parameter of~$\GP$ into a term starting with $\pP$, and a ``$\RuleP{P}$'' function to translate each \index{associated requirement!in requirement machine}associated requirement of \tP\ into a rewrite rule, in a manner analogous to ``$\Rule$'':
+\begin{center}
+\begin{tabular}{l@{ $:=$ }l}
+\toprule
+$\TermP{P}(\tSelf)$&$\pP$\\
+$\TermP{P}(\texttt{V.A})$&$\TermP{P}(\tV)\cdot\texttt{A}$\\
+\bottomrule
+\end{tabular}
+\qquad
+\begin{tabular}{l@{ $:=$ }l}
+\toprule
+\index{associated conformance requirement!in requirement machine}$\RuleP{P}\, \ConfReq{U}{Q}_\tP$&$\TermP{P}(\tU)\cdot\protosym{Q}\sim\TermP{P}(\tU)$\\
+\index{associated same-type requirement!in requirement machine}$\RuleP{P}\, \SameReq{U}{V}_\tP$&$\TermP{P}(\tU)\sim\TermP{P}(\tV)$\\
+\bottomrule
+\end{tabular}
+\end{center}
+This completely describes a very remarkable object, where the \emph{derived requirements} of~$G$ are \emph{rewrite paths} in the requirement machine for~$G$.
 
-blah blah blah
+\begin{example}\label{rqm first example}
+Let $G$ be the generic signature below:
 \begin{quote}
-\begin{tabular}{lll}
+\begin{verbatim}
+<τ_0_0, τ_0_1 where τ_0_0: Sequence, τ_0_1: Sequence,
+                    τ_0_0.Element: Equatable,
+                    τ_0_0.Element == τ_0_1.Element>
+\end{verbatim}
+\end{quote}
+We met this signature in \ExRef{motivating derived reqs} and then studied it in \SecRef{derived req} and \SecRef{type params}. We will now construct its requirement machine.
+
+Our generic signature depends on \texttt{Sequence} and \texttt{IteratorProtocol}. Both declare an associated type named ``\texttt{Element}'', and \texttt{Sequence} also declares an associated type named ``\texttt{Iterator}''. Our alphabet has six symbols---two of each kind:
+\[ A := \{ \underbrace{\mathstrut\rT,\, \rU}_{\text{generic param}},\, \underbrace{\mathstrut\nElement,\, \nIterator}_{\text{name}},\, \underbrace{\mathstrut\pSequence,\, \pIterator}_{\text{protocol}} \} \]
+
+Here are the requirements of $G$ and \texttt{Sequence} that will define our rewrite rules:
+\begin{gather*}
+\ConfReq{\rT}{Sequence}\\
+\ConfReq{\rU}{Sequence}\\
+\ConfReq{\rT.Element}{Equatable}\\
+\SameReq{\rT.Element}{\rU.Element}\\[\medskipamount]
+\AssocConfReq{Self.Iterator}{IteratorProtocol}{Sequence}\\
+\AssocSameReq{Self.Element}{Self.Iterator.Element}{Sequence}
+\end{gather*}
+We build our set of rewrite rules~$R$ by applying ``$\Rule$'' or ``$\RuleP{P}$'' to each requirement:
+\begin{gather*}
+\ConfRule{\rT}{\pSequence} \tag{1} \\
+\ConfRule{\rU}{\pSequence} \tag{2} \\
+\ConfRule{\rT\cdot\nElement}{\protosym{Equatable}} \tag{3} \\
+\SameRule{\rT\cdot\nElement}{\rU\cdot\nElement}\tag{4} \\[\medskipamount]
+\ConfRule{\pSequence\cdot\nIterator}{\pIterator} \tag{5} \\
+\SameRule{\pSequence\cdot\nElement}{\pSequence\cdot\nIterator\cdot\nElement} \tag{6}
+\end{gather*}
+
+Note that ``$\Term$'' is just a flattening of the linked list structure of a type parameter into an array; the resulting term is a generic parameter symbol followed by zero or more name symbols. To distinguish the two representations, we separate the components of a type parameter with ``\texttt{.}'' as before, while terms join their symbols with the requirement machine \index{$\cdot$}\index{binary operation!in requirement machine}monoid operation ``\;$\cdot$\;''. The protocol variants ``$\TermP{P}$'' and ``$\RuleP{P}$'' are needed to encode the original protocol of each associated requirement. This is why ``$\TermP{P}$'' replaces \IndexSelf\tSelf\ with the protocol symbol $\pP$ instead of the generic parameter symbol~\rT.
+
+One more remark. Name symbols and protocol symbols exist in different namespaces, so even if we renamed \texttt{IteratorProtocol} to \texttt{Iterator}, the name symbol \texttt{Iterator} would remain distinct from the protocol symbol $\protosym{Iterator}$. On the other hand, two associated types with the same name in different protocols always define the \emph{same} name symbol.
+
+Now, let's continue with our example and think about the \index{term equivalence relation!in requirement machine}equivalence relation these rewrite rules generate. Notice how there is a certain symmetry behind the appearance of protocol symbols. The conformance requirements (1), (2), (3) and (5) rewrite a term that \emph{ends} in a protocol symbol. The associated requirements (5) and (6) rewrite a term that \emph{begins} with a protocol symbol. (The associated conformance requirement (5) is both; its left-hand side begins and ends with a protocol symbol.)
+
+We know that $G\vdash\SameReq{\rT.Iterator.Element}{\rU.Iterator.Element}$ from \ExRef{derived equiv example}, even though this requirement is not explicitly stated. Applied to this requirement, ``$\Rule$'' outputs this ordered pair of terms:
+\[ (\rT\cdot\nIterator\cdot\nElement,\, \rU\cdot\nIterator\cdot\nElement) \]
+Again, this is not an explicit requirement, so this is not one of the rules in~$R$. However, there is a rewrite path from the first term to the second; they're equivalent via $\sim_R$:
+\begin{gather*}
+(\rT\Rightarrow\rT\cdot\pSequence)\WR\nIterator\cdot\nElement\\
+{} \circ \rT\WL(\pSequence\cdot\nIterator\cdot\nElement\Rightarrow\pSequence\cdot\nElement)\\
+{} \circ (\rT\cdot\pSequence\Rightarrow\rT)\WR\nElement\\
+{} \circ (\rT\cdot\nElement\Rightarrow\rU\cdot\nElement)\\
+{} \circ (\rU\Rightarrow\rU\cdot\pSequence)\WR\nElement\\
+{} \circ \rU\WL(\pSequence\cdot\nElement\Rightarrow\pSequence\cdot\nIterator\cdot\nElement)\\
+{} \circ (\rU\cdot\pSequence\Rightarrow\rU)\WR\nIterator\cdot\nElement
+\end{gather*}
+We can also understand this by writing down the intermediate terms between every consecutive pair of rewrite steps. We use conformance requirements to insert and delete protocol symbols before and after invoking our associated same-type requirement:
+\begin{gather*}
+\rT\cdot\nIterator\cdot\nElement\\
+{} \sim \rT\cdot\pSequence\cdot\nIterator\cdot\nElement\\
+{} \sim \rT\cdot\pSequence\cdot\nElement\\
+{} \sim \rT\cdot\nElement\\
+{} \sim \rU\cdot\nElement\\
+{} \sim \rU\cdot\pSequence\cdot\nElement\\
+{} \sim \rU\cdot\pSequence\cdot\nIterator\cdot\nElement\\
+{} \sim \rU\cdot\nIterator\cdot\nElement
+\end{gather*}
+
+Now let's try with $G\vdash\ConfReq{\rT.Iterator}{IteratorProtocol}$. We apply ``$\Rule$'' to get an ordered pair of terms:
+\[
+(\rT\cdot\nIterator\cdot\pIterator,\,\rT\cdot\nIterator)
+\]
+To prove this equivalence, we make use of the conformance requirement~(1), and then the associated conformance requirement~(5):
+\begin{gather*}
+(\rT\Rightarrow\rT\cdot\pSequence)\WR\nIterator\cdot\pIterator\\
+{} \circ \rT\WL(\pSequence\cdot\nIterator\cdot\pIterator\!\Rightarrow\!\pSequence\cdot\nIterator)\\
+{} \circ (\rT\cdot\pSequence\Rightarrow\rT)\WR\nIterator
+\end{gather*}
+Once again, we can show the intermediate terms in our path:
+\begin{gather*}
+\rT\cdot\nIterator\cdot\pIterator\\
+{} \sim \rT\cdot\pSequence\cdot\nIterator\cdot\pIterator\\
+{} \sim \rT\cdot\pSequence\cdot\nIterator\\
+{} \sim \rT\cdot\nIterator
+\end{gather*}
+\end{example}
+
+\section{Correctness}
+
+We saw some examples of encoding derived requirements as word problems. We now make this precise. We prove two theorems, to establish that we can translate derivations into rewrite paths, and vice versa. We use the algebra of rewriting from \SecRef{rewrite graph}.
+
+We begin with a preliminary result. In \SecRef{derived req}, we defined the \IndexStep{AssocConf}\textsc{AssocConf} and \IndexStep{AssocConf}\textsc{AssocSame} inference rules via formal substitution: if \tT\ is some type parameter of~$G$ known to conform to some protocol~\tP, and \texttt{Self.U} is some type parameter of~$\GP$, then \texttt{T.U} denotes the replacement of \tSelf\ with \tT\ in \texttt{Self.U}. We can relate this to the requirement machine \index{monoid operation!in requirement machine}monoid operation.
+
+\begin{lemma}\label{type param composition lemma}
+Let $G$ be a generic signature, and let $\AR$ be the requirement machine for~$G$. Further, suppose that:
+\begin{enumerate}
+\item \tT\ is some type parameter of~$G$,
+\item \tP\ is some protocol, and $\Term(\tT)\cdot\pP\sim\Term(\tT)$,
+\item \texttt{Self.U} is some type parameter of~$\GP$. 
+\end{enumerate}
+Then $\Term(\tT)\cdot\TermP{P}(\texttt{Self.U}) \sim \Term(\texttt{T.U})$.
+\end{lemma}
+\begin{proof}
+Note that $\TermP{P}(\texttt{Self.U})=\pP\cdot u$ for some $u\in A^*$, by definition of ``$\TermP{P}$''. We also let $t := \Term(\texttt{T})$, so that $\Term(\texttt{T.U})=t\cdot u$. Now, if $p$ is a rewrite path from $t\cdot\pP$~to~$t$, then $p\WR u$ is a rewrite path from $t\cdot\pP\cdot u$~to~$t\cdot u$.
+\end{proof}
+
+\begin{example}
+In \ExRef{rqm first example}, we can see the second rewrite path in a new way:
+\begin{gather*}
+\Term(\texttt{\rT.Iterator})\cdot\pIterator\\
+{} \sim \Term(\rT) \cdot \TermP{Sequence}(\texttt{Self.Iterator}) \cdot \pIterator\\
+{} \sim \Term(\rT) \cdot \TermP{Sequence}(\texttt{Self.Iterator})\\
+{} \sim \Term(\texttt{\rT.Iterator})
+\end{gather*}
+\end{example}
+
+This idea of ``cleaving'' a term in two will be key in the inductive step of the below proof, when we consider the \textsc{AssocConf} and \textsc{AssocSame} inference rules.
+
+\newcommand{\Path}{\mathsf{path}\,}
+
+\begin{theorem}\label{derivation to path swift}
+Let $G$ be a generic signature, and let $\AR$ be the requirement machine for~$G$.
+\begin{enumerate}
+\item If $G\vdash\TP$ for some type parameter \tT\ and protocol \tP, then $\Term(\tT)\cdot\pP \sim \Term(\tT)$.
+\item If $G\vdash\TU$ for some pair of type parameters \tT\ and \tU, then $\Term(\tT) \sim \Term(\tU)$.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+We use \index{structural induction}structural induction on \index{derived requirement}derived requirements (\SecRef{generic signature validity}) to define a ``$\mathsf{path}$'' mapping that assigns to each derived requirement $G\vdash D$ a rewrite path~$p$ such that $\Rule(D)=(\Src(p),\,\Dst(p))$. The conclusion then follows.
+
+\BaseCase To handle the \index{elementary statement}elementary statements, and those inference rules that do not have any requirements among their assumptions, we construct a rewrite path directly.
+
+A \IndexStep{Conf}\textsc{Conf} step invokes an explicit conformance requirement of~$G$:
+\[\ConfStepDef\]
+Note that $\Rule\,\TP=(\Term(\tT)\cdot\pP,\,\Term(\tT))\in R$. The path is a single rewrite step:
+\[\Path \TP := (\Term(\tT)\cdot\pP \Rightarrow \Term(\tT))\]
+
+A \IndexStep{Same}\textsc{Same} step invokes an explicit same-type requirement of~$G$:
+\[\SameStepDef\]
+Note that $\Rule\,\TU=(\Term(\tT),\,\Term(\tU))\in R$. The path is a single rewrite step:
+\[\Path \TU := (\Term(\tT) \Rightarrow \Term(\tU))\]
+
+A \IndexStep{Reflex}\textsc{Reflex} step derives a trivial same-type requirement from a valid type parameter:
+\[\ReflexStepDef\]
+We don't need the fact that $G\vdash\tT$ at all, because in a finitely-presented monoid, every term is already equivalent to itself via the empty rewrite path, so we let $t := \Term(\tT)$, and we set:
+\[\Path \SameReq{T}{T} := 1_t\]
+
+\InductiveStep In each case, the ``$\mathsf{path}$'' of the conclusion is defined from the ``$\mathsf{path}$'' of the step's assumptions. For an \IndexStep{AssocConf}\textsc{AssocConf} step, the induction hypothesis gives us $p_1 := \Path\TP$, so $\Src(p_1)=\Term(\tT)\cdot\pP$ and $\Dst(p_1)=\Term(\tT)$:
+\[\AssocConfStepDef\]
+Note that $\RuleP{P}\,\AssocConfReq{Self.U}{Q}{P}\in R$ is of the form $(\pP\cdot u\cdot\pQ,\,\pP\cdot u)$ for some $u\in A^*$. Using \LemmaRef{type param composition lemma}, we insert a~$\pP$ in the right spot, apply our associated requirement, and then delete the~$\pP$. We let $t := \Term(\tT)$, let $s := (\pP \cdot u \cdot \pQ \Rightarrow \pP \cdot u)$, and we set:
+\[
+\Path \ConfReq{T.U}{Q} := (p_1^{-1} \WR u \WR \pQ)
+\circ
+(t \WL s)
+\circ
+(p_1 \WR u)
+\]
+
+For an \IndexStep{AssocSame}\textsc{AssocSame} step, the induction hypothesis gives us $p_1 := \Path \TP$:
+\[\AssocSameStepDef\]
+Note that $\RuleP{P}\,\AssocSameReq{Self.U}{Self.V}{P}\in R$ is of the form $(\pP\cdot u,\,\pP\cdot v)$ for some $u$, $v\in A^*$. Again, we use \LemmaRef{type param composition lemma}. We let $t := \Term(\tT)$, let $s := (\pP \cdot u \Rightarrow \pP \cdot v)$, and we set:
+\[
+\Path \SameReq{T.U}{T.V} := (p_1^{-1} \WR u)
+\circ
+(t \WL s)
+\circ
+(p_1 \WR v)
+\]
+
+For a \IndexStep{Sym}\textsc{Sym} or \IndexStep{Trans}\textsc{Trans} step, we use the \index{rewrite rewrite path!in requirement machine}rewrite path inverse and \index{rewrite path composition!in requirement machine}composition operations:
+\begin{gather*}
+\SymStepDef\\
+\TransStepDef\\[\medskipamount]
+\Path\SameReq{U}{T} := \Path\TU^{-1}\\
+\Path\SameReq{T}{V} := \Path\TU \circ \Path\SameReq{U}{V}
+\end{gather*}
+
+For a \IndexStep{SameConf}\textsc{SameConf} step, the induction hypothesis gives us a pair of rewrite paths $p_1 := \Path \ConfReq{U}{P}$, and $p_2 := \Path \TU$:
+\[\SameConfStepDef\]
+We rewrite $\Term(\tT)\cdot\pP$ into $\Term(\tU)\cdot\pP$ using $p_2$, delete $\pP$ from the end of the term using $p_1$, and rewrite $\Term(\tU)$ back to $\Term(\tT)$ using $p_2$ again:
+\[
+\Path \TP := (p_2 \WR \pP) \circ p_1 \circ p_2^{-1}
+\]
+
+For a \IndexStep{SameName}\textsc{SameName} step, the induction hypothesis gives us $p_1 := \Path \ConfReq{U}{P}$, and $p_2 := \TU$:
+\[\SameNameStepDef\]
+We only need $p_2$ to construct our new rewrite path, by \index{rewrite path whiskering!in requirement machine}whiskering:
+\[
+\Path\SameReq{T.A}{U.A} := p_2 \WR \nA
+\]
+
+By induction, this completely defines ``$\mathsf{path}$'', so we apply it to our original requirement and get the desired result. \FigRef{derivation to path figure} \index{rewrite graph!in requirement machine}shows each rewrite path we constructed.
+\end{proof}
+
+\begin{figure}\captionabove{Rewrite paths defined by \ThmRef{derivation to path swift}, as paths in the rewrite graph}\label{derivation to path figure}
+\centering
+
+\begin{tabular}{cc}
 \toprule
-&\textbf{Declaration}&\textbf{Rule}\\
+&{\textsc{Conf:}}\\
+$\TP$&
+\begin{tikzcd}
+\Term(\tT)\cdot\pP \arrow [r, Rightarrow]
+&
+\Term(\tT)
+\end{tikzcd}\\
 \midrule
-identity conformance:&\texttt{protocol P}&$\protosym{P}.\protosym{P}\Rightarrow\protosym{P}$\\
-in protocol \texttt{P}:&\texttt{associatedtype A}&$\protosym{P}.\texttt{A}\Rightarrow\assocsym{P}{A}$\\
+&{\textsc{Same:}}\\
+$\TU$&
+\begin{tikzcd}
+\Term(\tT) \arrow [r, Rightarrow]
+&
+\Term(\tU)
+\end{tikzcd}\\
+\midrule
+&{\textsc{Reflex:}}\\
+$\SameReq{T}{T}$&
+\begin{tikzcd}
+\Term(\tT)
+\end{tikzcd}\\
+\midrule
+&{\textsc{AssocConf:}}\\
+$\ConfReq{T.U}{Q}$&
+\begin{tikzcd}
+\Term(\texttt{T.U})\cdot\pQ \arrow [rr, Rightarrow, "\cdots" description]
+&&
+\Term(\tT) \cdot \TermP{P}(\texttt{Self.U}) \cdot \pQ \arrow [d, Rightarrow]
+\\
+\Term(\texttt{T.U})
+&&
+\Term(\tT) \cdot \TermP{P}(\texttt{Self.U}) \arrow [ll, Rightarrow, "\cdots" description]
+\end{tikzcd}
+\\
+\midrule
+&{\textsc{AssocSame:}}\\
+$\SameReq{T.U}{T.V}$&
+\begin{tikzcd}
+\Term(\texttt{T.U}) \arrow [rr, Rightarrow, "\cdots" description]
+&&
+\Term(\tT) \cdot \TermP{P}(\texttt{Self.U}) \arrow [d, Rightarrow]
+\\
+\Term(\texttt{T.V})
+&&
+\Term(\tT) \cdot \TermP{P}(\texttt{Self.V}) \arrow [ll, Rightarrow, "\cdots" description]
+\end{tikzcd}\\
+\midrule
+&{\textsc{Sym:}}\\
+$\SameReq{U}{T}$&
+\begin{tikzcd}
+\Term(\tT)
+&&
+\Term(\tU) \arrow [ll, Rightarrow, "\cdots" description]
+\end{tikzcd}\\
+\midrule
+&{\textsc{Trans:}}\\
+$\SameReq{T}{V}$&
+\begin{tikzcd}
+\Term(\tT) \arrow [rr, Rightarrow, "\cdots" description]
+&&
+\Term(\tU) \arrow [rr, Rightarrow, "\cdots" description]
+&&
+\Term(\tV)
+\end{tikzcd}\\
+\midrule
+&{\textsc{SameConf:}}\\
+$\TP$&
+\begin{tikzcd}
+\Term(\tT) \cdot \pP \arrow [rr, Rightarrow, "\cdots" description]
+&&
+\Term(\tU) \cdot \pP \arrow [dd, Rightarrow, "\cdots" description]
+\\\\
+\Term(\tT)
+&&
+\Term(\tU) \arrow [ll, Rightarrow, "\cdots" description]
+\end{tikzcd}\\
+\midrule
+&{\textsc{SameName:}}\\
+$\SameReq{T.A}{U.A}$&\begin{tikzcd}
+\Term(\tT) \cdot \nA \arrow [rr, Rightarrow, "\cdots" description]
+&&
+\Term(\tU) \cdot \nA
+\end{tikzcd}\\
 \bottomrule
 \end{tabular}
-\end{quote}
+\end{figure}
+
+We now go in the other direction, and describe how rewrite paths in the requirement machine define derived requirements in our generic signature. Consider how we might reverse our ``$\mathsf{path}$'' mapping. The main difficulty to overcome is the fact that we did not actually use every assumption in each step:
+\begin{enumerate}
+\item The ``$\mathsf{path}$'' of a $\textsc{Reflex}$ step $\SameReq{T}{T}$ disregards the proof of the validity of the type parameter~\tT, because in the monoid, we can immediately construct an \index{empty rewrite path}empty rewrite path for \emph{any} term.
+
+However, this means that if we start from the empty rewrite path at a ``nonsensical'' term, such as $\nA \cdot \rU \cdot \pSequence \cdot \rT$, we cannot ``go backwards'' and hope to prove the validity of any type parameter in~$G$.
+
+\item The ``$\mathsf{path}$'' of a \textsc{SameName} step $\SameReq{T.A}{U.A}$ is defined from $\Path \TU$ by whiskering, ignoring $\Path \TP$, because we can \index{rewrite path whiskering}whisker \emph{any} rewrite path.
+
+That is, if we have an equivalent pair of terms $\Term(\tT) \sim \Term(\tU)$, and \nA\ is any name symbol, it is \emph{always} the case that $\Term(\tT)\cdot \nA \sim \Term(\tU)\cdot \nA$ in the monoid. 
+
+However, we may not be able to derive $G\vdash\SameReq{T.A}{U.A}$, because \tT\ might not conform any protocol with an associated type named ``\nA''. By the same reasoning, we might not even be able to derive $G\vdash\TU$.
+\end{enumerate}
+
+Thus, not every equivalence class of $\sim_R$ corresponds to a \index{valid type parameter!in requirement machine}valid type parameter of our generic signature~$G$. Before we can see how to translate a specific rewrite path into a derivation, we need to understand which rewrite paths are meaningful to us. We begin by describing the equivalence class of $\Term(\tT)$ for a type parameter~\tT.
+
+\begin{definition}
+Let $t\in A^*$ be a term.
+\begin{itemize}
+\item If the first symbol of~$t$ is a \index{generic parameter symbol}generic parameter symbol and all subsequent symbols are \index{name symbol}name symbols, then we say that $t$~is a \emph{standard} term.
+
+\item If the first symbol of~$t$ is a generic parameter symbol and all subsequent symbols are either \index{name symbol}name or \index{protocol symbol}protocol symbols, we say that $t$~is an \emph{admissible} term.
+\end{itemize}
+\end{definition}
+
+\begin{lemma}
+Some consequences of the above:
+\begin{enumerate}
+\item Every standard term is $\Term(\tT)$ for some \index{unbound type parameter}unbound type parameter~\tT.
+\item Every standard term is an admissible term.
+\item If $(u,v)$ is a rewrite rule output by ``$\Rule$'', both $u$ and $v$ are admissible terms.
+\item If $t\in A^*$ is an admissible term and $u\in A^*$ is a combination of name and protocol symbols (possibly empty), then $tu$ is an admissible term.
+\end{enumerate}
+\end{lemma}
+
+The next lemma states that admissibility is preserved by rewriting. In particular, this means that rewriting a standard term always outputs an admissible term.
+\begin{lemma}\label{rewriting admissible term}
+Let $G$ be a generic signature, and let $\AR$ be the requirement machine for $G$. Let $t\in A^*$ be an admissible term. If $t\sim z$ for some other term $z\in A^*$, then $z$ is an admissible term.
+\end{lemma}
+\begin{proof}
+Let $p$ be a rewrite path from $t$ to $z$. We argue by \index{induction}induction on the length of~$p$.
+
+\BaseCase If we have an empty rewrite path, then $t=z$, so $z$ is an admissible term.
+
+\InductiveStep Otherwise, $p=p^\prime \circ s$ for some rewrite path $p^\prime$ and rewrite step~$s$. We write $s := x(u\Rightarrow v)y$, where $x$, $y\in A^*$, and one of $(u,v)$ or $(v,u)\in R$.
+
+By the induction hypothesis, $\Dst(p^\prime)=\Src(s)=xuy$ is an admissible term. Because the prefix $xu$ is non-empty, the right whisker $y$ contains only name and protocol symbols.
+
+If the rule applied by $s$ is the ``$\Rule$'' for an explicit requirement, then the left \index{whiskering}whisker~$x$ is empty, because $u$ starts with a generic parameter symbol. Furthermore, $v$ is an admissible term. We see that $\Dst(s)=vy$ is an admissible term.
+
+If this rule applied by $s$ is the ``$\RuleP{P}$'' for an associated requirement, then the left whisker~$x$ is non-empty, and furthermore an admissible term, and $u$ and $v$ must contain only name and protocol symbols. We see that $\Dst(s)=xvy$ is an admissible term.
+\end{proof}
+
+\newcommand{\Chart}{\mathsf{chart}}
+
+Just like a standard term describes an \index{unbound type parameter}unbound type parameter, an admissible term more generally describes a type parameter and \textsl{a list of conformance requirements}.
+
+\begin{definition}
+The ``$\Type$'' function maps each admissible term to an unbound type parameter, by ignoring protocol symbols, and translating generic parameter symbols and name symbols into generic parameter types and dependent member types:
+\[
+\begin{array}{l@{\ :=\ }l}
+\Type(\ttgp{d}{i})&\ttgp{d}{i} \\
+\Type(\tU \cdot \nA)&\Type(\tU)\texttt{.A} \\ 
+\Type(\tU \cdot \pP)&\Type(\tU) 
+\end{array}
+\]
+\end{definition}
+
+\begin{definition}
+Let $z\in A^*$ be an admissible term. The \emph{conformance chart} of~$z$ is a \index{multiset}\emph{multiset} (that is, we allow duplicates) of conformance requirements:
+\begin{enumerate}
+\item Each requirement corresponds to an occurrence of a protocol symbol in~$z$.
+
+\item The subject type of each requirement is the prefix before the protocol symbol.
+
+\item Duplicate elements represent identical consecutive protocol symbols.
+\end{enumerate}
+\end{definition}
+
+\begin{definition}
+The ``$\Chart$'' function maps each admissible term to its conformance chart, by ignoring generic parameter and name symbols, and converting protocol symbols into requirements:
+\[
+\begin{array}{l@{\ :=\ }l}
+\Chart(\ttgp{d}{i})&\{\}\\
+\Chart(\tU \cdot \nA)&\Chart(\tU)\\
+\Chart(\tU \cdot \pP)&\Chart(\tU) \cup \{ \ConfReq{$\Type(\tU)$}{P} \}
+\end{array}
+\]
+\end{definition}
+
+\begin{example}
+If $z=\Term(\tT)$ is a standard term:
+\begin{gather*}
+\Type(z)=\tT\\
+\Chart(z)=\{\}
+\end{gather*}
+If $z=\Term(\tT)\cdot\pP$ for some unbound type parameter \tT\ and protocol \pP:
+\begin{gather*}
+\Type(z)=\tT\\
+\Chart(z)=\{\TP\}
+\end{gather*}
+If $z=\rU \cdot \pSequence \cdot \pSequence \cdot \nIterator \cdot \pIterator$,
+\begin{gather*}
+\Type(z) = \texttt{\rU.Iterator},\\
+\Chart(z) = \{\ConfReq{\rU}{Sequence},\\
+\phantom{\Chart(z) = \{}\ConfReq{\rU}{Sequence},\\
+\phantom{\Chart(z) = \{}\ConfReq{\rU.Iterator}{IteratorProtocol}\}.
+\end{gather*}
+\end{example}
+
+We can say a lot more if we add the assumptions that \tT\ is a \emph{valid} type parameter, and our generic signature $G$ is well-formed. (We lose nothing by doing this, because otherwise we diagnose an error and reject the program; see \SecRef{generic signature validity}). Having done so, we see that rewriting a standard term into an admissible term is tantamount to simultaneously deriving a same-type requirement \textsl{together with every conformance requirement in the destination term's chart}.
+
+\begin{theorem}\label{type chart theorem}
+Let $G$ be a well-formed generic signature, let $\AR$ be the requirement machine for~$G$, and let $t$ be a standard term such that $\Type(t)$ is a \index{valid type parameter!in requirement machine}valid type parameter of~$G$. Suppose we are given a term $z\in A^*$ such that $t \sim z$. Then $z$ is an admissible term, and furthermore:
+\begin{enumerate}
+\item $G \vdash \SameReq{$\Type(t)$}{$\Type(z)$}$.
+\item $G \vdash \ConfReq{$\Type(u)$}{P}$ for each $\ConfReq{$\Type(u)$}{P}\in\Chart(z)$.
+\end{enumerate}
+\end{theorem}
+
+\newcommand{\Case}[1]{\smallskip\par($\bigstar$ Case #1.)}
+
+\begin{proof}
+\LemmaRef{rewriting admissible term} already shows that $z$ is an admissible term. To establish the principal conclusion, we reason as follows:
+\begin{enumerate}
+\item Because we started with a standard term, we know that every protocol symbol appearing in~$z$ must have been introduced by some rewrite step in our path.
+
+When a rewrite step introduces a protocol symbol, we must be able to derive this conformance requirement, and record it alongside our chart.
+
+\item The other rewrite steps apply same-type requirements, and we must be able to build a derived same-type requirement corresponding to this transformation.
+
+We must also understand the effect that same-type requirement rules have on the conformance chart, so that we can update our collected set of derived conformance requirements when needed.
+\end{enumerate}
+Let~$p$ be a rewrite path from $t$ to $z$. We argue by induction on the length of~$p$.
+
+\BaseCase If $p$ is empty, then $t=z$, so $\Type(t)=\Type(z)$, and $\Chart(z)=\{\}$.
+We use the assumption that $\Type(t)$ is a valid type parameter to derive the same-type requirement $\SameReq{$\Type(t)$}{$\Type(t)$}$, by applying the \IndexStep{Reflex}\textsc{Reflex} inference rule to a derivation of $G\vdash\Type(t)$. We do not need to derive any conformance requirements.
+
+\InductiveStep Otherwise, $p=p^\prime \circ s$ for some rewrite path $p^\prime$ and rewrite step~$s$. Let $z^\prime := \Dst(p^\prime) = \Src(s)$, and note that $z=\Dst(s)$. By the induction hypothesis:
+\begin{enumerate}
+\item $G \vdash \SameReq{$\Type(t)$}{$\Type(z^\prime)$}$.
+\item $G \vdash \ConfReq{$\Type(u^\prime)$}{P}$ for each $\ConfReq{$\Type(u^\prime)$}{P}\in\Chart(z^\prime)$.
+\end{enumerate}
+The rewrite step~$s$ applies a conformance or same-type requirement; this requirement is explicit (``$\Rule$'') or associated (``$\RuleP{P}$''); and the rewrite step may be \index{positive rewrite step}positive or \index{negative rewrite step}negative. We consider each case to derive the desired conclusion about~$z$:
+\begin{center}
+\begin{tabular}{lllcl}
+\toprule
+&\textbf{Kind:}&\textbf{Domain:}&\textbf{Sign:}&\textbf{General Form:}\\
+\midrule
+1.&conformance&explicit&$+$&$(u\cdot\pP\Rightarrow u)\WR y$\\
+2.&&explicit&$-$&$(u\Rightarrow u\cdot\pP)\WR y$\\
+3.&&associated&$+$&$x\WL(\protosym{P}\cdot u\cdot\protosym{Q}\Rightarrow\protosym{P}\cdot u)\WR y$\\
+4.&&associated&$-$&$x\WL(\protosym{P}\cdot u\Rightarrow\protosym{P}\cdot u\cdot\protosym{Q})\WR y$\\
+\midrule
+5.&same-type&explicit&$+$&$(u\Rightarrow v)\WR y$\\
+6.&&explicit&$-$&$(v\Rightarrow u)\WR y$\\
+7.&&associated&$+$&$x\WL(\protosym{P}\cdot u\Rightarrow\protosym{P}\cdot v)\WR y$\\
+8.&&associated&$-$&$x\WL(\protosym{P}\cdot v\Rightarrow\protosym{P}\cdot u)\WR y$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\Case{1} A positive rewrite step for an explicit \index{conformance requirement!in requirement machine}conformance requirement has the following general form, where the left whisker is empty, $(u\cdot\pP,u)\in R$ for some standard term~$u$ and protocol symbol~\pP, and the right whisker $y$~is a combination of name and protocol symbols:
+\[(u\cdot\pP\Rightarrow u)\WR y\]
+The rewrite step deletes an occurrence of the protocol symbol~$\pP$:
+\begin{gather*}
+z^\prime=\Src(s)=u\cdot\pP\cdot y\\
+z=\Dst(s)=u\cdot y\\[\medskipamount]
+\Type(z)=\Type(z^\prime)\\
+\Chart(z)=\Chart(z^\prime) \setminus \{\ConfReq{$\Type(u)$}{P}\}
+\end{gather*}
+Therefore our conclusion already holds; we just ``discard'' our derivation of $\ConfReq{$\Type(u)$}{P}$.
+
+\Case{2} A negative rewrite step for an explicit conformance requirement has the following general form, where again the left whisker is empty, $(u\cdot\pP,u)\in R$ for some standard term~$u$ and protocol symbol~\pP, and the right whisker~$y$ is as before:
+\[(u\Rightarrow u\cdot\pP)\WR y\]
+The rewrite step inserts an occurrence of the protocol symbol~$\pP$:
+\begin{gather*}
+z^\prime=\Src(s)=u\cdot y\\
+z=\Dst(s)=u\cdot\pP\cdot y\\[\medskipamount]
+\Type(z)=\Type(z^\prime)\\
+\Chart(z)=\Chart(z^\prime) \cup \{\ConfReq{$\Type(u)$}{P}\}
+\end{gather*}
+To establish the conclusion, we must derive $\ConfReq{$\Type(u)$}{P}$. We do this with a \IndexStep{Conf}\textsc{Conf} elementary statement, because $\Rule\,\ConfReq{$\Type(u)$}{P}=(u\cdot\pP,u)\in R$:
+\[
+\ConfStep{$\Type(u)$}{P}{1}
+\]
+
+\Case{3} A positive rewrite step for an \index{associated conformance requirement!in requirement machine}associated conformance requirement has the following general form, where $x$ is an admissible term, $(\pP\cdot u\cdot\pQ,\pP\cdot u)\in R$ for some~$u$ that contains only name symbols, and the right whisker~$y$ is as before:
+\[x\WL(\protosym{P}\cdot u\cdot\protosym{Q}\Rightarrow\protosym{P}\cdot u)\WR y\]
+The rewrite step deletes a protocol symbol~$\pQ$. Note that $\Type(x\cdot \pP \cdot u)=\Type(x\cdot u)$:
+\begin{gather*}
+z^\prime=\Src(s)=x\cdot\protosym{P}\cdot u\cdot\protosym{Q}\cdot y\\
+z=\Dst(s)=x\cdot\protosym{P}\cdot u\cdot y\\[\medskipamount]
+\Type(z)=\Type(z^\prime)\\
+\Chart(z)=\Chart(z^\prime) \setminus \{\ConfReq{$\Type(x\cdot u)$}{Q}\}
+\end{gather*}
+As in Case~1, we ``discard'' our prior derivation of $\ConfReq{$\Type(x\cdot u)$}{Q}$.
+
+\Case{4} A negative rewrite step for an associated conformance requirement has the following general form, where $x$ is an admissible term, $(\pP\cdot u,\pP\cdot u\cdot \pQ)\in R$ for some~$u$ that contains only name symbols, and the right whisker~$y$ is as before:
+\[x\WL (\protosym{P}\cdot u\Rightarrow\protosym{P}\cdot u\cdot\protosym{Q})\WR y\]
+The rewrite step inserts a protocol symbol~$\pQ$. Again, $\Type(x\cdot \pP \cdot u)=\Type(x\cdot u)$:
+\begin{gather*}
+z^\prime=\Src(s)=x\cdot\protosym{P}\cdot u\cdot y\\
+z=\Dst(s)=x\cdot\protosym{P}\cdot u\cdot\protosym{Q}\cdot y\\[\medskipamount]
+\Type(z)=\Type(z^\prime)\\
+\Chart(z)=\Chart(z^\prime) \cup \{\ConfReq{$\Type(x\cdot u)$}{Q}\}
+\end{gather*}
+We must derive $\ConfReq{$\Type(x\cdot u)$}{Q}$. Since $\ConfReq{$\Type(x)$}{P}\in\Chart(z^\prime)$, the induction hypothesis tells us that $G\vdash\ConfReq{$\Type(x)$}{P}$, and the \IndexStep{AssocConf}\textsc{AssocConf} inference rule then gives us:
+\begin{gather*}
+\AnyStep{\ConfReq{$\Type(x)$}{P}}{1}\\
+\AssocConfStep{1}{$\Type(x\cdot u)$}{Q}{2}
+\end{gather*}
+
+\Case{5} A positive rewrite step for an explicit \index{same-type requirement!in requirement machine}same-type requirement has the following general form, where the left whisker is empty, $(u,v)\in R$ for standard terms $u$~and~$v$, and the right whisker $y$ is a combination of name and protocol symbols:
+\[(u\Rightarrow v)\WR y\]
+The rewrite step replaces the prefix $u$ with $v$:
+\begin{gather*}
+z^\prime=\Src(s)=u\cdot y\\
+z=\Dst(s)=v\cdot y
+\end{gather*}
+In this case, $\Type(z)$ and $\Type(z^\prime)$ are not identical, so we must first derive the same-type requirement $G\vdash\SameReq{$\Type(t)$}{$\Type(z)$}$. We now write $u\cdot y$ instead of $z^\prime$, so the induction hypothesis gave us this same-type requirement:
+\[ \AnyStep{\SameReq{$\Type(u\cdot y)$}{$\Type(v\cdot y)$}}{1} \]
+We now use the assumption that $G$ is well-formed. Because $\Type(u\cdot y)$ appears in the above requirement, the well-formedness of $G$ allows us to derive $G\vdash\Type(u\cdot y)$:
+\[ \AnyStep{\Type(u\cdot y)}{2} \]
+Next, we derive $\SameReq{$\Type(u)$}{$\Type(v)$}$ with a \IndexStep{Same}\textsc{Same} elementary statement:
+\[ \SameStep{$\Type(u)$}{$\Type(v)$}{3} \]
+Furthermore, $\Type(u)$ is a prefix of $\Type(u\cdot y)$. We apply \LemmaRef{general member type} to $G\vdash\texttt{$\Type(u\cdot y)$}$ and $G\vdash\SameReq{$\Type(u)$}{$\Type(v)$}$ to derive $G\vdash\SameReq{$\Type(u\cdot y)$}{$\Type(v\cdot y)$}$, or in other words, $\SameReq{$\Type(z^\prime)$}{$\Type(z)$}$:
+\[
+\AnyStep{\SameReq{$\Type(z^\prime)$}{$\Type(z)$}}{4}
+\]
+Finally, we apply the \IndexStep{Trans}\textsc{Trans} inference rule to compose the above requirement with the same-type requirement given to us by the induction hypothesis:
+\[
+\TransStep{1}{4}{$\Type(t)$}{$\Type(z)$}{5}
+\]
+We now have our same-type requirement, but we must also derive each conformance requirement in $\Chart(z)$ from the conformance requirements in $\Chart(z^\prime)$.
+
+Notice how $z^\prime$ and $z$ have the same number and relative ordering of protocol symbols, and they all occur in the right whisker~$y$, so there is a one-to-one correspondence between the elements of $\Chart(z^\prime)$ and $\Chart(z)$.
+
+At each occurrence of a protocol symbol in~$y$, we split up $y$ into a pair of terms, by writing $y=y_1\cdot\protosym{P}\cdot y_2$ for some $y_1$, $y_2\in A^*$ and some protocol \tP. Then:
+\begin{gather*}
+\ConfReq{$\Type(u\cdot y_1)$}{P}\in\Chart(z^\prime)\\
+\ConfReq{$\Type(v\cdot y_1)$}{P}\in\Chart(z)
+\end{gather*}
+
+For each $\ConfReq{$\Type(u\cdot y_1)$}{P}\in\Chart(z^\prime)$, we know that $\Type(u\cdot y_1)$ is a prefix of $\Type(z^\prime)$. Because $G$ is well-formed, \PropRef{prefix prop} says that $G\vdash\Type(u\cdot y_1)$. Then, $\Type(u)$ is also a prefix of $\Type(u\cdot y_1)$, so \LemmaRef{general member type} says that $G\vdash\SameReq{$\Type(u\cdot y_1)$}{$\Type(v\cdot y_1)$}$. Finally, we flip this requirement with \IndexStep{Sym}\textsc{Sym}, and apply \IndexStep{SameConf}\textsc{SameConf} to derive the desired conformance requirement in $\Chart(z)$:
+\begin{gather*}
+\AnyStep{\SameReq{$\Type(u\cdot y_1)$}{$\Type(v\cdot y_1)$}}{1}\\
+\AnyStep{\ConfReq{$\Type(u\cdot y_1)$}{P}}{2}\\
+\SymStep{1}{$\Type(v\cdot y_1)$}{$\Type(u\cdot y_1)$}{3}\\
+\SameConfStep{3}{1}{$\Type(u\cdot y_1)$}{P}{4}
+\end{gather*}
+
+\Case{6} A negative rewrite step for an explicit same-type requirement has the following general form, where $(u,v)\in R$ for standard terms $u$~and~$v$, the left whisker is empty, and the right whisker~$y$ is is a combination of name and protocol symbols:
+\[(v\Rightarrow u)\WR y\]
+
+We proceed as in Case~5, except that when the \textsc{Same} elementary statement gives us $\SameReq{$\Type(u)$}{$\Type(v)$}$, we must apply the \IndexStep{Sym}\textsc{Sym} inference rule to flip it around to get $\SameReq{$\Type(v)$}{$\Type(u)$}$ before we proceed:
+\begin{gather*}
+\SameStep{$\Type(u)$}{$\Type(v)$}{1}\\
+\SymStep{1}{$\Type(v)$}{$\Type(u)$}{2}
+\end{gather*}
+We can then derive our final same-type requirement, and all conformance requirements listed in the chart, as before.
+
+\Case{7} A positive rewrite step for an \index{associated same-type requirement!in requirement machine}associated same-type requirement has the following general form, where the left whisker $x$ is an admissible term, $(\pP\cdot u,\pP \cdot v)\in R$, $u$ and $v$ only contain name symbols, and the right whisker~$y$ is a combination of name and protocol symbols:
+\[x\WL(\protosym{P}\cdot u\Rightarrow\protosym{P}\cdot v)\WR y\]
+The rewrite step replaces $\protosym{P}\cdot u$ with $\protosym{P}\cdot v$ in the middle of the term:
+\begin{gather*}
+z^\prime=\Src(s)=x\cdot\protosym{P}\cdot u\cdot y\\
+z=\Dst(s)=x\cdot\protosym{P}\cdot v\cdot y
+\end{gather*}
+Note that $\ConfReq{$\Type(x)$}{P}\in\Chart(z^\prime)$, which we can derive by the induction hypothesis. Also, observe that $\Type(x\cdot\protosym{P}\cdot u)=\Type(x\cdot u)$. We derive $\SameReq{$\Type(x\cdot u)$}{$\Type(x\cdot v$)}$ from $\ConfReq{$\Type(x)$}{P}$ via the \IndexStep{AssocSame}\textsc{AssocSame} inference rule:
+\begin{gather*}
+\AnyStep{\ConfReq{$\Type(x)$}{P}}{1}\\
+\AssocSameStep{1}{$\Type(x\cdot u)$}{$\Type(x\cdot v)$}{2}
+\end{gather*}
+
+We then apply \LemmaRef{general member type} to $G\vdash\texttt{$\Type(x\cdot u\cdot y)$}$ and $G\vdash\SameReq{$\Type(x\cdot u)$}{$\Type(x\cdot v)$}$ to derive $G\vdash\SameReq{$\Type(x\cdot u\cdot y)$}{$\Type(x\cdot v\cdot y)$}$, or in other words, $\SameReq{$\Type(z^\prime)$}{$\Type(z)$}$:
+\[
+\AnyStep{\SameReq{$\Type(z^\prime)$}{$\Type(z)$}}{4}
+\]
+Finally, we apply the \IndexStep{Trans}\textsc{Trans} inference rule to compose the above requirement with the same-type requirement given to us by the induction hypothesis:
+\[
+\TransStep{1}{4}{$\Type(t)$}{$\Type(z)$}{5}
+\]
+
+We must also update the conformance chart. Both $x$ and $y$ may contain occurrences of protocol symbols, but since $\Chart(x)\subseteq\Chart(z^\prime)\cap\Chart(z)$, the requirements in $\Chart(x)$ that are common to both remain unchanged. We derive new conformance requirements corresponding to occurrences of protocol symbols in~$y$ as in Case~5.
+
+\Case{8} A negative rewrite step for an associated same-type requirement has the following general form, where the left whisker $x$ is an admissible term, $(\pP\cdot u,\pP\cdot v)\in R$, $u$ and $v$ contain only name symbols, and 
+the right whisker $y\in A^*$ is a combination of name and protocol symbols:
+\[x\WL(\protosym{P}\cdot v\Rightarrow\protosym{P}\cdot u)\WR y\]
+
+We proceed as in Case~7, except we must flip the same-type requirement around via \textsc{Sym} as in Case~6.
+\end{proof}
+
+The specific statement we are looking for falls out from the preceding theorem:
+
+\begin{corollary}\label{path to derivation swift}
+Let $G$ be a generic signature, and let $\AR$ be the requirement machine for~$G$. Assume $G$ is well-formed.
+\begin{enumerate}
+\item If $\Term(\tT)\cdot\pP \sim \Term(\tT)$ for some valid type parameter \tT, then $G \vdash \TP$.
+\item If $\Term(\tT) \sim \Term(\tU)$ for valid type parameters \tT\ and \tU, then $G\vdash\TU$.
+\end{enumerate}
+\end{corollary}
+\begin{proof}
+In both cases, we have an equivalence between a standard term and an admissible term, so we can apply the previous theorem.
+
+\Case{1} Let $t := \Term(\tT)$, and $z := \Term(\tT)\cdot\pP$. We have:
+\begin{gather*}
+\Type(z)=\tT\\
+\Chart(z) = \{\TP\}
+\end{gather*}
+Translating our rewrite path gives us $G\vdash\SameReq{T}{T}$ which we discard, together with $G\vdash\TP$ which we keep.
+
+\Case{2} Let $t := \Term(\tT)$, and $z := \Term(\tU)$. We have:
+\begin{gather*}
+\Type(z) = \tU\\
+\Chart(z)=\{\}
+\end{gather*}
+Translating our rewrite path gives us $G\vdash\TU$ which we keep, together with an empty list of derived conformance requirements which we discard.
+\end{proof}
+
+\paragraph{The decision procedure.} Recall the four basic generic signature queries that describe the equivalence class structure of a generic signature, from \SecRef{genericsigqueries}. We saw the first two are fundamental from a theoretical standpoint.
+
+Taken together, \CorollaryRef{convergent decidable}, \ThmRef{derivation to path swift}, and \CorollaryRef{path to derivation swift} say that if we have a well-formed generic signature~$G$ presented by a \index{convergent rewriting system}convergent rewriting system~$\AR$, and the given type parameters are \index{valid type parameter}valid, then:
+\begin{enumerate}
+\item $G\vdash\TP$ \textbf{if and only if} $\Term(\tT)\cdot\pP$ has the same normal form as $\Term(\tT)$.
+\item $G\vdash\TU$ \textbf{if and only if} $\Term(\tT)$ has the same normal form as $\Term(\tU)$.
+\end{enumerate}
+Also, crucially, the preconditions here are all things we can \emph{check}, and we can compute the normal form of a term using \AlgRef{term reduction algo}. As we now quite clearly can see:
+
+\begin{mdframed}[leftline=false,rightline=false,linecolor=black,linewidth=2pt]
+When implemented as below, the two basic generic signature queries always output the correct answer in a finite number of steps.
+\begin{itemize}
+\item \textbf{Query:} \Query{requiresProtocol}{G,\,\tT,\,\tP}
+
+Apply the normal form algorithm to $\Term(\tT)\cdot\pP$ and $\Term(\tT)$ and check if we get a pair of identical terms.
+
+\item \textbf{Query:} \Query{areReducedTypeParametersEqual}{G,\,\tT,\,\tU}
+
+Apply the normal form algorithm to $\Term(\tT)$ and $\Term(\tU)$ and check if we get a pair of identical terms.
+\end{itemize}
+\end{mdframed}
 
 \section{Symbols}\label{rqm symbols}
 
-\index{structural components}%
-\IndexDefinition{symbol}%
-\index{rewrite context}%
-\IndexDefinition{protocol symbol}%
-\IndexDefinition{associated type symbol}%
-\IndexDefinition{name symbol}%
-\index{identifier}%
-\IndexDefinition{generic parameter symbol}%
-\index{depth}%
-\index{index}%
-\IndexDefinition{layout symbol}%
-\IndexDefinition{superclass symbol}%
-\index{substitution term}%
-\IndexDefinition{concrete type symbol}%
-\IndexDefinition{concrete conformance symbol}%
-\index{pattern type}%
-\index{canonical type}%
-\IndexDefinition{alphabet}%
-Our alphabet consists of various kinds of \emph{symbols}. Symbols are constructed by the rewrite context, and they are uniqued by their kind and structural components, so two symbols can be compared for pointer equality. A symbol is indivisible from the rewrite system's point of view, but concretely each kind of symbol has a specific structure composed of smaller components, which determine the symbol's uniquing key, and the reduction order between symbols:
+Given a generic signature, our ``core model'' describes a monoid presentation whose alphabet consists of generic parameter, name, and protocol symbols. This gave us an elegant formalism for a subset of Swift generics. The remainder of this chapter describes the full implementation, with less mathematical rigor than before, and instead a focus on practical concerns.
+
+We begin by expanding our alphabet with a few more symbol kinds on top of the three found in the core model. We will also define a reduction order on this alphabet. While our correctness result only needed the symmetric term equivalence relation, we need a reduction order to make use of the \index{normal form algorithm}normal form algorithm in the implementation.
+
+Symbols are formed by the \index{rewrite context}rewrite context, the global singleton from \SecRef{protocol component} which manages the lifecycle of requirement machine instances. There are eight symbol kinds, with each kind having its own set of \index{structural components}structural components. This resembles how we modeled types in \ChapRef{types}.
+
+For each symbol kind, a constructor function takes the structural components and returns a pointer to the unique symbol formed from those structural components. The identity of a symbol is determined by its structural components, so symbols can be compared for pointer equality.
+\begin{definition}
+A \IndexDefinition{symbol!in requirement machine}\emph{symbol} in the Requirement Machine \IndexDefinition{alphabet!in requirement machine}alphabet is an instance of one of the following:
 \begin{itemize}
-\item \textbf{Generic parameter symbols}: \ttgp{d}{i} where \texttt{d} and \texttt{i} are the depth and index of some generic parameter type, respectively.
-\item \textbf{Name symbols}: \texttt{T}, where \texttt{T} is any valid identifier.
-\item \textbf{Associated type symbols}: $\assocsym{P}{A}$, where $\proto{P}$ is a protocol and $\texttt{A}$ is the name of an associated type.
-\item \textbf{Protocol symbols:} $\protosym{P}$, where \texttt{P} is a protocol declaration.
-\item \textbf{Layout symbols}: $\layoutsym{L}$ where \texttt{L} is a layout constraint such as \texttt{AnyObject}.
-\item \textbf{Superclass symbols}: $\supersym{\texttt{T};\;\sigma_0,\ldots,\sigma_n}$ where \texttt{T} is a canonical type, called the \emph{pattern type} of the symbol, and the $\sigma_i$ are terms, called \emph{substitution terms}.
-\item \textbf{Concrete type symbols}: $\concretesym{\texttt{T};\;\sigma_0,\ldots,\sigma_n}$ where \texttt{T} and $\sigma_i$ are as above.
-\item \textbf{Concrete conformance symbols}: $\concretesym{\texttt{T}\colon\texttt{P};\;\sigma_0,\ldots,\sigma_n}$ where \texttt{T} and $\sigma_i$ are as above, and \texttt{P} is a protocol declaration.
+\item A \IndexDefinition{generic parameter symbol}\textbf{generic parameter symbol} \ttgp{d}{i}, for some \index{depth!in generic parameter symbol}depth $d$ and \index{index!in generic parameter symbol}index $i\in\NN$.
+\item A \IndexDefinition{name symbol}\textbf{name symbol} \nA, where \nA\ is an \index{identifier!in name symbol}identifier appearing in the program.
+\item A \IndexDefinition{protocol symbol}\textbf{protocol symbol} \pP, where \tP\ is a reference to a \index{protocol declaration!in protocol symbol}protocol declaration.
+\item An \IndexDefinition{associated type symbol}\textbf{associated type symbol} $\aPA$, where \tP\ is some protocol, and \nA\ is the name of an associated type declaration.
+\item A \IndexDefinition{layout symbol}\textbf{layout symbol} $\layoutsym{L}$, where \texttt{L} is a \index{layout constraint}layout constraint, either \Index{AnyObject@\texttt{AnyObject}}\texttt{AnyObject} or \verb|_NativeClass|.
+\item A \IndexDefinition{superclass symbol}\textbf{superclass symbol} $\supersym{\texttt{C};\,t_0,\ldots,t_n}$ where \texttt{C} is an \index{canonical type!in requirement machine}interface type, called the \index{pattern type}\emph{pattern type} of the symbol, and the $t_i$ are terms, called \index{substitution term}\emph{substitution terms}. In a superclass symbol, the pattern type is a class or generic class type.
+\item A \IndexDefinition{concrete type symbol}\textbf{concrete type symbol} $\concretesym{\texttt{X};\,t_0,\ldots,t_n}$ where the pattern type~\texttt{X} is now any interface type that is not a type parameter, and the $t_i$ are substitution terms.
+\item A \IndexDefinition{concrete conformance symbol}\textbf{concrete conformance symbol} $\concretesym{\texttt{X}\colon\tP;\,t_0,\ldots,t_n}$ where \texttt{X} is any interface type that is not a type parameter, the $t_i$ are substitution terms, and \tP\ is a reference to a protocol declaration.
 \end{itemize}
-All of the concepts above should look familiar, even though it will not be immediately apparent how each kind of symbol is used. This will all be made clear over the course of this chapter, but we must get a few technicalities out of the way first.
+\end{definition}
 
-\index{type parameter}%
-\Index{protocol Self type@protocol \texttt{Self} type}%
-The kinds of symbols are further classified into two families, \emph{type-like} and \emph{property-like}. Generic parameter, name and associated type symbols appear in terms that represent type parameters. Layout, superclass, concrete type and concrete conformance symbols arise in terms that represent layout, superclass and concrete same-type requirements. Protocol symbols straddle both worlds: they model the protocol \texttt{Self} type, but also represent protocol conformance requirements:
-\IndexDefinition{property-like symbol}
-\IndexDefinition{type-like symbol}
-\begin{quote}
-\begin{tabular}{|l|l|}
-\hline
-\textbf{Type-like}&Generic parameter symbols\\
-&Name symbols\\
-&Associated type symbols\\
-\hline
-\textbf{Type and property}& Protocol symbols\\
-\hline
-\textbf{Property-like}&Layout symbols\\
-&Superclass symbols\\
-&Concrete type symbols\\
-&Concrete conformance symbols\\
-\hline
-\end{tabular}
-\end{quote}
-\index{associated type declaration}%
-\index{protocol declaration}%
-\index{inherited associated type}%
-\index{inherited protocol}%
-Note that an associated type symbol does not directly refer to the declaration of an associated type; instead, it stores a protocol declaration \texttt{P} and the \emph{name} of an associated type \texttt{A}; the invariant is that \texttt{A} must be declared either by \texttt{P} itself, or some base protocol of \texttt{P}. This allows us to distinguish a requirement imposed by a protocol on one of its inherited associated types, from the same requirement stated on the base protocol itself:
+\paragraph{Name symbols.}
+We already introduced name symbols at the beginning of this chapter and there isn't much else to say, but we add one remark. In the requirement machine for a \index{well-formed generic signature!name symbols}well-formed generic signature~$G$, every name symbol ``\nA'' has to be the name of some associated type or type alias of some \tP\ such that $G\prec\tP$---for otherwise, ``\nA'' cannot appear in any valid type parameter. However, we allow name symbols for arbitrary identifiers to be formed, so that we can model invalid programs as well. In any case, only a finite set of name symbols are constructed.
+
+\paragraph{Protocol symbols.}
+The reduction order on \index{protocol symbol!reduction order}protocol symbols has the property that if a protocol~\tQ\ inherits from a protocol~\tP, then $\protosym{P}<\protosym{Q}$.
+
+Consider the \index{directed graph}directed graph where the vertices are protocol declarations, and for each pair of protocols \tQ\ and \tP\ such that \tQ\ \index{inherited protocol!in requirement machine}inherits from \tP, there is an edge with \index{source vertex}source~\tQ\ and \index{destination vertex}destination~\tP. Define $\mathsf{depth}(\tP)\in\NN$ as the number of protocols we can reach from \tP, excluding \tP\ itself. To compute the ``$\mathsf{depth}$'' of a protocol, we evaluate the \index{all inherited protocols request}\Request{all inherited protocols request} with~\tP, which returns the set of all protocols reachable from \tP, and then take the number of elements in this set.
+
+\begin{algorithm}[Protocol reduction order]\label{protocol reduction order} \IndexDefinition{protocol reduction order}Takes two protocol symbols \pP\ and \pQ\ as input, and returns one of ``$<$'', ``$>$'' or ``$=$'' as output.
+\begin{enumerate}
+\item If $\mathsf{depth}(\tP)>\mathsf{depth}(\tQ)$, return ``$<$''. (Deeper protocols are smaller.)
+\item If $\mathsf{depth}(\tP)<\mathsf{depth}(\tQ)$, return ``$>$''.
+\item If $\mathsf{depth}(\tP)=\mathsf{depth}(\tQ)$, compare the protocols with \AlgRef{linear protocol order}.
+\end{enumerate}
+\end{algorithm}
+
+\begin{example}\label{protocol reduction order example}
+Various standard library protocols inherit from \texttt{Sequence}:
 \begin{Verbatim}
-protocol Base {
-  associatedtype A
-}
-
-// Not the same as writing `A: Equatable' inside `Base'
-protocol Derived: Base where A: Equatable {}
-\end{Verbatim}
-Finally, the last three property symbol kinds---superclass, concrete type, and concrete conformance symbols---are quite special, because they recursively contain terms; their construction and invariants are discussed in the next section.
-
-\section{Terms}\label{building terms}
-
-\IndexDefinition{term!in requirement machine}%
-\IndexDefinition{mutable term}%
-\IndexDefinition{immutable term}%
-A \emph{term} is an array of symbols. There are actually two representations of terms; \emph{mutable terms} and \emph{immutable terms}. Mutable terms are a value types which store their own heap-allocated buffer. Immutable terms are allocated in the rewrite context, and two immutable terms with the same length and symbols will always be equal as pointers, allowing for efficient hashing and equality. Mutable terms can be constructed by appending individual symbols, and are used as temporary values in various algorithms, such as term reduction and \index{completion}completion. Immutable terms are constructed from existing mutable terms, and appear inside rewrite rules and other permanent structures.
-
-\index{semigroup}%
-\index{free monoid}%
-\index{identity element}%
-When we talked about free monoids in the previous chapter, we allowed for an \index{empty term}empty term, denoted $\varepsilon$, to represent the identity element of our monoid. In turns out that in the rewrite system of a requirement machine, the identity element does not give us anything useful, and no other term will be equivalent to the identity element via a rewrite rule (so in reality, our rewrite system describes a \emph{semigroup}, not a monoid; a semigroup is a generalization of a monoid which does not require the existence of an identity element. However, monoids are a more natural setting for presenting the theory of rewrite paths, since we want to deal with rewrite steps where the whiskers are empty terms). Thus, the immutable term representation does not allow for empty terms. Mutable terms can still be empty, since this is their initial state before any symbols are added.
-
-\index{type parameter}%
-Type parameters become terms in our rewrite system. To construct rewrite rules from generic requirements, we must first build terms from the type parameters appearing in those requirements. Later, when the same rewrite system is asked a generic signature query about some type parameter, the implementation begins by building a term from this type parameter.
-
-First of all, requirement machines do not care for type sugar, so we only need to consider canonical type parameters here. From \ChapRef{rqm basic operation}, there are four varieties of requirement machine, representing the four combinations of domain (generic signature, protocol component) and purpose (queries, minimization). The details of the type parameter mapping differ slightly in each.
-
-\paragraph{Generic signature.}
-\index{sugared type}%
-\index{canonical type}%
-\index{generic parameter type}%
-\index{generic parameter symbol}%
-An instance of a \textbf{generic signature} or \textbf{generic signature minimization} requirement machine only needs to reason about type parameters coming from one single generic signature.
-
-For the base case where the type parameter is just a generic parameter type, we construct a term consisting of a single generic parameter symbol. Since each generic parameter type within a generic signature is uniquely identified by its depth and index, generic parameter symbols also just store a depth and index, and there is a one-to-one correspondence between generic parameter types and generic parameter symbols. 
-For the general case of a dependent member type, we're going to build a term where the first symbol is a generic parameter symbol and each subsequent symbol is an associated type or name symbol.
-
-\index{dependent member type}%
-\index{bound dependent member type}%
-\index{unbound dependent member type}%
-\index{associated type symbol}%
-\index{name symbol}%
-\index{identifier}%
-\FigRef{type params fig} illustrates that a dependent member type basically has the structure of a single-linked list. The head is the \emph{outermost} member type, the base type of a dependent member type is the ``next'' pointer, and finally, the tail is a generic parameter type. Requirement machine terms, on the other hand, are flat arrays of symbols. A classical algorithm allows us to convert a linked list to an array. We traverse the list from head to tail, appending an element to an array on each step; all that remains is to reverse array at the end.
-
-\begin{algorithm}[Building a term---generic signature case]\label{build term generic}
-Takes a type parameter \texttt{T} as input, and outputs a (non-empty) term.
-\begin{enumerate}
-\item (Initialize) Let $t$ be a new empty mutable term.
-\item (Base case) If \texttt{T} is a generic parameter type \ttgp{d}{i}:
-\begin{enumerate}
-\item Append the generic parameter symbol \ttgp{d}{i} to $t$.
-\item Reverse the order of the symbols in $t$.
-\item Return $t$.
-\end{enumerate}
-\item (Recursive case) Otherwise, \texttt{T} is a dependent member type:
-\begin{enumerate}
-\item If \texttt{T} is a bound dependent member type, it references some associated type declaration \texttt{A} in a protocol~\texttt{Q}. Append the associated type symbol $\assocsym{Q}{A}$ to $t$.
-\item If \texttt{T} is an unbound dependent member type, it stores an identifier \texttt{A}. Append the name symbol \texttt{A} to $t$.
-\end{enumerate}
-\item (Next) Replace \texttt{T} with its base type and go back to Step~2.
-\end{enumerate}
-\end{algorithm}
-\index{structural resolution stage}%
-A \textbf{generic signature} requirement machine is built from the minimal requirements of a generic signature, which are written with bound dependent member types. Terms built from bound dependent member member types consist of associated type symbols. A \textbf{generic signature minimization} machine is built from desugared requirements constructed in the structural resolution stage, which produces unbound dependent member types. Terms built from unbound dependent member types contain name symbols. The terms corresponding to the type parameters shown in \FigRef{type params fig} exhibit both possibilities:
-\begin{quote}
-\begin{tabular}{c@{\hskip 4em}c}
-\begin{tikzpicture}[sibling distance=6em,
-every fit/.style={rounded corners}]
-  \tikzstyle{symbol}=[draw=black,thick]
-  \tikzstyle{arrow} = [->,>=stealth]
-  
-  \node [matrix, column sep=0.5em] {
-    \node (t) [symbol] {\strut \ttgp{0}{0}}; &
-    \node (a) [symbol] {\strut $\assocsym{P}{A}$}; &
-    \node (b) [symbol] {\strut $\assocsym{Q}{B}$}; \\
-  };
-
-  \begin{scope}[on background layer]
-    \node[fill=light-gray, fit=(a) (b), inner sep=0.25em, pin={[pin distance=3em, pin edge={arrow,draw=black,thick,<-,shorten <=5pt}] below:associated type symbols}] {};
-  \end{scope}
-\end{tikzpicture}&
-
-\begin{tikzpicture}[sibling distance=6em,
-every fit/.style={rounded corners}]
-  \tikzstyle{symbol}=[draw=black,thick]
-  \tikzstyle{arrow} = [->,>=stealth]
-  
-  \node [matrix, column sep=0.5em] {
-    \node (t) [symbol] {\strut \ttgp{0}{0}}; &
-    \node (a) [symbol] {\strut \texttt{A}}; &
-    \node (b) [symbol] {\strut \texttt{B}}; \\
-  };
-
-  \begin{scope}[on background layer]
-    \node[fill=light-gray, fit=(a) (b), inner sep=0.25em, pin={[pin distance=3em, pin edge={arrow,draw=black,thick,<-,shorten <=5pt}] below:name symbols}] {};
-  \end{scope}
-\end{tikzpicture}
-\end{tabular}
-\end{quote}
-Our written notation for terms will join the symbols with ``$.$'', so the above terms are written as $\ttgp{0}{0}.\assocsym{P}{A}.\assocsym{Q}{B}$ and $\ttgp{0}{0}.\texttt{A}.\texttt{B}$, respectively.
-
-\paragraph{Protocol component.}
-\index{protocol component}%
-\Index{protocol Self type@protocol \texttt{Self} type}%
-With \textbf{protocol component} and \textbf{protocol component minimization} requirement machines, mapping type parameters to terms becomes more subtle. A type parameter written in a generic requirement of a protocol \texttt{P} is always rooted in the protocol \texttt{Self} type. However, a protocol component might contain more than one protocol, and furthermore other requirement machines must import rewrite rules from protocol component machines. Since \emph{every} protocol's \texttt{Self} type is always just the generic parameter type \ttgp{0}{0} with depth 0 and index 0, we can't map it to the generic parameter symbol \ttgp{0}{0}. Instead, the protocol \texttt{Self} type maps to the protocol symbol $\protosym{P}$ for the original protocol \texttt{P}.
-
-\index{inherited protocol}%
-Now, suppose we have a bound dependent member type \texttt{Self.[Q]A}. If this type parameter appears inside \texttt{P}, it must be that \texttt{Q} is either \texttt{P} itself, or some protocol inherited by \texttt{P}. From what we've covered so far, this would map to the term $\protosym{P}.\assocsym{Q}{A}$. However, as you will see later our rewrite system will always define a rewrite rule of the following form for each associated type \texttt{A} of each protocol \texttt{Q} inherited by \texttt{P}:
-\[\protosym{P}.\assocsym{Q}{A}\Rightarrow \assocsym{P}{A}\]
-While there is no harm in us returning a term which can be immediately reduced here, we save this extra step by immediately constructing the term $\assocsym{P}{A}$ instead. In particular, if \texttt{Q} is equal \texttt{P}, the rewrite rule in question is the following:
-\[\protosym{P}.\assocsym{P}{A}\Rightarrow \assocsym{P}{A}\]
-So the dependent member type \texttt{Self.[P]A} will always map to the term $\assocsym{P}{A}$, and not $\protosym{P}.\assocsym{P}{A}$. This short-circuiting only takes place for a bound dependent member type; the unbound dependent member type \texttt{Self.A} maps to the term $\protosym{P}.\texttt{A}$.
-
-\begin{algorithm}[Building a term---protocol component case]\label{build term protocol}
-Takes a type parameter \texttt{T} and a protocol declaration \texttt{P} as input, and outputs a (non-empty) term.
-\begin{enumerate}
-\item (Initialize) Let $t$ be a new empty mutable term.
-\item (Base case) If \texttt{T} is the protocol \texttt{Self} type (\ttgp{0}{0}), let $s$ be the last symbol of $t$:
-\begin{enumerate}
-\item If $s$ is an associated type symbol $\assocsym{Q}{A}$ (note that \texttt{Q} must either be \texttt{P} itself, or some protocol inherited by \texttt{P}), replace the last symbol of $t$ with $\assocsym{P}{A}$.
-\item Otherwise, $s$ is a name symbol. Append the protocol symbol $\protosym{P}$ to $t$.
-\item Reverse the order of the symbols in $t$, and return $t$.
-\end{enumerate}
-\item (Recursive case) Otherwise, \texttt{T} is a dependent member type.
-\begin{enumerate}
-\item If \texttt{T} is bound, it references some associated type declaration \texttt{A} in a protocol~\texttt{Q}. Append the associated type symbol $\assocsym{Q}{A}$ to $t$.
-\item If \texttt{T} is unbound, it stores an identifier \texttt{A}. Append the name symbol \texttt{A} to $t$.
-\end{enumerate}
-\item (Next) Replace \texttt{T} with its base type, and go back to Step~2.
-\end{enumerate}
-\end{algorithm}
-
-While any sequence of symbols defines a term in the free monoid generated by our alphabet, we want to consider certain terms which correspond to valid concepts in our problem space. We finish this section with a few definitions.
-\begin{definition}
-\IndexDefinition{type-like term}%
-\IndexDefinition{property-like term}%
-A \emph{type-like term} satisfies the following properties:
-\begin{enumerate}
-\item The first symbol is a generic parameter symbol, an associated type symbol or a protocol symbol.
-\item Every subsequent symbol is an associated type symbol or a name symbol.
-\end{enumerate}
-A \emph{property-like term} is a type-like term followed by a single property-like symbol.
-\end{definition}
-All terms output by \AlgRef{build term generic} and \AlgRef{build term protocol} are type-like, and type-like terms are composed of type-like symbols.  Examples of type-like terms:
-\begin{gather*}
-\ttgp{0}{1}.\assocsym{Sequence}{Element}\\
-\protosym{Equatable}\\
-\protosym{Collection}.\texttt{SubSequence}\\
-\assocsym{FixedWidthInteger}{Words}.\assocsym{Collection}{Index}
-\end{gather*}
-Examples of property-like terms:
-\begin{gather*}
-\ttgp{0}{1}.\supersym{\texttt{NSObject}}\\
-\ttgp{1}{0}.\assocsym{Sequence}{Element}.\protosym{Comparable}\\
-\protosym{Equatable}.\protosym{Hashable}
-\end{gather*}
-The following terms are neither property-like nor type-like; in our model, they lack a meaningful semantic interpretation:
-\begin{gather*}
-\texttt{Horse}.\ttgp{0}{1}\\
-\assocsym{Sequence}{Element}.\layoutsym{AnyObject}.\assocsym{Collection}{Index}
-\end{gather*}
-
-\begin{definition}
-\IndexDefinition{domain!of a term}%
-The \emph{domain} of a type-like or property-like term is a generic parameter or protocol declaration, given by the first symbol in the term. If the term starts with a generic parameter symbol, the domain is the corresponding generic parameter; if it starts with an associated type symbol or protocol symbol, the domain is the protocol referenced by this symbol.
-\end{definition}
-
-\index{protocol dependency set}%
-Terms with a generic parameter domain can only appear in the generic signature or generic signature minimization requirement machines. Terms with a protocol domain can appear in any variety of requirement machine; the protocol will always be an element of the requirement machine's protocol dependency set.
-
-\paragraph{Concrete types.}
-\index{concrete type symbol}%
-\index{concrete conformance symbol}%
-\index{superclass symbol}%
-\index{depth}%
-\index{index}%
-\IndexDefinition{pattern type}%
-\IndexDefinition{substitution term}%
-To model superclass requirements and same-type requirements where the right hand side is a concrete type, our rewrite system must also represent types which \emph{contain} type parameters, but are themselves not type parameters. This is the purpose of superclass and concrete type symbols. The type parameters inside the concrete type become terms, which we collect in a list of \emph{substitution terms}. Next, the concrete type is transformed into a pattern type by transforming the original concrete type, replacing each type parameter with a ``phantom'' generic parameter \ttgp{0}{i} where the generic parameter depth is always zero, and the generic parameter index \texttt{i} is the index of the corresponding term in the substitution list.
-
-\begin{algorithm}[Concrete type symbol construction]\label{concretesymbolcons}
-Takes a type \texttt{X} as input, which must not itself be a type parameter, and returns the pattern type together with a list of substitution terms as output. This algorithm is used with all varieties of requirement machine; when building terms from type parameters in Step~2.a, we use \AlgRef{build term generic} in generic signature machines and \AlgRef{build term protocol} in protocol component machines.
-\begin{enumerate}
-\item Let \texttt{S} be an empty mutable array of terms, and let $\texttt{i}:=0$.
-\item For each type parameter \texttt{T} contained in \texttt{X}:
-\begin{enumerate}
-\item Build a term from \texttt{T}, and append this term to \texttt{S}.
-\item Replace the child node \texttt{T} of \texttt{X} with a generic parameter type \ttgp{0}{i}.
-\item Increment \texttt{i}.
-\end{enumerate}
-\item Return the type \texttt{T} which now satisfies the invariants of a pattern type, and the array of substitution terms \texttt{S}.
-\end{enumerate}
-\end{algorithm}
-We can use the pattern type \texttt{T} and list of substitution terms $\{\sigma_0,\,\ldots,\,\sigma_n\}$ returned by the above algorithm to form a new concrete type symbol $\concretesym{\texttt{T};\;\sigma_0,\,\ldots,\sigma_n}$ or superclass symbol $\supersym{\texttt{T};\;\sigma_0,\,\ldots,\sigma_n}$. Together with a protocol \texttt{P}, we can build a concrete conformance symbol $\concretesym{\texttt{T}\colon\texttt{P};\;\sigma_0,\ldots,\sigma_n}$.
-\begin{example}
-If the original concrete type does not contain any type parameters---that is, if its fully concrete---the list of substitution terms will be empty. So the concrete type symbol for \texttt{Int} is $\concretesym{\texttt{Int}}$, and the superclass symbol for \texttt{NSObject} is $\supersym{\texttt{NSObject}}$.
-\end{example}
-\begin{example}
-Say the type \texttt{(\ttgp{1}{1}.[Sequence]Element) -> Array<\ttgp{1}{0}>} appears in a generic signature requirement machine. The corresponding concrete type symbol is:
-\begin{align*}
-\concretesym{&\texttt{(\ttgp{0}{0}) -> Array<\ttgp{0}{1}>};\;\\
-&\sigma_0 := \ttgp{1}{1}.\assocsym{Sequence}{Element},\,\\
-&\sigma_1 := \ttgp{1}{0}}.
-\end{align*}
-\end{example}
-The pattern type of a superclass, concrete type or concrete conformance symbol must satisfy the following invariants:
-\begin{enumerate}
-\item The type must itself not be a type parameter.
-\item Each generic parameter appearing inside the type has depth 0, and no dependent member types must appear in the pattern type.
-\item Each generic parameter index appears exactly once, and in the same order as a recursive traversal of the pattern type.
-\end{enumerate}
-The first condition rules out symbols which do not actually represent concrete types:
-\[\concretesym{\ttgp{0}{0};\; \sigma_0 := \ldots}.\]
-The second condition rules out ``partially substituted'' symbols:
-\[\concretesym{\texttt{Array<\ttgp{0}{0}.[Sequence]Iterator>};\; \sigma_0 := \ldots}.\]
-The third condition rules out both ``out of order'' symbols where the type references substitution terms in a non-standard way, and ``optimized'' symbols where the type contains multiple references to the same same substitution term:
-\begin{gather*}
-\concretesym{\texttt{Dictionary<\ttgp{0}{1}, \ttgp{0}{0}>}\colon\texttt{P};\;\sigma_0 := \ldots,\, \sigma_1 := \ldots}\\
-\concretesym{\texttt{(\ttgp{0}{0}) -> \ttgp{0}{0}}\colon\texttt{P};\;\sigma_0 := \ldots}
-\end{gather*}
-The substitution terms also satisfy a mutual compatibility condition: either all terms must begin with (possibly different) generic parameter symbols, or all terms must belong to the same protocol domain. These invariants are established by the construction algorithm, and preserved when we manipulate concrete type symbols in \ChapRef{concrete conformances}.
-
-\section{Term Reduction}\label{term reduction}
-
-\IndexTwoFlag{debug-requirement-machine}{simplify}
-
-rewrite steps only store the length of each whisker, index of rule, and inverse flag.
-
-\IndexDefinition{trie}
-rule trie. Section~6.3 of \cite{art3}.
-
-\begin{algorithm}[Adding a rule to the rule trie]\label{trie insert algo}
-\end{algorithm}
-
-\begin{algorithm}[Lookup in rule trie]\label{trie lookup algo}
-Hello world.
-\end{algorithm}
-
-\begin{algorithm}[Term reduction using rule trie]\label{term reduction trie algo}
-Hello world.
-\end{algorithm}
-
-Our implementation explicitly stores the source and destination terms in a critical pair, as well as the rewrite path itself. As we will learn in \SecRef{completion sourceref}, we use a compressed representation for \index{rewrite path!representation}rewrite paths in memory, where a \index{rewrite step!representation}rewrite step $x(u\Rightarrow v)y$ only stores the \emph{length} of each \index{whiskering}whisker $x$ and $y$ and not the actual terms $x$ and $y$. Thus, we must store the source and destination terms separately since they cannot be recovered from the rewrite path alone.
-
-\section{The Reduction Order}\label{reduction order}
-
-\begin{itemize}
-\item reduction order is not ABI, but we need a compatibility condition--reduced types of different equivalence classes order the same
-\end{itemize}
-
-\IndexDefinition{reduction order!in requirement machine}%
-
-Now that we can build terms from type parameters, we need a way to compare those terms so that we can proceed to define rewrite rules. We wish to use our rewrite system to compute reduced types, which are previously defined with the \index{type parameter order}type parameter order of \SecRef{reduced types}, so we would expect that if we take two type parameters \texttt{T} and \texttt{U} such that $\texttt{T}<\texttt{U}$ by the type parameter order, then the corresponding terms $t$ and $u$ satisfy $t<u$ in the reduction order. However, this will not always be true, which seems like a contradiction, but we will resolve this soon enough.
-
-In fact, the two orders differ in how they compare protocol declarations. The type parameter order compares protocols by their parent module and then their name. In the reduction order, we need an additional property: if \texttt{Q} inherits from \texttt{P}, then as protocol symbols, we wish to have that $\protosym{P}<\protosym{Q}$, and even more importantly, if both protocols also declare an associated type named \texttt{A}, then we want that $\assocsym{P}{A}<\assocsym{Q}{A}$. We will see why this must be so in \SecRef{tietze transformations}. There are many ways to get such an ordering, the one we use is based on the below construction.
-
-\begin{definition}
-\index{directed graph}%
-\index{directed acyclic graph}%
-\IndexDefinition{protocol inheritance graph}%
-\index{inherited protocol}%
-\index{transitive closure}%
-\index{vertex}%
-\index{edge}%
-The \emph{protocol inheritance graph} is a directed graph $(V,\,E)$ where the vertices are protocol declarations, and an edge connects protocol \texttt{P} to protocol \texttt{Q} if \texttt{Q} appears in the inheritance clause of \texttt{P}. The \emph{protocol inheritance closure} of a protocol \texttt{P} is the set of all unique protocols reachable from $\{\texttt{P}\}$ by paths of length $\ge 1$. Note that this set does not include \texttt{P} itself.
-\end{definition}
-\index{rewrite context}%
-The protocol inheritance graph is a directed acyclic graph (with invalid source code that defines protocols having \index{circular inheritance}circular inheritance relationships, we can break cycles arbitrarily after \index{diagnostic!circular inheritance}diagnosing an error). To speed up calculations, protocol inheritance closures are computed lazily and cached by the rewrite context. The protocol reduction order implements the behavior outlined above by comparing the number of elements each protocol has in its inheritance closure; a protocol that inherits from another necessarily has a larger its inheritance closure (of course the converse does not hold). We will also use the protocol inheritance closure in the next section to define rewrite rules representing inherited associated types.
-\IndexDefinition{protocol reduction order}%
-\begin{algorithm}[Protocol reduction order]\label{protocol reduction order} Takes two protocols \texttt{P} and \texttt{Q} as input, and returns one of ``$<$'', ``$>$'' or ``$=$'' as output.
-\begin{enumerate}
-\item Compute the protocol inheritance closures of \texttt{P} and \texttt{Q}, and let $n_\texttt{P}$ and $n_\texttt{Q}$ be the number of elements in each set.
-\item If $n_\texttt{P}>n_\texttt{Q}$, return ``$<$'' (so \texttt{P} precedes \texttt{Q} if \texttt{P} inherits from \emph{more} protocols than \texttt{Q}).
-\item If $n_\texttt{P}<n_\texttt{Q}$, return ``$>$''.
-\item If $n_\texttt{P}=n_\texttt{Q}$, compare the protocols using \AlgRef{linear protocol order}.
-\end{enumerate}
-\end{algorithm}
-\begin{example}
-The standard library defines a protocol hierarchy representing various types of collections:
-\begin{Verbatim}
-public protocol Sequence {
-  associatedtype Element
-}
+public protocol Sequence {...}
 public protocol Collection: Sequence {...}
 public protocol BidirectionalCollection: Collection {...}
 public protocol MutableCollection: Collection {...}
 public protocol RandomAccessCollection: BidirectionalCollection {...}
 \end{Verbatim}
 \index{tree}
-This protocol hierarchy can be represented by the following protocol inheritance graph; notice that this hierarchy does not exhibit any multiple inheritance, so our graph looks like a tree, except all directed edges point toward the root:
-\begin{quote}
-\begin{tikzpicture}[every node/.style={rounded corners,draw=black},node distance=2em]
-  \tikzstyle{arrow} = [->,>=stealth]
-
-  \node (Sequence) {\texttt{\vphantom{pI}Sequence}};
-  \node (Collection) [below=of Sequence] {\texttt{\vphantom{pI}Collection}};
-  \node (BidirectionalCollection) [below left=of Collection] {\texttt{\vphantom{pI}BidirectionalCollection}};
-  \node (MutableCollection) [below right=of Collection] {\texttt{\vphantom{pI}MutableCollection}};
-  \node (RandomAccessCollection) [below=of BidirectionalCollection] {\texttt{\vphantom{pI}RandomAccessCollection}};
+The protocol inheritance relationships above define this graph:
+\begin{center}
+\begin{tikzpicture}[x=2.5cm]
+  \node (Sequence) [interior, xshift=0.75em] at (0,3) {\texttt{\vphantom{pI}Sequence}};
+  \node (Collection) [interior, xshift=0.75em] at (0,2) {\texttt{\vphantom{pI}Collection}};
+  \node (BidirectionalCollection) [interior] at (-1,1) {\texttt{\vphantom{pI}BidirectionalCollection}};
+  \node (MutableCollection) [interior] at (1,1) {\texttt{\vphantom{pI}MutableCollection}};
+  \node (RandomAccessCollection) [interior] at (-1,0) {\texttt{\vphantom{pI}RandomAccessCollection}};
 
   \draw [arrow] (Collection) -- (Sequence);
   \draw [arrow] (BidirectionalCollection) -- (Collection);
@@ -419,126 +743,313 @@ This protocol hierarchy can be represented by the following protocol inheritance
 
   \draw [arrow] (RandomAccessCollection) -- (BidirectionalCollection);
 \end{tikzpicture}
-\end{quote}
-The protocol symbols order as follows---the rows are shown in decreasing size of protocol inheritance closure, and within each row our algorithm falls back to the original protocol order of \AlgRef{linear protocol order}:
+\end{center}
+The corresponding protocol symbols are ordered as follows---notice how deeper protocols precede shallower protocols:
 \begin{gather*}
 \protosym{RandomAccessCollection}\\
 {} < \protosym{BidirectionalCollection}<\protosym{MutableCollection}\\
 {} < \protosym{Collection}\\
 {} < \protosym{Sequence}
 \end{gather*}
-In particular, this gives the below relationship among associated type symbols:
-\begin{gather*}
-\assocsym{BidirectionalCollection}{Element} < \assocsym{Collection}{Element}\\
-\assocsym{RandomAccessCollection}{Element} < \assocsym{Collection}{Element}
-\end{gather*}
-If the reduction protocol order did not consider protocol inheritance, the second inequality would be reversed.
 \end{example}
-\index{partial order}%
-\index{linear order}%
-We now move on to superclass, concrete type and concrete conformance symbols. On these symbol kinds we only have a partial order, and not a linear order.
-\index{pattern type}%
-\index{substitution term}%
-\index{superclass symbol}%
-\index{concrete type symbol}%
-\index{concrete conformance symbol}%
+
+\paragraph{Associated type symbols.}
+We encode the relationship between a protocol symbol and the name symbols of its associated type declarations by extending our alphabet with \emph{associated type symbols}, and our set of rewrite rules with \emph{associated type introduction rules}.
+
+If $\aPA$ is an associated type symbol, it must be the case that \nA\ is the name of an associated type declared either by \tP\ itself, or some \index{inherited protocol!in requirement machine}base protocol of \tP. The notation $\aPA$ fuses a protocol symbol \pP\ with a name symbol \nA, and in fact an \index{associated type introduction rule}associated type introduction rule has the form $\pP\cdot\nA\sim\aPA$.
+
+Why do we need associated type symbols? There are two reasons:
+\begin{enumerate}
+\item In \SecRef{genericsigqueries}, we saw that we can implement $\Query{isValidTypeParameter}{}$ using the $\Query{areReducedTypeParametersEqual}{}$ and $\Query{requiresProtocol}{}$ generic signature queries. Once we add associated type symbols, we can instead directly decide if a type parameter is valid using the \index{normal form algorithm}normal form algorithm.
+
+\item More importantly, it also turns out that we need associated type symbols to obtain a convergent rewriting system when our generic signature has an infinite set of equivalence classes.
+\end{enumerate}
+We will study both of these points in great detail in \ChapRef{completion}.
+
+The reduction order on associated type symbols is defined using the reduction order on protocol symbols:
+\begin{algorithm}[Associated type reduction order]\label{associated type reduction order} \IndexDefinition{associated type reduction order}Takes two associated type symbols $\assocsym{P}{A}$ and $\assocsym{Q}{B}$ as input, and returns one of ``$<$'', ``$>$'' or ``$=$'' as output.
+\begin{enumerate}
+\item Compare the identifiers \texttt{A} and \texttt{B} using the \index{lexicographic order}lexicographic order. Return the result if it is ``$<$''~or~``$>$''. Otherwise, both associated types have the same name.
+\item Compare the protocol symbols $\pP$ and $\pQ$ using \AlgRef{protocol reduction order} and return the result.
+\end{enumerate}
+\end{algorithm}
+
+An associated type symbol does not directly refer to an associated type \index{associated type declaration!compared to associated type symbol}\emph{declaration}, because the associated type might be \index{inherited associated type}\emph{inherited} by the protocol. That is, every associated type declaration of a base protocol also gives rise to a distinct symbol when ``viewed'' from the derived protocol.
+
+\begin{example}
+We continue \ExRef{protocol reduction order example}. The \texttt{Sequence} protocol declares an \texttt{Element} associated type, so its derived protocols inherit this associated type. In the requirement machine for the \index{protocol generic signature}protocol generic signature $G_\texttt{RandomAccessCollection}$, the alphabet contains various associated type symbols, ordered as follows:
+\begin{gather*}
+\assocsym{RandomAccessCollection}{Element}\\
+{} < \assocsym{BidirectionalCollection}{Element}\\
+{} < \assocsym{Collection}{Element}\\
+{} < \assocsym{MutableCollection}{Element}\\
+{} < \assocsym{Sequence}{Element}
+\end{gather*}
+We will see \emph{why} the order must respect protocol inheritance in \SecRef{recursive conformances redux}.
+\end{example}
+
+\medskip
+
+The next three symbol kinds appear when we build rewrite rules for \index{layout requirement}layout, \index{superclass requirement}superclass and \index{same-type requirement}concrete type requirements. Just like a \index{conformance requirement}conformance requirement $\TP$ defines a rewrite rule $\Term(\tT)\cdot\pP\sim\Term(\tT)$, these other requirement kinds define \index{rewrite rule!in requirement machine}rewrite rules of the form $\Term(\tT)\cdot s\sim\Term(\tT)$, where \tT\ is the requirement's subject type, and $s$ is a layout, superclass or concrete type symbol.
+
+\paragraph{Layout symbols.} The $\layoutsym{AnyObject}$ \index{layout symbol}layout symbol represents the \texttt{AnyObject} layout constraint we introduced in \DefRef{requirement def}. It appears when we translate a layout requirement $\ConfReq{T}{AnyObject}$ into a rule $\Term(\tT)\cdot\layoutsym{AnyObject} \sim \Term(\tT)$.
+
+We also mentioned the \verb|_NativeClass| layout constraint in \SecRef{genericsigqueries}. This constraint cannot be stated directly by the user, but it is implied by a superclass requirement to a Swift-native class. These two layout symbols are ordered as follows:
+\[\layoutsym{AnyObject} < \layoutsym{\char`_NativeClass}\]
+
+\paragraph{Superclass and concrete type symbols.}
+\index{superclass symbol}Superclass and \index{concrete type symbol}concrete type symbols encode a concrete type that may contain type parameters. To form the symbol, we first decompose the concrete type into a \IndexDefinition{pattern type}\emph{pattern type} and a list of \IndexDefinition{substitution term}\emph{substitution terms}:
+\begin{ceqn}
+\[\text{concrete type} = \text{pattern type} + \text{substitution terms}\]
+\end{ceqn}
+We're forming the symbol because we're translating an explicit or associated requirement into a rewrite rule, so we use the ``$\Term$'' or ``$\TermP{P}$'' mapping as appropriate to translate each type parameter appearing in our concrete type. (The next section will introduce \AlgRef{build term generic} and \AlgRef{build term protocol} used for this purpose, but for now, the definitions from the start of this chapter remain valid.) We then replace each type parameter with a ``phantom'' generic parameter \ttgp{0}{i}, where the \index{depth}depth is always zero, and the \index{index}index~$i\in\NN$ is the index of the corresponding substitution term in the list.
+
+\begin{algorithm}[Build concrete type symbol]\label{concretesymbolcons}
+Receives an interface type~\texttt{X} as input, and optionally, a protocol~\tP. As output, returns a pattern type together with a list of substitution terms. Note that the type \texttt{X} must not itself be a type parameter.
+\begin{enumerate}
+\item Initialize $S$ with an empty list of terms, and let $i:=0$.
+\item Perform a pre-order walk over the tree structure of \texttt{T}, transforming each type parameter~\tT\ contained in \texttt{X} to form the pattern type~\texttt{Y}:
+\begin{enumerate}
+\item If we're lowering an explicit requirement, let $t := \Term(\tT)$. Otherwise, let $t := \TermP{P}(\tT)$. Set $S\leftarrow S + \{t\}$.
+\item Replace \tT\ with the generic parameter type \ttgp{0}{i} in \texttt{X}.
+\item Set $i\leftarrow i + 1$.
+\end{enumerate}
+\item Return the type \texttt{Y}, and the array of substitution terms~$S$.
+\end{enumerate}
+\end{algorithm}
+
+\begin{example}
+Given the explicit requirement $\SameReq{\rT}{Array<\rU.Element>}$, we decompose the right-hand side as follows:
+\begin{ceqn}
+\[\texttt{Array<\rU.Element>} = \texttt{Array<\rT>} + \{\rU\cdot\nElement\}\]
+\end{ceqn}
+We can then form the concrete type symbol $\concretesym{\texttt{Array<\rT>};\, \rU\cdot\nElement}$ from the pattern type \texttt{Array<\rT>} and list of substitution terms $\{\rU\cdot\nElement\}$.
+\end{example}
+
+\begin{example}
+If we have a \index{fully-concrete type}fully concrete type that does not contain type parameters, then our list of substitution terms will be empty. For example, the right-hand side of the superclass requirement $\ConfReq{Self}{NSObject}$ defines the symbol $\supersym{\texttt{NSObject}}$.
+\end{example}
+
+\begin{example}
+The pattern type output by \AlgRef{concretesymbolcons} satisfies certain conditions:
+\begin{enumerate}
+\item The pattern type itself cannot be a type parameter.
+\item The pattern type does not contain any dependent member types.
+\item Every generic parameter type appearing in the pattern type has depth zero.
+\item Every generic parameter type has a unique index.
+\item Indices are consecutive and start from zero.
+\end{enumerate}
+None of the following are valid pattern types:
+\begin{gather*}
+\rT\\
+\texttt{Array<\rT.Element>}\\
+\texttt{Array<\ttgp{1}{0}>}\\
+\texttt{Dictionary<\rT,~\rT>}\\
+\texttt{(\rU) -> \rT}
+\end{gather*}
+\end{example}
+To compare a pair of superclass or concrete type symbols, we first compare their pattern types for canonical type equality, and then compare their substitution terms using the reduction order on terms, which we define in the next section. Note that this is a \index{partial order}partial order; symbols with distinct pattern types are incomparable.
+
 \begin{algorithm}[Concrete type reduction order]\label{concrete reduction order}
-Takes two superclass symbols, two concrete type symbols, or two concrete conformance symbols as input,  and returns one of ``$<$'', ``$>$'', ``$=$'' or \index{$\bot$}``$\bot$'' as output.
+Takes two superclass or concrete type symbols $s_1$ and $s_2$ as input. Returns one of ``$<$'', ``$>$'', ``$=$'' or \index{$\bot$}``$\bot$'' as output.
 \begin{enumerate}
-\item (Invariant) We assume the two symbols already have the same kind; the case of comparing a superclass symbol against a concrete type symbol, for example, is handled by the symbol order below.
-\item (Concrete conformance) If the two symbols are both concrete conformance symbols, first compare their protocols using \AlgRef{protocol reduction order}. Return the result if it is ``$<$'' or ``$>$''. Otherwise, keep going.
-\item (Incomparable) If the two symbols store a different pattern type (by canonical type equality), or a different number of substitution terms, return ``$\bot$''.
-\item (Initialize) Let $\{\sigma_i\}$ and $\{\uptau_i\}$ be the substitution terms of our two symbols, with $0\le i<\texttt{N}$ for some \texttt{N}. Let $i:=0$.
-\item (Equal) If $i=\texttt{N}$, return ``$=$''.
-\item (Compare) Compare the terms $\sigma_i$ and $\uptau_i$ using the reduction order we are about to define. Return the result if it is ``$<$'' or ``$>$''.
-\item (Next) Otherwise, increment $i$ and go back to Step~5.
+\item (Invariant) We assume the two symbols already have the same kind; the case of comparing different kinds is handled by the general symbol order we define next.
+\item (Incomparable) Compare the pattern type of $s_1$ and $s_2$ with \index{canonical type equality}canonical type equality. If the pattern types are distinct, return ``$\bot$''.
+\item (Initialize) Both symbols have the same pattern type, so they must have the same number of substitution terms, say $n$. Also, let $i:=0$.
+\item (Equal) If $i=n$, all substitution terms are identical. Return ``$=$''.
+\item (Compare) Compare the $i$th substitution terms of $s_1$ and $s_2$ using \AlgRef{rqm reduction order}. Return the result if it is ``$<$'' or ``$>$''.
+\item (Next) Otherwise, set $i\leftarrow i+1$ and go back to Step~4.
 \end{enumerate}
 \end{algorithm}
-With the above protocol and concrete type orders, we define an order on all symbols.
+
+Note that superclass and concrete type symbols contain terms, but those terms cannot recursively contain superclass and concrete type symbols, because terms corresponding to type parameters only contain generic parameter, name, protocol and associated type symbols.
+
+\paragraph{Concrete conformance symbols.} Such a \index{concrete conformance symbol}symbol consists of a pattern type, a list of substitution terms, and a protocol declaration. We will see in \ChapRef{concrete conformances} that when a type parameter \tT\ is subject to the combination of a \index{conformance requirement}conformance requirement $\TP$ and a concrete same-type requirement $\TX$, we introduce a rewrite rule containing a concrete conformance symbol:
+\[\Term(\tT)\cdot\concretesym{\texttt{X}\colon\texttt{P};\,\ldots} \sim \Term(\tT)\]
+To compare two concrete conformance symbols, we first compare their protocol, then we compare their pattern type and substitution terms.
+\begin{algorithm}[Concrete conformance reduction order]\label{concrete conformance reduction order}
+Takes two concrete conformance symbols $s_1$ and $s_2$ as input. Returns one of ``$<$'', ``$>$'', ``$=$'' or \index{$\bot$}``$\bot$'' as output.
+\begin{enumerate}
+\item Compare the protocol of $s_1$ and $s_2$ using \AlgRef{protocol reduction order}. Return the result if it is ``$<$'' or ``$>$''.
+\item Otherwise, compare the pattern type and substitution terms as in \AlgRef{concrete reduction order}.
+\end{enumerate}
+\end{algorithm}
+
+\paragraph{Symbol order.} To compare an arbitrary pair of symbols that may have different kinds, we must define an order among the symbol kinds.
+
 \begin{algorithm}[Symbol reduction order]\label{symbol reduction order}
-Takes two symbols $a$ and $b$ as input, and returns one of ``$<$'', ``$>$'', ``$=$'' or ``$\bot$'' as output.
-\begin{enumerate}
-\item (Kind) If the symbols have different kinds, assign integers $k_a$ and $k_b$ by the below mapping, and return ``$<$'' if $k_a<k_b$, otherwise return ``$>$'' since necessarily $k_a>k_b$:
-\begin{quote}
-\begin{tabular}{|l|l|}
-\hline
-0&Concrete conformance\\
-1&Protocol\\
-2&Associated type\\
-3&Generic parameter\\
-4&Name\\
-5&Layout\\
-6&Superclass\\
-7&Concrete type\\
-\hline
+Takes two symbols as input, and returns one of ``$<$'', ``$>$'', ``$=$'' or ``$\bot$'' as output. If the two symbols have different kinds, map their kinds to \index{natural number}natural numbers and compare the numbers with the usual linear order on $\NN$:
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+Concrete conformance:&0\\
+Protocol:&1\\
+Associated type:&2\\
+Generic parameter:&3\\
+Name:&4\\
+Layout:&5\\
+Superclass:&6\\
+Concrete type:&7\\
+\bottomrule
 \end{tabular}
-\end{quote}
-Otherwise, both symbols have the same kind, so we handle each kind by comparing structural components.
-\index{generic parameter symbol}%
-\item (Generic parameter) If both symbols are generic parameter symbols, compare them as in \AlgRef{generic parameter order} (which was defined on canonical generic parameter types, but generic parameter symbols have the same representation as a depth/index pair).
-\index{name symbol}%
-\index{identifier}%
-\item (Name) If both symbols are name symbols, compare the stored identifiers lexicographically.
-\index{protocol symbol}%
-\item (Protocol) If both symbols are protocol symbols, compare them by \AlgRef{protocol reduction order}.
-\index{layout symbol}%
-\item (Layout) If both symbols are layout symbols, we use a partial order that we won't define here. For the purposes of this book, \texttt{AnyObject} is the only layout constraint that can be written in the language, so assume the symbols are equal. Return ``$=$''.
-\item (Concrete) If both symbols are superclass symbols, concrete type symbols or concrete conformance symbols, compare them using \AlgRef{concrete reduction order}.
-\index{associated type symbol}%
-\item (Associated type) Otherwise, we have two associated type symbols $\assocsym{P}{A}$ and $\assocsym{Q}{B}$. First, compare the identifiers \texttt{A} and \texttt{B} lexicographically. Return the result if is ``$<$'' or ``$>$''.
-\item (Same name) If both associated types have the same name, compare \texttt{P} with \texttt{Q} using \AlgRef{protocol reduction order} and return the result.
+\end{center}
+Otherwise, both symbols have the same kind, which we already know how to compare:
+\begin{itemize}
+\item For \index{generic parameter symbol}generic parameter symbols, use \AlgRef{generic parameter order}.
+\item For \index{name symbol}name symbols, use the \index{lexicographic order}lexicographic order on their stored \index{identifier}identifiers.
+\item For protocol symbols, use \AlgRef{protocol reduction order}.
+\item For \index{associated type symbol}associated type symbols, use \AlgRef{associated type reduction order}.
+\item For layout symbols, use the order previously described.
+\item For superclass symbols, use \AlgRef{concrete reduction order}.
+\item For concrete type symbols, use \AlgRef{concrete reduction order}.
+\item For concrete conformance symbols, use \AlgRef{concrete conformance reduction order}.
+\end{itemize}
+\end{algorithm}
+
+\section{Terms}\label{building terms}
+
+Recall that a \IndexDefinition{term!in requirement machine}\emph{term} is an array of symbols. Our implementation uses two representations for terms: \IndexDefinition{mutable term}\emph{mutable terms} and \IndexDefinition{immutable term}\emph{immutable terms}. Mutable terms are a value types which store their own heap-allocated buffer. Mutable terms are cheap to modify, but more expensive to pass around. The normal form algorithm and Knuth-Bendix completion both operate on mutable terms. Immutable terms are instead allocated and uniqued by the \index{rewrite context}rewrite context. Two immutable terms with the same length and symbols are always equal pointers. They are cheap to pass, and compare for equality, but expensive to modify. A rewrite rule is represented as a pair of immutable terms.
+
+By construction, the rewrite rules in a requirement machine always have non-empty terms on both sides. For this reason, there is no immutable term representation of the empty term~$\varepsilon$. Mutable terms may be empty though, and that is the initial state of a mutable term, before any symbols are added.
+
+We're going to describe a pair of algorithms implementing the ``$\Term$'' and ``$\TermP{P}$'' mappings we defined at the beginning of the chapter. Our implementation also extends these mappings to also handle \index{bound type parameter}bound type parameters. We start with the ``$\Term$'' mapping.
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Type parameter:}&\textbf{Term:}\\
+\midrule
+\texttt{\rT.A.B}&$\rT\cdot\nA\cdot\nB$\\
+\texttt{\rT.[P]A.[Q]B}&$\rT\cdot\aPA\cdot\assocsym{Q}{B}$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+A \index{type parameter!in requirement machine}type parameter is basically a \index{linked list}single-linked list. The head is the \emph{outermost} member type, the base type of a dependent member type is the ``next'' pointer, and finally, the tail is a generic parameter type. Requirement machine terms, on the other hand, are flat arrays of symbols.
+
+To translate a type parameter into a term, we use the classical algorithm to convert a linked list into an array. We traverse the list from head to tail, and append a symbol at the end of the array at each step; this leaves us with an array where the \emph{last} element is a generic parameter symbol. All that remains is to reverse array at the end.
+
+\begin{algorithm}[Build term for explicit requirement]\label{build term generic}
+Takes a type parameter \tT\ as input, and outputs a (non-empty) term.
+\begin{enumerate}
+\item (Initialize) Let $t$ be a new empty mutable term.
+\item (Base case) If \tT\ is a generic parameter type \ttgp{d}{i}:
+\begin{enumerate}
+\item Append the generic parameter symbol \ttgp{d}{i} to $t$.
+\item Reverse the symbols in $t$, and return $t$.
+\end{enumerate}
+\item (Recursive case) Otherwise, \tT\ is a dependent member type:
+\begin{enumerate}
+\item If \tT\ is an unbound dependent member type \verb|U.A|, append the name symbol \texttt{A} to $t$.
+\end{enumerate}
+\item If \tT\ is a bound dependent member type \verb|U.[P]A|, append the associated type symbol $\assocsym{P}{A}$ to $t$.
+\item (Next) Set $\tT \leftarrow \tU$ and go back to Step~2.
 \end{enumerate}
 \end{algorithm}
-The order among different symbol kinds in Step~1 looks arbitrary, but it has certain significance; even though we cannot fully explain everything yet:
-\begin{itemize}
-\item Protocol symbols must precede associated type symbols, so that the term for the protocol \verb|Self| type precedes the term for a dependent member type in the same protocol, \verb|Self.[P]A|.
-\item Associated type symbols must precede name symbols, in the same way that bound dependent member types precede unbound dependent member types in the type parameter order. We will see why in \SecRef{tietze transformations}.
-\item Superclass symbols must precede concrete type symbols, because we must maintain compatibility with the old \texttt{GenericSignatureBuilder} minimization algorithm in a certain edge case (Section~TODO).
-\item Concrete conformances must precede protocol symbols to ensure correct minimization when a type parameter is subject to both a same-type and conformance requirement (\SecRef{minimal conformances}).
-\end{itemize}
 
-\index{shortlex order}%
-\index{protocol type alias}%
-\IndexDefinition{weighted shortlex order}%
-\IndexDefinition{weight function}%
-The final step is to extend the partial order on symbols defined above to a partial order on terms, which gives us the reduction order used in our rewrite system to compute reduced terms.
+\begin{enumerate}
+\item A \textbf{generic signature} requirement machine, which is constructed from the explicit requirements of a generic signature. These requirements contain \index{bound type parameter}bound type parameters.
+\item A \textbf{generic signature minimization} requirement machine, which is constructed from \index{desugared requirement}desugared requirements. These typically contain \index{unbound type parameter}unbound type parameters.
+\end{enumerate}
 
-We modify the standard shortlex order from \AlgRef{shortlex} as follows. We compare the number of name symbols appearing in each term first, so a \emph{longer} term may precede a shorter term in the reduction order, as long as the number of name symbols decreases; but if the number of name symbols remains the same, we fall through to the standard shortlex order. This is called a \emph{weighted shortlex order} where our \emph{weight function} counts the number of name symbols in each term. In general, this works for any weight function $w\colon A^*\rightarrow\mathbb{N}$ such that $w(xy)=w(x)+w(y)$ for all $x$, $y\in A^*$. The next section shows how the weighted shortlex order is required for correct modeling of Swift's protocol type aliases.
-\begin{algorithm}[Term reduction order]\label{rqm reduction order}
+\paragraph{Protocol component.}
+\index{protocol component}%
+\IndexSelf%
+With \textbf{protocol component} and \textbf{protocol component minimization} requirement machines, mapping type parameters to terms becomes more subtle.
+
+\index{inherited protocol}%
+Now, suppose we have a bound dependent member type \texttt{Self.[Q]A}. If this type parameter appears inside \tP, it must be that \tQ\ is either \tP\ itself, or some protocol inherited by \tP. From what we've covered so far, this would map to the term $\protosym{P}.\assocsym{Q}{A}$. However, as you will see later our rewrite system will always define a rewrite rule of the following form for each associated type \texttt{A} of each protocol \tQ\ inherited by \tP:
+\[\protosym{P}.\assocsym{Q}{A}\Rightarrow \assocsym{P}{A}\]
+While there is no harm in us returning a term which can be immediately reduced here, we save this extra step by immediately constructing the term $\assocsym{P}{A}$ instead. In particular, if \tQ\ is equal \tP, the rewrite rule in question is the following:
+\[\protosym{P}.\assocsym{P}{A}\Rightarrow \assocsym{P}{A}\]
+So the dependent member type \texttt{Self.[P]A} will always map to the term $\assocsym{P}{A}$, and not $\protosym{P}.\assocsym{P}{A}$. This short-circuiting only takes place for a bound dependent member type; the unbound dependent member type \texttt{Self.A} maps to the term $\protosym{P}.\texttt{A}$.
+
+\begin{algorithm}[Build term for associated requirement]\label{build term protocol}
+Takes a type parameter \tT\ and a protocol declaration \tP\ as input, and outputs a (non-empty) term.
+\begin{enumerate}
+\item (Initialize) Let $t$ be a new empty mutable term.
+\item (Base case) If \tT\ is the protocol \tSelf\ type (\ttgp{0}{0}), consider the term~$t$ constructed so far:
+\begin{enumerate}
+\item If $t$ is empty, append the protocol symbol $\protosym{P}$ to $t$.
+\item If $t$ ends with some name symbol~\nA, append the protocol symbol $\protosym{P}$ to $t$.
+\item If $t$ ends with an associated type symbol $\assocsym{Q}{A}$, then either $\tQ=\tP$, or \tP\ inherits from~\tQ. In both cases, replace the last symbol of $t$ with $\assocsym{P}{A}$.
+\end{enumerate}
+Reverse the symbols in $t$, and return $t$.
+\item (Recursive case) Otherwise, \tT\ is a dependent member type.
+\begin{enumerate}
+\item If \tT\ is an unbound dependent member type \verb|U.A|, append the name symbol~\nA\ to~$t$.
+\item If \tT\ is a bound dependent member type \verb|U.[Q]A|, append the associated type symbol $\assocsym{Q}{A}$ to $t$.
+\end{enumerate}
+\item (Next) Set $\tT \leftarrow \tU$, and go back to Step~2.
+\end{enumerate}
+\end{algorithm}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Type parameter:}&\textbf{Term:}\\
+\midrule
+\texttt{Self.A.B}&$\pP\cdot\nA\cdot\nB$\\
+\texttt{Self.[P]A.[Q]B}&$\aPA\cdot\assocsym{Q}{B}$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Reduction order.}
+In the previous section, we defined a partial order on symbols. We now extend this to a partial order on terms. We use a modified version of the shortlex order from \AlgRef{shortlex}, where we first compare the number of \index{name symbol!in reduction order}name symbols appearing in each term, and then proceed to the standard shortlex order if both terms have the same number of name symbols. In the next section, we will see this order is necessary for the correct modeling of Swift's protocol type aliases.
+
+This order is an instance of the following construction, with a weight function that counts the number of name symbols appearing in a term.
+
+\begin{definition}
+Let $A$ be any set. We say that $w\colon A^*\rightarrow\NN$ is a \IndexDefinition{weight function}\emph{weight function} if it satisfies $w(xy)=w(x)+w(y)$ for all $x$, $y\in A^*$. That is, $w$ is a \index{monoid homomorphism}monoid homomorphism from $A^*$~to~$\NN$, where the latter is viewed as a monoid under addition.
+\end{definition}
+
+\begin{algorithm}[Weighted shortlex order]\label{rqm reduction order}
 Takes two terms $t$ and $u$ as input, and returns one of ``$<$'', ``$>$'', ``$=$'' or \index{$\bot$}``$\bot$'' as output.
 \begin{enumerate}
-\item (Weight) Let $w(t)$ and $w(u)$ be the number of name symbols appearing in $t$ and $u$, respectively.
+\item (Weight) Compute $w(t)$ and $w(u)$.
 \item (Less) If $w(t)<w(u)$, return ``$<$''.
 \item (More) If $w(t)>w(u)$, return ``$>$''.
 \item (Shortlex) Otherwise $w(t)=w(u)$, so we compare the terms using \AlgRef{shortlex} and return the result.
 \end{enumerate}
 \end{algorithm}
-We previously showed that the standard shortlex order satisfies the conditions of a reduction order from \DefRef{reduction order def}. Now we claim that the weighted shortlex order is also a reduction order.
-\begin{proposition} Let \index{natural numbers}$w\colon A^*\rightarrow\mathbb{N}$ be a weight function satisfying $w(xy)=w(x)+w(y)$. Then the weighted shortlex order induced by $w$ is \index{translation-invariant relation}translation-invariant and \index{well-founded order}well-founded.
+
+The weighted shortlex order is a suitable reduction order under \DefRef{reduction order def}.
+
+\begin{proposition} Let \index{natural numbers}$w\colon A^*\rightarrow\NN$ be a weight function. Then the weighted shortlex order induced by $w$ is \index{translation-invariant relation}translation-invariant and \index{well-founded order}well-founded.
 \end{proposition}
 \begin{proof}
-Let $<$ be the standard shortlex order on $A^*$, and $<_w$ be our new weighted shortlex order. We prove translation invariance first. Say we have terms $t$, $u$, $x$ and $y$, with $t<_w u$; we wish to show that $xty<_w xuy$. Since $t<_w u$, we either have $w(t)<w(u)$, or $w(t)=w(u)$ and $t<u$. We consider each case:
+Let $<$ be the standard shortlex order on $A^*$, and let $<_w$ be the weighted shortlex order induced by~$w$.
+
+We prove translation invariance first. We're given $x$, $y$, $z\in A^*$ with $x<_w y$. We will show that $zx<_w zy$; the proof that $xz<_w yz$ is similar. Since $x<_w y$, by definition we either have $w(x)<w(y)$, or $w(x)=w(y)$ and $x<y$. We consider each case:
 \begin{enumerate}
-\item In the first case, our assumption that $w(t)<w(u)$ implies $(w(x)+w(t)+w(y))<(w(x)+w(u)+w(y))$, and seeing that $w(xty)=w(x)+w(t)+w(y)$ and $w(xuy)=w(x)+w(u)+w(y)$ this gives us $w(xty)<w(xuy)$. Thus, $xty<_w xuy$.
-\item In the second case, the same calculation shows that the assumption $w(t)=w(u)$ implies $w(xty)=w(xuy)$. Also, $t<u$ implies that $xty<xuy$, since $<$ is known to be translation-invariant. Together this shows $xty<_w xuy$.
+\item If $w(x)<w(y)$, then $w(z)+w(x)<w(z)+w(y)$, and since $w(zx)=w(z)+w(x)$ and $w(zy)=w(z)+w(y)$, we see that $w(zx)<w(zy)$, therefore $zx <_w zy$.
+\item If $w(x)=w(y)$ and $x<y$, then $w(zx)=w(zy)$, and the translation invariance of $<$ implies that $zx<zy$. Once again, we conclude that $zx <_w zy$.
 \end{enumerate}
-Now, we show well-foundedness by contradiction. Assume we have an infinite descending chain:
-\[\cdots<_w  t_3<_w t_2<_w t_1\]
-If we consider the weight $w(t_i)$ of each element in this chain, we see that:
-\[\cdots\le w(t_3)\le w(t_2)\le w(t_1)\]
-Every $w(t_i)$ is a non-negative integer, which can only ``step down'' finitely many times. So there is some index after which all subsequent terms have equal weight, that is, there exists $i$ such that for all $j>i$, $w(t_j)=w(t_i)$. But together with $t_j<_w t_i$ this implies that actually $t_j < t_i$. Thus we can exhibit an infinite descending chain for the \emph{standard} shortlex order $<$:
-\[\cdots<t_{i+2}<t_{i+1}<t_i\]
+Now, we demonstrate that $<_w$ is well-founded, by contradiction. Assume we have an infinite descending chain:
+\[ t_1 >_w t_2 >_w t_3 >_w \cdots \]
+If we apply the weight function $w$ to each term $t_i$ in this chain, we see that:
+\[ w(t_1) \geq w(t_2) \geq w(t_3) \geq \cdots \]
+Since $w(t_i)\in\NN$, we can only ``step down'' finitely many times. So there exists some index~$i$ such that for all $j>i$, $w(t_j)=w(t_i)$. Together with $t_j <_w t_i$, we conclude that actually, $t_j < t_i$. Thus, we get an infinite descending chain for the \emph{standard} shortlex order~$<$:
+\[ t_i > t_{i+1} > t_{i+2} > \cdots \]
 However, we know this is impossible since the standard shortlex order $<$ is well-founded. Our assumption that $<_w$ has an infinite descending chain leads to a contradiction and cannot hold, proving that $<_w$ is also well-founded.
 \end{proof}
 We can now dispose of the notation $<_w$; the reduction order on terms will simply be denoted as $<$ which will henceforth be the weighted shortlex order of \AlgRef{rqm reduction order}.
 
 \section{Rules}\label{building rules}
 
+\begin{itemize}
+\item In the next section, we will define the translation of bound type parameters to terms. The term for a dependent member type consists of either a single protocol symbol or one or more associated type symbols. To ensure that $\TermP{P}(\tSelf)$ precedes $\TermP{P}(\texttt{Self.[P]A})$, we want protocol symbols to precede associated type symbols.
+\item Associated type symbols must precede name symbols, in the same way that bound dependent member types precede unbound dependent member types in the type parameter order. We will see why in \SecRef{tietze transformations}.
+\item Superclass symbols must precede concrete type symbols, because we must maintain compatibility with the old \texttt{GenericSignatureBuilder} minimization algorithm in a certain edge case (Section~TODO).
+\item Concrete conformances must precede protocol symbols to ensure correct minimization when a type parameter is subject to both a same-type and conformance requirement (\SecRef{minimal conformances}).
+\end{itemize}
+
 \IndexDefinition{rewrite rule!in requirement machine}%
 A rewrite rule is represented by a pair of immutable terms---the \emph{left-hand side} and \emph{right-hand side}---together with some flags. The right-hand side term must precede the left-hand side term in the reduction order, as required by the theory. The flags associated with each rule are important for \index{completion}completion and minimization:
 \begin{itemize}
 \IndexDefinition{permanent rule}%
-\item \textbf{Permanent} rules are created from associated type declarations and the implicit conformance of the protocol \texttt{Self} type to the protocol itself. Permanent rules are not subject to minimization. This bit is set by the rule builder (\SecRef{building rules}).
+\item \textbf{Permanent} rules are created from associated type declarations and the implicit conformance of the protocol \tSelf\ type to the protocol itself. Permanent rules are not subject to minimization. This bit is set by the rule builder (\SecRef{building rules}).
 \index{left-simplified rule}%
 \index{right-simplified rule}%
 \index{substitution-simplified rule}%
@@ -583,8 +1094,8 @@ Now, construction of local rules can be understood as follows:
 \begin{itemize}
 \item In the first row, local rules are built from requirements only.
 
-\Index{protocol Self type@protocol \texttt{Self} type}%
-\item In the second row, we also add local rules describing the protocol \texttt{Self} type, associated type declarations, and protocol type aliases.
+\IndexSelf%
+\item In the second row, we also add local rules describing the protocol \tSelf\ type, associated type declarations, and protocol type aliases.
 
 \index{bound dependent member type}%
 \index{minimal requirement}%
@@ -594,63 +1105,62 @@ Now, construction of local rules can be understood as follows:
 \index{desugared requirement}%
 \item In the second column we start with desugared requirements. Dependent member types appearing in desugared requirements are unbound, and terms built from unbound dependent member types will contain name symbols.
 \end{itemize}
-First, let's look at the algorithm for building a rewrite rule from a generic requirement. As usual, when building terms from type parameters in Step~2.a, we use \AlgRef{build term generic} in generic signature machines and \AlgRef{build term protocol} in protocol component machines. Recall that minimal requirements are also desugared requirements. Only the latter invariants are used here; we assume that the subject type of a requirement is always a type parameter, and the constraint type of a conformance requirement is a single protocol declaration.
-\begin{algorithm}[Building a rule from a requirement]\label{build rule}
-Takes a desugared requirement as input, and outputs a pair of terms $(u,\,v)$.
+First, let's look at the algorithm for building a rewrite rule from an \index{explicit requirement}explicit requirement. As usual, when building terms from type parameters in Step~2.a, we use \AlgRef{build term generic} in generic signature machines and \AlgRef{build term protocol} in protocol component machines. Recall that minimal requirements are also desugared requirements. Only the latter invariants are used here; we assume that the subject type of a requirement is always a type parameter, and the constraint type of a conformance requirement is a single protocol declaration.
+
+\begin{algorithm}[Build rule from explicit requirement]\label{build rule}
+Takes a desugared requirement as input, and outputs a pair of terms.
 \begin{enumerate}
-\item Let $v$ be the term built from the requirement's subject type. To build $u$, handle each requirement kind as follows:
-\index{conformance requirement}%
-\item (Conformance) Let $u := v.\protosym{P}$, where \texttt{P} is the protocol declaration on the right hand side of the requirement.
-\index{layout requirement}%
-\item (Layout) Let $u := v.\layoutsym{L}$, where \texttt{L} is the layout constraint on the right hand side of the requirement.
-\index{superclass requirement}%
-\item (Superclass) Using \AlgRef{concretesymbolcons}, build a pattern type \texttt{C} and substitution terms $\{\sigma_i\}$ from the class type on the right hand side of the requirement. Let $u := v.\supersym{\texttt{C};\;\sigma_0,\,\ldots,\,\sigma_n}$.
-\index{same-type requirement}%
-\item (Same type) There are two cases; the right hand side is either a concrete type, or another type parameter.
-\begin{enumerate}
-\item (Concrete type) Using \AlgRef{concretesymbolcons}, build a pattern type \texttt{C} and substitution terms $\{\sigma_i\}$ from the concrete type on the right hand side of the requirement. Let $u := v.\concretesym{\texttt{C};\;\sigma_0,\,\ldots,\,\sigma_n}$.
-\item (Type parameter) Let $u$ be the term built from the type parameter on the right hand side of the requirement.
-\end{enumerate}
-\item Return $(u,\,v)$.
+\item For a \index{conformance requirement!in requirement machine}\textbf{conformance requirement} $\TP$:
+\[\Rule\, \TP := (\Term(\tT)\cdot\pP,\,\Term(\tT))\]
+\item For a \index{layout requirement!in requirement machine}\textbf{layout requirement} $\TAnyObject$:
+\[\Rule\, \TAnyObject := (\Term(\tT)\cdot\layoutsym{AnyObject},$ $\Term(\tT)).\]
+\item For a \index{superclass requirement!in requirement machine}\textbf{superclass requirement} $\TC$, use \AlgRef{concretesymbolcons} to form a superclass symbol, say~$s$:
+\[\Rule\, \TC := (\Term(\tT)\cdot s,\,\Term(\tT))\]
+\item For a \textbf{same-type requirement} $\TU$ where \tU\ is a \textbf{type parameter}:
+\[\Rule\, \TU := (\Term(\tT),\,\Term(\tU)).\]
+\item For a \index{same-type requirement!in requirement machine}\textbf{same-type requirement} $\TX$, where \texttt{X} is a \textbf{concrete type}, use \AlgRef{concretesymbolcons} to form a concrete type symbol, say~$s$:
+\[\Rule\, \TX := (\Term(\tT)\cdot s,\,\Term(\tT))\]
 \end{enumerate}
 \end{algorithm}
-Rewrite rules built by this algorithm have a specific structure. The second term $v$ is always a type-like term, and the first term $u$ depends on the requirement kind:
-\begin{itemize}
-\item For a same-type requirement between type parameters, $u$ is also a type-like term. Our reduction order is always total on two type-like terms, so the requirement is either trivial and can be discarded (if $u=v$), or it can be oriented as a rewrite rule $u\Rightarrow v$ or $v\Rightarrow u$.
-\item In all other cases, $u$ is a property-like term formed by appending a single property-like symbol to $v$, and thus $|u|=|v|+1$, so the rewrite rule always orients as $u\Rightarrow v$.
-\end{itemize}
-Notice how all property-like symbol kinds are represented above with the exception of concrete conformance symbols. Rules containing concrete conformance symbols do not correspond directly to generic requirements, and are introduced by property map construction from the combination of a conformance requirement and a concrete same-type requirement (\ChapRef{concrete conformances}).
-\begin{definition}\label{type like rule}
-Several concepts we defined on symbols and terms generalize to rules:
-\begin{itemize}
-\IndexDefinition{type-like rule}%
-\item A rule $u\Rightarrow v$ is \emph{type-like} if $u$ and $v$ are type-like terms.
-\IndexDefinition{property-like rule}%
-\item A rule $u\Rightarrow v$ is \emph{property-like} if $v$ is a type-like term and $u=v\cdot s$ for some property-like \index{symbol}symbol $s$ (so in particular, $u$ is property-like, but it has this special form and cannot just be \emph{any} property-like term).
-\IndexDefinition{domain!of a rule}%
-\item In a rule $u\Rightarrow v$, both $u$ and $v$ must have the same domain. This allows us to talk about \emph{the domain} of the rule.
-\item In a property-like rule $v\cdot s\Rightarrow v$ where $s$ is a superclass or concrete type symbol, each substitution term $\sigma_i$ of $s$ has the same domain as $v$.
-\end{itemize}
-\end{definition}
-For protocol component and protocol component minimization machines, we have a pair of algorithms. The first builds the rule describing the protocol \texttt{Self} type, and rules for the protocol's associated types.
-\begin{algorithm}[Building rules for a protocol]\label{rules for protocol algo}
-Takes a protocol declaration \texttt{P} as input, and outputs a list of rules.
+
+\begin{algorithm}[Build rule from associated requirement]\label{build rule protocol}
+Takes a desugared requirement and a protocol declaration~\tP\ as input, and outputs a pair of terms.
 \begin{enumerate}
-\item Let \texttt{R} be an empty list of rules, represented as pairs of terms.
-\IndexDefinition{identity conformance rule}%
-\item (Identity conformance) Build the \emph{identity conformance rule} $\protosym{P}.\protosym{P}\Rightarrow\protosym{P}$ and add it to \texttt{R}.
-\IndexDefinition{associated type introduction rule}%
-\item (Associated types) For each associated type \texttt{A} of \texttt{P}, build the \emph{associated type introduction rule} $\protosym{P}.\texttt{A}\Rightarrow\assocsym{P}{A}$ and add it to \texttt{R}.
-\IndexDefinition{inherited associated type rule}%
-\index{protocol inheritance closure}%
-\item (Inherited associated types) For each protocol \texttt{Q} in the protocol inheritance closure of \texttt{P}:
-\begin{enumerate}
-\item For each associated type \texttt{A} of \texttt{Q}, build the \emph{inherited associated type rule} $\protosym{P}.\assocsym{Q}{A}\Rightarrow\assocsym{P}{A}$ and add it to \texttt{R}.
+\item For a \index{conformance requirement!in requirement machine}\textbf{conformance requirement} $\AssocConfReq{Self.U}{Q}{P}$:
+\[\RuleP{P}\, \AssocConfReq{Self.U}{Q}{P} := (\TermP{P}(\texttt{Self.U})\cdot\pQ,\,\TermP{P}(\texttt{Self.U}))\]
+\item For a \index{layout requirement!in requirement machine}\textbf{layout requirement} $\TAnyObject$:
+\begin{multline*}
+\RuleP{P}\, \AssocConfReq{Self.U}{AnyObject}{P}\\
+{} := (\TermP{P}(\texttt{Self.U})\cdot\layoutsym{AnyObject},$ $\TermP{P}(\texttt{Self.U})).
+\end{multline*}
+\item For a \index{superclass requirement!in requirement machine}\textbf{superclass requirement} $\TC$, use \AlgRef{concretesymbolcons} to form a superclass symbol, say~$s$:
+\[\RuleP{P}\, \AssocConfReq{Self.U}{C}{P} := (\TermP{P}(\texttt{Self.U})\cdot s,\,\TermP{P}(\texttt{Self.U}))\]
+\item For a \textbf{same-type requirement} $\TU$ where \tU\ is a \textbf{type parameter}:
+\[\RuleP{P}\, \AssocSameReq{Self.U}{Self.V}{P} := (\TermP{P}(\texttt{Self.U}),\,\TermP{P}(\texttt{Self.V})).\]
+\item For a \index{same-type requirement!in requirement machine}\textbf{same-type requirement} $\TX$, where \texttt{X} is a \textbf{concrete type}, use \AlgRef{concretesymbolcons} to form a concrete type symbol, say~$s$:
+\[\RuleP{P}\, \AssocSameReq{Self.U}{X} := (\TermP{P}(\texttt{Self.U})\cdot s,\,\TermP{P}(\texttt{Self.U}))\]
 \end{enumerate}
+\end{algorithm}
+
+\IndexDefinition{identity conformance rule}
+
+\IndexDefinition{inherited associated type rule}
+
+For protocol component and protocol component minimization machines, we have a pair of algorithms. The first builds the rule describing the protocol \tSelf\ type, and rules for the protocol's associated types.
+\begin{algorithm}[Build rules for protocol component]\label{rules for protocol algo}
+Takes a protocol declaration \tP\ as input, and outputs a list of rules.
+\begin{enumerate}
+\item Initialize $R$ with an empty list of rules, represented as pairs of terms.
+\item Add the identity conformance rule $(\pP \cdot \pP,\, \pP)$ to $R$.
+\item For each associated type \nA\ of \tP, build the associated type introduction rule $(\pP \cdot \nA,\, \aPA)$ and add it to~$R$.
+
+\item (Inherited associated types) For each associated type \nA\ of each protocol \tQ\ inherited by \tP, add the inherited associated type rule $(\pP \cdot \assocsym{Q}{A},\,\aPA)$ to~$R$.
 \end{enumerate}
 \end{algorithm}
 
 Re-stating an associated type vs not restating it, what changes? (Nothing)
+
+Derived requirements don’t capture protocol type aliases
 
 The second algorithm concerns protocol type aliases. 
 
@@ -670,197 +1180,76 @@ Minimized protocols:
 
 Like same-type requirements, we must separately consider the case where the underlying type is a concrete type, and where it is a type parameter. Mention the reduction order thing.
 
-\begin{algorithm}[Building a rule for a protocol type alias]
-Takes a protocol \texttt{P}, and the name and underlying type of a protocol type alias member as input. Returns a pair of terms $(u,\,v)$ as output.
+\begin{algorithm}[Build rule for protocol type alias]
+Takes a protocol \tP, and a type alias member \nA\ of \tP\ as input. Returns a pair of terms $(u,\,v)$ as output.
 \begin{enumerate}
-\item (Subject type) Build the name symbol \texttt{A} from the name of the type alias, and let $t := \protosym{P}.\texttt{A}$.
-\item (Concrete type) If the underlying type is concrete, use \AlgRef{concretesymbolcons} to build a pattern type \texttt{C} and substitution terms $\{\sigma_i\}$ from the underlying type. Let $u := t.\concretesym{\texttt{C};\;\sigma_0,\,\ldots,\,\sigma_n}$, and let $v := t$.
-\item (Type parameter) If the underlying type is a type parameter, let $u := t$, and let $v$ be the term built from the underlying type.
-\item Return $(u,\,v)$.
+\item Get the \index{underlying type}underlying type of \nA.
+\item If the underlying type of \nA\ is concrete, use \AlgRef{concretesymbolcons} to build a concrete type symbol, say~$s$, return the pair:
+\[(\pP \cdot \nA \cdot s,\, \pP \cdot \nA)\]
+\item If the underlying type of \nA\ is some type parameter \texttt{Self.U}, return the pair:
+\[(\pP \cdot \nA,\, \TermP{P}(\texttt{Self.U}))\]
 \end{enumerate}
 \end{algorithm}
 
 examples showing desugared vs minimal requirements, unbound vs bound. they actually end up giving us the same rewrite system via completion!
 
-Consider the following generic signature:
-\[\gensig{\genericsym{0}{0},\genericsym{0}{1}}{\genericsym{0}{0}\colon\proto{Collection},\;\genericsym{0}{1}\colon\proto{Collection},\;\genericsym{0}{0}.\namesym{Element}==\genericsym{0}{1}.\namesym{Element}}\]
-The signature's requirements lower to the following rewrite rules:
-\begin{align}
-\genericsym{0}{0}.\protosym{Collection}&\Rightarrow\genericsym{0}{0}\tag{1}\\
-\genericsym{0}{1}.\protosym{Collection}&\Rightarrow\genericsym{0}{1}\tag{2}\\
-\genericsym{0}{1}.\namesym{Element}&\Rightarrow\genericsym{0}{0}.\namesym{Element}\tag{3}
-\end{align}
-Rule 1 and Rule 2 are lowered conformance requirements of the form $\namesym{T}.\protosym{P}\Rightarrow\namesym{T}$ just like before, and Rule 3 is the lowered same-type requirement.
+\section{The Normal Form Algorithm}\label{term reduction}
 
-This rewrite system will also need to include the requirements of the $\proto{Collection}$ protocol, as well as $\proto{Sequence}$ and $\proto{IteratorProtocol}$, which are referenced from the requirement signatures of $\proto{Collection}$ and $\proto{Sequence}$.
+\IndexTwoFlag{debug-requirement-machine}{simplify}
 
-\section{Correctness}\label{rqm correctness}
+rewrite steps only store the length of each whisker, index of rule, and inverse flag.
 
-\begin{itemize}
-\item example before the correctness proof
-\item Derived requirements don’t capture protocol type aliases
-\item we don't handle concrete type requirements -- only conformance requirements, and same-type between type parameters
-\end{itemize}
+\IndexDefinition{trie}
+rule trie. Section~6.3 of \cite{art3}.
 
-To recap, we construct a \index{finitely-presented monoid}finitely-presented monoid from a \index{generic signature}generic signature and its protocol dependencies. The \index{explicit requirement}explicit requirements written by the user become relations of our monoid. This mapping from requirements to relations---where the latter are really just pairs of terms---was defined by \AlgRef{build rule}. Now, instead of using this algorithm to \emph{define} our monoid, we can instead apply it to an arbitrary requirement, and consider whether the pair of terms are equivalent in some existing monoid constructed from a generic signature.
-
-Certainly, if we take one of the exact explicit requirements we started with, the pair of terms we get are known to be equivalent, with the equivalence given by the previously-defined relation itself. But we also know that the equivalence relation of a finitely-presented monoid is more involved; equivalences are witnessed by rewrite paths, possibly composed of multiple relations operating on different subterms of the overall term at each rewrite step.
-
-Now, we will provide the formal justification for our entire endeavour. We will prove that if we take a \index{derived requirement}derived requirement of our generic signature, \AlgRef{build rule} outputs a pair of terms equivalent as elements of our monoid, with the \index{rewrite path}rewrite path constructively defined by the requirement's derivation. This is, essentially, one half of a correctness proof for the Requirement Machine.
-
-In what follows, $G$ is a generic signature, and $\AR$ is the finitely-presented monoid defined by the requirements of $G$ and its protocol dependencies. The relation $\sim$ is the equivalence of terms in this monoid, $\PhiInv$ is the mapping from type parameters of $G$ to elements of $A^*$ given by \AlgRef{build term generic}, and $\PhiInv_\texttt{P}$ is \AlgRef{build term protocol}. We begin with a preliminary result that is useful in the proof of the main theorem.
-
-\begin{lemma}\label{type param composition lemma}
-Suppose that \texttt{T} is a type parameter of $G$, \texttt{P} is some protocol, and \texttt{Self.U} is a type parameter of $\GP$. Denote by \texttt{T.U} the type parameter obtained by formal substitution of \texttt{Self} with \texttt{T} in \texttt{Self.U}. Then if $\PhiInv(\texttt{T})\cdot\protosym{P}\sim\PhiInv(\texttt{T})$ in $\AR$, we have $\PhiInv(\texttt{T.U})\sim\PhiInv(\texttt{T})\cdot\PhiInv_\texttt{P}(\texttt{Self.U})$.
-\end{lemma}
-\begin{proof}
-Note that $\PhiInv(\texttt{T})\cdot\protosym{P}\sim\PhiInv(\texttt{T})$ is a long-winded way of saying $G\vDash\ConfReq{T}{P}$, but we haven't proven this correspondence between derivations and rewrite paths yet. For convenience, define $t:=\PhiInv(\texttt{T})$ and $u:=\PhiInv_\texttt{P}(\texttt{Self.U})$. We must show that $\PhiInv(\texttt{T.U})$ is equivalent to $t\cdot u$.
-
-There are three cases to deal with:
+\begin{algorithm}[Insert rule in rule trie]\label{trie insert algo}
+Takes the index of a rewrite rule as input. Has side effects.
 \begin{enumerate}
-\item \texttt{Self.U} is a type parameter of length $>1$, and the innermost dependent member type is bound, so it takes the form ``\texttt{Self.[Q]A...}'' where \texttt{Q} is either \texttt{P} itself, or a base protocol of \texttt{P}. Then, $u$ starts with an associated type symbol $\assocsym{P}{A}$ for some associated type declaration \texttt{A} of \texttt{Q}.
-\item \texttt{Self.U} is either just the protocol \texttt{Self} type itself, or its innermost dependent member type is unbound. Then, $u$ starts with the protocol symbol $\protosym{P}$, followed by zero or more name symbols.
+\item (Initialize) Let $N$ be the root node of the trie. Let $i:=0$.
+\item (End) If $i=|t|$, store the index of our rewrite rule in~$N$ and return.
+\item (Traverse) Let $s_i$ be the $i$th symbol of $t$. Look up $s_i$ in $N$. Create a new node if no such node exists.
+\item (Child) Call this child node~$M$. Set $N \leftarrow M$. Set $i \leftarrow i+1$. Go back to Step~2.
 \end{enumerate}
+\end{algorithm}
 
-In case (1), this follows from the definition of \AlgRef{build term generic} and \AlgRef{build term protocol}:
-\[\PhiInv(\texttt{T.U})=t\cdot u\]
-The two terms we set out to prove equivalent are actually identical, so we are done.
-
-In case (2), $u=\protosym{P}\cdot v$ for some term $v\in A^*$, hence:
-\begin{gather*}
-\PhiInv(\texttt{T.U})=t\cdot v\\
-t\cdot u=t\cdot \protosym{P}\cdot v
-\end{gather*}
-Now we use the assumption that $t\cdot\protosym{P}\sim t$, so there exists a rewrite path $p$ with $\Src(p)=t\cdot\protosym{P}$ and $\Dst(p)=t$. Consider the rewrite path $p\star v$ obtained by \index{rewrite path whiskering}. It follows that $\Src(p\star v)=t\cdot\protosym{P}\cdot v$, and $\Dst(p\star v)=t\cdot v$. Thus,
-$\PhiInv(\texttt{T.U})\sim t\cdot u$, as required.
-\end{proof}
-
-Now we prove that the \index{derived requirement}derived conformance and same-type requirements of $G$ correspond to equivalences of terms in $\AR$. Note that this is a more elaborate version of the same argument as \ThmRef{derivation to path}.
-\begin{theorem}\label{derivation to path swift}
-Suppose that \texttt{T} and \texttt{U} are type parameters of $G$ and \texttt{P} is some protocol.
+\begin{algorithm}[Lookup in rule trie]\label{trie lookup algo}
+Takes a term $t$ and an offset $i$ such that $0\leq i<|t|$. Return the index of a rewrite rule~$(u, v)$ such that~$u$ is a prefix of $t[i:]$, or a null value if no such rule exists.
 \begin{enumerate}
-\item If $G\vDash\ConfReq{T}{P}$, then $\PhiInv(\texttt{T})\cdot\protosym{P}\sim\PhiInv(\texttt{T})$.
-\item If $G\vDash\SameReq{T}{U}$, then $\PhiInv(\texttt{T})\sim\PhiInv(\texttt{U})$.
+\item (Initialize) Let $N$ be the root node of the trie.
+\item (End) If $i=|t|$, we've reached the end of the term. Return null.
+\item (Traverse) Let $s_i$ be the $i$th symbol of $t$. Look up $s_i$ in $N$. Return null if no such node exists.
+\item (Child) Otherwise, call this child node~$M$. If $M$ stores the index of a rewrite rule, return this index.
+\item (Advance) Set $N \leftarrow M$. Set $i \leftarrow i+1$. Go back to Step~2.
 \end{enumerate}
-Note that the right hand side of each implication is the result of applying \AlgRef{build rule} to the requirement on the left.
-\end{theorem}
-\begin{proof}
-We proceed by \index{structural induction}structural induction on derivations. In the \index{base case}base case, explicit requirements of $G$ and its protocol dependencies directly correspond to elements of $R$. In the \index{inductive step}inductive step, the \index{induction}induction hypothesis gives us a \index{rewrite path}rewrite path corresponding to each derived requirement on the left-hand side of $\vdash$. We then construct a rewrite path corresponding to the requirement on the right hand side of $\vdash$. We only need to consider derived requirements, and not type parameters. Type parameters on either side of $\vdash$ are ignored, because existence of terms does not need to be derived in a finitely-presented monoid.
+\end{algorithm}
 
-\IndexStep{GenSig}(\textsc{GenSig}) This is the base case. \AlgRef{build rule} adds a relation to $R$ for each explicit conformance or same-type requirement of $G$:
-\begin{itemize}
-\item $\ConfReq{T}{P}$ becomes $(\PhiInv(T)\cdot\protosym{P},\,\PhiInv(T))$.
-\item $\SameReq{T}{U}$ becomes $(\PhiInv(T),\,\PhiInv(U))$.
-\end{itemize}
-We take our rewrite path to be the path consisting of a single rewrite step with empty terms as whiskers, corresponding to this relation.
+\begin{algorithm}[Normal form algorithm using rule trie]\label{term reduction trie algo}
+Takes a mutable term $t$ as input. Mutates $t$, and outputs a \index{positive rewrite path}positive rewrite path~$p$ where $\Src(p)$ is the original term~$t$, and $\Dst(p)$ is the normal form of~$t$.
+\begin{enumerate}
+\item (Initialize) Initialize the return value $p$ with the empty rewrite path $1_p$. Let $i := 0$.
+\item (End) If $i=|t|$, return $p$.
+\item (Lookup) Invoke \AlgRef{trie lookup algo} with $t$ and $i$.
+\item (Rewrite) If we found a rewrite rule $(u, v)$, then let $x := t[i:]$, $y := t[:i+|u|]$. Replace the subterm $t[i:i+|u|]$ with $v$, set $i\leftarrow i+1$, set $p\leftarrow p\circ x(u\Rightarrow v)y$, and go back to Step~2.
+\item (Done) Otherwise, $t$ is reduced. Return $p$.
+\end{enumerate}
+\end{algorithm}
 
-\IndexStep{ReqSig}(\textsc{ReqSig}) The other base case. If \texttt{P} is not a protocol dependency of $G$, this derivation step cannot be used in what follows, so we can discard it; we can assume our derivation does not contain such derivation steps, without loss of generality.
+\begin{algorithm}[Record rewrite rule]\label{add rewrite rule}
+Takes a pair of terms $(u,v)$ as input. Has side effects.
+\begin{enumerate}
+\item (Reduce) Apply \AlgRef{term reduction trie algo} to $u$ and $v$ to obtain $\tilde{u}$ and $\tilde{v}$.
+\item (Trivial) If $\tilde{u}=\tilde{v}$, return.
+\item (Compare) Use \AlgRef{rqm reduction order} to compare $\tilde{u}$ with $\tilde{v}$.
+\item (Error) If $\tilde{u}$ and $\tilde{v}$ are incomparable, signal an error.
+\item (Orient) If $\tilde{v}>\tilde{u}$, swap $\tilde{u}$ and $\tilde{v}$.
+\item (Record) Add $(\tilde{u},\tilde{v})$ to the list of local rules.
+\item (Trie) Invoke \AlgRef{trie insert algo} to insert the new local rule in the trie.
+\end{enumerate}
+\end{algorithm}
 
-Otherwise, \AlgRef{build rule} creates a relation corresponding to each explicit conformance or same-type requirement of each protocol dependency of $G$:
-\begin{itemize}
-\item $\ConfReq{Self.U}{P}$ becomes $(\PhiInv_\texttt{P}(\texttt{Self.U})\cdot\protosym{P},\,\PhiInv_\texttt{P}(\texttt{Self.U}))$.
-\item $\SameReq{Self.U}{Self.V}$ becomes $(\PhiInv_\texttt{P}(\texttt{Self.U}),\,\PhiInv_\texttt{P}(\texttt{Self.V}))$.
-\end{itemize}
-Once again we get a trivial rewrite path corresponding to this requirement.
+Our implementation explicitly stores the source and destination terms in a critical pair, as well as the rewrite path itself. As we will learn in \SecRef{completion sourceref}, we use a compressed representation for \index{rewrite path!representation}rewrite paths in memory, where a \index{rewrite step!representation}rewrite step $x(u\Rightarrow v)y$ only stores the \emph{length} of each \index{whiskering}whisker $x$ and $y$ and not the actual terms $x$ and $y$. Thus, we must store the source and destination terms separately since they cannot be recovered from the rewrite path alone.
 
-\IndexStep{AssocType}(\textsc{AssocType})
-The first two kinds prove validity of type parameters, which we do not need to handle. The third proves an equivalence between a bound and unbound dependent member type:
-\[\ConfReq{T}{P}\vdash\SameReq{T.[P]A}{T.A}\]
-Note that:
-\begin{gather*}
-\PhiInv(\texttt{T.[P]A})=\PhiInv(\texttt{T})\cdot\assocsym{P}{A}\\
-\PhiInv(\texttt{T.A})=\PhiInv(\texttt{T})\cdot\texttt{A}
-\end{gather*}
-We must construct a rewrite path from the first term to the second. By the induction hypothesis, we have a rewrite path $p^\prime$ with $\Src(p^\prime)=\PhiInv(\texttt{T})\cdot\protosym{P}$ and $\Dst(p^\prime)=\PhiInv(\texttt{T})$.
-
-For each associated type declaration \texttt{A} of \texttt{P}, we know that \AlgRef{rules for protocol algo} adds an associated type introduction rule to $R$. Call the corresponding rewrite path $p_\texttt{A}$:
-\[p_\texttt{A}:=(\protosym{P}.\texttt{A}\Rightarrow\assocsym{P}{A})\]
-We construct the following rewrite path by whiskering and \index{rewrite path composition}composition:
-\[p:=(\PhiInv(\texttt{T})\star p_\texttt{A})\circ(p^\prime \star \texttt{A})\]
-The composition is valid, and the source and destination are as required:
-\begin{gather*}
-\Dst(\PhiInv(\texttt{T})\star p_\texttt{A})=\PhiInv(\texttt{T}).\protosym{P}.\texttt{A}=\Src(p^\prime \star \texttt{A})\\[\medskipamount]
-\Src(p)=\PhiInv(\texttt{T})\cdot\assocsym{P}{A}\\
-\Dst(p)=\PhiInv(\texttt{T})\cdot\texttt{A}
-\end{gather*}
-
-\IndexStep{Conf}(\textsc{Conf}, 1) Consider the first kind of \textsc{Conf} derivation step:
-\[\ConfReq{T}{P},\,\ConfReq{Self.U}{Q}\vdash\ConfReq{T.U}{Q}\]
-The induction hypothesis gives us a pair of rewrite paths $p_1$ and $p_2$, corresponding to the derived requirements on the left-hand side of $\vdash$, with source and destination as follows:
-\begin{gather*}
-\Src(p_1)=\PhiInv(\texttt{T})\cdot\protosym{P}\\
-\Src(p_1)=\PhiInv(\texttt{T})\\[\medskipamount]
-\Src(p_2)=\PhiInv_\texttt{P}(\texttt{Self.U})\cdot\protosym{Q}\\
-\Dst(p_2)=\PhiInv_\texttt{P}(\texttt{Self.U})
-\end{gather*}
-Consider the rewrite path $\PhiInv(\texttt{T})\star p_2$. We have:
-\begin{gather*}
-\Src(\PhiInv(\texttt{T})\star p_2)= \PhiInv(\texttt{T})\cdot\PhiInv_\texttt{P}(\texttt{Self.U})\cdot\protosym{Q}\\
-\Dst(\PhiInv(\texttt{T})\star p_2)= \PhiInv(\texttt{T})\cdot\PhiInv_\texttt{P}(\texttt{Self.U})
-\end{gather*}
-Now, \LemmaRef{type param composition lemma} applied to $p_2$ tells us that $\PhiInv(\texttt{T.U})\sim\PhiInv(\texttt{T})\cdot\PhiInv_\texttt{P}(\texttt{Self.U})$, so there exists a certain rewrite path $p_3$:
-\begin{gather*}
-\Src(p_3) = \PhiInv(\texttt{T.U})\\
-\Dst(p_3) = \PhiInv(\texttt{T})\cdot\PhiInv_\texttt{P}(\texttt{Self.U})
-\end{gather*}
-Finally, we can form the requisite rewrite path $p$ corresponding to the derived requirement $\ConfReq{T.U}{Q}$ on the right-hand side of $\vdash$:
-\[p := (p_3\star\protosym{Q}) \circ (\PhiInv(\texttt{T})\star p_2) \circ p_3^{-1}\]
-
-(\textsc{Conf}, 2) Next, consider the second kind of \textsc{Conf} derivation step:
-\[\ConfReq{T}{P},\,\SameReq{Self.U}{Self.V}\vdash\SameReq{T.U}{T.V}\]
-We get a rewrite path $p_1$ identical to the above. The rewrite path $p_2$ instead corresponds to the same-type requirement:
-\begin{gather*}
-\Src(p_2)=\PhiInv_\texttt{P}(\texttt{Self.U})\\
-\Dst(p_2)=\PhiInv_\texttt{P}(\texttt{Self.V})
-\end{gather*}
-This time, we apply \LemmaRef{type param composition lemma} twice, to get a pair of rewrite paths $p_3$ and $p_4$:
-\begin{gather*}
-\Src(p_3) = \PhiInv(\texttt{T.U})\\
-\Dst(p_3) = \PhiInv(\texttt{T})\cdot\PhiInv_\texttt{P}(\texttt{Self.U})\\[\medskipamount]
-\Src(p_4) = \PhiInv(\texttt{T.V})\\
-\Dst(p_4) = \PhiInv(\texttt{T})\cdot\PhiInv_\texttt{P}(\texttt{Self.V})
-\end{gather*}
-
-The requisite rewrite path $p$ corresponding to $\SameReq{T.U}{T.V}$ is the below:
-\[p := p_3 \circ (\PhiInv(\texttt{T}) \star p_2) \circ p_4\]
-
-\IndexStep{Equiv}(\textsc{Equiv}, 1) The first kind derives a trivial equivalence from a valid type parameter:
-\[\texttt{T}\vdash\SameReq{T}{T}\]
-We take $p$ to be empty rewrite path for the term $\PhiInv(\texttt{T})$.
-
-(\textsc{Equiv}, 2) The second kind flips a same-type requirement:
-\[\SameReq{T}{U}\vdash\SameReq{U}{T}\]
-By the induction hypothesis, we have a rewrite path $p^\prime$ corresponding to $\SameReq{T}{U}$. We \index{inverse rewrite path}invert this rewrite path, and take $p := (p^\prime)^{-1}$.
-
-(\textsc{Equiv}, 3) The third kind combines two same-type requirements:
-\[\SameReq{T}{U},\,\SameReq{U}{V}\vdash\SameReq{T}{V}\]
-By the induction hypothesis, we have a pair of rewrite paths $p_1$ and $p_2$, corresponding to each same-type requirement on the left-hand side of $\vdash$. Their \index{rewrite path composition}composition corresponds to $\SameReq{T}{V}$:
-\[p:=p_1\circ p_2\]
-
-\IndexStep{Same}(\textsc{Same}) We only consider one kind here:
-\[\ConfReq{U}{P},\,\SameReq{T}{U}\vdash\ConfReq{T}{P}\]
-By induction, we have a pair of rewrite paths $p_1$ and $p_2$:
-\begin{gather*}
-\Src(p_1)=\PhiInv(\texttt{T})\cdot\protosym{P}\\
-\Src(p_1)=\PhiInv(\texttt{T})\\[\medskipamount]
-\Src(p_2)=\PhiInv(\texttt{T})\\
-\Dst(p_2)=\PhiInv(\texttt{U})
-\end{gather*}
-We can obtain the desired rewrite path easily enough:
-\[(p_2^{-1} \star \protosym{P}) \circ p_1 \circ p_2\]
-
-\IndexStep{Member}(\textsc{Member}) The same argument disposes of both kinds of \textsc{Member} derivation steps:
-\begin{gather*}
-\ConfReq{U}{P},\,\SameReq{T}{U}\vdash\SameReq{T.A}{U.A}\\
-\ConfReq{U}{P},\,\SameReq{T}{U}\vdash\SameReq{T.[P]A}{U.[P]A}
-\end{gather*}
-By the induction hypothesis, we have a pair of rewrite paths. We don't need the rewrite path corresponding to $\ConfReq{U}{P}$ at all. Let's say that $p^\prime$ is the rewrite path corresponding to $\SameReq{T}{U}$. Then we construct a new rewrite path by whiskering $p^\prime$ on the right by a name symbol or associated type symbol, depending on which of the two derivation step kinds we're dealing with:
-\begin{gather*}
-p := p^\prime \star \texttt{A}\\
-p := p^\prime \star \assocsym{P}{A}
-\end{gather*}
-This concludes the proof.
-\end{proof}
+Aho-Corasick algorithm \cite{ahocorasick}.
 
 \section{Source Code Reference}\label{symbols terms rules sourceref}
 

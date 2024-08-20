@@ -213,7 +213,7 @@ void Symbol::serializeRange(size_t InitialIndentation,
 const ValueDecl *Symbol::getDeclInheritingDocs() const {
   // get the decl that would provide docs for this symbol
   const auto *DocCommentProvidingDecl =
-      dyn_cast_or_null<ValueDecl>(getDocCommentProvidingDecl(D));
+      dyn_cast_or_null<ValueDecl>(D->getDocCommentProvidingDecl());
 
   // if the decl is the same as the one for this symbol, we're not
   // inheriting docs, so return null. however, if this symbol is
@@ -359,7 +359,7 @@ void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
   const auto *DocCommentProvidingDecl = D;
   if (!Graph->Walker.Options.SkipInheritedDocs) {
     DocCommentProvidingDecl =
-        dyn_cast_or_null<ValueDecl>(getDocCommentProvidingDecl(D));
+        dyn_cast_or_null<ValueDecl>(D->getDocCommentProvidingDecl());
     if (!DocCommentProvidingDecl) {
       DocCommentProvidingDecl = D;
     }

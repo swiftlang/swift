@@ -1159,36 +1159,29 @@ public:
 /// FallthroughStmt - The keyword "fallthrough".
 class FallthroughStmt : public Stmt {
   SourceLoc Loc;
-  CaseStmt *FallthroughSource;
-  CaseStmt *FallthroughDest;
+  DeclContext *DC;
 
-public:
-  FallthroughStmt(SourceLoc Loc, std::optional<bool> implicit = std::nullopt)
+  FallthroughStmt(SourceLoc Loc, DeclContext *DC,
+                  std::optional<bool> implicit = std::nullopt)
       : Stmt(StmtKind::Fallthrough, getDefaultImplicitFlag(implicit, Loc)),
-        Loc(Loc), FallthroughSource(nullptr), FallthroughDest(nullptr) {}
+        Loc(Loc), DC(DC) {}
+public:
+  static FallthroughStmt *createParsed(SourceLoc Loc, DeclContext *DC);
 
   SourceLoc getLoc() const { return Loc; }
 
   SourceRange getSourceRange() const { return Loc; }
 
+  DeclContext *getDeclContext() const { return DC; }
+  void setDeclContext(DeclContext *newDC) { DC = newDC; }
+
   /// Get the CaseStmt block from which the fallthrough transfers control.
-  /// Set during Sema. (May stay null if fallthrough is invalid.)
-  CaseStmt *getFallthroughSource() const { return FallthroughSource; }
-  void setFallthroughSource(CaseStmt *C) {
-    assert(!FallthroughSource && "fallthrough source already set?!");
-    FallthroughSource = C;
-  }
+  /// Returns \c nullptr if the fallthrough is invalid.
+  CaseStmt *getFallthroughSource() const;
 
   /// Get the CaseStmt block to which the fallthrough transfers control.
-  /// Set during Sema.
-  CaseStmt *getFallthroughDest() const {
-    assert(FallthroughDest && "fallthrough dest is not set until Sema");
-    return FallthroughDest;
-  }
-  void setFallthroughDest(CaseStmt *C) {
-    assert(!FallthroughDest && "fallthrough dest already set?!");
-    FallthroughDest = C;
-  }
+  /// Returns \c nullptr if the fallthrough is invalid.
+  CaseStmt *getFallthroughDest() const;
 
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Fallthrough;
@@ -1613,6 +1606,7 @@ public:
   }
 
   DeclContext *getDeclContext() const { return DC; }
+  void setDeclContext(DeclContext *newDC) { DC = newDC; }
 
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Break;
@@ -1648,6 +1642,7 @@ public:
   }
 
   DeclContext *getDeclContext() const { return DC; }
+  void setDeclContext(DeclContext *newDC) { DC = newDC; }
 
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Continue;

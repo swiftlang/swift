@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Generics -clang-header-expose-decls=all-public -emit-clang-header-path %t/generics.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Generics -enable-experimental-cxx-interop -emit-clang-header-path %t/generics.h
 // RUN: %FileCheck %s < %t/generics.h
 // RUN: %check-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
@@ -100,13 +100,23 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
+// CHECK-NEXT: class SWIFT_SYMBOL("s:8Generics17GenericCustomTypeO") GenericCustomType;
+
+// CHECK: inline const constexpr bool isOpaqueLayout<Generics::GenericCustomType<T_0_0>> = true;
+
+// CHECK: template<class T_0_0>
+
+// CHECK: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: class SWIFT_SYMBOL("s:8Generics10GenericOptO") GenericOpt;
 
 // CHECK: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Generics::GenericOpt<T_0_0>> = isUsableInGenericContext<T_0_0>;
+// CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<Generics::GenericOpt<T_0_0>> = isUsableInGenericContext<T_0_0>;
 
 // CHECK: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
@@ -217,6 +227,8 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT: #endif
 // CHECK-NEXT:   _impl::$s8Generics14takeGenericOptyyAA0cD0OyxGlF(_impl::_impl_GenericOpt<T_0_0>::getOpaquePointer(x), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT: }
+
+// CHECK: SWIFT_INLINE_THUNK  bool GenericCustomType<T_0_0>::isFailure() const {
 
 // CHECK: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts

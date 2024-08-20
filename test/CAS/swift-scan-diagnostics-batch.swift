@@ -50,8 +50,6 @@
 
 // PARSEABLE-COUNT-1:   "kind": "began",
 // PARSEABLE-COUNT-1:   "kind": "finished",
-// PRASEABLE-NOT: "kind": "began",
-// PRASEABLE-NOT: "kind": "finished",
 
 // NO-OUTPUT-NOT: "kind": "began",
 

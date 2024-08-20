@@ -13,6 +13,7 @@
 #include "swift/IDE/CompletionLookup.h"
 #include "CodeCompletionResultBuilder.h"
 #include "ExprContextAnalysis.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
@@ -258,19 +259,13 @@ void CompletionLookup::foundFunction(const AnyFunctionType *AFT) {
 
 bool CompletionLookup::canBeUsedAsRequirementFirstType(Type selfTy,
                                                        TypeAliasDecl *TAD) {
-  auto T = TAD->getDeclaredInterfaceType();
-  auto subMap = selfTy->getMemberSubstitutionMap(TAD);
-  T = T.subst(subMap)->getCanonicalType();
-
-  ArchetypeType *archeTy = T->getAs<ArchetypeType>();
-  if (!archeTy)
+  if (TAD->isGeneric())
     return false;
-  archeTy = archeTy->getRoot();
 
-  // For protocol, the 'archeTy' should match with the 'baseTy' which is the
-  // dynamic 'Self' type of the protocol. For nominal decls, 'archTy' should
-  // be one of the generic params in 'selfTy'. Search 'archeTy' in 'baseTy'.
-  return selfTy.findIf([&](Type T) { return archeTy->isEqual(T); });
+  auto T = TAD->getDeclaredInterfaceType();
+  auto subMap = selfTy->getContextSubstitutionMap(TAD->getDeclContext());
+
+  return T.subst(subMap)->is<ArchetypeType>();
 }
 
 CompletionLookup::CompletionLookup(CodeCompletionResultSink &Sink,
@@ -573,14 +568,14 @@ Type CompletionLookup::eraseArchetypes(Type type, GenericSignature genericSig) {
         genericFuncType->getExtInfo());
   }
 
-  return type.transform([&](Type t) -> Type {
+  return type.transformRec([&](Type t) -> std::optional<Type> {
     // FIXME: Code completion should only deal with one or the other,
     // and not both.
     if (auto *archetypeType = t->getAs<ArchetypeType>()) {
       // Don't erase opaque archetype.
       if (isa<OpaqueTypeArchetypeType>(archetypeType) &&
           archetypeType->isRoot())
-        return t;
+        return std::nullopt;
 
       auto genericSig = archetypeType->getGenericEnvironment()->getGenericSignature();
       auto upperBound = genericSig->getUpperBound(
@@ -602,7 +597,7 @@ Type CompletionLookup::eraseArchetypes(Type type, GenericSignature genericSig) {
         return upperBound;
     }
 
-    return t;
+    return std::nullopt;
   });
 }
 
@@ -720,6 +715,35 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
       if (MaybeNominalType->hasUnboundGenericType())
         return T;
 
+      // If we are doing implicit member lookup on a protocol and we have found
+      // a declaration in an extension, use the extension's `Self` type for the
+      // generic substitution.
+      // Eg in the following, the `Self` type returned by `qux` is
+      // `MyGeneric<Int>`, not `MyProto` because of the `Self` type restriction.
+      // ```
+      // protocol MyProto {}
+      // struct MyGeneric<T>: MyProto {}
+      // extension MyProto where Self == MyGeneric<Int> {
+      //   static func qux() -> Self { .init() }
+      // }
+      // func takeMyProto(_: any MyProto)  {}
+      // func test() {
+      //   takeMyProto(.#^COMPLETE^#)
+      // }
+      // ```
+      if (MaybeNominalType->isExistentialType()) {
+        Type SelfType;
+        if (auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
+          SelfType = ED->getGenericSignature()->getConcreteType(
+              ED->getSelfInterfaceType());
+        }
+        if (SelfType) {
+          MaybeNominalType = SelfType;
+        } else {
+          return T;
+        }
+      }
+
       // For everything else, substitute in the base type.
       auto Subs = MaybeNominalType->getMemberSubstitutionMap(VD);
 
@@ -749,7 +773,7 @@ Type CompletionLookup::getAssociatedTypeType(const AssociatedTypeDecl *ATD) {
   if (BaseTy) {
     BaseTy = BaseTy->getInOutObjectType()->getMetatypeInstanceType();
     if (auto NTD = BaseTy->getAnyNominal()) {
-      auto Conformance = ModuleDecl::lookupConformance(BaseTy, ATD->getProtocol());
+      auto Conformance = lookupConformance(BaseTy, ATD->getProtocol());
       if (Conformance.isConcrete()) {
         return Conformance.getConcrete()->getTypeWitness(
             const_cast<AssociatedTypeDecl *>(ATD));
@@ -2032,15 +2056,15 @@ void CompletionLookup::onLookupNominalTypeMembers(NominalTypeDecl *NTD,
 }
 
 Type CompletionLookup::normalizeTypeForDuplicationCheck(Type Ty) {
-  return Ty.transform([](Type T) {
+  return Ty.transformRec([](Type T) -> std::optional<Type> {
     if (auto opaque = T->getAs<OpaqueTypeArchetypeType>()) {
       /// Opaque type has a _invisible_ substitution map. Since IDE can't
       /// differentiate them, replace it with empty substitution map.
-      return OpaqueTypeArchetypeType::get(opaque->getDecl(),
-                                          opaque->getInterfaceType(),
-                                          /*Substitutions=*/{});
+      return Type(OpaqueTypeArchetypeType::get(opaque->getDecl(),
+                                               opaque->getInterfaceType(),
+                                               /*Substitutions=*/{}));
     }
-    return T;
+    return std::nullopt;
   });
 }
 
@@ -2602,7 +2626,7 @@ void CompletionLookup::addTypeRelationFromProtocol(
 
     // Check for conformance to the literal protocol.
     if (T->getAnyNominal()) {
-      if (ModuleDecl::lookupConformance(T, PD)) {
+      if (lookupConformance(T, PD)) {
         literalType = T;
         break;
       }

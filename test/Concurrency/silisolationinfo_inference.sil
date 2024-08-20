@@ -44,26 +44,26 @@ sil @useOptionalActor : $@convention(thin) (@sil_isolated @guaranteed Optional<M
 // For now we always infer an actor as having unknown isolation since we only
 // talk about isolation of an actor (or other Sendable types).
 //
-// CHECK: begin running test 1 of 1 on actor_self_isolation_unknown: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on actor_self_isolation_unknown: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = argument of bb0 : $MyActor
 // CHECK-NEXT: Isolation: unknown
-// CHECK-NEXT: end running test 1 of 1 on actor_self_isolation_unknown: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on actor_self_isolation_unknown: sil_isolation_info_inference with: @trace[0]
 sil [ossa] @actor_self_isolation_unknown : $@convention(thin) (@guaranteed MyActor) -> () {
 bb0(%0 : @guaranteed $MyActor):
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
   debug_value [trace] %0 : $MyActor
   %9999 = tuple ()
   return %9999 : $()
 }
 
-// CHECK: begin running test 1 of 1 on actor_field_isolation: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on actor_field_isolation: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %2 = ref_element_addr %0 : $MyActor
 // CHECK-NEXT: Isolation: 'argument'-isolated
-// CHECK-NEXT: end running test 1 of 1 on actor_field_isolation: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on actor_field_isolation: sil_isolation_info_inference with: @trace[0]
 sil [ossa] @actor_field_isolation : $@convention(thin) (@guaranteed MyActor) -> () {
 bb0(%0 : @guaranteed $MyActor):
   debug_value %0 : $MyActor, let, name "argument"
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
   %1 = ref_element_addr %0 : $MyActor, #MyActor.ns
   debug_value [trace] %1 : $*NonSendableKlass
   %9999 = tuple ()
@@ -74,13 +74,13 @@ bb0(%0 : @guaranteed $MyActor):
 // MARK: Temporary Alloc Stack //
 /////////////////////////////////
 
-// CHECK: begin running test 1 of 1 on temp_alloc_stack_infer_from_indirect_arg_same_block: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_infer_from_indirect_arg_same_block: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: Isolation: disconnected
-// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_infer_from_indirect_arg_same_block: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_infer_from_indirect_arg_same_block: sil_isolation_info_inference with: @trace[0]
 sil @temp_alloc_stack_infer_from_indirect_arg_same_block : $@convention(thin) () -> () {
 bb0:
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
   %0 = alloc_stack $NonSendableKlass
   %f = function_ref @constructNonSendableKlassIndirect : $@convention(thin) () -> @out NonSendableKlass
   apply %f(%0) : $@convention(thin) () -> @out NonSendableKlass
@@ -91,13 +91,13 @@ bb0:
   return %9999 : $()
 }
 
-// CHECK: begin running test 1 of 1 on temp_alloc_stack_infer_from_indirect_arg_with_isolation_same_block: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_infer_from_indirect_arg_with_isolation_same_block: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: global actor '<null>'-isolated
-// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_infer_from_indirect_arg_with_isolation_same_block: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_infer_from_indirect_arg_with_isolation_same_block: sil_isolation_info_inference with: @trace[0]
 sil @temp_alloc_stack_infer_from_indirect_arg_with_isolation_same_block : $@convention(thin) @async () -> () {
 bb0:
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
   %0 = alloc_stack $NonSendableKlass
   %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
@@ -108,13 +108,13 @@ bb0:
   return %9999 : $()
 }
 
-// CHECK: begin running test 1 of 1 on temp_alloc_stack_infer_failure_write_before_in_same_block: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_infer_failure_write_before_in_same_block: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: Isolation: disconnected
-// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_infer_failure_write_before_in_same_block: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_infer_failure_write_before_in_same_block: sil_isolation_info_inference with: @trace[0]
 sil @temp_alloc_stack_infer_failure_write_before_in_same_block : $@convention(thin) @async () -> () {
 bb0:
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
 
   %0 = alloc_stack $NonSendableKlass
   debug_value [trace] %0 : $*NonSendableKlass
@@ -133,13 +133,13 @@ bb0:
   return %9999 : $()
 }
 
-// CHECK: begin running test 1 of 1 on temp_alloc_stack_infer_failure_ignore_later_same_block_init: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_infer_failure_ignore_later_same_block_init: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: Isolation: global actor '<null>'-isolated
-// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_infer_failure_ignore_later_same_block_init: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_infer_failure_ignore_later_same_block_init: sil_isolation_info_inference with: @trace[0]
 sil @temp_alloc_stack_infer_failure_ignore_later_same_block_init : $@convention(thin) @async () -> () {
 bb0:
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
 
   %0 = alloc_stack $NonSendableKlass
   debug_value [trace] %0 : $*NonSendableKlass
@@ -155,13 +155,13 @@ bb0:
   return %9999 : $()
 }
 
-// CHECK: begin running test 1 of 1 on temp_alloc_stack_infer_failure_ignore_later_same_block_init_2: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_infer_failure_ignore_later_same_block_init_2: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: Isolation: actor-isolated
-// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_infer_failure_ignore_later_same_block_init_2: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_infer_failure_ignore_later_same_block_init_2: sil_isolation_info_inference with: @trace[0]
 sil @temp_alloc_stack_infer_failure_ignore_later_same_block_init_2 : $@convention(thin) @async () -> () {
 bb0:
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
 
   %0 = alloc_stack $NonSendableKlass
   debug_value [trace] %0 : $*NonSendableKlass
@@ -177,13 +177,13 @@ bb0:
   return %9999 : $()
 }
 
-// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_simple: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_simple: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: Isolation: actor-isolated
-// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_simple: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_simple: sil_isolation_info_inference with: @trace[0]
 sil @temp_alloc_stack_different_block_simple : $@convention(thin) @async () -> () {
 bb0:
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
 
   %0 = alloc_stack $NonSendableKlass
   debug_value [trace] %0 : $*NonSendableKlass
@@ -208,13 +208,13 @@ bb3:
   return %9999 : $()
 }
 
-// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_disrupting_write: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_disrupting_write: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: Isolation: disconnected
-// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_disrupting_write: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_disrupting_write: sil_isolation_info_inference with: @trace[0]
 sil @temp_alloc_stack_different_block_disrupting_write : $@convention(thin) @async () -> () {
 bb0:
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
 
   %0 = alloc_stack $NonSendableKlass
   debug_value [trace] %0 : $*NonSendableKlass
@@ -242,13 +242,13 @@ bb3:
   return %9999 : $()
 }
 
-// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_disrupting_write_2: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_disrupting_write_2: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: Isolation: disconnected
-// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_disrupting_write_2: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_disrupting_write_2: sil_isolation_info_inference with: @trace[0]
 sil @temp_alloc_stack_different_block_disrupting_write_2 : $@convention(thin) @async () -> () {
 bb0:
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
 
   %0 = alloc_stack $NonSendableKlass
   debug_value [trace] %0 : $*NonSendableKlass
@@ -276,13 +276,13 @@ bb3:
   return %9999 : $()
 }
 
-// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_disrupting_write_3: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_disrupting_write_3: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: Isolation: disconnected
-// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_disrupting_write_3: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_disrupting_write_3: sil_isolation_info_inference with: @trace[0]
 sil @temp_alloc_stack_different_block_disrupting_write_3 : $@convention(thin) @async () -> () {
 bb0:
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
 
   %0 = alloc_stack $NonSendableKlass
   debug_value [trace] %0 : $*NonSendableKlass
@@ -312,13 +312,13 @@ bb3:
   return %9999 : $()
 }
 
-// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_matching_inits: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_matching_inits: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: Isolation: disconnected
-// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_matching_inits: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_matching_inits: sil_isolation_info_inference with: @trace[0]
 sil @temp_alloc_stack_different_block_matching_inits : $@convention(thin) @async () -> () {
 bb0:
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
 
   %0 = alloc_stack $NonSendableKlass
   debug_value [trace] %0 : $*NonSendableKlass
@@ -344,13 +344,13 @@ bb3:
   return %9999 : $()
 }
 
-// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_matching_inits_2: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_matching_inits_2: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: Isolation: disconnected
-// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_matching_inits_2: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_matching_inits_2: sil_isolation_info_inference with: @trace[0]
 sil @temp_alloc_stack_different_block_matching_inits_2 : $@convention(thin) @async () -> () {
 bb0:
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
 
   %0 = alloc_stack $NonSendableKlass
   debug_value [trace] %0 : $*NonSendableKlass
@@ -379,13 +379,13 @@ bb3:
 // If we see multiple initializations, just leave it as disconnected. This is
 // more conservative.
 //
-// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_conflicting_inits: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_conflicting_inits: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: Isolation: disconnected
-// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_conflicting_inits: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_conflicting_inits: sil_isolation_info_inference with: @trace[0]
 sil @temp_alloc_stack_different_block_conflicting_inits : $@convention(thin) @async () -> () {
 bb0:
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
 
   %0 = alloc_stack $NonSendableKlass
   debug_value [trace] %0 : $*NonSendableKlass
@@ -411,13 +411,13 @@ bb3:
 
 // If we see multiple initializations along any path... we need to be disconnected.
 //
-// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_conflicting_inits_2: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_conflicting_inits_2: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: Isolation: disconnected
-// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_conflicting_inits_2: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_conflicting_inits_2: sil_isolation_info_inference with: @trace[0]
 sil @temp_alloc_stack_different_block_conflicting_inits_2 : $@convention(thin) @async () -> () {
 bb0:
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
 
   %0 = alloc_stack $NonSendableKlass
   debug_value [trace] %0 : $*NonSendableKlass
@@ -443,13 +443,13 @@ bb3:
 
 // More complex CFG work with a loop.
 //
-// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: Isolation: global actor '<null>'-isolated
-// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg: sil_isolation_info_inference with: @trace[0]
 sil @temp_alloc_stack_different_block_larger_cfg : $@convention(thin) @async () -> () {
 bb0:
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
 
   %0 = alloc_stack $NonSendableKlass
   debug_value [trace] %0 : $*NonSendableKlass
@@ -483,13 +483,13 @@ bb7:
   return %9999 : $()
 }
 
-// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_2: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_2: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: Isolation: global actor '<null>'-isolated
-// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_2: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_2: sil_isolation_info_inference with: @trace[0]
 sil @temp_alloc_stack_different_block_larger_cfg_2 : $@convention(thin) @async () -> () {
 bb0:
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
 
   %0 = alloc_stack $NonSendableKlass
   debug_value [trace] %0 : $*NonSendableKlass
@@ -523,13 +523,13 @@ bb7:
   return %9999 : $()
 }
 
-// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_3: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_3: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: Isolation: global actor '<null>'-isolated
-// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_3: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_3: sil_isolation_info_inference with: @trace[0]
 sil @temp_alloc_stack_different_block_larger_cfg_3 : $@convention(thin) @async () -> () {
 bb0:
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
 
   %0 = alloc_stack $NonSendableKlass
   debug_value [trace] %0 : $*NonSendableKlass
@@ -565,13 +565,13 @@ bb7:
   return %9999 : $()
 }
 
-// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_4: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_4: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: Isolation: disconnected
-// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_4: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_4: sil_isolation_info_inference with: @trace[0]
 sil @temp_alloc_stack_different_block_larger_cfg_4 : $@convention(thin) @async () -> () {
 bb0:
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
 
   %0 = alloc_stack $NonSendableKlass
   debug_value [trace] %0 : $*NonSendableKlass
@@ -610,13 +610,13 @@ bb7:
   return %9999 : $()
 }
 
-// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_5: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_5: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: Isolation: global actor '<null>'-isolated
-// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_5: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_5: sil_isolation_info_inference with: @trace[0]
 sil @temp_alloc_stack_different_block_larger_cfg_5 : $@convention(thin) @async () -> () {
 bb0:
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
 
   %0 = alloc_stack $NonSendableKlass
   debug_value [trace] %0 : $*NonSendableKlass
@@ -658,13 +658,13 @@ bb7:
   return %9999 : $()
 }
 
-// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_6: sil-isolation-info-inference with: @trace[0]
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_6: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: Isolation: disconnected
-// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_6: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_6: sil_isolation_info_inference with: @trace[0]
 sil @temp_alloc_stack_different_block_larger_cfg_6 : $@convention(thin) @async () -> () {
 bb0:
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
 
   %0 = alloc_stack $NonSendableKlass
   debug_value [trace] %0 : $*NonSendableKlass
@@ -704,13 +704,13 @@ bb7:
   return %9999 : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on lookthrough_test: sil-isolation-info-inference with: @trace[0]
+// CHECK-LABEL: begin running test 1 of 1 on lookthrough_test: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %7 = apply %6(%5) : $@convention(thin) (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
 // CHECK-NEXT: Isolation: 'argument'-isolated
-// CHECK-NEXT: end running test 1 of 1 on lookthrough_test: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on lookthrough_test: sil_isolation_info_inference with: @trace[0]
 sil [ossa] @lookthrough_test : $@convention(thin) (@owned MyActor) -> @owned NonSendableKlass {
 bb0(%0 : @owned $MyActor):
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
   debug_value %0 : $MyActor, let, name "argument"
   %1 = end_init_let_ref %0 : $MyActor
   %1a = copy_value %1 : $MyActor
@@ -725,13 +725,13 @@ bb0(%0 : @owned $MyActor):
   return %3 : $NonSendableKlass
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on isolated_variable_test_1: sil-isolation-info-inference with: @trace[0]
+// CHECK-LABEL: begin running test 1 of 1 on isolated_variable_test_1: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   %2 = apply %1(%0) : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
 // CHECK-NEXT: Isolation: disconnected
-// CHECK-NEXT: end running test 1 of 1 on isolated_variable_test_1: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: end running test 1 of 1 on isolated_variable_test_1: sil_isolation_info_inference with: @trace[0]
 sil [ossa] @isolated_variable_test_1 : $@convention(thin) @async () -> () {
 bb0:
-  specify_test "sil-isolation-info-inference @trace[0]"
+  specify_test "sil_isolation_info_inference @trace[0]"
   %0 = enum $Optional<MyActor>, #Optional.none
   %1 = function_ref @useOptionalActor : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
   %2 = apply %1(%0) : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass

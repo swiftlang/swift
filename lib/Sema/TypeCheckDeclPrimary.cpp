@@ -33,6 +33,7 @@
 #include "swift/AST/AccessNotes.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -113,7 +114,7 @@ public:
   /// repressed or return the inverted type.
   Type add(Type ty, InverseTypeRepr &repr,
            llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl) {
-    if (!ty)
+    if (!ty || ty->hasError())
       return Type();
     assert(!ty->is<ExistentialMetatypeType>());
     auto kp = ty->getKnownProtocol();
@@ -1171,7 +1172,8 @@ void TypeChecker::notePlaceholderReplacementTypes(Type writtenType,
       }
 
       if (auto *origRepr =
-              placeholder->getOriginator().dyn_cast<PlaceholderTypeRepr *>()) {
+              placeholder->getOriginator().dyn_cast<TypeRepr *>()) {
+        assert(isa<PlaceholderTypeRepr>(origRepr));
         t1->getASTContext()
             .Diags
             .diagnose(origRepr->getLoc(),
@@ -1543,7 +1545,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
     auto *decodableProto = C.getProtocol(KnownProtocolKind::Decodable);
     auto superclassType = superclassDecl->getDeclaredInterfaceType();
-    auto ref = ModuleDecl::lookupConformance(superclassType, decodableProto);
+    auto ref = lookupConformance(superclassType, decodableProto);
     if (ref) {
       // super conforms to Decodable, so we've failed to inherit init(from:).
       // Let's suggest overriding it here.
@@ -1571,7 +1573,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       // likely that the user forgot to override its encode(to:). In this case,
       // we can produce a slightly different diagnostic to suggest doing so.
       auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
-      auto ref = ModuleDecl::lookupConformance(superclassType, encodableProto);
+      auto ref = lookupConformance(superclassType, encodableProto);
       if (ref) {
         // We only want to produce this version of the diagnostic if the
         // subclass doesn't directly implement encode(to:).
@@ -1796,7 +1798,7 @@ static void diagnoseRetroactiveConformances(
     proto->walkInheritedProtocols([&](ProtocolDecl *decl) {
 
       // Get the original conformance of the extended type to this protocol.
-      auto conformanceRef = ModuleDecl::lookupConformance(extendedType, decl);
+      auto conformanceRef = lookupConformance(extendedType, decl);
       if (!conformanceRef.isConcrete()) {
         return TypeWalker::Action::Continue;
       }
@@ -2534,7 +2536,7 @@ public:
     (void) VD->getPropertyWrapperAuxiliaryVariables();
     (void) VD->getPropertyWrapperInitializerInfo();
     (void) VD->getImplInfo();
-    (void) getActorIsolation(VD);
+    checkGlobalIsolation(VD);
 
     // Visit auxiliary decls first
     VD->visitAuxiliaryDecls([&](VarDecl *var) {

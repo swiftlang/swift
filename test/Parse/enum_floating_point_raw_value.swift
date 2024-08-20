@@ -8,7 +8,7 @@
 // Windows does not support FP80
 // XFAIL: OS=windows-msvc
 
-enum RawTypeWithFloatValues : Float { // expected-error {{'RawTypeWithFloatValues' declares raw type 'Float', but does not conform to RawRepresentable and conformance could not be synthesized}}
+enum RawTypeWithFloatValues : Float { // expected-error {{'RawTypeWithFloatValues' declares raw type 'Float', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{add stubs for conformance}}
   case Northrup = 1.5
   case Overton // expected-error {{enum case must declare a raw value when the preceding raw value is not an integer}}
   case Pettygrove = 2.25

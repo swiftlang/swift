@@ -3,8 +3,7 @@
 
 // REQUIRES: executable_test
 
-@_moveOnly
-struct Butt {
+struct Butt: ~Copyable {
     var value: Int
     deinit { print("disposing \(value)") }
 

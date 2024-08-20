@@ -725,7 +725,14 @@ func consumeInitdArray() {
 func isNegative(_ c: consuming Int) -> Bool { return c < 0 }
 func consumeInt() {
     var g = 0 // expected-warning{{variable 'g' was never mutated; consider changing to 'let' constant}}
-    isNegative(consume g) // expected-warning{{result of call to 'isNegative' is unused}}
+              // expected-error@-1 {{'g' used after consume}}
+
+    _ = isNegative(consume g) // expected-note {{consumed here}}
+                              // expected-warning@-1 {{'consume' applied to bitwise-copyable type 'Int' has no effect}}
+
+    _ = isNegative(consume g) // expected-note {{used here}}
+                              // expected-error@-1 {{'consume' applied to value that the compiler does not support. This is a compiler bug. Please file a bug with a small example of the bug}}
+                              // expected-warning@-2 {{'consume' applied to bitwise-copyable type 'Int' has no effect}}
 }
 
 //////////////////////

@@ -8,6 +8,7 @@
 sil_stage canonical
 
 import Builtin
+import Swift
 
 typealias AnyObject = Builtin.AnyObject
 
@@ -79,8 +80,8 @@ struct STXXITXXII {
   var i: I
 }
 
-@_moveOnly struct MoS {}
-@_moveOnly struct MoE {}
+struct MoS: ~Copyable {}
+struct MoE: ~Copyable {}
 
 sil @unknown : $@convention(thin) () -> ()
 sil @use_S : $@convention(thin) (@in_guaranteed S) -> ()

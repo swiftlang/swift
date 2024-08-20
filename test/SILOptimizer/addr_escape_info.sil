@@ -17,6 +17,8 @@ class X {
   @_hasStorage var s: Str
 }
 
+class D: X {}
+
 struct Container {
   @_hasStorage var x: X
 }
@@ -44,6 +46,12 @@ sil @non_escaping_class_argument : $@convention(thin) (@guaranteed X) -> () {
 [%0: noescape]
 }
 sil @inout_class_argument : $@convention(thin) (@inout X) -> () {
+[%0: noescape **]
+}
+sil @inout_class_argument2 : $@convention(thin) (@inout XandIntClass) -> () {
+[%0: noescape **]
+}
+sil @inout_class_argument3 : $@convention(thin) (@inout XandIntClass) -> @error Error {
 [%0: noescape **]
 }
 sil @container_argument : $@convention(thin) (@guaranteed Container) -> ()
@@ -753,5 +761,104 @@ bb0:
   dealloc_stack %0 : $*Int
   %8 = tuple ()
   return %8 : $()
+}
+
+// CHECK-LABEL: Address escape information for test_unchecked_ref_cast:
+// CHECK:       pair 0 - 1
+// CHECK-NEXT:    %4 = ref_element_addr %2 : $X, #X.s
+// CHECK-NEXT:    %6 = ref_element_addr %3 : $X, #X.s
+// CHECK-NEXT:  no alias
+// CHECK:       End function test_unchecked_ref_cast
+sil @test_unchecked_ref_cast : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $D
+  %1 = alloc_ref $D
+  %2 = unchecked_ref_cast %0 : $D to $X
+  %3 = unchecked_ref_cast %1 : $D to $X
+  %4 = ref_element_addr %2 : $X, #X.s
+  fix_lifetime %4 : $*Str
+  %6 = ref_element_addr %3 : $X, #X.s
+  fix_lifetime %6 : $*Str
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: Address escape information for test_anyobject_cast:
+// CHECK:       pair 0 - 1
+// CHECK-NEXT:    %3 = ref_element_addr %2 : $X, #X.s
+// CHECK-NEXT:    %5 = ref_element_addr %2 : $X, #X.s
+// CHECK-NEXT:  may alias
+// CHECK:       End function test_anyobject_cast
+sil @test_anyobject_cast : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $X
+  %1 = init_existential_ref %0 : $X : $X, $AnyObject
+  %2 = unchecked_ref_cast %1 : $AnyObject to $X
+  %3 = ref_element_addr %2 : $X, #X.s
+  fix_lifetime %3 : $*Str
+  %5 = ref_element_addr %2 : $X, #X.s
+  fix_lifetime %5 : $*Str
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: Address escape information for test_is_unique:
+// CHECK:       value:  %1 = alloc_stack $X
+// CHECK-NEXT:  End function test_is_unique
+sil [ossa] @test_is_unique : $@convention(thin) (@owned X) -> () {
+bb0(%0 :  @owned $X):
+  %1 = alloc_stack $X
+  store %0 to [init] %1 : $*X
+  fix_lifetime %1 : $*X
+  %3 = is_unique %1 : $*X
+  destroy_addr %1 : $*X
+  dealloc_stack %1 : $*X
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: Address escape information for test_unchecked_addr_cast:
+// CHECK:       value:  %1 = alloc_stack $X
+// CHECK:         ==>   %10 = apply %9(%4) : $@convention(thin) (@inout XandIntClass) -> ()
+// CHECK:         ==>   try_apply %11(%4) : $@convention(thin) (@inout XandIntClass) -> @error any Error, normal bb1, error bb2
+// CHECK:         -     %15 = apply %14() : $@convention(thin) () -> ()
+// CHECK-NEXT:  End function test_unchecked_addr_cast
+sil [ossa] @test_unchecked_addr_cast : $@convention(thin) (@owned X) -> @owned XandIntClass {
+bb0(%0 :  @owned $X):
+  %1 = alloc_stack $X
+  store %0 to [init] %1 : $*X
+  fix_lifetime %1 : $*X
+  %4 = unchecked_addr_cast %1 : $*X to $*XandIntClass
+  %5 = is_unique %4 : $*XandIntClass
+  %6 = load_borrow %4 : $*XandIntClass
+  end_borrow %6 : $XandIntClass
+  %8 = load [take] %4 : $*XandIntClass
+  %9 = function_ref @inout_class_argument2 : $@convention(thin) (@inout XandIntClass) -> ()
+  %10 = apply %9(%4) : $@convention(thin) (@inout XandIntClass) -> ()
+  %11 = function_ref @inout_class_argument3 : $@convention(thin) (@inout XandIntClass) -> @error Error
+  try_apply %11(%4) : $@convention(thin) (@inout XandIntClass) -> @error Error, normal bb1, error bb2
+
+bb1(%13 : $()):
+  %14 = function_ref @no_arguments : $@convention(thin) () -> ()
+  %15 = apply %14() : $@convention(thin) () -> ()
+  dealloc_stack %1 : $*X
+  return %8 : $XandIntClass
+
+bb2(%17 : $Error):
+  unreachable
+}
+
+// CHECK-LABEL: Address escape information for test_store_borrow:
+// CHECK:       value:  %2 = store_borrow %0 to %1 : $*X                // users: %4, %3
+// CHECK-NEXT:  End function test_store_borrow
+sil [ossa] @test_store_borrow : $@convention(thin) (@guaranteed X) -> () {
+bb0(%0 :  @guaranteed $X):
+  %1 = alloc_stack $X
+  %2 = store_borrow %0 to %1 : $*X
+  fix_lifetime %2 : $*X
+  end_borrow %2 : $*X
+  dealloc_stack %1 : $*X
+  %3 = tuple ()
+  return %3 : $()
 }
 

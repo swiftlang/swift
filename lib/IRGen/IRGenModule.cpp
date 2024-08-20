@@ -220,7 +220,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                                             ModuleName, PrivateDiscriminator)),
       Module(*ClangCodeGen->GetModule()),
       DataLayout(irgen.getClangDataLayoutString()),
-      Triple(irgen.getEffectiveClangTriple()), TargetMachine(std::move(target)),
+      Triple(irgen.getEffectiveClangTriple()),
+      VariantTriple(irgen.getEffectiveClangVariantTriple()),
+      TargetMachine(std::move(target)),
       silConv(irgen.SIL), OutputFilename(OutputFilename),
       MainInputFilenameForDebugInfo(MainInputFilenameForDebugInfo),
       TargetInfo(SwiftTargetInfo::get(*this)), DebugInfo(nullptr),
@@ -1646,6 +1648,7 @@ void IRGenModule::addLinkLibraries() {
                                               getSwiftModule()->getName().str(),
                                               hasStaticCxx,
                                               hasStaticCxxStdlib,
+                                              Context.LangOpts.CXXStdlib,
                                               registerLinkLibrary);
   }
 
@@ -2227,6 +2230,13 @@ llvm::Triple IRGenerator::getEffectiveClangTriple() {
       &*SIL.getASTContext().getClangModuleLoader());
   assert(CI && "no clang module loader");
   return llvm::Triple(CI->getTargetInfo().getTargetOpts().Triple);
+}
+
+llvm::Triple IRGenerator::getEffectiveClangVariantTriple() {
+  auto CI = static_cast<ClangImporter *>(
+      &*SIL.getASTContext().getClangModuleLoader());
+  assert(CI && "no clang module loader");
+  return llvm::Triple(CI->getTargetInfo().getTargetOpts().DarwinTargetVariantTriple);
 }
 
 const llvm::StringRef IRGenerator::getClangDataLayoutString() {

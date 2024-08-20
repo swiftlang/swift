@@ -8,8 +8,8 @@
 // MARK: Declarations //
 ////////////////////////
 
-@_moveOnly public struct EmptyStruct {}
-@_moveOnly public struct NonEmptyStruct {
+public struct EmptyStruct: ~Copyable {}
+public struct NonEmptyStruct: ~Copyable {
     var e = EmptyStruct()
 }
 public class CopyableKlass {

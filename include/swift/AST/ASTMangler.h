@@ -680,7 +680,7 @@ protected:
   
   void appendClosureEntity(const AbstractClosureExpr *closure);
 
-  void appendClosureComponents(Type Ty, unsigned discriminator, bool isImplicit,
+  void appendClosureComponents(CanType Ty, unsigned discriminator, bool isImplicit,
                                const DeclContext *parentContext,
                                ArrayRef<GenericEnvironment *> capturedEnvs);
 

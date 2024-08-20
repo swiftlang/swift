@@ -192,8 +192,8 @@ SILCombiner::SILCombiner(SILFunctionTransform *trans,
                 use->set(newValue);
                 Worklist.add(use->getUser());
               })),
-  deadEndBlocks(trans->getFunction()), MadeChange(false),
-  RemoveCondFails(removeCondFails),
+  DEBA(trans->getPassManager()->getAnalysis<DeadEndBlocksAnalysis>()), 
+  MadeChange(false), RemoveCondFails(removeCondFails),
   enableCopyPropagation(enableCopyPropagation), Iteration(0),
   Builder(*trans->getFunction(), &TrackingList),
   FuncBuilder(*trans),
@@ -354,7 +354,7 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
   CanonicalizeOSSALifetime canonicalizer(
       DontPruneDebugInsts,
       MaximizeLifetime_t(!parentTransform->getFunction()->shouldOptimize()),
-      parentTransform->getFunction(), NLABA, domTree, CA, deleter);
+      parentTransform->getFunction(), NLABA, DEBA, domTree, CA, deleter);
   CanonicalizeBorrowScope borrowCanonicalizer(parentTransform->getFunction(),
                                               deleter);
 
@@ -397,7 +397,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
   // Add reachable instructions to our worklist.
   addReachableCodeToWorklist(&*F.begin());
 
-  SILCombineCanonicalize scCanonicalize(Worklist, deadEndBlocks);
+  SILCombineCanonicalize scCanonicalize(Worklist, *DEBA->get(&F));
 
   // Process until we run out of items in our worklist.
   while (!Worklist.isEmpty()) {
@@ -620,6 +620,7 @@ class SILCombine : public SILFunctionTransform {
     bool Changed = Combiner.runOnFunction(*getFunction());
 
     if (Changed) {
+      updateBorrowedFrom(getPassManager(), getFunction());
       // Invalidate everything.
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
     }

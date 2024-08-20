@@ -115,6 +115,7 @@ func test_sendable_attr_in_type_context(test: Test) {
 
 class TestConformanceWithStripping : InnerSendableTypes {
   // expected-error@-1 {{type 'TestConformanceWithStripping' does not conform to protocol 'InnerSendableTypes'}}
+  // expected-note@-2 {{add stubs for conformance}}
 
   func testComposition(_: MyValue) {
     // expected-note@-1 {{candidate has non-matching type '(MyValue) -> ()'}}

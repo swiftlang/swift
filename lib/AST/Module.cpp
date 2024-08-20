@@ -725,6 +725,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.IsConcurrencyChecked = 0;
   Bits.ModuleDecl.ObjCNameLookupCachePopulated = 0;
   Bits.ModuleDecl.HasCxxInteroperability = 0;
+  Bits.ModuleDecl.CXXStdlibKind = 0;
   Bits.ModuleDecl.AllowNonResilientAccess = 0;
   Bits.ModuleDecl.SerializePackageEnabled = 0;
 }
@@ -1541,6 +1542,8 @@ collectExportedImports(const ModuleDecl *topLevelModule,
   stack.push_back(topLevelModule);
   while (!stack.empty()) {
     const ModuleDecl *module = stack.pop_back_val();
+    if (module->isNonSwiftModule())
+      continue;
 
     for (const FileUnit *file : module->getFiles()) {
       if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
@@ -1720,9 +1723,9 @@ void ModuleDecl::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
   FORWARD(getImportedModules, (modules, filter));
 }
 
-void ModuleDecl::getMissingImportedModules(
+void ModuleDecl::getImplicitImportsForModuleInterface(
     SmallVectorImpl<ImportedModule> &imports) const {
-  FORWARD(getMissingImportedModules, (imports));
+  FORWARD(getImplicitImportsForModuleInterface, (imports));
 }
 
 const llvm::DenseMap<const clang::Module *, ModuleDecl *> &
@@ -1811,9 +1814,9 @@ SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
   }
 }
 
-void SourceFile::getMissingImportedModules(
+void SourceFile::getImplicitImportsForModuleInterface(
     SmallVectorImpl<ImportedModule> &modules) const {
-  for (auto module : MissingImportedModules)
+  for (auto module : ImplicitImportsForModuleInterface)
     modules.push_back(module);
 }
 
@@ -2728,10 +2731,8 @@ SourceFile::getMaxAccessLevelUsingImport(
   return known->second;
 }
 
-void SourceFile::registerAccessLevelUsingImport(
-    AttributedImport<ImportedModule> import,
-    AccessLevel accessLevel) {
-  auto mod = import.module.importedModule;
+void SourceFile::registerRequiredAccessLevelForModule(ModuleDecl *mod,
+                                                      AccessLevel accessLevel) {
   auto known = ImportsUseAccessLevel.find(mod);
   if (known == ImportsUseAccessLevel.end())
     ImportsUseAccessLevel[mod] = accessLevel;
@@ -2754,7 +2755,7 @@ void SourceFile::registerAccessLevelUsingImport(
     auto otherImportModName = otherImportMod->getName();
     if (otherImportMod == declaringMod ||
         llvm::find(bystanders, otherImportModName) != bystanders.end()) {
-      registerAccessLevelUsingImport(otherImport, accessLevel);
+      registerRequiredAccessLevelForModule(otherImportMod, accessLevel);
     }
   }
 }
@@ -2819,13 +2820,13 @@ bool SourceFile::hasImportsWithFlag(ImportFlags flag) const {
       ctx.evaluator, HasImportsMatchingFlagRequest{mutableThis, flag}, false);
 }
 
-ImportFlags SourceFile::getImportFlags(const ModuleDecl *module) const {
-  unsigned flags = 0x0;
+void SourceFile::forEachImportOfModule(
+    const ModuleDecl *module,
+    llvm::function_ref<void(AttributedImport<ImportedModule> &)> callback) {
   for (auto import : *Imports) {
     if (import.module.importedModule == module)
-      flags |= import.options.toRaw();
+      callback(import);
   }
-  return ImportFlags(flags);
 }
 
 bool SourceFile::hasTestableOrPrivateImport(
@@ -2961,62 +2962,12 @@ IfConfigClauseRangeInfo::getWholeRange(const SourceManager &SM) const {
 
 void SourceFile::recordIfConfigClauseRangeInfo(
     const IfConfigClauseRangeInfo &range) {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  // Don't record ranges; they'll be extracted from swift-syntax when needed.
+#else
   IfConfigClauseRanges.Ranges.push_back(range);
   IfConfigClauseRanges.IsSorted = false;
-}
-
-ArrayRef<IfConfigClauseRangeInfo> SourceFile::getIfConfigClauseRanges() const {
-  if (!IfConfigClauseRanges.IsSorted) {
-    auto &SM = getASTContext().SourceMgr;
-    // Sort the ranges if we need to.
-    llvm::sort(
-        IfConfigClauseRanges.Ranges, [&](const IfConfigClauseRangeInfo &lhs,
-                                         const IfConfigClauseRangeInfo &rhs) {
-          return SM.isBeforeInBuffer(lhs.getStartLoc(), rhs.getStartLoc());
-        });
-
-    // Be defensive and eliminate duplicates in case we've parsed twice.
-    auto newEnd = llvm::unique(
-        IfConfigClauseRanges.Ranges, [&](const IfConfigClauseRangeInfo &lhs,
-                                         const IfConfigClauseRangeInfo &rhs) {
-          if (lhs.getStartLoc() != rhs.getStartLoc())
-            return false;
-          assert(lhs.getBodyRange(SM) == rhs.getBodyRange(SM) &&
-                 "range changed on a re-parse?");
-          return true;
-        });
-    IfConfigClauseRanges.Ranges.erase(newEnd,
-                                      IfConfigClauseRanges.Ranges.end());
-    IfConfigClauseRanges.IsSorted = true;
-  }
-
-  return IfConfigClauseRanges.Ranges;
-}
-
-ArrayRef<IfConfigClauseRangeInfo>
-SourceFile::getIfConfigClausesWithin(SourceRange outer) const {
-  auto &SM = getASTContext().SourceMgr;
-  assert(SM.getRangeForBuffer(BufferID).contains(outer.Start) &&
-         "Range not within this file?");
-
-  // First let's find the first #if that is after the outer start loc.
-  auto ranges = getIfConfigClauseRanges();
-  auto lower = llvm::lower_bound(
-      ranges, outer.Start,
-      [&](const IfConfigClauseRangeInfo &range, SourceLoc loc) {
-        return SM.isBeforeInBuffer(range.getStartLoc(), loc);
-      });
-  if (lower == ranges.end() ||
-      SM.isBeforeInBuffer(outer.End, lower->getStartLoc())) {
-    return {};
-  }
-  // Next let's find the first #if that's after the outer end loc.
-  auto upper = llvm::upper_bound(
-      ranges, outer.End,
-      [&](SourceLoc loc, const IfConfigClauseRangeInfo &range) {
-        return SM.isBeforeInBuffer(loc, range.getStartLoc());
-      });
-  return llvm::ArrayRef(lower, upper - lower);
+#endif
 }
 
 void ModuleDecl::setPackageName(Identifier name) {
@@ -4094,63 +4045,4 @@ version::Version ModuleDecl::getLanguageVersionBuiltWith() const {
   }
 
   return version::Version();
-}
-
-bool swift::diagnoseMissingImportForMember(const ValueDecl *decl,
-                                           const DeclContext *dc,
-                                           SourceLoc loc) {
-  if (decl->findImport(dc))
-    return false;
-
-  auto &ctx = dc->getASTContext();
-  auto definingModule = decl->getModuleContext();
-  ctx.Diags.diagnose(loc, diag::candidate_from_missing_import,
-                     decl->getDescriptiveKind(), decl->getName(),
-                     definingModule);
-
-  SourceLoc bestLoc =
-      ctx.Diags.getBestAddImportFixItLoc(decl, dc->getParentSourceFile());
-  if (!bestLoc.isValid())
-    return false;
-
-  llvm::SmallString<64> importText;
-
-  // Check other source files for import flags that should be applied to the
-  // fix-it for consistency with the rest of the imports in the module.
-  auto parentModule = dc->getParentModule();
-  OptionSet<ImportFlags> flags;
-  for (auto file : parentModule->getFiles()) {
-    if (auto sf = dyn_cast<SourceFile>(file))
-      flags |= sf->getImportFlags(definingModule);
-  }
-
-  if (flags.contains(ImportFlags::Exported) ||
-      parentModule->isClangOverlayOf(definingModule))
-    importText += "@_exported ";
-  if (flags.contains(ImportFlags::ImplementationOnly))
-    importText += "@_implementationOnly ";
-  if (flags.contains(ImportFlags::WeakLinked))
-    importText += "@_weakLinked ";
-  if (flags.contains(ImportFlags::SPIOnly))
-    importText += "@_spiOnly ";
-
-  // FIXME: Access level should be considered, too.
-
-  // @_spi imports.
-  if (decl->isSPI()) {
-    auto spiGroups = decl->getSPIGroups();
-    if (!spiGroups.empty()) {
-      importText += "@_spi(";
-      importText += spiGroups[0].str();
-      importText += ") ";
-    }
-  }
-
-  importText += "import ";
-  importText += definingModule->getName().str();
-  importText += "\n";
-  ctx.Diags.diagnose(bestLoc, diag::candidate_add_import, definingModule)
-      .fixItInsert(bestLoc, importText);
-
-  return true;
 }

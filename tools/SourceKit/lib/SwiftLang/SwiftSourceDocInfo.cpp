@@ -1811,6 +1811,11 @@ static void computeDiagnostics(
     void cancelled() override {
       Receiver(RequestResult<DiagnosticsResult>::cancelled());
     }
+
+    void failed(StringRef Error) override {
+      LOG_WARN_FUNC("diagnostics failed: " << Error);
+      Receiver(RequestResult<DiagnosticsResult>::fromError(Error));
+    }
   };
 
   auto Consumer = std::make_shared<DiagnosticsConsumer>(std::move(Receiver));
@@ -2536,6 +2541,8 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
     bool IncludeNonEditableBaseNames;
     std::function<void(const RequestResult<RelatedIdentsResult> &)> Receiver;
     SwiftInvocationRef Invok;
+
+    bool requiresDeepStack() override { return true; }
 
 #if SWIFT_BUILD_SWIFT_SYNTAX
     // FIXME: Don't silently eat errors here.

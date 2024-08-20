@@ -4550,6 +4550,10 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  if (InitInvok.getLangOptions().EnableCXXInterop) {
+    InitInvok.computeCXXStdlibOptions();
+  }
+
   if (!options::InProcessPluginServerPath.empty()) {
     InitInvok.getSearchPathOptions().InProcessPluginServerPath =
         options::InProcessPluginServerPath;

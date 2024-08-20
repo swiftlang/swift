@@ -8,6 +8,7 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: asan
 
 import SwiftReflectionTest
 import Foundation

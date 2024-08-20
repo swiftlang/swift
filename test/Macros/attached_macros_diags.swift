@@ -69,4 +69,8 @@ struct TestMacroArgs {
   // expected-error@-1{{missing argument for parameter #1 in macro expansion}}
 
   @m3(message: #stringify(Nested.x).1) struct Args8 {}
+
+  // Allow macros to have arbitrary generic specialization lists, but warn
+  // https://github.com/swiftlang/swift/issues/75500
+  @m1<UInt> struct Args9 {} // expected-warning {{cannot specialize a non-generic external macro 'm1()'}}
 }

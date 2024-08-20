@@ -12,8 +12,8 @@
 import Categories_B
 import Categories_E
 
-// expected-member-visibility-note@-1 2 {{add import of module 'Categories_C'}}{{1-1=import Categories_C\n}}
-// expected-member-visibility-note@-2 {{add import of module 'Categories_D'}}{{1-1=import Categories_D\n}}
+// expected-member-visibility-note@-1 2 {{add import of module 'Categories_C'}}{{1-1=internal import Categories_C\n}}
+// expected-member-visibility-note@-2 {{add import of module 'Categories_D'}}{{1-1=internal import Categories_D\n}}
 func test(x: X) {
   x.fromA()
   x.fromOverlayForA()

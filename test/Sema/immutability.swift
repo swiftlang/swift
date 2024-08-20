@@ -149,7 +149,7 @@ struct SomeStruct {
 
   var p: Int {
     // Getters default to non-mutating.
-    get {          // expected-note {{mark accessor 'mutating' to make 'self' mutable}} {{5-5=mutating }}
+    get {          // expected-note {{mark getter 'mutating' to make 'self' mutable}} {{5-5=mutating }}
       iv = 37 // expected-error {{cannot assign to property: 'self' is immutable}}
       return 42
     }
@@ -168,13 +168,13 @@ struct SomeStruct {
       return 42
     }
     nonmutating
-    set {      // expected-note {{mark accessor 'mutating' to make 'self' mutable}} {{-1:5-16=mutating}}
+    set {      // expected-note {{mark setter 'mutating' to make 'self' mutable}} {{-1:5-16=mutating}}
       iv = newValue // expected-error {{cannot assign to property: 'self' is immutable}}
     }
   }
 
   var r : Int {
-    get {        // expected-note {{mark accessor 'mutating' to make 'self' mutable}} {{5-5=mutating }}
+    get {        // expected-note {{mark getter 'mutating' to make 'self' mutable}} {{5-5=mutating }}
       iv = 37 // expected-error {{cannot assign to property: 'self' is immutable}}
       return 42
     }
@@ -283,7 +283,7 @@ struct TestStruct2 : MutatingTestProto {
   __consuming func consuming_nonmutating_func() {}
 }
 
-struct TestStruct3 : MutatingTestProto {   // expected-error {{type 'TestStruct3' does not conform to protocol 'MutatingTestProto'}}
+struct TestStruct3 : MutatingTestProto {   // expected-error {{type 'TestStruct3' does not conform to protocol 'MutatingTestProto'}} expected-note {{add stubs for conformance}}
   func mutatingfunc() {}
 
   // This is not ok, "nonmutatingfunc" doesn't allow mutating functions.
@@ -312,7 +312,7 @@ struct TestStruct5 : MutatingTestProto {
 protocol NonMutatingSubscriptable {
   subscript(i: Int) -> Int {get nonmutating set} // expected-note {{protocol requires subscript with type '(Int) -> Int'}}
 }
-struct MutatingSubscriptor : NonMutatingSubscriptable {  // expected-error {{type 'MutatingSubscriptor' does not conform to protocol 'NonMutatingSubscriptable'}}
+struct MutatingSubscriptor : NonMutatingSubscriptable {  // expected-error {{type 'MutatingSubscriptor' does not conform to protocol 'NonMutatingSubscriptable'}} expected-note {{add stubs for conformance}}
   subscript(i: Int) -> Int {
     get { return 42 }
     mutating set {}   // expected-note {{candidate is marked 'mutating' but protocol does not allow it}}
@@ -322,7 +322,7 @@ struct MutatingSubscriptor : NonMutatingSubscriptable {  // expected-error {{typ
 protocol NonMutatingGet {
   var a: Int { get } // expected-note {{protocol requires property 'a' with type 'Int'}}
 }
-struct MutatingGet : NonMutatingGet { // expected-error {{type 'MutatingGet' does not conform to protocol 'NonMutatingGet'}}
+struct MutatingGet : NonMutatingGet { // expected-error {{type 'MutatingGet' does not conform to protocol 'NonMutatingGet'}} expected-note {{add stubs for conformance}}
   var a: Int { mutating get { return 0 } } // expected-note {{candidate is marked 'mutating' but protocol does not allow it}}
 }
 
@@ -353,7 +353,7 @@ protocol OpaqueRefinement : class, OpaqueBase {
   var x: Int { get set } // expected-note {{protocol requires property 'x' with type 'Int'}}
 }
 
-class SetterMutatingConflict : OpaqueRefinement {} // expected-error {{type 'SetterMutatingConflict' does not conform to protocol 'OpaqueRefinement'}}
+class SetterMutatingConflict : OpaqueRefinement {} // expected-error {{type 'SetterMutatingConflict' does not conform to protocol 'OpaqueRefinement'}} expected-note {{add stubs for conformance}}
 
 struct DuplicateMutating {
   mutating mutating func f() {} // expected-error {{duplicate modifier}} expected-note {{modifier already specified here}}
@@ -708,7 +708,7 @@ extension JustAProtocol {
   var foo: String {
     get { return name }
     nonmutating set { name = newValue } // expected-error {{cannot assign to property: 'self' is immutable}} 
-    // expected-note@-1 {{mark accessor 'mutating' to make 'self' mutable}}{{5-16=mutating}}
+    // expected-note@-1 {{mark setter 'mutating' to make 'self' mutable}}{{5-16=mutating}}
   }
 
   nonmutating func bar() { // expected-note {{mark method 'mutating' to make 'self' mutable}}{{3-14=mutating}}

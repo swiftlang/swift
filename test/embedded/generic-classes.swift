@@ -34,6 +34,18 @@ class SubClass2 : SubClass1<Int> {
   override func test() { print("SubClass2") }
 }
 
+public class Outer<T> {
+  public class Inner {
+    func foo() {
+      print("Inner.foo")
+    }
+  }
+}
+
+public func makeInner() -> Outer<Int>.Inner {
+  return Outer<Int>.Inner()
+}
+
 @main
 struct Main {
   static func main() {
@@ -43,10 +55,12 @@ struct Main {
     makeItFoo(f: g)
     let x = SubClass2()
     x.test()
+    makeInner().foo()
   }
 }
 
 // CHECK: GenericFooableClass<T>.foo
 // CHECK: GenericFooableSubClass<T>.foo
 // CHECK: SubClass2
+// CHECK: Inner.foo
 

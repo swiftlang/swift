@@ -26,6 +26,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/IfConfigClauseRangeInfo.h"
 #include "swift/AST/Stmt.h"
 #endif
 
@@ -189,6 +190,75 @@ bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
 
 SWIFT_NAME("getter:BridgedASTContext.majorLanguageVersion(self:)")
 unsigned BridgedASTContext_majorLanguageVersion(BridgedASTContext cContext);
+
+SWIFT_NAME("BridgedASTContext.langOptsCustomConditionSet(self:_:)")
+bool BridgedASTContext_langOptsCustomConditionSet(BridgedASTContext cContext,
+                                                  BridgedStringRef cName);
+
+SWIFT_NAME("BridgedASTContext.langOptsHasFeatureNamed(self:_:)")
+bool BridgedASTContext_langOptsHasFeatureNamed(BridgedASTContext cContext,
+                                               BridgedStringRef cName);
+
+SWIFT_NAME("BridgedASTContext.langOptsHasAttributeNamed(self:_:)")
+bool BridgedASTContext_langOptsHasAttributeNamed(BridgedASTContext cContext,
+                                                 BridgedStringRef cName);
+
+SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetOS(self:_:)")
+bool BridgedASTContext_langOptsIsActiveTargetOS(BridgedASTContext cContext,
+                                                BridgedStringRef cName);
+
+SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetArchitecture(self:_:)")
+bool BridgedASTContext_langOptsIsActiveTargetArchitecture(BridgedASTContext cContext,
+                                                          BridgedStringRef cName);
+
+SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetEnvironment(self:_:)")
+bool BridgedASTContext_langOptsIsActiveTargetEnvironment(BridgedASTContext cContext,
+                                                         BridgedStringRef cName);
+
+SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetRuntime(self:_:)")
+bool BridgedASTContext_langOptsIsActiveTargetRuntime(BridgedASTContext cContext,
+                                                     BridgedStringRef cName);
+
+SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetPtrAuth(self:_:)")
+bool BridgedASTContext_langOptsIsActiveTargetPtrAuth(BridgedASTContext cContext,
+                                                     BridgedStringRef cName);
+
+SWIFT_NAME("getter:BridgedASTContext.langOptsTargetPointerBitWidth(self:)")
+unsigned BridgedASTContext_langOptsTargetPointerBitWidth(BridgedASTContext cContext);
+
+SWIFT_NAME("BridgedASTContext.langOptsGetTargetAtomicBitWidths(self:_:)")
+SwiftInt BridgedASTContext_langOptsGetTargetAtomicBitWidths(BridgedASTContext cContext,
+                                                      SwiftInt* _Nullable * _Nonnull cComponents);
+
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedEndianness : size_t {
+  EndianLittle,
+  EndianBig,
+};
+
+SWIFT_NAME("getter:BridgedASTContext.langOptsTargetEndianness(self:)")
+BridgedEndianness BridgedASTContext_langOptsTargetEndianness(BridgedASTContext cContext);
+
+SWIFT_NAME("BridgedASTContext.langOptsGetLanguageVersion(self:_:)")
+SwiftInt BridgedASTContext_langOptsGetLanguageVersion(BridgedASTContext cContext,
+                                                      SwiftInt* _Nullable * _Nonnull cComponents);
+
+SWIFT_NAME("BridgedASTContext.langOptsGetCompilerVersion(self:_:)")
+SwiftInt BridgedASTContext_langOptsGetCompilerVersion(BridgedASTContext cContext,
+                                                      SwiftInt* _Nullable * _Nonnull cComponents);
+
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedCanImportVersion : size_t {
+  CanImportUnversioned,
+  CanImportVersion,
+  CanImportUnderlyingVersion,
+};
+
+SWIFT_NAME("BridgedASTContext.canImport(self:importPath:location:versionKind:versionComponents:numVersionComponents:)")
+bool BridgedASTContext_canImport(BridgedASTContext cContext,
+                                 BridgedStringRef importPath,
+                                 BridgedSourceLoc canImportLoc,
+                                 BridgedCanImportVersion versionKind,
+                                 const SwiftInt * _Nullable versionComponents,
+                                 SwiftInt numVersionComponents);
 
 //===----------------------------------------------------------------------===//
 // MARK: AST nodes
@@ -1421,10 +1491,10 @@ BridgedDoCatchStmt BridgedDoCatchStmt_createParsed(
     BridgedNullableTypeRepr cThrownType, BridgedStmt cBody,
     BridgedArrayRef cCatches);
 
-SWIFT_NAME("BridgedFallthroughStmt.createParsed(_:loc:)")
+SWIFT_NAME("BridgedFallthroughStmt.createParsed(loc:declContext:)")
 BridgedFallthroughStmt
-BridgedFallthroughStmt_createParsed(BridgedASTContext cContext,
-                                    BridgedSourceLoc cLoc);
+BridgedFallthroughStmt_createParsed(BridgedSourceLoc cLoc,
+                                    BridgedDeclContext cDC);
 
 SWIFT_NAME("BridgedForEachStmt.createParsed(_:labelInfo:forLoc:tryLoc:awaitLoc:"
            "pattern:inLoc:sequence:whereLoc:whereExpr:body:)")
@@ -1843,6 +1913,49 @@ SWIFT_NAME("BridgedParameterList.createParsed(_:leftParenLoc:parameters:"
 BridgedParameterList BridgedParameterList_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLeftParenLoc,
     BridgedArrayRef cParameters, BridgedSourceLoc cRightParenLoc);
+
+//===----------------------------------------------------------------------===//
+// MARK: #if handling
+//===----------------------------------------------------------------------===//
+
+/// Bridged version of IfConfigClauseRangeInfo::ClauseKind.
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedIfConfigClauseKind : size_t {
+  IfConfigActive,
+  IfConfigInactive,
+  IfConfigEnd
+};
+
+/// Bridged version of IfConfigClauseRangeInfo.
+struct BridgedIfConfigClauseRangeInfo {
+  BridgedSourceLoc directiveLoc;
+  BridgedSourceLoc bodyLoc;
+  BridgedSourceLoc endLoc;
+  BridgedIfConfigClauseKind kind;
+
+#ifdef USED_IN_CPP_SOURCE
+  swift::IfConfigClauseRangeInfo unbridged() const {
+    swift::IfConfigClauseRangeInfo::ClauseKind clauseKind;
+    switch (kind) {
+    case IfConfigActive:
+      clauseKind = swift::IfConfigClauseRangeInfo::ActiveClause;
+      break;
+
+    case IfConfigInactive:
+      clauseKind = swift::IfConfigClauseRangeInfo::InactiveClause;
+      break;
+
+    case IfConfigEnd:
+      clauseKind = swift::IfConfigClauseRangeInfo::EndDirective;
+      break;
+    }
+
+    return swift::IfConfigClauseRangeInfo(directiveLoc.unbridged(),
+                                          bodyLoc.unbridged(),
+                                          endLoc.unbridged(),
+                                          clauseKind);
+  }
+#endif
+};
 
 //===----------------------------------------------------------------------===//
 // MARK: Plugins

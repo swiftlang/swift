@@ -132,7 +132,7 @@ private extension Instruction {
     // In instruction simplification we don't have a domtree. Therefore do a simple dominance
     // check based on same-block relations.
     if parentBlock == value.parentBlock {
-      // The value and instruction are in the same block. All uses are dominanted by both.
+      // The value and instruction are in the same block. All uses are dominated by both.
       return true
     }
     let destroys = value.uses.filterUsers(ofType: DestroyValueInst.self)

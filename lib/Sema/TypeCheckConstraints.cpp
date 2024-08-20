@@ -21,6 +21,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Initializer.h"
@@ -478,10 +479,8 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
 
   // First, pre-check the target, validating any types that occur in the
   // expression and folding sequence expressions.
-  if (ConstraintSystem::preCheckTarget(
-          target, /*replaceInvalidRefsWithErrors=*/true)) {
+  if (ConstraintSystem::preCheckTarget(target))
     return errorResult();
-  }
 
   // Check whether given target has a code completion token which requires
   // special handling. Returns true if handled, in which case we've already
@@ -638,7 +637,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
 
   // Find and open all of the generic parameters used by the parameter
   // and replace them with type variables.
-  auto contextualTy = paramInterfaceTy.transform([&](Type type) -> Type {
+  auto contextualTy = paramInterfaceTy.transformRec([&](Type type) -> std::optional<Type> {
     assert(!type->is<UnboundGenericType>());
 
     if (auto *GP = type->getAs<GenericTypeParamType>()) {
@@ -649,7 +648,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       return cs.openGenericParameter(DC->getParent(), GP, genericParameters,
                                      locator);
     }
-    return type;
+    return std::nullopt;
   });
 
   auto containsTypes = [&](Type type, OpenedTypeMap &toFind) {
@@ -1008,10 +1007,9 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
         return found->second;
 
       if (auto archetypeType = dyn_cast<ArchetypeType>(origType)) {
-        auto root = archetypeType->getRoot();
-        // For other nested types, fail here so the default logic in subst()
+        // For nested types, fail here so the default logic in subst()
         // for nested types applies.
-        if (root != archetypeType)
+        if (!archetypeType->getInterfaceType()->is<GenericTypeParamType>())
           return Type();
 
         auto locator = cs.getConstraintLocator({});
@@ -1992,8 +1990,8 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
       auto archetype = toType->castTo<ArchetypeType>();
       conformsToAllProtocols = llvm::all_of(archetype->getConformsTo(),
         [&](ProtocolDecl *proto) {
-          return ModuleDecl::checkConformance(fromType, proto,
-                                              /*allowMissing=*/false);
+          return checkConformance(fromType, proto,
+                                  /*allowMissing=*/false);
         });
     }
 
@@ -2244,7 +2242,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
     auto nsErrorTy = Context.getNSErrorType();
 
     if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::Error)) {
-      if (ModuleDecl::checkConformance(toType, errorTypeProto)) {
+      if (checkConformance(toType, errorTypeProto)) {
         if (nsErrorTy) {
           if (isSubtypeOf(fromType, nsErrorTy, dc)
               // Don't mask "always true" warnings if NSError is cast to
@@ -2254,7 +2252,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
         }
       }
 
-      if (ModuleDecl::checkConformance(fromType, errorTypeProto)) {
+      if (checkConformance(fromType, errorTypeProto)) {
         // Cast of an error-conforming type to NSError or NSObject.
         if ((nsObject && toType->isEqual(nsObject)) ||
              (nsErrorTy && toType->isEqual(nsErrorTy)))

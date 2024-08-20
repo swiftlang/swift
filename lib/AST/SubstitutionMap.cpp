@@ -25,6 +25,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "SubstitutionMapStorage.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericParamList.h"
@@ -326,7 +327,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   if (proto->getInvertibleProtocolKind()) {
     auto substType = type.subst(*this);
     if (!substType->isTypeParameter())
-      return ModuleDecl::lookupConformance(substType, proto);
+      return swift::lookupConformance(substType, proto);
     return ProtocolConformanceRef(proto);
   }
 
@@ -360,7 +361,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
            substType->castTo<ArchetypeType>()->getSuperclass()) &&
           !substType->isTypeParameter() &&
           !substType->isExistentialType()) {
-        return ModuleDecl::lookupConformance(substType, proto);
+        return swift::lookupConformance(substType, proto);
       }
 
       return ProtocolConformanceRef(proto);
@@ -565,7 +566,7 @@ LookUpConformanceInOverrideSubs::operator()(CanType type,
   if (substType->isTypeParameter())
     return ProtocolConformanceRef(proto);
 
-  return ModuleDecl::lookupConformance(substType, proto);
+  return lookupConformance(substType, proto);
 }
 
 SubstitutionMap
@@ -592,37 +593,38 @@ SubstitutionMap::combineSubstitutionMaps(SubstitutionMap firstSubMap,
                                          GenericSignature genericSig) {
   auto &ctx = genericSig->getASTContext();
 
-  auto replaceGenericParameter = [&](Type type) -> Type {
+  auto replaceGenericParameter = [&](Type type) -> std::optional<Type> {
     if (auto gp = type->getAs<GenericTypeParamType>()) {
       if (how == CombineSubstitutionMaps::AtDepth) {
         if (gp->getDepth() < firstDepthOrIndex)
           return Type();
-        return GenericTypeParamType::get(gp->isParameterPack(),
-                                         gp->getDepth() + secondDepthOrIndex -
-                                             firstDepthOrIndex,
-                                         gp->getIndex(), ctx);
+        return Type(GenericTypeParamType::get(gp->isParameterPack(),
+                                              gp->getDepth() + secondDepthOrIndex -
+                                                  firstDepthOrIndex,
+                                              gp->getIndex(), ctx));
       }
 
       assert(how == CombineSubstitutionMaps::AtIndex);
       if (gp->getIndex() < firstDepthOrIndex)
         return Type();
-      return GenericTypeParamType::get(
+      return Type(GenericTypeParamType::get(
           gp->isParameterPack(), gp->getDepth(),
-          gp->getIndex() + secondDepthOrIndex - firstDepthOrIndex, ctx);
+          gp->getIndex() + secondDepthOrIndex - firstDepthOrIndex, ctx));
     }
 
-    return type;
+    return std::nullopt;
   };
 
   return get(
     genericSig,
     [&](SubstitutableType *type) {
       if (auto replacement = replaceGenericParameter(type))
-        return Type(replacement).subst(secondSubMap);
+        if (*replacement)
+          return replacement->subst(secondSubMap);
       return Type(type).subst(firstSubMap);
     },
     [&](CanType type, Type substType, ProtocolDecl *proto) {
-      if (auto replacement = type.transform(replaceGenericParameter))
+      if (auto replacement = type.transformRec(replaceGenericParameter))
         return secondSubMap.lookupConformance(replacement->getCanonicalType(),
                                               proto);
       if (auto conformance = firstSubMap.lookupConformance(type, proto))
@@ -663,7 +665,7 @@ SubstitutionMap::combineSubstitutionMaps(SubstitutionMap firstSubMap,
       if (substType->isTypeParameter())
         return ProtocolConformanceRef(proto);
 
-      return ModuleDecl::lookupConformance(substType, proto);
+      return swift::lookupConformance(substType, proto);
     });
 }
 

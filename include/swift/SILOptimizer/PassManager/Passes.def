@@ -84,7 +84,7 @@
 #define PASS_RANGE(Id, First, Last)
 #endif
 
-PASS(AADumper, "aa-dump",
+SWIFT_FUNCTION_PASS(AliasInfoDumper, "dump-alias-info",
      "Dump Alias Analysis over all Pairs")
 PASS(ABCOpt, "abcopts",
      "Array Bounds Check Optimization")
@@ -514,7 +514,7 @@ PASS(DiagnoseUnnecessaryPreconcurrencyImports, "sil-diagnose-unnecessary-preconc
      "Diagnose any preconcurrency imports that Sema and TransferNonSendable did not use")
 PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
-PASS_RANGE(AllPasses, AADumper, PruneVTables)
+PASS_RANGE(AllPasses, AliasInfoDumper, PruneVTables)
 
 SWIFT_SILCOMBINE_PASS(BeginCOWMutationInst)
 SWIFT_SILCOMBINE_PASS(GlobalValueInst)

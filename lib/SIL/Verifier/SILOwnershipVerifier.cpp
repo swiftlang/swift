@@ -516,7 +516,7 @@ bool SILValueOwnershipChecker::checkDeadEnds(
   }
   auto allWithinBoundary = true;
   for (auto *use : regularUses) {
-    if (!liveness.isWithinBoundary(use->getUser())) {
+    if (!liveness.isWithinBoundary(use->getUser(), /*deadEndBlocks=*/nullptr)) {
       allWithinBoundary |= errorBuilder.handleMalformedSIL([&] {
         llvm::errs()
             << "Owned value without lifetime ending uses whose regular use "
@@ -607,8 +607,8 @@ bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
 
 bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses(
     ArrayRef<Operand *> regularUses, ArrayRef<Operand *> extendLifetimeUses) {
-  if (extendLifetimeUses.size()) {
-  }
+  if (value->getOwnershipKind() == OwnershipKind::None)
+    return true;
 
   LLVM_DEBUG(llvm::dbgs() << "No lifetime ending users?! Bailing early.\n");
   if (auto *arg = dyn_cast<SILFunctionArgument>(value)) {

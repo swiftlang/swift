@@ -94,6 +94,8 @@ add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES
     ${SWIFT_SYNCHRONIZATION_DARWIN_SOURCES}
   SWIFT_SOURCES_DEPENDS_LINUX
     ${SWIFT_SYNCHRONIZATION_LINUX_SOURCES}
+  SWIFT_SOURCES_DEPENDS_LINUX_STATIC
+    ${SWIFT_SYNCHRONIZATION_LINUX_SOURCES}
   SWIFT_SOURCES_DEPENDS_WASI
     ${SWIFT_SYNCHRONIZATION_WASM_SOURCES}
   SWIFT_SOURCES_DEPENDS_WINDOWS
@@ -115,6 +117,8 @@ add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES
     ${SWIFT_SYNCHRONIZATION_DARWIN_DEPENDENCIES}
   SWIFT_MODULE_DEPENDS_LINUX
     Glibc
+  SWIFT_MODULE_DEPENDS_LINUX_STATIC
+    Musl
   SWIFT_MODULE_DEPENDS_ANDROID
     Android
   SWIFT_MODULE_DEPENDS_WINDOWS
@@ -142,6 +146,11 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     list(GET list 0 arch)
     list(GET list 1 mod)
     list(GET list 2 triple)
+
+    # Disable the Synchronization library on AVR for now.
+    if("${arch}" MATCHES "avr")
+      continue()
+    endif()
     
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")

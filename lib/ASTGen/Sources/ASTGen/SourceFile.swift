@@ -44,6 +44,12 @@ public struct ExportedSourceFile {
     }
     return AbsolutePosition(utf8Offset: opaqueValue - sourceFileBaseAddress)
   }
+
+  /// Retrieve a bridged source location for the given absolute position in
+  /// this source file.
+  public func sourceLoc(at position: AbsolutePosition) -> BridgedSourceLoc {
+    BridgedSourceLoc(at: position, in: buffer)
+  }
 }
 
 extension Parser.ExperimentalFeatures {
@@ -61,6 +67,7 @@ extension Parser.ExperimentalFeatures {
     mapFeature(.DoExpressions, to: .doExpressions)
     mapFeature(.NonescapableTypes, to: .nonescapableTypes)
     mapFeature(.SendingArgsAndResults, to: .sendingArgsAndResults)
+    mapFeature(.TrailingComma, to: .trailingComma)
   }
 }
 

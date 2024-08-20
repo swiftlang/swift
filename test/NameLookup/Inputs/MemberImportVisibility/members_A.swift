@@ -31,3 +31,17 @@ extension Y {
 public enum EnumInA {
   case caseInA
 }
+
+open class BaseClassInA {
+  open func methodInA() {}
+}
+
+public protocol ProtocolInA {
+  func defaultedRequirementInA()
+  func defaultedRequirementInB()
+  func defaultedRequirementInC()
+}
+
+extension ProtocolInA {
+  public func defaultedRequirementInA() { }
+}

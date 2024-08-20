@@ -406,6 +406,7 @@ func checkDiagnosticMinimality(x: Runcible?) {
   // expected-note@-1 {{add missing case: '(.fork, _)'}}
   // expected-note@-2 {{add missing case: '(.hat, .hat)'}}
   // expected-note@-3 {{add missing case: '(_, .fork)'}}
+  // expected-note@-4 {{add missing cases}}
   case (.spoon, .spoon):
     break
   case (.spoon, .hat):
@@ -419,6 +420,7 @@ func checkDiagnosticMinimality(x: Runcible?) {
   // expected-note@-2 {{add missing case: '(.hat, .spoon)'}}
   // expected-note@-3 {{add missing case: '(.spoon, .hat)'}}
   // expected-note@-4 {{add missing case: '(_, .fork)'}}
+  // expected-note@-5 {{add missing cases}}
   case (.spoon, .spoon):
     break
   case (.hat, .hat):
@@ -443,12 +445,14 @@ indirect enum MutuallyRecursive {
 func infinitelySized() -> Bool {
   switch (InfinitelySized.one, InfinitelySized.one) { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 8 {{add missing case:}}
+  // expected-note@-2 {{add missing cases}}
   case (.one, .one): return true
   case (.two, .two): return true
   }
   
   switch (MutuallyRecursive.one, MutuallyRecursive.one) { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 8 {{add missing case:}}
+  // expected-note@-2 {{add missing cases}}
   case (.one, .one): return true
   case (.two, .two): return true
   }
@@ -470,6 +474,7 @@ do {
   // expected-error@-1 {{switch must be exhaustive}}
   // expected-note@-2 {{add missing case: '(false, (_, false, true, _), (_, true, _, _))'}}
   // expected-note@-3 {{add missing case: '(_, (_, true, _, _), (_, false, true, _))'}}
+  // expected-note@-4 {{add missing cases}}
   case (true, (_, _, _, _), (_, true, true, _)):
     break
   case (true, (_, _, _, _), (_, _, false, _)):
@@ -807,11 +812,15 @@ public enum NonExhaustivePayload {
 // case.
 @inlinable
 public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePayload, for interval: TemporalProxy, flag: Bool) {
-  switch value { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{none}}
+  switch value { 
+  // expected-error@-1 {{switch must be exhaustive}} {{none}} 
+  // expected-note@-2 {{add missing case: '.b'}} {{+6:3-3=case .b:\n<#code#>\n}}
+  // expected-note@-3 {{handle unknown values using "@unknown default"}} {{+6:3-3=@unknown default:\n<#fatalError()#>\n}}
+  // expected-note@-4 {{add missing cases}} {{+6:3-3=case .b:\n<#code#>\n@unknown default:\n<#fatalError()#>\n}}
   case .a: break
   }
 
-  switch value { // expected-warning {{switch covers known cases, but 'NonExhaustive' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{+3:3-3=@unknown default:\n<#fatalError#>()\n}}
+  switch value { // expected-warning {{switch covers known cases, but 'NonExhaustive' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{+3:3-3=@unknown default:\n<#fatalError()#>\n}}
   case .a: break
   case .b: break
   }
@@ -828,12 +837,16 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   @unknown case _: break // no-warning
   }
 
-  switch value { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}} {{none}}
+  switch value { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}} {{+2:3-3=case .b:\n<#code#>\n}}
   case .a: break
   @unknown case _: break
   }
 
-  switch value { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.a'}} {{none}} expected-note {{add missing case: '.b'}} {{none}}
+  switch value { 
+  // expected-warning@-1 {{switch must be exhaustive}} {{none}} 
+  // expected-note@-2 {{add missing case: '.a'}} {{+5:3-3=case .a:\n<#code#>\n}}
+  // expected-note@-3 {{add missing case: '.b'}} {{+5:3-3=case .b:\n<#code#>\n}}
+  // expected-note@-4 {{add missing cases}} {{+5:3-3=case .a:\n<#code#>\ncase .b:\n<#code#>\n}}
   @unknown case _: break
   }
 
@@ -899,11 +912,15 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   } // no-warning
 
   // Test payloaded enums.
-  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(_)'}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{none}}
+  switch payload { 
+  // expected-error@-1 {{switch must be exhaustive}} {{none}} 
+  // expected-note@-2 {{add missing case: '.b(_)'}} {{+6:3-3=case .b(_):\n<#code#>\n}}
+  // expected-note@-3 {{handle unknown values using "@unknown default"}} {{+6:3-3=@unknown default:\n<#fatalError()#>\n}}
+  // expected-note@-4 {{add missing cases}} {{+6:3-3=case .b(_):\n<#code#>\n@unknown default:\n<#fatalError()#>\n}}
   case .a: break
   }
 
-  switch payload { // expected-warning {{switch covers known cases, but 'NonExhaustivePayload' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{+3:3-3=@unknown default:\n<#fatalError#>()\n}}
+  switch payload { // expected-warning {{switch covers known cases, but 'NonExhaustivePayload' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{+3:3-3=@unknown default:\n<#fatalError()#>\n}}
   case .a: break
   case .b: break
   }
@@ -920,17 +937,21 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   @unknown case _: break // no-warning
   }
 
-  switch payload { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(_)'}} {{none}}
+  switch payload { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(_)'}} {{+2:3-3=case .b(_):\n<#code#>\n}}
   case .a: break
   @unknown case _: break
   }
 
-  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{none}}
+  switch payload { 
+  // expected-error@-1 {{switch must be exhaustive}} {{none}} 
+  // expected-note@-2 {{add missing case: '.b(true)'}} {{+7:3-3=case .b(true):\n<#code#>\n}}
+  // expected-note@-3 {{handle unknown values using "@unknown default"}} {{+7:3-3=@unknown default:\n<#fatalError()#>\n}}
+  // expected-note@-4 {{add missing cases}} {{+7:3-3=case .b(true):\n<#code#>\n@unknown default:\n<#fatalError()#>\n}}
   case .a: break
   case .b(false): break
   }
 
-  switch payload { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{none}}
+  switch payload { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{+3:3-3=case .b(true):\n<#code#>\n}}
   case .a: break
   case .b(false): break
   @unknown case _: break
@@ -984,12 +1005,16 @@ public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: Non
   @unknown case _: break // no-warning
   }
 
-  switch value { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}} {{none}}
+  switch value { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}} {{+2:3-3=case .b:\n<#code#>\n}}
   case .a: break
   @unknown case _: break
   }
 
-  switch value { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.a'}} {{none}} expected-note {{add missing case: '.b'}} {{none}}
+  switch value { 
+  // expected-warning@-1 {{switch must be exhaustive}} {{none}} 
+  // expected-note@-2 {{add missing case: '.a'}} {{+5:3-3=case .a:\n<#code#>\n}} 
+  // expected-note@-3 {{add missing case: '.b'}} {{+5:3-3=case .b:\n<#code#>\n}}
+  // expected-note@-4 {{add missing cases}} {{+5:3-3=case .a:\n<#code#>\ncase .b:\n<#code#>\n}}
   @unknown case _: break
   }
 
@@ -1038,7 +1063,7 @@ public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: Non
   }
 
   // Test payloaded enums.
-  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(_)'}} {{none}}
+  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(_)'}} {{+2:3-3=case .b(_):\n<#code#>\n}}
   case .a: break
   }
 
@@ -1059,17 +1084,17 @@ public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: Non
   @unknown case _: break // no-warning
   }
 
-  switch payload { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(_)'}} {{none}}
+  switch payload { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(_)'}} {{+2:3-3=case .b(_):\n<#code#>\n}}
   case .a: break
   @unknown case _: break
   }
 
-  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{none}}
+  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{+3:3-3=case .b(true):\n<#code#>\n}}
   case .a: break
   case .b(false): break
   }
 
-  switch payload { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{none}}
+  switch payload { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{+3:3-3=case .b(true):\n<#code#>\n}}
   case .a: break
   case .b(false): break
   @unknown case _: break
@@ -1236,6 +1261,7 @@ public enum E_54081 {
       // expected-error@-1 {{switch must be exhaustive}}
       // expected-note@-2 {{add missing case: '.a'}}
       // expected-note@-3 {{add missing case: '.b'}}
+      // expected-note@-4 {{add missing cases}}
       // Do not suggest adding '@unknown default'
     }
     
@@ -1244,12 +1270,14 @@ public enum E_54081 {
       // expected-note@-2 {{add missing case: '.a'}}
       // expected-note@-3 {{add missing case: '.b'}}
       // expected-note@-4 {{add missing case: '.c'}}
+      // expected-note@-5 {{add missing cases}}
     }
     
     switch value3 {
       // expected-error@-1 {{switch must be exhaustive}}
       // expected-note@-2 {{add missing case: '.a'}}
       // expected-note@-3 {{add missing case: '.b'}}
+      // expected-note@-4 {{add missing cases}}
     }
   }
   
@@ -1258,6 +1286,7 @@ public enum E_54081 {
       // expected-error@-1 {{switch must be exhaustive}}
       // expected-note@-2 {{add missing case: '.a'}}
       // expected-note@-3 {{add missing case: '.b'}}
+      // expected-note@-4 {{add missing cases}}
     }
   }
   
@@ -1269,6 +1298,7 @@ public enum E_54081 {
       // expected-note@-2 {{add missing case: '.a'}}
       // expected-note@-3 {{add missing case: '.b'}}
       // expected-note@-4 {{handle unknown values using "@unknown default"}}
+      // expected-note@-5 {{add missing cases}}
     }
   }
 }

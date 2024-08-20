@@ -2177,3 +2177,10 @@ void BridgedBuilder::destroyCapturedArgs(BridgedInstruction partialApply) const 
     assert(false && "`destroyCapturedArgs` must only be called on a `partial_apply` on stack!");   
   }
 }
+
+void verifierError(BridgedStringRef message,
+                   OptionalBridgedInstruction atInstruction,
+                   OptionalBridgedArgument atArgument) {
+  Twine msg(message.unbridged());
+  verificationFailure(msg, atInstruction.unbridged(), atArgument.unbridged(), /*extraContext=*/nullptr);
+}

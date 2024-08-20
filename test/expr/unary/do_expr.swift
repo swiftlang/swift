@@ -147,7 +147,7 @@ func testReturn1() -> Int {
     try throwsError()
   } catch {
     if .random() {
-      return 0 // expected-error {{cannot 'return' in 'do-catch' when used as expression}}
+      return 0 // expected-error {{cannot use 'return' to transfer control out of 'do-catch' expression}}
     }
     then 0
   }

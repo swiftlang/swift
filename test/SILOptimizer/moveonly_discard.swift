@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sil-verify-all -verify -emit-sil -enable-experimental-feature MoveOnlyEnumDeinits %s
+// RUN: %target-swift-frontend -sil-verify-all -verify -emit-sil -enable-experimental-feature MoveOnlyEnumDeinits -enable-experimental-feature ConsumeSelfInDeinit %s
 
 
 func posix_close(_ t: Int) {}

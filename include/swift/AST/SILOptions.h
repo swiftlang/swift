@@ -118,6 +118,10 @@ public:
   /// Controls whether to run async demotion pass.
   bool EnableAsyncDemotion = false;
 
+  /// Controls whether to always assume that functions rarely throw an Error
+  /// within the optimizer. This influences static branch prediction.
+  bool EnableThrowsPrediction = false;
+
   /// Should we run any SIL performance optimizations
   ///
   /// Useful when you want to enable -O LLVM opts but not -O SIL opts.
@@ -145,6 +149,10 @@ public:
 
   /// Enables SIL-level diagnostics for NonescapableTypes.
   bool EnableLifetimeDependenceDiagnostics = true;
+
+  /// Enables SIL-level performance diagnostics (for @noLocks, @noAllocation
+  /// annotations and for Embedded Swift).
+  bool EnablePerformanceDiagnostics = true;
 
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;

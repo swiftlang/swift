@@ -18,6 +18,13 @@ class TrivialDestructor {
   deinit { }
 }
 
+class Klass {}
+
+struct NonTrivialStruct {
+  var k : Klass
+  init()
+}
+
 // Remove a dead array.
 // rdar://20980377 Add dead array elimination to DeadObjectElimination
 // Swift._allocateUninitializedArray <A> (Builtin.Word) -> (Swift.Array<A>, Builtin.RawPointer)
@@ -165,5 +172,21 @@ bb3:
 bb2:
   %18 = tuple ()
   return %18 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dead_debuginfo
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'dead_debuginfo'
+sil [ossa] @dead_debuginfo : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack [lexical] [var_decl] $NonTrivialStruct, var, name "x", type $NonTrivialStruct
+  %2 = integer_literal $Builtin.Int64, 0
+  %4 = struct $NonTrivialStruct (%0 : $Klass)
+  apply undef(%4) : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+  store %4 to [init] %1 : $*NonTrivialStruct
+  destroy_addr %1 : $*NonTrivialStruct
+  dealloc_stack %1 : $*NonTrivialStruct
+  %t = tuple ()
+  return %t : $()
 }
 

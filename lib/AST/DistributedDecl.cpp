@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignAsyncConvention.h"
@@ -106,6 +107,8 @@ VarDecl *
 swift::getDistributedActorAsLocalActorComputedProperty(ModuleDecl *module) {
   auto &C = module->getASTContext();
   auto DA = C.getDistributedActorDecl();
+  if (!DA)
+    return nullptr;
   auto extension = findDistributedActorAsActorExtension(DA);
 
   if (!extension)
@@ -200,7 +203,7 @@ Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
 
   // Dig out the actor system type.
   Type selfType = actor->getSelfInterfaceType();
-  auto conformance = ModuleDecl::lookupConformance(selfType, DA);
+  auto conformance = lookupConformance(selfType, DA);
   return conformance.getTypeWitnessByName(selfType, C.Id_ActorSystem);
 }
 
@@ -215,7 +218,7 @@ static Type getTypeWitnessByName(NominalTypeDecl *type, ProtocolDecl *protocol,
     return ErrorType::get(type->getASTContext());
 
   Type selfType = type->getSelfInterfaceType();
-  auto conformance = ModuleDecl::lookupConformance(selfType, protocol);
+  auto conformance = lookupConformance(selfType, protocol);
   if (!conformance || conformance.isInvalid())
     return Type();
   return conformance.getTypeWitnessByName(selfType, member);
@@ -295,7 +298,7 @@ Type swift::getDistributedSerializationRequirementType(
 
   // Dig out the serialization requirement type.
   Type selfType = nominal->getSelfInterfaceType();
-  auto conformance = ModuleDecl::lookupConformance(selfType, protocol);
+  auto conformance = lookupConformance(selfType, protocol);
   if (conformance.isInvalid())
     return Type();
 
@@ -361,7 +364,7 @@ Type swift::getAssociatedTypeOfDistributedSystemOfActor(
     return memberTy->getReducedType(sig);
 
   auto actorConformance =
-      ModuleDecl::lookupConformance(
+      lookupConformance(
           actorType->getDeclaredInterfaceType(), actorProtocol);
   if (!actorConformance || actorConformance.isInvalid())
     return Type();
@@ -490,7 +493,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
       C.getDistributedActorSystemDecl();
 
   auto systemNominal = DC->getSelfNominalTypeDecl();
-  auto distSystemConformance = ModuleDecl::lookupConformance(
+  auto distSystemConformance = lookupConformance(
       systemNominal->getDeclaredInterfaceType(), systemProto);
 
   if (distSystemConformance.isInvalid()) {
@@ -594,7 +597,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   // --- Check: Act: DistributedActor,
   //            Act.ID == Self.ActorID
   GenericTypeParamDecl *ActParam = genericParams->getParams()[0];
-  auto ActConformance = ModuleDecl::lookupConformance(
+  auto ActConformance = lookupConformance(
       mapTypeIntoContext(ActParam->getDeclaredInterfaceType()),
       C.getProtocol(KnownProtocolKind::DistributedActor));
   if (ActConformance.isInvalid()) {
@@ -603,7 +606,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
 
   // --- Check: Err: Error
   GenericTypeParamDecl *ErrParam = genericParams->getParams()[1];
-  auto ErrConformance = ModuleDecl::lookupConformance(
+  auto ErrConformance = lookupConformance(
       mapTypeIntoContext(ErrParam->getDeclaredInterfaceType()),
       C.getProtocol(KnownProtocolKind::Error));
   if (ErrConformance.isInvalid()) {
@@ -677,7 +680,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
       }
 
       for (auto requirementProto : requirementProtos) {
-        auto conformance = ModuleDecl::lookupConformance(resultType, requirementProto);
+        auto conformance = lookupConformance(resultType, requirementProto);
         if (conformance.isInvalid()) {
           return false;
         }
@@ -722,7 +725,7 @@ AbstractFunctionDecl::isDistributedActorSystemMakeInvocationEncoder() const {
   }
 
   auto returnTy = func->getResultInterfaceType();
-  auto conformance = ModuleDecl::lookupConformance(
+  auto conformance = lookupConformance(
       returnTy, C.getDistributedTargetInvocationEncoderDecl());
   if (conformance.isInvalid()) {
     return false;
@@ -794,7 +797,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
       C.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
 
   auto encoderNominal = getDeclContext()->getSelfNominalTypeDecl();
-  auto protocolConformance = ModuleDecl::lookupConformance(
+  auto protocolConformance = lookupConformance(
       encoderNominal->getDeclaredInterfaceType(), encoderProto);
 
   if (protocolConformance.isInvalid()) {
@@ -925,7 +928,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
       C.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
 
   auto encoderNominal = getDeclContext()->getSelfNominalTypeDecl();
-  auto protocolConformance = ModuleDecl::lookupConformance(
+  auto protocolConformance = lookupConformance(
       encoderNominal->getDeclaredInterfaceType(), encoderProto);
 
   if (protocolConformance.isInvalid()) {
@@ -1018,7 +1021,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
   }
 
   for (auto requirementProto : requirementProtos) {
-    auto conformance = ModuleDecl::lookupConformance(resultType, requirementProto);
+    auto conformance = lookupConformance(resultType, requirementProto);
     if (conformance.isInvalid()) {
         return false;
     }
@@ -1051,7 +1054,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
         C.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
 
     auto encoderNominal = getDeclContext()->getSelfNominalTypeDecl();
-    auto protocolConformance = ModuleDecl::lookupConformance(
+    auto protocolConformance = lookupConformance(
         encoderNominal->getDeclaredInterfaceType(), encoderProto);
 
     if (protocolConformance.isInvalid()) {
@@ -1115,7 +1118,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
     // === Check generic parameters in detail
     // --- Check: Err: Error
     GenericTypeParamDecl *ErrParam = genericParams->getParams()[0];
-    auto ErrConformance = ModuleDecl::lookupConformance(
+    auto ErrConformance = lookupConformance(
         mapTypeIntoContext(ErrParam->getDeclaredInterfaceType()),
         C.getProtocol(KnownProtocolKind::Error));
     if (ErrConformance.isInvalid()) {
@@ -1158,7 +1161,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationDecoderDecodeNextArgument() c
         C.getProtocol(KnownProtocolKind::DistributedTargetInvocationDecoder);
 
     auto decoderNominal = getDeclContext()->getSelfNominalTypeDecl();
-    auto protocolConformance = ModuleDecl::lookupConformance(
+    auto protocolConformance = lookupConformance(
         decoderNominal->getDeclaredInterfaceType(), decoderProto);
 
     if (protocolConformance.isInvalid()) {
@@ -1223,7 +1226,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationDecoderDecodeNextArgument() c
 
     for (auto requirementProto : requirementProtos) {
       auto conformance =
-          ModuleDecl::lookupConformance(resultType, requirementProto);
+          lookupConformance(resultType, requirementProto);
       if (conformance.isInvalid()) {
           return false;
       }
@@ -1251,7 +1254,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
         C.getProtocol(KnownProtocolKind::DistributedTargetInvocationResultHandler);
 
     auto decoderNominal = getDeclContext()->getSelfNominalTypeDecl();
-    auto protocolConformance = ModuleDecl::lookupConformance(
+    auto protocolConformance = lookupConformance(
         decoderNominal->getDeclaredInterfaceType(), decoderProto);
 
     if (protocolConformance.isInvalid()) {
@@ -1320,7 +1323,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
 
     for (auto requirementProto : requirementProtos) {
       auto conformance =
-          ModuleDecl::lookupConformance(argumentType, requirementProto);
+          lookupConformance(argumentType, requirementProto);
       if (conformance.isInvalid()) {
         return false;
       }

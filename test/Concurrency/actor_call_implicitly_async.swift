@@ -176,11 +176,11 @@ func someAsyncFunc() async {
   ////////////
   // effectful properties from outside the actor instance
 
-  // expected-warning@+2 {{non-sendable type 'Box' in asynchronous access to actor-isolated property 'effPropA' cannot cross actor boundary}}
+  // expected-warning@+2 {{non-sendable type 'Box' of property 'effPropA' cannot exit actor-isolated context}}
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}} {{7-7=await }} expected-note@+1{{property access is 'async'}}
   _ = a.effPropA
 
-  // expected-warning@+3 {{non-sendable type 'Box' in implicitly asynchronous access to actor-isolated property 'effPropT' cannot cross actor boundary}}
+  // expected-warning@+3 {{non-sendable type 'Box' of property 'effPropT' cannot exit actor-isolated context}}
   // expected-error@+2{{property access can throw, but it is not marked with 'try' and the error is not handled}}
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}} {{7-7=await }} expected-note@+1{{property access is 'async'}}
   _ = a.effPropT
@@ -190,8 +190,8 @@ func someAsyncFunc() async {
   _ = a.effPropAT
 
   // (mostly) corrected ones
-  _ = await a.effPropA  // expected-warning {{non-sendable type 'Box' in asynchronous access to actor-isolated property 'effPropA' cannot cross actor boundary}}
-  _ = try! await a.effPropT // expected-warning {{non-sendable type 'Box' in implicitly asynchronous access to actor-isolated property 'effPropT' cannot cross actor boundary}}
+  _ = await a.effPropA  // expected-warning {{non-sendable type 'Box' of property 'effPropA' cannot exit actor-isolated context}}
+  _ = try! await a.effPropT // expected-warning {{non-sendable type 'Box' of property 'effPropT' cannot exit actor-isolated context}}
   _ = try? await a.effPropAT
 
   print("ok!")
@@ -353,23 +353,23 @@ actor Calculator {
 
 @OrangeActor func doSomething() async {
   let _ = (await bananaAdd(1))(2)
-  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
+  // expected-warning@-1{{non-sendable result type '(Int) -> Int' cannot be sent from global actor 'BananaActor'-isolated context in call to global function 'bananaAdd'}}
   // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   let _ = await (await bananaAdd(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
-  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
+  // expected-warning@-1{{non-sendable result type '(Int) -> Int' cannot be sent from global actor 'BananaActor'-isolated context in call to global function 'bananaAdd'}}
   // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
   let calc = Calculator()
   
   let _ = (await calc.addCurried(1))(2)
-  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by call to actor-isolated function cannot cross actor boundary}}
+  // expected-warning@-1{{non-sendable result type '(Int) -> Int' cannot be sent from actor-isolated context in call to instance method 'addCurried'}}
   // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   let _ = await (await calc.addCurried(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
-  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by call to actor-isolated function cannot cross actor boundary}}
+  // expected-warning@-1{{non-sendable result type '(Int) -> Int' cannot be sent from actor-isolated context in call to instance method 'addCurried'}}
   // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
   let plusOne = await calc.addCurried(await calc.add(0, 1))
-  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by call to actor-isolated function cannot cross actor boundary}}
+  // expected-warning@-1{{non-sendable result type '(Int) -> Int' cannot be sent from actor-isolated context in call to instance method 'addCurried'}}
   // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   let _ = plusOne(2)
 }

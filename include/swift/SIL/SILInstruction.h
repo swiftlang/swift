@@ -1978,6 +1978,7 @@ enum HasPointerEscape_t : bool {
   HasPointerEscape = true,
 };
 
+// See SILValue::isFromVarDecl()
 enum IsFromVarDecl_t : bool {
   IsNotFromVarDecl = false,
   IsFromVarDecl = true,
@@ -7067,6 +7068,12 @@ public:
                           getAllOperands()[i+1].get());
   }
 
+  std::pair<EnumElementDecl *, Operand *> getCaseOperand(unsigned i) const {
+    auto *self = const_cast<SelectEnumInstBase *>(this);
+    return std::make_pair(getEnumElementDeclStorage()[i],
+                          &self->getAllOperands()[i + 1]);
+  }
+
   /// Return the value that will be used as the result for the specified enum
   /// case.
   SILValue getCaseResult(EnumElementDecl *D) {
@@ -7079,6 +7086,18 @@ public:
     return getDefaultResult();
   }
 
+  Operand *getCaseResultOperand(EnumElementDecl *D) {
+    for (unsigned i = 0, e = getNumCases(); i != e; ++i) {
+      auto Entry = getCaseOperand(i);
+      if (Entry.first == D)
+        return Entry.second;
+    }
+
+    // select_enum is required to be fully covered, so return the default if we
+    // didn't find anything.
+    return getDefaultResultOperand();
+  }
+
   bool hasDefault() const {
     return sharedUInt8().SelectEnumInstBase.hasDefault;
   }
@@ -7086,6 +7105,12 @@ public:
   SILValue getDefaultResult() const {
     assert(hasDefault() && "doesn't have a default");
     return getAllOperands().back().get();
+  }
+
+  Operand *getDefaultResultOperand() const {
+    assert(hasDefault() && "doesn't have a default");
+    auto *self = const_cast<SelectEnumInstBase *>(this);
+    return &self->getAllOperands().back();
   }
 
   unsigned getNumCases() const {
@@ -10968,7 +10993,8 @@ private:
 
 protected:
   TryApplyInstBase(SILInstructionKind valueKind, SILDebugLocation Loc,
-                   SILBasicBlock *normalBB, SILBasicBlock *errorBB);
+                   SILBasicBlock *normalBB, SILBasicBlock *errorBB,
+                   ProfileCounter normalCount, ProfileCounter errorCount);
 
 public:
   SuccessorListTy getSuccessors() {
@@ -10988,6 +11014,11 @@ public:
   const SILBasicBlock *getNormalBB() const { return DestBBs[NormalIdx]; }
   SILBasicBlock *getErrorBB() { return DestBBs[ErrorIdx]; }
   const SILBasicBlock *getErrorBB() const { return DestBBs[ErrorIdx]; }
+
+  /// The number of times the Normal branch was executed
+  ProfileCounter getNormalBBCount() const { return DestBBs[NormalIdx].getCount(); }
+  /// The number of times the Error branch was executed
+  ProfileCounter getErrorBBCount() const { return DestBBs[ErrorIdx].getCount(); }
 };
 
 /// TryApplyInst - Represents the full application of a function that
@@ -11005,7 +11036,9 @@ class TryApplyInst final
                SILBasicBlock *normalBB, SILBasicBlock *errorBB,
                ApplyOptions options,
                const GenericSpecializationInformation *specializationInfo,
-               std::optional<ApplyIsolationCrossing> isolationCrossing);
+               std::optional<ApplyIsolationCrossing> isolationCrossing,
+               ProfileCounter normalCount,
+               ProfileCounter errorCount);
 
   static TryApplyInst *
   create(SILDebugLocation debugLoc, SILValue callee,
@@ -11013,7 +11046,9 @@ class TryApplyInst final
          SILBasicBlock *normalBB, SILBasicBlock *errorBB, ApplyOptions options,
          SILFunction &parentFunction,
          const GenericSpecializationInformation *specializationInfo,
-         std::optional<ApplyIsolationCrossing> isolationCrossing);
+         std::optional<ApplyIsolationCrossing> isolationCrossing,
+         ProfileCounter normalCount,
+         ProfileCounter errorCount);
 };
 
 /// DifferentiableFunctionInst - creates a `@differentiable` function-typed

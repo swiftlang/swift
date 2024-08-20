@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -no-allocations %s -c -o %t/a.o
+// RUN: %target-swift-frontend -enable-experimental-feature Extern -enable-experimental-feature Embedded -no-allocations %s -c -o %t/a.o
 
 // RUN: grep DEP\: %s | sed 's#// DEP\: ##' | sort > %t/allowed-dependencies.txt
 

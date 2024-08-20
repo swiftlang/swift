@@ -88,7 +88,7 @@ class Derived: Base<Int> {
 }
 \end{Verbatim}
 
-One edge case here is that if a protocol or protocol extension imposes a \index{superclass requirement}superclass requirement on \texttt{Self}, we might find a member of this superclass when resolving an identifier type representation inside our protocol or protocol extension. Swift does not support recursive superclass requirements, so the superclass bound of \texttt{Self} in this case must always be a \index{fully-concrete type}fully-concrete type. To continue our example, we can reference \texttt{Inner} from a protocol extension of \texttt{Proto}, which requires that \texttt{Self} inherit from \texttt{Derived}:
+One edge case here is that if a protocol or protocol extension imposes a \index{superclass requirement}superclass requirement on \tSelf, we might find a member of this superclass when resolving an identifier type representation inside our protocol or protocol extension. Swift does not support recursive superclass requirements, so the superclass bound of \tSelf\ in this case must always be a \index{fully-concrete type}fully-concrete type. To continue our example, we can reference \texttt{Inner} from a protocol extension of \texttt{Proto}, which requires that \tSelf\ inherit from \texttt{Derived}:
 \begin{Verbatim}
 protocol Proto: Derived {}
 
@@ -111,7 +111,7 @@ struct G<T> {
 The resolved type is the declared interface type of the generic parameter declaration, which is the corresponding \index{generic parameter type}generic parameter type.
 
 \paragraph{The identifier Self.}
-Speaking of \texttt{Self}, inside a protocol or protocol extension this refers to the \Index{protocol Self type@protocol \texttt{Self} type}implicit generic parameter named \texttt{Self}, also known as $\rT$ (\SecRef{protocols}), which we resolve like a reference to any other named other generic parameter:
+Speaking of \tSelf, inside a protocol or protocol extension this refers to the \IndexSelf implicit generic parameter named \tSelf, also known as $\rT$ (\SecRef{protocols}), which we resolve like a reference to any other named other generic parameter:
 \begin{Verbatim}
 protocol Proto {
   // Return type of `f' is the `Self' generic parameter of `Proto'
@@ -119,7 +119,7 @@ protocol Proto {
 }
 \end{Verbatim}
 
-Inside the source range of a \index{struct type}struct or \index{enum type}enum declaration or an extension thereof, \texttt{Self} is shorthand for the \index{declared interface type}declared interface type of this nominal type declaration. This is not a generic parameter type at all, but rather a nominal type, generic or non-generic:
+Inside the source range of a \index{struct type}struct or \index{enum type}enum declaration or an extension thereof, \tSelf\ is shorthand for the \index{declared interface type}declared interface type of this nominal type declaration. This is not a generic parameter type at all, but rather a nominal type, generic or non-generic:
 \begin{Verbatim}
 struct Outer<T> {
   // Return type of `f' is `Outer<T>'
@@ -127,7 +127,7 @@ struct Outer<T> {
 }
 \end{Verbatim}
 
-Inside the source range of a class declaration or an extension of one, \texttt{Self} stands for the \Index{dynamic Self type@dynamic \texttt{Self} type}dynamic \texttt{Self} type, wrapping the declared interface type of the class:
+Inside the source range of a class declaration or an extension of one, \tSelf\ stands for the \Index{dynamic Self type@dynamic \tSelf\ type}dynamic \tSelf\ type, wrapping the declared interface type of the class:
 \begin{Verbatim}
 extension Outer {
   class InnerClass {
@@ -138,7 +138,7 @@ extension Outer {
 }
 \end{Verbatim}
 
-The dynamic \texttt{Self} type was previously described in \SecRef{misc types}. Historically, Swift only had \texttt{Self} in protocols and dynamic \texttt{Self} in classes, and the latter could only appear in the return type of a method. \IndexSwift{5.1}Swift~5.1 introduced the ability to state dynamic \texttt{Self} in more positions, and also refer to ``static'' \texttt{Self} inside struct and enum declarations~\cite{se0068}.
+The dynamic \tSelf\ type was previously described in \SecRef{misc types}. Historically, Swift only had \tSelf\ in protocols and dynamic \tSelf\ in classes, and the latter could only appear in the return type of a method. \IndexSwift{5.1}Swift~5.1 introduced the ability to state dynamic \tSelf\ in more positions, and also refer to ``static'' \tSelf\ inside struct and enum declarations~\cite{se0068}.
 
 \paragraph{Type aliases.}
 Identifier type representations can also refer to type alias declarations, generalizing the behavior described for nominal type declarations above. Once again, we take the declared interface type of the type alias declaration, and possibly apply a substitution map. While the declared interface type of a nominal type declaration is a nominal type, the declared interface type of a \index{type alias declaration}type alias declaration is a \index{type alias type}type alias type. This is a sugared type, \index{canonical type}canonically equal to the \index{underlying type}underlying type of the type alias declaration.
@@ -168,7 +168,7 @@ class Derived: Base<Int> {
 As explained in \SecRef{nested nominal types}, a nominal type declaration cannot be a member of a protocol or protocol extension, but a type alias declaration can. We say it's a \IndexDefinition{protocol type alias}\emph{protocol type alias}. Unqualified lookup will find such a type alias declaration from within the scope of any nominal type declaration that conforms to this protocol. We discuss protocol type aliases in the next section when we talk about member type representations.
 
 \paragraph{Associated types.}
-If the identifier type representation is located within the source range of a \index{protocol declaration}protocol or protocol extension, the protocol's \index{associated type declaration}associated type declarations are visible to unqualified lookup. The resolved type is the declared interface type of the associated type declaration, which is a \index{dependent member type}dependent member type around ``\texttt{Self}'':
+If the identifier type representation is located within the source range of a \index{protocol declaration}protocol or protocol extension, the protocol's \index{associated type declaration}associated type declarations are visible to unqualified lookup. The resolved type is the declared interface type of the associated type declaration, which is a \index{dependent member type}dependent member type around ``\tSelf'':
 \begin{Verbatim}
 protocol Pair {
   associatedtype A
@@ -276,7 +276,7 @@ struct G<T: Provider> {
   var x: T.Entity = ...
 }
 \end{Verbatim}
-To obtain the resolved type \texttt{T.[Provider]Entity} from \texttt{Self.[Provider]Entity} (the declared interface type of the \texttt{Entity} associated type), we must replace \texttt{Self} with \texttt{T}. We do this by applying the \index{protocol substitution map}protocol substitution map, which satisfies the protocol generic signature $G_\texttt{Provider}$ with the \index{abstract conformance}abstract conformance $\ConfReq{T}{Provider}$: \[\Sigma_{\ConfReq{T}{Provider}}:=\SubstMapC{\SubstType{Self}{T}}{\SubstConf{Self}{T}{Provider}}\]
+To obtain the resolved type \texttt{T.[Provider]Entity} from \texttt{Self.[Provider]Entity} (the declared interface type of the \texttt{Entity} associated type), we must replace \tSelf\ with \texttt{T}. We do this by applying the \index{protocol substitution map}protocol substitution map, which satisfies the protocol generic signature $G_\texttt{Provider}$ with the \index{abstract conformance}abstract conformance $\ConfReq{T}{Provider}$: \[\Sigma_{\ConfReq{T}{Provider}}:=\SubstMapC{\SubstType{Self}{T}}{\SubstConf{Self}{T}{Provider}}\]
 Applying $\Sigma_{\ConfReq{T}{Provider}}$ to \texttt{Self.[Provider]Entity} projects the type witness from this conformance, with an equation we've seen a few times now, for example in \SecRef{abstract conformances}:
 \begin{gather*}
 \texttt{Self.[Provider]Entity}\otimes\Sigma_{\ConfReq{T}{Provider}}\\
@@ -285,7 +285,7 @@ Applying $\Sigma_{\ConfReq{T}{Provider}}$ to \texttt{Self.[Provider]Entity} proj
 \qquad\qquad{}=\texttt{T.[Provider]Entity}
 \end{gather*}
 
-The second case, where we found a \index{protocol type alias}\index{type alias declaration}protocol type alias as a member of the base, is closely related. The resolved type is again obtained by replacing all occurrences of \texttt{Self} in the \index{underlying type}underlying type of the type alias with the resolved base type of the member type representation. We're also going to make things slightly more interesting by using a dependent member type \texttt{T.Element} as the base type, rather than the generic parameter~\texttt{T}:
+The second case, where we found a \index{protocol type alias}\index{type alias declaration}protocol type alias as a member of the base, is closely related. The resolved type is again obtained by replacing all occurrences of \tSelf\ in the \index{underlying type}underlying type of the type alias with the resolved base type of the member type representation. We're also going to make things slightly more interesting by using a dependent member type \texttt{T.Element} as the base type, rather than the generic parameter~\texttt{T}:
 \begin{Verbatim}
 protocol Subscriber {
   associatedtype Parent: Provider
@@ -345,7 +345,7 @@ Here, we form the requirement $\ConfReq{T.Element.Content}{Equatable}$ whose sub
 $\ConfReq{T.[Sequence]Element.[Subscriber]Parent.[Provider]Entity}{Equatable}$.
 \end{center}
 
-Type aliases can also appear in \index{protocol extension}protocol extensions. However, such aliases cannot be referenced from positions resolved in the structural resolution stage, and in particular, trailing \texttt{where} clauses. We will see later this is because type aliases from protocol extensions do not participate in the rewrite system, so the reduction described above cannot be performed. This situation is detected after the fact, when the type representation is revisited in the interface resolution stage:
+Type aliases can also appear in \index{protocol extension}protocol extensions. However, such aliases cannot be referenced from positions resolved in the structural resolution stage, and in particular, trailing \texttt{where} clauses. We will see later that type aliases from protocol extensions do not define rewrite rules, so the reduction described above cannot be performed. This situation is detected after the fact, when the type representation is revisited in the interface resolution stage:
 \begin{Verbatim}
 extension Provider {
   typealias Object = Entity
@@ -360,7 +360,7 @@ struct G<T: Provider> where T.Object: Equatable {}
 
 \emph{Remaining cases.} We now wrap up the case where we have a type parameter base, the type parameter is subject to a concrete same-type or superclass requirement, and the resolved type declaration is a member of this concrete type. We compute the resolved type from this type declaration by proceeding as if the base type was this concrete type or superclass bound instead of the type parameter spelled by the user. Once again, various limitations surface if this type representation is also resolved in structural resolution stage. The \index{concrete contraction}``concrete contraction'' pass allows certain cases to work (\SecRef{concrete contraction}).
 
-\paragraph{Concrete base.} Now, consider what happens when the base resolves to \index{fully-concrete type}something other than a type parameter. The only interesting case is when the base type is a \index{nominal type}nominal type or \Index{dynamic Self type@dynamic \texttt{Self} type}dynamic \texttt{Self} type, because function types and such do not have member types. (The dynamic \texttt{Self} type is simply unwrapped to its underlying nominal type, allowing member types of the innermost class declaration to be referenced by ``\texttt{Self.Foo}'', which is perhaps slightly more explicit than the almost equivalent ``\texttt{Foo}''.)
+\paragraph{Concrete base.} Now, consider what happens when the base resolves to \index{fully-concrete type}something other than a type parameter. The only interesting case is when the base type is a \index{nominal type}nominal type or \Index{dynamic Self type@dynamic \tSelf\ type}dynamic \tSelf\ type, because function types and such do not have member types. (The dynamic \tSelf\ type is simply unwrapped to its underlying nominal type, allowing member types of the innermost class declaration to be referenced by ``\texttt{Self.Foo}'', which is perhaps slightly more explicit than the almost equivalent ``\texttt{Foo}''.)
 
 Unlike the type parameter case, here we immediately perform a \index{qualified lookup}qualified lookup into the base type without consulting the generic signature of the current context. When both the base and the member type declaration are non-generic nominal types, and the member type is a direct member of the base, the resolved type is just the \index{declared interface type}declared interface type of the member. The member might also be found in a superclass, and not as a direct member of the base. We saw an almost identical example in the previous section, where the reference to \texttt{Inner} was instead an identifier type representation inside the body of \texttt{Derived}:
 \begin{Verbatim}
@@ -448,13 +448,13 @@ To resolve the interface type of ``\texttt{y}'', where we have the type represen
 \qquad\qquad {} = \texttt{Pasta<Ketchup>}
 \end{gather*}
 
-\paragraph{Protocol base.} This is really just a funny edge case. A protocol type alias is visible as a member type of the \index{protocol type}protocol type \emph{itself} when its underlying type does not depend on the \Index{protocol Self type@protocol \texttt{Self} type}protocol \texttt{Self} type. The \texttt{Food} protocol type alias above cannot be referenced as a member of the protocol type \texttt{Plant}, because the underlying type of \texttt{Food} contains \texttt{Self}, and \texttt{Plant} is not a valid replacement type for \texttt{Self}; \texttt{Plant} does not conform to \texttt{Plant}! Type resolution must reject the member type representation ``\texttt{Plant.Food}'':
+\paragraph{Protocol base.} This is really just a funny edge case. A protocol type alias is visible as a member type of the \index{protocol type}protocol type \emph{itself} when its underlying type does not depend on the \IndexSelf protocol \tSelf\ type. The \texttt{Food} protocol type alias above cannot be referenced as a member of the protocol type \texttt{Plant}, because the underlying type of \texttt{Food} contains \tSelf, and \texttt{Plant} is not a valid replacement type for \tSelf; \texttt{Plant} does not conform to \texttt{Plant}! Type resolution must reject the member type representation ``\texttt{Plant.Food}'':
 \begin{Verbatim}
 // error: cannot access type alias `Food' from `Plant'; use a
 // concrete type or generic parameter base instead
 var x: Plant.Food = ...
 \end{Verbatim}
-Similarly, an associated type member can \emph{never} be referenced with a protocol base, like ``\texttt{Plant.Sauce}''; its declared interface type \emph{always} contains \texttt{Self}. However, if the underlying type of some protocol type alias does not contain \texttt{Self}, the type alias is just a shortcut for another globally-visible type that does not depend on the conformance. We allow the reference because no substitution needs to be performed:
+Similarly, an associated type member can \emph{never} be referenced with a protocol base, like ``\texttt{Plant.Sauce}''; its declared interface type \emph{always} contains \tSelf. However, if the underlying type of some protocol type alias does not contain \tSelf, the type alias is just a shortcut for another globally-visible type that does not depend on the conformance. We allow the reference because no substitution needs to be performed:
 \begin{Verbatim}
 protocol Pet {
   typealias Age = Int
@@ -464,7 +464,7 @@ protocol Pet {
 func celebratePetBirthday(_ age: Pet.Age) {}
 \end{Verbatim}
 
-Due to peculiarities of type substitution, protocol type aliases that are also \index{generic type alias}generic are always considered to depend on \texttt{Self}, even if their underlying type does not reference \texttt{Self}, so they \index{limitation!generic type alias with protocol base}cannot be referenced with a protocol base. (In structural resolution stage, a generic type alias cannot be referenced with a \index{limitation!generic type alias with type parameter base}type parameter base, either. Perhaps it is best not to stick generic type aliases inside protocols, at all.)
+Due to peculiarities of type substitution, protocol type aliases that are also \index{generic type alias}generic are always considered to depend on \tSelf, even if their underlying type does not reference \tSelf, so they \index{limitation!generic type alias with protocol base}cannot be referenced with a protocol base. (In structural resolution stage, a generic type alias cannot be referenced with a \index{limitation!generic type alias with type parameter base}type parameter base, either. Perhaps it is best not to stick generic type aliases inside protocols, at all.)
 
 \paragraph{General principle.} Let's say that $H$ is the generic signature of the current context, and \texttt{T} is the resolved base type of our member type representation, obtained via a recursive call to type resolution. We perform a \index{qualified lookup}qualified lookup after considering the base type \texttt{T}:
 \begin{itemize}
@@ -475,7 +475,7 @@ If qualified lookup fails or finds more than one type declaration, we \index{dia
 \begin{itemize}
 \item In the \textbf{direct case}, $d$ is a direct member of the nominal type declaration of \texttt{T}, and $\Sigma$ is the \index{context substitution map}context substitution map of \texttt{T}.
 \item In the \textbf{superclass case}, $d$ is a member of a superclass of \texttt{T}, and $\Sigma$ is the \index{superclass substitution map}superclass substitution map formed from \texttt{T} and the parent class of $d$.
-\item In the \textbf{protocol case}, $d$ is a member of some protocol $\protosym{P}$, either via conformance (if \texttt{T} is concrete) or protocol inheritance (if \texttt{T} is a type parameter), and $\Sigma$ is the \index{protocol substitution map}protocol substitution map $\Sigma_{\ConfReq{T}{P}}$ for the conformance of \texttt{T} to $\protosym{P}$, found via global conformance lookup.
+\item In the \textbf{protocol case}, $d$ is a member of some protocol $\protosym{P}$, either via conformance (if \texttt{T} is concrete) or protocol inheritance (if \texttt{T} is a type parameter), and $\Sigma$ is the \index{protocol substitution map}protocol substitution map $\Sigma_{\TP}$ for the conformance of \texttt{T} to $\protosym{P}$, found via global conformance lookup.
 \end{itemize}
 If the base type \texttt{T} is a type parameter subject to a concrete \index{same-type requirement}same-type requirement or a \index{superclass requirement}superclass requirement, we replace \texttt{T} with the corresponding concrete type obtained by a generic signature query against $H$ before proceeding to compute $\Sigma$ above.
 
@@ -551,17 +551,17 @@ We denote by \IndexSetDefinition{req}{\ReqObj{G}}$\ReqObj{G}$ the set of all req
 \[\ReqObj{G}\otimes\SubMapObj{G}{\EquivClass{H}}\rightarrow\ReqObj{\EquivClass{H}}\]
 Requirement substitution must apply $\Sigma$ to every type parameter appearing in a given requirement $R$ by considering the \index{requirement kind}requirement kind. In all of the below, \texttt{T} is the subject type of the requirement, so $\texttt{T}\in\TypeObj{G}$:
 \begin{itemize}
-\item For a \index{conformance requirement}\textbf{conformance requirement} $\ConfReq{T}{P}$, we apply $\Sigma$ to \texttt{T}. The \index{protocol type}protocol type~\texttt{P} remains unchanged because it does not contain any type parameters:
-\[\ConfReq{T}{P}\otimes\Sigma:=\ConfReq{$(\texttt{T}\otimes\Sigma)$}{P}\]
+\item For a \index{conformance requirement}\textbf{conformance requirement} $\TP$, we apply $\Sigma$ to \texttt{T}. The \index{protocol type}protocol type~\texttt{P} remains unchanged because it does not contain any type parameters:
+\[\TP\otimes\Sigma:=\ConfReq{$(\texttt{T}\otimes\Sigma)$}{P}\]
 
-\item For a \index{superclass requirement}\textbf{superclass requirement} $\ConfReq{T}{C}$, we apply $\Sigma$ to \texttt{T} as well as the superclass bound \texttt{C}, which might be a generic class type containing type parameters of~$G$:
-\[\ConfReq{T}{C}\otimes\Sigma:=\ConfReq{$(\texttt{T}\otimes\Sigma)$}{$(\texttt{C}\otimes\Sigma)$}\]
+\item For a \index{superclass requirement}\textbf{superclass requirement} $\TC$, we apply $\Sigma$ to \texttt{T} as well as the superclass bound \texttt{C}, which might be a generic class type containing type parameters of~$G$:
+\[\TC\otimes\Sigma:=\ConfReq{$(\texttt{T}\otimes\Sigma)$}{$(\texttt{C}\otimes\Sigma)$}\]
 
-\item For a \index{same-type requirement}\textbf{same-type requirement} $\SameReq{T}{U}$, we apply $\Sigma$ to both sides; \texttt{U} is either a type parameter or a concrete type that may contain type parameters of $G$:
-\[\SameReq{T}{U}\otimes\Sigma:=\SameReq{$(\texttt{T}\otimes\Sigma)$}{$(\texttt{U}\otimes\Sigma)$}\]
+\item For a \index{same-type requirement}\textbf{same-type requirement} $\TU$, we apply $\Sigma$ to both sides; \texttt{U} is either a type parameter or a concrete type that may contain type parameters of $G$:
+\[\TU\otimes\Sigma:=\SameReq{$(\texttt{T}\otimes\Sigma)$}{$(\texttt{U}\otimes\Sigma)$}\]
 
-\item For a \index{layout requirement}\textbf{layout requirement} $\ConfReq{T}{AnyObject}$, we apply $\Sigma$ to \texttt{T}. The right-hand side remains invariant under substitution:
-\[\ConfReq{T}{AnyObject}\otimes\Sigma:=\ConfReq{$(\texttt{T}\otimes\Sigma)$}{AnyObject}\]
+\item For a \index{layout requirement}\textbf{layout requirement} $\TAnyObject$, we apply $\Sigma$ to \texttt{T}. The right-hand side remains invariant under substitution:
+\[\TAnyObject\otimes\Sigma:=\ConfReq{$(\texttt{T}\otimes\Sigma)$}{AnyObject}\]
 \end{itemize}
 Having obtained a substituted requirement, we can check that it is satisfied. Before describing how this is done, we look at a few examples to help motivate what follows.
 \end{definition}
@@ -653,25 +653,25 @@ The two type witness projections construct the \index{dependent member type}depe
 Both sides of our substituted same-type requirement are canonically equal, so we can conclude that all requirements of $G$ are satisfied, and our type representation is valid.
 \end{example}
 
-\begin{algorithm}[``Requirement is satisfied'' check]\label{reqissatisfied}
+\begin{algorithm}[Check if requirement is satisfied]\label{reqissatisfied}
 Takes a substituted requirement $R\in\ReqObj{\EquivClass{H}}$ as input, where the generic signature $H$ is not given explicitly; $R$ may contain primary archetypes of $H$, but not type parameters. Returns true if $R$ is \IndexDefinition{satisfied requirement}satisfied, false otherwise. In the below, \texttt{T} is the concrete subject type of $R$, so $\texttt{T}\in\TypeObj{\EquivClass{H}}$. We handle each \index{requirement kind}requirement kind as follows:
 \begin{itemize}
-\item For a \index{conformance requirement}\textbf{conformance requirement} $\ConfReq{T}{P}$, we perform the \index{global conformance lookup}global conformance lookup $\protosym{P}\otimes\texttt{T}$. There are three possible outcomes:
+\item For a \index{conformance requirement}\textbf{conformance requirement} $\TP$, we perform the \index{global conformance lookup}global conformance lookup $\protosym{P}\otimes\texttt{T}$. There are three possible outcomes:
 \begin{enumerate}
 \item If we get an \index{abstract conformance}abstract conformance, it must be that \texttt{T} is an archetype of $H$ whose type parameter conforms to $\protosym{P}$. Return true.
 \item If we get a \index{concrete conformance}concrete conformance, it might be \index{conditional conformance}conditional (\SecRef{conditional conformance}). These conditional requirements are also substituted requirements of $\ReqObj{\EquivClass{H}}$, and we check them by recursively invoking this algorithm. If all conditional requirements are satisfied (or if there aren't any), return true.
 \item If we get an invalid conformance, or if the conditional requirement check failed above, return false.
 \end{enumerate}
-\item For a \index{superclass requirement}\textbf{superclass requirement} $\ConfReq{T}{C}$, we proceed as follows:
+\item For a \index{superclass requirement}\textbf{superclass requirement} $\TC$, we proceed as follows:
 \begin{enumerate}
 \item If \texttt{T} is a class type \index{canonical type equality}canonically equal to \texttt{C}, return true.
 \item If \texttt{T} and \texttt{C} are two distinct generic class types for the same \index{class declaration}class declaration, return false.
 \item If \texttt{T} does not have a \index{superclass type}superclass type (\ChapRef{classinheritance}), return false.
 \item Otherwise, let $\texttt{T}^\prime$ be the superclass type of \texttt{T}. Recursively apply the algorithm to the superclass requirement $\ConfReq{$\texttt{T}^\prime$}{C}$.
 \end{enumerate}
-\item For a \index{layout requirement}\textbf{layout requirement} $\ConfReq{T}{AnyObject}$, we check if \texttt{T} is a class type, an archetype satisfying the \Index{AnyObject@\texttt{AnyObject}}\texttt{AnyObject} \index{layout constraint}layout constraint, or an \index{Objective-C existential}\texttt{@objc} existential, and if so, we return true. Otherwise, we return false. (We'll discuss representation of existentials in \ChapRef{existentialtypes}.)
+\item For a \index{layout requirement}\textbf{layout requirement} $\TAnyObject$, we check if \texttt{T} is a class type, an archetype satisfying the \Index{AnyObject@\texttt{AnyObject}}\texttt{AnyObject} \index{layout constraint}layout constraint, or an \index{Objective-C existential}\texttt{@objc} existential, and if so, we return true. Otherwise, we return false. (We'll discuss representation of existentials in \ChapRef{existentialtypes}.)
 \index{canonical type equality}
-\item For a \index{same-type requirement}\textbf{same-type requirement} $\SameReq{T}{U}$, we check if \texttt{T} and \texttt{U} are canonically equal.
+\item For a \index{same-type requirement}\textbf{same-type requirement} $\TU$, we check if \texttt{T} and \texttt{U} are canonically equal.
 \end{itemize}
 \end{algorithm}
 \paragraph{Contextually-generic declarations.}
@@ -724,7 +724,7 @@ After applying our substitution map, but before checking the substituted require
 \item The declaration of a \index{normal conformance}normal conformance may itself contain error types for any invalid or missing \index{type witness}type witnesses, in which case projecting a type witness may output an error type; again, we will have diagnosed an error earlier, when checking the conformance.
 \end{enumerate}
 In all cases, a \index{diagnostic!substitution failure}diagnostic was already emitted, thus the requirement itself need not be diagnosed. We called this a \index{substitution failure}\emph{substitution failure} in \ChapRef{substmaps}.
-\begin{algorithm}[Substitution map requirement check]\label{check generic arguments algorithm}
+\begin{algorithm}[Check if substitution map satisfies requirements]\label{check generic arguments algorithm}
 Takes two inputs:
 \begin{enumerate}
 \item A substitution map $\Sigma\in\SubMapObj{G}{\EquivClass{H}}$.
@@ -744,9 +744,9 @@ If any requirements appear in the unsatisfied list, type resolution diagnoses a 
 
 \paragraph{There's more.} Other places where we use \AlgRef{check generic arguments algorithm}:
 \begin{enumerate}
-\item When \index{conformance checker}checking the declaration of a \index{normal conformance}normal conformance $\ConfReq{T}{P}$ where \texttt{T} is the declared interface type of some nominal type declaration, we must decide if a given set of type witnesses satisfy the associated requirements of $\protosym{P}$. In other words, we ask if the \index{protocol substitution map}protocol substitution map $\Sigma_{\ConfReq{T}{P}}$ satisfies the requirements of the \index{requirement signature}requirement signature of $\protosym{P}$ (\SecRef{requirement sig}).
+\item When \index{conformance checker}checking the declaration of a \index{normal conformance}normal conformance $\TP$ where \texttt{T} is the declared interface type of some nominal type declaration, we must decide if a given set of type witnesses satisfy the associated requirements of $\protosym{P}$. In other words, we ask if the \index{protocol substitution map}protocol substitution map $\Sigma_{\TP}$ satisfies the requirements of the \index{requirement signature}requirement signature of $\protosym{P}$ (\SecRef{requirement sig}).
 
-\item When a concrete type \texttt{T} conforms to a protocol $\protosym{P}$ via a \index{conditional conformance}conditional conformance, we check if the \index{context substitution map}context substitution map of \texttt{T} satisfies the conditional requirements of $\ConfReq{T}{P}$. We will describe this in \SecRef{conditional conformance}.
+\item When a concrete type \texttt{T} conforms to a protocol $\protosym{P}$ via a \index{conditional conformance}conditional conformance, we check if the \index{context substitution map}context substitution map of \texttt{T} satisfies the conditional requirements of $\TP$. We will describe this in \SecRef{conditional conformance}.
 
 \item The conditional requirements of a conditional conformance are also computed via the same algorithm when the declaration of the conformance is type checked. We ask which requirements in the generic signature of the constrained extension are \emph{not} satisfied by the generic signature of the \index{extended type}extended type.
 
@@ -878,12 +878,12 @@ A set of flags to control various esoteric behaviors:
 \begin{itemize}
 \item \texttt{TypeResolutionFlags::AllowUnspecifiedTypes}: allows type resolution to succeed if no type representation was actually provided. Used when resolving type annotations which can be omitted, such as the types of variable declarations and the types of closure parameters.
 \item \texttt{TypeResolutionFlags::SILType}: used when resolving a position where lowered SIL types, such as SIL function types, can appear.
-\item \texttt{TypeResolutionFlags::SILMode}: used when resolving a position where ordinary AST types appear, but in textual SIL, which enables special syntax, for example \texttt{@dynamic\_self} for the dynamic \texttt{Self} type.
+\item \texttt{TypeResolutionFlags::SILMode}: used when resolving a position where ordinary AST types appear, but in textual SIL, which enables special syntax, for example \verb|@dynamic_self| for the dynamic \tSelf\ type.
 \item \texttt{TypeResolutionFlags::FromNonInferredPattern}: when resolving an explicitly-stated type annotation in a pattern binding, muffles warnings where the type of a variable binding is inferred as \texttt{()} or \texttt{Never}, which suggests a programmer mistake unless the type was explicitly stated.
 \item \texttt{TypeResolutionFlags::Direct}: set when resolving the top-level type representation, and cleared when type resolution recurses on a child. Allows certain type representations which cannot be nested inside other type representations, such as \texttt{inout T} for an \texttt{inout} parameter type.
 \item \texttt{TypeResolutionFlags::SilenceErrors}: disables diagnostics, simply returning an error type if type resolution fails. Used in pattern resolution when it is not known if a pattern refers to a type or some other member.
 \item \texttt{TypeResolutionFlags::AllowModule}: allows an identifier type representation with a single component to resolve to a \texttt{ModuleType}, which is usually prohibited.
-\item \texttt{TypeResolutionFlags::AllowUsableFromInline}: makes internal type declarations annotated with the \texttt{@usableFromInline} attribute visible, which is used in the implementation of the \texttt{@\_specialize} attribute.
+\item \texttt{TypeResolutionFlags::AllowUsableFromInline}: makes internal type declarations annotated with the \texttt{@usableFromInline} attribute visible, which is used in the implementation of the \verb|@_specialize| attribute.
 \item \texttt{TypeResolutionFlags::DisallowOpaqueTypes}: prevents opaque parameter declarations from appearing in contexts where they would otherwise be allowed, such as the generic arguments of a parameterized protocol type \verb|any P<some Q>|.
 \item \texttt{TypeResolutionFlags::Preconcurrency}: when resolving a reference to a type alias marked with the \texttt{@preconcurrency} attribute, strips off \texttt{@Sendable} and global actor attributes from function types appearing in the underlying type of the type alias.
 \end{itemize}
@@ -982,15 +982,15 @@ Key source files:
 
 \IndexSource{unqualified lookup}
 \apiref{resolveTopLevelIdentTypeComponent()}{function}
-Resolves the first component of an identifier type representation. Performs an unqualified lookup, disambiguates results, handles the special case of a \texttt{Self} reference, applies generic arguments if they were provided, and diagnoses errors.
+Resolves the first component of an identifier type representation. Performs an unqualified lookup, disambiguates results, handles the special case of a \tSelf\ reference, applies generic arguments if they were provided, and diagnoses errors.
 
 \apiref{TypeChecker::lookupUnqualifiedType()}{function}
 Wrapper around unqualified lookup which only considers type declarations.
 
-\Index{dynamic Self type@dynamic \texttt{Self} type}
-\Index{protocol Self type@protocol \texttt{Self} type}
+\Index{dynamic Self type@dynamic \tSelf\ type}
+\IndexSelf
 \apiref{getSelfTypeKind()}{function}
-Determines if \texttt{Self} in the given context refers to the innermost nominal type declaration, the dynamic \texttt{Self} type of the innermost class declaration, or if it is invalid to utter \texttt{Self}.
+Determines if \tSelf\ in the given context refers to the innermost nominal type declaration, the dynamic \tSelf\ type of the innermost class declaration, or if it is invalid to utter \tSelf.
 
 \apiref{resolveTypeDecl()}{function}
 Resolves an unqualified reference to a type declaration to a type. This handles the behavior where omitted generic arguments when referencing type within its own context are deduced to be the corresponding generic parameters. It also handles various edge-case behaviors where the referenced type declaration was a nested type of a different nominal type, such as a superclass or conformed protocol, and requires substitutions.

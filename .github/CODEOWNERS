@@ -69,6 +69,7 @@
 /include/swift/AST/DiagnosticsParse.def            @ahoppen @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
 /include/swift/AST/Evaluator*                      @CodaFi @slavapestov
 /include/swift/Basic/                              @DougGregor
+/include/swift/Basic/Features.def                  @DougGregor @hborla
 /include/swift/ClangImporter                       @zoecarver @hyp @egorzhdan @beccadax @ian-twilightcoder
 /include/swift/DependencyScan                      @artemcm
 /include/swift/Driver*/                            @artemcm

@@ -109,9 +109,7 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info") {
   for value in valuesToCheck {
     print("value:\(value)")
     for apply in applies {
-      let path = AliasAnalysis.getPtrOrAddressPath(for: value)
-      
-      if value.at(path).isEscaping(using: Visitor(apply: apply), context) {
+      if value.allContainedAddresss.isEscaping(using: Visitor(apply: apply), context) {
         print("  ==> \(apply)")
       } else {
         print("  -   \(apply)")
@@ -129,8 +127,8 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info") {
         print(lhs)
         print(rhs)
 
-        let projLhs = lhs.at(AliasAnalysis.getPtrOrAddressPath(for: lhs))
-        let projRhs = rhs.at(AliasAnalysis.getPtrOrAddressPath(for: rhs))
+        let projLhs = lhs.allContainedAddresss
+        let projRhs = rhs.allContainedAddresss
         let mayAlias = projLhs.canAddressAlias(with: projRhs, context)
         if mayAlias != projRhs.canAddressAlias(with: projLhs, context) {
           fatalError("canAddressAlias(with:) must be symmetric")

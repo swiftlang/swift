@@ -19,7 +19,7 @@ protocol NonObjCProto {
   func good()
 }
 
-class Bar : NonObjCProto { // expected-error {{type 'Bar' does not conform to protocol 'NonObjCProto'}}
+class Bar : NonObjCProto { // expected-error {{type 'Bar' does not conform to protocol 'NonObjCProto'}} expected-note {{add stubs for conformance}}
   func good() {}
 }
 

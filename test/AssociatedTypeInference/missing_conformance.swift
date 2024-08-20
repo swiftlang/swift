@@ -4,8 +4,8 @@
 // in various ways.
 
 protocol LikeSetAlgebra {
-    func onion(_ other: Self) -> Self // expected-note {{protocol requires function 'onion' with type '(X) -> X'; add a stub for conformance}}
-    func indifference(_ other: Self) -> Self // expected-note {{protocol requires function 'indifference' with type '(X) -> X'; add a stub for conformance}}
+    func onion(_ other: Self) -> Self // expected-note {{protocol requires function 'onion' with type '(X) -> X'}}
+    func indifference(_ other: Self) -> Self // expected-note {{protocol requires function 'indifference' with type '(X) -> X'}}
 
 }
 protocol LikeOptionSet : LikeSetAlgebra, RawRepresentable {}
@@ -17,6 +17,7 @@ extension LikeOptionSet where RawValue : FixedWidthInteger {
 struct X : LikeOptionSet {}
 // expected-error@-1 {{type 'X' does not conform to protocol 'LikeSetAlgebra'}}
 // expected-error@-2 {{type 'X' does not conform to protocol 'RawRepresentable'}}
+// expected-note@-3 {{add stubs for conformance}}
 
 protocol IterProtocol {}
 protocol LikeSequence {
@@ -31,8 +32,8 @@ struct Y : LikeSequence {} // expected-error {{type 'Y' does not conform to prot
 
 protocol P1 {
     associatedtype Result
-    func get() -> Result // expected-note {{protocol requires function 'get()' with type '() -> Result'; add a stub for conformance}}
-    func got() // expected-note {{protocol requires function 'got()' with type '() -> ()'; add a stub for conformance}}
+    func get() -> Result // expected-note {{protocol requires function 'get()' with type '() -> Result'}}
+    func got() // expected-note {{protocol requires function 'got()' with type '() -> ()'}}
 }
 protocol P2 {
     static var singularThing: Self { get }
@@ -45,20 +46,20 @@ extension P1 where Self : P3 {
     func got() {} // expected-note {{candidate would match if 'Z<T1, T2, T3, Result, T4>' conformed to 'P3'}}
 }
 
-struct Z<T1, T2, T3, Result, T4> : P1 {} // expected-error {{type 'Z<T1, T2, T3, Result, T4>' does not conform to protocol 'P1'}}
+struct Z<T1, T2, T3, Result, T4> : P1 {} // expected-error {{type 'Z<T1, T2, T3, Result, T4>' does not conform to protocol 'P1'}} expected-note {{add stubs for conformance}}
 
 protocol P4 {
-    func this() // expected-note 2 {{protocol requires function 'this()' with type '() -> ()'; add a stub for conformance}}
+    func this() // expected-note 2 {{protocol requires function 'this()' with type '() -> ()'}}
 }
 protocol P5 {}
 extension P4 where Self : P5 {
     func this() {} // expected-note {{candidate would match if 'W' conformed to 'P5'}}
     //// expected-note@-1 {{candidate would match if 'S<T>.SS' conformed to 'P5'}}
 }
-struct W : P4 {} // expected-error {{type 'W' does not conform to protocol 'P4'}}
+struct W : P4 {} // expected-error {{type 'W' does not conform to protocol 'P4'}} expected-note {{add stubs for conformance}}
 
 struct S<T> {
-    struct SS : P4 {} // expected-error {{type 'S<T>.SS' does not conform to protocol 'P4'}}
+    struct SS : P4 {} // expected-error {{type 'S<T>.SS' does not conform to protocol 'P4'}} expected-note {{add stubs for conformance}}
 }
 
 class C {}
@@ -82,22 +83,22 @@ struct B : P8 { // expected-error {{type 'B' does not conform to protocol 'P8'}}
 }
 
 protocol P9 {
-    func foo() // expected-note {{protocol requires function 'foo()' with type '() -> ()'; add a stub for conformance}}
+    func foo() // expected-note {{protocol requires function 'foo()' with type '() -> ()'}}
 }
 class C2 {}
 extension P9 where Self : C2 {
     func foo() {} // expected-note {{candidate would match if 'C3' subclassed 'C2'}}
 }
-class C3 : P9 {} // expected-error {{type 'C3' does not conform to protocol 'P9'}}
+class C3 : P9 {} // expected-error {{type 'C3' does not conform to protocol 'P9'}} expected-note {{add stubs for conformance}}
 
 protocol P10 {
     associatedtype A
-    func bar() // expected-note {{protocol requires function 'bar()' with type '() -> ()'; add a stub for conformance}}
+    func bar() // expected-note {{protocol requires function 'bar()' with type '() -> ()'}}
 }
 extension P10 where A == Int {
     func bar() {} // expected-note {{candidate would match if 'A' was the same type as 'Int'}}
 }
-struct S2<A> : P10 {} // expected-error {{type 'S2<A>' does not conform to protocol 'P10'}}
+struct S2<A> : P10 {} // expected-error {{type 'S2<A>' does not conform to protocol 'P10'}} expected-note {{add stubs for conformance}}
 
 protocol P11 {}
 protocol P12 {
@@ -145,9 +146,11 @@ struct CountSteps1<T> : Collection {
 }
 
 extension CountSteps1 // expected-error {{type 'CountSteps1<T>' does not conform to protocol 'RandomAccessCollection'}}
-  // expected-error@-1 {{conditional conformance of type 'CountSteps1<T>' to protocol 'RandomAccessCollection' does not imply conformance to inherited protocol 'BidirectionalCollection'}}
-  // expected-note@-2 {{did you mean to explicitly state the conformance like 'extension CountSteps1: BidirectionalCollection where ...'?}}
-  // expected-error@-3 {{type 'CountSteps1<T>' does not conform to protocol 'BidirectionalCollection'}}
+  // expected-note@-1 {{add stubs for conformance}}
+  // expected-error@-2 {{conditional conformance of type 'CountSteps1<T>' to protocol 'RandomAccessCollection' does not imply conformance to inherited protocol 'BidirectionalCollection'}}
+  // expected-note@-3 {{did you mean to explicitly state the conformance with the same bounds using 'where T : Equatable'?}}
+  // expected-note@-4 {{did you mean to explicitly state the conformance with different bounds?}}
+  // expected-error@-5 {{type 'CountSteps1<T>' does not conform to protocol 'BidirectionalCollection'}}
   : RandomAccessCollection
      where T : Equatable
 {

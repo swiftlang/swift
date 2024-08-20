@@ -163,6 +163,10 @@ extension FullApplySite {
 }
 
 extension Builder {
+  static func insert(after inst: Instruction, _ context: some MutatingContext, insertFunc: (Builder) -> ()) {
+    Builder.insert(after: inst, location: inst.location, context, insertFunc: insertFunc)
+  }
+
   static func insert(after inst: Instruction, location: Location,
                      _ context: some MutatingContext, insertFunc: (Builder) -> ()) {
     if inst is TermInst {
@@ -550,7 +554,7 @@ extension BasicBlock {
 
 extension SimplifyContext {
 
-  /// Replaces a pair of redudant instructions, like
+  /// Replaces a pair of redundant instructions, like
   /// ```
   ///   %first = enum $E, #E.CaseA!enumelt, %replacement
   ///   %second = unchecked_enum_data %first : $E, #E.CaseA!enumelt
@@ -621,16 +625,6 @@ private struct EscapesToValueVisitor : EscapeVisitor {
 }
 
 extension Function {
-  var globalOfGlobalInitFunction: GlobalVariable? {
-    if isGlobalInitFunction,
-       let ret = returnInstruction,
-       let atp = ret.returnedValue as? AddressToPointerInst,
-       let ga = atp.address as? GlobalAddrInst {
-      return ga.global
-    }
-    return nil
-  }
-
   var initializedGlobal: GlobalVariable? {
     if !isGlobalInitOnceFunction {
       return nil

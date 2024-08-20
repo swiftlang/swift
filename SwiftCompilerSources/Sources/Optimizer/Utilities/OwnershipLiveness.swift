@@ -275,10 +275,10 @@ protocol OwnershipUseVisitor {
   mutating func pointerEscapingUse(of operand: Operand) -> WalkResult
 
   /// A use that creates an implicit borrow scope over the lifetime of
-  /// an owned dependent value. The operand owership is .borrow, but
+  /// an owned dependent value. The operand ownership is .borrow, but
   /// there are no explicit scope-ending operations. Instead
   /// BorrowingInstruction.scopeEndingOperands will return the final
-  /// consumes in the dependent value's forwaring chain.
+  /// consumes in the dependent value's forwarding chain.
   mutating func dependentUse(of operand: Operand, into value: Value)
     -> WalkResult
 
@@ -490,7 +490,7 @@ extension OwnershipUseVisitor {
 ///
 /// - Does not assume the current lifetime is linear. Transitively
 /// follows guaranteed forwarding and address uses within the current
-/// scope. Phis that are not dominanted by definingValue or an outer
+/// scope. Phis that are not dominated by definingValue or an outer
 /// adjacent phi are marked "unenclosed" to signal an incomplete
 /// lifetime.
 ///
@@ -742,7 +742,11 @@ extension InteriorUseWalker: AddressUseVisitor {
   mutating func loadedAddressUse(of operand: Operand, into address: Operand)
     -> WalkResult {
     return .continueWalk
-  }    
+  }
+  
+  mutating func yieldedAddressUse(of operand: Operand) -> WalkResult {
+    return .continueWalk
+  }
 
   mutating func dependentAddressUse(of operand: Operand, into value: Value)
     -> WalkResult {

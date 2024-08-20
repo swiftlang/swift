@@ -106,7 +106,7 @@ TEST_F(SemaTest, TestKeypathFunctionConversionPrefersNarrowConversion) {
 
   Expr *target = callExpr;
   ConstraintSystem cs(DC, ConstraintSystemOptions());
-  ASSERT_FALSE(cs.preCheckExpression(target, DC, false));
+  ASSERT_FALSE(cs.preCheckExpression(target, DC));
   auto *expr = cs.generateConstraints(callExpr, DC);
   ASSERT_TRUE(expr);
 

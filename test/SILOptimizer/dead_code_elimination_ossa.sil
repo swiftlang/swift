@@ -21,8 +21,7 @@ struct CAndBit {
     var bit: Int1
 }
 
-@_moveOnly
-struct MO {
+struct MO: ~Copyable {
     deinit
 }
 

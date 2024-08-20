@@ -17,6 +17,7 @@
 #ifndef SWIFT_SIL_SILCLONER_H
 #define SWIFT_SIL_SILCLONER_H
 
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/BasicBlockUtils.h"
@@ -50,7 +51,7 @@ struct SubstitutionMapWithLocalArchetypes {
                                     Type substType,
                                     ProtocolDecl *proto) {
     if (isa<LocalArchetypeType>(origType))
-      return ModuleDecl::lookupConformance(substType, proto);
+      return swift::lookupConformance(substType, proto);
     if (SubsMap)
       return SubsMap->lookupConformance(origType, proto);
 
@@ -234,6 +235,9 @@ public:
           Functor.SubsMap->dump(llvm::errs());
         llvm::errs() << "\nsubstitution map:\n";
         Subs.dump(llvm::errs());
+        llvm::errs() << "\n";
+        llvm::errs() << "\ncomposed substitution map:\n";
+        substSubs.dump(llvm::errs());
         llvm::errs() << "\n";
         abort();
       }

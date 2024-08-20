@@ -214,9 +214,6 @@ static swiftscan_dependency_graph_t generateHollowDiagnosticOutput(
   // Hollow info details
   swiftscan_module_details_s *hollowDetails = new swiftscan_module_details_s;
   hollowDetails->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL;
-  swiftscan_macro_dependency_set_t *hollowMacroSet = new swiftscan_macro_dependency_set_t;
-  hollowMacroSet->count = 0;
-  hollowMacroSet->macro_dependencies = nullptr;
   hollowDetails->swift_textual_details = {c_string_utils::create_null(),
                                           c_string_utils::create_empty_set(),
                                           c_string_utils::create_null(),
@@ -232,7 +229,8 @@ static swiftscan_dependency_graph_t generateHollowDiagnosticOutput(
                                           c_string_utils::create_null(),
                                           c_string_utils::create_null(),
                                           c_string_utils::create_null(),
-                                          hollowMacroSet};
+                                          nullptr,
+                                          c_string_utils::create_null()};
   hollowMainModuleInfo->details = hollowDetails;
 
   // Empty Link Library set

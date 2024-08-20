@@ -39,28 +39,25 @@ private func devirtualize(destroy: some DevirtualizableDestroy, _ context: some 
     return true
   }
 
-  let result: Bool
   if type.nominal.hasValueDeinit && !destroy.shouldDropDeinit {
     guard let deinitFunc = context.lookupDeinit(ofNominal: type.nominal) else {
       return false
     }
     destroy.createDeinitCall(to: deinitFunc, context)
-    result = true
-  } else {
-    // If there is no deinit to be called for the original type we have to recursively visit
-    // the struct fields or enum cases.
-    if type.isStruct {
-      result = destroy.devirtualizeStructFields(context)
-    } else if type.isEnum {
-      result = destroy.devirtualizeEnumPayloads(context)
-    } else {
-      precondition(type.isClass, "unknown non-copyable type")
-      // A class reference cannot be further de-composed.
-      return true
-    }
+    context.erase(instruction: destroy)
+    return true
   }
-  context.erase(instruction: destroy)
-  return result
+  // If there is no deinit to be called for the original type we have to recursively visit
+  // the struct fields or enum cases.
+  if type.isStruct {
+    return destroy.devirtualizeStructFields(context)
+  }
+  if type.isEnum {
+    return destroy.devirtualizeEnumPayloads(context)
+  }
+  precondition(type.isClass, "unknown non-copyable type")
+  // A class reference cannot be further de-composed.
+  return true
 }
 
 // Used to dispatch devirtualization tasks to `destroy_value` and `destroy_addr`.
@@ -79,6 +76,10 @@ private extension DevirtualizableDestroy {
     guard let cases = type.getEnumCases(in: parentFunction) else {
       return false
     }
+    defer {
+      context.erase(instruction: self)
+    }
+
     if cases.allPayloadsAreTrivial(in: parentFunction) {
       let builder = Builder(before: self, context)
       builder.createEndLifetime(of: operand.value)
@@ -122,11 +123,15 @@ extension DestroyValueInst : DevirtualizableDestroy {
   }
 
   fileprivate func devirtualizeStructFields(_ context: some MutatingContext) -> Bool {
-    let builder = Builder(before: self, context)
-
     guard let fields = type.getNominalFields(in: parentFunction) else {
       return false
     }
+
+    defer {
+      context.erase(instruction: self)
+    }
+
+    let builder = Builder(before: self, context)
     if fields.allFieldsAreTrivial(in: parentFunction) {
       builder.createEndLifetime(of: operand.value)
       return true
@@ -192,6 +197,9 @@ extension DestroyAddrInst : DevirtualizableDestroy {
 
     guard let fields = type.getNominalFields(in: parentFunction) else {
       return false
+    }
+    defer {
+      context.erase(instruction: self)
     }
     if fields.allFieldsAreTrivial(in: parentFunction) {
       builder.createEndLifetime(of: operand.value)

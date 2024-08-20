@@ -24,6 +24,7 @@
 #include "TypeCheckType.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
@@ -1313,7 +1314,7 @@ static ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var,
   auto proto = ctx.getNSCopyingDecl();
 
   if (proto) {
-    if (auto result = ModuleDecl::checkConformance(type, proto))
+    if (auto result = checkConformance(type, proto))
       return result;
   }
 
@@ -1587,6 +1588,14 @@ namespace {
         for (auto *CaseVar : CS->getCaseBodyVariablesOrEmptyArray())
           CaseVar->setDeclContext(NewDC);
       }
+      // A few statements store DeclContexts, update them.
+      if (auto *BS = dyn_cast<BreakStmt>(S))
+        BS->setDeclContext(NewDC);
+      if (auto *CS = dyn_cast<ContinueStmt>(S))
+        CS->setDeclContext(NewDC);
+      if (auto *FS = dyn_cast<FallthroughStmt>(S))
+        FS->setDeclContext(NewDC);
+
       return Action::Continue(S);
     }
 

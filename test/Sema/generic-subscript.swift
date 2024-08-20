@@ -1,14 +1,14 @@
 // RUN: %target-typecheck-verify-swift
 
 protocol P {
-  subscript<Value>(x: Value) -> Int { // expected-note {{protocol requires subscript with type '<Value> (Value) -> Int'; add a stub for conformance}}
+  subscript<Value>(x: Value) -> Int { // expected-note {{protocol requires subscript with type '<Value> (Value) -> Int'}}
     get
   }
 }
 
-struct S : P { // expected-error {{type 'S' does not conform to protocol 'P'}}
+struct S : P { // expected-error {{type 'S' does not conform to protocol 'P'}} expected-note {{add stubs for conformance}}
   subscript<Value>(x: Int) -> Value { // expected-note {{candidate has non-matching type '<Value> (Int) -> Value'}}
-  }  // expected-error {{missing return in subscript expected to return 'Value'}}
+  } // missing return expectations moved to `SILOptimizer/missing_returns`
 }
 
 struct S2: P {

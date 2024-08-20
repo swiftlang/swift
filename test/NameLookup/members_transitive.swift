@@ -7,7 +7,7 @@
 // RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 5 -package-name TestPackage -enable-experimental-feature MemberImportVisibility -verify-additional-prefix member-visibility-
 
 import members_C
-// expected-member-visibility-note 11{{add import of module 'members_B'}}{{1-1=import members_B\n}}
+// expected-member-visibility-note 12{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
 
 
 func testExtensionMembers(x: X, y: Y<Z>) {
@@ -67,3 +67,11 @@ func testTopLevelTypes() {
   _ = EnumInB_package.self // expected-error{{cannot find 'EnumInB_package' in scope}}
   _ = EnumInC.self
 }
+
+class DerivedFromClassInC: DerivedClassInC {
+  override func methodInA() {}
+  override func methodInB() {} // expected-member-visibility-error{{instance method 'methodInB()' is not available due to missing import of defining module 'members_B'}}
+  override func methodInC() {}
+}
+
+struct ConformsToProtocolInA: ProtocolInA {} // expected-member-visibility-error{{type 'ConformsToProtocolInA' does not conform to protocol 'ProtocolInA'}} expected-member-visibility-note {{add stubs for conformance}}

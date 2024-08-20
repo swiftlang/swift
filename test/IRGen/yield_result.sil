@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-irgen %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -emit-irgen %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
 
 import Builtin
 
@@ -47,6 +47,8 @@ unwind:
   // CHECK-NEXT:    unreachable
 }
 
+// CHECK-LABEL:     declare{{( dllimport)?}}{{( protected)?}} swiftcc i64 @"$sBi64_IetAd_TC{{(.ptrauth)?}}"
+// CHECK-SAME:      (ptr noalias dereferenceable([[BUFFER_SIZE]]), i1)
 
 // CHECK-LABEL: test_coro_ret
 sil @test_coro_ret : $() -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) {
@@ -90,4 +92,64 @@ entry:
 
   %retf = tuple (%ret : $Builtin.Int64, %ret2_1 : $Builtin.Int64, %ret2_2 : $Builtin.Int64)
   return %retf : $(Builtin.Int64, Builtin.Int64, Builtin.Int64)
+}
+
+// CHECK-LABEL: coro_ret_indirect
+// CHECK-SAME: ptr{{.*}} [[CTX:%.*]], ptr{{.*}} [[INDIRECT_RET:%.*]], ptr{{.*}} [[ARG:%.*]], ptr{{.*}} [[TYPE:%.*]])
+sil @coro_ret_indirect : $@yield_once @convention(thin) <T> (@in T) -> (@yields @in T, @out T) {
+bb0(%outt : $*T, %t : $*T):
+  // CHECK-32:      [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:4]], ptr [[CTX]], ptr @"$sxxxlIetAirYi_TC{{(.ptrauth)?}}", ptr @malloc, ptr @free)
+  // CHECK-64:      [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], ptr [[CTX]], ptr @"$sxxxlIetAirYi_TC{{(.ptrauth)?}}", ptr @malloc, ptr @free)
+
+  // CHECK:    [[IS_UNWIND:%.*]] = call i1 (...) @llvm.coro.suspend.retcon.i1(ptr [[ARG]])
+  // CHECK:    br i1 [[IS_UNWIND]], label %[[UNWIND_BB:.*]], label %[[RESUME_BB:.*]]
+
+  // CHECK:[[RESUME_BB]]:
+  // CHECK: [[VW_PTR:%.*]] = getelementptr inbounds ptr, ptr [[TYPE]], [[INT]] -1
+  // CHECK: [[VW:%.*]] = load ptr, ptr [[VW_PTR]]
+  // CHECK-arm64e-NEXT: ptrtoint ptr [[VW_PTR]] to i64
+  // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
+  // CHECK-arm64e: [[VW:%.*]] = inttoptr i64 {{%.*}} to ptr
+  // CHECK: [[ASSIGN_PTR:%.*]] = getelementptr inbounds ptr, ptr [[VW]], i32 3
+  // CHECK: [[ASSIGN:%.*]] = load ptr, ptr [[ASSIGN_PTR]]
+  // CHECK: call ptr [[ASSIGN]](ptr [[INDIRECT_RET]], ptr [[ARG]], ptr [[TYPE]]) #2
+
+  yield (%t : $*T), resume bb1, unwind bb2
+
+bb1:
+  copy_addr %t to %outt : $*T
+  %r = tuple ()
+  return %r : $()
+
+bb2:
+  unwind
+}
+
+// CHECK-LABEL: @test_coro_ret_indirect
+// CHECK-SAME: (i64 [[ARG:%.*]])
+sil [ossa] @test_coro_ret_indirect : $(Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  // CHECK: [[ARG_COPY:%.*]] = alloca i64
+  // CHECK: [[INDIRECT_RET:%.*]] = alloca i64
+  // CHECK: [[FRAME:%.*]] = alloca [[[BUFFER_SIZE]] x i8]
+  %coro = function_ref @coro_ret_indirect : $@yield_once @convention(thin) <T> (@in T) -> (@yields @in T, @out T)
+  %temp = alloc_stack $Builtin.Int64
+  store %0 to [trivial] %temp : $*Builtin.Int64
+
+  %out = alloc_stack $Builtin.Int64
+
+  // CHECK: store i64 [[ARG]], ptr [[ARG_COPY]]
+  // CHECK: [[CTX:%.*]] = getelementptr inbounds [[[BUFFER_SIZE]] x i8], ptr [[FRAME]], i32 0, i32 0
+  // CHECK: [[CORO:%.*]] = call ptr @llvm.coro.prepare.retcon(ptr @coro_ret_indirect)
+  // CHECK: [[FRAME:%.*]] = call swiftcc { ptr, ptr } [[CORO]](ptr{{.*}} [[CTX]], ptr [[INDIRECT_RET]], ptr noalias [[ARG_COPY]], ptr getelementptr inbounds (%swift.full_existential_type, ptr @{{.*}}
+
+  (%f1, %token) = begin_apply %coro<Builtin.Int64>(%out, %temp) : $@yield_once @convention(thin) <T> (@in T) -> (@yields @in T, @out T)
+
+  %f2 = end_apply %token as $()
+
+  dealloc_stack %out : $*Builtin.Int64
+  dealloc_stack %temp : $*Builtin.Int64
+
+  %r = tuple ()
+  return %r : $()
 }

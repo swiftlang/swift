@@ -5,8 +5,7 @@
 
 
 @frozen
-@_moveOnly
-public struct S_Implicit_Noncopyable {}
+public struct S_Implicit_Noncopyable: ~Copyable {}
 
 // CHECK-NOT: extension Test.S_Implicit_Noncopyable : Swift.BitwiseCopyable {}
 

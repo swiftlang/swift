@@ -96,7 +96,7 @@ public:
     return Cache->getDestructors(type, isExactType);
   }
 
-  MemoryBehavior getMemoryBehavior(ApplySite as, bool observeRetains);
+  MemoryBehavior getMemoryBehavior(FullApplySite as, bool observeRetains);
 
   CalleeCache *getCalleeCache() { return Cache.get(); }
 };

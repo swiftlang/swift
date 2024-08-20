@@ -357,6 +357,12 @@ void IRGenThunk::emit() {
     llvm::Value *nil = llvm::ConstantPointerNull::get(
         cast<llvm::PointerType>(errorValue->getType()));
     auto *hasError = IGF.Builder.CreateICmpNE(errorValue, nil);
+
+    // Predict no error is thrown.
+    hasError =
+        IGF.IGM.getSILModule().getOptions().EnableThrowsPrediction ?
+        IGF.Builder.CreateExpectCond(IGF.IGM, hasError, false) : hasError;
+
     IGF.Builder.CreateCondBr(hasError, errorBB, successBB);
 
     IGF.Builder.emitBlock(errorBB);
@@ -381,14 +387,14 @@ void IRGenThunk::emit() {
             for (unsigned i : combined.errorValueMapping) {
               llvm::Value *elt = nativeError.claimNext();
               auto *nativeTy = structTy->getElementType(i);
-              elt = convertForAsyncDirect(IGF, elt, nativeTy,
+              elt = convertForDirectError(IGF, elt, nativeTy,
                                           /*forExtraction*/ false);
               expandedResult =
                   IGF.Builder.CreateInsertValue(expandedResult, elt, i);
             }
             IGF.emitAllExtractValues(expandedResult, structTy, errorArgValues);
           } else if (!errorSchema.getExpandedType(IGM)->isVoidTy()) {
-            errorArgValues = convertForAsyncDirect(IGF, nativeError.claimNext(),
+            errorArgValues = convertForDirectError(IGF, nativeError.claimNext(),
                                                    combined.combinedTy,
                                                    /*forExtraction*/ false);
           }

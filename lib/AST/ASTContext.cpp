@@ -21,6 +21,7 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -325,7 +326,7 @@ struct ASTContext::Implementation {
   /// The declaration of 'AsyncIteratorProtocol.next()'.
   FuncDecl *AsyncIteratorNext = nullptr;
 
-  /// The declaration of 'AsyncIteratorProtocol.next(_:)' that takes
+  /// The declaration of 'AsyncIteratorProtocol.next(isolation:)' that takes
   /// an actor isolation.
   FuncDecl *AsyncIteratorNextIsolated = nullptr;
 
@@ -388,6 +389,23 @@ struct ASTContext::Implementation {
   /// func _stdlib_isOSVersionAtLeast(Builtin.Word,Builtin.Word, Builtin.word)
   ///    -> Builtin.Int1
   FuncDecl *IsOSVersionAtLeastDecl = nullptr;
+
+  /// func _stdlib_isVariantOSVersionAtLeast(
+  ///   Builtin.Word,
+  ///   Builtin.Word,
+  ///   Builtin.word)
+  ///  -> Builtin.Int1
+  FuncDecl *IsVariantOSVersionAtLeastDecl = nullptr;
+
+  /// func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(
+  ///   Builtin.Word,
+  ///   Builtin.Word,
+  ///   Builtin.Word,
+  ///   Builtin.Word,
+  ///   Builtin.Word,
+  ///   Builtin.Word)
+  ///  -> Builtin.Int1
+  FuncDecl *IsOSVersionAtLeastOrVariantVersionAtLeastDecl = nullptr;
 
   /// The set of known protocols, lazily populated as needed.
   ProtocolDecl *KnownProtocols[NumKnownProtocols] = { };
@@ -1313,6 +1331,14 @@ ASTContext::synthesizeInvertibleProtocolDecl(InvertibleProtocolKind ip) const {
     return proto;
 
   ModuleDecl *stdlib = getStdlibModule();
+  if (stdlib && stdlib->failedToLoad()) {
+    stdlib = nullptr; // Use the Builtin module instead.
+
+    // Ensure we emitted an error diagnostic!
+    if (!Diags.hadAnyError())
+      Diags.diagnose(SourceLoc(), diag::serialization_load_failed, "Swift");
+  }
+
   FileUnit *file = nullptr;
   if (stdlib) {
     file = &stdlib->getFiles()[0]->getOrCreateSynthesizedFile();
@@ -1398,6 +1424,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::CxxUniqueSet:
   case KnownProtocolKind::CxxVector:
   case KnownProtocolKind::CxxSpan:
+  case KnownProtocolKind::CxxMutableSpan:
   case KnownProtocolKind::UnsafeCxxInputIterator:
   case KnownProtocolKind::UnsafeCxxMutableInputIterator:
   case KnownProtocolKind::UnsafeCxxRandomAccessIterator:
@@ -1587,8 +1614,7 @@ ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
 
   auto type = decl->getDeclaredInterfaceType();
   auto builtinProtocol = getProtocol(builtinProtocolKind);
-  auto builtinConformance = ModuleDecl::lookupConformance(
-      type, builtinProtocol);
+  auto builtinConformance = lookupConformance(type, builtinProtocol);
   if (builtinConformance.isInvalid()) {
     assert(false && "Missing required conformance");
     witness = ConcreteDeclRef();
@@ -1830,6 +1856,31 @@ FuncDecl *ASTContext::getIsOSVersionAtLeastDecl() const {
     return nullptr;
 
   getImpl().IsOSVersionAtLeastDecl = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getIsVariantOSVersionAtLeastDecl() const {
+  if (getImpl().IsVariantOSVersionAtLeastDecl)
+    return getImpl().IsVariantOSVersionAtLeastDecl;
+
+  auto decl = findLibraryIntrinsic(*this, "_stdlib_isVariantOSVersionAtLeast");
+  if (!decl)
+    return nullptr;
+
+  getImpl().IsVariantOSVersionAtLeastDecl = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getIsOSVersionAtLeastOrVariantVersionAtLeast() const {
+if (getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl)
+    return getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl;
+
+  auto decl = findLibraryIntrinsic(*this,
+      "_stdlib_isOSVersionAtLeastOrVariantVersionAtLeast");
+  if (!decl)
+    return nullptr;
+
+  getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl = decl;
   return decl;
 }
 
@@ -2547,7 +2598,10 @@ bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
     // The module version could not be parsed from the preferred source for
     // this query. Diagnose and treat the query as if it succeeded.
     auto mID = ModuleName[0];
-    Diags.diagnose(mID.Loc, diag::cannot_find_project_version,
+    auto diagLoc = mID.Loc;
+    if (mID.Loc.isInvalid())
+      diagLoc = loc;
+    Diags.diagnose(diagLoc, diag::cannot_find_project_version,
                    getModuleVersionKindString(bestVersionInfo), mID.Item.str());
     return true;
   }
@@ -3843,7 +3897,9 @@ get(GenericTypeDecl *TheDecl, Type Parent, const ASTContext &C) {
   UnboundGenericType::Profile(ID, TheDecl, Parent);
   void *InsertPos = nullptr;
   RecursiveTypeProperties properties;
+  if (TheDecl->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
+
   auto arena = getArena(properties);
 
   if (auto unbound = C.getImpl().getArena(arena).UnboundGenericTypes
@@ -3894,6 +3950,7 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
   llvm::FoldingSetNodeID ID;
   BoundGenericType::Profile(ID, TheDecl, Parent, GenericArgs);
   RecursiveTypeProperties properties;
+  if (TheDecl->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
   for (Type Arg : GenericArgs) {
     properties |= Arg->getRecursiveProperties();
@@ -3975,6 +4032,7 @@ EnumType::EnumType(EnumDecl *TheDecl, Type Parent, const ASTContext &C,
 
 EnumType *EnumType::get(EnumDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
+  if (D->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -3991,6 +4049,7 @@ StructType::StructType(StructDecl *TheDecl, Type Parent, const ASTContext &C,
 
 StructType *StructType::get(StructDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
+  if (D->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -4007,6 +4066,7 @@ ClassType::ClassType(ClassDecl *TheDecl, Type Parent, const ASTContext &C,
 
 ClassType *ClassType::get(ClassDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
+  if (D->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -4271,20 +4331,39 @@ isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 // always materializable.
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
-                                      Type result) {
-  static_assert(RecursiveTypeProperties::BitWidth == 18,
+                                      Type result, Type globalActor,
+                                      Type thrownError) {
+  static_assert(RecursiveTypeProperties::BitWidth == 19,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
   for (auto param : params) {
     if (param.getPlainType()->getRecursiveProperties().hasError())
       properties |= RecursiveTypeProperties::HasError;
+    if (param.getPlainType()->getRecursiveProperties().isUnsafe())
+      properties |= RecursiveTypeProperties::IsUnsafe;
   }
 
   if (result->getRecursiveProperties().hasDynamicSelf())
     properties |= RecursiveTypeProperties::HasDynamicSelf;
   if (result->getRecursiveProperties().hasError())
     properties |= RecursiveTypeProperties::HasError;
+  if (result->getRecursiveProperties().isUnsafe())
+    properties |= RecursiveTypeProperties::IsUnsafe;
+  
+  if (globalActor) {
+    if (globalActor->getRecursiveProperties().hasError())
+      properties |= RecursiveTypeProperties::HasError;
+    if (globalActor->getRecursiveProperties().isUnsafe())
+      properties |= RecursiveTypeProperties::IsUnsafe;
+  }
+
+  if (thrownError) {
+    if (thrownError->getRecursiveProperties().hasError())
+      properties |= RecursiveTypeProperties::HasError;
+    if (thrownError->getRecursiveProperties().isUnsafe())
+      properties |= RecursiveTypeProperties::IsUnsafe;
+  }
 
   return properties;
 }
@@ -4617,7 +4696,8 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
       hasLifetimeDependenceInfo ? numLifetimeDependencies : 0);
   void *mem = ctx.Allocate(allocSize, alignof(GenericFunctionType));
 
-  auto properties = getGenericFunctionRecursiveProperties(params, result);
+  auto properties = getGenericFunctionRecursiveProperties(
+      params, result, globalActor, thrownError);
   auto funcTy = new (mem) GenericFunctionType(sig, params, result, info,
                                               isCanonical ? &ctx : nullptr,
                                               properties);
@@ -4990,7 +5070,7 @@ CanSILFunctionType SILFunctionType::get(
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 18,
+  static_assert(RecursiveTypeProperties::BitWidth == 19,
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getInterfaceType()->getRecursiveProperties();
@@ -5078,6 +5158,7 @@ OptionalType *OptionalType::get(Type base) {
 ProtocolType *ProtocolType::get(ProtocolDecl *D, Type Parent,
                                 const ASTContext &C) {
   RecursiveTypeProperties properties;
+  if (D->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -5780,7 +5861,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
     if (nominal != dc->getASTContext().getOptionalDecl()) {
       if (auto objcBridgeable
             = getProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
-        auto conformance = ModuleDecl::lookupConformance(
+        auto conformance = lookupConformance(
             nominal->getDeclaredInterfaceType(), objcBridgeable);
         if (conformance) {
           result =
@@ -5932,7 +6013,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
     if (!proto)
       return ProtocolConformanceRef::forInvalid();
 
-    return ModuleDecl::lookupConformance(type, proto);
+    return lookupConformance(type, proto);
   };
 
   // Do we conform to _ObjectiveCBridgeable?
