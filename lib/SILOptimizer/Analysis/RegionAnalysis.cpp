@@ -1123,7 +1123,9 @@ void InferredCallerArgumentTypeInfo::init(const Operand *op) {
 
 namespace {
 
-constexpr const char *SEP_STR = "╾──────────────────────────────╼\n";
+constexpr StringLiteral SEP_STR = "╾──────────────────────────────╼\n";
+constexpr StringLiteral PER_FUNCTION_SEP_STR =
+    "╾++++++++++++++++++++++++++++++╼\n";
 
 } // namespace
 
@@ -1434,9 +1436,11 @@ class PartitionOpTranslator {
 
   void gatherFlowInsensitiveInformationBeforeDataflow() {
     REGIONBASEDISOLATION_LOG(llvm::dbgs()
-                             << ">>> Performing pre-dataflow scan to gather "
+                             << SEP_STR
+                             << "Performing pre-dataflow scan to gather "
                                 "flow insensitive information "
-                             << function->getName() << ":\n");
+                             << function->getName() << ":\n"
+                             << SEP_STR);
 
     for (auto &block : *function) {
       for (auto &inst : block) {
@@ -1488,6 +1492,18 @@ public:
       : function(function), functionArgPartition(), builder(),
         partialApplyReachabilityDataflow(function, pofi), valueMap(valueMap) {
     builder.translator = this;
+
+    REGIONBASEDISOLATION_LOG(
+        llvm::dbgs()
+        << PER_FUNCTION_SEP_STR
+        << "Beginning processing: " << function->getName() << '\n'
+        << "Demangled: "
+        << Demangle::demangleSymbolAsString(
+               function->getName(),
+               Demangle::DemangleOptions::SimplifiedUIDemangleOptions())
+        << '\n'
+        << PER_FUNCTION_SEP_STR);
+
     gatherFlowInsensitiveInformationBeforeDataflow();
 
     REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Initializing Function Args:\n");
