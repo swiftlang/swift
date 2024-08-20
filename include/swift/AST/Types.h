@@ -6679,10 +6679,6 @@ public:
   /// Retrieve the set of substitutions applied to the opaque type.
   SubstitutionMap getSubstitutions() const;
 
-  /// Compute the canonical interface type within the environment of this
-  /// opaque type archetype.
-  CanType getCanonicalInterfaceType(Type interfaceType);
-
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OpaqueTypeArchetype;
   }

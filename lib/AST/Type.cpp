@@ -3556,14 +3556,6 @@ OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(
   assert(!interfaceType->isParameterPack());
 }
 
-CanType OpaqueTypeArchetypeType::getCanonicalInterfaceType(Type interfaceType) {
-  auto sig = Environment->getOpaqueTypeDecl()
-      ->getOpaqueInterfaceGenericSignature();
-  CanType canonicalType = interfaceType->getReducedType(sig);
-  return Environment->maybeApplyOuterContextSubstitutions(canonicalType)
-      ->getCanonicalType();
-}
-
 OpaqueTypeDecl *OpaqueTypeArchetypeType::getDecl() const {
   return Environment->getOpaqueTypeDecl();
 }
