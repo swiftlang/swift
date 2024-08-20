@@ -3575,10 +3575,9 @@ SubstitutionMap OpaqueTypeArchetypeType::getSubstitutions() const {
 OpenedArchetypeType::OpenedArchetypeType(
     GenericEnvironment *environment, Type interfaceType,
     ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
-    LayoutConstraint layout)
+    LayoutConstraint layout, RecursiveTypeProperties properties)
   : LocalArchetypeType(TypeKind::OpenedArchetype,
-                       interfaceType->getASTContext(),
-                       RecursiveTypeProperties::HasOpenedExistential,
+                       interfaceType->getASTContext(), properties,
                        interfaceType, conformsTo, superclass, layout,
                        environment)
 {

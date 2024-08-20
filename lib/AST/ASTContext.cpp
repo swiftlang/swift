@@ -520,6 +520,8 @@ struct ASTContext::Implementation {
                MetatypeRepresentation::Last_MetatypeRepresentation) + 1,
                "Use std::pair for MetatypeTypes and ExistentialMetatypeTypes.");
 
+    using OpenedExistentialKey = std::pair<SubstitutionMap, UUID>;
+
     llvm::DenseMap<Type, ErrorType *> ErrorTypesWithOriginal;
     llvm::FoldingSet<TypeAliasType> TypeAliasTypes;
     llvm::FoldingSet<TupleType> TupleTypes;
@@ -555,6 +557,8 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
     llvm::DenseMap<std::pair<OpaqueTypeDecl *, SubstitutionMap>,
                    GenericEnvironment *> OpaqueArchetypeEnvironments;
+    llvm::DenseMap<OpenedExistentialKey, GenericEnvironment *>
+      OpenedExistentialEnvironments;
 
     /// The set of function types.
     llvm::FoldingSet<FunctionType> FunctionTypes;
@@ -606,8 +610,6 @@ struct ASTContext::Implementation {
     void dump(llvm::raw_ostream &out) const;
   };
 
-  using OpenedExistentialKey = std::pair<SubstitutionMap, UUID>;
-
   llvm::DenseMap<ModuleDecl*, ModuleType*> ModuleTypes;
   llvm::DenseMap<std::pair<unsigned, unsigned>, GenericTypeParamType *>
     GenericParamTypes;
@@ -620,8 +622,6 @@ struct ASTContext::Implementation {
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> IntegerTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
-  llvm::DenseMap<OpenedExistentialKey, GenericEnvironment *>
-      OpenedExistentialEnvironments;
   llvm::DenseMap<UUID, GenericEnvironment *> OpenedElementEnvironments;
   llvm::FoldingSet<IndexSubset> IndexSubsets;
   llvm::FoldingSet<AutoDiffDerivativeFunctionIdentifier>
@@ -866,7 +866,6 @@ void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
   SIZE_AND_BYTES(SILBlockStorageTypes);
   SIZE_AND_BYTES(SILMoveOnlyWrappedTypes);
   SIZE_AND_BYTES(IntegerTypes);
-  SIZE_AND_BYTES(OpenedExistentialEnvironments);
   SIZE_AND_BYTES(OpenedElementEnvironments);
   SIZE_AND_BYTES(ForeignRepresentableCache);
   SIZE(SearchPathsSet);
@@ -3128,7 +3127,6 @@ size_t ASTContext::getTotalMemory() const {
     // getImpl().BuiltinVectorTypes ?
     // getImpl().GenericSignatures ?
     // getImpl().CompoundNames ?
-    getImpl().OpenedExistentialEnvironments.getMemorySize() +
     getImpl().Permanent.getTotalMemory();
 
     Size += getSolverMemory();
@@ -3165,7 +3163,9 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     llvm::capacity_in_bytes(StructTypes) +
     llvm::capacity_in_bytes(ClassTypes) +
     llvm::capacity_in_bytes(ProtocolTypes) +
-    llvm::capacity_in_bytes(DynamicSelfTypes);
+    llvm::capacity_in_bytes(DynamicSelfTypes) +
+    OpaqueArchetypeEnvironments.getMemorySize() +
+    OpenedExistentialEnvironments.getMemorySize();
     // FunctionTypes ?
     // UnboundGenericTypes ?
     // BoundGenericTypes ?
@@ -3212,6 +3212,7 @@ void ASTContext::Implementation::Arena::dump(llvm::raw_ostream &os) const {
     SIZE(ParameterizedProtocolTypes);
     SIZE(LayoutConstraints);
     SIZE_AND_BYTES(OpaqueArchetypeEnvironments);
+    SIZE_AND_BYTES(OpenedExistentialEnvironments);
     SIZE(FunctionTypes);
     SIZE(NormalConformances);
     SIZE(SelfConformances);
@@ -5316,26 +5317,39 @@ Type OpaqueTypeArchetypeType::get(
   return env->getOrCreateArchetypeFromInterfaceType(interfaceType);
 }
 
+/// Compute the recursive type properties of an opaque type archetype.
+static RecursiveTypeProperties getOpenedArchetypeProperties(SubstitutionMap subs) {
+  // An opaque type isn't contextually dependent like other archetypes, so
+  // by itself, it doesn't impose the "Has Archetype" recursive property,
+  // but the substituted types might. A disjoint "Has Opaque Archetype" tracks
+  // the presence of opaque archetypes.
+  RecursiveTypeProperties properties =
+    RecursiveTypeProperties::HasOpenedExistential;
+  for (auto type : subs.getReplacementTypes()) {
+    properties |= type->getRecursiveProperties();
+  }
+  return properties;
+}
+
 CanTypeWrapper<OpenedArchetypeType> OpenedArchetypeType::getNew(
     GenericEnvironment *environment, Type interfaceType,
     ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
     LayoutConstraint layout) {
-  // FIXME: It'd be great if all of our callers could submit interface types.
-  // But the constraint solver submits archetypes when e.g. trying to issue
-  // checks against members of existential types.
-  //  assert((!superclass || !superclass->hasArchetype())
-  //         && "superclass must be interface type");
-  auto arena = AllocationArena::Permanent;
-  ASTContext &ctx = interfaceType->getASTContext();
-  void *mem = ctx.Allocate(
-    OpenedArchetypeType::totalSizeToAlloc<ProtocolDecl *,Type,LayoutConstraint>(
+  auto properties = getOpenedArchetypeProperties(
+      environment->getOuterSubstitutions());
+  auto arena = getArena(properties);
+  auto size = OpenedArchetypeType::totalSizeToAlloc<
+      ProtocolDecl *, Type, LayoutConstraint>(
       conformsTo.size(),
       superclass ? 1 : 0,
-      layout ? 1 : 0),
-      alignof(OpenedArchetypeType), arena);
+      layout ? 1 : 0);
+
+  ASTContext &ctx = interfaceType->getASTContext();
+  void *mem = ctx.Allocate(size, alignof(OpenedArchetypeType), arena);
 
   return CanOpenedArchetypeType(::new (mem) OpenedArchetypeType(
-      environment, interfaceType, conformsTo, superclass, layout));
+      environment, interfaceType, conformsTo, superclass, layout,
+      properties));
 }
 
 CanTypeWrapper<OpenedArchetypeType>
@@ -5560,25 +5574,24 @@ GenericEnvironment *
 GenericEnvironment::forOpenedExistential(
     Type existential, SubstitutionMap subs, UUID uuid) {
   assert(existential->isExistentialType());
-  // FIXME: Opened archetypes can't be transformed because the
-  // the identity of the archetype has to be preserved. This
-  // means that simplifying an opened archetype in the constraint
-  // system to replace type variables with fixed types is not
-  // yet supported. For now, assert that an opened archetype never
-  // contains type variables to catch cases where type variables
-  // would be applied to the type-checked AST.
-  assert(!existential->hasTypeVariable() &&
-         "opened existentials containing type variables cannot be simplified");
+
+  // TODO: We could attempt to preserve type sugar in the substitution map.
+  // Currently archetypes are assumed to be always canonical in many places,
+  // though, so doing so would require fixing those places.
+  subs = subs.getCanonical();
 
   auto &ctx = existential->getASTContext();
 
+  auto properties = getOpenedArchetypeProperties(subs);
+  auto arena = getArena(properties);
+
   auto key = std::make_pair(subs, uuid);
 
-  auto &openedExistentialEnvironments =
-      ctx.getImpl().OpenedExistentialEnvironments;
-  auto found = openedExistentialEnvironments.find(key);
+  auto &environments =
+      ctx.getImpl().getArena(arena).OpenedExistentialEnvironments;
+  auto found = environments.find(key);
 
-  if (found != openedExistentialEnvironments.end()) {
+  if (found != environments.end()) {
     auto *existingEnv = found->second;
     assert(existingEnv->getOpenedExistentialType()->isEqual(existential));
     assert(existingEnv->getOuterSubstitutions() == subs);
@@ -5601,7 +5614,7 @@ GenericEnvironment::forOpenedExistential(
   auto *genericEnv =
       new (mem) GenericEnvironment(signature, existential, subs, uuid);
 
-  openedExistentialEnvironments[key] = genericEnv;
+  environments[key] = genericEnv;
 
   return genericEnv;
 }

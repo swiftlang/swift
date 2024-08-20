@@ -6870,8 +6870,10 @@ public:
   
 private:
   OpenedArchetypeType(GenericEnvironment *environment, Type interfaceType,
-                      ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
-                      LayoutConstraint layout);
+                      ArrayRef<ProtocolDecl *> conformsTo,
+                      Type superclass,
+                      LayoutConstraint layout,
+                      RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(OpenedArchetypeType, LocalArchetypeType)
   CanOpenedArchetypeType getRoot() const {
