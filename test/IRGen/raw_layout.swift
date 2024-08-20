@@ -369,31 +369,31 @@ entry(%0 : $*Cell<T>):
 // CHECK: [[T_VWT_ADDR:%.*]] = getelementptr inbounds ptr, ptr [[T]], {{i64|i32}} -1
 // CHECK-NEXT: {{%.*}} = load ptr, ptr [[T_VWT_ADDR]]
 // CHECK: [[T_LAYOUT:%.*]] = getelementptr inbounds ptr, ptr {{%.*}}, i32 8
-// CHECK-NEXT: call void @swift_initRawStructMetadata(ptr %"Cell<T>", {{i64|i32}} 0, ptr [[T_LAYOUT]], {{i64|i32}} 0, {{i64|i32}} 0)
+// CHECK-NEXT: call void @swift_initRawStructMetadata2(ptr %"Cell<T>", {{i64|i32}} 0, ptr [[T_LAYOUT]], {{i64|i32}} 0, {{i64|i32}} 0)
 
 // PaddedCell<T>
 
 // CHECK-LABEL: define {{.*}} swiftcc %swift.metadata_response @"$s{{[A-Za-z0-9_]*}}10PaddedCellVMr"(ptr %"PaddedCell<T>", ptr {{.*}}, ptr {{.*}})
-// CHECK: call void @swift_initRawStructMetadata(ptr %"PaddedCell<T>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} 1, {{i64|i32}} 1)
+// CHECK: call void @swift_initRawStructMetadata2(ptr %"PaddedCell<T>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} 1, {{i64|i32}} 1)
 
 // SmallVectorBuf<T>
 
 // CHECK-LABEL: define {{.*}} swiftcc %swift.metadata_response @"$s{{[A-Za-z0-9_]*}}14SmallVectorBufVMr"(ptr %"SmallVectorBuf<T>", ptr {{.*}}, ptr {{.*}})
-// CHECK: call void @swift_initRawStructMetadata(ptr %"SmallVectorBuf<T>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} 8, {{i64|i32}} 1)
+// CHECK: call void @swift_initRawStructMetadata2(ptr %"SmallVectorBuf<T>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} 8, {{i64|i32}} 1)
 
 // Vector<T, N>
 
 // CHECK-LABEL: define {{.*}} swiftcc %swift.metadata_response @"$s{{[A-Za-z0-9_]*}}6VectorVMr"(ptr %"Vector<T, N>", ptr {{.*}}, ptr {{.*}})
 // CHECK:         [[N_GEP:%.*]] = getelementptr inbounds {{i64|i32}}, ptr %"Vector<T, N>", {{i64|i32}} 3
 // CHECK-NEXT:    [[N:%.*]] = load {{i64|i32}}, ptr [[N_GEP]]
-// CHECK:         call void @swift_initRawStructMetadata(ptr %"Vector<T, N>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} [[N]], {{i64|i32}} 1)
+// CHECK:         call void @swift_initRawStructMetadata2(ptr %"Vector<T, N>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} [[N]], {{i64|i32}} 1)
 
 //===----------------------------------------------------------------------===//
 // CellThatMovesAsLike<T> Dependent layout metadata initialization
 //===----------------------------------------------------------------------===//
 
 // CHECK-LABEL: define {{.*}} swiftcc %swift.metadata_response @"$s{{[A-Za-z0-9_]*}}19CellThatMovesAsLikeVMr"(ptr %"CellThatMovesAsLike<T>", ptr {{.*}}, ptr {{.*}})
-// CHECK: call void @swift_initRawStructMetadata(ptr %"CellThatMovesAsLike<T>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} 0, {{i64|i32}} 2)
+// CHECK: call void @swift_initRawStructMetadata2(ptr %"CellThatMovesAsLike<T>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} 0, {{i64|i32}} 2)
 
 //===----------------------------------------------------------------------===//
 // CellThatMovesAsLike<T> destroy
@@ -629,7 +629,7 @@ entry(%0 : $*Cell<T>):
 // CHECK-LABEL: define {{.*}} swiftcc %swift.metadata_response @"$s{{[A-Za-z0-9_]*}}17VectorMovesAsLikeVMr"(ptr %"VectorMovesAsLike<T, N>", ptr {{.*}}, ptr {{.*}})
 // CHECK:         [[N_GEP:%.*]] = getelementptr inbounds {{i64|i32}}, ptr %"VectorMovesAsLike<T, N>", {{i64|i32}} 3
 // CHECK-NEXT:    [[N:%.*]] = load {{i64|i32}}, ptr [[N_GEP]]
-// CHECK:         call void @swift_initRawStructMetadata(ptr %"VectorMovesAsLike<T, N>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} [[N]], {{i64|i32}} 3)
+// CHECK:         call void @swift_initRawStructMetadata2(ptr %"VectorMovesAsLike<T, N>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} [[N]], {{i64|i32}} 3)
 
 //===----------------------------------------------------------------------===//
 // VectorMovesAsLike destroy
