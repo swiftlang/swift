@@ -684,15 +684,24 @@ TypeRefBuilder::getMultiPayloadEnumDescriptor(const TypeRef *TR) {
 RemoteRef<CaptureDescriptor>
 TypeRefBuilder::ReflectionTypeDescriptorFinder::getCaptureDescriptor(
     uint64_t RemoteAddress) {
-  for (auto Info : ReflectionInfos) {
-    for (auto CD : Info.Capture) {
-      if (RemoteAddress == CD.getAddressData()) {
-        return CD;
-      }
+
+  for (; CaptureDescriptorsByAddressLastReflectionInfoCache <
+         ReflectionInfos.size();
+       CaptureDescriptorsByAddressLastReflectionInfoCache++) {
+    for (const auto &CD :
+         ReflectionInfos[CaptureDescriptorsByAddressLastReflectionInfoCache]
+             .Capture) {
+      CaptureDescriptorsByAddress.emplace(
+          std::make_pair(CD.getAddressData(), CD));
     }
   }
 
-  return nullptr;
+  const auto found = CaptureDescriptorsByAddress.find(RemoteAddress);
+  if (found == CaptureDescriptorsByAddress.end()) {
+    return nullptr;
+  }
+
+  return found->second;
 }
 
 /// Get the unsubstituted capture types for a closure context.
