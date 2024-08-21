@@ -1978,6 +1978,12 @@ static void fixAvailabilityByAddingVersionCheck(
 
     PlatformKind Target = targetPlatform(Context.LangOpts);
 
+    // Runtime availability checks that specify app extension platforms don't
+    // work, so only suggest checks against the base platform.
+    if (auto TargetRemovingAppExtension =
+            basePlatformForExtensionPlatform(Target))
+      Target = *TargetRemovingAppExtension;
+
     Out << "if #available(" << platformString(Target)
         << " " << RequiredRange.getLowerEndpoint().getAsString()
         << ", *) {\n";
