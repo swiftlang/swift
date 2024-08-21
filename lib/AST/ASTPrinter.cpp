@@ -6955,7 +6955,7 @@ public:
     // the generic signature of the contextual substitution map in the
     // opened element environment.
     auto env = T->getGenericEnvironment();
-    auto subs = env->getPackElementContextSubstitutions();
+    auto subs = env->getOuterSubstitutions();
     auto sig = subs.getGenericSignature();
     auto params = sig.getGenericParams();
 

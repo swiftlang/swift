@@ -1667,10 +1667,9 @@ void Serializer::writeASTBlockEntity(const GenericEnvironment *genericEnv) {
   case GenericEnvironment::Kind::OpenedExistential: {
     auto kind = GenericEnvironmentKind::OpenedExistential;
     auto existentialTypeID = addTypeRef(genericEnv->getOpenedExistentialType());
-    auto parentSig = genericEnv->getOpenedExistentialParentSignature();
-    auto parentSigID = addGenericSignatureRef(parentSig);
-    auto emptySubs = SubstitutionMap();
-    auto subsID = addSubstitutionMapRef(emptySubs);
+    auto parentSigID = addGenericSignatureRef(GenericSignature());
+    auto contextSubs = genericEnv->getOuterSubstitutions();
+    auto subsID = addSubstitutionMapRef(contextSubs);
 
     auto genericEnvAbbrCode = DeclTypeAbbrCodes[GenericEnvironmentLayout::Code];
     GenericEnvironmentLayout::emitRecord(Out, ScratchRecord, genericEnvAbbrCode,
@@ -1684,7 +1683,7 @@ void Serializer::writeASTBlockEntity(const GenericEnvironment *genericEnv) {
     auto shapeClassID = addTypeRef(genericEnv->getOpenedElementShapeClass());
     auto parentSig = genericEnv->getGenericSignature();
     auto parentSigID = addGenericSignatureRef(parentSig);
-    auto contextSubs = genericEnv->getPackElementContextSubstitutions();
+    auto contextSubs = genericEnv->getOuterSubstitutions();
     auto subsID = addSubstitutionMapRef(contextSubs);
 
     auto genericEnvAbbrCode = DeclTypeAbbrCodes[GenericEnvironmentLayout::Code];
