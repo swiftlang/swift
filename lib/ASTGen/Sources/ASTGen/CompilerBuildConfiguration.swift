@@ -18,7 +18,7 @@ import SwiftSyntax
 
 /// A build configuration that uses the compiler's ASTContext to answer
 /// queries.
-final class CompilerBuildConfiguration: BuildConfiguration {
+struct CompilerBuildConfiguration: BuildConfiguration {
   let ctx: BridgedASTContext
   var conditionLoc: BridgedSourceLoc
 
