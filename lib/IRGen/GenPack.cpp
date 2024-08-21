@@ -1040,7 +1040,7 @@ void irgen::bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
     openablePackParams.insert(genericParam->getCanonicalType());
   });
 
-  auto subs = environment->getPackElementContextSubstitutions();
+  auto subs = environment->getOuterSubstitutions();
 
   // Find the archetypes and conformances which must be bound.
   llvm::SmallSetVector<CanType, 2> types;

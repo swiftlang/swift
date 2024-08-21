@@ -2870,7 +2870,7 @@ void SILCloner<ImplClass>::visitOpenPackElementInst(
 
   // Substitute the contextual substitutions.
   auto newContextSubs =
-    getOpSubstitutionMap(origEnv->getPackElementContextSubstitutions());
+    getOpSubstitutionMap(origEnv->getOuterSubstitutions());
 
   // The opened shape class is a parameter of the original signature,
   // which is unchanged.
