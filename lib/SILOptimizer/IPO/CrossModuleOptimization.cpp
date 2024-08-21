@@ -164,7 +164,7 @@ public:
   }
 
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
-    if (Subs.hasLocalArchetypes())
+    if (Subs.getRecursiveProperties().hasLocalArchetype())
       Subs = Subs.subst(Functor, Functor);
 
     CMS.makeSubstUsableFromInline(Subs);

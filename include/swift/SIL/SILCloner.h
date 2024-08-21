@@ -520,13 +520,13 @@ protected:
 
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
     // If we have local archetypes to substitute, do so now.
-    if (Subs.hasLocalArchetypes() || Functor.SubsMap)
+    if (Subs.getRecursiveProperties().hasLocalArchetype() || Functor.SubsMap)
       Subs = Subs.subst(Functor, Functor);
 
     if (asImpl().shouldSubstOpaqueArchetypes()) {
       auto context = getBuilder().getTypeExpansionContext();
 
-      if (!Subs.hasOpaqueArchetypes() ||
+      if (!Subs.getRecursiveProperties().hasOpaqueArchetype() ||
           !context.shouldLookThroughOpaqueTypeArchetypes())
         return Subs;
 

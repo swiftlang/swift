@@ -473,16 +473,18 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   // Get the original substitution map.
   CalleeParamSubMap = ParamSubs;
 
+  auto Props = CalleeParamSubMap.getRecursiveProperties();
+
   using namespace OptRemark;
   // We do not support partial specialization.
-  if (!EnablePartialSpecialization && CalleeParamSubMap.hasArchetypes()) {
+  if (!EnablePartialSpecialization && Props.hasArchetype()) {
     LLVM_DEBUG(llvm::dbgs() <<"    Partial specialization is not supported.\n");
     LLVM_DEBUG(ParamSubs.dump(llvm::dbgs()));
     return false;
   }
 
   // Perform some checks to see if we need to bail.
-  if (CalleeParamSubMap.hasDynamicSelf()) {
+  if (Props.hasDynamicSelf()) {
     REMARK_OR_DEBUG(ORE, [&]() {
       return RemarkMissed("DynamicSelf", *Apply.getInstruction())
              << IndentDebug(4) << "Cannot specialize with dynamic self";
@@ -709,11 +711,11 @@ bool ReabstractionInfo::canBeSpecialized() const {
 }
 
 bool ReabstractionInfo::isFullSpecialization() const {
-  return !getCalleeParamSubstitutionMap().hasArchetypes();
+  return !getCalleeParamSubstitutionMap().getRecursiveProperties().hasArchetype();
 }
 
 bool ReabstractionInfo::isPartialSpecialization() const {
-  return getCalleeParamSubstitutionMap().hasArchetypes();
+  return getCalleeParamSubstitutionMap().getRecursiveProperties().hasArchetype();
 }
 
 void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
@@ -2819,7 +2821,7 @@ static bool createPrespecialized(StringRef UnspecializedName,
 /// @_semantics("prespecialize.X") attributes.
 static bool createPrespecializations(ApplySite Apply, SILFunction *ProxyFunc,
                                      SILOptFunctionBuilder &FuncBuilder) {
-  if (Apply.getSubstitutionMap().hasArchetypes())
+  if (Apply.getSubstitutionMap().getRecursiveProperties().hasArchetype())
     return false;
 
   SILModule &M = FuncBuilder.getModule();
