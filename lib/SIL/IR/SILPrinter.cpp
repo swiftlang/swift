@@ -2511,7 +2511,7 @@ public:
   }
   void visitOpenPackElementInst(OpenPackElementInst *OPEI) {
     auto env = OPEI->getOpenedGenericEnvironment();
-    auto subs = env->getPackElementContextSubstitutions();
+    auto subs = env->getOuterSubstitutions();
     *this << Ctx.getID(OPEI->getIndexOperand()) << " of ";
     PrintOptions Opts;
     Opts.PrintInverseRequirements = true;

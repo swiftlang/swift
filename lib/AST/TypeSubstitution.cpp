@@ -1182,7 +1182,7 @@ operator()(SubstitutableType *maybeOpaqueType) const {
 
   auto *genericEnv = archetype->getGenericEnvironment();
   auto *decl = genericEnv->getOpaqueTypeDecl();
-  auto outerSubs = genericEnv->getOpaqueSubstitutions();
+  auto outerSubs = genericEnv->getOuterSubstitutions();
 
   auto substitutionKind = shouldPerformSubstitution(decl);
   if (substitutionKind == OpaqueSubstitutionKind::DontSubstitute) {
@@ -1312,7 +1312,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
 
   auto *genericEnv = archetype->getGenericEnvironment();
   auto *decl = genericEnv->getOpaqueTypeDecl();
-  auto outerSubs = genericEnv->getOpaqueSubstitutions();
+  auto outerSubs = genericEnv->getOuterSubstitutions();
 
   auto substitutionKind = shouldPerformSubstitution(decl);
   if (substitutionKind == OpaqueSubstitutionKind::DontSubstitute) {
