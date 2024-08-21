@@ -1969,7 +1969,8 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
 
     t = t.subst(MapLocalArchetypesOutOfContext(origGenericSig, capturedEnvs),
                 MakeAbstractConformanceForGenericType(),
-                SubstFlags::PreservePackExpansionLevel);
+                SubstFlags::PreservePackExpansionLevel |
+                SubstFlags::SubstituteLocalArchetypes);
 
     LLVM_DEBUG(llvm::dbgs() << "-- maps to " << t->getCanonicalType() << "\n");
     return t->getCanonicalType();
@@ -2958,7 +2959,8 @@ buildThunkSignature(SILFunction *fn,
     auto thunkInterfaceType = Type(localArchetype).subst(
         mapOutOfContext,
         MakeAbstractConformanceForGenericType(),
-        SubstFlags::PreservePackExpansionLevel);
+        SubstFlags::PreservePackExpansionLevel |
+        SubstFlags::SubstituteLocalArchetypes);
     auto thunkArchetype = genericEnv->mapTypeIntoContext(
         thunkInterfaceType);
     contextLocalArchetypes.insert(std::make_pair(localArchetype,
@@ -3026,14 +3028,17 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   // Does the thunk type involve a local archetype type?
   SmallVector<CanLocalArchetypeType, 8> localArchetypes;
   auto archetypeVisitor = [&](CanType t) {
-    if (auto archetypeTy = dyn_cast<ArchetypeType>(t)) {
-      if (auto local = dyn_cast<LocalArchetypeType>(archetypeTy)) {
-        auto root = local.getRoot();
-        if (llvm::find(localArchetypes, root) == localArchetypes.end())
-          localArchetypes.push_back(root);
-      }
+    if (auto local = dyn_cast<LocalArchetypeType>(t)) {
+      auto root = local.getRoot();
+      if (llvm::find(localArchetypes, root) == localArchetypes.end())
+        localArchetypes.push_back(root);
     }
   };
+
+  if (expectedType->hasLocalArchetype())
+    expectedType.visit(archetypeVisitor);
+  if (sourceType->hasLocalArchetype())
+    sourceType.visit(archetypeVisitor);
 
   // Use the generic signature from the context if the thunk involves
   // generic parameters.
@@ -3041,10 +3046,9 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   SubstitutionMap contextSubs;
   llvm::DenseMap<ArchetypeType*, Type> contextLocalArchetypes;
 
-  if (expectedType->hasArchetype() || sourceType->hasArchetype()) {
-    expectedType.visit(archetypeVisitor);
-    sourceType.visit(archetypeVisitor);
-
+  if (!localArchetypes.empty() ||
+      expectedType->hasPrimaryArchetype() ||
+      sourceType->hasPrimaryArchetype()) {
     genericSig = buildThunkSignature(fn,
                                      localArchetypes,
                                      genericEnv,
@@ -3079,13 +3083,16 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   // opened existential with the new archetype.
   auto substFormalTypeIntoThunkContext =
       [&](CanType t) -> CanType {
-    return t.subst(substTypeHelper, substConformanceHelper)
+    return t.subst(substTypeHelper, substConformanceHelper,
+                   SubstFlags::SubstituteLocalArchetypes)
                ->getCanonicalType();
   };
   auto substLoweredTypeIntoThunkContext =
       [&](CanSILFunctionType t) -> CanSILFunctionType {
     return SILType::getPrimitiveObjectType(t)
-             .subst(fn->getModule(), substTypeHelper, substConformanceHelper)
+             .subst(fn->getModule(), substTypeHelper, substConformanceHelper,
+                    CanGenericSignature(),
+                    SubstFlags::SubstituteLocalArchetypes)
              .castTo<SILFunctionType>();
   };
 

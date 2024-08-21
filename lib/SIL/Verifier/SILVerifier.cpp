@@ -6310,7 +6310,8 @@ public:
                                      substTypes,
                                      LookUpConformanceInModule(),
                                      CanGenericSignature(),
-                                     SubstFlags::PreservePackExpansionLevel);
+                                     SubstFlags::PreservePackExpansionLevel |
+                                     SubstFlags::SubstituteLocalArchetypes);
         requireSameType(indexedElementSILType, substTargetElementSILType,
                         "lanewise-substituted pack element type didn't "
                         "match expected element type");

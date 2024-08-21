@@ -472,10 +472,13 @@ InFlightSubstitution::lookupConformance(CanType dependentType,
 }
 
 bool InFlightSubstitution::isInvariant(Type derivedType) const {
-  return !derivedType->hasArchetype()
-      && !derivedType->hasTypeParameter()
-      && (!shouldSubstituteOpaqueArchetypes()
-          || !derivedType->hasOpaqueArchetype());
+  if (derivedType->hasPrimaryArchetype() || derivedType->hasTypeParameter())
+    return false;
+  if (shouldSubstituteLocalArchetypes() && derivedType->hasLocalArchetype())
+    return false;
+  if (shouldSubstituteOpaqueArchetypes() && derivedType->hasOpaqueArchetype())
+    return false;
+  return true;
 }
 
 namespace {
@@ -522,6 +525,12 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
   // specifically were asked to substitute them.
   if (!IFS.shouldSubstituteOpaqueArchetypes()
       && isa<OpaqueTypeArchetypeType>(substOrig))
+    return std::nullopt;
+
+  // Local types can't normally be directly substituted unless we
+  // specifically were asked to substitute them.
+  if (!IFS.shouldSubstituteLocalArchetypes()
+      && isa<LocalArchetypeType>(substOrig))
     return std::nullopt;
 
   // If we have a substitution for this type, use it.

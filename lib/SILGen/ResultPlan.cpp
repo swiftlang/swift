@@ -145,7 +145,8 @@ mapTypeOutOfOpenedExistentialContext(CanType t) {
 
         return params[index];
       },
-      MakeAbstractConformanceForGenericType());
+      MakeAbstractConformanceForGenericType(),
+      SubstFlags::SubstituteLocalArchetypes);
 
   return std::make_pair(mappedTy->getCanonicalType(), mappedSubs);
 }

@@ -717,7 +717,8 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
     },
     MakeAbstractConformanceForGenericType(),
     SubstFlags::AllowLoweredTypes |
-    SubstFlags::PreservePackExpansionLevel);
+    SubstFlags::PreservePackExpansionLevel |
+    SubstFlags::SubstituteLocalArchetypes);
 
   auto shapeClass = elementEnv->getOpenedElementShapeClass();
 
