@@ -290,6 +290,19 @@ struct BridgedLifetimeDependenceInfoArray {
   at(SwiftInt index) const;
 };
 
+enum class BridgedLinkage {
+  Public,
+  PublicNonABI,
+  Package,
+  PackageNonABI,
+  Hidden,
+  Shared,
+  Private,
+  PublicExternal,
+  PackageExternal,
+  HiddenExternal
+};
+
 // Temporary access to the AST type within SIL until ASTBridging provides it.
 struct BridgedASTType {
   swift::TypeBase * _Nullable type;
@@ -618,20 +631,7 @@ struct BridgedFunction {
     IsSerializedForPackage
   };
 
-  enum class Linkage {
-    Public,
-    PublicNonABI,
-    Package,
-    PackageNonABI,
-    Hidden,
-    Shared,
-    Private,
-    PublicExternal,
-    PackageExternal,
-    HiddenExternal
-  };
-
-  SWIFT_NAME("init(obj:)") 
+  SWIFT_NAME("init(obj:)")
   SWIFT_IMPORT_UNSAFE BridgedFunction(SwiftObject obj) : obj(obj) {}
   SWIFT_IMPORT_UNSAFE BridgedFunction() {}
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::SILFunction * _Nonnull getFunction() const;
@@ -650,7 +650,6 @@ struct BridgedFunction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getSILResultType() const;
   BRIDGED_INLINE bool isSwift51RuntimeAvailable() const;
   BRIDGED_INLINE bool isPossiblyUsedExternally() const;
-  BRIDGED_INLINE bool isAvailableExternally() const;
   BRIDGED_INLINE bool isTransparent() const;
   BRIDGED_INLINE bool isAsync() const;
   BRIDGED_INLINE bool isGlobalInitFunction() const;
@@ -676,7 +675,8 @@ struct BridgedFunction {
   BRIDGED_INLINE bool isResilientNominalDecl(BridgedNominalTypeDecl decl) const;
   BRIDGED_INLINE BridgedType getLoweredType(BridgedASTType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getLoweredType(BridgedType type) const;
-  BRIDGED_INLINE void setLinkage(Linkage linkage) const;
+  BRIDGED_INLINE BridgedLinkage getLinkage() const;
+  BRIDGED_INLINE void setLinkage(BridgedLinkage linkage) const;
   bool isTrapNoReturn() const;
   bool isAutodiffVJP() const;
   SwiftInt specializationLevel() const;
@@ -734,8 +734,8 @@ struct BridgedGlobalVar {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getName() const;
   BRIDGED_INLINE bool isLet() const;
   BRIDGED_INLINE void setLet(bool value) const;
+  BRIDGED_INLINE BridgedLinkage getLinkage() const;
   BRIDGED_INLINE bool isPossiblyUsedExternally() const;
-  BRIDGED_INLINE bool isAvailableExternally() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedInstruction getFirstStaticInitInst() const;
   bool canBeInitializedStatically() const;
   bool mustBeInitializedStatically() const;

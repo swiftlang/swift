@@ -693,10 +693,6 @@ bool BridgedFunction::isPossiblyUsedExternally() const {
   return getFunction()->isPossiblyUsedExternally();
 }
 
-bool BridgedFunction::isAvailableExternally() const {
-  return getFunction()->isAvailableExternally();
-}
-
 bool BridgedFunction::isTransparent() const {
   return getFunction()->isTransparent() == swift::IsTransparent;
 }
@@ -788,7 +784,11 @@ void BridgedFunction::setIsPerformanceConstraint(bool isPerfConstraint) const {
   getFunction()->setIsPerformanceConstraint(isPerfConstraint);
 }
 
-void BridgedFunction::setLinkage(Linkage linkage) const {
+BridgedLinkage BridgedFunction::getLinkage() const {
+  return (BridgedLinkage)getFunction()->getLinkage();
+}
+
+void BridgedFunction::setLinkage(BridgedLinkage linkage) const {
   getFunction()->setLinkage((swift::SILLinkage)linkage);
 }
 
@@ -825,12 +825,12 @@ bool BridgedGlobalVar::isLet() const { return getGlobal()->isLet(); }
 
 void BridgedGlobalVar::setLet(bool value) const { getGlobal()->setLet(value); }
 
-bool BridgedGlobalVar::isPossiblyUsedExternally() const {
-  return getGlobal()->isPossiblyUsedExternally();
+BridgedLinkage BridgedGlobalVar::getLinkage() const {
+  return (BridgedLinkage)getGlobal()->getLinkage();
 }
 
-bool BridgedGlobalVar::isAvailableExternally() const {
-  return swift::isAvailableExternally(getGlobal()->getLinkage());
+bool BridgedGlobalVar::isPossiblyUsedExternally() const {
+  return getGlobal()->isPossiblyUsedExternally();
 }
 
 OptionalBridgedInstruction BridgedGlobalVar::getFirstStaticInitInst() const {

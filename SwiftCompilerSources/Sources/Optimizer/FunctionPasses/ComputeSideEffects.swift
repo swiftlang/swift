@@ -27,7 +27,7 @@ import SIL
 let computeSideEffects = FunctionPass(name: "compute-side-effects") {
   (function: Function, context: FunctionPassContext) in
 
-  if function.isAvailableExternally {
+  if function.isDefinedExternally {
     // We cannot assume anything about function, which are defined in another module,
     // even if the serialized SIL of its body is available in the current module.
     // If the other module was compiled with library evolution, the implementation
