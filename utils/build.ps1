@@ -62,6 +62,10 @@ The version number of the Windows SDK to be used.
 Overrides the value resolved by the Visual Studio command prompt.
 If no such Windows SDK is installed, it will be downloaded from nuget.
 
+.PARAMETER IncludeDS2
+Include the ds2 remote debug server in the SDK.
+This component is currently only supported in Android builds.
+
 .PARAMETER SkipBuild
 If set, does not run the build phase.
 
@@ -125,6 +129,7 @@ param(
   [switch] $SkipBuild = $false,
   [switch] $SkipRedistInstall = $false,
   [switch] $SkipPackaging = $false,
+  [switch] $IncludeDS2 = $false,
   [string[]] $Test = @(),
   [string] $Stage = "",
   [string] $BuildTo = "",
@@ -335,6 +340,16 @@ function Get-AndroidNDKPath {
   return $androidNDKPath
 }
 
+function Get-FlexExecutable {
+  $flexExecutable = Join-Path -Path $BinaryCache -ChildPath "win_flex_bison\win_flex.exe"
+  return $flexExecutable
+}
+
+function Get-BisonExecutable {
+  $bisonExecutable = Join-Path -Path $BinaryCache -ChildPath "win_flex_bison\win_bison.exe"
+  return $bisonExecutable
+}
+
 function Get-InstallDir($Arch) {
   if ($Arch -eq $HostArch) {
     $ProgramFilesName = "Program Files"
@@ -431,6 +446,7 @@ enum HostComponent {
   LMDB
   SymbolKit
   DocC
+  RegsGen2
 }
 
 function Get-HostProjectBinaryCache([HostComponent]$Project) {
@@ -737,6 +753,15 @@ function Fetch-Dependencies {
     DownloadAndVerify $NDKURL "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDKHash
 
     Extract-ZipFile -ZipFileName "android-ndk-$AndroidNDKVersion-windows.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-$AndroidNDKVersion" -CreateExtractPath $false
+  }
+
+  if ($IncludeDS2) {
+    $WinFlexBisonVersion = "2.5.25"
+    $WinFlexBisonURL = "https://github.com/lexxmark/winflexbison/releases/download/v$WinFlexBisonVersion/win_flex_bison-$WinFlexBisonVersion.zip"
+    $WinFlexBisonHash = "8D324B62BE33604B2C45AD1DD34AB93D722534448F55A16CA7292DE32B6AC135"
+    DownloadAndVerify $WinFlexBisonURL "$BinaryCache\win_flex_bison-$WinFlexBisonVersion.zip" $WinFlexBisonHash
+
+    Extract-ZipFile -ZipFileName "win_flex_bison-$WinFlexBisonVersion.zip" -BinaryCache $BinaryCache -ExtractPath "win_flex_bison"
   }
 
   if ($WinSDKVersion) {
@@ -1487,6 +1512,39 @@ function Build-XML2([Platform]$Platform, $Arch) {
       LIBXML2_WITH_TESTS = "NO";
       LIBXML2_WITH_THREADS = "YES";
       LIBXML2_WITH_ZLIB = "NO";
+    }
+}
+
+function Build-RegsGen2($Arch) {
+  $ArchName = $Arch.LLVMName
+
+  Build-CMakeProject `
+    -Src $SourceCache\ds2\Tools\RegsGen2 `
+    -Bin "$(Get-HostProjectBinaryCache RegsGen2)" `
+    -Arch $Arch `
+    -BuildTargets default `
+    -UseMSVCCompilers C,CXX `
+    -Defines @{
+      BISON_EXECUTABLE = "$(Get-BisonExecutable)";
+      FLEX_EXECUTABLE = "$(Get-FlexExecutable)";
+    }
+}
+
+function Build-DS2([Platform]$Platform, $Arch) {
+  $ArchName = $Arch.LLVMTarget.Replace("$AndroidAPILevel","")
+
+  Build-CMakeProject `
+    -Src "$SourceCache\ds2" `
+    -Bin "$($Arch.BinaryCache)\$Platform\ds2" `
+    -InstallTo "$($Arch.PlatformInstallRoot)\Developer\Library\$ArchName" `
+    -Arch $Arch `
+    -Platform $Platform `
+    -BuildTargets default `
+    -Defines @{
+      CMAKE_SYSTEM_NAME = $Platform.ToString();
+      DS2_REGSGEN2 = "$(Get-HostProjectBinaryCache RegsGen2)/regsgen2.exe";
+      BISON_EXECUTABLE = "$(Get-BisonExecutable)";
+      FLEX_EXECUTABLE = "$(Get-FlexExecutable)";
     }
 }
 
@@ -2471,6 +2529,10 @@ if ($Clean) {
   }
 }
 
+if (-not $SkipBuild -and $IncludeDS2) {
+  Invoke-BuildStep Build-RegsGen2 $HostArch
+}
+
 if (-not $SkipBuild) {
   foreach ($Arch in $WindowsSDKArchs) {
     Invoke-BuildStep Build-ZLib Windows $Arch
@@ -2491,6 +2553,9 @@ if (-not $SkipBuild) {
   }
 
   foreach ($Arch in $AndroidSDKArchs) {
+    if ($IncludeDS2) {
+      Invoke-BuildStep Build-DS2 Android $Arch
+    }
     Invoke-BuildStep Build-ZLib Android $Arch
     Invoke-BuildStep Build-XML2 Android $Arch
     Invoke-BuildStep Build-CURL Android $Arch
