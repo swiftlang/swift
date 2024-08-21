@@ -1,6 +1,6 @@
 // REQUIRES: swift_swift_parser
 
-// sandbox-exec is only avaiable in Darwin
+// sandbox-exec is only available in Darwin
 // REQUIRES: OS=macosx
 
 // RUN: %empty-directory(%t)

@@ -17,7 +17,7 @@ func multiStatementInference() -> Int {
   #multiStatement()
 }
 
-// The closure intruduced by the macro expansion should not contain any inline
+// The closure introduced by the macro expansion should not contain any inline
 // locations, but instead point directly into the macro buffer.
 // CHECK-SIL: sil_scope [[S0:[0-9]+]] { loc "@__swiftmacro_9MacroUser0031macro_expand_closureswift_yFFIifMX16_2_14multiStatementfMf_.swift":1:1 parent @$s9MacroUser23multiStatementInferenceSiyFSiyXEfU_
 // CHECK-SIL: sil_scope [[S2:[0-9]+]] { loc "@__swiftmacro_9MacroUser0031macro_expand_closureswift_yFFIifMX16_2_14multiStatementfMf_.swift":2:14 parent [[S0]] }

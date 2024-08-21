@@ -117,7 +117,7 @@
 //    Check the unit output is based on -index-unit-output-path:
 //    RUN: c-index-test core -print-unit %t/idx_batch_with | %FileCheck -check-prefixes=INDEX_BATCH_WITH %s
 //
-//    Check the unit output is not baed on the -o values:
+//    Check the unit output is not based on the -o values:
 //    RUN: c-index-test core -print-unit %t/idx_batch_with | %FileCheck -check-prefixes=INDEX_BATCH_WITH_NEGATIVE %s
 //
 //    INDEX_BATCH_WITH:      custom_main.o-{{.*}}

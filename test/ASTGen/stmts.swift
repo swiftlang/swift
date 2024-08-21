@@ -129,7 +129,7 @@ struct GenericTypeWithYields<T> {
     }
   }
 
-/* FXIME: yield(...) is parsed as an expression. ASTGen needs to onvert it to a statments.
+/* FXIME: yield(...) is parsed as an expression. ASTGen needs to convert it to a statement.
   subscript<U>(u: U) -> (T,U) {
     _read {
       yield ((storedProperty!, u))

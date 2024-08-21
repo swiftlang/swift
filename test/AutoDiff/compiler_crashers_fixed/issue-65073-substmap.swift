@@ -4,7 +4,7 @@
 // We need to ensure we are not dropping the substitution map during the
 // derivative type calculation in sil combiner that causes errors in the
 // subsequent optimizations as we're ending with invalid "recursive" 
-// subsitutions
+// substitutions
 
 import _Differentiation;
 

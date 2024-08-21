@@ -879,7 +879,7 @@ class SubWithLimitedMemberAvailability : SuperWithAlwaysAvailableMembers {
 }
 
 @available(OSX, introduced: 10.51)
-class SubWithLimitedAvailablility : SuperWithAlwaysAvailableMembers {
+class SubWithLimitedAvailability : SuperWithAlwaysAvailableMembers {
   override func shouldAlwaysBeAvailableMethod() {}
   
   override var shouldAlwaysBeAvailableProperty: Int {

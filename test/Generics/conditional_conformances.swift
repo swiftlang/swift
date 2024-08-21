@@ -389,7 +389,7 @@ extension TwoDisjointConformances: P2 where T == String {}
 
 
 // FIXME: these cases should be equivalent (and both with the same output as the
-// first), but the second one choses T as the representative of the
+// first), but the second one chooses T as the representative of the
 // equivalence class containing both T and U in the extension's generic
 // signature, meaning the stored conditional requirement is T: P1, which isn't
 // true in the original type's generic signature.
