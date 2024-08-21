@@ -20,6 +20,7 @@ endif()
 
 add_pure_swift_host_library(swiftASTGen STATIC
   Sources/ASTGen/ASTGen.swift
+  Sources/ASTGen/ASTGen+CompilerBuildConfiguration.swift
   Sources/ASTGen/Bridge.swift
   Sources/ASTGen/CompilerBuildConfiguration.swift
   Sources/ASTGen/DeclAttrs.swift

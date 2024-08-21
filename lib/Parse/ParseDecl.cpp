@@ -267,7 +267,7 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
   if (parsingOpts.contains(ParsingFlags::ValidateNewParserDiagnostics) &&
       !Context.Diags.hadAnyError()) {
     auto hadSyntaxError = swift_ASTGen_emitParserDiagnostics(
-        &Context.Diags, exportedSourceFile,
+        Context, &Context.Diags, exportedSourceFile,
         /*emitOnlyErrors=*/true,
         /*downgradePlaceholderErrorsToWarnings=*/
         Context.LangOpts.Playground ||
@@ -346,7 +346,7 @@ void Parser::parseSourceFileViaASTGen(
   // If we're supposed to emit diagnostics from the parser, do so now.
   if (!suppressDiagnostics) {
     auto hadSyntaxError = swift_ASTGen_emitParserDiagnostics(
-        &Context.Diags, exportedSourceFile, /*emitOnlyErrors=*/false,
+        Context, &Context.Diags, exportedSourceFile, /*emitOnlyErrors=*/false,
         /*downgradePlaceholderErrorsToWarnings=*/langOpts.Playground ||
             langOpts.WarnOnEditorPlaceholder);
     if (hadSyntaxError && Context.Diags.hadAnyError() &&

@@ -20,7 +20,12 @@ import SwiftSyntax
 /// queries.
 struct CompilerBuildConfiguration: BuildConfiguration {
   let ctx: BridgedASTContext
-  let conditionLoc: BridgedSourceLoc
+  var conditionLoc: BridgedSourceLoc
+
+  init(ctx: BridgedASTContext, conditionLoc: BridgedSourceLoc) {
+    self.ctx = ctx
+    self.conditionLoc = conditionLoc
+  }
 
   func isCustomConditionSet(name: String) throws -> Bool {
     var name = name
@@ -118,7 +123,7 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     var bitWidthsBuf: UnsafeMutablePointer<SwiftInt>? = nil
     let count = ctx.langOptsGetTargetAtomicBitWidths(&bitWidthsBuf)
     let bitWidths = Array(UnsafeMutableBufferPointer(start: bitWidthsBuf, count: count))
-    bitWidthsBuf?.deallocate()
+    deallocateIntBuffer(bitWidthsBuf);
     return bitWidths
   }
 
@@ -135,7 +140,7 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     let version = VersionTuple(
       components: Array(UnsafeMutableBufferPointer(start: componentsBuf, count: count))
     )
-    componentsBuf?.deallocate()
+    deallocateIntBuffer(componentsBuf);
     return version
   }
 
@@ -145,7 +150,7 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     let version = VersionTuple(
       components: Array(UnsafeMutableBufferPointer(start: componentsBuf, count: count))
     )
-    componentsBuf?.deallocate()
+    deallocateIntBuffer(componentsBuf);
     return version
   }
 }
