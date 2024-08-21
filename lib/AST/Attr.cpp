@@ -973,6 +973,30 @@ static void printDifferentiableAttrArguments(
   printer << '(' << stream.str() << ')';
 }
 
+/// Returns the `PlatformKind` referenced by \p attr if applicable, or
+/// `std::nullopt` otherwise.
+static std::optional<PlatformKind>
+referencedPlatform(const DeclAttribute *attr) {
+  switch (attr->getKind()) {
+  case DeclAttrKind::Available:
+    return static_cast<const AvailableAttr *>(attr)->Platform;
+  case DeclAttrKind::BackDeployed:
+    return static_cast<const BackDeployedAttr *>(attr)->Platform;
+  case DeclAttrKind::OriginallyDefinedIn:
+    return static_cast<const OriginallyDefinedInAttr *>(attr)->Platform;
+  default:
+    return std::nullopt;
+  }
+}
+
+/// Returns true if \p attr contains a reference to a `PlatformKind` that should
+/// be considered SPI.
+static bool referencesSPIPlatform(const DeclAttribute *attr) {
+  if (auto platform = referencedPlatform(attr))
+    return isPlatformSPI(*platform);
+  return false;
+}
+
 void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
                            const Decl *D) const {
   if (!DeclAttrs)
@@ -995,6 +1019,8 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   AttributeVector longAttributes;
   AttributeVector attributes;
   AttributeVector modifiers;
+  bool libraryLevelAPI =
+      D->getASTContext().LangOpts.LibraryLevel == LibraryLevel::API;
 
   for (auto DA : llvm::reverse(FlattenedAttrs)) {
     // Don't skip implicit custom attributes. Custom attributes like global
@@ -1008,6 +1034,12 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
         DeclAttribute::isUserInaccessible(DA->getKind()))
       continue;
     if (Options.excludeAttrKind(DA->getKind()))
+      continue;
+
+    // In the public interfaces of -library-level=api modules, skip attributes
+    // that reference SPI platforms.
+    if (Options.printPublicInterface() && libraryLevelAPI &&
+        referencesSPIPlatform(DA))
       continue;
 
     // If we're supposed to suppress expanded macros, check whether this is
