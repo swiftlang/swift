@@ -1182,7 +1182,8 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite, bool isMandatory) 
 
   // function_ref inside fragile function cannot reference a private or
   // hidden symbol.
-  if (applySite.getFunction()->isAnySerialized() &&
+  if (!isMandatory &&
+      applySite.getFunction()->isAnySerialized() &&
       !f->hasValidLinkageForFragileRef(applySite.getFunction()->getSerializedKind()))
     return false;
 
