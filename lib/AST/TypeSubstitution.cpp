@@ -97,23 +97,13 @@ static Type getMemberForBaseType(InFlightSubstitution &IFS,
                                  Type origBase,
                                  Type substBase,
                                  AssociatedTypeDecl *assocType,
-                                 Identifier name,
                                  unsigned level) {
-  // Produce a dependent member type for the given base type.
-  auto getDependentMemberType = [&](Type baseType) {
-    if (assocType)
-      return DependentMemberType::get(baseType, assocType);
-
-    return DependentMemberType::get(baseType, name);
-  };
+  ASSERT(assocType);
 
   // Produce a failed result.
   auto failed = [&]() -> Type {
     Type baseType = ErrorType::get(substBase ? substBase : origBase);
-    if (assocType)
-      return DependentMemberType::get(baseType, assocType);
-
-    return DependentMemberType::get(baseType, name);
+    return DependentMemberType::get(baseType, assocType);
   };
 
   if (auto *selfType = substBase->getAs<DynamicSelfType>())
@@ -125,12 +115,7 @@ static Type getMemberForBaseType(InFlightSubstitution &IFS,
   if (substBase->isTypeVariableOrMember() ||
       substBase->isTypeParameter() ||
       substBase->is<UnresolvedType>())
-    return getDependentMemberType(substBase);
-
-  // All remaining cases require an associated type declaration and not just
-  // the name of a member type.
-  if (!assocType)
-    return failed();
+    return DependentMemberType::get(substBase, assocType);
 
   // If the parent is an archetype, extract the child archetype with the
   // given name.
@@ -138,9 +123,9 @@ static Type getMemberForBaseType(InFlightSubstitution &IFS,
     if (Type memberArchetypeByName = archetypeParent->getNestedType(assocType))
       return memberArchetypeByName;
 
-    // If looking for an associated type and the archetype is constrained to a
-    // class, continue to the default associated type lookup
-    if (!assocType || !archetypeParent->getSuperclass())
+    // If the archetype is constrained to a class, continue to the default
+    // type witness lookuppath.
+    if (!archetypeParent->getSuperclass())
       return failed();
   }
 
@@ -274,8 +259,7 @@ Type DependentMemberType::substBaseType(Type substBase,
     return this;
 
   InFlightSubstitution IFS(nullptr, lookupConformance, options);
-  return getMemberForBaseType(IFS, getBase(), substBase,
-                              getAssocType(), getName(),
+  return getMemberForBaseType(IFS, getBase(), substBase, getAssocType(),
                               /*level=*/0);
 }
 
@@ -562,8 +546,7 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
       ->castTo<DependentMemberType>()->getAssocType();
 
   return getMemberForBaseType(IFS, substOrig->getParent(), substParent,
-                              assocType, assocType->getName(),
-                              level);
+                              assocType, level);
 }
 
 Type TypeSubstituter::transformGenericTypeParam(GenericTypeParamType *param,
@@ -596,9 +579,7 @@ Type TypeSubstituter::transformDependentMember(DependentMemberType *dependent,
   auto newBase = doIt(dependent->getBase(), TypePosition::Invariant);
   return getMemberForBaseType(IFS,
                               dependent->getBase(), newBase,
-                              dependent->getAssocType(),
-                              dependent->getName(),
-                              level);
+                              dependent->getAssocType(), level);
 }
 
 SubstitutionMap TypeSubstituter::transformSubstitutionMap(SubstitutionMap subs) {
