@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swift(-import-bridging-header %S/Inputs/cdecl_implementation.h -D TOP_LEVEL_CODE -swift-version 5 -enable-experimental-feature CImplementation -target %target-stable-abi-triple) %s | %FileCheck %s
 // REQUIRES: executable_test
-// REQUIRES: objc_interop
 
 @_objcImplementation @_cdecl("implFunc") public func implFunc(_ param: Int32) {
   print("implFunc(\(param))")

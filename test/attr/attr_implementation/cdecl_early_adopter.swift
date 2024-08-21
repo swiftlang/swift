@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift -import-objc-header %S/Inputs/cdecl_implementation.h -enable-experimental-feature CImplementation -target %target-stable-abi-triple
-// REQUIRES: objc_interop
+// RUN: %target-typecheck-verify-swift -import-bridging-header %S/Inputs/cdecl_implementation.h -enable-experimental-feature CImplementation -target %target-stable-abi-triple
 
 //
 // @_cdecl for global functions

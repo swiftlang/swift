@@ -3,7 +3,6 @@
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-feature CImplementation -I %S/Inputs/abi -F %clang-importer-sdk-path/frameworks %s -import-bridging-header %S/Inputs/cdecl_implementation.h -emit-ir -target %target-future-triple > %t.ir
 // RUN: %FileCheck --input-file %t.ir %s
-// REQUIRES: objc_interop
 
 //
 // Functions

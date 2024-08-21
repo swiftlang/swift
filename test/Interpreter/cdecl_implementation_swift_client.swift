@@ -32,7 +32,6 @@
 // RUN: %target-run %t/clangmod/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
-// REQUIRES: objc_interop
 
 import cdecl_implementation
 

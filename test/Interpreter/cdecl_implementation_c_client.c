@@ -17,7 +17,6 @@
 // RUN: %target-run %t/cdecl_implementation_objc_client 2>&1 | %FileCheck %s
 
 // REQUIRES: executable_test
-// REQUIRES: objc_interop
 
 // FIXME: This test fails in Swift CI simulators, but I have not been able to
 //        reproduce this locally.
