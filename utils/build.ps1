@@ -1481,7 +1481,7 @@ function Build-FoundationMacros() {
 
   $SwiftSDK = $null
   if ($Build) {
-    $SwiftSDK = $HostArch.SDKInstallRoot
+    $SwiftSDK = $BuildArch.SDKInstallRoot
   }
 
   $Targets = if ($Build) {
@@ -1495,6 +1495,12 @@ function Build-FoundationMacros() {
     $InstallDir = "$($Arch.ToolchainInstallRoot)\usr"
   }
 
+  $SwiftSyntaxCMakeModules = if ($Build -and $HostArch -ne $BuildArch) {
+    Get-BuildProjectCMakeModules Compilers
+  } else {
+    Get-HostProjectCMakeModules Compilers
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\swift-foundation\Sources\FoundationMacros `
     -Bin $FoundationMacrosBinaryCache `
@@ -1505,7 +1511,7 @@ function Build-FoundationMacros() {
     -SwiftSDK:$SwiftSDK `
     -BuildTargets $Targets `
     -Defines @{
-      SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
+      SwiftSyntax_DIR = $SwiftSyntaxCMakeModules;
     }
 }
 
