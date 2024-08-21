@@ -1,5 +1,3 @@
-#if __OBJC__
-
 @import Foundation;
 
 @interface ObjCBaseClass
@@ -202,35 +200,6 @@
 
 @protocol EmptyObjCProto
 @end
-
-#endif
-
-void CImplFunc1(int param);
-void CImplFunc2(int param);
-
-void CImplFuncMismatch1(int param);
-void CImplFuncMismatch2(int param);
-
-#if __OBJC__
-void CImplFuncMismatch3(_Nullable id param);
-void CImplFuncMismatch4(_Nullable id param);
-void CImplFuncMismatch5(_Nonnull id param);
-void CImplFuncMismatch6(_Nonnull id param);
-_Nullable id CImplFuncMismatch3a(int param);
-_Nullable id CImplFuncMismatch4a(int param);
-_Nonnull id CImplFuncMismatch5a(int param);
-_Nonnull id CImplFuncMismatch6a(int param);
-#endif
-
-void CImplFuncNameMismatch1(int param);
-void CImplFuncNameMismatch2(int param);
-
-int CImplGetComputedGlobal1(void) __attribute__((swift_name("getter:cImplComputedGlobal1()")));
-void CImplSetComputedGlobal1(int param) __attribute__((swift_name("setter:cImplComputedGlobal1(newValue:)")));
-
-typedef struct CImplStruct {} CImplStruct;
-
-void CImplStructStaticFunc1(int param) __attribute__((swift_name("CImplStruct.staticFunc1(_:)")));
 
 struct ObjCStruct {
   int foo;
