@@ -301,43 +301,53 @@ void CrossModuleOptimization::serializeFunctionsInModule(SILPassManager *manager
 }
 
 void CrossModuleOptimization::serializeWitnessTablesInModule() {
-  if (!isPackageCMOEnabled(M.getSwiftModule()))
+  if (!isPackageCMOEnabled(M.getSwiftModule()) && !everything)
     return;
 
   for (auto &wt : M.getWitnessTables()) {
-    if (wt.getSerializedKind() != getRightSerializedKind(M) &&
-        hasPublicOrPackageVisibility(wt.getLinkage(), /*includePackage*/ true)) {
-      auto unserializedWTMethodRange = llvm::make_filter_range(
-          wt.getEntries(), [&](const SILWitnessTable::Entry &entry) {
-            return entry.getKind() == SILWitnessTable::Method &&
-                   entry.getMethodWitness().Witness->getSerializedKind() !=
-                       getRightSerializedKind(M);
-          });
-      // In Package CMO, we try serializing witness thunks that
-      // are private if they don't contain hidden or private
-      // references. If they are serialized, they are set to
-      // a shared linkage. If they can't be serialized, we set
-      // the linkage to package so that the witness table itself
-      // can still be serialized, thus giving a chance for entires
-      // that _are_ serialized to be accessed directly.
-      for (const SILWitnessTable::Entry &entry: unserializedWTMethodRange) {
-        if (entry.getMethodWitness().Witness->getLinkage() == SILLinkage::Private)
-          entry.getMethodWitness().Witness->setLinkage(SILLinkage::Package);
+    if (wt.getSerializedKind() == getRightSerializedKind(M))
+      continue;
+
+    if (!hasPublicOrPackageVisibility(wt.getLinkage(), /*includePackage*/ true) && !everything)
+      continue;
+
+    bool containsInternal = false;
+
+    for (const SILWitnessTable::Entry &entry : wt.getEntries()) {
+      if (entry.getKind() != SILWitnessTable::Method)
+        continue;
+
+      SILFunction *witness = entry.getMethodWitness().Witness;
+      if (!witness)
+        continue;
+
+      if (everything) {
+        makeFunctionUsableFromInline(witness);
+      } else {
+        assert(isPackageCMOEnabled(M.getSwiftModule()));
+
+        // In Package CMO, we try serializing witness thunks that
+        // are private if they don't contain hidden or private
+        // references. If they are serialized, they are set to
+        // a shared linkage. If they can't be serialized, we set
+        // the linkage to package so that the witness table itself
+        // can still be serialized, thus giving a chance for entires
+        // that _are_ serialized to be accessed directly.
+        if (witness->getSerializedKind() != getRightSerializedKind(M) &&
+            witness->getLinkage() == SILLinkage::Private) {
+          witness->setLinkage(SILLinkage::Package);
+        }
       }
 
-      bool containsInternal = llvm::any_of(
-          wt.getEntries(), [&](const SILWitnessTable::Entry &entry) {
-            return entry.getKind() == SILWitnessTable::Method &&
-                   !entry.getMethodWitness()
-                        .Witness->hasValidLinkageForFragileRef(
-                            getRightSerializedKind(M));
-          });
-      // FIXME: This check shouldn't be necessary but added as a caution
-      // to ensure we don't serialize witness table if it contains an
-      // internal entry.
-      if (!containsInternal)
-        wt.setSerializedKind(getRightSerializedKind(M));
+      if (!witness->hasValidLinkageForFragileRef(getRightSerializedKind(M)))
+          containsInternal = true;
     }
+
+    // FIXME: This check shouldn't be necessary but added as a caution
+    // to ensure we don't serialize witness table if it contains an
+    // internal entry.
+    if (!containsInternal)
+      wt.setSerializedKind(getRightSerializedKind(M));
   }
 }
 
