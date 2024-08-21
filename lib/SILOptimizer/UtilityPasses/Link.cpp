@@ -63,6 +63,9 @@ public:
 #define UNKNOWN_MEMEFFECTS
 
 #include "swift/Runtime/RuntimeFunctions.def"
+
+      // swift_retainCount is not part of private contract between the compiler and runtime, but we still need to link it
+      linkEmbeddedRuntimeFunctionByName("swift_retainCount", { RefCounting });
   }
 
   void linkEmbeddedRuntimeFunctionByName(StringRef name,

@@ -204,14 +204,6 @@ FUNCTION(CopyPOD, swift_copyPOD, C_CC, AlwaysAvailable,
          EFFECT(NoEffect),
          UNKNOWN_MEMEFFECTS)
 
-// size_t swift_retainCount(void *ptr);
-FUNCTION(NativeRetainCount, swift_retainCount, C_CC, AlwaysAvailable,
-         RETURNS(SizeTy),
-         ARGS(RefCountedPtrTy),
-         ATTRS(NoUnwind, WillReturn),
-         EFFECT(RefCounting),
-         UNKNOWN_MEMEFFECTS)
-
 // void *swift_retain(void *ptr);
 FUNCTION(NativeStrongRetain, swift_retain, C_CC, AlwaysAvailable,
          RETURNS(RefCountedPtrTy),
