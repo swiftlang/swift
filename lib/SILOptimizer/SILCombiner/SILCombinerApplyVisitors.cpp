@@ -1184,7 +1184,7 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
                 return CEI.lookupExistentialConformance(proto);
               }
               return ProtocolConformanceRef(proto);
-            });
+            }, SubstFlags::SubstituteLocalArchetypes);
         continue;
       }
       // Otherwise, use the original argument.
@@ -1222,7 +1222,7 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
             return CEI.lookupExistentialConformance(proto);
           }
           return ProtocolConformanceRef(proto);
-        });
+        }, SubstFlags::SubstituteLocalArchetypes);
   }
 
   // We need to make sure that we can a) update Apply to use the new args and b)

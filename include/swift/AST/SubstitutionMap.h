@@ -34,6 +34,7 @@ namespace swift {
 
 class GenericEnvironment;
 class GenericParamList;
+class RecursiveTypeProperties;
 class SubstitutableType;
 typedef CanTypeWrapper<GenericTypeParamType> CanGenericTypeParamType;
 
@@ -150,19 +151,7 @@ public:
   /// parameters.
   ArrayRef<Type> getInnermostReplacementTypes() const;
 
-  /// Query whether any replacement types in the map contain archetypes.
-  bool hasArchetypes() const;
-
-  /// Query whether any replacement types in the map contain an opened
-  /// existential or opened element.
-  bool hasLocalArchetypes() const;
-
-  /// Query whether any replacement types in the map contain an opaque
-  /// return type.
-  bool hasOpaqueArchetypes() const;
-
-  /// Query whether any replacement types in the map contain dynamic Self.
-  bool hasDynamicSelf() const;
+  RecursiveTypeProperties getRecursiveProperties() const;
 
   /// Whether the replacement types are all canonical.
   bool isCanonical() const;
