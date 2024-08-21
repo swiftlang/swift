@@ -31,7 +31,11 @@ swift_dispatch_thread_get_current_override_qos_floor()
     return dispatch_thread_get_current_override_qos_floor();
   }
 
-  return (dispatch_thread_override_info_s) {0};
+  return (dispatch_thread_override_info_s){
+      0,                     // can_override
+      0,                     // unused
+      QOS_CLASS_UNSPECIFIED, // override_qos_floor
+  };
 }
 
 static inline int
