@@ -366,7 +366,7 @@ protected:
     if (!RemappedSig || !OriginalEnvironment)
       return ParentFunction;
 
-    if (SubsMap.hasArchetypes())
+    if (SubsMap.getRecursiveProperties().hasPrimaryArchetype())
       SubsMap = SubsMap.mapReplacementTypesOutOfContext();
 
     // One abstract function in the debug info can only have one set of variables
@@ -379,7 +379,7 @@ protected:
     // Note that mapReplacementTypesOutOfContext() can't do anything for
     // opened existentials, and since archetypes can't be mangled, ignore
     // this case for now.
-    if (SubsMap.hasArchetypes())
+    if (SubsMap.getRecursiveProperties().hasLocalArchetype())
       return ParentFunction;
 
     // Clone the function with the substituted type for the debug info.

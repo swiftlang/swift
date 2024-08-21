@@ -472,10 +472,13 @@ InFlightSubstitution::lookupConformance(CanType dependentType,
 }
 
 bool InFlightSubstitution::isInvariant(Type derivedType) const {
-  return !derivedType->hasArchetype()
-      && !derivedType->hasTypeParameter()
-      && (!shouldSubstituteOpaqueArchetypes()
-          || !derivedType->hasOpaqueArchetype());
+  if (derivedType->hasPrimaryArchetype() || derivedType->hasTypeParameter())
+    return false;
+  if (shouldSubstituteLocalArchetypes() && derivedType->hasLocalArchetype())
+    return false;
+  if (shouldSubstituteOpaqueArchetypes() && derivedType->hasOpaqueArchetype())
+    return false;
+  return true;
 }
 
 namespace {
@@ -488,9 +491,19 @@ public:
   TypeSubstituter(unsigned level, InFlightSubstitution &IFS)
     : level(level), IFS(IFS) {}
 
-  std::optional<Type> transform(TypeBase *type, TypePosition position);
+  std::optional<Type> transform(TypeBase *type, TypePosition pos);
+
+  Type transformGenericTypeParam(GenericTypeParamType *param, TypePosition pos);
+
+  Type transformPackExpansion(PackExpansionType *expand, TypePosition pos);
+
+  Type transformPackElement(PackElementType *element, TypePosition pos);
+
+  Type transformDependentMember(DependentMemberType *dependent, TypePosition pos);
 
   SubstitutionMap transformSubstitutionMap(SubstitutionMap subs);
+
+  CanType transformSILField(CanType fieldTy, TypePosition pos);
 };
 
 }
@@ -504,74 +517,7 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
          "should not be doing AST type-substitution on a lowered SIL type;"
          "use SILType::subst");
 
-  // Special-case handle SILBoxTypes and substituted SILFunctionTypes;
-  // we want to structurally substitute the substitutions.
-  if (auto boxTy = dyn_cast<SILBoxType>(type)) {
-    auto subMap = boxTy->getSubstitutions();
-    auto newSubMap = subMap.subst(IFS);
-
-    return SILBoxType::get(boxTy->getASTContext(),
-                           boxTy->getLayout(),
-                           newSubMap);
-  }
-
-  if (auto packExpansionTy = dyn_cast<PackExpansionType>(type)) {
-    auto eltTys = IFS.expandPackExpansionType(packExpansionTy);
-    if (eltTys.size() == 1)
-      return eltTys[0];
-    return Type(PackType::get(packExpansionTy->getASTContext(), eltTys));
-  }
-
-  if (auto silFnTy = dyn_cast<SILFunctionType>(type)) {
-    if (silFnTy->isPolymorphic())
-      return std::nullopt;
-    if (auto subs = silFnTy->getInvocationSubstitutions()) {
-      auto newSubs = subs.subst(IFS);
-      return silFnTy->withInvocationSubstitutions(newSubs);
-    }
-    if (auto subs = silFnTy->getPatternSubstitutions()) {
-      auto newSubs = subs.subst(IFS);
-      return silFnTy->withPatternSubstitutions(newSubs);
-    }
-    return std::nullopt;
-  }
-
-  // Special-case TypeAliasType; we need to substitute conformances.
-  if (auto aliasTy = dyn_cast<TypeAliasType>(type)) {
-    Type parentTy;
-    if (auto origParentTy = aliasTy->getParent())
-      parentTy = doIt(origParentTy, TypePosition::Invariant);
-    auto underlyingTy = doIt(aliasTy->getSinglyDesugaredType(),
-                             TypePosition::Invariant);
-    if (parentTy && parentTy->isExistentialType())
-      return underlyingTy;
-    auto subMap = aliasTy->getSubstitutionMap().subst(IFS);
-    return Type(TypeAliasType::get(aliasTy->getDecl(), parentTy,
-                                   subMap, underlyingTy));
-  }
-
-  auto oldLevel = level;
-  SWIFT_DEFER { level = oldLevel; };
-
-  if (auto elementTy = dyn_cast<PackElementType>(type)) {
-    type = elementTy->getPackType().getPointer();
-    level += elementTy->getLevel();
-  }
-
-  // We only substitute for substitutable types and dependent member types.
-  
-  // For dependent member types, we may need to look up the member if the
-  // base is resolved to a non-dependent type.
-  if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
-    auto newBase = doIt(depMemTy->getBase(), TypePosition::Invariant);
-    return getMemberForBaseType(IFS,
-                                depMemTy->getBase(), newBase,
-                                depMemTy->getAssocType(),
-                                depMemTy->getName(),
-                                level);
-  }
-  
-  auto substOrig = dyn_cast<SubstitutableType>(type);
+  auto substOrig = dyn_cast<ArchetypeType>(type);
   if (!substOrig)
     return std::nullopt;
 
@@ -579,6 +525,12 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
   // specifically were asked to substitute them.
   if (!IFS.shouldSubstituteOpaqueArchetypes()
       && isa<OpaqueTypeArchetypeType>(substOrig))
+    return std::nullopt;
+
+  // Local types can't normally be directly substituted unless we
+  // specifically were asked to substitute them.
+  if (!IFS.shouldSubstituteLocalArchetypes()
+      && isa<LocalArchetypeType>(substOrig))
     return std::nullopt;
 
   // If we have a substitution for this type, use it.
@@ -591,15 +543,10 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
     return known;
   }
 
-  // If we failed to substitute a generic type parameter, give up.
-  if (isa<GenericTypeParamType>(substOrig))
-    return ErrorType::get(type);
-
-  auto origArchetype = cast<ArchetypeType>(substOrig);
-  if (origArchetype->isRoot()) {
+  if (substOrig->isRoot()) {
     // Root opened archetypes are not required to be substituted. Other root
     // archetypes must already have been substituted above.
-    if (isa<LocalArchetypeType>(origArchetype)) {
+    if (isa<LocalArchetypeType>(substOrig)) {
       return Type(type);
     } else {
       return ErrorType::get(type);
@@ -607,28 +554,70 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
   }
 
   // For nested archetypes, we can substitute the parent.
-  Type origParent = origArchetype->getParent();
+  Type origParent = substOrig->getParent();
   assert(origParent && "Not a nested archetype");
 
   // Substitute into the parent type.
   Type substParent = doIt(origParent, TypePosition::Invariant);
 
   // If the parent didn't change, we won't change.
-  if (substParent.getPointer() == origArchetype->getParent())
+  if (substParent.getPointer() == substOrig->getParent())
     return Type(type);
 
   // Get the associated type reference from a child archetype.
-  AssociatedTypeDecl *assocType = origArchetype->getInterfaceType()
+  AssociatedTypeDecl *assocType = substOrig->getInterfaceType()
       ->castTo<DependentMemberType>()->getAssocType();
 
-  return getMemberForBaseType(IFS, origArchetype->getParent(), substParent,
+  return getMemberForBaseType(IFS, substOrig->getParent(), substParent,
                               assocType, assocType->getName(),
+                              level);
+}
+
+Type TypeSubstituter::transformGenericTypeParam(GenericTypeParamType *param,
+                                                TypePosition pos) {
+  // If we have a substitution for this type, use it.
+  if (auto known = IFS.substType(param, level))
+    return known;
+
+  // If we failed to substitute a generic type parameter, give up.
+  return ErrorType::get(param);
+}
+
+Type TypeSubstituter::transformPackExpansion(PackExpansionType *expand,
+                                             TypePosition pos) {
+  auto eltTys = IFS.expandPackExpansionType(expand);
+  if (eltTys.size() == 1)
+    return eltTys[0];
+  return Type(PackType::get(expand->getASTContext(), eltTys));
+}
+
+Type TypeSubstituter::transformPackElement(PackElementType *element,
+                                           TypePosition pos) {
+  SWIFT_DEFER { level -= element->getLevel(); };
+  level += element->getLevel();
+  return doIt(element->getPackType(), pos);
+}
+
+Type TypeSubstituter::transformDependentMember(DependentMemberType *dependent,
+                                               TypePosition pos) {
+  auto newBase = doIt(dependent->getBase(), TypePosition::Invariant);
+  return getMemberForBaseType(IFS,
+                              dependent->getBase(), newBase,
+                              dependent->getAssocType(),
+                              dependent->getName(),
                               level);
 }
 
 SubstitutionMap TypeSubstituter::transformSubstitutionMap(SubstitutionMap subs) {
   // FIXME: Take level into account? Move level down into IFS?
   return subs.subst(IFS);
+}
+
+CanType TypeSubstituter::transformSILField(CanType fieldTy, TypePosition pos) {
+  // Type substitution does not walk into the SILBoxType's field types, because
+  // that's written with respect to the generic signature of the box type,
+  // and not the input generic signature of the substitution.
+  return fieldTy;
 }
 
 Type Type::subst(SubstitutionMap substitutions,

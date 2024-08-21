@@ -3693,7 +3693,7 @@ public:
         return Action::Stop();
       }
 
-      if (subMap.hasDynamicSelf()) {
+      if (subMap.getRecursiveProperties().hasDynamicSelf()) {
         Ctx.Diags.diagnose(E->getLoc(),
                            diag::opaque_type_cannot_contain_dynamic_self);
         HasInvalidReturn = true;

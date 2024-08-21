@@ -256,7 +256,7 @@ CanSILFunctionType getPartialApplyInterfaceResultType(PartialApplyInst *PAI) {
   // return signature.
   auto FTy = PAI->getType().castTo<SILFunctionType>();
   assert(!PAI->hasSubstitutions() ||
-         !PAI->getSubstitutionMap().hasArchetypes());
+         !PAI->getSubstitutionMap().getRecursiveProperties().hasArchetype());
   FTy = cast<SILFunctionType>(
     FTy->mapTypeOutOfContext()->getCanonicalType());
   auto NewFTy = FTy;
@@ -512,7 +512,8 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
   if (SubstF->isExternalDeclaration())
     return false;
 
-  if (PAI->hasSubstitutions() && PAI->getSubstitutionMap().hasArchetypes()) {
+  if (PAI->hasSubstitutions() &&
+      PAI->getSubstitutionMap().getRecursiveProperties().hasArchetype()) {
     LLVM_DEBUG(llvm::dbgs()
                  << "CapturePropagation: cannot handle partial specialization "
                     "of partial_apply:\n";

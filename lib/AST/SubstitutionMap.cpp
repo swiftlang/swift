@@ -102,36 +102,11 @@ bool SubstitutionMap::hasAnySubstitutableParams() const {
   return !genericSig->areAllParamsConcrete();
 }
 
-bool SubstitutionMap::hasArchetypes() const {
-  for (Type replacementTy : getReplacementTypes()) {
-    if (replacementTy->hasArchetype())
-      return true;
-  }
-  return false;
-}
-
-bool SubstitutionMap::hasLocalArchetypes() const {
-  for (Type replacementTy : getReplacementTypes()) {
-    if (replacementTy->hasLocalArchetype())
-      return true;
-  }
-  return false;
-}
-
-bool SubstitutionMap::hasOpaqueArchetypes() const {
-  for (Type replacementTy : getReplacementTypes()) {
-    if (replacementTy->hasOpaqueArchetype())
-      return true;
-  }
-  return false;
-}
-
-bool SubstitutionMap::hasDynamicSelf() const {
-  for (Type replacementTy : getReplacementTypes()) {
-    if (replacementTy->hasDynamicSelfType())
-      return true;
-  }
-  return false;
+RecursiveTypeProperties SubstitutionMap::getRecursiveProperties() const {
+  RecursiveTypeProperties properties;
+  for (auto replacementTy : getReplacementTypes())
+    properties |= replacementTy->getRecursiveProperties();
+  return properties;
 }
 
 bool SubstitutionMap::isCanonical() const {
