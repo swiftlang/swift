@@ -58,6 +58,11 @@
 using namespace swift;
 using namespace constraints;
 
+static bool isClosureLiteralExpr(Expr *expr) {
+  expr = expr->getSemanticsProvidingExpr();
+  return (isa<CaptureListExpr>(expr) || isa<ClosureExpr>(expr));
+}
+
 bool Solution::hasFixedType(TypeVariableType *typeVar) const {
   auto knownBinding = typeBindings.find(typeVar);
   return knownBinding != typeBindings.end();
@@ -5963,24 +5968,29 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
 /// Apply the contextually Sendable flag to the given expression,
 static void applyContextualClosureFlags(Expr *expr, bool implicitSelfCapture,
                                         bool inheritActorContext,
-                                        bool isPassedToSendingParameter) {
+                                        bool isPassedToSendingParameter,
+                                        bool requiresDynamicIsolationChecking) {
   if (auto closure = dyn_cast<ClosureExpr>(expr)) {
     closure->setAllowsImplicitSelfCapture(implicitSelfCapture);
     closure->setInheritsActorContext(inheritActorContext);
     closure->setIsPassedToSendingParameter(isPassedToSendingParameter);
+    closure->setRequiresDynamicIsolationChecking(
+        requiresDynamicIsolationChecking);
     return;
   }
 
   if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
     applyContextualClosureFlags(captureList->getClosureBody(),
                                 implicitSelfCapture, inheritActorContext,
-                                isPassedToSendingParameter);
+                                isPassedToSendingParameter,
+                                requiresDynamicIsolationChecking);
   }
 
   if (auto identity = dyn_cast<IdentityExpr>(expr)) {
     applyContextualClosureFlags(identity->getSubExpr(), implicitSelfCapture,
                                 inheritActorContext,
-                                isPassedToSendingParameter);
+                                isPassedToSendingParameter,
+                                requiresDynamicIsolationChecking);
   }
 }
 
@@ -6084,14 +6094,40 @@ ArgumentList *ExprRewriter::coerceCallArguments(
         return placeholder;
       };
 
-  auto applyFlagsToArgument = [&paramInfo](unsigned paramIdx, Expr *argument) {
+  bool closuresRequireDynamicIsolationChecking = [&]() {
+    auto *decl = callee.getDecl();
+    // If this is something like `{ @MainActor in ... }()`, let's consider
+    // callee as concurrency checked.
+    if (!decl)
+      return false;
+
+    if (auto declaredIn = decl->findImport(dc))
+      return !declaredIn->module.importedModule->isConcurrencyChecked();
+
+    // Both the caller and the allee are in the same module.
+    if (dc->getParentModule() == decl->getModuleContext()) {
+      return !dc->getASTContext().isSwiftVersionAtLeast(6);
+    }
+
+    // If we cannot figure out where the callee came from, let's conservatively
+    // assume that closure arguments require dynamic isolation checks.
+    return true;
+  }();
+
+  auto applyFlagsToArgument = [&paramInfo,
+                               &closuresRequireDynamicIsolationChecking](
+                                  unsigned paramIdx, Expr *argument) {
+    if (!isClosureLiteralExpr(argument))
+      return;
+
     bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
     bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
     bool isPassedToSendingParameter = paramInfo.isSendingParameter(paramIdx);
 
     applyContextualClosureFlags(argument, isImplicitSelfCapture,
                                 inheritsActorContext,
-                                isPassedToSendingParameter);
+                                isPassedToSendingParameter,
+                                closuresRequireDynamicIsolationChecking);
   };
 
   // Quickly test if any further fix-ups for the argument types are necessary.
@@ -6361,11 +6397,6 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     newArgs.push_back(arg);
   }
   return ArgumentList::createTypeChecked(ctx, args, newArgs);
-}
-
-static bool isClosureLiteralExpr(Expr *expr) {
-  expr = expr->getSemanticsProvidingExpr();
-  return (isa<CaptureListExpr>(expr) || isa<ClosureExpr>(expr));
 }
 
 /// Whether the given expression is a closure that should inherit
