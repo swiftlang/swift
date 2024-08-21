@@ -69,3 +69,11 @@ extension NotOnOSXApplicationExtension {
     osx_extension() // OK
   }
 }
+
+@available(OSXApplicationExtension, introduced: 12)
+func osx_introduced_in_macOS_extesnions_12() {}
+
+func call_osx_introduced_in_macOS_extesnions_12() { // expected-note {{add @available attribute to enclosing global function}} {{1-1=@available(macOSApplicationExtension 12, *)\n}}
+  osx_introduced_in_macOS_extesnions_12() // expected-error {{'osx_introduced_in_macOS_extesnions_12()' is only available in application extensions for macOS 12 or newer}}
+  // expected-note@-1 {{add 'if #available' version check}} {{3-42=if #available(macOS 12, *) {\n      osx_introduced_in_macOS_extesnions_12()\n  \} else {\n      // Fallback on earlier versions\n  \}}}
+}
