@@ -91,6 +91,10 @@ bool inheritsAvailabilityFromPlatform(PlatformKind Child, PlatformKind Parent);
 llvm::VersionTuple canonicalizePlatformVersion(
     PlatformKind platform, const llvm::VersionTuple &version);
 
+/// Returns true if \p Platform should be considered to be SPI and therefore not
+/// printed in public `.swiftinterface` files, for example.
+bool isPlatformSPI(PlatformKind Platform);
+
 } // end namespace swift
 
 #endif
