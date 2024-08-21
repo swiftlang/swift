@@ -246,6 +246,11 @@ public:
   /// they have a type variable originator.
   bool isSolverAllocated() const { return Bits & SolverAllocated; }
 
+  /// Determine whether the type involves a primary, pack or local archetype.
+  bool hasArchetype() const {
+    return hasPrimaryArchetype() || hasLocalArchetype();
+  }
+
   /// Does a type with these properties structurally contain a local
   /// archetype?
   bool hasLocalArchetype() const {
@@ -720,10 +725,8 @@ public:
   }
 
   /// Determine whether the type involves a primary, pack or local archetype.
-  ///
-  /// FIXME: Replace all remaining callers with a more precise check.
   bool hasArchetype() const {
-    return hasPrimaryArchetype() || hasLocalArchetype();
+    return getRecursiveProperties().hasArchetype();
   }
   
   /// Determine whether the type involves an opened existential archetype.
@@ -779,10 +782,6 @@ public:
 
   /// Determine whether the type is an opened existential type with Error inside
   bool isOpenedExistentialWithError();
-
-  /// Retrieve the set of root opened archetypes that occur within this type.
-  void getRootOpenedExistentials(
-      SmallVectorImpl<OpenedArchetypeType *> &rootOpenedArchetypes) const;
 
   /// Retrieve the set of type parameter packs that occur within this type.
   void getTypeParameterPacks(SmallVectorImpl<Type> &rootParameterPacks);

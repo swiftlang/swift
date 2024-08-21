@@ -85,10 +85,12 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
 
     SubstitutionMap Subs = AI.getSubstitutionMap();
 
-    // Bail if any generic type parameters are unbound.
+    // Bail if the replacement types depend on the callee's generic
+    // environment.
+    //
     // TODO: Remove this limitation once public partial specializations
     // are supported and can be provided by other modules.
-    if (Subs.hasArchetypes())
+    if (Subs.getRecursiveProperties().hasArchetype())
       continue;
 
     ReabstractionInfo ReInfo(M.getSwiftModule(), M.isWholeModule(), AI,

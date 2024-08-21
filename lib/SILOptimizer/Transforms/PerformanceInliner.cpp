@@ -858,7 +858,7 @@ static std::optional<bool> shouldInlineGeneric(FullApplySite AI,
   // If all substitutions are concrete, then there is no need to perform the
   // generic inlining. Let the generic specializer create a specialized
   // function and then decide if it is beneficial to inline it.
-  if (!AI.getSubstitutionMap().hasArchetypes())
+  if (!AI.getSubstitutionMap().getRecursiveProperties().hasArchetype())
     return false;
 
   if (Callee->getLoweredFunctionType()->getCoroutineKind() !=

@@ -4215,11 +4215,12 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     // Map the substitutions out of context.
     if (!subs.empty()) {
       externalSubs = subs;
-      // If any of the substitutions involve local archetypes, then the
+      // If any of the substitutions involve primary archetypes, then the
       // key path pattern needs to capture the generic context, and we need
       // to map the pattern substitutions out of this context.
-      if (externalSubs.hasArchetypes()) {
+      if (externalSubs.getRecursiveProperties().hasArchetype()) {
         needsGenericContext = true;
+        // FIXME: This doesn't do anything for local archetypes!
         externalSubs = externalSubs.mapReplacementTypesOutOfContext();
       }
     }

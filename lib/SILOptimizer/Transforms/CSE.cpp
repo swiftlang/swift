@@ -849,7 +849,9 @@ static void updateBasicBlockArgTypes(SILBasicBlock *BB,
                                            return NewOpenedArchetype;
                                          return type;
                                        },
-                                       MakeAbstractConformanceForGenericType());
+                                       MakeAbstractConformanceForGenericType(),
+                                       CanGenericSignature(),
+                                       SubstFlags::SubstituteLocalArchetypes);
     if (NewArgType == Arg->getType())
       continue;
     // Replace the type of this BB argument. The type of a BBArg

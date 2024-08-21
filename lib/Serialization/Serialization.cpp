@@ -1800,9 +1800,9 @@ void Serializer::writeLocalNormalProtocolConformance(
       // Map archetypes to type parameters, since we always substitute them
       // away. Note that in a merge-modules pass, we're serializing conformances
       // that we deserialized, so they will already have their replacement types
-      // in terms of interface types; hence the hasArchetypes() check is
+      // in terms of interface types; hence the hasPrimaryArchetype() check is
       // necessary for correctness, not just as a fast path.
-      if (subs.hasArchetypes())
+      if (subs.getRecursiveProperties().hasPrimaryArchetype())
         subs = subs.mapReplacementTypesOutOfContext();
 
       data.push_back(addSubstitutionMapRef(subs));
