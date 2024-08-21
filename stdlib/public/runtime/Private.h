@@ -523,7 +523,7 @@ public:
   /// \p substWitnessTable Function that provides witness tables given a
   /// particular dependent conformance index.
   SWIFT_RUNTIME_LIBRARY_VISIBILITY
-  TypeLookupErrorOr<size_t> getTypeValueByMangledName(
+  TypeLookupErrorOr<intptr_t> getTypeValueByMangledName(
                                StringRef typeName,
                                const void * const *arguments,
                                SubstGenericParameterFn substGenericParam,

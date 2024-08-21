@@ -2443,7 +2443,12 @@ public:
   }
 
   TypeLookupErrorOr<BuiltType> createIntegerType(intptr_t value) {
-    return BuiltType(value);
+    // Note: We explicitly ignore the value check here because when the
+    // integer happens to be '0', we'll compare a MetadataPackOrValue against
+    // 'nullptr' which this is. We know this is still a good value for
+    // integers.
+    return TypeLookupErrorOr<BuiltType>(BuiltType(value),
+                                        /*ignoreValueCheck*/ true);
   }
 
   TypeLookupErrorOr<BuiltType> createNegativeIntegerType(intptr_t value) {
@@ -2785,7 +2790,7 @@ swift::getTypePackByMangledName(StringRef typeName,
   return type.getType().getMetadataPack();
 }
 
-TypeLookupErrorOr<size_t>
+TypeLookupErrorOr<intptr_t>
 swift::getTypeValueByMangledName(StringRef typeName,
                                 const void *const *origArgumentVector,
                                 SubstGenericParameterFn substGenericParam,
@@ -2800,15 +2805,14 @@ swift::getTypeValueByMangledName(StringRef typeName,
                                  substWitnessTable);
   auto type = Demangle::decodeMangledType(builder, node);
 
-  if (type.isError()) {
+  if (type.isError())
     return *type.getError();
-  }
 
-  if (!type.getType()) {
-    return TypeLookupError("NULL type but no error provided");
-  }
-
-  return type.getType().getValue();
+  // Note: We explicitly ignore the value check here because when the
+  // integer happens to be '0', we'll do '!value' which in this case converts
+  // the integer to a boolean, but '0' is a valid value.
+  return TypeLookupErrorOr<intptr_t>(type.getType().getValue(),
+                                     /*ignoreValueCheck*/ true);
 }
 
 // ==== Function metadata functions ----------------------------------------------

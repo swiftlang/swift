@@ -1654,8 +1654,51 @@ checkGenericValueRequirement(const GenericRequirementDescriptor &req,
                              SubstGenericParameterFn substGenericParam,
                              SubstDependentWitnessTableFn substWitnessTable,
                      llvm::SmallVectorImpl<InvertibleProtocolSet> &suppressed) {
-  // FIXME: implement
-  return std::nullopt;
+  assert(req.getFlags().isValueRequirement());
+
+  // Make sure we understand the requirement we're dealing with.
+  if (!req.hasKnownKind())
+    return TypeLookupError("unknown kind");
+
+  // Resolve the subject generic value.
+  auto result = swift::getTypeValueByMangledName(
+      req.getParam(), extraArguments.data(),
+      substGenericParam, substWitnessTable);
+
+  if (result.getError())
+    return *result.getError();
+
+  auto subjectValue = result.getType();
+
+  // Check the requirement.
+  switch (req.getKind()) {
+  case GenericRequirementKind::SameType: {
+    // Resolve the constraint generic value.
+    auto result = swift::getTypeValueByMangledName(
+        req.getMangledTypeName(), extraArguments.data(),
+        substGenericParam, substWitnessTable);
+
+    if (result.getError())
+      return *result.getError();
+
+    auto constraintValue = result.getType();
+
+    if (subjectValue != constraintValue) {
+      return TYPE_LOOKUP_ERROR_FMT(
+            "subject value %" PRIiPTR " does not match constraint value %" PRIiPTR,
+            subjectValue,
+            constraintValue);
+    }
+
+    return std::nullopt;
+  }
+
+  default: {
+    // Value requirements can only be same type'd at the moment.
+    return TYPE_LOOKUP_ERROR_FMT("unknown value generic requirement kind %u",
+                                 (unsigned)req.getKind());
+  }
+  }
 }
 
 static std::optional<TypeLookupError>
