@@ -543,15 +543,8 @@ TypeSubstituter::transform(TypeBase *type, TypePosition position) {
     return known;
   }
 
-  if (substOrig->isRoot()) {
-    // Root opened archetypes are not required to be substituted. Other root
-    // archetypes must already have been substituted above.
-    if (isa<LocalArchetypeType>(substOrig)) {
-      return Type(type);
-    } else {
-      return ErrorType::get(type);
-    }
-  }
+  if (substOrig->isRoot())
+    return ErrorType::get(type);
 
   // For nested archetypes, we can substitute the parent.
   Type origParent = substOrig->getParent();

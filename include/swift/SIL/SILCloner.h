@@ -33,13 +33,21 @@ namespace swift {
 struct SubstitutionMapWithLocalArchetypes {
   std::optional<SubstitutionMap> SubsMap;
   TypeSubstitutionMap LocalArchetypeSubs;
+  bool IncorrectBehaviorForCSE = false;
 
   SubstitutionMapWithLocalArchetypes() {}
   SubstitutionMapWithLocalArchetypes(SubstitutionMap subs) : SubsMap(subs) {}
 
   Type operator()(SubstitutableType *type) {
-    if (isa<LocalArchetypeType>(type))
-      return QueryTypeSubstitutionMap{LocalArchetypeSubs}(type);
+    if (auto *local = dyn_cast<LocalArchetypeType>(type)) {
+      auto found = LocalArchetypeSubs.find(local);
+      if (found == LocalArchetypeSubs.end()) {
+        if (local->isRoot() && IncorrectBehaviorForCSE)
+          return type;
+        return Type();
+      }
+      return found->second;
+    }
 
     if (SubsMap)
       return Type(type).subst(*SubsMap);

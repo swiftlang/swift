@@ -594,7 +594,9 @@ class InstructionCloner : public SILCloner<InstructionCloner> {
   SILInstruction *Result = nullptr;
 
 public:
-  InstructionCloner(SILFunction *F) : SILCloner(*F) {}
+  InstructionCloner(SILFunction *F) : SILCloner(*F) {
+    Functor.IncorrectBehaviorForCSE = true;
+  }
 
   static SILInstruction *doIt(SILInstruction *I) {
     InstructionCloner TC(I->getFunction());
