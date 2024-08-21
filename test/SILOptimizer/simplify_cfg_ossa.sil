@@ -1887,3 +1887,35 @@ bb6(%21 : $Optional<Int>):
   return %22 : $()
 }
 
+
+// CHECK-LABEL: sil [ossa] @simplify_switch_enum3 :
+// CHECK-NOT:     switch_enum
+// CHECK:         destroy_value %{{[0-9]+}} : $Optional<String>
+// CHECK:       } // end sil function 'simplify_switch_enum3'
+sil [ossa] @simplify_switch_enum3 : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  %1 = enum $Optional<String>, #Optional.none!enumelt
+  br bb3(%1 : $Optional<String>)
+
+bb2:
+  %4 = enum $Optional<String>, #Optional.none!enumelt
+  br bb3(%4 : $Optional<String>)
+
+bb3(%10 : @owned $Optional<String>):
+  debug_value %10 : $Optional<String>
+  switch_enum %10 : $Optional<String>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb4
+
+bb4:
+  br bb6
+
+bb5(%14 : @owned $String):
+  destroy_value %14 : $String
+  br bb6
+
+bb6:
+  %17 = tuple ()
+  return %17 : $()
+}

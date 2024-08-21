@@ -3556,29 +3556,20 @@ OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(
   assert(!interfaceType->isParameterPack());
 }
 
-CanType OpaqueTypeArchetypeType::getCanonicalInterfaceType(Type interfaceType) {
-  auto sig = Environment->getOpaqueTypeDecl()
-      ->getOpaqueInterfaceGenericSignature();
-  CanType canonicalType = interfaceType->getReducedType(sig);
-  return Environment->maybeApplyOuterContextSubstitutions(canonicalType)
-      ->getCanonicalType();
-}
-
 OpaqueTypeDecl *OpaqueTypeArchetypeType::getDecl() const {
   return Environment->getOpaqueTypeDecl();
 }
 
 SubstitutionMap OpaqueTypeArchetypeType::getSubstitutions() const {
-  return Environment->getOpaqueSubstitutions();
+  return Environment->getOuterSubstitutions();
 }
 
 OpenedArchetypeType::OpenedArchetypeType(
     GenericEnvironment *environment, Type interfaceType,
     ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
-    LayoutConstraint layout)
+    LayoutConstraint layout, RecursiveTypeProperties properties)
   : LocalArchetypeType(TypeKind::OpenedArchetype,
-                       interfaceType->getASTContext(),
-                       RecursiveTypeProperties::HasOpenedExistential,
+                       interfaceType->getASTContext(), properties,
                        interfaceType, conformsTo, superclass, layout,
                        environment)
 {
@@ -4422,23 +4413,6 @@ SILBoxType::SILBoxType(ASTContext &C,
              getBoxRecursiveProperties(Layout, Substitutions)),
     Layout(Layout), Substitutions(Substitutions) {
   assert(Substitutions.isCanonical());
-}
-
-Type TypeBase::openAnyExistentialType(OpenedArchetypeType *&opened,
-                                      GenericSignature parentSig) {
-  assert(isAnyExistentialType());
-  if (auto metaty = getAs<ExistentialMetatypeType>()) {
-    opened = OpenedArchetypeType::get(
-        metaty->getExistentialInstanceType()->getCanonicalType(),
-        parentSig.getCanonicalSignature());
-    if (metaty->hasRepresentation())
-      return MetatypeType::get(opened, metaty->getRepresentation());
-    else
-      return MetatypeType::get(opened);
-  }
-  opened = OpenedArchetypeType::get(getCanonicalType(),
-                                    parentSig.getCanonicalSignature());
-  return opened;
 }
 
 AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {

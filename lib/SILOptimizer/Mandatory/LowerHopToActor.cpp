@@ -244,8 +244,7 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
 
     // Open an existential actor type.
     if (actorType->isExistentialType()) {
-      actorType = OpenedArchetypeType::get(
-          actorType, F->getGenericSignature())->getCanonicalType();
+      actorType = OpenedArchetypeType::get(actorType)->getCanonicalType();
       SILType loweredActorType = F->getLoweredType(actorType);
       actor = B.createOpenExistentialRef(loc, actor, loweredActorType);
     }

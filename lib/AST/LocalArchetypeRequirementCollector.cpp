@@ -157,27 +157,17 @@ GenericSignature swift::buildGenericSignatureWithCapturedEnvironments(
                                /*allowInverses=*/false);
 }
 
-Type MapLocalArchetypesOutOfContext::operator()(SubstitutableType *type) const {
-  auto *archetypeTy = cast<ArchetypeType>(type);
+Type MapLocalArchetypesOutOfContext::getInterfaceType(
+    Type interfaceTy, GenericEnvironment *genericEnv) const {
 
-  // Primary archetypes just map out of context.
-  if (isa<PrimaryArchetypeType>(archetypeTy) ||
-      isa<PackArchetypeType>(archetypeTy)) {
-    return archetypeTy->getInterfaceType();
+  if (auto *dmt = interfaceTy->getAs<DependentMemberType>()) {
+    auto newBase = getInterfaceType(dmt->getBase(), genericEnv);
+    return DependentMemberType::get(newBase, dmt->getAssocType());
   }
 
-  assert(isa<LocalArchetypeType>(archetypeTy));
-
-  // Handle dependent member types recursively in the usual way.
-  if (!archetypeTy->isRoot())
-    return Type();
-
-  // Root local archetypes change depth.
-  auto *genericEnv = archetypeTy->getGenericEnvironment();
-  auto rootParam = archetypeTy->getInterfaceType()
-      ->castTo<GenericTypeParamType>();
-  assert(!rootParam->isParameterPack());
-  assert(rootParam->getDepth() == genericEnv->getGenericSignature()->getMaxDepth());
+  auto rootParam = interfaceTy->castTo<GenericTypeParamType>();
+  ASSERT(!rootParam->isParameterPack());
+  ASSERT(rootParam->getDepth() == genericEnv->getGenericSignature()->getMaxDepth());
 
   // The new depth is determined by counting how many captured environments
   // precede this one.
@@ -192,7 +182,25 @@ Type MapLocalArchetypesOutOfContext::operator()(SubstitutableType *type) const {
     ++depth;
   }
 
-  llvm_unreachable("Fell off the end");
+  llvm::errs() << "Fell off the end:\n";
+  interfaceTy->dump(llvm::errs());
+  abort();
+}
+
+Type MapLocalArchetypesOutOfContext::operator()(SubstitutableType *type) const {
+  auto *archetypeTy = cast<ArchetypeType>(type);
+
+  // Primary archetypes just map out of context.
+  if (isa<PrimaryArchetypeType>(archetypeTy) ||
+      isa<PackArchetypeType>(archetypeTy)) {
+    return archetypeTy->getInterfaceType();
+  }
+
+  ASSERT(isa<LocalArchetypeType>(archetypeTy));
+
+  // Root local archetypes change depth.
+  auto *genericEnv = archetypeTy->getGenericEnvironment();
+  return getInterfaceType(archetypeTy->getInterfaceType(), genericEnv);
 }
 
 static Type mapIntoLocalContext(GenericTypeParamType *param, unsigned baseDepth,

@@ -337,11 +337,10 @@ public:
   void remapRootOpenedType(CanOpenedArchetypeType archetypeTy) {
     assert(archetypeTy->isRoot());
 
-    auto sig = Builder.getFunction().getGenericSignature();
     auto origExistentialTy = archetypeTy->getExistentialType()
         ->getCanonicalType();
     auto substExistentialTy = getOpASTType(origExistentialTy);
-    auto replacementTy = OpenedArchetypeType::get(substExistentialTy, sig);
+    auto replacementTy = OpenedArchetypeType::get(substExistentialTy);
     registerLocalArchetypeRemapping(archetypeTy, replacementTy);
   }
 
@@ -2871,7 +2870,7 @@ void SILCloner<ImplClass>::visitOpenPackElementInst(
 
   // Substitute the contextual substitutions.
   auto newContextSubs =
-    getOpSubstitutionMap(origEnv->getPackElementContextSubstitutions());
+    getOpSubstitutionMap(origEnv->getOuterSubstitutions());
 
   // The opened shape class is a parameter of the original signature,
   // which is unchanged.

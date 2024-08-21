@@ -1638,19 +1638,19 @@ Expected<GenericEnvironment *> ModuleFile::getGenericEnvironmentChecked(
     fatal(llvm::make_error<InvalidRecordKindError>(recordID));
 
   unsigned kind;
-  GenericSignatureID parentSigID;
+  GenericSignatureID genericSigID;
   TypeID existentialOrShapeID;
   SubstitutionMapID subsID;
   GenericEnvironmentLayout::readRecord(scratch, kind, existentialOrShapeID,
-                                       parentSigID, subsID);
+                                       genericSigID, subsID);
 
   auto existentialOrShapeTypeOrError = getTypeChecked(existentialOrShapeID);
   if (!existentialOrShapeTypeOrError)
     return existentialOrShapeTypeOrError.takeError();
 
-  auto parentSigOrError = getGenericSignatureChecked(parentSigID);
-  if (!parentSigOrError)
-    return parentSigOrError.takeError();
+  auto genericSigOrError = getGenericSignatureChecked(genericSigID);
+  if (!genericSigOrError)
+    return genericSigOrError.takeError();
 
   auto contextSubsOrError = getSubstitutionMapChecked(subsID);
   if (!contextSubsOrError)
@@ -1660,12 +1660,12 @@ Expected<GenericEnvironment *> ModuleFile::getGenericEnvironmentChecked(
   switch (GenericEnvironmentKind(kind)) {
   case GenericEnvironmentKind::OpenedExistential:
     genericEnv = GenericEnvironment::forOpenedExistential(
-        existentialOrShapeTypeOrError.get(), parentSigOrError.get(), UUID::fromTime());
+        existentialOrShapeTypeOrError.get(), contextSubsOrError.get(), UUID::fromTime());
     break;
 
   case GenericEnvironmentKind::OpenedElement:
     genericEnv = GenericEnvironment::forOpenedElement(
-        parentSigOrError.get(), UUID::fromTime(),
+        genericSigOrError.get(), UUID::fromTime(),
         cast<GenericTypeParamType>(
           existentialOrShapeTypeOrError.get()->getCanonicalType()),
         contextSubsOrError.get());
