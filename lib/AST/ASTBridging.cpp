@@ -195,6 +195,10 @@ namespace {
   }
 }
 
+void deallocateIntBuffer(SwiftInt * _Nullable cComponents) {
+  free(cComponents);
+}
+
 SwiftInt BridgedASTContext_langOptsGetLanguageVersion(BridgedASTContext cContext,
                                                       SwiftInt** cComponents) {
   auto theVersion = cContext.unbridged().LangOpts.EffectiveLanguageVersion;

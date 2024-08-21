@@ -123,7 +123,7 @@ final class CompilerBuildConfiguration: BuildConfiguration {
     var bitWidthsBuf: UnsafeMutablePointer<SwiftInt>? = nil
     let count = ctx.langOptsGetTargetAtomicBitWidths(&bitWidthsBuf)
     let bitWidths = Array(UnsafeMutableBufferPointer(start: bitWidthsBuf, count: count))
-    bitWidthsBuf?.deallocate()
+    deallocateIntBuffer(bitWidthsBuf);
     return bitWidths
   }
 
@@ -140,7 +140,7 @@ final class CompilerBuildConfiguration: BuildConfiguration {
     let version = VersionTuple(
       components: Array(UnsafeMutableBufferPointer(start: componentsBuf, count: count))
     )
-    componentsBuf?.deallocate()
+    deallocateIntBuffer(componentsBuf);
     return version
   }
 
@@ -150,7 +150,7 @@ final class CompilerBuildConfiguration: BuildConfiguration {
     let version = VersionTuple(
       components: Array(UnsafeMutableBufferPointer(start: componentsBuf, count: count))
     )
-    componentsBuf?.deallocate()
+    deallocateIntBuffer(componentsBuf);
     return version
   }
 }
