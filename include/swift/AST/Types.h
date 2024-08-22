@@ -6817,29 +6817,6 @@ public:
   static CanTypeWrapper<OpenedArchetypeType>
   get(CanType existential, std::optional<UUID> knownID = std::nullopt);
 
-  /// Get or create an archetype that represents the opened type
-  /// of an existential value.
-  ///
-  /// \param existential The existential type to open.
-  /// \param interfaceType The interface type represented by this archetype.
-  ///
-  /// \param knownID When non-empty, the known ID of the archetype. When empty,
-  /// a fresh archetype with a unique ID will be opened.
-  static CanTypeWrapper<OpenedArchetypeType>
-  get(CanType existential, Type interfaceType,
-      std::optional<UUID> knownID = std::nullopt);
-
-  /// Create a new archetype that represents the opened type
-  /// of an existential value.
-  ///
-  /// Use this function when you are unsure of whether the
-  /// \c existential type is a metatype or an instance type. This function
-  /// will unwrap any existential metatype containers.
-  ///
-  /// \param existential The existential type or existential metatype to open.
-  /// \param interfaceType The interface type represented by this archetype.
-  static Type getAny(Type existential, Type interfaceType);
-
   /// Create a new archetype that represents the opened type
   /// of an existential value.
   ///
