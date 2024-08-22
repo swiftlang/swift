@@ -51,6 +51,10 @@ WARNING(error_in_future_swift_version,none,
         "%0; this is an error in the Swift %1 language mode",
         (DiagnosticInfo *, unsigned))
 
+WARNING(error_in_a_future_swift_version,none,
+        "%0; this will be an error in a future Swift language mode",
+        (DiagnosticInfo *))
+
 // Generic disambiguation
 NOTE(while_parsing_as_left_angle_bracket,none,
      "while parsing this '<' as a type parameter bracket", ())

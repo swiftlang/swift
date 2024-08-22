@@ -990,10 +990,10 @@ bool diagnoseConformanceExportability(SourceLoc loc,
 /// is sufficient to safely conform to the requirement in the context
 /// the provided conformance. On return, requiredAvailability holds th
 /// availability levels required for conformance.
-bool
-isAvailabilitySafeForConformance(ProtocolDecl *proto, ValueDecl *requirement,
-                                 ValueDecl *witness, DeclContext *dc,
-                                 AvailabilityContext &requiredAvailability);
+bool isAvailabilitySafeForConformance(
+    const ProtocolDecl *proto, const ValueDecl *requirement,
+    const ValueDecl *witness, const DeclContext *dc,
+    AvailabilityContext &requiredAvailability);
 
 /// Returns an over-approximation of the range of operating system versions
 /// that could the passed-in location could be executing upon for
