@@ -1853,19 +1853,21 @@ maybeNoteMutatingMethodSuggestion(ASTContext &C,
   }
 
   if (auto actor = isolation.getActor()) {
-      // TODO: isolation is printing without the type name for instance actors,
-      //  it'd be nicer to print with type name and avoid this switch
-      if (isolation.getKind() == swift::ActorIsolation::ActorInstance) {
-        C.Diags.diagnose(
-            memberLoc,
-            diag::note_consider_method_for_isolated_property_mutation,
-            actor, isolation);
-      } else if (isolation.getKind() == swift::ActorIsolation::GlobalActor) {
-        C.Diags.diagnose(
-            memberLoc,
-            diag::note_consider_method_for_global_actor_isolated_property_mutation,
-            isolation);
-      }
+      NominalTypeDecl *actorTy =
+        actor;
+//          (isolation.getKind() == swift::ActorIsolation::ActorInstance ?
+//)
+
+      C.Diags.diagnose(
+          memberLoc,
+          diag::note_consider_method_for_isolated_property_mutation,
+          actor);
+//      } else if (isolation.getKind() == swift::ActorIsolation::GlobalActor) {
+//        C.Diags.diagnose(
+//            memberLoc,
+//            diag::note_consider_method_for_global_actor_isolated_property_mutation,
+//            isolation.getGlobalActor());
+//      }
   }
 }
 

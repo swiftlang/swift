@@ -233,7 +233,7 @@ func anotherAsyncFunc() async {
   _ = b.balance // expected-error {{actor-isolated instance method 'balance()' can not be partially applied}}
 
   // expected-error@+2{{actor-isolated property 'owner' can not be mutated from a nonisolated context}}
-  // expected-note@+1{{consider declaring an 'BankAccount' actor-isolated method to perform the mutation}}
+  // expected-note@+1{{consider declaring an isolated method on 'BankAccount' to perform the mutation}}
   a.owner = "cat"
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}} {{7-7=await }} expected-note@+1{{property access is 'async'}}
   _ = b.owner
@@ -282,7 +282,7 @@ func blender(_ peeler : () -> Void) {
   money -= 1200
 
   // expected-error@+2{{global actor 'BananaActor'-isolated var 'dollarsInBananaStand' can not be mutated from global actor 'OrangeActor'}}
-  // expected-note@+1{{consider declaring an global actor 'BananaActor'-isolated method to perform the mutation}}
+  // expected-note@+1{{consider declaring an isolated method on 'BananaActor' to perform the mutation}}
   dollarsInBananaStand = money
 
   // FIXME: these two errors seem a bit redundant.

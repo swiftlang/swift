@@ -25,7 +25,7 @@ func nonIsolatedAsync() async {
     // expected-warning@-1:5 {{main actor-isolated var 'a' can not be mutated from a nonisolated context}}
     // expected-warning@-2:9 {{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
     // expected-note@-3:9 {{property access is 'async'}}
-    // expected-note@-4 {{consider declaring an main actor-isolated method to perform the mutation}}
+    // expected-note@-4 {{consider declaring an isolated method on 'MainActor' to perform the mutation}}
 }
 
 @MainActor
