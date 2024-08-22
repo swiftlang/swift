@@ -45,7 +45,7 @@ struct FunctionUses {
     var hasUnknownUses: Bool
 
     init(of function: Function) {
-      self.hasUnknownUses = function.isPossiblyUsedExternally || function.isAvailableExternally
+      self.hasUnknownUses = function.isPossiblyUsedExternally || function.isDefinedExternally
     }
 
     mutating func insert(_ inst: Instruction, _ uses: inout [Use]) {

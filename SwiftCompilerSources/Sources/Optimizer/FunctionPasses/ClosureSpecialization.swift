@@ -119,7 +119,7 @@ let generalClosureSpecialization = FunctionPass(name: "experimental-swift-based-
 let autodiffClosureSpecialization = FunctionPass(name: "autodiff-closure-specialization") {
   (function: Function, context: FunctionPassContext) in
 
-  guard !function.isAvailableExternally,
+  guard !function.isDefinedExternally,
         function.isAutodiffVJP,
         function.blocks.singleElement != nil else {
     return
@@ -502,7 +502,7 @@ private func handleApplies(for rootClosure: SingleValueInstruction, callSiteMap:
       continue
     }
 
-    if callee.isAvailableExternally {
+    if callee.isDefinedExternally {
       continue
     }
 
