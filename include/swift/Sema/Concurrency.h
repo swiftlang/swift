@@ -29,7 +29,7 @@ class SourceFile;
 class NominalTypeDecl;
 class VarDecl;
 
-enum class DiagnosticBehavior: uint8_t;
+struct DiagnosticBehavior;
 
 /// If any of the imports in this source file was @preconcurrency but there were
 /// no diagnostics downgraded or suppressed due to that @preconcurrency, suggest

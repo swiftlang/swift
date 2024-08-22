@@ -122,16 +122,12 @@ getDiagnosticBehaviorLimitForCapturedValue(CapturedValue value) {
 static std::optional<DiagnosticBehavior>
 getDiagnosticBehaviorLimitForCapturedValues(
     ArrayRef<CapturedValue> capturedValues) {
-  using UnderlyingType = std::underlying_type<DiagnosticBehavior>::type;
-
   std::optional<DiagnosticBehavior> diagnosticBehavior;
   for (auto value : capturedValues) {
-    auto lhs = UnderlyingType(
-        diagnosticBehavior.value_or(DiagnosticBehavior::Unspecified));
-    auto rhs = UnderlyingType(
-        getDiagnosticBehaviorLimitForCapturedValue(value).value_or(
-            DiagnosticBehavior::Unspecified));
-    auto result = DiagnosticBehavior(std::max(lhs, rhs));
+    auto lhs = diagnosticBehavior.value_or(DiagnosticBehavior::Unspecified);
+    auto rhs = getDiagnosticBehaviorLimitForCapturedValue(value).value_or(
+        DiagnosticBehavior::Unspecified);
+    auto result = lhs.merge(rhs);
     if (result != DiagnosticBehavior::Unspecified)
       diagnosticBehavior = result;
   }
