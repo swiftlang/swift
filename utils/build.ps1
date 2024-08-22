@@ -2293,7 +2293,7 @@ function Build-TestingMacros() {
 
   $SwiftSDK = $null
   if ($Build) {
-    $SwiftSDK = $HostArch.SDKInstallRoot
+    $SwiftSDK = $BuildArch.SDKInstallRoot
   }
 
   $Targets = if ($Build) {
@@ -2307,6 +2307,12 @@ function Build-TestingMacros() {
     $InstallDir = "$($Arch.ToolchainInstallRoot)\usr"
   }
 
+  $SwiftSyntaxCMakeModules = if ($Build -and $HostArch -ne $BuildArch) {
+    Get-BuildProjectCMakeModules Compilers
+  } else {
+    Get-HostProjectCMakeModules Compilers
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\swift-testing\Sources\TestingMacros `
     -Bin $TestingMacrosBinaryCache `
@@ -2317,7 +2323,7 @@ function Build-TestingMacros() {
     -SwiftSDK:$SwiftSDK `
     -BuildTargets $Targets `
     -Defines @{
-      SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
+      SwiftSyntax_DIR = $SwiftSyntaxCMakeModules;
     }
 }
 
