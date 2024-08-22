@@ -6675,6 +6675,8 @@ namespace {
   public:
     using EnumTypeInfoBase<Base>::Strategy;
 
+    /// \group Methods delegated to the EnumImplStrategy
+
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
       return Strategy.getFixedExtraInhabitantCount(IGM);
     }

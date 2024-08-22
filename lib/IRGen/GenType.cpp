@@ -3044,7 +3044,7 @@ bool irgen::tryEmitDestroyUsingDeinit(IRGenFunction &IGF, Address address,
 IsABIAccessible_t irgen::isTypeABIAccessibleIfFixedSize(IRGenModule &IGM,
                                                         CanType ty) {
 
-  // Copyable types currently are always fixed size.
+  // Copyable types currently are always ABI-accessible if they're fixed size.
   if (!ty->isNoncopyable())
     return IsABIAccessible;
 
@@ -3054,7 +3054,9 @@ IsABIAccessible_t irgen::isTypeABIAccessibleIfFixedSize(IRGenModule &IGM,
   if (!nom || !nom->getValueTypeDestructor())
     return IsABIAccessible;
 
-  if (IGM.getSILModule().isTypeMetadataAccessible(ty))
+  if (IGM.getSILModule().isTypeMetadataAccessible(ty) ||
+      IGM.getSILModule().lookUpMoveOnlyDeinit(nom,
+                                              false /*deserialize lazily*/))
     return IsABIAccessible;
 
   return IsNotABIAccessible;
