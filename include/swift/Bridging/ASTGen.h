@@ -48,7 +48,6 @@ int swift_ASTGen_roundTripCheck(void *_Nonnull sourceFile);
 /// Emit parser diagnostics for given source file.. Returns non-zero if any
 /// diagnostics were emitted.
 int swift_ASTGen_emitParserDiagnostics(
-    BridgedASTContext astContext,
     void *_Nonnull diagEngine, void *_Nonnull sourceFile, int emitOnlyErrors,
     int downgradePlaceholderErrorsToWarnings);
 
