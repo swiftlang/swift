@@ -180,6 +180,7 @@ swift_reflection_createReflectionContext(void *ReaderContext,
   auto *DataLayout = PointerSize == 4 ? minimalDataLayoutQueryFunction<4>
                                       : minimalDataLayoutQueryFunction<8>;
   MemoryReaderImpl ReaderImpl {
+    PointerSize,
     ReaderContext,
     DataLayout,
     Free,
@@ -198,7 +199,9 @@ swift_reflection_createReflectionContextWithDataLayout(void *ReaderContext,
                                     ReadBytesFunction ReadBytes,
                                     GetStringLengthFunction GetStringLength,
                                     GetSymbolAddressFunction GetSymbolAddress) {
+  uint8_t PointerSize = sizeof(uintptr_t);
   MemoryReaderImpl ReaderImpl {
+    PointerSize,
     ReaderContext,
     DataLayout,
     Free,

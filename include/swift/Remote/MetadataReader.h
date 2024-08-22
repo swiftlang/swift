@@ -1818,9 +1818,6 @@ public:
       if (!bounds)
         return std::nullopt;
 
-      bounds->adjustForSubclass(type->areImmediateMembersNegative(),
-                                type->NumImmediateMembers);
-
       return bounds->ImmediateMembersOffset / sizeof(StoredPointer);
     }
 
@@ -1845,35 +1842,45 @@ public:
   std::optional<ClassMetadataBounds>
   readMetadataBoundsOfSuperclass(ContextDescriptorRef subclassRef) {
     auto subclass = cast<TargetClassDescriptor<Runtime>>(subclassRef);
-    if (!subclass->hasResilientSuperclass())
-      return ClassMetadataBounds::forSwiftRootClass();
+    std::optional<ClassMetadataBounds> bounds;
 
-    auto rawSuperclass =
-      resolveRelativeField(subclassRef, subclass->getResilientSuperclass());
-    if (!rawSuperclass) {
-      return ClassMetadataBounds::forSwiftRootClass();
+    if (!subclass->hasResilientSuperclass()) {
+      bounds = ClassMetadataBounds::forSwiftRootClass();
+    } else {
+      auto rawSuperclass =
+          resolveRelativeField(subclassRef, subclass->getResilientSuperclass());
+      if (!rawSuperclass) {
+        return std::nullopt;
+      }
+
+      bounds = forTypeReference<ClassMetadataBounds>(
+          subclass->getResilientSuperclassReferenceKind(), rawSuperclass,
+          [&](ContextDescriptorRef superclass)
+              -> std::optional<ClassMetadataBounds> {
+            if (!isa<TargetClassDescriptor<Runtime>>(superclass))
+              return std::nullopt;
+            return readMetadataBoundsOfSuperclass(superclass);
+          },
+          [&](MetadataRef metadata) -> std::optional<ClassMetadataBounds> {
+            auto cls = dyn_cast<TargetClassMetadata>(metadata);
+            if (!cls)
+              return std::nullopt;
+
+            return cls->getClassBoundsAsSwiftSuperclass();
+          },
+          [](StoredPointer objcClassName)
+              -> std::optional<ClassMetadataBounds> {
+            // We have no ability to look up an ObjC class by name.
+            // FIXME: add a query for this; clients may have a way to do it.
+            return std::nullopt;
+          });
     }
-
-    return forTypeReference<ClassMetadataBounds>(
-        subclass->getResilientSuperclassReferenceKind(), rawSuperclass,
-        [&](ContextDescriptorRef superclass)
-            -> std::optional<ClassMetadataBounds> {
-          if (!isa<TargetClassDescriptor<Runtime>>(superclass))
-            return std::nullopt;
-          return readMetadataBoundsOfSuperclass(superclass);
-        },
-        [&](MetadataRef metadata) -> std::optional<ClassMetadataBounds> {
-          auto cls = dyn_cast<TargetClassMetadata>(metadata);
-          if (!cls)
-            return std::nullopt;
-
-          return cls->getClassBoundsAsSwiftSuperclass();
-        },
-        [](StoredPointer objcClassName) -> std::optional<ClassMetadataBounds> {
-          // We have no ability to look up an ObjC class by name.
-          // FIXME: add a query for this; clients may have a way to do it.
-          return std::nullopt;
-        });
+    if (!bounds) {
+      return std::nullopt;
+    }
+    bounds->adjustForSubclass(subclass->areImmediateMembersNegative(),
+                              subclass->NumImmediateMembers);
+    return bounds;
   }
 
   template <class Result, class DescriptorFn, class MetadataFn,
@@ -1885,11 +1892,12 @@ public:
                                          const ClassNameFn &classNameFn) {
     switch (refKind) {
     case TypeReferenceKind::IndirectTypeDescriptor: {
-      StoredPointer descriptorAddress = 0;
-      if (!Reader->readInteger(RemoteAddress(ref), &descriptorAddress))
+      StoredSignedPointer descriptorAddress;
+      if (!Reader->readInteger(RemoteAddress(ref), &descriptorAddress)) {
         return std::nullopt;
+      }
 
-      ref = descriptorAddress;
+      ref = stripSignedPointer(descriptorAddress);
       LLVM_FALLTHROUGH;
     }
 
