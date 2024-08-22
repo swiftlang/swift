@@ -276,6 +276,20 @@ static_assert((int)BridgedArgumentConvention::Pack_Inout == (int)swift::SILArgum
 static_assert((int)BridgedArgumentConvention::Pack_Guaranteed == (int)swift::SILArgumentConvention::Pack_Guaranteed);
 static_assert((int)BridgedArgumentConvention::Pack_Out == (int)swift::SILArgumentConvention::Pack_Out);
 
+//===----------------------------------------------------------------------===//
+//                                Linkage
+//===----------------------------------------------------------------------===//
+
+static_assert((int)BridgedLinkage::Public == (int)swift::SILLinkage::Public);
+static_assert((int)BridgedLinkage::PublicNonABI == (int)swift::SILLinkage::PublicNonABI);
+static_assert((int)BridgedLinkage::Package == (int)swift::SILLinkage::Package);
+static_assert((int)BridgedLinkage::PackageNonABI == (int)swift::SILLinkage::PackageNonABI);
+static_assert((int)BridgedLinkage::Hidden == (int)swift::SILLinkage::Hidden);
+static_assert((int)BridgedLinkage::Shared == (int)swift::SILLinkage::Shared);
+static_assert((int)BridgedLinkage::Private == (int)swift::SILLinkage::Private);
+static_assert((int)BridgedLinkage::PublicExternal == (int)swift::SILLinkage::PublicExternal);
+static_assert((int)BridgedLinkage::PackageExternal == (int)swift::SILLinkage::PackageExternal);
+static_assert((int)BridgedLinkage::HiddenExternal == (int)swift::SILLinkage::HiddenExternal);
 
 //===----------------------------------------------------------------------===//
 //                            SILGlobalVariable

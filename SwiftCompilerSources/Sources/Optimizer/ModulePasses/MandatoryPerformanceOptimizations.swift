@@ -118,6 +118,16 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
           context.erase(instructionIncludingDebugUses: iem)
         }
 
+      case let fri as FunctionRefInst:
+        // Mandatory de-virtualization and mandatory inlining might leave referenced functions in "serialized"
+        // functions with wrong linkage. Fix this by making the referenced function public.
+        // It's not great, because it can prevent dead code elimination. But it's only a rare case.
+        if function.serializedKind != .notSerialized,
+           !fri.referencedFunction.hasValidLinkageForFragileRef(function.serializedKind)
+        {
+          fri.referencedFunction.set(linkage: .public, moduleContext)
+        }
+
       default:
         break
       }
@@ -153,6 +163,8 @@ private func specializeVTableAndAddEntriesToWorklist(for type: Type, in function
 
 private func inlineAndDevirtualize(apply: FullApplySite, alreadyInlinedFunctions: inout Set<PathFunctionTuple>,
                                    _ context: FunctionPassContext, _ simplifyCtxt: SimplifyContext) {
+  // De-virtualization and inlining in/into a "serialized" function might create function references to functions
+  // with wrong linkage. We need to fix this later (see handling of FunctionRefInst in `optimize`).
   if simplifyCtxt.tryDevirtualize(apply: apply, isMandatory: true) != nil {
     return
   }
@@ -166,9 +178,7 @@ private func inlineAndDevirtualize(apply: FullApplySite, alreadyInlinedFunctions
     return
   }
 
-  if apply.canInline &&
-     shouldInline(apply: apply, callee: callee, alreadyInlinedFunctions: &alreadyInlinedFunctions)
-  {
+  if shouldInline(apply: apply, callee: callee, alreadyInlinedFunctions: &alreadyInlinedFunctions) {
     if apply.inliningCanInvalidateStackNesting  {
       simplifyCtxt.notifyInvalidatedStackNesting()
     }
@@ -196,7 +206,12 @@ private func removeUnusedMetatypeInstructions(in function: Function, _ context: 
 
 private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlinedFunctions: inout Set<PathFunctionTuple>) -> Bool {
   if callee.isTransparent {
+    precondition(callee.hasOwnership, "transparent functions should have ownership at this stage of the pipeline")
     return true
+  }
+
+  if !apply.canInline {
+    return false
   }
 
   if apply is BeginApplyInst {
