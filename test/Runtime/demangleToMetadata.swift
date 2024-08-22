@@ -493,6 +493,8 @@ DemangleToMetadataTests.test("Nested types in same-type-constrained extensions")
   // V !: P3 in InnerTEqualsConformsToP1
 }
 
+struct NonCopyable: ~Copyable {}
+
 if #available(SwiftStdlib 5.3, *) {
   DemangleToMetadataTests.test("Round-trip with _mangledTypeName and _typeByName") {
     func roundTrip<T>(_ type: T.Type) {
@@ -523,6 +525,11 @@ if #available(SwiftStdlib 5.3, *) {
   DemangleToMetadataTests.test("Check _mangledTypeName with Any.Type") {
     let type: Any.Type = Int.self
     expectEqual("Si", _mangledTypeName(type))
+  }
+
+  DemangleToMetadataTests.test("Check _MangledTypeName with any ~Copyable.Type") {
+    let type: any ~Copyable.Type = NonCopyable.self
+    expectEqual("s11NonCopyableV", _mangledTypeName(type))
   }
 }
 
