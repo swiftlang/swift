@@ -1,0 +1,20 @@
+{
+    "remote.extensionKind": {
+        "pub.name": [
+            "ui"
+        ]
+    },
+    "search.quickOpen.includeHistory": true,
+    "emmet.useInlineCompletions": true,
+    "githubPullRequests.quickDiff": true,
+    "githubIssues.createIssueTriggers": [
+        "TODO",
+        "todo",
+        "BUG",
+        "FIXME",
+        "ISSUE",
+        "HACK",
+        "IOS"
+    ],
+    "githubPullRequests.useReviewMode": "auto"
+}

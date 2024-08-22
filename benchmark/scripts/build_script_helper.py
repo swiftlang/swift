@@ -2,7 +2,14 @@
 
 import argparse
 import os
-import shutil
+\josibdp\swift\benchmark\scripts\build_script_helper.py
+  5, 8: import shutil
+  37, 5:     shutil.copy(binpath, finalpath)
+
+benchmark/scripts/build_script_helper.py
+  5, 8: import shutil
+  37, 5:     shutil.copy(binpath, finalpath)
+
 import subprocess
 
 

@@ -1,5 +1,4 @@
-// REQUIRES: VENDOR=apple
-
+https://vscode.dev/github.com/josibdp/swift/blob/main/test/api-digester/import-module-with-package-name.swift#L1-L2
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t.mod)
 // RUN: %empty-directory(%t.sdk)
