@@ -98,18 +98,23 @@ func checkAsyncPropertyAccess() async {
   let act = MyActor()
   let _ : Int = await act.mutable + act.mutable
   act.mutable += 1  // expected-error {{actor-isolated property 'mutable' can not be mutated from a nonisolated context}}
+  // expected-note@-1{{consider declaring an isolated method on 'MyActor' to perform the mutation}}
 
   act.superState += 1 // expected-error {{actor-isolated property 'superState' can not be mutated from a nonisolated context}}
+  // expected-note@-1{{consider declaring an isolated method on 'MySuperActor' to perform the mutation}}
 
   act.text[0].append("hello") // expected-error{{actor-isolated property 'text' can not be mutated from a nonisolated context}}
+  // expected-note@-1{{consider declaring an isolated method on 'MyActor' to perform the mutation}}
 
   // this is not the same as the above, because Array is a value type
   var arr = await act.text
   arr[0].append("hello")
 
   act.text.append("no") // expected-error{{actor-isolated property 'text' can not be mutated from a nonisolated context}}
+  // expected-note@-1{{consider declaring an isolated method on 'MyActor' to perform the mutation}}
 
   act.text[0] += "hello" // expected-error{{actor-isolated property 'text' can not be mutated from a nonisolated context}}
+  // expected-note@-1{{consider declaring an isolated method on 'MyActor' to perform the mutation}}
 
   _ = act.point  // expected-warning{{non-sendable type 'Point' of property 'point' cannot exit actor-isolated context}}
   // expected-warning@-1 {{expression is 'async' but is not marked with 'await'}}
@@ -269,9 +274,11 @@ extension MyActor {
     // expected-note@-1{{property access is 'async'}}
     _ = await otherActor.mutable
     otherActor.mutable = 0  // expected-error{{actor-isolated property 'mutable' can not be mutated on a nonisolated actor instance}}
+    // expected-note@-1{{consider declaring an isolated method on 'MyActor' to perform the mutation}}
     acceptInout(&otherActor.mutable)  // expected-error{{actor-isolated property 'mutable' can not be used 'inout' on a nonisolated actor instance}}
-    // expected-error@+2{{actor-isolated property 'mutable' can not be mutated on a nonisolated actor instance}}
-    // expected-warning@+1{{no 'async' operations occur within 'await' expression}}
+    // expected-error@+3{{actor-isolated property 'mutable' can not be mutated on a nonisolated actor instance}}
+    // expected-warning@+2{{no 'async' operations occur within 'await' expression}}
+    // expected-note@+1{{consider declaring an isolated method on 'MyActor' to perform the mutation}}
     await otherActor.mutable = 0
 
     _ = otherActor.synchronous()
@@ -443,8 +450,10 @@ actor Crystal {
     _ = await globActorVar + globActorProp
 
     globActorProp = 20 // expected-error {{global actor 'SomeGlobalActor'-isolated property 'globActorProp' can not be mutated on a different actor instance}}
+    // expected-note@-1{{consider declaring an isolated method on 'SomeGlobalActor' to perform the mutation}}
 
     globActorVar = 30 // expected-error {{global actor 'SomeGlobalActor'-isolated property 'globActorVar' can not be mutated on a different actor instance}}
+    // expected-note@-1{{consider declaring an isolated method on 'SomeGlobalActor' to perform the mutation}}
 
     // expected-error@+2 {{global actor 'SomeGlobalActor'-isolated property 'globActorVar' can not be used 'inout' on a different actor instance}}
     // expected-error@+1 {{actor-isolated property 'globActorVar' cannot be passed 'inout' to implicitly 'async' function call}}
@@ -864,7 +873,7 @@ extension SomeClassInActor.ID {
 @available(SwiftStdlib 5.1, *)
 actor SomeActorWithInits {
   // expected-note@+2 2 {{property declared here}}
-  // expected-note@+1 3 {{mutation of this property is only permitted within the actor}}
+  // expected-note@+1 4 {{mutation of this property is only permitted within the actor}}
   var mutableState: Int = 17
   var otherMutableState: Int
   // expected-note@+1 {{mutation of this property is only permitted within the actor}}
@@ -895,6 +904,14 @@ actor SomeActorWithInits {
       nonisolated()
     }
     local()
+
+    func localAsync() async {
+      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+      mutableState += 1 // expected-warning{{actor-isolated property 'mutableState' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+      // expected-note@-1{{consider declaring an isolated method on 'SomeActorWithInits' to perform the mutation}}
+      nonisolated()
+    }
+    Task { await localAsync() }
 
     let _ = {
       defer {
@@ -990,8 +1007,7 @@ actor SomeActorWithInits {
     }()
   }
 
-
-  func isolated() { } // expected-note 9 {{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
+  func isolated() { } // expected-note 10 {{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
   nonisolated func nonisolated() {}
 }
 
@@ -1346,6 +1362,7 @@ actor Butterfly {
   nonisolated init(cookies: Void) async {
     self.init()
     self.flapsPerSec += 1 // expected-error {{actor-isolated property 'flapsPerSec' can not be mutated from a nonisolated context}}
+    // expected-note@-1 {{consider declaring an isolated method on 'Butterfly' to perform the mutation}}
   }
 
   init(brownies: Void) {
