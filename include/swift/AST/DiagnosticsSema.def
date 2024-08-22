@@ -5456,6 +5456,9 @@ ERROR(distributed_actor_isolated_non_self_reference,none,
       "distributed actor-isolated %kind0 can not be accessed from a "
       "nonisolated context",
       (const ValueDecl *))
+NOTE(note_consider_method_for_isolated_property_mutation,none,
+     "consider declaring an isolated method on %0 to perform the mutation",
+     (const NominalTypeDecl *))
 ERROR(conflicting_stored_property_isolation,none,
       "%select{default|memberwise}0 initializer for %1 cannot be both %2 and %3",
       (bool, Type, ActorIsolation, ActorIsolation))
