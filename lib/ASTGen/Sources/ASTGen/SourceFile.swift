@@ -12,7 +12,6 @@
 
 import ASTBridging
 import SwiftDiagnostics
-import SwiftIfConfig
 @_spi(ExperimentalLanguageFeatures) import SwiftParser
 import SwiftParserDiagnostics
 import SwiftSyntax
@@ -143,10 +142,20 @@ public func roundTripCheck(
   }
 }
 
+extension Syntax {
+  /// Whether this syntax node is or is enclosed within a #if.
+  fileprivate var isInIfConfig: Bool {
+    if self.is(IfConfigDeclSyntax.self) {
+      return true
+    }
+
+    return parent?.isInIfConfig ?? false
+  }
+}
+
 /// Emit diagnostics within the given source file.
 @_cdecl("swift_ASTGen_emitParserDiagnostics")
 public func emitParserDiagnostics(
-  ctx: BridgedASTContext,
   diagEnginePtr: UnsafeMutableRawPointer,
   sourceFilePtr: UnsafeMutablePointer<UInt8>,
   emitOnlyErrors: CInt,
@@ -163,18 +172,11 @@ public func emitParserDiagnostics(
     )
 
     let diagnosticEngine = BridgedDiagnosticEngine(raw: diagEnginePtr)
-    let buildConfiguration = CompilerBuildConfiguration(
-      ctx: ctx,
-      conditionLoc:
-        BridgedSourceLoc(
-        at: AbsolutePosition(utf8Offset: 0),
-        in: sourceFile.pointee.buffer
-      )
-    )
-
     for diag in diags {
-      // If the diagnostic is in an unparsed #if region, don't emit it.
-      if diag.node.isActive(in: buildConfiguration).state == .unparsed {
+      // Skip over diagnostics within #if, because we don't know whether
+      // we are in an active region or not.
+      // FIXME: This heuristic could be improved.
+      if diag.node.isInIfConfig {
         continue
       }
 
