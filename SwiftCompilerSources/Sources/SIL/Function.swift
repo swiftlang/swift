@@ -113,6 +113,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var isGeneric: Bool { bridged.isGeneric() }
 
+  public var linkage: Linkage { bridged.getLinkage().linkage }
+
   /// True, if the linkage of the function indicates that it is visible outside the current
   /// compilation unit and therefore not all of its uses are known.
   ///
@@ -125,9 +127,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   /// current compilation unit.
   ///
   /// For example, `public_external` linkage.
-  public var isAvailableExternally: Bool {
-    return bridged.isAvailableExternally()
-  }
+  public var isDefinedExternally: Bool { linkage.isExternal }
 
   public func hasSemanticsAttribute(_ attr: StaticString) -> Bool {
     attr.withUTF8Buffer { (buffer: UnsafeBufferPointer<UInt8>) in
