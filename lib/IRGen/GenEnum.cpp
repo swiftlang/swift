@@ -659,8 +659,7 @@ namespace {
     void consume(IRGenFunction &IGF, Explosion &src,
                  Atomicity atomicity,
                  SILType T) const override {
-      if (ElementsAreABIAccessible &&
-          tryEmitConsumeUsingDeinit(IGF, src, T)) {
+      if (tryEmitConsumeUsingDeinit(IGF, src, T)) {
         return;
       }
 
@@ -682,8 +681,7 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
                  bool isOutlined) const override {
-      if (ElementsAreABIAccessible &&
-          tryEmitDestroyUsingDeinit(IGF, addr, T)) {
+      if (tryEmitDestroyUsingDeinit(IGF, addr, T)) {
         return;
       }
 
@@ -2858,8 +2856,7 @@ namespace {
 
     void consume(IRGenFunction &IGF, Explosion &src,
                  Atomicity atomicity, SILType T) const override {
-      if (ElementsAreABIAccessible &&
-          tryEmitConsumeUsingDeinit(IGF, src, T)) {
+      if (tryEmitConsumeUsingDeinit(IGF, src, T)) {
         return;
       }
 
@@ -2987,8 +2984,7 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
                  bool isOutlined) const override {
-      if (ElementsAreABIAccessible &&
-          tryEmitDestroyUsingDeinit(IGF, addr, T)) {
+      if (tryEmitDestroyUsingDeinit(IGF, addr, T)) {
         return;
       }
 
@@ -4899,8 +4895,7 @@ namespace {
 
     void consume(IRGenFunction &IGF, Explosion &src,
                  Atomicity atomicity, SILType T) const override {
-      if (ElementsAreABIAccessible &&
-          tryEmitConsumeUsingDeinit(IGF, src, T)) {
+      if (tryEmitConsumeUsingDeinit(IGF, src, T)) {
         return;
       }
 
@@ -5259,8 +5254,7 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
                  bool isOutlined) const override {
-      if (ElementsAreABIAccessible &&
-          tryEmitDestroyUsingDeinit(IGF, addr, T)) {
+      if (tryEmitDestroyUsingDeinit(IGF, addr, T)) {
         return;
       }
 
@@ -6919,11 +6913,8 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
       auto alignment = fixedEltTI.getFixedAlignment();
       applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
 
-      IsABIAccessible_t isABIAccessible = IsABIAccessible;
-      if (Type.getASTType()->isNoncopyable() &&
-          !IGM.getSILModule().isTypeMetadataAccessible(Type.getASTType()))
-        isABIAccessible = IsNotABIAccessible;
-
+      auto isABIAccessible = isTypeABIAccessibleIfFixedSize(TC.IGM,
+                                                            Type.getASTType());
       return getFixedEnumTypeInfo(enumTy,
         fixedEltTI.getFixedSize(),
         fixedEltTI.getSpareBits(),
@@ -7086,11 +7077,8 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
   auto copyable = !theEnum->canBeCopyable()
     ? IsNotCopyable : IsCopyable;
 
-  IsABIAccessible_t isABIAccessible = IsABIAccessible;
-  if (Type.getASTType()->isNoncopyable() &&
-      !IGM.getSILModule().isTypeMetadataAccessible(Type.getASTType()))
-    isABIAccessible = IsNotABIAccessible;
-
+  auto isABIAccessible = isTypeABIAccessibleIfFixedSize(TC.IGM,
+                                                        Type.getASTType());
   getFixedEnumTypeInfo(
       enumTy, Size(sizeWithTag), spareBits.build(), alignment,
       deinit & payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
@@ -7303,11 +7291,8 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   
   applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/ true, worstAlignment);
 
-  IsABIAccessible_t isABIAccessible = IsABIAccessible;
-  if (Type.getASTType()->isNoncopyable() &&
-      !IGM.getSILModule().isTypeMetadataAccessible(Type.getASTType()))
-    isABIAccessible = IsNotABIAccessible;
-
+  auto isABIAccessible = isTypeABIAccessibleIfFixedSize(TC.IGM,
+                                                        Type.getASTType());
   getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
                        worstAlignment, isTriviallyDestroyable, isBT,
                        isCopyable, isABIAccessible);

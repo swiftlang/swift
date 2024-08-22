@@ -3040,3 +3040,22 @@ bool irgen::tryEmitDestroyUsingDeinit(IRGenFunction &IGF, Address address,
     // Indirect parameter teardown
     [&]{ /* nothing to do */ });
 }
+
+IsABIAccessible_t irgen::isTypeABIAccessibleIfFixedSize(IRGenModule &IGM,
+                                                        CanType ty) {
+
+  // Copyable types currently are always fixed size.
+  if (!ty->isNoncopyable())
+    return IsABIAccessible;
+
+  // Check for a deinit. If this type does not define a deinit it is ABI
+  // accessible because we can just project onto its sub elements.
+  auto nom = ty->getAnyNominal();
+  if (!nom || !nom->getValueTypeDestructor())
+    return IsABIAccessible;
+
+  if (IGM.getSILModule().isTypeMetadataAccessible(ty))
+    return IsABIAccessible;
+
+  return IsNotABIAccessible;
+}

@@ -277,14 +277,14 @@ namespace {
     void destroy(IRGenFunction &IGF, Address address, SILType T,
                  bool isOutlined) const override {
 
-      if (!asImpl().areFieldsABIAccessible()) {
-        emitDestroyCall(IGF, T, address);
-        return;
-      }
-
       // If the struct has a deinit declared, then call it to destroy the
       // value.
       if (!tryEmitDestroyUsingDeinit(IGF, address, T)) {
+        if (!asImpl().areFieldsABIAccessible()) {
+          emitDestroyCall(IGF, T, address);
+          return;
+        }
+
         // Otherwise, perform elementwise destruction of the value.
         super::destroy(IGF, address, T, isOutlined);
       }
@@ -953,6 +953,12 @@ namespace {
     
     void consume(IRGenFunction &IGF, Explosion &explosion,
                  Atomicity atomicity, SILType T) const override {
+      // If the struct has a deinit declared, then call it to consume the
+      // value.
+      if (tryEmitConsumeUsingDeinit(IGF, explosion, T)) {
+        return;
+      }
+
       if (!areFieldsABIAccessible()) {
         auto temporary = allocateStack(IGF, T, "deinit.arg").getAddress();
         initialize(IGF, explosion, temporary, /*outlined*/false);
@@ -960,12 +966,6 @@ namespace {
         return;
       }
 
-      // If the struct has a deinit declared, then call it to consume the
-      // value.
-      if (tryEmitConsumeUsingDeinit(IGF, explosion, T)) {
-        return;
-      }
-      
       // Otherwise, do elementwise destruction of the value.
       return super::consume(IGF, explosion, atomicity, T);
     }
@@ -1267,10 +1267,7 @@ namespace {
                                            FieldsAreABIAccessible_t areFieldsABIAccessible,
                                            StructLayout &&layout,
                                            unsigned explosionSize) {
-      IsABIAccessible_t isABIAccessible = IsABIAccessible;
-      if (TheStruct->isNoncopyable() &&
-          !IGM.getSILModule().isTypeMetadataAccessible(TheStruct))
-        isABIAccessible = IsNotABIAccessible;
+      auto isABIAccessible = isTypeABIAccessibleIfFixedSize(IGM, TheStruct);
       return LoadableStructTypeInfo::create(fields,
                                             areFieldsABIAccessible,
                                             explosionSize,
@@ -1287,10 +1284,7 @@ namespace {
     FixedStructTypeInfo *createFixed(ArrayRef<StructFieldInfo> fields,
                                      FieldsAreABIAccessible_t areFieldsABIAccessible,
                                      StructLayout &&layout) {
-      IsABIAccessible_t isABIAccessible = IsABIAccessible;
-      if (TheStruct->isNoncopyable() &&
-          !IGM.getSILModule().isTypeMetadataAccessible(TheStruct))
-        isABIAccessible = IsNotABIAccessible;
+      auto isABIAccessible = isTypeABIAccessibleIfFixedSize(IGM, TheStruct);
       return FixedStructTypeInfo::create(fields, areFieldsABIAccessible,
                                          layout.getType(),
                                          layout.getSize(),
