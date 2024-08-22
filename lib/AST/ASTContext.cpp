@@ -5336,18 +5336,13 @@ CanTypeWrapper<OpenedArchetypeType> OpenedArchetypeType::getNew(
       properties));
 }
 
-CanTypeWrapper<OpenedArchetypeType>
-OpenedArchetypeType::get(CanType existential, std::optional<UUID> knownID) {
+CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
+                                                std::optional<UUID> knownID) {
   assert(existential->isExistentialType());
+  assert(!existential->hasTypeParameter());
+
   auto interfaceType = OpenedArchetypeType::getSelfInterfaceTypeFromContext(
       GenericSignature(), existential->getASTContext());
-  return get(existential, interfaceType, knownID);
-}
-
-CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
-                                                Type interfaceType,
-                                                std::optional<UUID> knownID) {
-  assert(!existential->hasTypeParameter());
 
   if (!knownID)
     knownID = UUID::fromTime();
@@ -5362,28 +5357,20 @@ CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
   return CanOpenedArchetypeType(result);
 }
 
-Type OpenedArchetypeType::getAny(Type existential, Type interfaceTy) {
+Type OpenedArchetypeType::getAny(Type existential) {
   assert(existential->isAnyExistentialType());
+
   if (auto metatypeTy = existential->getAs<ExistentialMetatypeType>()) {
-    auto instanceTy =
-        metatypeTy->getExistentialInstanceType()->getCanonicalType();
-    auto openedInstanceTy = OpenedArchetypeType::getAny(
-        instanceTy, interfaceTy);
+    auto instanceTy = metatypeTy->getExistentialInstanceType();
+    auto openedInstanceTy = OpenedArchetypeType::getAny(instanceTy);
     if (metatypeTy->hasRepresentation()) {
       return MetatypeType::get(openedInstanceTy,
                                metatypeTy->getRepresentation());
     }
     return MetatypeType::get(openedInstanceTy);
   }
-  assert(existential->isExistentialType());
-  return OpenedArchetypeType::get(existential->getCanonicalType(),
-                                  interfaceTy);
-}
 
-Type OpenedArchetypeType::getAny(Type existential) {
-  auto interfaceTy = OpenedArchetypeType::getSelfInterfaceTypeFromContext(
-      GenericSignature(), existential->getASTContext());
-  return getAny(existential, interfaceTy);
+  return OpenedArchetypeType::get(existential->getCanonicalType());
 }
 
 void SubstitutionMap::Storage::Profile(
