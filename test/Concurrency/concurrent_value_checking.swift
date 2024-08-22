@@ -413,20 +413,20 @@ extension NotConcurrent {
   func f() { }
 
   func test() {
-    Task { // expected-tns-warning {{task-isolated value of type '() async -> ()' passed as a strongly transferred parameter}}
-      f()
+    Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      f() // expected-tns-note {{closure captures 'self' which is accessible to code in the current task}}
     }
 
-    Task { // expected-tns-warning {{task-isolated value of type '() async -> ()' passed as a strongly transferred parameter}}
-      self.f()
+    Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      self.f() // expected-tns-note {{closure captures 'self' which is accessible to code in the current task}}
     }
 
-    Task { [self] in // expected-tns-warning {{task-isolated value of type '() async -> ()' passed as a strongly transferred parameter}}
-      f()
+    Task { [self] in // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      f() // expected-tns-note {{closure captures 'self' which is accessible to code in the current task}}
     }
 
-    Task { [self] in // expected-tns-warning {{task-isolated value of type '() async -> ()' passed as a strongly transferred parameter}}
-      self.f()
+    Task { [self] in // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      self.f() // expected-tns-note {{closure captures 'self' which is accessible to code in the current task}}
     }
   }
 }
