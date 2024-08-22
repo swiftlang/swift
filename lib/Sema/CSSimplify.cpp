@@ -3927,8 +3927,8 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
 
   if (shouldAttemptFixes()) {
     auto *baseLoc =
-      getConstraintLocator(locator, {LocatorPathElt::GenericType(bound1),
-          LocatorPathElt::GenericType(bound2)});
+      getConstraintLocator(locator, {LocatorPathElt::GenericType(type1),
+          LocatorPathElt::GenericType(type2)});
 
     auto argMatchingFlags = subflags;
     // Allow the solver to produce separate fixes while matching
