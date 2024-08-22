@@ -46,6 +46,52 @@ public func makeInner() -> Outer<Int>.Inner {
   return Outer<Int>.Inner()
 }
 
+final class List<Element> where Element: ~Copyable {
+  init(x: Element) where Element: Copyable { }
+}
+
+func testList() -> List<Int> {
+  return List(x: 0)
+}
+
+open class OpenClass<Element> where Element: ~Copyable {
+  public func foo(x: Element) where Element: Copyable { }
+}
+
+func testOpenClass() -> OpenClass<Int> {
+  return OpenClass()
+}
+
+
+class Base<T> {
+  func foo(_: T) {}
+}
+
+class Derived<T>: Base<Array<T>> {}
+
+func testBaseDerived() -> Derived<Int> {
+  return Derived()
+}
+
+class Base2<T> {
+  func foo(_: T) {}
+}
+
+class Derived2<T>: Base2<(T, T)> {}
+
+func testBaseDerived2() -> Derived2<Int> {
+  return Derived2()
+}
+
+class Base3<T> {
+  func foo(_: T) {}
+}
+class Derived3<T, U>: Base3<(T, U)> {}
+
+func testBaseDerived3() -> Derived3<Int, Bool> {
+  return Derived3()
+}
+
 @main
 struct Main {
   static func main() {
@@ -56,6 +102,11 @@ struct Main {
     let x = SubClass2()
     x.test()
     makeInner().foo()
+    testList()
+    testOpenClass()
+    testBaseDerived()
+    testBaseDerived2()
+    testBaseDerived3()
   }
 }
 
