@@ -699,8 +699,7 @@ static Type getTypeForDWARFMangling(Type t) {
       }
       return t->getCanonicalType();
     },
-    MakeAbstractConformanceForGenericType(),
-    SubstFlags::AllowLoweredTypes);
+    MakeAbstractConformanceForGenericType());
 }
 
 std::string ASTMangler::mangleTypeForDebugger(Type Ty, GenericSignature sig) {

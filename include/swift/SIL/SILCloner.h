@@ -548,8 +548,7 @@ protected:
         return ty;
 
       // Remap types containing opaque result types in the current context.
-      return substOpaqueTypesWithUnderlyingTypes(ty, context,
-                                                 /*allowLoweredTypes=*/false);
+      return substOpaqueTypesWithUnderlyingTypes(ty, context);
     }
 
     return ty;

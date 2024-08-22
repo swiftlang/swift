@@ -377,7 +377,6 @@ Type TypeBase::mapTypeOutOfContext() {
   assert(!hasTypeParameter() && "already have an interface type");
   return Type(this).subst(MapTypeOutOfContext(),
     MakeAbstractConformanceForGenericType(),
-    SubstFlags::AllowLoweredTypes |
     SubstFlags::PreservePackExpansionLevel |
     SubstFlags::SubstitutePrimaryArchetypes);
 }
@@ -580,7 +579,6 @@ Type GenericEnvironment::mapTypeIntoContext(
 
   Type result = type.subst(QueryInterfaceTypeSubstitutions(this),
                            lookupConformance,
-                           SubstFlags::AllowLoweredTypes |
                            SubstFlags::PreservePackExpansionLevel);
   assert((!result->hasTypeParameter() || result->hasError() ||
           getKind() == Kind::Opaque) &&
@@ -717,7 +715,6 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
       return archetype->getInterfaceType();
     },
     MakeAbstractConformanceForGenericType(),
-    SubstFlags::AllowLoweredTypes |
     SubstFlags::PreservePackExpansionLevel |
     SubstFlags::SubstitutePrimaryArchetypes |
     SubstFlags::SubstituteLocalArchetypes);

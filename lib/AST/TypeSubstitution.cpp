@@ -523,13 +523,6 @@ public:
 
 std::optional<Type>
 TypeSubstituter::transform(TypeBase *type, TypePosition position) {
-  // FIXME: Add SIL versions of mapTypeIntoContext() and
-  // mapTypeOutOfContext() and use them appropriately
-  assert((IFS.getOptions().contains(SubstFlags::AllowLoweredTypes) ||
-          !isa<SILFunctionType>(type)) &&
-         "should not be doing AST type-substitution on a lowered SIL type;"
-         "use SILType::subst");
-
   return std::nullopt;
 }
 
@@ -1308,8 +1301,7 @@ operator()(SubstitutableType *maybeOpaqueType) const {
 }
 
 CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
-                                                   TypeExpansionContext context,
-                                                   bool allowLoweredTypes) {
+                                                   TypeExpansionContext context) {
   if (!context.shouldLookThroughOpaqueTypeArchetypes() ||
       !ty->hasOpaqueArchetype())
     return ty;
@@ -1319,8 +1311,6 @@ CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
       context.isWholeModuleContext());
   SubstOptions flags = (SubstFlags::SubstituteOpaqueArchetypes |
                         SubstFlags::PreservePackExpansionLevel);
-  if (allowLoweredTypes)
-    flags |= SubstFlags::AllowLoweredTypes;
   return ty.subst(replacer, replacer, flags)->getCanonicalType();
 }
 

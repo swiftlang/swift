@@ -3552,8 +3552,7 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
 
       // The Swift type directly corresponds to the lowered type.
       auto underlyingTy =
-          substOpaqueTypesWithUnderlyingTypes(substType, forExpansion,
-                                              /*allowLoweredTypes*/ true);
+          substOpaqueTypesWithUnderlyingTypes(substType, forExpansion);
       if (underlyingTy != substType) {
         underlyingTy =
             TC.computeLoweredRValueType(forExpansion, origType, underlyingTy);
@@ -4971,8 +4970,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
       return paramTy;
     },
     MakeAbstractConformanceForGenericType(),
-    SubstFlags::PreservePackExpansionLevel |
-    SubstFlags::AllowLoweredTypes)->getCanonicalType());
+    SubstFlags::PreservePackExpansionLevel)->getCanonicalType());
 }
 
 CanSILBoxType
@@ -4993,7 +4991,6 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
       mapOutOfContext,
       MakeAbstractConformanceForGenericType(),
       SubstFlags::PreservePackExpansionLevel |
-      SubstFlags::AllowLoweredTypes |
       SubstFlags::SubstitutePrimaryArchetypes |
       SubstFlags::SubstituteLocalArchetypes)->getCanonicalType();
 
@@ -5041,8 +5038,7 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
   return cast<SILBoxType>(
     Type(boxType).subst(mapIntoContext,
                         LookUpConformanceInModule(),
-                        SubstFlags::PreservePackExpansionLevel |
-                        SubstFlags::AllowLoweredTypes)->getCanonicalType());
+                        SubstFlags::PreservePackExpansionLevel)->getCanonicalType());
 }
 
 CanSILBoxType TypeConverter::getBoxTypeForEnumElement(

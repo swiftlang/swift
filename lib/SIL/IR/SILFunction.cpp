@@ -504,7 +504,6 @@ Type SILFunction::mapTypeIntoContext(Type type) const {
     // environment.
     return type.subst(MapIntoLocalArchetypeContext(GenericEnv, CapturedEnvs),
                       LookUpConformanceInModule(),
-                      SubstFlags::AllowLoweredTypes |
                       SubstFlags::PreservePackExpansionLevel);
   }
 

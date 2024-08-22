@@ -4803,8 +4803,7 @@ class SILFunctionConventions;
 
 
 CanType substOpaqueTypesWithUnderlyingTypes(CanType type,
-                                            TypeExpansionContext context,
-                                            bool allowLoweredTypes = false);
+                                            TypeExpansionContext context);
 ProtocolConformanceRef
 substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
                                     TypeExpansionContext context);

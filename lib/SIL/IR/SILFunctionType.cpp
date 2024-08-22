@@ -3023,8 +3023,7 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
                         MakeAbstractConformanceForGenericType(),
                         SubstFlags::PreservePackExpansionLevel |
                         SubstFlags::SubstitutePrimaryArchetypes |
-                        SubstFlags::SubstituteLocalArchetypes |
-                        SubstFlags::AllowLoweredTypes))
+                        SubstFlags::SubstituteLocalArchetypes))
               ->getCanonicalType());
   };
 
