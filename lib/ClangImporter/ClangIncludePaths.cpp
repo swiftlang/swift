@@ -33,41 +33,63 @@ static std::optional<Path> getActualModuleMapPath(
   StringRef platform = swift::getPlatformNameForTriple(triple);
   StringRef arch = swift::getMajorArchitectureName(triple);
 
-  Path result;
+  auto checkRuntimeResourcesPath = [&]() -> std::optional<Path> {
+    Path result;
+    if (!Opts.RuntimeResourcePath.empty()) {
+      result.append(Opts.RuntimeResourcePath.begin(),
+                    Opts.RuntimeResourcePath.end());
+      llvm::sys::path::append(result, platform);
+      if (isArchSpecific) {
+        llvm::sys::path::append(result, arch);
+      }
+      llvm::sys::path::append(result, name);
 
-  StringRef SDKPath = Opts.getSDKPath();
-  if (!SDKPath.empty()) {
-    result.append(SDKPath.begin(), SDKPath.end());
-    llvm::sys::path::append(result, "usr", "lib", "swift");
-    llvm::sys::path::append(result, platform);
-    if (isArchSpecific) {
-      llvm::sys::path::append(result, arch);
+      // Only specify the module map if that file actually exists. It may not;
+      // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
+      // -emit-ir` is invoked using a Swift compiler not built for Linux
+      // targets.
+      if (vfs->exists(result))
+        return result;
     }
-    llvm::sys::path::append(result, name);
+    return std::nullopt;
+  };
 
-    // Only specify the module map if that file actually exists.  It may not;
-    // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
-    // -emit-ir` is invoked using a Swift compiler not built for Linux targets.
-    if (vfs->exists(result))
-      return result;
+  auto checkSDKPath = [&]() -> std::optional<Path> {
+    Path result;
+    StringRef SDKPath = Opts.getSDKPath();
+    if (!SDKPath.empty()) {
+      result.append(SDKPath.begin(), SDKPath.end());
+      llvm::sys::path::append(result, "usr", "lib", "swift");
+      llvm::sys::path::append(result, platform);
+      if (isArchSpecific) {
+        llvm::sys::path::append(result, arch);
+      }
+      llvm::sys::path::append(result, name);
+
+      // Only specify the module map if that file actually exists.  It may not;
+      // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
+      // -emit-ir` is invoked using a Swift compiler not built for Linux
+      // targets.
+      if (vfs->exists(result))
+        return result;
+    }
+    return std::nullopt;
+  };
+
+  // FIXME: This is a workaround to keep the Android SDK build working.
+  // See https://github.com/swiftlang/swift/pull/74814.
+  if (triple.isAndroid()) {
+    if (auto path = checkSDKPath())
+      return path;
+    if (auto path = checkRuntimeResourcesPath())
+      return path;
+    return std::nullopt;
   }
 
-  if (!Opts.RuntimeResourcePath.empty()) {
-    result.clear();
-    result.append(Opts.RuntimeResourcePath.begin(),
-                  Opts.RuntimeResourcePath.end());
-    llvm::sys::path::append(result, platform);
-    if (isArchSpecific) {
-      llvm::sys::path::append(result, arch);
-    }
-    llvm::sys::path::append(result, name);
-
-    // Only specify the module map if that file actually exists.  It may not;
-    // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
-    // -emit-ir` is invoked using a Swift compiler not built for Linux targets.
-    if (vfs->exists(result))
-      return result;
-  }
+  if (auto path = checkRuntimeResourcesPath())
+    return path;
+  if (auto path = checkSDKPath())
+    return path;
 
   return std::nullopt;
 }
