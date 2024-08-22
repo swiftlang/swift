@@ -6203,6 +6203,24 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::ExistentialConstraintType: {
+    if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
+      return true;
+
+    // If there are any restrictions/conversions left to attempt, wait.
+    if (hasAnyRestriction())
+      break;
+
+    // Drop the element introduced by DeepEquality matcher.
+    path.pop_back();
+
+    // Presence of DeepEquality conversion delayed repair but since the
+    // constraint types didn't match easier, let's retry it.
+    return repairFailures(ExistentialType::get(lhs), ExistentialType::get(rhs),
+                          matchKind, flags, conversionsOrFixes,
+                          getConstraintLocator(anchor, path));
+  }
+
   case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ClosureResult: {
     if (repairByInsertingExplicitCall(lhs, rhs))
