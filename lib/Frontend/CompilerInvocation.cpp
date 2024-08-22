@@ -1014,6 +1014,21 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableExperimentalStringProcessing = true;
   }
 
+  auto enableUpcomingFeature = [&Opts, &Diags](Feature feature) -> bool {
+    // Check if this feature was introduced already in this language version.
+    if (auto firstVersion = getFeatureLanguageVersion(feature)) {
+      if (Opts.isSwiftVersionAtLeast(*firstVersion)) {
+        Diags.diagnose(SourceLoc(), diag::error_upcoming_feature_on_by_default,
+                       getFeatureName(feature), *firstVersion);
+        return true;
+      }
+    }
+
+    Opts.enableFeature(feature);
+    return false;
+  };
+
+  // Enable experimental features.
   for (const Arg *A : Args.filtered(OPT_enable_experimental_feature)) {
     // Allow StrictConcurrency to have a value that corresponds to the
     // -strict-concurrency=<blah> settings.
@@ -1040,12 +1055,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       } else {
         Opts.enableFeature(*feature);
       }
+    }
 
-      if (*feature == Feature::NoncopyableGenerics2)
-        Opts.enableFeature(Feature::NoncopyableGenerics);
-
-      if (*feature == Feature::IsolatedAny2)
-        Opts.enableFeature(Feature::IsolatedAny);
+    // For compatibility, upcoming features can be enabled with the
+    // -enable-experimental-feature flag too since the feature may have
+    // graduated from being experimental.
+    if (auto feature = getUpcomingFeature(value)) {
+      if (enableUpcomingFeature(*feature))
+        HadError = true;
     }
 
     // Hack: In order to support using availability macros in SPM packages, we
@@ -1062,24 +1079,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
-  // Map historical flags over to future features.
+  // Enable upcoming features.
   for (const Arg *A : Args.filtered(OPT_enable_upcoming_feature)) {
     // Ignore unknown features.
     auto feature = getUpcomingFeature(A->getValue());
     if (!feature)
       continue;
 
-    // Check if this feature was introduced already in this language version.
-    if (auto firstVersion = getFeatureLanguageVersion(*feature)) {
-      if (Opts.isSwiftVersionAtLeast(*firstVersion)) {
-        Diags.diagnose(SourceLoc(), diag::error_upcoming_feature_on_by_default,
-                       A->getValue(), *firstVersion);
-        continue;
-      }
-    }
-
-    // Add the feature.
-    Opts.enableFeature(*feature);
+    if (enableUpcomingFeature(*feature))
+      HadError = true;
   }
 
   // Map historical flags over to experimental features. We do this for all
