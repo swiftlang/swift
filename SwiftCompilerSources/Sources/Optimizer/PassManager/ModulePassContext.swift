@@ -171,3 +171,9 @@ extension GlobalVariable {
     bridged.setLet(value)
   }
 }
+
+extension Function {
+  func set(linkage: Linkage, _ context: ModulePassContext) {
+    bridged.setLinkage(linkage.bridged)
+  }
+}

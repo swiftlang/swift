@@ -117,20 +117,24 @@ public:
   
 /// Flags that can be passed when substituting into a type.
 enum class SubstFlags {
-  /// Allow substitutions to recurse into SILFunctionTypes.
-  /// Normally, SILType::subst() should be used for lowered
-  /// types, however in special cases where the substitution
-  /// is just changing between contextual and interface type
-  /// representations, using Type::subst() is allowed.
+  /// Allow substitutions to recurse into SILFunctionTypes. Normally,
+  /// SILType::subst() should be used for lowered types, however in special
+  /// cases where the substitution is just changing between contextual and
+  /// interface type representations, using Type::subst() is allowed.
   AllowLoweredTypes = 0x01,
   /// Map member types to their desugared witness type.
   DesugarMemberTypes = 0x02,
-  /// Substitute types involving opaque type archetypes.
+  /// Allow opaque archetypes to themselves be the subject of substitution,
+  /// used when erasing them to their underlying types. otherwise, we
+  /// recursively substitute their substitutions, instead, preserving the
+  /// opaque archetype.
   SubstituteOpaqueArchetypes = 0x04,
+  /// Allow local archetypes to themselves be the subject of substitution.
+  SubstituteLocalArchetypes = 0x08,
   /// Don't increase pack expansion level for free pack references.
   /// Do not introduce new usages of this flag.
   /// FIXME: Remove this.
-  PreservePackExpansionLevel = 0x08,
+  PreservePackExpansionLevel = 0x10,
 };
 
 /// Options for performing substitutions into a type.

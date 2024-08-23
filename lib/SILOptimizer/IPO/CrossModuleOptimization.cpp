@@ -134,21 +134,20 @@ private:
 class InstructionVisitor : public SILCloner<InstructionVisitor> {
   friend class SILCloner<InstructionVisitor>;
   friend class SILInstructionVisitor<InstructionVisitor>;
+  friend class CrossModuleOptimization;
 
 private:
   CrossModuleOptimization &CMS;
-  SILInstruction *result = nullptr;
 
 public:
-  InstructionVisitor(SILInstruction *I, CrossModuleOptimization &CMS) :
-    SILCloner(*I->getFunction()), CMS(CMS) {
-    Builder.setInsertionPoint(I);
-  }
+  InstructionVisitor(SILFunction &F, CrossModuleOptimization &CMS) :
+    SILCloner(F), CMS(CMS) {}
 
   SILType remapType(SILType Ty) {
     if (Ty.hasLocalArchetype()) {
-      Ty = Ty.subst(getBuilder().getModule(), Functor, Functor,
-                    CanGenericSignature());
+      Ty = Ty.subst(getBuilder().getModule(),
+                    Functor, Functor, CanGenericSignature(),
+                    SubstFlags::SubstituteLocalArchetypes);
     }
 
     CMS.makeTypeUsableFromInline(Ty.getASTType());
@@ -156,36 +155,33 @@ public:
   }
 
   CanType remapASTType(CanType Ty) {
-    if (Ty->hasLocalArchetype())
-      Ty = Ty.subst(Functor, Functor)->getCanonicalType();
+    if (Ty->hasLocalArchetype()) {
+      Ty = Ty.subst(Functor, Functor,
+                    SubstFlags::SubstituteLocalArchetypes)->getCanonicalType();
+    }
 
     CMS.makeTypeUsableFromInline(Ty);
     return Ty;
   }
 
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
-    if (Subs.hasLocalArchetypes())
-      Subs = Subs.subst(Functor, Functor);
+    if (Subs.getRecursiveProperties().hasLocalArchetype()) {
+      Subs = Subs.subst(Functor, Functor,
+                        SubstFlags::SubstituteLocalArchetypes);
+    }
 
     CMS.makeSubstUsableFromInline(Subs);
     return Subs;
   }
 
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
-    result = Cloned;
     SILCloner<InstructionVisitor>::postProcess(Orig, Cloned);
+    Cloned->eraseFromParent();
   }
 
   SILValue getMappedValue(SILValue Value) { return Value; }
 
   SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
-
-  static void makeTypesUsableFromInline(SILInstruction *I,
-                                        CrossModuleOptimization &CMS) {
-    InstructionVisitor visitor(I, CMS);
-    visitor.visit(I);
-    visitor.result->eraseFromParent();
-  }
 };
 
 static bool isPackageCMOEnabled(ModuleDecl *mod) {
@@ -731,12 +727,16 @@ void CrossModuleOptimization::serializeFunction(SILFunction *function,
   }
   function->setSerializedKind(getRightSerializedKind(M));
 
+  InstructionVisitor visitor(*function, *this);
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
-      InstructionVisitor::makeTypesUsableFromInline(&inst, *this);
+      visitor.getBuilder().setInsertionPoint(&inst);
+      visitor.visit(&inst);
       serializeInstruction(&inst, canSerializeFlags);
     }
   }
+
+  M.reclaimUnresolvedLocalArchetypeDefinitions();
 }
 
 /// Prepare \p inst for serialization.

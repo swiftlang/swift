@@ -3322,9 +3322,7 @@ TypeAliasType *TypeAliasType::get(TypeAliasDecl *typealias, Type parent,
   auto properties = underlying->getRecursiveProperties();
   if (parent)
     properties |= parent->getRecursiveProperties();
-
-  for (auto substGP : substitutions.getReplacementTypes())
-    properties |= substGP->getRecursiveProperties();
+  properties |= substitutions.getRecursiveProperties();
 
   // Figure out which arena this type will go into.
   auto &ctx = underlying->getASTContext();
@@ -4936,7 +4934,7 @@ SILFunctionType::SILFunctionType(
     }
 
     if (genericSig && patternSubs) {
-      assert(!patternSubs.hasArchetypes()
+      assert(!patternSubs.getRecursiveProperties().hasArchetype()
              && "pattern substitutions should not contain context archetypes");
     }
   }
@@ -5093,9 +5091,7 @@ CanSILFunctionType SILFunctionType::get(
   }
 
   auto outerSubs = genericSig ? invocationSubs : patternSubs;
-  for (auto replacement : outerSubs.getReplacementTypes()) {
-    properties |= replacement->getRecursiveProperties();
-  }
+  properties |= outerSubs.getRecursiveProperties();
 
   auto fnType =
       new (mem) SILFunctionType(genericSig, ext, coroutineKind, callee,
@@ -5282,15 +5278,9 @@ DependentMemberType *DependentMemberType::get(Type base,
 /// Compute the recursive type properties of an opaque type archetype.
 static RecursiveTypeProperties getOpaqueTypeArchetypeProperties(
     SubstitutionMap subs) {
-  // An opaque type isn't contextually dependent like other archetypes, so
-  // by itself, it doesn't impose the "Has Archetype" recursive property,
-  // but the substituted types might. A disjoint "Has Opaque Archetype" tracks
-  // the presence of opaque archetypes.
   RecursiveTypeProperties properties =
     RecursiveTypeProperties::HasOpaqueArchetype;
-  for (auto type : subs.getReplacementTypes()) {
-    properties |= type->getRecursiveProperties();
-  }
+  properties |= subs.getRecursiveProperties();
   return properties;
 }
 
@@ -5317,17 +5307,11 @@ Type OpaqueTypeArchetypeType::get(
   return env->getOrCreateArchetypeFromInterfaceType(interfaceType);
 }
 
-/// Compute the recursive type properties of an opaque type archetype.
+/// Compute the recursive type properties of an opened existential archetype.
 static RecursiveTypeProperties getOpenedArchetypeProperties(SubstitutionMap subs) {
-  // An opaque type isn't contextually dependent like other archetypes, so
-  // by itself, it doesn't impose the "Has Archetype" recursive property,
-  // but the substituted types might. A disjoint "Has Opaque Archetype" tracks
-  // the presence of opaque archetypes.
   RecursiveTypeProperties properties =
     RecursiveTypeProperties::HasOpenedExistential;
-  for (auto type : subs.getReplacementTypes()) {
-    properties |= type->getRecursiveProperties();
-  }
+  properties |= subs.getRecursiveProperties();
   return properties;
 }
 
@@ -5352,18 +5336,13 @@ CanTypeWrapper<OpenedArchetypeType> OpenedArchetypeType::getNew(
       properties));
 }
 
-CanTypeWrapper<OpenedArchetypeType>
-OpenedArchetypeType::get(CanType existential, std::optional<UUID> knownID) {
+CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
+                                                std::optional<UUID> knownID) {
   assert(existential->isExistentialType());
+  assert(!existential->hasTypeParameter());
+
   auto interfaceType = OpenedArchetypeType::getSelfInterfaceTypeFromContext(
       GenericSignature(), existential->getASTContext());
-  return get(existential, interfaceType, knownID);
-}
-
-CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
-                                                Type interfaceType,
-                                                std::optional<UUID> knownID) {
-  assert(!existential->hasTypeParameter());
 
   if (!knownID)
     knownID = UUID::fromTime();
@@ -5378,28 +5357,20 @@ CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
   return CanOpenedArchetypeType(result);
 }
 
-Type OpenedArchetypeType::getAny(Type existential, Type interfaceTy) {
+Type OpenedArchetypeType::getAny(Type existential) {
   assert(existential->isAnyExistentialType());
+
   if (auto metatypeTy = existential->getAs<ExistentialMetatypeType>()) {
-    auto instanceTy =
-        metatypeTy->getExistentialInstanceType()->getCanonicalType();
-    auto openedInstanceTy = OpenedArchetypeType::getAny(
-        instanceTy, interfaceTy);
+    auto instanceTy = metatypeTy->getExistentialInstanceType();
+    auto openedInstanceTy = OpenedArchetypeType::getAny(instanceTy);
     if (metatypeTy->hasRepresentation()) {
       return MetatypeType::get(openedInstanceTy,
                                metatypeTy->getRepresentation());
     }
     return MetatypeType::get(openedInstanceTy);
   }
-  assert(existential->isExistentialType());
-  return OpenedArchetypeType::get(existential->getCanonicalType(),
-                                  interfaceTy);
-}
 
-Type OpenedArchetypeType::getAny(Type existential) {
-  auto interfaceTy = OpenedArchetypeType::getSelfInterfaceTypeFromContext(
-      GenericSignature(), existential->getASTContext());
-  return getAny(existential, interfaceTy);
+  return OpenedArchetypeType::get(existential->getCanonicalType());
 }
 
 void SubstitutionMap::Storage::Profile(

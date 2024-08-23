@@ -1690,18 +1690,23 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         -Arch $HostArch
     }
 
-    # swift-corelibs-foundation tests are disabled since the package does not build for Windows yet
-    # $OutDir = Join-Path -Path $HostArch.BinaryCache -ChildPath foundation-tests
+    $OutDir = Join-Path -Path $HostArch.BinaryCache -ChildPath foundation-tests
+    $ShortArch = $Arch.LLVMName
 
-    # Isolate-EnvVars {
-    #   $env:SWIFTCI_USE_LOCAL_DEPS=1
-    #   $env:DISPATCH_INCLUDE_PATH="$($Arch.SDKInstallRoot)/usr/lib/swift"
-    #   Build-SPMProject `
-    #     -Test `
-    #     -Src $SourceCache\swift-corelibs-foundation `
-    #     -Bin $OutDir `
-    #     -Arch $HostArch
-    # }
+    Isolate-EnvVars {
+      $env:SWIFTCI_USE_LOCAL_DEPS=1
+      $env:DISPATCH_INCLUDE_PATH="$($Arch.SDKInstallRoot)/usr/lib/swift"
+      $env:LIBXML_LIBRARY_PATH="$LibraryRoot/libxml2-2.11.5/usr/lib/$Platform/$ShortArch"
+      $env:LIBXML_INCLUDE_PATH="$LibraryRoot/libxml2-2.11.5/usr/include/libxml2"
+      $env:ZLIB_LIBRARY_PATH="$LibraryRoot/zlib-1.3.1/usr/lib/$Platform/$ShortArch"
+      $env:CURL_LIBRARY_PATH="$LibraryRoot/curl-8.9.1/usr/lib/$Platform/$ShortArch"
+      $env:CURL_INCLUDE_PATH="$LibraryRoot/curl-8.9.1/usr/include"
+      Build-SPMProject `
+        -Test `
+        -Src $SourceCache\swift-corelibs-foundation `
+        -Bin $OutDir `
+        -Arch $HostArch
+    }
   } else {
     $DispatchBinaryCache = Get-TargetProjectBinaryCache $Arch Dispatch
     $FoundationBinaryCache = Get-TargetProjectBinaryCache $Arch Foundation
@@ -2288,7 +2293,7 @@ function Build-TestingMacros() {
 
   $SwiftSDK = $null
   if ($Build) {
-    $SwiftSDK = $HostArch.SDKInstallRoot
+    $SwiftSDK = $BuildArch.SDKInstallRoot
   }
 
   $Targets = if ($Build) {
@@ -2302,6 +2307,12 @@ function Build-TestingMacros() {
     $InstallDir = "$($Arch.ToolchainInstallRoot)\usr"
   }
 
+  $SwiftSyntaxCMakeModules = if ($Build -and $HostArch -ne $BuildArch) {
+    Get-BuildProjectCMakeModules Compilers
+  } else {
+    Get-HostProjectCMakeModules Compilers
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\swift-testing\Sources\TestingMacros `
     -Bin $TestingMacrosBinaryCache `
@@ -2312,7 +2323,7 @@ function Build-TestingMacros() {
     -SwiftSDK:$SwiftSDK `
     -BuildTargets $Targets `
     -Defines @{
-      SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
+      SwiftSyntax_DIR = $SwiftSyntaxCMakeModules;
     }
 }
 

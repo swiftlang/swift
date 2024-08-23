@@ -19,6 +19,7 @@
 #include "SILGenFunction.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"
 
@@ -99,53 +100,36 @@ public:
 /// dependent type, and return a substitution map with generic parameters
 /// corresponding to each distinct root opened archetype.
 static std::pair<CanType, SubstitutionMap>
-mapTypeOutOfOpenedExistentialContext(CanType t) {
+mapTypeOutOfOpenedExistentialContext(CanType t, GenericEnvironment *genericEnv) {
   auto &ctx = t->getASTContext();
 
-  SmallVector<OpenedArchetypeType *, 4> openedTypes;
-  t->getRootOpenedExistentials(openedTypes);
+  SmallVector<GenericEnvironment *, 4> capturedEnvs;
+  t.visit([&](CanType t) {
+    if (auto local = dyn_cast<LocalArchetypeType>(t)) {
+      auto *genericEnv = local->getGenericEnvironment();
+      if (std::find(capturedEnvs.begin(), capturedEnvs.end(), genericEnv)
+            == capturedEnvs.end()) {
+        capturedEnvs.push_back(genericEnv);
+      }
+    }
+  });
 
-  SmallVector<GenericTypeParamType *, 2> params;
-  SmallVector<Requirement, 2> requirements;
-  for (const unsigned i : indices(openedTypes)) {
-    auto *param = GenericTypeParamType::get(
-        /*isParameterPack*/ false, /*depth*/ 0, /*index*/ i, ctx);
-    params.push_back(param);
-
-    Type constraintTy = openedTypes[i]->getExistentialType();
-    if (auto existentialTy = constraintTy->getAs<ExistentialType>())
-      constraintTy = existentialTy->getConstraintType();
-
-    requirements.emplace_back(RequirementKind::Conformance, param,
-                              constraintTy);
+  GenericSignature baseGenericSig;
+  SubstitutionMap forwardingSubs;
+  if (genericEnv) {
+    baseGenericSig = genericEnv->getGenericSignature();
+    forwardingSubs = genericEnv->getForwardingSubstitutionMap();
   }
 
-  const auto mappedSubs = SubstitutionMap::get(
-      swift::buildGenericSignature(ctx, nullptr, params, requirements,
-                                   /*allowInverses=*/false),
-      [&](SubstitutableType *t) -> Type {
-        return openedTypes[cast<GenericTypeParamType>(t)->getIndex()];
-      },
-      MakeAbstractConformanceForGenericType());
+  MapLocalArchetypesOutOfContext mapOutOfContext(baseGenericSig, capturedEnvs);
+  auto mappedTy = t.subst(mapOutOfContext,
+                          MakeAbstractConformanceForGenericType(),
+                          SubstFlags::SubstituteLocalArchetypes);
 
-  const auto mappedTy = t.subst(
-      [&](SubstitutableType *t) -> Type {
-        auto *archTy = cast<ArchetypeType>(t);
-        const auto index = std::find(openedTypes.begin(), openedTypes.end(),
-                                     archTy->getRoot()) -
-                           openedTypes.begin();
-        assert(index != openedTypes.end() - openedTypes.begin());
-
-        if (auto *dmt =
-                archTy->getInterfaceType()->getAs<DependentMemberType>()) {
-          return dmt->substRootParam(params[index],
-                                     MakeAbstractConformanceForGenericType(),
-                                     std::nullopt);
-        }
-
-        return params[index];
-      },
-      MakeAbstractConformanceForGenericType());
+  auto genericSig = buildGenericSignatureWithCapturedEnvironments(
+      ctx, baseGenericSig, capturedEnvs);
+  auto mappedSubs = buildSubstitutionMapWithCapturedEnvironments(
+      forwardingSubs, genericSig, capturedEnvs);
 
   return std::make_pair(mappedTy->getCanonicalType(), mappedSubs);
 }
@@ -188,7 +172,7 @@ public:
     CanType layoutTy;
     SubstitutionMap layoutSubs;
     std::tie(layoutTy, layoutSubs) =
-        mapTypeOutOfOpenedExistentialContext(resultTy);
+        mapTypeOutOfOpenedExistentialContext(resultTy, SGF.F.getGenericEnvironment());
 
     CanGenericSignature layoutSig =
         layoutSubs.getGenericSignature().getCanonicalSignature();

@@ -246,6 +246,11 @@ public:
   /// they have a type variable originator.
   bool isSolverAllocated() const { return Bits & SolverAllocated; }
 
+  /// Determine whether the type involves a primary, pack or local archetype.
+  bool hasArchetype() const {
+    return hasPrimaryArchetype() || hasLocalArchetype();
+  }
+
   /// Does a type with these properties structurally contain a local
   /// archetype?
   bool hasLocalArchetype() const {
@@ -720,10 +725,8 @@ public:
   }
 
   /// Determine whether the type involves a primary, pack or local archetype.
-  ///
-  /// FIXME: Replace all remaining callers with a more precise check.
   bool hasArchetype() const {
-    return hasPrimaryArchetype() || hasLocalArchetype();
+    return getRecursiveProperties().hasArchetype();
   }
   
   /// Determine whether the type involves an opened existential archetype.
@@ -779,10 +782,6 @@ public:
 
   /// Determine whether the type is an opened existential type with Error inside
   bool isOpenedExistentialWithError();
-
-  /// Retrieve the set of root opened archetypes that occur within this type.
-  void getRootOpenedExistentials(
-      SmallVectorImpl<OpenedArchetypeType *> &rootOpenedArchetypes) const;
 
   /// Retrieve the set of type parameter packs that occur within this type.
   void getTypeParameterPacks(SmallVectorImpl<Type> &rootParameterPacks);
@@ -3842,7 +3841,7 @@ struct ParameterListInfo {
   SmallBitVector implicitSelfCapture;
   SmallBitVector inheritActorContext;
   SmallBitVector variadicGenerics;
-  SmallBitVector isPassedToSending;
+  SmallBitVector sendingParameters;
 
 public:
   ParameterListInfo() { }
@@ -3875,7 +3874,7 @@ public:
   bool isVariadicGenericParameter(unsigned paramIdx) const;
 
   /// Returns true if this is a sending parameter.
-  bool isPassedToSendingParameter(unsigned paramIdx) const;
+  bool isSendingParameter(unsigned paramIdx) const;
 
   /// Retrieve the number of non-defaulted parameters.
   unsigned numNonDefaultedParameters() const {
@@ -6817,29 +6816,6 @@ public:
   /// a fresh archetype with a unique ID will be opened.
   static CanTypeWrapper<OpenedArchetypeType>
   get(CanType existential, std::optional<UUID> knownID = std::nullopt);
-
-  /// Get or create an archetype that represents the opened type
-  /// of an existential value.
-  ///
-  /// \param existential The existential type to open.
-  /// \param interfaceType The interface type represented by this archetype.
-  ///
-  /// \param knownID When non-empty, the known ID of the archetype. When empty,
-  /// a fresh archetype with a unique ID will be opened.
-  static CanTypeWrapper<OpenedArchetypeType>
-  get(CanType existential, Type interfaceType,
-      std::optional<UUID> knownID = std::nullopt);
-
-  /// Create a new archetype that represents the opened type
-  /// of an existential value.
-  ///
-  /// Use this function when you are unsure of whether the
-  /// \c existential type is a metatype or an instance type. This function
-  /// will unwrap any existential metatype containers.
-  ///
-  /// \param existential The existential type or existential metatype to open.
-  /// \param interfaceType The interface type represented by this archetype.
-  static Type getAny(Type existential, Type interfaceType);
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.

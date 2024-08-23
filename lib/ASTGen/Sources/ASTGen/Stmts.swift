@@ -77,7 +77,28 @@ extension ASTGenVisitor {
 
   @inline(__always)
   func generate(codeBlockItemList node: CodeBlockItemListSyntax) -> BridgedArrayRef {
-    node.lazy.map { self.generate(codeBlockItem: $0).bridged }.bridgedArray(in: self)
+    var allItems: [BridgedASTNode] = []
+    visitIfConfigElements(
+      node,
+      of: CodeBlockItemSyntax.self,
+      split: Self.splitCodeBlockItemIfConfig
+    ) { codeBlockItem in
+      allItems.append(self.generate(codeBlockItem: codeBlockItem).bridged)
+    }
+
+    return allItems.lazy.bridgedArray(in: self)
+  }
+
+  /// Function that splits a code block item into either an #if or the item.
+  static func splitCodeBlockItemIfConfig(
+    _ element: CodeBlockItemSyntax
+  ) -> IfConfigOrUnderlying<CodeBlockItemSyntax> {
+    if case .decl(let decl) = element.item,
+       let ifConfigDecl = decl.as(IfConfigDeclSyntax.self) {
+      return .ifConfigDecl(ifConfigDecl)
+    }
+
+    return .underlying(element)
   }
 
   func generate(codeBlock node: CodeBlockSyntax) -> BridgedBraceStmt {
@@ -461,18 +482,21 @@ extension ASTGenVisitor {
   }
 
   func generate(switchCaseList node: SwitchCaseListSyntax) -> BridgedArrayRef {
-    return node.lazy.map({ node -> BridgedASTNode in
-      switch node {
-      case .switchCase(let node):
-        return ASTNode.stmt(self.generate(switchCase: node).asStmt).bridged
-      case .ifConfigDecl(_):
-        fatalError("unimplemented")
-#if RESILIENT_SWIFT_SYNTAX
-      @unknown default:
-        fatalError()
-#endif
+    var allBridgedCases: [BridgedASTNode] = []
+    visitIfConfigElements(node, of: SwitchCaseSyntax.self) { element in
+      switch element {
+      case .ifConfigDecl(let ifConfigDecl):
+        return .ifConfigDecl(ifConfigDecl)
+      case .switchCase(let switchCase):
+        return .underlying(switchCase)
       }
-    }).bridgedArray(in: self)
+    } body: { caseNode in
+      allBridgedCases.append(
+        ASTNode.stmt(self.generate(switchCase: caseNode).asStmt).bridged
+      )
+    }
+
+    return allBridgedCases.lazy.bridgedArray(in: self)
   }
 
   func generateSwitchStmt(switchExpr node: SwitchExprSyntax, labelInfo: BridgedLabeledStmtInfo = nil)

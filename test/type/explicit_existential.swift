@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift -verify-additional-prefix default-swift-mode-
 // RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix swift-6-
 // RUN: %target-typecheck-verify-swift -enable-upcoming-feature ExistentialAny -verify-additional-prefix explicit-any- -verify-additional-prefix default-swift-mode-
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature ExistentialAny -verify-additional-prefix explicit-any- -verify-additional-prefix default-swift-mode-
 
 
 protocol HasSelfRequirements {

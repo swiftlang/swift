@@ -13,8 +13,8 @@ public struct TopLevelStruct {
   // -- Back deployment thunk for TopLevelStruct.property.getter
   // CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvgTwb : $@convention(method) (TopLevelStruct) -> TopLevelStruct
   // CHECK: bb0([[BB0_ARG:%.*]] : $TopLevelStruct):
-  // CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 10
-  // CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 52
+  // CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 52
+  // CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 1
   // CHECK:   [[PATCH:%.*]] = integer_literal $Builtin.Word, 0
   // CHECK:   [[OSVFN:%.*]] = function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
   // CHECK:   [[AVAIL:%.*]] = apply [[OSVFN]]([[MAJOR]], [[MINOR]], [[PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
@@ -34,8 +34,8 @@ public struct TopLevelStruct {
   // CHECK:   return [[RETURN_BB_ARG]] : $TopLevelStruct
 
   // -- Original definition of TopLevelStruct.property.getter
-  // CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvg : $@convention(method) (TopLevelStruct) -> TopLevelStruct
-  @backDeployed(before: macOS 10.52)
+  // CHECK-LABEL: sil [available 52.1] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvg : $@convention(method) (TopLevelStruct) -> TopLevelStruct
+  @backDeployed(before: macOS 52.1)
   public var property: TopLevelStruct { self }
 }
 

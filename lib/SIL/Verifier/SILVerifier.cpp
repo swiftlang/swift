@@ -6281,10 +6281,9 @@ public:
         auto archetype = dyn_cast<ElementArchetypeType>(type);
         if (!archetype)
           return type;
-        if (!archetype->isRoot())
-          return Type();
 
-        auto it = allOpened.find(type->getCanonicalType());
+        auto root = archetype->getRoot();
+        auto it = allOpened.find(root->getCanonicalType());
         assert(it != allOpened.end());
 
         auto pack = it->second;
@@ -6295,7 +6294,13 @@ public:
         } else {
           assert(!indexedShape && "pack substitution doesn't match in shape");
         }
-        return packElementType;
+
+        if (archetype->isRoot())
+          return packElementType;
+
+        return archetype->getInterfaceType()->castTo<DependentMemberType>()
+            ->substRootParam(packElementType, LookUpConformanceInModule(),
+                             std::nullopt);
       };
 
       // If the pack components and expected element types are SIL types,
@@ -6310,7 +6315,8 @@ public:
                                      substTypes,
                                      LookUpConformanceInModule(),
                                      CanGenericSignature(),
-                                     SubstFlags::PreservePackExpansionLevel);
+                                     SubstFlags::PreservePackExpansionLevel |
+                                     SubstFlags::SubstituteLocalArchetypes);
         requireSameType(indexedElementSILType, substTargetElementSILType,
                         "lanewise-substituted pack element type didn't "
                         "match expected element type");

@@ -246,6 +246,9 @@ SWIFT_NAME("BridgedASTContext.langOptsGetCompilerVersion(self:_:)")
 SwiftInt BridgedASTContext_langOptsGetCompilerVersion(BridgedASTContext cContext,
                                                       SwiftInt* _Nullable * _Nonnull cComponents);
 
+/* Deallocate an array of Swift int values that was allocated in C++. */
+void deallocateIntBuffer(SwiftInt * _Nullable cComponents);
+
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedCanImportVersion : size_t {
   CanImportUnversioned,
   CanImportVersion,

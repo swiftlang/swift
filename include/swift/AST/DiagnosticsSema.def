@@ -3126,7 +3126,7 @@ NOTE(declared_protocol_conformance_here,none,
 
 ERROR(witness_unavailable,none,
         "unavailable %kind0 was used to satisfy a requirement of protocol %1%select{|: %2}2",
-        (const ValueDecl *, Identifier, StringRef))
+        (const ValueDecl *, const ProtocolDecl *, StringRef))
 
 WARNING(witness_deprecated,none,
         "deprecated default implementation is used to satisfy %kind0 required by "
@@ -5456,6 +5456,9 @@ ERROR(distributed_actor_isolated_non_self_reference,none,
       "distributed actor-isolated %kind0 can not be accessed from a "
       "nonisolated context",
       (const ValueDecl *))
+NOTE(note_consider_method_for_isolated_property_mutation,none,
+     "consider declaring an isolated method on %0 to perform the mutation",
+     (const NominalTypeDecl *))
 ERROR(conflicting_stored_property_isolation,none,
       "%select{default|memberwise}0 initializer for %1 cannot be both %2 and %3",
       (bool, Type, ActorIsolation, ActorIsolation))
@@ -6778,7 +6781,7 @@ WARNING(availability_enum_element_no_potential_warn,
 
 ERROR(availability_protocol_requires_version,
       none, "protocol %0 requires %1 to be available in %2 %3 and newer",
-      (Identifier, DeclName, StringRef, llvm::VersionTuple))
+      (const ProtocolDecl *, const ValueDecl *, StringRef, llvm::VersionTuple))
 
 NOTE(availability_protocol_requirement_here, none,
      "protocol requirement here", ())

@@ -531,25 +531,6 @@ bool TypeBase::hasLocalArchetypeFromEnvironment(
   });
 }
 
-void TypeBase::getRootOpenedExistentials(
-    SmallVectorImpl<OpenedArchetypeType *> &rootOpenedArchetypes) const {
-  if (!hasOpenedExistential())
-    return;
-
-  SmallPtrSet<OpenedArchetypeType *, 4> known;
-  getCanonicalType().findIf([&](Type type) -> bool {
-    auto *archetype = dyn_cast<OpenedArchetypeType>(type.getPointer());
-    if (!archetype)
-      return false;
-
-    auto *root = archetype->getRoot();
-    if (known.insert(root).second)
-      rootOpenedArchetypes.push_back(root);
-
-    return false;
-  });
-}
-
 Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
   if (!dc->isTypeContext())
     return this;
@@ -1299,7 +1280,7 @@ ParameterListInfo::ParameterListInfo(
   implicitSelfCapture.resize(params.size());
   inheritActorContext.resize(params.size());
   variadicGenerics.resize(params.size());
-  isPassedToSending.resize(params.size());
+  sendingParameters.resize(params.size());
 
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
@@ -1365,7 +1346,7 @@ ParameterListInfo::ParameterListInfo(
     }
 
     if (param->isSending()) {
-      isPassedToSending.set(i);
+      sendingParameters.set(i);
     }
   }
 }
@@ -1407,8 +1388,8 @@ bool ParameterListInfo::isVariadicGenericParameter(unsigned paramIdx) const {
       : false;
 }
 
-bool ParameterListInfo::isPassedToSendingParameter(unsigned paramIdx) const {
-  return paramIdx < isPassedToSending.size() ? isPassedToSending[paramIdx]
+bool ParameterListInfo::isSendingParameter(unsigned paramIdx) const {
+  return paramIdx < sendingParameters.size() ? sendingParameters[paramIdx]
                                              : false;
 }
 

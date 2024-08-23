@@ -366,6 +366,18 @@ static bool isInsideCompatibleUnavailableDeclaration(
           inheritsAvailabilityFromPlatform(platform, *referencedPlatform));
 }
 
+const AvailableAttr *
+ExportContext::shouldDiagnoseDeclAsUnavailable(const Decl *D) const {
+  auto attr = AvailableAttr::isUnavailable(D);
+  if (!attr)
+    return nullptr;
+
+  if (isInsideCompatibleUnavailableDeclaration(D, *this, attr))
+    return nullptr;
+
+  return attr;
+}
+
 static bool shouldAllowReferenceToUnavailableInSwiftDeclaration(
     const Decl *D, const ExportContext &where) {
   auto *DC = where.getDeclContext();
@@ -1902,8 +1914,8 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
                                  AvailabilityContext(RunningRange))) {
 
     // Only fix situations that are "nearby" versions, meaning
-    // disagreement on a minor-or-less version for non-macOS,
-    // or disagreement on a subminor-or-less version for macOS.
+    // disagreement on a minor-or-less version (subminor-or-less version for
+    // macOS 10.x.y).
     auto RunningVers = RunningRange.getLowerEndpoint();
     auto RequiredVers = RequiredRange.getLowerEndpoint();
     auto Platform = targetPlatform(Context.LangOpts);
@@ -1911,6 +1923,7 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
       return false;
     if ((Platform == PlatformKind::macOS ||
          Platform == PlatformKind::macOSApplicationExtension) &&
+        RunningVers.getMajor() == 10 &&
         !(RunningVers.getMinor().has_value() &&
           RequiredVers.getMinor().has_value() &&
           RunningVers.getMinor().value() ==
@@ -2900,15 +2913,8 @@ public:
 static std::optional<UnavailabilityDiagnosticInfo>
 getExplicitUnavailabilityDiagnosticInfo(const Decl *decl,
                                         const ExportContext &where) {
-  auto *attr = AvailableAttr::isUnavailable(decl);
+  auto *attr = where.shouldDiagnoseDeclAsUnavailable(decl);
   if (!attr)
-    return std::nullopt;
-
-  // Calling unavailable code from within code with the same
-  // unavailability is OK -- the eventual caller can't call the
-  // enclosing code in the same situations it wouldn't be able to
-  // call this code.
-  if (isInsideCompatibleUnavailableDeclaration(decl, where, attr))
     return std::nullopt;
 
   ASTContext &ctx = decl->getASTContext();
