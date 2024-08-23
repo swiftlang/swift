@@ -2,17 +2,17 @@
 
 import subprocess
 import sys
+import threading
 
 
 def watchdog(command, timeout=None):
     process = subprocess.Popen(command)
+    timer = threading.Timer(timeout, process.kill)
     try:
-        process.communicate(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        sys.exit(
-            'error: command timed out after {} seconds: {}'
-            .format(timeout, ' '.join(sys.argv[2:])))
+        timer.start()
+        process.communicate()
+    finally:
+        timer.cancel()
 
 
 if __name__ == '__main__':
