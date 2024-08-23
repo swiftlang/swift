@@ -331,7 +331,18 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
 
     // Construct the availability of the type witnesses based on the
     // availability of the enclosing type and the associated type.
-    const Decl *availabilitySources[2] = { dc->getAsDecl(), assocType };
+    llvm::SmallVector<Decl *, 2> availabilitySources = {dc->getAsDecl()};
+
+    // Only constrain the availability of the typealias by the availability of
+    // the associated type if the associated type is less available than its
+    // protocol. This is required for source compatibility.
+    auto protoAvailability = AvailabilityInference::availableRange(proto, ctx);
+    auto assocTypeAvailability =
+        AvailabilityInference::availableRange(assocType, ctx);
+    if (protoAvailability.isSupersetOf(assocTypeAvailability)) {
+      availabilitySources.push_back(assocType);
+    }
+
     AvailabilityInference::applyInferredAvailableAttrs(
         aliasDecl, availabilitySources, ctx);
 
