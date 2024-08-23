@@ -187,6 +187,12 @@ public:
   /// Get the ExportabilityReason for diagnostics. If this is 'None', there
   /// are no restrictions on referencing unexported declarations.
   std::optional<ExportabilityReason> getExportabilityReason() const;
+
+  /// If \p decl is unconditionally unavailable in this context, and the context
+  /// is not also unavailable in the same way, then this returns the specific
+  /// `@available` attribute that makes the decl unavailable. Otherwise, returns
+  /// nullptr.
+  const AvailableAttr *shouldDiagnoseDeclAsUnavailable(const Decl *decl) const;
 };
 
 /// Check if a declaration is exported as part of a module's external interface.

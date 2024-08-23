@@ -366,6 +366,18 @@ static bool isInsideCompatibleUnavailableDeclaration(
           inheritsAvailabilityFromPlatform(platform, *referencedPlatform));
 }
 
+const AvailableAttr *
+ExportContext::shouldDiagnoseDeclAsUnavailable(const Decl *D) const {
+  auto attr = AvailableAttr::isUnavailable(D);
+  if (!attr)
+    return nullptr;
+
+  if (isInsideCompatibleUnavailableDeclaration(D, *this, attr))
+    return nullptr;
+
+  return attr;
+}
+
 static bool shouldAllowReferenceToUnavailableInSwiftDeclaration(
     const Decl *D, const ExportContext &where) {
   auto *DC = where.getDeclContext();
@@ -2901,15 +2913,8 @@ public:
 static std::optional<UnavailabilityDiagnosticInfo>
 getExplicitUnavailabilityDiagnosticInfo(const Decl *decl,
                                         const ExportContext &where) {
-  auto *attr = AvailableAttr::isUnavailable(decl);
+  auto *attr = where.shouldDiagnoseDeclAsUnavailable(decl);
   if (!attr)
-    return std::nullopt;
-
-  // Calling unavailable code from within code with the same
-  // unavailability is OK -- the eventual caller can't call the
-  // enclosing code in the same situations it wouldn't be able to
-  // call this code.
-  if (isInsideCompatibleUnavailableDeclaration(decl, where, attr))
     return std::nullopt;
 
   ASTContext &ctx = decl->getASTContext();
