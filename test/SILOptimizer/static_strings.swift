@@ -46,10 +46,10 @@ public struct S {
 // CHECK-NEXT: }
 
 // getter for S.largestr
-// CHECK: define {{.*largestr.*}}gZ"
-// CHECK-NEXT: entry:
-// CHECK-NEXT:   ret {{.*}}
-// CHECK-NEXT: }
+// CHECK:      define {{.*largestr.*}}gZ"
+// CHECK-NOT:    load
+// CHECK-NOT:    call
+// CHECK:        ret
 
 // unsafeMutableAddressor for S.unicodestr
 // CHECK: define {{.*unicodestr.*}}u"
@@ -59,9 +59,9 @@ public struct S {
 
 // getter for S.unicodestr
 // CHECK: define {{.*unicodestr.*}}gZ"
-// CHECK-NEXT: entry:
-// CHECK-NEXT:   ret {{.*}}
-// CHECK-NEXT: }
+// CHECK-NOT:    load
+// CHECK-NOT:    call
+// CHECK:        ret
 
 // unsafeMutableAddressor for S.emptystr
 // CHECK: define {{.*emptystr.*}}u"
@@ -85,18 +85,18 @@ public func get_smallstr() -> String {
 }
 
 // CHECK-LABEL: define {{.*}}get_largestr
-// CHECK:      entry:
-// CHECK-NEXT:   ret {{.*}}
-// CHECK-NEXT: }
+// CHECK-NOT:    load
+// CHECK-NOT:    call
+// CHECK:        ret
 @inline(never)
 public func get_largestr() -> String {
   return S.largestr
 }
 
 // CHECK-LABEL: define {{.*}}get_unicodestr
-// CHECK:      entry:
-// CHECK-NEXT:   ret {{.*}}
-// CHECK-NEXT: }
+// CHECK-NOT:    load
+// CHECK-NOT:    call
+// CHECK:        ret
 @inline(never)
 public func get_unicodestr() -> String {
   return S.unicodestr
