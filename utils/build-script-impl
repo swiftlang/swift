@@ -583,9 +583,6 @@ function set_build_options_for_host() {
         watchsimulator-*    | \
         xros-*              | \
         xrsimulator-*)
-            swift_cmake_options+=(
-              -DPython3_EXECUTABLE="$(xcrun -f python3)"
-            )
             case ${host} in
                 macosx-x86_64)
                     SWIFT_HOST_TRIPLE="x86_64-apple-macosx${DARWIN_DEPLOYMENT_VERSION_OSX}"
