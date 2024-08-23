@@ -13,6 +13,15 @@
 /// A C++ type that is an object that can refer to a contiguous sequence of objects.
 ///
 /// C++ standard library type `std::span` conforms to this protocol.
+#if $NonescapableTypes
+public protocol CxxSpan<Element> : ~Escapable {
+  associatedtype Element
+  associatedtype Size: BinaryInteger
+
+  init()
+  init(_ unsafePointer : UnsafePointer<Element>, _ count: Size)
+}
+#else
 public protocol CxxSpan<Element> {
   associatedtype Element
   associatedtype Size: BinaryInteger
@@ -20,7 +29,26 @@ public protocol CxxSpan<Element> {
   init()
   init(_ unsafePointer : UnsafePointer<Element>, _ count: Size)
 }
+#endif
 
+#if $NonescapableTypes
+extension CxxSpan : ~Escapable {
+  /// Creates a C++ span from a Swift UnsafeBufferPointer
+  @inlinable
+  public init(_ unsafeBufferPointer: UnsafeBufferPointer<Element>) {
+    precondition(unsafeBufferPointer.baseAddress != nil, 
+                  "UnsafeBufferPointer should not point to nil")
+    self.init(unsafeBufferPointer.baseAddress!, Size(unsafeBufferPointer.count))
+  }
+
+  @inlinable
+  public init(_ unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element>) {
+    precondition(unsafeMutableBufferPointer.baseAddress != nil, 
+                  "UnsafeMutableBufferPointer should not point to nil")
+    self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
+  }
+}
+#else
 extension CxxSpan {
   /// Creates a C++ span from a Swift UnsafeBufferPointer
   @inlinable
@@ -37,7 +65,17 @@ extension CxxSpan {
     self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
   }
 }
+#endif
 
+#if $NonescapableTypes
+public protocol CxxMutableSpan<Element> : ~Escapable {
+  associatedtype Element
+  associatedtype Size: BinaryInteger
+
+  init()
+  init(_ unsafeMutablePointer : UnsafeMutablePointer<Element>, _ count: Size)
+}
+#else
 public protocol CxxMutableSpan<Element> {
   associatedtype Element
   associatedtype Size: BinaryInteger
@@ -45,7 +83,19 @@ public protocol CxxMutableSpan<Element> {
   init()
   init(_ unsafeMutablePointer : UnsafeMutablePointer<Element>, _ count: Size)
 }
+#endif
 
+#if $NonescapableTypes
+extension CxxMutableSpan : ~Escapable {
+  /// Creates a C++ span from a Swift UnsafeMutableBufferPointer
+  @inlinable
+  public init(_ unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element>) {
+    precondition(unsafeMutableBufferPointer.baseAddress != nil, 
+                  "UnsafeMutableBufferPointer should not point to nil")
+    self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
+  }
+}
+#else
 extension CxxMutableSpan {
   /// Creates a C++ span from a Swift UnsafeMutableBufferPointer
   @inlinable
@@ -55,3 +105,4 @@ extension CxxMutableSpan {
     self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
   }
 }
+#endif

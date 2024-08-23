@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ClangDerivedConformances.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -1197,6 +1198,12 @@ void swift::conformToCxxSpanIfNeeded(ClangImporter::Implementation &impl,
   importedConstructor->getAttrs().add(attr);
 
   decl->addMember(importedConstructor);
+  if (ctx.LangOpts.hasFeature(Feature::NonescapableTypes))
+  {
+    // Needs to be added before conformances are looked up.
+    decl->getAttrs().add(new (ctx)
+                                NonEscapableAttr(/*Implicit=*/true));
+  }
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element,
                                elementType->getUnderlyingType());
