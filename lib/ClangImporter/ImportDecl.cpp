@@ -2656,7 +2656,8 @@ namespace {
       // FIXME: https://github.com/apple/swift/issues/73037
       if (decl->getDeclContext()->isNamespace() &&
           decl->getDeclContext()->getParent()->isStdNamespace() &&
-          decl->getIdentifier() && decl->getName() == "tzdb")
+          decl->getIdentifier() &&
+          (decl->getName() == "tzdb" || decl->getName() == "time_zone_link"))
         return nullptr;
 
       auto &clangSema = Impl.getClangSema();
