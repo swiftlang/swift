@@ -6555,9 +6555,8 @@ bool ASTContext::isASCIIString(StringRef s) const {
 
 clang::DarwinSDKInfo *ASTContext::getDarwinSDKInfo() const {
   if (!getImpl().SDKInfo) {
-    auto SDKInfoOrErr = clang::parseDarwinSDKInfo(
-            *llvm::vfs::getRealFileSystem(),
-            SearchPathOpts.SDKPath);
+    auto SDKInfoOrErr = clang::parseDarwinSDKInfo(*SourceMgr.getFileSystem(),
+                                                  SearchPathOpts.SDKPath);
     if (!SDKInfoOrErr) {
       llvm::handleAllErrors(SDKInfoOrErr.takeError(),
                             [](const llvm::ErrorInfoBase &) {
