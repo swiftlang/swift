@@ -295,6 +295,13 @@ ExportContext ExportContext::withExported(bool exported) const {
   return copy;
 }
 
+ExportContext ExportContext::withRefinedAvailability(
+    const AvailabilityContext &availability) const {
+  auto copy = *this;
+  copy.RunningOSVersion.intersectWith(availability);
+  return copy;
+}
+
 std::optional<PlatformKind> ExportContext::getUnavailablePlatformKind() const {
   if (Unavailable)
     return PlatformKind(Platform);

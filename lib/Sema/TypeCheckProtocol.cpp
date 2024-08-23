@@ -4987,9 +4987,21 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
       if (assocConf.isConcrete()) {
         auto *concrete = assocConf.getConcrete();
         auto replacementTy = dc->mapTypeIntoContext(concrete->getType());
-        diagnoseConformanceAvailability(conformance->getLoc(),
-                                        assocConf, where,
-                                        depTy, replacementTy);
+
+        // If this requirement has a dependent member type, only require the
+        // associated conformance to be as available as the requirement's
+        // associated type.
+        auto availability = AvailabilityContext::alwaysAvailable();
+        if (auto depMemberType = depTy->getAs<DependentMemberType>()) {
+          auto assocType = depMemberType->getAssocType();
+          availability.intersectWith(
+              TypeChecker::overApproximateAvailabilityAtLocation(
+                  assocType->getLoc(), assocType->getDeclContext()));
+        }
+
+        diagnoseConformanceAvailability(
+            conformance->getLoc(), assocConf,
+            where.withRefinedAvailability(availability), depTy, replacementTy);
       }
 
       return false;
