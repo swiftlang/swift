@@ -1814,7 +1814,7 @@ public:
       if (!type->hasResilientSuperclass())
         return type->getNonResilientGenericArgumentOffset();
 
-      auto bounds = readMetadataBoundsOfSuperclass(descriptor);
+      auto bounds = computeMetadataBoundsFromSuperclass(descriptor);
       if (!bounds)
         return std::nullopt;
 
@@ -1838,9 +1838,32 @@ public:
 
   using ClassMetadataBounds = TargetClassMetadataBounds<Runtime>;
 
-  // This follows computeMetadataBoundsForSuperclass.
+  // This follows getMetadataBounds in ABI/Metadata.h.
   std::optional<ClassMetadataBounds>
-  readMetadataBoundsOfSuperclass(ContextDescriptorRef subclassRef) {
+  getClassMetadataBounds(ContextDescriptorRef classRef) {
+    auto classDescriptor = cast<TargetClassDescriptor<Runtime>>(classRef);
+
+    if (!classDescriptor->hasResilientSuperclass()) {
+      auto nonResilientImmediateMembersOffset =
+          classDescriptor->areImmediateMembersNegative()
+              ? -int32_t(classDescriptor->MetadataNegativeSizeInWords)
+              : int32_t(classDescriptor->MetadataPositiveSizeInWords -
+                        classDescriptor->NumImmediateMembers);
+      typename Runtime::StoredPointerDifference immediateMembersOffset =
+          nonResilientImmediateMembersOffset * sizeof(StoredPointer);
+
+      ClassMetadataBounds bounds{immediateMembersOffset,
+                                 classDescriptor->MetadataNegativeSizeInWords,
+                                 classDescriptor->MetadataPositiveSizeInWords};
+      return bounds;
+    }
+
+    return computeMetadataBoundsFromSuperclass(classRef);
+  }
+
+  // This follows computeMetadataBoundsFromSuperclass in Metadata.cpp.
+  std::optional<ClassMetadataBounds>
+  computeMetadataBoundsFromSuperclass(ContextDescriptorRef subclassRef) {
     auto subclass = cast<TargetClassDescriptor<Runtime>>(subclassRef);
     std::optional<ClassMetadataBounds> bounds;
 
@@ -1859,7 +1882,7 @@ public:
               -> std::optional<ClassMetadataBounds> {
             if (!isa<TargetClassDescriptor<Runtime>>(superclass))
               return std::nullopt;
-            return readMetadataBoundsOfSuperclass(superclass);
+            return getClassMetadataBounds(superclass);
           },
           [&](MetadataRef metadata) -> std::optional<ClassMetadataBounds> {
             auto cls = dyn_cast<TargetClassMetadata>(metadata);
