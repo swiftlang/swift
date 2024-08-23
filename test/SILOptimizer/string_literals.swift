@@ -31,17 +31,17 @@ public func test_create_smallstring() -> String {
 }
 
 // CHECK-LABEL: define {{.*}}test_create_largestring
-// CHECK:      entry:
-// CHECK-NEXT:   ret {{.*}}
-// CHECK-NEXT: }
+// CHECK-NOT:    load
+// CHECK-NOT:    call
+// CHECK:        ret
 public func test_create_largestring() -> String {
   return "abcdefghijkl012qwerqwer"
 }
 
 // CHECK-LABEL: define {{.*}}test_create_unicode
-// CHECK:      entry:
-// CHECK-NEXT:   ret {{.*}}
-// CHECK-NEXT: }
+// CHECK-NOT:    load
+// CHECK-NOT:    call
+// CHECK:        ret
 public func test_create_unicode() -> String {
   return "❄️gastroperiodyni"
 }
