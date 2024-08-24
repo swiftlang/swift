@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "transfer-non-sendable"
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Concurrency.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ProtocolConformance.h"
