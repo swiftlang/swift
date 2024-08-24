@@ -158,23 +158,19 @@ public func emitParserDiagnostics(
   ) { sourceFile in
     var anyDiags = false
 
-    let diags = ParseDiagnosticsGenerator.diagnostics(
-      for: sourceFile.pointee.syntax
-    )
+    let sourceFileSyntax = sourceFile.pointee.syntax
+    let diags = ParseDiagnosticsGenerator.diagnostics(for: sourceFileSyntax)
 
     let diagnosticEngine = BridgedDiagnosticEngine(raw: diagEnginePtr)
     let buildConfiguration = CompilerBuildConfiguration(
       ctx: ctx,
-      conditionLoc:
-        BridgedSourceLoc(
-        at: AbsolutePosition(utf8Offset: 0),
-        in: sourceFile.pointee.buffer
-      )
+      sourceBuffer: sourceFile.pointee.buffer
     )
 
+    let configuredRegions = sourceFileSyntax.configuredRegions(in: buildConfiguration)
     for diag in diags {
       // If the diagnostic is in an unparsed #if region, don't emit it.
-      if diag.node.isActive(in: buildConfiguration).state == .unparsed {
+      if configuredRegions.isActive(diag.node) == .unparsed {
         continue
       }
 
