@@ -264,11 +264,15 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     auto moduleNode = findModuleNode(definingDecl);
     if (!moduleNode)
       return Type();
-    auto parentModule = findModule(moduleNode);
-    if (!parentModule)
+    auto potentialParentModules = findPotentialModules(moduleNode);
+    if (potentialParentModules.empty())
       return Type();
 
-    auto opaqueDecl = parentModule->lookupOpaqueResultType(mangledName);
+    OpaqueTypeDecl *opaqueDecl = nullptr;
+    for (auto module : potentialParentModules)
+      if (auto decl = module->lookupOpaqueResultType(mangledName))
+        opaqueDecl = decl;
+
     if (!opaqueDecl)
       return Type();
     SmallVector<Type, 8> allArgs;
@@ -1123,17 +1127,11 @@ ASTBuilder::createTypeDecl(NodePointer node,
   return dyn_cast<GenericTypeDecl>(DC);
 }
 
-ModuleDecl *ASTBuilder::findModule(NodePointer node) {
+llvm::ArrayRef<ModuleDecl *>
+ASTBuilder::findPotentialModules(NodePointer node) {
   assert(node->getKind() == Demangle::Node::Kind::Module);
   const auto moduleName = node->getText();
-  // Respect the module's ABI name when we're trying to resolve
-  // mangled names. But don't touch anything under the Swift stdlib's
-  // umbrella.
-  if (moduleName != STDLIB_NAME)
-    if (auto *Module = Ctx.getLoadedModuleByABIName(moduleName))
-      return Module;
-
-  return Ctx.getModuleByName(moduleName);
+  return Ctx.getModulesByRealOrABIName(moduleName);
 }
 
 Demangle::NodePointer
@@ -1223,8 +1221,17 @@ ASTBuilder::findDeclContext(NodePointer node) {
   case Demangle::Node::Kind::BoundGenericTypeAlias:
     return findDeclContext(node->getFirstChild());
 
-  case Demangle::Node::Kind::Module:
-    return findModule(node);
+  case Demangle::Node::Kind::Module: {
+    // A Module node is not enough information to find the decl context.
+    // The reason being that the module name in a mangled name can either be
+    // the module's ABI name, which is potentially not unique (due to the
+    // -module-abi-name flag), or the module's real name, if mangling for the
+    // debugger or USR together with the OriginallyDefinedIn attribute for
+    // example.
+    assert(false && "Looked up module as decl context directly!");
+    auto modules = findPotentialModules(node);
+    return modules.empty() ? nullptr : modules[0];
+  }
 
   case Demangle::Node::Kind::Class:
   case Demangle::Node::Kind::Enum:
@@ -1237,20 +1244,24 @@ ASTBuilder::findDeclContext(NodePointer node) {
     if (declNameNode->getKind() == Demangle::Node::Kind::LocalDeclName) {
       // Find the AST node for the defining module.
       auto moduleNode = findModuleNode(node);
-      if (!moduleNode) return nullptr;
+      if (!moduleNode)
+        return nullptr;
 
-      auto module = findModule(moduleNode);
-      if (!module) return nullptr;
+      auto potentialModules = findPotentialModules(moduleNode);
+      if (potentialModules.empty())
+        return nullptr;
 
       // Look up the local type by its mangling.
       auto mangling = Demangle::mangleNode(node);
-      if (!mangling.isSuccess()) return nullptr;
+      if (!mangling.isSuccess())
+        return nullptr;
       auto mangledName = mangling.result();
 
-      auto decl = module->lookupLocalType(mangledName);
-      if (!decl) return nullptr;
+      for (auto *module : potentialModules)
+        if (auto *decl = module->lookupLocalType(mangledName))
+          return dyn_cast<DeclContext>(decl);
 
-      return dyn_cast<DeclContext>(decl);
+      return nullptr;
     }
 
     StringRef name;
@@ -1284,22 +1295,33 @@ ASTBuilder::findDeclContext(NodePointer node) {
       }
     }
 
-    DeclContext *dc = findDeclContext(node->getChild(0));
-    if (!dc) {
+    auto child = node->getFirstChild();
+    if (child->getKind() == Node::Kind::Module) {
+      auto potentialModules = findPotentialModules(child);
+      if (potentialModules.empty())
+        return nullptr;
+
+      for (auto *module : potentialModules)
+        if (auto typeDecl = findTypeDecl(module, Ctx.getIdentifier(name),
+                                         privateDiscriminator, node->getKind()))
+          return typeDecl;
       return nullptr;
     }
 
-    return findTypeDecl(dc, Ctx.getIdentifier(name),
-                        privateDiscriminator, node->getKind());
+    if (auto *dc = findDeclContext(child))
+      if (auto typeDecl = findTypeDecl(dc, Ctx.getIdentifier(name),
+                                       privateDiscriminator, node->getKind()))
+        return typeDecl;
+
+    return nullptr;
   }
 
   case Demangle::Node::Kind::Global:
     return findDeclContext(node->getChild(0));
 
   case Demangle::Node::Kind::Extension: {
-    auto *moduleDecl = dyn_cast_or_null<ModuleDecl>(
-        findDeclContext(node->getChild(0)));
-    if (!moduleDecl)
+    auto moduleDecls = findPotentialModules(node->getFirstChild());
+    if (moduleDecls.empty())
       return nullptr;
 
     auto *nominalDecl = dyn_cast_or_null<NominalTypeDecl>(
@@ -1321,14 +1343,23 @@ ASTBuilder::findDeclContext(NodePointer node) {
       // If the generic signature is equivalent to that of the nominal type,
       // and we're in the same module, it's due to inverse requirements.
       // Just return the nominal declaration.
-      if (genericSigMatchesNominal &&
-          nominalDecl->getParentModule() == moduleDecl) {
-        return nominalDecl;
+      for (auto *moduleDecl : moduleDecls) {
+        if (genericSigMatchesNominal &&
+            nominalDecl->getParentModule() == moduleDecl) {
+          return nominalDecl;;
+        }
       }
     }
 
     for (auto *ext : nominalDecl->getExtensions()) {
-      if (ext->getParentModule() != moduleDecl)
+      bool found = false;
+      for (ModuleDecl *module : moduleDecls) {
+        if (ext->getParentModule() == module) {
+          found = true;
+          break;
+        }
+      }
+      if (!found)
         continue;
 
       if (!ext->isConstrainedExtension()) {

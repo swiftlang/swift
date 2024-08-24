@@ -275,6 +275,10 @@ struct ASTContext::Implementation {
   /// DenseMap.
   llvm::MapVector<Identifier, ModuleDecl *> LoadedModules;
 
+  /// The map from a module's name to a vector of modules that share that name.
+  /// The name can be either the module's real name of the module's ABI name.
+  llvm::DenseMap<Identifier, llvm::SmallVector<ModuleDecl *, 1>> NameToModules;
+
   // FIXME: This is a StringMap rather than a StringSet because StringSet
   // doesn't allow passing in a pre-existing allocator.
   llvm::StringMap<Identifier::Aligner, llvm::BumpPtrAllocator&>
@@ -839,6 +843,7 @@ void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
                                 << llvm::capacity_in_bytes(Name) << "\n"
 
   SIZE(LoadedModules);
+  SIZE(NameToModules);
   SIZE(IdentifierTable);
   SIZE(Cleanups);
   SIZE_AND_BYTES(ModuleLoaders);
@@ -2323,10 +2328,61 @@ void ASTContext::addLoadedModule(ModuleDecl *M) {
   // and a source file has 'import Foo', a module called Bar (real name)
   // will be loaded and added to the map.
   getImpl().LoadedModules[M->getRealName()] = M;
+
+  // Add the module to the mapping from module name to list of modules that
+  // share that name.
+  getImpl().NameToModules[M->getRealName()].push_back(M);
+
+  // If the ABI name differs from the real name, also add the module to the list
+  // that share that ABI name.
+  if (M->getRealName() != M->getABIName())
+    getImpl().NameToModules[M->getABIName()].push_back(M);
 }
 
 void ASTContext::removeLoadedModule(Identifier RealName) {
+  // First remove the module from the mappings of names to modules.
+  if (ModuleDecl *M = getLoadedModule(RealName)) {
+    auto eraseModule = [&](ModuleDecl *module) {
+      return module->getRealName() == RealName;
+    };
+    auto &vector = getImpl().NameToModules[M->getRealName()];
+    llvm::erase_if(vector, eraseModule);
+    if (M->getRealName() != M->getABIName()) {
+      auto &vector = getImpl().NameToModules[M->getABIName()];
+      llvm::erase_if(vector, eraseModule);
+    }
+  }
+
   getImpl().LoadedModules.erase(RealName);
+}
+
+void ASTContext::moduleABINameWillChange(ModuleDecl *module,
+                                         Identifier newName) {
+  auto it = llvm::find_if(getLoadedModules(),
+                          [&](auto pair) { return pair.second == module; });
+
+  // If this module isn't in the loaded modules list (perhaps because there is
+  // no memory cache) theere's nothing to do.
+  if (it == getLoadedModules().end())
+    return;
+
+  // If the names are the same there's nothing to do.
+  if (module->getABIName() == newName)
+    return;
+
+  // If the real and ABI names are different, ASTContext needs to remove the
+  // module from the mapping whose key is the old ABI name.
+  if (module->getRealName() != module->getABIName()) {
+    auto &vector = getImpl().NameToModules[module->getABIName()];
+    llvm::erase_if(vector,
+                   [&](ModuleDecl *current) { return module == current; });
+  }
+
+  // Now add the module to the vector that's mapped from the new name, if it's
+  // not there already.
+  auto &vector = getImpl().NameToModules[newName];
+  if (llvm::find(vector, module) == vector.end())
+    vector.push_back(module);
 }
 
 void ASTContext::setIgnoreAdjacentModules(bool value) {
@@ -2715,12 +2771,21 @@ ModuleDecl *ASTContext::getModuleByIdentifier(Identifier ModuleID) {
   return getModule(builder.get());
 }
 
-ModuleDecl *ASTContext::getLoadedModuleByABIName(StringRef ModuleName) {
-  for (auto &[_, module] : getLoadedModules()) {
-    if (ModuleName == module->getABIName().str())
-      return module;
-  }
-  return nullptr;
+llvm::ArrayRef<ModuleDecl *>
+ASTContext::getModulesByRealOrABIName(StringRef ModuleName) {
+  auto Identifier = getIdentifier(ModuleName);
+  auto it = getImpl().NameToModules.find(Identifier);
+  if (it != getImpl().NameToModules.end())
+    return it->second;
+
+  // If we didn't find the module it might have not been loaded yet, try
+  // triggering a module load and searching again.
+  getModuleByName(ModuleName);
+  it = getImpl().NameToModules.find(Identifier);
+  if (it != getImpl().NameToModules.end())
+    return it->second;
+
+  return {};
 }
 
 ModuleDecl *ASTContext::getStdlibModule(bool loadIfAbsent) {

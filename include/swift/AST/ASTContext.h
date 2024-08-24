@@ -1200,10 +1200,15 @@ public:
 
   ModuleDecl *getModuleByIdentifier(Identifier ModuleID);
 
-  /// Looks up an already loaded module by its ABI name.
+  /// Looks up all modules whose real name or ABI name match ModuleName.
   ///
-  /// \returns The module if found, nullptr otherwise.
-  ModuleDecl *getLoadedModuleByABIName(StringRef ModuleName);
+  /// Modules that are being looked up by ABI name are only found if they are a
+  /// dependency of a module that has that same name as its real name, as there
+  /// is no efficient way to lazily load a module by ABI name.
+  llvm::ArrayRef<ModuleDecl *> getModulesByRealOrABIName(StringRef ModuleName);
+
+  /// Notifies the AST context that a loaded module's ABI name will change.
+  void moduleABINameWillChange(ModuleDecl *module, Identifier newName);
 
   /// Returns the standard library module, or null if the library isn't present.
   ///
