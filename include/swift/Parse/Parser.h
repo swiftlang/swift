@@ -2096,12 +2096,15 @@ public:
 
   using PlatformAndVersion = std::pair<PlatformKind, llvm::VersionTuple>;
 
-  /// Parse a platform and version tuple (e.g. "macOS 12.0") and append it to the
-  /// given vector. Wildcards ('*') parse successfully but are ignored. Assumes
-  /// that the tuples are part of a comma separated list ending with a trailing
-  /// ')'.
-  ParserStatus parsePlatformVersionInList(StringRef AttrName,
-      llvm::SmallVector<PlatformAndVersion, 4> &PlatformAndVersions);
+  /// Parse a platform and version tuple (e.g. "macOS 12.0") and append it to
+  /// the given vector. Wildcards ('*') parse successfully but are ignored.
+  /// Unrecognized platform names also parse successfully but are ignored.
+  /// Assumes that the tuples are part of a comma separated list ending with a
+  /// trailing ')'.
+  ParserStatus parsePlatformVersionInList(
+      StringRef AttrName,
+      llvm::SmallVector<PlatformAndVersion, 4> & PlatformAndVersions,
+      bool &ParsedUnrecognizedPlatformName);
 
   //===--------------------------------------------------------------------===//
   // Code completion second pass.
