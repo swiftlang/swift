@@ -908,7 +908,8 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
   // opened archetypes trivial.
   InstructionCloner Cloner(Inst->getFunction());
   Cloner.registerLocalArchetypeRemapping(
-      OldOpenedArchetype->castTo<ArchetypeType>(), NewOpenedArchetype);
+      OldOpenedArchetype->getGenericEnvironment(),
+      NewOpenedArchetype->getGenericEnvironment());
   auto &Builder = Cloner.getBuilder();
 
   // Now clone each candidate and replace the opened archetype

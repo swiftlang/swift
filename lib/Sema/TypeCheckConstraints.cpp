@@ -1059,6 +1059,9 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
       return replacement;
     },
     MakeAbstractConformanceForGenericType(),
+    // FIXME: By folding primary and opaque archetypes together, this doesn't
+    // really capture the correct semantics for opaque archetypes.
+    SubstFlags::SubstitutePrimaryArchetypes |
     SubstFlags::SubstituteOpaqueArchetypes);
 }
 

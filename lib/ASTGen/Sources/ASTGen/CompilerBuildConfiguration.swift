@@ -20,11 +20,11 @@ import SwiftSyntax
 /// queries.
 struct CompilerBuildConfiguration: BuildConfiguration {
   let ctx: BridgedASTContext
-  var conditionLoc: BridgedSourceLoc
+  let sourceBuffer: UnsafeBufferPointer<UInt8>
 
-  init(ctx: BridgedASTContext, conditionLoc: BridgedSourceLoc) {
+  init(ctx: BridgedASTContext, sourceBuffer: UnsafeBufferPointer<UInt8>) {
     self.ctx = ctx
-    self.conditionLoc = conditionLoc
+    self.sourceBuffer = sourceBuffer
   }
 
   func isCustomConditionSet(name: String) throws -> Bool {
@@ -48,8 +48,11 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     }
   }
   
-  func canImport(importPath: [String], version: CanImportVersion) throws -> Bool {
-    var importPathStr = importPath.joined(separator: ".")
+  func canImport(
+    importPath: [(TokenSyntax, String)],
+    version: CanImportVersion
+  ) throws -> Bool {
+    var importPathStr = importPath.map { $0.1 }.joined(separator: ".")
 
     var versionComponents: [Int]
     let cVersionKind: BridgedCanImportVersion
@@ -71,7 +74,10 @@ struct CompilerBuildConfiguration: BuildConfiguration {
       versionComponents.withUnsafeBufferPointer { versionComponentsBuf in
         ctx.canImport(
           importPath: bridgedImportPathStr,
-          location: conditionLoc,
+          location: BridgedSourceLoc(
+            at: importPath.first!.0.position,
+            in: sourceBuffer
+          ),
           versionKind: cVersionKind,
           versionComponents: versionComponentsBuf.baseAddress,
           numVersionComponents: versionComponentsBuf.count
@@ -165,7 +171,7 @@ public func configuredRegions(
   let sourceFilePtr = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1)
   let configuration = CompilerBuildConfiguration(
     ctx: astContext,
-    conditionLoc: sourceFilePtr.pointee.sourceLoc(at: AbsolutePosition(utf8Offset: 0))
+    sourceBuffer: sourceFilePtr.pointee.buffer
   )
   let regions = sourceFilePtr.pointee.syntax.configuredRegions(in: configuration)
 

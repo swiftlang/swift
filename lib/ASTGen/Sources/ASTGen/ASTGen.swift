@@ -98,7 +98,7 @@ struct ASTGenVisitor {
     self.legacyParse = legacyParser
     self.buildConfiguration = CompilerBuildConfiguration(
       ctx: ctx,
-      conditionLoc: BridgedSourceLoc(at: AbsolutePosition(utf8Offset: 0), in: sourceBuffer)
+      sourceBuffer: sourceBuffer
     )
   }
 
