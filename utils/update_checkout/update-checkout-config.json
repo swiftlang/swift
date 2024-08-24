@@ -34,6 +34,8 @@
             "remote": { "id": "apple/swift-system" } },
         "swift-stress-tester": {
             "remote": { "id": "swiftlang/swift-stress-tester" } },
+        "swift-testing": {
+            "remote": { "id": "swiftlang/swift-testing" } },
         "swift-corelibs-xctest": {
             "remote": { "id": "apple/swift-corelibs-xctest" } },
         "swift-corelibs-foundation": {
@@ -128,6 +130,7 @@
                 "swift-syntax": "main",
                 "swift-system": "1.3.0",
                 "swift-stress-tester": "main",
+                "swift-testing": "main",
                 "swift-corelibs-xctest": "main",
                 "swift-corelibs-foundation": "main",
                 "swift-foundation-icu": "main",
@@ -179,6 +182,7 @@
                 "swift-syntax": "release/6.0",
                 "swift-system": "1.3.0",
                 "swift-stress-tester": "release/6.0",
+                "swift-testing": "release/6.0",
                 "swift-corelibs-xctest": "release/6.0",
                 "swift-corelibs-foundation": "release/6.0",
                 "swift-foundation": "release/6.0",
@@ -230,6 +234,7 @@
                 "swift-syntax": "release/6.0.0",
                 "swift-system": "1.3.0",
                 "swift-stress-tester": "release/6.0.0",
+                "swift-testing": "release/6.0.0",
                 "swift-corelibs-xctest": "release/6.0.0",
                 "swift-corelibs-foundation": "release/6.0.0",
                 "swift-foundation": "release/6.0.0",
@@ -328,6 +333,7 @@
                 "swift-syntax": "main",
                 "swift-system": "1.3.0",
                 "swift-stress-tester": "main",
+                "swift-testing": "main",
                 "swift-corelibs-xctest": "main",
                 "swift-corelibs-foundation": "main",
                 "swift-corelibs-libdispatch": "main",
@@ -705,6 +711,7 @@
                 "swift-syntax": "main",
                 "swift-system": "1.3.0",
                 "swift-stress-tester": "main",
+                "swift-testing": "main",
                 "swift-corelibs-xctest": "main",
                 "swift-corelibs-foundation": "main",
                 "swift-corelibs-libdispatch": "main",

@@ -293,7 +293,8 @@ class Product(object):
                 arch, self.args.darwin_deployment_version_xros)
         return target
 
-    def generate_darwin_toolchain_file(self, platform, arch):
+    def generate_darwin_toolchain_file(self, platform, arch,
+                                       macos_deployment_version=None):
         """
         Generates a new CMake tolchain file that specifies Darwin as a target
         plaftorm.
@@ -306,9 +307,14 @@ class Product(object):
 
         cmake_osx_sysroot = xcrun.sdk_path(platform)
 
-        target = self.target_for_platform(platform, arch)
-        if not target:
-            raise RuntimeError('Unhandled platform {}?!'.format(platform))
+        if platform == 'macosx':
+            if macos_deployment_version is None:
+                macos_deployment_version = self.args.darwin_deployment_version_osx
+            target = '{}-apple-macosx{}'.format(arch, macos_deployment_version)
+        else:
+            target = self.target_for_platform(platform, arch)
+            if not target:
+                raise RuntimeError('Unhandled platform {}?!'.format(platform))
 
         toolchain_args = {}
 
@@ -429,7 +435,8 @@ class Product(object):
 
         return toolchain_file
 
-    def generate_toolchain_file_for_darwin_or_linux(self, host_target):
+    def generate_toolchain_file_for_darwin_or_linux(
+            self, host_target, override_macos_deployment_version=None):
         """
         Checks `host_target` platform and generates a new CMake tolchain file
         appropriate for that target plaftorm (either Darwin or Linux). Defines
@@ -448,7 +455,9 @@ class Product(object):
 
         toolchain_file = None
         if self.is_darwin_host(host_target):
-            toolchain_file = self.generate_darwin_toolchain_file(platform, arch)
+            toolchain_file = self.generate_darwin_toolchain_file(
+                platform, arch,
+                macos_deployment_version=override_macos_deployment_version)
             self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
         elif platform == "linux":
             toolchain_file = self.generate_linux_toolchain_file(platform, arch)
