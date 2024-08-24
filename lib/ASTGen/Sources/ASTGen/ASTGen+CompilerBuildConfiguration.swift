@@ -25,8 +25,6 @@ extension ASTGenVisitor {
   /// produced due to the evaluation.
   func activeClause(in node: IfConfigDeclSyntax) -> IfConfigClauseSyntax? {
     // Determine the active clause.
-    var buildConfiguration = self.buildConfiguration
-    buildConfiguration.conditionLoc = generateSourceLoc(node)
     let (activeClause, diagnostics) = node.activeClause(in: buildConfiguration)
     diagnoseAll(diagnostics)
 

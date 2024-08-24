@@ -3,8 +3,8 @@
 // REQUIRES: asserts
 
 #if NOT_SET
-func f { } // FIXME: Error once the parser diagnostics generator knows to
-           // evaluate the active clause.
+func f { } // expected-error{{expected parameter clause in function signature}}
+           // expected-note@-1{{insert parameter clause}}{{7-8=}}{{8-8=(}}{{8-8=) }}
 #endif
 
 #if compiler(>=10.0)
