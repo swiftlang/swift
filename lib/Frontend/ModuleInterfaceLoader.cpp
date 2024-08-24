@@ -1787,6 +1787,9 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   genericSubInvocation.getClangImporterOptions().ClangImporterDirectCC1Scan =
       clangImporterOpts.ClangImporterDirectCC1Scan;
 
+  genericSubInvocation.getSearchPathOptions().ScannerPrefixMapper =
+      SearchPathOpts.ScannerPrefixMapper;
+
   // Validate Clang modules once per-build session flags must be consistent
   // across all module sub-invocations
   if (clangImporterOpts.ValidateModulesOnce) {
