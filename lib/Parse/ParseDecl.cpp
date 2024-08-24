@@ -2189,7 +2189,8 @@ void Parser::parseAllAvailabilityMacroArguments() {
 }
 
 ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
-    llvm::SmallVector<PlatformAndVersion, 4> &PlatformAndVersions) {
+    llvm::SmallVector<PlatformAndVersion, 4> &PlatformAndVersions,
+    bool &ParsedUnrecognizedPlatformName) {
   // Check for availability macros first.
   if (peekAvailabilityMacroName()) {
     SmallVector<AvailabilitySpec *, 4> Specs;
@@ -2226,6 +2227,7 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
   // Parse the platform name.
   StringRef platformText = Tok.getText();
   auto MaybePlatform = platformFromString(platformText);
+  ParsedUnrecognizedPlatformName = !MaybePlatform.has_value();
   SourceLoc PlatformLoc = Tok.getLoc();
   consumeToken();
 
@@ -2288,6 +2290,7 @@ bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
   SourceLoc RightLoc;
   ParserStatus Status;
   bool SuppressLaterDiags = false;
+  bool ParsedUnrecognizedPlatformName = false;
   llvm::SmallVector<PlatformAndVersion, 4> PlatformAndVersions;
 
   {
@@ -2306,12 +2309,12 @@ bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
     if (!Tok.is(tok::r_paren)) {
       ParseListItemResult Result;
       do {
-        Result = parseListItem(Status, tok::r_paren, LeftLoc, RightLoc,
-                               /*AllowSepAfterLast=*/false,
-                               [&]() -> ParserStatus {
-                                 return parsePlatformVersionInList(
-                                     AtAttrName, PlatformAndVersions);
-                               });
+        Result = parseListItem(
+            Status, tok::r_paren, LeftLoc, RightLoc,
+            /*AllowSepAfterLast=*/false, [&]() -> ParserStatus {
+              return parsePlatformVersionInList(AtAttrName, PlatformAndVersions,
+                                                ParsedUnrecognizedPlatformName);
+            });
       } while (Result == ParseListItemResult::Continue);
     }
   }
@@ -2324,12 +2327,11 @@ bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
     return false;
   }
 
-  if (PlatformAndVersions.empty()) {
+  if (PlatformAndVersions.empty() && !ParsedUnrecognizedPlatformName) {
     diagnose(Loc, diag::attr_availability_need_platform_version, AtAttrName);
     return false;
   }
 
-  assert(!PlatformAndVersions.empty());
   auto AttrRange = SourceRange(Loc, RightLoc);
   for (auto &Item : PlatformAndVersions) {
     Attributes.add(new (Context) BackDeployedAttr(AtLoc, AttrRange, Item.first,
@@ -3445,6 +3447,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     StringRef AttrName = "@_originallyDefinedIn";
     bool SuppressLaterDiags = false;
+    bool ParsedUnrecognizedPlatformName = false;
     if (parseList(tok::r_paren, LeftLoc, RightLoc, false,
                   diag::originally_defined_in_missing_rparen,
                   [&]() -> ParserStatus {
@@ -3484,8 +3487,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       }
       // Parse 'OSX 13.13'.
       case NextSegmentKind::PlatformVersion: {
-        ParserStatus ListItemStatus =
-            parsePlatformVersionInList(AttrName, PlatformAndVersions);
+        ParserStatus ListItemStatus = parsePlatformVersionInList(
+            AttrName, PlatformAndVersions, ParsedUnrecognizedPlatformName);
         if (ListItemStatus.isErrorOrHasCompletion())
           SuppressLaterDiags = true;
         return ListItemStatus;
@@ -3499,13 +3502,13 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       diagnose(AtLoc, diag::originally_defined_in_need_nonempty_module_name);
       return makeParserSuccess();
     }
-    if (PlatformAndVersions.empty()) {
+
+    if (PlatformAndVersions.empty() && !ParsedUnrecognizedPlatformName) {
       diagnose(AtLoc, diag::attr_availability_need_platform_version, AttrName);
       return makeParserSuccess();
     }
 
     assert(!OriginalModuleName.empty());
-    assert(!PlatformAndVersions.empty());
     assert(NK == NextSegmentKind::PlatformVersion);
     AttrRange = SourceRange(Loc, RightLoc);
     for (auto &Item: PlatformAndVersions) {
