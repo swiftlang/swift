@@ -326,7 +326,7 @@ SIMPLE_DECL_ATTR(_noAllocation, NoAllocation,
   OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   124)
 SIMPLE_DECL_ATTR(preconcurrency, Preconcurrency,
-  OnFunc | OnConstructor | OnDestructor | OnProtocol | OnGenericType | OnVar | OnSubscript | OnEnumElement | OnImport | ABIStableToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  OnFunc | OnConstructor | OnProtocol | OnGenericType | OnVar | OnSubscript | OnEnumElement | OnImport | ABIStableToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   125)
 DECL_ATTR(_unavailableFromAsync, UnavailableFromAsync,
   OnFunc | OnConstructor | OnMacro | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
