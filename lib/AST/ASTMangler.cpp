@@ -699,8 +699,7 @@ static Type getTypeForDWARFMangling(Type t) {
       }
       return t->getCanonicalType();
     },
-    MakeAbstractConformanceForGenericType(),
-    SubstFlags::AllowLoweredTypes);
+    MakeAbstractConformanceForGenericType());
 }
 
 std::string ASTMangler::mangleTypeForDebugger(Type Ty, GenericSignature sig) {
@@ -3801,6 +3800,7 @@ void ASTMangler::appendClosureComponents(CanType Ty, unsigned discriminator,
   Ty = Ty.subst(MapLocalArchetypesOutOfContext(Sig, capturedEnvs),
                 MakeAbstractConformanceForGenericType(),
                 SubstFlags::PreservePackExpansionLevel |
+                SubstFlags::SubstitutePrimaryArchetypes |
                 SubstFlags::SubstituteLocalArchetypes)->getCanonicalType();
 
   appendType(Ty, Sig);

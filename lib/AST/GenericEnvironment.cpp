@@ -377,8 +377,8 @@ Type TypeBase::mapTypeOutOfContext() {
   assert(!hasTypeParameter() && "already have an interface type");
   return Type(this).subst(MapTypeOutOfContext(),
     MakeAbstractConformanceForGenericType(),
-    SubstFlags::AllowLoweredTypes |
-    SubstFlags::PreservePackExpansionLevel);
+    SubstFlags::PreservePackExpansionLevel |
+    SubstFlags::SubstitutePrimaryArchetypes);
 }
 
 class GenericEnvironment::NestedTypeStorage
@@ -579,7 +579,6 @@ Type GenericEnvironment::mapTypeIntoContext(
 
   Type result = type.subst(QueryInterfaceTypeSubstitutions(this),
                            lookupConformance,
-                           SubstFlags::AllowLoweredTypes |
                            SubstFlags::PreservePackExpansionLevel);
   assert((!result->hasTypeParameter() || result->hasError() ||
           getKind() == Kind::Opaque) &&
@@ -716,8 +715,8 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
       return archetype->getInterfaceType();
     },
     MakeAbstractConformanceForGenericType(),
-    SubstFlags::AllowLoweredTypes |
     SubstFlags::PreservePackExpansionLevel |
+    SubstFlags::SubstitutePrimaryArchetypes |
     SubstFlags::SubstituteLocalArchetypes);
 
   auto shapeClass = elementEnv->getOpenedElementShapeClass();
@@ -740,10 +739,7 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
   QueryInterfaceTypeSubstitutions mapIntoContext(this);
   return type.subst(
       [&](SubstitutableType *type) {
-        auto *genericParam = type->getAs<GenericTypeParamType>();
-        if (!genericParam)
-          return Type();
-
+        auto *genericParam = cast<GenericTypeParamType>(type);
         if (genericParam->getDepth() == elementDepth) {
           genericParam = members[genericParam->getIndex()];
           assert(genericParam->isParameterPack());
@@ -773,7 +769,7 @@ public:
 
 Type BuildForwardingSubstitutions::operator()(SubstitutableType *type) const {
   if (auto resultType = Query(type)) {
-    auto param = type->castTo<GenericTypeParamType>();
+    auto param = cast<GenericTypeParamType>(type);
     if (!param->isParameterPack())
       return resultType;
     if (resultType->is<PackType>())

@@ -4803,8 +4803,7 @@ class SILFunctionConventions;
 
 
 CanType substOpaqueTypesWithUnderlyingTypes(CanType type,
-                                            TypeExpansionContext context,
-                                            bool allowLoweredTypes = false);
+                                            TypeExpansionContext context);
 ProtocolConformanceRef
 substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
                                     TypeExpansionContext context);
@@ -6574,10 +6573,6 @@ public:
   /// This is a slow operation because it must scan all of the protocols to
   /// which the archetype conforms.
   Type getNestedTypeByName(Identifier name);
-
-  /// Retrieve the parent of this archetype, or null if this is a
-  /// primary archetype.
-  ArchetypeType *getParent() const;
 
   /// Return the archetype that represents the root generic parameter of its
   /// interface type.

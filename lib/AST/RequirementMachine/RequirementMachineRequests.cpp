@@ -629,7 +629,6 @@ AbstractGenericSignatureRequest::evaluate(
             return Type(type);
           },
           MakeAbstractConformanceForGenericType(),
-          SubstFlags::AllowLoweredTypes |
           SubstFlags::PreservePackExpansionLevel);
       resugaredRequirements.push_back(resugaredReq);
     }

@@ -3381,15 +3381,6 @@ ArchetypeType::ArchetypeType(TypeKind Kind,
                           getSubclassTrailingObjects<ProtocolDecl *>());
 }
 
-ArchetypeType *ArchetypeType::getParent() const {
-  if (auto depMemTy = getInterfaceType()->getAs<DependentMemberType>()) {
-    return getGenericEnvironment()->mapTypeIntoContext(depMemTy->getBase())
-        ->castTo<ArchetypeType>();
-  }
-
-  return nullptr;
-}
-
 ArchetypeType *ArchetypeType::getRoot() const {
   if (isRoot()) {
     return const_cast<ArchetypeType *>(this);
