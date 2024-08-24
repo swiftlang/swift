@@ -95,6 +95,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Memory.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/TextAPI/InterfaceFile.h"
@@ -4141,6 +4142,16 @@ ClangImporter::getSwiftExplicitModuleDirectCC1Args() const {
     // FileSystemOptions.
     auto &FSOpts = instance.getFileSystemOpts();
     FSOpts.WorkingDir.clear();
+  }
+
+  if (!Impl.SwiftContext.SearchPathOpts.ScannerPrefixMapper.empty()) {
+    // Remap all the paths if requested.
+    llvm::PrefixMapper Mapper;
+    clang::tooling::dependencies::DepscanPrefixMapping::configurePrefixMapper(
+        Impl.SwiftContext.SearchPathOpts.ScannerPrefixMapper, Mapper);
+    clang::tooling::dependencies::DepscanPrefixMapping::remapInvocationPaths(
+        instance, Mapper);
+    instance.getFrontendOpts().PathPrefixMappings.clear();
   }
 
   return instance.getCC1CommandLine();
