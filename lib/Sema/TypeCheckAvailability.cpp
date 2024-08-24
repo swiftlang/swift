@@ -86,6 +86,14 @@ bool swift::isExported(const ValueDecl *VD) {
 }
 
 static bool hasConformancesToPublicProtocols(const ExtensionDecl *ED) {
+  auto nominal = ED->getExtendedNominal();
+  if (!nominal)
+    return false;
+
+  // Extensions of protocols cannot introduce additional conformances.
+  if (isa<ProtocolDecl>(nominal))
+    return false;
+
   auto protocols = ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
   for (const ProtocolDecl *PD : protocols) {
     AccessScope scope =
