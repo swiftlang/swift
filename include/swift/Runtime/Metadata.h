@@ -1059,7 +1059,7 @@ SWIFT_RUNTIME_EXPORT
 void swift_initRawStructMetadata(StructMetadata *self,
                                  StructLayoutFlags flags,
                                  const TypeLayout *likeType,
-                                 ssize_t count);
+                                 int32_t count);
 
 /// Initialize the value witness table for a struct using the provided like type
 /// as the basis for the layout.

@@ -3030,7 +3030,7 @@ SWIFT_RUNTIME_EXPORT
 void swift::swift_initRawStructMetadata(StructMetadata *structType,
                                         StructLayoutFlags layoutFlags,
                                         const TypeLayout *likeTypeLayout,
-                                        ssize_t count) {
+                                        int32_t count) {
   auto vwtable = getMutableVWTableForInit(structType, layoutFlags);
 
   // The existing vwt function entries are all fine to preserve, the only thing
@@ -3040,9 +3040,9 @@ void swift::swift_initRawStructMetadata(StructMetadata *structType,
   auto alignMask = likeTypeLayout->flags.getAlignmentMask();
   auto extraInhabitantCount = likeTypeLayout->extraInhabitantCount;
 
-  // If our count is not -1, we're dealing an array like layout.
-  if (count != -1) {
-    stride *= (size_t)count;
+  // If our count is greater than or equal 0, we're dealing an array like layout.
+  if (count >= 0) {
+    stride *= count;
     size = stride;
   }
 
