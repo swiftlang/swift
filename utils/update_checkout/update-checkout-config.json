@@ -244,6 +244,7 @@
                 "swift-syntax": "release/6.0.0",
                 "swift-system": "1.3.0",
                 "swift-stress-tester": "release/6.0.0",
+                "swift-testing": "release/6.0.0",
                 "swift-corelibs-xctest": "release/6.0.0",
                 "swift-corelibs-foundation": "release/6.0.0",
                 "swift-foundation": "release/6.0.0",
