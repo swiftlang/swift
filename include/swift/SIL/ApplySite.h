@@ -534,6 +534,10 @@ public:
   /// result argument to the apply site.
   bool isIndirectResultOperand(const Operand &op) const;
 
+  /// Returns true if \p op is an operand that is passed as an indirect error
+  /// result.
+  bool isIndirectErrorResultOperand(const Operand &op) const;
+
   ApplyOptions getApplyOptions() const {
     switch (ApplySiteKind(getInstruction()->getKind())) {
     case ApplySiteKind::ApplyInst:
@@ -595,6 +599,14 @@ public:
     // The ParameterInfo is going to be the parameter in the caller.
     unsigned calleeArgIndex = getCalleeArgIndex(oper);
     return getSubstCalleeConv().getParamInfoForSILArg(calleeArgIndex);
+  }
+
+  bool isSending(const Operand &oper) const {
+    if (isIndirectErrorResultOperand(oper))
+      return false;
+    if (isIndirectResultOperand(oper))
+      return getSubstCalleeType()->hasSendingResult();
+    return getArgumentParameterInfo(oper).hasOption(SILParameterInfo::Sending);
   }
 
   static ApplySite getFromOpaqueValue(void *p) { return ApplySite(p); }
@@ -953,6 +965,13 @@ inline bool ApplySite::isIndirectResultOperand(const Operand &op) const {
   if (!fas)
     return false;
   return fas.isIndirectResultOperand(op);
+}
+
+inline bool ApplySite::isIndirectErrorResultOperand(const Operand &op) const {
+  auto fas = asFullApplySite();
+  if (!fas)
+    return false;
+  return fas.isIndirectErrorResultOperand(op);
 }
 
 } // namespace swift
