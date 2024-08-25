@@ -60,9 +60,10 @@ func withCheckedContinuation_3() async {
     // expected-note @-2 {{'x' used after being passed as a 'sending' parameter}}
     useValue(x) // expected-note {{access can happen concurrently}}
   }
+
+  // Since x is returned as sending from withCheckedContinuation, we can send it
+  // further.
   await useValueAsync(x)
-  // expected-error @-1 {{sending 'x' risks causing data races}}
-  // expected-note @-2 {{sending main actor-isolated 'x' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
 }
 
 func withCheckedContinuation_3a() async {
@@ -88,9 +89,10 @@ func withCheckedContinuation_4() async {
     // expected-note @-2 {{main actor-isolated 'y' is passed as a 'sending' parameter}}
     useValue(y)
   }
+
+  // Since withCheckedContinuation returns value as sending, we can call
+  // useValueAsync since it is disconnected.
   await useValueAsync(x)
-  // expected-error @-1 {{sending 'x' risks causing data races}}
-  // expected-note @-2 {{sending main actor-isolated 'x' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
 }
 
 func withCheckedContinuation_4a() async {
@@ -189,9 +191,10 @@ func withUnsafeContinuation_3() async {
     // expected-note @-2 {{'x' used after being passed as a 'sending' parameter}}
     useValue(x) // expected-note {{access can happen concurrently}}
   }
+
+  // withUnsafeContinuation returns x as sending, so we can pass it to a
+  // nonisolated function.
   await useValueAsync(x)
-  // expected-error @-1 {{sending 'x' risks causing data races}}
-  // expected-note @-2 {{sending main actor-isolated 'x' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
 }
 
 func withUnsafeContinuation_3a() async {
@@ -215,9 +218,10 @@ func withUnsafeContinuation_4() async {
     // expected-note @-2 {{main actor-isolated 'y' is passed as a 'sending' parameter}}
     useValue(y)
   }
+
+  // Since withUnsafeContinuation returns x as sending, we can use it in a
+  // nonisolated function.
   await useValueAsync(x)
-  // expected-error @-1 {{sending 'x' risks causing data races}}
-  // expected-note @-2 {{sending main actor-isolated 'x' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
 }
 
 func withUnsafeContinuation_4a() async {

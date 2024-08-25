@@ -832,11 +832,19 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
 
   auto *fArg = cast<SILFunctionArgument>(arg);
 
-  // Transferring is always disconnected.
+  // Sending is always disconnected.
+  if (fArg->isSending())
+    return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
+
+  // If we have a closure capture that is not an indirect result or indirect
+  // result error, we want to treat it as sending so that we properly handle
+  // async lets.
+  //
+  // This pattern should only come up with async lets. See comment in
+  // isTransferrableFunctionArgument.
   if (!fArg->isIndirectResult() && !fArg->isIndirectErrorResult() &&
-      ((fArg->isClosureCapture() &&
-        fArg->getFunction()->getLoweredFunctionType()->isSendable()) ||
-       fArg->isSending()))
+      fArg->isClosureCapture() &&
+      fArg->getFunction()->getLoweredFunctionType()->isSendable())
     return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
 
   // Before we do anything further, see if we have an isolated parameter. This
