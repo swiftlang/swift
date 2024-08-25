@@ -13,26 +13,28 @@
 // This file implements type checking support for Swift's concurrency model.
 //
 //===----------------------------------------------------------------------===//
-#include "MiscDiagnostics.h"
+
 #include "TypeCheckConcurrency.h"
+#include "MiscDiagnostics.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckInvertible.h"
-#include "TypeChecker.h"
 #include "TypeCheckType.h"
-#include "swift/Strings.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Concurrency.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/AST/ExistentialLayout.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Strings.h"
 
 using namespace swift;
 
@@ -840,33 +842,6 @@ SendableCheckContext::implicitSendableDiagnosticBehavior() const {
   }
 }
 
-/// Determine whether the given nominal type has an explicit Sendable
-/// conformance (regardless of its availability).
-bool swift::hasExplicitSendableConformance(NominalTypeDecl *nominal,
-                                           bool applyModuleDefault) {
-  ASTContext &ctx = nominal->getASTContext();
-  auto nominalModule = nominal->getParentModule();
-
-  // In a concurrency-checked module, a missing conformance is equivalent to
-  // an explicitly unavailable one. If we want to apply this rule, do so now.
-  if (applyModuleDefault && nominalModule->isConcurrencyChecked())
-    return true;
-
-  // Look for any conformance to `Sendable`.
-  auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
-  if (!proto)
-    return false;
-
-  // Look for a conformance. If it's present and not (directly) missing,
-  // we're done.
-  auto conformance = lookupConformance(
-      nominal->getDeclaredInterfaceType(), proto, /*allowMissing=*/true);
-  return conformance &&
-      !(isa<BuiltinProtocolConformance>(conformance.getConcrete()) &&
-        cast<BuiltinProtocolConformance>(
-          conformance.getConcrete())->isMissing());
-}
-
 /// Determine the diagnostic behavior for a Sendable reference to the given
 /// nominal type.
 DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
@@ -885,43 +860,6 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
     return DiagnosticBehavior::Warning;
 
   return defaultBehavior;
-}
-
-std::optional<DiagnosticBehavior>
-swift::getConcurrencyDiagnosticBehaviorLimit(NominalTypeDecl *nominal,
-                                             const DeclContext *fromDC,
-                                             bool ignoreExplicitConformance) {
-  ModuleDecl *importedModule = nullptr;
-  if (nominal->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
-    // If the declaration itself has the @preconcurrency attribute,
-    // respect it.
-    importedModule = nominal->getParentModule();
-  } else {
-    // Determine whether this nominal type is visible via a @preconcurrency
-    // import.
-    auto import = nominal->findImport(fromDC);
-    auto sourceFile = fromDC->getParentSourceFile();
-
-    if (!import || !import->options.contains(ImportFlags::Preconcurrency))
-      return std::nullopt;
-
-    if (sourceFile)
-      sourceFile->setImportUsedPreconcurrency(*import);
-
-    importedModule = import->module.importedModule;
-  }
-
-  // When the type is explicitly non-Sendable, @preconcurrency imports
-  // downgrade the diagnostic to a warning in Swift 6.
-  if (!ignoreExplicitConformance &&
-      hasExplicitSendableConformance(nominal))
-    return DiagnosticBehavior::Warning;
-
-  // When the type is implicitly non-Sendable, `@preconcurrency` suppresses
-  // diagnostics until the imported module enables Swift 6.
-  return importedModule->isConcurrencyChecked()
-      ? DiagnosticBehavior::Warning
-      : DiagnosticBehavior::Ignore;
 }
 
 std::optional<DiagnosticBehavior>

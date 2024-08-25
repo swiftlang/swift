@@ -964,6 +964,11 @@ public:
   bool isAnyActor() const { return getASTType()->isAnyActorType(); }
 
   /// Returns true if this function conforms to the Sendable protocol.
+  ///
+  /// NOTE: For diagnostics this is not always the correct thing to check since
+  /// non-Sendable types afflicted with preconcurrency can have different
+  /// semantic requirements around diagnostics. \see
+  /// getConcurrencyDiagnosticBehavior.
   bool isSendable(SILFunction *fn) const;
 
   /// False if SILValues of this type cannot be used outside the scope of their
@@ -977,6 +982,16 @@ public:
   bool mayEscape(const SILFunction &function) const {
     return !isNoEscapeFunction() && isEscapable(function);
   }
+
+  /// Return the expected concurrency diagnostic behavior for this SILType.
+  ///
+  /// This allows one to know if the type is marked with preconcurrency and thus
+  /// should have diagnostics ignored or converted to warnings instead of
+  /// errors.
+  ///
+  /// \returns nil if we were unable to find such information for this type.
+  std::optional<DiagnosticBehavior>
+  getConcurrencyDiagnosticBehavior(SILFunction *fn) const;
 
   //
   // Accessors for types used in SIL instructions:
