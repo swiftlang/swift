@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "transfer-non-sendable"
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Concurrency.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -93,45 +94,25 @@ static SILValue stripFunctionConversions(SILValue val) {
 }
 
 static std::optional<DiagnosticBehavior>
-getDiagnosticBehaviorLimitForValue(SILValue value) {
-  auto *nom = value->getType().getNominalOrBoundGenericNominal();
-  if (!nom)
-    return {};
-
-  auto declRef = value->getFunction()->getDeclRef();
-  if (!declRef)
-    return {};
-
-  auto *fromDC = declRef.getInnermostDeclContext();
-  return getConcurrencyDiagnosticBehaviorLimit(nom, fromDC);
-}
-
-static std::optional<DiagnosticBehavior>
-getDiagnosticBehaviorLimitForCapturedValue(CapturedValue value) {
+getDiagnosticBehaviorLimitForCapturedValue(SILFunction *fn,
+                                           CapturedValue value) {
   ValueDecl *decl = value.getDecl();
-  auto *nom = decl->getInterfaceType()->getNominalOrBoundGenericNominal();
-  if (!nom)
-    return {};
-
-  auto *fromDC = decl->getInnermostDeclContext();
-  return getConcurrencyDiagnosticBehaviorLimit(nom, fromDC);
+  auto *ctx = decl->getInnermostDeclContext();
+  auto type = fn->mapTypeIntoContext(decl->getInterfaceType());
+  return type->getConcurrencyDiagnosticBehaviorLimit(ctx);
 }
 
 /// Find the most conservative diagnostic behavior by taking the max over all
 /// DiagnosticBehavior for the captured values.
 static std::optional<DiagnosticBehavior>
 getDiagnosticBehaviorLimitForCapturedValues(
-    ArrayRef<CapturedValue> capturedValues) {
-  using UnderlyingType = std::underlying_type<DiagnosticBehavior>::type;
-
+    SILFunction *fn, ArrayRef<CapturedValue> capturedValues) {
   std::optional<DiagnosticBehavior> diagnosticBehavior;
   for (auto value : capturedValues) {
-    auto lhs = UnderlyingType(
-        diagnosticBehavior.value_or(DiagnosticBehavior::Unspecified));
-    auto rhs = UnderlyingType(
-        getDiagnosticBehaviorLimitForCapturedValue(value).value_or(
-            DiagnosticBehavior::Unspecified));
-    auto result = DiagnosticBehavior(std::max(lhs, rhs));
+    auto lhs = diagnosticBehavior.value_or(DiagnosticBehavior::Unspecified);
+    auto rhs = getDiagnosticBehaviorLimitForCapturedValue(fn, value).value_or(
+        DiagnosticBehavior::Unspecified);
+    auto result = lhs.merge(rhs);
     if (result != DiagnosticBehavior::Unspecified)
       diagnosticBehavior = result;
   }
@@ -671,8 +652,11 @@ public:
       emitUnknownPatternError();
   }
 
+  SILFunction *getFunction() const { return transferOp->getFunction(); }
+
   std::optional<DiagnosticBehavior> getBehaviorLimit() const {
-    return getDiagnosticBehaviorLimitForValue(transferOp->get());
+    return transferOp->get()->getType().getConcurrencyDiagnosticBehavior(
+        getFunction());
   }
 
   /// If we can find a callee decl name, return that. None otherwise.
@@ -1332,6 +1316,8 @@ public:
 
   Operand *getOperand() const { return info.transferredOperand; }
 
+  SILFunction *getFunction() const { return getOperand()->getFunction(); }
+
   SILValue getNonTransferrableValue() const {
     return info.nonTransferrable.dyn_cast<SILValue>();
   }
@@ -1341,7 +1327,9 @@ public:
   }
 
   std::optional<DiagnosticBehavior> getBehaviorLimit() const {
-    return getDiagnosticBehaviorLimitForValue(info.transferredOperand->get());
+    return info.transferredOperand->get()
+        ->getType()
+        .getConcurrencyDiagnosticBehavior(getOperand()->getFunction());
   }
 
   /// If we can find a callee decl name, return that. None otherwise.
@@ -1463,8 +1451,8 @@ public:
                   diag::regionbasedisolation_typed_tns_passed_sending_closure,
                   descriptiveKindStr)
         .highlight(loc.getSourceRange())
-        .limitBehaviorIf(
-            getDiagnosticBehaviorLimitForCapturedValue(capturedValue));
+        .limitBehaviorIf(getDiagnosticBehaviorLimitForCapturedValue(
+            getFunction(), capturedValue));
 
     auto capturedLoc = RegularLocation(capturedValue.getLoc());
     if (getIsolationRegionInfo().getIsolationInfo().isTaskIsolated()) {
@@ -1499,8 +1487,8 @@ public:
       }
     }
 
-    auto behaviorLimit =
-        getDiagnosticBehaviorLimitForCapturedValues(capturedValues);
+    auto behaviorLimit = getDiagnosticBehaviorLimitForCapturedValues(
+        getFunction(), capturedValues);
     diagnoseError(loc,
                   diag::regionbasedisolation_typed_tns_passed_sending_closure,
                   descriptiveKindStr)
@@ -2062,8 +2050,13 @@ public:
       emitUnknownPatternError();
   }
 
+  SILFunction *getFunction() const {
+    return info.inoutSendingParam->getFunction();
+  }
+
   std::optional<DiagnosticBehavior> getBehaviorLimit() const {
-    return getDiagnosticBehaviorLimitForValue(info.inoutSendingParam);
+    return info.inoutSendingParam->getType().getConcurrencyDiagnosticBehavior(
+        getFunction());
   }
 
   void emitUnknownPatternError() {
@@ -2181,8 +2174,11 @@ public:
       emitUnknownPatternError();
   }
 
-  std::optional<DiagnosticBehavior> getBehaviorLimit() const {
-    return getDiagnosticBehaviorLimitForValue(info.outSendingResult);
+  SILFunction *getFunction() const { return info.srcOperand->getFunction(); }
+
+  std::optional<DiagnosticBehavior> getConcurrencyDiagnosticBehavior() const {
+    return info.outSendingResult->getType().getConcurrencyDiagnosticBehavior(
+        getFunction());
   }
 
   void emitUnknownPatternError() {
@@ -2193,7 +2189,7 @@ public:
 
     diagnoseError(info.srcOperand->getUser(),
                   diag::regionbasedisolation_unknown_pattern)
-        .limitBehaviorIf(getBehaviorLimit());
+        .limitBehaviorIf(getConcurrencyDiagnosticBehavior());
   }
 
   void emit();
@@ -2329,7 +2325,7 @@ void AssignIsolatedIntoSendingResultDiagnosticEmitter::emit() {
         info.srcOperand,
         diag::regionbasedisolation_out_sending_cannot_be_actor_isolated_named,
         *varName, descriptiveKindStr)
-        .limitBehaviorIf(getBehaviorLimit());
+        .limitBehaviorIf(getConcurrencyDiagnosticBehavior());
 
     diagnoseNote(
         info.srcOperand,
@@ -2345,7 +2341,7 @@ void AssignIsolatedIntoSendingResultDiagnosticEmitter::emit() {
       info.srcOperand,
       diag::regionbasedisolation_out_sending_cannot_be_actor_isolated_type,
       type, descriptiveKindStr)
-      .limitBehaviorIf(getBehaviorLimit());
+      .limitBehaviorIf(getConcurrencyDiagnosticBehavior());
 
   diagnoseNote(
       info.srcOperand,

@@ -25,6 +25,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/Test.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/Sema/Concurrency.h"
 #include <tuple>
 
 using namespace swift;
@@ -1253,6 +1254,15 @@ SILType SILType::removingAnyMoveOnlyWrapping(const SILFunction *fn) {
 
 bool SILType::isSendable(SILFunction *fn) const {
   return getASTType()->isSendableType();
+}
+
+std::optional<DiagnosticBehavior>
+SILType::getConcurrencyDiagnosticBehavior(SILFunction *fn) const {
+  auto declRef = fn->getDeclRef();
+  if (!declRef)
+    return {};
+  auto *fromDC = declRef.getInnermostDeclContext();
+  return getASTType()->getConcurrencyDiagnosticBehaviorLimit(fromDC);
 }
 
 namespace swift::test {

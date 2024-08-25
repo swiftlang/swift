@@ -45,12 +45,12 @@
 
 namespace swift {
 
-  enum class DiagnosticBehavior : uint8_t;
+  struct DiagnosticBehavior;
 
   /// Kind of implicit platform conditions.
   enum class PlatformConditionKind {
-#define PLATFORM_CONDITION(LABEL, IDENTIFIER) LABEL,
-#include "swift/AST/PlatformConditionKinds.def"
+  #define PLATFORM_CONDITION(LABEL, IDENTIFIER) LABEL,
+  #include "swift/AST/PlatformConditionKinds.def"
   };
 
   /// Describes how strict concurrency checking should be.

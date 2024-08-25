@@ -31,16 +31,12 @@ struct MyType3 {
 }
 
 func testA(ns: NS, mt: MyType, mt2: MyType2, mt3: MyType3, sc: StrictClass, nsc: NonStrictClass) async {
-  // This is task isolated since we are capturing function arguments... but
-  // since we are merging NonStrictClass from a preconcurrency module, the whole
-  // error is squelched since we allow for preconcurrency to apply to the entire
-  // region.
-  Task {
+  Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
     print(ns)
     print(mt)
     print(mt2)
     print(mt3)
-    print(sc)
+    print(sc) // expected-tns-note {{closure captures 'sc' which is accessible to code in the current task}}
     print(nsc)
   }
 }

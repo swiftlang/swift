@@ -1173,8 +1173,26 @@ bool SILIsolationInfo::isNonSendableType(SILType type, SILFunction *fn) {
     return false;
   }
 
-  // Otherwise, delegate to seeing if type conforms to the Sendable protocol.
-  return !type.isSendable(fn);
+  // First before we do anything, see if we have a Sendable type. In such a
+  // case, just return true early.
+  //
+  // DISCUSSION: It is important that we do this first since otherwise calling
+  // getConcurrencyDiagnosticBehavior could cause us to prevent a
+  // "preconcurrency" unneeded diagnostic when just using Sendable values. We
+  // only want to trigger that if we analyze a non-Sendable type.
+  if (type.isSendable(fn))
+    return false;
+
+  // Grab out behavior. If it is none, then we have a type that we want to treat
+  // as non-Sendable.
+  auto behavior = type.getConcurrencyDiagnosticBehavior(fn);
+  if (!behavior)
+    return true;
+
+  // Finally, if we are not supposed to ignore, then we have a true non-Sendable
+  // type. Types whose diagnostics we are supposed to ignore, we want to treat
+  // as Sendable.
+  return *behavior != DiagnosticBehavior::Ignore;
 }
 
 //===----------------------------------------------------------------------===//
