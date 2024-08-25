@@ -175,6 +175,23 @@ public:
   readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
+class EvaluateIfConditionRequest
+    : public SimpleRequest<EvaluateIfConditionRequest,
+          std::pair<bool, bool>(SourceFile *, SourceRange conditionRange,
+                                bool shouldEvaluate),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  std::pair<bool, bool> evaluate(
+      Evaluator &evaluator, SourceFile *SF, SourceRange conditionRange,
+      bool shouldEvaluate) const;
+};
+
 /// The zone number for the parser.
 #define SWIFT_TYPEID_ZONE Parse
 #define SWIFT_TYPEID_HEADER "swift/AST/ParseTypeIDZone.def"

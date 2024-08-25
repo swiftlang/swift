@@ -16,6 +16,7 @@
 
 #include "swift/Parse/Parser.h"
 
+#include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/Basic/Assertions.h"
@@ -766,6 +767,26 @@ static Expr *findAnyLikelySimulatorEnvironmentTest(Expr *Condition) {
 
 } // end anonymous namespace
 
+/// Call into the Swift implementation of #if condition evaluation.
+///
+/// \returns std::nullopt if the Swift implementation is not available, or
+/// a pair (isActive, allowSyntaxErrors) describing whether the evaluated
+/// condition indicates that the region is active and whether, if inactive,
+/// the code in that region is allowed to have syntax errors.
+static std::optional<std::pair<bool, bool>> evaluateWithSwiftIfConfig(
+    Parser &parser,
+    SourceRange conditionRange,
+    bool shouldEvaluate
+) {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  return evaluateOrDefault(
+      parser.Context.evaluator,
+      EvaluateIfConditionRequest{&parser.SF, conditionRange, shouldEvaluate},
+      std::pair(false, false));
+#else
+  return std::nullopt;
+#endif
+}
 
 /// Parse and populate a #if ... #endif directive.
 /// Delegate callback function to parse elements in the blocks.
@@ -842,7 +863,15 @@ Result Parser::parseIfConfigRaw(
       if (result.isNull())
         return makeParserError();
       Condition = result.get();
-      if (validateIfConfigCondition(Condition, Context, Diags)) {
+      if (std::optional<std::pair<bool, bool>> evalResult =
+              evaluateWithSwiftIfConfig(*this,
+                                        Condition->getSourceRange(),
+                                        shouldEvaluate)) {
+        if (!foundActive) {
+          isActive = evalResult->first;
+          isVersionCondition = evalResult->second;
+        }
+      } else if (validateIfConfigCondition(Condition, Context, Diags)) {
         // Error in the condition;
         isActive = false;
         isVersionCondition = false;
