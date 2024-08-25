@@ -428,14 +428,29 @@ namespace swift {
 
   /// Describes the current behavior to take with a diagnostic.
   /// Ordered from most severe to least.
-  enum class DiagnosticBehavior : uint8_t {
-    Unspecified = 0,
-    Fatal,
-    Error,
-    Warning,
-    Remark,
-    Note,
-    Ignore,
+  struct DiagnosticBehavior {
+    enum Kind : uint8_t {
+      Unspecified = 0,
+      Fatal,
+      Error,
+      Warning,
+      Remark,
+      Note,
+      Ignore,
+    };
+
+    Kind kind;
+
+    DiagnosticBehavior() : kind(Unspecified) {}
+    DiagnosticBehavior(Kind kind) : kind(kind) {}
+    operator Kind() const { return kind; }
+
+    /// Move up the lattice returning the max value.
+    DiagnosticBehavior merge(DiagnosticBehavior other) const {
+      auto value = std::max(std::underlying_type<Kind>::type(*this),
+                            std::underlying_type<Kind>::type(other));
+      return Kind(value);
+    }
   };
 
   struct DiagnosticFormatOptions {
