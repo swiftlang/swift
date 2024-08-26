@@ -338,8 +338,7 @@ static llvm::Error resolveExplicitModuleInputs(
     // Compute the CASFS root ID for the resolving dependency.
     if (auto *sourceDep = resolvingDepInfo.getAsSwiftSourceModule()) {
       tracker->startTracking();
-      tracker->addCommonSearchPathDeps(
-          instance.getInvocation().getSearchPathOptions());
+      tracker->addCommonSearchPathDeps(instance.getInvocation());
       llvm::for_each(
           sourceDep->sourceFiles,
           [&tracker](const std::string &file) { tracker->trackFile(file); });
@@ -359,8 +358,7 @@ static llvm::Error resolveExplicitModuleInputs(
     } else if (auto *textualDep =
                    resolvingDepInfo.getAsSwiftInterfaceModule()) {
       tracker->startTracking();
-      tracker->addCommonSearchPathDeps(
-          instance.getInvocation().getSearchPathOptions());
+      tracker->addCommonSearchPathDeps(instance.getInvocation());
       tracker->trackFile(textualDep->swiftInterfaceFile);
       llvm::for_each(
           textualDep->auxiliaryFiles,
