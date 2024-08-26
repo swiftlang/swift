@@ -1611,3 +1611,26 @@ bb0:
   %9999 = tuple ()
   return %9999 : $()
 }
+
+sil [ossa] @unused_argument : $@convention(thin) <T> (@in_guaranteed T) -> () {
+[global: ]
+bb0(%0 : $*T):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @call_generic_func_with_no_arg_read :
+// CHECK-NOT:     load
+// CHECK:           = apply {{%[0-9]+}}() :
+// CHECK-NOT:     end_borrow
+// CHECK:       } // end sil function 'call_generic_func_with_no_arg_read'
+sil [ossa] @call_generic_func_with_no_arg_read : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack $Klass
+  %2 = function_ref @unused_argument : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %3 = apply %2<Klass>(%1) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %1 : $*Klass
+  %5 = tuple ()
+  return %5 : $()
+}
+
