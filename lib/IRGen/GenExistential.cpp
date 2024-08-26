@@ -689,7 +689,8 @@ namespace {
                                                 align, IsNotTriviallyDestroyable, \
                                                 IsNotBitwiseTakable, \
                                                 IsCopyable, \
-                                                IsFixedSize), \
+                                                IsFixedSize, \
+                                                IsABIAccessible), \
         IsOptional(isOptional) {} \
     TypeLayoutEntry \
     *buildTypeLayoutEntry(IRGenModule &IGM, \
@@ -747,7 +748,7 @@ namespace {
                                       spareBits, align, \
                                       IsNotTriviallyDestroyable, \
                                       IsCopyable, \
-                                      IsFixedSize), \
+                                      IsFixedSize, IsABIAccessible), \
         Refcounting(refcounting), ValueType(valueTy), IsOptional(isOptional) { \
       assert(refcounting == ReferenceCounting::Native || \
              refcounting == ReferenceCounting::Unknown); \
@@ -816,7 +817,7 @@ namespace {
         bool isOptional) \
       : ScalarExistentialTypeInfoBase(storedProtocols, ty, size, \
                                       spareBits, align, IsTriviallyDestroyable,\
-                                      IsCopyable, IsFixedSize), \
+                                      IsCopyable, IsFixedSize, IsABIAccessible), \
         IsOptional(isOptional) {} \
     TypeLayoutEntry \
     *buildTypeLayoutEntry(IRGenModule &IGM, \
@@ -904,7 +905,7 @@ class OpaqueExistentialTypeInfo final :
     : super(protocols, ty, size,
             std::move(spareBits), align,
             IsNotTriviallyDestroyable, IsBitwiseTakable, IsCopyable,
-            IsFixedSize) {}
+            IsFixedSize, IsABIAccessible) {}
 
 public:
   OpaqueExistentialLayout getLayout() const {
@@ -1402,7 +1403,7 @@ class ExistentialMetatypeTypeInfo final
                                     std::move(spareBits), align,
                                     IsTriviallyDestroyable,
                                     IsCopyable,
-                                    IsFixedSize),
+                                    IsFixedSize, IsABIAccessible),
       MetatypeTI(metatypeTI) {}
 
 public:

@@ -62,11 +62,12 @@ protected:
                    IsTriviallyDestroyable_t pod,
                    IsCopyable_t copy,
                    IsFixedSize_t alwaysFixedSize,
+                   IsABIAccessible_t isABIAccessible,
                    SpecialTypeInfoKind stik = SpecialTypeInfoKind::Loadable)
       : FixedTypeInfo(type, size, spareBits, align, pod,
                       // All currently implemented loadable types are bitwise-takable.
                       IsBitwiseTakable,
-                      copy, alwaysFixedSize, stik) {
+                      copy, alwaysFixedSize, isABIAccessible, stik) {
     assert(isLoadable());
   }
 
@@ -76,11 +77,12 @@ protected:
                    IsTriviallyDestroyable_t pod,
                    IsCopyable_t copy,
                    IsFixedSize_t alwaysFixedSize,
+                   IsABIAccessible_t isABIAccessible,
                    SpecialTypeInfoKind stik = SpecialTypeInfoKind::Loadable)
       : FixedTypeInfo(type, size, std::move(spareBits), align, pod,
                       // All currently implemented loadable types are bitwise-takable.
                       IsBitwiseTakable,
-                      copy, alwaysFixedSize, stik) {
+                      copy, alwaysFixedSize, isABIAccessible, stik) {
     assert(isLoadable());
   }
 
