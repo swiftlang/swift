@@ -53,3 +53,34 @@ func testPrimaryExistentialBad<U>(_: any P1<Int, U>) {}
 
 @available(macOS 13, *)
 func testPrimaryExistentialGood<U>(_: any P1<Int, U>) {}
+
+
+@available(macOS 13, *)
+protocol P2 {
+  associatedtype A
+
+  @available(macOS 14, *)
+  associatedtype B
+
+  var a: A { get }
+
+  @available(macOS 14, *)
+  var b: B { get }
+}
+
+struct ModelP2: P2 {
+  var a: Int
+  var b: Double
+}
+
+extension ModelP2 {
+  // expected-note@-1{{add @available attribute to enclosing extension}}
+
+  // Ok, the inferred typealias for A is always available.
+  func takesA(_ a: A) {}
+
+  // Bad, the inferred typealias for B is introduced with associated type B.
+  func takesB(_ b: B) {}
+  // expected-error@-1{{'B' is only available in macOS 14 or newer}}
+  // expected-note@-2{{add @available attribute to enclosing instance method}}
+}
