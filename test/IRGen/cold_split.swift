@@ -7,6 +7,11 @@
 // RUN:   -enable-throws-prediction -O -disable-split-cold-code \
 // RUN:       | %FileCheck --check-prefix CHECK-DISABLED %s
 
+//// Test using -Osize doesn't yield a split.
+// RUN: %target-swift-frontend %s -module-name=test -emit-assembly \
+// RUN:   -enable-throws-prediction -Osize -enable-split-cold-code \
+// RUN:       | %FileCheck --check-prefix CHECK-DISABLED %s
+
 //// Test disabling optimization entirely doesn't yield a split.
 // RUN: %target-swift-frontend %s -module-name=test -emit-assembly \
 // RUN:   -enable-throws-prediction -enable-split-cold-code \
