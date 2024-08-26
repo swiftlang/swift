@@ -862,7 +862,7 @@ public:
   void findBoundariesInBlock(SILBasicBlock *block, bool isLiveOut,
                              PrunedLivenessBoundary &boundary) const;
 
-  /// Compute liveness for a all currently initialized definitions. The
+  /// Compute liveness for all currently initialized definitions. The
   /// lifetime-ending uses are also recorded--destroy_value or
   /// end_borrow. However destroy_values might not jointly-post dominate if
   /// dead-end blocks are present.
