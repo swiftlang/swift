@@ -554,6 +554,26 @@ public:
   void dump() const;
 };
 
+/// Recording liveness boundary at some level of detail; see concrete subclasses
+/// PrunedLivenessBoundary and PrunedLivenessBlockBoundary.
+struct AnyPrunedLivenessBoundary {
+  virtual ~AnyPrunedLivenessBoundary() {}
+  /// Targets whose single predecessor has at least one non-boundary successor.
+  SmallVector<SILBasicBlock *, 8> boundaryEdges;
+
+  friend class SSAPrunedLiveness;
+  friend class MultiDefPrunedLiveness;
+
+private:
+  virtual void findBoundaryInSSADefBlock(SILNode *ssaDef,
+                                         const PrunedLiveness &liveness) = 0;
+  virtual void
+  findBoundaryInMultiDefBlock(SILBasicBlock *block, bool isLiveOut,
+                              const MultiDefPrunedLiveness &liveness) = 0;
+  virtual void findBoundaryInNonDefBlock(SILBasicBlock *block,
+                                         const PrunedLiveness &liveness) = 0;
+};
+
 /// Record the last use points and CFG edges that form the boundary of
 /// PrunedLiveness.
 ///
@@ -565,9 +585,8 @@ public:
 /// Each boundary edge is identified by its target block. The source of the edge
 /// is the target block's single predecessor which must have at least one other
 /// non-boundary successor.
-struct PrunedLivenessBoundary {
+struct PrunedLivenessBoundary : AnyPrunedLivenessBoundary {
   SmallVector<SILInstruction *, 8> lastUsers;
-  SmallVector<SILBasicBlock *, 8> boundaryEdges;
   SmallVector<SILNode *, 1> deadDefs;
 
   void clear() {
@@ -586,6 +605,39 @@ struct PrunedLivenessBoundary {
 
   void print(llvm::raw_ostream &OS) const;
   void dump() const;
+
+private:
+  void findBoundaryInSSADefBlock(SILNode *ssaDef,
+                                 const PrunedLiveness &liveness) override;
+  void
+  findBoundaryInMultiDefBlock(SILBasicBlock *block, bool isLiveOut,
+                              const MultiDefPrunedLiveness &liveness) override;
+  void findBoundaryInNonDefBlock(SILBasicBlock *block,
+                                 const PrunedLiveness &liveness) override;
+};
+
+/// Record the blocks which either contain last use points or are boundary edge
+/// targets.
+///
+/// Enables clients only interested in block-level details to avoid expensive
+/// and for-them wasteful instruction list iteration.
+struct PrunedLivenessBlockBoundary : AnyPrunedLivenessBoundary {
+  /// Blocks containing last users or dead defs.
+  SmallVector<SILBasicBlock *, 8> endBlocks;
+
+  void clear() {
+    endBlocks.clear();
+    boundaryEdges.clear();
+  }
+
+private:
+  void findBoundaryInSSADefBlock(SILNode *ssaDef,
+                                 const PrunedLiveness &liveness) override;
+  void
+  findBoundaryInMultiDefBlock(SILBasicBlock *block, bool isLiveOut,
+                              const MultiDefPrunedLiveness &liveness) override;
+  void findBoundaryInNonDefBlock(SILBasicBlock *block,
+                                 const PrunedLiveness &liveness) override;
 };
 
 /// PrunedLiveness with information about defs for computing the live range
@@ -696,7 +748,7 @@ public:
   /// The computed boundary will completely post-dominate, including dead end
   /// paths. The client should query DeadEndBlocks to ignore those dead end
   /// paths.
-  void computeBoundary(PrunedLivenessBoundary &boundary) const;
+  void computeBoundary(AnyPrunedLivenessBoundary &boundary) const;
 
   /// Compute the boundary from a backward CFG traversal from a known set of
   /// jointly post-dominating blocks. Avoids the need to record an ordered list
@@ -772,7 +824,7 @@ public:
 
   /// SSA implementation of computeBoundary.
   void findBoundariesInBlock(SILBasicBlock *block, bool isLiveOut,
-                             PrunedLivenessBoundary &boundary) const;
+                             AnyPrunedLivenessBoundary &boundary) const;
 
   /// Compute liveness for a single SSA definition. The lifetime-ending uses are
   /// also recorded--destroy_value or end_borrow.
@@ -860,7 +912,7 @@ public:
 
   /// Multi-Def implementation of computeBoundary.
   void findBoundariesInBlock(SILBasicBlock *block, bool isLiveOut,
-                             PrunedLivenessBoundary &boundary) const;
+                             AnyPrunedLivenessBoundary &boundary) const;
 
   /// Compute liveness for all currently initialized definitions. The
   /// lifetime-ending uses are also recorded--destroy_value or
@@ -879,6 +931,9 @@ public:
   /// also lack scope-ending instructions, so the liveness of their nested uses
   /// may be ignored.
   LiveRangeSummary computeSimple();
+
+  friend struct PrunedLivenessBoundary;
+  friend struct PrunedLivenessBlockBoundary;
 };
 
 //===----------------------------------------------------------------------===//
