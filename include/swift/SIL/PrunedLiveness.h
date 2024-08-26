@@ -543,6 +543,13 @@ public:
         RangeIterationHelpers::MapFunctor());
   }
 
+  void visitUsers(llvm::function_ref<void(SILInstruction *, LifetimeEnding)>
+                      visitor) const {
+    for (auto &pair : users) {
+      visitor(pair.first, pair.second);
+    }
+  }
+
   void print(llvm::raw_ostream &OS) const;
   void dump() const;
 };
