@@ -285,7 +285,7 @@ public:
 
   /// Returns true if there are any dropped metatype arguments.
   /// See `droppedMetatypeArgs`.
-  bool hasDroppedMetatypeArgs() const { return droppedMetatypeArgs.any(); }
+  const SmallBitVector &getDroppedArgs() const { return droppedMetatypeArgs; }
 
   /// Remove the arguments of a partial apply, leaving the arguments for the
   /// partial apply result function.

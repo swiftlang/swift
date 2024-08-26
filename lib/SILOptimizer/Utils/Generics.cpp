@@ -887,7 +887,7 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
 }
 
 CanSILFunctionType ReabstractionInfo::createThunkType(PartialApplyInst *forPAI) const {
-  if (!hasDroppedMetatypeArgs())
+  if (!droppedMetatypeArgs.any())
     return SubstitutedType;
 
   llvm::SmallVector<SILParameterInfo, 8> newParams;
@@ -2002,7 +2002,7 @@ GenericFuncSpecializer::GenericFuncSpecializer(
     } else {
       ClonedName = Mangler.mangleReabstracted(ParamSubs,
                                               ReInfo.needAlternativeMangling(),
-                                              ReInfo.hasDroppedMetatypeArgs());
+                                              ReInfo.getDroppedArgs());
     }
   }
   LLVM_DEBUG(llvm::dbgs() << "    Specialized function " << ClonedName << '\n');
@@ -2517,7 +2517,7 @@ public:
       Mangle::GenericSpecializationMangler Mangler(OrigF, ReInfo.getSerializedKind());
       ThunkName = Mangler.mangleNotReabstracted(
           ReInfo.getCalleeParamSubstitutionMap(),
-          ReInfo.hasDroppedMetatypeArgs());
+          ReInfo.getDroppedArgs());
     } else {
       Mangle::PartialSpecializationMangler Mangler(
           OrigF, ReInfo.getSpecializedType(), ReInfo.getSerializedKind(),
