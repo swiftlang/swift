@@ -2257,6 +2257,24 @@ static void swift_task_deinitOnExecutorImpl(void *object,
                                             DeinitWorkFunction *work,
                                             SerialExecutorRef newExecutor,
                                             size_t rawFlags) {
+#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+  // To properly support isolated deinit in this mode, we
+  // need to be able to postpone deallocation of the lock
+  // until actor is unlocked.
+  //
+  // Note that such zombie state probably should be supported regardless of the isolated deinit.
+  // Theoretically it is possible for last release to happen in the middle of a job isolated to the actor.
+  // But until isolated consuming parameters are fixed, this seems to be impossible to reproduce.
+  // See also https://github.com/swiftlang/swift/issues/76083
+  //
+  // Alternatively we could lock and unlock before executing deinit body.
+  // This would be sufficient to wait until all jobs isolated to the actor have finished.
+  // Any code attempting to take actor's lock while deinit is running is incorrect anyway.
+  // So it does not matter much if deinit body is executed with lock held or not.
+  //
+  // But this workaround applies only to the isolated deinit and does not solve the generic case.
+  swift_Concurrency_fatalError(0, "Isolated deinit is not yet supported in actor as locks model");
+#else
   // If the current executor is compatible with running the new executor,
   // we can just immediately continue running with the resume function
   // we were passed in.
@@ -2271,12 +2289,7 @@ static void swift_task_deinitOnExecutorImpl(void *object,
     return work(object); // 'return' forces tail call
   }
 
-#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
-  // In this mode taking actor lock is the only possible implementation
-#else
-  // Otherwise, it is an optimisation applied when deinitializing default actors
   if (newExecutor.isDefaultActor() && object == newExecutor.getIdentity()) {
-#endif
     // Try to take the lock. This should always succeed, unless someone is
     // running the actor using unsafe unowned reference.
     if (asImpl(newExecutor.getDefaultActor())->tryLock(false)) {
@@ -2316,12 +2329,7 @@ static void swift_task_deinitOnExecutorImpl(void *object,
       // Give up the current actor.
       asImpl(newExecutor.getDefaultActor())->unlock(true);
       return;
-    } else {
-#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
-      assert(false && "Should not enqueue onto default actor in actor as locks model");
-#endif
     }
-#if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
   }
 
   auto currentTask = swift_task_getCurrent();

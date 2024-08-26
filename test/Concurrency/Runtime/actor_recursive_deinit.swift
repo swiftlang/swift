@@ -5,6 +5,7 @@
 
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: freestanding
 
 import Swift
 import _Concurrency
@@ -34,12 +35,12 @@ func isMainThread() -> Bool {
 @_silgen_name("swift_task_isCurrentExecutor")
 private func isCurrentExecutor(_ executor: Builtin.Executor) -> Bool
 
-func getExecutor(_ a: AnyActor) -> Builtin.Executor {
-  let pack = (a, UnsafeRawPointer?.none)
+func getExecutor(_ a: any Actor) -> Builtin.Executor {
+  let pack: (AnyObject, UnsafeRawPointer?) = (a, UnsafeRawPointer?.none)
   return unsafeBitCast(pack, to: Builtin.Executor.self)
 }
 
-func isCurrent(_ a: AnyActor) -> Bool {
+func isCurrent(_ a: any Actor) -> Bool {
   return isCurrentExecutor(getExecutor(a))
 }
 
@@ -53,7 +54,7 @@ actor Foo {
     }
 
     isolated deinit {
-        print("DEINIT: \(name) isolated:\(isCurrent(self)) mainThread:\(isMainThread())")
+      print("DEINIT: \(name) isolated:\(isCurrent(self)) mainThread:\(isMainThread())")
     }
 }
 
