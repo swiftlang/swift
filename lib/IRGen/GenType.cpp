@@ -970,7 +970,7 @@ namespace {
       : ScalarTypeInfo(ty, Size(0), SpareBitVector{}, Alignment(1),
                        IsTriviallyDestroyable,
                        IsCopyable,
-                       IsFixedSize) {}
+                       IsFixedSize, IsABIAccessible) {}
     unsigned getExplosionSize() const override { return 0; }
     void getSchema(ExplosionSchema &schema) const override {}
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
@@ -1138,7 +1138,8 @@ namespace {
       : ScalarTypeInfo(storage, size, std::move(spareBits), align,
                        IsTriviallyDestroyable,
                        IsCopyable,
-                       IsFixedSize),
+                       IsFixedSize,
+                       IsABIAccessible),
         ScalarTypes(std::move(scalarTypes))
     {}
     
@@ -1329,7 +1330,7 @@ namespace {
                               IsNotTriviallyDestroyable,
                               IsNotBitwiseTakable,
                               IsNotCopyable,
-                              IsFixedSize) {}
+                              IsFixedSize, IsABIAccessible) {}
   };
 
   /// A TypeInfo implementation for address-only types which can never
@@ -2541,7 +2542,8 @@ public:
                     IsNotTriviallyDestroyable, /* irrelevant */
                     IsNotBitwiseTakable, /* irrelevant */
                     IsCopyable, /* irrelevant */
-                    IsFixedSize /* irrelevant */),
+                    IsFixedSize /* irrelevant */,
+                    IsABIAccessible),
       NumExtraInhabitants(node.NumExtraInhabitants) {}
 
   TypeLayoutEntry
@@ -3037,4 +3039,25 @@ bool irgen::tryEmitDestroyUsingDeinit(IRGenFunction &IGF, Address address,
     },
     // Indirect parameter teardown
     [&]{ /* nothing to do */ });
+}
+
+IsABIAccessible_t irgen::isTypeABIAccessibleIfFixedSize(IRGenModule &IGM,
+                                                        CanType ty) {
+
+  // Copyable types currently are always ABI-accessible if they're fixed size.
+  if (!ty->isNoncopyable())
+    return IsABIAccessible;
+
+  // Check for a deinit. If this type does not define a deinit it is ABI
+  // accessible because we can just project onto its sub elements.
+  auto nom = ty->getAnyNominal();
+  if (!nom || !nom->getValueTypeDestructor())
+    return IsABIAccessible;
+
+  if (IGM.getSILModule().isTypeMetadataAccessible(ty) ||
+      IGM.getSILModule().lookUpMoveOnlyDeinit(nom,
+                                              false /*deserialize lazily*/))
+    return IsABIAccessible;
+
+  return IsNotABIAccessible;
 }
