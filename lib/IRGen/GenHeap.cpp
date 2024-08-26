@@ -74,7 +74,7 @@ namespace {
                                     SpareBitVector &&spareBits, \
                                     bool isOptional) \
       : IndirectTypeInfo(type, size, std::move(spareBits), alignment, \
-                         IsNotTriviallyDestroyable, IsNotBitwiseTakable, IsCopyable, IsFixedSize), \
+                         IsNotTriviallyDestroyable, IsNotBitwiseTakable, IsCopyable, IsFixedSize, IsABIAccessible), \
         ValueTypeAndIsOptional(valueType, isOptional) {} \
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr, \
                             Address srcAddr, SILType T, \
@@ -151,7 +151,7 @@ namespace {
       : SingleScalarTypeInfo(type, size, std::move(spareBits), \
                              alignment, IsNotTriviallyDestroyable, \
                              IsCopyable, \
-                             IsFixedSize), \
+                             IsFixedSize, IsABIAccessible), \
         ValueTypeAndIsOptional(valueType, isOptional) {} \
     enum { IsScalarTriviallyDestroyable = false }; \
     TypeLayoutEntry \

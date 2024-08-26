@@ -47,7 +47,7 @@ public:
                    Size size, Alignment align, SpareBitVector &&spareBits)
       : TrivialScalarPairTypeInfo(storageType, size, std::move(spareBits),
                                   align, IsTriviallyDestroyable,
-                                  IsCopyable, IsFixedSize) {}
+                                  IsCopyable, IsFixedSize, IsABIAccessible) {}
 
   static Size getFirstElementSize(IRGenModule &IGM) {
     return IGM.getPointerSize();

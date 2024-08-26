@@ -683,7 +683,7 @@ class RecordTypeInfo<Impl, Base, FieldImpl,
 protected:
   template <class... As> 
   RecordTypeInfo(ArrayRef<FieldImpl> fields, As &&...args)
-    : super(fields, FieldsAreABIAccessible, std::forward<As>(args)...) {}
+    : super(fields, std::forward<As>(args)...) {}
 
   using super::asImpl;
 
@@ -965,12 +965,12 @@ public:
     fieldTypesForLayout.reserve(astFields.size());
 
     auto fieldsABIAccessible = FieldsAreABIAccessible;
-
     unsigned explosionSize = 0;
     for (unsigned i : indices(astFields)) {
       auto &astField = astFields[i];
       // Compute the field's type info.
-      auto &fieldTI = IGM.getTypeInfo(asImpl()->getType(astField));
+      auto fieldTy = asImpl()->getType(astField);
+      auto &fieldTI = IGM.getTypeInfo(fieldTy);
       fieldTypesForLayout.push_back(&fieldTI);
 
       if (!fieldTI.isABIAccessible())
@@ -1003,11 +1003,10 @@ public:
     // Create the type info.
     if (layout.isLoadable()) {
       assert(layout.isFixedLayout());
-      assert(fieldsABIAccessible);
-      return asImpl()->createLoadable(fields, std::move(layout), explosionSize);
+      return asImpl()->createLoadable(fields, fieldsABIAccessible, std::move(layout), explosionSize
+                                      );
     } else if (layout.isFixedLayout()) {
-      assert(fieldsABIAccessible);
-      return asImpl()->createFixed(fields, std::move(layout));
+      return asImpl()->createFixed(fields, fieldsABIAccessible, std::move(layout));
     } else {
       return asImpl()->createNonFixed(fields, fieldsABIAccessible,
                                       std::move(layout));
