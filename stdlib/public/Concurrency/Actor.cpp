@@ -1034,6 +1034,11 @@ protected:
   // synchronously, no job queue is needed and the lock will handle all priority
   // escalation logic
   Mutex drainLock;
+  // Actor can be deinitialized while lock is still being held.
+  // We maintain separate reference counter for the lock to make sure that
+  // lock is destroyed and memory is freed when both actor is deinitialized
+  // and lock is unlocked.
+  std::atomic<int> lockReferenceCount;
 #else
   // Note: There is some padding that is added here by the compiler in order to
   // enforce alignment. This is space that is available for us to use in
@@ -1130,6 +1135,7 @@ public:
     this->isDistributedRemoteActor = isDistributedRemote;
 #if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
     new (&this->drainLock) Mutex();
+    lockReferenceCount = 1;
 #else
    _status().store(ActiveActorStatus(), std::memory_order_relaxed);
    new (&this->prioritizedJobs) PriorityQueue();
@@ -1151,6 +1157,11 @@ public:
 
   /// Unlock an actor
   bool unlock(bool forceUnlock);
+
+#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+  void retainLock();
+  void releaseLock();
+#endif
 
 #if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
   /// Enqueue a job onto the actor.
@@ -1688,7 +1699,9 @@ void DefaultActorImpl::destroy() {
 }
 
 void DefaultActorImpl::deallocate() {
-#if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+  releaseLock();
+#else
   // If we're running, mark ourselves as ready for deallocation but don't
   // deallocate yet. When we stop running the actor - at unlock() time - we'll
   // do the actual deallocation.
@@ -1704,8 +1717,8 @@ void DefaultActorImpl::deallocate() {
   }
 
   assert(oldState.isIdle());
-#endif
   deallocateUnconditional();
+#endif
 }
 
 void DefaultActorImpl::deallocateUnconditional() {
@@ -1718,6 +1731,7 @@ void DefaultActorImpl::deallocateUnconditional() {
 
 bool DefaultActorImpl::tryLock(bool asDrainer) {
 #if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+  retainLock();
   this->drainLock.lock();
   return true;
 #else /* SWIFT_CONCURRENCY_ACTORS_AS_LOCKS */
@@ -1830,6 +1844,7 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
 {
 #if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
   this->drainLock.unlock();
+  releaseLock();
   return true;
 #else
   bool distributedActorIsRemote = swift_distributed_actor_is_remote(this);
@@ -1918,6 +1933,18 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
   }
 #endif
 }
+
+#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+void DefaultActorImpl::retainLock() {
+  lockReferenceCount.fetch_add(1, std::memory_order_acquire);
+}
+void DefaultActorImpl::releaseLock() {
+  if (1 == lockReferenceCount.fetch_add(-1, std::memory_order_release)) {
+    drainLock.~Mutex();
+    deallocateUnconditional();
+  }
+}
+#endif
 
 SWIFT_CC(swift)
 static void swift_job_runImpl(Job *job, SerialExecutorRef executor) {
@@ -2257,24 +2284,6 @@ static void swift_task_deinitOnExecutorImpl(void *object,
                                             DeinitWorkFunction *work,
                                             SerialExecutorRef newExecutor,
                                             size_t rawFlags) {
-#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
-  // To properly support isolated deinit in this mode, we
-  // need to be able to postpone deallocation of the lock
-  // until actor is unlocked.
-  //
-  // Note that such zombie state probably should be supported regardless of the isolated deinit.
-  // Theoretically it is possible for last release to happen in the middle of a job isolated to the actor.
-  // But until isolated consuming parameters are fixed, this seems to be impossible to reproduce.
-  // See also https://github.com/swiftlang/swift/issues/76083
-  //
-  // Alternatively we could lock and unlock before executing deinit body.
-  // This would be sufficient to wait until all jobs isolated to the actor have finished.
-  // Any code attempting to take actor's lock while deinit is running is incorrect anyway.
-  // So it does not matter much if deinit body is executed with lock held or not.
-  //
-  // But this workaround applies only to the isolated deinit and does not solve the generic case.
-  swift_Concurrency_fatalError(0, "Isolated deinit is not yet supported in actor as locks model");
-#else
   // If the current executor is compatible with running the new executor,
   // we can just immediately continue running with the resume function
   // we were passed in.
@@ -2289,7 +2298,12 @@ static void swift_task_deinitOnExecutorImpl(void *object,
     return work(object); // 'return' forces tail call
   }
 
+#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+  // In this mode taking actor lock is the only possible implementation
+#else
+  // Otherwise, it is an optimisation applied when deinitializing default actors
   if (newExecutor.isDefaultActor() && object == newExecutor.getIdentity()) {
+#endif
     // Try to take the lock. This should always succeed, unless someone is
     // running the actor using unsafe unowned reference.
     if (asImpl(newExecutor.getDefaultActor())->tryLock(false)) {
@@ -2329,9 +2343,13 @@ static void swift_task_deinitOnExecutorImpl(void *object,
       // Give up the current actor.
       asImpl(newExecutor.getDefaultActor())->unlock(true);
       return;
+    } else {
+#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+      assert(false && "Should not enqueue onto default actor in actor as locks model");
+#endif
     }
+#if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
   }
-
   auto currentTask = swift_task_getCurrent();
   auto priority = currentTask ? swift_task_currentPriority(currentTask)
                               : swift_task_getCurrentThreadPriority();

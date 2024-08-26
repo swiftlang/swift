@@ -8,8 +8,6 @@
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 
-// XFAIL: freestanding
-
 @_spi(_TaskToThreadModel) import _Concurrency
 import StdlibUnittest
 import Darwin

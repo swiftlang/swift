@@ -5,7 +5,10 @@
 
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
-// UNSUPPORTED: freestanding
+
+// Compiler crashes because builtin "ifdef_SWIFT_STDLIB_PRINT_DISABLED"() gets lowered as "i32 0",
+// which triggers assertion in LLVM, which expects it to be i1
+// XFAIL: freestanding
 
 import Swift
 import _Concurrency
@@ -54,7 +57,7 @@ actor Foo {
     }
 
     isolated deinit {
-      print("DEINIT: \(name) isolated:\(isCurrent(self)) mainThread:\(isMainThread())")
+      print("DEINIT: \(self.name) isolated:\(isCurrent(self)) mainThread:\(isMainThread())")
     }
 }
 
