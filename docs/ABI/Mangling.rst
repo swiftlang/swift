@@ -1265,13 +1265,16 @@ Function Specializations
 
 ::
 
-  specialization ::= type '_' type* 'Tg' SPEC-INFO     // Generic re-abstracted specialization
-  specialization ::= type '_' type* 'TB' SPEC-INFO     // Alternative mangling for generic re-abstracted specializations,
-                                                       // used for functions with re-abstracted resilient parameter types.
+  specialization ::= type '_' type* 'T' dropped-arg* 'g' SPEC-INFO  // Generic re-abstracted specialization
+  specialization ::= type '_' type* 'T' dropped-arg* 'B' SPEC-INFO  // Alternative mangling for generic re-abstracted specializations,
+                                                                    // used for functions with re-abstracted resilient parameter types.
+  specialization ::= type '_' type* 'T' dropped-arg* 'G' SPEC-INFO  // Generic not re-abstracted specialization
   specialization ::= type '_' type* 'Ts' SPEC-INFO     // Generic re-abstracted prespecialization
-  specialization ::= type '_' type* 'TG' SPEC-INFO     // Generic not re-abstracted specialization
   specialization ::= type '_' type* 'Ti' SPEC-INFO     // Inlined function with generic substitutions.
   specialization ::= type '_' type* 'Ta' SPEC-INFO     // Non-async specialization
+
+  dropped-arg ::= 't'                                  // The first argument is dropped
+  dropped-arg ::= 't' NATURAL                          // The `N+1`th argument is dropped
 
 The types are the replacement types of the substitution list.
 
@@ -1294,7 +1297,7 @@ Some kinds need arguments, which precede ``Tf``.
   spec-arg ::= identifier
   spec-arg ::= type
 
-  SPEC-INFO ::= MT-REMOVED? FRAGILE? ASYNC-REMOVED? PASSID
+  SPEC-INFO ::= FRAGILE? ASYNC-REMOVED? PASSID
 
   PASSID ::= '0'                             // AllocBoxToStack,
   PASSID ::= '1'                             // ClosureSpecializer,
@@ -1304,8 +1307,6 @@ Some kinds need arguments, which precede ``Tf``.
   PASSID ::= '5'                             // GenericSpecializer,
   PASSID ::= '6'                             // MoveDiagnosticInOutToOut,
   PASSID ::= '7'                             // AsyncDemotion,
-
-  MT-REMOVED ::= 'm'                         // non-generic metatype arguments are removed in the specialized function
 
   FRAGILE ::= 'q'
 
