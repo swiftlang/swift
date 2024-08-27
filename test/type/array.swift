@@ -42,7 +42,7 @@ func constructArray(_ n: Int) {
 
 typealias FixIt0 = Int[] // expected-error{{array types are now written with the brackets around the element type}}{{20-20=[}}{{23-24=}}
 
-// Make sure preCheckExpression() properly folds member types.
+// Make sure preCheckTarget() properly folds member types.
 
 class Outer {
   class Middle {
