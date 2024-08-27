@@ -9,7 +9,7 @@
 // RUN:     -Xllvm -sil-print-function='$s4main1CCACycfc' \
 // RUN:     2>&1 | %FileCheck %s
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: PTRSIZE=64
 
 // This test expects the stdlib to be in its properly optimized form.
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
@@ -30,7 +30,7 @@
 // CHECK:         [[BRIDGE_STORAGE:%[^,]+]] = struct $_BridgeStorage<__ContiguousArrayStorageBase> ([[BRIDGE_OBJECT]] :
 // CHECK:         [[ARRAY_BUFFER:%[^,]+]] = struct $_ArrayBuffer<(String, String)> ([[BRIDGE_STORAGE]] :
 // CHECK:         [[ARRAY:%[^,]+]] = struct $Array<(String, String)> ([[ARRAY_BUFFER]] :
-// CHECK:         [[DICTIONARY_INIT:%[^,]+]] = function_ref @$sSD17dictionaryLiteralSDyxq_Gx_q_td_tcfCSS_SSTg{{m?}}5
+// CHECK:         [[DICTIONARY_INIT:%[^,]+]] = function_ref @$sSD17dictionaryLiteralSDyxq_Gx_q_td_tcfCSS_SST{{[t0-9]*}}g5
 // CHECK-NEXT:    strong_retain [[REF]] : $__EmptyArrayStorage
 // CHECK-NEXT:    apply [[DICTIONARY_INIT]]([[ARRAY]]
 // CHECK-LABEL: } // end sil function '$s4main1CCACycfc'
