@@ -2844,18 +2844,20 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       return Thunk;
     }
     case 'g':
-      return demangleGenericSpecialization(Node::Kind::GenericSpecialization);
+      return demangleGenericSpecialization(Node::Kind::GenericSpecialization, nullptr);
     case 'G':
       return demangleGenericSpecialization(Node::Kind::
-                                          GenericSpecializationNotReAbstracted);
+                                          GenericSpecializationNotReAbstracted, nullptr);
     case 'B':
       return demangleGenericSpecialization(Node::Kind::
-                                      GenericSpecializationInResilienceDomain);
+                                      GenericSpecializationInResilienceDomain, nullptr);
+    case 't':
+      return demangleGenericSpecializationWithDroppedArguments();
     case 's':
       return demangleGenericSpecialization(
-          Node::Kind::GenericSpecializationPrespecialized);
+          Node::Kind::GenericSpecializationPrespecialized, nullptr);
     case 'i':
-      return demangleGenericSpecialization(Node::Kind::InlinedGenericFunction);
+      return demangleGenericSpecialization(Node::Kind::InlinedGenericFunction, nullptr);
     case 'p': {
       NodePointer Spec = demangleSpecAttributes(Node::Kind::
                                                 GenericPartialSpecialization);
@@ -3202,10 +3204,18 @@ std::string Demangler::demangleBridgedMethodParams() {
   return Str;
 }
 
-NodePointer Demangler::demangleGenericSpecialization(Node::Kind SpecKind) {
+NodePointer Demangler::demangleGenericSpecialization(Node::Kind SpecKind,
+                                                     NodePointer droppedArguments) {
   NodePointer Spec = demangleSpecAttributes(SpecKind);
   if (!Spec)
     return nullptr;
+
+  if (droppedArguments) {
+    for (NodePointer a : *droppedArguments) {
+      Spec->addChild(a, *this);
+    }
+  }
+
   NodePointer TyList = popTypeList();
   if (!TyList)
     return nullptr;
@@ -3214,6 +3224,24 @@ NodePointer Demangler::demangleGenericSpecialization(Node::Kind SpecKind) {
                    *this);
   }
   return Spec;
+}
+
+NodePointer Demangler::demangleGenericSpecializationWithDroppedArguments() {
+  pushBack();
+  NodePointer tmp = createNode(Node::Kind::GenericSpecialization);
+  while (nextIf('t')) {
+    int n = demangleNatural();
+    addChild(tmp, createNode(Node::Kind::DroppedArgument, n < 0 ? 0 : n + 1));
+  }
+  Node::Kind specKind;
+  switch (nextChar()) {
+    case 'g': specKind = Node::Kind::GenericSpecialization; break;
+    case 'G': specKind = Node::Kind::GenericSpecializationNotReAbstracted; break;
+    case 'B': specKind = Node::Kind::GenericSpecializationInResilienceDomain; break;
+    default:
+      return nullptr;
+  }
+  return demangleGenericSpecialization(specKind, tmp);
 }
 
 NodePointer Demangler::demangleFunctionSpecialization() {
@@ -3429,20 +3457,15 @@ NodePointer Demangler::addFuncSpecParamNumber(NodePointer Param,
 }
 
 NodePointer Demangler::demangleSpecAttributes(Node::Kind SpecKind) {
-  bool metatypeParamsRemoved = nextIf('m');
   bool isSerialized = nextIf('q');
   bool asyncRemoved = nextIf('a');
 
   int PassID = (int)nextChar() - '0';
   if (PassID < 0 || PassID >= MAX_SPECIALIZATION_PASS) {
-    assert(false && "unexpected pass id");
     return nullptr;
   }
 
   NodePointer SpecNd = createNode(SpecKind);
-
-  if (metatypeParamsRemoved)
-    SpecNd->addChild(createNode(Node::Kind::MetatypeParamsRemoved), *this);
 
   if (isSerialized)
     SpecNd->addChild(createNode(Node::Kind::IsSerialized),
