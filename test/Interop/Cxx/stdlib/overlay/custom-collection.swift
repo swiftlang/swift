@@ -37,6 +37,23 @@ CxxCollectionTestSuite.test("SimpleCollectionReadOnly as Swift.Collection") {
   expectEqual(slice.last, 3)
 }
 
+CxxCollectionTestSuite.test("SimpleCollectionReadWrite as Swift.MutableCollection") {
+  var c = SimpleCollectionReadWrite()
+  expectEqual(c.first, 1)
+  expectEqual(c.last, 5)
+
+  c.swapAt(0, 4)
+  expectEqual(c.first, 5)
+  expectEqual(c.last, 1)
+
+  c.reverse()
+  expectEqual(c[0], 1)
+  expectEqual(c[1], 4)
+  expectEqual(c[2], 3)
+  expectEqual(c[3], 2)
+  expectEqual(c[4], 5)
+}
+
 CxxCollectionTestSuite.test("SimpleArrayWrapper as Swift.Collection") {
   let c = SimpleArrayWrapper()
   expectEqual(c.first, 10)

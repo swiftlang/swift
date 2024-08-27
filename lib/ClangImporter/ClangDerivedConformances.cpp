@@ -780,8 +780,44 @@ void swift::conformToCxxSequenceIfNeeded(
     impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Indices"), indicesTy);
     impl.addSynthesizedTypealias(decl, ctx.getIdentifier("SubSequence"),
                                  sliceTy);
-    impl.addSynthesizedProtocolAttrs(
-        decl, {KnownProtocolKind::CxxRandomAccessCollection});
+
+    auto tryToConformToMutatingRACollection = [&]() -> bool {
+      auto rawMutableIteratorProto = ctx.getProtocol(
+          KnownProtocolKind::UnsafeCxxMutableRandomAccessIterator);
+      if (!rawMutableIteratorProto)
+        return false;
+
+      // Check if present: `func __beginMutatingUnsafe() -> RawMutableIterator`
+      auto beginMutatingId = ctx.getIdentifier("__beginMutatingUnsafe");
+      auto beginMutating =
+          lookupDirectSingleWithoutExtensions<FuncDecl>(decl, beginMutatingId);
+      if (!beginMutating)
+        return false;
+      auto rawMutableIteratorTy = beginMutating->getResultInterfaceType();
+
+      // Check if present: `func __endMutatingUnsafe() -> RawMutableIterator`
+      auto endMutatingId = ctx.getIdentifier("__endMutatingUnsafe");
+      auto endMutating =
+          lookupDirectSingleWithoutExtensions<FuncDecl>(decl, endMutatingId);
+      if (!endMutating)
+        return false;
+
+      if (!checkConformance(rawMutableIteratorTy, rawMutableIteratorProto))
+        return false;
+
+      impl.addSynthesizedTypealias(
+          decl, ctx.getIdentifier("RawMutableIterator"), rawMutableIteratorTy);
+      impl.addSynthesizedProtocolAttrs(
+          decl, {KnownProtocolKind::CxxMutableRandomAccessCollection});
+      return true;
+    };
+
+    bool conformedToMutableRAC = tryToConformToMutatingRACollection();
+
+    if (!conformedToMutableRAC)
+      impl.addSynthesizedProtocolAttrs(
+          decl, {KnownProtocolKind::CxxRandomAccessCollection});
+
     return true;
   };
 
