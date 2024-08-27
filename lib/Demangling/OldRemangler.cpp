@@ -451,8 +451,8 @@ ManglingError Remangler::mangleAsyncRemoved(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
-ManglingError Remangler::mangleMetatypeParamsRemoved(Node *node, unsigned depth) {
-  Buffer << "m";
+ManglingError Remangler::mangleDroppedArgument(Node *node, unsigned depth) {
+  Buffer << "t" << node->getIndex();
   return ManglingError::Success;
 }
 

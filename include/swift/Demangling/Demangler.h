@@ -594,7 +594,9 @@ protected:
   NodePointer popDependentAssociatedConformance();
   NodePointer demangleDependentProtocolConformanceAssociated();
   NodePointer demangleThunkOrSpecialization();
-  NodePointer demangleGenericSpecialization(Node::Kind SpecKind);
+  NodePointer demangleGenericSpecialization(Node::Kind SpecKind,
+                                            NodePointer droppedArguments);
+  NodePointer demangleGenericSpecializationWithDroppedArguments();
   NodePointer demangleFunctionSpecialization();
   NodePointer demangleFuncSpecParam(Node::Kind Kind);
   NodePointer addFuncSpecParamNumber(NodePointer Param,

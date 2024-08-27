@@ -87,13 +87,15 @@ class GenericSpecializationMangler : public SpecializationMangler {
   std::string manglePrespecialized(GenericSignature sig,
                                       SubstitutionMap subs);
 
+  void appendRemovedParams(const SmallBitVector &paramsRemoved);
+
 public:
   GenericSpecializationMangler(SILFunction *F, swift::SerializedKind_t Serialized)
       : SpecializationMangler(SpecializationPass::GenericSpecializer,
                               Serialized, F) {}
 
   std::string mangleNotReabstracted(SubstitutionMap subs,
-                                    bool metatyeParamsRemoved);
+                                    const SmallBitVector &paramsRemoved = SmallBitVector());
 
   /// Mangle a generic specialization with re-abstracted parameters.
   ///
@@ -107,7 +109,7 @@ public:
   /// \param metatyeParamsRemoved  true if non-generic metatype parameters are
   ///                              removed in the specialized function.
   std::string mangleReabstracted(SubstitutionMap subs, bool alternativeMangling,
-                                 bool metatyeParamsRemoved = false);
+                                 const SmallBitVector &paramsRemoved = SmallBitVector());
 
   std::string mangleForDebugInfo(GenericSignature sig, SubstitutionMap subs,
                                  bool forInlining);
