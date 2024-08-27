@@ -212,6 +212,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::PUBLIC_MODULE_NAME:
       extendedInfo.setPublicModuleName(blobData);
       break;
+    case options_block::HAS_SEALED_CXX_INTEROPERABILITY_ENABLED:
+      extendedInfo.setHasSealedCxxInteroperability(true);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -1472,6 +1475,8 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.CXXStdlibKind = static_cast<uint8_t>(extInfo.getCXXStdlibKind());
       Bits.AllowNonResilientAccess = extInfo.allowNonResilientAccess();
       Bits.SerializePackageEnabled = extInfo.serializePackageEnabled();
+      Bits.HasSealedCxxInteroperability =
+          extInfo.hasSealedCxxInteroperability();
       MiscVersion = info.miscVersion;
       SDKVersion = info.sdkVersion;
       ModuleABIName = extInfo.getModuleABIName();

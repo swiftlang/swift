@@ -514,6 +514,13 @@ void importer::getNormalInvocationArguments(
       "-isystem", searchPathOpts.RuntimeResourcePath,
   });
 
+  if (ctx.LangOpts.SealCxxInteropRequirement) {
+    // Add a define that ensures Clang can note when a module
+    // is being imported with sealed mode enabled.
+    invocationArgStrs.insert(invocationArgStrs.end(),
+                             {"-D__swift_seal_cxx_interop__"});
+  }
+
   // Enable Position Independence.  `-fPIC` is not supported on Windows, which
   // is implicitly position independent.
   if (!triple.isOSWindows())

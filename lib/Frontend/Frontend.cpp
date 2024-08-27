@@ -1478,6 +1478,8 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setHasCxxInteroperability();
     if (Invocation.getLangOptions().EnableCXXInterop)
       MainModule->setCXXStdlibKind(Invocation.getLangOptions().CXXStdlib);
+    if (Invocation.getLangOptions().SealCxxInteropRequirement)
+      MainModule->setHasSealedCxxInteroperability();
     if (Invocation.getLangOptions().AllowNonResilientAccess)
       MainModule->setAllowNonResilientAccess();
     if (Invocation.getSILOptions().EnableSerializePackage)

@@ -1,0 +1,4 @@
+module CxxHeader {
+    header "header.h"
+    export *
+}

@@ -947,6 +947,11 @@ ERROR(cxx_stdlib_kind_mismatch,none,
       "module %0 was built with %1, but current compilation uses %2",
       (Identifier, StringRef, StringRef))
 
+ERROR(serialization_import_cant_deserialize_custom_cxx_stdlib_decl,Fatal,
+      "%0 from module %1 cannot be imported as it relies on sealed C++ "
+      "APIs that are not available in the current compilation",
+      (const Decl *, const ModuleDecl *))
+
 ERROR(modularization_issue_decl_moved,Fatal,
       "reference to %select{top-level declaration|type}0 %1 broken by a context change; "
       "%1 was expected to be in %2, but now a candidate is found only in %3",

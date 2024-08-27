@@ -728,6 +728,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.CXXStdlibKind = 0;
   Bits.ModuleDecl.AllowNonResilientAccess = 0;
   Bits.ModuleDecl.SerializePackageEnabled = 0;
+  Bits.ModuleDecl.HasSealedCxxInteroperability = 0;
 }
 
 void ModuleDecl::setIsSystemModule(bool flag) {

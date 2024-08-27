@@ -651,6 +651,12 @@ public:
     return static_cast<CXXStdlibKind>(Core->Bits.CXXStdlibKind);
   }
 
+  /// Whether this module was built with sealed C++ interoperability enabled,
+  /// that's broadly incompatible with default C++ interoperability support.
+  bool hasSealedCxxInteroperability() const {
+    return Core->Bits.HasSealedCxxInteroperability;
+  }
+
   /// Whether the module is resilient. ('-enable-library-evolution')
   ResilienceStrategy getResilienceStrategy() const {
     return ResilienceStrategy(Core->Bits.ResilienceStrategy);
