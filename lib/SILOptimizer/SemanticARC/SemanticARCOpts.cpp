@@ -21,6 +21,7 @@
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -176,6 +177,7 @@ struct SemanticARCOpts : SILFunctionTransform {
     // converted to guaranteed, ignoring the phi, try convert those phis to be
     // guaranteed.
     if (tryConvertOwnedPhisToGuaranteedPhis(visitor.ctx)) {
+      updateBorrowedFrom(getPassManager(), &f);
       // We return here early to save a little compile time so we do not
       // invalidate analyses redundantly.
       return invalidateAnalysis(
@@ -183,8 +185,10 @@ struct SemanticARCOpts : SILFunctionTransform {
     }
 
     // Otherwise, we only deleted instructions and did not touch phis.
-    if (didEliminateARCInsts)
+    if (didEliminateARCInsts) {
+      updateBorrowedFrom(getPassManager(), &f);
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    }
   }
 };
 
