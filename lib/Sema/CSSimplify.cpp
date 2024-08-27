@@ -14155,7 +14155,48 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyLValueObjectConstraint(
     Type type1, Type type2, TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
-  return SolutionKind::Error;
+  auto lvalueTy = simplifyType(type1);
+
+  auto formUnsolved = [&]() {
+    // If we're supposed to generate constraints, do so.
+    if (flags.contains(TMF_GenerateConstraints)) {
+      auto *lvalueObject =
+          Constraint::create(*this, ConstraintKind::LValueObject,
+                             type1, type2, getConstraintLocator(locator));
+
+      addUnsolvedConstraint(lvalueObject);
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  };
+
+  auto isOrCanBeLValueType = [](Type type) {
+    if (auto *typeVar = type->getAs<TypeVariableType>()) {
+      return typeVar->getImpl().canBindToLValue();
+    }
+    return type->is<LValueType>();
+  };
+
+  if (!isOrCanBeLValueType(lvalueTy)) {
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
+
+    if (recordFix(
+            TreatRValueAsLValue::create(*this, getConstraintLocator(locator))))
+      return SolutionKind::Error;
+
+    lvalueTy = LValueType::get(lvalueTy);
+  }
+
+  if (lvalueTy->isTypeVariableOrMember())
+    return formUnsolved();
+
+  // TODO: This operation deserves its own locator just like OptionalObject.
+  addConstraint(ConstraintKind::Equal,
+                lvalueTy->castTo<LValueType>()->getObjectType(), type2,
+                getConstraintLocator(locator));
+  return SolutionKind::Solved;
 }
 
 static llvm::PointerIntPair<Type, 3, unsigned>

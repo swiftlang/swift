@@ -3510,23 +3510,10 @@ namespace {
       } else {
         auto *locator = CS.getConstraintLocator(expr);
 
-        auto isOrCanBeLValueType = [](Type type) {
-          if (auto *typeVar = type->getAs<TypeVariableType>()) {
-            return typeVar->getImpl().canBindToLValue();
-          }
-          return type->is<LValueType>();
-        };
-
         auto exprType = CS.getType(expr);
-        if (!isOrCanBeLValueType(exprType)) {
-          // Pretend that destination is an l-value type.
-          exprType = LValueType::get(exprType);
-          (void)CS.recordFix(TreatRValueAsLValue::create(CS, locator));
-        }
-
         auto *destTy = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
-        CS.addConstraint(ConstraintKind::Bind, LValueType::get(destTy),
-                         exprType, locator);
+        CS.addConstraint(ConstraintKind::LValueObject, exprType, destTy,
+                         locator);
         return destTy;
       }
     }
