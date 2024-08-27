@@ -134,6 +134,10 @@ public:
     return Options;
   }
 
+  bool shouldSubstitutePrimaryArchetypes() const {
+    return Options.contains(SubstFlags::SubstitutePrimaryArchetypes);
+  }
+
   bool shouldSubstituteOpaqueArchetypes() const {
     return Options.contains(SubstFlags::SubstituteOpaqueArchetypes);
   }

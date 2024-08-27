@@ -3552,8 +3552,7 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
 
       // The Swift type directly corresponds to the lowered type.
       auto underlyingTy =
-          substOpaqueTypesWithUnderlyingTypes(substType, forExpansion,
-                                              /*allowLoweredTypes*/ true);
+          substOpaqueTypesWithUnderlyingTypes(substType, forExpansion);
       if (underlyingTy != substType) {
         underlyingTy =
             TC.computeLoweredRValueType(forExpansion, origType, underlyingTy);
@@ -3910,6 +3909,7 @@ getAnyFunctionRefInterfaceType(TypeConverter &TC,
         MapLocalArchetypesOutOfContext(sig.baseGenericSig, sig.capturedEnvs),
         MakeAbstractConformanceForGenericType(),
         SubstFlags::PreservePackExpansionLevel |
+        SubstFlags::SubstitutePrimaryArchetypes |
         SubstFlags::SubstituteLocalArchetypes);
     funcType = cast<FunctionType>(substType->getCanonicalType());
   }
@@ -4970,8 +4970,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
       return paramTy;
     },
     MakeAbstractConformanceForGenericType(),
-    SubstFlags::PreservePackExpansionLevel |
-    SubstFlags::AllowLoweredTypes)->getCanonicalType());
+    SubstFlags::PreservePackExpansionLevel)->getCanonicalType());
 }
 
 CanSILBoxType
@@ -4992,7 +4991,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
       mapOutOfContext,
       MakeAbstractConformanceForGenericType(),
       SubstFlags::PreservePackExpansionLevel |
-      SubstFlags::AllowLoweredTypes |
+      SubstFlags::SubstitutePrimaryArchetypes |
       SubstFlags::SubstituteLocalArchetypes)->getCanonicalType();
 
   // If the type is not dependent at all, we can form a concrete box layout.
@@ -5039,8 +5038,7 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
   return cast<SILBoxType>(
     Type(boxType).subst(mapIntoContext,
                         LookUpConformanceInModule(),
-                        SubstFlags::PreservePackExpansionLevel |
-                        SubstFlags::AllowLoweredTypes)->getCanonicalType());
+                        SubstFlags::PreservePackExpansionLevel)->getCanonicalType());
 }
 
 CanSILBoxType TypeConverter::getBoxTypeForEnumElement(

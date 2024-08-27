@@ -136,6 +136,22 @@ class Sub : Super {
 // CHECK: [[PRECONDITION:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
 // CHECK-NEXT: {{.*}} = apply [[PRECONDITION]]({{.*}}, [[EXEC]]) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
 
+@MainActor
+class NSObjectInitOverride: NSObject {
+  @MainActor override init() {
+    super.init()
+  }
+}
+
+// CHECK-LABEL: sil private [thunk] [ossa] @$s27preconcurrency_conformances20NSObjectInitOverrideCACycfcTo : $@convention(objc_method) (@owned NSObjectInitOverride) -> @owned NSObjectInitOverride
+// CHECK: [[MAIN_ACTOR_METATYPE:%.*]] = metatype $@thick MainActor.Type
+// CHECK: [[SHARED_FIELD:%.*]] = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// CHECK-NEXT: [[SHARED_ACTOR:%.*]] = apply [[SHARED_FIELD]]([[MAIN_ACTOR_METATYPE]]) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// CHECK-NEXT: [[MAIN_ACTOR:%.*]] = begin_borrow [[SHARED_ACTOR]] : $MainActor
+// CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR]] : $MainActor
+// CHECK: [[PRECONDITION:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
+// CHECK-NEXT: {{.*}} = apply [[PRECONDITION]]({{.*}}, [[EXEC]]) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
+
 //--- checks_disabled.swift
 import Foundation
 
@@ -208,4 +224,14 @@ class Sub : Super {
 // CHECK-NOT: [[PRECONDITION:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
 
 // CHECK-LABEL: sil private [thunk] [ossa] @$s27preconcurrency_conformances3SubC4testyyFTo : $@convention(objc_method) (Sub) -> ()
+// CHECK-NOT: [[PRECONDITION:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
+
+@MainActor
+class NSObjectInitOverride: NSObject {
+  @MainActor override init() {
+    super.init()
+  }
+}
+
+// CHECK-LABEL: sil private [thunk] [ossa] @$s27preconcurrency_conformances20NSObjectInitOverrideCACycfcTo : $@convention(objc_method) (@owned NSObjectInitOverride) -> @owned NSObjectInitOverride
 // CHECK-NOT: [[PRECONDITION:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()

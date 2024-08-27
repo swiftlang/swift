@@ -90,6 +90,10 @@ class GenericNonSendableKlass<T> {
 
 func sendParameter<T>(_ t: sending T) {}
 
+actor MyActor {
+  private var ns = NonSendableKlass()
+}
+
 /////////////////
 // MARK: Tests //
 /////////////////
@@ -294,4 +298,20 @@ func indirectSendingOptionalClassField<T>(_ t: GenericNonSendableKlass<T>) -> se
   return t.t2! // expected-warning {{returning a task-isolated 'Optional<T>' value as a 'sending' result risks causing data races}}
   // expected-note @-1 {{returning a task-isolated 'Optional<T>' value risks causing races since the caller assumes the value can be safely sent to other isolation domains}}
   // expected-note @-2 {{'Optional<T>' is a non-Sendable type}}
+}
+
+func useBlock<T>(block: () throws -> T) throws -> sending T {
+  fatalError()
+}
+
+extension MyActor {
+  // This shouldn't emit any errors. We used to error on returning result.
+  public func withContext<T>(_ block: sending () throws -> T) async throws -> sending T {
+    let value: T = try useBlock {
+      _ = ns
+      return try block()
+    }
+
+    return value
+  }
 }

@@ -12,7 +12,7 @@
 
 import ASTBridging
 import SwiftDiagnostics
-import SwiftIfConfig
+@_spi(Compiler) import SwiftIfConfig
 import SwiftParser
 import SwiftSyntax
 
@@ -20,11 +20,11 @@ import SwiftSyntax
 /// queries.
 struct CompilerBuildConfiguration: BuildConfiguration {
   let ctx: BridgedASTContext
-  var conditionLoc: BridgedSourceLoc
+  let sourceBuffer: UnsafeBufferPointer<UInt8>
 
-  init(ctx: BridgedASTContext, conditionLoc: BridgedSourceLoc) {
+  init(ctx: BridgedASTContext, sourceBuffer: UnsafeBufferPointer<UInt8>) {
     self.ctx = ctx
-    self.conditionLoc = conditionLoc
+    self.sourceBuffer = sourceBuffer
   }
 
   func isCustomConditionSet(name: String) throws -> Bool {
@@ -48,8 +48,11 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     }
   }
   
-  func canImport(importPath: [String], version: CanImportVersion) throws -> Bool {
-    var importPathStr = importPath.joined(separator: ".")
+  func canImport(
+    importPath: [(TokenSyntax, String)],
+    version: CanImportVersion
+  ) throws -> Bool {
+    var importPathStr = importPath.map { $0.1 }.joined(separator: ".")
 
     var versionComponents: [Int]
     let cVersionKind: BridgedCanImportVersion
@@ -71,7 +74,10 @@ struct CompilerBuildConfiguration: BuildConfiguration {
       versionComponents.withUnsafeBufferPointer { versionComponentsBuf in
         ctx.canImport(
           importPath: bridgedImportPathStr,
-          location: conditionLoc,
+          location: BridgedSourceLoc(
+            at: importPath.first!.0.position,
+            in: sourceBuffer
+          ),
           versionKind: cVersionKind,
           versionComponents: versionComponentsBuf.baseAddress,
           numVersionComponents: versionComponentsBuf.count
@@ -103,6 +109,13 @@ struct CompilerBuildConfiguration: BuildConfiguration {
   
   func isActiveTargetRuntime(name: String) throws -> Bool {
     var name = name
+
+    // Complain if the provided runtime isn't one of the known values.
+    switch name {
+    case "_Native", "_ObjC", "_multithreaded": break
+    default: throw IfConfigError.unexpectedRuntimeCondition
+    }
+
     return name.withBridgedString { nameRef in
       ctx.langOptsIsActiveTargetRuntime(nameRef)
     }
@@ -155,6 +168,18 @@ struct CompilerBuildConfiguration: BuildConfiguration {
   }
 }
 
+enum IfConfigError: Error, CustomStringConvertible {
+  case unexpectedRuntimeCondition
+
+  var description: String {
+    switch self {
+      case .unexpectedRuntimeCondition:
+        return "unexpected argument for the '_runtime' condition; expected '_Native' or '_ObjC'"
+    }
+  }
+}
+
+
 /// Extract the #if clause range information for the given source file.
 @_cdecl("swift_ASTGen_configuredRegions")
 public func configuredRegions(
@@ -165,7 +190,7 @@ public func configuredRegions(
   let sourceFilePtr = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1)
   let configuration = CompilerBuildConfiguration(
     ctx: astContext,
-    conditionLoc: sourceFilePtr.pointee.sourceLoc(at: AbsolutePosition(utf8Offset: 0))
+    sourceBuffer: sourceFilePtr.pointee.buffer
   )
   let regions = sourceFilePtr.pointee.syntax.configuredRegions(in: configuration)
 
@@ -294,4 +319,54 @@ public func freeConfiguredRegions(
   numRegions: Int
 ) {
   UnsafeMutableBufferPointer(start: regions, count: numRegions).deallocate()
+}
+
+/// Evaluate the #if condition at ifClauseLocationPtr.
+@_cdecl("swift_ASTGen_evaluatePoundIfCondition")
+public func evaluatePoundIfCondition(
+  astContext: BridgedASTContext,
+  diagEnginePtr: UnsafeMutableRawPointer,
+  sourceFileBuffer: BridgedStringRef,
+  ifConditionText: BridgedStringRef,
+  shouldEvaluate: Bool
+) -> Int {
+  // Retrieve the #if condition that we're evaluating here.
+  // FIXME: Use 'ExportedSourceFile' when C++ parser is replaced.
+  let textBuffer = UnsafeBufferPointer<UInt8>(start: ifConditionText.data, count: ifConditionText.count)
+  var parser = Parser(textBuffer)
+  let conditionExpr = ExprSyntax.parse(from: &parser)
+
+  let isActive: Bool
+  let syntaxErrorsAllowed: Bool
+  let diagnostics: [Diagnostic]
+  if shouldEvaluate {
+    // Evaluate the condition against the compiler's build configuration.
+    let configuration = CompilerBuildConfiguration(
+      ctx: astContext,
+      sourceBuffer: textBuffer
+    )
+
+    let state: IfConfigRegionState
+    (state, syntaxErrorsAllowed, diagnostics) = IfConfigRegionState.evaluating(conditionExpr, in: configuration)
+    isActive = (state == .active)
+  } else {
+    // Don't evaluate the condition, because we know it's inactive. Determine
+    // whether syntax errors are permitted within this region according to the
+    // condition.
+    isActive = false
+    (syntaxErrorsAllowed, diagnostics) = IfConfigClauseSyntax.syntaxErrorsAllowed(conditionExpr)
+  }
+
+  // Render the diagnostics.
+  for diagnostic in diagnostics {
+    emitDiagnostic(
+      diagnosticEngine: BridgedDiagnosticEngine(raw: diagEnginePtr),
+      sourceFileBuffer: UnsafeBufferPointer(start: sourceFileBuffer.data, count: sourceFileBuffer.count),
+      sourceFileBufferOffset: ifConditionText.data! - sourceFileBuffer.data!,
+      diagnostic: diagnostic,
+      diagnosticSeverity: diagnostic.diagMessage.severity
+    )
+  }
+
+  return (isActive ? 0x1 : 0) | (syntaxErrorsAllowed ? 0x2 : 0)
 }

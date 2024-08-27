@@ -86,6 +86,14 @@ bool swift::isExported(const ValueDecl *VD) {
 }
 
 static bool hasConformancesToPublicProtocols(const ExtensionDecl *ED) {
+  auto nominal = ED->getExtendedNominal();
+  if (!nominal)
+    return false;
+
+  // Extensions of protocols cannot introduce additional conformances.
+  if (isa<ProtocolDecl>(nominal))
+    return false;
+
   auto protocols = ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
   for (const ProtocolDecl *PD : protocols) {
     AccessScope scope =
@@ -292,6 +300,13 @@ ExportContext ExportContext::withReason(ExportabilityReason reason) const {
 ExportContext ExportContext::withExported(bool exported) const {
   auto copy = *this;
   copy.Exported = isExported() && exported;
+  return copy;
+}
+
+ExportContext ExportContext::withRefinedAvailability(
+    const AvailabilityContext &availability) const {
+  auto copy = *this;
+  copy.RunningOSVersion.intersectWith(availability);
   return copy;
 }
 

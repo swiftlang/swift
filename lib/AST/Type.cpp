@@ -16,17 +16,14 @@
 
 #define DEBUG_TYPE "ast-types"
 
-#include "swift/AST/Types.h"
+#include "clang/AST/Type.h"
 #include "ForeignRepresentationInfo.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/Concurrency.h"
 #include "swift/AST/ConformanceLookup.h"
-#include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/ReferenceCounting.h"
-#include "swift/AST/TypeCheckRequests.h"
-#include "swift/AST/TypeVisitor.h"
-#include "swift/AST/TypeWalker.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
@@ -34,18 +31,22 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeTransform.h"
+#include "swift/AST/TypeVisitor.h"
+#include "swift/AST/TypeWalker.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
-#include "clang/AST/Type.h"
 #include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -3381,15 +3382,6 @@ ArchetypeType::ArchetypeType(TypeKind Kind,
                           getSubclassTrailingObjects<ProtocolDecl *>());
 }
 
-ArchetypeType *ArchetypeType::getParent() const {
-  if (auto depMemTy = getInterfaceType()->getAs<DependentMemberType>()) {
-    return getGenericEnvironment()->mapTypeIntoContext(depMemTy->getBase())
-        ->castTo<ArchetypeType>();
-  }
-
-  return nullptr;
-}
-
 ArchetypeType *ArchetypeType::getRoot() const {
   if (isRoot()) {
     return const_cast<ArchetypeType *>(this);
@@ -4882,4 +4874,51 @@ StringRef swift::getNameForParamSpecifier(ParamSpecifier specifier) {
   case ParamSpecifier::ImplicitlyCopyableConsuming:
     return "implicitly_copyable_consuming";
   }
+}
+
+std::optional<DiagnosticBehavior>
+TypeBase::getConcurrencyDiagnosticBehaviorLimit(DeclContext *declCtx) const {
+  auto *self = const_cast<TypeBase *>(this);
+
+  if (auto *nomDecl = self->getNominalOrBoundGenericNominal()) {
+    // First try to just grab the exact concurrency diagnostic behavior.
+    if (auto result =
+            swift::getConcurrencyDiagnosticBehaviorLimit(nomDecl, declCtx)) {
+      return result;
+    }
+
+    // But if we get nothing, see if we can come up with diagnostic behavior by
+    // merging our fields if we have a struct.
+    if (auto *structDecl = dyn_cast<StructDecl>(nomDecl)) {
+      std::optional<DiagnosticBehavior> diagnosticBehavior;
+      auto substMap = self->getContextSubstitutionMap();
+      for (auto storedProperty : structDecl->getStoredProperties()) {
+        auto lhs = diagnosticBehavior.value_or(DiagnosticBehavior::Unspecified);
+        auto astType = storedProperty->getInterfaceType().subst(substMap);
+        auto rhs = astType->getConcurrencyDiagnosticBehaviorLimit(declCtx);
+        auto result = lhs.merge(rhs.value_or(DiagnosticBehavior::Unspecified));
+        if (result != DiagnosticBehavior::Unspecified)
+          diagnosticBehavior = result;
+      }
+      return diagnosticBehavior;
+    }
+  }
+
+  // When attempting to determine the diagnostic behavior limit of a tuple, just
+  // merge for each of the elements.
+  if (auto *tupleType = self->getAs<TupleType>()) {
+    std::optional<DiagnosticBehavior> diagnosticBehavior;
+    for (auto tupleType : tupleType->getElements()) {
+      auto lhs = diagnosticBehavior.value_or(DiagnosticBehavior::Unspecified);
+
+      auto type = tupleType.getType()->getCanonicalType();
+      auto rhs = type->getConcurrencyDiagnosticBehaviorLimit(declCtx);
+      auto result = lhs.merge(rhs.value_or(DiagnosticBehavior::Unspecified));
+      if (result != DiagnosticBehavior::Unspecified)
+        diagnosticBehavior = result;
+    }
+    return diagnosticBehavior;
+  }
+
+  return {};
 }

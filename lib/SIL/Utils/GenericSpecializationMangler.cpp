@@ -107,31 +107,35 @@ manglePrespecialized(GenericSignature sig, SubstitutionMap subs) {
                                   
 std::string GenericSpecializationMangler::
 mangleNotReabstracted(SubstitutionMap subs,
-                      bool metatyeParamsRemoved) {
+                      const SmallBitVector &paramsRemoved) {
   beginMangling();
   appendSubstitutions(getGenericSignature(), subs);
-  if (metatyeParamsRemoved) {
-    appendSpecializationOperator("TGm");
-  } else {
-    appendSpecializationOperator("TG");
-  }
+  appendOperator("T");
+  appendRemovedParams(paramsRemoved);
+  appendSpecializationOperator("G");
   return finalize();
 }
                                   
 std::string GenericSpecializationMangler::
 mangleReabstracted(SubstitutionMap subs, bool alternativeMangling,
-                   bool metatyeParamsRemoved) {
+                   const SmallBitVector &paramsRemoved) {
   beginMangling();
   appendSubstitutions(getGenericSignature(), subs);
-  
+  appendOperator("T");
+  appendRemovedParams(paramsRemoved);
+
   // See ReabstractionInfo::hasConvertedResilientParams for why and when to use
   // the alternative mangling.
-  if (metatyeParamsRemoved) {
-    appendSpecializationOperator(alternativeMangling ? "TBm" : "Tgm");
-  } else {
-    appendSpecializationOperator(alternativeMangling ? "TB" : "Tg");
-  }
+  appendSpecializationOperator(alternativeMangling ? "B" : "g");
   return finalize();
+}
+
+void GenericSpecializationMangler::appendRemovedParams(const SmallBitVector &paramsRemoved) {
+  for (int paramIdx : paramsRemoved.set_bits()) {
+    appendOperator("t");
+    if (paramIdx != 0)
+      Buffer << (paramIdx - 1);
+  }
 }
 
 std::string GenericSpecializationMangler::

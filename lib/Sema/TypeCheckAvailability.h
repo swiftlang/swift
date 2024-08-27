@@ -153,6 +153,11 @@ public:
   /// That is, this will perform a 'bitwise and' on the 'exported' bit.
   ExportContext withExported(bool exported) const;
 
+  /// Produce a new context with the same properties as this one, except the
+  /// availability context is constrained by \p availability if necessary.
+  ExportContext
+  withRefinedAvailability(const AvailabilityContext &availability) const;
+
   DeclContext *getDeclContext() const { return DC; }
 
   AvailabilityContext getAvailabilityContext() const {

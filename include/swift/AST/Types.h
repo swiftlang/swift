@@ -21,6 +21,7 @@
 #include "swift/AST/ASTAllocated.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/Identifier.h"
@@ -936,6 +937,11 @@ public:
   /// Returns true if this type conforms to Sendable, or if its a function type
   /// that is @Sendable.
   bool isSendableType();
+
+  /// Returns the diagnostic behavior for a specific nominal type handling
+  /// whether or not the type has preconcurrency applied to it.
+  std::optional<DiagnosticBehavior>
+  getConcurrencyDiagnosticBehaviorLimit(DeclContext *ctx) const;
 
   /// Determines whether this type conforms or inherits (if it's a protocol
   /// type) from `DistributedActor`.
@@ -4803,8 +4809,7 @@ class SILFunctionConventions;
 
 
 CanType substOpaqueTypesWithUnderlyingTypes(CanType type,
-                                            TypeExpansionContext context,
-                                            bool allowLoweredTypes = false);
+                                            TypeExpansionContext context);
 ProtocolConformanceRef
 substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
                                     TypeExpansionContext context);
@@ -6574,10 +6579,6 @@ public:
   /// This is a slow operation because it must scan all of the protocols to
   /// which the archetype conforms.
   Type getNestedTypeByName(Identifier name);
-
-  /// Retrieve the parent of this archetype, or null if this is a
-  /// primary archetype.
-  ArchetypeType *getParent() const;
 
   /// Return the archetype that represents the root generic parameter of its
   /// interface type.

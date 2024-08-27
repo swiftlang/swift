@@ -147,6 +147,7 @@ public:
     if (Ty.hasLocalArchetype()) {
       Ty = Ty.subst(getBuilder().getModule(),
                     Functor, Functor, CanGenericSignature(),
+                    SubstFlags::SubstitutePrimaryArchetypes |
                     SubstFlags::SubstituteLocalArchetypes);
     }
 
@@ -157,6 +158,7 @@ public:
   CanType remapASTType(CanType Ty) {
     if (Ty->hasLocalArchetype()) {
       Ty = Ty.subst(Functor, Functor,
+                    SubstFlags::SubstitutePrimaryArchetypes |
                     SubstFlags::SubstituteLocalArchetypes)->getCanonicalType();
     }
 
@@ -167,6 +169,7 @@ public:
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
     if (Subs.getRecursiveProperties().hasLocalArchetype()) {
       Subs = Subs.subst(Functor, Functor,
+                        SubstFlags::SubstitutePrimaryArchetypes |
                         SubstFlags::SubstituteLocalArchetypes);
     }
 

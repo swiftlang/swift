@@ -134,7 +134,8 @@ ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() cons
           return type;
         },
         MakeAbstractConformanceForGenericType(),
-        SubstFlags::PreservePackExpansionLevel);
+        SubstFlags::PreservePackExpansionLevel |
+        SubstFlags::SubstitutePrimaryArchetypes);
   } else if (isPack()) {
     return getPack()->subst(
         [](SubstitutableType *type) -> Type {
@@ -143,7 +144,8 @@ ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() cons
           return type;
         },
         MakeAbstractConformanceForGenericType(),
-        SubstFlags::PreservePackExpansionLevel);
+        SubstFlags::PreservePackExpansionLevel |
+        SubstFlags::SubstitutePrimaryArchetypes);
   }
 
   return *this;

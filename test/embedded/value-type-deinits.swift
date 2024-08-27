@@ -31,6 +31,6 @@ public func test() {
   createFoo(x: 1)
 }
 
-// CHECK-LABEL: sil @$s8MyModule9createFoo1xyx_ts17FixedWidthIntegerRzlFSi_Tg5 :
+// CHECK-LABEL: sil @$s8MyModule9createFoo1xyx_ts17FixedWidthIntegerRzlFSi_Ttg5 :
 // CHECK-NOT:     release
-// CHECK:       } // end sil function '$s8MyModule9createFoo1xyx_ts17FixedWidthIntegerRzlFSi_Tg5'
+// CHECK:       } // end sil function '$s8MyModule9createFoo1xyx_ts17FixedWidthIntegerRzlFSi_Ttg5'

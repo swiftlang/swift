@@ -113,7 +113,7 @@ public struct AsyncStream<Element> {
     /// A type that indicates how the stream terminated.
     ///
     /// The `onTermination` closure receives an instance of this type.
-    public enum Termination {
+    public enum Termination: Sendable {
       
       /// The stream finished as a result of calling the continuation's
       ///  `finish` method.
@@ -159,7 +159,7 @@ public struct AsyncStream<Element> {
     }
     
     /// A strategy that handles exhaustion of a buffer’s capacity.
-    public enum BufferingPolicy {
+    public enum BufferingPolicy: Sendable {
       /// Continue to add to the buffer, without imposing a limit on the number
       /// of buffered elements.
       case unbounded
@@ -471,6 +471,10 @@ extension AsyncStream {
 
 @available(SwiftStdlib 5.1, *)
 extension AsyncStream: @unchecked Sendable where Element: Sendable { }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncStream.Continuation.YieldResult: Sendable where Element: Sendable { }
+
 #else
 @available(SwiftStdlib 5.1, *)
 @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")

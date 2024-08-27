@@ -531,8 +531,7 @@ CanType IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type) {
   // assume are constant.
   if (type->hasOpaqueArchetype()) {
     auto context = getMaximalTypeExpansionContext();
-    return swift::substOpaqueTypesWithUnderlyingTypes(type, context,
-                                                      /*allowLoweredTypes=*/false);
+    return swift::substOpaqueTypesWithUnderlyingTypes(type, context);
   }
 
   return type;
@@ -545,8 +544,7 @@ SILType IRGenModule::substOpaqueTypesWithUnderlyingTypes(
   if (type.getASTType()->hasOpaqueArchetype()) {
     auto context = getMaximalTypeExpansionContext();
     return SILType::getPrimitiveType(
-      swift::substOpaqueTypesWithUnderlyingTypes(type.getASTType(), context,
-                                                 /*allowLoweredTypes=*/true),
+      swift::substOpaqueTypesWithUnderlyingTypes(type.getASTType(), context),
       type.getCategory());
   }
 
@@ -561,8 +559,7 @@ IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type,
   if (type->hasOpaqueArchetype()) {
     auto context = getMaximalTypeExpansionContext();
     return std::make_pair(
-       swift::substOpaqueTypesWithUnderlyingTypes(type, context,
-                                                  /*allowLoweredTypes=*/false),
+       swift::substOpaqueTypesWithUnderlyingTypes(type, context),
        swift::substOpaqueTypesWithUnderlyingTypes(conformance, type, context));
   }
 

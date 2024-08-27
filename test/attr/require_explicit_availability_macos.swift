@@ -237,3 +237,23 @@ extension StructWithImplicitMembers: Hashable { }
 // expected-note @-1 {{add @available attribute to enclosing extension}}
 // expected-warning @-2 {{public declarations should have an availability attribute with an introduction version}}
 // expected-error @-3 {{'StructWithImplicitMembers' is only available in macOS 10.15 or newer}}
+
+extension PublicProtocol {}
+
+extension PublicProtocol {
+  internal var internalVar: Bool { return true }
+}
+
+extension PublicProtocol { // expected-warning {{public declarations should have an availability attribute with an introduction version}}
+  public var publicVar: Bool { return true } // expected-warning {{public declarations should have an availability attribute with an introduction version}}
+}
+
+extension Error {}
+
+extension Error {
+  internal var internalVar: Bool { return true }
+}
+
+extension Error { // expected-warning {{public declarations should have an availability attribute with an introduction version}}
+  public var publicVar: Bool { return true } // expected-warning {{public declarations should have an availability attribute with an introduction version}}
+}

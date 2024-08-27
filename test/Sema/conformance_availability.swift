@@ -279,6 +279,15 @@ func passAvailableConformance1a(x: HasAvailableConformance1) {
   _ = UsesHorse<HasAvailableConformance1>.self
 }
 
+// Always available conformance
+struct HasAvailableConformance2: Horse {}
+
+// Conformance available in macOS 200
+struct HasAvailableConformance3 {}
+
+@available(macOS 200, *)
+extension HasAvailableConformance3: Horse {}
+
 // Associated conformance with unavailability
 protocol Rider {
   associatedtype H : Horse
@@ -324,6 +333,58 @@ struct AssocConformanceAvailable4 {}
 @available(macOS 100, *)
 extension AssocConformanceAvailable4 : Rider {
   typealias H = HasAvailableConformance1
+}
+
+@available(macOS 100, *)
+protocol Saddle {
+  associatedtype H : Horse = HasAvailableConformance1
+}
+
+struct ConformsToSaddle1 : Saddle {}
+
+struct ConformsToSaddle2 : Saddle {
+  typealias H = HasAvailableConformance2
+}
+
+struct ConformsToSaddle3 : Saddle {
+  // expected-error@-1 {{conformance of 'HasAvailableConformance3' to 'Horse' is only available in macOS 200 or newer}}
+  // expected-note@-2 {{add @available attribute to enclosing struct}}
+  // expected-note@-3 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance3'}}
+  typealias H = HasAvailableConformance3
+}
+
+struct ConformsToSaddle4 : Saddle {
+  // expected-error@-1 {{conformance of 'HasAvailableConformance3' to 'Horse' is only available in macOS 200 or newer}}
+  // expected-note@-2 {{add @available attribute to enclosing struct}}
+  // expected-note@-3 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance3'}}
+  @available(macOS 200, *)
+  typealias H = HasAvailableConformance3
+}
+
+protocol Barn {
+  @available(macOS 100, *)
+  associatedtype H : Horse = HasAvailableConformance1
+}
+
+struct ConformsToBarn1 : Barn {}
+
+struct ConformsToBarn2 : Barn {
+  typealias H = HasAvailableConformance2
+}
+
+struct ConformsToBarn3 : Barn {
+  // expected-error@-1 {{conformance of 'HasAvailableConformance3' to 'Horse' is only available in macOS 200 or newer}}
+  // expected-note@-2 {{add @available attribute to enclosing struct}}
+  // expected-note@-3 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance3'}}
+  typealias H = HasAvailableConformance3
+}
+
+struct ConformsToBarn4 : Barn {
+  // expected-error@-1 {{conformance of 'HasAvailableConformance3' to 'Horse' is only available in macOS 200 or newer}}
+  // expected-note@-2 {{add @available attribute to enclosing struct}}
+  // expected-note@-3 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance3'}}
+  @available(macOS 200, *)
+  typealias H = HasAvailableConformance3
 }
 
 // Solution ranking should down-rank solutions involving unavailable conformances

@@ -65,7 +65,7 @@ class ReabstractionInfo {
   /// A 1-bit means that the argument is a metatype argument. The argument is
   /// dropped and replaced by a `metatype` instruction in the entry block.
   /// Only used if `dropMetatypeArgs` is true.
-  SmallBitVector droppedMetatypeArgs;
+  SmallBitVector droppedArguments;
 
   /// Set to true if the function has a re-abstracted (= converted from
   /// indirect to direct) resilient argument or return type. This can happen if
@@ -84,10 +84,10 @@ class ReabstractionInfo {
   /// specializer.
   bool ConvertIndirectToDirect = true;
 
-  /// If true, drop metatype arguments.
-  /// See `droppedMetatypeArgs`.
-  bool dropMetatypeArgs = false;
-  
+  /// If true, drop unused arguments.
+  /// See `droppedArguments`.
+  bool dropUnusedArguments = false;
+
   bool hasIndirectErrorResult = false;
 
   /// The first NumResults bits in Conversions refer to formal indirect
@@ -277,15 +277,13 @@ public:
   /// Returns true if there are any conversions from indirect to direct values.
   bool hasConversions() const { return Conversions.any(); }
 
-  /// Returns true if the argument at `ArgIdx` is a dropped metatype argument.
-  /// See `droppedMetatypeArgs`.
-  bool isDroppedMetatypeArg(unsigned ArgIdx) const {
-    return droppedMetatypeArgs.test(ArgIdx);
+  /// Returns true if the argument at `ArgIdx` is a dropped argument.
+  /// See `droppedArguments`.
+  bool isDroppedArgument(unsigned ArgIdx) const {
+    return droppedArguments.test(ArgIdx);
   }
 
-  /// Returns true if there are any dropped metatype arguments.
-  /// See `droppedMetatypeArgs`.
-  bool hasDroppedMetatypeArgs() const { return droppedMetatypeArgs.any(); }
+  const SmallBitVector &getDroppedArgs() const { return droppedArguments; }
 
   /// Remove the arguments of a partial apply, leaving the arguments for the
   /// partial apply result function.

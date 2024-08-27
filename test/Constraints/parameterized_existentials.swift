@@ -37,6 +37,7 @@ func g3(x: G<any P<Int>>) -> G<any P<String>> {
 
 func h1(x: (any P)?) -> (any P<Int>)? {
   return x // expected-error {{cannot convert return expression of type '(any P)?' to return type '(any P<Int>)?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('any P' and 'any P<Int>') are expected to be equal}}
 }
 
 func h2(x: (any P<Int>)?) -> (any P)? {
