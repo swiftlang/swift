@@ -2313,6 +2313,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::LValueObject:
     llvm_unreachable("Bad constraint kind in matchTupleTypes()");
   }
 
@@ -2673,6 +2674,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::LValueObject:
     return true;
   }
 
@@ -3318,6 +3320,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::LValueObject:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -7179,6 +7182,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::ExplicitGenericArguments:
     case ConstraintKind::SameShape:
     case ConstraintKind::MaterializePackExpansion:
+    case ConstraintKind::LValueObject:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -14147,6 +14151,13 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   return SolutionKind::Solved;
 }
 
+ConstraintSystem::SolutionKind 
+ConstraintSystem::simplifyLValueObjectConstraint(
+    Type type1, Type type2, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  return SolutionKind::Error;
+}
+
 static llvm::PointerIntPair<Type, 3, unsigned>
 getBaseTypeForPointer(TypeBase *type) {
   unsigned unwrapCount = 0;
@@ -15614,6 +15625,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
     return simplifyMaterializePackExpansionConstraint(first, second, subflags,
                                                       locator);
 
+  case ConstraintKind::LValueObject:
+    return simplifyLValueObjectConstraint(first, second, subflags, locator);
+
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueWitness:
@@ -16207,6 +16221,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::MaterializePackExpansion:
     return simplifyMaterializePackExpansionConstraint(
+        constraint.getFirstType(), constraint.getSecondType(),
+        /*flags*/ std::nullopt, constraint.getLocator());
+
+  case ConstraintKind::LValueObject:
+    return simplifyLValueObjectConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
         /*flags*/ std::nullopt, constraint.getLocator());
   }

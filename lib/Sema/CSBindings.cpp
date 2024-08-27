@@ -1797,6 +1797,11 @@ void PotentialBindings::infer(Constraint *constraint) {
     // Constraints from which we can't do anything.
     break;
 
+  case ConstraintKind::LValueObject: {
+    DelayedBy.push_back(constraint);
+    break;
+  }
+
   // For now let's avoid inferring protocol requirements from
   // this constraint, but in the future we could do that to
   // to filter bindings.

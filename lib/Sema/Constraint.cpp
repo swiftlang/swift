@@ -85,6 +85,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::LValueObject:
     assert(!First.isNull());
     assert(!Second.isNull());
     break;
@@ -176,6 +177,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::LValueObject:
     llvm_unreachable("Wrong constructor");
 
   case ConstraintKind::KeyPath:
@@ -326,6 +328,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::LValueObject:
     return create(cs, getKind(), getFirstType(), getSecondType(), getLocator());
 
   case ConstraintKind::ApplicableFunction:
@@ -590,6 +593,10 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
     Out << " materialize pack expansion ";
     break;
 
+  case ConstraintKind::LValueObject:
+    Out << " l-value object type ";
+    break;
+
   case ConstraintKind::Disjunction:
     llvm_unreachable("disjunction handled above");
   case ConstraintKind::Conjunction:
@@ -760,6 +767,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::LValueObject:
     constraint->getFirstType()->getTypeVariables(typeVars);
     constraint->getSecondType()->getTypeVariables(typeVars);
     break;

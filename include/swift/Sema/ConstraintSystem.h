@@ -5239,6 +5239,12 @@ private:
                                              TypeMatchOptions flags,
                                              ConstraintLocatorBuilder locator);
 
+  /// Extract the object type of the l-value type (type1) and bind it to
+  /// to type2.
+  SolutionKind simplifyLValueObjectConstraint(Type type1, Type type2,
+                                              TypeMatchOptions flags,
+                                              ConstraintLocatorBuilder locator);
+
 public: // FIXME: Public for use by static functions.
   /// Simplify a conversion constraint with a fix applied to it.
   SolutionKind simplifyFixConstraint(ConstraintFix *fix, Type type1, Type type2,
