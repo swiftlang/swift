@@ -1710,6 +1710,7 @@ internal struct RawKeyPathComponent {
     switch value {
     case .struct(let offset):
       var base2 = base
+      defer { _fixLifetime(base2) }
       return .continue(withUnsafeBytes(of: &base2) {
         let p = $0.baseAddress.unsafelyUnwrapped.advanced(by: offset)
         // The contents of the struct should be well-typed, so we can assume
