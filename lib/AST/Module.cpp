@@ -4009,7 +4009,8 @@ FrontendStatsTracer::getTraceFormatter<const SourceFile *>() {
 bool IsNonUserModuleRequest::evaluate(Evaluator &evaluator, ModuleDecl *mod) const {
   // If there's no SDK path, fallback to checking whether the module was
   // in the system search path or a clang system module
-  SearchPathOptions &searchPathOpts = mod->getASTContext().SearchPathOpts;
+  auto &ctx = mod->getASTContext();
+  SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
   StringRef sdkPath = searchPathOpts.getSDKPath();
   if (sdkPath.empty() && mod->isSystemModule())
     return true;
@@ -4028,9 +4029,14 @@ bool IsNonUserModuleRequest::evaluate(Evaluator &evaluator, ModuleDecl *mod) con
   if (modulePath.empty())
     return false;
 
+  // If we have a platform path, check against that as it will be a parent of
+  // the SDK path.
+  auto *FS = ctx.SourceMgr.getFileSystem().get();
+  auto sdkOrPlatform = searchPathOpts.getSDKPlatformPath(FS).value_or(sdkPath);
+
   StringRef runtimePath = searchPathOpts.RuntimeResourcePath;
   return (!runtimePath.empty() && pathStartsWith(runtimePath, modulePath)) ||
-      (!sdkPath.empty() && pathStartsWith(sdkPath, modulePath));
+      (!sdkOrPlatform.empty() && pathStartsWith(sdkOrPlatform, modulePath));
 }
 
 version::Version ModuleDecl::getLanguageVersionBuiltWith() const {
