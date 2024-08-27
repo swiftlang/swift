@@ -4773,8 +4773,9 @@ void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
 
 /// Computes whether a module is part of the stdlib or contained within the
-/// SDK. If no SDK was specified, falls back to whether the module was
-/// specified as a system module (ie. it's on the system search path).
+/// SDK or the platform directory. If no SDK was specified, falls back to
+/// whether the module was specified as a system module (ie. it's on the system
+/// search path).
 class IsNonUserModuleRequest
     : public SimpleRequest<IsNonUserModuleRequest,
                            bool(ModuleDecl *),

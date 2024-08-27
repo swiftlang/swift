@@ -380,6 +380,8 @@ private:
 
   std::optional<StringRef> SysRoot = std::nullopt;
 
+  mutable std::optional<std::string> SDKPlatformPath = std::nullopt;
+
 public:
   StringRef getSDKPath() const { return SDKPath; }
 
@@ -397,6 +399,12 @@ public:
 
     Lookup.searchPathsDidChange();
   }
+
+  /// Retrieves the corresponding parent platform path for the SDK, or
+  /// \c nullopt if there isn't one.
+  /// NOTE: This computes and caches the result, and as such will not respect
+  /// a different FileSystem being passed later.
+  std::optional<StringRef> getSDKPlatformPath(llvm::vfs::FileSystem *FS) const;
 
   std::optional<StringRef> getWinSDKRoot() const { return WinSDKRoot; }
   void setWinSDKRoot(StringRef root) {
