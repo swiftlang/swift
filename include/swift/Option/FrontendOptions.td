@@ -1310,6 +1310,13 @@ def disable_fragile_resilient_protocol_witnesses :
   Flag<["-"], "disable-fragile-relative-protocol-tables">,
   HelpText<"Disable relative protocol witness tables">;
 
+def enable_async_frame_push_pop_metadata :
+  Flag<["-"], "enable-async-frame-push-pop-metadata">,
+  HelpText<"Enable async frame push pop metadata">;
+def disable_async_frame_push_pop_metadata :
+  Flag<["-"], "disable-async-frame-push-pop-metadata">,
+  HelpText<"Disable async frame push pop metadata">;
+
 def enable_split_cold_code :
   Flag<["-"], "enable-split-cold-code">,
   HelpText<"Enable splitting of cold code when optimizing">;
