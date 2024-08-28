@@ -367,7 +367,11 @@ public func incorrectPlatformCaseFunc() {}
 public func incorrectPlatformSimilarFunc() {}
 
 @backDeployed(before: macOS 12.0, unknownOS 1.0) // expected-warning {{unknown platform 'unknownOS' for attribute '@backDeployed'}}
-public func unknownOSFunc() {}
+public func unknownOSFunc1() {}
+
+@backDeployed(before: macOS 12.0)
+@backDeployed(before: unknownOS 1.0) // expected-warning {{unknown platform 'unknownOS' for attribute '@backDeployed'}}
+public func unknownOSFunc2() {}
 
 @backDeployed(before: @) // expected-error {{expected platform in '@backDeployed' attribute}}
 public func badPlatformFunc1() {}
@@ -414,7 +418,6 @@ public func missingMacroVersion() {}
 public func unknownMacroMissingVersion() {}
 
 @backDeployed(before: _unknownMacro 1.0) // expected-warning {{unknown platform '_unknownMacro' for attribute '@backDeployed'}}
-// expected-error@-1 {{expected at least one platform version in '@backDeployed' attribute}}
 public func unknownMacroVersioned() {}
 
 @backDeployed(before: _unknownMacro 1.0, _myProject 2.0) // expected-warning {{unknown platform '_unknownMacro' for attribute '@backDeployed'}}
