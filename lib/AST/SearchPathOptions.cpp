@@ -93,7 +93,7 @@ static std::string computeSDKPlatformPath(StringRef SDKPath,
   llvm::sys::path::remove_filename(platformPath); // SDKs
   llvm::sys::path::remove_filename(platformPath); // Developer
 
-  if (!llvm::sys::path::filename(platformPath).endswith(".platform"))
+  if (!llvm::sys::path::filename(platformPath).ends_with(".platform"))
     return "";
 
   return platformPath.str().str();
