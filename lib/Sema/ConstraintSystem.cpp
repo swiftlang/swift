@@ -1775,8 +1775,11 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
               adjustedTy->withExtInfo(adjustedTy->getExtInfo().withSendable());
         }
       } else if (isPartialApplication(getConstraintLocator(locator))) {
-        if (baseType &&
-            (baseType->is<AnyMetatypeType>() || baseType->isSendableType())) {
+        // Operators on protocols could be found via unqualified lookup and
+        // won't have a base type.
+        if (decl->isOperator() ||
+            (baseType &&
+             (baseType->is<AnyMetatypeType>() || baseType->isSendableType()))) {
           auto referenceTy = adjustedTy->getResult()->castTo<FunctionType>();
           referenceTy =
               referenceTy->withExtInfo(referenceTy->getExtInfo().withSendable())

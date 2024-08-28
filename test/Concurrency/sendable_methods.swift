@@ -286,3 +286,11 @@ func testPatternMatch(ge: [GenericE<Int>]) {
     _ = a
   }
 }
+
+// rdar://131321053 - cannot pass an operator to parameter that expectes a @Sendable type
+do {
+  func test(_: @Sendable (Int, Int) -> Bool) {
+  }
+
+  test(<) // Ok
+}
