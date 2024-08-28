@@ -317,8 +317,14 @@ getOperatorCompletionTypes(DeclContext *DC, Type LHSType, OperatorDecl *Op) {
     llvm_unreachable("unexpected operator kind");
   }
 
-  CS.preCheckExpression(OpCallExpr, DC);
-  OpCallExpr = CS.generateConstraints(OpCallExpr, DC);
+  auto target = SyntacticElementTarget(OpCallExpr, DC, CTP_Unused, Type(),
+                                       /*isDiscarded*/ true);
+  if (CS.preCheckTarget(target))
+    return {};
+  if (CS.generateConstraints(target))
+    return {};
+
+  OpCallExpr = target.getAsExpr();
 
   CS.assignFixedType(CS.getType(&LHS)->getAs<TypeVariableType>(), LHSType);
 
