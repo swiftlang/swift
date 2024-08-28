@@ -1381,6 +1381,7 @@ void SILGenFunction::emitProlog(
   }
 
   emitExpectedExecutor();
+  emitExpectedExecutorPreconditionForClosure();
 
   // IMPORTANT: This block should be the last one in `emitProlog`,
   // since it terminates BB and no instructions should be insterted after it.

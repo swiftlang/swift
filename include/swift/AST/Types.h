@@ -3874,9 +3874,6 @@ public:
   /// actor context from the context in which it was created.
   bool inheritsActorContext(unsigned paramIdx) const;
 
-  /// Whether there is any contextual information set on this parameter list.
-  bool anyContextualInfo() const;
-
   bool isVariadicGenericParameter(unsigned paramIdx) const;
 
   /// Returns true if this is a sending parameter.
