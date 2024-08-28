@@ -2226,7 +2226,7 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
   // Parse the platform name.
   StringRef platformText = Tok.getText();
   auto MaybePlatform = platformFromString(platformText);
-  ParsedUnrecognizedPlatformName = !MaybePlatform.has_value();
+  ParsedUnrecognizedPlatformName = ParsedUnrecognizedPlatformName || !MaybePlatform.has_value();
   SourceLoc PlatformLoc = Tok.getLoc();
   consumeToken();
 
