@@ -496,6 +496,16 @@ public:
     return const_cast<DeclContext *>(this)->getTopmostDeclarationDeclContext();
   }
 
+  /// This routine looks through closure, initializer, and local function
+  /// contexts to find the outermost function declaration.
+  ///
+  /// \returns the outermost function, or null if there is no such context.
+  LLVM_READONLY
+  DeclContext *getOutermostFunctionContext();
+  const DeclContext *getOutermostFunctionContext() const {
+    return const_cast<DeclContext *>(this)->getOutermostFunctionContext();
+  }
+
   /// Returns the innermost context that is an AbstractFunctionDecl whose
   /// body has been skipped.
   LLVM_READONLY
