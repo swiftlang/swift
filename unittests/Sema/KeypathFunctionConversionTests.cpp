@@ -104,11 +104,11 @@ TEST_F(SemaTest, TestKeypathFunctionConversionPrefersNarrowConversion) {
       fDecls, DeclNameLoc(), FunctionRefKind::SingleApply, false);
   auto *callExpr = CallExpr::create(Context, fDRE, argList, false);
 
-  Expr *target = callExpr;
   ConstraintSystem cs(DC, ConstraintSystemOptions());
-  ASSERT_FALSE(cs.preCheckExpression(target, DC));
-  auto *expr = cs.generateConstraints(callExpr, DC);
-  ASSERT_TRUE(expr);
+  auto target = SyntacticElementTarget(callExpr, DC, CTP_Unused, Type(),
+                                       /*isDiscarded*/ true);
+  ASSERT_FALSE(cs.preCheckTarget(target));
+  ASSERT_FALSE(cs.generateConstraints(target));
 
   SmallVector<Solution, 2> solutions;
   cs.solve(solutions);

@@ -1649,7 +1649,7 @@ class VarDeclMultipleReferencesChecker : public ASTWalker {
     }
 
     // FIXME: We can see UnresolvedDeclRefExprs here because we have
-    // not yet run preCheckExpression() on the entire function body
+    // not yet run preCheckTarget() on the entire function body
     // yet.
     //
     // We could consider pre-checking more eagerly.

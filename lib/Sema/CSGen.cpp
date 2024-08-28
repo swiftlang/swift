@@ -889,7 +889,7 @@ TypeVarRefCollector::walkToExprPre(Expr *expr) {
     inferTypeVars(DRE->getDecl());
 
   // FIXME: We can see UnresolvedDeclRefExprs here because we don't walk into
-  // patterns when running preCheckExpression, since we don't resolve patterns
+  // patterns when running preCheckTarget, since we don't resolve patterns
   // until CSGen. We ought to consider moving pattern resolution into
   // pre-checking, which would allow us to pre-check patterns normally.
   if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
