@@ -1160,6 +1160,11 @@ def create_argument_parser():
            help='Include Unicode data in the standard library.'
                 'Note: required for full String functionality')
 
+    option('--build-stdlib-docs', toggle_true,
+           default=False,
+           help='Build documentation for the standard library.'
+                'Note: this builds SwiftDocC to perform the docs build.')
+
     option('--build-swift-clang-overlays', toggle_true,
            default=True,
            help='Build Swift overlays for the clang builtin modules')
