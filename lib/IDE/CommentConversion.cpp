@@ -381,7 +381,7 @@ visitDocComment(const DocComment *DC, TypeOrExtensionDecl SynthesizedTarget) {
     PO.VarInitializers = false;
     PO.ShouldQualifyNestedDeclarations =
         PrintOptions::QualifyNestedDeclarations::TypesOnly;
-    PO.SkipUnderscoredStdlibProtocols = false;
+    PO.SkipUnderscoredSystemProtocols = false;
     if (SynthesizedTarget)
       PO.initForSynthesizedExtension(SynthesizedTarget);
 

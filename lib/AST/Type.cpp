@@ -4178,40 +4178,40 @@ TypeTraitResult TypeBase::canBeClass() {
   return TypeTraitResult::IsNot;
 }
 
-bool Type::isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic) const {
+bool Type::isPrivateSystemType(bool treatNonBuiltinProtocolsAsPublic) const {
   Type Ty = *this;
   if (!Ty)
     return false;
 
   if (auto existential = dyn_cast<ExistentialType>(Ty.getPointer()))
-    return existential->getConstraintType()
-        .isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic);
+    return existential->getConstraintType().isPrivateSystemType(
+        treatNonBuiltinProtocolsAsPublic);
 
   // A 'public' typealias can have an 'internal' type.
   if (auto *NAT = dyn_cast<TypeAliasType>(Ty.getPointer())) {
     auto *AliasDecl = NAT->getDecl();
     if (auto parent = NAT->getParent()) {
-      if (parent.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic))
+      if (parent.isPrivateSystemType(treatNonBuiltinProtocolsAsPublic))
         return true;
     }
 
-    if (AliasDecl->isPrivateStdlibDecl(treatNonBuiltinProtocolsAsPublic))
+    if (AliasDecl->isPrivateSystemDecl(treatNonBuiltinProtocolsAsPublic))
       return true;
 
-    return Type(NAT->getSinglyDesugaredType()).isPrivateStdlibType(
-                                            treatNonBuiltinProtocolsAsPublic);
+    return Type(NAT->getSinglyDesugaredType())
+        .isPrivateSystemType(treatNonBuiltinProtocolsAsPublic);
   }
 
   if (auto Paren = dyn_cast<ParenType>(Ty.getPointer())) {
     Type Underlying = Paren->getUnderlyingType();
-    return Underlying.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic);
+    return Underlying.isPrivateSystemType(treatNonBuiltinProtocolsAsPublic);
   }
 
   if (Type Unwrapped = Ty->getOptionalObjectType())
-    return Unwrapped.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic);
+    return Unwrapped.isPrivateSystemType(treatNonBuiltinProtocolsAsPublic);
 
   if (auto TyD = Ty->getAnyNominal())
-    if (TyD->isPrivateStdlibDecl(treatNonBuiltinProtocolsAsPublic))
+    if (TyD->isPrivateSystemDecl(treatNonBuiltinProtocolsAsPublic))
       return true;
 
   return false;

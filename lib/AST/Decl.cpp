@@ -1133,11 +1133,11 @@ bool Decl::hasUnderscoredNaming() const {
   return false;
 }
 
-bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
+bool Decl::isPrivateSystemDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   const Decl *D = this;
   if (auto ExtD = dyn_cast<ExtensionDecl>(D)) {
     Type extTy = ExtD->getExtendedType();
-    return extTy.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic);
+    return extTy.isPrivateSystemType(treatNonBuiltinProtocolsAsPublic);
   }
 
   DeclContext *DC = D->getDeclContext()->getModuleScopeContext();
@@ -4235,7 +4235,7 @@ bool ValueDecl::isInterfacePackageEffectivelyPublic() const {
 
 bool ValueDecl::shouldHideFromEditor() const {
   // Hide private stdlib declarations.
-  if (isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic*/ false) ||
+  if (isPrivateSystemDecl(/*treatNonBuiltinProtocolsAsPublic*/ false) ||
       // ShowInInterfaceAttr is for decls to show in interface as exception but
       // they are not intended to be used directly.
       getAttrs().hasAttribute<ShowInInterfaceAttr>())
