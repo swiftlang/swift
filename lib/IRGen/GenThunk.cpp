@@ -153,7 +153,8 @@ void IRGenThunk::prepareArguments() {
       auto &resultSchema = resultTI.nativeReturnValueSchema(IGF.IGM);
 
       if (resultSchema.requiresIndirect() ||
-          errorSchema.shouldReturnTypedErrorIndirectly()) {
+          errorSchema.shouldReturnTypedErrorIndirectly() ||
+          conv.hasIndirectSILResults()) {
         auto directTypedErrorAddr = original.takeLast();
         IGF.setCalleeTypedErrorResultSlot(Address(directTypedErrorAddr,
                                                   errorTI.getStorageType(),
