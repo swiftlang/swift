@@ -132,7 +132,7 @@ WARNING(libstdcxx_modulemap_not_found, none,
         (StringRef))
 
 WARNING(api_pattern_attr_ignored, none,
-        "'%0' swift attribute ignored on type '%1': type is not copyable or destructible",
+        "'%0' Swift attribute ignored on type '%1': type is not copyable or destructible",
         (StringRef, StringRef))
 
 ERROR(objc_implementation_two_impls, none,
@@ -208,30 +208,40 @@ NOTE(iterator_method_unavailable, none, "C++ method '%0' that returns an "
 NOTE(iterator_potentially_unsafe, none, "C++ methods that return iterators "
                                         "are potentially unsafe; try using Swift collection APIs instead", ())
 
-ERROR(reference_type_must_have_retain_attr,none,
-      "reference type '%0' must have 'retain:' swift attribute", (StringRef))
-ERROR(reference_type_must_have_release_attr,none,
-      "reference type '%0' must have 'release:' swift attribute", (StringRef))
-ERROR(foreign_reference_types_cannot_find_retain,none,
-      "cannot find retain function '%0' for reference type '%1'", (StringRef, StringRef))
-ERROR(foreign_reference_types_cannot_find_release,none,
-      "cannot find release function '%0' for reference type '%1'", (StringRef, StringRef))
-ERROR(too_many_reference_type_retain_operations,none,
-      "multiple functions '%0' found; there must be exactly one retain "
-      "function for reference type '%1'", (StringRef, StringRef))
-ERROR(too_many_reference_type_release_operations,none,
-      "multiple functions '%0' found; there must be exactly one release "
-      "function for reference type '%1'", (StringRef, StringRef))
-ERROR(foreign_reference_types_invalid_retain,none,
-      "specified retain function '%0' is invalid; retain function must have exactly one "
-      "argument of type '%1'", (StringRef, StringRef))
-ERROR(foreign_reference_types_invalid_release,none,
-      "specified release function '%0' is invalid; release function must have exactly "
-      "one argument of type '%1'", (StringRef, StringRef))
+ERROR(reference_type_must_have_retain_release_attr, none,
+      "reference type '%1' must have %select{'retain:'|'release:'}0 Swift "
+      "attribute",
+      (bool, StringRef))
+ERROR(too_many_reference_type_retain_release_attr, none,
+      "reference type '%1' must have only one %select{'retain:'|'release:'}0 "
+      "Swift "
+      "attribute",
+      (bool, StringRef))
+ERROR(foreign_reference_types_cannot_find_retain_release, none,
+      "cannot find %select{retain|release}0 function '%1' for reference type "
+      "'%2'",
+      (bool, StringRef, StringRef))
+ERROR(too_many_reference_type_retain_release_operations, none,
+      "multiple functions '%1' found; there must be exactly one "
+      "%select{retain|release}0 function for reference type '%2'",
+      (bool, StringRef, StringRef))
+ERROR(foreign_reference_types_invalid_retain_release, none,
+      "specified %select{retain|release}0 function '%1' is invalid; "
+      "%select{retain|release}0 function must have exactly one argument of "
+      "type '%2'",
+      (bool, StringRef, StringRef))
 
-
-ERROR(conforms_to_missing_dot,none,
-      "expected module name and protocol name separated by '.' in protocol conformance; '%0' is invalid", (StringRef))
+ERROR(foreign_reference_types_retain_release_non_void_return_type, none,
+      "specified %select{retain|release}0 function '%1' is invalid; "
+      "%select{retain|release}0 function must have 'void' return type",
+      (bool, StringRef))
+ERROR(foreign_reference_types_retain_release_not_a_function_decl, none,
+      "specified %select{retain|release}0 function '%1' is not a function",
+      (bool, StringRef))
+ERROR(conforms_to_missing_dot, none,
+      "expected module name and protocol name separated by '.' in protocol "
+      "conformance; '%0' is invalid",
+      (StringRef))
 ERROR(cannot_find_conforms_to_module,none,
       "module '%1' in specified protocol conformance '%0' is not found; did you mean to import it first?", (StringRef, StringRef))
 
