@@ -106,7 +106,7 @@ template <class T> void takesDependent(Dependent<T> d) {}
 
 void takesAtomic(_Atomic(int) a) {}
 
-struct HasImposibleMember {
+struct HasImpossibleMember {
   void memberTakesAtomic(_Atomic(int) a) {}
 };
 
