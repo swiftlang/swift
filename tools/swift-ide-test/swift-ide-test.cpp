@@ -3099,10 +3099,12 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
 }
 
 static int doPrintHeaders(const CompilerInvocation &InitInvok,
+                          StringRef SourceFilename,
                           const std::vector<std::string> HeadersToPrint,
-                          const PrintOptions &Options,
-                          bool AnnotatePrint) {
+                          const PrintOptions &Options, bool AnnotatePrint) {
   CompilerInvocation Invocation(InitInvok);
+  Invocation.getFrontendOptions().InputsAndOutputs.addPrimaryInputFile(
+      SourceFilename);
 
   CompilerInstance CI;
   // Display diagnostics to stderr.
@@ -4780,9 +4782,9 @@ int main(int argc, char *argv[]) {
     break;
   }
   case ActionType::PrintHeader: {
-    ExitCode = doPrintHeaders(
-        InitInvok, options::HeaderToPrint, PrintOpts,
-        options::AnnotatePrint);
+    ExitCode = doPrintHeaders(InitInvok, options::SourceFilename,
+                              options::HeaderToPrint, PrintOpts,
+                              options::AnnotatePrint);
     break;
   }
 
