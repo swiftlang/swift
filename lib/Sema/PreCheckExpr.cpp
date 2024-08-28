@@ -2440,19 +2440,3 @@ bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target) {
   target = *newTarget;
   return false;
 }
-
-/// Pre-check the expression, validating any types that occur in the
-/// expression and folding sequence expressions.
-bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc) {
-  auto &ctx = dc->getASTContext();
-  FrontendStatsTracer StatsTracer(ctx.Stats, "precheck-expr", expr);
-
-  PreCheckExpression preCheck(dc);
-
-  // Perform the pre-check.
-  if (auto result = expr->walk(preCheck)) {
-    expr = result;
-    return false;
-  }
-  return true;
-}

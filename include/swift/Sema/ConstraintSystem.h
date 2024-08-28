@@ -5404,10 +5404,6 @@ public:
   /// and folding sequence expressions.
   static bool preCheckTarget(SyntacticElementTarget &target);
 
-  /// Pre-check the expression, validating any types that occur in the
-  /// expression and folding sequence expressions.
-  static bool preCheckExpression(Expr *&expr, DeclContext *dc);
-
   /// Solve the system of constraints generated from provided target.
   ///
   /// \param target The target that we'll generate constraints from, which
