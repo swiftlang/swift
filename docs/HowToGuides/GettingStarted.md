@@ -643,14 +643,14 @@ llvm::report_fatal_error(os.str());
 
 ### Debugging using LLDB
 
-When the compiler crashes, the commandline arguments passed to it will be
+When the compiler crashes, the command line arguments passed to it will be
 printed to stderr. It will likely look something like:
 
 ```
 /path/to/swift-frontend <args>
 ```
 
-- Using LLDB on the commandline: Copy the entire invocation and pass it to LLDB.
+- Using LLDB on the command line: Copy the entire invocation and pass it to LLDB.
   ```sh
   lldb -- /path/to/swift-frontend <args>
   ```
