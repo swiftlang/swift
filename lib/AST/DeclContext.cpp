@@ -253,6 +253,22 @@ Decl *DeclContext::getTopmostDeclarationDeclContext() {
   return topmost;
 }
 
+DeclContext *DeclContext::getOutermostFunctionContext() {
+  AbstractFunctionDecl *result = nullptr;
+  auto dc = this;
+  do {
+    if (auto afd = dyn_cast<AbstractFunctionDecl>(dc))
+      result = afd;
+
+    // If we've found a non-local context, we don't have to keep walking up
+    // the hierarchy.
+    if (!dc->isLocalContext())
+      break;
+  } while ((dc = dc->getParent()));
+
+  return result;
+}
+
 DeclContext *DeclContext::getInnermostSkippedFunctionContext() {
   auto dc = this;
   do {
