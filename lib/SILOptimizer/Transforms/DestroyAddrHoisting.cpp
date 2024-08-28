@@ -112,14 +112,17 @@ namespace {
 /// Step #1: Find all known uses of the unique storage object.
 struct KnownStorageUses : UniqueStorageUseVisitor {
   bool preserveDebugInfo;
+  bool ignoreDeinitBarriers;
 
   SmallPtrSet<SILInstruction *, 16> storageUsers;
   llvm::SmallSetVector<SILInstruction *, 4> originalDestroys;
   SmallPtrSet<SILInstruction *, 4> debugInsts;
 
-  KnownStorageUses(AccessStorage storage, SILFunction *function)
+  KnownStorageUses(AccessStorage storage, SILFunction *function,
+                   bool ignoreDeinitBarriers)
       : UniqueStorageUseVisitor(storage, function),
-        preserveDebugInfo(function->preserveDebugInfo()) {}
+        preserveDebugInfo(function->preserveDebugInfo()),
+        ignoreDeinitBarriers(ignoreDeinitBarriers) {}
 
   bool empty() const {
     return storageUsers.empty() && originalDestroys.empty() &&
@@ -178,11 +181,19 @@ protected:
 
   bool visitUnknownUse(Operand *use) override {
     auto *user = use->getUser();
-    if (isa<BuiltinRawPointerType>(use->get()->getType().getASTType())) {
-      // Destroy hoisting considers address_to_pointer to be a leaf use because
-      // any potential pointer access is already considered to be a
-      // deinitialization barrier.  Consequently, any instruction that uses a
-      // value produced by address_to_pointer isn't regarded as a storage use.
+    if (isa<BuiltinRawPointerType>(use->get()->getType().getASTType()) &&
+        !ignoreDeinitBarriers) {
+      // When respecting deinit barriers, destroy hoisting considers
+      // address_to_pointer to be a leaf use because any potential pointer
+      // access is already considered to be a barrier to hoisting (because as a
+      // pointer access it's a deinitialization barrier). Consequently, any
+      // instruction that uses a value produced by address_to_pointer isn't
+      // regarded as a storage use.
+      //
+      // On the other hand, when _not_ respecting deinit barriers, potential
+      // pointer accesses are _not_ already considered to be barriers to
+      // hoisting (deinit barriers being ignored); so uses of the pointer must
+      // obstruct all hoisting.
       return true;
     }
     LLVM_DEBUG(llvm::dbgs() << "Unknown user " << *user);
@@ -473,7 +484,7 @@ bool HoistDestroys::perform() {
       storage.getKind() != AccessStorage::Kind::Nested)
     return false;
 
-  KnownStorageUses knownUses(storage, getFunction());
+  KnownStorageUses knownUses(storage, getFunction(), ignoreDeinitBarriers);
   if (!knownUses.findUses())
     return false;
 

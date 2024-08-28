@@ -630,13 +630,37 @@ entry(%instance : $*X):
   return %value : $X
 }
 
-// Hoist even if the pointerified address gets used.
+// If lexical, hoist even if the pointerified address gets used.
 //
 // CHECK-LABEL: sil [ossa] @hoist_despite_use_of_pointer : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[INSTANCE:%[^,]+]] = alloc_stack [lexical]
+// CHECK-NEXT:    copy_addr {{.*}} to [init] [[INSTANCE]]
 // CHECK-NEXT:    destroy_addr [[INSTANCE]]
 // CHECK-LABEL: } // end sil function 'hoist_despite_use_of_pointer'
-sil [ossa] @hoist_despite_use_of_pointer : $@convention(thin) (@inout X) -> () {
+sil [ossa] @hoist_despite_use_of_pointer : $@convention(thin) (@in_guaranteed X) -> () {
+entry(%original : $*X):
+   %instance = alloc_stack [lexical] $X
+   copy_addr %original to [init] %instance : $*X
+   %addr_for_pointer = alloc_stack $Builtin.RawPointer
+   %pointer = address_to_pointer %instance : $*X to $Builtin.RawPointer
+   store %pointer to [trivial] %addr_for_pointer : $*Builtin.RawPointer
+   %retval = tuple ()
+   dealloc_stack %addr_for_pointer : $*Builtin.RawPointer
+   destroy_addr %instance : $*X
+   dealloc_stack %instance : $*X
+   return %retval : $()
+}
+
+// If non-lexical, _don't_ hoist if the pointerified address gets used--deinit
+// barriers are ignored.
+//
+// CHECK-LABEL: sil [ossa] @no_hoist_nonlexical_because_of_use_of_pointer : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         destroy_addr [[INSTANCE]]
+// CHECK-NEXT:    dealloc_stack
+// CHECK-NEXT:    return
+// CHECK-LABEL: } // end sil function 'no_hoist_nonlexical_because_of_use_of_pointer'
+sil [ossa] @no_hoist_nonlexical_because_of_use_of_pointer : $@convention(thin) (@inout X) -> () {
 entry(%instance : $*X):
    %addr_for_pointer = alloc_stack $Builtin.RawPointer
    %pointer = address_to_pointer %instance : $*X to $Builtin.RawPointer
