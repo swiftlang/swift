@@ -1379,10 +1379,6 @@ bool ParameterListInfo::inheritsActorContext(unsigned paramIdx) const {
       : false;
 }
 
-bool ParameterListInfo::anyContextualInfo() const {
-  return implicitSelfCapture.any() || inheritActorContext.any();
-}
-
 bool ParameterListInfo::isVariadicGenericParameter(unsigned paramIdx) const {
   return paramIdx < variadicGenerics.size()
       ? variadicGenerics[paramIdx]
