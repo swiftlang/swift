@@ -1141,17 +1141,16 @@ bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   }
 
   DeclContext *DC = D->getDeclContext()->getModuleScopeContext();
-  if (DC->getParentModule()->isBuiltinModule() ||
-      DC->getParentModule()->isSwiftShimsModule())
+  auto *M = DC->getParentModule();
+  if (M->isBuiltinModule() || M->isSwiftShimsModule())
     return true;
-  if (!DC->getParentModule()->isSystemModule())
+  if (!M->isSystemModule() && !M->isNonUserModule())
     return false;
   auto FU = dyn_cast<FileUnit>(DC);
   if (!FU)
     return false;
-  // Check for Swift module and overlays.
-  if (!DC->getParentModule()->isStdlibModule() &&
-      FU->getKind() != FileUnitKind::SerializedAST)
+  // Check for stdlib and imported Swift modules.
+  if (!M->isStdlibModule() && FU->getKind() != FileUnitKind::SerializedAST)
     return false;
 
   if (isa<ProtocolDecl>(D)) {
