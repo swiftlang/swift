@@ -2644,6 +2644,11 @@ bool ConstraintSystem::isPartialApplication(ConstraintLocator *locator) {
       locator->findFirst<LocatorPathElt::ImplicitConversion>())
     return false;
 
+  if (locator->directlyAt<OverloadedDeclRefExpr>()) {
+    auto *ODRE = castToExpr<OverloadedDeclRefExpr>(locator->getAnchor());
+    return ODRE->getFunctionRefKind() == FunctionRefKind::Unapplied;
+  }
+
   auto *UDE = getAsExpr<UnresolvedDotExpr>(locator->getAnchor());
   if (UDE == nullptr)
     return false;
