@@ -18,7 +18,8 @@ extension Error {
 
 // CHECK: "test(seq:)"
 func test(seq: any AsyncSequence) async {
-  // CHECK: "error" interface type="any Error"
+  // CHECK: case_body_variables=array
+  // CHECK: "any Error"
   do {
     for try await _ in seq { }
   } catch {
