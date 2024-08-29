@@ -4,6 +4,8 @@
 
 // RUN: %target-swift-frontend -primary-file %s -emit-ir  | %FileCheck %s --check-prefix=CHECK
 
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-library-evolution
+
 // XFAIL: CPU=arm64e
 // REQUIRES: PTRSIZE=64
 
@@ -215,4 +217,18 @@ func mayThrowEmptyErrorAsync(x: Bool) async throws(EmptyError) -> String? {
   }
 
   return ""
+}
+
+
+enum SP: Error {
+    case a
+    case b(Int32)
+}
+
+protocol Proto {
+  // This used to crash.
+  static func f() throws(SP) -> Self
+
+  // This used to crash.
+  static func f2() throws(SP) -> Int64
 }
