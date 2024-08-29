@@ -275,7 +275,7 @@ updated without updating swift.py?")
 
     @property
     def _enable_stdlib_symbol_graphs(self):
-        return [('SWIFT_STDLIB_BUILD_SYMBOL_GRAPHS',
+        return [('SWIFT_STDLIB_BUILD_SYMBOL_GRAPHS:BOOL',
                  self.args.build_stdlib_docs)]
 
     def _handle_swift_debuginfo_non_lto_args(self):
