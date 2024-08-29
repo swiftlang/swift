@@ -643,11 +643,11 @@ std::optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
 /// modify the declaration.
 void checkDeclCircularity(NominalTypeDecl *decl);
 
-/// Type check whether an extension matches its Objective-C interface, if it
+/// Type check whether a declaration matches its imported interface, if it
 /// has one.
 ///
 /// \param D The declaration to check.
-void checkObjCImplementation(Decl *D);
+void checkImplementationAttr(Decl *D);
 
 /// Type check whether the given switch statement exhaustively covers
 /// its domain.

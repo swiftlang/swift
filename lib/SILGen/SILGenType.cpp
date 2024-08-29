@@ -1313,16 +1313,16 @@ public:
     PrettyStackTraceDecl("silgen emitExtension", e);
 
     // Arguably, we should divert to SILGenType::emitType() here if it's an
-    // @_objcImplementation extension, but we don't actually need to do any of
+    // @objc @implementation extension, but we don't actually need to do any of
     // the stuff that it currently does.
 
     for (Decl *member : e->getABIMembers()) {
       visit(member);
     }
 
-    // If this is a main-interface @_objcImplementation extension and the class
+    // If this is a main-interface @objc @implementation extension and the class
     // has a synthesized destructor, emit it now.
-    if (auto cd = dyn_cast_or_null<ClassDecl>(e->getImplementedObjCDecl())) {
+    if (auto cd = dyn_cast_or_null<ClassDecl>(e->getImplementedDecl())) {
       auto dd = cd->getDestructor();
       if (dd->getDeclContext() == cd)
         visit(dd);
@@ -1392,7 +1392,7 @@ public:
       SGM.emitObjCConstructorThunk(cd);
   }
   void visitDestructorDecl(DestructorDecl *dd) {
-    auto contextInterface = dd->getDeclContext()->getImplementedObjCContext();
+    auto contextInterface = dd->getDeclContext()->getImplementedContext();
     if (auto cd = dyn_cast<ClassDecl>(contextInterface)) {
       SGM.emitDestructor(cd, dd);
       return;
@@ -1407,8 +1407,7 @@ public:
         if (pd->isStatic())
           SGM.emitGlobalInitialization(pd, i);
         else if (isa<ExtensionDecl>(pd->getDeclContext()) &&
-                 cast<ExtensionDecl>(pd->getDeclContext())
-                     ->isObjCImplementation())
+                 cast<ExtensionDecl>(pd->getDeclContext())->isImplementation())
           SGM.emitStoredPropertyInitialization(pd, i);
       }
     }
@@ -1417,10 +1416,9 @@ public:
   void visitVarDecl(VarDecl *vd) {
     if (vd->hasStorage()) {
       if (!vd->isStatic()) {
-        // Is this a stored property of an @_objcImplementation extension?
+        // Is this a stored property of an @objc @implementation extension?
         auto ed = cast<ExtensionDecl>(vd->getDeclContext());
-        if (auto cd =
-                dyn_cast_or_null<ClassDecl>(ed->getImplementedObjCDecl())) {
+        if (auto cd = dyn_cast_or_null<ClassDecl>(ed->getImplementedDecl())) {
           // Act as though we declared it on the class.
           SILGenType(SGM, cd).visitVarDecl(vd);
           return;

@@ -259,7 +259,7 @@ static bool isInSourceFile(IterableDeclContext *idc) {
 ArrayRef<VarDecl *>
 StoredPropertiesRequest::evaluate(Evaluator &evaluator,
                                   NominalTypeDecl *decl) const {
-  // If this is an imported class with an @_objcImplementation extension, get
+  // If this is an imported class with an @implementation extension, get
   // members from the extension instead.
   IterableDeclContext *implDecl = decl->getImplementationContext();
 
@@ -285,7 +285,7 @@ StoredPropertiesRequest::evaluate(Evaluator &evaluator,
 ArrayRef<Decl *>
 StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
                                                    NominalTypeDecl *decl) const {
-  // If this is an imported class with an @_objcImplementation extension, get
+  // If this is an imported class with an @implementation extension, get
   // members from the extension instead.
   IterableDeclContext *implDecl = decl->getImplementationContext();
 
@@ -3514,9 +3514,9 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
       if (storage->getAttrs().getAttribute<DynamicReplacementAttr>())
         return;
 
-      // @_objcImplementation extensions on a non-category can declare stored
+      // @objc @implementation extensions on a non-category can declare stored
       // properties; StoredPropertiesRequest knows to look for them there.
-      if (ext->isObjCImplementation() && ext->getObjCCategoryName().empty())
+      if (ext->isImplementation() && ext->getObjCCategoryName().empty())
         return;
 
       storage->diagnose(diag::extension_stored_property);

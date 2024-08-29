@@ -5,6 +5,26 @@
 
 ## Swift (next)
 
+* [SE-0436][]:
+  The new `@implementation` attribute can be used to implement a class in Swift
+  that was declared using a handwritten Objective-C header. Unlike classes
+  created with `@objc class`, which can only be subclassed from Swift, these
+  classes are virtually indistinguishable from classes written in Objective-C,
+  allowing existing Objective-C classes to be reimplemented in Swift or new
+  features to be developed with first-class Objective-C support.
+  
+  To use `@implementation`, one should first declare the class in a header file
+  imported from a bridging header, umbrella header, or private module, and then
+  write an `extension` of that class using the `@objc` and `@implementation`
+  attributes. The extension should implement all of the members declared in the
+  Objective-C header (except members of categories), and may additionally
+  declare private helpers or Swift-only `final` members (with some limitations
+  on the latter).
+  
+  In addition, the `@objc(<name>)` attribute applied to an extension of an
+  Objective-C class now generates a category named `<name>`. This can be used
+  in combination with `@implementation` to implement the members of a category.
+
 * [SE-0442][]:
   TaskGroups can now be created without explicitly specifying their child task's result types:
 
@@ -10612,6 +10632,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0424]: https://github.com/apple/swift-evolution/blob/main/proposals/0424-custom-isolation-checking-for-serialexecutor.md
 [SE-0428]: https://github.com/apple/swift-evolution/blob/main/proposals/0428-resolve-distributed-actor-protocols.md
 [SE-0431]: https://github.com/apple/swift-evolution/blob/main/proposals/0431-isolated-any-functions.md
+[SE-0436]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0436-objc-implementation.md
 [SE-0442]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0442-allow-taskgroup-childtaskresult-type-to-be-inferred.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>

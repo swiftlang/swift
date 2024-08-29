@@ -1087,7 +1087,7 @@ namespace {
       printFlag(D->isImplicit(), "implicit", DeclModifierColor);
       printFlag(D->isHoisted(), "hoisted", DeclModifierColor);
 
-      if (auto implAttr = D->getAttrs().getAttribute<ObjCImplementationAttr>()) {
+      if (auto implAttr = D->getAttrs().getAttribute<ImplementationAttr>()) {
         StringRef label =
             implAttr->isEarlyAdopter() ? "objc_impl" : "clang_impl";
         if (implAttr->CategoryName.empty())

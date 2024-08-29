@@ -3738,7 +3738,7 @@ public:
       }
     }
 
-    TypeChecker::checkObjCImplementation(FD);
+    TypeChecker::checkImplementationAttr(FD);
   }
 
   void visitModuleDecl(ModuleDecl *) { }
@@ -3985,9 +3985,9 @@ public:
 
     TypeChecker::checkDeclAttributes(ED);
 
-    // If this is an @_objcImplementation of a class, set up some aspects of the
-    // class.
-    if (auto CD = dyn_cast_or_null<ClassDecl>(ED->getImplementedObjCDecl())) {
+    // If this is an @objc @implementation of a class, set up some aspects of
+    // the class.
+    if (auto CD = dyn_cast_or_null<ClassDecl>(ED->getImplementedDecl())) {
       // Force lowering of stored properties.
       (void) CD->getStoredProperties();
 
@@ -3997,7 +3997,7 @@ public:
       // FIXME: Should we duplicate any other logic from visitClassDecl()?
     }
 
-    TypeChecker::checkObjCImplementation(ED);
+    TypeChecker::checkImplementationAttr(ED);
 
     for (Decl *Member : ED->getMembers())
       visit(Member);
@@ -4181,7 +4181,7 @@ public:
     checkDefaultArguments(CD->getParameters());
     checkVariadicParameters(CD->getParameters(), CD);
 
-    TypeChecker::checkObjCImplementation(CD);
+    TypeChecker::checkImplementationAttr(CD);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
@@ -4189,7 +4189,7 @@ public:
     // if our destructor is not marked as invalid.
     if (!DD->isInvalid()) {
       auto *nom = dyn_cast<NominalTypeDecl>(
-                             DD->getDeclContext()->getImplementedObjCContext());
+                             DD->getDeclContext()->getImplementedContext());
       if (!nom || !isa<ClassDecl, StructDecl, EnumDecl>(nom)) {
         DD->diagnose(diag::destructor_decl_outside_class_or_noncopyable);
       }

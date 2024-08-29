@@ -514,8 +514,7 @@ SILGenTopLevel::ExtensionVisitor::ExtensionVisitor(SILGenFunction &SGF)
 void SILGenTopLevel::ExtensionVisitor::visitPatternBindingDecl(
     PatternBindingDecl *PD) {
   auto *Ctx = PD->getDeclContext();
-  if (isa<ExtensionDecl>(Ctx) &&
-      cast<ExtensionDecl>(Ctx)->isObjCImplementation()) {
+  if (isa<ExtensionDecl>(Ctx) && cast<ExtensionDecl>(Ctx)->isImplementation()) {
     TypeVisitor::visitPatternBindingDecl(PD);
   }
 }

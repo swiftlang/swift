@@ -470,7 +470,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   }
   
   if (auto dd = dyn_cast<DestructorDecl>(d)) {
-    // The destructor of a class implemented with @_objcImplementation is only
+    // The destructor of a class implemented with @objc @implementation is only
     // ever called by its ObjC thunk, so it should not be public.
     if (d->getDeclContext()->getSelfNominalTypeDecl()->hasClangNode())
       return Limit::OnDemand;
@@ -628,7 +628,7 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
   // their nominal.
   if (isStoredPropertyInitializer())
     decl = cast<NominalTypeDecl>(
-               decl->getDeclContext()->getImplementedObjCContext());
+               decl->getDeclContext()->getImplementedContext());
 
   // Compute the effective access level, taking e.g testable into consideration.
   auto effectiveAccess = decl->getEffectiveAccess();
@@ -896,7 +896,7 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
     // don't think of these as Swift classes.
     if (!nominal) {
       ASSERT(isa<ExtensionDecl>(d->getDeclContext()) &&
-             cast<ExtensionDecl>(d->getDeclContext())->isObjCImplementation());
+             cast<ExtensionDecl>(d->getDeclContext())->isImplementation());
       return IsNotSerialized;
     }
 
@@ -1262,8 +1262,8 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
       if (isNativeToForeignThunk()) {
         // If this is an @implementation @_cdecl, mangle it like the clang
         // function it implements.
-        if (auto objcInterface = getDecl()->getImplementedObjCDecl()) {
-          auto clangMangling = mangleClangDecl(objcInterface, isForeign);
+        if (auto clangInterface = getDecl()->getImplementedDecl()) {
+          auto clangMangling = mangleClangDecl(clangInterface, isForeign);
           if (!clangMangling.empty())
             return clangMangling;
         }

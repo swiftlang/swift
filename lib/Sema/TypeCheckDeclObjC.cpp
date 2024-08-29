@@ -41,7 +41,7 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
   switch(reason) {
   case ObjCReason::MemberOfObjCImplementationExtension:
     // If they're using the old syntax, soften to a warning.
-    if (cast<ObjCImplementationAttr>(reason.getAttr())->isEarlyAdopter())
+    if (cast<ImplementationAttr>(reason.getAttr())->isEarlyAdopter())
       return DiagnosticBehavior::Warning;
 
     LLVM_FALLTHROUGH;
@@ -870,7 +870,8 @@ bool swift::isRepresentableInObjC(
         ASTExtInfoBuilder(FunctionTypeRepresentation::Block, false, Type())
           .build());
 
-    // @objcImpl member implementations need to allow a nil completion handler.
+    // @objc @implementation member implementations need to allow a nil
+    // completion handler.
     if (AFD->isObjCMemberImplementation())
       completionHandlerType = OptionalType::get(completionHandlerType);
 
@@ -1263,7 +1264,7 @@ static bool isMemberOfObjCClassExtension(const ValueDecl *VD) {
 
 static bool isMemberOfObjCImplementationExtension(const ValueDecl *VD) {
   return isMemberOfObjCClassExtension(VD) &&
-      cast<ExtensionDecl>(VD->getDeclContext())->isObjCImplementation();
+      cast<ExtensionDecl>(VD->getDeclContext())->isImplementation();
 }
 
 /// Whether this declaration is a member of a class with the `@objcMembers`
@@ -1504,7 +1505,7 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
     if (canInferImplicitObjC(/*allowAnyAccess*/true)) {
       auto ext = VD->getDeclContext()->getAsDecl();
       auto attr = ext->getAttrs()
-                   .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
+                   .getAttribute<ImplementationAttr>(/*AllowInvalid=*/true);
       return ObjCReason(ObjCReason::MemberOfObjCImplementationExtension, attr);
     }
   }
@@ -2645,10 +2646,9 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
                                      conflict.selector);
       diag.warnUntilSwiftVersionIf(breakingInSwift5, 6);
 
-      // Temporarily soften selector conflicts in objcImpl extensions; we're
-      // seeing some that are caused by ObjCImplementationChecker improvements.
-      if (conflictingDecl->getDeclContext()->getImplementedObjCContext()
-            != conflictingDecl->getDeclContext())
+      // Temporarily soften selector conflicts in @implementation extensions;
+      // some are caused by ImplementationChecker improvements.
+      if (conflictingDecl->getDeclContext()->getAsDecl()->getImplementedDecl())
         diag.wrapIn(diag::wrap_objc_implementation_will_become_error);
 
       auto objcAttr = getObjCAttrIfFromAccessNote(conflictingDecl);
@@ -2720,12 +2720,12 @@ static void resolveObjCCategoryConflict(
 
     // If the best extension has an implementation that's also in the list,
     // remove the implementation; it's not a conflict.
-    if (ext == best->getObjCImplementationDecl())
+    if (ext == best->getImplementationDecl())
       return true;
 
     // If there's an @implementation attribute but something about the category
     // name has already been diagnosed, don't diagnose a conflict.
-    auto implAttr = ext->getAttrs().getAttribute<ObjCImplementationAttr>(
+    auto implAttr = ext->getAttrs().getAttribute<ImplementationAttr>(
                                                          /*AllowInvalid=*/true);
     if (implAttr && implAttr->isCategoryNameInvalid())
       return true;
@@ -2798,7 +2798,7 @@ bool swift::diagnoseObjCCategoryConflicts(SourceFile &sf) {
 
         auto bestCat = resolvedCategories.front();
         if (auto implCat = dyn_cast_or_null<ExtensionDecl>(
-                                       bestCat->getObjCImplementationDecl()))
+                                       bestCat->getImplementationDecl()))
           if (implCat != catToCheck)
             bestCat = implCat;
 
@@ -2937,13 +2937,12 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
   return anyDiagnosed;
 }
 
-void TypeChecker::checkObjCImplementation(Decl *D) {
-  if (!D->getImplementedObjCDecl())
+void TypeChecker::checkImplementationAttr(Decl *D) {
+  if (!D->getImplementedDecl())
     return;
 
   evaluateOrDefault(D->getASTContext().evaluator,
-                    TypeCheckObjCImplementationRequest{D},
-                    evaluator::SideEffect());
+                    TypeCheckImplementationRequest{D}, evaluator::SideEffect());
 }
 
 static std::optional<Located<StaticSpellingKind>>
@@ -3041,12 +3040,12 @@ fixDeclarationStaticSpelling(InFlightDiagnostic &diag, ValueDecl *VD,
 }
 
 namespace {
-class ObjCImplementationChecker {
+class ImplementationChecker {
   Decl *decl;
 
-  ObjCImplementationAttr *getAttr() const {
+  ImplementationAttr *getAttr() const {
     return decl->getAttrs()
-               .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
+               .getAttribute<ImplementationAttr>(/*AllowInvalid=*/true);
   }
 
   template<typename Loc, typename ...ArgTypes>
@@ -3058,7 +3057,7 @@ class ObjCImplementationChecker {
     auto diag = diags.diagnose(loc, diagID, std::forward<ArgTypes>(Args)...);
 
     // Early adopters using the '@_objcImplementation' syntax may have had the
-    // ObjCImplementationChecker evolve out from under them. Soften their errors
+    // ImplementationChecker evolve out from under them. Soften their errors
     // to warnings so we don't break their projects.
     if (getAttr()->isEarlyAdopter()
          && diags.declaredDiagnosticKindFor(diagID.ID) == DiagnosticKind::Error)
@@ -3075,14 +3074,14 @@ class ObjCImplementationChecker {
   bool hasDiagnosed = false;
 
 public:
-  ObjCImplementationChecker(Decl *D)
+  ImplementationChecker(Decl *D)
       : decl(D), hasDiagnosed(getAttr()->isInvalid())
   {
     assert(!D->hasClangNode() && "passed interface, not impl, to checker");
 
     if (auto func = dyn_cast<AbstractFunctionDecl>(D)) {
       addCandidate(D);
-      addRequirement(D->getImplementedObjCDecl());
+      addRequirement(D->getImplementedDecl());
 
       return;
     }
@@ -3104,11 +3103,11 @@ public:
 
     // Did we actually match this extension to an interface? (In invalid code,
     // we might not have.)
-    auto interfaceDecls = ext->getAllImplementedObjCDecls();
+    auto interfaceDecls = ext->getAllImplementedDecls();
     if (interfaceDecls.empty())
       return;
 
-    // Add the @_objcImplementation extension's members as candidates.
+    // Add the @implementation extension's members as candidates.
     addCandidates(ext);
 
     // Add its interface's members as requirements.
@@ -3160,14 +3159,14 @@ private:
     // Don't diagnose if we already diagnosed an unrelated ObjC interop issue,
     // like an un-representable type. If there's an `@objc` attribute on the
     // member, this will be indicated by its `isInvalid()` bit; otherwise we'll
-    // use the enclosing extension's `@_objcImplementation` attribute.
+    // use the enclosing extension's `@implementation` attribute.
     DeclAttribute *attr = afd->getAttrs()
                               .getAttribute<ObjCAttr>(/*AllowInvalid=*/true);
     if (!attr)
       attr = member->getDeclContext()->getAsDecl()->getAttrs()
-                 .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
-    assert(attr && "expected @_objcImplementation on context of member checked "
-                   "by ObjCImplementationChecker");
+                 .getAttribute<ImplementationAttr>(/*AllowInvalid=*/true);
+    assert(attr && "expected @implementation on context of member checked "
+                   "by ImplementationChecker");
     if (attr->isInvalid())
       return;
 
@@ -3247,7 +3246,7 @@ private:
   }
 
   void addCandidates(ExtensionDecl *ext) {
-    assert(ext->isObjCImplementation());
+    assert(ext->isImplementation());
     for (Decl *member : ext->getMembers()) {
       // Skip accessors; we'll match their storage instead.
       if (isa<AccessorDecl>(member))
@@ -3257,7 +3256,7 @@ private:
         // Skip non-member implementations.
         // FIXME: Should we consider them if only rejected for access level?
         if (!VD->isObjCMemberImplementation()) {
-          // No member of an `@_objcImplementation` extension should need a
+          // No member of an `@implementation` extension should need a
           // vtable entry.
           diagnoseVTableUse(VD);
           continue;
@@ -3395,7 +3394,7 @@ private:
       auto &candExplicitObjCName = pair.second;
 
       PrettyStackTraceDecl t1(
-            "checking @objcImplementation matches to candidate", cand);
+            "checking @implementation matches to candidate", cand);
       BestMatchList matchedRequirements{threshold};
 
       for (ValueDecl *req : unmatchedRequirements) {
@@ -3606,9 +3605,9 @@ private:
 
     // Check only applies to members of implementations, not implementations in
     // their own right.
-    if (!cand->isObjCImplementation() &&
-          getCategoryName(cand->getDeclContext()->getImplementedObjCContext())
-               != getCategoryName(req->getDeclContext()))
+    if (!cand->isImplementation() &&
+          getCategoryName(cand->getDeclContext())
+            != getCategoryName(req->getDeclContext()))
       return MatchOutcome::WrongCategory;
 
     if (cand->getKind() != req->getKind())
@@ -3697,8 +3696,7 @@ private:
     case MatchOutcome::WrongCategory:
       diagnose(cand, diag::objc_implementation_wrong_category,
                cand, getCategoryName(req->getDeclContext()),
-               getCategoryName(cand->getDeclContext()->
-                                 getImplementedObjCContext()));
+               getCategoryName(cand->getDeclContext()));
       return;
 
     case MatchOutcome::WrongDeclKind:
@@ -3802,10 +3800,9 @@ public:
       if (isOptionalObjCProtocolRequirement(req))
         continue;
 
-      auto ext = cast<IterableDeclContext>(req->getDeclContext()->getAsDecl())
-                        ->getImplementationContext();
+      auto ext = req->getDeclContext()->getAsDecl()->getImplementationDecl();
 
-      diagnose(ext->getDecl(), diag::objc_implementation_missing_impl,
+      diagnose(ext, diag::objc_implementation_missing_impl,
                getCategoryName(req->getDeclContext()), req);
 
       // FIXME: Should give fix-it to add stub implementation
@@ -3882,7 +3879,7 @@ public:
 };
 }
 
-evaluator::SideEffect TypeCheckObjCImplementationRequest::
+evaluator::SideEffect TypeCheckImplementationRequest::
 evaluate(Evaluator &evaluator, Decl *D) const {
   PrettyStackTraceDecl trace("checking member implementations of", D);
 
@@ -3893,7 +3890,7 @@ evaluate(Evaluator &evaluator, Decl *D) const {
   // candidates we considered to all unmatched requirements in the module, and
   // vice versa. The tricky bit is making sure we only diagnose for candidates
   // and requirements in our primary files!
-  ObjCImplementationChecker checker(D);
+  ImplementationChecker checker(D);
 
   checker.matchRequirements();
   checker.diagnoseUnmatchedCandidates();

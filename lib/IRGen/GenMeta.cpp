@@ -2976,7 +2976,7 @@ emitInitializeFieldOffsetVector(SILType T, llvm::Value *metadata,
   // @objc @implementation classes don't actually have a field vector; for them,
   // we're just trying to update the direct field offsets.
   if (!isa<ClassDecl>(target)
-        || !cast<ClassDecl>(target)->getObjCImplementationDecl()) {
+        || !cast<ClassDecl>(target)->getImplementationDecl()) {
     fieldVector = emitAddressOfFieldOffsetVector(*this, metadata, target)
       .getAddress();
   }
@@ -3032,7 +3032,7 @@ emitInitializeFieldOffsetVector(SILType T, llvm::Value *metadata,
     case ClassMetadataStrategy::Singleton:
       // Call swift_initClassMetadata().
       assert(fieldVector && "Singleton/Resilient strategies not supported for "
-                            "objcImplementation");
+                            "@objc @implementation");
       dependency = Builder.CreateCall(
             IGM.getInitClassMetadata2FunctionPointer(),
             {metadata, IGM.getSize(Size(uintptr_t(flags))), numFieldsV,
@@ -3745,7 +3745,7 @@ createSingletonInitializationMetadataAccessFunction(IRGenModule &IGM,
                                               DynamicMetadataRequest request,
                                               llvm::Constant *cacheVariable) {
     if (auto CD = dyn_cast<ClassDecl>(typeDecl)) {
-      if (CD->getObjCImplementationDecl()) {
+      if (CD->getImplementationDecl()) {
         // Use the Objective-C runtime symbol instead of the Swift one.
         llvm::Value *descriptor =
           IGF.IGM.getAddrOfObjCClass(CD, NotForDefinition);
@@ -4324,7 +4324,7 @@ namespace {
     llvm::Constant *getROData() { return emitClassPrivateData(IGM, Target); }
 
     uint64_t getClassDataPointerHasSwiftMetadataBits() {
-      // objcImpl classes should not have the Swift bit set.
+      // @objc @implementation classes should not have the Swift bit set.
       if (isPureObjC())
         return 0;
       return IGM.UseDarwinPreStableABIBit ? 1 : 2;
@@ -4548,7 +4548,8 @@ namespace {
 
     void layout() {
       assert(!FieldLayout.hasObjCImplementation()
-                && "Resilient class metadata not supported for @objcImpl");
+                && "Resilient class metadata not supported for "
+                   "@objc @implementation");
       emitNominalTypeDescriptor();
 
       addRelocationFunction();
@@ -4643,10 +4644,10 @@ namespace {
     }
 
     void layoutHeader() {
-      // @_objcImplementation on true (non-ObjC) generic classes doesn't make
+      // @objc @implementation on true (non-ObjC) generic classes doesn't make
       // much sense, and we haven't updated this builder to handle it.
       assert(!FieldLayout.hasObjCImplementation()
-             && "Generic metadata not supported for @objcImpl");
+             && "Generic metadata not supported for @objc @implementation");
 
       super::layoutHeader();
 
@@ -5055,7 +5056,7 @@ namespace {
 static void emitObjCClassSymbol(IRGenModule &IGM, ClassDecl *classDecl,
                                 llvm::Constant *metadata,
                                 llvm::Type *metadataTy) {
-  if (classDecl->getObjCImplementationDecl())
+  if (classDecl->getImplementationDecl())
     // Should already have this symbol.
     return;
 

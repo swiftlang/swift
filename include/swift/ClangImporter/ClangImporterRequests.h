@@ -234,26 +234,26 @@ private:
                                 ClangCategoryLookupDescriptor desc) const;
 };
 
-/// Links an \c \@_objcImplementation decl to the imported declaration(s) that
+/// Links an \c \@implementation decl to the imported declaration(s) that
 /// it implements.
 ///
 /// There is usually a 1:1 correspondence between interfaces and
 /// implementations, except that a class's main implementation implements
 /// both its main interface and any class extension interfaces. In this
 /// situation, the main class is always the first decl in \c interfaceDecls.
-struct ObjCInterfaceAndImplementation final {
+struct InterfaceAndImplementation final {
   llvm::TinyPtrVector<Decl *> interfaceDecls;
   Decl *implementationDecl;
 
-  ObjCInterfaceAndImplementation(llvm::TinyPtrVector<Decl *> interfaceDecls,
-                                 Decl *implementationDecl)
+  InterfaceAndImplementation(llvm::TinyPtrVector<Decl *> interfaceDecls,
+                             Decl *implementationDecl)
       : interfaceDecls(interfaceDecls), implementationDecl(implementationDecl)
   {
     assert(!interfaceDecls.empty() && implementationDecl &&
            "interface and implementation are both non-null");
   }
 
-  ObjCInterfaceAndImplementation()
+  InterfaceAndImplementation()
       : interfaceDecls(), implementationDecl(nullptr) {}
 
   bool empty() const {
@@ -261,37 +261,37 @@ struct ObjCInterfaceAndImplementation final {
   }
 
   friend llvm::hash_code
-  hash_value(const ObjCInterfaceAndImplementation &pair) {
+  hash_value(const InterfaceAndImplementation &pair) {
     return hash_combine(llvm::hash_combine_range(pair.interfaceDecls.begin(),
                                                  pair.interfaceDecls.end()),
                         pair.implementationDecl);
   }
 
-  friend bool operator==(const ObjCInterfaceAndImplementation &lhs,
-                         const ObjCInterfaceAndImplementation &rhs) {
+  friend bool operator==(const InterfaceAndImplementation &lhs,
+                         const InterfaceAndImplementation &rhs) {
     return lhs.interfaceDecls == rhs.interfaceDecls
                && lhs.implementationDecl == rhs.implementationDecl;
   }
 
-  friend bool operator!=(const ObjCInterfaceAndImplementation &lhs,
-                         const ObjCInterfaceAndImplementation &rhs) {
+  friend bool operator!=(const InterfaceAndImplementation &lhs,
+                         const InterfaceAndImplementation &rhs) {
     return !(lhs == rhs);
   }
 };
 
 void simple_display(llvm::raw_ostream &out,
-                    const ObjCInterfaceAndImplementation &desc);
-SourceLoc extractNearestSourceLoc(const ObjCInterfaceAndImplementation &desc);
+                    const InterfaceAndImplementation &desc);
+SourceLoc extractNearestSourceLoc(const InterfaceAndImplementation &desc);
 
 /// Given a \c Decl , determine if it is an implementation with separate
-/// interfaces imported from ObjC (or vice versa) and if so, return all of the
+/// interfaces imported from clang (or vice versa) and if so, return all of the
 /// declarations involved in this relationship. Otherwise return an empty value.
 ///
 /// We perform this lookup in both directions using a single request because
 /// we want to cache the relationship on both sides to avoid duplicating work.
-class ObjCInterfaceAndImplementationRequest
-    : public SimpleRequest<ObjCInterfaceAndImplementationRequest,
-                           ObjCInterfaceAndImplementation(Decl *),
+class InterfaceAndImplementationRequest
+    : public SimpleRequest<InterfaceAndImplementationRequest,
+                           InterfaceAndImplementation(Decl *),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -300,14 +300,13 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ObjCInterfaceAndImplementation
-  evaluate(Evaluator &evaluator, Decl *decl) const;
+  InterfaceAndImplementation evaluate(Evaluator &evaluator, Decl *decl) const;
 
  public:
    // Separate caching.
    bool isCached() const { return true; }
-   std::optional<ObjCInterfaceAndImplementation> getCachedResult() const;
-   void cacheResult(ObjCInterfaceAndImplementation value) const;
+   std::optional<InterfaceAndImplementation> getCachedResult() const;
+   void cacheResult(InterfaceAndImplementation value) const;
 };
 
 enum class CxxRecordSemanticsKind {

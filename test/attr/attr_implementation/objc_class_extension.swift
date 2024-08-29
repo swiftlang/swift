@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -import-underlying-module -Xcc -fmodule-map-file=%S/Inputs/objc_implementation_class_extension.modulemap -target %target-stable-abi-triple
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -import-underlying-module -Xcc -fmodule-map-file=%S/Inputs/objc_class_extension.modulemap -target %target-stable-abi-triple
 // REQUIRES: objc_interop
 
-@_implementationOnly import objc_implementation_class_extension_internal
+@_implementationOnly import objc_class_extension_internal
 
 @_objcImplementation extension ObjCClass {
   // expected-warning@-1 {{extension for main class interface should provide implementation for instance method 'method(fromHeader2:)'}}

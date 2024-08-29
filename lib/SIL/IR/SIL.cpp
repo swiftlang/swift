@@ -36,8 +36,7 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
 
   // Clang declarations are public and can't be assured of having a
   // unique defining location.
-  if (isa<ClangModuleUnit>(fileContext) &&
-          !D->getObjCImplementationDecl())
+  if (isa<ClangModuleUnit>(fileContext) && !D->getImplementationDecl())
     return FormalLinkage::PublicNonUnique;
 
   switch (D->getEffectiveAccess()) {

@@ -128,6 +128,8 @@ extension ASTGenVisitor {
         return self.generateExternAttr(attribute: node)?.asDeclAttribute
       case .extractConstantsFromMembers:
         fatalError("unimplemented")
+      case .implementation:
+        return self.generateImplementationAttr(attribute: node)?.asDeclAttribute
       case .implements:
         return self.generateImplementsAttr(attribute: node)?.asDeclAttribute
       case .inline:
@@ -148,8 +150,6 @@ extension ASTGenVisitor {
         fatalError("unimplemented")
       case .objC:
         return self.generateObjCAttr(attribute: node)?.asDeclAttribute
-      case .objCImplementation:
-        return self.generateObjCImplementationAttr(attribute: node)?.asDeclAttribute
       case .objCRuntimeName:
         return self.generateObjCRuntimeNameAttr(attribute: node)?.asDeclAttribute
       case .optimize:
@@ -733,7 +733,7 @@ extension ASTGenVisitor {
     }
   }
 
-  func generateObjCImplementationAttr(attribute node: AttributeSyntax) -> BridgedObjCImplementationAttr? {
+  func generateImplementationAttr(attribute node: AttributeSyntax) -> BridgedImplementationAttr? {
     let name: BridgedIdentifier? = self.generateSingleAttrOption(
       attribute: node,
       self.generateIdentifier,

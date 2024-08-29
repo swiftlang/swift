@@ -5303,7 +5303,7 @@ public:
 
     dtor->setGenericSignature(MF.getGenericSignature(genericSigID));
 
-    auto *nom = cast<NominalTypeDecl>(DC->getImplementedObjCContext());
+    auto *nom = cast<NominalTypeDecl>(DC->getImplementedContext());
     dtor->setAccess(std::max(nom->getFormalAccess(), AccessLevel::Internal));
 
     if (isImplicit)
@@ -6254,19 +6254,18 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
-      case decls_block::ObjCImplementation_DECL_ATTR: {
+      case decls_block::Implementation_DECL_ATTR: {
         bool isImplicit;
         bool isCategoryNameInvalid;
         bool isEarlyAdopter;
         uint64_t categoryNameID;
-        serialization::decls_block::ObjCImplementationDeclAttrLayout::
-            readRecord(scratch, isImplicit, isCategoryNameInvalid,
-                       isEarlyAdopter, categoryNameID);
+        serialization::decls_block::ImplementationDeclAttrLayout::readRecord(
+            scratch, isImplicit, isCategoryNameInvalid, isEarlyAdopter,
+            categoryNameID);
         Identifier categoryName = MF.getIdentifier(categoryNameID);
-        Attr = new (ctx) ObjCImplementationAttr(categoryName, SourceLoc(),
-                                                SourceRange(), isEarlyAdopter,
-                                                isImplicit,
-                                                isCategoryNameInvalid);
+        Attr = new (ctx) ImplementationAttr(categoryName, SourceLoc(),
+                                            SourceRange(), isEarlyAdopter,
+                                            isImplicit, isCategoryNameInvalid);
         break;
       }
 

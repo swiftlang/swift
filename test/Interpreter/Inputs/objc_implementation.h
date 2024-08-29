@@ -27,6 +27,4 @@ NS_ASSUME_NONNULL_BEGIN
 
 @end
 
-extern void implFunc(int param);
-
 NS_ASSUME_NONNULL_END

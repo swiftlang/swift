@@ -100,9 +100,9 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
     } else {
       auto container = dyn_cast<NominalTypeDecl>(DC);
       if (D->getKind() == DeclKind::Destructor && !container) {
-        // A destructor in an extension means @_objcImplementation. An
-        // @_objcImplementation class's deinit is only called by the ObjC thunk,
-        // if at all, so it is nonpublic.
+        // A destructor in an extension means @objc @implementation. An
+        // @objc @implementation class's deinit is only called by the ObjC
+        // thunk, if at all, so it is nonpublic.
         return AccessLevel::Internal;
       }
 

@@ -69,7 +69,7 @@ protected:
 
 public:
   bool isPureObjC() const {
-    return Target->getObjCImplementationDecl();
+    return Target->getImplementationDecl();
   }
 
   // Layout in embedded mode while considering the class type.

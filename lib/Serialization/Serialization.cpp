@@ -2999,13 +2999,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DeclAttrKind::ObjCImplementation: {
-      auto *theAttr = cast<ObjCImplementationAttr>(DA);
+    case DeclAttrKind::Implementation: {
+      auto *theAttr = cast<ImplementationAttr>(DA);
       auto categoryNameID = S.addDeclBaseNameRef(theAttr->CategoryName);
-      auto abbrCode =
-          S.DeclTypeAbbrCodes[ObjCImplementationDeclAttrLayout::Code];
-      ObjCImplementationDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord,
-          abbrCode, theAttr->isImplicit(), theAttr->isCategoryNameInvalid(),
+      auto abbrCode = S.DeclTypeAbbrCodes[ImplementationDeclAttrLayout::Code];
+      ImplementationDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+          theAttr->isImplicit(), theAttr->isCategoryNameInvalid(),
           theAttr->isEarlyAdopter(), categoryNameID);
       return;
     }

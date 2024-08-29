@@ -59,6 +59,11 @@ module EmitClangHeaderNonmodularIncludesStressTest {
   export *
 }
 
+module cdecl_implementation {
+  header "cdecl_implementation/cdecl_implementation.h"
+  export *
+}
+
 module objc_implementation {
   header "objc_implementation/objc_implementation.h"
   export *

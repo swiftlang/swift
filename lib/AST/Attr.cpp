@@ -1272,7 +1272,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DeclAttrKind::Optimize:
   case DeclAttrKind::Exclusivity:
   case DeclAttrKind::NonSendable:
-  case DeclAttrKind::ObjCImplementation:
+  case DeclAttrKind::Implementation:
     if (getKind() == DeclAttrKind::Effects &&
         cast<EffectsAttr>(this)->getKind() == EffectsKind::Custom) {
       Printer.printAttrName("@_effects");
@@ -1872,8 +1872,8 @@ StringRef DeclAttribute::getAttrName() const {
   case DeclAttrKind::ObjC:
   case DeclAttrKind::ObjCRuntimeName:
     return "objc";
-  case DeclAttrKind::ObjCImplementation:
-    if (cast<ObjCImplementationAttr>(this)->isEarlyAdopter())
+  case DeclAttrKind::Implementation:
+    if (cast<ImplementationAttr>(this)->isEarlyAdopter())
       return "_objcImplementation";
     return "implementation";
   case DeclAttrKind::MainType:

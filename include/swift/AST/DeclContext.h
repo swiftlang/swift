@@ -559,10 +559,16 @@ public:
   LLVM_READONLY
   DeclContext *getModuleScopeContext() const;
 
-  /// If this DeclContext is an \c \@_objcImplementation extension, returns the
-  /// \c DeclContext for the Objective-C declaration it implements. Otherwise
+  /// If this DeclContext is an \c \@implementation extension, returns the
+  /// \c DeclContext for the Clang declaration it implements. Otherwise
   /// returns \c this.
-  DeclContext *getImplementedObjCContext() const;
+  ///
+  /// This is a convenience for code which ought to operate on the context's
+  /// interface if it is an \c \@implementation , or on the context itself
+  /// otherwise. If you want to apply totally different logic to
+  /// \c @implementation decls, consider using \c Decl::getImplementedDecl()
+  /// instead.
+  DeclContext *getImplementedContext() const;
 
   /// Returns the source file that contains this context, or null if this
   /// is not within a source file.

@@ -2330,8 +2330,8 @@ namespace decls_block {
     BCArray<IdentifierIDField>
   >;
 
-  using ObjCImplementationDeclAttrLayout = BCRecordLayout<
-    ObjCImplementation_DECL_ATTR,
+  using ImplementationDeclAttrLayout = BCRecordLayout<
+    Implementation_DECL_ATTR,
     BCFixed<1>,                // implicit flag
     BCFixed<1>,                // category name invalid
     BCFixed<1>,                // is early adopter

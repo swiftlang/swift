@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-import-objc-header %S/Inputs/objc_implementation.h -D TOP_LEVEL_CODE -swift-version 5 -enable-experimental-feature CImplementation -target %target-stable-abi-triple) %s | %FileCheck %s
+// RUN: %target-run-simple-swift(-import-objc-header %S/Inputs/objc_implementation.h -D TOP_LEVEL_CODE -swift-version 5 -target %target-stable-abi-triple) %s | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
@@ -32,8 +32,6 @@ class LastWords {
   @objc var defaultIntProperty: Int = 17
 
   @objc class func runTests() {
-    implFunc(2023 - 34)
-
     do {
       print("*** ImplClass init ***")
       let impl = ImplClass()
@@ -162,14 +160,9 @@ extension SwiftSubclass {
 }
 #endif
 
-@_objcImplementation @_cdecl("implFunc") public func implFunc(_ param: Int32) {
-  print("implFunc(\(param))")
-}
-
 // `#if swift` to ignore the inactive branch's contents
 #if swift(>=5.0) && TOP_LEVEL_CODE
 ImplClass.runTests()
-// CHECK: implFunc(1989)
 // CHECK-LABEL: *** ImplClass init ***
 // CHECK: ImplClass.init()
 // CHECK-RESILIENCE-LABEL: *** ImplClassWithResilientStoredProperty #1 ***

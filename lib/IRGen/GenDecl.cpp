@@ -5089,7 +5089,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   auto isPrespecialized = concreteTypeDecl &&
                           concreteTypeDecl->isGenericContext();
   bool isObjCImpl = concreteTypeDecl &&
-                    concreteTypeDecl->getObjCImplementationDecl();
+                    concreteTypeDecl->getImplementationDecl();
 
   if (isPattern) {
     assert(isConstant && "Type metadata patterns must be constant");
@@ -5147,13 +5147,13 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   unsigned adjustmentIndex = MetadataAdjustmentIndex::ValueType;
 
   if (auto nominal = concreteType->getAnyNominal()) {
-    // Keep type metadata around for all types (except @_objcImplementation,
+    // Keep type metadata around for all types (except @objc @implementation,
     // since we're using ObjC metadata for that).
     if (!isObjCImpl)
       addRuntimeResolvableType(nominal);
 
-    // Don't define the alias for foreign type metadata, prespecialized
-    // generic metadata, or @_objcImplementation classes, since they're not ABI.
+    // Don't define the alias for foreign type metadata, prespecialized generic
+    // metadata, or @objc @implementation classes, since they're not ABI.
     if (requiresForeignTypeMetadata(nominal) || isPrespecialized || isObjCImpl)
       return var;
 
@@ -5221,7 +5221,7 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   } else if (nominal) {
     // The symbol for native non-generic nominal type metadata is generated at
     // the aliased address point (see defineTypeMetadata() above).
-    if (nominal->getObjCImplementationDecl()) {
+    if (nominal->getImplementationDecl()) {
       defaultVarTy = ObjCClassStructTy;
     } else {
       assert(!nominal->hasClangNode());
@@ -5268,7 +5268,7 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   switch (canonicality) {
   case TypeMetadataCanonicality::Canonical: {
     auto classDecl = concreteType->getClassOrBoundGenericClass();
-    if (classDecl && classDecl->getObjCImplementationDecl()) {
+    if (classDecl && classDecl->getImplementationDecl()) {
       entity = LinkEntity::forObjCClass(classDecl);
     } else {
       entity = LinkEntity::forTypeMetadata(
@@ -5757,7 +5757,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
 }
 
 static bool shouldEmitCategory(IRGenModule &IGM, ExtensionDecl *ext) {
-  if (ext->isObjCImplementation()) {
+  if (ext->isImplementation()) {
     assert(!ext->getObjCCategoryName().empty());
     return true;
   }
@@ -5802,8 +5802,8 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
   if (!origClass)
     return;
 
-  if (ext->isObjCImplementation() && ext->getObjCCategoryName().empty()) {
-    // This is the @_objcImplementation for the class--generate its class
+  if (ext->isImplementation() && ext->getObjCCategoryName().empty()) {
+    // This is the @objc @implementation for the class--generate its class
     // metadata.
     emitClassDecl(origClass);
   } else if (shouldEmitCategory(*this, ext)) {

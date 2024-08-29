@@ -1644,7 +1644,7 @@ namespace  {
     UNINTERESTING_ATTR(WarnUnqualifiedAccess)
     UNINTERESTING_ATTR(DiscardableResult)
 
-    UNINTERESTING_ATTR(ObjCImplementation)
+    UNINTERESTING_ATTR(Implementation)
     UNINTERESTING_ATTR(ObjCMembers)
     UNINTERESTING_ATTR(ObjCRuntimeName)
     UNINTERESTING_ATTR(RestatedObjCConformance)

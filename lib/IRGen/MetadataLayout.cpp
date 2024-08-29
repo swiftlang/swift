@@ -282,8 +282,8 @@ Address irgen::emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
                                               llvm::Value *metadata,
                                               NominalTypeDecl *decl) {
   assert(!isa<ClassDecl>(decl)
-            || !cast<ClassDecl>(decl)->getObjCImplementationDecl()
-                && "objcImpl classes don't have a field offset vector");
+            || !cast<ClassDecl>(decl)->getImplementationDecl()
+         && "@objc @implementation classes don't have a field offset vector");
 
   auto &layout = IGF.IGM.getMetadataLayout(decl);
   auto offset = [&]() {
@@ -406,7 +406,7 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
 
     void addFieldOffset(VarDecl *field) {
       assert(IsInTargetFields ==
-              (field->getDeclContext()->getImplementedObjCContext() == Target));
+              (field->getDeclContext()->getImplementedContext() == Target));
       if (IsInTargetFields) {
         ++Layout.NumImmediateMembers;
         Layout.FieldOffsets.try_emplace(field, getNextOffset());
@@ -429,7 +429,7 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
     }
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
-      if (placeholder->getDeclContext()->getImplementedObjCContext() == Target) {
+      if (placeholder->getDeclContext()->getImplementedContext() == Target) {
         Layout.NumImmediateMembers +=
           placeholder->getNumberOfFieldOffsetVectorEntries();
       }

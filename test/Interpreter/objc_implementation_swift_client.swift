@@ -12,7 +12,7 @@
 // RUN: %empty-directory(%t/frameworks/objc_implementation.framework/Headers)
 // RUN: cp %S/Inputs/objc_implementation.modulemap %t/frameworks/objc_implementation.framework/Modules/module.modulemap
 // RUN: cp %S/Inputs/objc_implementation.h %t/frameworks/objc_implementation.framework/Headers
-// RUN: %target-build-swift-dylib(%t/frameworks/objc_implementation.framework/objc_implementation) -enable-experimental-feature CImplementation -emit-module-path %t/frameworks/objc_implementation.framework/Modules/objc_implementation.swiftmodule/%module-target-triple.swiftmodule -module-name objc_implementation -F %t/frameworks -import-underlying-module -Xlinker -install_name -Xlinker %t/frameworks/objc_implementation.framework/objc_implementation %S/objc_implementation.swift -target %target-stable-abi-triple
+// RUN: %target-build-swift-dylib(%t/frameworks/objc_implementation.framework/objc_implementation) -emit-module-path %t/frameworks/objc_implementation.framework/Modules/objc_implementation.swiftmodule/%module-target-triple.swiftmodule -module-name objc_implementation -F %t/frameworks -import-underlying-module -Xlinker -install_name -Xlinker %t/frameworks/objc_implementation.framework/objc_implementation %S/objc_implementation.swift -target %target-stable-abi-triple
 
 //
 // Execute this file
@@ -97,7 +97,6 @@ do {
   print("*** SwiftClientSubclass end ***")
 }
 
-// CHECK: implFunc(1989)
 // CHECK-LABEL: *** ImplClass init ***
 // CHECK: ImplClass.init()
 // CHECK-RESILIENCE-LABEL: *** ImplClassWithResilientStoredProperty #1 ***

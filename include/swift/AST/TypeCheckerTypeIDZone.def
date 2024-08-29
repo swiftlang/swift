@@ -542,8 +542,8 @@ SWIFT_REQUEST(TypeChecker, SemanticBriefCommentRequest,
 SWIFT_REQUEST(TypeChecker, IsNonUserModuleRequest,
               bool(ModuleDecl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, TypeCheckObjCImplementationRequest,
-              unsigned(ExtensionDecl *),
+SWIFT_REQUEST(TypeChecker, TypeCheckImplementationRequest,
+              evaluator::SideEffect(Decl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasInitAccessorRequest,
               bool(AbstractStorageDecl *), Cached,

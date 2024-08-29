@@ -584,7 +584,7 @@ ConstValueTypeInfo ConstantValueInfoRequest::evaluate(
   std::optional<std::vector<EnumElementDeclValue>> EnumCases;
 
   // Use 'getStoredProperties' to get lowered lazy and wrapped properties.
-  // @_objcImplementation extensions might contain stored properties.
+  // @implementation extensions might contain stored properties.
   auto StoredProperties = Decl->getStoredProperties();
   std::unordered_set<VarDecl *> StoredPropertiesSet(StoredProperties.begin(),
                                                     StoredProperties.end());

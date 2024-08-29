@@ -167,7 +167,7 @@ static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
 
 static bool isInObjCImpl(const ValueDecl *VD) {
   auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext());
-  return ED && ED->isObjCImplementation();
+  return ED && ED->isImplementation();
 }
 
 /// Triggering type checking requests while printing is desirable in compiler
@@ -267,7 +267,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
             return false;
         }
 
-        // Skip member implementations and @objc overrides in @objcImpl
+        // Skip member implementations and @objc overrides in @implementation
         // extensions.
         if (VD->isObjCMemberImplementation()
             || (isInObjCImpl(VD) && VD->getOverriddenDecl() && VD->isObjC())) {
@@ -368,7 +368,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       DeclAttrKind::AccessControl,
       DeclAttrKind::SetterAccess,
       DeclAttrKind::Lazy,
-      DeclAttrKind::ObjCImplementation,
+      DeclAttrKind::Implementation,
       DeclAttrKind::StaticInitializeObjCMetadata,
       DeclAttrKind::RestatedObjCConformance,
       DeclAttrKind::NonSendable,
@@ -1228,7 +1228,7 @@ void PrintAST::printAttributes(const Decl *D) {
     if (auto vd = dyn_cast<VarDecl>(D)) {
       // Don't print @_hasInitialValue if we're printing an initializer
       // expression, if the storage is resilient, or if it's in an
-      // @objcImplementation extension (where final properties should appear
+      // @implementation extension (where final properties should appear
       // computed).
       if (vd->isInitExposedToClients() || vd->isResilient() || isInObjCImpl(vd))
         Options.ExcludeAttrList.push_back(DeclAttrKind::HasInitialValue);
@@ -1293,8 +1293,8 @@ void PrintAST::printAttributes(const Decl *D) {
 
   // If we are suppressing @implementation, also suppress @objc on extensions.
   if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-    if (ED->isObjCImplementation() &&
-            Options.excludeAttrKind(DeclAttrKind::ObjCImplementation)) {
+    if (ED->isImplementation() &&
+            Options.excludeAttrKind(DeclAttrKind::Implementation)) {
       Options.ExcludeAttrList.push_back(DeclAttrKind::ObjC);
     }
   }
@@ -2329,7 +2329,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   // Don't print accessors for trivially stored properties...
   if (impl.isSimpleStored()) {
     // ...unless we're printing for SIL, which expects a { get set? } on
-    //    trivial properties, or in an @objcImpl extension, which treats
+    //    trivial properties, or in an @implementation extension, which treats
     //    final stored properties as computed.
     if (Options.PrintForSIL || isInObjCImpl(ASD)) {
       Printer << " { get " << (impl.supportsMutation() ? "set }" : "}");

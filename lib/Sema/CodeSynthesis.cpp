@@ -558,13 +558,14 @@ createDesignatedInitOverrideGenericParams(ASTContext &ctx,
 }
 
 /// True if the type has an opaque clang implementation, meaning it is imported
-/// and doesn't have an \c \@objcImplementation extension.
-static bool hasClangImplementation(const NominalTypeDecl *decl) {
-  return decl->hasClangNode() && !decl->getObjCImplementationDecl();
+/// and doesn't match a visible \c \@implementation decl. We cannot reason
+/// about the stored properties of such types.
+static bool hasOpaqueImplementation(const NominalTypeDecl *decl) {
+  return decl->hasClangNode() && !decl->getImplementationDecl();
 }
 
 /// True if \p member is in the main body of \p ty, where the "main body" is
-/// either the type itself (the usual case) or its \c \@objcImplementation
+/// either the type itself (the usual case) or its \c \@objc \c \@implementation
 /// extension (if one is present).
 static bool isInMainBody(ValueDecl *member, NominalTypeDecl *ty) {
   return member->getDeclContext() ==
@@ -991,7 +992,7 @@ static bool enumerateCurrentPropertiesAndAuxiliaryVars(
 
 bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *decl) const {
-  assert(!hasClangImplementation(decl));
+  assert(!hasOpaqueImplementation(decl));
 
   std::multimap<VarDecl *, VarDecl *> initializedViaInitAccessor;
   decl->collectPropertiesInitializableByInitAccessors(
@@ -1063,7 +1064,7 @@ bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
 
 static bool areAllStoredPropertiesDefaultInitializable(Evaluator &eval,
                                                        NominalTypeDecl *decl) {
-  if (hasClangImplementation(decl))
+  if (hasOpaqueImplementation(decl))
     return true;
 
   return evaluateOrDefault(
@@ -1073,7 +1074,7 @@ static bool areAllStoredPropertiesDefaultInitializable(Evaluator &eval,
 bool
 HasUserDefinedDesignatedInitRequest::evaluate(Evaluator &evaluator,
                                               NominalTypeDecl *decl) const {
-  assert(!hasClangImplementation(decl));
+  assert(!hasOpaqueImplementation(decl));
 
   auto results = decl->lookupDirect(DeclBaseName::createConstructor());
   for (auto *member : results) {
@@ -1091,7 +1092,7 @@ HasUserDefinedDesignatedInitRequest::evaluate(Evaluator &evaluator,
 static bool hasUserDefinedDesignatedInit(Evaluator &eval,
                                          NominalTypeDecl *decl) {
   // Imported decls don't have a designated initializer defined by the user.
-  if (hasClangImplementation(decl))
+  if (hasOpaqueImplementation(decl))
     return false;
 
   return evaluateOrDefault(eval, HasUserDefinedDesignatedInitRequest{decl},
@@ -1111,9 +1112,9 @@ static ValueDecl *findImplementedObjCDecl(ValueDecl *VD) {
   if (auto vdSelector = VD->getObjCRuntimeName()) {
     // and it's in an extension...
     if (auto implED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
-      // and that extension is the @objcImplementation of a class's main body...
+      // and that extension is the @implementation of a class's main body...
       if (auto interfaceCD =
-              dyn_cast_or_null<ClassDecl>(implED->getImplementedObjCDecl())) {
+              dyn_cast_or_null<ClassDecl>(implED->getImplementedDecl())) {
         // Find the initializer in the class's main body that matches VD.
         for (auto interfaceVD : interfaceCD->getAllMembers()) {
           if (auto interfaceCtor = dyn_cast<ConstructorDecl>(interfaceVD)) {
@@ -1162,7 +1163,7 @@ static void collectNonOveriddenSuperclassInits(
       subOptions, lookupResults);
 
   for (auto decl : lookupResults) {
-    // HACK: If an @objcImplementation extension declares an initializer, its
+    // HACK: If an @objc @implementation extension declares an initializer, its
     // interface usually also has a declaration. We need the interface decl for
     // access control computations, but the name lookup returns the
     // implementation decl because it's in the Swift module. Go find the
@@ -1331,7 +1332,7 @@ InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
 
 static bool shouldAttemptInitializerSynthesis(const NominalTypeDecl *decl) {
   // Don't synthesize initializers for imported decls.
-  if (hasClangImplementation(decl))
+  if (hasOpaqueImplementation(decl))
     return false;
 
   // Don't add implicit constructors in module interfaces.

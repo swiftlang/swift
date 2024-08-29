@@ -1,4 +1,4 @@
-#import "objc_implementation_class_extension.h"
+#import "objc_class_extension.h"
 
 @interface ObjCClass ()
 

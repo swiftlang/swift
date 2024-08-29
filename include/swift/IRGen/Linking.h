@@ -852,7 +852,7 @@ public:
   static LinkEntity forTypeMetadata(CanType concreteType,
                                     TypeMetadataAddress addr,
                                     bool forceShared = false) {
-    assert(!isObjCImplementation(concreteType));
+    assert(!isImplementation(concreteType));
     assert(!isEmbedded(concreteType) || isMetadataAllowedInEmbedded(concreteType));
     LinkEntity entity;
     entity.setForType(Kind::TypeMetadata, concreteType);
@@ -918,7 +918,7 @@ public:
   }
 
   static LinkEntity forNominalTypeDescriptor(NominalTypeDecl *decl) {
-    assert(!isObjCImplementation(decl));
+    assert(!isImplementation(decl));
     assert(!isEmbedded(decl));
     LinkEntity entity;
     entity.setForDecl(Kind::NominalTypeDescriptor, decl);
@@ -926,7 +926,7 @@ public:
   }
 
   static LinkEntity forNominalTypeDescriptorRecord(NominalTypeDecl *decl) {
-    assert(!isObjCImplementation(decl));
+    assert(!isImplementation(decl));
     assert(!isEmbedded(decl));
     LinkEntity entity;
     entity.setForDecl(Kind::NominalTypeDescriptorRecord, decl);
@@ -1644,13 +1644,13 @@ public:
 #undef LINKENTITY_SET_FIELD
 
 private:
-  static bool isObjCImplementation(NominalTypeDecl *NTD) {
+  static bool isImplementation(NominalTypeDecl *NTD) {
     if (NTD)
-      return NTD->getObjCImplementationDecl();
+      return NTD->getImplementationDecl();
     return false;
   }
-  static bool isObjCImplementation(CanType ty) {
-    return isObjCImplementation(ty->getClassOrBoundGenericClass());
+  static bool isImplementation(CanType ty) {
+    return isImplementation(ty->getClassOrBoundGenericClass());
   }
 };
 

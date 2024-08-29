@@ -600,7 +600,7 @@ public:
   // Mapping from imported types to their raw value types.
   llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
 
-  // Caches used by ObjCInterfaceAndImplementationRequest.
+  // Caches used by InterfaceAndImplementationRequest.
   llvm::DenseMap<Decl *, Decl *> ImplementationsByInterface;
   llvm::DenseMap<Decl *, llvm::TinyPtrVector<Decl*>> InterfacesByImplementation;
 
