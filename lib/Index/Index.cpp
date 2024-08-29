@@ -1094,7 +1094,7 @@ private:
       return isa<ParamDecl>(D) && !IsRef &&
         D->getDeclContext()->getContextKind() != DeclContextKind::AbstractClosureExpr;
 
-    if (D->isPrivateStdlibDecl())
+    if (D->isPrivateSystemDecl())
       return false;
 
     return true;

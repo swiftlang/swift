@@ -330,7 +330,9 @@ public:
   /// subsystem.
   Type subst(InFlightSubstitution &subs) const;
 
-  bool isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic = true) const;
+  /// Whether this type is from a system module and should be considered
+  /// implicitly private.
+  bool isPrivateSystemType(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, unsigned indent = 0) const;
