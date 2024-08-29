@@ -710,6 +710,8 @@ class BuildScriptInvocation(object):
         )
         builder.add_product(products.SwiftDocCRender,
                             is_enabled=install_doccrender)
+        builder.add_product(products.StdlibDocs,
+                            is_enabled=self.args.build_stdlib_docs)
 
         # Keep SwiftDriver at last.
         # swift-driver's integration with the build scripts is not fully
