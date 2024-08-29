@@ -465,8 +465,8 @@ enum class FixKind : uint8_t {
   /// Ignore an attempt to specialize a non-generic type.
   AllowConcreteTypeSpecialization,
 
-  /// Ignore an attempt to specialize a generic function.
-  AllowGenericFunctionSpecialization,
+  /// Ignore an attempt to specialize a (generic) function reference.
+  AllowFunctionSpecialization,
 
   /// Ignore an out-of-place \c then statement.
   IgnoreOutOfPlaceThenStmt,
@@ -3750,17 +3750,19 @@ public:
   }
 };
 
-class AllowGenericFunctionSpecialization final : public ConstraintFix {
+class AllowFunctionSpecialization final : public ConstraintFix {
   ValueDecl *Decl;
 
-  AllowGenericFunctionSpecialization(ConstraintSystem &cs, ValueDecl *decl,
-                                     ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AllowGenericFunctionSpecialization, locator),
+  AllowFunctionSpecialization(ConstraintSystem &cs, ValueDecl *decl,
+                              ConstraintLocator *locator,
+                              FixBehavior fixBehavior)
+      : ConstraintFix(cs, FixKind::AllowFunctionSpecialization, locator,
+                      fixBehavior),
         Decl(decl) {}
 
 public:
   std::string getName() const override {
-    return "allow generic function specialization";
+    return "allow (generic) function specialization";
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
@@ -3769,11 +3771,11 @@ public:
     return diagnose(*commonFixes.front().first);
   }
 
-  static AllowGenericFunctionSpecialization *
+  static AllowFunctionSpecialization *
   create(ConstraintSystem &cs, ValueDecl *decl, ConstraintLocator *locator);
 
   static bool classof(const ConstraintFix *fix) {
-    return fix->getKind() == FixKind::AllowGenericFunctionSpecialization;
+    return fix->getKind() == FixKind::AllowFunctionSpecialization;
   }
 };
 

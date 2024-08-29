@@ -14069,6 +14069,13 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
 
   auto genericParams = getGenericParams(decl);
   if (!decl->getAsGenericContext() || !genericParams) {
+    if (isa<AbstractFunctionDecl>(decl)) {
+      return recordFix(AllowFunctionSpecialization::create(
+                 *this, decl, getConstraintLocator(locator)))
+                 ? SolutionKind::Error
+                 : SolutionKind::Solved;
+    }
+
     // Allow concrete macros to have specializations with just a warning.
     return recordFix(AllowConcreteTypeSpecialization::create(
                *this, type1, decl, getConstraintLocator(locator),
@@ -14111,10 +14118,7 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   // FIXME: We could support explicit function specialization.
   if (openedGenericParams.empty() ||
       (isa<AbstractFunctionDecl>(decl) && !hasParameterPack)) {
-    if (!shouldAttemptFixes())
-      return SolutionKind::Error;
-
-    return recordFix(AllowGenericFunctionSpecialization::create(
+    return recordFix(AllowFunctionSpecialization::create(
                *this, decl, getConstraintLocator(locator)))
                ? SolutionKind::Error
                : SolutionKind::Solved;
@@ -15246,7 +15250,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowAssociatedValueMismatch:
   case FixKind::GenericArgumentsMismatch:
   case FixKind::AllowConcreteTypeSpecialization:
-  case FixKind::AllowGenericFunctionSpecialization:
+  case FixKind::AllowFunctionSpecialization:
   case FixKind::IgnoreGenericSpecializationArityMismatch:
   case FixKind::IgnoreKeyPathSubscriptIndexMismatch:
   case FixKind::AllowMemberRefOnExistential: {

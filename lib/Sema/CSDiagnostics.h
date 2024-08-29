@@ -3133,13 +3133,15 @@ public:
   bool diagnoseAsError() override;
 };
 
-class GenericFunctionSpecialization final : public FailureDiagnostic {
+/// Diagnose attempts to specialize (generic) function references.
+class InvalidFunctionSpecialization final : public FailureDiagnostic {
   ValueDecl *Decl;
 
 public:
-  GenericFunctionSpecialization(const Solution &solution, ValueDecl *decl,
-                                ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator), Decl(decl) {}
+  InvalidFunctionSpecialization(const Solution &solution, ValueDecl *decl,
+                                ConstraintLocator *locator,
+                                FixBehavior fixBehavior)
+      : FailureDiagnostic(solution, locator, fixBehavior), Decl(decl) {}
 
   bool diagnoseAsError() override;
 };

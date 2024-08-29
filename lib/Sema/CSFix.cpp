@@ -2618,16 +2618,21 @@ AllowConcreteTypeSpecialization *AllowConcreteTypeSpecialization::create(
       cs, concreteTy, decl, locator, fixBehavior);
 }
 
-bool AllowGenericFunctionSpecialization::diagnose(const Solution &solution,
-                                                  bool asNote) const {
-  GenericFunctionSpecialization failure(solution, Decl, getLocator());
+bool AllowFunctionSpecialization::diagnose(const Solution &solution,
+                                           bool asNote) const {
+  InvalidFunctionSpecialization failure(solution, Decl, getLocator(),
+                                        fixBehavior);
   return failure.diagnose(asNote);
 }
 
-AllowGenericFunctionSpecialization *AllowGenericFunctionSpecialization::create(
-    ConstraintSystem &cs, ValueDecl *decl, ConstraintLocator *locator) {
+AllowFunctionSpecialization *
+AllowFunctionSpecialization::create(ConstraintSystem &cs, ValueDecl *decl,
+                                    ConstraintLocator *locator) {
+  auto fixBehavior = cs.getASTContext().isSwiftVersionAtLeast(6)
+                         ? FixBehavior::Error
+                         : FixBehavior::DowngradeToWarning;
   return new (cs.getAllocator())
-      AllowGenericFunctionSpecialization(cs, decl, locator);
+      AllowFunctionSpecialization(cs, decl, locator, fixBehavior);
 }
 
 bool IgnoreOutOfPlaceThenStmt::diagnose(const Solution &solution,
