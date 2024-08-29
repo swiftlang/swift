@@ -6468,3 +6468,46 @@ llvm::FunctionType *FunctionPointer::getFunctionType() const {
 
   return Sig.getType();
 }
+
+void irgen::buildDirectError(IRGenFunction &IGF,
+                             const CombinedResultAndErrorType &combined,
+                             const NativeConventionSchema &errorSchema,
+                             SILType silErrorTy, Explosion &errorResult,
+                             bool forAsync, Explosion &out) {
+  if (combined.combinedTy->isVoidTy()) {
+    return;
+  }
+
+  llvm::Value *expandedResult = llvm::UndefValue::get(combined.combinedTy);
+  auto *structTy = dyn_cast<llvm::StructType>(combined.combinedTy);
+
+  if (!errorSchema.getExpandedType(IGF.IGM)->isVoidTy()) {
+    auto nativeError =
+        errorSchema.mapIntoNative(IGF.IGM, IGF, errorResult, silErrorTy, false);
+
+    if (structTy) {
+      for (unsigned i : combined.errorValueMapping) {
+        llvm::Value *elt = nativeError.claimNext();
+        auto *nativeTy = structTy->getElementType(i);
+        elt = convertForDirectError(IGF, elt, nativeTy,
+                                    /*forExtraction*/ false);
+        expandedResult = IGF.Builder.CreateInsertValue(expandedResult, elt, i);
+      }
+      if (forAsync) {
+        IGF.emitAllExtractValues(expandedResult, structTy, out);
+      } else {
+        out = expandedResult;
+      }
+    } else if (!errorSchema.getExpandedType(IGF.IGM)->isVoidTy()) {
+      out = convertForDirectError(IGF, nativeError.claimNext(),
+                                  combined.combinedTy,
+                                  /*forExtraction*/ false);
+    }
+  } else {
+    if (forAsync && structTy) {
+      IGF.emitAllExtractValues(expandedResult, structTy, out);
+    } else {
+      out = expandedResult;
+    }
+  }
+}
