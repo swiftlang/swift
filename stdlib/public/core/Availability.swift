@@ -17,6 +17,37 @@ import SwiftShims
 ///
 /// This is a magic entry point known to the compiler. It is called in
 /// generated code for API availability checking.
+///
+/// This is marked @_transparent on iOS to work around broken availability
+/// checking for iOS apps running on macOS (rdar://83378814). libswiftCore uses
+/// the macOS platform identifier for its version check in that scenario,
+/// causing all queries to return true. When this function is inlined into the
+/// caller, the compiler embeds the correct platform identifier in the client
+/// code, and we get the right answer.
+///
+/// @_transparent breaks the optimizer's ability to remove availability checks
+/// that are unnecessary due to the current deployment target. We call through
+/// to the _stdlib_isOSVersionAtLeast_AEIC function below to work around this,
+/// as the optimizer is able to perform this optimization for a
+/// @_alwaysEmitIntoClient function. We can't use @_alwaysEmitIntoClient
+/// directly on this call because it would break ABI for existing apps.
+///
+/// `@_transparent` breaks the interpreter mode on macOS, as it creates a direct
+/// reference to ___isPlatformVersionAtLeast from compiler-rt, and the
+/// interpreter doesn't currently know how to load symbols from compiler-rt.
+/// Since `@_transparent` is only necessary for iOS apps, we only apply it on
+/// iOS, not any other which would inherit/remap iOS availability.
+#if os(iOS) && !os(xrOS)
+@_effects(readnone)
+@_transparent
+public func _stdlib_isOSVersionAtLeast(
+  _ major: Builtin.Word,
+  _ minor: Builtin.Word,
+  _ patch: Builtin.Word
+) -> Builtin.Int1 {
+  return _stdlib_isOSVersionAtLeast_AEIC(major, minor, patch)
+}
+#else
 @_semantics("availability.osversion")
 @_effects(readnone)
 @_unavailableInEmbedded
@@ -25,17 +56,34 @@ public func _stdlib_isOSVersionAtLeast(
   _ minor: Builtin.Word,
   _ patch: Builtin.Word
 ) -> Builtin.Int1 {
+  return _stdlib_isOSVersionAtLeast_AEIC(major, minor, patch)
+}
+#endif
+
+@_semantics("availability.osversion")
+@_effects(readnone)
+@_alwaysEmitIntoClient
+public func _stdlib_isOSVersionAtLeast_AEIC(
+  _ major: Builtin.Word,
+  _ minor: Builtin.Word,
+  _ patch: Builtin.Word
+) -> Builtin.Int1 {
 #if (os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)) && SWIFT_RUNTIME_OS_VERSIONING
   if Int(major) == 9999 {
     return true._value
   }
-  let runningVersion = _swift_stdlib_operatingSystemVersion()
-  
-  let result =
-    (runningVersion.majorVersion,runningVersion.minorVersion,runningVersion.patchVersion)
-    >= (Int(major),Int(minor),Int(patch))
 
-  return result._value
+  let queryVersion = (Int(major), Int(minor), Int(patch))
+  let major32 = Int32(truncatingIfNeeded:Int(queryVersion.0))
+  let minor32 = Int32(truncatingIfNeeded:Int(queryVersion.1))
+  let patch32 = Int32(truncatingIfNeeded:Int(queryVersion.2))
+
+  // Defer to a builtin that calls clang's version checking builtin from
+  // compiler-rt.
+  let result32 = Int32(Builtin.targetOSVersionAtLeast(major32._value,
+                                                      minor32._value,
+                                                      patch32._value))
+  return (result32 != (0 as Int32))._value
 #else
   // FIXME: As yet, there is no obvious versioning standard for platforms other
   // than Darwin-based OSes, so we just assume false for now. 

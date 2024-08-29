@@ -1,8 +1,9 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s
 // RUN: %target-swift-frontend -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT
 
-// On iOS stdlib_isOSVersionAtLeast() is @_transparent, which affects optimization.
-// REQUIRES: OS=macosx || OS=tvos || OS=watchos || OS=xros
+// On iOS _stdlib_isOSVersionAtLeast() is @_transparent, which affects optimization.
+// See IRGen/availability.swift for other Apple platforms.
+// REQUIRES: OS=ios
 
 import Foundation
 
@@ -11,16 +12,16 @@ import Foundation
 
 // CHECK-LABEL: define{{.*}} @{{.*}}dontHoist
 // CHECK-NOT: s10Foundation11MeasurementVySo17NSUnitTemperature
-// CHECK: call swiftcc i1 @"$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"(
+// CHECK: call swiftcc i1 @"$ss31_stdlib_isOSVersionAtLeast_AEICyBi1_Bw_BwBwtF"(
 // CHECK: s10Foundation11MeasurementVySo17NSUnitTemperature
 
 // OPT-LABEL: define{{.*}} @{{.*}}dontHoist
 // OPT-NOT: S10Foundation11MeasurementVySo17NSUnitTemperature
-// OPT: call {{.*}} @"$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"(
+// OPT: call {{.*}} @__isPlatformVersionAtLeast(
 // OPT: s10Foundation11MeasurementVySo17NSUnitTemperature
 
 public func dontHoist() {
-  if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, visionOS 1.1, *) {
+  if #available(macOS 51.0, iOS 54.0, watchOS 57.0, tvOS 54.0, visionOS 51.1, *) {
       let measurement = Measurement<UnitTemperature>(value: Double(42), unit: .celsius)
       print("\(measurement)")
   } else {
@@ -37,26 +38,27 @@ public func dontHoist() {
 // for iOS 9 will also succeed.
 
 // With optimizations on, multiple #availability checks should generate only
-// a single call into _isOSVersionAtLeast.
+// a single call into _isOSVersionAtLeast, which after inlining will be a
+// call to __isPlatformVersionAtLeast.
 
 // CHECK-LABEL: define{{.*}} @{{.*}}multipleAvailabilityChecks
-// CHECK: call swiftcc i1 @"$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"(
-// CHECK: call swiftcc i1 @"$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"(
-// CHECK: call swiftcc i1 @"$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"(
+// CHECK: call swiftcc i1 @"$ss31_stdlib_isOSVersionAtLeast_AEICyBi1_Bw_BwBwtF"(
+// CHECK: call swiftcc i1 @"$ss31_stdlib_isOSVersionAtLeast_AEICyBi1_Bw_BwBwtF"(
+// CHECK: call swiftcc i1 @"$ss31_stdlib_isOSVersionAtLeast_AEICyBi1_Bw_BwBwtF"(
 // CHECK: ret void
 
 // OPT-LABEL: define{{.*}} @{{.*}}multipleAvailabilityChecks
-// OPT: call {{.*}} @"$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"
-// OPT-NOT: call {{.*}} @"$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"
+// OPT: call {{.*}} @__isPlatformVersionAtLeast
+// OPT-NOT: call {{.*}} @$__isPlatformVersionAtLeast
 // OPT: ret void
 public func multipleAvailabilityChecks() {
-  if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, visionOS 1.1, *) {
+  if #available(macOS 51.0, iOS 54.0, watchOS 57.0, tvOS 54.0, visionOS 51.1, *) {
     print("test one")
   }
-  if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, visionOS 1.1, *) {
+  if #available(macOS 51.0, iOS 54.0, watchOS 57.0, tvOS 54.0, visionOS 51.1, *) {
     print("test two")
   }
-  if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, visionOS 1.1, *) {
+  if #available(macOS 51.0, iOS 54.0, watchOS 57.0, tvOS 54.0, visionOS 51.1, *) {
     print("test three")
   }
 }
