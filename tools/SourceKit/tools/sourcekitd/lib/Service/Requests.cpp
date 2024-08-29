@@ -3774,7 +3774,8 @@ void SKEditorConsumer::handleSemanticAnnotation(unsigned Offset,
 void SKEditorConsumer::handleDeclaration(unsigned Offset, unsigned Length,
                                          UIdent Kind, StringRef USR) {
   assert(Kind.isValid());
-  Declarations.add(Kind, Offset, Length, USR);
+  if(this->Opts.EnableDeclarations)
+      Declarations.add(Kind, Offset, Length, USR);
 }
 
 void
