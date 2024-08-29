@@ -4419,48 +4419,6 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
                               getSILModule());
   assert(!conv.hasIndirectSILErrorResults());
 
-  auto buildDirectError = [=](const CombinedResultAndErrorType &combined,
-                              const NativeConventionSchema &errorSchema,
-                              SILType silErrorTy, Explosion &errorResult,
-                              bool forAsync, Explosion &out) {
-    if (combined.combinedTy->isVoidTy()) {
-      return;
-    }
-
-    llvm::Value *expandedResult = llvm::UndefValue::get(combined.combinedTy);
-    auto *structTy = dyn_cast<llvm::StructType>(combined.combinedTy);
-
-    if (!errorSchema.getExpandedType(IGM)->isVoidTy()) {
-      auto nativeError =
-          errorSchema.mapIntoNative(IGM, *this, errorResult, silErrorTy, false);
-
-      if (structTy) {
-        for (unsigned i : combined.errorValueMapping) {
-          llvm::Value *elt = nativeError.claimNext();
-          auto *nativeTy = structTy->getElementType(i);
-          elt = convertForDirectError(*this, elt, nativeTy,
-                                      /*forExtraction*/ false);
-          expandedResult = Builder.CreateInsertValue(expandedResult, elt, i);
-        }
-        if (forAsync) {
-          emitAllExtractValues(expandedResult, structTy, out);
-        } else {
-          out = expandedResult;
-        }
-      } else if (!errorSchema.getExpandedType(IGM)->isVoidTy()) {
-        out =
-            convertForDirectError(*this, nativeError.claimNext(),
-                                  combined.combinedTy, /*forExtraction*/ false);
-      }
-    } else {
-      if (forAsync && structTy) {
-        emitAllExtractValues(expandedResult, structTy, out);
-      } else {
-        out = expandedResult;
-      }
-    }
-  };
-
   if (!isAsync()) {
     auto fnTy = CurFn->getFunctionType();
     auto retTy = fnTy->getReturnType();
@@ -4493,7 +4451,8 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
           auto combined =
               combineResultAndTypedErrorType(IGM, resultSchema, errorSchema);
           Explosion nativeAgg;
-          buildDirectError(combined, errorSchema, silErrorTy, errorResult,
+          buildDirectError(*this, combined, errorSchema, silErrorTy,
+                           errorResult,
                            /*forAsync*/ false, nativeAgg);
 
           emitScalarReturn(combined.combinedTy, nativeAgg);
@@ -4543,7 +4502,7 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
         Explosion nativeAgg;
         auto combined =
             combineResultAndTypedErrorType(IGM, resultSchema, errorSchema);
-        buildDirectError(combined, errorSchema, silErrorTy, exn,
+        buildDirectError(*this, combined, errorSchema, silErrorTy, exn,
                          /*forAsync*/ true, nativeAgg);
         assert(exn.empty() && "Unclaimed typed error results");
 
