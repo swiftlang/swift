@@ -433,3 +433,11 @@ bool SILFunctionArgument::isSelf() const {
   return getFunction()->hasSelfParam() &&
          getParent()->getArguments().back() == this;
 }
+
+bool SILFunctionArgument::isSending() const {
+  if (isIndirectErrorResult())
+    return false;
+  if (isIndirectResult())
+    return getFunction()->getLoweredFunctionType()->hasSendingResult();
+  return getKnownParameterInfo().hasOption(SILParameterInfo::Sending);
+}

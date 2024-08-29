@@ -812,8 +812,8 @@ Comparison TypeChecker::compareDeclarations(DeclContext *dc,
 }
 
 static Type getUnlabeledType(Type type, ASTContext &ctx) {
-  return type.transform([&](Type type) -> Type {
-    if (auto *tupleType = dyn_cast<TupleType>(type.getPointer())) {
+  return type.transformRec([&](TypeBase *type) -> std::optional<Type> {
+    if (auto *tupleType = dyn_cast<TupleType>(type)) {
       if (tupleType->getNumElements() == 1)
         return ParenType::get(ctx, tupleType->getElementType(0));
 
@@ -825,7 +825,7 @@ static Type getUnlabeledType(Type type, ASTContext &ctx) {
       return TupleType::get(elts, ctx);
     }
 
-    return type;
+    return std::nullopt;
   });
 }
 

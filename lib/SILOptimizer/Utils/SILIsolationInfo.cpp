@@ -832,11 +832,19 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
 
   auto *fArg = cast<SILFunctionArgument>(arg);
 
-  // Transferring is always disconnected.
+  // Sending is always disconnected.
+  if (fArg->isSending())
+    return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
+
+  // If we have a closure capture that is not an indirect result or indirect
+  // result error, we want to treat it as sending so that we properly handle
+  // async lets.
+  //
+  // This pattern should only come up with async lets. See comment in
+  // isTransferrableFunctionArgument.
   if (!fArg->isIndirectResult() && !fArg->isIndirectErrorResult() &&
-      ((fArg->isClosureCapture() &&
-        fArg->getFunction()->getLoweredFunctionType()->isSendable()) ||
-       fArg->isSending()))
+      fArg->isClosureCapture() &&
+      fArg->getFunction()->getLoweredFunctionType()->isSendable())
     return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
 
   // Before we do anything further, see if we have an isolated parameter. This
@@ -884,10 +892,9 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   }
 
   // Otherwise, if we do not have an isolated argument and are not in an
-  // alloactor, then we might be isolated via global isolation.
+  // allocator, then we might be isolated via global isolation.
   if (auto functionIsolation = fArg->getFunction()->getActorIsolation()) {
     if (functionIsolation.isActorIsolated()) {
-      assert(functionIsolation.isGlobalActor());
       if (functionIsolation.isGlobalActor()) {
         return SILIsolationInfo::getGlobalActorIsolated(
             fArg, functionIsolation.getGlobalActor());
@@ -1173,8 +1180,26 @@ bool SILIsolationInfo::isNonSendableType(SILType type, SILFunction *fn) {
     return false;
   }
 
-  // Otherwise, delegate to seeing if type conforms to the Sendable protocol.
-  return !type.isSendable(fn);
+  // First before we do anything, see if we have a Sendable type. In such a
+  // case, just return true early.
+  //
+  // DISCUSSION: It is important that we do this first since otherwise calling
+  // getConcurrencyDiagnosticBehavior could cause us to prevent a
+  // "preconcurrency" unneeded diagnostic when just using Sendable values. We
+  // only want to trigger that if we analyze a non-Sendable type.
+  if (type.isSendable(fn))
+    return false;
+
+  // Grab out behavior. If it is none, then we have a type that we want to treat
+  // as non-Sendable.
+  auto behavior = type.getConcurrencyDiagnosticBehavior(fn);
+  if (!behavior)
+    return true;
+
+  // Finally, if we are not supposed to ignore, then we have a true non-Sendable
+  // type. Types whose diagnostics we are supposed to ignore, we want to treat
+  // as Sendable.
+  return *behavior != DiagnosticBehavior::Ignore;
 }
 
 //===----------------------------------------------------------------------===//

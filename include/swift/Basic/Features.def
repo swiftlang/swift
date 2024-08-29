@@ -396,10 +396,17 @@ EXPERIMENTAL_FEATURE(ReinitializeConsumeInMultiBlockDefer, false)
 
 EXPERIMENTAL_FEATURE(SE427NoInferenceOnExtension, true)
 
+
 EXPERIMENTAL_FEATURE(Extern, true)
 
 // Enable trailing comma for comma-separated lists.
 EXPERIMENTAL_FEATURE(TrailingComma, false)
+
+/// Allow the @unsafe attribute.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AllowUnsafeAttribute, true)
+
+/// Warn on use of unsafe constructs.
+EXPERIMENTAL_FEATURE(WarnUnsafe, true)
 
 SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated/async deinit")
 

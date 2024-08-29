@@ -125,11 +125,19 @@ void GenericCloner::populateCloned() {
             return true;
           }
         }
-      } else if (ReInfo.isDroppedMetatypeArg(ArgIdx)) {
-        // Replace the metatype argument with an `metatype` instruction in the
-        // entry block.
-        auto *mtInst = getBuilder().createMetatype(Loc, mappedType);
-        entryArgs.push_back(mtInst);
+      } else if (ReInfo.isDroppedArgument(ArgIdx)) {
+        if (OrigArg->getType().isAddress()) {
+          // Create an uninitialized alloc_stack for unused indirect arguments.
+          // This will be removed by other optimizations.
+          createAllocStack();
+          entryArgs.push_back(ASI);
+        } else {
+          // Dropped direct (= non-address) arguments are metatype arguments.
+          // Replace the metatype argument with an `metatype` instruction in the
+          // entry block.
+          auto *mtInst = getBuilder().createMetatype(Loc, mappedType);
+          entryArgs.push_back(mtInst);
+        }
         return true;
       } else {
         // Handle arguments for formal parameters.

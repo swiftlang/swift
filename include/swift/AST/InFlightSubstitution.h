@@ -134,8 +134,16 @@ public:
     return Options;
   }
 
+  bool shouldSubstitutePrimaryArchetypes() const {
+    return Options.contains(SubstFlags::SubstitutePrimaryArchetypes);
+  }
+
   bool shouldSubstituteOpaqueArchetypes() const {
     return Options.contains(SubstFlags::SubstituteOpaqueArchetypes);
+  }
+
+  bool shouldSubstituteLocalArchetypes() const {
+    return Options.contains(SubstFlags::SubstituteLocalArchetypes);
   }
 
   /// Is the given type invariant to substitution?

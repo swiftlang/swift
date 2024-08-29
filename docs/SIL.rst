@@ -2748,12 +2748,12 @@ That's the case if the destroy point is jointly dominated by:
 
 or
 
-* an ``inject_enum_addr`` to the enum memory location with a non-trivial or
+* an ``inject_enum_addr`` to the enum memory location with a trivial or
   non-payload case.
 
 or
 
-* a successor of a ``switch_enum`` or ``switch_enum_addr`` for a non-trivial
+* a successor of a ``switch_enum`` or ``switch_enum_addr`` for a trivial
   or non-payload case.
 
 Dead End Blocks

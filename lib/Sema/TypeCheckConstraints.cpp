@@ -24,6 +24,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -637,7 +638,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
 
   // Find and open all of the generic parameters used by the parameter
   // and replace them with type variables.
-  auto contextualTy = paramInterfaceTy.transform([&](Type type) -> Type {
+  auto contextualTy = paramInterfaceTy.transformRec([&](Type type) -> std::optional<Type> {
     assert(!type->is<UnboundGenericType>());
 
     if (auto *GP = type->getAs<GenericTypeParamType>()) {
@@ -648,7 +649,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       return cs.openGenericParameter(DC->getParent(), GP, genericParameters,
                                      locator);
     }
-    return type;
+    return std::nullopt;
   });
 
   auto containsTypes = [&](Type type, OpenedTypeMap &toFind) {
@@ -996,48 +997,71 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   return false;
 }
 
+static Type openTypeParameter(ConstraintSystem &cs,
+                              Type interfaceTy,
+                              GenericEnvironment *env,
+                llvm::DenseMap<SubstitutableType *, TypeVariableType *> &types) {
+  if (auto *memberTy = interfaceTy->getAs<DependentMemberType>()) {
+    return DependentMemberType::get(
+        openTypeParameter(cs, memberTy->getBase(), env, types),
+        memberTy->getAssocType());
+  }
+
+  auto *paramTy = interfaceTy->castTo<GenericTypeParamType>();
+  auto archetypeTy = env->mapTypeIntoContext(paramTy)->castTo<ArchetypeType>();
+
+  auto found = types.find(archetypeTy);
+  if (found != types.end())
+    return found->second;
+
+  auto locator = cs.getConstraintLocator({});
+  auto replacement = cs.createTypeVariable(locator,
+                                           TVO_CanBindToNoEscape);
+
+  // FIXME: This doesn't capture all requirements imposed on the archetype!
+  // We really need to be opening the generic signature instead.
+  if (auto superclass = archetypeTy->getSuperclass()) {
+    cs.addConstraint(ConstraintKind::Subtype, replacement,
+                     superclass, locator);
+  }
+  for (auto proto : archetypeTy->getConformsTo()) {
+    cs.addConstraint(ConstraintKind::ConformsTo, replacement,
+                     proto->getDeclaredInterfaceType(), locator);
+  }
+
+  types[archetypeTy] = replacement;
+  return replacement;
+}
+
 static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
                                                Type t) {
   llvm::DenseMap<SubstitutableType *, TypeVariableType *> types;
 
   return t.subst(
     [&](SubstitutableType *origType) -> Type {
-      auto found = types.find(origType);
-      if (found != types.end())
-        return found->second;
-
-      if (auto archetypeType = dyn_cast<ArchetypeType>(origType)) {
-        auto root = archetypeType->getRoot();
-        // For other nested types, fail here so the default logic in subst()
-        // for nested types applies.
-        if (root != archetypeType)
-          return Type();
-
-        auto locator = cs.getConstraintLocator({});
-        auto replacement = cs.createTypeVariable(locator,
-                                                 TVO_CanBindToNoEscape);
-
-        if (auto superclass = archetypeType->getSuperclass()) {
-          cs.addConstraint(ConstraintKind::Subtype, replacement,
-                           superclass, locator);
-        }
-        for (auto proto : archetypeType->getConformsTo()) {
-          cs.addConstraint(ConstraintKind::ConformsTo, replacement,
-                           proto->getDeclaredInterfaceType(), locator);
-        }
-        types[origType] = replacement;
-        return replacement;
+      if (auto archetypeTy = dyn_cast<ArchetypeType>(origType)) {
+        return openTypeParameter(cs,
+                                 archetypeTy->getInterfaceType(),
+                                 archetypeTy->getGenericEnvironment(),
+                                 types);
       }
 
       // FIXME: Remove this case
-      assert(cast<GenericTypeParamType>(origType));
+      auto *paramTy = cast<GenericTypeParamType>(origType);
+      auto found = types.find(paramTy);
+      if (found != types.end())
+        return found->second;
+
       auto locator = cs.getConstraintLocator({});
       auto replacement = cs.createTypeVariable(locator,
                                                TVO_CanBindToNoEscape);
-      types[origType] = replacement;
+      types[paramTy] = replacement;
       return replacement;
     },
     MakeAbstractConformanceForGenericType(),
+    // FIXME: By folding primary and opaque archetypes together, this doesn't
+    // really capture the correct semantics for opaque archetypes.
+    SubstFlags::SubstitutePrimaryArchetypes |
     SubstFlags::SubstituteOpaqueArchetypes);
 }
 

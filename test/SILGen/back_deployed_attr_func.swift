@@ -13,8 +13,8 @@
 // -- Back deployment thunk for trivialFunc()
 // CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy11trivialFuncyyFTwb : $@convention(thin) () -> ()
 // CHECK: bb0:
-// CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 10
-// CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 52
+// CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 52
+// CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK:   [[PATCH:%.*]] = integer_literal $Builtin.Word, 0
 // CHECK:   [[OSVFN:%.*]] = function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
 // CHECK:   [[AVAIL:%.*]] = apply [[OSVFN]]([[MAJOR]], [[MINOR]], [[PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
@@ -35,8 +35,8 @@
 // CHECK:   return [[RESULT]] : $()
 
 // -- Original definition of trivialFunc()
-// CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy11trivialFuncyyF : $@convention(thin) () -> ()
-@backDeployed(before: macOS 10.52)
+// CHECK-LABEL: sil [available 52.1] [ossa] @$s11back_deploy11trivialFuncyyF : $@convention(thin) () -> ()
+@backDeployed(before: macOS 52.1)
 public func trivialFunc() {}
 
 // -- Fallback definition of isNumber(_:)
@@ -48,8 +48,8 @@ public func trivialFunc() {}
 // -- Back deployment thunk for isNumber(_:)
 // CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy8isNumberySbSiFTwb : $@convention(thin) (Int) -> Bool
 // CHECK: bb0([[ARG_X:%.*]] : $Int):
-// CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 10
-// CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 52
+// CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 52
+// CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK:   [[PATCH:%.*]] = integer_literal $Builtin.Word, 0
 // CHECK:   [[OSVFN:%.*]] = function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
 // CHECK:   [[AVAIL:%.*]] = apply [[OSVFN]]([[MAJOR]], [[MINOR]], [[PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
@@ -69,8 +69,8 @@ public func trivialFunc() {}
 // CHECK:   return [[RETURN_BB_ARG]] : $Bool
 
 // -- Original definition of isNumber(_:)
-// CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy8isNumberySbSiF : $@convention(thin) (Int) -> Bool
-@backDeployed(before: macOS 10.52)
+// CHECK-LABEL: sil [available 52.1] [ossa] @$s11back_deploy8isNumberySbSiF : $@convention(thin) (Int) -> Bool
+@backDeployed(before: macOS 52.1)
 public func isNumber(_ x: Int) -> Bool {
   return true
 }

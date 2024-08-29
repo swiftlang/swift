@@ -226,6 +226,12 @@ UNINTERESTING_FEATURE(ReinitializeConsumeInMultiBlockDefer)
 UNINTERESTING_FEATURE(SE427NoInferenceOnExtension)
 UNINTERESTING_FEATURE(TrailingComma)
 
+static bool usesFeatureAllowUnsafeAttribute(Decl *decl) {
+  return decl->getAttrs().hasAttribute<UnsafeAttr>();
+}
+
+UNINTERESTING_FEATURE(WarnUnsafe)
+
 bool swift::usesFeatureIsolatedDeinit(const Decl *decl) {
   if (auto cd = dyn_cast<ClassDecl>(decl)) {
     return cd->getFormalAccess() == AccessLevel::Open &&

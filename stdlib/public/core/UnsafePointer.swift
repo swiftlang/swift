@@ -204,6 +204,7 @@
 ///       let numberPointer = UnsafePointer<Int>(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen // unsafe-performance
+@unsafe
 public struct UnsafePointer<Pointee: ~Copyable>: Copyable {
 
   /// The underlying raw (untyped) pointer.
@@ -655,6 +656,7 @@ extension UnsafePointer where Pointee: ~Copyable {
 ///       let numberPointer = UnsafeMutablePointer<Int>(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen // unsafe-performance
+@unsafe
 public struct UnsafeMutablePointer<Pointee: ~Copyable>: Copyable {
   /// The underlying raw (untyped) pointer.
   @_preInverseGenerics

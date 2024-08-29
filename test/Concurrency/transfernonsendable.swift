@@ -1865,3 +1865,4 @@ extension MyActor {
     // expected-tns-note @-1 {{returning 'self'-isolated 'self.klass' risks causing data races since the caller assumes that 'self.klass' can be safely sent to other isolation domains}}
   }
 }
+

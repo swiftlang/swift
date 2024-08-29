@@ -1969,7 +1969,9 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
 
     t = t.subst(MapLocalArchetypesOutOfContext(origGenericSig, capturedEnvs),
                 MakeAbstractConformanceForGenericType(),
-                SubstFlags::PreservePackExpansionLevel);
+                SubstFlags::PreservePackExpansionLevel |
+                SubstFlags::SubstitutePrimaryArchetypes |
+                SubstFlags::SubstituteLocalArchetypes);
 
     LLVM_DEBUG(llvm::dbgs() << "-- maps to " << t->getCanonicalType() << "\n");
     return t->getCanonicalType();
@@ -2012,22 +2014,22 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
 
     auto options = SILParameterInfo::Options();
 
-    Type type;
+    CanType type;
     VarDecl *varDecl = nullptr;
     if (auto *expr = capture.getPackElement()) {
-      type = expr->getType();
+      type = expr->getType()->getCanonicalType();
     } else {
       varDecl = cast<VarDecl>(capture.getDecl());
-      type = varDecl->getTypeInContext();
+      type = varDecl->getTypeInContext()->getCanonicalType();
 
       // If we're capturing a parameter pack, wrap it in a tuple.
-      if (type->is<PackExpansionType>()) {
+      if (isa<PackExpansionType>(type)) {
         assert(!cast<ParamDecl>(varDecl)->supportsMutation() &&
                "Cannot capture a pack as an lvalue");
 
         SmallVector<TupleTypeElt, 1> elts;
         elts.push_back(type);
-        type = TupleType::get(elts, TC.Context);
+        type = CanType(TupleType::get(elts, TC.Context));
       }
 
       if (isolatedParam == varDecl) {
@@ -2909,48 +2911,23 @@ CanSILFunctionType swift::getNativeSILFunctionType(
 /// Build a generic signature and environment for a re-abstraction thunk.
 ///
 /// Most thunks share the generic environment with their original function.
-/// The one exception is if the thunk type involves an open existential,
-/// in which case we "promote" the opened existential to a new generic parameter.
-///
-/// \param localArchetypes - the list of local archetypes to promote
-///   into the signature, if any
-/// \param genericEnv - the new generic environment
-/// \param contextSubs - map non-local archetypes from the original function
-///    to archetypes in the thunk
-/// \param interfaceSubs - map interface types to old archetypes
+/// The one exception is if the thunk type involves local archetypes,
+/// in which case we "promote" the local archetypes to new generic parameters.
 static CanGenericSignature
 buildThunkSignature(SILFunction *fn,
-                    ArrayRef<CanLocalArchetypeType> localArchetypes,
+                    CanGenericSignature baseGenericSig,
+                    ArrayRef<GenericEnvironment *> capturedEnvs,
                     GenericEnvironment *&genericEnv,
-                    SubstitutionMap &contextSubs,
-                    SubstitutionMap &interfaceSubs,
-                    llvm::DenseMap<ArchetypeType*, Type> &contextLocalArchetypes) {
-  auto *mod = fn->getModule().getSwiftModule();
-  auto &ctx = mod->getASTContext();
+                    SubstitutionMap &interfaceSubs) {
+  auto &ctx = fn->getASTContext();
   auto forwardingSubs = fn->getForwardingSubstitutionMap();
 
   // If there are no local archetypes, we just inherit the generic
   // environment from the parent function.
-  if (localArchetypes.empty()) {
-    auto genericSig =
-      fn->getLoweredFunctionType()->getInvocationGenericSignature();
+  if (capturedEnvs.empty()) {
     genericEnv = fn->getGenericEnvironment();
     interfaceSubs = forwardingSubs;
-    contextSubs = interfaceSubs;
-    return genericSig;
-  }
-
-  // Get the existing generic signature.
-  auto baseGenericSig =
-      fn->getLoweredFunctionType()->getInvocationGenericSignature();
-
-  SmallVector<GenericEnvironment *, 2> capturedEnvs;
-  for (auto archetype : localArchetypes) {
-    auto *genericEnv = archetype->getGenericEnvironment();
-    if (std::find(capturedEnvs.begin(), capturedEnvs.end(), genericEnv)
-          == capturedEnvs.end()) {
-      capturedEnvs.push_back(genericEnv);
-    }
+    return baseGenericSig;
   }
 
   auto genericSig = buildGenericSignatureWithCapturedEnvironments(
@@ -2959,42 +2936,10 @@ buildThunkSignature(SILFunction *fn,
 
   genericEnv = genericSig.getGenericEnvironment();
 
-  MapLocalArchetypesOutOfContext mapOutOfContext(baseGenericSig, capturedEnvs);
-
-  // Map the local archetypes to their new parameter types.
-  for (auto localArchetype : localArchetypes) {
-    auto thunkInterfaceType = Type(localArchetype).subst(
-        mapOutOfContext,
-        MakeAbstractConformanceForGenericType(),
-        SubstFlags::PreservePackExpansionLevel);
-    auto thunkArchetype = genericEnv->mapTypeIntoContext(
-        thunkInterfaceType);
-    contextLocalArchetypes.insert(std::make_pair(localArchetype,
-                                                 thunkArchetype));
-  }
-
-  // Calculate substitutions to map the caller's archetypes to the thunk's
-  // archetypes.
-  if (auto calleeGenericSig = fn->getLoweredFunctionType()
-          ->getInvocationGenericSignature()) {
-    contextSubs = SubstitutionMap::get(
-      calleeGenericSig,
-      genericEnv->getForwardingSubstitutionMap());
-  }
-
   // Calculate substitutions to map interface types to the caller's archetypes.
   interfaceSubs = buildSubstitutionMapWithCapturedEnvironments(
       forwardingSubs, genericSig, capturedEnvs);
   LLVM_DEBUG(llvm::dbgs() << "Thunk substitution map: " << interfaceSubs << "\n");
-
-  for (auto pair : contextLocalArchetypes) {
-    auto substArchetype = Type(pair.second).subst(interfaceSubs);
-    if (!pair.first->isEqual(substArchetype)) {
-      llvm::errs() << "Expected: "; pair.first->dump(llvm::errs());
-      llvm::errs() << "Got: "; substArchetype->dump(llvm::errs());
-      abort();
-    }
-  }
 
   return genericSig.getCanonicalSignature();
 }
@@ -3032,69 +2977,62 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
     extInfoBuilder = extInfoBuilder.withNoEscape(false);
 
   // Does the thunk type involve a local archetype type?
-  SmallVector<CanLocalArchetypeType, 8> localArchetypes;
+  SmallVector<GenericEnvironment *, 2> capturedEnvs;
   auto archetypeVisitor = [&](CanType t) {
-    if (auto archetypeTy = dyn_cast<ArchetypeType>(t)) {
-      if (auto local = dyn_cast<LocalArchetypeType>(archetypeTy)) {
-        auto root = local.getRoot();
-        if (llvm::find(localArchetypes, root) == localArchetypes.end())
-          localArchetypes.push_back(root);
+    if (auto local = dyn_cast<LocalArchetypeType>(t)) {
+      auto *genericEnv = local->getGenericEnvironment();
+      if (std::find(capturedEnvs.begin(), capturedEnvs.end(), genericEnv)
+            == capturedEnvs.end()) {
+        capturedEnvs.push_back(genericEnv);
       }
     }
   };
 
+  if (expectedType->hasLocalArchetype())
+    expectedType.visit(archetypeVisitor);
+  if (sourceType->hasLocalArchetype())
+    sourceType.visit(archetypeVisitor);
+
   // Use the generic signature from the context if the thunk involves
   // generic parameters.
   CanGenericSignature genericSig;
-  SubstitutionMap contextSubs;
-  llvm::DenseMap<ArchetypeType*, Type> contextLocalArchetypes;
+  CanGenericSignature baseGenericSig;
 
-  if (expectedType->hasArchetype() || sourceType->hasArchetype()) {
-    expectedType.visit(archetypeVisitor);
-    sourceType.visit(archetypeVisitor);
+  if (!capturedEnvs.empty() ||
+      expectedType->hasPrimaryArchetype() ||
+      sourceType->hasPrimaryArchetype()) {
+    // Get the existing generic signature.
+    baseGenericSig = fn->getLoweredFunctionType()
+        ->getInvocationGenericSignature();
 
     genericSig = buildThunkSignature(fn,
-                                     localArchetypes,
+                                     baseGenericSig,
+                                     capturedEnvs,
                                      genericEnv,
-                                     contextSubs,
-                                     interfaceSubs,
-                                     contextLocalArchetypes);
+                                     interfaceSubs);
   }
 
-  auto substTypeHelper = [&](SubstitutableType *type) -> Type {
-    // If it's a local archetype, do an ad-hoc mapping through the
-    // map produced by buildThunkSignature.
-    if (auto *archetype = dyn_cast<LocalArchetypeType>(type)) {
-      assert(!contextLocalArchetypes.empty());
-
-      // Decline to map non-root archetypes; subst() will come back
-      // to us later and ask about the root.
-      if (!archetype->isRoot())
-        return Type();
-
-      auto it = contextLocalArchetypes.find(archetype);
-      assert(it != contextLocalArchetypes.end());
-      return it->second;
-    }
-
-    // Otherwise, use the context substitutions.
-    return Type(type).subst(contextSubs);
-  };
-  auto substConformanceHelper =
-    LookUpConformanceInSubstitutionMap(contextSubs);
-
-  // Utility function to apply contextSubs, and also replace the
-  // opened existential with the new archetype.
+  MapLocalArchetypesOutOfContext mapOutOfContext(baseGenericSig, capturedEnvs);
   auto substFormalTypeIntoThunkContext =
       [&](CanType t) -> CanType {
-    return t.subst(substTypeHelper, substConformanceHelper)
+    return genericEnv->mapTypeIntoContext(
+        t.subst(mapOutOfContext,
+                MakeAbstractConformanceForGenericType(),
+                SubstFlags::PreservePackExpansionLevel |
+                SubstFlags::SubstitutePrimaryArchetypes |
+                SubstFlags::SubstituteLocalArchetypes))
                ->getCanonicalType();
   };
   auto substLoweredTypeIntoThunkContext =
       [&](CanSILFunctionType t) -> CanSILFunctionType {
-    return SILType::getPrimitiveObjectType(t)
-             .subst(fn->getModule(), substTypeHelper, substConformanceHelper)
-             .castTo<SILFunctionType>();
+    return cast<SILFunctionType>(
+        genericEnv->mapTypeIntoContext(
+          Type(t).subst(mapOutOfContext,
+                        MakeAbstractConformanceForGenericType(),
+                        SubstFlags::PreservePackExpansionLevel |
+                        SubstFlags::SubstitutePrimaryArchetypes |
+                        SubstFlags::SubstituteLocalArchetypes))
+              ->getCanonicalType());
   };
 
   sourceType = substLoweredTypeIntoThunkContext(sourceType);

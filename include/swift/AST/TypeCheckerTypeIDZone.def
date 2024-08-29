@@ -482,6 +482,9 @@ SWIFT_REQUEST(TypeChecker, BreakTargetRequest,
 SWIFT_REQUEST(TypeChecker, ContinueTargetRequest,
               LabeledStmt *(const ContinueStmt *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, FallthroughSourceAndDestRequest,
+              FallthroughSourceAndDest(const FallthroughStmt *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PreCheckReturnStmtRequest,
               Stmt *(ReturnStmt *, DeclContext *),
               Cached, NoLocationInfo)
@@ -589,4 +592,7 @@ SWIFT_REQUEST(TypeChecker, CaptureInfoRequest,
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ParamCaptureInfoRequest,
               CaptureInfo(ParamDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsUnsafeRequest,
+              bool(Decl *),
               SeparatelyCached, NoLocationInfo)

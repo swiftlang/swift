@@ -80,8 +80,6 @@ StringForPrintObjectTests.test("NSStringUTF8") {
 
   if #available(SwiftStdlib 6.1, *) {
     expectEqual("🏂☃❅❆❄︎⛄️❄️\n", printed)
-  } else {
-    expectEqual("\"🏂☃❅❆❄︎⛄️❄️\"\n", printed)
   }
 
   expectEqual(printed, debug)

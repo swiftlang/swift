@@ -889,7 +889,7 @@ TypeVarRefCollector::walkToExprPre(Expr *expr) {
     inferTypeVars(DRE->getDecl());
 
   // FIXME: We can see UnresolvedDeclRefExprs here because we don't walk into
-  // patterns when running preCheckExpression, since we don't resolve patterns
+  // patterns when running preCheckTarget, since we don't resolve patterns
   // until CSGen. We ought to consider moving pattern resolution into
   // pre-checking, which would allow us to pre-check patterns normally.
   if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
@@ -2754,7 +2754,7 @@ namespace {
           // becomes `($T_x, $_T_y) = ($T_s_x, $T_s_y)` which doesn't result in
           // stripping of l-value flag from the right-hand side since
           // simplification can only happen when either side is resolved.
-          auto declTy = varType.transform([&](Type type) -> Type {
+          auto declTy = varType.transformRec([&](Type type) -> std::optional<Type> {
             if (auto *typeVar = type->getAs<TypeVariableType>()) {
               if (typeVar->getImpl().canBindToLValue()) {
                 foundLValueVars = true;
@@ -2763,11 +2763,11 @@ namespace {
                 auto options = typeVar->getImpl().getRawOptions();
                 options &= ~TVO_CanBindToLValue;
 
-                return CS.createTypeVariable(typeVar->getImpl().getLocator(),
-                                             options);
+                return Type(CS.createTypeVariable(typeVar->getImpl().getLocator(),
+                                                  options));
               }
             }
-            return type;
+            return std::nullopt;
           });
 
           // If pattern types allows l-value types, let's create an
@@ -4813,24 +4813,24 @@ bool ConstraintSystem::generateConstraints(
       // Substitute type variables in for placeholder types (and unresolved
       // types, if allowed).
       if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
-        convertType = convertType.transform([&](Type type) -> Type {
+        convertType = convertType.transformRec([&](Type type) -> std::optional<Type> {
           if (type->is<UnresolvedType>() || type->is<PlaceholderType>()) {
-            return createTypeVariable(getLocator(type),
-                                      TVO_CanBindToNoEscape |
-                                          TVO_PrefersSubtypeBinding |
-                                          TVO_CanBindToHole);
+            return Type(createTypeVariable(getLocator(type),
+                                           TVO_CanBindToNoEscape |
+                                               TVO_PrefersSubtypeBinding |
+                                               TVO_CanBindToHole));
           }
-          return type;
+          return std::nullopt;
         });
       } else {
-        convertType = convertType.transform([&](Type type) -> Type {
+        convertType = convertType.transformRec([&](Type type) -> std::optional<Type> {
           if (type->is<PlaceholderType>()) {
-            return createTypeVariable(getLocator(type),
-                                      TVO_CanBindToNoEscape |
-                                          TVO_PrefersSubtypeBinding |
-                                          TVO_CanBindToHole);
+            return Type(createTypeVariable(getLocator(type),
+                                           TVO_CanBindToNoEscape |
+                                               TVO_PrefersSubtypeBinding |
+                                               TVO_CanBindToHole));
           }
-          return type;
+          return std::nullopt;
         });
       }
 

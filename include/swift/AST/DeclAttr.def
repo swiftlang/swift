@@ -503,7 +503,13 @@ SIMPLE_DECL_ATTR(sensitive, Sensitive,
   OnStruct | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   159)
 
-LAST_DECL_ATTR(PreInverseGenerics)
+SIMPLE_DECL_ATTR(unsafe, Unsafe,
+  OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType |
+  UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  160)
+
+LAST_DECL_ATTR(Unsafe)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

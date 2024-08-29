@@ -195,6 +195,10 @@ namespace {
   }
 }
 
+void deallocateIntBuffer(SwiftInt * _Nullable cComponents) {
+  free(cComponents);
+}
+
 SwiftInt BridgedASTContext_langOptsGetLanguageVersion(BridgedASTContext cContext,
                                                       SwiftInt** cComponents) {
   auto theVersion = cContext.unbridged().LangOpts.EffectiveLanguageVersion;
@@ -2005,9 +2009,9 @@ BridgedDoCatchStmt BridgedDoCatchStmt_createParsed(
 }
 
 BridgedFallthroughStmt
-BridgedFallthroughStmt_createParsed(BridgedASTContext cContext,
-                                    BridgedSourceLoc cLoc) {
-  return new (cContext.unbridged()) FallthroughStmt(cLoc.unbridged());
+BridgedFallthroughStmt_createParsed(BridgedSourceLoc cLoc,
+                                    BridgedDeclContext cDC) {
+  return FallthroughStmt::createParsed(cLoc.unbridged(), cDC.unbridged());
 }
 
 BridgedForEachStmt BridgedForEachStmt_createParsed(

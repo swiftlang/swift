@@ -153,6 +153,11 @@ public:
   /// That is, this will perform a 'bitwise and' on the 'exported' bit.
   ExportContext withExported(bool exported) const;
 
+  /// Produce a new context with the same properties as this one, except the
+  /// availability context is constrained by \p availability if necessary.
+  ExportContext
+  withRefinedAvailability(const AvailabilityContext &availability) const;
+
   DeclContext *getDeclContext() const { return DC; }
 
   AvailabilityContext getAvailabilityContext() const {
@@ -187,6 +192,12 @@ public:
   /// Get the ExportabilityReason for diagnostics. If this is 'None', there
   /// are no restrictions on referencing unexported declarations.
   std::optional<ExportabilityReason> getExportabilityReason() const;
+
+  /// If \p decl is unconditionally unavailable in this context, and the context
+  /// is not also unavailable in the same way, then this returns the specific
+  /// `@available` attribute that makes the decl unavailable. Otherwise, returns
+  /// nullptr.
+  const AvailableAttr *shouldDiagnoseDeclAsUnavailable(const Decl *decl) const;
 };
 
 /// Check if a declaration is exported as part of a module's external interface.

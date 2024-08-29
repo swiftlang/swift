@@ -376,7 +376,7 @@ NODE(NonUniqueExtendedExistentialTypeShapeSymbolicReference)
 NODE(SymbolicExtendedExistentialType)
 
 // Added in Swift 5.8
-NODE(MetatypeParamsRemoved)
+NODE(DroppedArgument)
 NODE(HasSymbolQuery)
 NODE(OpaqueReturnTypeIndex)
 NODE(OpaqueReturnTypeParent)

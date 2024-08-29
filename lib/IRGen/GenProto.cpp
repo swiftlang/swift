@@ -718,7 +718,6 @@ bindParameterSource(SILParameterInfo param, unsigned paramIndex,
       emitDynamicTypeOfHeapObject(IGF, instanceRef,
                                   MetatypeRepresentation::Thick,
                                   instanceType,
-                                  Fn.getGenericSignature(),
                                   /*allow artificial subclasses*/ true);
     IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
                                           MetadataState::Complete);
@@ -839,7 +838,6 @@ void BindPolymorphicParameter::emit(Explosion &nativeParam, unsigned paramIndex)
     emitDynamicTypeOfHeapObject(IGF, instanceRef,
                                 MetatypeRepresentation::Thick,
                                 instanceType,
-                                SubstFnType->getInvocationGenericSignature(),
                                 /* allow artificial subclasses */ true);
   IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
                                         MetadataState::Complete);
@@ -1764,11 +1762,7 @@ void WitnessTableBuilderBase::defineAssociatedTypeWitnessTableAccessFunction(
                                 CanType associatedType,
                                 ProtocolConformanceRef associatedConformance) {
   bool hasArchetype = associatedType->hasArchetype();
-  OpaqueTypeArchetypeType *associatedRootOpaqueType = nullptr;
-  if (auto assocArchetype = dyn_cast<ArchetypeType>(associatedType)) {
-    associatedRootOpaqueType = dyn_cast<OpaqueTypeArchetypeType>(
-                                                     assocArchetype->getRoot());
-  }
+  bool isOpaqueArchetype = isa<OpaqueTypeArchetypeType>(associatedType);
 
   assert(isa<NormalProtocolConformance>(Conformance) && "has associated type");
 
@@ -1827,7 +1821,7 @@ void WitnessTableBuilderBase::defineAssociatedTypeWitnessTableAccessFunction(
   }
 
   // If there are no archetypes, return a reference to the table.
-  if (!hasArchetype && !associatedRootOpaqueType) {
+  if (!hasArchetype && !isOpaqueArchetype) {
     auto wtable = conformanceI->getTable(IGF, &associatedTypeMetadata);
     IGF.Builder.CreateRet(wtable);
     return;

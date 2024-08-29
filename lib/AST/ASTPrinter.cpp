@@ -3095,6 +3095,15 @@ suppressingFeatureIsolatedDeinit(PrintOptions &options,
   action();
 }
 
+static void
+suppressingFeatureAllowUnsafeAttribute(PrintOptions &options,
+                                       llvm::function_ref<void()> action) {
+  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
+  options.ExcludeAttrList.push_back(DeclAttrKind::Unsafe);
+  action();
+  options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
@@ -6173,11 +6182,11 @@ public:
       // FIXME: We need to replace nested existential metatypes so that
       // we don't print duplicate 'any'. This will be unnecessary once
       // ExistentialMetatypeType is split into ExistentialType(MetatypeType).
-      printWithParensIfNotSimple(instanceType.transform([](Type type) -> Type {
-        if (auto existential = type->getAs<ExistentialMetatypeType>())
+      printWithParensIfNotSimple(instanceType.transformRec([](Type t) -> std::optional<Type> {
+        if (auto existential = t->getAs<ExistentialMetatypeType>())
           return MetatypeType::get(existential->getInstanceType());
 
-        return type;
+        return std::nullopt;
       }));
     } else {
       assert(T->is<MetatypeType>());
@@ -6985,7 +6994,7 @@ public:
     // the generic signature of the contextual substitution map in the
     // opened element environment.
     auto env = T->getGenericEnvironment();
-    auto subs = env->getPackElementContextSubstitutions();
+    auto subs = env->getOuterSubstitutions();
     auto sig = subs.getGenericSignature();
     auto params = sig.getGenericParams();
 
@@ -7051,16 +7060,17 @@ public:
     Printer << "each ";
   }
 
-  void printArchetypeCommon(Type interfaceTy, ArchetypeType *archetypeTy) {
+  void printArchetypeCommon(Type interfaceTy, GenericEnvironment *env) {
     if (auto *paramTy = interfaceTy->getAs<GenericTypeParamType>()) {
-      assert(archetypeTy->isRoot());
-
       if (Options.AlternativeTypeNames) {
-        auto found = Options.AlternativeTypeNames->find(CanType(archetypeTy));
-        if (found != Options.AlternativeTypeNames->end()) {
-          if (paramTy->isParameterPack()) printEach();
-          Printer << found->second.str();
-          return;
+        auto archetypeTy = env->mapTypeIntoContext(paramTy)->getAs<GenericTypeParamType>();
+        if (archetypeTy) {
+          auto found = Options.AlternativeTypeNames->find(CanType(archetypeTy));
+          if (found != Options.AlternativeTypeNames->end()) {
+            if (paramTy->isParameterPack()) printEach();
+            Printer << found->second.str();
+            return;
+          }
         }
       }
 
@@ -7069,10 +7079,10 @@ public:
     }
 
     auto *memberTy = interfaceTy->castTo<DependentMemberType>();
-    if (memberTy->getBase()->is<GenericTypeParamType>())
-      visitParentType(archetypeTy->getRoot());
+    if (auto *paramTy = memberTy->getBase()->getAs<GenericTypeParamType>())
+      visitParentType(env->mapTypeIntoContext(paramTy));
     else {
-      printArchetypeCommon(memberTy->getBase(), archetypeTy->getRoot());
+      printArchetypeCommon(memberTy->getBase(), env);
       Printer << ".";
     }
 
@@ -7080,7 +7090,7 @@ public:
   }
 
   void visitPrimaryArchetypeType(PrimaryArchetypeType *T) {
-    printArchetypeCommon(T->getInterfaceType(), T);
+    printArchetypeCommon(T->getInterfaceType(), T->getGenericEnvironment());
   }
 
   void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
@@ -7089,7 +7099,7 @@ public:
 
     if (!paramTy) {
       assert(interfaceTy->is<DependentMemberType>());
-      printArchetypeCommon(interfaceTy, T);
+      printArchetypeCommon(interfaceTy, T->getGenericEnvironment());
       return;
     }
 
@@ -7174,7 +7184,7 @@ public:
   }
 
   void visitPackArchetypeType(PackArchetypeType *T) {
-    printArchetypeCommon(T->getInterfaceType(), T);
+    printArchetypeCommon(T->getInterfaceType(), T->getGenericEnvironment());
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {

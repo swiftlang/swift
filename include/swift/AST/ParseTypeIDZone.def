@@ -31,3 +31,6 @@ SWIFT_REQUEST(Parse, ParseTopLevelDeclsRequest,
 SWIFT_REQUEST(Parse, ExportedSourceFileRequest,
               void *(const SourceFile *), Cached,
               NoLocationInfo)
+SWIFT_REQUEST(Parse, EvaluateIfConditionRequest,
+              (std::pair<bool, bool>)(SourceFile *, SourceRange, bool), Uncached,
+              NoLocationInfo)

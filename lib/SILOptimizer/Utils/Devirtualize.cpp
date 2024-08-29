@@ -995,15 +995,15 @@ getWitnessMethodSubstitutions(
         }
 
         if (depth < baseDepth) {
-          type = CanType(type.transform([&](Type t) -> Type {
-            if (t->isEqual(paramType)) {
-              return GenericTypeParamType::get(
+          type = CanType(type.transformRec([&](TypeBase *t) -> std::optional<Type> {
+            if (t == paramType) {
+              return Type(GenericTypeParamType::get(
                   paramType->isParameterPack(),
-                  depth, paramType->getIndex(), ctx);
+                  depth, paramType->getIndex(), ctx));
             }
 
-            assert(!t->is<GenericTypeParamType>());
-            return t;
+            assert(!isa<GenericTypeParamType>(t));
+            return std::nullopt;
           }));
 
           return baseSubMap.lookupConformance(type, proto);
@@ -1011,15 +1011,15 @@ getWitnessMethodSubstitutions(
 
         depth = depth - baseDepth + 1;
 
-        type = CanType(type.transform([&](Type t) -> Type {
-          if (t->isEqual(paramType)) {
-            return GenericTypeParamType::get(
+        type = CanType(type.transformRec([&](TypeBase *t) -> std::optional<Type> {
+          if (t ==paramType) {
+            return Type(GenericTypeParamType::get(
                 paramType->isParameterPack(),
-                depth, paramType->getIndex(), ctx);
+                depth, paramType->getIndex(), ctx));
           }
 
-          assert(!t->is<GenericTypeParamType>());
-          return t;
+          assert(!isa<GenericTypeParamType>(t));
+          return std::nullopt;
         }));
 
         return origSubMap.lookupConformance(type, proto);
@@ -1182,7 +1182,8 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite, bool isMandatory) 
 
   // function_ref inside fragile function cannot reference a private or
   // hidden symbol.
-  if (applySite.getFunction()->isAnySerialized() &&
+  if (!isMandatory &&
+      applySite.getFunction()->isAnySerialized() &&
       !f->hasValidLinkageForFragileRef(applySite.getFunction()->getSerializedKind()))
     return false;
 

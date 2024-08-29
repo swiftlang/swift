@@ -120,7 +120,7 @@ bb0:
   %2 = tuple ()
   return %2 : $()
 }
-sil shared [transparent] [serialized] [thunk] [canonical] @$sSiSLsSL1loiySbx_xtFZTW : $@convention(witness_method: Comparable) (@in_guaranteed Int, @in_guaranteed Int, @thick Int.Type) -> Bool {
+sil shared [ossa] [transparent] [serialized] [thunk] [canonical] @$sSiSLsSL1loiySbx_xtFZTW : $@convention(witness_method: Comparable) (@in_guaranteed Int, @in_guaranteed Int, @thick Int.Type) -> Bool {
 bb0(%0 : $*Int, %1 : $*Int, %2 : $@thick Int.Type):
   %3 = integer_literal $Builtin.Int1, 0
   %4 = struct $Bool (%3 : $Builtin.Int1)

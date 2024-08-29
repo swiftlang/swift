@@ -659,3 +659,36 @@ struct LazyProp {
     0
   }
 }
+
+func testNestedFallthrough1() throws -> Int {
+  let x = if .random() {
+    switch Bool.random() {
+    case true:
+      fallthrough
+    case false:
+      break
+    }
+    throw Err()
+  } else {
+    0
+  }
+  return x
+}
+
+func testNestedFallthrough2() throws -> Int {
+  let x = if .random() {
+    switch Bool.random() {
+    case true:
+      if .random() {
+        fallthrough
+      }
+      break
+    case false:
+      break
+    }
+    throw Err()
+  } else {
+    0
+  }
+  return x
+}

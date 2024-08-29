@@ -10,6 +10,8 @@
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
 
+// UNSUPPORTED: remote_run || device_run
+
 //--- Test.h
 #import "Foundation/Foundation.h"
 

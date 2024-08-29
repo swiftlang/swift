@@ -3552,8 +3552,7 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
 
       // The Swift type directly corresponds to the lowered type.
       auto underlyingTy =
-          substOpaqueTypesWithUnderlyingTypes(substType, forExpansion,
-                                              /*allowLoweredTypes*/ true);
+          substOpaqueTypesWithUnderlyingTypes(substType, forExpansion);
       if (underlyingTy != substType) {
         underlyingTy =
             TC.computeLoweredRValueType(forExpansion, origType, underlyingTy);
@@ -3909,7 +3908,9 @@ getAnyFunctionRefInterfaceType(TypeConverter &TC,
     auto substType = Type(funcType).subst(
         MapLocalArchetypesOutOfContext(sig.baseGenericSig, sig.capturedEnvs),
         MakeAbstractConformanceForGenericType(),
-        SubstFlags::PreservePackExpansionLevel);
+        SubstFlags::PreservePackExpansionLevel |
+        SubstFlags::SubstitutePrimaryArchetypes |
+        SubstFlags::SubstituteLocalArchetypes);
     funcType = cast<FunctionType>(substType->getCanonicalType());
   }
 
@@ -4486,26 +4487,6 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     PrettyStackTraceAnyFunctionRef("lowering local captures", curFn);
     collectCaptures(curFn.getCaptureInfo());
 
-    if (auto *afd = curFn.getAbstractFunctionDecl()) {
-      // If a local function inherits isolation from the enclosing context,
-      // make sure we capture the isolated parameter, if we haven't already.
-      if (afd->isLocalCapture()) {
-        auto actorIsolation = getActorIsolation(afd);
-        if (actorIsolation.getKind() == ActorIsolation::ActorInstance) {
-          if (auto *var = actorIsolation.getActorInstance()) {
-            assert(isa<ParamDecl>(var));
-            recordCapture(CapturedValue(var, 0, afd->getLoc()));
-	    if (var->getInterfaceType()->hasTypeParameter()) {
-	      // If the isolated parameter is of a generic (actor)
-	      // type, we need to treat as if the local function is
-	      // generic.
-	      capturesGenericParams = true;
-	    }
-          }
-        }
-      }
-    }
-
     // A function's captures also include its default arguments, because
     // when we reference a function we don't track which default arguments
     // are referenced too.
@@ -4971,8 +4952,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
       return paramTy;
     },
     MakeAbstractConformanceForGenericType(),
-    SubstFlags::PreservePackExpansionLevel |
-    SubstFlags::AllowLoweredTypes)->getCanonicalType());
+    SubstFlags::PreservePackExpansionLevel)->getCanonicalType());
 }
 
 CanSILBoxType
@@ -4993,7 +4973,8 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
       mapOutOfContext,
       MakeAbstractConformanceForGenericType(),
       SubstFlags::PreservePackExpansionLevel |
-      SubstFlags::AllowLoweredTypes)->getCanonicalType();
+      SubstFlags::SubstitutePrimaryArchetypes |
+      SubstFlags::SubstituteLocalArchetypes)->getCanonicalType();
 
   // If the type is not dependent at all, we can form a concrete box layout.
   // We don't need to capture the generic environment.
@@ -5039,8 +5020,7 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
   return cast<SILBoxType>(
     Type(boxType).subst(mapIntoContext,
                         LookUpConformanceInModule(),
-                        SubstFlags::PreservePackExpansionLevel |
-                        SubstFlags::AllowLoweredTypes)->getCanonicalType());
+                        SubstFlags::PreservePackExpansionLevel)->getCanonicalType());
 }
 
 CanSILBoxType TypeConverter::getBoxTypeForEnumElement(

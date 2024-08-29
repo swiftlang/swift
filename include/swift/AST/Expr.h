@@ -266,7 +266,7 @@ protected:
     Kind : 2
   );
 
-  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1,
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     HasAnonymousClosureVars : 1,
@@ -288,7 +288,13 @@ protected:
 
     /// True if we're in the common case where the GlobalActorAttributeRequest
     /// request returned a pair of null pointers.
-    NoGlobalActorAttribute : 1
+    NoGlobalActorAttribute : 1,
+
+    /// Indicates whether this closure literal would require dynamic actor 
+    /// isolation checks when it either specifies or inherits isolation
+    /// and was passed as an argument to a function that is not fully 
+    /// concurrency checked.
+    RequiresDynamicIsolationChecking : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BindOptionalExpr, Expr, 16,
@@ -4158,6 +4164,7 @@ public:
     Bits.ClosureExpr.InheritActorContext = false;
     Bits.ClosureExpr.IsPassedToSendingParameter = false;
     Bits.ClosureExpr.NoGlobalActorAttribute = false;
+    Bits.ClosureExpr.RequiresDynamicIsolationChecking = false;
   }
 
   SourceRange getSourceRange() const;
@@ -4221,6 +4228,16 @@ public:
 
   void setIsPassedToSendingParameter(bool value = true) {
     Bits.ClosureExpr.IsPassedToSendingParameter = value;
+  }
+
+  /// True if this is an isolated closure literal that is passed 
+  /// to a callee that has not been concurrency checked.
+  bool requiresDynamicIsolationChecking() const {
+    return Bits.ClosureExpr.RequiresDynamicIsolationChecking;
+  }
+
+  void setRequiresDynamicIsolationChecking(bool value = true) {
+    Bits.ClosureExpr.RequiresDynamicIsolationChecking = value;
   }
 
   /// Determine whether this closure expression has an

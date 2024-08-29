@@ -818,6 +818,11 @@ bool SILGenModule::shouldSkipDecl(Decl *D) {
   if (!getASTContext().SILOpts.SkipNonExportableDecls)
     return false;
 
+  // Declarations nested in functions should be emitted whenever the function
+  // containing them should also be emitted.
+  if (auto funcContext = D->getDeclContext()->getOutermostFunctionContext())
+    return shouldSkipDecl(funcContext->getAsDecl());
+
   if (D->isExposedToClients())
     return false;
 

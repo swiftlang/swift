@@ -1186,6 +1186,10 @@ public:
   void emitPreconditionCheckExpectedExecutor(
       SILLocation loc, SILValue executor);
 
+  /// Emit a precondition check to ensure that the closure is executing in
+  /// the expected isolation context.
+  void emitExpectedExecutorPreconditionForClosure();
+
   /// Gets a reference to the current executor for the task.
   /// \returns a value of type Builtin.Executor
   SILValue emitGetCurrentExecutor(SILLocation loc);

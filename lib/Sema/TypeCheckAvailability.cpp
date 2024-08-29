@@ -18,6 +18,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckObjC.h"
+#include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -85,6 +86,14 @@ bool swift::isExported(const ValueDecl *VD) {
 }
 
 static bool hasConformancesToPublicProtocols(const ExtensionDecl *ED) {
+  auto nominal = ED->getExtendedNominal();
+  if (!nominal)
+    return false;
+
+  // Extensions of protocols cannot introduce additional conformances.
+  if (isa<ProtocolDecl>(nominal))
+    return false;
+
   auto protocols = ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
   for (const ProtocolDecl *PD : protocols) {
     AccessScope scope =
@@ -294,6 +303,13 @@ ExportContext ExportContext::withExported(bool exported) const {
   return copy;
 }
 
+ExportContext ExportContext::withRefinedAvailability(
+    const AvailabilityContext &availability) const {
+  auto copy = *this;
+  copy.RunningOSVersion.intersectWith(availability);
+  return copy;
+}
+
 std::optional<PlatformKind> ExportContext::getUnavailablePlatformKind() const {
   if (Unavailable)
     return PlatformKind(Platform);
@@ -363,6 +379,18 @@ static bool isInsideCompatibleUnavailableDeclaration(
 
   return (*referencedPlatform == platform ||
           inheritsAvailabilityFromPlatform(platform, *referencedPlatform));
+}
+
+const AvailableAttr *
+ExportContext::shouldDiagnoseDeclAsUnavailable(const Decl *D) const {
+  auto attr = AvailableAttr::isUnavailable(D);
+  if (!attr)
+    return nullptr;
+
+  if (isInsideCompatibleUnavailableDeclaration(D, *this, attr))
+    return nullptr;
+
+  return attr;
 }
 
 static bool shouldAllowReferenceToUnavailableInSwiftDeclaration(
@@ -1901,8 +1929,8 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
                                  AvailabilityContext(RunningRange))) {
 
     // Only fix situations that are "nearby" versions, meaning
-    // disagreement on a minor-or-less version for non-macOS,
-    // or disagreement on a subminor-or-less version for macOS.
+    // disagreement on a minor-or-less version (subminor-or-less version for
+    // macOS 10.x.y).
     auto RunningVers = RunningRange.getLowerEndpoint();
     auto RequiredVers = RequiredRange.getLowerEndpoint();
     auto Platform = targetPlatform(Context.LangOpts);
@@ -1910,6 +1938,7 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
       return false;
     if ((Platform == PlatformKind::macOS ||
          Platform == PlatformKind::macOSApplicationExtension) &&
+        RunningVers.getMajor() == 10 &&
         !(RunningVers.getMinor().has_value() &&
           RequiredVers.getMinor().has_value() &&
           RunningVers.getMinor().value() ==
@@ -1977,6 +2006,12 @@ static void fixAvailabilityByAddingVersionCheck(
     }
 
     PlatformKind Target = targetPlatform(Context.LangOpts);
+
+    // Runtime availability checks that specify app extension platforms don't
+    // work, so only suggest checks against the base platform.
+    if (auto TargetRemovingAppExtension =
+            basePlatformForExtensionPlatform(Target))
+      Target = *TargetRemovingAppExtension;
 
     Out << "if #available(" << platformString(Target)
         << " " << RequiredRange.getLowerEndpoint().getAsString()
@@ -2841,36 +2876,65 @@ bool swift::diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
   });
 }
 
-/// Emit a diagnostic for references to declarations that have been
-/// marked as unavailable, either through "unavailable" or "obsoleted:".
-bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
-                                           const RootProtocolConformance *rootConf,
-                                           const ExtensionDecl *ext,
-                                           const ExportContext &where,
-                                           bool warnIfConformanceUnavailablePreSwift6) {
-  auto *attr = AvailableAttr::isUnavailable(ext);
+/// Represents common information needed to emit diagnostics about explicitly
+/// unavailable declarations.
+class UnavailabilityDiagnosticInfo {
+public:
+  enum class Status {
+    /// The declaration is marked `unavailable`, potentially on a specific
+    /// platform.
+    AlwaysUnavailable,
+
+    /// The declaration is not available until, for example, a later Swift
+    /// language mode.
+    IntroducedInVersion,
+
+    /// The declaration was obsoleted in a previous version.
+    Obsoleted,
+  };
+
+private:
+  Status DiagnosticStatus;
+  const AvailableAttr *Attr;
+  StringRef Platform;
+  StringRef VersionedPlatform;
+
+public:
+  UnavailabilityDiagnosticInfo(Status status, const AvailableAttr *attr,
+                               StringRef platform, StringRef versionedPlatform)
+      : DiagnosticStatus(status), Attr(attr), Platform(platform),
+        VersionedPlatform(versionedPlatform) {
+    assert(attr);
+    assert(status == Status::AlwaysUnavailable || !VersionedPlatform.empty());
+  };
+
+  Status getStatus() const { return DiagnosticStatus; }
+  const AvailableAttr *getAttr() const { return Attr; }
+
+  /// Returns the platform name (or "Swift" for a declaration that is
+  /// unavailable in Swift) to print in the main unavailability diangostic. May
+  /// be empty.
+  StringRef getPlatform() const { return Platform; }
+
+  /// Returns the platform name to print in diagnostic notes about the version
+  /// in which a declaration either will become available or previously became
+  /// obsoleted.
+  StringRef getVersionedPlatform() const {
+    assert(DiagnosticStatus != Status::AlwaysUnavailable);
+    return VersionedPlatform;
+  }
+};
+
+static std::optional<UnavailabilityDiagnosticInfo>
+getExplicitUnavailabilityDiagnosticInfo(const Decl *decl,
+                                        const ExportContext &where) {
+  auto *attr = where.shouldDiagnoseDeclAsUnavailable(decl);
   if (!attr)
-    return false;
+    return std::nullopt;
 
-  // Calling unavailable code from within code with the same
-  // unavailability is OK -- the eventual caller can't call the
-  // enclosing code in the same situations it wouldn't be able to
-  // call this code.
-  if (isInsideCompatibleUnavailableDeclaration(ext, where, attr))
-    return false;
-
-  // Invertible protocols are never unavailable.
-  if (rootConf->getProtocol()->getInvertibleProtocolKind())
-    return false;
-
-  ASTContext &ctx = ext->getASTContext();
-  auto &diags = ctx.Diags;
-
-  auto type = rootConf->getType();
-  auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
-
-  StringRef platform;
-  auto behavior = DiagnosticBehavior::Unspecified;
+  ASTContext &ctx = decl->getASTContext();
+  StringRef platform = "";
+  StringRef versionedPlatform = "";
   switch (attr->getPlatformAgnosticAvailability()) {
   case PlatformAgnosticAvailabilityKind::Deprecated:
     llvm_unreachable("shouldn't see deprecations in explicit unavailability");
@@ -2881,35 +2945,20 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
   case PlatformAgnosticAvailabilityKind::None:
   case PlatformAgnosticAvailabilityKind::Unavailable:
     if (attr->Platform != PlatformKind::none) {
-      // This was platform-specific; indicate the platform.
       platform = attr->prettyPlatformString();
-      break;
+      versionedPlatform = platform;
     }
-
-    // Downgrade unavailable Sendable conformance diagnostics where
-    // appropriate.
-    behavior = behaviorLimitForExplicitUnavailability(
-        rootConf, where.getDeclContext());
-    LLVM_FALLTHROUGH;
-
-  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
-  case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
-    // We don't want to give further detail about these.
-    platform = "";
     break;
-
+  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
+    versionedPlatform = "Swift";
+    break;
+  case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
+    versionedPlatform = "PackageDescription";
+    break;
   case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
-    // This API is explicitly unavailable in Swift.
     platform = "Swift";
     break;
   }
-
-  EncodedDiagnosticMessage EncodedMessage(attr->Message);
-  diags.diagnose(loc, diag::conformance_availability_unavailable,
-                 type, proto,
-                 platform.empty(), platform, EncodedMessage.Message)
-      .limitBehaviorUntilSwiftVersion(behavior, 6)
-      .warnUntilSwiftVersionIf(warnIfConformanceUnavailablePreSwift6, 6);
 
   switch (attr->getVersionAvailability(ctx)) {
   case AvailableVersionComparison::Available:
@@ -2918,36 +2967,74 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
 
   case AvailableVersionComparison::Unavailable:
     if ((attr->isLanguageVersionSpecific() ||
-         attr->isPackageDescriptionVersionSpecific())
-        && attr->Introduced.has_value())
-      diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
-                     type, proto,
-                     (attr->isLanguageVersionSpecific() ?
-                      "Swift" : "PackageDescription"),
-                     *attr->Introduced)
-        .highlight(attr->getRange());
-    else
-      diags.diagnose(ext, diag::conformance_availability_marked_unavailable,
-                     type, proto)
-        .highlight(attr->getRange());
+         attr->isPackageDescriptionVersionSpecific()) &&
+        attr->Introduced.has_value()) {
+      return UnavailabilityDiagnosticInfo(
+          UnavailabilityDiagnosticInfo::Status::IntroducedInVersion, attr,
+          platform, versionedPlatform);
+    } else {
+      return UnavailabilityDiagnosticInfo(
+          UnavailabilityDiagnosticInfo::Status::AlwaysUnavailable, attr,
+          platform, versionedPlatform);
+    }
     break;
 
   case AvailableVersionComparison::Obsoleted:
-    // FIXME: Use of the platformString here is non-awesome for application
-    // extensions.
+    return UnavailabilityDiagnosticInfo(
+        UnavailabilityDiagnosticInfo::Status::Obsoleted, attr, platform,
+        versionedPlatform);
+  }
+}
 
-    StringRef platformDisplayString;
-    if (attr->isLanguageVersionSpecific()) {
-      platformDisplayString = "Swift";
-    } else if (attr->isPackageDescriptionVersionSpecific()) {
-      platformDisplayString = "PackageDescription";
-    } else {
-      platformDisplayString = platform;
-    }
+bool swift::diagnoseExplicitUnavailability(
+    SourceLoc loc, const RootProtocolConformance *rootConf,
+    const ExtensionDecl *ext, const ExportContext &where,
+    bool warnIfConformanceUnavailablePreSwift6) {
+  // Invertible protocols are never unavailable.
+  if (rootConf->getProtocol()->getInvertibleProtocolKind())
+    return false;
 
-    diags.diagnose(ext, diag::conformance_availability_obsoleted,
-                   type, proto, platformDisplayString, *attr->Obsoleted)
-      .highlight(attr->getRange());
+  auto diagnosticInfo = getExplicitUnavailabilityDiagnosticInfo(ext, where);
+  if (!diagnosticInfo)
+    return false;
+
+  ASTContext &ctx = ext->getASTContext();
+  auto &diags = ctx.Diags;
+
+  auto type = rootConf->getType();
+  auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
+  StringRef platform = diagnosticInfo->getPlatform();
+  const AvailableAttr *attr = diagnosticInfo->getAttr();
+
+  // Downgrade unavailable Sendable conformance diagnostics where
+  // appropriate.
+  auto behavior =
+      behaviorLimitForExplicitUnavailability(rootConf, where.getDeclContext());
+
+  EncodedDiagnosticMessage EncodedMessage(attr->Message);
+  diags
+      .diagnose(loc, diag::conformance_availability_unavailable, type, proto,
+                platform.empty(), platform, EncodedMessage.Message)
+      .limitBehaviorUntilSwiftVersion(behavior, 6)
+      .warnUntilSwiftVersionIf(warnIfConformanceUnavailablePreSwift6, 6);
+
+  switch (diagnosticInfo->getStatus()) {
+  case UnavailabilityDiagnosticInfo::Status::AlwaysUnavailable:
+    diags
+        .diagnose(ext, diag::conformance_availability_marked_unavailable, type,
+                  proto)
+        .highlight(attr->getRange());
+    break;
+  case UnavailabilityDiagnosticInfo::Status::IntroducedInVersion:
+    diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
+                   type, proto, diagnosticInfo->getVersionedPlatform(),
+                   *attr->Introduced);
+    break;
+  case UnavailabilityDiagnosticInfo::Status::Obsoleted:
+    diags
+        .diagnose(ext, diag::conformance_availability_obsoleted, type, proto,
+                  diagnosticInfo->getVersionedPlatform(), *attr->Obsoleted)
+        .highlight(attr->getRange());
     break;
   }
   return true;
@@ -3282,52 +3369,21 @@ bool swift::diagnoseExplicitUnavailability(
     const ExportContext &Where,
     DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts) {
-  auto *Attr = AvailableAttr::isUnavailable(D);
-  if (!Attr)
+  auto diagnosticInfo = getExplicitUnavailabilityDiagnosticInfo(D, Where);
+  if (!diagnosticInfo)
     return false;
 
-  // Calling unavailable code from within code with the same
-  // unavailability is OK -- the eventual caller can't call the
-  // enclosing code in the same situations it wouldn't be able to
-  // call this code.
-  if (isInsideCompatibleUnavailableDeclaration(D, Where, Attr))
-    return false;
+  auto *Attr = diagnosticInfo->getAttr();
+  if (Attr->getPlatformAgnosticAvailability() ==
+      PlatformAgnosticAvailabilityKind::UnavailableInSwift) {
+    if (shouldAllowReferenceToUnavailableInSwiftDeclaration(D, Where))
+      return false;
+  }
 
   SourceLoc Loc = R.Start;
-
   ASTContext &ctx = D->getASTContext();
   auto &diags = ctx.Diags;
-
-  StringRef platform;
-  switch (Attr->getPlatformAgnosticAvailability()) {
-  case PlatformAgnosticAvailabilityKind::Deprecated:
-    llvm_unreachable("shouldn't see deprecations in explicit unavailability");
-
-  case PlatformAgnosticAvailabilityKind::NoAsync:
-    llvm_unreachable("shouldn't see noasync with explicit unavailability");
-
-  case PlatformAgnosticAvailabilityKind::None:
-  case PlatformAgnosticAvailabilityKind::Unavailable:
-    if (Attr->Platform != PlatformKind::none) {
-      // This was platform-specific; indicate the platform.
-      platform = Attr->prettyPlatformString();
-      break;
-    }
-    LLVM_FALLTHROUGH;
-
-  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
-  case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
-    // We don't want to give further detail about these.
-    platform = "";
-    break;
-
-  case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
-    if (shouldAllowReferenceToUnavailableInSwiftDeclaration(D, Where))
-      return true;
-
-    platform = "Swift";
-    break;
-  }
+  StringRef platform = diagnosticInfo->getPlatform();
 
   // TODO: Consider removing this.
   // ObjC keypaths components weren't checked previously, so errors are demoted
@@ -3372,41 +3428,22 @@ bool swift::diagnoseExplicitUnavailability(
         .limitBehavior(limit);
   }
 
-  switch (Attr->getVersionAvailability(ctx)) {
-  case AvailableVersionComparison::Available:
-  case AvailableVersionComparison::PotentiallyUnavailable:
-    llvm_unreachable("These aren't considered unavailable");
-
-  case AvailableVersionComparison::Unavailable:
-    if ((Attr->isLanguageVersionSpecific() ||
-         Attr->isPackageDescriptionVersionSpecific())
-        && Attr->Introduced.has_value())
-      diags.diagnose(D, diag::availability_introduced_in_version, D,
-                     (Attr->isLanguageVersionSpecific() ?
-                      "Swift" : "PackageDescription"),
-                     *Attr->Introduced)
-        .highlight(Attr->getRange());
-    else
-      diags.diagnose(D, diag::availability_marked_unavailable, D)
+  switch (diagnosticInfo->getStatus()) {
+  case UnavailabilityDiagnosticInfo::Status::AlwaysUnavailable:
+    diags.diagnose(D, diag::availability_marked_unavailable, D)
         .highlight(Attr->getRange());
     break;
-
-  case AvailableVersionComparison::Obsoleted:
-    // FIXME: Use of the platformString here is non-awesome for application
-    // extensions.
-
-    StringRef platformDisplayString;
-    if (Attr->isLanguageVersionSpecific()) {
-      platformDisplayString = "Swift";
-    } else if (Attr->isPackageDescriptionVersionSpecific()) {
-      platformDisplayString = "PackageDescription";
-    } else {
-      platformDisplayString = platform;
-    }
-
-    diags.diagnose(D, diag::availability_obsoleted, D, platformDisplayString,
-                   *Attr->Obsoleted)
-      .highlight(Attr->getRange());
+  case UnavailabilityDiagnosticInfo::Status::IntroducedInVersion:
+    diags
+        .diagnose(D, diag::availability_introduced_in_version, D,
+                  diagnosticInfo->getVersionedPlatform(), *Attr->Introduced)
+        .highlight(Attr->getRange());
+    break;
+  case UnavailabilityDiagnosticInfo::Status::Obsoleted:
+    diags
+        .diagnose(D, diag::availability_obsoleted, D,
+                  diagnosticInfo->getVersionedPlatform(), *Attr->Obsoleted)
+        .highlight(Attr->getRange());
     break;
   }
   return true;
@@ -3873,6 +3910,26 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
   if (diagnoseDeclAvailability(D, R, call, Where, Flags))
       return true;
 
+  // If the declaration itself is "safe" but we don't disallow unsafe uses,
+  // check whether it traffics in unsafe types.
+  ASTContext &ctx = D->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::WarnUnsafe) && !D->isUnsafe()) {
+    auto type = D->getInterfaceType();
+    if (auto subs = declRef.getSubstitutions())
+      type = type.subst(subs);
+    if (type->isUnsafe()) {
+      diagnoseUnsafeType(
+          ctx, R.Start, type,
+          [&](Type specificType) {
+            ctx.Diags.diagnose(
+                R.Start, diag::reference_to_unsafe_typed_decl,
+                call != nullptr && !isa<ParamDecl>(D), D,
+                specificType);
+            D->diagnose(diag::decl_declared_here, D);
+          });
+    }
+  }
+
   if (R.isValid()) {
     if (diagnoseSubstitutionMapAvailability(R.Start, declRef.getSubstitutions(),
                                             Where)) {
@@ -3934,6 +3991,23 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
   return true;
 }
 
+/// Diagnose uses of unsafe declarations.
+static void
+diagnoseDeclUnsafe(const ValueDecl *D, SourceRange R,
+                   const Expr *call, const ExportContext &Where) {
+  ASTContext &ctx = D->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::WarnUnsafe))
+    return;
+
+  if (!D->isUnsafe())
+    return;
+
+  SourceLoc diagLoc = call ? call->getLoc() : R.Start;
+  ctx.Diags
+    .diagnose(diagLoc, diag::reference_to_unsafe_decl, call != nullptr, D);
+  D->diagnose(diag::decl_declared_here, D);
+}
+
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
@@ -3969,6 +4043,8 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
 
   if (diagnoseDeclAsyncAvailability(D, R, call, Where))
     return true;
+
+  diagnoseDeclUnsafe(D, R, call, Where);
 
   // Make sure not to diagnose an accessor's deprecation if we already
   // complained about the property/subscript.

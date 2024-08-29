@@ -4,10 +4,6 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
-// CHECK:      SWIFT_INLINE_THUNK float passThrougCFloat(float x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT: return _impl::$s9Functions16passThrougCFloatyS2fF(x);
-// CHECK-NEXT: }
-
 // CHECK:      SWIFT_INLINE_THUNK bool passThroughBool(bool x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return _impl::$s9Functions15passThroughBoolyS2bF(x);
 // CHECK-NEXT: }
@@ -30,6 +26,10 @@
 
 // CHECK:      SWIFT_INLINE_THUNK double passThroughCDouble(double x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return _impl::$s9Functions18passThroughCDoubleyS2dF(x);
+// CHECK-NEXT: }
+
+// CHECK:      SWIFT_INLINE_THUNK float passThroughCFloat(float x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT: return _impl::$s9Functions17passThroughCFloatyS2fF(x);
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK int passThroughCInt(int x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
@@ -179,7 +179,7 @@ public func passThroughCUnsignedShort(_ x: CUnsignedShort) -> CUnsignedShort { r
 public func passThroughCUnsignedInt(_ x: CUnsignedInt) -> CUnsignedInt { return x }
 public func passThroughCUnsignedLongLong(_ x: CUnsignedLongLong) -> CUnsignedLongLong { return x }
 
-public func passThrougCFloat(_ x: CFloat) -> CFloat { return x }
+public func passThroughCFloat(_ x: CFloat) -> CFloat { return x }
 public func passThroughCDouble(_ x: CDouble) -> CDouble { return x }
 
 public func passThroughInt8(_ x: Int8) -> Int8 { return x }

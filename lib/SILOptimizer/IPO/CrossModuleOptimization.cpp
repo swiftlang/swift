@@ -134,21 +134,21 @@ private:
 class InstructionVisitor : public SILCloner<InstructionVisitor> {
   friend class SILCloner<InstructionVisitor>;
   friend class SILInstructionVisitor<InstructionVisitor>;
+  friend class CrossModuleOptimization;
 
 private:
   CrossModuleOptimization &CMS;
-  SILInstruction *result = nullptr;
 
 public:
-  InstructionVisitor(SILInstruction *I, CrossModuleOptimization &CMS) :
-    SILCloner(*I->getFunction()), CMS(CMS) {
-    Builder.setInsertionPoint(I);
-  }
+  InstructionVisitor(SILFunction &F, CrossModuleOptimization &CMS) :
+    SILCloner(F), CMS(CMS) {}
 
   SILType remapType(SILType Ty) {
     if (Ty.hasLocalArchetype()) {
-      Ty = Ty.subst(getBuilder().getModule(), Functor, Functor,
-                    CanGenericSignature());
+      Ty = Ty.subst(getBuilder().getModule(),
+                    Functor, Functor, CanGenericSignature(),
+                    SubstFlags::SubstitutePrimaryArchetypes |
+                    SubstFlags::SubstituteLocalArchetypes);
     }
 
     CMS.makeTypeUsableFromInline(Ty.getASTType());
@@ -156,36 +156,35 @@ public:
   }
 
   CanType remapASTType(CanType Ty) {
-    if (Ty->hasLocalArchetype())
-      Ty = Ty.subst(Functor, Functor)->getCanonicalType();
+    if (Ty->hasLocalArchetype()) {
+      Ty = Ty.subst(Functor, Functor,
+                    SubstFlags::SubstitutePrimaryArchetypes |
+                    SubstFlags::SubstituteLocalArchetypes)->getCanonicalType();
+    }
 
     CMS.makeTypeUsableFromInline(Ty);
     return Ty;
   }
 
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
-    if (Subs.hasLocalArchetypes())
-      Subs = Subs.subst(Functor, Functor);
+    if (Subs.getRecursiveProperties().hasLocalArchetype()) {
+      Subs = Subs.subst(Functor, Functor,
+                        SubstFlags::SubstitutePrimaryArchetypes |
+                        SubstFlags::SubstituteLocalArchetypes);
+    }
 
     CMS.makeSubstUsableFromInline(Subs);
     return Subs;
   }
 
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
-    result = Cloned;
     SILCloner<InstructionVisitor>::postProcess(Orig, Cloned);
+    Cloned->eraseFromParent();
   }
 
   SILValue getMappedValue(SILValue Value) { return Value; }
 
   SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
-
-  static void makeTypesUsableFromInline(SILInstruction *I,
-                                        CrossModuleOptimization &CMS) {
-    InstructionVisitor visitor(I, CMS);
-    visitor.visit(I);
-    visitor.result->eraseFromParent();
-  }
 };
 
 static bool isPackageCMOEnabled(ModuleDecl *mod) {
@@ -301,43 +300,53 @@ void CrossModuleOptimization::serializeFunctionsInModule(SILPassManager *manager
 }
 
 void CrossModuleOptimization::serializeWitnessTablesInModule() {
-  if (!isPackageCMOEnabled(M.getSwiftModule()))
+  if (!isPackageCMOEnabled(M.getSwiftModule()) && !everything)
     return;
 
   for (auto &wt : M.getWitnessTables()) {
-    if (wt.getSerializedKind() != getRightSerializedKind(M) &&
-        hasPublicOrPackageVisibility(wt.getLinkage(), /*includePackage*/ true)) {
-      auto unserializedWTMethodRange = llvm::make_filter_range(
-          wt.getEntries(), [&](const SILWitnessTable::Entry &entry) {
-            return entry.getKind() == SILWitnessTable::Method &&
-                   entry.getMethodWitness().Witness->getSerializedKind() !=
-                       getRightSerializedKind(M);
-          });
-      // In Package CMO, we try serializing witness thunks that
-      // are private if they don't contain hidden or private
-      // references. If they are serialized, they are set to
-      // a shared linkage. If they can't be serialized, we set
-      // the linkage to package so that the witness table itself
-      // can still be serialized, thus giving a chance for entires
-      // that _are_ serialized to be accessed directly.
-      for (const SILWitnessTable::Entry &entry: unserializedWTMethodRange) {
-        if (entry.getMethodWitness().Witness->getLinkage() == SILLinkage::Private)
-          entry.getMethodWitness().Witness->setLinkage(SILLinkage::Package);
+    if (wt.getSerializedKind() == getRightSerializedKind(M))
+      continue;
+
+    if (!hasPublicOrPackageVisibility(wt.getLinkage(), /*includePackage*/ true) && !everything)
+      continue;
+
+    bool containsInternal = false;
+
+    for (const SILWitnessTable::Entry &entry : wt.getEntries()) {
+      if (entry.getKind() != SILWitnessTable::Method)
+        continue;
+
+      SILFunction *witness = entry.getMethodWitness().Witness;
+      if (!witness)
+        continue;
+
+      if (everything) {
+        makeFunctionUsableFromInline(witness);
+      } else {
+        assert(isPackageCMOEnabled(M.getSwiftModule()));
+
+        // In Package CMO, we try serializing witness thunks that
+        // are private if they don't contain hidden or private
+        // references. If they are serialized, they are set to
+        // a shared linkage. If they can't be serialized, we set
+        // the linkage to package so that the witness table itself
+        // can still be serialized, thus giving a chance for entires
+        // that _are_ serialized to be accessed directly.
+        if (witness->getSerializedKind() != getRightSerializedKind(M) &&
+            witness->getLinkage() == SILLinkage::Private) {
+          witness->setLinkage(SILLinkage::Package);
+        }
       }
 
-      bool containsInternal = llvm::any_of(
-          wt.getEntries(), [&](const SILWitnessTable::Entry &entry) {
-            return entry.getKind() == SILWitnessTable::Method &&
-                   !entry.getMethodWitness()
-                        .Witness->hasValidLinkageForFragileRef(
-                            getRightSerializedKind(M));
-          });
-      // FIXME: This check shouldn't be necessary but added as a caution
-      // to ensure we don't serialize witness table if it contains an
-      // internal entry.
-      if (!containsInternal)
-        wt.setSerializedKind(getRightSerializedKind(M));
+      if (!witness->hasValidLinkageForFragileRef(getRightSerializedKind(M)))
+          containsInternal = true;
     }
+
+    // FIXME: This check shouldn't be necessary but added as a caution
+    // to ensure we don't serialize witness table if it contains an
+    // internal entry.
+    if (!containsInternal)
+      wt.setSerializedKind(getRightSerializedKind(M));
   }
 }
 
@@ -721,12 +730,16 @@ void CrossModuleOptimization::serializeFunction(SILFunction *function,
   }
   function->setSerializedKind(getRightSerializedKind(M));
 
+  InstructionVisitor visitor(*function, *this);
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
-      InstructionVisitor::makeTypesUsableFromInline(&inst, *this);
+      visitor.getBuilder().setInsertionPoint(&inst);
+      visitor.visit(&inst);
       serializeInstruction(&inst, canSerializeFlags);
     }
   }
+
+  M.reclaimUnresolvedLocalArchetypeDefinitions();
 }
 
 /// Prepare \p inst for serialization.

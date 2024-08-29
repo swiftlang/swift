@@ -13,6 +13,8 @@
 import ASTBridging
 import BasicBridging
 import SwiftDiagnostics
+import SwiftIfConfig
+
 @_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) import SwiftSyntax
 
 extension ASTGenVisitor {
@@ -52,17 +54,15 @@ extension ASTGenVisitor {
     }
 
     // '@' attributes.
-    for node in node.attributes {
-      switch node {
-      case .attribute(let node):
-        addAttribute(self.generateDeclAttribute(attribute: node))
-      case .ifConfigDecl:
-        fatalError("unimplemented")
-#if RESILIENT_SWIFT_SYNTAX
-      @unknown default:
-        fatalError()
-#endif
+    visitIfConfigElements(node.attributes, of: AttributeSyntax.self) { element in
+      switch element {
+      case .ifConfigDecl(let ifConfigDecl):
+        return .ifConfigDecl(ifConfigDecl)
+      case .attribute(let attribute):
+        return .underlying(attribute)
       }
+    } body: { attribute in
+      addAttribute(self.generateDeclAttribute(attribute: attribute))
     }
 
     func genStatic(node: DeclModifierSyntax, spelling: BridgedStaticSpelling) {
@@ -253,6 +253,7 @@ extension ASTGenVisitor {
         .testable,
         .transparent,
         .uiApplicationMain,
+        .unsafe,
         .unsafeInheritExecutor,
         .unsafeNoObjCTaggedPointer,
         .unsafeNonEscapableResult,

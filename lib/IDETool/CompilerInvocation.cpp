@@ -223,7 +223,6 @@ bool ide::initCompilerInvocation(
 
   auto &LangOpts = Invocation.getLangOptions();
   LangOpts.AttachCommentsToDecls = true;
-  LangOpts.DiagnosticsEditorMode = true;
   LangOpts.CollectParsedToken = true;
   #if defined(_WIN32)
   // Source files that might be open in an editor should not be memory mapped on Windows,

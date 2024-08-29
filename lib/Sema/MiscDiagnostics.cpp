@@ -3693,7 +3693,7 @@ public:
         return Action::Stop();
       }
 
-      if (subMap.hasDynamicSelf()) {
+      if (subMap.getRecursiveProperties().hasDynamicSelf()) {
         Ctx.Diags.diagnose(E->getLoc(),
                            diag::opaque_type_cannot_contain_dynamic_self);
         HasInvalidReturn = true;
@@ -4478,7 +4478,7 @@ private:
           // default.
           Diags.diagnose(branch->getEndLoc(),
                          diag::single_value_stmt_branch_must_end_in_result,
-                         S->getKind());
+                         S->getKind(), isa<SwitchStmt>(S));
         }
         break;
       }

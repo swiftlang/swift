@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift %s -I %S/Inputs -diagnostics-editor-mode
+// RUN: %target-typecheck-verify-swift %s -I %S/Inputs
 
 enum E1 {
   case e1
@@ -17,6 +17,6 @@ func foo1(_ e: E1) {
 }
 
 func foo1 (_ i : Int) {
-  switch i { // expected-error {{'switch' statement body must have at least one 'case' or 'default' block; add a default case}} {{+1:3-3=default:\n<#code#>\n}} 
+  switch i { // expected-error {{'switch' statement body must have at least one 'case' or 'default' block; add a default case}} {{+1:3-3=default:\n<#code#>\n}}
   }
 }

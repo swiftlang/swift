@@ -76,6 +76,8 @@ struct ASTGenVisitor {
 
   let ctx: BridgedASTContext
 
+  let buildConfiguration: CompilerBuildConfiguration
+
   fileprivate let allocator: SwiftSyntax.BumpPtrAllocator = .init(initialSlabSize: 256)
 
   /// Fallback legacy parser used when ASTGen doesn't have the generate(_:)
@@ -94,12 +96,20 @@ struct ASTGenVisitor {
     self.declContext = declContext
     self.ctx = astContext
     self.legacyParse = legacyParser
+    self.buildConfiguration = CompilerBuildConfiguration(
+      ctx: ctx,
+      sourceBuffer: sourceBuffer
+    )
   }
 
   func generate(sourceFile node: SourceFileSyntax) -> [BridgedDecl] {
     var out = [BridgedDecl]()
 
-    for element in node.statements {
+    visitIfConfigElements(
+      node.statements,
+      of: CodeBlockItemSyntax.self,
+      split: Self.splitCodeBlockItemIfConfig
+    ) { element in
       let loc = self.generateSourceLoc(element)
       let swiftASTNodes = generate(codeBlockItem: element)
       switch swiftASTNodes {
@@ -259,6 +269,11 @@ extension ASTGenVisitor {
       diagnostic: diagnostic,
       diagnosticSeverity: diagnostic.diagMessage.severity
     )
+  }
+
+  /// Emits the given diagnostics via the C++ diagnostic engine.
+  func diagnoseAll(_ diagnostics: [Diagnostic]) {
+    diagnostics.forEach(diagnose)
   }
 }
 

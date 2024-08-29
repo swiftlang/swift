@@ -17,7 +17,6 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Chrono.h"
-#include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Program.h"
 
@@ -98,8 +97,8 @@ public:
 
 /// Represents a in-process plugin server.
 class InProcessPlugins : public CompilerPlugin {
-  /// PluginServer
-  llvm::sys::DynamicLibrary server;
+  /// PluginServer shared library handle.
+  void *server;
 
   /// Entry point in the in-process plugin server. It receives the request
   /// string and populate the response string. The return value indicates there
@@ -114,7 +113,7 @@ class InProcessPlugins : public CompilerPlugin {
   /// Temporary storage for the response data from 'handleMessageFn'.
   std::string receivedResponse;
 
-  InProcessPlugins(llvm::StringRef serverPath, llvm::sys::DynamicLibrary server,
+  InProcessPlugins(llvm::StringRef serverPath, void *server,
                    HandleMessageFunction handleMessageFn)
       : CompilerPlugin(serverPath), server(server),
         handleMessageFn(handleMessageFn) {}

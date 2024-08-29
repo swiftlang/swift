@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/Inputs/fixit_stub_mutability_proto_module.swift -emit-module -parse-as-library -o %t
 
-// RUN: %target-swift-frontend -typecheck %s -I %t -verify -diagnostics-editor-mode
+// RUN: %target-swift-frontend -typecheck %s -I %t -verify
 
 protocol P0_A { associatedtype T } // expected-note{{protocol requires nested type 'T'}}
 protocol P0_B { associatedtype T }

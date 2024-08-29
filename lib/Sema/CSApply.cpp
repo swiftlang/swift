@@ -58,6 +58,11 @@
 using namespace swift;
 using namespace constraints;
 
+static bool isClosureLiteralExpr(Expr *expr) {
+  expr = expr->getSemanticsProvidingExpr();
+  return (isa<CaptureListExpr>(expr) || isa<ClosureExpr>(expr));
+}
+
 bool Solution::hasFixedType(TypeVariableType *typeVar) const {
   auto knownBinding = typeBindings.find(typeVar);
   return knownBinding != typeBindings.end();
@@ -956,9 +961,12 @@ namespace {
       // If we had a return type of 'Self', erase it.
       Type resultTy;
       resultTy = cs.getType(result);
-      if (resultTy->hasOpenedExistentialWithRoot(record.Archetype)) {
-        Type erasedTy = constraints::typeEraseOpenedArchetypesWithRoot(
-            resultTy, record.Archetype);
+
+      auto *env = record.Archetype->getGenericEnvironment();
+
+      if (resultTy->hasLocalArchetypeFromEnvironment(env)) {
+        Type erasedTy = constraints::typeEraseOpenedArchetypesFromEnvironment(
+            resultTy, env);
         auto range = result->getSourceRange();
         result = coerceToType(result, erasedTy, locator);
         // FIXME: Implement missing tuple-to-tuple conversion
@@ -1668,8 +1676,8 @@ namespace {
         } else {
           // Erase opened existentials from the type of the thunk; we're
           // going to open the existential inside the thunk's body.
-          containerTy = constraints::typeEraseOpenedArchetypesWithRoot(
-              containerTy, knownOpened->second);
+          containerTy = constraints::typeEraseOpenedArchetypesFromEnvironment(
+              containerTy, knownOpened->second->getGenericEnvironment());
           selfTy = containerTy;
         }
       }
@@ -1732,8 +1740,8 @@ namespace {
           // If the base was an opened existential, erase the opened
           // existential.
           if (openedExistential) {
-            refType = constraints::typeEraseOpenedArchetypesWithRoot(
-                refType, baseTy->castTo<OpenedArchetypeType>());
+            refType = constraints::typeEraseOpenedArchetypesFromEnvironment(
+                refType, baseTy->castTo<OpenedArchetypeType>()->getGenericEnvironment());
           }
 
           return refType;
@@ -1958,8 +1966,8 @@ namespace {
               getConstraintSystem().getConstraintLocator(memberLocator));
           if (knownOpened != solution.OpenedExistentialTypes.end()) {
             curryThunkTy =
-                constraints::typeEraseOpenedArchetypesWithRoot(
-                  curryThunkTy, knownOpened->second)
+                constraints::typeEraseOpenedArchetypesFromEnvironment(
+                  curryThunkTy, knownOpened->second->getGenericEnvironment())
                     ->castTo<FunctionType>();
           }
         }
@@ -5801,8 +5809,7 @@ Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType) {
     // Coercion from superclass-constrained existential to its
     // concrete superclass.
     auto fromArchetype =
-        OpenedArchetypeType::getAny(fromType->getCanonicalType(),
-                                    dc->getGenericSignatureOfContext());
+        OpenedArchetypeType::getAny(fromType->getCanonicalType());
 
     auto *archetypeVal = cs.cacheType(new (ctx) OpaqueValueExpr(
         expr->getSourceRange(), fromArchetype));
@@ -5961,24 +5968,29 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
 /// Apply the contextually Sendable flag to the given expression,
 static void applyContextualClosureFlags(Expr *expr, bool implicitSelfCapture,
                                         bool inheritActorContext,
-                                        bool isPassedToSendingParameter) {
+                                        bool isPassedToSendingParameter,
+                                        bool requiresDynamicIsolationChecking) {
   if (auto closure = dyn_cast<ClosureExpr>(expr)) {
     closure->setAllowsImplicitSelfCapture(implicitSelfCapture);
     closure->setInheritsActorContext(inheritActorContext);
     closure->setIsPassedToSendingParameter(isPassedToSendingParameter);
+    closure->setRequiresDynamicIsolationChecking(
+        requiresDynamicIsolationChecking);
     return;
   }
 
   if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
     applyContextualClosureFlags(captureList->getClosureBody(),
                                 implicitSelfCapture, inheritActorContext,
-                                isPassedToSendingParameter);
+                                isPassedToSendingParameter,
+                                requiresDynamicIsolationChecking);
   }
 
   if (auto identity = dyn_cast<IdentityExpr>(expr)) {
     applyContextualClosureFlags(identity->getSubExpr(), implicitSelfCapture,
                                 inheritActorContext,
-                                isPassedToSendingParameter);
+                                isPassedToSendingParameter,
+                                requiresDynamicIsolationChecking);
   }
 }
 
@@ -6082,10 +6094,48 @@ ArgumentList *ExprRewriter::coerceCallArguments(
         return placeholder;
       };
 
+  bool closuresRequireDynamicIsolationChecking = [&]() {
+    auto *decl = callee.getDecl();
+    // If this is something like `{ @MainActor in ... }()`, let's consider
+    // callee as concurrency checked.
+    if (!decl)
+      return false;
+
+    if (auto declaredIn = decl->findImport(dc))
+      return !declaredIn->module.importedModule->isConcurrencyChecked();
+
+    // Both the caller and the allee are in the same module.
+    if (dc->getParentModule() == decl->getModuleContext()) {
+      return !dc->getASTContext().isSwiftVersionAtLeast(6);
+    }
+
+    // If we cannot figure out where the callee came from, let's conservatively
+    // assume that closure arguments require dynamic isolation checks.
+    return true;
+  }();
+
+  auto applyFlagsToArgument = [&paramInfo,
+                               &closuresRequireDynamicIsolationChecking](
+                                  unsigned paramIdx, Expr *argument) {
+    if (!isClosureLiteralExpr(argument))
+      return;
+
+    bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
+    bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
+    bool isPassedToSendingParameter = paramInfo.isSendingParameter(paramIdx);
+
+    applyContextualClosureFlags(argument, isImplicitSelfCapture,
+                                inheritsActorContext,
+                                isPassedToSendingParameter,
+                                closuresRequireDynamicIsolationChecking);
+  };
+
   // Quickly test if any further fix-ups for the argument types are necessary.
   auto matches = args->matches(params, [&](Expr *E) { return cs.getType(E); });
-  if (matches && !shouldInjectWrappedValuePlaceholder &&
-      !paramInfo.anyContextualInfo()) {
+  if (matches && !shouldInjectWrappedValuePlaceholder) {
+    for (unsigned paramIdx : indices(params)) {
+      applyFlagsToArgument(paramIdx, args->getExpr(paramIdx));
+    }
     return args;
   }
 
@@ -6202,16 +6252,10 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     // for things like trailing closures and args to property wrapper params.
     arg.setLabel(param.getLabel());
 
-    // Determine whether the closure argument should be treated as having
-    // implicit self capture or inheriting actor context.
-    bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
-    bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
-    bool isPassedToSendingParameter =
-        paramInfo.isPassedToSendingParameter(paramIdx);
-
-    applyContextualClosureFlags(argExpr, isImplicitSelfCapture,
-                                inheritsActorContext,
-                                isPassedToSendingParameter);
+    // Determine whether the argument should be marked as having
+    // implicit self capture, inheriting actor context, is passed to a
+    // `sending` parameter etc.
+    applyFlagsToArgument(paramIdx, argExpr);
 
     // If the types exactly match, this is easy.
     auto paramType = param.getOldType();
@@ -6353,11 +6397,6 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     newArgs.push_back(arg);
   }
   return ArgumentList::createTypeChecked(ctx, args, newArgs);
-}
-
-static bool isClosureLiteralExpr(Expr *expr) {
-  expr = expr->getSemanticsProvidingExpr();
-  return (isa<CaptureListExpr>(expr) || isa<ClosureExpr>(expr));
 }
 
 /// Whether the given expression is a closure that should inherit
@@ -6822,8 +6861,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   // For existential-to-existential coercions, open the source existential.
   Type openedFromType;
   if (fromType->isAnyExistentialType()) {
-    openedFromType = OpenedArchetypeType::getAny(fromType->getCanonicalType(),
-                                                 dc->getGenericSignatureOfContext());
+    openedFromType = OpenedArchetypeType::getAny(fromType->getCanonicalType());
   }
 
   Type openedFromInstanceType = openedFromType;

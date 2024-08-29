@@ -245,6 +245,12 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
       }
     }
 
+    // Any composition with an inverse will need the 6.0 runtime to demangle.
+    if (auto pct = dyn_cast<ProtocolCompositionType>(t)) {
+      if (pct->hasInverse())
+        return addRequirement(Swift_6_0);
+    }
+
     return false;
   });
 
@@ -1473,12 +1479,12 @@ public:
 
       // Erase pseudogeneric captures down to AnyObject.
       if (OrigCalleeType->isPseudogeneric()) {
-        SwiftType = SwiftType.transform([&](Type t) -> Type {
+        SwiftType = SwiftType.transformRec([&](Type t) -> std::optional<Type> {
           if (auto *archetype = t->getAs<ArchetypeType>()) {
             assert(archetype->requiresClass() && "don't know what to do");
             return IGM.Context.getAnyObjectType();
           }
-          return t;
+          return std::nullopt;
         })->getCanonicalType();
       }
       

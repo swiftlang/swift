@@ -103,13 +103,15 @@ public:
   };
 };
 
+/// FIXME: This should be removed in favor of fixing ASTDemangler to wrap types in
+/// ExistentialType where appropriate.
 static bool equalWithoutExistentialTypes(Type t1, Type t2) {
   static Type (*withoutExistentialTypes)(Type) = [](Type type) -> Type {
-    return type.transform([](Type type) -> Type {
-      if (auto existential = type->getAs<ExistentialType>()) {
+    return type.transformRec([](TypeBase *type) -> std::optional<Type> {
+      if (auto existential = dyn_cast<ExistentialType>(type)) {
         return withoutExistentialTypes(existential->getConstraintType());
       }
-      return type;
+      return std::nullopt;
     });
   };
 
@@ -2971,6 +2973,7 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
        Rep == SILFunctionTypeRepresentation::ObjCMethod ||
        Rep == SILFunctionTypeRepresentation::WitnessMethod ||
        Rep == SILFunctionTypeRepresentation::CXXMethod ||
+       Rep == SILFunctionTypeRepresentation::CFunctionPointer ||
        Rep == SILFunctionTypeRepresentation::Thin)) {
     llvm::DISubprogram::DISPFlags SPFlags = llvm::DISubprogram::toSPFlags(
         /*IsLocalToUnit=*/Fn ? Fn->hasInternalLinkage() : true,

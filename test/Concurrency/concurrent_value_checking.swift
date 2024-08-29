@@ -413,24 +413,20 @@ extension NotConcurrent {
   func f() { }
 
   func test() {
-    Task { // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-      // expected-tns-note @-1 {{Passing task-isolated value of non-Sendable type '() async -> ()' as a 'sending' parameter risks causing races inbetween task-isolated uses and uses reachable from the callee}}
-      f()
+    Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      f() // expected-tns-note {{closure captures 'self' which is accessible to code in the current task}}
     }
 
-    Task { // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-      // expected-tns-note @-1 {{Passing task-isolated value of non-Sendable type '() async -> ()' as a 'sending' parameter risks causing races inbetween task-isolated uses and uses reachable from the callee}}
-      self.f()
+    Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      self.f() // expected-tns-note {{closure captures 'self' which is accessible to code in the current task}}
     }
 
-    Task { [self] in // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-      // expected-tns-note @-1 {{Passing task-isolated value of non-Sendable type '() async -> ()' as a 'sending' parameter risks causing races inbetween task-isolated uses and uses reachable from the callee}}
-      f()
+    Task { [self] in // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      f() // expected-tns-note {{closure captures 'self' which is accessible to code in the current task}}
     }
 
-    Task { [self] in // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-      // expected-tns-note @-1 {{Passing task-isolated value of non-Sendable type '() async -> ()' as a 'sending' parameter risks causing races inbetween task-isolated uses and uses reachable from the callee}}
-      self.f()
+    Task { [self] in // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      self.f() // expected-tns-note {{closure captures 'self' which is accessible to code in the current task}}
     }
   }
 }

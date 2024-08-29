@@ -74,7 +74,7 @@ namespace {
                                     SpareBitVector &&spareBits, \
                                     bool isOptional) \
       : IndirectTypeInfo(type, size, std::move(spareBits), alignment, \
-                         IsNotTriviallyDestroyable, IsNotBitwiseTakable, IsCopyable, IsFixedSize), \
+                         IsNotTriviallyDestroyable, IsNotBitwiseTakable, IsCopyable, IsFixedSize, IsABIAccessible), \
         ValueTypeAndIsOptional(valueType, isOptional) {} \
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr, \
                             Address srcAddr, SILType T, \
@@ -151,7 +151,7 @@ namespace {
       : SingleScalarTypeInfo(type, size, std::move(spareBits), \
                              alignment, IsNotTriviallyDestroyable, \
                              IsCopyable, \
-                             IsFixedSize), \
+                             IsFixedSize, IsABIAccessible), \
         ValueTypeAndIsOptional(valueType, isOptional) {} \
     enum { IsScalarTriviallyDestroyable = false }; \
     TypeLayoutEntry \
@@ -1861,7 +1861,6 @@ llvm::Value *IRGenFunction::getDynamicSelfMetadata() {
     SelfValue = emitDynamicTypeOfHeapObject(*this, SelfValue,
                                 MetatypeRepresentation::Thick,
                                 SILType::getPrimitiveObjectType(SelfType),
-                                GenericSignature(),
                                 /*allow artificial*/ false);
     SelfKind = SwiftMetatype;
     break;
@@ -1926,12 +1925,11 @@ static llvm::Value *emitLoadOfHeapMetadataRef(IRGenFunction &IGF,
 llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      llvm::Value *object,
                                                      CanType objectType,
-                                                     GenericSignature sig,
                                                      bool suppressCast) {
   ClassDecl *theClass = objectType.getClassOrBoundGenericClass();
   if ((theClass && isKnownNotTaggedPointer(IGF.IGM, theClass)) ||
       !IGF.IGM.ObjCInterop) {
-    auto isaEncoding = getIsaEncodingForType(IGF.IGM, objectType, sig);
+    auto isaEncoding = getIsaEncodingForType(IGF.IGM, objectType);
     return emitLoadOfHeapMetadataRef(IGF, object, isaEncoding, suppressCast);
   }
 
@@ -1942,11 +1940,9 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
 llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      llvm::Value *object,
                                                      SILType objectType,
-                                                     GenericSignature sig,
                                                      bool suppressCast) {
   return emitHeapMetadataRefForHeapObject(IGF, object,
                                           objectType.getASTType(),
-                                          sig,
                                           suppressCast);
 }
 
@@ -2013,10 +2009,9 @@ llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
                                                 llvm::Value *object,
                                                 MetatypeRepresentation repr,
                                                 SILType objectType,
-                                                GenericSignature sig,
                                                 bool allowArtificialSubclasses){
   switch (auto isaEncoding =
-            getIsaEncodingForType(IGF.IGM, objectType.getASTType(), sig)) {
+            getIsaEncodingForType(IGF.IGM, objectType.getASTType())) {
   case IsaEncoding::Pointer:
     // Directly load the isa pointer from a pure Swift class.
     return emitLoadOfHeapMetadataRef(IGF, object, isaEncoding,
@@ -2043,8 +2038,7 @@ llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
 
 /// What isa encoding mechanism does a type have?
 IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
-                                         CanType type,
-                                         GenericSignature outerSignature) {
+                                         CanType type) {
   if (!IGM.ObjCInterop) return IsaEncoding::Pointer;
 
   // This needs to be kept up-to-date with hasKnownSwiftMetadata.
@@ -2060,15 +2054,13 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
   // Existentials use the encoding of the enclosed dynamic type.
   if (type->isAnyExistentialType()) {
     return getIsaEncodingForType(
-        IGM, OpenedArchetypeType::getAny(type, outerSignature),
-        outerSignature);
+        IGM, OpenedArchetypeType::getAny(type)->getCanonicalType());
   }
 
   if (auto archetype = dyn_cast<ArchetypeType>(type)) {
     // If we have a concrete superclass constraint, just recurse.
     if (auto superclass = archetype->getSuperclass()) {
-      return getIsaEncodingForType(IGM, superclass->getCanonicalType(),
-                                   outerSignature);
+      return getIsaEncodingForType(IGM, superclass->getCanonicalType());
     }
 
     // Otherwise, we must just have a class constraint.  Use the

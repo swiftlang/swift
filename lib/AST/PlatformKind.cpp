@@ -262,3 +262,25 @@ llvm::VersionTuple swift::canonicalizePlatformVersion(
 
   return version;
 }
+
+bool swift::isPlatformSPI(PlatformKind Platform) {
+  switch (Platform) {
+  case PlatformKind::macOS:
+  case PlatformKind::macOSApplicationExtension:
+  case PlatformKind::iOS:
+  case PlatformKind::iOSApplicationExtension:
+  case PlatformKind::macCatalyst:
+  case PlatformKind::macCatalystApplicationExtension:
+  case PlatformKind::tvOS:
+  case PlatformKind::tvOSApplicationExtension:
+  case PlatformKind::watchOS:
+  case PlatformKind::watchOSApplicationExtension:
+  case PlatformKind::visionOS:
+  case PlatformKind::visionOSApplicationExtension:
+  case PlatformKind::OpenBSD:
+  case PlatformKind::Windows:
+  case PlatformKind::none:
+    return false;
+  }
+  llvm_unreachable("bad PlatformKind");
+}

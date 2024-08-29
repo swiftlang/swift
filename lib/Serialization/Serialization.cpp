@@ -1667,10 +1667,9 @@ void Serializer::writeASTBlockEntity(const GenericEnvironment *genericEnv) {
   case GenericEnvironment::Kind::OpenedExistential: {
     auto kind = GenericEnvironmentKind::OpenedExistential;
     auto existentialTypeID = addTypeRef(genericEnv->getOpenedExistentialType());
-    auto parentSig = genericEnv->getOpenedExistentialParentSignature();
-    auto parentSigID = addGenericSignatureRef(parentSig);
-    auto emptySubs = SubstitutionMap();
-    auto subsID = addSubstitutionMapRef(emptySubs);
+    auto parentSigID = addGenericSignatureRef(GenericSignature());
+    auto contextSubs = genericEnv->getOuterSubstitutions();
+    auto subsID = addSubstitutionMapRef(contextSubs);
 
     auto genericEnvAbbrCode = DeclTypeAbbrCodes[GenericEnvironmentLayout::Code];
     GenericEnvironmentLayout::emitRecord(Out, ScratchRecord, genericEnvAbbrCode,
@@ -1684,7 +1683,7 @@ void Serializer::writeASTBlockEntity(const GenericEnvironment *genericEnv) {
     auto shapeClassID = addTypeRef(genericEnv->getOpenedElementShapeClass());
     auto parentSig = genericEnv->getGenericSignature();
     auto parentSigID = addGenericSignatureRef(parentSig);
-    auto contextSubs = genericEnv->getPackElementContextSubstitutions();
+    auto contextSubs = genericEnv->getOuterSubstitutions();
     auto subsID = addSubstitutionMapRef(contextSubs);
 
     auto genericEnvAbbrCode = DeclTypeAbbrCodes[GenericEnvironmentLayout::Code];
@@ -1801,9 +1800,9 @@ void Serializer::writeLocalNormalProtocolConformance(
       // Map archetypes to type parameters, since we always substitute them
       // away. Note that in a merge-modules pass, we're serializing conformances
       // that we deserialized, so they will already have their replacement types
-      // in terms of interface types; hence the hasArchetypes() check is
+      // in terms of interface types; hence the hasPrimaryArchetype() check is
       // necessary for correctness, not just as a fast path.
-      if (subs.hasArchetypes())
+      if (subs.getRecursiveProperties().hasPrimaryArchetype())
         subs = subs.mapReplacementTypesOutOfContext();
 
       data.push_back(addSubstitutionMapRef(subs));
