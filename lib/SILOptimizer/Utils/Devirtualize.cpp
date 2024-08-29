@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-devirtualize-utility"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -386,6 +387,93 @@ swift::getExactDynamicTypeOfUnderlyingObject(SILValue instance,
   return getExactDynamicType(instance, cha, /* forUnderlyingObject */ true);
 }
 
+/// Combine two substitution maps as follows.
+///
+/// The result is written in terms of the generic parameters of 'genericSig'.
+///
+/// Generic parameters with a depth less than 'firstDepth'
+/// come from 'firstSubMap'.
+///
+/// Generic parameters with a depth greater than 'firstDepth' come from
+/// 'secondSubMap', but are looked up starting with a depth or index of
+/// 'secondDepth'.
+///
+/// The 'how' parameter determines if we're looking at the depth or index.
+static SubstitutionMap
+combineSubstitutionMaps(SubstitutionMap firstSubMap,
+                        SubstitutionMap secondSubMap,
+                        unsigned firstDepth,
+                        unsigned secondDepth,
+                        GenericSignature genericSig) {
+  auto &ctx = genericSig->getASTContext();
+
+  auto replaceGenericParameter = [&](Type type) -> std::optional<Type> {
+    if (auto gp = type->getAs<GenericTypeParamType>()) {
+      if (gp->getDepth() < firstDepth)
+        return Type();
+      return Type(GenericTypeParamType::get(gp->isParameterPack(),
+                                            gp->getDepth() + secondDepth -
+                                                firstDepth,
+                                            gp->getIndex(), ctx));
+    }
+
+    return std::nullopt;
+  };
+
+  return SubstitutionMap::get(
+    genericSig,
+    [&](SubstitutableType *type) {
+      if (auto replacement = replaceGenericParameter(type))
+        if (*replacement)
+          return replacement->subst(secondSubMap);
+      return Type(type).subst(firstSubMap);
+    },
+    [&](CanType type, Type substType, ProtocolDecl *proto) {
+      if (auto replacement = type.transformRec(replaceGenericParameter))
+        return secondSubMap.lookupConformance(replacement->getCanonicalType(),
+                                              proto);
+      if (auto conformance = firstSubMap.lookupConformance(type, proto))
+        return conformance;
+
+      // We might not have enough information in the substitution maps alone.
+      //
+      // Eg,
+      //
+      // class Base<T1> {
+      //   func foo<U1>(_: U1) where T1 : P {}
+      // }
+      //
+      // class Derived<T2> : Base<Foo<T2>> {
+      //   override func foo<U2>(_: U2) where T2 : Q {}
+      // }
+      //
+      // Suppose we're devirtualizing a call to Base.foo() on a value whose
+      // type is known to be Derived<Bar>. We start with substitutions written
+      // in terms of Base.foo()'s generic signature:
+      //
+      // <T1, U1 where T1 : P>
+      // T1 := Foo<Bar>
+      // T1 : P := Foo<Bar> : P
+      //
+      // We want to build substitutions in terms of Derived.foo()'s
+      // generic signature:
+      //
+      // <T2, U2 where T2 : Q>
+      // T2 := Bar
+      // T2 : Q := Bar : Q
+      //
+      // The conformance Bar : Q is difficult to recover in the general case.
+      //
+      // Some combination of storing substitution maps in BoundGenericTypes
+      // as well as for method overrides would solve this, but for now, just
+      // punt to module lookup.
+      if (substType->isTypeParameter())
+        return ProtocolConformanceRef(proto);
+
+      return swift::lookupConformance(substType, proto);
+    });
+}
+
 // Start with the substitutions from the apply.
 // Try to propagate them to find out the real substitutions required
 // to invoke the method.
@@ -440,13 +528,11 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
 
   auto baseCalleeSig = baseCalleeType->getInvocationGenericSignature();
 
-  return
-    SubstitutionMap::combineSubstitutionMaps(baseSubMap,
-                                             origSubMap,
-                                             CombineSubstitutionMaps::AtDepth,
-                                             baseDepth,
-                                             origDepth,
-                                             baseCalleeSig);
+  return combineSubstitutionMaps(baseSubMap,
+                                 origSubMap,
+                                 baseDepth,
+                                 origDepth,
+                                 baseCalleeSig);
 }
 
 // Return the new apply and true if a cast required CFG modification.
