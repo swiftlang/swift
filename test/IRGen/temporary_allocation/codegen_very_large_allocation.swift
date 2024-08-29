@@ -7,6 +7,9 @@
 // this function.
 // UNSUPPORTED: OS=xros
 
+// On iOS _stdlib_isOSVersionAtLeast() is @_transparent, which affects codegen.
+// UNSUPPORTED: OS=ios
+
 @_silgen_name("blackHole")
 func blackHole(_ value: UnsafeMutableRawPointer?) -> Void
 
