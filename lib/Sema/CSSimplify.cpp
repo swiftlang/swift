@@ -14178,6 +14178,14 @@ ConstraintSystem::simplifyLValueObjectConstraint(
     return type->is<LValueType>();
   };
 
+  if (lvalueTy->isPlaceholder()) {
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
+
+    recordAnyTypeVarAsPotentialHole(type2);
+    return SolutionKind::Solved;
+  }
+
   if (!isOrCanBeLValueType(lvalueTy)) {
     if (!shouldAttemptFixes())
       return SolutionKind::Error;

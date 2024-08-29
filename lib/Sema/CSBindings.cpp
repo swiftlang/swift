@@ -1594,7 +1594,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       if (type->isTypeVariableOrMember())
         return std::nullopt;
 
-     type = LValueType::get(type);
+      type = LValueType::get(type);
     } else {
       // Right-hand side of the l-value object constraint can only
       // be bound via constraint simplification when l-value type
