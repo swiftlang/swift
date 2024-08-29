@@ -60,6 +60,10 @@ def _apply_default_arguments(args):
     if args.build_linux_static and args.build_libcxx is None:
         args.build_libcxx = True
 
+    # Previewing the stdlib docs requires building them.
+    if args.preview_stdlib_docs:
+        args.build_stdlib_docs = True
+
     # Set the default CMake generator.
     if args.cmake_generator is None:
         args.cmake_generator = 'Ninja'
@@ -1163,7 +1167,11 @@ def create_argument_parser():
     option('--build-stdlib-docs', toggle_true,
            default=False,
            help='Build documentation for the standard library.'
-                'Note: this builds SwiftDocC to perform the docs build.')
+                'Note: this builds Swift-DocC to perform the docs build.')
+    option('--preview-stdlib-docs', toggle_true,
+           default=False,
+           help='Build and preview standard library documentation with Swift-DocC.'
+                'Note: this builds Swift-DocC to perform the docs build.')
 
     option('--build-swift-clang-overlays', toggle_true,
            default=True,

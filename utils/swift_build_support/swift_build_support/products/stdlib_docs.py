@@ -45,9 +45,11 @@ class StdlibDocs(product.Product):
         symbol_graph_dir = os.path.join(swift_build_dir, "lib", "symbol-graph")
         output_path = os.path.join(swift_build_dir, "Swift.doccarchive")
 
+        docc_action = 'preview' if self.args.preview_stdlib_docs else 'convert'
+
         docc_cmd = [
             docc_path,
-            "convert",  # TODO: give people the option to preview instead
+            docc_action,
             "--additional-symbol-graph-dir",
             symbol_graph_dir,
             "--output-path",
