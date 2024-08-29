@@ -906,7 +906,7 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     preEmitFunction(constant, f, loc);
     PrettyStackTraceSILFunction X("silgen emitBackDeploymentThunk", f);
     f->setBare(IsBare);
-    f->setThunk(IsThunk);
+    f->setThunk(IsBackDeployedThunk);
 
     SILGenFunction(*this, *f, dc).emitBackDeploymentThunk(constant);
 
