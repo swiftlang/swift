@@ -2174,8 +2174,8 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
     }
   }
 
-  if (Options.SkipPrivateStdlibDecls &&
-      D->isPrivateStdlibDecl(!Options.SkipUnderscoredStdlibProtocols))
+  if (Options.SkipPrivateSystemDecls &&
+      D->isPrivateSystemDecl(!Options.SkipUnderscoredSystemProtocols))
     return false;
 
   auto &ctx = D->getASTContext();
@@ -3386,7 +3386,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   Type Ty = decl->getUnderlyingType();
 
   // If the underlying type is private, don't print it.
-  if (Options.SkipPrivateStdlibDecls && Ty && Ty.isPrivateStdlibType())
+  if (Options.SkipPrivateSystemDecls && Ty && Ty.isPrivateSystemType())
     ShouldPrint = false;
 
   if (ShouldPrint) {
@@ -7813,8 +7813,8 @@ swift::getInheritedForPrinting(
       // protocol, see if any of its inherited protocols are public. Those
       // protocols can affect the user-visible behavior of the declaration, and
       // should be printed.
-      if (options.SkipPrivateStdlibDecls &&
-          proto->isPrivateStdlibDecl(!options.SkipUnderscoredStdlibProtocols)) {
+      if (options.SkipPrivateSystemDecls &&
+          proto->isPrivateSystemDecl(!options.SkipUnderscoredSystemProtocols)) {
         auto inheritedProtocols = proto->getInheritedProtocols();
         protocols.insert(inheritedProtocols.begin(), inheritedProtocols.end());
         if (isUnchecked)

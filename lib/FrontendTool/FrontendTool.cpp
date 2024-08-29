@@ -916,7 +916,7 @@ static void dumpAPIIfNeeded(const CompilerInstance &Instance) {
     PO.PrintOriginalSourceText = true;
     PO.Indent = 2;
     PO.PrintAccess = false;
-    PO.SkipUnderscoredStdlibProtocols = true;
+    PO.SkipUnderscoredSystemProtocols = true;
     SF->print(TempOS, PO);
     if (TempOS.str().trim().empty())
       return false; // nothing to show.
