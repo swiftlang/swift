@@ -892,10 +892,9 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   }
 
   // Otherwise, if we do not have an isolated argument and are not in an
-  // alloactor, then we might be isolated via global isolation.
+  // allocator, then we might be isolated via global isolation.
   if (auto functionIsolation = fArg->getFunction()->getActorIsolation()) {
     if (functionIsolation.isActorIsolated()) {
-      assert(functionIsolation.isGlobalActor());
       if (functionIsolation.isGlobalActor()) {
         return SILIsolationInfo::getGlobalActorIsolated(
             fArg, functionIsolation.getGlobalActor());

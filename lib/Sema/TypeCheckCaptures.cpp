@@ -234,10 +234,9 @@ public:
 
     // Visit the type of the capture, if it isn't a class reference, since
     // we'd need the metadata to do so.
-    if (VD->hasInterfaceType()
-        && (!ObjC
+    if (!ObjC
             || !isa<VarDecl>(VD)
-            || !cast<VarDecl>(VD)->getTypeInContext()->hasRetainablePointerRepresentation()))
+            || !cast<VarDecl>(VD)->getTypeInContext()->hasRetainablePointerRepresentation())
       checkType(VD->getInterfaceType(), VD->getLoc());
   }
 
@@ -750,6 +749,18 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
 
   if (!AFD->isObjC()) {
     finder.checkType(type, AFD->getLoc());
+  }
+
+  if (AFD->isLocalCapture() && AFD->hasAsync()) {
+    // If a local function inherits isolation from the enclosing context,
+    // make sure we capture the isolated parameter, if we haven't already.
+    auto actorIsolation = getActorIsolation(AFD);
+    if (actorIsolation.getKind() == ActorIsolation::ActorInstance) {
+      if (auto *var = actorIsolation.getActorInstance()) {
+        assert(isa<ParamDecl>(var));
+        finder.addCapture(CapturedValue(var, 0, AFD->getLoc()));
+      }
+    }
   }
 
   // Extensions of generic ObjC functions can't use generic parameters from
