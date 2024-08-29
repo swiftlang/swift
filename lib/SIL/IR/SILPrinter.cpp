@@ -3387,6 +3387,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
 
   switch (isThunk()) {
   case IsNotThunk: break;
+  case IsBackDeployedThunk: // FIXME: Give this a distinct label
   case IsThunk: OS << "[thunk] "; break;
   case IsSignatureOptimizedThunk:
     OS << "[signature_optimized_thunk] ";
