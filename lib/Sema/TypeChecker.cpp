@@ -781,11 +781,16 @@ std::pair<bool, bool> EvaluateIfConditionRequest::evaluate(
   // FIXME: When we migrate to SwiftParser, use the parsed syntax tree.
   ASTContext &ctx = sourceFile->getASTContext();
   auto &sourceMgr = ctx.SourceMgr;
-  StringRef sourceFileText =
-      sourceMgr.getEntireTextForBuffer(*sourceFile->getBufferID());
-  StringRef conditionText =
-      sourceMgr.extractText(Lexer::getCharSourceRangeFromSourceRange(
-          sourceMgr, conditionRange));
+
+  // Extract the full buffer containing the condition.
+  auto bufferID = sourceMgr.findBufferContainingLoc(conditionRange.Start);
+  StringRef sourceFileText = sourceMgr.getEntireTextForBuffer(bufferID);
+
+  // Extract the condition text from that buffer.
+  auto conditionCharRange = Lexer::getCharSourceRangeFromSourceRange(sourceMgr, conditionRange);
+  StringRef conditionText = sourceMgr.extractText(conditionCharRange, bufferID);
+
+  // Evaluate the condition.
   intptr_t evalResult = swift_ASTGen_evaluatePoundIfCondition(
       ctx, &ctx.Diags, sourceFileText, conditionText, shouldEvaluate
   );
