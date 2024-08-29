@@ -473,6 +473,3 @@ $s23variadic_generic_opaque2G2VyAA2S1V_AA2S2VQPGAA1PHPAeA1QHPyHC_AgaJHPyHCHX_HC 
 
 $s9MacroUser0023macro_expandswift_elFCffMX436_4_23bitwidthNumberedStructsfMf_ ---> freestanding macro expansion #1 of bitwidthNumberedStructs in module MacroUser file macro_expand.swift line 437 column 5
 $sxq_IyXd_D ---> @callee_unowned (@in_cxx A) -> (@unowned B)
-$s32def_implicit_lifetime_dependence6deriveyAA10BufferViewVYliS_ADF ---> def_implicit_lifetime_dependence.derive(def_implicit_lifetime_dependence.BufferView) -> inherit lifetime dependence: {0} def_implicit_lifetime_dependence.BufferView
-$s32def_explicit_lifetime_dependence16deriveThisOrThatyAA10BufferViewVYlsSS_AD_ADtF ---> def_explicit_lifetime_dependence.deriveThisOrThat(def_explicit_lifetime_dependence.BufferView, def_explicit_lifetime_dependence.BufferView) -> scope lifetime dependence: {0, 1} def_explicit_lifetime_dependence.BufferView
-$s39explicit_lifetime_dependence_specifiers17deriveThisOrThat2yAA10BufferViewVYliUS_YlsSU_AD_ADntF ---> explicit_lifetime_dependence_specifiers.deriveThisOrThat2(explicit_lifetime_dependence_specifiers.BufferView, __owned explicit_lifetime_dependence_specifiers.BufferView) -> scope lifetime dependence: {0} inherit lifetime dependence: {1} explicit_lifetime_dependence_specifiers.BufferView
