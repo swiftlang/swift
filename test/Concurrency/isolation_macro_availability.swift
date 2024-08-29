@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -target %target-pre-stable-abi-triple
 
 // REQUIRES: concurrency
 // REQUIRES: swift_swift_parser

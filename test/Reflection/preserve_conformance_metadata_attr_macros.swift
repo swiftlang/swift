@@ -4,13 +4,13 @@
 // RUN: %empty-directory(%t/includes)
 
 // Build support Protocols module
-// RUN: %target-build-swift %S/Inputs/PreservedConformanceProtocols.swift -parse-as-library -emit-module -emit-library -module-name PreservedConformanceProtocols -o %t/includes/PreservedConformanceProtocols.o
+// RUN: %target-build-swift -target %target-swift-abi-5.4-triple %S/Inputs/PreservedConformanceProtocols.swift -parse-as-library -emit-module -emit-library -module-name PreservedConformanceProtocols -o %t/includes/PreservedConformanceProtocols.o
 
 // Build the macro library
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/Macros.swift -g -no-toolchain-stdlib-rpath
 
 // Build the test into a binary
-// RUN: %target-build-swift %s -parse-as-library -emit-module -emit-library -module-name PreservedConformances -O -whole-module-optimization -I %t/includes -o %t/PreservedConformances -Xlinker %t/includes/PreservedConformanceProtocols.o -load-plugin-library %t/%target-library-name(MacroDefinition)
+// RUN: %target-build-swift -target %target-swift-abi-5.4-triple  %s -parse-as-library -emit-module -emit-library -module-name PreservedConformances -O -whole-module-optimization -I %t/includes -o %t/PreservedConformances -Xlinker %t/includes/PreservedConformanceProtocols.o -load-plugin-library %t/%target-library-name(MacroDefinition)
 
 // RUN: %target-swift-reflection-dump %t/PreservedConformances | %FileCheck %s
 
