@@ -214,6 +214,7 @@ set(SWIFT_BENCH_MODULES
     cxx-source/CxxVectorSum
     # TODO: rdar://92120528
     # cxx-source/ReadAccessor
+    cxx-source/CxxSpanTests
 )
 
 set(SWIFT_MULTISOURCE_SWIFT_BENCHES
