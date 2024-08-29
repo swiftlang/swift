@@ -94,7 +94,9 @@ class SwiftTestingCMakeShim(cmake_product.CMakeProduct):
             if Version(self.args.darwin_deployment_version_osx) < Version('10.15'):
                 override_deployment_version = '10.15'
 
-        self.cmake_options.define('BUILD_SHARED_LIBS', 'YES')
+        build_shared_libs = not host_target.startswith('wasi')
+        self.cmake_options.define('BUILD_SHARED_LIBS',
+                                  'TRUE' if build_shared_libs else 'FALSE')
 
         # Use empty CMake install prefix, since the `DESTDIR` env var is set by
         # `install_with_cmake` later which already has the same prefix.
