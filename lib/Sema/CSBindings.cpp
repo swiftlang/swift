@@ -1586,6 +1586,24 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       return std::nullopt;
   }
 
+  if (constraint->getKind() == ConstraintKind::LValueObject) {
+    // Allow l-value type inference from its object type, but
+    // not the other way around, that would be handled by constraint
+    // simplification.
+    if (kind == AllowedBindingKind::Subtypes) {
+      if (type->isTypeVariableOrMember())
+        return std::nullopt;
+
+     type = LValueType::get(type);
+    } else {
+      // Right-hand side of the l-value object constraint can only
+      // be bound via constraint simplification when l-value type
+      // is inferred or contextually from other constraints.
+      DelayedBy.push_back(constraint);
+      return std::nullopt;
+    }
+  }
+
   // If the source of the binding is 'OptionalObject' constraint
   // and type variable is on the left-hand side, that means
   // that it _has_ to be of optional type, since the right-hand
@@ -1757,7 +1775,8 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::OptionalObject:
-  case ConstraintKind::UnresolvedMemberChainBase: {
+  case ConstraintKind::UnresolvedMemberChainBase:
+  case ConstraintKind::LValueObject: {
     auto binding = inferFromRelational(constraint);
     if (!binding)
       break;
@@ -1796,11 +1815,6 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::MaterializePackExpansion:
     // Constraints from which we can't do anything.
     break;
-
-  case ConstraintKind::LValueObject: {
-    DelayedBy.push_back(constraint);
-    break;
-  }
 
   // For now let's avoid inferring protocol requirements from
   // this constraint, but in the future we could do that to
