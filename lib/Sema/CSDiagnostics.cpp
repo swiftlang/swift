@@ -9366,8 +9366,7 @@ bool ConcreteTypeSpecialization::diagnoseAsError() {
 }
 
 bool InvalidFunctionSpecialization::diagnoseAsError() {
-  emitDiagnostic(diag::cannot_explicitly_specialize_function,
-                 bool(Decl->getAsGenericContext()));
+  emitDiagnostic(diag::cannot_explicitly_specialize_function, Decl);
   emitDiagnosticAt(Decl, diag::decl_declared_here, Decl);
   return true;
 }

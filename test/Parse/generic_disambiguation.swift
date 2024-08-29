@@ -42,8 +42,8 @@ _ = a>(b)
 _ = a > (b)
 
 generic<Int>(0)
-// expected-swift5-warning@-1{{cannot explicitly specialize a generic function}}
-// expected-swift6-error@-2 {{cannot explicitly specialize a generic function}}
+// expected-swift5-warning@-1{{cannot explicitly specialize global function 'generic'}}
+// expected-swift6-error@-2 {{cannot explicitly specialize global function 'generic'}}
 
 A<B>.c()
 A<A<B>>.c()

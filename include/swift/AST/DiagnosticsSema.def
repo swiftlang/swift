@@ -4607,7 +4607,7 @@ NOTE(duplicated_key_declared_here, none,
 
 // Generic specializations
 ERROR(cannot_explicitly_specialize_function,none,
-      "cannot explicitly specialize a%select{| generic}0 function", (bool))
+      "cannot explicitly specialize %kind0", (ValueDecl *))
 ERROR(not_a_generic_type,none,
       "cannot specialize non-generic type %0", (Type))
 ERROR(not_a_generic_macro,none,
