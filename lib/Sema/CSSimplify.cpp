@@ -14190,8 +14190,26 @@ ConstraintSystem::simplifyLValueObjectConstraint(
     if (!shouldAttemptFixes())
       return SolutionKind::Error;
 
+    auto assessImpact = [&]() -> unsigned {
+      // If this is a projection of a member reference
+      // let's check whether the member is unconditionally
+      // settable, if so than it's a problem with its base.
+      if (locator.directlyAt<UnresolvedDotExpr>()) {
+        auto *memberLoc = getConstraintLocator(locator.getAnchor(),
+                                               ConstraintLocator::Member);
+        if (auto selected = findSelectedOverloadFor(memberLoc)) {
+          if (auto *storage = dyn_cast_or_null<AbstractStorageDecl>(
+                  selected->choice.getDeclOrNull())) {
+            return storage->isSettable(nullptr) ? 1 : 2;
+          }
+        }
+      }
+      return 2;
+    };
+
     if (recordFix(
-            TreatRValueAsLValue::create(*this, getConstraintLocator(locator))))
+            TreatRValueAsLValue::create(*this, getConstraintLocator(locator)),
+            assessImpact()))
       return SolutionKind::Error;
 
     lvalueTy = LValueType::get(lvalueTy);
