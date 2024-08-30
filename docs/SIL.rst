@@ -1177,6 +1177,7 @@ information when inlined.
   sil-function-thunk ::= 'thunk'
   sil-function-thunk ::= 'signature_optimized_thunk'
   sil-function-thunk ::= 'reabstraction_thunk'
+  sil-function-thunk ::= 'back_deployed_thunk'
 
 The function is a compiler generated thunk.
 ::
