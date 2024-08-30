@@ -220,6 +220,7 @@ $ArchX64 = @{
   XCTestInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\Library\XCTest-development";
   SwiftTestingInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\Library\Testing-development";
   ToolchainInstallRoot = "$BinaryCache\x64\toolchains\$ProductVersion+Asserts";
+  EarlyHostToolchainInstallRoot = "$BinaryCache\x64\early-toolchain\$ProductVersion+Asserts";
 }
 
 $ArchX86 = @{
@@ -251,6 +252,7 @@ $ArchARM64 = @{
   XCTestInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\Library\XCTest-development";
   ToolchainInstallRoot = "$BinaryCache\arm64\toolchains\$ProductVersion+Asserts";
   SwiftTestingInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\Library\Testing-development";
+  EarlyHostToolchainInstallRoot = "$BinaryCache\arm64\early-toolchains\$ProductVersion+Asserts";
 }
 
 $AndroidARM64 = @{
@@ -426,6 +428,12 @@ enum HostComponent {
   SymbolKit
   DocC
   SwiftTestingMacros
+  EarlySystem = 40
+  EarlyToolsSupportCore
+  EarlyLLBuild
+  EarlyYams
+  EarlyArgumentParser
+  EarlyDriver
 }
 
 function Get-HostProjectBinaryCache([HostComponent]$Project) {
@@ -832,6 +840,7 @@ function Build-CMakeProject {
     [string[]] $UsePinnedCompilers = @(), # ASM,C,CXX,Swift
     [switch] $UseSwiftSwiftDriver = $false,
     [switch] $AddAndroidCMakeEnv = $false,
+    [switch] $UsePinnedSwiftRuntime = $false,
     [string] $SwiftSDK = "",
     [hashtable] $Defines = @{}, # Values are either single strings or arrays of flags
     [string[]] $BuildTargets = @()
@@ -1121,7 +1130,8 @@ function Build-CMakeProject {
 
     if ($UseBuiltCompilers.Contains("Swift")) {
       $env:Path = "$($BuildArch.SDKInstallRoot)\usr\bin;$($BuildArch.BinaryCache)\cmark-gfm-0.29.0.gfm.13\src;$($BuildArch.ToolchainInstallRoot)\usr\bin;${env:Path}"
-    } elseif ($UsePinnedCompilers.Contains("Swift")) {
+    } 
+    if ($UsePinnedCompilers.Contains("Swift") -Or $UsePinnedSwiftRuntime) {
       $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
     }
     Invoke-Program cmake.exe @cmakeGenerateArgs
@@ -1705,6 +1715,8 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         -Arch $Arch `
         -Platform $Platform `
         -UseBuiltCompilers ASM,C,CXX,Swift `
+        -SwiftSDK $Arch.SDKInstallRoot `
+        -UsePinnedSwiftRuntime `
         -BuildTargets $Targets `
         -Defines (@{
           FOUNDATION_BUILD_TOOLS = if ($Platform -eq "Windows") { "YES" } else { "NO" };
@@ -1810,6 +1822,8 @@ function Build-XCTest([Platform]$Platform, $Arch, [switch]$Test = $false) {
       -Arch $Arch `
       -Platform $Platform `
       -UseBuiltCompilers Swift `
+      -SwiftSDK $Arch.SDKInstallRoot `
+      -UsePinnedSwiftRuntime `
       -BuildTargets $Targets `
       -Defines (@{
         CMAKE_BUILD_WITH_INSTALL_RPATH = "YES";
@@ -1964,6 +1978,21 @@ function Build-System($Arch) {
   }
 }
 
+function Build-EarlySystem($Arch) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-system `
+    -Bin (Get-HostProjectBinaryCache EarlySystem) `
+    -InstallTo "$($Arch.EarlyHostToolchainInstallRoot)\usr" `
+    -Arch $Arch `
+    -Platform Windows `
+    -UsePinnedCompilers C,CXX,Swift `
+    -SwiftSDK (Get-PinnedToolchainSDK) `
+    -BuildTargets default `
+    -Defines @{
+      BUILD_SHARED_LIBS = "YES";
+    }
+}
+
 function Build-ToolsSupportCore($Arch) {
   Build-CMakeProject `
     -Src $SourceCache\swift-tools-support-core `
@@ -1977,6 +2006,22 @@ function Build-ToolsSupportCore($Arch) {
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       SwiftSystem_DIR = (Get-HostProjectCMakeModules System);
+    }
+}
+
+function Build-EarlyToolsSupportCore($Arch) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-tools-support-core `
+    -Bin (Get-HostProjectBinaryCache EarlyToolsSupportCore) `
+    -InstallTo "$($Arch.EarlyHostToolchainInstallRoot)\usr" `
+    -Arch $Arch `
+    -Platform Windows `
+    -UsePinnedCompilers C,CXX,Swift `
+    -SwiftSDK (Get-PinnedToolchainSDK) `
+    -BuildTargets default `
+    -Defines @{
+      BUILD_SHARED_LIBS = "YES";
+      SwiftSystem_DIR = (Get-HostProjectCMakeModules EarlySystem);
     }
 }
 
@@ -2022,6 +2067,29 @@ function Build-LLBuild($Arch, [switch]$Test = $false) {
       })
   }
 }
+function Build-EarlyLLBuild($Arch, [switch]$Test = $false) {
+  Isolate-EnvVars {
+     $Targets = @("default", "install")
+
+    Build-CMakeProject `
+      -Src $SourceCache\llbuild `
+      -Bin (Get-HostProjectBinaryCache EarlyLLBuild) `
+      -InstallTo "$($Arch.EarlyHostToolchainInstallRoot)\usr" `
+      -Arch $Arch `
+      -Platform Windows `
+      -UseMSVCCompilers CXX `
+      -UsePinnedCompilers Swift `
+      -SwiftSDK (Get-PinnedToolchainSDK) `
+      -BuildTargets $Targets `
+      -Defines @{
+        BUILD_SHARED_LIBS = "YES";
+        LLBUILD_SUPPORT_BINDINGS = "Swift";
+        SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.43.2\usr\include";
+        SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.43.2\usr\lib\SQLite3.lib";
+      }
+  }
+}
+
 
 function Build-Yams($Arch) {
   Build-CMakeProject `
@@ -2038,6 +2106,22 @@ function Build-Yams($Arch) {
     }
 }
 
+function Build-EarlyYams($Arch) {
+  Build-CMakeProject `
+    -Src $SourceCache\Yams `
+    -Bin (Get-HostProjectBinaryCache EarlyYams) `
+    -InstallTo "$($Arch.EarlyHostToolchainInstallRoot)\usr" `
+    -Arch $Arch `
+    -Platform Windows `
+    -UsePinnedCompilers C,CXX,Swift `
+    -SwiftSDK (Get-PinnedToolchainSDK) `
+    -BuildTargets default `
+    -Defines @{
+      BUILD_SHARED_LIBS = "NO";
+      BUILD_TESTING = "NO";
+    }
+}
+
 function Build-ArgumentParser($Arch) {
   Build-CMakeProject `
     -Src $SourceCache\swift-argument-parser `
@@ -2047,6 +2131,22 @@ function Build-ArgumentParser($Arch) {
     -Platform Windows `
     -UseBuiltCompilers Swift `
     -SwiftSDK (Get-HostSwiftSDK) `
+    -BuildTargets default `
+    -Defines @{
+      BUILD_SHARED_LIBS = "YES";
+      BUILD_TESTING = "NO";
+    }
+}
+
+function Build-EarlyArgumentParser($Arch) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-argument-parser `
+    -Bin (Get-HostProjectBinaryCache EarlyArgumentParser) `
+    -InstallTo "$($Arch.EarlyHostToolchainInstallRoot)\usr" `
+    -Arch $Arch `
+    -Platform Windows `
+    -UsePinnedCompilers C,CXX,Swift `
+    -SwiftSDK (Get-PinnedToolchainSDK) `
     -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
@@ -2077,6 +2177,33 @@ function Build-Driver($Arch) {
       LLVM_DIR = "$(Get-HostProjectBinaryCache Compilers)\lib\cmake\llvm";
       Clang_DIR = "$(Get-HostProjectBinaryCache Compilers)\lib\cmake\clang";
       Swift_DIR = "$(Get-HostProjectBinaryCache Compilers)\tools\swift\lib\cmake\swift";
+    }
+}
+
+function Build-EarlyDriver($Arch) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-driver `
+    -Bin (Get-HostProjectBinaryCache EarlyDriver) `
+    -InstallTo "$($Arch.EarlyHostToolchainInstallRoot)\usr" `
+    -Arch $Arch `
+    -Platform Windows `
+    -UsePinnedCompilers C,CXX,Swift `
+    -SwiftSDK (Get-PinnedToolchainSDK) `
+    -BuildTargets default `
+    -Defines @{
+      BUILD_SHARED_LIBS = "YES";
+      SwiftSystem_DIR = (Get-HostProjectCMakeModules EarlySystem);
+      TSC_DIR = (Get-HostProjectCMakeModules EarlyToolsSupportCore);
+      LLBuild_DIR = (Get-HostProjectCMakeModules EarlyLLBuild);
+      Yams_DIR = (Get-HostProjectCMakeModules EarlyYams);
+      ArgumentParser_DIR = (Get-HostProjectCMakeModules EarlyArgumentParser);
+      SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.43.2\usr\include";
+      SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.43.2\usr\lib\SQLite3.lib";
+      SWIFT_DRIVER_BUILD_TOOLS = "YES";
+      LLVM_DIR = "$(Get-HostProjectBinaryCache Compilers)\lib\cmake\llvm";
+      Clang_DIR = "$(Get-HostProjectBinaryCache Compilers)\lib\cmake\clang";
+      Swift_DIR = "$(Get-HostProjectBinaryCache Compilers)\tools\swift\lib\cmake\swift";
+      SWIFT_CLANG_LOCATION = (Get-PinnedToolchainTool);
     }
 }
 
@@ -2409,22 +2536,53 @@ if ($Clean) {
   }
 }
 
+# Build early swift driver to use during the build of SDK.
 if (-not $SkipBuild) {
+  Invoke-BuildStep Build-SQLite $HostArch
+
+  Invoke-BuildStep Build-EarlySystem $HostArch
+  Invoke-BuildStep Build-EarlyToolsSupportCore $HostArch
+  Invoke-BuildStep Build-EarlyLLBuild $HostArch
+  Invoke-BuildStep Build-EarlyYams $HostArch
+  Invoke-BuildStep Build-EarlyArgumentParser $HostArch
+  Invoke-BuildStep Build-EarlyDriver $HostArch
+}
+
+if (-not $SkipBuild) {
+  # FIXME: everything should use the arly swift driver.
   foreach ($Arch in $WindowsSDKArchs) {
     Invoke-BuildStep Build-ZLib Windows $Arch
     Invoke-BuildStep Build-XML2 Windows $Arch
     Invoke-BuildStep Build-CURL Windows $Arch
     Invoke-BuildStep Build-LLVM Windows $Arch
 
-    # Build platform: SDK, Redist and XCTest
+    # Build SDK
     Invoke-BuildStep Build-Runtime Windows $Arch
     Invoke-BuildStep Build-Dispatch Windows $Arch
     Invoke-BuildStep Build-FoundationMacros -Build Windows $BuildArch
+  }
+
+  # Copy over the early swift driver binaries into compiler invocation binary dir.  
+  if (-not $ToBatch) {
+    Get-ChildItem -Path "$($HostArch.EarlyHostToolchainInstallRoot)\usr\bin" -Filter *.dll | Copy-Item -Destination "$(Get-HostProjectBinaryCache Compilers)\bin" -Force
+    Get-ChildItem -Path "$($HostArch.EarlyHostToolchainInstallRoot)\usr\bin" -Filter *.exe | Copy-Item -Destination "$(Get-HostProjectBinaryCache Compilers)\bin" -Force
+  } else {
+      Write-Output "Copy early swift driver binaries from '$($HostArch.EarlyHostToolchainInstallRoot)\usr\bin' to '$(Get-HostProjectBinaryCache Compilers)\bin' "
+  }
+  
+  foreach ($Arch in $WindowsSDKArchs) {
+    # Build rest of the runtime, using early swift. driver.
     Invoke-BuildStep Build-Foundation Windows $Arch
     Invoke-BuildStep Build-XCTest Windows $Arch
     Invoke-BuildStep Build-SwiftTesting Windows $Arch
     Invoke-BuildStep Write-PlatformInfoPlist $Arch
   }
+
+  # Remove the early swift driver binary.
+  if (-not $ToBatch) {
+    Remove-item "$(Get-HostProjectBinaryCache Compilers)\bin\swift-driver.exe"
+  }
+
 
   foreach ($Arch in $AndroidSDKArchs) {
     Invoke-BuildStep Build-ZLib Android $Arch
@@ -2468,7 +2626,6 @@ if (-not $ToBatch) {
 if (-not $SkipBuild) {
   # TestingMacros can't be built before the standard library for the host as it is required for the Swift code.
   Invoke-BuildStep Build-SwiftTestingMacros $HostArch
-  Invoke-BuildStep Build-SQLite $HostArch
   Invoke-BuildStep Build-System $HostArch
   Invoke-BuildStep Build-ToolsSupportCore $HostArch
   Invoke-BuildStep Build-LLBuild $HostArch
