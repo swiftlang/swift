@@ -3378,17 +3378,6 @@ ArchetypeType::ArchetypeType(TypeKind Kind,
                           getSubclassTrailingObjects<ProtocolDecl *>());
 }
 
-ArchetypeType *ArchetypeType::getRoot() const {
-  if (isRoot()) {
-    return const_cast<ArchetypeType *>(this);
-  }
-
-  auto gp = InterfaceType->getRootGenericParam();
-  assert(gp && "Missing root generic parameter?");
-  return getGenericEnvironment()->mapTypeIntoContext(
-      Type(gp))->castTo<ArchetypeType>();
-}
-
 bool ArchetypeType::isRoot() const {
   return getInterfaceType()->is<GenericTypeParamType>();
 }
