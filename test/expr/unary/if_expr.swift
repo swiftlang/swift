@@ -557,14 +557,26 @@ func stmts() {
     return
   }
 
-  switch if .random() { true } else { false } { // expected-error {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
-  case _ where if .random() { true } else { false }: // expected-error {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+  switch if .random() { true } else { false } {
+    // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+  case _ where if .random() { true } else { false }:
+    // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+    break
+  case if .random() { true } else { false }:
+    // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+    break
+  case if .random() { true } else { false } && false:
+    // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
     break
   default:
     break
   }
 
-  for b in [true] where if b { true } else { false } {} // expected-error {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+  for b in [true] where if b { true } else { false } {}
+  // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+
+  for _ in if .random() { [true] } else { [false] } {}
+  // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 
   // Make sure this doesn't parse as an if expr pattern with a label.
   let x = 0
