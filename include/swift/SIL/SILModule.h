@@ -343,7 +343,7 @@ private:
   /// projections, shared between all functions in the module.
   std::unique_ptr<IndexTrieNode> indexTrieRoot;
 
-  /// A mapping from root local archetypes to the instructions which define
+  /// A mapping from local generic environments to the instructions which define
   /// them.
   ///
   /// The value is either a SingleValueInstruction or a PlaceholderValue,
@@ -351,10 +351,10 @@ private:
   /// deserializing SIL, where local archetypes can be forward referenced.
   ///
   /// In theory we wouldn't need to have the SILFunction in the key, because
-  /// local archetypes \em should be unique across the module. But currently
+  /// local environments should be unique across the module. But currently
   /// in some rare cases SILGen re-uses the same local archetype for multiple
   /// functions.
-  using LocalArchetypeKey = std::pair<LocalArchetypeType *, SILFunction *>;
+  using LocalArchetypeKey = std::pair<GenericEnvironment *, SILFunction *>;
   llvm::DenseMap<LocalArchetypeKey, SILValue> RootLocalArchetypeDefs;
 
   /// The number of PlaceholderValues in RootLocalArchetypeDefs.
@@ -450,6 +450,15 @@ public:
   void setHasAccessMarkerHandler() {
     hasAccessMarkerHandler = true;
   }
+
+  /// Returns the instruction which defines the given local generic environment,
+  /// e.g. an open_existential_addr.
+  ///
+  /// In case the generic environment is not defined yet (e.g. during parsing or
+  /// deserialization), a PlaceholderValue is returned. This should not be the
+  /// case outside of parsing or deserialization.
+  SILValue getLocalGenericEnvironmentDef(GenericEnvironment *genericEnv,
+                                         SILFunction *inFunction);
 
   /// Returns the instruction which defines the given root local archetype,
   /// e.g. an open_existential_addr.

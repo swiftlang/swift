@@ -208,9 +208,9 @@ void *SILModule::allocateInst(unsigned Size, unsigned Align) const {
 
 void SILModule::willDeleteInstruction(SILInstruction *I) {
   // Update RootLocalArchetypeDefs.
-  I->forEachDefinedLocalArchetype([&](CanLocalArchetypeType archeTy,
-                                      SILValue dependency) {
-    LocalArchetypeKey key = {archeTy, I->getFunction()};
+  I->forEachDefinedLocalEnvironment([&](GenericEnvironment *genericEnv,
+                                        SILValue dependency) {
+    LocalArchetypeKey key = {genericEnv, I->getFunction()};
     // In case `willDeleteInstruction` is called twice for the
     // same instruction, we need to check if the archetype is really
     // still in the map for this instruction.
@@ -674,18 +674,23 @@ void SILModule::registerDeserializationNotificationHandler(
   deserializationNotificationHandlers.add(std::move(handler));
 }
 
-SILValue SILModule::getRootLocalArchetypeDef(CanLocalArchetypeType archetype,
-                                             SILFunction *inFunction) {
-  assert(archetype->isRoot());
-
-  SILValue &def = RootLocalArchetypeDefs[{archetype, inFunction}];
+SILValue SILModule::getLocalGenericEnvironmentDef(GenericEnvironment *genericEnv,
+                                                  SILFunction *inFunction) {
+  SILValue &def = RootLocalArchetypeDefs[{genericEnv, inFunction}];
   if (!def) {
     numUnresolvedLocalArchetypes++;
     def = ::new PlaceholderValue(inFunction,
-                                 SILType::getPrimitiveAddressType(archetype));
+                                 SILType::getPrimitiveAddressType(
+                                    inFunction->getASTContext().TheEmptyTupleType));
   }
 
   return def;
+}
+
+SILValue SILModule::getRootLocalArchetypeDef(CanLocalArchetypeType archetype,
+                                             SILFunction *inFunction) {
+  return getLocalGenericEnvironmentDef(archetype->getGenericEnvironment(),
+                                       inFunction);
 }
 
 void SILModule::reclaimUnresolvedLocalArchetypeDefinitions() {
@@ -757,13 +762,13 @@ unsigned SILModule::getCaseIndex(EnumElementDecl *enumElement) {
 }
 
 void SILModule::notifyAddedInstruction(SILInstruction *inst) {
-  inst->forEachDefinedLocalArchetype([&](CanLocalArchetypeType archeTy,
-                                         SILValue dependency) {
-    SILValue &val = RootLocalArchetypeDefs[{archeTy, inst->getFunction()}];
+  inst->forEachDefinedLocalEnvironment([&](GenericEnvironment *genericEnv,
+                                           SILValue dependency) {
+    SILValue &val = RootLocalArchetypeDefs[{genericEnv, inst->getFunction()}];
     if (val) {
       if (!isa<PlaceholderValue>(val)) {
         // Print a useful error message (and not just abort with an assert).
-        llvm::errs() << "re-definition of root local archetype in function "
+        llvm::errs() << "re-definition of local environment in function "
                      << inst->getFunction()->getName() << ":\n";
         inst->print(llvm::errs());
         llvm::errs() << "previously defined in function "
@@ -771,7 +776,7 @@ void SILModule::notifyAddedInstruction(SILInstruction *inst) {
         val->print(llvm::errs());
         abort();
       }
-      // The local archetype was unresolved so far. Replace the placeholder
+      // The local environment was unresolved so far. Replace the placeholder
       // by inst.
       auto *placeholder = cast<PlaceholderValue>(val);
       placeholder->replaceAllUsesWith(dependency);
@@ -792,13 +797,13 @@ void SILModule::notifyMovedInstruction(SILInstruction *inst,
     }
   }
 
-  inst->forEachDefinedLocalArchetype([&](CanLocalArchetypeType archeTy,
-                                         SILValue dependency) {
-    LocalArchetypeKey key = {archeTy, fromFunction};
+  inst->forEachDefinedLocalEnvironment([&](GenericEnvironment *genericEnv,
+                                           SILValue dependency) {
+    LocalArchetypeKey key = {genericEnv, fromFunction};
     assert(RootLocalArchetypeDefs.lookup(key) == dependency &&
            "archetype def was not registered");
     RootLocalArchetypeDefs.erase(key);
-    RootLocalArchetypeDefs[{archeTy, inst->getFunction()}] = dependency;
+    RootLocalArchetypeDefs[{genericEnv, inst->getFunction()}] = dependency;
   });
 }
 

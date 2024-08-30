@@ -531,17 +531,14 @@ SILGenFunction::emitPointerToPointer(SILLocation loc,
     origValue = emitManagedBufferWithCleanup(origBuf);
   }
   // Invoke the conversion intrinsic to convert to the destination type.
-  auto *proto = getPointerProtocol();
-  auto firstSubMap = inputType->getContextSubstitutionMap(proto);
-  auto secondSubMap = outputType->getContextSubstitutionMap(proto);
+  SmallVector<Type, 2> replacementTypes;
+  replacementTypes.push_back(inputType);
+  replacementTypes.push_back(outputType);
 
   auto genericSig = converter->getGenericSignature();
   auto subMap =
-    SubstitutionMap::combineSubstitutionMaps(firstSubMap,
-                                             secondSubMap,
-                                             CombineSubstitutionMaps::AtIndex,
-                                             1, 0,
-                                             genericSig);
+    SubstitutionMap::get(genericSig, replacementTypes,
+                         LookUpConformanceInModule());
   
   return emitApplyOfLibraryIntrinsic(loc, converter, subMap, origValue, C);
 }
