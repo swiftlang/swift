@@ -33,6 +33,11 @@ public enum E2 {
     case baz
 }
 
+public enum Expr {
+    case Const(Int)
+    indirect case Neg(Expr)
+}
+
 public struct S {
     public var x: Int64
     
