@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "sourcekitd/DeclarationsArray.h"
 #include "sourcekitd/DictionaryKeys.h"
 #include "sourcekitd/Internal.h"
 #include "sourcekitd/CodeCompletionResultsArray.h"
@@ -247,6 +248,7 @@ public:
   sourcekitd_variant_type_t getVariantType() const override {
     switch (getBufferKind()) {
       case CustomBufferKind::TokenAnnotationsArray:
+      case CustomBufferKind::DeclarationsArray:
       case CustomBufferKind::DocSupportAnnotationArray:
       case CustomBufferKind::CodeCompletionResultsArray:
       case CustomBufferKind::DocStructureArray:
@@ -975,6 +977,9 @@ static sourcekitd_variant_t variantFromSKDObject(SKDObjectRef Object) {
     switch(DataObject->getBufferKind()) {
       case CustomBufferKind::TokenAnnotationsArray:
         return {{ (uintptr_t)getVariantFunctionsForTokenAnnotationsArray(),
+          (uintptr_t)DataObject->getDataPtr(), 0 }};
+      case CustomBufferKind::DeclarationsArray:
+        return {{ (uintptr_t)sourcekitd::getVariantFunctionsForDeclarationsArray(),
           (uintptr_t)DataObject->getDataPtr(), 0 }};
       case CustomBufferKind::DocSupportAnnotationArray:
         return {{ (uintptr_t)getVariantFunctionsForDocSupportAnnotationArray(),
