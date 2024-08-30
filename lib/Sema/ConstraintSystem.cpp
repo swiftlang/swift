@@ -2639,31 +2639,6 @@ static unsigned getApplicationLevel(ConstraintSystem &CS, Type baseTy,
   return level;
 }
 
-bool ConstraintSystem::isPartialApplication(ConstraintLocator *locator) {
-  // If this is a compiler synthesized implicit conversion, let's skip
-  // the check because the base of `UDE` is not the base of the injected
-  // initializer.
-  if (locator->isLastElement<LocatorPathElt::ConstructorMember>() &&
-      locator->findFirst<LocatorPathElt::ImplicitConversion>())
-    return false;
-
-  if (locator->directlyAt<OverloadedDeclRefExpr>()) {
-    auto *ODRE = castToExpr<OverloadedDeclRefExpr>(locator->getAnchor());
-    return ODRE->getFunctionRefKind() == FunctionRefKind::Unapplied;
-  }
-
-  auto *UDE = getAsExpr<UnresolvedDotExpr>(locator->getAnchor());
-  if (UDE == nullptr)
-    return false;
-
-  auto baseTy =
-      simplifyType(getType(UDE->getBase()))->getWithoutSpecifierType();
-  auto level = getApplicationLevel(*this, baseTy, UDE);
-  // Static members have base applied implicitly which means that their
-  // application level is lower.
-  return level < (baseTy->is<MetatypeType>() ? 1 : 2);
-}
-
 bool IsInLeftHandSideOfAssignment::operator()(Expr *expr) const {
   // Walk up the parent tree.
   auto parent = cs.getParentExpr(expr);

@@ -5609,8 +5609,6 @@ public:
     return range.isValid() ? range : std::optional<SourceRange>();
   }
 
-  bool isPartialApplication(ConstraintLocator *locator);
-
   bool isTooComplex(size_t solutionMemory) {
     if (isAlreadyTooComplex.first)
       return true;
