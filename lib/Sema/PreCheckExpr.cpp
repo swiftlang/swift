@@ -956,523 +956,521 @@ TypeChecker::getSelfForInitDelegationInConstructor(DeclContext *DC,
 }
 
 namespace {
-  /// Update the function reference kind based on adding a direct call to a
-  /// callee with this kind.
-  FunctionRefKind addingDirectCall(FunctionRefKind kind) {
-    switch (kind) {
-    case FunctionRefKind::Unapplied:
-      return FunctionRefKind::SingleApply;
+/// Update the function reference kind based on adding a direct call to a
+/// callee with this kind.
+FunctionRefKind addingDirectCall(FunctionRefKind kind) {
+  switch (kind) {
+  case FunctionRefKind::Unapplied:
+    return FunctionRefKind::SingleApply;
 
-    case FunctionRefKind::SingleApply:
-    case FunctionRefKind::DoubleApply:
-      return FunctionRefKind::DoubleApply;
+  case FunctionRefKind::SingleApply:
+  case FunctionRefKind::DoubleApply:
+    return FunctionRefKind::DoubleApply;
 
-    case FunctionRefKind::Compound:
-      return FunctionRefKind::Compound;
-    }
-
-    llvm_unreachable("Unhandled FunctionRefKind in switch.");
+  case FunctionRefKind::Compound:
+    return FunctionRefKind::Compound;
   }
 
-  /// Update a direct callee expression node that has a function reference kind
-  /// based on seeing a call to this callee.
-  template<typename E,
-           typename = decltype(((E*)nullptr)->getFunctionRefKind())>
-  void tryUpdateDirectCalleeImpl(E *callee, int) {
-    callee->setFunctionRefKind(addingDirectCall(callee->getFunctionRefKind()));
+  llvm_unreachable("Unhandled FunctionRefKind in switch.");
+}
+
+/// Update a direct callee expression node that has a function reference kind
+/// based on seeing a call to this callee.
+template <typename E, typename = decltype(((E *)nullptr)->getFunctionRefKind())>
+void tryUpdateDirectCalleeImpl(E *callee, int) {
+  callee->setFunctionRefKind(addingDirectCall(callee->getFunctionRefKind()));
+}
+
+/// Version of tryUpdateDirectCalleeImpl for when the callee
+/// expression type doesn't carry a reference.
+template <typename E>
+void tryUpdateDirectCalleeImpl(E *callee, ...) {}
+
+/// The given expression is the direct callee of a call expression; mark it to
+/// indicate that it has been called.
+void markDirectCallee(Expr *callee) {
+  while (true) {
+    // Look through identity expressions.
+    if (auto identity = dyn_cast<IdentityExpr>(callee)) {
+      callee = identity->getSubExpr();
+      continue;
+    }
+
+    // Look through unresolved 'specialize' expressions.
+    if (auto specialize = dyn_cast<UnresolvedSpecializeExpr>(callee)) {
+      callee = specialize->getSubExpr();
+      continue;
+    }
+
+    // Look through optional binding.
+    if (auto bindOptional = dyn_cast<BindOptionalExpr>(callee)) {
+      callee = bindOptional->getSubExpr();
+      continue;
+    }
+
+    // Look through forced binding.
+    if (auto force = dyn_cast<ForceValueExpr>(callee)) {
+      callee = force->getSubExpr();
+      continue;
+    }
+
+    // Calls compose.
+    if (auto call = dyn_cast<CallExpr>(callee)) {
+      callee = call->getFn();
+      continue;
+    }
+
+    // We're done.
+    break;
   }
 
-  /// Version of tryUpdateDirectCalleeImpl for when the callee
-  /// expression type doesn't carry a reference.
-  template<typename E>
-  void tryUpdateDirectCalleeImpl(E *callee, ...) { }
-
-  /// The given expression is the direct callee of a call expression; mark it to
-  /// indicate that it has been called.
-  void markDirectCallee(Expr *callee) {
-    while (true) {
-      // Look through identity expressions.
-      if (auto identity = dyn_cast<IdentityExpr>(callee)) {
-        callee = identity->getSubExpr();
-        continue;
-      }
-
-      // Look through unresolved 'specialize' expressions.
-      if (auto specialize = dyn_cast<UnresolvedSpecializeExpr>(callee)) {
-        callee = specialize->getSubExpr();
-        continue;
-      }
-      
-      // Look through optional binding.
-      if (auto bindOptional = dyn_cast<BindOptionalExpr>(callee)) {
-        callee = bindOptional->getSubExpr();
-        continue;
-      }
-
-      // Look through forced binding.
-      if (auto force = dyn_cast<ForceValueExpr>(callee)) {
-        callee = force->getSubExpr();
-        continue;
-      }
-
-      // Calls compose.
-      if (auto call = dyn_cast<CallExpr>(callee)) {
-        callee = call->getFn();
-        continue;
-      }
-
-      // We're done.
-      break;
-    }
-                                
-    // Cast the callee to its most-specific class, then try to perform an
-    // update. If the expression node has a declaration reference in it, the
-    // update will succeed. Otherwise, we're done propagating.
-    switch (callee->getKind()) {
-#define EXPR(Id, Parent)                                  \
-    case ExprKind::Id:                                    \
-      tryUpdateDirectCalleeImpl(cast<Id##Expr>(callee), 0); \
-      break;
+  // Cast the callee to its most-specific class, then try to perform an
+  // update. If the expression node has a declaration reference in it, the
+  // update will succeed. Otherwise, we're done propagating.
+  switch (callee->getKind()) {
+#define EXPR(Id, Parent)                                                       \
+  case ExprKind::Id:                                                           \
+    tryUpdateDirectCalleeImpl(cast<Id##Expr>(callee), 0);                      \
+    break;
 #include "swift/AST/ExprNodes.def"
-    }
+  }
+}
+
+class PreCheckExpression : public ASTWalker {
+  ASTContext &Ctx;
+  DeclContext *DC;
+
+  /// A stack of expressions being walked, used to determine where to
+  /// insert RebindSelfInConstructorExpr nodes.
+  llvm::SmallVector<Expr *, 8> ExprStack;
+
+  /// The 'self' variable to use when rebinding 'self' in a constructor.
+  VarDecl *UnresolvedCtorSelf = nullptr;
+
+  /// The expression that will be wrapped by a RebindSelfInConstructorExpr
+  /// node when visited.
+  Expr *UnresolvedCtorRebindTarget = nullptr;
+
+  /// Keep track of acceptable DiscardAssignmentExpr's.
+  llvm::SmallPtrSet<DiscardAssignmentExpr *, 2> CorrectDiscardAssignmentExprs;
+
+  /// Simplify expressions which are type sugar productions that got parsed
+  /// as expressions due to the parser not knowing which identifiers are
+  /// type names.
+  TypeExpr *simplifyTypeExpr(Expr *E);
+
+  /// Simplify unresolved dot expressions which are nested type productions.
+  TypeExpr *simplifyNestedTypeExpr(UnresolvedDotExpr *UDE);
+
+  TypeExpr *simplifyUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *USE);
+
+  /// Simplify a key path expression into a canonical form.
+  void resolveKeyPathExpr(KeyPathExpr *KPE);
+
+  /// Simplify constructs like `UInt32(1)` into `1 as UInt32` if
+  /// the type conforms to the expected literal protocol.
+  ///
+  /// \returns Either a transformed expression, or `ErrorExpr` upon type
+  /// resolution failure, or `nullptr` if transformation is not applicable.
+  Expr *simplifyTypeConstructionWithLiteralArg(Expr *E);
+
+  /// Whether the given expression "looks like" a (possibly sugared) type. For
+  /// example, `(foo, bar)` "looks like" a type, but `foo + bar` does not.
+  bool exprLooksLikeAType(Expr *expr);
+
+  /// Whether the current expression \p E is in a context that might turn out
+  /// to be a \c TypeExpr after \c simplifyTypeExpr is called up the tree.
+  /// This function allows us to make better guesses about whether invalid
+  /// uses of '_' were "supposed" to be \c DiscardAssignmentExprs or patterns,
+  /// which results in better diagnostics after type checking.
+  bool possiblyInTypeContext(Expr *E);
+
+  /// Whether we can simplify the given discard assignment expr. Not possible
+  /// if it's been marked "valid" or if the current state of the AST disallows
+  /// such simplification (see \c canSimplifyPlaceholderTypes above).
+  bool canSimplifyDiscardAssignmentExpr(DiscardAssignmentExpr *DAE);
+
+  /// In Swift < 5, diagnose and correct invalid multi-argument or
+  /// argument-labeled interpolations. Returns \c true if the AST walk should
+  /// continue, or \c false if it should be aborted.
+  bool correctInterpolationIfStrange(InterpolatedStringLiteralExpr *ISLE);
+
+  /// Scout out the specified destination of an AssignExpr to recursively
+  /// identify DiscardAssignmentExpr in legal places.  We can only allow them
+  /// in simple pattern-like expressions, so we reject anything complex here.
+  void markAcceptableDiscardExprs(Expr *E);
+
+public:
+  PreCheckExpression(DeclContext *dc) : Ctx(dc->getASTContext()), DC(dc) {}
+
+  ASTContext &getASTContext() const { return Ctx; }
+
+  bool walkToClosureExprPre(ClosureExpr *expr);
+
+  bool shouldWalkCaptureInitializerExpressions() override { return true; }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
   }
 
-  class PreCheckExpression : public ASTWalker {
-    ASTContext &Ctx;
-    DeclContext *DC;
+  VarDecl *getImplicitSelfDeclForSuperContext(SourceLoc Loc);
 
-    /// A stack of expressions being walked, used to determine where to
-    /// insert RebindSelfInConstructorExpr nodes.
-    llvm::SmallVector<Expr *, 8> ExprStack;
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+    auto &diags = Ctx.Diags;
 
-    /// The 'self' variable to use when rebinding 'self' in a constructor.
-    VarDecl *UnresolvedCtorSelf = nullptr;
-
-    /// The expression that will be wrapped by a RebindSelfInConstructorExpr
-    /// node when visited.
-    Expr *UnresolvedCtorRebindTarget = nullptr;
-
-    /// Keep track of acceptable DiscardAssignmentExpr's.
-    llvm::SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
-
-    /// Simplify expressions which are type sugar productions that got parsed
-    /// as expressions due to the parser not knowing which identifiers are
-    /// type names.
-    TypeExpr *simplifyTypeExpr(Expr *E);
-
-    /// Simplify unresolved dot expressions which are nested type productions.
-    TypeExpr *simplifyNestedTypeExpr(UnresolvedDotExpr *UDE);
-
-    TypeExpr *simplifyUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *USE);
-
-    /// Simplify a key path expression into a canonical form.
-    void resolveKeyPathExpr(KeyPathExpr *KPE);
-
-    /// Simplify constructs like `UInt32(1)` into `1 as UInt32` if
-    /// the type conforms to the expected literal protocol.
-    ///
-    /// \returns Either a transformed expression, or `ErrorExpr` upon type
-    /// resolution failure, or `nullptr` if transformation is not applicable.
-    Expr *simplifyTypeConstructionWithLiteralArg(Expr *E);
-
-    /// Whether the given expression "looks like" a (possibly sugared) type. For
-    /// example, `(foo, bar)` "looks like" a type, but `foo + bar` does not.
-    bool exprLooksLikeAType(Expr *expr);
-
-    /// Whether the current expression \p E is in a context that might turn out
-    /// to be a \c TypeExpr after \c simplifyTypeExpr is called up the tree.
-    /// This function allows us to make better guesses about whether invalid
-    /// uses of '_' were "supposed" to be \c DiscardAssignmentExprs or patterns,
-    /// which results in better diagnostics after type checking.
-    bool possiblyInTypeContext(Expr *E);
-
-    /// Whether we can simplify the given discard assignment expr. Not possible
-    /// if it's been marked "valid" or if the current state of the AST disallows
-    /// such simplification (see \c canSimplifyPlaceholderTypes above).
-    bool canSimplifyDiscardAssignmentExpr(DiscardAssignmentExpr *DAE);
-
-    /// In Swift < 5, diagnose and correct invalid multi-argument or
-    /// argument-labeled interpolations. Returns \c true if the AST walk should
-    /// continue, or \c false if it should be aborted.
-    bool correctInterpolationIfStrange(InterpolatedStringLiteralExpr *ISLE);
-
-    /// Scout out the specified destination of an AssignExpr to recursively
-    /// identify DiscardAssignmentExpr in legal places.  We can only allow them
-    /// in simple pattern-like expressions, so we reject anything complex here.
-    void markAcceptableDiscardExprs(Expr *E);
-
-  public:
-    PreCheckExpression(DeclContext *dc) : Ctx(dc->getASTContext()), DC(dc) {}
-
-    ASTContext &getASTContext() const { return Ctx; }
-
-    bool walkToClosureExprPre(ClosureExpr *expr);
-
-    bool shouldWalkCaptureInitializerExpressions() override { return true; }
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Arguments;
+    // Fold sequence expressions.
+    if (auto *seqExpr = dyn_cast<SequenceExpr>(expr)) {
+      auto result = TypeChecker::foldSequence(seqExpr, DC);
+      result = result->walk(*this);
+      if (!result)
+        return Action::Stop();
+      // Already walked.
+      return Action::SkipNode(result);
     }
 
-    VarDecl *getImplicitSelfDeclForSuperContext(SourceLoc Loc) ;
-
-    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
-      auto &diags = Ctx.Diags;
-
-      // Fold sequence expressions.
-      if (auto *seqExpr = dyn_cast<SequenceExpr>(expr)) {
-        auto result = TypeChecker::foldSequence(seqExpr, DC);
-        result = result->walk(*this);
-        if (!result)
-          return Action::Stop();
-        // Already walked.
-        return Action::SkipNode(result);
+    // FIXME(diagnostics): `InOutType` could appear here as a result
+    // of successful re-typecheck of the one of the sub-expressions e.g.
+    // `let _: Int = { (s: inout S) in s.bar() }`. On the first
+    // attempt to type-check whole expression `s.bar()` - is going
+    // to have a base which points directly to declaration of `S`.
+    // But when diagnostics attempts to type-check `s.bar()` standalone
+    // its base would be transformed into `InOutExpr -> DeclRefExr`,
+    // and `InOutType` is going to be recorded in constraint system.
+    // One possible way to fix this (if diagnostics still use typecheck)
+    // might be to make it so self is not wrapped into `InOutExpr`
+    // but instead used as @lvalue type in some case of mutable members.
+    if (!expr->isImplicit()) {
+      if (isa<MemberRefExpr>(expr) || isa<DynamicMemberRefExpr>(expr)) {
+        auto *LE = cast<LookupExpr>(expr);
+        if (auto *IOE = dyn_cast<InOutExpr>(LE->getBase()))
+          LE->setBase(IOE->getSubExpr());
       }
 
-      // FIXME(diagnostics): `InOutType` could appear here as a result
-      // of successful re-typecheck of the one of the sub-expressions e.g.
-      // `let _: Int = { (s: inout S) in s.bar() }`. On the first
-      // attempt to type-check whole expression `s.bar()` - is going
-      // to have a base which points directly to declaration of `S`.
-      // But when diagnostics attempts to type-check `s.bar()` standalone
-      // its base would be transformed into `InOutExpr -> DeclRefExr`,
-      // and `InOutType` is going to be recorded in constraint system.
-      // One possible way to fix this (if diagnostics still use typecheck)
-      // might be to make it so self is not wrapped into `InOutExpr`
-      // but instead used as @lvalue type in some case of mutable members.
-      if (!expr->isImplicit()) {
-        if (isa<MemberRefExpr>(expr) || isa<DynamicMemberRefExpr>(expr)) {
-          auto *LE = cast<LookupExpr>(expr);
-          if (auto *IOE = dyn_cast<InOutExpr>(LE->getBase()))
-            LE->setBase(IOE->getSubExpr());
-        }
-
-        if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(expr)) {
-          if (auto *IOE = dyn_cast<InOutExpr>(DSCE->getBase()))
-            DSCE->setBase(IOE->getSubExpr());
-        }
+      if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(expr)) {
+        if (auto *IOE = dyn_cast<InOutExpr>(DSCE->getBase()))
+          DSCE->setBase(IOE->getSubExpr());
       }
+    }
 
-      // Local function used to finish up processing before returning. Every
-      // return site should call through here.
-      auto finish = [&](bool recursive, Expr *expr) -> PreWalkResult<Expr *> {
-        if (!expr)
-          return Action::Stop();
+    // Local function used to finish up processing before returning. Every
+    // return site should call through here.
+    auto finish = [&](bool recursive, Expr *expr) -> PreWalkResult<Expr *> {
+      if (!expr)
+        return Action::Stop();
 
-        // If we're going to recurse, record this expression on the stack.
-        if (recursive)
-          ExprStack.push_back(expr);
+      // If we're going to recurse, record this expression on the stack.
+      if (recursive)
+        ExprStack.push_back(expr);
 
-        return Action::VisitNodeIf(recursive, expr);
-      };
+      return Action::VisitNodeIf(recursive, expr);
+    };
 
-      // Resolve 'super' references.
-      if (auto *superRef = dyn_cast<SuperRefExpr>(expr)) {
-        auto loc = superRef->getLoc();
+    // Resolve 'super' references.
+    if (auto *superRef = dyn_cast<SuperRefExpr>(expr)) {
+      auto loc = superRef->getLoc();
 
-        auto *selfDecl = getImplicitSelfDeclForSuperContext(loc);
-        if (selfDecl == nullptr)
-          return finish(false, new (Ctx) ErrorExpr(loc));
+      auto *selfDecl = getImplicitSelfDeclForSuperContext(loc);
+      if (selfDecl == nullptr)
+        return finish(false, new (Ctx) ErrorExpr(loc));
 
-        superRef->setSelf(selfDecl);
+      superRef->setSelf(selfDecl);
 
-        const bool isValidSuper = [&]() -> bool {
-          auto *parentExpr = Parent.getAsExpr();
-          if (!parentExpr) {
-            return false;
-          }
-
-          if (isa<UnresolvedDotExpr>(parentExpr) ||
-              isa<MemberRefExpr>(parentExpr)) {
-            return true;
-          } else if (auto *SE = dyn_cast<SubscriptExpr>(parentExpr)) {
-            // 'super[]' is valid, but 'x[super]' is not.
-            return superRef == SE->getBase();
-          }
-
+      const bool isValidSuper = [&]() -> bool {
+        auto *parentExpr = Parent.getAsExpr();
+        if (!parentExpr) {
           return false;
-        }();
-
-        // NB: This is done along the happy path because presenting this error
-        // in a context where 'super' is not legal to begin with is not helpful.
-        if (!isValidSuper) {
-          // Diagnose and keep going. It is important for source tooling such
-          // as code completion that Sema is able to provide type information
-          // for 'super' in arbitrary positions inside expressions.
-          diags.diagnose(loc, diag::super_invalid_parent_expr);
         }
 
-        return finish(true, superRef);
-      }
-
-      // For closures, type-check the patterns and result type as written,
-      // but do not walk into the body. That will be type-checked after
-      // we've determine the complete function type.
-      if (auto closure = dyn_cast<ClosureExpr>(expr))
-        return finish(walkToClosureExprPre(closure), expr);
-
-      if (auto *unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr))
-        return finish(true, TypeChecker::resolveDeclRefExpr(unresolved, DC));
-
-      // Let's try to figure out if `InOutExpr` is out of place early
-      // otherwise there is a risk of producing solutions which can't
-      // be later applied to AST and would result in the crash in some
-      // cases. Such expressions are only allowed in argument positions
-      // of function/operator calls.
-      if (isa<InOutExpr>(expr)) {
-        // If this is an implicit `inout` expression we assume that
-        // compiler knowns what it's doing.
-        if (expr->isImplicit())
-          return finish(true, expr);
-
-        ArrayRef<Expr *> parents = ExprStack;
-        auto takeNextParent = [&]() -> Expr * {
-          if (parents.empty())
-            return nullptr;
-
-          auto parent = parents.back();
-          parents = parents.drop_back();
-          return parent;
-        };
-        if (auto *parent = takeNextParent()) {
-          SourceLoc lastInnerParenLoc;
-          // Unwrap to the outermost paren in the sequence.
-          // e.g. `foo(((&bar))`
-          while (auto *PE = dyn_cast<ParenExpr>(parent)) {
-            auto nextParent = takeNextParent();
-            if (!nextParent)
-              break;
-
-            lastInnerParenLoc = PE->getLParenLoc();
-            parent = nextParent;
-          }
-
-          if (isa<ApplyExpr>(parent) || isa<UnresolvedMemberExpr>(parent)) {
-            // If outermost paren is associated with a call or
-            // a member reference, it might be valid to have `&`
-            // before all of the parens.
-            if (lastInnerParenLoc.isValid()) {
-              auto diag = diags.diagnose(expr->getStartLoc(),
-                                         diag::extraneous_address_of);
-              diag.fixItExchange(expr->getLoc(), lastInnerParenLoc);
-            }
-            return finish(true, expr);
-          }
-
-          if (isa<SubscriptExpr>(parent)) {
-            diags.diagnose(expr->getStartLoc(),
-                           diag::cannot_pass_inout_arg_to_subscript);
-            return finish(false, nullptr);
-          }
+        if (isa<UnresolvedDotExpr>(parentExpr) ||
+            isa<MemberRefExpr>(parentExpr)) {
+          return true;
+        } else if (auto *SE = dyn_cast<SubscriptExpr>(parentExpr)) {
+          // 'super[]' is valid, but 'x[super]' is not.
+          return superRef == SE->getBase();
         }
 
-        diags.diagnose(expr->getStartLoc(), diag::extraneous_address_of);
-        return finish(false, nullptr);
+        return false;
+      }();
+
+      // NB: This is done along the happy path because presenting this error
+      // in a context where 'super' is not legal to begin with is not helpful.
+      if (!isValidSuper) {
+        // Diagnose and keep going. It is important for source tooling such
+        // as code completion that Sema is able to provide type information
+        // for 'super' in arbitrary positions inside expressions.
+        diags.diagnose(loc, diag::super_invalid_parent_expr);
       }
 
-      if (auto *ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr)) {
-        if (!correctInterpolationIfStrange(ISLE))
-          return finish(false, nullptr);
-      }
-
-      if (auto *assignment = dyn_cast<AssignExpr>(expr))
-        markAcceptableDiscardExprs(assignment->getDest());
-
-      return finish(true, expr);
+      return finish(true, superRef);
     }
 
-    PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
-      // Remove this expression from the stack.
-      assert(ExprStack.back() == expr);
-      ExprStack.pop_back();
+    // For closures, type-check the patterns and result type as written,
+    // but do not walk into the body. That will be type-checked after
+    // we've determine the complete function type.
+    if (auto closure = dyn_cast<ClosureExpr>(expr))
+      return finish(walkToClosureExprPre(closure), expr);
 
-      // Type check the type parameters in an UnresolvedSpecializeExpr.
-      if (auto *us = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
-        if (auto *typeExpr = simplifyUnresolvedSpecializeExpr(us))
-          return Action::Continue(typeExpr);
-      }
+    if (auto *unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr))
+      return finish(true, TypeChecker::resolveDeclRefExpr(unresolved, DC));
 
-      // Check whether this is standalone `self` in init accessor, which
-      // is invalid.
-      if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
-        if (auto *accessor = DC->getInnermostPropertyAccessorContext()) {
-          if (accessor->isInitAccessor() &&
-              accessor->getImplicitSelfDecl() == DRE->getDecl() &&
-              !isa_and_nonnull<UnresolvedDotExpr>(Parent.getAsExpr())) {
-            Ctx.Diags.diagnose(DRE->getLoc(),
-                               diag::invalid_use_of_self_in_init_accessor);
-            return Action::Continue(new (Ctx) ErrorExpr(DRE->getSourceRange()));
-          }
-        }
-      }
+    // Let's try to figure out if `InOutExpr` is out of place early
+    // otherwise there is a risk of producing solutions which can't
+    // be later applied to AST and would result in the crash in some
+    // cases. Such expressions are only allowed in argument positions
+    // of function/operator calls.
+    if (isa<InOutExpr>(expr)) {
+      // If this is an implicit `inout` expression we assume that
+      // compiler knowns what it's doing.
+      if (expr->isImplicit())
+        return finish(true, expr);
 
-      // If we're about to step out of a ClosureExpr, restore the DeclContext.
-      if (auto *ce = dyn_cast<ClosureExpr>(expr)) {
-        assert(DC == ce && "DeclContext imbalance");
-        DC = ce->getParent();
-      }
+      ArrayRef<Expr *> parents = ExprStack;
+      auto takeNextParent = [&]() -> Expr * {
+        if (parents.empty())
+          return nullptr;
 
-      if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
-        // Mark the direct callee as being a callee.
-        markDirectCallee(apply->getFn());
-
-        // A 'self.init' or 'super.init' application inside a constructor will
-        // evaluate to void, with the initializer's result implicitly rebound
-        // to 'self'. Recognize the unresolved constructor expression and
-        // determine where to place the RebindSelfInConstructorExpr node.
-        //
-        // When updating this logic, also may need to also update
-        // RebindSelfInConstructorExpr::getCalledConstructor.
-        VarDecl *self = nullptr;
-        if (auto *unresolvedDot =
-                dyn_cast<UnresolvedDotExpr>(apply->getSemanticFn())) {
-          self = TypeChecker::getSelfForInitDelegationInConstructor(
-              DC, unresolvedDot);
-        }
-
-        if (self) {
-          // Walk our ancestor expressions looking for the appropriate place
-          // to insert the RebindSelfInConstructorExpr.
-          Expr *target = apply;
-          for (auto ancestor : llvm::reverse(ExprStack)) {
-            if (isa<IdentityExpr>(ancestor) || isa<ForceValueExpr>(ancestor) ||
-                isa<AnyTryExpr>(ancestor)) {
-              target = ancestor;
-              continue;
-            }
-
-            if (isa<RebindSelfInConstructorExpr>(ancestor)) {
-              // If we already have a rebind, then we're re-typechecking an
-              // expression and are done.
-              target = nullptr;
-            }
-
-            // No other expression kinds are permitted.
+        auto parent = parents.back();
+        parents = parents.drop_back();
+        return parent;
+      };
+      if (auto *parent = takeNextParent()) {
+        SourceLoc lastInnerParenLoc;
+        // Unwrap to the outermost paren in the sequence.
+        // e.g. `foo(((&bar))`
+        while (auto *PE = dyn_cast<ParenExpr>(parent)) {
+          auto nextParent = takeNextParent();
+          if (!nextParent)
             break;
-          }
 
-          // If we found a rebind target, note the insertion point.
-          if (target) {
-            UnresolvedCtorRebindTarget = target;
-            UnresolvedCtorSelf = self;
+          lastInnerParenLoc = PE->getLParenLoc();
+          parent = nextParent;
+        }
+
+        if (isa<ApplyExpr>(parent) || isa<UnresolvedMemberExpr>(parent)) {
+          // If outermost paren is associated with a call or
+          // a member reference, it might be valid to have `&`
+          // before all of the parens.
+          if (lastInnerParenLoc.isValid()) {
+            auto diag = diags.diagnose(expr->getStartLoc(),
+                                       diag::extraneous_address_of);
+            diag.fixItExchange(expr->getLoc(), lastInnerParenLoc);
           }
+          return finish(true, expr);
+        }
+
+        if (isa<SubscriptExpr>(parent)) {
+          diags.diagnose(expr->getStartLoc(),
+                         diag::cannot_pass_inout_arg_to_subscript);
+          return finish(false, nullptr);
         }
       }
 
-      auto &ctx = getASTContext();
+      diags.diagnose(expr->getStartLoc(), diag::extraneous_address_of);
+      return finish(false, nullptr);
+    }
 
-      // If the expression we've found is the intended target of an
-      // RebindSelfInConstructorExpr, wrap it in the
-      // RebindSelfInConstructorExpr.
-      if (expr == UnresolvedCtorRebindTarget) {
-        expr = new (ctx)
-            RebindSelfInConstructorExpr(expr, UnresolvedCtorSelf);
-        UnresolvedCtorRebindTarget = nullptr;
-        return Action::Continue(expr);
-      }
+    if (auto *ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr)) {
+      if (!correctInterpolationIfStrange(ISLE))
+        return finish(false, nullptr);
+    }
 
-      // Double check if there are any BindOptionalExpr remaining in the
-      // tree (see comment below for more details), if there are no BOE
-      // expressions remaining remove OptionalEvaluationExpr from the tree.
-      if (auto OEE = dyn_cast<OptionalEvaluationExpr>(expr)) {
-        bool hasBindOptional = false;
-        OEE->forEachChildExpr([&](Expr *expr) -> Expr * {
-          if (isa<BindOptionalExpr>(expr))
-            hasBindOptional = true;
-          // If at least a single BOE was found, no reason
-          // to walk any further in the tree.
-          return hasBindOptional ? nullptr : expr;
-        });
+    if (auto *assignment = dyn_cast<AssignExpr>(expr))
+      markAcceptableDiscardExprs(assignment->getDest());
 
-        return Action::Continue(hasBindOptional ? OEE : OEE->getSubExpr());
-      }
+    return finish(true, expr);
+  }
 
-      // Check if there are any BindOptionalExpr in the tree which
-      // wrap DiscardAssignmentExpr, such situation corresponds to syntax
-      // like - `_? = <value>`, since it doesn't really make
-      // sense to have optional assignment to discarded LValue which can
-      // never be optional, we can remove BOE from the tree and avoid
-      // generating any of the unnecessary constraints.
-      if (auto BOE = dyn_cast<BindOptionalExpr>(expr)) {
-        if (auto DAE = dyn_cast<DiscardAssignmentExpr>(BOE->getSubExpr()))
-          if (CorrectDiscardAssignmentExprs.count(DAE))
-            return Action::Continue(DAE);
-      }
+  PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
+    // Remove this expression from the stack.
+    assert(ExprStack.back() == expr);
+    ExprStack.pop_back();
 
-      // If this is a sugared type that needs to be folded into a single
-      // TypeExpr, do it.
-      if (auto *simplified = simplifyTypeExpr(expr))
-        return Action::Continue(simplified);
+    // Type check the type parameters in an UnresolvedSpecializeExpr.
+    if (auto *us = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
+      if (auto *typeExpr = simplifyUnresolvedSpecializeExpr(us))
+        return Action::Continue(typeExpr);
+    }
 
-      // Diagnose a '_' that isn't on the immediate LHS of an assignment. We
-      // skip diagnostics if we've explicitly marked the expression as valid.
-      if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(expr)) {
-        if (!CorrectDiscardAssignmentExprs.count(DAE)) {
-          ctx.Diags.diagnose(expr->getLoc(),
-                             diag::discard_expr_outside_of_assignment);
-          return Action::Stop();
+    // Check whether this is standalone `self` in init accessor, which
+    // is invalid.
+    if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
+      if (auto *accessor = DC->getInnermostPropertyAccessorContext()) {
+        if (accessor->isInitAccessor() &&
+            accessor->getImplicitSelfDecl() == DRE->getDecl() &&
+            !isa_and_nonnull<UnresolvedDotExpr>(Parent.getAsExpr())) {
+          Ctx.Diags.diagnose(DRE->getLoc(),
+                             diag::invalid_use_of_self_in_init_accessor);
+          return Action::Continue(new (Ctx) ErrorExpr(DRE->getSourceRange()));
         }
       }
+    }
 
-      if (auto KPE = dyn_cast<KeyPathExpr>(expr)) {
-        resolveKeyPathExpr(KPE);
-        return Action::Continue(KPE);
+    // If we're about to step out of a ClosureExpr, restore the DeclContext.
+    if (auto *ce = dyn_cast<ClosureExpr>(expr)) {
+      assert(DC == ce && "DeclContext imbalance");
+      DC = ce->getParent();
+    }
+
+    if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
+      // Mark the direct callee as being a callee.
+      markDirectCallee(apply->getFn());
+
+      // A 'self.init' or 'super.init' application inside a constructor will
+      // evaluate to void, with the initializer's result implicitly rebound
+      // to 'self'. Recognize the unresolved constructor expression and
+      // determine where to place the RebindSelfInConstructorExpr node.
+      //
+      // When updating this logic, also may need to also update
+      // RebindSelfInConstructorExpr::getCalledConstructor.
+      VarDecl *self = nullptr;
+      if (auto *unresolvedDot =
+              dyn_cast<UnresolvedDotExpr>(apply->getSemanticFn())) {
+        self = TypeChecker::getSelfForInitDelegationInConstructor(
+            DC, unresolvedDot);
       }
 
-      if (auto *result = simplifyTypeConstructionWithLiteralArg(expr)) {
-        if (isa<ErrorExpr>(result))
-           return Action::Stop();
-
-        return Action::Continue(result);
-      }
-
-      // If we find an unresolved member chain, wrap it in an
-      // UnresolvedMemberChainResultExpr (unless this has already been done).
-      auto *parent = Parent.getAsExpr();
-      if (isMemberChainTail(expr, parent)) {
-        if (auto *UME = TypeChecker::getUnresolvedMemberChainBase(expr)) {
-          if (!parent || !isa<UnresolvedMemberChainResultExpr>(parent)) {
-            auto *chain = new (ctx) UnresolvedMemberChainResultExpr(expr, UME);
-            return Action::Continue(chain);
+      if (self) {
+        // Walk our ancestor expressions looking for the appropriate place
+        // to insert the RebindSelfInConstructorExpr.
+        Expr *target = apply;
+        for (auto ancestor : llvm::reverse(ExprStack)) {
+          if (isa<IdentityExpr>(ancestor) || isa<ForceValueExpr>(ancestor) ||
+              isa<AnyTryExpr>(ancestor)) {
+            target = ancestor;
+            continue;
           }
+
+          if (isa<RebindSelfInConstructorExpr>(ancestor)) {
+            // If we already have a rebind, then we're re-typechecking an
+            // expression and are done.
+            target = nullptr;
+          }
+
+          // No other expression kinds are permitted.
+          break;
+        }
+
+        // If we found a rebind target, note the insertion point.
+        if (target) {
+          UnresolvedCtorRebindTarget = target;
+          UnresolvedCtorSelf = self;
         }
       }
+    }
+
+    auto &ctx = getASTContext();
+
+    // If the expression we've found is the intended target of an
+    // RebindSelfInConstructorExpr, wrap it in the
+    // RebindSelfInConstructorExpr.
+    if (expr == UnresolvedCtorRebindTarget) {
+      expr = new (ctx) RebindSelfInConstructorExpr(expr, UnresolvedCtorSelf);
+      UnresolvedCtorRebindTarget = nullptr;
       return Action::Continue(expr);
     }
 
-    PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
-      if (auto *RS = dyn_cast<ReturnStmt>(stmt)) {
-        // Pre-check a return statement, which includes potentially turning it
-        // into a FailStmt.
-        auto &eval = Ctx.evaluator;
-        auto *S = evaluateOrDefault(eval, PreCheckReturnStmtRequest{RS, DC},
-                                    nullptr);
-        if (!S)
-          return Action::Stop();
+    // Double check if there are any BindOptionalExpr remaining in the
+    // tree (see comment below for more details), if there are no BOE
+    // expressions remaining remove OptionalEvaluationExpr from the tree.
+    if (auto OEE = dyn_cast<OptionalEvaluationExpr>(expr)) {
+      bool hasBindOptional = false;
+      OEE->forEachChildExpr([&](Expr *expr) -> Expr * {
+        if (isa<BindOptionalExpr>(expr))
+          hasBindOptional = true;
+        // If at least a single BOE was found, no reason
+        // to walk any further in the tree.
+        return hasBindOptional ? nullptr : expr;
+      });
 
-        return Action::Continue(S);
+      return Action::Continue(hasBindOptional ? OEE : OEE->getSubExpr());
+    }
+
+    // Check if there are any BindOptionalExpr in the tree which
+    // wrap DiscardAssignmentExpr, such situation corresponds to syntax
+    // like - `_? = <value>`, since it doesn't really make
+    // sense to have optional assignment to discarded LValue which can
+    // never be optional, we can remove BOE from the tree and avoid
+    // generating any of the unnecessary constraints.
+    if (auto BOE = dyn_cast<BindOptionalExpr>(expr)) {
+      if (auto DAE = dyn_cast<DiscardAssignmentExpr>(BOE->getSubExpr()))
+        if (CorrectDiscardAssignmentExprs.count(DAE))
+          return Action::Continue(DAE);
+    }
+
+    // If this is a sugared type that needs to be folded into a single
+    // TypeExpr, do it.
+    if (auto *simplified = simplifyTypeExpr(expr))
+      return Action::Continue(simplified);
+
+    // Diagnose a '_' that isn't on the immediate LHS of an assignment. We
+    // skip diagnostics if we've explicitly marked the expression as valid.
+    if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(expr)) {
+      if (!CorrectDiscardAssignmentExprs.count(DAE)) {
+        ctx.Diags.diagnose(expr->getLoc(),
+                           diag::discard_expr_outside_of_assignment);
+        return Action::Stop();
       }
-      return Action::Continue(stmt);
     }
 
-    PreWalkAction walkToDeclPre(Decl *D) override {
-      return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
+    if (auto KPE = dyn_cast<KeyPathExpr>(expr)) {
+      resolveKeyPathExpr(KPE);
+      return Action::Continue(KPE);
     }
 
-    PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
-      // In general we can't walk into patterns due to the fact that we don't
-      // currently resolve patterns until constraint generation, and therefore
-      // shouldn't walk into any expressions that may turn into patterns.
-      // One exception to this is if the parent is an expression. In that case,
-      // we are type-checking an expression in an ExprPattern, meaning that
-      // the pattern will already be resolved, and that we ought to e.g
-      // diagnose any stray '_' expressions nested within it. This then also
-      // means we should walk into any child pattern if we walked into the
-      // parent pattern.
-      return Action::VisitNodeIf(Parent.getAsExpr() || Parent.getAsPattern(),
-                                 pattern);
+    if (auto *result = simplifyTypeConstructionWithLiteralArg(expr)) {
+      if (isa<ErrorExpr>(result))
+        return Action::Stop();
+
+      return Action::Continue(result);
     }
-  };
+
+    // If we find an unresolved member chain, wrap it in an
+    // UnresolvedMemberChainResultExpr (unless this has already been done).
+    auto *parent = Parent.getAsExpr();
+    if (isMemberChainTail(expr, parent)) {
+      if (auto *UME = TypeChecker::getUnresolvedMemberChainBase(expr)) {
+        if (!parent || !isa<UnresolvedMemberChainResultExpr>(parent)) {
+          auto *chain = new (ctx) UnresolvedMemberChainResultExpr(expr, UME);
+          return Action::Continue(chain);
+        }
+      }
+    }
+    return Action::Continue(expr);
+  }
+
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
+    if (auto *RS = dyn_cast<ReturnStmt>(stmt)) {
+      // Pre-check a return statement, which includes potentially turning it
+      // into a FailStmt.
+      auto &eval = Ctx.evaluator;
+      auto *S =
+          evaluateOrDefault(eval, PreCheckReturnStmtRequest{RS, DC}, nullptr);
+      if (!S)
+        return Action::Stop();
+
+      return Action::Continue(S);
+    }
+    return Action::Continue(stmt);
+  }
+
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
+  }
+
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
+    // In general we can't walk into patterns due to the fact that we don't
+    // currently resolve patterns until constraint generation, and therefore
+    // shouldn't walk into any expressions that may turn into patterns.
+    // One exception to this is if the parent is an expression. In that case,
+    // we are type-checking an expression in an ExprPattern, meaning that
+    // the pattern will already be resolved, and that we ought to e.g
+    // diagnose any stray '_' expressions nested within it. This then also
+    // means we should walk into any child pattern if we walked into the
+    // parent pattern.
+    return Action::VisitNodeIf(Parent.getAsExpr() || Parent.getAsPattern(),
+                               pattern);
+  }
+};
 } // end anonymous namespace
 
 /// Perform prechecking of a ClosureExpr before we dive into it.  This returns
