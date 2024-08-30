@@ -797,8 +797,7 @@ static std::string expandMacroDefinition(
     if (isExpressionReplacement) {
       auto argExpr = args->getArgExprs()[replacement.parameterIndex];
       SmallString<32> argTextBuffer;
-      auto argText =
-          extractInlinableText(ctx.SourceMgr, argExpr, argTextBuffer);
+      auto argText = extractInlinableText(ctx, argExpr, argTextBuffer);
       expandedResult.append(argText);
     } else {
       auto typeArgType = subs.getReplacementTypes()[replacement.parameterIndex];

@@ -2225,9 +2225,9 @@ StringRef PatternBindingEntry::getInitStringRepresentation(
   if (InitContextAndFlags.getInt().contains(PatternFlags::IsText) &&
       !InitStringRepresentation.empty())
     return InitStringRepresentation;
-  auto &sourceMgr = getAnchoringVarDecl()->getASTContext().SourceMgr;
+  auto &ctx = getAnchoringVarDecl()->getASTContext();
   auto init = getOriginalInit();
-  return extractInlinableText(sourceMgr, init, scratch);
+  return extractInlinableText(ctx, init, scratch);
 }
 
 SourceRange PatternBindingDecl::getSourceRange() const {
@@ -9022,7 +9022,7 @@ ParamDecl::getDefaultValueStringRepresentation(
 
     assert(hasDefaultExpr()
            && "Normal default argument with no default expression?!");
-    return extractInlinableText(getASTContext().SourceMgr,
+    return extractInlinableText(getASTContext(),
                                 getStructuralDefaultExpr(), scratch);
   }
   case DefaultArgumentKind::StoredProperty: {
@@ -9066,8 +9066,7 @@ ParamDecl::getDefaultValueStringRepresentation(
           return ".init()";
         }
 
-        auto &sourceMgr = getASTContext().SourceMgr;
-        return extractInlinableText(sourceMgr, wrappedValue, scratch);
+        return extractInlinableText(getASTContext(), wrappedValue, scratch);
       }
     }
 
@@ -9087,9 +9086,7 @@ ParamDecl::getDefaultValueStringRepresentation(
       return "<<empty>>";
     }
 
-    return extractInlinableText(getASTContext().SourceMgr,
-                                init,
-                                scratch);
+    return extractInlinableText(getASTContext(), init, scratch);
   }
   case DefaultArgumentKind::Inherited: return "super";
 #define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
@@ -10275,7 +10272,7 @@ StringRef AbstractFunctionDecl::getInlinableBodyText(
     return BodyStringRepresentation;
 
   auto body = getBody();
-  return extractInlinableText(getASTContext().SourceMgr, body, scratch);
+  return extractInlinableText(getASTContext(), body, scratch);
 }
 
 /// A uniqued list of derivative function configurations.
