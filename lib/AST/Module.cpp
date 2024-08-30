@@ -2136,12 +2136,23 @@ bool ModuleDecl::registerEntryPointFile(
 }
 
 void ModuleDecl::collectLinkLibraries(LinkLibraryCallback callback) const {
-  // FIXME: The proper way to do this depends on the decls used.
-  FORWARD(collectLinkLibraries, (callback));
-}
+  bool hasSourceFile = false;
 
-void
-SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {
+  for (auto *file : getFiles()) {
+    if (isa<SourceFile>(file)) {
+      hasSourceFile = true;
+    } else {
+      file->collectLinkLibraries(callback);
+    }
+
+    if (auto *synth = file->getSynthesizedFile()) {
+      synth->collectLinkLibraries(callback);
+    }
+  }
+
+  if (!hasSourceFile)
+    return;
+
   llvm::SmallDenseSet<ModuleDecl *, 32> visited;
   SmallVector<ImportedModule, 32> stack;
 
@@ -2149,17 +2160,15 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
       ModuleDecl::ImportFilterKind::Exported,
       ModuleDecl::ImportFilterKind::Default};
 
-  auto *topLevel = getParentModule();
-
   ModuleDecl::ImportFilter topLevelFilter = filter;
   topLevelFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
   topLevelFilter |= ModuleDecl::ImportFilterKind::InternalOrBelow;
   topLevelFilter |= ModuleDecl::ImportFilterKind::PackageOnly,
   topLevelFilter |= ModuleDecl::ImportFilterKind::SPIOnly;
-  topLevel->getImportedModules(stack, topLevelFilter);
+  getImportedModules(stack, topLevelFilter);
 
   // Make sure the top-level module is first; we want pre-order-ish traversal.
-  stack.emplace_back(ImportPath::Access(), topLevel);
+  stack.emplace_back(ImportPath::Access(), const_cast<ModuleDecl *>(this));
 
   while (!stack.empty()) {
     auto next = stack.pop_back_val().importedModule;
@@ -2167,13 +2176,16 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
     if (!visited.insert(next).second)
       continue;
 
-    if (next->getName() != getParentModule()->getName()) {
+    if (next->getName() != getName()) {
       next->collectLinkLibraries(callback);
     }
 
     next->getImportedModules(stack, filter);
   }
 }
+
+void
+SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {}
 
 bool ModuleDecl::walk(ASTWalker &Walker) {
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(Walker.Parent, this);
@@ -3090,35 +3102,6 @@ bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   return false;
 }
 
-bool SourceFile::importsModuleAsWeakLinked(const ModuleDecl *module) const {
-  for (auto &import : *Imports) {
-    if (!import.options.contains(ImportFlags::WeakLinked))
-      continue;
-
-    const ModuleDecl *importedModule = import.module.importedModule;
-    if (module == importedModule)
-      return true;
-
-    // Also check whether the target module is actually the underlyingClang
-    // module for this @_weakLinked import.
-    const ModuleDecl *clangModule =
-        importedModule->getUnderlyingModuleIfOverlay();
-    if (module == clangModule)
-      return true;
-
-    // Traverse the exported modules of this weakly-linked module to ensure
-    // that we weak-link declarations from its exported peers.
-    SmallVector<ImportedModule, 8> reexportedModules;
-    importedModule->getImportedModules(reexportedModules,
-                                       ModuleDecl::ImportFilterKind::Exported);
-    for (const ImportedModule &reexportedModule : reexportedModules) {
-      if (module == reexportedModule.importedModule)
-        return true;
-    }
-  }
-  return false;
-}
-
 bool ModuleDecl::isImportedAsSPI(const SpecializeAttr *attr,
                                  const ValueDecl *targetDecl) const {
   auto declSPIGroups = attr->getSPIGroups();
@@ -3150,11 +3133,7 @@ bool ModuleDecl::isImportedAsSPI(Identifier spiGroup,
 }
 
 bool ModuleDecl::isImportedAsWeakLinked(const ModuleDecl *module) const {
-  for (auto file : getFiles()) {
-    if (file->importsModuleAsWeakLinked(module))
-      return true;
-  }
-  return false;
+  return getASTContext().getImportCache().isWeakImportedBy(module, this);
 }
 
 bool Decl::isSPI() const {

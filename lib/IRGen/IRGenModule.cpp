@@ -21,6 +21,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ModuleDependencies.h"
 #include "swift/Basic/LLVMExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -1605,6 +1606,110 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
       auto casted = llvm::ConstantExpr::getBitCast(ref, Int8PtrTy);
       LLVMUsed.push_back(casted);
     }
+  }
+}
+
+void IRGenModule::addLinkLibraries() {
+  auto registerLinkLibrary = [this](const LinkLibrary &ll) {
+    this->addLinkLibrary(ll);
+  };
+
+  getSwiftModule()->collectLinkLibraries(
+    [registerLinkLibrary](LinkLibrary linkLib) {
+      registerLinkLibrary(linkLib);
+    });
+
+  if (ObjCInterop)
+    registerLinkLibrary(LinkLibrary("objc", LibraryKind::Library));
+
+  // If C++ interop is enabled, add -lc++ on Darwin and -lstdc++ on linux.
+  // Also link with C++ bridging utility module (Cxx) and C++ stdlib overlay
+  // (std) if available.
+  if (Context.LangOpts.EnableCXXInterop) {
+    const llvm::Triple &target = Context.LangOpts.Target;
+    if (target.isOSDarwin())
+      registerLinkLibrary(LinkLibrary("c++", LibraryKind::Library));
+    else if (target.isOSLinux())
+      registerLinkLibrary(LinkLibrary("stdc++", LibraryKind::Library));
+
+    // Do not try to link Cxx with itself.
+    if (!getSwiftModule()->getName().is("Cxx")) {
+      bool isStatic = false;
+      if (const auto *M = Context.getModuleByName("Cxx"))
+        isStatic = M->isStaticLibrary();
+      registerLinkLibrary(LinkLibrary(target.isOSWindows() && isStatic
+                                         ? "libswiftCxx"
+                                         : "swiftCxx",
+                                      LibraryKind::Library));
+    }
+
+    // Do not try to link CxxStdlib with the C++ standard library, Cxx or
+    // itself.
+    if (llvm::none_of(llvm::ArrayRef{"Cxx", "CxxStdlib", "std"},
+                      [M = getSwiftModule()->getName().str()](StringRef Name) {
+                        return M == Name;
+                      })) {
+      // Only link with CxxStdlib on platforms where the overlay is available.
+      switch (target.getOS()) {
+      case llvm::Triple::Linux:
+        if (!target.isAndroid())
+          registerLinkLibrary(LinkLibrary("swiftCxxStdlib",
+                                          LibraryKind::Library));
+        break;
+      case llvm::Triple::Win32: {
+        bool isStatic = Context.getModuleByName("CxxStdlib")->isStaticLibrary();
+        registerLinkLibrary(
+            LinkLibrary(isStatic ? "libswiftCxxStdlib" : "swiftCxxStdlib",
+                        LibraryKind::Library));
+        break;
+      }
+      default:
+        if (target.isOSDarwin())
+          registerLinkLibrary(LinkLibrary("swiftCxxStdlib",
+                                          LibraryKind::Library));
+        break;
+      }
+    }
+  }
+
+  // FIXME: It'd be better to have the driver invocation or build system that
+  // executes the linker introduce these compatibility libraries, since at
+  // that point we know whether we're building an executable, which is the only
+  // place where the compatibility libraries take effect. For the benefit of
+  // build systems that build Swift code, but don't use Swift to drive
+  // the linker, we can also use autolinking to pull in the compatibility
+  // libraries. This may however cause the library to get pulled in in
+  // situations where it isn't useful, such as for dylibs, though this is
+  // harmless aside from code size.
+  if (!IRGen.Opts.UseJIT && !Context.LangOpts.hasFeature(Feature::Embedded)) {
+    auto addBackDeployLib = [&](llvm::VersionTuple version,
+                                StringRef libraryName, bool forceLoad) {
+      std::optional<llvm::VersionTuple> compatibilityVersion;
+      if (libraryName == "swiftCompatibilityDynamicReplacements") {
+        compatibilityVersion = IRGen.Opts.
+            AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
+      } else if (libraryName == "swiftCompatibilityConcurrency") {
+        compatibilityVersion =
+            IRGen.Opts.AutolinkRuntimeCompatibilityConcurrencyLibraryVersion;
+      } else {
+        compatibilityVersion = IRGen.Opts.
+            AutolinkRuntimeCompatibilityLibraryVersion;
+      }
+
+      if (!compatibilityVersion)
+        return;
+
+      if (*compatibilityVersion > version)
+        return;
+
+      registerLinkLibrary(LinkLibrary(libraryName,
+                                      LibraryKind::Library,
+                                      forceLoad));
+    };
+
+#define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName, ForceLoad) \
+      addBackDeployLib(llvm::VersionTuple Version, LibraryName, ForceLoad);
+    #include "swift/Frontend/BackDeploymentLibs.def"
   }
 }
 
