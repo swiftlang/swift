@@ -16,6 +16,19 @@
 
 public struct IntBox { var x: CInt }
 
+public struct CustomArray<Element> where Element : ~Copyable {
+  private var buffer: UnsafeMutableBufferPointer<Element>
+
+  public subscript(index: Int) -> Element {
+    _read {
+        yield buffer[index]
+    }
+    nonmutating _modify {
+        yield &buffer[index]
+    }
+  }
+}
+
 public func -(lhs: IntBox, rhs: IntBox) -> CInt {
   return lhs.x - rhs.x
 }
