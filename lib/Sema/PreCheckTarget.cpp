@@ -1,4 +1,4 @@
-//===--- PreCheckExpr.cpp - Expression pre-checking pass ------------------===//
+//===--- PreCheckTarget.cpp - Pre-checking pass ---------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -1036,7 +1036,7 @@ void markDirectCallee(Expr *callee) {
   }
 }
 
-class PreCheckExpression : public ASTWalker {
+class PreCheckTarget final : public ASTWalker {
   ASTContext &Ctx;
   DeclContext *DC;
 
@@ -1101,7 +1101,7 @@ class PreCheckExpression : public ASTWalker {
   void markAcceptableDiscardExprs(Expr *E);
 
 public:
-  PreCheckExpression(DeclContext *dc) : Ctx(dc->getASTContext()), DC(dc) {}
+  PreCheckTarget(DeclContext *dc) : Ctx(dc->getASTContext()), DC(dc) {}
 
   ASTContext &getASTContext() const { return Ctx; }
 
@@ -1475,7 +1475,7 @@ public:
 
 /// Perform prechecking of a ClosureExpr before we dive into it.  This returns
 /// true when we want the body to be considered part of this larger expression.
-bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
+bool PreCheckTarget::walkToClosureExprPre(ClosureExpr *closure) {
   // Pre-check the closure body.
   (void)evaluateOrDefault(Ctx.evaluator, PreCheckClosureBodyRequest{closure},
                           nullptr);
@@ -1489,7 +1489,7 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   return true;
 }
 
-TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
+TypeExpr *PreCheckTarget::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   if (!UDE->getName().isSimpleName() ||
       UDE->getName().isSpecial())
     return nullptr;
@@ -1612,7 +1612,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   return nullptr;
 }
 
-TypeExpr *PreCheckExpression::simplifyUnresolvedSpecializeExpr(
+TypeExpr *PreCheckTarget::simplifyUnresolvedSpecializeExpr(
     UnresolvedSpecializeExpr *us) {
   // If this is a reference type a specialized type, form a TypeExpr.
   // The base should be a TypeExpr that we already resolved.
@@ -1630,7 +1630,7 @@ TypeExpr *PreCheckExpression::simplifyUnresolvedSpecializeExpr(
 
 /// Whether the given expression "looks like" a (possibly sugared) type. For
 /// example, `(foo, bar)` "looks like" a type, but `foo + bar` does not.
-bool PreCheckExpression::exprLooksLikeAType(Expr *expr) {
+bool PreCheckTarget::exprLooksLikeAType(Expr *expr) {
   return isa<OptionalEvaluationExpr>(expr) ||
       isa<BindOptionalExpr>(expr) ||
       isa<ForceValueExpr>(expr) ||
@@ -1646,7 +1646,7 @@ bool PreCheckExpression::exprLooksLikeAType(Expr *expr) {
       getCompositionExpr(expr);
 }
 
-bool PreCheckExpression::possiblyInTypeContext(Expr *E) {
+bool PreCheckTarget::possiblyInTypeContext(Expr *E) {
   // Walk back up the stack of parents looking for a valid type context.
   for (auto *ParentExpr : llvm::reverse(ExprStack)) {
     // We're considered to be in a type context if either:
@@ -1666,7 +1666,7 @@ bool PreCheckExpression::possiblyInTypeContext(Expr *E) {
 
 /// Only allow simplification of a DiscardAssignmentExpr if it hasn't already
 /// been explicitly marked as correct, and the current AST state allows it.
-bool PreCheckExpression::canSimplifyDiscardAssignmentExpr(
+bool PreCheckTarget::canSimplifyDiscardAssignmentExpr(
     DiscardAssignmentExpr *DAE) {
   return !CorrectDiscardAssignmentExprs.count(DAE) &&
          possiblyInTypeContext(DAE);
@@ -1676,7 +1676,7 @@ bool PreCheckExpression::canSimplifyDiscardAssignmentExpr(
 /// In Swift < 5, diagnose and correct invalid multi-argument or
 /// argument-labeled interpolations. Returns \c true if the AST walk should
 /// continue, or \c false if it should be aborted.
-bool PreCheckExpression::correctInterpolationIfStrange(
+bool PreCheckTarget::correctInterpolationIfStrange(
     InterpolatedStringLiteralExpr *ISLE) {
   // These expressions are valid in Swift 5+.
   if (getASTContext().isSwiftVersionAtLeast(5))
@@ -1799,7 +1799,7 @@ bool PreCheckExpression::correctInterpolationIfStrange(
 /// Scout out the specified destination of an AssignExpr to recursively
 /// identify DiscardAssignmentExpr in legal places.  We can only allow them
 /// in simple pattern-like expressions, so we reject anything complex here.
-void PreCheckExpression::markAcceptableDiscardExprs(Expr *E) {
+void PreCheckTarget::markAcceptableDiscardExprs(Expr *E) {
   if (!E) return;
 
   if (auto *PE = dyn_cast<ParenExpr>(E))
@@ -1817,7 +1817,7 @@ void PreCheckExpression::markAcceptableDiscardExprs(Expr *E) {
   // Otherwise, we can't support this.
 }
 
-VarDecl *PreCheckExpression::getImplicitSelfDeclForSuperContext(SourceLoc Loc) {
+VarDecl *PreCheckTarget::getImplicitSelfDeclForSuperContext(SourceLoc Loc) {
   auto *methodContext = DC->getInnermostMethodContext();
 
   if (auto *typeContext = DC->getInnermostTypeContext()) {
@@ -1884,7 +1884,7 @@ static bool isTildeOperator(Expr *expr) {
 /// Simplify expressions which are type sugar productions that got parsed
 /// as expressions due to the parser not knowing which identifiers are
 /// type names.
-TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
+TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
   // If it's already a type expression, return it.
   if (auto typeExpr = dyn_cast<TypeExpr>(E))
     return typeExpr;
@@ -2207,7 +2207,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
   return nullptr;
 }
 
-void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
+void PreCheckTarget::resolveKeyPathExpr(KeyPathExpr *KPE) {
   if (KPE->isObjC())
     return;
   
@@ -2353,7 +2353,7 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
   KPE->setComponents(getASTContext(), components);
 }
 
-Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
+Expr *PreCheckTarget::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   // If constructor call is expected to produce an optional let's not attempt
   // this optimization because literal initializers aren't failable.
   if (!getASTContext().LangOpts.isSwiftVersionAtLeast(5)) {
@@ -2429,7 +2429,7 @@ bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target) {
   auto &ctx = DC->getASTContext();
 
   FrontendStatsTracer StatsTracer(ctx.Stats, "precheck-target");
-  PreCheckExpression preCheck(DC);
+  PreCheckTarget preCheck(DC);
 
   auto newTarget = target.walk(preCheck);
   if (!newTarget)
