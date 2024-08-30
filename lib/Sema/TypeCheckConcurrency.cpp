@@ -1780,7 +1780,8 @@ maybeNoteMutatingMethodSuggestion(ASTContext &C,
 
   if (useKind != VarRefUseEnv::Mutating) {
       // This note is tailored for the 'mutating' access, i.e. when
-      // attempting to mutate a property, they should instead make an actor method to perform the mutation. Reading properties does not have the same restriction.
+      // attempting to mutate a property, they should instead make an actor method
+      // to perform the mutation. Reading properties does not have the same restriction.
       return;
   }
 
@@ -1791,21 +1792,10 @@ maybeNoteMutatingMethodSuggestion(ASTContext &C,
   }
 
   if (auto actor = isolation.getActor()) {
-      NominalTypeDecl *actorTy =
-        actor;
-//          (isolation.getKind() == swift::ActorIsolation::ActorInstance ?
-//)
-
       C.Diags.diagnose(
           memberLoc,
           diag::note_consider_method_for_isolated_property_mutation,
           actor);
-//      } else if (isolation.getKind() == swift::ActorIsolation::GlobalActor) {
-//        C.Diags.diagnose(
-//            memberLoc,
-//            diag::note_consider_method_for_global_actor_isolated_property_mutation,
-//            isolation.getGlobalActor());
-//      }
   }
 }
 
@@ -1823,7 +1813,8 @@ static void noteIsolatedActorMember(ValueDecl const *decl,
   if (isDistributedActor) {
     if (auto varDecl = dyn_cast<VarDecl>(decl)) {
       if (varDecl->isDistributed()) {
-        // This is an attempt to access a `distributed var` synchronously, so offer a more detailed error
+        // This is an attempt to access a `distributed var` synchronously, so
+        // offer a more detailed error
         decl->diagnose(diag::distributed_actor_synchronous_access_distributed_computed_property,
                        decl,
                        nominal->getName());

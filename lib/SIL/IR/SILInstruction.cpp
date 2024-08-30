@@ -1676,22 +1676,21 @@ const ValueBase *SILInstructionResultArray::back() const {
 
 bool SILInstruction::definesLocalArchetypes() const {
   bool definesAny = false;
-  forEachDefinedLocalArchetype([&](CanLocalArchetypeType type,
-                                   SILValue dependency) {
+  forEachDefinedLocalEnvironment([&](GenericEnvironment *genericEnv,
+                                     SILValue dependency) {
     definesAny = true;
   });
   return definesAny;
 }
 
-void SILInstruction::forEachDefinedLocalArchetype(
-      llvm::function_ref<void(CanLocalArchetypeType, SILValue)> fn) const {
+void SILInstruction::forEachDefinedLocalEnvironment(
+      llvm::function_ref<void(GenericEnvironment *, SILValue)> fn) const {
   switch (getKind()) {
 #define SINGLE_VALUE_SINGLE_OPEN(TYPE)                                    \
   case SILInstructionKind::TYPE: {                                        \
     auto I = cast<TYPE>(this);                                            \
     auto archetype = I->getDefinedOpenedArchetype();                      \
-    assert(archetype);                                                    \
-    return fn(archetype, I);                                              \
+    return fn(archetype->getGenericEnvironment(), I);                     \
   }
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialAddrInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialRefInst)
@@ -1700,20 +1699,13 @@ void SILInstruction::forEachDefinedLocalArchetype(
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialMetatypeInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialValueInst)
 #undef SINGLE_VALUE_SINGLE_OPEN
-  case SILInstructionKind::OpenPackElementInst:
-    return cast<OpenPackElementInst>(this)->forEachDefinedLocalArchetype(fn);
+  case SILInstructionKind::OpenPackElementInst: {
+    auto I = cast<OpenPackElementInst>(this);
+    return fn(I->getOpenedGenericEnvironment(), I);
+  }
   default:
     return;
   }
-}
-
-void OpenPackElementInst::forEachDefinedLocalArchetype(
-      llvm::function_ref<void(CanLocalArchetypeType, SILValue)> fn) const {
-  getOpenedGenericEnvironment()->forEachPackElementBinding(
-                                  [&](ElementArchetypeType *elementType,
-                                      PackType *packSubstitution) {
-    fn(CanElementArchetypeType(elementType), this);
-  });
 }
 
 //===----------------------------------------------------------------------===//

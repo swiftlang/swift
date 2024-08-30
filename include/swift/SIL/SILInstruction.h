@@ -724,8 +724,8 @@ public:
   /// Run the given function for each local archetype this instruction
   /// defines, passing the value that should be used to record the
   /// dependency.
-  void forEachDefinedLocalArchetype(
-      llvm::function_ref<void(CanLocalArchetypeType archetype,
+  void forEachDefinedLocalEnvironment(
+      llvm::function_ref<void(GenericEnvironment *genericEnv,
                               SILValue typeDependency)> function) const;
   bool definesLocalArchetypes() const;
 
@@ -8196,8 +8196,8 @@ class OpenPackElementInst final
 public:
   /// Call the given function for each element archetype that this
   /// instruction opens.
-  void forEachDefinedLocalArchetype(
-      llvm::function_ref<void(CanLocalArchetypeType, SILValue)> fn) const;
+  void forEachDefinedLocalEnvironment(
+      llvm::function_ref<void(GenericEnvironment *, SILValue)> fn) const;
 
   GenericEnvironment *getOpenedGenericEnvironment() const {
     return Env;

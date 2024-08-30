@@ -1944,8 +1944,8 @@ public:
                 "archetype from the substitutions list");
 
         bool matchedDependencyResult = false;
-        DI->forEachDefinedLocalArchetype(
-            [&](CanLocalArchetypeType archetype, SILValue dependency) {
+        DI->forEachDefinedLocalEnvironment(
+            [&](GenericEnvironment *genericEnv, SILValue dependency) {
           if (dependency == V)
             matchedDependencyResult = true;
         });
