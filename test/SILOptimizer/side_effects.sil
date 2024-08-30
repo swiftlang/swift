@@ -1234,3 +1234,12 @@ bb0(%0 : $SP):
   %r = tuple ()
   return %r : $()
 }
+
+// CHECK-LABEL: sil @test_consuming_in_with_unreachable
+// CHECK-NEXT:  [%0: read v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @test_consuming_in_with_unreachable : $@convention(thin) (@in X) -> () {
+bb0(%0 : $*X):
+  unreachable
+}
