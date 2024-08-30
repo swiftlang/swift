@@ -567,7 +567,7 @@ public:
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false),
-        EnableHotColdSplit(false),
+        EnableHotColdSplit(true),
         CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
