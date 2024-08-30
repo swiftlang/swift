@@ -31,6 +31,7 @@ class InFlightSubstitution {
   SubstOptions Options;
   TypeSubstitutionFn BaselineSubstType;
   LookupConformanceFn BaselineLookupConformance;
+  RecursiveTypeProperties Props;
 
   struct ActivePackExpansion {
     bool isSubstExpansion = false;
@@ -41,10 +42,7 @@ class InFlightSubstitution {
 public:
   InFlightSubstitution(TypeSubstitutionFn substType,
                        LookupConformanceFn lookupConformance,
-                       SubstOptions options)
-    : Options(options),
-      BaselineSubstType(substType),
-      BaselineLookupConformance(lookupConformance) {}
+                       SubstOptions options);
 
   InFlightSubstitution(const InFlightSubstitution &) = delete;
   InFlightSubstitution &operator=(const InFlightSubstitution &) = delete;
