@@ -294,3 +294,15 @@ do {
 
   test(<) // Ok
 }
+
+// Partially applied instance method
+do {
+  struct S {
+    func foo() {}
+  }
+
+  func bar(_ x: @Sendable () -> Void) {}
+
+  let fn = S.foo(S())
+  bar(fn) // Ok
+}

@@ -1655,8 +1655,8 @@ static unsigned getNumRemovedArgumentLabels(ValueDecl *decl,
 }
 
 /// Determine the number of applications
-static unsigned getNumApplications(
-    ValueDecl *decl, bool hasAppliedSelf, FunctionRefKind functionRefKind) {
+unsigned constraints::getNumApplications(ValueDecl *decl, bool hasAppliedSelf,
+                                         FunctionRefKind functionRefKind) {
   switch (functionRefKind) {
   case FunctionRefKind::Unapplied:
   case FunctionRefKind::Compound:
@@ -1774,7 +1774,7 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
           adjustedTy =
               adjustedTy->withExtInfo(adjustedTy->getExtInfo().withSendable());
         }
-      } else if (isPartialApplication(getConstraintLocator(locator))) {
+      } else if (numApplies < decl->getNumCurryLevels()) {
         // Operators on protocols could be found via unqualified lookup and
         // won't have a base type.
         if (decl->isOperator() ||
