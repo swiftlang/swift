@@ -1356,7 +1356,7 @@ extension BetweenTargets {
 
 @available(macOS 10.10, *)
 extension BetweenTargets { // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
-  public func publicFuncInExcessivelyAvailableExtension() {}
+  public func publicFuncInExcessivelyAvailableExtension() {} // expected-note {{instance method 'publicFuncInExcessivelyAvailableExtension()' declared here must be visible to other modules}}
 }
 
 // MARK: Extensions on BetweenTargetsInternal
@@ -1408,6 +1408,7 @@ extension AfterDeploymentTarget { // expected-note 2 {{add @available attribute 
 
 // expected-error@+1 {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
 extension AfterDeploymentTarget { // expected-note 2 {{add @available attribute to enclosing extension}}
+  // expected-note@+1 {{instance method 'publicFuncInExtension' declared here must be visible to other modules}}
   public func publicFuncInExtension( // expected-note {{add @available attribute to enclosing instance method}}
     _: NoAvailable,
     _: BeforeInliningTarget,

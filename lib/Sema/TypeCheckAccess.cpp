@@ -2018,20 +2018,20 @@ namespace {
 class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
   ExportContext Where;
 
-  void checkType(Type type, const TypeRepr *typeRepr, const Decl *context,
+  bool checkType(Type type, const TypeRepr *typeRepr, const Decl *context,
                  ExportabilityReason reason = ExportabilityReason::General,
                  DeclAvailabilityFlags flags = std::nullopt) {
     // Don't bother checking errors.
     if (type && type->hasError())
-      return;
-    
+      return false;
+
     // If the decl which references this type is unavailable on the current
     // platform, don't diagnose the availability of the type.
     if (AvailableAttr::isUnavailable(context))
-      return;
+      return false;
 
-    diagnoseTypeAvailability(typeRepr, type, context->getLoc(),
-                             Where.withReason(reason), flags);
+    return diagnoseTypeAvailability(typeRepr, type, context->getLoc(),
+                                    Where.withReason(reason), flags);
   }
 
   /// Identify the AsyncSequence.flatMap set of functions from the
@@ -2330,18 +2330,20 @@ public:
     checkType(MD->getResultInterfaceType(), MD->resultType.getTypeRepr(), MD);
   }
 
-  void checkConstrainedExtensionRequirements(ExtensionDecl *ED,
+  bool checkConstrainedExtensionRequirements(ExtensionDecl *ED,
                                              bool hasExportedMembers) {
     if (!ED->getTrailingWhereClause())
-      return;
+      return false;
 
     ExportabilityReason reason =
         hasExportedMembers ? ExportabilityReason::ExtensionWithPublicMembers
                            : ExportabilityReason::ExtensionWithConditionalConformances;
 
+    bool foundAny = false;
     forAllRequirementTypes(ED, [&](Type type, TypeRepr *typeRepr) {
-      checkType(type, typeRepr, ED, reason);
+      foundAny |= checkType(type, typeRepr, ED, reason);
     });
+    return foundAny;
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
@@ -2364,29 +2366,40 @@ public:
 
     // 2) If the extension contains exported members, the as-written
     // extended type should be exportable.
-    bool hasExportedMembers = llvm::any_of(ED->getMembers(),
-                                           [](const Decl *member) -> bool {
+    llvm::SmallVector<ValueDecl *> exportedMembers;
+    for (auto member : ED->getMembers()) {
       auto *valueMember = dyn_cast<ValueDecl>(member);
-      if (!valueMember)
-        return false;
-      return isExported(valueMember);
-    });
+      if (!valueMember || !isExported(valueMember))
+        continue;
+      exportedMembers.push_back(valueMember);
+    }
 
-    Where = wasWhere.withExported(hasExportedMembers);
-    checkType(ED->getExtendedType(), ED->getExtendedTypeRepr(), ED,
-              ExportabilityReason::ExtensionWithPublicMembers);
+    Where = wasWhere.withExported(!exportedMembers.empty());
+    bool noteExportedMembers =
+        checkType(ED->getExtendedType(), ED->getExtendedTypeRepr(), ED,
+                  ExportabilityReason::ExtensionWithPublicMembers);
 
     // 3) If the extension contains exported members or defines conformances,
     // the 'where' clause must only name exported types.
-    Where = wasWhere.withExported(hasExportedMembers ||
+    Where = wasWhere.withExported(!exportedMembers.empty() ||
                                   !ED->getInherited().empty());
-    checkConstrainedExtensionRequirements(ED, hasExportedMembers);
+    noteExportedMembers |=
+        checkConstrainedExtensionRequirements(ED, !exportedMembers.empty());
+
+    // If we diagnosed either 2 or 3, emit a note for each exported member.
+    // (This is especially important for implicit members, since they're
+    // invisible!)
+    if (noteExportedMembers) {
+      for (auto member : exportedMembers)
+        member->diagnose(diag::note_public_extension_member,
+                         member, member->isImplicit());
+    }
 
     // If we haven't already visited the extended nominal visit it here.
     // This logic is too wide but prevents false reports of an unused public
     // import. We should instead check for public generic requirements
     // similarly to ShouldPrintForModuleInterface::shouldPrint.
-    if (!hasExportedMembers && !ED->getInherited().empty()) {
+    if (exportedMembers.empty() && !ED->getInherited().empty()) {
       auto DC = Where.getDeclContext();
 
       // Remember that the module defining the extended type must be imported
