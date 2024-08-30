@@ -29,6 +29,8 @@ class Klass {
   func foo()
 }
 
+class C {}
+
 struct KlassPair {
   var lhs: Klass
   var rhs: Klass
@@ -612,4 +614,16 @@ bb0(%x : @guaranteed $any Error):
   %em = existential_metatype $@thick any Error.Type, %y : $@moveOnly (any Error)
   debug_value %em : $@thick any Error.Type, var, name "s", argno 1, expr op_deref
   return %em : $@thick any Error.Type
+}
+
+// CHECK-LABEL: sil [ossa] @builtin_tsanInoutAccess : {{.*}} {
+// CHECK:         builtin "tsanInoutAccess"
+// CHECK-LABEL: } // end sil function 'builtin_tsanInoutAccess'
+sil [ossa] @builtin_tsanInoutAccess : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack $@moveOnly C, var, name "b", type $@moveOnly C
+  %6 = builtin "tsanInoutAccess"(%1 : $*@moveOnly C) : $()
+  dealloc_stack %1 : $*@moveOnly C
+  %13 = tuple ()
+  return %13 : $()
 }
