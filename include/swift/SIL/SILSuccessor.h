@@ -80,7 +80,6 @@ public:
   SILSuccessor *getNext() const { return Next; }
 
   ProfileCounter getCount() const { return Count; }
-  void setCount(ProfileCounter newCount) { Count = newCount; }
 
   // Do not copy or move these.
   SILSuccessor(const SILSuccessor &) = delete;
