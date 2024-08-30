@@ -2112,6 +2112,8 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
   }
   newMethod->setParams(params);
 
+  clang::Sema::SynthesizedFunctionScope scope(clangSema, newMethod);
+
   // Create a new Clang diagnostic pool to capture any diagnostics
   // emitted during the construction of the method.
   clang::sema::DelayedDiagnosticPool diagPool{
@@ -2165,8 +2167,9 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
       clang::SourceLocation());
   if (!memberCall.isUsable())
     return nullptr;
-  auto returnStmt = clang::ReturnStmt::Create(clangCtx, clang::SourceLocation(),
-                                              memberCall.get(), nullptr);
+  auto returnStmt =
+      clangSema.BuildReturnStmt(clang::SourceLocation(), memberCall.get())
+          .get();
 
   // Check if there were any Clang errors during the construction
   // of the method body.
