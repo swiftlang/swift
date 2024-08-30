@@ -1107,8 +1107,6 @@ public:
 
   bool walkToClosureExprPre(ClosureExpr *expr);
 
-  bool shouldWalkCaptureInitializerExpressions() override { return true; }
-
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::Arguments;
   }
