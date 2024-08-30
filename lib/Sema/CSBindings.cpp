@@ -1318,30 +1318,7 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
     // Such type variables might be connected to closure as well
     // e.g. when result type is optional, so it makes sense to
     // open closure before attempting such disjunction.
-    if (auto *typeVar = boundType->lookThroughAllOptionalTypes()
-                            ->getAs<TypeVariableType>()) {
-      auto fixedType = CS.getFixedType(typeVar);
-      // Handles "assignment to an overloaded member" pattern where
-      // type variable that represents the destination is bound to an
-      // l-value type during constraint generation. See \c genAssignDestType.
-      //
-      // Note that in all other circumstances we won't be here if the
-      // type variable that presents the closure is connected to a
-      // disjunction because that would mark closure as "delayed".
-      if (fixedType && fixedType->is<LValueType>()) {
-        auto lvalueObjTy = fixedType->castTo<LValueType>()->getObjectType();
-        // Prefer closure only if it's not connected to the type variable
-        // that represents l-value object type of the assignment destination.
-        // Eagerly attempting closure first could result in missing some of
-        // the contextual annotations i.e. `@Sendable`.
-        if (auto *lvalueObjVar = lvalueObjTy->getAs<TypeVariableType>())
-          return !AdjacentVars.count(lvalueObjVar);
-      }
-
-      return true;
-    }
-
-    return false;
+    return boundType->lookThroughAllOptionalTypes()->is<TypeVariableType>();
   }
 
   // If this is a collection literal type, it's preferrable to bind it
@@ -1574,6 +1551,18 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
           return std::nullopt;
         }
       }
+    }
+  }
+
+  // Situations like `v.<member> = { ... }` where member is overloaded.
+  // We need to wait until member is resolved otherwise there is a risk
+  // of losing some of the contextual attributes important for the closure
+  // such as @Sendable and global actor.
+  if (TypeVar->getImpl().isClosureType() &&
+      kind == AllowedBindingKind::Subtypes) {
+    if (type->isTypeVariableOrMember() &&
+        constraint->getLocator()->directlyAt<AssignExpr>()) {
+      DelayedBy.push_back(constraint);
     }
   }
 
