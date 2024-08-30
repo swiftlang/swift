@@ -263,6 +263,8 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
       for (const auto *elementDecl : enumCase->getElements()) {
         if (!elementDecl->hasAssociatedValues())
           continue;
+        if (elementDecl->isIndirect())
+          return {Unsupported, UnrepresentableIndirectEnum};
         // Do not expose any enums with > 1
         // enum parameter, or any enum parameter
         // whose type we do not yet support.
