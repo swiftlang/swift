@@ -65,10 +65,10 @@ Let's define a \index{substitution map}substitution map for this \index{generic 
 \]
 The substitution map $\Sigma$ satisfies the requirements of our generic signature. To see why, we apply $\Sigma$ to both sides of the requirement $\SameReq{U}{T.[Collection]SubSequence}$:
 \begin{gather*}
-\texttt{U} \otimes \Sigma\\
+\tU \otimes \Sigma\\
 \texttt{T.[Collection]SubSequence} \otimes \Sigma
 \end{gather*}
-The first substituted type is the replacement type for \texttt{U} in $\Sigma$, which is \texttt{Substring}. The second substituted type can be computed with what we learned about dependent member type substitution from \SecRef{abstract conformances}. Recalling that a dependent member type is a \index{type witness}type witness of an \index{abstract conformance}abstract conformance, we proceed as follows:
+The first substituted type is the replacement type for \tU\ in $\Sigma$, which is \texttt{Substring}. The second substituted type can be computed with what we learned about dependent member type substitution from \SecRef{abstract conformances}. Recalling that a dependent member type is a \index{type witness}type witness of an \index{abstract conformance}abstract conformance, we proceed as follows:
 \begin{gather*}
 \texttt{T.[Collection]SubSequence} \otimes \Sigma\\
 \qquad {} = \bigl(\AssocType{[Collection]SubSequence} \otimes \ConfReq{T}{Collection}\bigr) \otimes \Sigma\\
@@ -90,11 +90,11 @@ However, $\ConfReq{U}{Sequence}$ does not appear in our generic signature, thus 
 
 \paragraph{Root conformances.} The \IndexDefinition{root conformance}\emph{root conformances} of a \index{substitution map}substitution map are those directly stored in the substitution map. The \IndexDefinition{root abstract conformance}\emph{root abstract conformances} of a generic signature are those corresponding to the explicit conformance requirements of the generic signature. These two concepts are closely related via the \index{identity substitution map}identity substitution map $1_G$: the root conformances of $1_G$ are the root abstract conformances of its \index{input generic signature}input generic signature $G$. In our example, $\ConfReq{T}{Collection}$ is a root abstract conformance of our generic signature, but $\ConfReq{U}{Sequence}$ is not, because the latter represents a derived conformance requirement, not explicitly stated in the generic signature (we will present a derivation later).
 
-The general case of applying a substitution map to an abstract conformance is called \emph{local conformance lookup}. Without knowing anything about local conformance lookup, we can already deduce the result of $\ConfReq{U}{Sequence}\otimes \Sigma$ only using concepts introduced previously. We know the abstract conformance $\ConfReq{U}{Sequence}$ can be obtained by the \emph{global} conformance lookup $\protosym{Sequence}\otimes\texttt{U}$. We also know that $\texttt{U}\otimes \Sigma=\texttt{Substring}$. Therefore, from the \index{associative operation}associativity of ``$\otimes$'', we see that:
+The general case of applying a substitution map to an abstract conformance is called \emph{local conformance lookup}. Without knowing anything about local conformance lookup, we can already deduce the result of $\ConfReq{U}{Sequence}\otimes \Sigma$ only using concepts introduced previously. We know the abstract conformance $\ConfReq{U}{Sequence}$ can be obtained by the \emph{global} conformance lookup $\protosym{Sequence}\otimes\tU$. We also know that $\tU\otimes \Sigma=\texttt{Substring}$. Therefore, from the \index{associative operation}associativity of ``$\otimes$'', we see that:
 \begin{gather*}
 \ConfReq{U}{Sequence}\otimes \Sigma\\
-\qquad {} = \bigl(\protosym{Sequence}\otimes\texttt{U}\bigr)\otimes \Sigma\\
-\qquad {} = \protosym{Sequence}\otimes\bigl(\texttt{U}\otimes \Sigma\bigr)\\
+\qquad {} = \bigl(\protosym{Sequence}\otimes\tU\bigr)\otimes \Sigma\\
+\qquad {} = \protosym{Sequence}\otimes\bigl(\tU\otimes \Sigma\bigr)\\
 \qquad {} = \protosym{Sequence}\otimes\texttt{Substring}\\
 \qquad {} = \ConfReq{Substring}{Sequence}.
 \end{gather*}
@@ -195,23 +195,23 @@ We now show the algorithms for local conformance lookup and dependent member typ
 \begin{algorithm}[Local conformance lookup]\label{local conformance lookup algorithm}
 As input, takes a substitution map $\Sigma$, and an abstract conformance $\TP$.
 \begin{enumerate}
-\item Let \texttt{C} be an invalid conformance. This will be the return value.
+\item Let \nC\ be an invalid conformance. This will be the return value.
 \item Find a conformance path $s_n\otimes \cdots \otimes s_1\otimes s_0$ for $\TP$ using \AlgRef{find conformance path algorithm}.
 \item (Initialize) Let $i := 1$.
-\item (Root) Suppose $s_0$ is the root abstract conformance $\ConfReq{$\texttt{T}_0$}{$\texttt{P}_0$}$. Project the root conformance corresponding to $\ConfReq{$\texttt{T}_0$}{$\texttt{P}_0$}$ from $\Sigma$, and assign the result to \texttt{C}.
-\item (Check) If $i=n+1$, return \texttt{C}.
-\item (Step) Suppose $s_i$ is the associated conformance projection $\AssocConf{$\texttt{Self.[$\texttt{P}_{i-1}$]T}_i$}{$\texttt{P}_i$}$. Apply the projection to \texttt{C} to get a conformance to $\texttt{P}_i$, and assign the result to \texttt{C}.
+\item (Root) Suppose $s_0$ is the root abstract conformance $\ConfReq{$\tT_0$}{$\tP_0$}$. Project the root conformance corresponding to $\ConfReq{$\tT_0$}{$\tP_0$}$ from $\Sigma$, and assign the result to \nC.
+\item (Check) If $i=n+1$, return \nC.
+\item (Step) Suppose $s_i$ is the associated conformance projection $\AssocConf{$\texttt{Self.[$\tP_{i-1}$]T}_i$}{$\tP_i$}$. Apply the projection to \nC\ to get a conformance to $\tP_i$, and assign the result to \nC.
 \item (Next) Increment $i$ and go back to Step~5.
 \end{enumerate}
 \end{algorithm}
 
-In Step~6, \texttt{C} must be a conformance to $\texttt{P}_{i-1}$ for the projection to make sense; also, we expect that on the last iteration, $\texttt{P}_n$ is equal to $\texttt{P}$, the conformed protocol of the original abstract conformance. This gives us a validity condition on conformance paths, which we will explore in the next section. For now, we again assume that \AlgRef{find conformance path algorithm} gives us such a path.
+In Step~6, \nC\ must be a conformance to $\tP_{i-1}$ for the projection to make sense; also, we expect that on the last iteration, $\tP_n$ is equal to $\tP$, the conformed protocol of the original abstract conformance. This gives us a validity condition on conformance paths, which we will explore in the next section. For now, we again assume that \AlgRef{find conformance path algorithm} gives us such a path.
 \begin{algorithm}[Substitute dependent member type]\label{dependent member type substitution}
 As input, takes a \index{dependent member type}dependent member type \texttt{T.[P]A} and a substitution map $\Sigma$. The dependent member type is understood to be a \index{valid type parameter}valid type parameter in the substitution map's \index{input generic signature}input generic signature. Outputs the substituted type $\texttt{T.[P]A}\otimes\Sigma$.
 \begin{enumerate}
-\item Let \texttt{A} be the associated type declaration referenced by the dependent member type. (This algorithm does not support \index{unbound dependent member type}unbound dependent member types.)
-\item Let \texttt{P} be the protocol containing this associated type declaration.
-\item Let \texttt{T} be the base type parameter of the dependent member type. (This could be another dependent member type, or a generic parameter.)
+\item Let \nA\ be the associated type declaration referenced by the dependent member type. (This algorithm does not support \index{unbound dependent member type}unbound dependent member types.)
+\item Let \tP\ be the protocol containing this associated type declaration.
+\item Let \tT\ be the base type parameter of the dependent member type. (This could be another dependent member type, or a generic parameter.)
 \item (Lookup) Construct the abstract conformance $\TP$ and invoke \AlgRef{local conformance lookup algorithm} to perform the local conformance lookup $\TP\otimes\Sigma$.
 \item (Project) Apply the type witness projection $\AssocType{[P]A}$ to this conformance and return the result.
 \end{enumerate}
@@ -226,7 +226,7 @@ Returning to our example, let's see what happens when we evaluate our conformanc
 \qquad {} = \ConfReq{T.SubSequence}{Sequence}
 \end{gather*}
 
-We claimed this conformance path represents $\ConfReq{U}{Sequence}$, but simplifying it in the above manner gives us $\ConfReq{T.SubSequence}{Sequence}$, which is not identical. We can justify this by noting that both conformances have the same conformed protocol, and the two subject types \texttt{T.SubSequence} and \texttt{U} belong to the same equivalence class, due to the explicit same-type requirement of our generic signature.
+We claimed this conformance path represents $\ConfReq{U}{Sequence}$, but simplifying it in the above manner gives us $\ConfReq{T.SubSequence}{Sequence}$, which is not identical. We can justify this by noting that both conformances have the same conformed protocol, and the two subject types \texttt{T.SubSequence} and \tU\ belong to the same equivalence class, due to the explicit same-type requirement of our generic signature.
 
 Thus, just like the \index{reduced type equality}reduced type equality relation on type parameters (\SecRef{type params}), we can define an \index{equivalence relation}equivalence relation on abstract conformances. We say that two abstract conformances are equivalent if they name the same protocol, and their subject types are \index{reduced type equality}equivalent. A \IndexDefinition{reduced abstract conformance}\emph{reduced abstract conformance} is then one whose subject type is a reduced type parameter. Every equivalence class of abstract conformances contains a unique reduced abstract conformance, and two abstract conformances are equivalent if their reduced abstract conformances are identical.
 
@@ -242,30 +242,30 @@ We will answer (1) and (2) first, and present an algorithm for (3) in the next s
 \begin{algorithm}[Simplify conformance path]\label{invertconformancepath}
 Takes a generic signature and a conformance path $s_n\otimes\cdots\otimes s_1\otimes s_0$. Outputs an abstract conformance. This conformance will have the same conformed protocol as the last step of the conformance path.
 \begin{enumerate}
-\item (Initialize) Let \texttt{C} be an invalid conformance. This will be the return value. Also let $i := 1$.
-\item (Root) Suppose $s_0$ is the root abstract conformance $\ConfReq{$\texttt{T}_0$}{$\texttt{P}_0$}$. Assign this root abstract conformance to \texttt{C}.
-\item (Check) If $i=n+1$, return \texttt{C}.
-\item (Step) Suppose $s_i$ is the associated conformance projection $\AssocConf{$\texttt{Self.[$\texttt{P}_{i-1}$]T}_i$}{$\texttt{P}_i$}$. Apply the projection to \texttt{C} to get a conformance to $\texttt{P}_i$, and assign the result to \texttt{C}.
+\item (Initialize) Let \nC\ be an invalid conformance. This will be the return value. Also let $i := 1$.
+\item (Root) Suppose $s_0$ is the root abstract conformance $\ConfReq{$\tT_0$}{$\tP_0$}$. Assign this root abstract conformance to \nC.
+\item (Check) If $i=n+1$, return \nC.
+\item (Step) Suppose $s_i$ is the associated conformance projection $\AssocConf{$\texttt{Self.[$\tP_{i-1}$]T}_i$}{$\tP_i$}$. Apply the projection to \nC\ to get a conformance to $\tP_i$, and assign the result to \nC.
 \item (Next) Increment $i$ and go back to Step~4.
 \end{enumerate}
 \end{algorithm}
 
-Every step $s_i$ in a conformance path names a protocol on the right hand side; call this protocol $\texttt{P}_i$. A \IndexDefinition{valid conformance path}\emph{valid conformance path} in a generic signature $G$ satisfies two conditions:
+Every step $s_i$ in a conformance path names a protocol on the right hand side; call this protocol $\tP_i$. A \IndexDefinition{valid conformance path}\emph{valid conformance path} in a generic signature $G$ satisfies two conditions:
 \begin{itemize}
 \item The first step $s_0$ must be a root abstract conformance of $G$.
-\item Every subsequent step $s_i$ is an associated conformance projection defined in the protocol $\texttt{P}_{i-1}$.
+\item Every subsequent step $s_i$ is an associated conformance projection defined in the protocol $\tP_{i-1}$.
 \end{itemize}
 
 Recall that an \index{valid abstract conformance}abstract conformance $\TP$ is valid in a generic signature $G$ if the conformance requirement $\TP$ can be \index{derived requirement}derived in $G$. To show that a valid conformance path simplifies to a valid abstract conformance, we construct a special kind of derivation, called a \IndexDefinition{primitive derivation}\emph{primitive derivation}, from the conformance path.
 
 The first step of the conformance path translates to a \textsc{Conf} derivation step (recall that a conformance path begins with a \index{root abstract conformance}\emph{root} abstract conformance, and not an arbitrary abstract conformance, for otherwise we could not make use of the \textsc{Conf} derivation step):
 \begin{gather*}
-\vdash\ConfReq{$\texttt{T}_0$}{$\texttt{P}_0$}\tag{1}
+\vdash\ConfReq{$\tT_0$}{$\tP_0$}\tag{1}
 \end{gather*}
 If the conformance path has length 1, we're done; we have our primitive derivation. Otherwise, for each remaining step in the conformance path, we add an \textsc{AssocConf} step for the corresponding associated conformance requirement:
 \begin{gather*}
 \ldots\\
-(n),\,\ConfReq{Self.$\texttt{A}_n$}{$\texttt{P}_n$}_{\texttt{P}_{n+1}}\vdash\ConfReq{$\texttt{T}_0$.$\texttt{A}_1$...$\texttt{A}_{n}$.$\texttt{A}_{n+1}$}{$\texttt{P}_{n+1}$}\tag{$n+1$}\\
+(n),\,\ConfReq{Self.$\nA_n$}{$\tP_n$}_{\tP_{n+1}}\vdash\ConfReq{$\tT_0$.$\nA_1$...$\nA_{n}$.$\nA_{n+1}$}{$\tP_{n+1}$}\tag{$n+1$}\\
 \ldots
 \end{gather*}
 The derivation is well-formed at every step, and the subject type and conformed protocol of the final derived conformance requirement is the same as the abstract conformance output by \AlgRef{invertconformancepath}. This shows the aforesaid algorithm outputs a valid abstract conformance, as was claimed.
@@ -287,40 +287,40 @@ We saw that $\ConfReq{T.SubSequence}{Sequence}$ is equivalent to $\ConfReq{U}{Se
 (5),\,(6)\vdash\ConfReq{U}{Sequence}\tag{7}
 \end{gather*}
 
-\paragraph{Existence.} The above procedure always works in general. If we receive a conformance path for $\TP$, and the conformance path simplifies to $\ConfReq{$\texttt{T}^\prime$}{P}$ for a possibly different type parameter $\texttt{T}^\prime$,
-then we can construct a primitive derivation for $\ConfReq{$\texttt{T}^\prime$}{P}$. We also know that \texttt{T} and $\texttt{T}^\prime$ must be equivalent, so there exists a derivation for the same-type requirement $\SameReq{T}{$\texttt{T}^\prime$}$. From these two derivations, we get a derivation for $\TP$.
+\paragraph{Existence.} The above procedure always works in general. If we receive a conformance path for $\TP$, and the conformance path simplifies to $\ConfReq{$\tT^\prime$}{P}$ for a possibly different type parameter $\tT^\prime$,
+then we can construct a primitive derivation for $\ConfReq{$\tT^\prime$}{P}$. We also know that \tT\ and $\tT^\prime$ must be equivalent, so there exists a derivation for the same-type requirement $\SameReq{T}{$\tT^\prime$}$. From these two derivations, we get a derivation for $\TP$.
 
-Now, we will go in the other direction. First, observe that a primitive derivation defines a conformance path, as follows: the initial \textsc{GenSig} derivation step becomes the root abstract conformance at the start of the path, and each subsequent \textsc{ReqSig} derivation step becomes an associated conformance projection. Then, the next theorem shows a derivation of a conformance requirement $\TP$ always splits into two parts: a primitive derivation $\ConfReq{$\texttt{T}^\prime$}{P}$, together with a same-type requirement $\SameReq{T}{$\texttt{T}^\prime$}$. Since a derived conformance requirement defines an abstract conformance, and a primitive derivation defines a conformance path, we can conclude that every abstract conformance has a conformance path. 
+Now, we will go in the other direction. First, observe that a primitive derivation defines a conformance path, as follows: the initial \textsc{GenSig} derivation step becomes the root abstract conformance at the start of the path, and each subsequent \textsc{ReqSig} derivation step becomes an associated conformance projection. Then, the next theorem shows a derivation of a conformance requirement $\TP$ always splits into two parts: a primitive derivation $\ConfReq{$\tT^\prime$}{P}$, together with a same-type requirement $\SameReq{T}{$\tT^\prime$}$. Since a derived conformance requirement defines an abstract conformance, and a primitive derivation defines a conformance path, we can conclude that every abstract conformance has a conformance path. 
 
-We now look at more ways of building new derivations from existing ones; we will use these results in \SecRef{conformance paths exist}. Recall that we can take a same-type requirement $\TU$ from $\ConfReq{U}{P}$ and $\SameReq{T.[P]A}{U.[P]A}$, where protocol \texttt{P} declares an associated type \texttt{A}. By iterated application of the \textsc{Member} step, we perform a construction with \emph{any} valid type parameter \texttt{Self.V} in the protocol generic signature \verb|<Self where Self: P>|, to obtain a derived requirement $\SameReq{T.V}{U.V}$.
+We now look at more ways of building new derivations from existing ones; we will use these results in \SecRef{conformance paths exist}. Recall that we can take a same-type requirement $\TU$ from $\ConfReq{U}{P}$ and $\SameReq{T.[P]A}{U.[P]A}$, where protocol \tP\ declares an associated type \nA. By iterated application of the \textsc{Member} step, we perform a construction with \emph{any} valid type parameter \texttt{Self.V} in the protocol generic signature \verb|<Self where Self: P>|, to obtain a derived requirement $\SameReq{T.V}{U.V}$.
 
 \begin{lemma}\label{general member type}
-Let $G$ be a well-formed generic signature, and suppose that $G\vDash\TU$ for type parameters \texttt{T} and \texttt{U}. If $\texttt{T}^\prime$ is any valid type parameter having \texttt{T} as a prefix, then $G\vDash\SameReq{$\texttt{T}^\prime$}{$\texttt{U}^\prime$}$, where $\texttt{U}^\prime$ is the type parameter obtained by replacing \texttt{T} with \texttt{U} in $\texttt{T}^\prime$.
+Let $G$ be a well-formed generic signature, and suppose that $G\vDash\TU$ for type parameters \tT\ and \tU. If $\tT^\prime$ is any valid type parameter having \tT\ as a prefix, then $G\vDash\SameReq{$\tT^\prime$}{$\tU^\prime$}$, where $\tU^\prime$ is the type parameter obtained by replacing \tT\ with \tU\ in $\tT^\prime$.
 \end{lemma}
 \begin{proof}
-We proceed by \index{induction}induction on the \index{type parameter length}length of $\texttt{T}^\prime$, building the desired same-type requirement by repeated application of the \IndexStep{SameDecl}\textsc{SameDecl} or \IndexStep{SameName}\textsc{SameName} derivation step.
+We proceed by \index{induction}induction on the \index{type parameter length}length of $\tT^\prime$, building the desired same-type requirement by repeated application of the \IndexStep{SameDecl}\textsc{SameDecl} or \IndexStep{SameName}\textsc{SameName} derivation step.
 
-\BaseCase When $\texttt{T}^\prime$ has the same length as \texttt{T}, they must in fact be identical, since the latter is a prefix of the former, and thus $\texttt{U}^\prime$ is also the same as \texttt{U}. We have the necessary derivation $G\vDash\TU$ by assumption.
+\BaseCase When $\tT^\prime$ has the same length as \tT, they must in fact be identical, since the latter is a prefix of the former, and thus $\tU^\prime$ is also the same as \tU. We have the necessary derivation $G\vDash\TU$ by assumption.
 
-\InductiveStep We write $\texttt{T}^\prime$ as a dependent member type \texttt{$\texttt{T}^{\prime\prime}$.[P]A} or \texttt{$\texttt{T}^{\prime\prime}$.A}, with base type $\texttt{T}^{\prime\prime}$ and associated type~\texttt{A}. We have $G\vDash\texttt{T}^\prime$ by assumption, and so $G\vDash\texttt{T}^{\prime\prime}$ by \PropRef{prefix prop}. By the inductive hypothesis, we have a derivation $G\vDash\SameReq{$\texttt{T}^{\prime\prime}$}{$\texttt{U}^{\prime\prime}$}$.
+\InductiveStep We write $\tT^\prime$ as a dependent member type \texttt{$\tT^{\prime\prime}$.[P]A} or \texttt{$\tT^{\prime\prime}$.A}, with base type $\tT^{\prime\prime}$ and associated type~\nA. We have $G\vDash\tT^\prime$ by assumption, and so $G\vDash\tT^{\prime\prime}$ by \PropRef{prefix prop}. By the inductive hypothesis, we have a derivation $G\vDash\SameReq{$\tT^{\prime\prime}$}{$\tU^{\prime\prime}$}$.
 
-Note that $G\vDash\texttt{T}^\prime$ also implies that $G\vDash\ConfReq{$\texttt{T}^{\prime\prime}$}{P}$. If $\texttt{T}^\prime$ is \index{bound dependent member type}bound, we apply a \textsc{SameDecl} step to $\SameReq{$\texttt{T}^{\prime\prime}$}{$\texttt{U}^{\prime\prime}$}$ and $\ConfReq{$\texttt{T}^{\prime\prime}$}{P}$:
+Note that $G\vDash\tT^\prime$ also implies that $G\vDash\ConfReq{$\tT^{\prime\prime}$}{P}$. If $\tT^\prime$ is \index{bound dependent member type}bound, we apply a \textsc{SameDecl} step to $\SameReq{$\tT^{\prime\prime}$}{$\tU^{\prime\prime}$}$ and $\ConfReq{$\tT^{\prime\prime}$}{P}$:
 \begin{gather*}
-\ldots\vdash\ConfReq{$\texttt{T}^{\prime\prime}$}{P}\tag{1}\\
-\ldots\vdash\SameReq{$\texttt{T}^{\prime\prime}$}{$\texttt{U}^{\prime\prime}$}\tag{2}\\
-(1),\,(2)\vdash\SameReq{$\texttt{T}^{\prime\prime}$.[P]A}{$\texttt{U}^{\prime\prime}$.[P]A}\tag{3}
+\ldots\vdash\ConfReq{$\tT^{\prime\prime}$}{P}\tag{1}\\
+\ldots\vdash\SameReq{$\tT^{\prime\prime}$}{$\tU^{\prime\prime}$}\tag{2}\\
+(1),\,(2)\vdash\SameReq{$\tT^{\prime\prime}$.[P]A}{$\tU^{\prime\prime}$.[P]A}\tag{3}
 \end{gather*}
-If $\texttt{T}^\prime$ is unbound, we just change the final step to a \textsc{SameName}:
+If $\tT^\prime$ is unbound, we just change the final step to a \textsc{SameName}:
 \begin{gather*}
-(1),\,(2)\vdash\SameReq{$\texttt{T}^{\prime\prime}$.A}{$\texttt{U}^{\prime\prime}$.A}\tag{3}
+(1),\,(2)\vdash\SameReq{$\tT^{\prime\prime}$.A}{$\tU^{\prime\prime}$.A}\tag{3}
 \end{gather*}
-In both cases, we get the desired derivation $G\vDash\SameReq{$\texttt{T}^\prime$}{$\texttt{U}^\prime$}$.
+In both cases, we get the desired derivation $G\vDash\SameReq{$\tT^\prime$}{$\tU^\prime$}$.
 \end{proof}
 
-\begin{theorem}\label{conformance paths theorem} Let $G$ be a valid generic signature, with \texttt{T} a type parameter and \texttt{P} some protocol. If $G\vDash\TP$, then there exists at least one conformance path for $\TP$. In other words, there exists a type parameter $\texttt{T}^\prime\in\TypeObj{G}$, such that:
+\begin{theorem}\label{conformance paths theorem} Let $G$ be a valid generic signature, with \tT\ a type parameter and \tP\ some protocol. If $G\vDash\TP$, then there exists at least one conformance path for $\TP$. In other words, there exists a type parameter $\tT^\prime\in\TypeObj{G}$, such that:
 \begin{enumerate}
-\item $G\vDash\ConfReq{$\texttt{T}^\prime$}{P}$, via a primitive derivation.
-\item $G\vDash\SameReq{T}{$\texttt{T}^\prime$}$.
+\item $G\vDash\ConfReq{$\tT^\prime$}{P}$, via a primitive derivation.
+\item $G\vDash\SameReq{T}{$\tT^\prime$}$.
 \end{enumerate}
 \end{theorem}
 \begin{proof}
@@ -331,33 +331,33 @@ The proof relies on a few results developed in \SecRef{generic signature validit
 \item \IndexStep{AssocConf}\textsc{AssocConf} steps: $\ConfReq{U}{P},\,\ConfReq{Self.V}{Q}\vdash\ConfReq{U.V}{Q}$.
 \end{enumerate}
 
-\noindent \textbf{First case.} Notice that a \textsc{Conf} step is the \index{base case}base case of our structural induction, because there are no assumptions on the left-hand side of $\vdash$. We set $\texttt{T}^\prime := \texttt{T}$. A derivation of a single explicit conformance requirement is already primitive by our definition, so $D_1$ is just:
+\noindent \textbf{First case.} Notice that a \textsc{Conf} step is the \index{base case}base case of our structural induction, because there are no assumptions on the left-hand side of $\vdash$. We set $\tT^\prime := \tT$. A derivation of a single explicit conformance requirement is already primitive by our definition, so $D_1$ is just:
 \begin{gather*}
 \vdash\TP\tag{1}
 \end{gather*}
-To construct $D_2$, we recall that $G$ is well-formed, thus $G\vDash\texttt{T}$, since \texttt{T} appears in $\TP$. We then derive $\SameReq{T}{T}$ via an \IndexStep{Ident}\textsc{Ident} derivation step:
+To construct $D_2$, we recall that $G$ is well-formed, thus $G\vDash\tT$, since \tT\ appears in $\TP$. We then derive $\SameReq{T}{T}$ via an \IndexStep{Ident}\textsc{Ident} derivation step:
 \begin{gather*}
-\ldots\vdash\texttt{T}\tag{1}\\
+\ldots\vdash\tT\tag{1}\\
 (2)\vdash\SameReq{T}{T}\tag{2}
 \end{gather*}
 
 \noindent \textbf{Second case.} We have a \textsc{SameConf} derivation step:
 \[\TU,\,\ConfReq{U}{P}\vdash\TP\]
-By the \index{inductive step}inductive hypothesis, we can assume the derivation of $\ConfReq{U}{P}$ has already been split up into two derivations: a primitive derivation $D_1^\prime$ of $G\vDash\ConfReq{$\texttt{U}^\prime$}{P}$, and a derivation $D_2^\prime$ of $G\vDash\SameReq{U}{$\texttt{U}^\prime$}$. We set $D_1:=D_1^\prime$. Then, we construct $D_2$ from $D_2^\prime$ by adding an \textsc{Equiv} derivation step:
+By the \index{inductive step}inductive hypothesis, we can assume the derivation of $\ConfReq{U}{P}$ has already been split up into two derivations: a primitive derivation $D_1^\prime$ of $G\vDash\ConfReq{$\tU^\prime$}{P}$, and a derivation $D_2^\prime$ of $G\vDash\SameReq{U}{$\tU^\prime$}$. We set $D_1:=D_1^\prime$. Then, we construct $D_2$ from $D_2^\prime$ by adding an \textsc{Equiv} derivation step:
 \begin{gather*}
 \ldots\TU\tag{1}\\
-\ldots\SameReq{U}{$\texttt{U}^\prime$}\tag{2}\\
-(1),\,(2)\vdash\SameReq{T}{$\texttt{U}^\prime$}\tag{3}
+\ldots\SameReq{U}{$\tU^\prime$}\tag{2}\\
+(1),\,(2)\vdash\SameReq{T}{$\tU^\prime$}\tag{3}
 \end{gather*}
 
 \noindent \textbf{Third case.} The trickiest scenario is when we have a \textsc{AssocConf} derivation step:
 \[\ConfReq{U}{P},\,\ConfReq{Self.V}{Q}\vdash\ConfReq{U.V}{Q}\]
 By induction, we again assume the derivation of $\ConfReq{U}{P}$ has been split up into $D_1^\prime$ and $D_2^\prime$ as above. We construct $D_1$ from $D_1^\prime$ by adding an \textsc{AssocConf} derivation step for the same associated requirement:
 \begin{gather*}
-\ldots\ConfReq{$\texttt{U}^\prime$}{P}\tag{1}\\
-(1),\,\ConfReq{Self.V}{Q}_\texttt{P}\vdash\ConfReq{$\texttt{U}^\prime$.V}{Q}\tag{2}
+\ldots\ConfReq{$\tU^\prime$}{P}\tag{1}\\
+(1),\,\ConfReq{Self.V}{Q}_\tP\vdash\ConfReq{$\tU^\prime$.V}{Q}\tag{2}
 \end{gather*}
-This is a primitive derivation by construction. We derive the same-type requirement $G\vDash\SameReq{U.V}{$\texttt{U}^\prime$.V}$, giving us $D_2$. To do that, we note that $G$ is well-formed, so $G\vDash\texttt{U.V}$. \LemmaRef{general member type} then gives us the desired derivation, completing the induction.
+This is a primitive derivation by construction. We derive the same-type requirement $G\vDash\SameReq{U.V}{$\tU^\prime$.V}$, giving us $D_2$. To do that, we note that $G$ is well-formed, so $G\vDash\texttt{U.V}$. \LemmaRef{general member type} then gives us the desired derivation, completing the induction.
 \end{proof}
 
 \section{The Conformance Path Graph}\label{finding conformance paths}
@@ -372,7 +372,7 @@ The \IndexDefinition{conformance path graph}\emph{conformance path graph} of a g
 \item The \index{vertex}vertices are the \index{reduced abstract conformance}reduced abstract conformances of $G$.
 \item The \index{edge}edges are the \index{associated conformance projection}associated conformance projections.
 
-That is, if $\TP$ is an abstract conformance and $\AssocConf{Self.V}{Q}$ is an \index{associated conformance requirement}associated conformance requirement of \texttt{P}, we form the abstract conformance $\AssocConf{Self.V}{Q}\otimes \TP=\ConfReq{T.V}{Q}$. If \texttt{U} is the reduced type of \texttt{T.V}, there is an edge with \index{source vertex}source vertex $\TP$ and \index{destination vertex}destination vertex $\ConfReq{U}{Q}$.
+That is, if $\TP$ is an abstract conformance and $\AssocConf{Self.V}{Q}$ is an \index{associated conformance requirement}associated conformance requirement of \tP, we form the abstract conformance $\AssocConf{Self.V}{Q}\otimes \TP=\ConfReq{T.V}{Q}$. If \tU\ is the reduced type of \texttt{T.V}, there is an edge with \index{source vertex}source vertex $\TP$ and \index{destination vertex}destination vertex $\ConfReq{U}{Q}$.
 \end{itemize}
 
 \vfill
@@ -495,45 +495,45 @@ Putting everything together, we finally get an algorithm to find conformance pat
 \begin{itemize}
 \item A table mapping reduced abstract conformances to conformance paths. Initially empty.
 \item A non-negative integer \texttt{N}, representing the maximum length of conformance paths stored in the table. Initially 0.
-\item A growable array \texttt{B} storing all conformance paths of length $\texttt{N}$. Initially empty.
-\item A growable array $\texttt{B}^\prime$ storing all conformance paths of length $\texttt{N}+1$. Initially empty.
+\item A growable array \nB\ storing all conformance paths of length $\texttt{N}$. Initially empty.
+\item A growable array $\nB^\prime$ storing all conformance paths of length $\texttt{N}+1$. Initially empty.
 \end{itemize}
 
 \begin{algorithm}[Find conformance path]\label{find conformance path algorithm}
 Takes a generic signature $G$ and an abstract conformance $\TP$ valid in $G$ as input. Outputs a conformance path for $\TP$.
 
 \begin{enumerate}
-\item (Precondition) Check that \IndexQuery{requiresProtocol}$\Query{requiresProtocol}{G,\,\texttt{T},\,\texttt{P}}$. If this is not true, signal an error. This guarantees termination below.
+\item (Precondition) Check that \IndexQuery{requiresProtocol}$\Query{requiresProtocol}{G,\,\tT,\,\tP}$. If this is not true, signal an error. This guarantees termination below.
 
-\item (Reduce) Set \IndexQuery{getReducedType}$\texttt{T}\leftarrow\Query{getReducedType}{G,\,\texttt{T}}$.
+\item (Reduce) Set \IndexQuery{getReducedType}$\tT\leftarrow\Query{getReducedType}{G,\,\tT}$.
 
 \item (Check) If the table contains an entry for $\TP$, return the conformance path associated with this entry.
 
-\item (Initialize) If $\texttt{N}=0$, initialize \texttt{B} with a conformance path of length~1 for each of the generic signature's root abstract conformances, and set $\texttt{N}=1$.
+\item (Initialize) If $\texttt{N}=0$, initialize \nB\ with a conformance path of length~1 for each of the generic signature's root abstract conformances, and set $\texttt{N}=1$.
 
-\item (Loop) For every conformance path $c\in \texttt{B}$:
+\item (Loop) For every conformance path $c\in \nB$:
 
 \begin{enumerate}
 
-\item (Simplify) Invoke \AlgRef{invertconformancepath} to simplify $c$ to an abstract conformance. Denote this abstract conformance by $\ConfReq{$\texttt{T}_c$}{$\texttt{P}_c$}$.
+\item (Simplify) Invoke \AlgRef{invertconformancepath} to simplify $c$ to an abstract conformance. Denote this abstract conformance by $\ConfReq{$\tT_c$}{$\tP_c$}$.
 
-\item (Reduce) Set \IndexQuery{getReducedType}$\texttt{T}_c\leftarrow\Query{getReducedType}{G,\,\texttt{T}_c}$.
+\item (Reduce) Set \IndexQuery{getReducedType}$\tT_c\leftarrow\Query{getReducedType}{G,\,\tT_c}$.
 
-\item (Check) If the table already contains an entry for $\ConfReq{$\texttt{T}_c$}{$\texttt{P}_c$}$, continue onto the next iteration of Step~5.
+\item (Check) If the table already contains an entry for $\ConfReq{$\tT_c$}{$\tP_c$}$, continue onto the next iteration of Step~5.
 
-\item (Record) Otherwise, add an entry with key $\ConfReq{$\texttt{T}_c$}{$\texttt{P}_c$}$ and value $c$ to the table.
+\item (Record) Otherwise, add an entry with key $\ConfReq{$\tT_c$}{$\tP_c$}$ and value $c$ to the table.
 
-\item (Successors) For every associated conformance requirement $\AssocConf{Self.$\texttt{A}_i$}{$\texttt{P}_i$}$ of protocol $\texttt{P}_c$, add the conformance path $\AssocConf{Self.$\texttt{A}_i$}{$\texttt{P}_i$}\otimes c$ to $\texttt{B}^\prime$.
+\item (Successors) For every associated conformance requirement $\AssocConf{Self.$\nA_i$}{$\tP_i$}$ of protocol $\tP_c$, add the conformance path $\AssocConf{Self.$\nA_i$}{$\tP_i$}\otimes c$ to $\nB^\prime$.
 \end{enumerate}
 
-\item (Refill) Swap the contents of \texttt{B} with $\texttt{B}^\prime$, and clear $\texttt{B}^\prime$. Increment \texttt{N}.
+\item (Refill) Swap the contents of \nB\ with $\nB^\prime$, and clear $\nB^\prime$. Increment \texttt{N}.
 
 \item (Retry) Go back to Step~1.
 \end{enumerate}
 \end{algorithm}
 
 \paragraph{Algorithmic complexity.}
-Despite the memoization performed above, \AlgRef{find conformance path algorithm} requires exponential time in the worst case. We can demonstrate this by constructing a generic signature with $2^{n-1}$ unique conformance paths of length $n$. Consider the protocol generic signature $\GP$ with the following protocol \texttt{P}:
+Despite the memoization performed above, \AlgRef{find conformance path algorithm} requires exponential time in the worst case. We can demonstrate this by constructing a generic signature with $2^{n-1}$ unique conformance paths of length $n$. Consider the protocol generic signature $\GP$ with the following protocol \tP:
 \begin{Verbatim}
 protocol P {
   associatedtype A: P
@@ -566,14 +566,14 @@ This allows us to define an \IndexDefinition{infinite generic signature}\emph{in
 \begin{proof}
 For $(1)\Rightarrow(2)$, note that the set of generic parameter types is always finite, so it suffices to only consider reduced \index{dependent member type}dependent member types. Suppose we're given an infinite set of reduced dependent member types; we must produce an infinite set of abstract conformances. Each dependent member type \texttt{T.[P]A} is equivalent to an ordered pair consisting of a type witness projection $\AssocType{[P]A}$ and an abstract conformance $\TP$; the first element of the pair is drawn from a finite set, so a counting argument shows that the mapping that takes the second element of each pair must give us an infinite set of abstract conformances.
 
-Furthermore, these abstract conformances must be reduced, meaning their subject types are reduced. To see why, note that whenever \texttt{T.[P]A} is a reduced dependent member type, its base type \texttt{T} must be reduced as well (otherwise, if $G\vDash\SameReq{$\texttt{T}^\prime$}{T}$ with $\texttt{T}^\prime<\texttt{T}$, we could construct from this a derivation of $\SameReq{$\texttt{T}^\prime$.[P]A}{T.[P]A}$ with $\texttt{$\texttt{T}^\prime$.[P]A} < \texttt{T.[P]A}$, contradicting the assumption that \texttt{T.[P]A} is reduced).
+Furthermore, these abstract conformances must be reduced, meaning their subject types are reduced. To see why, note that whenever \texttt{T.[P]A} is a reduced dependent member type, its base type \tT\ must be reduced as well (otherwise, if $G\vDash\SameReq{$\tT^\prime$}{T}$ with $\tT^\prime<\tT$, we could construct from this a derivation of $\SameReq{$\tT^\prime$.[P]A}{T.[P]A}$ with $\texttt{$\tT^\prime$.[P]A} < \texttt{T.[P]A}$, contradicting the assumption that \texttt{T.[P]A} is reduced).
 
-A similar argument establishes $(2)\Rightarrow(1)$. We're given an infinite set of reduced abstract conformances, and we must produce an infinite set of reduced type parameters. Each abstract conformance $\TP$ uniquely determines an ordered pair, consisting of a \index{protocol declaration}protocol declaration $\protosym{P}$ and a type parameter \texttt{T}. The set of protocol declarations is finite, so again, taking the second element of each pair gives us an infinite set of reduced type parameters.
+A similar argument establishes $(2)\Rightarrow(1)$. We're given an infinite set of reduced abstract conformances, and we must produce an infinite set of reduced type parameters. Each abstract conformance $\TP$ uniquely determines an ordered pair, consisting of a \index{protocol declaration}protocol declaration $\tP$ and a type parameter \tT. The set of protocol declarations is finite, so again, taking the second element of each pair gives us an infinite set of reduced type parameters.
 \end{proof}
 
 Next, we will characterize infinite generic signatures by way of another directed graph.
 
-\begin{definition}
+\begin{definition}\label{protocol dependency graph def}
 The \IndexDefinition{protocol dependency graph}\emph{protocol dependency graph} is defined as follows:
 \begin{itemize}
 \item The \index{vertex}vertices are \index{protocol declaration}protocol declarations.
@@ -597,8 +597,8 @@ A \IndexDefinition{recursive conformance requirement}\emph{recursive conformance
 \begin{tikzpicture}[node distance=1.4cm]
 
 \node (N) [protocol] {$\protosym{N}$};
-\node (Q) [protocol, above left=of N] {$\protosym{Q}$};
-\node (R) [protocol, above right=of N] {$\protosym{R}$};
+\node (Q) [protocol, above left=of N] {$\pQ$};
+\node (R) [protocol, above right=of N] {$\pR$};
 \node (O) [protocol, below=of N] {$\protosym{O}$};
 \path [->] (Q) edge [left, bend left] (R)
            (R) edge [right, bend left] (Q)
@@ -607,7 +607,7 @@ A \IndexDefinition{recursive conformance requirement}\emph{recursive conformance
 \path [->,every loop/.style={min distance=13mm}] (N) edge [loop left] ();
 \end{tikzpicture}
 \end{wrapfigure}
-The protocol dependency graph for \ListingRef{protocol dependency graph listing} is shown on the right. It has two distinct cycles; the first joins $\protosym{Q}$ with $\protosym{R}$, and the second is a loop at $\protosym{N}$. This gives us three recursive associated conformance requirements, by the above definition:
+The protocol dependency graph for \ListingRef{protocol dependency graph listing} is shown on the right. It has two distinct cycles; the first joins $\pQ$ with $\pR$, and the second is a loop at $\protosym{N}$. This gives us three recursive associated conformance requirements, by the above definition:
 \begin{gather*}
 \AssocConf{Self.[N]A}{N}\\
 \AssocConf{Self.[Q]B}{R}\\
@@ -638,16 +638,16 @@ protocol O {
 \end{Verbatim}
 \end{listing}
 
-Now consider the protocol generic signature $G_\texttt{Q}$ from \ListingRef{protocol dependency graph listing}. \FigRef{infinite tree graph} shows the conformance path graph for this generic signature, an infinite tree with the abstract conformance $\ConfReq{Self}{Q}$ as the root. One possible path from the root is the conformance path for $\ConfReq{Self.B.D.B.C}{N}$ in $G_\texttt{Q}$:
+Now consider the protocol generic signature $G_\tQ$ from \ListingRef{protocol dependency graph listing}. \FigRef{infinite tree graph} shows the conformance path graph for this generic signature, an infinite tree with the abstract conformance $\ConfReq{Self}{Q}$ as the root. One possible path from the root is the conformance path for $\ConfReq{Self.B.D.B.C}{N}$ in $G_\tQ$:
 \[
 \AssocConf{Self.C}{N} \otimes \AssocConf{Self.B}{R} \otimes \AssocConf{Self.D}{Q} \otimes \AssocConf{Self.B}{R} \otimes \ConfReq{Self}{Q}
 \]
-Writing down the list of protocols from each step (remember that conformance paths are read from right to left!) we get a path in the protocol dependency graph; the path visits $\protosym{Q}$ and $\protosym{R}$ twice, exhibiting the existence of a cycle:
-\[\protosym{Q}\longrightarrow\protosym{R}\longrightarrow\protosym{Q}\longrightarrow\protosym{R}\longrightarrow\protosym{N}\]
+Writing down the list of protocols from each step (remember that conformance paths are read from right to left!) we get a path in the protocol dependency graph; the path visits $\pQ$ and $\pR$ twice, exhibiting the existence of a cycle:
+\[\pQ\longrightarrow\pR\longrightarrow\pQ\longrightarrow\pR\longrightarrow\protosym{N}\]
 
 We will encounter protocol dependency graphs again in \ChapRef{rqm basic operation}, when we describe the construction of the rewrite system for a generic signature.
 
-\begin{figure}\captionabove{Conformance path graph for $G_\texttt{Q}$ from \ListingRef{protocol dependency graph listing}}\label{infinite tree graph}
+\begin{figure}\captionabove{Conformance path graph for $G_\tQ$ from \ListingRef{protocol dependency graph listing}}\label{infinite tree graph}
 \begin{center}
 \begin{tikzpicture}[sibling distance=3.8cm, level distance=1.5cm, edge from parent path={[->] (\tikzparentnode) .. controls +(0,-1) and +(0,1) .. (\tikzchildnode.north)}]
 
@@ -694,9 +694,9 @@ To choose the first element of the sequence, note that there are only finitely m
 \begin{center}
 \begin{tikzpicture}[level distance=1.5cm, edge from parent path={[->] (\tikzparentnode) .. controls +(0,-1) and +(0,1) .. (\tikzchildnode.north)}]
 
-\node (T) [root] {\ConfReq{\ttgp{0}{0}}{N}}
-  child {node (TA) [interior] {\ConfReq{\ttgp{0}{0}.A}{N}}
-    child {node (TAA) [interior] {\ConfReq{\ttgp{0}{0}.A.A}{N}}
+\node (T) [root] {\ConfReq{\rT}{N}}
+  child {node (TA) [interior] {\ConfReq{\rT.A}{N}}
+    child {node (TAA) [interior] {\ConfReq{\rT.A.A}{N}}
       child {node (Rest) {\vphantom{\texttt{[]}}$\ldots$}}
     }
   };
@@ -713,9 +713,9 @@ To choose the first element of the sequence, note that there are only finitely m
 
 The protocol generic signature $G_\texttt{N}$ with the protocol \texttt{N} from \ListingRef{protocol dependency graph listing} is then the quintessential infinite generic signature, in a sense, because its conformance path graph is just one ray, shown in \FigRef{ray conformance path graph}. Let $\Sigma_{\ConfReq{T}{N}}$ be a \index{protocol substitution map}protocol substitution map for a conformance to \texttt{N}. This is a substitution map with input generic signature $G_\texttt{N}$, which we can apply to each abstract conformance of $G_\texttt{N}$, obtaining a sequence of concrete conformances:
 \begin{gather*}
-\ConfReq{\ttgp{0}{0}}{N}\otimes\Sigma_{\ConfReq{T}{N}}=\ConfReq{T}{N}\\
-\ConfReq{\ttgp{0}{0}.Body}{N}\otimes\Sigma_{\ConfReq{T}{N}}=\SelfAToN\otimes\ConfReq{T}{N}\\
-\ConfReq{\ttgp{0}{0}.Body.Body}{N}\otimes\Sigma_{\ConfReq{T}{N}}=\SelfAToN\otimes\SelfAToN\otimes\ConfReq{T}{N}\\
+\ConfReq{\rT}{N}\otimes\Sigma_{\ConfReq{T}{N}}=\ConfReq{T}{N}\\
+\ConfReq{\rT.A}{N}\otimes\Sigma_{\ConfReq{T}{N}}=\SelfAToN\otimes\ConfReq{T}{N}\\
+\ConfReq{\rT.A.A}{N}\otimes\Sigma_{\ConfReq{T}{N}}=\SelfAToN\otimes\SelfAToN\otimes\ConfReq{T}{N}\\
 \ldots
 \end{gather*}
 Local conformance lookup associates a substituted conformance with each abstract conformance. The substituted conformances are not necessarily distinct, but the mapping is compatible with associated conformance projection, as we saw in \SecRef{associated conformances}. To understand the structure we obtain here, we define yet another directed graph.
@@ -740,7 +740,7 @@ f_V(\Dst(e)) = \Dst(f_E(e)).
 That is, if two vertices are joined by an edge in $E_1$, their image must be joined by an edge in $E_2$ (and if both vertices map to the same vertex, then $E_2$ contains a loop at this vertex). An immediate consequence of this definition is that a graph homomorphism also maps paths in $G$ to paths in $H$.
 \end{definition}
 
-Let's now reconsider the application of a \index{protocol substitution map}protocol substitution map $\Sigma_{\ConfReq{T}{N}}$, where \texttt{T} is an arbitrary concrete type, to each abstract conformance of $G_{\texttt{N}}$. In light of the above, that we're actually looking at is a graph homomorphism from the conformance path graph of $G_{\texttt{N}}$, to the conformance evaluation graph of $\Sigma_{\ConfReq{T}{N}}$. We saw that the conformance path graph of $G_{\texttt{N}}$ is a ray, and local conformance lookup maps each successive vertex to the result of applying $\SelfAToN$ some number of times to the root conformance $\ConfReq{T}{N}$. There are three possibilities, each one corresponding to different outcomes of the repeated application of $\SelfAToN$ to $\ConfReq{T}{N}$:
+Let's now reconsider the application of a \index{protocol substitution map}protocol substitution map $\Sigma_{\ConfReq{T}{N}}$, where \tT\ is an arbitrary concrete type, to each abstract conformance of $G_{\texttt{N}}$. In light of the above, that we're actually looking at is a graph homomorphism from the conformance path graph of $G_{\texttt{N}}$, to the conformance evaluation graph of $\Sigma_{\ConfReq{T}{N}}$. We saw that the conformance path graph of $G_{\texttt{N}}$ is a ray, and local conformance lookup maps each successive vertex to the result of applying $\SelfAToN$ some number of times to the root conformance $\ConfReq{T}{N}$. There are three possibilities, each one corresponding to different outcomes of the repeated application of $\SelfAToN$ to $\ConfReq{T}{N}$:
 \begin{enumerate}
 \item We eventually end up back at $\ConfReq{T}{N}$; the ray is mapped to a cycle, and the conformance evaluation graph is finite.
 \item Every application of $\SelfAToN$ gives us a new conformance we have not seen before; the ray is mapped to another ray, and we have an infinite conformance evaluation graph.
@@ -759,13 +759,13 @@ struct Y: N {
 }
 \end{Verbatim}
 The normal conformance $\ConfReq{X}{N}$ records the type witness \verb|Y| for \verb|A|, and also the associated conformance $\ConfReq{Y}{N}$ for $\AssocConf{Self.A}{N}$:
-\begin{quote}
+\begin{center}
 \NormalConformance{X}{N}{
 \AssocTypeDef{[N]A}{Y}
 }{
 \AssocConfDef{Self.[N]A}{Y}{N}
 }
-\end{quote}
+\end{center}
 The conformance $\ConfReq{Y}{N}$ is likewise a mirror image that points back to \verb|X| and $\ConfReq{X}{N}$. We can express the relationship between the two conformances via associated conformance projection:
 \begin{gather*}
 \SelfAToN \otimes \ConfReq{X}{N} = \ConfReq{Y}{N}\\
@@ -773,10 +773,10 @@ The conformance $\ConfReq{Y}{N}$ is likewise a mirror image that points back to 
 \end{gather*}
 \index{normal conformance}%
 \index{protocol substitution map}%
-We can construct a substitution map for our generic signature \texttt{<\ttgp{0}{0} where \ttgp{0}{0}:\ P>} which replaces \ttgp{0}{0} with the concrete type \texttt{X}:
-\[\SubstMapC{\SubstType{\ttgp{0}{0}}{X}}{\SubstConf{\ttgp{0}{0}}{X}{N}}\]
+We can construct a substitution map for our generic signature \texttt{<\rT\ where \rT:\ P>} which replaces \rT\ with the concrete type \texttt{X}:
+\[\SubstMapC{\SubstType{\rT}{X}}{\SubstConf{\rT}{X}{N}}\]
 The conformance evaluation graph of this substitution map only has two vertices, the root conformance $\ConfReq{X}{N}$ and the other normal conformance $\ConfReq{Y}{N}$, and the vertices form a cycle. The recursive conformance requirement allows us to jump from one conformance to the other and back again:
-\begin{quote}
+\begin{center}
 \begin{tikzpicture}[node distance=1.5cm]
 
 \node (X) [root] {\ConfReq{X}{N}};
@@ -784,7 +784,7 @@ The conformance evaluation graph of this substitution map only has two vertices,
 \path [->] (X) edge [right, bend left] node {\scriptsize{$\SelfAToN$}} (Y)
            (Y) edge [left, bend left] node {\scriptsize{$\SelfAToN$}} (X);
 \end{tikzpicture}
-\end{quote}
+\end{center}
 
 \paragraph{Recursive specialized conformances.}
 When a recursive conformance requirement is witnessed by a specialized conformance, we can observe an infinite conformance evaluation graph:
@@ -793,27 +793,23 @@ struct G<T>: N {
   typealias A = G<G<T>>
 }
 \end{Verbatim}
-Writing the canonical type \ttgp{0}{0} in place of \texttt{T}, we can exhibit the information stored in the normal conformance $\ConfReq{G<\ttgp{0}{0}>}{N}$ with the below table.
-\begin{quote}
-\begin{tabular}{|lcl|}
-\hline
-\multicolumn{3}{|l|}{\texttt{G<\ttgp{0}{0}>:\ P}}\\
-\hline
-\rule{0pt}{3ex}\textbf{Associated type}&&\textbf{Type witness}\\
-$\AssocType{[N]A}$&$\mapsto$&\texttt{G<G<\ttgp{0}{0}>>}\\[\medskipamount]
-\textbf{Conformance requirement}&&\textbf{Conformance}\\
-$\SelfAToN$&$\mapsto$&$\ConfReq{G<G<\ttgp{0}{0}>>}{N}$\\[\medskipamount]
-\hline
-\end{tabular}
-\end{quote}
-Let $\Sigma:=\SubstMap{\SubstType{\ttgp{0}{0}}{G<\ttgp{0}{0}>}}$. Then, the associated conformance for $\SelfAToN$ is a specialized conformance having $\Sigma$ as the conformance substitution map. Thus:
+Writing the canonical type \rT\ in place of \tT, we can exhibit the information stored in the normal conformance $\ConfReq{G<\rT>}{N}$ with the below table.
+\begin{center}
+\NormalConformance{G<\rT>}{N}{
+\AssocTypeDef{[N]A}{G<G<\rT>>}
+}
+{
+\AssocConfDef{Sef.[N]A}{G<G<\rT>>}{N}
+}
+\end{center}
+Let $\Sigma:=\SubstMap{\SubstType{\rT}{G<\rT>}}$. Then, the associated conformance for $\SelfAToN$ is a specialized conformance having $\Sigma$ as the conformance substitution map. Thus:
 \begin{gather*}
-\AssocType{[N]A} \otimes \ConfReq{G<\ttgp{0}{0}>}{N} = \texttt{G<\ttgp{0}{0}>}\otimes \Sigma\\
-\SelfAToN \otimes \ConfReq{G<\ttgp{0}{0}>}{N} = \ConfReq{G<\ttgp{0}{0}>}{N}\otimes \Sigma
+\AssocType{[N]A} \otimes \ConfReq{G<\rT>}{N} = \texttt{G<\rT>}\otimes \Sigma\\
+\SelfAToN \otimes \ConfReq{G<\rT>}{N} = \ConfReq{G<\rT>}{N}\otimes \Sigma
 \end{gather*}
 In particular, the normal conformance points back to itself via the associated conformance. Now consider this specialized conformance:
-\[\ConfReq{G<Int>}{N}=\ConfReq{G<\ttgp{0}{0}>}{N}\otimes\SubstMap{\SubstType{\ttgp{0}{0}}{Int}}\]
-The choice of \texttt{Int} is arbitrary---any type can be used as the generic argument, since the generic parameter \ttgp{0}{0} is not constrained. We see that:
+\[\ConfReq{G<Int>}{N}=\ConfReq{G<\rT>}{N}\otimes\SubstMap{\SubstType{\rT}{Int}}\]
+The choice of \texttt{Int} is arbitrary---any type can be used as the generic argument, since the generic parameter \rT\ is not constrained. We see that:
 \begin{gather*}
 \SelfAToN\otimes\ConfReq{G<Int>}{N}=\ConfReq{G<G<Int>>}{N}\\
 \SelfAToN\otimes\SelfAToN\otimes\ConfReq{G<Int>}{N}=\ConfReq{G<G<G<Int>>>}{N}\\
@@ -821,13 +817,13 @@ The choice of \texttt{Int} is arbitrary---any type can be used as the generic ar
 \end{gather*}
 More generally, projecting the associated conformance any number of times on the left is equivalent to applying $\Sigma$ the same number of times on the right, which adds new levels of ``\texttt{G<>}'':
 \begin{gather*}
-\underbrace{\SelfAToN\otimes\cdots\otimes\SelfAToN}_{\textrm{$n$ times}}{} \otimes\ConfReq{G<\ttgp{0}{0}>}{N}\otimes \SubstMap{\SubstType{\ttgp{0}{0}}{Int}}\\
-= \ConfReq{G<\ttgp{0}{0}>}{N}\otimes \underbrace{\Sigma\otimes\cdots\otimes \Sigma}_{\textrm{$n$ times}}{} \otimes \SubstMap{\SubstType{\ttgp{0}{0}}{Int}}
+\underbrace{\SelfAToN\otimes\cdots\otimes\SelfAToN}_{\textrm{$n$ times}}{} \otimes\ConfReq{G<\rT>}{N}\otimes \SubstMap{\SubstType{\rT}{Int}}\\
+= \ConfReq{G<\rT>}{N}\otimes \underbrace{\Sigma\otimes\cdots\otimes \Sigma}_{\textrm{$n$ times}}{} \otimes \SubstMap{\SubstType{\rT}{Int}}
 \end{gather*}
-Now suppose we take the substitution map for \texttt{<\ttgp{0}{0} where \ttgp{0}{0}:\ P>} which replaces \ttgp{0}{0} with \texttt{G<Int>}:
-\[\SubstMapC{\SubstType{\ttgp{0}{0}}{G<Int>}}{\SubstConf{\ttgp{0}{0}}{G<Int>}{N}}\]
+Now suppose we take the substitution map for \texttt{<\rT\ where \rT:\ P>} which replaces \rT\ with \texttt{G<Int>}:
+\[\SubstMapC{\SubstType{\rT}{G<Int>}}{\SubstConf{\rT}{G<Int>}{N}}\]
 We've shown that this substitution map has an infinite conformance evaluation graph. Starting from the root conformance \ConfReq{G<Int>}{N}, we can construct arbitrarily ``large'' specialized conformances; the conformance evaluation graph is a ray, just like the original conformance path graph:
-\begin{quote}
+\begin{center}
 \begin{tikzpicture}[level distance=1.5cm, edge from parent path={[->] (\tikzparentnode) .. controls +(0,-1) and +(0,1) .. (\tikzchildnode.north)}]
 
 \node (T) [root] {\ConfReq{G<Int>}{N}}
@@ -843,7 +839,7 @@ We've shown that this substitution map has an infinite conformance evaluation gr
 \path (TAA) -- node [right] {\tiny{$\SelfAToN$}} (Rest);
 \end{scope}
 \end{tikzpicture}
-\end{quote}
+\end{center}
 
 \paragraph{Recursive abstract conformances.}
 We saw a recursive conformance requirement being fulfilled by a normal conformance, and then a specialized conformance. The third possibility, where this conformance is abstract, reveals another interesting phenomenon:
@@ -852,50 +848,45 @@ struct H<T: N>: N {
   typealias A = T
 }
 \end{Verbatim}
-This time, the normal conformance $\ConfReq{H<\ttgp{0}{0}>}{N}$ is not circular at all. The associated conformance is the abstract conformance $\ConfReq{\ttgp{0}{0}}{N}$:
-\begin{quote}
-\begin{tabular}{|lcl|}
-\hline
-\multicolumn{3}{|l|}{\texttt{G<\ttgp{0}{0}>:\ P}}\\
-\hline
-\rule{0pt}{3ex}\textbf{Associated type}&&\textbf{Type witness}\\
-$\AssocType{[N]A}$&$\mapsto$&\ttgp{0}{0}\\[\medskipamount]
-\textbf{Conformance requirement}&&\textbf{Conformance}\\
-$\SelfAToN$&$\mapsto$&\ConfReq{\ttgp{0}{0}}{N}\\[\medskipamount]
-\hline
-\end{tabular}
-\end{quote}
+This time, the normal conformance $\ConfReq{H<\rT>}{N}$ is not circular at all. The associated conformance is the abstract conformance $\ConfReq{\rT}{N}$:
+\begin{center}
+\NormalConformance{G<\rT>}{N}{
+\AssocTypeDef{[N]A}{\rT}
+}{
+\AssocConfDef{Self.[N]A}{\rT}{N}
+}
+\end{center}
 Let's define two substitution maps since they will appear multiple times below:
 \begin{gather*}
-\Sigma_\texttt{H} := \SubstMapC{\SubstType{\ttgp{0}{0}}{H<\ttgp{0}{0}>}}{\SubstConf{\ttgp{0}{0}}{H<\ttgp{0}{0}>}{N}}\\
-\Sigma_\texttt{X} := \SubstMapC{\SubstType{\ttgp{0}{0}}{X}}{\SubstConf{\ttgp{0}{0}}{X}{N}}
+\Sigma_\texttt{H} := \SubstMapC{\SubstType{\rT}{H<\rT>}}{\SubstConf{\rT}{H<\rT>}{N}}\\
+\Sigma_\texttt{X} := \SubstMapC{\SubstType{\rT}{X}}{\SubstConf{\rT}{X}{N}}
 \end{gather*}
 Consider the specialized conformance $\ConfReq{H<H<X>>}{N}$. The conformance substitution map is the composition $\Sigma_{\texttt{H}}\otimes \Sigma_{\texttt{X}}$:
-\[\ConfReq{H<H<X>>}{N} = \ConfReq{H<\ttgp{0}{0}>}{N}\otimes \Sigma_{\texttt{H}}\otimes \Sigma_{\texttt{X}}\]
+\[\ConfReq{H<H<X>>}{N} = \ConfReq{H<\rT>}{N}\otimes \Sigma_{\texttt{H}}\otimes \Sigma_{\texttt{X}}\]
 Also we have these two identities:
 \begin{gather*}
-\SelfAToN \otimes \ConfReq{H<\ttgp{0}{0}>}{N} = \ConfReq{\ttgp{0}{0}}{N}\\
-\ConfReq{\ttgp{0}{0}}{N} \otimes \Sigma_{\texttt{H}} = \ConfReq{H<\ttgp{0}{0}>}{N}
+\SelfAToN \otimes \ConfReq{H<\rT>}{N} = \ConfReq{\rT}{N}\\
+\ConfReq{\rT}{N} \otimes \Sigma_{\texttt{H}} = \ConfReq{H<\rT>}{N}
 \end{gather*}
 Now we can calculate $\SelfAToN\otimes\ConfReq{H<H<X>>}{N}$:
 \begin{gather*}
 \SelfAToN \otimes \ConfReq{H<H<X>>}{N}\\
-= \SelfAToN \otimes \ConfReq{H<\ttgp{0}{0}>}{N} \otimes \Sigma_{\texttt{H}}\otimes \Sigma_{\texttt{X}} \\
-= \ConfReq{\ttgp{0}{0}}{N} \otimes \Sigma_{\texttt{H}}\otimes \Sigma_{\texttt{X}} \\
-= \ConfReq{H<\ttgp{0}{0}>}{N} \otimes \Sigma_{\texttt{X}}\\
+= \SelfAToN \otimes \ConfReq{H<\rT>}{N} \otimes \Sigma_{\texttt{H}}\otimes \Sigma_{\texttt{X}} \\
+= \ConfReq{\rT}{N} \otimes \Sigma_{\texttt{H}}\otimes \Sigma_{\texttt{X}} \\
+= \ConfReq{H<\rT>}{N} \otimes \Sigma_{\texttt{X}}\\
 = \ConfReq{H<X>}{N}
 \end{gather*}
 
 We jumped from $\ConfReq{H<H<X>>}{N}$ to $\ConfReq{H<X>}{N}$ by performing the associated conformance projection. If we project the associated conformance again, we get:
 \begin{gather*}
 \SelfAToN \otimes \ConfReq{H<X>}{N}\\
-= \SelfAToN \otimes \ConfReq{H<\ttgp{0}{0}>}{N} \otimes \Sigma_{\texttt{X}}\\
-= \ConfReq{\ttgp{0}{0}}{N} \otimes \Sigma_{\texttt{X}}\\
+= \SelfAToN \otimes \ConfReq{H<\rT>}{N} \otimes \Sigma_{\texttt{X}}\\
+= \ConfReq{\rT}{N} \otimes \Sigma_{\texttt{X}}\\
 = \ConfReq{X}{N}
 \end{gather*}
 
 We see that at each step, the projection ``peels off'' an \texttt{H<>}, until we finally reach the leaf type \verb|X|, at which point the projection cycles between $\ConfReq{X}{N}$ and $\ConfReq{Y}{N}$, as we've already seen. We can now draw the conformance evaluation graph for $\ConfReq{H<H<X>>}{N}$, which consists of a path leading to a cycle, the cycle being the conformance evaluation graph of $\ConfReq{X}{N}$:
-\begin{quote}
+\begin{center}
 \begin{tikzpicture}[node distance=1.5cm]
 
 \node (HH) [root] {\ConfReq{H<H<X>>}{N}};
@@ -908,7 +899,7 @@ We see that at each step, the projection ``peels off'' an \texttt{H<>}, until we
            (X) edge [right, bend left] node {\scriptsize{$\SelfAToN$}} (Y)
            (Y) edge [left, bend left] node {\scriptsize{$\SelfAToN$}} (X);
 \end{tikzpicture}
-\end{quote}
+\end{center}
 
 \paragraph{Non-terminating substitutions.}
 We gave a termination proof for \AlgRef{find conformance path algorithm}; we can always find a conformance path in a finite number of steps. However, we cannot make the same guarantee about \AlgRef{dependent member type substitution} for evaluating of a conformance path. \index{limitation!non-terminating type substitution} This example demonstrates \index{non-terminating computation}non-terminating substitution:
@@ -922,21 +913,21 @@ struct F<T: N>: N {
 }
 \end{Verbatim}
 We have a pair of types conforming to \texttt{N}, and thus two normal conformances. Here is the first normal conformance:
-\begin{quote}
+\begin{center}
 \NormalConformance{S}{N}{
 \AssocTypeDef{[N]A}{F<S>}
 }{
 \AssocConfDef{Self.[N]A}{F<S>}{N}
 }
-\end{quote}
+\end{center}
 And the second:
-\begin{quote}
-\NormalConformance{F<\ttgp{0}{0}>}{N}{
-\AssocTypeDef{[N]A}{\ttgp{0}{0}.[N]A.[N]A}
+\begin{center}
+\NormalConformance{F<\rT>}{N}{
+\AssocTypeDef{[N]A}{\rT.[N]A.[N]A}
 }{
-\AssocConfDef{Self.[N]A}{\ttgp{0}{0}.[N]A.[N]A}{N}
+\AssocConfDef{Self.[N]A}{\rT.[N]A.[N]A}{N}
 }
-\end{quote}
+\end{center}
 We now claim that there is no possible substituted type which can be ascribed to the declaration of \texttt{value} in the below code:
 \begin{Verbatim}
 func f<T: N>(_: T.Type) -> T.A.A.Type { ... }
@@ -944,39 +935,39 @@ func f<T: N>(_: T.Type) -> T.A.A.Type { ... }
 let value = f(F<S>.self)
 \end{Verbatim}
 Define these two substitution maps:
-\begin{gather*} \Sigma_\texttt{S}:=\SubstMapC{\SubstType{\ttgp{0}{0}}{S}}{\SubstConf{\ttgp{0}{0}}{S}{N}}\\
-\Sigma_\texttt{F} := \SubstMapC{\SubstType{\ttgp{0}{0}}{F<\ttgp{0}{0}>}}{\SubstConf{\ttgp{0}{0}}{F<\ttgp{0}{0}>}{N}}
+\begin{gather*} \Sigma_\texttt{S}:=\SubstMapC{\SubstType{\rT}{S}}{\SubstConf{\rT}{S}{N}}\\
+\Sigma_\texttt{F} := \SubstMapC{\SubstType{\rT}{F<\rT>}}{\SubstConf{\rT}{F<\rT>}{N}}
 \end{gather*}
 In the first conformance, we can expand both the type witness (as a declared interface type and context substitution map) and the associated conformance (as a normal conformance and conformance substitution map) in terms of $\Sigma_\texttt{S}$:
 \begin{gather*}
-\AssocType{[N]A} \otimes \ConfReq{S}{N} = \texttt{F<\ttgp{0}{0}>}\otimes \Sigma_\texttt{S}\\
-\SelfAToN \otimes \ConfReq{S}{N} = \ConfReq{F<\ttgp{0}{0}>}{N}\otimes \Sigma_\texttt{S}
+\AssocType{[N]A} \otimes \ConfReq{S}{N} = \texttt{F<\rT>}\otimes \Sigma_\texttt{S}\\
+\SelfAToN \otimes \ConfReq{S}{N} = \ConfReq{F<\rT>}{N}\otimes \Sigma_\texttt{S}
 \end{gather*}
 In the second conformance, the type witness is a type parameter, and the associated conformance is abstract, so we can expand both using a conformance path:
 \begin{gather*}
-\AssocType{[N]A} \otimes \ConfReq{F<\ttgp{0}{0}>}{N} = \AssocType{[N]A} \otimes \SelfAToN \otimes \ConfReq{\ttgp{0}{0}}{N}\\
-\SelfAToN \otimes \ConfReq{F<\ttgp{0}{0}>}{N} = \SelfAToN \otimes \SelfAToN \otimes \ConfReq{\ttgp{0}{0}}{N}
+\AssocType{[N]A} \otimes \ConfReq{F<\rT>}{N} = \AssocType{[N]A} \otimes \SelfAToN \otimes \ConfReq{\rT}{N}\\
+\SelfAToN \otimes \ConfReq{F<\rT>}{N} = \SelfAToN \otimes \SelfAToN \otimes \ConfReq{\rT}{N}
 \end{gather*}
-We will attempt to compute $\texttt{\ttgp{0}{0}.[N]A}\otimes \Sigma_\texttt{F}\otimes\Sigma_\texttt{S}$ using the conformances $\ConfReq{S}{N}$ and $\ConfReq{F<\ttgp{0}{0}>}{N}$. Since $\ConfReq{\ttgp{0}{0}}{N} \otimes \Sigma_\texttt{F}=\ConfReq{F<\ttgp{0}{0}>}{N}$, we have:
+We will attempt to compute $\texttt{\rT.[N]A}\otimes \Sigma_\texttt{F}\otimes\Sigma_\texttt{S}$ using the conformances $\ConfReq{S}{N}$ and $\ConfReq{F<\rT>}{N}$. Since $\ConfReq{\rT}{N} \otimes \Sigma_\texttt{F}=\ConfReq{F<\rT>}{N}$, we have:
 \begin{gather*}
-\texttt{\ttgp{0}{0}.[N]A} \otimes \Sigma_\texttt{F}\otimes\Sigma_\texttt{S} \\
-\qquad {} = \bigl( \AssocType{[N]A} \otimes \ConfReq{\ttgp{0}{0}}{N} \bigr) \otimes \Sigma_\texttt{F}\otimes\Sigma_\texttt{S}\\
-\qquad {} = \AssocType{[N]A} \otimes \bigl( \ConfReq{\ttgp{0}{0}}{N} \otimes \Sigma_\texttt{F} \bigr)\otimes\Sigma_\texttt{S}\\
-\qquad {} = \AssocType{[N]A} \otimes \ConfReq{F<\ttgp{0}{0}>}{N} \otimes \Sigma_\texttt{S}
+\texttt{\rT.[N]A} \otimes \Sigma_\texttt{F}\otimes\Sigma_\texttt{S} \\
+\qquad {} = \bigl( \AssocType{[N]A} \otimes \ConfReq{\rT}{N} \bigr) \otimes \Sigma_\texttt{F}\otimes\Sigma_\texttt{S}\\
+\qquad {} = \AssocType{[N]A} \otimes \bigl( \ConfReq{\rT}{N} \otimes \Sigma_\texttt{F} \bigr)\otimes\Sigma_\texttt{S}\\
+\qquad {} = \AssocType{[N]A} \otimes \ConfReq{F<\rT>}{N} \otimes \Sigma_\texttt{S}
 \end{gather*}
-Next, we project the type witness $\AssocType{[N]A}\otimes\ConfReq{F<\ttgp{0}{0}>}{N}$ and use $\ConfReq{\ttgp{0}{0}}{N} \otimes \Sigma_\texttt{S}=\ConfReq{S}{N}$:
+Next, we project the type witness $\AssocType{[N]A}\otimes\ConfReq{F<\rT>}{N}$ and use $\ConfReq{\rT}{N} \otimes \Sigma_\texttt{S}=\ConfReq{S}{N}$:
 \begin{gather*}
-\bigl( \AssocType{[N]A} \otimes \ConfReq{F<\ttgp{0}{0}>}{N}\bigr)\otimes\Sigma_\texttt{S}\\
-\qquad {} = \bigl( \AssocType{[N]A} \otimes \SelfAToN \otimes \ConfReq{\ttgp{0}{0}}{N} \bigr) \otimes \Sigma_\texttt{S}\\
-\qquad {} = \AssocType{[N]A} \otimes \SelfAToN \otimes \bigl( \ConfReq{\ttgp{0}{0}}{N} \otimes \Sigma_\texttt{S} \bigr)\\
+\bigl( \AssocType{[N]A} \otimes \ConfReq{F<\rT>}{N}\bigr)\otimes\Sigma_\texttt{S}\\
+\qquad {} = \bigl( \AssocType{[N]A} \otimes \SelfAToN \otimes \ConfReq{\rT}{N} \bigr) \otimes \Sigma_\texttt{S}\\
+\qquad {} = \AssocType{[N]A} \otimes \SelfAToN \otimes \bigl( \ConfReq{\rT}{N} \otimes \Sigma_\texttt{S} \bigr)\\
 \qquad {} = \AssocType{[N]A} \otimes \SelfAToN \otimes \ConfReq{S}{N}
 \end{gather*}
-But, the only further simplification we can apply here is $\SelfAToN \otimes \ConfReq{S}{N}=\ConfReq{F<\ttgp{0}{0}>}{N} \otimes \Sigma_\texttt{S}$, which brings us back to the left hand side of the equation prior:
+But, the only further simplification we can apply here is $\SelfAToN \otimes \ConfReq{S}{N}=\ConfReq{F<\rT>}{N} \otimes \Sigma_\texttt{S}$, which brings us back to the left hand side of the equation prior:
 \begin{gather*}
 \AssocType{[N]A} \otimes \bigl( \SelfAToN \otimes \ConfReq{S}{N} \bigr) \\
-\qquad {} = \AssocType{[N]A} \otimes \bigl( \ConfReq{F<\ttgp{0}{0}>}{N} \otimes \Sigma_\texttt{S} \bigr)
+\qquad {} = \AssocType{[N]A} \otimes \bigl( \ConfReq{F<\rT>}{N} \otimes \Sigma_\texttt{S} \bigr)
 \end{gather*}
-It appears that our attempt to evaluate $\texttt{\ttgp{0}{0}.[N]A}\otimes \Sigma_\texttt{F}\otimes\Sigma_\texttt{S}$ gets stuck in a loop. This exposes a hole in our theory, because it shows that local conformance lookup---and our type substitution operator ``$\otimes$''---are actually \index{partial function}\emph{partial} functions, which do not always output a result. Similarly, the substitution maps $\Sigma_\texttt{S}$ and $\Sigma_\texttt{F}$ do not have conformance evaluation graphs. (While for the most part this theoretical hole doesn't matter, in \SecRef{rewritesystemintro}, we will sketch out an alternative way of formalizing ``$\otimes$'' which avoids this difficulty.)
+It appears that our attempt to evaluate $\texttt{\rT.[N]A}\otimes \Sigma_\texttt{F}\otimes\Sigma_\texttt{S}$ gets stuck in a loop. This exposes a hole in our theory, because it shows that local conformance lookup---and our type substitution operator ``$\otimes$''---are actually \index{partial function}\emph{partial} functions, which do not always output a result. Similarly, the substitution maps $\Sigma_\texttt{S}$ and $\Sigma_\texttt{F}$ do not have conformance evaluation graphs. (While for the most part this theoretical hole doesn't matter, in \SecRef{rewritesystemintro}, we will sketch out an alternative way of formalizing ``$\otimes$'' which avoids this difficulty.)
 
 Indeed, at the time of writing, the compiler actually terminates with a stack overflow while attempting to perform this type substitution. In the future, the compiler should detect this situation and diagnose it, instead of crashing. A savvy compiler engineer will immediately suggest at least two possible approaches for doing so:
 \begin{enumerate}
@@ -1095,7 +1086,7 @@ To evaluate the Collatz sequence for $n\in\NN$, we take the input string to be $
 Evaluation now stops; the length of ``$a$'' is smaller than the deletion number of 2. Now consider the evaluation steps where the input string consists entirely of ``$a$''; in order, we have ``$aaaa$'', ``$aa$'', and ``$a$''. This is the Collatz sequence for 4, which is 4, 2, 1. If we had instead started with the input string ``$aaaaa$'', we would get the Collatz sequence for 5, and so on.
 
 \paragraph{Swift type substitution.}
-To encode this tag system in Swift, we begin with a protocol declaration, together with the five concrete types conforming to \texttt{P} shown in \ListingRef{collatz listing}:
+To encode this tag system in Swift, we begin with a protocol declaration, together with the five concrete types conforming to \tP\ shown in \ListingRef{collatz listing}:
 \begin{Verbatim}
 protocol P {
   associatedtype A: P
@@ -1150,9 +1141,9 @@ struct CC<T: P>: P {
 \end{Verbatim}
 \end{listing}
 
-\newcommand{\SigmaA}{\Sigma_{\texttt{A}}}
-\newcommand{\SigmaB}{\Sigma_{\texttt{B}}}
-\newcommand{\SigmaC}{\Sigma_{\texttt{C}}}
+\newcommand{\SigmaA}{\Sigma_{\nA}}
+\newcommand{\SigmaB}{\Sigma_{\nB}}
+\newcommand{\SigmaC}{\Sigma_{\nC}}
 \newcommand{\SigmaAA}{\Sigma_{\texttt{AA}}}
 \newcommand{\SigmaBB}{\Sigma_{\texttt{BB}}}
 \newcommand{\SigmaCC}{\Sigma_{\texttt{CC}}}
@@ -1174,7 +1165,7 @@ struct CC<T: P>: P {
 \newcommand{\AssocConfCP}{\AssocConf{Self.[P]C}{P}}
 \newcommand{\AssocConfTP}{\AssocConf{Self.[P]T}{P}}
 
-We only need one generic parameter type for the below, so let's write $\uptau$ in place of the generic parameter type $\ttgp{0}{0}$. We're going to define a series of substitution maps for the protocol generic signature $\GP$ (that is, \texttt{<$\uptau$ where $\uptau$:~P>}). The simplest is the \index{identity substitution map}identity substitution map, which we will denote in the below by the symbol $1$:
+We only need one generic parameter type for the below, so let's write $\uptau$ in place of the generic parameter type $\rT$. We're going to define a series of substitution maps for the protocol generic signature $\GP$ (that is, \texttt{<$\uptau$ where $\uptau$:~P>}). The simplest is the \index{identity substitution map}identity substitution map, which we will denote in the below by the symbol $1$:
 \[1 := \SubstMapC{\SubstType{$\uptau$}{$\uptau$}}{\SubstConf{$\uptau$}{$\uptau$}{P}}\]
 We will build up our tag system by considering how to perform each of these in turn:
 \begin{enumerate}
@@ -1201,7 +1192,7 @@ Applying these substitution maps to the generic parameter type $\uptau$ produces
 \uptau\otimes\SigmaAA\otimes\SigmaBB\otimes\SigmaCC\otimes\SigmaEnd = \texttt{AA<BB<CC<End>>>}
 \end{gather*}
 
-For (2), we use the \texttt{Del} associated type of \texttt{P} to delete symbols from the beginning of the input string. Specifically, we let:
+For (2), we use the \texttt{Del} associated type of \tP\ to delete symbols from the beginning of the input string. Specifically, we let:
 \[
 \SigmaDel := \SubstMapC{\SubstType{$\uptau$}{$\uptau$.[P]Del}}{\SubstConf{$\uptau$}{$\uptau$.[P]Del}{P}}.
 \]
@@ -1247,7 +1238,7 @@ Thus, we've shown that deleting a symbol from the start of the empty string give
 It can also be seen that:
 \[\SigmaDel\otimes\SigmaHalt=\SigmaHalt\]
 
-For (4), appending symbols at the end of the string is accomplished by the \texttt{A}, \texttt{B} and \texttt{C} associated types of \texttt{P}. We define three more substitution maps:
+For (4), appending symbols at the end of the string is accomplished by the \nA, \nB\ and \nC\ associated types of \tP. We define three more substitution maps:
 \begin{gather*}
 \SigmaA := \SubstMapC{\SubstType{$\uptau$}{$\uptau$.[P]A}}{\SubstConf{$\uptau$}{$\uptau$.[P]A}{P}}\\
 \SigmaB := \SubstMapC{\SubstType{$\uptau$}{$\uptau$.[P]B}}{\SubstConf{$\uptau$}{$\uptau$.[P]B}{P}}\\
@@ -1296,14 +1287,14 @@ For example, adding ``$c$'' at the end of ``$ab$'' gives us ``$abc$''; or, in ty
 \qquad {} = \SigmaAA\otimes\SigmaBB\otimes\SigmaC\otimes\SigmaEnd\\
 \qquad {} = \SigmaAA\otimes\SigmaBB\otimes\SigmaCC\otimes\SigmaEnd
 \end{gather*}
-Observe that $\SigmaC$ commutes with $\SigmaAA$, $\SigmaBB$ and $\SigmaCC$ until it abuts $\SigmaEnd$ on the right, before becoming $\SigmaCC$, which represents the symbol ``$c$''. Here we see the difference between \texttt{End} and \texttt{Halt}; we can add new symbols to \texttt{End}, representing the empty string, but once we reach the halting state, we can't add any more symbols to our string. The type witneses for \texttt{A}, \texttt{B} and \texttt{C} in the conformance $\ConfHaltP$ are all \texttt{Halt} again, for this reason:
+Observe that $\SigmaC$ commutes with $\SigmaAA$, $\SigmaBB$ and $\SigmaCC$ until it abuts $\SigmaEnd$ on the right, before becoming $\SigmaCC$, which represents the symbol ``$c$''. Here we see the difference between \texttt{End} and \texttt{Halt}; we can add new symbols to \texttt{End}, representing the empty string, but once we reach the halting state, we can't add any more symbols to our string. The type witneses for \nA, \nB\ and \nC\ in the conformance $\ConfHaltP$ are all \texttt{Halt} again, for this reason:
 \begin{gather*}
 \SigmaA\otimes\SigmaHalt=\SigmaHalt\\
 \SigmaB\otimes\SigmaHalt=\SigmaHalt\\
 \SigmaC\otimes\SigmaHalt=\SigmaHalt
 \end{gather*}
 
-Finally, we get to (5), the evaluation rule itself. The evaluation rule depends on the first symbol in the string. The first symbol is the outermost generic type---for example, ``abc'' is represented as the type \texttt{AA<BB<CC<End>>>}---so we encode the evaluation rule with the \texttt{Next} associated type in each conformance to \texttt{P}. Notice how each one begins by deleting the first two symbols from the beginning of the string, then appends the production, and finally, repeats the next evaluation step by projecting \texttt{Next} again:
+Finally, we get to (5), the evaluation rule itself. The evaluation rule depends on the first symbol in the string. The first symbol is the outermost generic type---for example, ``abc'' is represented as the type \texttt{AA<BB<CC<End>>>}---so we encode the evaluation rule with the \texttt{Next} associated type in each conformance to \tP. Notice how each one begins by deleting the first two symbols from the beginning of the string, then appends the production, and finally, repeats the next evaluation step by projecting \texttt{Next} again:
 \begin{gather*}
 \AssocType{[P]Next} \otimes \ConfAAP = \texttt{$\uptau$.Del.Del.B.C.Next}\\
 \AssocType{[P]Next} \otimes \ConfBBP = \texttt{$\uptau$.Del.Del.A.Next}\\
@@ -1314,7 +1305,7 @@ In contrast, evaluation stops if we start with an empty string, or if we're alre
 \AssocType{[P]Next} \otimes \ConfEndP = \texttt{Halt}\\
 \AssocType{[P]Next} \otimes \ConfHaltP = \texttt{Halt}
 \end{gather*}
-It is more perspicuous to continue our exposition with substitution map composition, so let's reinterpret the above identities in that form instead, writing each type witness as a conformance path and then expressing it as a composition of substitution maps:
+It is more convenient for what follows to express the above using substitution map composition instead of type witness projection:
 \begin{gather*}
 \TNext \otimes \SigmaAA = \TNext \otimes \SigmaC \otimes \SigmaB \otimes \SigmaDel \otimes \SigmaDel\\
 \TNext \otimes \SigmaBB = \TNext \otimes \SigmaA \otimes \SigmaDel \otimes \SigmaDel\\
@@ -1329,7 +1320,7 @@ An immediate consequence is that there can be only three possible outcomes when 
 \item Evaluation gets stuck in a loop, and never reaches the halting state.
 \item Evaluation grows the input string indefinitely, and never reaches the halting state.
 \end{enumerate}
-So the substituted type is always known to be \texttt{Halt}, as long as substitution halts---but the substitution halts if and only if the Collatz conjecture is true. Of course, termination checking for type substitution doesn't hinge on resolving the Collatz conjecture, because  we can also encode a tag system for a Turing machine. We enlarge the alphabet by adding associated types to \texttt{P} and declaring more generic nominal types conforming to \texttt{P}, and we encode the deletion number and production rules as type witnesses for $\AssocType{[P]Next}$. 
+So the substituted type is always known to be \texttt{Halt}, as long as substitution halts---but the substitution halts if and only if the Collatz conjecture is true. Of course, termination checking for type substitution doesn't hinge on resolving the Collatz conjecture, because  we can also encode a tag system for a Turing machine. We enlarge the alphabet by adding associated types to \tP\ and declaring more generic nominal types conforming to \tP, and we encode the deletion number and production rules as type witnesses for $\AssocType{[P]Next}$. 
 
 \eject
 
@@ -1339,7 +1330,7 @@ func collatz<T: P>(_: T.Type) -> T.Next.Type {
   return T.Next.self
 }
 
-collatz(AA<AA<End>>>.self)
+collatz(AA<AA<End>>.self)
 \end{Verbatim}
 The substituted return type can be computed with our identities. The parentheses serve to draw attention to each simplification step, but other evaluation orders are possible, and all are equivalent:
 \begin{gather*}
