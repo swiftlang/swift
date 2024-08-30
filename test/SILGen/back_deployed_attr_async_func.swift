@@ -17,7 +17,7 @@
 // CHECK:   return [[RESULT]] : $()
 
 // -- Back deployment thunk for trivialFunc()
-// CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy9asyncFuncyyYaFTwb : $@convention(thin) @async () -> ()
+// CHECK-LABEL: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy9asyncFuncyyYaFTwb : $@convention(thin) @async () -> ()
 // CHECK: bb0:
 // CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 52
 // CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 1

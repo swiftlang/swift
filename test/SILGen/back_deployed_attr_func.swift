@@ -11,7 +11,7 @@
 // CHECK:   return [[RESULT]] : $()
 
 // -- Back deployment thunk for trivialFunc()
-// CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy11trivialFuncyyFTwb : $@convention(thin) () -> ()
+// CHECK-LABEL: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy11trivialFuncyyFTwb : $@convention(thin) () -> ()
 // CHECK: bb0:
 // CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 52
 // CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 1
@@ -46,7 +46,7 @@ public func trivialFunc() {}
 // CHECK:   return {{%.*}} : $Bool
 
 // -- Back deployment thunk for isNumber(_:)
-// CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy8isNumberySbSiFTwb : $@convention(thin) (Int) -> Bool
+// CHECK-LABEL: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy8isNumberySbSiFTwb : $@convention(thin) (Int) -> Bool
 // CHECK: bb0([[ARG_X:%.*]] : $Int):
 // CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 52
 // CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 1

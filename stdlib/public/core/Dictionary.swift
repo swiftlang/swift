@@ -344,7 +344,7 @@
 ///     } else {
 ///         print("No glyphs found!")
 ///     }
-///     // Prints "The 'star' image is a glyph.")
+///     // Prints "The 'star' image is a glyph."
 ///
 /// Note that in this example, `imagePaths` is subscripted using a dictionary
 /// index. Unlike the key-based subscript, the index-based subscript returns
@@ -1191,7 +1191,7 @@ extension Dictionary {
   ///     } else {
   ///         print("No value found for that key.")
   ///     }
-  ///     // Prints "No value found for that key.""
+  ///     // Prints "No value found for that key."
   ///
   /// - Parameter key: The key to remove along with its associated value.
   /// - Returns: The value that was removed, or `nil` if the key was not

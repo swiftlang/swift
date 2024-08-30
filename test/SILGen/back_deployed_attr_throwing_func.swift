@@ -11,7 +11,7 @@
 // CHECK:   return [[RESULT]] : $()
 
 // -- Back deployment thunk for throwingFunc()
-// CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy12throwingFuncyyKFTwb : $@convention(thin) () -> @error any Error
+// CHECK-LABEL: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy12throwingFuncyyKFTwb : $@convention(thin) () -> @error any Error
 // CHECK: bb0:
 // CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 52
 // CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 1
