@@ -47,7 +47,7 @@ static void *allocateTrailingInst(SILFunction &F, CountTypes... counts) {
 
 namespace {
 class TypeDependentOperandCollector {
-  SmallVector<CanLocalArchetypeType, 4> rootLocalArchetypes;
+  SmallVector<GenericEnvironment *, 4> genericEnvs;
   bool hasDynamicSelf = false;
 public:
   void collect(CanType type);
@@ -86,15 +86,15 @@ void TypeDependentOperandCollector::collect(CanType type) {
     return;
   type.visit([&](CanType t) {
     if (const auto local = dyn_cast<LocalArchetypeType>(t)) {
-      const auto root = local.getRoot();
+      auto *genericEnv = local->getGenericEnvironment();
 
-      // Add this root local archetype if it was not seen yet.
+      // Add this local archetype's environment if it was not seen yet.
       // We don't use a set here, because the number of open archetypes
       // is usually very small and using a real set may introduce too
       // much overhead.
-      if (std::find(rootLocalArchetypes.begin(), rootLocalArchetypes.end(),
-                    root) == rootLocalArchetypes.end())
-        rootLocalArchetypes.push_back(root);
+      if (std::find(genericEnvs.begin(), genericEnvs.end(),
+                    genericEnv) == genericEnvs.end())
+        genericEnvs.push_back(genericEnv);
     }
   });
 }
@@ -113,20 +113,11 @@ void TypeDependentOperandCollector::collect(SubstitutionMap subs) {
 /// for those dependencies to the given vector.
 void TypeDependentOperandCollector::addTo(SmallVectorImpl<SILValue> &operands,
                                           SILFunction &F) {
-  size_t firstArchetypeOperand = operands.size();
-  for (CanLocalArchetypeType archetype : rootLocalArchetypes) {
-    SILValue def = F.getModule().getRootLocalArchetypeDef(archetype, &F);
+  for (GenericEnvironment *genericEnv : genericEnvs) {
+    SILValue def = F.getModule().getLocalGenericEnvironmentDef(genericEnv, &F);
     assert(def->getFunction() == &F &&
-           "def of root local archetype is in wrong function");
-
-    // The archetypes in rootLocalArchetypes have already been uniqued,
-    // but a single instruction can open multiple archetypes (e.g.
-    // open_pack_element), so we also unique the actual operand values.
-    // As above, we assume there are very few values in practice and so
-    // a linear scan is better than maintaining a set.
-    if (std::find(operands.begin() + firstArchetypeOperand, operands.end(),
-                  def) == operands.end())
-      operands.push_back(def);
+           "def of local environment is in wrong function");
+    operands.push_back(def);
   }
   if (hasDynamicSelf)
     operands.push_back(F.getDynamicSelfMetadata());
