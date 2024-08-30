@@ -1967,14 +1967,11 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
   auto mapTypeOutOfContext = [&](Type t) -> CanType {
     LLVM_DEBUG(llvm::dbgs() << "-- capture with contextual type " << t << "\n");
 
-    t = t.subst(MapLocalArchetypesOutOfContext(origGenericSig, capturedEnvs),
-                MakeAbstractConformanceForGenericType(),
-                SubstFlags::PreservePackExpansionLevel |
-                SubstFlags::SubstitutePrimaryArchetypes |
-                SubstFlags::SubstituteLocalArchetypes);
+    auto result = mapLocalArchetypesOutOfContext(t, origGenericSig, capturedEnvs)
+        ->getCanonicalType();
 
-    LLVM_DEBUG(llvm::dbgs() << "-- maps to " << t->getCanonicalType() << "\n");
-    return t->getCanonicalType();
+    LLVM_DEBUG(llvm::dbgs() << "-- maps to " << result << "\n");
+    return result;
   };
 
   for (auto capture : loweredCaptures.getCaptures()) {
@@ -3004,26 +3001,17 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
                                      interfaceSubs);
   }
 
-  MapLocalArchetypesOutOfContext mapOutOfContext(baseGenericSig, capturedEnvs);
   auto substFormalTypeIntoThunkContext =
       [&](CanType t) -> CanType {
     return genericEnv->mapTypeIntoContext(
-        t.subst(mapOutOfContext,
-                MakeAbstractConformanceForGenericType(),
-                SubstFlags::PreservePackExpansionLevel |
-                SubstFlags::SubstitutePrimaryArchetypes |
-                SubstFlags::SubstituteLocalArchetypes))
+        mapLocalArchetypesOutOfContext(t, baseGenericSig, capturedEnvs))
                ->getCanonicalType();
   };
   auto substLoweredTypeIntoThunkContext =
       [&](CanSILFunctionType t) -> CanSILFunctionType {
     return cast<SILFunctionType>(
         genericEnv->mapTypeIntoContext(
-          Type(t).subst(mapOutOfContext,
-                        MakeAbstractConformanceForGenericType(),
-                        SubstFlags::PreservePackExpansionLevel |
-                        SubstFlags::SubstitutePrimaryArchetypes |
-                        SubstFlags::SubstituteLocalArchetypes))
+          mapLocalArchetypesOutOfContext(t, baseGenericSig, capturedEnvs))
               ->getCanonicalType());
   };
 
