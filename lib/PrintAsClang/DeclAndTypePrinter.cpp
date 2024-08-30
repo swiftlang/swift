@@ -2091,9 +2091,10 @@ private:
     if (outputLang == OutputLanguageMode::Cxx) {
       if (!SD->isInstanceMember())
         return;
-      auto *getter = SD->getOpaqueAccessor(AccessorKind::Get);
-      printAbstractFunctionAsMethod(getter, false,
-                                    /*isNSUIntegerSubscript=*/false, SD);
+      // TODO: support read accessors.
+      if (auto *getter = SD->getOpaqueAccessor(AccessorKind::Get))
+        printAbstractFunctionAsMethod(getter, false,
+                                      /*isNSUIntegerSubscript=*/false, SD);
       return;
     }
     assert(SD->isInstanceMember() && "static subscripts not supported");
