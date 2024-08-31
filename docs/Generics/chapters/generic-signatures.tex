@@ -49,16 +49,16 @@ Generic signature: <T, U where T : Sequence, U == T.[Sequence]Element>
 This flag also allows us to observe \index{requirement minimization}\emph{requirement minimization}. Here are three functions, each one generic over a pair of types conforming to \texttt{Sequence}:
 \begin{Verbatim}
 func sameElt<S1: Sequence, S2: Sequence>(_ s1: S1, _ s2: S2)
-    where S1.Element == S2.Element {}
+    where S1.Element == S2.Element {...}
 
 func sameIter<S1: Sequence, S2: Sequence>(_ s1: S1, _ s2: S2)
-    where S1.Iterator == S2.Iterator {}
+    where S1.Iterator == S2.Iterator {...}
 
 func sameEltAndIter<S1: Sequence, S2: Sequence>(_ s1: S1, _ s2: S2)
     where S1.Element == S2.Element,
-          S1.Iterator == S2.Iterator {}
+          S1.Iterator == S2.Iterator {...}
 \end{Verbatim}
-The first function expects two sequences with the same \texttt{Element} associated type, so ``\verb|sameElt(Array<Int>(), Set<Int>())|'' for example. The second requires both have the same \texttt{Iterator} type. The third requires both, but a consequence of how \texttt{Sequence} is declared in the standard library is that the second is a stronger condition; if two sequences have the same \texttt{Iterator} type, they will also have the same \texttt{Element} type, but not vice versa. In other words, the same-type requirement $\SameReq{S1.Element}{S2.Element}$ is \emph{redundant} in the trailing \texttt{where} clause of \texttt{sameEltAndIter()}. (We will be able to \emph{prove} it when we revisit this generic signature in \ExRef{same name rule example}.) When we compile this program with \texttt{-debug-generic-signatures}, we observe that the generic signature of \texttt{sameElt()} is completely distinct, while the other two have a generic signature that looks like this:
+The first function expects two sequences with the same \texttt{Element} associated type, so ``\verb|sameElt(Array<Int>(), Set<Int>())|'' for example. The second requires both have the same \texttt{Iterator} type. The third requires both, but a consequence of how \texttt{Sequence} is declared in the standard library is that the second is a stronger condition; if two sequences have the same \texttt{Iterator} type, they will also have the same \texttt{Element} type, but not vice versa. In other words, the same-type requirement $\SameReq{S1.Element}{S2.Element}$ is \emph{redundant} in the trailing \texttt{where} clause of \texttt{sameEltAndIter()}. (We will be able to \emph{prove} it when we revisit this generic signature in \ExRef{same name rule example}.) When we compile this program with \texttt{-debug-generic-signatures}, we observe that the generic signature of \texttt{sameElt()} is distinct from the other two, while \texttt{sameIter()} and \texttt{sameEltAndIter()} have a generic signature that looks like this:
 \begin{quote}
 \begin{verbatim}
 <S1, S2 where S1: Sequence, S2: Sequence,
@@ -246,7 +246,7 @@ From each \index{associated type declaration}associated type declaration~\nA\ of
 \AssocNameStepDef
 \end{gather*}
 
-From each \index{associated conformance requirement}associated conformance requirement of~\tP, the \IndexStepDefinition{AssocConf}\textsc{AssocConf} inference rule derives the conformance requirement obtained by substituting~\tT\ in place of \IndexSelf \tSelf. An arbitrary \index{associated conformance requirement}associated conformance requirement takes the form $\AssocConfReq{Self.U}{Q}{P}$ for some type parameter \texttt{Self.U} and protocol~\texttt{Q}. The substituted type parameter we described above is denoted by ``\texttt{T.U}'':
+From each \index{associated conformance requirement}associated conformance requirement of~\tP, the \IndexStepDefinition{AssocConf}\textsc{AssocConf} inference rule derives the conformance requirement obtained by substituting~\tT\ in place of \IndexSelf \tSelf. An arbitrary \index{associated conformance requirement}associated conformance requirement takes the form $\AssocConfReq{Self.U}{Q}{P}$ for some type parameter \texttt{Self.U} and protocol~\tQ. The substituted type parameter we described above is denoted by ``\texttt{T.U}'':
 \begin{gather*}
 \AssocConfStepDef
 \end{gather*}
@@ -267,8 +267,8 @@ The inference rules presented so far can already prove some interesting statemen
 \begin{quote}
 \begin{verbatim}
 <τ_0_0, τ_0_1 where τ_0_0: Sequence, τ_0_1: Sequence,
-                    τ_0_0.Element == τ_0_1.Element,
-                    τ_0_0.Element: Equatable>
+                    τ_0_0.Element: Equatable,
+                    τ_0_0.Element == τ_0_1.Element>
 \end{verbatim}
 \end{quote}
 The \texttt{Sequence} protocol declares two associated types \texttt{Iterator} and \texttt{Element}, and since $\rT$ conforms to \texttt{Sequence}, we can derive \texttt{\rT.Element}, for example:
@@ -465,7 +465,7 @@ The proof that reduced type equality is an equivalence relation may seem useless
 \AssocSameStep{3}{\rU.Element}{\rU.Iterator.Element}{4}\\
 \SameStep{\rT.Element}{\rU.Element}{5}
 \end{gather*}
-We use \textsc{Sym} to flip the first requirement, and observe that the three requirements now form a chain where the right-hand side of each one is identical to the left-hand side of the next. Two applications of \textsc{Trans} give us what we're looking for:
+We apply \textsc{Sym} to (2), and then observe that (6), (5) and (4) now form a chain where the right-hand side of each one is identical to the left-hand side of the next. Two applications of \textsc{Trans} give us what we're looking for:
 \begin{gather*}
 \SymStep{2}{\rT.Iterator.Element}{\rT.Element}{6}\\
 \TransStep{6}{5}{\rT.Iterator.Element}{\rU.Element}{7}\\
@@ -567,10 +567,10 @@ Now, consider the protocol generic signature $G_\texttt{N}$. We can derive an in
 \end{gather*}
 We can also derive infinitely many valid type parameters:
 \begin{gather*}
-\GenericStep{\rT}{4}\\
-\AssocNameStep{2}{\rT.A}{5}\\
-\AssocNameStep{3}{\rT.A.A}{6}\\
-7.\ \ldots
+\GenericStep{\rT}{5}\\
+\AssocNameStep{2}{\rT.A}{6}\\
+\AssocNameStep{3}{\rT.A.A}{7}\\
+8.\ \ldots
 \end{gather*}
 Each one of these type parameters is in its own equivalence class, because we cannot derive any non-trivial same-type requirements. We've shown that $G_\texttt{N}$ defines an infinite set of equivalence classes.
 \end{example}
@@ -746,7 +746,7 @@ Let's continue to pretend that those associated requirements are written with un
 \begin{gather*}
 \ConfStep{\rT}{Sequence}{1}\\
 \AssocConfStep{1}{\rT.Iterator}{IteratorProtocol}{2}\\
-\AssocBindStep{2}{\rT.[Sequence]Iterator}{\rT.Iterator}{3}\\
+\AssocBindStep{1}{\rT.[Sequence]Iterator}{\rT.Iterator}{3}\\
 \SameConfStep{2}{3}{\rT.[Sequence]Iterator}{IteratorProtocol}{4}\\
 \AssocDeclStep{4}{\rT.[Sequence]Iterator.[IteratorProtocol]Element}{5}
 \end{gather*}
@@ -876,7 +876,7 @@ Each equivalence class of $G_\texttt{Collection}$ has a unique representative of
 (The real \texttt{Collection} protocol defines these reduced types together with a few more equivalence classes related to the \texttt{Index} and \texttt{Indices} associated types.)
 \end{example}
 
-In the general case, we must also be prepared to order type parameters of equal length. Note that all of the below algorithms take a pair of values $x$ and $y$ and then compute whether $x<y$, $x>y$ or $x=y$ simultaneously. We start with the generic parameters, which are the type parameters of length~1.
+In general, we must also order type parameters of equal length, so we show how we do this now. All of the below algorithms take a pair of values $x$ and $y$ and then compute whether $x<y$, $x>y$ or $x=y$ simultaneously. We start with the generic parameters, which are the type parameters of length~1.
 
 \begin{algorithm}[Generic parameter order]\label{generic parameter order} \IndexDefinition{generic parameter order}Takes two \index{generic parameter type}generic parameter types \ttgp{d}{i} and \ttgp{D}{I} as input. Returns one of ``$<$'', ``$>$'' or ``$=$'' as output.
 \begin{enumerate}
@@ -890,10 +890,10 @@ In the general case, we must also be prepared to order type parameters of equal 
 
 To order dependent member types, we must order associated type declarations, and to do that we must order protocol declarations.
 
-\begin{algorithm}[Protocol order]\label{linear protocol order} Takes \IndexDefinition{protocol order}protocols \tP\ and \texttt{Q} as input, and returns one of ``$<$'', ``$>$'' or ``$=$'' as output.
+\begin{algorithm}[Protocol order]\label{linear protocol order} Takes \IndexDefinition{protocol order}protocols \tP\ and \tQ\ as input, and returns one of ``$<$'', ``$>$'' or ``$=$'' as output.
 \begin{enumerate}
-\item Compare the parent \index{module declaration}module names of \tP\ and \texttt{Q} with the usual lexicographic order on identifiers. Return the result if it is ``$<$'' or ``$>$''. Otherwise, \tP\ and \texttt{Q} are declared in the same module, so keep going.
-\item Compare the names of \tP\ and~\texttt{Q} and return the result if it is ``$<$'' or ``$>$''. If \tP~and~\texttt{Q} are actually the same protocol, return ``$=$''. Otherwise, the program is invalid because it declares two protocols with the same name. Any tie-breaker can be used, such as source location.
+\item Compare the parent \index{module declaration}module names of \tP\ and \tQ\ with the usual lexicographic order on identifiers. Return the result if it is ``$<$'' or ``$>$''. Otherwise, \tP\ and \tQ\ are declared in the same module, so keep going.
+\item Compare the names of \tP\ and~\tQ\ and return the result if it is ``$<$'' or ``$>$''. If \tP~and~\tQ\ are actually the same protocol, return ``$=$''. Otherwise, the program is invalid because it declares two protocols with the same name. Any tie-breaker can be used, such as source location.
 \end{enumerate}
 \end{algorithm}
 
@@ -970,7 +970,7 @@ Any partial order on a finite set is always well-founded. The usual linear order
 \begin{proposition}\label{well founded type order} The type parameter order of \AlgRef{type parameter order} is well-founded.
 \end{proposition}
 \begin{proof}
-Let $S$ be any set of type parameters, possibly infinite. We will demonstrate that $S$ contains a minimum element.
+Let $S$ be any non-empty set of type parameters, possibly infinite. We must prove that $S$ contains a minimum element.
 
 First, define the set $L(S)\subseteq\NN$ by taking the length of each type parameter in $S$. While~$L(S)$ might be an infinite set, it must have a minimum element under the linear order on~$\NN$, say~$n\in L(S)$. Let~$S_n\subseteq S$ be the subset of $S$ containing only type parameters of length~$n$. If~$S_n$ has a minimum element, it will also be the minimum element of~$S$.
 
@@ -1022,6 +1022,15 @@ In the implementation, we answer questions about the derived requirements and va
 {Produce a list of all protocols this type parameter is known to conform to.
 \end{itemize}
 
+From a theoretical point of view, the two fundamental queries are $\Query{requiresProtocol}{}$ and $\Query{areReducedTypeParametersEqual}{}$. The other two, $\Query{isValidTypeParameter}{}$ and $\Query{getRequiredProtocols}{}$, while primitive in the implementation, can be formalized in terms of the others. Here is $\Query{isValidTypeParameter}{G,\,\tT}$:
+\begin{itemize}
+\item A \index{generic parameter type}generic parameter type is valid if it appears in~$G$.
+\item An \index{unbound dependent member type}unbound dependent member type \texttt{U.A} is valid if there exists a protocol \tP\ in $\Query{getRequiredProtocols}{G,\,\tU}$
+such that \tP\ declares an associated type named~\nA.
+\item A \index{bound dependent member type}bound dependent member type \texttt{U.[P]A} is valid if $\Query{requiresProtocol}{G,\,\tU,\,\tP}$.
+\end{itemize}
+As for $\Query{getRequiredProtocols}{}$, because the ``for all'' quantifier is selecting from a finite universe of protocols, a correct but inefficient implementation would repeatedly check if $\Query{requiresProtocol}{G,\tT,\,\tP}$ for each~\tP\ in turn. We will describe the data structure that allows this to be implemented efficiently in \ChapRef{propertymap}.
+
 The $\Query{getRequiredProtocols}{}$ query is used when type checking a \index{member reference expression}member reference expression like ``\texttt{foo.bar}'' where the type of ``\texttt{foo}'' is a type parameter, because we resolve ``\texttt{bar}'' by a \index{qualified lookup}qualified name lookup into this list of protocols. Qualified lookup recursively visits inherited protocols, so the list is minimal in the sense that no protocol inherits from any other. The protocols are also sorted using \AlgRef{linear protocol order}.}
 
 \begin{example}
@@ -1045,15 +1054,6 @@ Let $G$ be the generic signature from \ExRef{motivating derived reqs}:
 \item $\Query{getRequiredProtocols}{G,\, \texttt{\rT.Iterator}}$ is $\{\texttt{IteratorProtocol}\}$.
 \end{enumerate}
 \end{example}
-
-From a theoretical point of view, the two fundamental queries are $\Query{requiresProtocol}{}$ and $\Query{areReducedTypeParametersEqual}{}$. The other two, $\Query{isValidTypeParameter}{}$ and $\Query{getRequiredProtocols}{}$, while primitive in the implementation, can be formalized in terms of the others. Here is $\Query{isValidTypeParameter}{G,\,\tT}$:
-\begin{itemize}
-\item A \index{generic parameter type}generic parameter type is valid if it appears in~$G$.
-\item An \index{unbound dependent member type}unbound dependent member type \texttt{U.A} is valid if there exists a protocol \tP\ in $\Query{getRequiredProtocols}{G,\,\tU}$
-such that \tP\ declares an associated type named~\nA.
-\item A \index{bound dependent member type}bound dependent member type \texttt{U.[P]A} is valid if $\Query{requiresProtocol}{G,\,\tU,\,\tP}$.
-\end{itemize}
-As for $\Query{getRequiredProtocols}{}$, because the ``for all'' quantifier is selecting from a finite universe of protocols, a correct but inefficient implementation would repeatedly check if $\Query{requiresProtocol}{G,\tT,\,\tP}$ for each~\tP\ in turn. We will describe the data structure that allows this to be implemented efficiently in \ChapRef{propertymap}.
 
 \paragraph{Concrete types.} The next two queries concern concrete \index{same-type requirement}same-type requirements. We can ask if a type parameter is fixed to a concrete type, and then we can ask for this concrete type. (We use ``$\vdash$'' below, but recall from \SecRef{derived req} that we \index{limitation!derived requirements}don't have a complete set of inference rules to describe the implemented behavior of concrete same-type requirements.)
 
@@ -1092,7 +1092,7 @@ protocol Foo {
 \end{enumerate}
 \end{example}
 
-\paragraph{Reduced types.} We will now generalize \index{reduced type parameter}reduced type equality from \SecRef{type params} to an equivalence relation on all interface types. In the previous example, the first invocation of $\Query{getConcreteType}{}$ returned a concrete type containing a type parameter \texttt{\rT.[Foo]B}, which was itself fixed to the concrete type~\texttt{Int}. We can write down three interface types that all abstract over the same concrete replacement type in our generic signature:
+\paragraph{Reduced types.} We now generalize \index{reduced type parameter}reduced type equality from \SecRef{type params} to an equivalence relation on all interface types. In the previous example, the first call to $\Query{getConcreteType}{}$ returns a concrete type containing \texttt{\rT.[Foo]B}, which is itself fixed to the concrete type~\texttt{Int}. We can write down three interface types that all abstract over the same concrete replacement type in our generic signature:
 \begin{gather*}
 \texttt{\rT.A}\\
 \texttt{Array<\rT.[Foo]B>}\\

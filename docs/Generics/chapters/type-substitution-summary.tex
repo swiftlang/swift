@@ -54,13 +54,13 @@ If $\texttt{T}\in\TypeObj{G_1}$, $\TP\in\ConfPObj{P}{G_1}$, $\Sigma_1\in\SubMapO
 \bigl(\AssocConf{Self.U}{Q}\otimes \TP\bigr)\otimes \Sigma=\AssocConf{Self.U}{Q}\otimes \bigl(\TP\otimes \Sigma\bigr)
 \end{gather*}
 If $d$ is a \index{nominal type declaration}nominal type declaration conforming to \texttt{P}, and $G$ is the generic signature of the conformance context, then there exists a \index{normal conformance}normal conformance $\ConfReq{$\texttt{T}_d$}{P}\in\ConfPObj{P}{G}$, and
-\[\protosym{P}\otimes\texttt{T}_d=\ConfReq{$\texttt{T}_d$}{P}\]
+\[\pP\otimes\texttt{T}_d=\ConfReq{$\texttt{T}_d$}{P}\]
 If $H$ is some other generic signature, $\Sigma\in\SubMapObj{G}{H}$, and $\texttt{T}=\texttt{T}_d\otimes \Sigma$, then there exists a \index{specialized conformance}specialized conformance $\TP\in\ConfPObj{P}{H}$, and
-\[\protosym{P}\otimes\texttt{T}=\ConfReq{$\texttt{T}_d$}{P}\otimes \Sigma = \TP\]
+\[\pP\otimes\texttt{T}=\ConfReq{$\texttt{T}_d$}{P}\otimes \Sigma = \TP\]
 If \texttt{T} is a \index{type parameter}type parameter of $G$ and the conformance requirement $\TP$ can be derived from $G$, then there exists an \index{abstract conformance}abstract conformance $\TP\in\ConfPObj{G}{P}$, and
-\[\protosym{P}\otimes\texttt{T} = \TP\]
+\[\pP\otimes\texttt{T} = \TP\]
 Global conformance lookup is compatible with type substitution:
-\[(\protosym{P}\otimes\texttt{T})\otimes \Sigma = \texttt{P}\otimes(\texttt{T}\otimes \Sigma)\]
+\[(\pP\otimes\texttt{T})\otimes \Sigma = \texttt{P}\otimes(\texttt{T}\otimes \Sigma)\]
 
 \paragraph{Abstract conformances.} The type witnesses of an abstract conformance are \index{dependent member type}dependent member types, and the associated conformances are other abstract conformances:
 \begin{gather*}
