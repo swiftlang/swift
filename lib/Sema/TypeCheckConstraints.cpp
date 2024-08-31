@@ -329,15 +329,12 @@ void ParentConditionalConformance::diagnoseConformanceStack(
 namespace {
 /// Produce any additional syntactic diagnostics for a SyntacticElementTarget.
 class SyntacticDiagnosticWalker final : public ASTWalker {
-  SmallVector<DeclContext *, 4> dcStack;
   const SyntacticElementTarget &Target;
   bool IsTopLevelExprStmt;
 
   SyntacticDiagnosticWalker(const SyntacticElementTarget &target,
                             bool isExprStmt)
-      : Target(target), IsTopLevelExprStmt(isExprStmt) {
-    dcStack.push_back(target.getDeclContext());
-  }
+      : Target(target), IsTopLevelExprStmt(isExprStmt) {}
 
 public:
   static void check(const SyntacticElementTarget &target, bool isExprStmt) {
@@ -351,31 +348,12 @@ public:
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     auto isExprStmt = (expr == Target.getAsExpr()) ? IsTopLevelExprStmt : false;
-    performSyntacticExprDiagnostics(expr, dcStack.back(), isExprStmt);
-
-    if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-      if (closure->isSeparatelyTypeChecked()) {
-        dcStack.push_back(closure);
-        return Action::Continue(expr);
-      }
-    }
-
+    performSyntacticExprDiagnostics(expr, Target.getDeclContext(), isExprStmt);
     return Action::SkipNode(expr);
   }
 
-  PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
-    if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-      if (closure->isSeparatelyTypeChecked()) {
-        assert(dcStack.back() == closure);
-        dcStack.pop_back();
-      }
-    }
-
-    return Action::Continue(expr);
-  }
-
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
-    performStmtDiagnostics(stmt, dcStack.back());
+    performStmtDiagnostics(stmt, Target.getDeclContext());
     return Action::Continue(stmt);
   }
 
