@@ -127,10 +127,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       return MacroWalking::Expansion;
     }
 
-    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
-      return Action::SkipNode(P);
-    }
-
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
       return Action::Continue();
     }
