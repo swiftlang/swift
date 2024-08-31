@@ -9,6 +9,7 @@ add_sourcekit_library(sourcekitdAPI
   DocSupportAnnotationArray.cpp
   RawData.cpp
   sourcekitdAPI-Common.cpp
+  DeclarationsArray.cpp
   TokenAnnotationsArray.cpp
   ExpressionTypeArray.cpp
   VariableTypeArray.cpp
