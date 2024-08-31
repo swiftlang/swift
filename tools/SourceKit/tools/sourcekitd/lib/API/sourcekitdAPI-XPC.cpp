@@ -10,16 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "SourceKit/Support/UIdent.h"
 #include "sourcekitd/CodeCompletionResultsArray.h"
+#include "sourcekitd/DeclarationsArray.h"
 #include "sourcekitd/DictionaryKeys.h"
 #include "sourcekitd/DocStructureArray.h"
 #include "sourcekitd/DocSupportAnnotationArray.h"
-#include "sourcekitd/TokenAnnotationsArray.h"
 #include "sourcekitd/ExpressionTypeArray.h"
-#include "sourcekitd/VariableTypeArray.h"
 #include "sourcekitd/RawData.h"
 #include "sourcekitd/RequestResponsePrinterBase.h"
-#include "SourceKit/Support/UIdent.h"
+#include "sourcekitd/TokenAnnotationsArray.h"
+#include "sourcekitd/VariableTypeArray.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -618,11 +619,9 @@ static sourcekitd_variant_type_t XPCVar_get_type(sourcekitd_variant_t var) {
   if (type == XPC_TYPE_DATA) {
     switch(CUSTOM_BUF_KIND(obj)) {
     case CustomBufferKind::TokenAnnotationsArray:
-      return SOURCEKITD_VARIANT_TYPE_ARRAY;
+    case CustomBufferKind::DeclarationsArray:
     case CustomBufferKind::DocSupportAnnotationArray:
-      return SOURCEKITD_VARIANT_TYPE_ARRAY;
     case CustomBufferKind::CodeCompletionResultsArray:
-      return SOURCEKITD_VARIANT_TYPE_ARRAY;
     case CustomBufferKind::DocStructureArray:
     case CustomBufferKind::InheritedTypesArray:
     case CustomBufferKind::DocStructureElementArray:
@@ -771,6 +770,9 @@ static sourcekitd_variant_t variantFromXPCObject(xpc_object_t obj) {
     case CustomBufferKind::TokenAnnotationsArray:
       return {{ (uintptr_t)getVariantFunctionsForTokenAnnotationsArray(),
                 (uintptr_t)CUSTOM_BUF_START(obj), 0 }};
+    case CustomBufferKind::DeclarationsArray:
+      return {{(uintptr_t)getVariantFunctionsForDeclarationsArray(),
+               (uintptr_t)CUSTOM_BUF_START(obj), 0}};
     case CustomBufferKind::DocSupportAnnotationArray:
       return {{ (uintptr_t)getVariantFunctionsForDocSupportAnnotationArray(),
                 (uintptr_t)CUSTOM_BUF_START(obj), 0 }};

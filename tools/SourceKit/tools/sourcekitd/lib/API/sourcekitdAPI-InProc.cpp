@@ -10,23 +10,24 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "sourcekitd/DictionaryKeys.h"
-#include "sourcekitd/Internal.h"
-#include "sourcekitd/CodeCompletionResultsArray.h"
-#include "sourcekitd/DocStructureArray.h"
-#include "sourcekitd/DocSupportAnnotationArray.h"
-#include "sourcekitd/RawData.h"
-#include "sourcekitd/TokenAnnotationsArray.h"
-#include "sourcekitd/ExpressionTypeArray.h"
-#include "sourcekitd/VariableTypeArray.h"
-#include "sourcekitd/Logging.h"
 #include "SourceKit/Core/LLVM.h"
 #include "SourceKit/Support/UIdent.h"
-#include "swift/Basic/ThreadSafeRefCounted.h"
+#include "sourcekitd/CodeCompletionResultsArray.h"
+#include "sourcekitd/DeclarationsArray.h"
+#include "sourcekitd/DictionaryKeys.h"
+#include "sourcekitd/DocStructureArray.h"
+#include "sourcekitd/DocSupportAnnotationArray.h"
+#include "sourcekitd/ExpressionTypeArray.h"
+#include "sourcekitd/Internal.h"
+#include "sourcekitd/Logging.h"
+#include "sourcekitd/RawData.h"
+#include "sourcekitd/TokenAnnotationsArray.h"
+#include "sourcekitd/VariableTypeArray.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Basic/ThreadSafeRefCounted.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/StringRef.h"
 
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -247,6 +248,7 @@ public:
   sourcekitd_variant_type_t getVariantType() const override {
     switch (getBufferKind()) {
       case CustomBufferKind::TokenAnnotationsArray:
+      case CustomBufferKind::DeclarationsArray:
       case CustomBufferKind::DocSupportAnnotationArray:
       case CustomBufferKind::CodeCompletionResultsArray:
       case CustomBufferKind::DocStructureArray:
@@ -976,6 +978,10 @@ static sourcekitd_variant_t variantFromSKDObject(SKDObjectRef Object) {
       case CustomBufferKind::TokenAnnotationsArray:
         return {{ (uintptr_t)getVariantFunctionsForTokenAnnotationsArray(),
           (uintptr_t)DataObject->getDataPtr(), 0 }};
+      case CustomBufferKind::DeclarationsArray:
+        return {
+            {(uintptr_t)sourcekitd::getVariantFunctionsForDeclarationsArray(),
+             (uintptr_t)DataObject->getDataPtr(), 0}};
       case CustomBufferKind::DocSupportAnnotationArray:
         return {{ (uintptr_t)getVariantFunctionsForDocSupportAnnotationArray(),
           (uintptr_t)DataObject->getDataPtr(), 0 }};
