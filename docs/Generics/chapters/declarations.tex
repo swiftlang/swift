@@ -198,7 +198,7 @@ Function, constructor and subscript declarations can also declare \IndexDefiniti
 \begin{Verbatim}
 func pickElement<E>(_ elts: some Sequence<E>) -> E {...}
 \end{Verbatim}
-An opaque parameter simultaneously declares a parameter value, a generic parameter type that is the type of the value, and a requirement this type must satisfy. Here, we can refer to ``\texttt{elts}'' from an expression inside the function body, but we cannot name the \emph{type} of ``\texttt{elts}'' in a type representation. From \index{expression}expression context however, the type of an opaque parameter can be obtained via the \texttt{type(of:)} special form, which produces a metatype value. This allows for invoking static methods and such.
+An opaque parameter simultaneously declares a parameter value, a generic parameter type that is the type of the value, and a requirement this type must satisfy. Here, we can refer to ``\texttt{elts}'' from an expression inside the function body, but we cannot name the \emph{type} of ``\texttt{elts}'' in a type representation. From \index{expression}expression context however, the type of an opaque parameter can be obtained via the \texttt{type(of:)} special form, which produces a metatype value. This allows for invoking static methods on these types.
 
 The \IndexDefinition{generic parameter list request}\Request{generic parameter list request} appends the opaque parameters to the parsed generic parameter list, so they follow the parsed generic parameters in index order. In \texttt{pickElement()}, the generic parameter \texttt{E} has canonical type~\rT, while the opaque parameter associated with ``\texttt{elts}'' has canonical type~\rU. Opaque parameter declarations also state a constraint type, which imposes a requirement on this unnamed generic parameter. We will discuss this in the next section. Note that when \texttt{some} appears in the return type of a function, it declares an \emph{opaque return type}, which is a related but different feature (\ChapRef{opaqueresult}).
 
@@ -379,7 +379,7 @@ class MockDuck: Plant, Duck {}  // error: not a subclass of Animal
 A protocol is \IndexDefinition{class-constrained protocol}\emph{class-constrained} if the $\ConfReq{Self}{AnyObject}$ associated requirement is either explicitly stated, or a consequence of some other associated requirement. We'll say more about the semantics of protocol inheritance clauses and name lookup in \SecRef{requirement sig}, \SecRef{identtyperepr}, and \ChapRef{building generic signatures}.
 
 \paragraph{Primary associated types.}
-A protocol can declare a list of \IndexDefinition{primary associated type}\emph{primary associated types} with a syntax resembling a generic parameter list:
+A protocol can declare a list of \IndexDefinition{primary associated type}\emph{primary associated types} with a syntax resembling that of a generic parameter list:
 \begin{Verbatim}
 protocol IteratorProtocol<Element> {
   associatedtype Element
@@ -467,7 +467,7 @@ func g() {...}
 \end{Verbatim}
 
 \paragraph{Method declarations.}
-In addition to the formal parameters declared in its parameter list, a method declaration also has an implicit \texttt{self} parameter, to receive the value on the left-hand side of the ``\texttt{.}'' in the \index{method call expression}method call expression. The interface type of a method declaration is a function type which receives the \IndexDefinition{self parameter declaration}\texttt{self} parameter, and returns another function which then takes the method's formal parameters. The ``\texttt{->}'' operator denoting a function type is right-associative, so \verb|A -> B -> C| means \verb|A -> (B -> C)|:
+In addition to the formal parameters declared in its parameter list, a method declaration also has an implicit \texttt{self} parameter, to receive the value on the left-hand side of the ``\texttt{.}'' in the \index{method call expression}method call expression. The interface type of a method declaration is a function type which receives the \IndexDefinition{self parameter declaration}\texttt{self} parameter, and returns another function which then takes the method's formal parameters. The ``\texttt{->}'' syntax for a function type associates to the right, so \verb|A -> B -> C| means \verb|A -> (B -> C)|:
 \begin{Verbatim}
 struct Universe {
   func wormhole(x: Int, y: String) -> Bool {...}
@@ -518,7 +518,7 @@ Let's compare the interface type of a method declaration with the structure of a
 \begin{itemize}
 \item The outer expression's callee, \texttt{universe.wormhole}, is itself a call expression, so we must evaluate this inner call expression first.
 
-The inner call expression applies the the argument \texttt{universe} to the \texttt{self} parameter of \texttt{Universe.wormhole()}. This represents the method lookup. The inner call expression's return type is \verb|(Int, String) -> Bool|.
+The inner call expression applies the argument \texttt{universe} to the \texttt{self} parameter of \texttt{Universe.wormhole()}. This represents the method lookup. The return type of the inner call expression is \verb|(Int, String) -> Bool|.
 \item The outer call expression applies the argument list \verb|(x: 1, y: "hi")| to the result of the inner call expression. This represents the method call itself, with a return type of \texttt{Bool}.
 \end{itemize}
 The extra function call disappears in \index{SILGen}SILGen, where we lower a method to a SIL function that receives all formal parameters and the \texttt{self} parameter at once.
@@ -527,7 +527,7 @@ A partially-applied method reference, such as \texttt{universe.wormhole}, can al
 \begin{Verbatim}
 { x, y in universe.wormhole(x: x, y: y) }
 \end{Verbatim}
-The unapplied form, \texttt{Universe.wormhole}, desugars into a closure returning a closure:
+The \index{unapplied function reference}unapplied form, \texttt{Universe.wormhole}, desugars into a closure returning a closure:
 \begin{Verbatim}
 { mySelf in { x y in mySelf.wormhole(x: x, y: y) } }
 \end{Verbatim}
@@ -573,12 +573,12 @@ For the same reason, methods inside \index{local type declaration}local types ca
 \paragraph{Constructor declarations.}
 \IndexDefinition{constructor declaration}Constructor declarations are introduced with the \texttt{init} keyword. The parent context of a constructor must be a nominal type or extension.
 
-A constructor's interface type looks like that of a static method that returns the new instance, but inside the constructor, \texttt{self} is the instance being initialized, so the interface type of \texttt{self} is the nominal type, and not its metatype. In a struct or enum, \texttt{self} is also \texttt{inout}. Constructors can delegate to other constructors in various ways. To model the delegation with a call expression, the \IndexDefinition{initializer interface type}\emph{initializer interface type} describes the type of an in-place initialization at a location provided by the caller:
+From the outside, the interface type of a constructor looks like a static method that returns a new instance of the type, but inside the constructor, \texttt{self} is the instance being initialized, so the interface type of \texttt{self} is the nominal type, and not its metatype. In a struct or enum, \texttt{self} is also \texttt{inout}. Constructors can delegate to other constructors in various ways. To model the delegation with a call expression, the \IndexDefinition{initializer interface type}\emph{initializer interface type} describes the type of an in-place initialization at a location provided by the caller:
 \begin{Verbatim}
 struct Universe {
   init(age: Int) {...}
-  // Interface type is (Universe.Type) -> (Int) -> Universe
-  // Initializer interface type is (inout Universe) -> (Int) -> Universe
+  // Interface type: (Universe.Type) -> (Int) -> Universe
+  // Initializer interface type: (inout Universe) -> (Int) -> Universe
 }
 \end{Verbatim}
 
@@ -644,12 +644,12 @@ As input, takes the type-checked body of a \index{closure function}closure expre
 \begin{enumerate}
 \item Initialize the return value with an \index{empty set}empty set, $C\leftarrow\varnothing$.
 \item Recursively walk the type-checked body of $F$ and handle each element:
-\item (Declaration references) If $F$ contains an expression that references some local variable or local function~$d$ by name, let $\texttt{PARENT}(d)$ denote the parent declaration context of~$d$. This is either $F$ itself, or some outer local context, because we found $d$ by unqualified lookup from~$F$.
+\item (Declaration references) If $F$ contains an expression that references some local variable or local function~$d$ by name, let $\texttt{PARENT}(d)$ denote the declaration context containing~$d$. This is either $F$ itself, or some outer local context, because we found $d$ by unqualified lookup from~$F$.
 
 If $\texttt{PARENT}(d)\neq F$, set $C\leftarrow C\cup\{d\}$.
-\item (Nested closures) If $F$ contains a nested closure expression or local function $F^\prime$, then any captures of $F^\prime$ not declared by~$F$ are also captures of~$F$.
+\item (Nested closures) If $F$ contains a nested closure expression or local function $F^\prime\!$, then any captures of $F^\prime$ not declared by~$F$ are also captures of~$F$.
 
-Recursively compute the captures of $F^\prime$. For each $d$ captured by $F^\prime$ such that $\texttt{PARENT}(d)\neq F$, set $C\leftarrow C\cup\{d\}$.
+Recursively compute the captures of $F^\prime\!$. For each $d$ captured by $F^\prime$ such that $\texttt{PARENT}(d)\neq F$, set $C\leftarrow C\cup\{d\}$.
 
 \item (Local types) If $F$ contains a local type, do not walk into the children of the local type. Local types do not capture values; we enforce this below.
 
@@ -707,7 +707,7 @@ This completely explains captures of \texttt{let} variables, but mutable \texttt
 
 A \index{non-escaping function type}\emph{non-escaping} closure can capture a \texttt{var} or \texttt{inout} by simply capturing the memory address of the storage location. This is safe, because a non-escaping closure cannot outlive the dynamic extent of the storage location.
 
-An \index{escaping function type}\texttt{@escaping} closure can also capture a \texttt{var}, but this requires promoting the \texttt{var} to a \index{boxing}heap-allocated box with a reference count, with all variable accesses indirecting through the box. The below example can be found in every \index{Lisp}Lisp textbook. Each invocation of \texttt{counter()} allocates a new counter value on the heap, and returns three closures that reference the box; the box itself is completely hidden by the abstraction:
+An \index{escaping function type}\texttt{@escaping} closure can also capture a \texttt{var}, which requires promoting the \texttt{var} to a \index{boxing}heap-allocated box with a reference count, with all variable accesses indirecting through the box. The below example can be found in every \index{Lisp}Lisp textbook. Each invocation of \texttt{counter()} allocates a new counter value on the heap, and returns three closures that reference the box; the box itself is completely hidden by the abstraction:
 \begin{Verbatim}
 func counter() -> (read: () -> Int, inc: () -> (), dec: () -> ()) {
   var count = 0  // promoted to a box
@@ -761,15 +761,15 @@ We can write a more complex pattern, for example storing the first element of a 
 \begin{Verbatim}
 let (x, _) = (123, "hello")
 \end{Verbatim}
-The pattern can declare two variables \texttt{x} and \texttt{y}:
+Here is a pattern binding declaration with a single entry, whose pattern delares two variables \texttt{x} and \texttt{y}:
 \begin{Verbatim}
 let (x, y) = (123, "hello")
 \end{Verbatim}
-Here is a pattern binding declaration with two entries, where the first pattern declares \texttt{x} and the second declares \texttt{y}:
+Here is a pattern binding declaration with two entries, declaring \texttt{x} and \texttt{y} respectively:
 \begin{Verbatim}
 let x = 123, y = "hello"
 \end{Verbatim}
-And finally, two pattern binding declarations, where each one pattern binding declaration has a single entry declaring a single variable:
+And finally, here we have two pattern binding declarations, where each pattern binding declaration has a single entry declaring a single variable:
 \begin{Verbatim}
 let x = 123
 let y = "hello"
