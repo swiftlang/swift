@@ -107,8 +107,8 @@
 \tikzstyle{abstractvertex}=[circle, fill=gray, outer sep=0.1em]
 \tikzstyle{abstractvertex2}=[circle, fill=lightgray, outer sep=0.1em]
 \tikzstyle{SourceFile}=[draw=black,thick,fill=lightgray, outer sep=0.2em]
-\tikzstyle{decl}=[draw=black,thick]
-\tikzstyle{type}=[rounded corners,draw=black,thick,fill=lighter-gray]
+\tikzstyle{decl}=[draw=black,thick, outer sep=0.2em]
+\tikzstyle{type}=[rounded corners,draw=black,thick,fill=lighter-gray, outer sep=0.2em]
 \tikzstyle{OtherEntity}=[draw=black,thick,fill=lighter-gray, outer sep=0.2em]
 
 % \DeclareMathOperator, \boxed, etc
@@ -338,6 +338,9 @@
 \newcommand{\tV}{\texttt{V}}
 \newcommand{\tP}{\texttt{P}}
 \newcommand{\tQ}{\texttt{Q}}
+\newcommand{\tR}{\texttt{R}}
+\newcommand{\tCollection}{\texttt{Collection}}
+\newcommand{\tSequence}{\texttt{Sequence}}
 
 \newcommand{\tSelf}{\texttt{Self}}
 
@@ -378,6 +381,7 @@
 \newcommand{\aNA}{\assocsym{N}{A}}
 
 \newcommand{\pSequence}{\protosym{Sequence}}
+\newcommand{\pCollection}{\protosym{Collection}}
 \newcommand{\pIterator}{\protosym{IteratorProtocol}}
 
 \newcommand{\ConfRule}[2]{#1 \cdot #2 \sim #1}

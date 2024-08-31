@@ -696,9 +696,9 @@ using LookupConformanceFn = llvm::function_ref<
 \apiref{LookUpConformanceInModule}{struct}
 A callback intended to be used with \texttt{SubstitutionMap::get()} as a conformance lookup callback. Overloads \texttt{operator()} with the signature of \texttt{LookupConformanceFn}.
 
-Constructed with a \texttt{ModuleDecl *}:
+Performs a global conformance lookup. Constructed without arguments:
 \begin{Verbatim}
-LookUpConformanceInModule{moduleDecl}
+LookUpConformanceInModule()
 \end{Verbatim}
 
 \IndexSource{local conformance lookup callback}
@@ -711,12 +711,12 @@ LookUpConformanceInSubstitutionMap{subMap}
 \end{Verbatim}
 
 \IndexSource{make abstract conformance callback}
-\apiref{MakeAbstractConformance}{struct}
+\apiref{MakeAbstractConformanceForGenericType}{struct}
 A callback intended to be used with \texttt{SubstitutionMap::get()} as a conformance lookup callback. Overloads \texttt{operator()} with the signature of \texttt{LookupConformanceFn}.
 
 Constructed without arguments:
 \begin{Verbatim}
-MakeAbstractConformance()
+MakeAbstractConformanceForGenericType()
 \end{Verbatim}
 
 \index{generic signature}

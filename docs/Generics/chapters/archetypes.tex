@@ -155,16 +155,16 @@ We will resume discussing substitution maps with contextual replacement types sh
 Recall that with a type parameter, global conformance lookup returns an abstract conformance without being able to check if the conformance actually holds (\SecRef{abstract conformances}). With archetypes, we implement a more useful behavior that distinguishes several cases. Let $\archetype{T}$ be an archetype with generic signature $G$, and let \texttt{P} be a protocol:
 \begin{enumerate}
 \item If $G\vdash\TC$ for some class type~\texttt{C}, and \texttt{C} conforms to \texttt{P}, then the archetype \emph{conforms concretely} to \texttt{P}. The class type \texttt{C} may contain type parameters, so global conformance lookup recursively calls itself on~$\MapIn(\texttt{C})$:
-\[\protosym{P}\otimes\archetype{T}=\protosym{P}\otimes\MapIn(\texttt{C})=\ConfReq{$\MapIn(\texttt{C})$}{P}\]
+\[\pP \otimes \archetype{T}=\pP \otimes \MapIn(\texttt{C})=\ConfReq{$\MapIn(\texttt{C})$}{P}\]
 The result is actually wrapped in an \index{inherited conformance}\emph{inherited conformance}, which doesn't do much except report the conforming type as $\archetype{T}$ rather than $\MapIn(\texttt{C})$ (\SecRef{inheritedconformance}).
 \item If $G\vdash\TP$, the archetype \emph{conforms abstractly}, and thus global conformance lookup returns an abstract conformance:
-\[\protosym{P}\otimes\archetype{T}=\ConfReq{$\archetype{T}$}{P}\]
+\[\pP\otimes\archetype{T}=\ConfReq{$\archetype{T}$}{P}\]
 \item Otherwise, $\archetype{T}$ does not conform to \texttt{P}, and global conformance lookup returns an invalid conformance.
 \end{enumerate}
 In (2), we return an abstract conformance whose subject type is an archetype. We need to explain what this means. To recap, when the original type of an abstract conformance is a type parameter~\tT, the type witness for \texttt{[P]A} is a dependent member type~\texttt{T.[P]A}. Similarly, the associated conformance for $\AssocConfReq{Self.U}{Q}{P}$ is the abstract conformance $\ConfReq{T.U}{Q}$. So, when the original type is an \index{abstract conformance!with archetype}archetype $\archetype{T}$, we must also map this \index{type witness!of abstract conformance}type witness or \index{associated conformance!of abstract conformance}associated conformance into the environment:
 \begin{align*}
 \AssocType{[P]A}\otimes \ConfReq{$\archetype{T}$}{P} &=\archetype{T.[P]A}= \MapIn(\texttt{T.[P]A})\\
-\AssocConf{Self.U}{Q}\otimes \ConfReq{$\archetype{T}$}{P} &=\ConfReq{$\archetype{T.U}$}{Q}= \protosym{Q}\otimes\MapIn(\texttt{T.U})
+\AssocConf{Self.U}{Q}\otimes \ConfReq{$\archetype{T}$}{P} &=\ConfReq{$\archetype{T.U}$}{Q}= \pQ\otimes\MapIn(\texttt{T.U})
 \end{align*}
 
 \section{Archetype Substitution}\label{archetypesubst}
@@ -173,7 +173,7 @@ Recall that $\SubMapObj{G}{H}$ is set of substitution maps with input generic si
 \[
 \TypeObj{\EquivClass{G}}\otimes\SubMapObj{G}{H}\longrightarrow\TypeObj{H}
 \]
-To apply a substitution map $\Sigma$ to a contextual type $\tT^\prime\in\TypeObj{\EquivClass{G}}$, we first map the the contextual type out of its environment, and then apply the substitution map to this interface type:
+To apply a substitution map $\Sigma$ to a contextual type $\tT^\prime\in\TypeObj{\EquivClass{G}}$, we first map the contextual type out of its environment, and then apply the substitution map to this interface type:
 \[\tT^\prime\otimes \Sigma = \MapOut(\tT^\prime)\otimes \Sigma\]
 If the replacement types of $\Sigma$ are interface types, we always get an interface type back, regardless of whether the original type was an interface type or a contextual type.
 
@@ -415,7 +415,7 @@ We saw that the protocol generic signature $G_\texttt{N}$ (that is, \verb|<τ_0_
 \node (TA) [interior, right=of T] {\texttt{\rT.A}};
 \node (TAA) [interior, right=of TA] {\texttt{\rT.A.A}};
 \node (TAAA) [interior, right=of TAA] {\texttt{\rT.A.A.A}};
-\node (Rest) [interior, right=of TAAA] {\texttt{\vphantom{Ty}...}};
+\node (Rest) [right=of TAAA] {$\cdots$};
 
 \path [arrow] (T) edge [above] node {\tiny{\texttt{.A}}} (TA);
 \path [arrow] (TA) edge [above] node {\tiny{\texttt{.A}}} (TAA);
@@ -597,14 +597,14 @@ Takes a potential archetype~$t$ and a protocol \texttt{P} as input. Has side eff
 \item If $\PAForward(t)$ is non-null, load $t\leftarrow\PAForward(t)$, and repeat if necessary.
 \item If $\texttt{P}\in\PAConforms(t)$, return.
 \item Otherwise, set $\PAConforms(t)\leftarrow \PAConforms(t)\cup\{\texttt{P}\}$.
-\item For each protocol~\texttt{Q} appearing in the inheritance clause of the declaration of \texttt{P}, recursively apply this algorithm to $t$ and \texttt{Q}.
+\item For each protocol~\tQ\ appearing in the inheritance clause of the declaration of \texttt{P}, recursively apply this algorithm to $t$ and \tQ.
 \item Let $\tT:=\PAType(t)$.
 \item For each associated type declaration \texttt{A} of \texttt{P}:
 \begin{enumerate}
 \item If $\PAMembers(t)$ does not have an entry for \texttt{A}, create a new potential archetype~$v$ with $\PAType(v)=\texttt{T.A}$. Add the ordered pair $(\texttt{A}, v)$ to $\PAMembers(t)$.
 
 Otherwise, $\PAMembers(t)$ contains an existing entry~$(\texttt{A}, v)$ with $\PAType(v)=\texttt{T.A}$.
-\item For each protocol $\texttt{Q}$ listed in the inheritance clause of the declaration of \texttt{A}, first check if \texttt{Q} already appears among the set of all protocols we've visited in prior recursive calls; if so, emit a diagnostic. Otherwise, add \texttt{Q} to the visited set, and recursively apply this algorithm to $v$ and \texttt{Q}.
+\item For each protocol \tQ\ listed in the inheritance clause of the declaration of \texttt{A}, first check if \tQ\ already appears among the set of all protocols we've visited in prior recursive calls; if so, emit a diagnostic. Otherwise, add \tQ\ to the visited set, and recursively apply this algorithm to $v$ and \tQ.
 \end{enumerate}
 \end{enumerate}
 \end{algorithm}

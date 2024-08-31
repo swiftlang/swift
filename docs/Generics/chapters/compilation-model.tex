@@ -339,7 +339,7 @@ The request evaluator framework was first introduced in \IndexSwift{4.2}Swift~4.
 class A: B {}
 class B: A {}
 \end{Verbatim}
-Implementing bespoke logic to detect circularity is error-prone and tedious, and a missing circularity check can result in a crash or infinite loop when the compiler encounters an invalid input program. The request evaluator centralizes \IndexDefinition{request cycle}cycle detection by maintaining a \index{stack}stack of \IndexDefinition{active request}\emph{active requests}. Before evaluating a request, the request evaluator first checks if the active request stack already contains an equal request. In this case, calling the evaluation function would result in infinite recursion, so instead the request evaluator diagnoses an error and returns a request-specific sentinel value.
+Implementing bespoke logic to detect \index{circular reference}circularity is error-prone and tedious, and a missing circularity check can result in a crash or infinite loop when the compiler encounters an invalid input program. The request evaluator centralizes \IndexDefinition{request cycle}cycle detection by maintaining a \index{stack}stack of \IndexDefinition{active request}\emph{active requests}. Before evaluating a request, the request evaluator first checks if the active request stack already contains an equal request. In this case, calling the evaluation function would result in infinite recursion, so instead the request evaluator diagnoses an error and returns a request-specific sentinel value.
 \begin{Verbatim}
 $ swiftc cycle.swift
 cycle.swift:1:7: error: `A' inherits from itself
@@ -472,7 +472,7 @@ The frontend represents a module by a \IndexDefinition{module declaration}\emph{
 \begin{itemize}
 \item \textbf{Serialized modules} containing one or more \IndexDefinition{serialized AST file unit}\emph{serialized AST file units}. When the main module imports another module written in Swift, the frontend reads a serialized module that was previously built.
 
-\item \textbf{Imported modules} consisting of one or more \IndexDefinition{Clang file unit}\emph{Clang file units}. These are the modules implemented in C, Objective-C or C++.
+\item \textbf{Imported modules} consisting of one or more \IndexDefinition{Clang file unit}\emph{Clang file units}. These are the modules implemented in C, Objective-C, or C++.
 
 \item \textbf{The builtin module} with exactly one file unit, containing types and intrinsics implemented by the compiler itself.
 \end{itemize}
@@ -490,7 +490,7 @@ Another key difference between parsed declarations and deserialized declarations
 
 \IndexDefinition{imported module}
 \IndexDefinition{Clang importer}
-\paragraph{Imported modules.} An imported module is implemented in \index{C}C, \index{Objective-C}Objective-C or \index{C++}C++. The Swift compiler embeds a copy of \index{Clang}Clang and uses it to parse module maps, header files, and binary precompiled headers. Name lookup into an imported module lazily constructs Swift declarations from their corresponding Clang declarations. The Swift compiler component responsible for this is known as the ``Clang importer.''
+\paragraph{Imported modules.} An imported module is implemented in \index{C}C, \index{Objective-C}Objective-C, or \index{C++}C++. The Swift compiler embeds a copy of \index{Clang}Clang and uses it to parse module maps, header files, and binary precompiled headers. Name lookup into an imported module lazily constructs Swift declarations from their corresponding Clang declarations. The Swift compiler component responsible for this is known as the ``Clang importer.''
 
 Imported function declarations generally do not have bodies if the entry point was previously emitted by Clang and is available externally. Occasionally the Clang importer synthesizes accessor methods and other such trivia, which do have bodies represented as Swift statements and expressions. C functions not available externally, such as \texttt{static inline} functions declared in header files, are emitted by having Swift \index{IRGen}IRGen call into Clang.
 
@@ -551,6 +551,7 @@ Key source files:
 \item \SourceFile{lib/AST/ASTContext.cpp}
 \end{itemize}
 
+\IndexSource{AST context}
 \apiref{ASTContext}{class}
 The global singleton for a single frontend instance. An AST context provides a memory allocation arena, unique allocation for various immutable data types used throughout the compiler, and storage for various other global singletons.
 
