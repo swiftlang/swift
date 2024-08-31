@@ -37,7 +37,7 @@ import SwiftShims
 /// interpreter doesn't currently know how to load symbols from compiler-rt.
 /// Since `@_transparent` is only necessary for iOS apps, we only apply it on
 /// iOS, not any other which would inherit/remap iOS availability.
-#if os(iOS) && !os(xrOS)
+#if os(iOS) && !os(visionOS)
 @_effects(readnone)
 @_transparent
 public func _stdlib_isOSVersionAtLeast(
