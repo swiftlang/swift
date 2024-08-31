@@ -2024,7 +2024,6 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Protocol:
   case DeclKind::Constructor:
   case DeclKind::Destructor:
-  case DeclKind::PatternBinding:
   case DeclKind::Subscript:
   case DeclKind::TypeAlias:
   case DeclKind::GenericTypeParam:
@@ -2036,7 +2035,10 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Param:
   case DeclKind::Func:
   case DeclKind::Accessor:
-    return true;
+    return !cast<ValueDecl>(D)->isObjCMemberImplementation();
+
+  case DeclKind::PatternBinding:
+    return !cast<PatternBindingDecl>(D)->hasAnyObjCMemberImplementations();
   }
 
   llvm_unreachable("Unhandled DeclKind in switch.");

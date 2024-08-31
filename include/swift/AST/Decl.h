@@ -2535,6 +2535,10 @@ public:
   /// Does this binding declare something that requires storage?
   bool hasStorage() const;
 
+  /// Does this binding have at least one VarDecl that's an ObjC member
+  /// implementation?
+  bool hasAnyObjCMemberImplementations() const;
+
   /// Determines whether this binding either has an initializer expression, or is
   /// default initialized, without performing any type checking on it.
   bool isDefaultInitializable() const {

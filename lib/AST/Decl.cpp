@@ -4620,6 +4620,16 @@ bool ValueDecl::isObjCMemberImplementation() const {
               this, [&]() { return this->getFormalAccess(); });
 }
 
+bool PatternBindingDecl::hasAnyObjCMemberImplementations() const {
+  bool foundAny = false;
+  for (auto i : range(getNumPatternEntries())) {
+    getPattern(i)->forEachVariable([&](VarDecl *VD) {
+      foundAny |= VD->isObjCMemberImplementation();
+    });
+  }
+  return foundAny;
+}
+
 /// Checks if \p VD may be used from \p useDC, taking \@testable and \@_spi
 /// imports into account.
 ///
