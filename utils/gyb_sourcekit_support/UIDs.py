@@ -67,6 +67,8 @@ UID_KEYS = [
     KEY('ModuleImportDepth', 'key.moduleimportdepth'),
     KEY('NumBytesToErase', 'key.num_bytes_to_erase'),
     KEY('NotRecommended', 'key.not_recommended'),
+    KEY('Declarations', 'key.declarations'),
+    KEY('EnableDeclarations', 'key.enabledeclarations'),
     KEY('Annotations', 'key.annotations'),
     KEY('SemanticTokens', 'key.semantic_tokens'),
     KEY('DiagnosticStage', 'key.diagnostic_stage'),
