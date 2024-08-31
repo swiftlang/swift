@@ -2219,8 +2219,10 @@ for host in "${ALL_HOSTS[@]}"; do
                     should_configure_tests=$(false_true ${BUILD_TOOLCHAIN_ONLY})
                 fi
 
+                echo "Current PATH is '${PATH}'"
                 cmake_options=(
                     "${cmake_options[@]}"
+                    --trace-expand
                     -C${LLDB_SOURCE_DIR}/cmake/caches/${cmake_cache}
                     -DCMAKE_C_FLAGS="$(llvm_c_flags ${host})"
                     -DCMAKE_CXX_FLAGS="$(llvm_c_flags ${host})"
