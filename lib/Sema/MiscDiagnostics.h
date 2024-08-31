@@ -38,21 +38,9 @@ namespace swift {
   class ValueDecl;
   class ForEachStmt;
 
-/// Diagnose any expressions that appear in an unsupported position. If visiting
-/// an expression directly, its \p contextualPurpose should be provided to
-/// evaluate its position.
-  void diagnoseOutOfPlaceExprs(
-      ASTContext &ctx, ASTNode root,
-      std::optional<ContextualTypePurpose> contextualPurpose);
-
   /// Emit diagnostics for syntactic restrictions on a given expression.
-  ///
-  /// Note: \p contextualPurpose must be non-nil, unless
-  /// \p disableOutOfPlaceExprChecking is set to \c true.
-  void performSyntacticExprDiagnostics(
-      const Expr *E, const DeclContext *DC,
-      std::optional<ContextualTypePurpose> contextualPurpose, bool isExprStmt,
-      bool disableOutOfPlaceExprChecking = false);
+  void performSyntacticExprDiagnostics(const Expr *E, const DeclContext *DC,
+                                       bool isExprStmt);
 
   /// Emit diagnostics for a given statement.
   void performStmtDiagnostics(const Stmt *S, DeclContext *DC);

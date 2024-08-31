@@ -116,12 +116,14 @@ takesValue(if .random() { 0 } else { 1 })
 do {
   takesValue(x: if .random() { 0 } else { 1 })
   // expected-error@-1 {{extraneous argument label 'x:' in call}}
+  // expected-error@-2 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 
   takesValue(_: x: if .random() { 0 } else { 1 })
   // expected-error@-1 {{expected argument label before colon}}
   // expected-error@-2 {{expected ',' separator}}
   // expected-error@-3 {{cannot find 'x' in scope}}
   // expected-error@-4 {{extra argument in call}}
+  // expected-error@-5 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 }
 func takesValueWithLabel<T>(x: T) {}
 do {
@@ -133,6 +135,7 @@ do {
   // expected-error@-2 {{expected ',' separator}}
   // expected-error@-3 {{cannot find 'y' in scope}}
   // expected-error@-4 {{extra argument in call}}
+  // expected-error@-5 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 }
 func takesValueAndTrailingClosure<T>(_ x: T, _ fn: () -> Int) {}
 takesValueAndTrailingClosure(if .random() { 0 } else { 1 }) { 2 }
@@ -141,6 +144,7 @@ takesValueAndTrailingClosure(if .random() { 0 } else { 1 }) { 2 }
 func takesInOut<T>(_ x: inout T) {}
 takesInOut(&if .random() { 1 } else { 2 })
 // expected-error@-1 {{cannot pass immutable value of type 'Int' as inout argument}}
+// expected-error@-2 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 
 struct HasSubscript {
   static subscript(x: Int) -> Void { () }
@@ -462,6 +466,9 @@ let o = !if .random() { true } else { false }  // expected-error {{'if' may only
 let p = if .random() { 1 } else { 2 } + // expected-error {{ambiguous use of operator '+'}}
         if .random() { 3 } else { 4 } +
         if .random() { 5 } else { 6 }
+// expected-error@-3 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+// expected-error@-3 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+// expected-error@-3 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 
 let p1 = if .random() { 1 } else { 2 } +  5
 // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
@@ -504,6 +511,7 @@ do {
   // FIXME: The type error is likely due to not solving the conjunction before attempting default type var bindings.
   let _ = (if .random() { Int?.none } else { 1 as Int? })?.bitWidth
   // expected-error@-1 {{type of expression is ambiguous without a type annotation}}
+  // expected-error@-2 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 }
 do {
   let _ = if .random() { Int?.none } else { 1 as Int? }!
@@ -557,14 +565,28 @@ func stmts() {
     return
   }
 
-  switch if .random() { true } else { false } { // expected-error {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
-  case _ where if .random() { true } else { false }: // expected-error {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+  switch if .random() { true } else { false } {
+    // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+  case _ where if .random() { true } else { false }:
+    // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+    break
+  case if .random() { true } else { false }:
+    // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+    break
+  case if .random() { true } else { false } && false:
+    // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
     break
   default:
     break
   }
 
-  for b in [true] where if b { true } else { false } {} // expected-error {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+  for b in [true] where if b { true } else { false } {}
+  // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+
+  for _ in if .random() { [true] } else { [false] } {}
+  // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+
+  for _ in if .random() { [true] } else { [false] } {} // expected-error {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 
   // Make sure this doesn't parse as an if expr pattern with a label.
   let x = 0
@@ -597,9 +619,9 @@ func returnBranches() -> Int {
 
 func returnBranches1() -> Int {
   return if .random() { // expected-error {{cannot convert return expression of type 'Void' to return type 'Int'}}
-    return 0
+    return 0 // expected-error {{cannot use 'return' to transfer control out of 'if' expression}}
   } else {
-    return 1
+    return 1 // expected-error {{cannot use 'return' to transfer control out of 'if' expression}}
   }
 }
 
