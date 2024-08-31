@@ -3808,91 +3808,19 @@ Type ProtocolCompositionType::get(const ASTContext &C,
 
 CanType ProtocolCompositionType::getMinimalCanonicalType(
     const DeclContext *useDC) const {
-  const CanType CanTy = getCanonicalType();
-
-  // If the canonical type is not a composition, it's minimal.
-  const auto Composition = dyn_cast<ProtocolCompositionType>(CanTy);
-  if (!Composition) {
-    return CanTy;
-  }
-
-  // Nothing to minimize.
-  if (Composition->getMembers().empty()) {
-    return CanTy;
-  }
-
-  // The only cases we're missing out on proper minimization is when a
-  // composition has an explicit superclass or AnyObject constraint.
-  if (!Composition->hasExplicitAnyObject() &&
-      !Composition->getMembers().front()->getClassOrBoundGenericClass()) {
-    // Already minimal.
-    return CanTy;
-  }
-
-  auto &Ctx = CanTy->getASTContext();
+  auto &Ctx = getASTContext();
 
   // Use generic signature minimization: the requirements of the signature will
   // represent the minimal composition.
-  auto sig = useDC->getGenericSignatureOfContext();
-  const auto Sig = Ctx.getOpenedExistentialSignature(CanTy, sig);
-  SmallVector<Requirement, 2> Reqs;
-  SmallVector<InverseRequirement, 2> Inverses;
-  Sig->getRequirementsWithInverses(Reqs, Inverses);
-
-  if (Reqs.size() == 1) {
-    return Reqs.front().getSecondType()->getCanonicalType();
-  }
-
-  // The set of inverses is already minimal.
-  auto MinimalInverses = Composition->getInverses();
-
-#ifndef NDEBUG
-  // Check that the generic signature's inverses matches.
-  InvertibleProtocolSet genSigInverses;
-  for (InverseRequirement ireq : Inverses)
-    genSigInverses.insert(ireq.getKind());
-  assert(genSigInverses == MinimalInverses);
-#endif
-
-  llvm::SmallVector<Type, 2> MinimalMembers;
-  bool MinimalHasExplicitAnyObject = false;
-  auto ifaceTy = Sig.getGenericParams().back();
-  for (const auto &Req : Reqs) {
-    if (!Req.getFirstType()->isEqual(ifaceTy)) {
-      continue;
-    }
-
-    switch (Req.getKind()) {
-    case RequirementKind::SameShape:
-      llvm_unreachable("Same-shape requirement not supported here");
-    case RequirementKind::Superclass:
-    case RequirementKind::Conformance:
-      MinimalMembers.push_back(Req.getSecondType());
-      break;
-    case RequirementKind::Layout:
-      MinimalHasExplicitAnyObject = true;
-      break;
-    case RequirementKind::SameType:
-      llvm_unreachable("");
-    }
-  }
-
-  // A superclass constraint is always retained and must appear first in the
-  // members list.
-  assert(Composition->getMembers().front()->getClassOrBoundGenericClass() ==
-         MinimalMembers.front()->getClassOrBoundGenericClass());
-
-  // If we are left with a single member and no layout constraint, the member
-  // is the minimal type. Also, note that a protocol composition cannot be
-  // constructed with a single member unless there is a layout constraint.
-  if (MinimalMembers.size() == 1
-      && !MinimalHasExplicitAnyObject
-      && MinimalInverses.empty())
-    return CanType(MinimalMembers.front());
-
-  // The resulting composition is necessarily canonical.
-  return CanType(build(Ctx, MinimalMembers, MinimalInverses,
-                       MinimalHasExplicitAnyObject));
+  auto parentSig = useDC->getGenericSignatureOfContext();
+  auto existentialSig =
+      Ctx.getOpenedExistentialSignature(getCanonicalType(), parentSig);
+  auto selfTy =
+      OpenedArchetypeType::getSelfInterfaceTypeFromContext(parentSig, Ctx);
+  return existentialSig->getUpperBound(selfTy,
+                                       /*forExistentialSelf=*/true,
+                                       /*includeParameterizedProtocols=*/true)
+            ->getCanonicalType();
 }
 
 ClangTypeInfo AnyFunctionType::getClangTypeInfo() const {
