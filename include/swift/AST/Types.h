@@ -587,7 +587,7 @@ public:
   /// Canonical protocol composition types are minimized only to a certain
   /// degree to preserve ABI compatibility. This routine enables performing
   /// slower, but stricter minimization at need (e.g. redeclaration checking).
-  CanType getMinimalCanonicalType(const DeclContext *useDC) const;
+  CanType getMinimalCanonicalType() const;
 
   /// Reconstitute type sugar, e.g., for array types, dictionary
   /// types, optionals, etc.
@@ -6139,7 +6139,7 @@ public:
   /// Canonical protocol composition types are minimized only to a certain
   /// degree to preserve ABI compatibility. This routine enables performing
   /// slower, but stricter minimization at need (e.g. redeclaration checking).
-  CanType getMinimalCanonicalType(const DeclContext *useDC) const;
+  CanType getMinimalCanonicalType() const;
 
   /// Retrieve the set of members composed to create this type.
   ///

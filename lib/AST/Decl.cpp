@@ -3636,7 +3636,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
                                     /*topLevelFunction=*/true, isMethod,
                                     /*isInitializer=*/isa<ConstructorDecl>(afd),
                                     getNumCurryLevels())
-        ->getMinimalCanonicalType(afd);
+        ->getMinimalCanonicalType();
   }
 
   if (isa<AbstractStorageDecl>(this)) {
@@ -3652,7 +3652,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
                                    /*topLevelFunction=*/true,
                                    /*isMethod=*/false,
                                    /*isInitializer=*/false, getNumCurryLevels())
-              ->getMinimalCanonicalType(cast<SubscriptDecl>(this));
+              ->getMinimalCanonicalType();
     }
 
     // We want to curry the default signature type with the 'self' type of the
@@ -3667,7 +3667,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
     auto mappedType = mapSignatureFunctionType(
         getASTContext(), getInterfaceType(), /*topLevelFunction=*/false,
         /*isMethod=*/false, /*isInitializer=*/false, getNumCurryLevels());
-    return mappedType->getMinimalCanonicalType(getDeclContext());
+    return mappedType->getMinimalCanonicalType();
   }
 
   // Note: If you add more cases to this function, you should update the

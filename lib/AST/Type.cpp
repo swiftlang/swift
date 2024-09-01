@@ -1836,8 +1836,9 @@ CanType TypeBase::getReducedType(GenericSignature sig) {
   return sig.getReducedType(this);
 }
 
-CanType TypeBase::getMinimalCanonicalType(const DeclContext *useDC) const {
-  const auto MinimalTy = getCanonicalType().transformRec([useDC](TypeBase *Ty) -> std::optional<Type> {
+CanType TypeBase::getMinimalCanonicalType() const {
+  const auto MinimalTy = getCanonicalType().transformRec(
+      [](TypeBase *Ty) -> std::optional<Type> {
     const CanType CanTy = CanType(Ty);
 
     if (const auto ET = dyn_cast<ExistentialType>(CanTy)) {
@@ -1847,7 +1848,7 @@ CanType TypeBase::getMinimalCanonicalType(const DeclContext *useDC) const {
         return CanTy;
       }
 
-      const auto MinimalTy = PCT->getMinimalCanonicalType(useDC);
+      const auto MinimalTy = PCT->getMinimalCanonicalType();
       if (MinimalTy->getClassOrBoundGenericClass()) {
         return MinimalTy;
       }
@@ -1861,7 +1862,7 @@ CanType TypeBase::getMinimalCanonicalType(const DeclContext *useDC) const {
         return CanTy;
       }
 
-      const auto MinimalTy = PCT->getMinimalCanonicalType(useDC);
+      const auto MinimalTy = PCT->getMinimalCanonicalType();
       if (MinimalTy->getClassOrBoundGenericClass()) {
         return MetatypeType::get(MinimalTy);
       }
@@ -1870,7 +1871,7 @@ CanType TypeBase::getMinimalCanonicalType(const DeclContext *useDC) const {
     }
 
     if (const auto Composition = dyn_cast<ProtocolCompositionType>(CanTy)) {
-      return Composition->getMinimalCanonicalType(useDC);
+      return Composition->getMinimalCanonicalType();
     }
 
     return std::nullopt;
@@ -3795,21 +3796,15 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   return build(C, CanTypes, Inverses, HasExplicitAnyObject);
 }
 
-CanType ProtocolCompositionType::getMinimalCanonicalType(
-    const DeclContext *useDC) const {
+CanType ProtocolCompositionType::getMinimalCanonicalType() const {
   auto &Ctx = getASTContext();
 
-  // Use generic signature minimization: the requirements of the signature will
-  // represent the minimal composition.
-  auto parentSig = useDC->getGenericSignatureOfContext();
-  auto existentialSig =
-      Ctx.getOpenedExistentialSignature(getCanonicalType(), parentSig);
-  auto selfTy =
-      OpenedArchetypeType::getSelfInterfaceTypeFromContext(parentSig, Ctx);
-  return existentialSig->getUpperBound(selfTy,
-                                       /*forExistentialSelf=*/true,
-                                       /*includeParameterizedProtocols=*/true)
-            ->getCanonicalType();
+  auto existentialSig = Ctx.getOpenedExistentialSignature(getCanonicalType());
+  auto result = existentialSig.OpenedSig->getUpperBound(
+      existentialSig.SelfType,
+      /*forExistentialSelf=*/true,
+      /*includeParameterizedProtocols=*/true);
+  return result.subst(existentialSig.Generalization)->getCanonicalType();
 }
 
 ClangTypeInfo AnyFunctionType::getClangTypeInfo() const {
