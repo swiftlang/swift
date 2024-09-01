@@ -2011,6 +2011,8 @@ StringRef DeclAttribute::getAttrName() const {
     } else {
       return "_allowFeatureSuppression";
     }
+  case DeclAttrKind::Lifetime:
+    return "lifetime";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -3038,6 +3040,24 @@ AllowFeatureSuppressionAttr *AllowFeatureSuppressionAttr::create(
   auto *mem = ctx.Allocate(size, alignof(AllowFeatureSuppressionAttr));
   return new (mem)
       AllowFeatureSuppressionAttr(atLoc, range, implicit, inverted, features);
+}
+
+LifetimeAttr::LifetimeAttr(SourceLoc atLoc, SourceRange baseRange,
+                           bool implicit,
+                           ArrayRef<LifetimeDependenceSpecifier> entries)
+    : DeclAttribute(DeclAttrKind::Lifetime, atLoc, baseRange, implicit),
+      NumEntries(entries.size()) {
+  std::copy(entries.begin(), entries.end(),
+            getTrailingObjects<LifetimeDependenceSpecifier>());
+}
+
+LifetimeAttr *
+LifetimeAttr::create(ASTContext &context, SourceLoc atLoc,
+                     SourceRange baseRange, bool implicit,
+                     ArrayRef<LifetimeDependenceSpecifier> entries) {
+  unsigned size = totalSizeToAlloc<LifetimeDependenceSpecifier>(entries.size());
+  void *mem = context.Allocate(size, alignof(LifetimeDependenceSpecifier));
+  return new (mem) LifetimeAttr(atLoc, baseRange, implicit, entries);
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {

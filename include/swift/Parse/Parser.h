@@ -1178,6 +1178,10 @@ public:
       MacroSyntax syntax, SourceLoc AtLoc, SourceLoc Loc
   );
 
+  /// Parse the @lifetime attribute.
+  ParserResult<LifetimeAttr> parseLifetimeAttribute(SourceLoc AtLoc,
+                                                    SourceLoc Loc);
+
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                   SourceLoc AtEndLoc,

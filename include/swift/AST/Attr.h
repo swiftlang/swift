@@ -24,6 +24,7 @@
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/KnownProtocols.h"
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
@@ -2624,6 +2625,27 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::RawLayout;
+  }
+};
+
+class LifetimeAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<LifetimeAttr, LifetimeDependenceSpecifier> {
+
+  friend TrailingObjects;
+
+  unsigned NumEntries = 0;
+
+  explicit LifetimeAttr(SourceLoc atLoc, SourceRange baseRange, bool implicit,
+                        ArrayRef<LifetimeDependenceSpecifier> entries);
+
+public:
+  static LifetimeAttr *create(ASTContext &context, SourceLoc atLoc,
+                              SourceRange baseRange, bool implicit,
+                              ArrayRef<LifetimeDependenceSpecifier> entries);
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Lifetime;
   }
 };
 

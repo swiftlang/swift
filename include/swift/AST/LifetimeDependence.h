@@ -74,7 +74,9 @@ private:
 
 public:
   static LifetimeDependenceSpecifier getNamedLifetimeDependenceSpecifier(
-      SourceLoc loc, ParsedLifetimeDependenceKind kind, Identifier name) {
+      SourceLoc loc, Identifier name,
+      ParsedLifetimeDependenceKind kind =
+          ParsedLifetimeDependenceKind::Default) {
     return {loc, SpecifierKind::Named, kind, name};
   }
 
@@ -84,13 +86,15 @@ public:
   }
 
   static LifetimeDependenceSpecifier getOrderedLifetimeDependenceSpecifier(
-      SourceLoc loc, ParsedLifetimeDependenceKind kind, unsigned index) {
+      SourceLoc loc, unsigned index,
+      ParsedLifetimeDependenceKind kind =
+          ParsedLifetimeDependenceKind::Default) {
     return {loc, SpecifierKind::Ordered, kind, index};
   }
 
-  static LifetimeDependenceSpecifier
-  getSelfLifetimeDependenceSpecifier(SourceLoc loc,
-                                     ParsedLifetimeDependenceKind kind) {
+  static LifetimeDependenceSpecifier getSelfLifetimeDependenceSpecifier(
+      SourceLoc loc, ParsedLifetimeDependenceKind kind =
+                         ParsedLifetimeDependenceKind::Default) {
     return {loc, SpecifierKind::Self, kind, {}};
   }
 
