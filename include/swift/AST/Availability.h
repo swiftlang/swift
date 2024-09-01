@@ -194,28 +194,6 @@ private:
   }
 };
 
-/// Records the reason a declaration is potentially unavailable.
-class UnavailabilityReason {
-private:
-  VersionRange RequiredDeploymentRange;
-
-  explicit UnavailabilityReason(const VersionRange RequiredDeploymentRange)
-      : RequiredDeploymentRange(RequiredDeploymentRange) {}
-
-public:
-  static UnavailabilityReason requiresVersionRange(const VersionRange Range) {
-    return UnavailabilityReason(Range);
-  }
-
-  const VersionRange &getRequiredOSVersionRange() const {
-    return RequiredDeploymentRange;
-  }
-
-  /// Returns true if the required OS version range's lower endpoint is at or
-  /// below the deployment target of the given ASTContext.
-  bool requiresDeploymentTargetOrEarlier(ASTContext &Ctx) const;
-};
-
 /// Represents a version range in which something is available.
 ///
 /// The AvailabilityContext structure forms a [lattice][], which allows it to

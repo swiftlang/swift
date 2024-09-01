@@ -517,14 +517,6 @@ bool Decl::requiresUnavailableDeclABICompatibilityStubs() const {
   return isUnreachableAtRuntime();
 }
 
-bool UnavailabilityReason::requiresDeploymentTargetOrEarlier(
-    ASTContext &Ctx) const {
-  return RequiredDeploymentRange.getLowerEndpoint() <=
-         AvailabilityContext::forDeploymentTarget(Ctx)
-             .getVersionRange()
-             .getLowerEndpoint();
-}
-
 AvailabilityContext
 AvailabilityInference::annotatedAvailableRangeForAttr(const SpecializeAttr* attr,
                                                       ASTContext &ctx) {
