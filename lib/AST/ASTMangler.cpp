@@ -3796,12 +3796,8 @@ void ASTMangler::appendClosureComponents(CanType Ty, unsigned discriminator,
   appendContext(parentContext, base, StringRef());
 
   auto Sig = parentContext->getGenericSignatureOfContext();
-
-  Ty = Ty.subst(MapLocalArchetypesOutOfContext(Sig, capturedEnvs),
-                MakeAbstractConformanceForGenericType(),
-                SubstFlags::PreservePackExpansionLevel |
-                SubstFlags::SubstitutePrimaryArchetypes |
-                SubstFlags::SubstituteLocalArchetypes)->getCanonicalType();
+  Ty = mapLocalArchetypesOutOfContext(Ty, Sig, capturedEnvs)
+      ->getCanonicalType();
 
   appendType(Ty, Sig);
   appendOperator(isImplicit ? "fu" : "fU", Index(discriminator));

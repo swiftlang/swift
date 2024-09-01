@@ -6577,10 +6577,6 @@ public:
   /// which the archetype conforms.
   Type getNestedTypeByName(Identifier name);
 
-  /// Return the archetype that represents the root generic parameter of its
-  /// interface type.
-  ArchetypeType *getRoot() const;
-
   /// Determine whether this is a root archetype within the environment.
   bool isRoot() const;
 
@@ -6761,19 +6757,12 @@ protected:
   using ArchetypeType::ArchetypeType;
 
 public:
-  LocalArchetypeType *getRoot() const {
-    return cast<LocalArchetypeType>(ArchetypeType::getRoot());
-  }
-
   static bool classof(const TypeBase *type) {
     return type->getKind() == TypeKind::OpenedArchetype ||
            type->getKind() == TypeKind::ElementArchetype;
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(LocalArchetypeType, ArchetypeType)
-  CanLocalArchetypeType getRoot() const {
-    return CanLocalArchetypeType(getPointer()->getRoot());
-  }
 END_CAN_TYPE_WRAPPER(LocalArchetypeType, ArchetypeType)
 
 /// An archetype that represents the dynamic type of an opened existential.
@@ -6828,12 +6817,6 @@ public:
   /// Retrieve the ID number of this opened existential.
   UUID getOpenedExistentialID() const;
 
-  /// Return the archetype that represents the root generic parameter of its
-  /// interface type.
-  OpenedArchetypeType *getRoot() const {
-    return cast<OpenedArchetypeType>(ArchetypeType::getRoot());
-  }
-
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OpenedArchetype;
   }
@@ -6846,9 +6829,6 @@ private:
                       RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(OpenedArchetypeType, LocalArchetypeType)
-  CanOpenedArchetypeType getRoot() const {
-    return CanOpenedArchetypeType(getPointer()->getRoot());
-  }
 END_CAN_TYPE_WRAPPER(OpenedArchetypeType, LocalArchetypeType)
 
 /// A wrapper around a shape type to use in ArchetypeTrailingObjects
@@ -6916,12 +6896,6 @@ public:
   /// Retrieve the ID number of this opened element.
   UUID getOpenedElementID() const;
 
-  /// Return the archetype that represents the root generic parameter of its
-  /// interface type.
-  ElementArchetypeType *getRoot() const {
-    return cast<ElementArchetypeType>(ArchetypeType::getRoot());
-  }
-
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ElementArchetype;
   }
@@ -6933,9 +6907,6 @@ private:
                        LayoutConstraint layout);
 };
 BEGIN_CAN_TYPE_WRAPPER(ElementArchetypeType, LocalArchetypeType)
-  CanElementArchetypeType getRoot() const {
-    return CanElementArchetypeType(getPointer()->getRoot());
-  }
 END_CAN_TYPE_WRAPPER(ElementArchetypeType, LocalArchetypeType)
 
 template<typename Type>
