@@ -4378,206 +4378,6 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
   }
 }
 
-namespace {
-class SingleValueStmtUsageChecker final : public ASTWalker {
-  ASTContext &Ctx;
-  DiagnosticEngine &Diags;
-  llvm::DenseSet<SingleValueStmtExpr *> ValidSingleValueStmtExprs;
-
-public:
-  SingleValueStmtUsageChecker(
-      ASTContext &ctx, ASTNode root,
-      std::optional<ContextualTypePurpose> contextualPurpose)
-      : Ctx(ctx), Diags(ctx.Diags) {
-    assert(!root.is<Expr *>() || contextualPurpose &&
-           "Must provide contextual purpose for expr");
-
-    // If we have a contextual purpose, this is for an expression. Check if it's
-    // an expression in a valid position.
-    if (contextualPurpose) {
-      markAnyValidTopLevelSingleValueStmt(root.get<Expr *>(),
-                                          *contextualPurpose);
-    }
-  }
-
-private:
-  /// Mark a given expression as a valid position for a SingleValueStmtExpr.
-  void markValidSingleValueStmt(Expr *E) {
-    if (!E)
-      return;
-
-    if (auto *SVE = SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(E))
-      ValidSingleValueStmtExprs.insert(SVE);
-  }
-
-  /// Mark a valid top-level expression with a given contextual purpose.
-  void markAnyValidTopLevelSingleValueStmt(Expr *E, ContextualTypePurpose ctp) {
-    // Allowed in returns, throws, and bindings.
-    switch (ctp) {
-    case CTP_ReturnStmt:
-    case CTP_ThrowStmt:
-    case CTP_Initialization:
-      markValidSingleValueStmt(E);
-      break;
-    default:
-      break;
-    }
-  }
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::ArgumentsAndExpansion;
-  }
-
-  AssignExpr *findAssignment(Expr *E) const {
-    // Don't consider assignments if we have a parent expression (as otherwise
-    // this would be effectively allowing it in an arbitrary expression
-    // position).
-    if (Parent.getAsExpr())
-      return nullptr;
-
-    // Look through optional exprs, which are present for e.g x?.y = z, as
-    // we wrap the entire assign in the optional evaluation of the destination.
-    if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(E)) {
-      E = OEE->getSubExpr();
-      while (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(E))
-        E = IIO->getSubExpr();
-    }
-    return dyn_cast<AssignExpr>(E);
-  }
-
-  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E)) {
-      // Diagnose a SingleValueStmtExpr in a context that we do not currently
-      // support. If we start allowing these in arbitrary places, we'll need
-      // to ensure that autoclosures correctly contextualize them.
-      if (!ValidSingleValueStmtExprs.contains(SVE)) {
-        Diags.diagnose(SVE->getLoc(), diag::single_value_stmt_out_of_place,
-                       SVE->getStmt()->getKind());
-      }
-
-      // Diagnose invalid SingleValueStmtExprs. This should only happen for
-      // expressions in positions that we didn't support before
-      // (e.g assignment or *explicit* return).
-      auto *S = SVE->getStmt();
-      auto mayProduceSingleValue = S->mayProduceSingleValue(Ctx);
-      switch (mayProduceSingleValue.getKind()) {
-      case IsSingleValueStmtResult::Kind::Valid:
-        break;
-      case IsSingleValueStmtResult::Kind::UnterminatedBranches: {
-        for (auto *branch : mayProduceSingleValue.getUnterminatedBranches()) {
-          if (auto *BS = dyn_cast<BraceStmt>(branch)) {
-            if (BS->empty()) {
-              Diags.diagnose(branch->getStartLoc(),
-                             diag::single_value_stmt_branch_empty,
-                             S->getKind());
-              continue;
-            }
-          }
-          // TODO: The wording of this diagnostic will need tweaking if either
-          // implicit last expressions or 'then' statements are enabled by
-          // default.
-          Diags.diagnose(branch->getEndLoc(),
-                         diag::single_value_stmt_branch_must_end_in_result,
-                         S->getKind(), isa<SwitchStmt>(S));
-        }
-        break;
-      }
-      case IsSingleValueStmtResult::Kind::NonExhaustiveIf: {
-        Diags.diagnose(S->getStartLoc(),
-                       diag::if_expr_must_be_syntactically_exhaustive);
-        break;
-      }
-      case IsSingleValueStmtResult::Kind::NonExhaustiveDoCatch: {
-        Diags.diagnose(S->getStartLoc(),
-                       diag::do_catch_expr_must_be_syntactically_exhaustive);
-        break;
-      }
-      case IsSingleValueStmtResult::Kind::HasLabel: {
-        // FIXME: We should offer a fix-it to remove (currently we don't track
-        // the colon SourceLoc).
-        auto label = cast<LabeledStmt>(S)->getLabelInfo();
-        Diags.diagnose(label.Loc,
-                       diag::single_value_stmt_must_be_unlabeled, S->getKind())
-          .highlight(label.Loc);
-        break;
-      }
-      case IsSingleValueStmtResult::Kind::InvalidJumps: {
-        // Diagnose each invalid jump.
-        for (auto *jump : mayProduceSingleValue.getInvalidJumps()) {
-          Diags.diagnose(jump->getStartLoc(),
-                         diag::cannot_jump_in_single_value_stmt,
-                         jump->getKind(), S->getKind())
-            .highlight(jump->getSourceRange());
-        }
-        break;
-      }
-      case IsSingleValueStmtResult::Kind::NoResult:
-        // This is fine, we will have typed the expression as Void (we verify
-        // as such in the ASTVerifier).
-        break;
-      case IsSingleValueStmtResult::Kind::CircularReference:
-        // Already diagnosed.
-        break;
-      case IsSingleValueStmtResult::Kind::UnhandledStmt:
-        break;
-      }
-      return Action::Continue(E);
-    }
-
-    // Valid as the source of an assignment.
-    if (auto *AE = findAssignment(E))
-      markValidSingleValueStmt(AE->getSrc());
-
-    // Valid as a single expression body of a closure. This is needed in
-    // addition to ReturnStmt checking, as we will remove the return if the
-    // expression is inferred to be Never.
-    if (auto *ACE = dyn_cast<ClosureExpr>(E)) {
-      if (ACE->hasSingleExpressionBody())
-        markValidSingleValueStmt(ACE->getSingleExpressionBody());
-    }
-    return Action::Continue(E);
-  }
-
-  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-    // Valid in a return/throw/then.
-    if (auto *RS = dyn_cast<ReturnStmt>(S)) {
-      if (RS->hasResult())
-        markValidSingleValueStmt(RS->getResult());
-    }
-    if (auto *TS = dyn_cast<ThrowStmt>(S))
-      markValidSingleValueStmt(TS->getSubExpr());
-
-    if (auto *TS = dyn_cast<ThenStmt>(S))
-      markValidSingleValueStmt(TS->getResult());
-
-    return Action::Continue(S);
-  }
-
-  PreWalkAction walkToDeclPre(Decl *D) override {
-    // Valid as an initializer of a pattern binding.
-    if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
-      for (auto idx : range(PBD->getNumPatternEntries()))
-        markValidSingleValueStmt(PBD->getInit(idx));
-
-      return Action::Continue();
-    }
-    // We don't want to walk into any other decl, we will visit them as part of
-    // typeCheckDecl.
-    return Action::SkipNode();
-  }
-};
-} // end anonymous namespace
-
-void swift::diagnoseOutOfPlaceExprs(
-    ASTContext &ctx, ASTNode root,
-    std::optional<ContextualTypePurpose> contextualPurpose) {
-  // TODO: We ought to consider moving this into pre-checking such that we can
-  // still diagnose on invalid code, and don't have to traverse over implicit
-  // exprs. We need to first separate out SequenceExpr folding though.
-  SingleValueStmtUsageChecker sveChecker(ctx, root, contextualPurpose);
-  root.walk(sveChecker);
-}
-
 /// Apply the warnings managed by VarDeclUsageChecker to the top level
 /// code declarations that haven't been checked yet.
 void swift::
@@ -6426,10 +6226,9 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
 //===----------------------------------------------------------------------===//
 
 /// Emit diagnostics for syntactic restrictions on a given expression.
-void swift::performSyntacticExprDiagnostics(
-    const Expr *E, const DeclContext *DC,
-    std::optional<ContextualTypePurpose> contextualPurpose, bool isExprStmt,
-    bool disableOutOfPlaceExprChecking) {
+void swift::performSyntacticExprDiagnostics(const Expr *E,
+                                            const DeclContext *DC,
+                                            bool isExprStmt) {
   auto &ctx = DC->getASTContext();
   TypeChecker::diagnoseSelfAssignment(E);
   diagSyntacticUseRestrictions(E, DC, isExprStmt);
@@ -6448,8 +6247,6 @@ void swift::performSyntacticExprDiagnostics(
   diagnoseConstantArgumentRequirement(E, DC);
   diagUnqualifiedAccessToMethodNamedSelf(E, DC);
   diagnoseDictionaryLiteralDuplicateKeyEntries(E, DC);
-  if (!disableOutOfPlaceExprChecking)
-    diagnoseOutOfPlaceExprs(ctx, const_cast<Expr *>(E), contextualPurpose);
 }
 
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {

@@ -340,10 +340,7 @@ public:
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
-    // We skip out-of-place expr checking here since we've already performed it.
-    performSyntacticExprDiagnostics(expr, dcStack.back(), /*ctp*/ std::nullopt,
-                                    /*isExprStmt=*/false,
-                                    /*disableOutOfPlaceExprChecking*/ true);
+    performSyntacticExprDiagnostics(expr, dcStack.back(), /*isExprStmt=*/false);
 
     if (auto closure = dyn_cast<ClosureExpr>(expr)) {
       if (closure->isSeparatelyTypeChecked()) {
@@ -389,9 +386,7 @@ void constraints::performSyntacticDiagnosticsForTarget(
   switch (target.kind) {
   case SyntacticElementTarget::Kind::expression: {
     // First emit diagnostics for the main expression.
-    performSyntacticExprDiagnostics(target.getAsExpr(), dc,
-                                    target.getExprContextualTypePurpose(),
-                                    isExprStmt);
+    performSyntacticExprDiagnostics(target.getAsExpr(), dc, isExprStmt);
     return;
   }
 
@@ -400,22 +395,15 @@ void constraints::performSyntacticDiagnosticsForTarget(
 
     // First emit diagnostics for the main expression.
     performSyntacticExprDiagnostics(stmt->getTypeCheckedSequence(), dc,
-                                    CTP_ForEachSequence, isExprStmt);
+                                    isExprStmt);
 
     if (auto *whereExpr = stmt->getWhere())
-      performSyntacticExprDiagnostics(whereExpr, dc, CTP_Condition,
-                                      /*isExprStmt*/ false);
+      performSyntacticExprDiagnostics(whereExpr, dc, /*isExprStmt*/ false);
     return;
   }
 
   case SyntacticElementTarget::Kind::function: {
-    // Check for out of place expressions. This needs to be done on the entire
-    // function body rather than on individual expressions since we need the
-    // context of the parent nodes.
     auto *body = target.getFunctionBody();
-    diagnoseOutOfPlaceExprs(dc->getASTContext(), body,
-                            /*contextualPurpose*/ std::nullopt);
-
     FunctionSyntacticDiagnosticWalker walker(dc);
     body->walk(walker);
     return;
