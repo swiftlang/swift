@@ -489,6 +489,11 @@ enum class FixKind : uint8_t {
   /// sending result, but is passed a function typed parameter without a sending
   /// result.
   AllowSendingMismatch,
+
+  /// Ignore a type mismatch on the arguments for an applied operator, where
+  /// the type of each argument conflicts with the generic constraint imposed by
+  /// the other argument.
+  IgnoreOperatorArgumentMismatch,
 };
 
 class ConstraintFix {
@@ -3857,6 +3862,50 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::IgnoreKeyPathSubscriptIndexMismatch;
+  }
+};
+
+class IgnoreOperatorArgumentMismatch final : public ConstraintFix {
+
+  Identifier operatorName;
+  Type lhs;
+  Type rhs;
+  SmallVector<std::pair<Type, Type>, 2> matchingParamLists;
+
+  IgnoreOperatorArgumentMismatch(ConstraintSystem &cs,
+                                 Identifier operatorName,
+                                 Type lhs,
+                                 Type rhs,
+                                 SmallVector<std::pair<Type, Type>, 2> matchingParamLists,
+                                 ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreOperatorArgumentMismatch, locator), 
+        operatorName(operatorName), lhs(lhs), rhs(rhs), matchingParamLists(matchingParamLists) {}
+
+public:
+
+  Identifier getOperatorName() const {
+    return operatorName;
+  }
+
+  std::string getName() const override {
+    return "allow mismatched argument types for binary operator";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+
+  bool isEqual(const ConstraintFix *other) const;
+
+  static IgnoreOperatorArgumentMismatch *create(ConstraintSystem &cs,
+                                                Identifier operatorName,
+                                                Type lhs,
+                                                Type rhs,
+                                                SmallVector<std::pair<Type, Type>, 2> matchingParamLists,
+                                                ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreOperatorArgumentMismatch;
   }
 };
 

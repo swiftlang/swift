@@ -3196,6 +3196,26 @@ public:
   bool diagnoseAsError() override;
 };
 
+class OperatorArgumentMismatchFailure final : public FailureDiagnostic {
+  Identifier operatorName;
+  Type lhs;
+  Type rhs;
+  SmallVector<std::pair<Type, Type>, 2> matchingParamLists;
+
+public:
+  OperatorArgumentMismatchFailure(const Solution &solution,
+                                  Identifier operatorName,
+                                  Type lhs,
+                                  Type rhs,
+                                  SmallVector<std::pair<Type, Type>, 2> matchingParamLists,
+                                  ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), operatorName(operatorName),
+  lhs(lhs), rhs(rhs), matchingParamLists(matchingParamLists) {}
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

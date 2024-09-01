@@ -2672,3 +2672,50 @@ IgnoreKeyPathSubscriptIndexMismatch::create(ConstraintSystem &cs, Type argType,
   return new (cs.getAllocator())
       IgnoreKeyPathSubscriptIndexMismatch(cs, argType, locator);
 }
+
+bool IgnoreOperatorArgumentMismatch::diagnose(const Solution &solution,
+                                              bool asNote) const {
+  OperatorArgumentMismatchFailure failure(solution,
+                                          operatorName,
+                                          lhs,
+                                          rhs,
+                                          matchingParamLists,
+                                          getLocator());
+  return failure.diagnose(asNote);
+}
+
+bool IgnoreOperatorArgumentMismatch::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+    auto *primaryFix =
+        commonFixes.front().second->getAs<IgnoreOperatorArgumentMismatch>();
+    assert(primaryFix);
+
+    if (llvm::all_of(
+            commonFixes,
+            [&primaryFix](
+                const std::pair<const Solution *, const ConstraintFix *> &entry) {
+              return primaryFix->isEqual(entry.second);
+            }))
+      return diagnose(*commonFixes.front().first);
+
+    return false;
+}
+
+bool IgnoreOperatorArgumentMismatch::isEqual(const ConstraintFix *other) const {
+  auto opArgMismatchFix = other->getAs<IgnoreOperatorArgumentMismatch>();
+  return opArgMismatchFix->operatorName == operatorName
+    && opArgMismatchFix->lhs->isEqual(lhs)
+    && opArgMismatchFix->rhs->isEqual(rhs);
+}
+
+IgnoreOperatorArgumentMismatch *IgnoreOperatorArgumentMismatch::create(
+    ConstraintSystem &cs, 
+    Identifier operatorName,
+    Type lhs,
+    Type rhs,
+    SmallVector<std::pair<Type, Type>, 2> matchingParamLists,
+    ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+    IgnoreOperatorArgumentMismatch(cs, operatorName, lhs, rhs, matchingParamLists, locator);
+}
+

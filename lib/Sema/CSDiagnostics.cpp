@@ -9386,3 +9386,34 @@ bool InvalidTypeAsKeyPathSubscriptIndex::diagnoseAsError() {
   emitDiagnostic(diag::cannot_convert_type_to_keypath_subscript_index, ArgType);
   return true;
 }
+
+bool OperatorArgumentMismatchFailure::diagnoseAsError() {
+  if (lhs->isEqual(rhs)) {
+    emitDiagnostic(diag::cannot_apply_binop_to_same_args, operatorName.str(),
+                   lhs);
+  } else {
+    emitDiagnostic(diag::cannot_apply_binop_to_args, operatorName.str(),
+                   lhs, rhs);
+  }
+
+  diagnoseAsNote();
+  return true;
+}
+
+bool OperatorArgumentMismatchFailure::diagnoseAsNote() {
+
+  auto stringifyPairs = [](std::pair<Type, Type> params) -> std::string {
+    return "(" + params.first->getString() + ", " + params.second->getString() + ")";
+  };
+
+  std::set<std::string> parameters;
+  for (auto parameterPair : matchingParamLists) {
+    auto pairString = stringifyPairs(parameterPair);
+    parameters.insert(pairString);
+  }
+
+  emitDiagnostic(diag::suggest_partial_overloads,
+                 /*isResult*/ false, operatorName.str(),
+                 llvm::join(parameters, ", "));
+  return true;
+}

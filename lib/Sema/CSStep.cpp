@@ -574,6 +574,146 @@ bool TypeVariableStep::attempt(const TypeVariableBinding &choice) {
   return choice.attempt(CS);
 }
 
+bool TypeVariableStep::mergeOperatorFixesIfPossible() {
+  // After all bindings have been attempted, check if all the fixes are
+  // for argument type mismatches on the same operator.
+  if (!CS.shouldAttemptFixes() || !Producer.isExhausted() || Solutions.size() < 2)
+    return false;
+  // All solutions should have a single fix of argument to parameter
+  // conversion mismatch.
+  if (!llvm::all_of(Solutions, [](Solution &solution) {
+    if (solution.Fixes.size() != 1)
+      return false;
+    return solution.Fixes.front()->getKind() == FixKind::AllowArgumentTypeMismatch;
+  })) {
+    return false;
+  }
+
+  // All solutions should be for the same operator.
+  auto firstFix = Solutions.front().Fixes.front();
+  auto *calleeLocator = Solutions.front().getCalleeLocator(firstFix->getLocator());
+  bool allFixesForSameLocator = llvm::all_of(Solutions, [&calleeLocator](Solution &solution) {
+    return llvm::all_of(solution.Fixes, [&solution, &calleeLocator](ConstraintFix *fix) {
+      return fix->getKind() == FixKind::AllowArgumentTypeMismatch
+        && solution.getCalleeLocator(fix->getLocator()) == calleeLocator;
+    });
+  });
+  // There must be at least one fix for argument 0.
+  bool hasParam0Fixes = llvm::any_of(Solutions, [](Solution &solution) {
+    return llvm::any_of(solution.Fixes, [](ConstraintFix *fix) {
+      ConstraintLocator* loc = fix->getLocator();
+      if (loc->getPath().empty())
+        return false;
+      auto argLoc = loc->getLastElementAs<LocatorPathElt::ApplyArgToParam>();
+      if (!argLoc)
+        return false;
+      return argLoc->getArgIdx() == 0;
+    });
+  });
+  // There must be at least one fix for argument 1.
+  bool hasParam1Fixes = llvm::any_of(Solutions, [](Solution &solution) {
+    return llvm::any_of(solution.Fixes, [](ConstraintFix *fix) {
+      ConstraintLocator* loc = fix->getLocator();
+      if (loc->getPath().empty())
+        return false;
+      auto argLoc = loc->getLastElementAs<LocatorPathElt::ApplyArgToParam>();
+      if (!argLoc)
+        return false;
+      return argLoc->getArgIdx() == 1;
+    });
+  });
+
+  if (!allFixesForSameLocator || !hasParam0Fixes || !hasParam1Fixes)
+    return false;
+
+  // Check if the callee is a non-overloaded applied operator 
+  // (e.g. `"1"..<2`). If the declaration is overloaded, it'll
+  // be diagnosed as an ambiguity.
+  auto refDecl = castToExpr(calleeLocator->getAnchor())->getReferencedDecl();
+  if (!refDecl)
+    return false;
+  auto decl = refDecl.getDecl();
+
+  DeclName calleeName = decl->getName();
+  if (!calleeName.isOperator())
+    return false;
+
+  auto *anchor = castToExpr(calleeLocator->getAnchor());
+  auto *parentExpr = CS.getParentExpr(anchor);
+  if (!parentExpr)
+    return false;
+  auto *applyExpr = dyn_cast<ApplyExpr>(parentExpr);
+  if (!applyExpr)
+    return false;
+  if (applyExpr->getFn() != anchor)
+    return false;
+  auto *binaryOp = dyn_cast<BinaryExpr>(applyExpr);
+  if (!binaryOp)
+    return false;
+
+  // If the type variables already have fixed types we can't bind
+  // them to holes later on.
+  for (auto &openedType : Solutions.front().OpenedTypes[calleeLocator]) {
+    auto openedTypeVar = openedType.second;
+    if (openedTypeVar->getImpl().hasRepresentativeOrFixed())
+      return false;
+  }
+
+  // Find the type of the arguments, to be used in the diagnostics.
+  auto &solution = Solutions.front();
+  auto *lhs = binaryOp->getLHS();
+  auto *rhs = binaryOp->getRHS();
+
+  auto lhsType =
+    solution.simplifyType(solution.getType(lhs))->getRValueType();
+  auto rhsType =
+    solution.simplifyType(solution.getType(rhs))->getRValueType();
+  
+  // Find the type of any matching overloads, to be used in the
+  // diagnostics.
+  SmallVector<std::pair<Type, Type>, 2> matchingParamLists;
+  for (auto &solution : Solutions) {
+    auto matchingOverload =
+    solution.getOverloadChoice(calleeLocator).adjustedOpenedType;
+    auto overloadFnTy = matchingOverload->getAs<FunctionType>();
+    if (!overloadFnTy)
+      return false;
+    auto typeVar0 = dyn_cast<TypeVariableType>(overloadFnTy->getParams()[0]
+                                               .getPlainType().getPointer());
+    auto typeVar1 = dyn_cast<TypeVariableType>(overloadFnTy->getParams()[1]
+                                               .getPlainType().getPointer());
+
+    matchingParamLists.push_back({
+      solution.typeBindings[typeVar0],
+      solution.typeBindings[typeVar1]});
+  }
+
+  // Bind all generic requirements for the operator to holes, and
+  // setup the constraint system to re-attempt finding a solution
+  // with holes.
+  ActiveChoice.reset();
+  Solutions.clear();
+  auto scope = std::make_unique<Scope>(CS);
+  auto binding = PotentialBinding::forHole(TypeVar, calleeLocator);
+  auto choice = TypeVariableBinding(TypeVar, binding);
+  ActiveChoice.emplace(std::move(scope), choice);
+
+  for (auto &openedType : solution.OpenedTypes[calleeLocator]) {
+    auto typeVar = openedType.second;
+    CS.assignFixedType(typeVar,
+                       PlaceholderType::get(CS.getASTContext(), typeVar));
+  }
+
+  auto operatorFix = IgnoreOperatorArgumentMismatch::create(CS,
+                                                            calleeName.getBaseIdentifier(),
+                                                            lhsType,
+                                                            rhsType,
+                                                            matchingParamLists,
+                                                            calleeLocator);
+  CS.recordFix(operatorFix);
+  return true;
+}
+
 StepResult TypeVariableStep::resume(bool prevFailed) {
   assert(ActiveChoice);
 

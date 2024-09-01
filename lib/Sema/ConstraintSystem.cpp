@@ -4881,23 +4881,8 @@ std::string swift::describeGenericType(ValueDecl *GP, bool includeName) {
 static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
                                                 const SolutionDiff &diff,
                                                 ArrayRef<Solution> solutions) {
-  // Attempt to diagnose conflicting generic arguments only when
-  // the overload choices in the solutions cannot be the cause the
-  // conflicts, by checking that all differing overloads resolve
-  // to the same opened type in all solutions.
-  for (auto &overload : diff.overloads) {
-    auto firstChoiceType = overload.choices[0].getBaseType();
-    if (!firstChoiceType)
-      return false;
-
-    for (auto &choice : overload.choices) {
-      Type choiceType = choice.getBaseType();
-      if (!choiceType || choiceType->hasTypeVariable())
-        return false;
-      if (!choiceType->isEqual(firstChoiceType))
-        return false;
-    }
-  }
+  if (!diff.overloads.empty())
+    return false;
 
   bool noFixes = llvm::all_of(solutions, [](const Solution &solution) -> bool {
      const auto score = solution.getFixedScore();
@@ -4953,14 +4938,12 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
   llvm::SmallDenseMap<std::pair<GenericTypeParamType *, SourceLoc>,
                       SmallVector<Type, 4>>
       conflicts;
-  SmallVector<ConstraintLocator *, 4> conflictingCalleeLocators;
 
   for (const auto &entry : genericParams) {
     auto *typeVar = entry.first;
     auto GP = entry.second;
 
     swift::SmallSetVector<Type, 4> arguments;
-    swift::SmallSetVector<ConstraintLocator *, 4> calleeLocators;
     for (const auto &solution : solutions) {
       auto type = solution.typeBindings.lookup(typeVar);
       // Type variables gathered from a solution's type binding context may not
@@ -4984,37 +4967,10 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
       }
 
       arguments.insert(type);
-      calleeLocators.insert(solution.getCalleeLocator(typeVar->getImpl().getLocator()));
     }
 
-    if (arguments.size() > 1) {
+    if (arguments.size() > 1)
       conflicts[GP].append(arguments.begin(), arguments.end());
-      if (calleeLocators.size() == 1)
-        conflictingCalleeLocators.push_back(calleeLocators.front());
-    }
-  }
-  
-  // Special handling with better diagnostics if the callee with
-  // conflicting generic arguments is an operator.
-  for (auto &calleeLocator : conflictingCalleeLocators) {
-    auto refDecl = castToExpr(calleeLocator->getAnchor())->getReferencedDecl();
-    if (!refDecl)
-      continue;
-    DeclName calleeName = refDecl.getDecl()->getName();
-    if (calleeName.isOperator()) {
-      auto *anchor = castToExpr(calleeLocator->getAnchor());
-      // Use tailored ambiguity diagnostics for "applied" operators
-      // (e.g. `1 + 2`) only.
-      if (auto *parentExpr = cs.getParentExpr(anchor)) {
-        if (auto *apply = dyn_cast<ApplyExpr>(parentExpr)) {
-          if (apply->getFn() == anchor) {
-            diagnoseOperatorAmbiguity(cs, calleeName.getBaseIdentifier(), solutions,
-                                      calleeLocator);
-            return true;
-          }
-        }
-      }
-    }
   }
 
   auto getGenericTypeDecl = [&](ArchetypeType *archetype) -> ValueDecl * {
