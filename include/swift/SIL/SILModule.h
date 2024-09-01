@@ -460,6 +460,18 @@ public:
   SILValue getLocalGenericEnvironmentDef(GenericEnvironment *genericEnv,
                                          SILFunction *inFunction);
 
+  /// Returns the instruction which defines the given local generic environment,
+  /// e.g. an open_existential_addr.
+  ///
+  /// In contrast to getLocalGenericEnvironmentDef, it is required that all local
+  /// generic environments are resolved.
+  SingleValueInstruction *
+  getLocalGenericEnvironmentDefInst(GenericEnvironment *genericEnv,
+                                    SILFunction *inFunction) {
+    return dyn_cast<SingleValueInstruction>(
+        getLocalGenericEnvironmentDef(genericEnv, inFunction));
+  }
+
   /// Returns the instruction which defines the given root local archetype,
   /// e.g. an open_existential_addr.
   ///

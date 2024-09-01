@@ -359,6 +359,40 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
                                   fnType->getResult(), fnType->getExtInfo());
 }
 
+InFlightSubstitution::InFlightSubstitution(TypeSubstitutionFn substType,
+                                           LookupConformanceFn lookupConformance,
+                                           SubstOptions options)
+  : Options(options),
+    BaselineSubstType(substType),
+    BaselineLookupConformance(lookupConformance) {
+  // FIXME: Don't substitute type parameters if one of the special flags is set.
+  Props |= RecursiveTypeProperties::HasTypeParameter;
+
+  // If none of the special flags are set, we substitute type parameters and
+  // primary archetypes only.
+  if (!Options.contains(SubstFlags::SubstitutePrimaryArchetypes) &&
+      !Options.contains(SubstFlags::SubstituteLocalArchetypes) &&
+      !Options.contains(SubstFlags::SubstituteOpaqueArchetypes)) {
+    Props |= RecursiveTypeProperties::HasPrimaryArchetype;
+  }
+
+  if (Options.contains(SubstFlags::SubstitutePrimaryArchetypes))
+    Props |= RecursiveTypeProperties::HasPrimaryArchetype;
+
+  if (Options.contains(SubstFlags::SubstituteLocalArchetypes)) {
+    Props |= RecursiveTypeProperties::HasOpenedExistential;
+    Props |= RecursiveTypeProperties::HasElementArchetype;
+  }
+
+  if (Options.contains(SubstFlags::SubstituteOpaqueArchetypes))
+    Props |= RecursiveTypeProperties::HasOpaqueArchetype;
+}
+
+bool InFlightSubstitution::isInvariant(Type derivedType) const {
+  // If none of the bits are set, the type won't be changed by substitution.
+  return !(derivedType->getRecursiveProperties().getBits() & Props.getBits());
+}
+
 void InFlightSubstitution::expandPackExpansionShape(Type origShape,
     llvm::function_ref<void(Type substComponentShape)> handleComponent) {
 
@@ -470,16 +504,6 @@ InFlightSubstitution::lookupConformance(CanType dependentType,
   return substPackPatterns[index];
 }
 
-bool InFlightSubstitution::isInvariant(Type derivedType) const {
-  if (derivedType->hasPrimaryArchetype() || derivedType->hasTypeParameter())
-    return false;
-  if (shouldSubstituteLocalArchetypes() && derivedType->hasLocalArchetype())
-    return false;
-  if (shouldSubstituteOpaqueArchetypes() && derivedType->hasOpaqueArchetype())
-    return false;
-  return true;
-}
-
 namespace {
 
 class TypeSubstituter : public TypeTransform<TypeSubstituter> {
@@ -522,6 +546,9 @@ public:
 
 std::optional<Type>
 TypeSubstituter::transform(TypeBase *type, TypePosition position) {
+  if (IFS.isInvariant(type))
+    return Type(type);
+
   return std::nullopt;
 }
 
