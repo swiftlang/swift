@@ -230,13 +230,10 @@ public:
 /// to create an \c AvailabilityContext, rather than creating one directly.
 class AvailabilityContext {
   VersionRange OSVersion;
-  std::optional<bool> SPI;
 
 public:
   /// Creates a context that requires certain versions of the target OS.
-  explicit AvailabilityContext(VersionRange OSVersion,
-                               std::optional<bool> SPI = std::nullopt)
-      : OSVersion(OSVersion), SPI(SPI) {}
+  explicit AvailabilityContext(VersionRange OSVersion) : OSVersion(OSVersion) {}
 
   /// Creates a context that imposes the constraints of the ASTContext's
   /// deployment target.
@@ -332,12 +329,9 @@ public:
     OSVersion.unionWith(other.getOSVersion());
   }
 
-  bool isAvailableAsSPI() const { return SPI && *SPI; }
-
   /// Returns a representation of this range as a string for debugging purposes.
   std::string getAsString() const {
-    return "AvailabilityContext(" + OSVersion.getAsString() +
-           (isAvailableAsSPI() ? ", spi" : "") + ")";
+    return "AvailabilityContext(" + OSVersion.getAsString() + ")";
   }
 };
 
@@ -358,8 +352,11 @@ public:
   static AvailabilityContext inferForType(Type t);
 
   /// Returns the context where a declaration is available
-  ///  We assume a declaration without an annotation is always available.
+  /// We assume a declaration without an annotation is always available.
   static AvailabilityContext availableRange(const Decl *D, ASTContext &C);
+
+  /// Returns true is the declaration is `@_spi_available`.
+  static bool isAvailableAsSPI(const Decl *D, ASTContext &C);
 
   /// Returns the availability context for a declaration with the given
   /// @available attribute.
