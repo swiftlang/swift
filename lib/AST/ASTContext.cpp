@@ -557,8 +557,11 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
     llvm::DenseMap<std::pair<OpaqueTypeDecl *, SubstitutionMap>,
                    GenericEnvironment *> OpaqueArchetypeEnvironments;
-    llvm::DenseMap<OpenedExistentialKey, GenericEnvironment *>
-      OpenedExistentialEnvironments;
+
+    llvm::DenseMap<CanType,
+                   OpenedExistentialSignature> ExistentialSignatures;
+    llvm::DenseMap<OpenedExistentialKey,
+                   GenericEnvironment *> OpenedExistentialEnvironments;
 
     /// The set of function types.
     llvm::FoldingSet<FunctionType> FunctionTypes;
@@ -6156,10 +6159,56 @@ ASTContext::getOpenedExistentialSignature(Type type, GenericSignature parentSig)
 
   auto result = getImpl().ExistentialSignatures.insert(
       std::make_pair(key, genericSig));
-  assert(result.second);
-  (void) result;
+  ASSERT(result.second);
 
   return genericSig;
+}
+
+OpenedExistentialSignature
+ASTContext::getOpenedExistentialSignature(Type type) {
+  assert(type->isExistentialType());
+
+  if (auto existential = type->getAs<ExistentialType>())
+    type = existential->getConstraintType();
+
+  const CanType constraint = type->getCanonicalType();
+
+  // The constraint type might contain type variables.
+  auto properties = constraint->getRecursiveProperties();
+  auto arena = getArena(properties);
+
+  // Check the cache.
+  const auto &sigs = getImpl().getArena(arena).ExistentialSignatures;
+  auto found = sigs.find(constraint);
+  if (found != sigs.end())
+    return found->second;
+
+  OpenedExistentialSignature existentialSig;
+
+  // Generalize the existential type, to move type variables and primary
+  // archetypes into the substitution map.
+  auto gen = ExistentialTypeGeneralization::get(constraint);
+  existentialSig.Shape = gen.Shape->getCanonicalType();
+  existentialSig.Generalization = gen.Generalization;
+
+  // Now, we have an existential type written with type parameters only.
+  // Open the generalization signature by adding a new generic parameter
+  // for `Self`.
+  auto parentSig = gen.Generalization.getGenericSignature();
+  existentialSig.OpenedSig =
+      getOpenedExistentialSignature(gen.Shape, parentSig);
+
+  // Stash the `Self` type.
+  existentialSig.SelfType =
+      OpenedArchetypeType::getSelfInterfaceTypeFromContext(parentSig, *this)
+          ->getCanonicalType();
+
+  // Cache the result.
+  auto result = getImpl().getArena(arena).ExistentialSignatures.insert(
+      std::make_pair(constraint, existentialSig));
+  ASSERT(result.second);
+
+  return existentialSig;
 }
 
 CanGenericSignature
