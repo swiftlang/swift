@@ -60,9 +60,8 @@ struct SubstitutionMapWithLocalArchetypes {
 
         // Map the local archetype to an interface type in the new generic
         // signature.
-        MapLocalArchetypesOutOfContext mapOutOfContext(BaseGenericSig,
-                                                       CapturedEnvs);
-        auto interfaceTy = mapOutOfContext(local);
+        auto interfaceTy = mapLocalArchetypesOutOfContext(
+            local, BaseGenericSig, CapturedEnvs);
 
         // Map this interface type into the new generic environment to get
         // a primary archetype.

@@ -3905,12 +3905,8 @@ getAnyFunctionRefInterfaceType(TypeConverter &TC,
 
   if (funcType->hasArchetype()) {
     assert(isa<FunctionType>(funcType));
-    auto substType = Type(funcType).subst(
-        MapLocalArchetypesOutOfContext(sig.baseGenericSig, sig.capturedEnvs),
-        MakeAbstractConformanceForGenericType(),
-        SubstFlags::PreservePackExpansionLevel |
-        SubstFlags::SubstitutePrimaryArchetypes |
-        SubstFlags::SubstituteLocalArchetypes);
+    auto substType = mapLocalArchetypesOutOfContext(
+        funcType, sig.baseGenericSig, sig.capturedEnvs);
     funcType = cast<FunctionType>(substType->getCanonicalType());
   }
 
@@ -4964,15 +4960,10 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
   SmallSetVector<GenericEnvironment *, 2> boxCapturedEnvs;
   findCapturedEnvironments(loweredContextType, boxCapturedEnvs);
 
-  MapLocalArchetypesOutOfContext mapOutOfContext(baseGenericSig,
-                                                 boxCapturedEnvs.getArrayRef());
-
-  auto loweredInterfaceType = loweredContextType.subst(
-      mapOutOfContext,
-      MakeAbstractConformanceForGenericType(),
-      SubstFlags::PreservePackExpansionLevel |
-      SubstFlags::SubstitutePrimaryArchetypes |
-      SubstFlags::SubstituteLocalArchetypes)->getCanonicalType();
+  auto loweredInterfaceType =
+      mapLocalArchetypesOutOfContext(loweredContextType, baseGenericSig,
+                                     boxCapturedEnvs.getArrayRef())
+      ->getCanonicalType();
 
   // If the type is not dependent at all, we can form a concrete box layout.
   // We don't need to capture the generic environment.

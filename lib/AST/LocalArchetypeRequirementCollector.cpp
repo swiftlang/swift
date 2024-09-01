@@ -203,6 +203,17 @@ Type MapLocalArchetypesOutOfContext::operator()(SubstitutableType *type) const {
   return getInterfaceType(archetypeTy->getInterfaceType(), genericEnv);
 }
 
+Type swift::mapLocalArchetypesOutOfContext(
+    Type type,
+    GenericSignature baseGenericSig,
+    ArrayRef<GenericEnvironment *> capturedEnvs) {
+  return type.subst(MapLocalArchetypesOutOfContext(baseGenericSig, capturedEnvs),
+                    MakeAbstractConformanceForGenericType(),
+                    SubstFlags::PreservePackExpansionLevel |
+                    SubstFlags::SubstitutePrimaryArchetypes |
+                    SubstFlags::SubstituteLocalArchetypes);
+}
+
 static Type mapIntoLocalContext(GenericTypeParamType *param, unsigned baseDepth,
                                 ArrayRef<GenericEnvironment *> capturedEnvs) {
   assert(!param->isParameterPack());
