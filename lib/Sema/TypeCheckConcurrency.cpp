@@ -3986,7 +3986,7 @@ namespace {
       // do not cause implicit 'self' capture diagnostics, etc.
 
       Expr *actorExpr = nullptr;
-      Type optionalAnyActorType = isolationExpr->getType();
+      Type isolationType = isolationExpr->getType();
       switch (isolation) {
       case ActorIsolation::ActorInstance: {
         if (auto *instance = isolation.getActorInstanceExpr()) {
@@ -4040,10 +4040,16 @@ namespace {
 
 
       // Convert the actor argument to the appropriate type.
-      (void)TypeChecker::typeCheckExpression(
+      auto result = TypeChecker::typeCheckExpression(
           actorExpr, dc,
           constraints::ContextualTypeInfo(
-            optionalAnyActorType, CTP_CallArgument));
+            isolationType, CTP_CallArgument));
+
+      // Don't set the actor if there's a type mismatch. The isolation
+      // checker will treat calls using this #isolation value for an
+      // isolated argument as crossing an isolation boundary.
+      if (!result)
+        return;
 
       isolationExpr->setActor(actorExpr);
     }
