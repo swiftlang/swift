@@ -2947,25 +2947,34 @@ namespace {
       if (!clangDecl->hasAttrs())
         return;
 
-      SmallVector<ValueDecl *, 1> results;
-      auto conformsToAttr =
-          llvm::find_if(clangDecl->getAttrs(), [](auto *attr) {
-            if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-              return swiftAttr->getAttribute().starts_with("conforms_to:");
-            return false;
-          });
-      if (conformsToAttr == clangDecl->getAttrs().end())
+      SmallVector<clang::Attr*, 40> conformsToMatches;
+      llvm::copy_if(clangDecl->getAttrs(), std::back_inserter(conformsToMatches), [](auto *attr) -> bool {
+        if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+          return swiftAttr->getAttribute().starts_with("conforms_to:");
+        return false; 
+      });
+
+      if (conformsToMatches.empty())
         return;
 
-      auto conformsToValue = cast<clang::SwiftAttrAttr>(*conformsToAttr)
-                                 ->getAttribute()
-                                 .drop_front(StringRef("conforms_to:").size())
-                                 .str();
+      for (auto match : conformsToMatches) {
+        if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(match))
+          addExplicitProtocolConformance(decl, swiftAttr);
+      }
+    }
+
+    void 
+    addExplicitProtocolConformance(NominalTypeDecl *decl, 
+                                   clang::SwiftAttrAttr *conformsToAttr) {
+     
+      auto conformsToValue = conformsToAttr->getAttribute()
+                                .drop_front(StringRef("conforms_to:").size())
+                                .str();
       auto names = StringRef(conformsToValue).split('.');
       auto moduleName = names.first;
       auto protocolName = names.second;
       if (protocolName.empty()) {
-        HeaderLoc attrLoc((*conformsToAttr)->getLocation());
+        HeaderLoc attrLoc(conformsToAttr->getLocation());
         Impl.diagnose(attrLoc, diag::conforms_to_missing_dot, conformsToValue);
         return;
       }
@@ -2973,20 +2982,22 @@ namespace {
       auto *mod = Impl.SwiftContext.getModuleByIdentifier(
           Impl.SwiftContext.getIdentifier(moduleName));
       if (!mod) {
-        HeaderLoc attrLoc((*conformsToAttr)->getLocation());
+        HeaderLoc attrLoc(conformsToAttr->getLocation());
         Impl.diagnose(attrLoc, diag::cannot_find_conforms_to_module,
                       conformsToValue, moduleName);
         return;
       }
+
+      SmallVector<ValueDecl *, 1> results;
       mod->lookupValue(Impl.SwiftContext.getIdentifier(protocolName),
                        NLKind::UnqualifiedLookup, results);
       if (results.empty()) {
-        HeaderLoc attrLoc((*conformsToAttr)->getLocation());
+        HeaderLoc attrLoc(conformsToAttr->getLocation());
         Impl.diagnose(attrLoc, diag::cannot_find_conforms_to, protocolName,
                       moduleName);
         return;
       } else if (results.size() != 1) {
-        HeaderLoc attrLoc((*conformsToAttr)->getLocation());
+        HeaderLoc attrLoc(conformsToAttr->getLocation());
         Impl.diagnose(attrLoc, diag::conforms_to_ambiguous, protocolName,
                       moduleName);
         return;
@@ -2997,7 +3008,7 @@ namespace {
         decl->getAttrs().add(
             new (Impl.SwiftContext) SynthesizedProtocolAttr(protocol, &Impl, false));
       } else {
-        HeaderLoc attrLoc((*conformsToAttr)->getLocation());
+        HeaderLoc attrLoc(conformsToAttr->getLocation());
         Impl.diagnose(attrLoc, diag::conforms_to_not_protocol,
                       result->getDescriptiveKind(), result, conformsToValue);
       }
