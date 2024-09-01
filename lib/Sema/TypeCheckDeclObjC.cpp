@@ -521,11 +521,11 @@ static bool checkObjCClassStubAvailability(ASTContext &ctx, const Decl *decl) {
   auto minRange = getMinOSVersionForClassStubs(ctx.LangOpts.Target);
 
   auto targetRange = AvailabilityContext::forDeploymentTarget(ctx);
-  if (targetRange.getOSVersion().isContainedIn(minRange))
+  if (targetRange.getVersionRange().isContainedIn(minRange))
     return true;
 
   auto declRange = AvailabilityInference::availableRange(decl, ctx);
-  return declRange.getOSVersion().isContainedIn(minRange);
+  return declRange.getVersionRange().isContainedIn(minRange);
 }
 
 static const ClassDecl *getResilientAncestor(ModuleDecl *mod,

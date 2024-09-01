@@ -5116,8 +5116,8 @@ diagnoseUnsupportedObjCImplLayout(IRGenModule &IGM, ClassDecl *classDecl,
             field.getVarDecl(),
             diag::attr_objc_implementation_resilient_property_deployment_target,
             prettyPlatformString(targetPlatform(ctx.LangOpts)),
-            currentAvailability.getOSVersion().getLowerEndpoint(),
-            requiredAvailability.getOSVersion().getLowerEndpoint());
+            currentAvailability.getVersionRange().getLowerEndpoint(),
+            requiredAvailability.getVersionRange().getLowerEndpoint());
       else
         diags.diagnose(
             field.getVarDecl(),

@@ -216,8 +216,7 @@ public:
   bool requiresDeploymentTargetOrEarlier(ASTContext &Ctx) const;
 };
 
-/// Represents everything that a particular chunk of code may assume about its
-/// runtime environment.
+/// Represents a version range in which something is available.
 ///
 /// The AvailabilityContext structure forms a [lattice][], which allows it to
 /// have meaningful union and intersection operations ("join" and "meet"),
@@ -229,11 +228,10 @@ public:
 /// NOTE: Generally you should use the utilities on \c AvailabilityInference
 /// to create an \c AvailabilityContext, rather than creating one directly.
 class AvailabilityContext {
-  VersionRange OSVersion;
+  VersionRange Range;
 
 public:
-  /// Creates a context that requires certain versions of the target OS.
-  explicit AvailabilityContext(VersionRange OSVersion) : OSVersion(OSVersion) {}
+  explicit AvailabilityContext(VersionRange Range) : Range(Range) {}
 
   /// Creates a context that imposes the constraints of the ASTContext's
   /// deployment target.
@@ -261,21 +259,21 @@ public:
     return AvailabilityContext(VersionRange::empty());
   }
 
-  /// Returns the range of possible OS versions required by this context.
-  VersionRange getOSVersion() const { return OSVersion; }
+  /// Returns the range of possible versions required by this context.
+  VersionRange getVersionRange() const { return Range; }
 
   /// Returns true if \p other makes stronger guarantees than this context.
   ///
   /// That is, `a.isContainedIn(b)` implies `a.union(b) == b`.
   bool isContainedIn(const AvailabilityContext &other) const {
-    return OSVersion.isContainedIn(other.OSVersion);
+    return Range.isContainedIn(other.Range);
   }
 
   /// Returns true if \p other is a strict subset of this context.
   ///
   /// That is, `a.isSupersetOf(b)` implies `a != b` and `a.union(b) == a`.
   bool isSupersetOf(const AvailabilityContext &other) const {
-    return OSVersion.isSupersetOf(other.OSVersion);
+    return Range.isSupersetOf(other.Range);
   }
 
   /// Returns true if this context has constraints that make it impossible to
@@ -284,13 +282,13 @@ public:
   /// For example, the else branch of a `#available` check for iOS 8.0 when the
   /// containing function already requires iOS 9.
   bool isKnownUnreachable() const {
-    return OSVersion.isEmpty();
+    return Range.isEmpty();
   }
 
   /// Returns true if there are no constraints on this context; that is,
   /// nothing can be assumed.
   bool isAlwaysAvailable() const {
-    return OSVersion.isAll();
+    return Range.isAll();
   }
 
   /// Produces an under-approximation of the intersection of the two
@@ -303,7 +301,7 @@ public:
   /// As an example, this is used when figuring out the required availability
   /// for a type that references multiple nominal decls.
   void intersectWith(const AvailabilityContext &other) {
-    OSVersion.intersectWith(other.getOSVersion());
+    Range.intersectWith(other.Range);
   }
 
   /// Produces an over-approximation of the intersection of the two
@@ -314,7 +312,7 @@ public:
   ///
   /// As an example, this is used for the true branch of `#available`.
   void constrainWith(const AvailabilityContext &other) {
-    OSVersion.constrainWith(other.getOSVersion());
+    Range.constrainWith(other.Range);
   }
 
   /// Produces an over-approximation of the union of two availability contexts.
@@ -326,12 +324,12 @@ public:
   /// As an example, this is used for the else branch of a conditional with
   /// multiple `#available` checks.
   void unionWith(const AvailabilityContext &other) {
-    OSVersion.unionWith(other.getOSVersion());
+    Range.unionWith(other.Range);
   }
 
   /// Returns a representation of this range as a string for debugging purposes.
   std::string getAsString() const {
-    return "AvailabilityContext(" + OSVersion.getAsString() + ")";
+    return "AvailabilityContext(" + Range.getAsString() + ")";
   }
 };
 

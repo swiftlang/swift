@@ -541,7 +541,7 @@ static void applyAvailableAttribute(Decl *decl, AvailabilityContext &info,
                                       /*Message=*/StringRef(),
                                       /*Rename=*/StringRef(),
                                       /*RenameDecl=*/nullptr,
-                                      info.getOSVersion().getLowerEndpoint(),
+                                      info.getVersionRange().getLowerEndpoint(),
                                       /*IntroducedRange*/SourceRange(),
                                       /*Deprecated=*/noVersion,
                                       /*DeprecatedRange*/SourceRange(),
@@ -2800,11 +2800,11 @@ namespace {
 
         auto ctx = Impl.SwiftContext.getSwift58Availability();
         if (!ctx.isAlwaysAvailable()) {
-          assert(ctx.getOSVersion().hasLowerEndpoint());
+          assert(ctx.getVersionRange().hasLowerEndpoint());
           auto AvAttr = new (Impl.SwiftContext) AvailableAttr(
               SourceLoc(), SourceRange(),
               targetPlatform(Impl.SwiftContext.LangOpts), "", "",
-              /*RenameDecl=*/nullptr, ctx.getOSVersion().getLowerEndpoint(),
+              /*RenameDecl=*/nullptr, ctx.getVersionRange().getLowerEndpoint(),
               /*IntroducedRange=*/SourceRange(), {},
               /*DeprecatedRange=*/SourceRange(), {},
               /*ObsoletedRange=*/SourceRange(),
@@ -6615,7 +6615,7 @@ bool SwiftDeclConverter::existingConstructorIsWorse(
     if (!introduced.empty())
       return false;
   } else {
-    VersionRange existingIntroduced = existingAvailability.getOSVersion();
+    VersionRange existingIntroduced = existingAvailability.getVersionRange();
     if (introduced != existingIntroduced.getLowerEndpoint()) {
       return introduced < existingIntroduced.getLowerEndpoint();
     }

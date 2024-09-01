@@ -365,7 +365,7 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
   OS.indent(Indent);
   OS << "(" << getReasonName(getReason());
 
-  OS << " versions=" << AvailabilityInfo.getOSVersion().getAsString();
+  OS << " versions=" << AvailabilityInfo.getVersionRange().getAsString();
 
   if (getReason() == Reason::Decl || getReason() == Reason::DeclImplicit) {
     Decl *D = Node.getAsDecl();
@@ -391,7 +391,7 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
 
   if (!ExplicitAvailabilityInfo.isAlwaysAvailable())
     OS << " explicit_versions="
-       << ExplicitAvailabilityInfo.getOSVersion().getAsString();
+       << ExplicitAvailabilityInfo.getVersionRange().getAsString();
 
   for (TypeRefinementContext *Child : Children) {
     OS << '\n';

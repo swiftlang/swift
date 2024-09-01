@@ -521,7 +521,7 @@ bool UnavailabilityReason::requiresDeploymentTargetOrEarlier(
     ASTContext &Ctx) const {
   return RequiredDeploymentRange.getLowerEndpoint() <=
          AvailabilityContext::forDeploymentTarget(Ctx)
-             .getOSVersion()
+             .getVersionRange()
              .getLowerEndpoint();
 }
 

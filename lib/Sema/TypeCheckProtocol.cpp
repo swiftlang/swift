@@ -4316,7 +4316,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
               diagLoc, diag::availability_protocol_requires_version,
               conformance->getProtocol(), witness,
               prettyPlatformString(targetPlatform(ctx.LangOpts)),
-              check.RequiredAvailability.getOSVersion().getLowerEndpoint());
+              check.RequiredAvailability.getVersionRange().getLowerEndpoint());
           emitDeclaredHereIfNeeded(diags, diagLoc, witness);
           diags.diagnose(requirement,
                          diag::availability_protocol_requirement_here);
@@ -4821,7 +4821,7 @@ static bool diagnoseTypeWitnessAvailability(
   if (!TypeChecker::isAvailabilitySafeForConformance(conformance->getProtocol(),
                                                      assocType, witness, dc,
                                                      requiredAvailability)) {
-    auto requiredRange = requiredAvailability.getOSVersion();
+    auto requiredRange = requiredAvailability.getVersionRange();
     ctx.addDelayedConformanceDiag(
         conformance, shouldError,
         [witness, requiredRange](NormalProtocolConformance *conformance) {

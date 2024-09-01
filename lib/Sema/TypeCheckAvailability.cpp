@@ -1119,7 +1119,7 @@ private:
       }
 
       AvailabilityContext NewConstraint = contextForSpec(Spec, false);
-      Query->setAvailableRange(contextForSpec(Spec, true).getOSVersion());
+      Query->setAvailableRange(contextForSpec(Spec, true).getVersionRange());
 
       // When compiling zippered for macCatalyst, we need to collect both
       // a macOS version (the target version) and an iOS/macCatalyst version
@@ -1130,7 +1130,7 @@ private:
         AvailabilitySpec *VariantSpec =
             bestActiveSpecForQuery(Query, /*ForTargetVariant*/ true);
         VersionRange VariantRange =
-            contextForSpec(VariantSpec, true).getOSVersion();
+            contextForSpec(VariantSpec, true).getVersionRange();
         Query->setVariantAvailableRange(VariantRange);
       }
 
@@ -1474,7 +1474,7 @@ TypeChecker::checkDeclarationAvailability(const Decl *D,
     AvailabilityContext safeRangeUnderApprox{
         AvailabilityInference::availableRange(D, Context)};
 
-    VersionRange version = safeRangeUnderApprox.getOSVersion();
+    VersionRange version = safeRangeUnderApprox.getVersionRange();
     return UnavailabilityReason::requiresVersionRange(version);
   }
 
@@ -1921,7 +1921,8 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
                                                            ReferenceDC, &TRC);
   if (!TRC)
     return false;
-  VersionRange RunningRange = TRC->getExplicitAvailabilityInfo().getOSVersion();
+  VersionRange RunningRange =
+      TRC->getExplicitAvailabilityInfo().getVersionRange();
   if (RunningRange.hasLowerEndpoint() &&
       RequiredRange.hasLowerEndpoint() &&
       TRC->getReason() != TypeRefinementContext::Reason::Root &&
@@ -2100,9 +2101,9 @@ bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
     TypeChecker::overApproximateAvailabilityAtLocation(
       ReferenceRange.Start, ReferenceDC);
   if (!runningOS.isContainedIn(Availability)) {
-    diagnosePotentialUnavailability(
-      ReferenceRange, Diag, ReferenceDC,
-      UnavailabilityReason::requiresVersionRange(Availability.getOSVersion()));
+    diagnosePotentialUnavailability(ReferenceRange, Diag, ReferenceDC,
+                                    UnavailabilityReason::requiresVersionRange(
+                                        Availability.getVersionRange()));
     return true;
   }
 
@@ -4634,7 +4635,7 @@ static bool declNeedsExplicitAvailability(const Decl *decl) {
 
   // Warn on decls without an introduction version.
   auto safeRangeUnderApprox = AvailabilityInference::availableRange(decl, ctx);
-  return !safeRangeUnderApprox.getOSVersion().hasLowerEndpoint();
+  return !safeRangeUnderApprox.getVersionRange().hasLowerEndpoint();
 }
 
 void swift::checkExplicitAvailability(Decl *decl) {

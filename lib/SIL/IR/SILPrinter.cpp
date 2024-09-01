@@ -3438,7 +3438,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[weak_imported] ";
   auto availability = getAvailabilityForLinkage();
   if (!availability.isAlwaysAvailable()) {
-    auto version = availability.getOSVersion().getLowerEndpoint();
+    auto version = availability.getVersionRange().getLowerEndpoint();
     OS << "[available " << version.getAsString() << "] ";
   }
 
@@ -4409,8 +4409,8 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
   if (targetFunction) {
     OS << "target: \"" << targetFunction->getName() << "\", ";
   }
- if (!availability.isAlwaysAvailable()) {
-    auto version = availability.getOSVersion().getLowerEndpoint();
+  if (!availability.isAlwaysAvailable()) {
+    auto version = availability.getVersionRange().getLowerEndpoint();
     OS << "available: " << version.getAsString() << ", ";
   }
   if (!requirements.empty()) {
