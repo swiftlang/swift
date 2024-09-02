@@ -9525,7 +9525,8 @@ public:
 /// specifies the index of the parameter that shall be skipped.
 GenericParameterReferenceInfo
 findGenericParameterReferences(const ValueDecl *value, CanGenericSignature sig,
-                               GenericTypeParamType *genericParam,
+                               GenericTypeParamType *origParam,
+                               GenericTypeParamType *openedParam,
                                std::optional<unsigned> skipParamIndex);
 
 inline void

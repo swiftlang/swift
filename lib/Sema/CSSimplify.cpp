@@ -1607,7 +1607,7 @@ shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   // Ensure that the formal parameter is only used in covariant positions,
   // because it won't match anywhere else.
   auto referenceInfo = findGenericParameterReferences(
-      callee, genericSig, genericParam,
+      callee, genericSig, genericParam, genericParam,
       /*skipParamIdx=*/paramIdx);
   if (referenceInfo.selfRef > TypePosition::Covariant ||
       referenceInfo.assocTypeRef > TypePosition::Covariant)
