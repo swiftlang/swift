@@ -15,7 +15,7 @@ public func trivialFunc_macOS() {}
 // CHECK:   return [[RESULT]] : $()
 
 // -- Back deployment thunk for trivialFunc_iOS_macOS()
-// CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy019trivialFunc_iOS_macE0yyFTwb : $@convention(thin) () -> ()
+// CHECK-LABEL: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy019trivialFunc_iOS_macE0yyFTwb : $@convention(thin) () -> ()
 // CHECK: bb0:
 // CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 51
 // CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 1
@@ -50,7 +50,7 @@ public func trivialFunc_iOS_macOS() {}
 // CHECK:   return [[RESULT]] : $()
 
 // -- Back deployment thunk for trivialFunc_iOS_macOS_macCatalyst()
-// CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy019trivialFunc_iOS_mace1_F8CatalystyyFTwb : $@convention(thin) () -> ()
+// CHECK-LABEL: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy019trivialFunc_iOS_mace1_F8CatalystyyFTwb : $@convention(thin) () -> ()
 // CHECK: bb0:
 // CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 53
 // CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 2
