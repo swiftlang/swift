@@ -4312,11 +4312,10 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           ASTContext &ctx = witness->getASTContext();
           auto &diags = ctx.Diags;
           SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
-          diags.diagnose(
-              diagLoc, diag::availability_protocol_requires_version,
-              conformance->getProtocol(), witness,
-              prettyPlatformString(targetPlatform(ctx.LangOpts)),
-              check.RequiredAvailability.getVersionRange().getLowerEndpoint());
+          diags.diagnose(diagLoc, diag::availability_protocol_requires_version,
+                         conformance->getProtocol(), witness,
+                         prettyPlatformString(targetPlatform(ctx.LangOpts)),
+                         check.RequiredAvailability.getRawMinimumVersion());
           emitDeclaredHereIfNeeded(diags, diagLoc, witness);
           diags.diagnose(requirement,
                          diag::availability_protocol_requirement_here);
@@ -4821,17 +4820,17 @@ static bool diagnoseTypeWitnessAvailability(
   if (!TypeChecker::isAvailabilitySafeForConformance(conformance->getProtocol(),
                                                      assocType, witness, dc,
                                                      requiredAvailability)) {
-    auto requiredRange = requiredAvailability.getVersionRange();
+    auto requiredVersion = requiredAvailability.getRawMinimumVersion();
     ctx.addDelayedConformanceDiag(
         conformance, shouldError,
-        [witness, requiredRange](NormalProtocolConformance *conformance) {
+        [witness, requiredVersion](NormalProtocolConformance *conformance) {
           SourceLoc loc = getLocForDiagnosingWitness(conformance, witness);
           auto &ctx = conformance->getDeclContext()->getASTContext();
           ctx.Diags
               .diagnose(loc, diag::availability_protocol_requires_version,
                         conformance->getProtocol(), witness,
                         prettyPlatformString(targetPlatform(ctx.LangOpts)),
-                        requiredRange.getLowerEndpoint())
+                        requiredVersion)
               .warnUntilSwiftVersion(warnBeforeVersion);
 
           emitDeclaredHereIfNeeded(ctx.Diags, loc, witness);

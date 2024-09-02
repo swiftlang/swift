@@ -238,7 +238,20 @@ public:
   }
 
   /// Returns the range of possible versions required by this context.
-  VersionRange getVersionRange() const { return Range; }
+  VersionRange getRawVersionRange() const { return Range; }
+
+  /// Returns true if there is a version tuple for this context.
+  bool hasMinimumVersion() const { return Range.hasLowerEndpoint(); }
+
+  /// Returns the minimum version required by this context. This convenience
+  /// is meant for debugging, diagnostics, serialization, etc. Use of the set
+  /// algebra operations on `AvailabilityContext` should be preferred over
+  /// direct comparison of raw versions.
+  ///
+  /// Only call when `hasMinimumVersion()` returns true.
+  llvm::VersionTuple getRawMinimumVersion() const {
+    return Range.getLowerEndpoint();
+  }
 
   /// Returns true if \p other makes stronger guarantees than this context.
   ///

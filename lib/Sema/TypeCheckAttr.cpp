@@ -1685,7 +1685,7 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
           attr->getLocation(),
           diag::attr_objc_implementation_raise_minimum_deployment_target,
           prettyPlatformString(targetPlatform(Ctx.LangOpts)),
-          Ctx.getSwift50Availability().getVersionRange().getLowerEndpoint());
+          Ctx.getSwift50Availability().getRawMinimumVersion());
       if (attr->isEarlyAdopter()) {
         diag.wrapIn(diag::wrap_objc_implementation_will_become_error);
       }
@@ -2210,11 +2210,11 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
                    diag::availability_implicit_decl_here,
                    D->getDescriptiveKind(),
                    prettyPlatformString(targetPlatform(Ctx.LangOpts)),
-                   AttrRange.getVersionRange().getLowerEndpoint());
+                   AttrRange.getRawMinimumVersion());
         diagnose(enclosingDecl->getLoc(),
                  diag::availability_decl_more_than_enclosing_here,
                  prettyPlatformString(targetPlatform(Ctx.LangOpts)),
-                 EnclosingAnnotatedRange->getVersionRange().getLowerEndpoint());
+                 EnclosingAnnotatedRange->getRawMinimumVersion());
       }
     }
   }

@@ -509,7 +509,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   std::optional<llvm::VersionTuple> available;
   auto availability = F.getAvailabilityForLinkage();
   if (!availability.isAlwaysAvailable()) {
-    available = availability.getVersionRange().getLowerEndpoint();
+    available = availability.getRawMinimumVersion();
   }
   ENCODE_VER_TUPLE(available, available)
 
@@ -567,7 +567,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
     }
     auto availability = SA->getAvailability();
     if (!availability.isAlwaysAvailable()) {
-      available = availability.getVersionRange().getLowerEndpoint();
+      available = availability.getRawMinimumVersion();
     }
     ENCODE_VER_TUPLE(available, available)
 

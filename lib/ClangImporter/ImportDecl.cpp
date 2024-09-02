@@ -541,7 +541,7 @@ static void applyAvailableAttribute(Decl *decl, AvailabilityContext &info,
                                       /*Message=*/StringRef(),
                                       /*Rename=*/StringRef(),
                                       /*RenameDecl=*/nullptr,
-                                      info.getVersionRange().getLowerEndpoint(),
+                                      info.getRawMinimumVersion(),
                                       /*IntroducedRange*/SourceRange(),
                                       /*Deprecated=*/noVersion,
                                       /*DeprecatedRange*/SourceRange(),
@@ -2798,13 +2798,13 @@ namespace {
       if (auto classDecl = dyn_cast<ClassDecl>(result)) {
         validateForeignReferenceType(decl, classDecl);
 
-        auto ctx = Impl.SwiftContext.getSwift58Availability();
-        if (!ctx.isAlwaysAvailable()) {
-          assert(ctx.getVersionRange().hasLowerEndpoint());
+        auto availability = Impl.SwiftContext.getSwift58Availability();
+        if (!availability.isAlwaysAvailable()) {
+          assert(availability.hasMinimumVersion());
           auto AvAttr = new (Impl.SwiftContext) AvailableAttr(
               SourceLoc(), SourceRange(),
               targetPlatform(Impl.SwiftContext.LangOpts), "", "",
-              /*RenameDecl=*/nullptr, ctx.getVersionRange().getLowerEndpoint(),
+              /*RenameDecl=*/nullptr, availability.getRawMinimumVersion(),
               /*IntroducedRange=*/SourceRange(), {},
               /*DeprecatedRange=*/SourceRange(), {},
               /*ObsoletedRange=*/SourceRange(),
@@ -6615,9 +6615,9 @@ bool SwiftDeclConverter::existingConstructorIsWorse(
     if (!introduced.empty())
       return false;
   } else {
-    VersionRange existingIntroduced = existingAvailability.getVersionRange();
-    if (introduced != existingIntroduced.getLowerEndpoint()) {
-      return introduced < existingIntroduced.getLowerEndpoint();
+    auto existingIntroduced = existingAvailability.getRawMinimumVersion();
+    if (introduced != existingIntroduced) {
+      return introduced < existingIntroduced;
     }
   }
 
