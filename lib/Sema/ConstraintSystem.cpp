@@ -7548,9 +7548,7 @@ bool ConstraintSystem::isMemberAvailableOnExistential(
   // N.B. We pass the module context because this check does not care about the
   // the actual signature of the opened archetype in context, rather it cares
   // about whether you can "hold" `baseTy.member` properly in the abstract.
-  const auto info = member->findExistentialSelfReferences(
-      baseTy,
-      /*treatNonResultCovariantSelfAsInvariant=*/false);
+  const auto info = member->findExistentialSelfReferences(baseTy);
   if (info.selfRef > TypePosition::Covariant ||
       info.assocTypeRef > TypePosition::Covariant) {
     return false;
