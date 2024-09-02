@@ -2606,8 +2606,9 @@ ERROR(retroactive_not_in_extension_inheritance_clause,none,
       "extensions", ())
 
 ERROR(retroactive_attr_does_not_apply,none,
-      "'retroactive' attribute does not apply; %0 is declared in this module",
-      (Identifier))
+      "'retroactive' attribute does not apply; %0 is declared in "
+      "%select{the same package|this module}1",
+      (const ValueDecl *, bool))
 
 WARNING(extension_retroactive_conformance,none,
        "extension declares a conformance of imported type %0 to imported "
@@ -4606,8 +4607,8 @@ NOTE(duplicated_key_declared_here, none,
      "duplicate key declared here", ())
 
 // Generic specializations
-ERROR(cannot_explicitly_specialize_generic_function,none,
-      "cannot explicitly specialize a generic function", ())
+ERROR(cannot_explicitly_specialize_function,none,
+      "cannot explicitly specialize %kind0", (ValueDecl *))
 ERROR(not_a_generic_type,none,
       "cannot specialize non-generic type %0", (Type))
 ERROR(not_a_generic_macro,none,

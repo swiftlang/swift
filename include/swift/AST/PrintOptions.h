@@ -274,12 +274,12 @@ struct PrintOptions {
 
   bool SkipSwiftPrivateClangDecls = false;
 
-  /// Whether to skip internal stdlib declarations.
-  bool SkipPrivateStdlibDecls = false;
+  /// Whether to skip underscored declarations from system modules.
+  bool SkipPrivateSystemDecls = false;
 
-  /// Whether to skip underscored stdlib protocols.
+  /// Whether to skip underscored protocols from system modules.
   /// Protocols marked with @_show_in_interface are still printed.
-  bool SkipUnderscoredStdlibProtocols = false;
+  bool SkipUnderscoredSystemProtocols = false;
 
   /// Whether to skip unsafe C++ class methods that were renamed
   /// (e.g. __fooUnsafe). See IsSafeUseOfCxxDecl.
@@ -689,8 +689,8 @@ struct PrintOptions {
     result.SkipUnavailable = true;
     result.SkipImplicit = true;
     result.SkipSwiftPrivateClangDecls = true;
-    result.SkipPrivateStdlibDecls = true;
-    result.SkipUnderscoredStdlibProtocols = true;
+    result.SkipPrivateSystemDecls = true;
+    result.SkipUnderscoredSystemProtocols = true;
     result.SkipUnsafeCXXMethods = true;
     result.SkipDeinit = false; // Deinit may have isolation attributes, which
                                // are part of the interface
@@ -799,7 +799,7 @@ struct PrintOptions {
       PrintOptions::FunctionRepresentationMode::None;
     PO.PrintDocumentationComments = false;
     PO.ExcludeAttrList.push_back(DeclAttrKind::Available);
-    PO.SkipPrivateStdlibDecls = true;
+    PO.SkipPrivateSystemDecls = true;
     PO.SkipUnsafeCXXMethods = true;
     PO.ExplodeEnumCaseDecls = true;
     PO.ShouldQualifyNestedDeclarations = QualifyNestedDeclarations::TypesOnly;

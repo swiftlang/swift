@@ -501,7 +501,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         // Members from underscored system protocols should still appear as
         // members of the target type, even if the protocols themselves are not
         // printed.
-        AdjustedOpts.SkipUnderscoredStdlibProtocols = false;
+        AdjustedOpts.SkipUnderscoredSystemProtocols = false;
       }
       if (AdjustedOpts.shouldPrint(E)) {
         auto Pair = isApplicable(E, Synthesized, EnablingE, Conf);

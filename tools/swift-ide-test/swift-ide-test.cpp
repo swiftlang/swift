@@ -678,17 +678,15 @@ SynthesizeExtension("synthesize-extension",
                     llvm::cl::cat(Category),
                     llvm::cl::init(false));
 
-static llvm::cl::opt<bool>
-SkipPrivateStdlibDecls("skip-private-stdlib-decls",
+static llvm::cl::opt<bool> SkipPrivateSystemDecls(
+    "skip-private-system-decls",
     llvm::cl::desc("Don't print declarations that start with '_'"),
-    llvm::cl::cat(Category),
-    llvm::cl::init(false));
+    llvm::cl::cat(Category), llvm::cl::init(false));
 
-static llvm::cl::opt<bool>
-SkipUnderscoredStdlibProtocols("skip-underscored-stdlib-protocols",
+static llvm::cl::opt<bool> SkipUnderscoredSystemProtocols(
+    "skip-underscored-system-protocols",
     llvm::cl::desc("Don't print protocols that start with '_'"),
-    llvm::cl::cat(Category),
-    llvm::cl::init(false));
+    llvm::cl::cat(Category), llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 SkipUnsafeCXXMethods("skip-unsafe-cxx-methods",
@@ -2876,7 +2874,7 @@ struct GroupNamesPrinter {
 
   void addDecl(const Decl *D) {
     if (auto VD = dyn_cast<ValueDecl>(D)) {
-      if (!VD->isImplicit() && !VD->isPrivateStdlibDecl()) {
+      if (!VD->isImplicit() && !VD->isPrivateSystemDecl()) {
         StringRef Name = VD->getGroupName().has_value() ?
           VD->getGroupName().value() : "";
         Groups.insert(Name.empty() ? "<NULL>" : Name);
@@ -3098,10 +3096,12 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
 }
 
 static int doPrintHeaders(const CompilerInvocation &InitInvok,
+                          StringRef SourceFilename,
                           const std::vector<std::string> HeadersToPrint,
-                          const PrintOptions &Options,
-                          bool AnnotatePrint) {
+                          const PrintOptions &Options, bool AnnotatePrint) {
   CompilerInvocation Invocation(InitInvok);
+  Invocation.getFrontendOptions().InputsAndOutputs.addPrimaryInputFile(
+      SourceFilename);
 
   CompilerInstance CI;
   // Display diagnostics to stderr.
@@ -4612,7 +4612,7 @@ int main(int argc, char *argv[]) {
     PrintOpts.PrintAccess = options::PrintAccess;
     PrintOpts.AccessFilter = options::AccessFilter;
     PrintOpts.PrintDocumentationComments = !options::SkipDocumentationComments;
-    PrintOpts.SkipPrivateStdlibDecls = options::SkipPrivateStdlibDecls;
+    PrintOpts.SkipPrivateSystemDecls = options::SkipPrivateSystemDecls;
     PrintOpts.SkipUnsafeCXXMethods = options::SkipUnsafeCXXMethods;
     PrintOpts.SkipUnavailable = options::SkipUnavailable;
     PrintOpts.SkipDeinit = options::SkipDeinit;
@@ -4626,8 +4626,8 @@ int main(int argc, char *argv[]) {
         = PrintOptions::ArgAndParamPrintingMode::BothAlways;
     }
   }
-  if (options::SkipUnderscoredStdlibProtocols)
-    PrintOpts.SkipUnderscoredStdlibProtocols = true;
+  if (options::SkipUnderscoredSystemProtocols)
+    PrintOpts.SkipUnderscoredSystemProtocols = true;
   if (options::PrintOriginalSourceText)
     PrintOpts.PrintOriginalSourceText = true;
 
@@ -4779,9 +4779,9 @@ int main(int argc, char *argv[]) {
     break;
   }
   case ActionType::PrintHeader: {
-    ExitCode = doPrintHeaders(
-        InitInvok, options::HeaderToPrint, PrintOpts,
-        options::AnnotatePrint);
+    ExitCode = doPrintHeaders(InitInvok, options::SourceFilename,
+                              options::HeaderToPrint, PrintOpts,
+                              options::AnnotatePrint);
     break;
   }
 

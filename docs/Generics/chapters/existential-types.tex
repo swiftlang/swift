@@ -277,7 +277,7 @@ print(concrete() == generic(Int.self))  // true
 \end{listing}
 \ListingRef{metadataunique} constructs the same metatype twice, once in a concrete function and then again in a generic function:
 \begin{itemize}
-\item The \texttt{concrete()} function encodes the type \texttt{(Int, Int)} using a compact mangled representation and passes it to the a runtime entry point for instantiating metadata from a mangled type string. This entry point ultimately calls the tuple type constructor after demangling the input string.
+\item The \texttt{concrete()} function encodes the type \texttt{(Int, Int)} using a compact mangled representation and passes it to the runtime entry point for instantiating metadata from a mangled type string. This entry point ultimately calls the tuple type constructor after demangling the input string.
 \item The \texttt{generic()} function receives the type metadata for \texttt{Int} as an argument, and directly calls the tuple type constructor to build the type \texttt{(T, T)} with the substitution \texttt{T := Int}. Both functions return the same value of \texttt{Any.Type} because the two calls to the tuple type constructor return the same value.
 \end{itemize}
 

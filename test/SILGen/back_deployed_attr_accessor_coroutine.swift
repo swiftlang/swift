@@ -18,7 +18,7 @@ public struct TopLevelStruct {
   // CHECK:   unwind
 
   // -- Back deployment thunk for TopLevelStruct.property.read
-  // CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvrTwb : $@yield_once @convention(method) (TopLevelStruct) -> @yields TopLevelStruct
+  // CHECK-LABEL: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvrTwb : $@yield_once @convention(method) (TopLevelStruct) -> @yields TopLevelStruct
   // CHECK: bb0([[BB0_ARG:%.*]] : $TopLevelStruct):
   // CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 52
   // CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 1

@@ -1303,8 +1303,10 @@ public:
 
   bool hasUnderscoredNaming() const;
 
-  bool isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic = true) const;
-  
+  /// Whether this declaration is from a system module and should be considered
+  /// implicitly private.
+  bool isPrivateSystemDecl(bool treatNonBuiltinProtocolsAsPublic = true) const;
+
   /// Check if this is a declaration defined at the top level of the Swift module
   bool isStdlibDecl() const;
 

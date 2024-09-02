@@ -121,10 +121,7 @@ mapTypeOutOfOpenedExistentialContext(CanType t, GenericEnvironment *genericEnv) 
     forwardingSubs = genericEnv->getForwardingSubstitutionMap();
   }
 
-  MapLocalArchetypesOutOfContext mapOutOfContext(baseGenericSig, capturedEnvs);
-  auto mappedTy = t.subst(mapOutOfContext,
-                          MakeAbstractConformanceForGenericType(),
-                          SubstFlags::SubstituteLocalArchetypes);
+  auto mappedTy = mapLocalArchetypesOutOfContext(t, baseGenericSig, capturedEnvs);
 
   auto genericSig = buildGenericSignatureWithCapturedEnvironments(
       ctx, baseGenericSig, capturedEnvs);

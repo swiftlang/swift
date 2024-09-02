@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-additional-prefix swift5-
+// RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix swift6-
 
 struct A<B> { // expected-note{{generic type 'A' declared here}}
   init(x:Int) {}
@@ -40,7 +41,9 @@ _ = (a < b, c > d)
 _ = a>(b)
 _ = a > (b)
 
-generic<Int>(0) // expected-error{{cannot explicitly specialize a generic function}}
+generic<Int>(0)
+// expected-swift5-warning@-1{{cannot explicitly specialize global function 'generic'}}
+// expected-swift6-error@-2 {{cannot explicitly specialize global function 'generic'}}
 
 A<B>.c()
 A<A<B>>.c()

@@ -1819,13 +1819,20 @@ static void diagnoseRetroactiveConformances(
         if (decl == proto && entry.isRetroactive()) {
           auto loc =
               entry.getTypeRepr()->findAttrLoc(TypeAttrKind::Retroactive);
+
+          bool typeInSamePackage = extTypeModule->inSamePackage(module);
           bool typeIsSameModule =
               extTypeModule->isSameModuleLookingThroughOverlays(module);
-          auto incorrectTypeName = typeIsSameModule ? 
-              extendedNominalDecl->getName() : proto->getName();
+
+          auto declForDiag = (typeIsSameModule || typeInSamePackage)
+                                 ? extendedNominalDecl
+                                 : proto;
+          bool isSameModule = declForDiag->getParentModule()
+                                  ->isSameModuleLookingThroughOverlays(module);
+
           diags
-              .diagnose(loc, diag::retroactive_attr_does_not_apply,
-                        incorrectTypeName)
+              .diagnose(loc, diag::retroactive_attr_does_not_apply, declForDiag,
+                        isSameModule)
               .warnUntilSwiftVersion(6)
               .fixItRemove(SourceRange(loc, loc.getAdvancedLoc(1)));
           return TypeWalker::Action::Stop;

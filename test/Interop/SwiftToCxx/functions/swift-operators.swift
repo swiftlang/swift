@@ -25,6 +25,19 @@ public struct IntBox {
   } 
 }
 
+public struct CustomArray<Element> where Element : ~Copyable {
+  private var buffer: UnsafeMutableBufferPointer<Element>
+
+  public subscript(index: Int) -> Element {
+    _read {
+        yield buffer[index]
+    }
+    nonmutating _modify {
+        yield &buffer[index]
+    }
+  }
+}
+
 // CHECK: #if __cplusplus >= 202302L
 // CHECK-NEXT: SWIFT_INLINE_THUNK int operator [](int x, int _2) const SWIFT_SYMBOL("s:9Operators6IntBoxVys5Int32VAE_AEtcig");
 // CHECK-NEXT: #endif // #if __cplusplus >= 202302L

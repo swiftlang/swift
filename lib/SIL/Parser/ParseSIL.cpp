@@ -729,6 +729,8 @@ static bool parseDeclSILOptional(
       *isThunk = IsSignatureOptimizedThunk;
     else if (isThunk && SP.P.Tok.getText() == "reabstraction_thunk")
       *isThunk = IsReabstractionThunk;
+    else if (isThunk && SP.P.Tok.getText() == "back_deployed_thunk")
+      *isThunk = IsBackDeployedThunk;
     else if (isWithoutActuallyEscapingThunk
              && SP.P.Tok.getText() == "without_actually_escaping")
       *isWithoutActuallyEscapingThunk = true;

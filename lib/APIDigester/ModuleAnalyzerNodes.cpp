@@ -1772,7 +1772,7 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
     if (D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
       return true;
   } else {
-    if (D->isPrivateStdlibDecl(false))
+    if (D->isPrivateSystemDecl(false))
       return true;
   }
   if (AvailableAttr::isUnavailable(D))

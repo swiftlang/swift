@@ -12,7 +12,7 @@ public struct TopLevelStruct {
   // CHECK:   return [[RESULT]] : $()
 
   // -- Back deployment thunk for TopLevelStruct.trivialMethod()
-  // CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy14TopLevelStructV13trivialMethodyyFTwb : $@convention(method) (TopLevelStruct) -> ()
+  // CHECK-LABEL: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy14TopLevelStructV13trivialMethodyyFTwb : $@convention(method) (TopLevelStruct) -> ()
   // CHECK: bb0([[BB0_ARG:%.*]] : $TopLevelStruct):
   // CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 52
   // CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 1

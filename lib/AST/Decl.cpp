@@ -1153,25 +1153,24 @@ bool Decl::hasUnderscoredNaming() const {
   return false;
 }
 
-bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
+bool Decl::isPrivateSystemDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   const Decl *D = this;
   if (auto ExtD = dyn_cast<ExtensionDecl>(D)) {
     Type extTy = ExtD->getExtendedType();
-    return extTy.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic);
+    return extTy.isPrivateSystemType(treatNonBuiltinProtocolsAsPublic);
   }
 
   DeclContext *DC = D->getDeclContext()->getModuleScopeContext();
-  if (DC->getParentModule()->isBuiltinModule() ||
-      DC->getParentModule()->isSwiftShimsModule())
+  auto *M = DC->getParentModule();
+  if (M->isBuiltinModule() || M->isSwiftShimsModule())
     return true;
-  if (!DC->getParentModule()->isSystemModule())
+  if (!M->isSystemModule() && !M->isNonUserModule())
     return false;
   auto FU = dyn_cast<FileUnit>(DC);
   if (!FU)
     return false;
-  // Check for Swift module and overlays.
-  if (!DC->getParentModule()->isStdlibModule() &&
-      FU->getKind() != FileUnitKind::SerializedAST)
+  // Check for stdlib and imported Swift modules.
+  if (!M->isStdlibModule() && FU->getKind() != FileUnitKind::SerializedAST)
     return false;
 
   if (isa<ProtocolDecl>(D)) {
@@ -4266,7 +4265,7 @@ bool ValueDecl::isInterfacePackageEffectivelyPublic() const {
 
 bool ValueDecl::shouldHideFromEditor() const {
   // Hide private stdlib declarations.
-  if (isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic*/ false) ||
+  if (isPrivateSystemDecl(/*treatNonBuiltinProtocolsAsPublic*/ false) ||
       // ShowInInterfaceAttr is for decls to show in interface as exception but
       // they are not intended to be used directly.
       getAttrs().hasAttribute<ShowInInterfaceAttr>())

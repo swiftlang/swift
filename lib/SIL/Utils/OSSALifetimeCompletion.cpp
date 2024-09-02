@@ -262,8 +262,17 @@ void AvailabilityBoundaryVisitor::visit(const SSAPrunedLiveness &liveness,
 void AvailabilityBoundaryVisitor::computeRegion(
     const SSAPrunedLiveness &liveness) {
   // (1) Compute the complete liveness boundary.
-  PrunedLivenessBoundary boundary;
+  PrunedLivenessBlockBoundary boundary;
   liveness.computeBoundary(boundary);
+
+  BasicBlockSet consumingBlocks(value->getFunction());
+
+  liveness.visitUsers(
+      [&consumingBlocks](auto *instruction, auto lifetimeEnding) {
+        if (lifetimeEnding.isEnding()) {
+          consumingBlocks.insert(instruction->getParent());
+        }
+      });
 
   // Used in the forward walk below (3).
   BasicBlockWorklist regionWorklist(value->getFunction());
@@ -284,17 +293,13 @@ void AvailabilityBoundaryVisitor::computeRegion(
     regionWorklist.push(block);
   };
 
-  for (SILInstruction *lastUser : boundary.lastUsers) {
-    if (liveness.isInterestingUser(lastUser)
-        != PrunedLiveness::LifetimeEndingUse) {
-      collect(lastUser->getParent());
+  for (auto *endBlock : boundary.endBlocks) {
+    if (!consumingBlocks.contains(endBlock)) {
+      collect(endBlock);
     }
   }
   for (SILBasicBlock *edge : boundary.boundaryEdges) {
     collect(edge);
-  }
-  for (SILNode *deadDef : boundary.deadDefs) {
-    collect(deadDef->getParentBlock());
   }
 
   // (3) Forward walk to find the region in which `value` might be available.

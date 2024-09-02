@@ -60,6 +60,7 @@ import CreateObjects
 import CxxStringConversion
 // rdar://128520766
 // import CxxVectorSum
+import CxxSpanTests
 import DataBenchmarks
 import DeadArray
 import DevirtualizeProtocolComposition
@@ -258,6 +259,7 @@ register(CreateObjects.benchmarks)
 register(CxxStringConversion.benchmarks)
 // rdar://128520766
 // register(CxxVectorSum.benchmarks)
+register(CxxSpanTests.benchmarks)
 register(DataBenchmarks.benchmarks)
 register(DeadArray.benchmarks)
 register(DevirtualizeProtocolComposition.benchmarks)

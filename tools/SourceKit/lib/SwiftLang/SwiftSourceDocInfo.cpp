@@ -1039,7 +1039,7 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
     Options.MinimumAccessLevel = AccessLevel::Private;
     Options.IncludeSPISymbols = true;
     Options.IncludeClangDocs = true;
-    Options.PrintPrivateStdlibSymbols = true;
+    Options.PrintPrivateSystemSymbols = true;
 
     symbolgraphgen::printSymbolGraphForDecl(DInfo.VD, DInfo.BaseType,
                                             DInfo.InSynthesizedExtension,

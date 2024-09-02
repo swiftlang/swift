@@ -66,8 +66,8 @@ Broken down into constituent parts, a normal conformance stores the following:
 \section{Conformance Lookup}\label{conformance lookup}
 
 \IndexDefinition{global conformance lookup}
-A conformance can be obtained via \emph{global conformance lookup}, an operation defined as taking a \index{protocol declaration}protocol declaration and a \IndexDefinition{conforming type}conforming type. Global conformance lookup can be understood as the action of a protocol declaration \texttt{P} on the left of a type \texttt{T}. We denote the protocol as $\protosym{P}$ to avoid confusion with the protocol \emph{type}, and use the notation $\TP$ to represent the found conformance of \texttt{T} to \texttt{P}, whatever kind of conformance it may be:\index{$\otimes$}
-\[\protosym{P}\otimes\texttt{T} = \TP\]
+A conformance can be obtained via \emph{global conformance lookup}, an operation defined as taking a \index{protocol declaration}protocol declaration and a \IndexDefinition{conforming type}conforming type. Global conformance lookup can be understood as the action of a protocol declaration \texttt{P} on the left of a type \texttt{T}. We denote the protocol as $\pP$ to avoid confusion with the protocol \emph{type}, and use the notation $\TP$ to represent the found conformance of \texttt{T} to \texttt{P}, whatever kind of conformance it may be:\index{$\otimes$}
+\[\pP\otimes\texttt{T} = \TP\]
 
 Global conformance lookup performs a case analysis on the given conforming type, returning one of several kinds of conformance:
 \begin{itemize}
@@ -92,7 +92,7 @@ A commutative diagram is a diagram where every path with the same start and end 
 \newcommand{\NormalConf}{\ConfReq{$\texttt{T}_d$}{P}}
 
 So far, we've only introduced normal conformances. If $d$ is a nominal type declaration and $\texttt{T}_d$ is the declared interface type of $d$, then a normal conformance of $\texttt{T}_d$ to \texttt{P} is written as $\NormalConf$ in our notation, as its conforming type is $\texttt{T}_d$:
-\[\protosym{P}\otimes\texttt{T}_d=\NormalConf\]
+\[\pP\otimes\texttt{T}_d=\NormalConf\]
 
 We will look at more equations and commutative diagrams in the next section, after a brief interlude to discuss a conceptual difficulty.
 
@@ -138,22 +138,22 @@ extension DerivedClass: MyProtocol {}
 \end{Verbatim}
 However, in the next version of the framework, the framework author might decide to conform \texttt{BaseClass} to \texttt{MyProtocol}. At this point, \texttt{DerivedClass} has two overlapping conformances to \texttt{MyProtocol}; the inherited conformance from \texttt{BaseClass}, and the local conformance of \texttt{DerivedClass}.
 
-It is possible to some day extend the compiler to correctly reason about overlapping conformances. As implemented, the global conformance lookup operation takes a \index{module declaration}module declaration as an input, along with the type and protocol. The intent behind passing the module was that it should determine visibility of conformances via the \index{import declaration}import graph. At the time of writing, this module declaration is ignored.
+\paragraph{Future directions.} The theoretical model could one day be extended to fully support overlapping conformances. The global conformance lookup operation would need to be changed to disambiguate in the case of multiple lookup results, possibly by receiving some kind of lexical context from the caller, in addition to the type and protocol.
 
-The runtime equivalent of a global conformance lookup is a \index{dynamic cast}\emph{dynamic cast} from a concrete type to an existential type. Dynamic casts would also need to be extended to deal with overlapping conformances, inspecting something akin to a module import graph reified at the call site.
+The runtime equivalent of a global conformance lookup is a \index{dynamic cast}\emph{dynamic cast} from a concrete type to an existential type. Dynamic casts would also need to be extended to deal with overlapping conformances.
 
 \section{Conformance Substitution}\label{conformance subst}
 
-Now, we will define global conformance lookup with a \index{specialized type}specialized nominal type \texttt{T}. We know from \SecRef{contextsubstmap} that \texttt{T} splits up into the \index{declared interface type}declared interface type $\texttt{T}_d$ and \index{context substitution map}context substitution map, $\Sigma$. We begin by expanding out \texttt{T} in the global conformance lookup $\protosym{P}\otimes\texttt{T}$:
+Now, we will define global conformance lookup with a \index{specialized type}specialized nominal type \texttt{T}. We know from \SecRef{contextsubstmap} that \texttt{T} splits up into the \index{declared interface type}declared interface type $\texttt{T}_d$ and \index{context substitution map}context substitution map, $\Sigma$. We begin by expanding out \texttt{T} in the global conformance lookup $\pP\otimes\texttt{T}$:
 \[
-\protosym{P}\otimes\texttt{T} = \protosym{P} \otimes (\texttt{T}_d \otimes \Sigma)
+\pP\otimes\texttt{T} = \pP \otimes (\texttt{T}_d \otimes \Sigma)
 \]
 So far, we don't have any means to simplify the above expression further. However, recall that when we first introduced type substitution and substitution map composition, we defined them to not depend on order of operations. Thus, if \texttt{T} is a type and $\Sigma_1$, $\Sigma_2$, and $\Sigma_3$ are substitution maps, we showed that $(\texttt{T}\otimes\Sigma_1)\otimes\Sigma_2=\texttt{T}\otimes(\Sigma_1\otimes\Sigma_2)$, and also $(\Sigma_1\otimes\Sigma_2)\otimes\Sigma_3=\Sigma_1\otimes(\Sigma_2\otimes\Sigma_3)$. Analogously, we would like for the following to hold:
 \[
-\protosym{P} \otimes (\texttt{T}_d \otimes \Sigma) = (\protosym{P} \otimes \texttt{T}_d) \otimes \Sigma
+\pP \otimes (\texttt{T}_d \otimes \Sigma) = (\pP \otimes \texttt{T}_d) \otimes \Sigma
 \]
-Now, we can simplify the right hand side, at least partially. We have $\protosym{P}\otimes\texttt{T}_d=\NormalConf$. This leaves us with the new kind of expression $\NormalConf\otimes\Sigma$ that we have not seen before; we need to apply a substitution map to a conformance. Just as applying $\Sigma$ to $\texttt{T}_d$ outputs the specialized type \texttt{T}, applying $\Sigma$ to the normal conformance $\NormalConf$ outputs a \IndexDefinition{specialized conformance}\emph{specialized conformance}, denoted $\TP$, which describes how \texttt{T} meets the requirements of \texttt{P}:
-\[\protosym{P}\otimes\texttt{T}=\TP=\NormalConf\otimes\Sigma\]
+Now, we can simplify the right hand side, at least partially. We have $\pP\otimes\texttt{T}_d=\NormalConf$. This leaves us with the new kind of expression $\NormalConf\otimes\Sigma$ that we have not seen before; we need to apply a substitution map to a conformance. Just as applying $\Sigma$ to $\texttt{T}_d$ outputs the specialized type \texttt{T}, applying $\Sigma$ to the normal conformance $\NormalConf$ outputs a \IndexDefinition{specialized conformance}\emph{specialized conformance}, denoted $\TP$, which describes how \texttt{T} meets the requirements of \texttt{P}:
+\[\pP\otimes\texttt{T}=\TP=\NormalConf\otimes\Sigma\]
 
 The behavior of a specialized conformance $\TP$ can be specified entirely in terms of the underlying normal conformance $\NormalConf$, together with the \IndexDefinition{conformance substitution map}\emph{conformance substitution map} $\Sigma$. When \texttt{T} is not the declared interface type of some nominal type, we write $\TP$ as a notational convenience, if it is clear that $\texttt{T}=\texttt{T}_d\otimes\Sigma$ for some $\texttt{T}_d$ and $\Sigma$. In the implementation, the ``formal'' pair $\NormalConf\otimes\Sigma$ is the more primitive notion.
 
@@ -190,7 +190,7 @@ Just like types and substitution maps, specialized conformances are immutable an
 
 With this notation, we can understand how type substitution applies a substitution map to a \emph{specialized} conformance. Suppose $\Sigma^\prime\in\SubMapObj{G^\prime}{G^{\prime\prime}}$. Then, applying $\Sigma^\prime$ to the specialized conformance $\NormalConf\otimes\Sigma$ outputs a new specialized conformance with the composed substitution map:
 \[(\NormalConf\otimes\Sigma)\otimes\Sigma^\prime=\NormalConf\otimes(\Sigma\otimes\Sigma^\prime)\]
-This means that, for example, the expression $\protosym{P}\otimes\texttt{T}_d\otimes\Sigma\otimes\Sigma^\prime$ can be evaluated in one of several ways, corresponding to each possible placement of parentheses, but all evaluations produce the same result---a conformance to \texttt{P} with conforming type $\texttt{T}_d\otimes\Sigma\otimes\Sigma^\prime$.
+This means that, for example, the expression $\pP\otimes\texttt{T}_d\otimes\Sigma\otimes\Sigma^\prime$ can be evaluated in one of several ways, corresponding to each possible placement of parentheses, but all evaluations produce the same result---a conformance to \texttt{P} with conforming type $\texttt{T}_d\otimes\Sigma\otimes\Sigma^\prime$.
 
 Thus, we can apply substitution maps to conformances, just like we can apply them to types, and compose them with other substitution maps. To recap, we now have three ``overloads'' of \index{$\otimes$}$\otimes$ in our type substitution algebra:
 \begin{gather*}
@@ -302,7 +302,7 @@ The type witnesses of a specialized conformance are completely determined by the
 Thus, if $\texttt{T}=\texttt{T}_d\otimes\Sigma$ and $\AssocType{[P]A}\otimes\NormalConf=\texttt{W}$, then $\AssocType{[P]A}\otimes\TP=\texttt{W}\otimes\Sigma$. Also, note that if $\Sigma\in\SubMapObj{G}{G^\prime}$, then $\AssocType{[P]A} \otimes \TP\in\TypeObj{G^\prime}$. So the type witnesses of a normal or specialized conformance are understood in relation to the \index{output generic signature}output generic signature of the conformance, just as the replacement types of a substitution map contain type parameters for the output generic signature of the substitution map.
 
 We now study the relationship between global conformance lookup and type witness projection. Consider the ``general type witness expression'':
-\[\AssocType{[P]A}\otimes\protosym{P}\otimes\texttt{T}_d\otimes\Sigma\]
+\[\AssocType{[P]A}\otimes\pP\otimes\texttt{T}_d\otimes\Sigma\]
 There are three ways to place parentheses in this expression, and the key property is that the three different evaluation orders produce the same result:
 \begin{enumerate}
 \item We can look up the conformance of $\texttt{T}_d$ to \texttt{P} to get the normal conformance $\NormalConf$, project the type witness $\AssocType{[P]A}$ to get \texttt{W}, and apply $\Sigma$ to get $\texttt{W}\otimes\Sigma$.
@@ -314,7 +314,7 @@ There are three ways to place parentheses in this expression, and the key proper
 \begin{figure}\captionabove{Type witnesses of normal and specialized conformances}\label{type witness diagram}
 \begin{center}
 \begin{tikzcd}[column sep=3cm,row sep=1cm]
-\texttt{T}_d \arrow[d, "\protosym{P}"{left}] \arrow[r, "\Sigma"] &\texttt{T} \arrow[d, "\protosym{P}"] \\
+\texttt{T}_d \arrow[d, "\pP"{left}] \arrow[r, "\Sigma"] &\texttt{T} \arrow[d, "\pP"] \\
 \NormalConf \arrow[r, "\Sigma"] \arrow[d, "\AssocType{[P]A}"{left}]&\TP \arrow[d, "\AssocType{[P]A}"]\\
 \texttt{W} \arrow[r, "\Sigma"]&\texttt{W}\otimes\Sigma
 \end{tikzcd}
@@ -342,7 +342,7 @@ If we take \IndexSetDefinition{assoctype}{\AssocTypeObj{P}}$\AssocTypeObj{P}$ to
 \section{Abstract Conformances}\label{abstract conformances}
 
 An \IndexDefinition{abstract conformance}\emph{abstract conformance} represents the conformance of a \index{type parameter}type parameter of some \index{generic signature}generic signature to a protocol. Unlike concrete conformances, abstract conformances do not refer to a specific declaration, nor do they store their type witnesses directly. They are to concrete conformances, what type parameters are to concrete types. If it is understood that \texttt{T} is a type parameter, we use the same notation for abstract conformances as for concrete conformances:
-\[\protosym{P}\otimes\texttt{T} = \TP\]
+\[\pP\otimes\texttt{T} = \TP\]
 
 If the conformance \emph{requirement} $\TP$ can be \index{derived requirement}derived in a generic signature $G$, then there is an abstract conformance $\TP\in\ConfObj{G}$. (To put it another way, an abstract conformance $\TP$ exists if the \IndexQuery{requiresProtocol}$\Query{requiresProtocol}{G,\,\texttt{T},\,\texttt{P}}$ is true.)
 
@@ -357,7 +357,7 @@ As every valid dependent member type is the type witness of an abstract conforma
 \[\texttt{T.[P]A}\otimes\Sigma=\bigl(\AssocType{[P]A} \otimes \TP\bigr)\otimes\Sigma=\AssocType{[P]A}\otimes\bigl(\TP\otimes\Sigma\bigr)\]
 
 We saw how normal and specialized conformances are substituted in \SecRef{conformance subst}. Now, it appears we need the ability to apply a substitution map to an abstract conformance. This operation is named \IndexDefinition{local conformance lookup}\emph{local conformance lookup} by analogy with \index{global conformance lookup}global conformance lookup. Local conformance lookup is \emph{compatible} with global conformance lookup, in this sense: a local conformance lookup with some \index{substitution map}substitution map $\Sigma$, type parameter \texttt{T} and protocol \texttt{P} must return the same conformance as performing a global conformance lookup of $\texttt{T}\otimes\Sigma$ to $\texttt{P}$. This can be expressed as an equation:
-\[(\protosym{P}\otimes\texttt{T})\otimes\Sigma=\protosym{P}\otimes(\texttt{T}\otimes\Sigma)\]
+\[(\pP\otimes\texttt{T})\otimes\Sigma=\pP\otimes(\texttt{T}\otimes\Sigma)\]
 
 Local conformance lookup is not actually implemented in terms of global conformance lookup, though. In the simple case, when the abstract conformance corresponds to an explicit conformance requirement in the substitution map's input generic signature,  local conformance lookup returns one of the conformances stored by the substitution map. In the general case, local conformance lookup derives the conformance via a \index{conformance path}\emph{conformance path}. This will be revealed in \ChapRef{conformance paths}.
 
@@ -553,21 +553,27 @@ This has some unexpected consequences, which are explored in \SecRef{recursive c
 
 \section{Source Code Reference}\label{conformancesourceref}
 
+\subsection*{Global Conformance Lookup}
+
 Key source files:
 \begin{itemize}
-\item \SourceFile{include/swift/AST/ProtocolConformanceRef.h}
-\item \SourceFile{include/swift/AST/ProtocolConformance.h}
-\item \SourceFile{lib/AST/ProtocolConformanceRef.cpp}
-\item \SourceFile{lib/AST/ProtocolConformance.cpp}
+\item \SourceFile{include/swift/AST/ConformanceLookup.h}
+\item \SourceFile{lib/AST/ConformanceLookupTable.h}
+\item \SourceFile{lib/AST/ConformanceLookup.cpp}
+\item \SourceFile{lib/AST/ConformanceLookupTable.cpp}
 \end{itemize}
 Other source files:
 \begin{itemize}
 \item \SourceFile{include/swift/AST/DeclContext.h}
-\item \SourceFile{include/swift/AST/Module.h}
-\item \SourceFile{lib/AST/ConformanceLookupTable.h}
-\item \SourceFile{lib/AST/ConformanceLookupTable.cpp}
-\item \SourceFile{lib/AST/Module.cpp}
 \end{itemize}
+
+\IndexSource{global conformance lookup}
+\apiref{lookupConformance()}{function}
+Performs global conformance lookup of a type to a protocol. Does not check conditional requirements. To check conditional requirements, use \texttt{checkConformance()} described in \SecRef{extensionssourceref}.
+
+\IndexSource{conformance lookup table}
+\apiref{ConformanceLookupTable}{class}
+A conformance lookup table for a nominal type. Every \texttt{NominalTypeDecl} has a private instance of this class, but it is not exposed outside of the global conformance lookup implementation.
 
 \IndexSource{local conformance}
 \apiref{IterableDeclContext}{class}
@@ -583,16 +589,14 @@ See also \SecRef{declarationssourceref}.
 \item \texttt{getAllConformances()} returns a list of all conformances declared on this nominal type, its extensions, and inherited from its superclass, if any.
 \end{itemize}
 
-\IndexSource{conformance lookup table}
-\apiref{ConformanceLookupTable}{class}
-A conformance lookup table for a nominal type. Every \texttt{NominalTypeDecl} has a private instance of this class, but it is not exposed outside of the global conformance lookup implementation.
+\subsection*{Operations on Conformances}
 
-\index{module declaration}
-\IndexSource{global conformance lookup}
-\apiref{ModuleDecl}{class}
-See also \SecRef{compilation model source reference} and \SecRef{extensionssourceref}.
+Key source files:
 \begin{itemize}
-\item \texttt{lookupConformance()} returns the conformance of a type to a protocol. This is the a global conformance lookup operation that does not check conditional requirements. To check conditional requirements, use \texttt{checkConformance()} described in \SecRef{extensionssourceref}.
+\item \SourceFile{include/swift/AST/ProtocolConformanceRef.h}
+\item \SourceFile{include/swift/AST/ProtocolConformance.h}
+\item \SourceFile{lib/AST/ProtocolConformanceRef.cpp}
+\item \SourceFile{lib/AST/ProtocolConformance.cpp}
 \end{itemize}
 
 \IndexSource{conformance}
@@ -658,6 +662,8 @@ A specialized protocol conformance. Inherits from \texttt{ProtocolConformance}.
 \item \texttt{getGenericConformance()} returns the underlying normal conformance.
 \item \texttt{getSubstitutionMap()} returns the conformance substitution map.
 \end{itemize}
+
+\subsection*{Lazy Loading}
 
 The interface between conformances and the module system is mediated by an abstract base classes defined in the below header file:
 \begin{itemize}

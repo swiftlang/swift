@@ -49,6 +49,7 @@ static const unsigned ProtocolMinorVersion = 0;
 
 enum class CustomBufferKind {
   TokenAnnotationsArray,
+  DeclarationsArray,
   DocSupportAnnotationArray,
   CodeCompletionResultsArray,
   DocStructureArray,

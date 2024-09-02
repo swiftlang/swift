@@ -56,7 +56,8 @@ enum IsThunk_t {
   IsNotThunk,
   IsThunk,
   IsReabstractionThunk,
-  IsSignatureOptimizedThunk
+  IsSignatureOptimizedThunk,
+  IsBackDeployedThunk,
 };
 enum IsDynamicallyReplaceable_t {
   IsNotDynamic,
@@ -368,7 +369,7 @@ private:
   ///
   /// The inliner uses this information to avoid inlining (non-trivial)
   /// functions into the thunk.
-  unsigned Thunk : 2;
+  unsigned Thunk : 3;
 
   /// The scope in which the parent class can be subclassed, if this is a method
   /// which is contained in the vtable of that class.
@@ -486,6 +487,7 @@ private:
       break;
     case IsThunk:
     case IsReabstractionThunk:
+    case IsBackDeployedThunk:
       thunkCanHaveSubclassScope = false;
       break;
     }
