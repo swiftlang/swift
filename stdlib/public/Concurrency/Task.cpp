@@ -22,7 +22,6 @@
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "Debug.h"
-#include "Error.h"
 #include "TaskGroupPrivate.h"
 #include "TaskPrivate.h"
 #include "Tracing.h"
@@ -32,6 +31,7 @@
 #include "swift/ABI/TaskOptions.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Concurrency.h"
+#include "swift/Runtime/Debug.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Threading/Mutex.h"
@@ -1157,7 +1157,7 @@ void swift::swift_task_run_inline(OpaqueValue *result, void *closureAFP,
                                   const Metadata *futureResultTypeMetadata) {
   // Ensure that we're currently in a synchronous context.
   if (swift_task_getCurrent()) {
-    swift_Concurrency_fatalError(0, "called runInline within an async context");
+    swift::fatalError(0, "called runInline within an async context");
   }
 
   ResultTypeInfo futureResultType;
@@ -1302,7 +1302,7 @@ static void swift_task_future_waitImpl(
   }
 
   case FutureFragment::Status::Error:
-    swift_Concurrency_fatalError(0, "future reported an error, but wait cannot throw");
+    swift::fatalError(0, "future reported an error, but wait cannot throw");
   }
 }
 
@@ -1418,7 +1418,7 @@ static void init(AsyncTask *task) {
   auto result = ActiveContinuations.get().insert(task);
   auto inserted = std::get<1>(result);
   if (!inserted)
-    swift_Concurrency_fatalError(
+    swift::fatalError(
         0,
         "Initializing continuation for task %p that was already initialized.\n",
         task);
@@ -1431,11 +1431,10 @@ static void willResume(AsyncTask *task) {
   LazyMutex::ScopedLock guard(ActiveContinuationsLock);
   auto removed = ActiveContinuations.get().erase(task);
   if (!removed)
-    swift_Concurrency_fatalError(
-        0,
-        "Resuming continuation for task %p that is not awaited "
-        "(may have already been resumed).\n",
-        task);
+    swift::fatalError(0,
+                      "Resuming continuation for task %p that was not awaited "
+                      "(may have already been resumed).\n",
+                      task);
 }
 
 } // namespace continuationChecking
@@ -1742,15 +1741,14 @@ static void swift_task_asyncMainDrainQueueImpl() {
 #if defined(_WIN32)
   HMODULE hModule = LoadLibraryW(L"dispatch.dll");
   if (hModule == NULL) {
-    swift_Concurrency_fatalError(0,
-      "unable to load dispatch.dll: %lu", GetLastError());
+    swift::fatalError(0, "unable to load dispatch.dll: %lu", GetLastError());
   }
 
   auto pfndispatch_main = reinterpret_cast<void (FAR *)(void)>(
     GetProcAddress(hModule, "dispatch_main"));
   if (pfndispatch_main == NULL) {
-    swift_Concurrency_fatalError(0,
-      "unable to locate dispatch_main in dispatch.dll: %lu", GetLastError());
+    swift::fatalError(0, "unable to locate dispatch_main in dispatch.dll: %lu",
+                      GetLastError());
   }
 
   pfndispatch_main();
@@ -1784,7 +1782,7 @@ static void swift_task_startOnMainActorImpl(AsyncTask* task) {
   AsyncTask * originalTask = _swift_task_clearCurrent();
   SerialExecutorRef mainExecutor = swift_task_getMainExecutor();
   if (!swift_task_isCurrentExecutor(mainExecutor))
-    swift_Concurrency_fatalError(0, "Not on the main executor");
+    swift::fatalError(0, "Not on the main executor");
   swift_retain(task);
   swift_job_run(task, mainExecutor);
   _swift_task_setCurrent(originalTask);

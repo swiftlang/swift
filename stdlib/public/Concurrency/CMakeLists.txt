@@ -76,7 +76,6 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   Clock.cpp
   GlobalExecutor.cpp
   EmbeddedSupport.cpp
-  Error.cpp
   Setup.cpp
   Task.cpp
   TaskAlloc.cpp

@@ -17,6 +17,7 @@
 #ifndef SWIFT_CONCURRENCY_TRACING_H
 #define SWIFT_CONCURRENCY_TRACING_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 namespace swift {

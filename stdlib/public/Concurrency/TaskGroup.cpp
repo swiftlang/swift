@@ -30,6 +30,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/Debug.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Threading/Mutex.h"
 #include <atomic>
@@ -654,7 +655,7 @@ AsyncTask *TaskGroupBase::claimWaitingTask() {
 
   auto waitingTask = waitQueue.load(std::memory_order_acquire);
   if (!waitQueue.compare_exchange_strong(waitingTask, nullptr)) {
-    swift_Concurrency_fatalError(0, "Failed to claim waitingTask!");
+    swift::fatalError(0, "Failed to claim waitingTask!");
   }
   return waitingTask;
 }
@@ -1358,7 +1359,7 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
           return runWaitingTask(prepared);
         }
         default: {
-          swift_Concurrency_fatalError(
+          swift::fatalError(
               0, "only errors can be stored by a discarding task group, yet it "
                  "wasn't an error! 1");
         }
@@ -1404,7 +1405,7 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
     // As another offer gets to run, it will have either a different waiting task, or no waiting task at all.
     auto waitingTask = waitQueue.load(std::memory_order_acquire);
     if (!waitQueue.compare_exchange_strong(waitingTask, nullptr)) {
-      swift_Concurrency_fatalError(0, "Failed to claim waitingTask!");
+      swift::fatalError(0, "Failed to claim waitingTask!");
     }
     assert(waitingTask && "status claimed to have waitingTask but waitQueue was empty!");
 
@@ -1444,7 +1445,7 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
         return runWaitingTask(preparedWaitingTask);
       }
       default: {
-        swift_Concurrency_fatalError(
+        swift::fatalError(
             0, "only errors can be stored by a discarding task group, yet it "
                "wasn't an error! 2");
       }
@@ -1783,9 +1784,11 @@ reevaluate_if_taskgroup_has_results:;
           return result;
 
         case ReadyStatus::RawError:
-          swift_Concurrency_fatalError(0, "accumulating task group should never use raw-errors!");
+          swift::fatalError(
+              0, "accumulating task group should never use raw-errors!");
       }
-      swift_Concurrency_fatalError(0, "must return result when status compare-and-swap was successful");
+      swift::fatalError(
+          0, "must return result when status compare-and-swap was successful");
     } // else, we failed status-cas (some other waiter claimed a ready pending task, try again)
   }
 

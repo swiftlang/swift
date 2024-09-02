@@ -24,6 +24,8 @@
 ///
 ///===------------------------------------------------------------------===///
 
+#include "swift/Runtime/Debug.h"
+
 SWIFT_CC(swift)
 static void swift_task_enqueueGlobalImpl(Job *job) {
   assert(job && "no job provided");

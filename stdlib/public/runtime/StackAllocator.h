@@ -27,12 +27,6 @@
 #include <cstddef>
 #include <new>
 
-// Notes: swift::fatalError is not shared between libswiftCore and libswift_Concurrency
-// and libswift_Concurrency uses swift_Concurrency_fatalError instead.
-#ifndef SWIFT_FATAL_ERROR
-#define SWIFT_FATAL_ERROR swift::fatalError
-#endif
-
 namespace swift {
 
 /// A bump-pointer allocator that obeys a stack discipline.
@@ -188,7 +182,7 @@ private:
       if (guardAllocations) {
         auto *endOfAllocation = (uintptr_t *)getAddr(currentOffset);
         if (endOfAllocation[-1] != magicEndOfAllocation)
-          SWIFT_FATAL_ERROR(0, "Buffer overflow in StackAllocator");
+          swift::fatalError(0, "Buffer overflow in StackAllocator");
         for (auto *p = (uintptr_t *)allocation; p < endOfAllocation; ++p)
           *p = magicUninitialized;
       }
@@ -300,7 +294,7 @@ public:
 
   ~StackAllocator() {
     if (lastAllocation)
-      SWIFT_FATAL_ERROR(0, "not all allocations are deallocated");
+      swift::fatalError(0, "not all allocations are deallocated");
     if (firstSlabIsPreallocated)
       firstSlab->clearMetadata();
     (void)freeAllSlabs(firstSlabIsPreallocated ? firstSlab->next : firstSlab);
@@ -327,7 +321,7 @@ public:
   /// Deallocate memory \p ptr.
   void dealloc(void *ptr) {
     if (!lastAllocation || lastAllocation->getAllocatedMemory() != ptr) {
-      SWIFT_FATAL_ERROR(0, "freed pointer was not the last allocation");
+      swift::fatalError(0, "freed pointer was not the last allocation");
     }
 
     Allocation *prev = lastAllocation->previous;

@@ -20,6 +20,7 @@
 #include "TaskPrivate.h"
 #include "swift/Runtime/AtomicWaitQueue.h"
 #include "swift/Runtime/Concurrency.h"
+#include "swift/Runtime/Debug.h"
 #include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Threading/Mutex.h"
 #include "swift/Threading/Thread.h"
@@ -170,7 +171,8 @@ static void waitForStatusRecordUnlock(AsyncTask *task,
       // not the owner and then wait for it to be unlocked.
       auto record = cast<StatusRecordLockRecord>(status.getInnermostRecord());
       if (record->isStatusRecordLockedBySelf()) {
-        swift_Concurrency_fatalError(0, "Waiting on a status record lock that is owned by self");
+        swift::fatalError(
+            0, "Waiting on a status record lock that is owned by self");
       }
       return record;
     });

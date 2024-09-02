@@ -10,10 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Runtime/Debug.h"
 #include "swift/Threading/Errors.h"
 #include <cstdio>
-
-#include "Error.h"
 
 // Handle fatal errors from the threading library
 SWIFT_ATTRIBUTE_NORETURN
@@ -22,5 +21,5 @@ void swift::threading::fatal(const char *format, ...) {
   va_list val;
 
   va_start(val, format);
-  swift_Concurrency_fatalErrorv(0, format, val);
+  swift::fatalErrorv(0, format, val);
 }
