@@ -5605,8 +5605,6 @@ public:
     return range.isValid() ? range : std::optional<SourceRange>();
   }
 
-  bool isPartialApplication(ConstraintLocator *locator);
-
   bool isTooComplex(size_t solutionMemory) {
     if (isAlreadyTooComplex.first)
       return true;
@@ -6554,6 +6552,11 @@ Type getPatternTypeOfSingleUnlabeledPackExpansionTuple(Type type);
 /// Check whether this is a reference to one of the special result builder
 /// methods prefixed with `build*` i.e. `buildBlock`, `buildExpression` etc.
 bool isResultBuilderMethodReference(ASTContext &, UnresolvedDotExpr *);
+
+/// Determine the number of applications applied to the given overload.
+unsigned getNumApplications(ValueDecl *decl, bool hasAppliedSelf,
+                            FunctionRefKind functionRefKind);
+
 } // end namespace constraints
 
 template<typename ...Args>
