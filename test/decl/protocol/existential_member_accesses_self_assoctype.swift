@@ -1024,3 +1024,12 @@ do {
   let _: Array<any Class2Base & CovariantAssocTypeErasureDerived> = exist.method11()
   let _: Dictionary<String, any Class2Base & CovariantAssocTypeErasureDerived> = exist.method12()
 }
+
+// Same-shape requirements
+protocol HasSameShape {
+  func foo<each T, each U>(t: repeat each T, u: repeat each U) -> (repeat (each T, each U))
+}
+
+func bar(a: any HasSameShape) -> (Int, String) {
+  a.foo(t: 1, u: "hi")
+}

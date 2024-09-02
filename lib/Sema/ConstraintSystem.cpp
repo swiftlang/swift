@@ -7479,9 +7479,6 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
 
   for (const auto &req : sig.getRequirements()) {
     switch (req.getKind()) {
-    case RequirementKind::SameShape:
-      llvm_unreachable("Same-shape requirement not supported here");
-
     case RequirementKind::Superclass: {
       if (req.getFirstType()->getRootGenericParam()->getDepth() > 0 &&
           req.getSecondType().walk(isDependentOnSelfWalker)) {
@@ -7490,7 +7487,8 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
 
       break;
     }
-    case RequirementKind::SameType: {
+    case RequirementKind::SameType:
+    case RequirementKind::SameShape: {
       const auto isNonSelfRootedTypeParam = [](Type ty) {
         return ty->isTypeParameter() &&
                ty->getRootGenericParam()->getDepth() > 0;
