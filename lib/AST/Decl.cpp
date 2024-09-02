@@ -5125,7 +5125,8 @@ swift::findGenericParameterReferences(const ValueDecl *value,
                                       GenericTypeParamType *origParam,
                                       GenericTypeParamType *openedParam,
                                       std::optional<unsigned> skipParamIndex) {
-  assert(!isa<TypeDecl>(value));
+  if (isa<TypeDecl>(value))
+    return GenericParameterReferenceInfo();
 
   auto type = value->getInterfaceType();
 
@@ -5150,26 +5151,13 @@ swift::findGenericParameterReferences(const ValueDecl *value,
                                              /*canBeCovariantResult=*/true);
 }
 
-GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
-    Type baseTy) const {
-  assert(baseTy->isExistentialType());
-  assert(!baseTy->hasTypeParameter());
+GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences() const {
+  auto *dc = getDeclContext();
+  ASSERT(dc->getSelfProtocolDecl());
 
-  // Type declarations don't really have type signatures.
-  if (isa<TypeDecl>(this))
-    return GenericParameterReferenceInfo();
+  auto sig = dc->getGenericSignatureOfContext().getCanonicalSignature();
+  auto genericParam = dc->getSelfInterfaceType()->castTo<GenericTypeParamType>();
 
-  // Skip invalid declarations.
-  if (getInterfaceType()->hasError())
-    return GenericParameterReferenceInfo();
-
-  // Note: a non-null GenericSignature would violate the invariant that
-  // the protocol 'Self' type referenced from the requirement's interface
-  // type is the same as the existential 'Self' type.
-  auto sig = getASTContext().getOpenedExistentialSignature(baseTy,
-      GenericSignature());
-
-  auto genericParam = sig.getGenericParams().front();
   return findGenericParameterReferences(this, sig, genericParam, genericParam,
                                         std::nullopt);
 }

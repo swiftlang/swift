@@ -3335,9 +3335,8 @@ public:
   /// that this declaration dynamically replaces.
   ValueDecl *getDynamicallyReplacedDecl() const;
 
-  /// Find references to 'Self' in the type signature of this declaration in the
-  /// context of the given existential base type.
-  GenericParameterReferenceInfo findExistentialSelfReferences(Type baseTy) const;
+  /// Find references to 'Self' in the type signature of this declaration.
+  GenericParameterReferenceInfo findExistentialSelfReferences() const;
 };
 
 /// This is a common base class for declarations which declare a type.

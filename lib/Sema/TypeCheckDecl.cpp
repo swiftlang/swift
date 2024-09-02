@@ -733,8 +733,7 @@ bool HasSelfOrAssociatedTypeRequirementsRequest::evaluate(
 
     // For value members, look at their type signatures.
     if (auto valueMember = dyn_cast<ValueDecl>(member)) {
-      const auto info = valueMember->findExistentialSelfReferences(
-          decl->getDeclaredInterfaceType());
+      const auto info = valueMember->findExistentialSelfReferences();
       if (info.selfRef > TypePosition::Covariant || info.assocTypeRef) {
         return true;
       }
