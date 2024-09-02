@@ -4607,13 +4607,14 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
         new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(stmt->getForLoc()),
                               /*Implicit=*/true),
         nextId, labels);
-    nextRef->setFunctionRefKind(FunctionRefKind::Compound);
+    nextRef->setFunctionRefKind(FunctionRefKind::SingleApply);
 
     ArgumentList *nextArgs;
     if (nextFn && nextFn->getParameters()->size() == 1) {
       auto isolationArg =
         new (ctx) CurrentContextIsolationExpr(stmt->getForLoc(), Type());
-      nextArgs = ArgumentList::forImplicitUnlabeled(ctx, { isolationArg });
+      nextArgs = ArgumentList::createImplicit(
+          ctx, {Argument(SourceLoc(), ctx.Id_isolation, isolationArg)});
     } else {
       nextArgs = ArgumentList::createImplicit(ctx, {});
     }
