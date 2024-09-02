@@ -305,4 +305,17 @@ do {
 
   let fn = S.foo(S())
   bar(fn) // Ok
+
+  let _: @Sendable (S) -> @Sendable () -> Void = S.foo // Ok
+
+  let classFn = NonSendable.f(NonSendable())
+  bar(classFn) // expected-warning {{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+
+  let _: @Sendable (NonSendable) -> () -> Void = NonSendable.f // Ok
+
+  class Test {
+    static func staticFn() {}
+  }
+
+  bar(Test.staticFn) // Ok
 }

@@ -1774,21 +1774,36 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
           adjustedTy =
               adjustedTy->withExtInfo(adjustedTy->getExtInfo().withSendable());
         }
-      } else if (numApplies < decl->getNumCurryLevels()) {
-        // Operators on protocols could be found via unqualified lookup and
-        // won't have a base type.
-        if (decl->isOperator() ||
-            (baseType &&
-             (baseType->is<AnyMetatypeType>() || baseType->isSendableType()))) {
-          auto referenceTy = adjustedTy->getResult()->castTo<FunctionType>();
-          referenceTy =
-              referenceTy->withExtInfo(referenceTy->getExtInfo().withSendable())
-                  ->getAs<FunctionType>();
+      } else if (numApplies < decl->getNumCurryLevels() &&
+                 decl->hasCurriedSelf() ) {
+        auto shouldMarkMemberTypeSendable = [&]() {
+          // Static member types are @Sendable on both levels because
+          // they only capture a metatype "base" that is always Sendable.
+          // For example, `(S.Type) -> () -> Void`.
+          if (!decl->isInstanceMember())
+            return true;
 
-          adjustedTy =
-              FunctionType::get(adjustedTy->getParams(), referenceTy,
-                                adjustedTy->getExtInfo().withSendable());
+          // For instance members we need to check whether instance type
+          // is Sendable because @Sendable function values cannot capture
+          // non-Sendable values (base instance type in this case).
+          // For example, `(C) -> () -> Void` where `C` should be Sendable
+          // for the inner function type to be Sendable as well.
+          return baseType &&
+                 baseType->getMetatypeInstanceType()->isSendableType();
+        };
+
+        auto referenceTy = adjustedTy->getResult()->castTo<FunctionType>();
+        if (shouldMarkMemberTypeSendable()) {
+          referenceTy =
+              referenceTy
+                  ->withExtInfo(referenceTy->getExtInfo().withSendable())
+                  ->getAs<FunctionType>();
         }
+
+        // @Sendable since fully uncurried type doesn't capture anything.
+        adjustedTy =
+            FunctionType::get(adjustedTy->getParams(), referenceTy,
+                              adjustedTy->getExtInfo().withSendable());
       }
     }
   }
