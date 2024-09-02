@@ -42,7 +42,7 @@ public:
 
 struct ConstRACIterator {
 private:
-  int value;
+  const int *value;
 
 public:
   using iterator_category = std::random_access_iterator_tag;
@@ -51,10 +51,10 @@ public:
   using reference = const int &;
   using difference_type = int;
 
-  ConstRACIterator(int value) : value(value) {}
+  ConstRACIterator(const int *value) : value(value) {}
   ConstRACIterator(const ConstRACIterator &other) = default;
 
-  const int &operator*() const { return value; }
+  const int &operator*() const { return *value; }
 
   ConstRACIterator &operator++() {
     value++;
@@ -97,7 +97,7 @@ public:
 // Same as ConstRACIterator, but operator+= returns a reference to this.
 struct ConstRACIteratorRefPlusEq {
 private:
-  int value;
+  const int *value;
 
 public:
   using iterator_category = std::random_access_iterator_tag;
@@ -106,10 +106,10 @@ public:
   using reference = const int &;
   using difference_type = int;
 
-  ConstRACIteratorRefPlusEq(int value) : value(value) {}
+  ConstRACIteratorRefPlusEq(const int *value) : value(value) {}
   ConstRACIteratorRefPlusEq(const ConstRACIteratorRefPlusEq &other) = default;
 
-  const int &operator*() const { return value; }
+  const int &operator*() const { return *value; }
 
   ConstRACIteratorRefPlusEq &operator++() {
     value++;
@@ -918,7 +918,7 @@ public:
 
 struct MutableRACIterator {
 private:
-  int value;
+  int *value;
 
 public:
   struct iterator_category : std::random_access_iterator_tag,
@@ -928,11 +928,11 @@ public:
   using reference = const int &;
   using difference_type = int;
 
-  MutableRACIterator(int value) : value(value) {}
+  MutableRACIterator(int *value) : value(value) {}
   MutableRACIterator(const MutableRACIterator &other) = default;
 
-  const int &operator*() const { return value; }
-  int &operator*() { return value; }
+  const int &operator*() const { return *value; }
+  int &operator*() { return *value; }
 
   MutableRACIterator &operator++() {
     value++;
