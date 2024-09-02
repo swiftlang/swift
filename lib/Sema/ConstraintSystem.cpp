@@ -7438,7 +7438,7 @@ void ConstraintSystem::maybeProduceFallbackDiagnostic(
 /// Because opened archetypes are not part of the surface language, these
 /// constraints render the member inaccessible.
 static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
-    Type baseTy, const ValueDecl *member) {
+    OpenedExistentialSignature existentialSig, const ValueDecl *member) {
   const auto sig =
       member->getInnermostDeclContext()->getGenericSignatureOfContext();
 
@@ -7446,9 +7446,6 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
   if (sig.getGenericParams().size() == 1) {
     return false;
   }
-
-  auto &ctx = member->getASTContext();
-  auto existentialSig = ctx.getOpenedExistentialSignature(baseTy);
 
   class IsDependentOnOpenedExistentialSelf : public TypeWalker {
     OpenedExistentialSignature existentialSig;
@@ -7542,20 +7539,14 @@ bool ConstraintSystem::isMemberAvailableOnExistential(
     Type baseTy, const ValueDecl *member) const {
   assert(member->getDeclContext()->getSelfProtocolDecl());
 
-  // If the type of the member references 'Self' or a 'Self'-rooted associated
-  // type in non-covariant position, we cannot reference the member.
-  assert(baseTy->isExistentialType());
-  assert(!baseTy->hasTypeParameter());
+  auto existentialSig = getASTContext().getOpenedExistentialSignature(baseTy);
 
-  // Note: a non-null GenericSignature would violate the invariant that
-  // the protocol 'Self' type referenced from the requirement's interface
-  // type is the same as the existential 'Self' type.
-  auto sig = getASTContext().getOpenedExistentialSignature(baseTy,
-      GenericSignature());
+  auto *dc = member->getDeclContext();
+  auto origParam = dc->getSelfInterfaceType()->castTo<GenericTypeParamType>();
+  auto openedParam = existentialSig.SelfType->castTo<GenericTypeParamType>();
 
-  auto genericParam = sig.getGenericParams().front();
   auto info = findGenericParameterReferences(
-      member, sig, genericParam, genericParam,
+      member, existentialSig.OpenedSig, origParam, openedParam,
       std::nullopt);
 
   if (info.selfRef > TypePosition::Covariant ||
@@ -7569,7 +7560,7 @@ bool ConstraintSystem::isMemberAvailableOnExistential(
       return false;
   }
 
-  if (doesMemberHaveUnfulfillableConstraintsWithExistentialBase(baseTy,
+  if (doesMemberHaveUnfulfillableConstraintsWithExistentialBase(existentialSig,
                                                                 member)) {
     return false;
   }
