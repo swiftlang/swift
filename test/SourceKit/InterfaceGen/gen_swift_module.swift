@@ -63,6 +63,15 @@ func f(s : inout [Int]) {
 // CHECK-DECLARATIONS-ARRAY-NOT: key.offset:{{.*}}{{^[0-9]}}0{{^[0-9]}}
 // CHECK-DECLARATIONS-ARRAY: key.offset
 
+// deinit
+// CHECK-DECLARATIONS-ARRAY: key.kind:
+// CHECK-DECLARATIONS-ARRAY-SAME: decl
+// CHECK-DECLARATIONS-ARRAY-SAME: function.destructor
+// CHECK-DECLARATIONS-ARRAY-NEXT: key.usr:
+// CHECK-DECLARATIONS-ARRAY-SAME: s:9swift_mod7MyClassCfd
+// CHECK-DECLARATIONS-ARRAY-NOT: key.offset:{{.*}}{{^[0-9]}}0{{^[0-9]}}
+// CHECK-DECLARATIONS-ARRAY: key.offset
+
 // CHECK-DECLARATIONS-ARRAY-NOT: int_method
 // CHECK-DECLARATIONS-ARRAY-NOT: fp_method
 // CHECK-DECLARATIONS-ARRAY-NOT: priv_method
