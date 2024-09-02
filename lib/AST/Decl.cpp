@@ -4904,7 +4904,7 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
                                   TypePosition position,
                                   bool canBeCovariantResult) {
   // If there are no type parameters, we're done.
-  if (!type->hasTypeParameter())
+  if (!type->getCanonicalType()->hasTypeParameter())
     return GenericParameterReferenceInfo();
 
   // Tuples preserve variance.
@@ -4954,7 +4954,7 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
     // Don't forget to look in the parent.
     if (const auto parent = nominal->getParent()) {
       info |= findGenericParameterReferencesRec(
-          genericSig, genericParam, parent, position,
+          genericSig, genericParam, parent, TypePosition::Invariant,
           /*canBeCovariantResult=*/false);
     }
 
@@ -5033,8 +5033,38 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
     return info;
   }
 
-  if (!type->isTypeParameter()) {
+  // Packs are invariant.
+  if (auto *pack = type->getAs<PackType>()) {
+    auto info = GenericParameterReferenceInfo();
+
+    for (auto arg : pack->getElementTypes()) {
+      info |= findGenericParameterReferencesRec(
+          genericSig, genericParam, arg,
+          TypePosition::Invariant, /*canBeCovariantResult=*/false);
+    }
+
+    return info;
+  }
+
+  // Pack expansions are invariant.
+  if (auto *expansion = type->getAs<PackExpansionType>()) {
+    return findGenericParameterReferencesRec(
+        genericSig, genericParam, expansion->getPatternType(),
+        TypePosition::Invariant, /*canBeCovariantResult=*/false);
+  }
+
+  // Specifically ignore parameterized protocols and existential
+  // metatypes because we can erase them to the upper bound.
+  if (type->is<ParameterizedProtocolType>() ||
+      type->is<ExistentialMetatypeType>()) {
     return GenericParameterReferenceInfo();
+  }
+
+  // Everything else should be a type parameter.
+  if (!type->isTypeParameter()) {
+    llvm::errs() << "Unhandled type:\n";
+    type->dump(llvm::errs());
+    abort();
   }
 
   Type selfTy(genericParam);
