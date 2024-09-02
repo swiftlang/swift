@@ -2202,6 +2202,12 @@ namespace {
                                    MoveOnlyAttr(/*Implicit=*/true));
       }
 
+      if (Impl.SwiftContext.LangOpts.hasFeature(Feature::NonescapableTypes) &&
+          importer::hasNonEscapableAttr(decl)) {
+        result->getAttrs().add(new (Impl.SwiftContext)
+                                   NonEscapableAttr(/*Implicit=*/true));
+      }
+
       // FIXME: Figure out what to do with superclasses in C++. One possible
       // solution would be to turn them into members and add conversion
       // functions.
