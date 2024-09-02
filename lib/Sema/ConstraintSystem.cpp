@@ -1655,8 +1655,8 @@ static unsigned getNumRemovedArgumentLabels(ValueDecl *decl,
 }
 
 /// Determine the number of applications
-static unsigned getNumApplications(
-    ValueDecl *decl, bool hasAppliedSelf, FunctionRefKind functionRefKind) {
+unsigned constraints::getNumApplications(ValueDecl *decl, bool hasAppliedSelf,
+                                         FunctionRefKind functionRefKind) {
   switch (functionRefKind) {
   case FunctionRefKind::Unapplied:
   case FunctionRefKind::Compound:
@@ -1774,18 +1774,36 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
           adjustedTy =
               adjustedTy->withExtInfo(adjustedTy->getExtInfo().withSendable());
         }
-      } else if (isPartialApplication(getConstraintLocator(locator))) {
-        if (baseType &&
-            (baseType->is<AnyMetatypeType>() || baseType->isSendableType())) {
-          auto referenceTy = adjustedTy->getResult()->castTo<FunctionType>();
-          referenceTy =
-              referenceTy->withExtInfo(referenceTy->getExtInfo().withSendable())
-                  ->getAs<FunctionType>();
+      } else if (numApplies < decl->getNumCurryLevels() &&
+                 decl->hasCurriedSelf() ) {
+        auto shouldMarkMemberTypeSendable = [&]() {
+          // Static member types are @Sendable on both levels because
+          // they only capture a metatype "base" that is always Sendable.
+          // For example, `(S.Type) -> () -> Void`.
+          if (!decl->isInstanceMember())
+            return true;
 
-          adjustedTy =
-              FunctionType::get(adjustedTy->getParams(), referenceTy,
-                                adjustedTy->getExtInfo().withSendable());
+          // For instance members we need to check whether instance type
+          // is Sendable because @Sendable function values cannot capture
+          // non-Sendable values (base instance type in this case).
+          // For example, `(C) -> () -> Void` where `C` should be Sendable
+          // for the inner function type to be Sendable as well.
+          return baseType &&
+                 baseType->getMetatypeInstanceType()->isSendableType();
+        };
+
+        auto referenceTy = adjustedTy->getResult()->castTo<FunctionType>();
+        if (shouldMarkMemberTypeSendable()) {
+          referenceTy =
+              referenceTy
+                  ->withExtInfo(referenceTy->getExtInfo().withSendable())
+                  ->getAs<FunctionType>();
         }
+
+        // @Sendable since fully uncurried type doesn't capture anything.
+        adjustedTy =
+            FunctionType::get(adjustedTy->getParams(), referenceTy,
+                              adjustedTy->getExtInfo().withSendable());
       }
     }
   }
@@ -2634,26 +2652,6 @@ static unsigned getApplicationLevel(ConstraintSystem &CS, Type baseTy,
   }
 
   return level;
-}
-
-bool ConstraintSystem::isPartialApplication(ConstraintLocator *locator) {
-  // If this is a compiler synthesized implicit conversion, let's skip
-  // the check because the base of `UDE` is not the base of the injected
-  // initializer.
-  if (locator->isLastElement<LocatorPathElt::ConstructorMember>() &&
-      locator->findFirst<LocatorPathElt::ImplicitConversion>())
-    return false;
-
-  auto *UDE = getAsExpr<UnresolvedDotExpr>(locator->getAnchor());
-  if (UDE == nullptr)
-    return false;
-
-  auto baseTy =
-      simplifyType(getType(UDE->getBase()))->getWithoutSpecifierType();
-  auto level = getApplicationLevel(*this, baseTy, UDE);
-  // Static members have base applied implicitly which means that their
-  // application level is lower.
-  return level < (baseTy->is<MetatypeType>() ? 1 : 2);
 }
 
 bool IsInLeftHandSideOfAssignment::operator()(Expr *expr) const {
