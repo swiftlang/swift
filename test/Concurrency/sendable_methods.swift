@@ -286,3 +286,36 @@ func testPatternMatch(ge: [GenericE<Int>]) {
     _ = a
   }
 }
+
+// rdar://131321053 - cannot pass an operator to parameter that expectes a @Sendable type
+do {
+  func test(_: @Sendable (Int, Int) -> Bool) {
+  }
+
+  test(<) // Ok
+}
+
+// Partially applied instance method
+do {
+  struct S {
+    func foo() {}
+  }
+
+  func bar(_ x: @Sendable () -> Void) {}
+
+  let fn = S.foo(S())
+  bar(fn) // Ok
+
+  let _: @Sendable (S) -> @Sendable () -> Void = S.foo // Ok
+
+  let classFn = NonSendable.f(NonSendable())
+  bar(classFn) // expected-warning {{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+
+  let _: @Sendable (NonSendable) -> () -> Void = NonSendable.f // Ok
+
+  class Test {
+    static func staticFn() {}
+  }
+
+  bar(Test.staticFn) // Ok
+}
