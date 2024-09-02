@@ -3,22 +3,22 @@
 
 // REQUIRES: OS=macosx
 
-// CHECK: {{^}}(root versions=[50,+Inf)
+// CHECK: {{^}}(root version=50
 
-// CHECK-NEXT: {{^}}  (decl versions=[51,+Inf) decl=SomeClass
-// CHECK-NEXT: {{^}}    (decl versions=[52,+Inf) decl=someMethod()
-// CHECK-NEXT: {{^}}      (decl versions=[53,+Inf) decl=someInnerFunc()
-// CHECK-NEXT: {{^}}      (decl versions=[53,+Inf) decl=InnerClass
-// CHECK-NEXT: {{^}}        (decl versions=[54,+Inf) decl=innerClassMethod
-// CHECK-NEXT: {{^}}    (decl_implicit versions=[51,+Inf) decl=someStaticProperty
-// CHECK-NEXT: {{^}}      (decl versions=[52,+Inf) decl=someStaticProperty
-// CHECK-NEXT: {{^}}    (decl_implicit versions=[51,+Inf) decl=someStaticPropertyInferredType
-// CHECK-NEXT: {{^}}      (decl versions=[52,+Inf) decl=someStaticPropertyInferredType
-// CHECK-NEXT: {{^}}    (decl_implicit versions=[51,+Inf) decl=multiPatternStaticPropertyA
-// CHECK-NEXT: {{^}}      (decl versions=[52,+Inf) decl=multiPatternStaticPropertyA
-// CHECK-NEXT: {{^}}    (decl_implicit versions=[51,+Inf) decl=someComputedProperty
-// CHECK-NEXT: {{^}}      (decl versions=[52,+Inf) decl=someComputedProperty
-// CHECK-NEXT: {{^}}    (decl versions=[52,+Inf) decl=someOtherMethod()
+// CHECK-NEXT: {{^}}  (decl version=51 decl=SomeClass
+// CHECK-NEXT: {{^}}    (decl version=52 decl=someMethod()
+// CHECK-NEXT: {{^}}      (decl version=53 decl=someInnerFunc()
+// CHECK-NEXT: {{^}}      (decl version=53 decl=InnerClass
+// CHECK-NEXT: {{^}}        (decl version=54 decl=innerClassMethod
+// CHECK-NEXT: {{^}}    (decl_implicit version=51 decl=someStaticProperty
+// CHECK-NEXT: {{^}}      (decl version=52 decl=someStaticProperty
+// CHECK-NEXT: {{^}}    (decl_implicit version=51 decl=someStaticPropertyInferredType
+// CHECK-NEXT: {{^}}      (decl version=52 decl=someStaticPropertyInferredType
+// CHECK-NEXT: {{^}}    (decl_implicit version=51 decl=multiPatternStaticPropertyA
+// CHECK-NEXT: {{^}}      (decl version=52 decl=multiPatternStaticPropertyA
+// CHECK-NEXT: {{^}}    (decl_implicit version=51 decl=someComputedProperty
+// CHECK-NEXT: {{^}}      (decl version=52 decl=someComputedProperty
+// CHECK-NEXT: {{^}}    (decl version=52 decl=someOtherMethod()
 @available(OSX 51, *)
 class SomeClass {
   @available(OSX 52, *)
@@ -56,14 +56,14 @@ class SomeClass {
   func someOtherMethod() { }
 }
 
-// CHECK-NEXT: {{^}}  (decl versions=[51,+Inf) decl=someFunction()
+// CHECK-NEXT: {{^}}  (decl version=51 decl=someFunction()
 @available(OSX 51, *)
 func someFunction() { }
 
-// CHECK-NEXT: {{^}}  (decl versions=[51,+Inf) decl=SomeProtocol
-// CHECK-NEXT: {{^}}    (decl versions=[52,+Inf) decl=protoMethod()
-// CHECK-NEXT: {{^}}    (decl_implicit versions=[51,+Inf) decl=protoProperty
-// CHECK-NEXT: {{^}}      (decl versions=[52,+Inf) decl=protoProperty
+// CHECK-NEXT: {{^}}  (decl version=51 decl=SomeProtocol
+// CHECK-NEXT: {{^}}    (decl version=52 decl=protoMethod()
+// CHECK-NEXT: {{^}}    (decl_implicit version=51 decl=protoProperty
+// CHECK-NEXT: {{^}}      (decl version=52 decl=protoProperty
 @available(OSX 51, *)
 protocol SomeProtocol {
   @available(OSX 52, *)
@@ -73,27 +73,27 @@ protocol SomeProtocol {
   var protoProperty: Int { get }
 }
 
-// CHECK-NEXT: {{^}}  (decl_implicit versions=[50,+Inf) decl=extension.SomeClass
-// CHECK-NEXT: {{^}}    (decl versions=[51,+Inf) decl=extension.SomeClass
-// CHECK-NEXT: {{^}}      (decl versions=[52,+Inf) decl=someExtensionFunction()
+// CHECK-NEXT: {{^}}  (decl_implicit version=50 decl=extension.SomeClass
+// CHECK-NEXT: {{^}}    (decl version=51 decl=extension.SomeClass
+// CHECK-NEXT: {{^}}      (decl version=52 decl=someExtensionFunction()
 @available(OSX 51, *)
 extension SomeClass {
   @available(OSX 52, *)
   func someExtensionFunction() { }
 }
 
-// CHECK-NEXT: {{^}}  (decl versions=[51,+Inf) decl=functionWithStmtCondition
-// CHECK-NEXT: {{^}}    (condition_following_availability versions=[52,+Inf)
-// CHECK-NEXT: {{^}}      (condition_following_availability versions=[53,+Inf)
-// CHECK-NEXT: {{^}}    (if_then versions=[53,+Inf)
-// CHECK-NEXT: {{^}}      (condition_following_availability versions=[54,+Inf)
-// CHECK-NEXT: {{^}}      (if_then versions=[54,+Inf)
-// CHECK-NEXT: {{^}}        (condition_following_availability versions=[55,+Inf)
-// CHECK-NEXT: {{^}}        (decl versions=[55,+Inf) decl=funcInGuardElse()
-// CHECK-NEXT: {{^}}        (guard_fallthrough versions=[55,+Inf)
-// CHECK-NEXT: {{^}}          (condition_following_availability versions=[56,+Inf)
-// CHECK-NEXT: {{^}}          (guard_fallthrough versions=[56,+Inf)
-// CHECK-NEXT: {{^}}      (decl versions=[57,+Inf) decl=funcInInnerIfElse()
+// CHECK-NEXT: {{^}}  (decl version=51 decl=functionWithStmtCondition
+// CHECK-NEXT: {{^}}    (condition_following_availability version=52
+// CHECK-NEXT: {{^}}      (condition_following_availability version=53
+// CHECK-NEXT: {{^}}    (if_then version=53
+// CHECK-NEXT: {{^}}      (condition_following_availability version=54
+// CHECK-NEXT: {{^}}      (if_then version=54
+// CHECK-NEXT: {{^}}        (condition_following_availability version=55
+// CHECK-NEXT: {{^}}        (decl version=55 decl=funcInGuardElse()
+// CHECK-NEXT: {{^}}        (guard_fallthrough version=55
+// CHECK-NEXT: {{^}}          (condition_following_availability version=56
+// CHECK-NEXT: {{^}}          (guard_fallthrough version=56
+// CHECK-NEXT: {{^}}      (decl version=57 decl=funcInInnerIfElse()
 @available(OSX 51, *)
 func functionWithStmtCondition() {
   if #available(OSX 52, *),
@@ -112,11 +112,11 @@ func functionWithStmtCondition() {
   }
 }
 
-// CHECK-NEXT: {{^}}  (decl versions=[51,+Inf) decl=functionWithUnnecessaryStmtCondition
-// CHECK-NEXT: {{^}}    (condition_following_availability versions=[53,+Inf)
-// CHECK-NEXT: {{^}}    (if_then versions=[53,+Inf)
-// CHECK-NEXT: {{^}}    (condition_following_availability versions=[54,+Inf)
-// CHECK-NEXT: {{^}}    (if_then versions=[54,+Inf)
+// CHECK-NEXT: {{^}}  (decl version=51 decl=functionWithUnnecessaryStmtCondition
+// CHECK-NEXT: {{^}}    (condition_following_availability version=53
+// CHECK-NEXT: {{^}}    (if_then version=53
+// CHECK-NEXT: {{^}}    (condition_following_availability version=54
+// CHECK-NEXT: {{^}}    (if_then version=54
 
 @available(OSX 51, *)
 func functionWithUnnecessaryStmtCondition() {
@@ -142,13 +142,13 @@ func functionWithUnnecessaryStmtCondition() {
   }
 }
 
-// CHECK-NEXT: {{^}}  (decl versions=[51,+Inf) decl=functionWithUnnecessaryStmtConditionsHavingElseBranch
-// CHECK-NEXT: {{^}}    (if_else versions=empty
-// CHECK-NEXT: {{^}}      (decl versions=empty decl=funcInInnerIfElse()
-// CHECK-NEXT: {{^}}    (if_else versions=empty
-// CHECK-NEXT: {{^}}    (guard_else versions=empty
-// CHECK-NEXT: {{^}}    (guard_else versions=empty
-// CHECK-NEXT: {{^}}    (if_else versions=empty
+// CHECK-NEXT: {{^}}  (decl version=51 decl=functionWithUnnecessaryStmtConditionsHavingElseBranch
+// CHECK-NEXT: {{^}}    (if_else version=none
+// CHECK-NEXT: {{^}}      (decl version=none decl=funcInInnerIfElse()
+// CHECK-NEXT: {{^}}    (if_else version=none
+// CHECK-NEXT: {{^}}    (guard_else version=none
+// CHECK-NEXT: {{^}}    (guard_else version=none
+// CHECK-NEXT: {{^}}    (if_else version=none
 
 @available(OSX 51, *)
 func functionWithUnnecessaryStmtConditionsHavingElseBranch(p: Int?) {
@@ -195,10 +195,10 @@ func functionWithUnnecessaryStmtConditionsHavingElseBranch(p: Int?) {
 
 }
 
-// CHECK-NEXT: {{^}}  (decl versions=[51,+Inf) decl=functionWithWhile()
-// CHECK-NEXT: {{^}}    (condition_following_availability versions=[52,+Inf)
-// CHECK-NEXT: {{^}}    (while_body versions=[52,+Inf)
-// CHECK-NEXT: {{^}}      (decl versions=[54,+Inf) decl=funcInWhileBody()
+// CHECK-NEXT: {{^}}  (decl version=51 decl=functionWithWhile()
+// CHECK-NEXT: {{^}}    (condition_following_availability version=52
+// CHECK-NEXT: {{^}}    (while_body version=52
+// CHECK-NEXT: {{^}}      (decl version=54 decl=funcInWhileBody()
 @available(OSX 51, *)
 func functionWithWhile() {
   while #available(OSX 52, *),
@@ -208,16 +208,16 @@ func functionWithWhile() {
   }
 }
 
-// CHECK-NEXT: {{^}}  (decl_implicit versions=[50,+Inf) decl=extension.SomeClass
-// CHECK-NEXT: {{^}}    (decl versions=[51,+Inf) decl=extension.SomeClass
-// CHECK-NEXT: {{^}}      (decl_implicit versions=[51,+Inf) decl=someStaticPropertyWithClosureInit
-// CHECK-NEXT: {{^}}        (decl versions=[52,+Inf) decl=someStaticPropertyWithClosureInit
-// CHECK-NEXT: {{^}}          (condition_following_availability versions=[54,+Inf)
-// CHECK-NEXT: {{^}}          (if_then versions=[54,+Inf)
-// CHECK-NEXT: {{^}}      (decl_implicit versions=[51,+Inf) decl=someStaticPropertyWithClosureInitInferred
-// CHECK-NEXT: {{^}}        (decl versions=[52,+Inf) decl=someStaticPropertyWithClosureInitInferred
-// CHECK-NEXT: {{^}}          (condition_following_availability versions=[54,+Inf)
-// CHECK-NEXT: {{^}}          (if_then versions=[54,+Inf)
+// CHECK-NEXT: {{^}}  (decl_implicit version=50 decl=extension.SomeClass
+// CHECK-NEXT: {{^}}    (decl version=51 decl=extension.SomeClass
+// CHECK-NEXT: {{^}}      (decl_implicit version=51 decl=someStaticPropertyWithClosureInit
+// CHECK-NEXT: {{^}}        (decl version=52 decl=someStaticPropertyWithClosureInit
+// CHECK-NEXT: {{^}}          (condition_following_availability version=54
+// CHECK-NEXT: {{^}}          (if_then version=54
+// CHECK-NEXT: {{^}}      (decl_implicit version=51 decl=someStaticPropertyWithClosureInitInferred
+// CHECK-NEXT: {{^}}        (decl version=52 decl=someStaticPropertyWithClosureInitInferred
+// CHECK-NEXT: {{^}}          (condition_following_availability version=54
+// CHECK-NEXT: {{^}}          (if_then version=54
 @available(OSX 51, *)
 extension SomeClass {
   @available(OSX 52, *)
@@ -237,21 +237,21 @@ extension SomeClass {
   }()
 }
 
-// CHECK-NEXT: {{^}}  (decl_implicit versions=[50,+Inf) decl=wrappedValue
+// CHECK-NEXT: {{^}}  (decl_implicit version=50 decl=wrappedValue
 
 @propertyWrapper
 struct Wrapper<T> {
   var wrappedValue: T
 }
 
-// CHECK-NEXT: {{^}}  (decl versions=[51,+Inf) decl=SomeStruct
-// CHECK-NEXT: {{^}}    (decl_implicit versions=[51,+Inf) decl=someLazyVar
-// CHECK-NEXT: {{^}}      (condition_following_availability versions=[52,+Inf)
-// CHECK-NEXT: {{^}}      (guard_fallthrough versions=[52,+Inf)
-// CHECK-NEXT: {{^}}    (decl_implicit versions=[51,+Inf) decl=someWrappedVar
-// CHECK-NEXT: {{^}}      (condition_following_availability versions=[52,+Inf)
-// CHECK-NEXT: {{^}}      (guard_fallthrough versions=[52,+Inf)
-// CHECK-NEXT: {{^}}    (decl versions=[52,+Inf) decl=someMethodAvailable52()
+// CHECK-NEXT: {{^}}  (decl version=51 decl=SomeStruct
+// CHECK-NEXT: {{^}}    (decl_implicit version=51 decl=someLazyVar
+// CHECK-NEXT: {{^}}      (condition_following_availability version=52
+// CHECK-NEXT: {{^}}      (guard_fallthrough version=52
+// CHECK-NEXT: {{^}}    (decl_implicit version=51 decl=someWrappedVar
+// CHECK-NEXT: {{^}}      (condition_following_availability version=52
+// CHECK-NEXT: {{^}}      (guard_fallthrough version=52
+// CHECK-NEXT: {{^}}    (decl version=52 decl=someMethodAvailable52()
 @available(OSX 51, *)
 struct SomeStruct {
   lazy var someLazyVar = {

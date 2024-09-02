@@ -307,7 +307,14 @@ public:
 
   /// Returns a representation of this range as a string for debugging purposes.
   std::string getAsString() const {
-    return "AvailabilityContext(" + Range.getAsString() + ")";
+    return "AvailabilityContext(" + getVersionString() + ")";
+  }
+
+  /// Returns a representation of the raw version range as a string for
+  /// debugging purposes.
+  std::string getVersionString() const {
+    assert(Range.hasLowerEndpoint());
+    return Range.getLowerEndpoint().getAsString();
   }
 };
 

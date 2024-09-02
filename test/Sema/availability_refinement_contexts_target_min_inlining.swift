@@ -6,15 +6,15 @@
 // Verify that -target-min-inlining-version min implies the correct OS version
 // for the target OS.
 
-// CHECK-macosx: {{^}}(root versions=[10.10.0,+Inf)
-// CHECK-ios: {{^}}(root versions=[8.0,+Inf)
-// CHECK-tvos: {{^}}(root versions=[9.0,+Inf)
-// CHECK-watchos: {{^}}(root versions=[2.0,+Inf)
-// CHECK-xros: {{^}}(root versions=[1.0,+Inf)
+// CHECK-macosx: {{^}}(root version=10.10.0
+// CHECK-ios: {{^}}(root version=8.0
+// CHECK-tvos: {{^}}(root version=9.0
+// CHECK-watchos: {{^}}(root version=2.0
+// CHECK-xros: {{^}}(root version=1.0
 
-// CHECK-macosx-NEXT: {{^}}  (decl_implicit versions=[10.15,+Inf) decl=foo()
-// CHECK-ios-NEXT: {{^}}  (decl_implicit versions=[13,+Inf) decl=foo()
-// CHECK-tvos-NEXT: {{^}}  (decl_implicit versions=[13,+Inf) decl=foo()
-// CHECK-watchos-NEXT: {{^}}  (decl_implicit versions=[6,+Inf) decl=foo()
+// CHECK-macosx-NEXT: {{^}}  (decl_implicit version=10.15 decl=foo()
+// CHECK-ios-NEXT: {{^}}  (decl_implicit version=13 decl=foo()
+// CHECK-tvos-NEXT: {{^}}  (decl_implicit version=13 decl=foo()
+// CHECK-watchos-NEXT: {{^}}  (decl_implicit version=6 decl=foo()
 
 func foo() {}
