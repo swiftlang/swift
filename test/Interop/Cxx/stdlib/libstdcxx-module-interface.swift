@@ -11,10 +11,10 @@
 // REQUIRES: OS=linux-gnu
 
 // CHECK-STD: enum std {
-// CHECK-STRING:   struct basic_string<CChar, char_traits<CChar>, allocator<CChar>> : CxxRandomAccessCollection {
+// CHECK-STRING:   struct basic_string<CChar, char_traits<CChar>, allocator<CChar>> : CxxMutableRandomAccessCollection {
 // CHECK-STRING:     typealias value_type = std.char_traits<CChar>.char_type
 // CHECK-STRING:   }
-// CHECK-STRING:   struct basic_string<CWideChar, char_traits<CWideChar>, allocator<CWideChar>> : CxxRandomAccessCollection {
+// CHECK-STRING:   struct basic_string<CWideChar, char_traits<CWideChar>, allocator<CWideChar>> : CxxMutableRandomAccessCollection {
 // CHECK-STRING:     typealias value_type = std.char_traits<CWideChar>.char_type
 // CHECK-STRING:   }
 
