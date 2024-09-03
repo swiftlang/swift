@@ -1,6 +1,8 @@
 // RUN: %target-swift-emit-irgen %s -I %S/Inputs -cxx-interoperability-mode=default -Xcc -fno-exceptions -Xcc -fno-objc-exceptions | %FileCheck %s
 // REQUIRES: objc_interop
 
+// UNSUPPORTED: CPU=arm64e
+
 import FunctionsObjC
 
 // CHECK: define linkonce_odr noundef ptr @_ZNK7Derived36__synthesizedBaseCall_virtual_methodEv(ptr noundef nonnull align {{4|8}} dereferenceable(12) %[[THIS:.*]])
