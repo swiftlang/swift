@@ -153,6 +153,10 @@ class LifetimeDependenceInfo {
                                             unsigned sourceIndex,
                                             LifetimeDependenceKind kind);
 
+  /// Builds LifetimeDependenceInfo from @lifetime attribute
+  static std::optional<ArrayRef<LifetimeDependenceInfo>>
+  fromLifetimeAttribute(AbstractFunctionDecl *afd);
+
   /// Builds LifetimeDependenceInfo from dependsOn type modifier
   static std::optional<LifetimeDependenceInfo>
   fromDependsOn(AbstractFunctionDecl *afd, TypeRepr *targetRepr,

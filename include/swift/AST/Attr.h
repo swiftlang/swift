@@ -2644,6 +2644,10 @@ public:
                               SourceRange baseRange, bool implicit,
                               ArrayRef<LifetimeEntry> entries);
 
+  ArrayRef<LifetimeEntry> getLifetimeEntries() const {
+    return {getTrailingObjects<LifetimeEntry>(), NumEntries};
+  }
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Lifetime;
   }

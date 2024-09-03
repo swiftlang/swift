@@ -1813,6 +1813,20 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::Lifetime: {
+    auto *attr = cast<LifetimeAttr>(this);
+    bool firstElem = true;
+    Printer << "@lifetime(";
+    for (auto entry : attr->getLifetimeEntries()) {
+      if (!firstElem) {
+        Printer << ", ";
+      }
+      Printer << entry.getParamString();
+    }
+    Printer << ")";
+    break;
+  }
+
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DeclAttrKind::CLASS:
 #include "swift/AST/DeclAttr.def"
     llvm_unreachable("handled above");
