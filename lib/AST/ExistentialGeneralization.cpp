@@ -81,7 +81,7 @@ public:
 private:
   Type visitProtocolType(CanProtocolType type) {
     // Simple protocol types have no sub-structure.
-    assert(!type.getParent());
+    assert(!type.getParent() || !type.getParent()->isSpecialized());
     return type;
   }
 
