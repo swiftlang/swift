@@ -3243,7 +3243,7 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
       VD->getFormalAccess() != AccessLevel::Package) {
     diagnoseAndRemoveAttr(attr,
                           diag::usable_from_inline_attr_with_explicit_access,
-                          VD->getName(), VD->getFormalAccess());
+                          VD, VD->getFormalAccess());
     return;
   }
 

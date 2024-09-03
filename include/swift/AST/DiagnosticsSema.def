@@ -6861,8 +6861,8 @@ ERROR(frozen_attr_on_internal_type,
 
 ERROR(usable_from_inline_attr_with_explicit_access,
       none, "'@usableFromInline' attribute can only be applied to internal or package "
-      "declarations, but %0 is %select{private|fileprivate|%error|package|public|open}1",
-      (DeclName, AccessLevel))
+      "declarations, but %kind0 is %select{private|fileprivate|%error|package|public|open}1",
+      (const ValueDecl *, AccessLevel))
 
 WARNING(inlinable_implies_usable_from_inline,none,
         "'@usableFromInline' attribute has no effect on '@inlinable' %kind0",

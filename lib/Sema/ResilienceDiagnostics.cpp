@@ -63,6 +63,17 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   auto *DC = where.getDeclContext();
   auto &Context = DC->getASTContext();
 
+  if (auto *init = dyn_cast<ConstructorDecl>(DC)) {
+    if (init->isDesignatedInit()) {
+      auto *storage = dyn_cast<AbstractStorageDecl>(D);
+      if (storage && storage->hasInitAccessor()) {
+        if (diagnoseInlinableDeclRefAccess(
+                loc, storage->getAccessor(AccessorKind::Init), where))
+          return true;
+      }
+    }
+  }
+
   ImportAccessLevel problematicImport = D->getImportAccessFrom(DC);
   if (problematicImport.has_value()) {
     auto SF = DC->getParentSourceFile();
@@ -111,7 +122,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 
   // Swift 4.2 did not check accessor accessibility.
   if (auto accessor = dyn_cast<AccessorDecl>(D)) {
-    if (!Context.isSwiftVersionAtLeast(5))
+    if (!accessor->isInitAccessor() && !Context.isSwiftVersionAtLeast(5))
       downgradeToWarning = DowngradeToWarning::Yes;
   }
 
