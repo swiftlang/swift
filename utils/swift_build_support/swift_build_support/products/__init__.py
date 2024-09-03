@@ -29,6 +29,7 @@ from .playgroundsupport import PlaygroundSupport
 from .skstresstester import SKStressTester
 from .sourcekitlsp import SourceKitLSP
 from .staticswiftlinux import StaticSwiftLinuxConfig
+from .stdlib_docs import StdlibDocs
 from .swift import Swift
 from .swift_testing import SwiftTesting
 from .swift_testing_macros import SwiftTestingMacros
@@ -65,6 +66,7 @@ __all__ = [
     'Ninja',
     'PlaygroundSupport',
     'StaticSwiftLinuxConfig',
+    'StdlibDocs',
     'Swift',
     'SwiftFormat',
     'SwiftInspect',
