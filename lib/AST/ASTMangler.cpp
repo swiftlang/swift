@@ -129,11 +129,11 @@ std::string ASTMangler::mangleEntity(const ValueDecl *decl, SymbolKind SKind) {
 }
 
 std::string ASTMangler::mangleDestructorEntity(const DestructorDecl *decl,
-                                               bool isDeallocating,
+                                               DestructorKind kind,
                                                SymbolKind SKind) {
   llvm::SaveAndRestore X(AllowInverses, inversesAllowed(decl));
   beginMangling();
-  appendDestructorEntity(decl, isDeallocating);
+  appendDestructorEntity(decl, kind);
   appendSymbolKind(SKind);
   return finalize();
 }
@@ -838,7 +838,7 @@ void ASTMangler::appendAnyDecl(const ValueDecl *Decl) {
   if (auto Ctor = dyn_cast<ConstructorDecl>(Decl)) {
     appendConstructorEntity(Ctor, /*isAllocating=*/false);
   } else if (auto Dtor = dyn_cast<DestructorDecl>(Decl)) {
-    appendDestructorEntity(Dtor, /*isDeallocating=*/false);
+    appendDestructorEntity(Dtor, DestructorKind::NonDeallocating);
   } else if (auto GTD = dyn_cast<GenericTypeDecl>(Decl)) {
     appendAnyGenericType(GTD);
   } else if (isa<AssociatedTypeDecl>(Decl)) {
@@ -940,7 +940,7 @@ std::string ASTMangler::mangleHasSymbolQuery(const ValueDecl *Decl) {
   if (auto Ctor = dyn_cast<ConstructorDecl>(Decl)) {
     appendConstructorEntity(Ctor, /*isAllocating=*/false);
   } else if (auto Dtor = dyn_cast<DestructorDecl>(Decl)) {
-    appendDestructorEntity(Dtor, /*isDeallocating=*/false);
+    appendDestructorEntity(Dtor, DestructorKind::NonDeallocating);
   } else if (auto GTD = dyn_cast<GenericTypeDecl>(Decl)) {
     appendAnyGenericType(GTD);
   } else if (isa<AssociatedTypeDecl>(Decl)) {
@@ -2447,8 +2447,8 @@ void ASTMangler::appendContext(const DeclContext *ctx,
     }
     
     if (auto dtor = dyn_cast<DestructorDecl>(fn))
-      return appendDestructorEntity(dtor, /*deallocating*/ false);
-    
+      return appendDestructorEntity(dtor, DestructorKind::NonDeallocating);
+
     return appendEntity(fn);
   }
 
@@ -3953,10 +3953,20 @@ void ASTMangler::appendConstructorEntity(const ConstructorDecl *ctor,
 }
 
 void ASTMangler::appendDestructorEntity(const DestructorDecl *dtor,
-                                        bool isDeallocating) {
+                                        DestructorKind kind) {
   BaseEntitySignature base(dtor);
   appendContextOf(dtor, base);
-  appendOperator(isDeallocating ? "fD" : "fd");
+  switch (kind) {
+  case DestructorKind::NonDeallocating:
+    appendOperator("fd");
+    break;
+  case DestructorKind::Deallocating:
+    appendOperator("fD");
+    break;
+  case DestructorKind::IsolatedDeallocating:
+    appendOperator("fZ");
+    break;
+  }
 }
 
 void ASTMangler::appendAccessorEntity(StringRef accessorKindCode,
