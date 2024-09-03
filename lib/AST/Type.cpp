@@ -3398,7 +3398,10 @@ Type ArchetypeType::getExistentialType() const {
   auto genericSig = genericEnv->getGenericSignature();
 
   auto existentialType = genericSig->getExistentialType(interfaceType);
-  return genericEnv->mapTypeIntoContext(existentialType);
+  if (existentialType->hasTypeParameter())
+    existentialType = genericEnv->mapTypeIntoContext(existentialType);
+
+  return existentialType;
 }
 
 bool ArchetypeType::requiresClass() const {
