@@ -76,7 +76,7 @@ static SILInstruction *endOSSALifetime(SILValue value,
     }
     return builder.createDestroyValue(loc, value, DontPoisonRefs, isDeadEnd);
   }
-  return builder.createEndBorrow(loc, value);
+  return builder.createEndBorrow(loc, lookThroughBorrowedFromUser(value));
 }
 
 static bool endLifetimeAtLivenessBoundary(SILValue value,
