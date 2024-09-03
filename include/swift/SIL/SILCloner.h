@@ -387,7 +387,7 @@ public:
 
     auto substExistentialTy = getOpASTType(origExistentialTy);
     auto *newEnv = GenericEnvironment::forOpenedExistential(
-        substExistentialTy, subMap, UUID::fromTime());
+        substExistentialTy, UUID::fromTime());
 
     registerLocalArchetypeRemapping(origEnv, newEnv);
   }
