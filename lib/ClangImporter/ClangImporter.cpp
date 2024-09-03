@@ -46,7 +46,6 @@
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Parse/Parser.h"
@@ -60,7 +59,6 @@
 #include "clang/Basic/LangStandard.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/TargetInfo.h"
-#include "clang/Basic/Version.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/CAS/IncludeTree.h"
 #include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
@@ -74,7 +72,6 @@
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Parse/Parser.h"
-#include "clang/Rewrite/Frontend/FrontendActions.h"
 #include "clang/Rewrite/Frontend/Rewriters.h"
 #include "clang/Sema/DelayedDiagnostic.h"
 #include "clang/Sema/Lookup.h"
@@ -88,6 +85,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/ObjectStore.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/CrashRecoveryContext.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -97,7 +95,6 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/VirtualFileSystem.h"
-#include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/TextAPI/InterfaceFile.h"
 #include "llvm/TextAPI/TextAPIReader.h"
 #include <algorithm>
@@ -5781,8 +5778,7 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
     // TODO: we also currently don't support static functions. That shouldn't be
     // too hard.
     if (fn->isStatic() ||
-        (fn->getClangDecl() &&
-         isa<clang::FunctionTemplateDecl>(fn->getClangDecl())))
+        isa_and_nonnull<clang::FunctionTemplateDecl>(fn->getClangDecl()))
       return nullptr;
     if (auto cxxMethod =
             dyn_cast_or_null<clang::CXXMethodDecl>(fn->getClangDecl())) {
@@ -7268,7 +7264,7 @@ void ClangImporter::diagnoseMemberValue(const DeclName &name,
                                                     nominalTypesToLookInto);
   for (auto containerDecl : nominalTypesToLookInto) {
     const clang::Decl *clangContainerDecl = containerDecl->getClangDecl();
-    if (clangContainerDecl && isa<clang::DeclContext>(clangContainerDecl)) {
+    if (isa_and_nonnull<clang::DeclContext>(clangContainerDecl)) {
       Impl.diagnoseMemberValue(name,
                                cast<clang::DeclContext>(clangContainerDecl));
     }
@@ -7374,6 +7370,10 @@ static bool hasIteratorAPIAttr(const clang::Decl *decl) {
 
 static bool hasNonCopyableAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, "~Copyable");
+}
+
+bool importer::hasNonEscapableAttr(const clang::RecordDecl *decl) {
+  return hasSwiftAttribute(decl, "~Escapable");
 }
 
 /// Recursively checks that there are no pointers in any fields or base classes.

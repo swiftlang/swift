@@ -1986,7 +1986,7 @@ private:
       }
 
       auto nominal = copyTy->getNominalOrBoundGenericNominal();
-      if (nominal && isa<StructDecl>(nominal)) {
+      if (isa_and_nonnull<StructDecl>(nominal)) {
         if (copyTy->isArray() ||
             copyTy->isDictionary() ||
             copyTy->isSet() ||
