@@ -324,6 +324,19 @@ struct LookUpConformanceInOverrideSubs {
                                     ProtocolDecl *proto) const;
 };
 
+// Substitute the outer generic parameters from a substitution map, ignoring
+/// inner generic parameters with a given depth.
+struct OuterSubstitutions {
+  SubstitutionMap subs;
+  unsigned depth;
+
+  bool isUnsubstitutedTypeParameter(Type type) const;
+  Type operator()(SubstitutableType *type) const;
+  ProtocolConformanceRef operator()(CanType dependentType,
+                                    Type conformingReplacementType,
+                                    ProtocolDecl *conformedProtocol) const;
+};
+
 } // end namespace swift
 
 namespace llvm {

@@ -666,3 +666,35 @@ SubstitutionMap SubstitutionMap::mapIntoTypeExpansionContext(
                      SubstFlags::SubstituteOpaqueArchetypes |
                      SubstFlags::PreservePackExpansionLevel);
 }
+
+bool OuterSubstitutions::isUnsubstitutedTypeParameter(Type type) const {
+  if (!type->isTypeParameter())
+    return false;
+
+  if (auto depMemTy = type->getAs<DependentMemberType>())
+    return isUnsubstitutedTypeParameter(depMemTy->getBase());
+
+  if (auto genericParam = type->getAs<GenericTypeParamType>())
+    return genericParam->getDepth() >= depth;
+
+  return false;
+}
+
+Type OuterSubstitutions::operator()(SubstitutableType *type) const {
+  if (isUnsubstitutedTypeParameter(type))
+    return Type(type);
+
+  return QuerySubstitutionMap{subs}(type);
+}
+
+ProtocolConformanceRef OuterSubstitutions::operator()(
+                                        CanType dependentType,
+                                        Type conformingReplacementType,
+                                        ProtocolDecl *conformedProtocol) const {
+  if (isUnsubstitutedTypeParameter(dependentType))
+    return ProtocolConformanceRef(conformedProtocol);
+
+  return LookUpConformanceInSubstitutionMap(subs)(
+      dependentType, conformingReplacementType, conformedProtocol);
+}
+
