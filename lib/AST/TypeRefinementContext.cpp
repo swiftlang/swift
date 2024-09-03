@@ -360,12 +360,22 @@ TypeRefinementContext::getAvailabilityConditionVersionSourceRange(
   llvm_unreachable("Unhandled Reason in switch.");
 }
 
+static std::string
+stringForAvailability(const AvailabilityContext &availability) {
+  if (availability.isAlwaysAvailable())
+    return "all";
+  if (availability.isKnownUnreachable())
+    return "none";
+
+  return availability.getVersionString();
+}
+
 void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
                                   unsigned Indent) const {
   OS.indent(Indent);
   OS << "(" << getReasonName(getReason());
 
-  OS << " versions=" << AvailabilityInfo.getOSVersion().getAsString();
+  OS << " version=" << stringForAvailability(AvailabilityInfo);
 
   if (getReason() == Reason::Decl || getReason() == Reason::DeclImplicit) {
     Decl *D = Node.getAsDecl();
@@ -390,8 +400,8 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
   }
 
   if (!ExplicitAvailabilityInfo.isAlwaysAvailable())
-    OS << " explicit_versions="
-       << ExplicitAvailabilityInfo.getOSVersion().getAsString();
+    OS << " explicit_version="
+       << stringForAvailability(ExplicitAvailabilityInfo);
 
   for (TypeRefinementContext *Child : Children) {
     OS << '\n';

@@ -1029,17 +1029,15 @@ bool isDeclarationUnavailable(
     llvm::function_ref<AvailabilityContext()> getAvailabilityContext);
 
 /// Checks whether a declaration should be considered unavailable when
-/// referred to at the given location and, if so, returns the reason why the
-/// declaration is unavailable. Returns None is the declaration is
-/// definitely available.
-std::optional<UnavailabilityReason>
+/// referred to at the given location and, if so, returns the unmet required
+/// version range. Returns None is the declaration is definitely available.
+std::optional<AvailabilityContext>
 checkDeclarationAvailability(const Decl *D, const ExportContext &Where);
 
 /// Checks whether a conformance should be considered unavailable when
-/// referred to at the given location and, if so, returns the reason why the
-/// declaration is unavailable. Returns None is the declaration is
-/// definitely available.
-std::optional<UnavailabilityReason>
+/// referred to at the given location and, if so, returns the unmet required
+/// version range. Returns None is the declaration is definitely available.
+std::optional<AvailabilityContext>
 checkConformanceAvailability(const RootProtocolConformance *Conf,
                              const ExtensionDecl *Ext,
                              const ExportContext &Where);
@@ -1056,7 +1054,7 @@ void checkIgnoredExpr(Expr *E);
 bool diagnosePotentialUnavailability(const ValueDecl *D,
                                      SourceRange ReferenceRange,
                                      const DeclContext *ReferenceDC,
-                                     const UnavailabilityReason &Reason,
+                                     const AvailabilityContext &Availability,
                                      bool WarnBeforeDeploymentTarget);
 
 // Emits a diagnostic for a protocol conformance that is potentially
@@ -1065,13 +1063,13 @@ void diagnosePotentialUnavailability(const RootProtocolConformance *rootConf,
                                      const ExtensionDecl *ext,
                                      SourceLoc loc,
                                      const DeclContext *dc,
-                                     const UnavailabilityReason &reason);
+                                     const AvailabilityContext &availability);
 
 void
 diagnosePotentialUnavailability(SourceRange ReferenceRange,
                                 Diag<StringRef, llvm::VersionTuple> Diag,
                                 const DeclContext *ReferenceDC,
-                                const UnavailabilityReason &Reason);
+                                const AvailabilityContext &Availability);
 
 /// Type check a 'distributed actor' declaration.
 void checkDistributedActor(SourceFile *SF, NominalTypeDecl *decl);
@@ -1082,7 +1080,7 @@ void checkDistributedActor(SourceFile *SF, NominalTypeDecl *decl);
 bool checkDistributedFunc(FuncDecl *func);
 
 bool checkAvailability(SourceRange ReferenceRange,
-                       AvailabilityContext Availability,
+                       AvailabilityContext RequiredAvailability,
                        Diag<StringRef, llvm::VersionTuple> Diag,
                        const DeclContext *ReferenceDC);
 
@@ -1093,7 +1091,7 @@ void checkConcurrencyAvailability(SourceRange ReferenceRange,
 /// potentially unavailable.
 void diagnosePotentialAccessorUnavailability(
     const AccessorDecl *Accessor, SourceRange ReferenceRange,
-    const DeclContext *ReferenceDC, const UnavailabilityReason &Reason,
+    const DeclContext *ReferenceDC, const AvailabilityContext &Availability,
     bool ForInout);
 
 /// Returns the availability attribute indicating deprecation if the
