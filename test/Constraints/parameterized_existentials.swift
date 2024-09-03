@@ -2,6 +2,8 @@
 
 protocol P<A> {
   associatedtype A
+
+  func f() -> A
 }
 
 func f1(x: any P) -> any P<Int> {
@@ -46,4 +48,8 @@ func h2(x: (any P<Int>)?) -> (any P)? {
 
 func h3(x: (any P<Int>)?) -> (any P<String>)? {
   return x // expected-error {{cannot convert return expression of type '(any P<Int>)?' to return type '(any P<String>)?'}}
+}
+
+func generic1<T>(x: any P<T>) -> T {
+  return x.f()
 }

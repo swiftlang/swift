@@ -7436,7 +7436,7 @@ void ConstraintSystem::maybeProduceFallbackDiagnostic(
 /// Because opened archetypes are not part of the surface language, these
 /// constraints render the member inaccessible.
 static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
-    Type baseTy, const ValueDecl *member) {
+    OpenedExistentialSignature existentialSig, const ValueDecl *member) {
   const auto sig =
       member->getInnermostDeclContext()->getGenericSignatureOfContext();
 
@@ -7445,14 +7445,18 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
     return false;
   }
 
-  class IsDependentOnSelfInBaseTypeContextWalker : public TypeWalker {
-    CanGenericSignature Sig;
+  class IsDependentOnOpenedExistentialSelf : public TypeWalker {
+    OpenedExistentialSignature existentialSig;
 
   public:
-    explicit IsDependentOnSelfInBaseTypeContextWalker(CanGenericSignature Sig)
-        : Sig(Sig) {}
+    explicit IsDependentOnOpenedExistentialSelf(OpenedExistentialSignature existentialSig)
+        : existentialSig(existentialSig) {}
 
     Action walkToTypePre(Type ty) override {
+      // We're looking at the interface type of a protocol member, so it's written
+      // in terms of `Self` (tau_0_0) and possibly type parameters at higher depth:
+      //
+      // <Self, ... where Self: P, ...>
       if (!ty->isTypeParameter()) {
         return Action::Continue;
       }
@@ -7461,43 +7465,60 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
         return Action::SkipNode;
       }
 
-      if (!Sig->isValidTypeParameter(ty)) {
+      // Ok, we found a type parameter rooted in `Self`. Replace `Self` with the
+      // opened Self type in the existential signature, which looks like this:
+      //
+      // <..., Self where ..., Self: P>
+      ty = ty.subst(
+        [&](SubstitutableType *type) -> Type {
+          return existentialSig.SelfType;
+        },
+        MakeAbstractConformanceForGenericType());
+
+      // Make sure this is valid first.
+      if (!existentialSig.OpenedSig->isValidTypeParameter(ty)) {
         return Action::SkipNode;
       }
 
-      const auto concreteTy = Sig->getConcreteType(ty);
-      if (concreteTy && !concreteTy->hasTypeParameter()) {
+      // If the existential type constrains Self.U to a type from the outer
+      // context, then the reduced type of Self.U in the existential signature
+      // will no longer contain Self.
+      ty = existentialSig.OpenedSig.getReducedType(ty);
+
+      if (!ty.findIf([&](Type t) -> bool {
+          if (auto *paramTy = t->getAs<GenericTypeParamType>())
+            return paramTy->isEqual(existentialSig.SelfType);
+          return false;
+        })) {
         return Action::SkipNode;
       }
 
+      // Ok, we found a type that depends on the opened existential Self.
       return Action::Stop;
     }
-  } isDependentOnSelfWalker(member->getASTContext().getOpenedExistentialSignature(
-      baseTy, GenericSignature()));
+  } isDependentOnSelf(existentialSig);
 
   for (const auto &req : sig.getRequirements()) {
     switch (req.getKind()) {
-    case RequirementKind::SameShape:
-      llvm_unreachable("Same-shape requirement not supported here");
-
     case RequirementKind::Superclass: {
       if (req.getFirstType()->getRootGenericParam()->getDepth() > 0 &&
-          req.getSecondType().walk(isDependentOnSelfWalker)) {
+          req.getSecondType().walk(isDependentOnSelf)) {
         return true;
       }
 
       break;
     }
-    case RequirementKind::SameType: {
+    case RequirementKind::SameType:
+    case RequirementKind::SameShape: {
       const auto isNonSelfRootedTypeParam = [](Type ty) {
         return ty->isTypeParameter() &&
                ty->getRootGenericParam()->getDepth() > 0;
       };
 
       if ((isNonSelfRootedTypeParam(req.getFirstType()) &&
-           req.getSecondType().walk(isDependentOnSelfWalker)) ||
+           req.getSecondType().walk(isDependentOnSelf)) ||
           (isNonSelfRootedTypeParam(req.getSecondType()) &&
-           req.getFirstType().walk(isDependentOnSelfWalker))) {
+           req.getFirstType().walk(isDependentOnSelf))) {
         return true;
       }
 
@@ -7516,15 +7537,16 @@ bool ConstraintSystem::isMemberAvailableOnExistential(
     Type baseTy, const ValueDecl *member) const {
   assert(member->getDeclContext()->getSelfProtocolDecl());
 
-  // If the type of the member references 'Self' or a 'Self'-rooted associated
-  // type in non-covariant position, we cannot reference the member.
-  //
-  // N.B. We pass the module context because this check does not care about the
-  // the actual signature of the opened archetype in context, rather it cares
-  // about whether you can "hold" `baseTy.member` properly in the abstract.
-  const auto info = member->findExistentialSelfReferences(
-      baseTy,
-      /*treatNonResultCovariantSelfAsInvariant=*/false);
+  auto existentialSig = getASTContext().getOpenedExistentialSignature(baseTy);
+
+  auto *dc = member->getDeclContext();
+  auto origParam = dc->getSelfInterfaceType()->castTo<GenericTypeParamType>();
+  auto openedParam = existentialSig.SelfType->castTo<GenericTypeParamType>();
+
+  auto info = findGenericParameterReferences(
+      member, existentialSig.OpenedSig, origParam, openedParam,
+      std::nullopt);
+
   if (info.selfRef > TypePosition::Covariant ||
       info.assocTypeRef > TypePosition::Covariant) {
     return false;
@@ -7536,7 +7558,7 @@ bool ConstraintSystem::isMemberAvailableOnExistential(
       return false;
   }
 
-  if (doesMemberHaveUnfulfillableConstraintsWithExistentialBase(baseTy,
+  if (doesMemberHaveUnfulfillableConstraintsWithExistentialBase(existentialSig,
                                                                 member)) {
     return false;
   }

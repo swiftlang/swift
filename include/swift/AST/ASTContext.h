@@ -220,6 +220,30 @@ public:
   virtual ~MissingWitnessesBase();
 };
 
+/// Return value of ASTContext::getOpenedExistentialSignature().
+struct OpenedExistentialSignature {
+  /// The generalized existential type.
+  ///
+  /// The actual generic arguments of superclass and parameterized protocol
+  /// types become fresh generic parameters in the generalization signature.
+  CanType Shape;
+
+  /// A substitution map sending each generic parameter of the generalization
+  /// signature to the corresponding generic argument in the original
+  /// existential type. May contain type variables.
+  SubstitutionMap Generalization;
+
+  /// The opened existential signature derived from the generalization signature.
+  ///
+  /// This is the generalization signature with one more generic parameter
+  /// `Self` at the next highest depth, subject to the requirement
+  /// `Self: Shape`, where `Shape` is above.
+  CanGenericSignature OpenedSig;
+
+  /// The `Self` parameter in the opened existential signature.
+  CanType SelfType;
+};
+
 /// ASTContext - This object creates and owns the AST objects.
 /// However, this class does more than just maintain context within an AST.
 /// It is the closest thing to thread-local or compile-local storage in this
@@ -1434,6 +1458,18 @@ public:
   /// values do.
   CanGenericSignature getOpenedExistentialSignature(Type type,
                                                     GenericSignature parentSig);
+
+  /// Retrieve a generic signature with a single type parameter conforming
+  /// to the given protocol or composition type, like <T: P>.
+  ///
+  /// The opened archetype may have a different set of conformances from the
+  /// corresponding existential. The opened archetype conformances are dictated
+  /// by the ABI for generic arguments, while the existential value conformances
+  /// are dictated by their layout (see \c Type::getExistentialLayout()). In
+  /// particular, the opened archetype signature does not have requirements for
+  /// conformances inherited from superclass constraints while existential
+  /// values do.
+  OpenedExistentialSignature getOpenedExistentialSignature(Type type);
 
   /// Get a generic signature where the generic parameter τ_d_i represents
   /// the element of the pack generic parameter τ_d_i… in \p baseGenericSig.
