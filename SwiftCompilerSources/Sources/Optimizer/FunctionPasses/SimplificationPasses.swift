@@ -44,6 +44,15 @@ let ononeSimplificationPass = FunctionPass(name: "onone-simplification") {
   }
 }
 
+let constPropagationPass = FunctionPass(name: "const-propagation") {
+  (function: Function, context: FunctionPassContext) in
+  runSimplification(on: function, context, preserveDebugInfo: true) {
+    if let i = $0 as? OnoneSimplifiable {
+      i.simplify($1)
+    }
+  }
+}
+
 let simplificationPass = FunctionPass(name: "simplification") {
   (function: Function, context: FunctionPassContext) in
 

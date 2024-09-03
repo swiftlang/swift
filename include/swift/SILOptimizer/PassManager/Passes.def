@@ -421,8 +421,6 @@ LEGACY_PASS(SROABBArgs, "sroa-bb-args",
      "Scalar Replacement of Aggregate SIL Block Arguments")
 LEGACY_PASS(SimplifyBBArgs, "simplify-bb-args",
      "SIL Block Argument Simplification")
-LEGACY_PASS(SimplifyCFG, "simplify-cfg",
-     "SIL CFG Simplification")
 LEGACY_PASS(SpeculativeDevirtualization, "specdevirt",
      "Speculative Devirtualization via Guarded Calls")
 LEGACY_PASS(SplitAllCriticalEdges, "split-critical-edges",
