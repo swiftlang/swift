@@ -6137,13 +6137,6 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   return canonicalSig;
 }
 
-Type OpenedArchetypeType::getSelfInterfaceTypeFromContext(GenericSignature parentSig,
-                                                          ASTContext &ctx) {
-  return GenericTypeParamType::get(/*isParameterPack=*/ false,
-                                   parentSig.getNextDepth(), /*index=*/ 0,
-                                   ctx);
-}
-
 CanGenericSignature
 ASTContext::getOpenedExistentialSignature(Type type, GenericSignature parentSig) {
   assert(type->isExistentialType());
@@ -6206,7 +6199,7 @@ ASTContext::getOpenedExistentialSignature(Type type) {
 
   // Stash the `Self` type.
   existentialSig.SelfType =
-      OpenedArchetypeType::getSelfInterfaceTypeFromContext(parentSig, *this)
+      existentialSig.OpenedSig.getGenericParams().back()
           ->getCanonicalType();
 
   // Cache the result.
