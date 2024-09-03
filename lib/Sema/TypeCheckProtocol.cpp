@@ -4314,7 +4314,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
           diags.diagnose(diagLoc, diag::availability_protocol_requires_version,
                          conformance->getProtocol(), witness,
-                         prettyPlatformString(targetPlatform(ctx.LangOpts)),
+                         ctx.getTargetPlatformStringForDiagnostics(),
                          check.RequiredAvailability.getRawMinimumVersion());
           emitDeclaredHereIfNeeded(diags, diagLoc, witness);
           diags.diagnose(requirement,
@@ -4829,7 +4829,7 @@ static bool diagnoseTypeWitnessAvailability(
           ctx.Diags
               .diagnose(loc, diag::availability_protocol_requires_version,
                         conformance->getProtocol(), witness,
-                        prettyPlatformString(targetPlatform(ctx.LangOpts)),
+                        ctx.getTargetPlatformStringForDiagnostics(),
                         requiredVersion)
               .warnUntilSwiftVersion(warnBeforeVersion);
 

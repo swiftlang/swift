@@ -2068,7 +2068,7 @@ void TypeChecker::diagnosePotentialUnavailability(
   {
     auto Err = Context.Diags.diagnose(
         ReferenceRange.Start, Diag,
-        prettyPlatformString(targetPlatform(Context.LangOpts)),
+        Context.getTargetPlatformStringForDiagnostics(),
         Availability.getRawMinimumVersion());
 
     // Direct a fixit to the error if an existing guard is nearly-correct
@@ -2122,7 +2122,7 @@ static Diagnostic getPotentialUnavailabilityDiagnostic(
     const AvailabilityContext &Availability, bool WarnBeforeDeploymentTarget,
     bool &IsError) {
   ASTContext &Context = ReferenceDC->getASTContext();
-  auto Platform = prettyPlatformString(targetPlatform(Context.LangOpts));
+  auto Platform = Context.getTargetPlatformStringForDiagnostics();
 
   if (requiresDeploymentTargetOrEarlier(Availability, Context)) {
     // The required OS version is at or before the deployment target so this
@@ -2179,7 +2179,7 @@ void TypeChecker::diagnosePotentialAccessorUnavailability(
   {
     auto Err = Context.Diags.diagnose(
         ReferenceRange.Start, diag, Accessor,
-        prettyPlatformString(targetPlatform(Context.LangOpts)),
+        Context.getTargetPlatformStringForDiagnostics(),
         Availability.getRawMinimumVersion());
 
     // Direct a fixit to the error if an existing guard is nearly-correct
@@ -2221,7 +2221,7 @@ void TypeChecker::diagnosePotentialUnavailability(
     auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
     auto err = ctx.Diags.diagnose(
         loc, diag::conformance_availability_only_version_newer, type, proto,
-        prettyPlatformString(targetPlatform(ctx.LangOpts)),
+        ctx.getTargetPlatformStringForDiagnostics(),
         availability.getRawMinimumVersion());
 
     err.warnUntilSwiftVersion(6);

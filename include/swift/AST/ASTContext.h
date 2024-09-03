@@ -1542,6 +1542,10 @@ private:
 
 public:
   clang::DarwinSDKInfo *getDarwinSDKInfo() const;
+
+  /// Returns the string to use in diagnostics when printing the platform being
+  /// targetted.
+  StringRef getTargetPlatformStringForDiagnostics() const;
 };
 
 } // end namespace swift

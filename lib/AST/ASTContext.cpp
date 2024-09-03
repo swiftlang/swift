@@ -6733,3 +6733,7 @@ ValueOwnership swift::asValueOwnership(ParameterOwnership o) {
   }
   llvm_unreachable("exhaustive switch");
 }
+
+StringRef ASTContext::getTargetPlatformStringForDiagnostics() const {
+  return prettyPlatformString(targetPlatform(LangOpts));
+}
