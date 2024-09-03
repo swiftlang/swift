@@ -341,13 +341,11 @@ function Get-AndroidNDKPath {
 }
 
 function Get-FlexExecutable {
-  $flexExecutable = Join-Path -Path $BinaryCache -ChildPath "win_flex_bison\win_flex.exe"
-  return $flexExecutable
+  return Join-Path -Path $BinaryCache -ChildPath "win_flex_bison\win_flex.exe"
 }
 
 function Get-BisonExecutable {
-  $bisonExecutable = Join-Path -Path $BinaryCache -ChildPath "win_flex_bison\win_bison.exe"
-  return $bisonExecutable
+  return Join-Path -Path $BinaryCache -ChildPath "win_flex_bison\win_bison.exe"
 }
 
 function Get-InstallDir($Arch) {
@@ -446,7 +444,6 @@ enum HostComponent {
   LMDB
   SymbolKit
   DocC
-  RegsGen2
 }
 
 function Get-HostProjectBinaryCache([HostComponent]$Project) {
@@ -462,6 +459,7 @@ enum BuildComponent {
   Compilers
   FoundationMacros
   TestingMacros
+  RegsGen2
 }
 
 function Get-BuildProjectBinaryCache([BuildComponent]$Project) {
@@ -1520,7 +1518,7 @@ function Build-RegsGen2($Arch) {
 
   Build-CMakeProject `
     -Src $SourceCache\ds2\Tools\RegsGen2 `
-    -Bin "$(Get-HostProjectBinaryCache RegsGen2)" `
+    -Bin "$(Get-BuildProjectBinaryCache RegsGen2)" `
     -Arch $Arch `
     -BuildTargets default `
     -UseMSVCCompilers C,CXX `
@@ -1542,7 +1540,7 @@ function Build-DS2([Platform]$Platform, $Arch) {
     -BuildTargets default `
     -Defines @{
       CMAKE_SYSTEM_NAME = $Platform.ToString();
-      DS2_REGSGEN2 = "$(Get-HostProjectBinaryCache RegsGen2)/regsgen2.exe";
+      DS2_REGSGEN2 = "$(Get-BuildProjectBinaryCache RegsGen2)/regsgen2.exe";
       BISON_EXECUTABLE = "$(Get-BisonExecutable)";
       FLEX_EXECUTABLE = "$(Get-FlexExecutable)";
     }
@@ -2517,6 +2515,9 @@ if (-not $SkipBuild) {
   if ($IsCrossCompiling) {
     Invoke-BuildStep Build-Compilers -Build $BuildArch
   }
+  if ($IncludeDS2) {
+    Invoke-BuildStep Build-RegsGen2 $BuildArch
+  }
 
   Invoke-BuildStep Build-CMark $HostArch
   Invoke-BuildStep Build-Compilers $HostArch
@@ -2527,10 +2528,6 @@ if ($Clean) {
   foreach ($Arch in $WindowsSDKArchs) {
     0..[TargetComponent].getEnumValues()[-1] | % { Remove-Item -Force -Recurse "$BinaryCache\$($Arch.BuildID + $_)" -ErrorAction Ignore }
   }
-}
-
-if (-not $SkipBuild -and $IncludeDS2) {
-  Invoke-BuildStep Build-RegsGen2 $HostArch
 }
 
 if (-not $SkipBuild) {
