@@ -6814,9 +6814,6 @@ public:
   /// \param existential The existential type or existential metatype to open.
   static Type getAny(Type existential);
 
-  /// Retrieve the ID number of this opened existential.
-  UUID getOpenedExistentialID() const;
-
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OpenedArchetype;
   }

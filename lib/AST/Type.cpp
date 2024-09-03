@@ -3538,10 +3538,6 @@ OpenedArchetypeType::OpenedArchetypeType(
   assert(!interfaceType->isParameterPack());
 }
 
-UUID OpenedArchetypeType::getOpenedExistentialID() const {
-  return getGenericEnvironment()->getOpenedExistentialUUID();
-}
-
 PackArchetypeType::PackArchetypeType(
     const ASTContext &Ctx, GenericEnvironment *GenericEnv, Type InterfaceType,
     ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
