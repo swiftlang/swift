@@ -517,15 +517,21 @@ static VersionRange getMinOSVersionForClassStubs(const llvm::Triple &target) {
   return VersionRange::all();
 }
 
-static bool checkObjCClassStubAvailability(ASTContext &ctx, const Decl *decl) {
-  auto minRange = getMinOSVersionForClassStubs(ctx.LangOpts.Target);
+static AvailabilityContext getObjCClassStubAvailability(ASTContext &ctx) {
+  // FIXME: This should just be ctx.getSwift51Availability(), but that breaks
+  // tests on arm64 arches.
+  return AvailabilityContext(getMinOSVersionForClassStubs(ctx.LangOpts.Target));
+}
 
-  auto targetRange = AvailabilityContext::forDeploymentTarget(ctx);
-  if (targetRange.getOSVersion().isContainedIn(minRange))
+static bool checkObjCClassStubAvailability(ASTContext &ctx, const Decl *decl) {
+  auto stubAvailability = getObjCClassStubAvailability(ctx);
+
+  auto deploymentTarget = AvailabilityContext::forDeploymentTarget(ctx);
+  if (deploymentTarget.isContainedIn(stubAvailability))
     return true;
 
-  auto declRange = AvailabilityInference::availableRange(decl, ctx);
-  return declRange.getOSVersion().isContainedIn(minRange);
+  auto declAvailability = AvailabilityInference::availableRange(decl, ctx);
+  return declAvailability.isContainedIn(stubAvailability);
 }
 
 static const ClassDecl *getResilientAncestor(ModuleDecl *mod,
@@ -568,16 +574,14 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
               AncestryFlags::ResilientOther) ||
             classDecl->hasResilientMetadata(mod,
                                             ResilienceExpansion::Maximal)) {
-          auto &target = ctx.LangOpts.Target;
-          auto platform = prettyPlatformString(targetPlatform(ctx.LangOpts));
-          auto range = getMinOSVersionForClassStubs(target);
+          auto stubAvailability = getObjCClassStubAvailability(ctx);
           auto *ancestor = getResilientAncestor(mod, classDecl);
           softenIfAccessNote(value, reason.getAttr(),
             value->diagnose(diag::objc_in_resilient_extension,
                             value->getDescriptiveKind(),
                             ancestor->getName(),
-                            platform,
-                            range.getLowerEndpoint())
+                            ctx.getTargetPlatformStringForDiagnostics(),
+                            stubAvailability.getRawMinimumVersion())
                 .limitBehavior(behavior));
           reason.describe(value);
           return true;
@@ -1317,17 +1321,13 @@ static std::optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
         return std::nullopt;
       }
 
-
-      auto &target = ctx.LangOpts.Target;
-      auto platform = prettyPlatformString(targetPlatform(ctx.LangOpts));
-      auto range = getMinOSVersionForClassStubs(target);
+      auto stubAvailability = getObjCClassStubAvailability(ctx);
       auto *ancestor = getResilientAncestor(CD->getParentModule(), CD);
-      swift::diagnoseAndRemoveAttr(CD, attr,
-                                   diag::objc_for_resilient_class,
+      swift::diagnoseAndRemoveAttr(CD, attr, diag::objc_for_resilient_class,
                                    ancestor->getName(),
-                                   platform,
-                                   range.getLowerEndpoint())
-        .limitBehavior(behavior);
+                                   ctx.getTargetPlatformStringForDiagnostics(),
+                                   stubAvailability.getRawMinimumVersion())
+          .limitBehavior(behavior);
       reason.describe(CD);
     }
 

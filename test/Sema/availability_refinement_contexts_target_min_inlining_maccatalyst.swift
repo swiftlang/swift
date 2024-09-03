@@ -10,6 +10,6 @@
 
 // Verify that -target-min-inlining-version min implies 13.1 on macCatalyst.
 
-// CHECK: {{^}}(root versions=[13.1,+Inf)
-// CHECK-NEXT: {{^}}  (decl_implicit versions=[14.4,+Inf) decl=foo()
+// CHECK: {{^}}(root version=13.1
+// CHECK-NEXT: {{^}}  (decl_implicit version=14.4 decl=foo()
 func foo() {}

@@ -423,8 +423,7 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
 }
 
 bool Decl::isAvailableAsSPI() const {
-  return AvailabilityInference::availableRange(this, getASTContext())
-    .isAvailableAsSPI();
+  return AvailabilityInference::isAvailableAsSPI(this, getASTContext());
 }
 
 std::optional<AvailableAttrDeclPair>
@@ -518,14 +517,6 @@ bool Decl::requiresUnavailableDeclABICompatibilityStubs() const {
   return isUnreachableAtRuntime();
 }
 
-bool UnavailabilityReason::requiresDeploymentTargetOrEarlier(
-    ASTContext &Ctx) const {
-  return RequiredDeploymentRange.getLowerEndpoint() <=
-         AvailabilityContext::forDeploymentTarget(Ctx)
-             .getOSVersion()
-             .getLowerEndpoint();
-}
-
 AvailabilityContext
 AvailabilityInference::annotatedAvailableRangeForAttr(const SpecializeAttr* attr,
                                                       ASTContext &ctx) {
@@ -550,13 +541,10 @@ AvailabilityInference::annotatedAvailableRangeForAttr(const SpecializeAttr* attr
   return AvailabilityContext::alwaysAvailable();
 }
 
-AvailabilityContext AvailabilityInference::availableRange(const Decl *D,
-                                                          ASTContext &Ctx) {
-  std::optional<AvailabilityContext> AnnotatedRange =
-      annotatedAvailableRange(D, Ctx);
-  if (AnnotatedRange.has_value()) {
-    return AnnotatedRange.value();
-  }
+static const AvailableAttr *attrForAvailableRange(const Decl *D,
+                                                  ASTContext &Ctx) {
+  if (auto attr = AvailabilityInference::attrForAnnotatedAvailableRange(D, Ctx))
+    return attr;
 
   // Unlike other declarations, extensions can be used without referring to them
   // by name (they don't have one) in the source. For this reason, when checking
@@ -568,14 +556,28 @@ AvailabilityContext AvailabilityInference::availableRange(const Decl *D,
 
   DeclContext *DC = D->getDeclContext();
   if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
-    AnnotatedRange = annotatedAvailableRange(ED, Ctx);
-    if (AnnotatedRange.has_value()) {
-      return AnnotatedRange.value();
-    }
+    if (auto attr =
+            AvailabilityInference::attrForAnnotatedAvailableRange(ED, Ctx))
+      return attr;
   }
+
+  return nullptr;
+}
+
+AvailabilityContext AvailabilityInference::availableRange(const Decl *D,
+                                                          ASTContext &Ctx) {
+  if (auto attr = attrForAvailableRange(D, Ctx))
+    return availableRange(attr, Ctx);
 
   // Treat unannotated declarations as always available.
   return AvailabilityContext::alwaysAvailable();
+}
+
+bool AvailabilityInference::isAvailableAsSPI(const Decl *D, ASTContext &Ctx) {
+  if (auto attr = attrForAvailableRange(D, Ctx))
+    return attr->IsSPI;
+
+  return false;
 }
 
 AvailabilityContext
@@ -590,8 +592,7 @@ AvailabilityInference::availableRange(const AvailableAttr *attr,
       attr, Ctx, Platform, RemappedIntroducedVersion))
     IntroducedVersion = RemappedIntroducedVersion;
 
-  return AvailabilityContext{VersionRange::allGTE(IntroducedVersion),
-                             attr->IsSPI};
+  return AvailabilityContext{VersionRange::allGTE(IntroducedVersion)};
 }
 
 namespace {
