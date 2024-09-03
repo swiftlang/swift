@@ -279,6 +279,16 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 
 func test() {
   let group = DispatchGroup()
+  var dummy: AnyObject?
+
+  func check(factory: () -> AnyObject) {
+    dummy = factory()
+    // Test requires actor system to be released before the actor,
+    // so that release of the actor system from actor deinit is the last one
+    group.enter()
+    dummy = nil
+    group.wait()
+  }
 
   // no lifecycle things make sense for a normal actor, double check we didn't emit them
   print("before A")
@@ -287,32 +297,26 @@ func test() {
   // CHECK: before A
   // CHECK: after A
 
-  group.enter()
-  _ = { () -> DA in
+  check {
     DA(system: DefaultDistributedActorSystem(group: group))
-  }()
-  group.wait()
+  }
   // CHECK: assign type:DA, address:[[ADDRESS:.*]]
   // CHECK: ready actor:main.DA, address:ActorAddress(address: "[[ADDR1:addr-[0-9]]]")
   // CHECK: resign address:ActorAddress(address: "[[ADDR1]]")
   // CHECK-NEXT: Deinit ActorSystem: mainExecutor=true mainThread=true
 
-  group.enter()
-  _ = { () -> DA_userDefined in
+  check {
     DA_userDefined(system: DefaultDistributedActorSystem(group: group))
-  }()
-  group.wait()
+  }
   // CHECK: assign type:DA_userDefined, address:[[ADDRESS:.*]]
   // CHECK: ready actor:main.DA_userDefined, address:ActorAddress(address: "[[ADDR2:addr-[0-9]]]")
   // CHECK: resign address:ActorAddress(address: "[[ADDR2]]")
   // CHECK-NEXT: Deinit ActorSystem: mainExecutor=true mainThread=true
 
   // resign must happen as the _last thing_ after user-deinit completed
-  group.enter()
-  _ = { () -> DA_userDefined_nonisolated in
+  check {
     DA_userDefined_nonisolated(system: DefaultDistributedActorSystem(group: group))
-  }()
-  group.wait()
+  }
   // CHECK: assign type:DA_userDefined_nonisolated, address:[[ADDRESS:.*]]
   // CHECK: ready actor:main.DA_userDefined_nonisolated, address:ActorAddress(address: "[[ADDR3:addr-[0-9]]]")
   // CHECK: Deinitializing ActorAddress(address: "[[ADDR3]]") remote:false isolated:false mainThread:true
@@ -320,11 +324,9 @@ func test() {
   // CHECK-NEXT: Deinit ActorSystem: mainExecutor=true mainThread=true
   
   // resign must happen as the _last thing_ after user-deinit completed
-  group.enter()
-  _ = { () -> DA_userDefined_isolated in
+  check {
     DA_userDefined_isolated(system: DefaultDistributedActorSystem(group: group))
-  }()
-  group.wait()
+  }
   // CHECK: assign type:DA_userDefined_isolated, address:[[ADDRESS:.*]]
   // CHECK: ready actor:main.DA_userDefined_isolated, address:ActorAddress(address: "[[ADDR4:addr-[0-9]]]")
   // CHECK: Deinitializing ActorAddress(address: "[[ADDR4]]") remote:false isolated:true mainThread:true
@@ -332,11 +334,9 @@ func test() {
   // CHECK-NEXT: Deinit ActorSystem: mainExecutor=false mainThread=true
 
   // resign must happen as the _last thing_ after user-deinit completed
-  group.enter()
-  _ = { () -> DA_state_nonisolated in
+  check {
     DA_state_nonisolated(name: "Foo", age:37, system: DefaultDistributedActorSystem(group: group))
-  }()
-  group.wait()
+  }
   // CHECK: assign type:DA_state_nonisolated, address:[[ADDRESS:.*]]
   // CHECK: ready actor:main.DA_state_nonisolated, address:ActorAddress(address: "[[ADDR5:addr-[0-9]]]")
   // CHECK: Deinitializing ActorAddress(address: "[[ADDR5]]") name=Foo age=37 remote:false isolated:false mainThread:true
@@ -344,11 +344,9 @@ func test() {
   // CHECK-NEXT: Deinit ActorSystem: mainExecutor=true mainThread=true
   
   // resign must happen as the _last thing_ after user-deinit completed
-  group.enter()
-  _ = { () -> DA_state_isolated in
+  check {
     DA_state_isolated(name: "Bar", age:42, system: DefaultDistributedActorSystem(group: group))
-  }()
-  group.wait()
+  }
   // CHECK: assign type:DA_state_isolated, address:[[ADDRESS:.*]]
   // CHECK: ready actor:main.DA_state_isolated, address:ActorAddress(address: "[[ADDR6:addr-[0-9]]]")
   // CHECK: Deinitializing ActorAddress(address: "[[ADDR6]]") name=Bar age=42 remote:false isolated:true mainThread:true
@@ -356,11 +354,9 @@ func test() {
   // CHECK-NEXT: Deinit ActorSystem: mainExecutor=false mainThread=true
   
   // resign must happen as the _last thing_ after user-deinit completed
-  group.enter()
-  _ = { () -> DA_state_isolated_on_another in
+  check {
     DA_state_isolated_on_another(name: "Baz", age:57, system: DefaultDistributedActorSystem(group: group))
-  }()
-  group.wait()
+  }
   // CHECK: assign type:DA_state_isolated_on_another, address:[[ADDRESS:.*]]
   // CHECK: ready actor:main.DA_state_isolated_on_another, address:ActorAddress(address: "[[ADDR6:addr-[0-9]]]")
   // CHECK: Deinitializing ActorAddress(address: "[[ADDR6]]") name=Baz age=57 remote:false isolated-self:false isolated-other:true mainThread:false
@@ -368,36 +364,30 @@ func test() {
   // CHECK-NEXT: Deinit ActorSystem: mainExecutor=false mainThread=false
 
   // a remote actor should not resign it's address, it was never "assigned" it
-  group.enter()
-  _ = { () -> DA_userDefined_nonisolated in
+  check {
     let address = ActorAddress(parse: "remote-1")
     return try! DA_userDefined_nonisolated.resolve(id: address, using: DefaultDistributedActorSystem(group: group))
-  }()
-  group.wait()
+  }
   // CHECK-NEXT: resolve type:DA_userDefined_nonisolated, address:ActorAddress(address: "remote-1")
   // MUST NOT run deinit body for a remote distributed actor
   // CHECK-NOT: Deinitializing ActorAddress(address: "remote-1")
   // CHECK-NEXT: Deinit ActorSystem: mainExecutor=true mainThread=true
   
   // a remote actor should not resign it's address, it was never "assigned" it
-  group.enter()
-  _ = { () -> DA_userDefined_isolated in
+  check {
     let address = ActorAddress(parse: "remote-2")
     return try! DA_userDefined_isolated.resolve(id: address, using: DefaultDistributedActorSystem(group: group))
-  }()
-  group.wait()
+  }
   // CHECK-NEXT: resolve type:DA_userDefined_isolated, address:ActorAddress(address: "remote-2")
   // MUST NOT run deinit body for a remote distributed actor
   // CHECK-NOT: Deinitializing ActorAddress(address: "remote-2")
   // CHECK-NEXT: Deinit ActorSystem: mainExecutor=true mainThread=true
   
   // a remote actor should not resign it's address, it was never "assigned" it
-  group.enter()
-  _ = { () -> DA_state_isolated_on_another in
+  check {
     let address = ActorAddress(parse: "remote-3")
     return try! DA_state_isolated_on_another.resolve(id: address, using: DefaultDistributedActorSystem(group: group))
-  }()
-  group.wait()
+  }
   // CHECK-NEXT: resolve type:DA_state_isolated_on_another, address:ActorAddress(address: "remote-3")
   // MUST NOT run deinit body for a remote distributed actor
   // CHECK-NOT: Deinitializing ActorAddress(address: "remote-3")
