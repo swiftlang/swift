@@ -457,10 +457,6 @@ struct ASTContext::Implementation {
   /// The single-parameter generic signature with no constraints, <T>.
   CanGenericSignature SingleGenericParameterSignature;
 
-  /// The existential signature <T : P> for each P.
-  llvm::DenseMap<std::pair<CanType, const GenericSignatureImpl *>, CanGenericSignature>
-      ExistentialSignatures;
-
   /// The element signature for a generic signature, which contains a clone
   /// of the context generic signature with new type parameters and requirements
   /// for opened pack elements in the given shape equivalence class.
@@ -851,7 +847,6 @@ void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
   SIZE_AND_BYTES(AssociativityCache);
   SIZE_AND_BYTES(DelayedConformanceDiags);
   SIZE_AND_BYTES(LazyContexts);
-  SIZE_AND_BYTES(ExistentialSignatures);
   SIZE_AND_BYTES(ElementSignatures);
   SIZE_AND_BYTES(Overrides);
   SIZE_AND_BYTES(DefaultWitnesses);
@@ -6137,34 +6132,6 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   return canonicalSig;
 }
 
-CanGenericSignature
-ASTContext::getOpenedExistentialSignature(Type type, GenericSignature parentSig) {
-  assert(type->isExistentialType());
-
-  if (auto existential = type->getAs<ExistentialType>())
-    type = existential->getConstraintType();
-
-  const CanType constraint = type->getCanonicalType();
-
-  auto canParentSig = parentSig.getCanonicalSignature();
-  auto key = std::make_pair(constraint, canParentSig.getPointer());
-  auto found = getImpl().ExistentialSignatures.find(key);
-  if (found != getImpl().ExistentialSignatures.end())
-    return found->second;
-
-  LocalArchetypeRequirementCollector collector(*this, canParentSig);
-  collector.addOpenedExistential(type);
-  auto genericSig = buildGenericSignature(
-      *this, collector.OuterSig, collector.Params, collector.Requirements,
-      /*allowInverses=*/true).getCanonicalSignature();
-
-  auto result = getImpl().ExistentialSignatures.insert(
-      std::make_pair(key, genericSig));
-  ASSERT(result.second);
-
-  return genericSig;
-}
-
 OpenedExistentialSignature
 ASTContext::getOpenedExistentialSignature(Type type) {
   assert(type->isExistentialType());
@@ -6194,8 +6161,13 @@ ASTContext::getOpenedExistentialSignature(Type type) {
   // Open the generalization signature by adding a new generic parameter
   // for `Self`.
   auto parentSig = gen.Generalization.getGenericSignature();
-  existentialSig.OpenedSig =
-      getOpenedExistentialSignature(gen.Shape, parentSig);
+  auto canParentSig = parentSig.getCanonicalSignature();
+
+  LocalArchetypeRequirementCollector collector(*this, canParentSig);
+  collector.addOpenedExistential(gen.Shape);
+  existentialSig.OpenedSig = buildGenericSignature(
+      *this, collector.OuterSig, collector.Params, collector.Requirements,
+      /*allowInverses=*/true).getCanonicalSignature();
 
   // Stash the `Self` type.
   existentialSig.SelfType =
