@@ -146,7 +146,7 @@ extension ArraySlice {
   @_semantics("array.props.isNativeTypeChecked")
   public // @testable
   func _hoistableIsNativeTypeChecked() -> Bool {
-   return _buffer.arrayPropertyIsNativeTypeChecked
+    return _buffer.arrayPropertyIsNativeTypeChecked
   }
 
   @inlinable
