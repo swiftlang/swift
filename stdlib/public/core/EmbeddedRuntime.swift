@@ -309,7 +309,13 @@ public func swift_bridgeObjectRelease_n(object: Builtin.RawPointer, n: UInt32) {
   swift_release_n(object: untaggedObject, n: n)
 }
 
-
+@_cdecl("swift_retainCount")
+public func swift_retainCount(object: Builtin.RawPointer) -> Int {
+  if !isValidPointerForNativeRetain(object: object) { return 0 }
+  let o = UnsafeMutablePointer<HeapObject>(object)
+  let refcount = refcountPointer(for: o)
+  return loadAcquire(refcount) & HeapObject.refcountMask
+}
 
 /// Refcount helpers
 
