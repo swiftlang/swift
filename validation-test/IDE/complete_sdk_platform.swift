@@ -15,6 +15,4 @@ import XCTest
 
 #^COMPLETE^#
 // COMPLETE: Decl[Module]/None/IsSystem: XCTest[#Module#]; name=XCTest
-
-// FIXME(rdar://134963605) - We also ought to be able to see this:
-// Decl[FreeFunction]/OtherModule[XCTest]/IsSystem: XCTFail()[#Void#]; name=XCTFail()
+// COMPLETE: Decl[FreeFunction]/OtherModule[XCTest]/IsSystem: XCTFail()[#Void#]; name=XCTFail()
