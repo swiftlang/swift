@@ -2085,7 +2085,7 @@ class NotCompileTimeConst final : public ContextualMismatch {
   NotCompileTimeConst(ConstraintSystem &cs, Type paramTy, ConstraintLocator *locator);
 
 public:
-  std::string getName() const override { return "replace with an literal"; }
+  std::string getName() const override { return "replace with a literal"; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
