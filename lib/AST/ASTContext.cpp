@@ -5342,22 +5342,21 @@ CanTypeWrapper<OpenedArchetypeType> OpenedArchetypeType::getNew(
 
 CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
                                                 std::optional<UUID> knownID) {
-  assert(existential->isExistentialType());
-  assert(!existential->hasTypeParameter());
-
-  auto interfaceType = OpenedArchetypeType::getSelfInterfaceTypeFromContext(
-      GenericSignature(), existential->getASTContext());
+  auto &ctx = existential->getASTContext();
+  auto existentialSig = ctx.getOpenedExistentialSignature(existential);
 
   if (!knownID)
     knownID = UUID::fromTime();
 
   auto *genericEnv = GenericEnvironment::forOpenedExistential(
-      existential, *knownID);
+      existentialSig.OpenedSig,
+      existentialSig.Shape,
+      existentialSig.Generalization,
+      *knownID);
 
-  // Map the interface type into that environment.
-  auto result = genericEnv->mapTypeIntoContext(interfaceType)
-      ->castTo<OpenedArchetypeType>();
-  return CanOpenedArchetypeType(result);
+  return cast<OpenedArchetypeType>(
+    genericEnv->mapTypeIntoContext(existentialSig.SelfType)
+      ->getCanonicalType());
 }
 
 Type OpenedArchetypeType::getAny(Type existential) {
@@ -5547,8 +5546,10 @@ GenericEnvironment *GenericEnvironment::forOpaqueType(
 GenericEnvironment *
 GenericEnvironment::forOpenedExistential(Type existential, UUID uuid) {
   auto &ctx = existential->getASTContext();
-  auto signature = ctx.getOpenedExistentialSignature(existential, GenericSignature());
-  return forOpenedExistential(signature, existential, SubstitutionMap(), uuid);
+  auto existentialSig = ctx.getOpenedExistentialSignature(existential);
+  return forOpenedExistential(existentialSig.OpenedSig,
+                              existentialSig.Shape,
+                              existentialSig.Generalization, uuid);
 }
 
 /// Create a new generic environment for an opened archetype.
@@ -6175,18 +6176,15 @@ OpenedExistentialSignature
 ASTContext::getOpenedExistentialSignature(Type type) {
   assert(type->isExistentialType());
 
-  if (auto existential = type->getAs<ExistentialType>())
-    type = existential->getConstraintType();
-
-  const CanType constraint = type->getCanonicalType();
+  auto canType = type->getCanonicalType();
 
   // The constraint type might contain type variables.
-  auto properties = constraint->getRecursiveProperties();
+  auto properties = canType->getRecursiveProperties();
   auto arena = getArena(properties);
 
   // Check the cache.
   const auto &sigs = getImpl().getArena(arena).ExistentialSignatures;
-  auto found = sigs.find(constraint);
+  auto found = sigs.find(canType);
   if (found != sigs.end())
     return found->second;
 
@@ -6194,7 +6192,8 @@ ASTContext::getOpenedExistentialSignature(Type type) {
 
   // Generalize the existential type, to move type variables and primary
   // archetypes into the substitution map.
-  auto gen = ExistentialTypeGeneralization::get(constraint);
+  auto gen = ExistentialTypeGeneralization::get(canType);
+
   existentialSig.Shape = gen.Shape->getCanonicalType();
   existentialSig.Generalization = gen.Generalization;
 
@@ -6212,7 +6211,7 @@ ASTContext::getOpenedExistentialSignature(Type type) {
 
   // Cache the result.
   auto result = getImpl().getArena(arena).ExistentialSignatures.insert(
-      std::make_pair(constraint, existentialSig));
+      std::make_pair(canType, existentialSig));
   ASSERT(result.second);
 
   return existentialSig;

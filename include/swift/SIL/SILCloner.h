@@ -245,8 +245,8 @@ public:
   /// Register a re-mapping for local archetypes such as opened existentials.
   void registerLocalArchetypeRemapping(GenericEnvironment *From,
                                        GenericEnvironment *To) {
-    ASSERT(From->getGenericSignature()->getMaxDepth()
-           == To->getGenericSignature()->getMaxDepth());
+    ASSERT(From->getGenericSignature().getPointer()
+           == To->getGenericSignature().getPointer());
 
     auto result = Functor.LocalArchetypeSubs.insert(std::make_pair(From, To));
     assert(result.second);
@@ -380,14 +380,14 @@ public:
 
   void remapRootOpenedType(CanOpenedArchetypeType archetypeTy) {
     auto *origEnv = archetypeTy->getGenericEnvironment();
-    auto subMap = origEnv->getOuterSubstitutions();
-    ASSERT(!subMap && "Transform the substitution map!");
-    auto origExistentialTy = origEnv->getOpenedExistentialType()
-        ->getCanonicalType();
 
-    auto substExistentialTy = getOpASTType(origExistentialTy);
+    auto genericSig = origEnv->getGenericSignature();
+    auto existentialTy = origEnv->getOpenedExistentialType();
+    auto subMap = origEnv->getOuterSubstitutions();
+
     auto *newEnv = GenericEnvironment::forOpenedExistential(
-        substExistentialTy, UUID::fromTime());
+        genericSig, existentialTy, getOpSubstitutionMap(subMap),
+        UUID::fromTime());
 
     registerLocalArchetypeRemapping(origEnv, newEnv);
   }
