@@ -1,4 +1,4 @@
-//===--- LifetimeDependenceSpecifiers.h ------------------------*- C++ -*-===//
+//===--- LifetimeDependence.h ---------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -43,13 +43,12 @@ enum class ParsedLifetimeDependenceKind : uint8_t {
 
 enum class LifetimeDependenceKind : uint8_t { Inherit = 0, Scope };
 
-class LifetimeDependenceSpecifier {
-public:
-  enum class SpecifierKind { Named, Ordered, Self, Immortal };
+enum class LifetimeEntryKind { Named, Ordered, Self, Immortal };
 
+class LifetimeEntry {
 private:
   SourceLoc loc;
-  SpecifierKind specifierKind;
+  LifetimeEntryKind lifetimeEntryKind;
   ParsedLifetimeDependenceKind parsedLifetimeDependenceKind;
   union Value {
     struct {
@@ -65,72 +64,72 @@ private:
     Value() {}
   } value;
 
-  LifetimeDependenceSpecifier(
-      SourceLoc loc, SpecifierKind specifierKind,
-      ParsedLifetimeDependenceKind parsedLifetimeDependenceKind, Value value)
-      : loc(loc), specifierKind(specifierKind),
+  LifetimeEntry(SourceLoc loc, LifetimeEntryKind lifetimeEntryKind,
+                ParsedLifetimeDependenceKind parsedLifetimeDependenceKind,
+                Value value)
+      : loc(loc), lifetimeEntryKind(lifetimeEntryKind),
         parsedLifetimeDependenceKind(parsedLifetimeDependenceKind),
         value(value) {}
 
 public:
-  static LifetimeDependenceSpecifier getNamedLifetimeDependenceSpecifier(
-      SourceLoc loc, Identifier name,
-      ParsedLifetimeDependenceKind kind =
-          ParsedLifetimeDependenceKind::Default) {
-    return {loc, SpecifierKind::Named, kind, name};
+  static LifetimeEntry
+  getNamedLifetimeEntry(SourceLoc loc, Identifier name,
+                        ParsedLifetimeDependenceKind kind =
+                            ParsedLifetimeDependenceKind::Default) {
+    return {loc, LifetimeEntryKind::Named, kind, name};
   }
 
-  static LifetimeDependenceSpecifier
-  getImmortalLifetimeDependenceSpecifier(SourceLoc loc) {
-    return {loc, SpecifierKind::Immortal, {}, {}};
+  static LifetimeEntry getImmortalLifetimeEntry(SourceLoc loc) {
+    return {loc, LifetimeEntryKind::Immortal, {}, {}};
   }
 
-  static LifetimeDependenceSpecifier getOrderedLifetimeDependenceSpecifier(
-      SourceLoc loc, unsigned index,
-      ParsedLifetimeDependenceKind kind =
-          ParsedLifetimeDependenceKind::Default) {
-    return {loc, SpecifierKind::Ordered, kind, index};
+  static LifetimeEntry
+  getOrderedLifetimeEntry(SourceLoc loc, unsigned index,
+                          ParsedLifetimeDependenceKind kind =
+                              ParsedLifetimeDependenceKind::Default) {
+    return {loc, LifetimeEntryKind::Ordered, kind, index};
   }
 
-  static LifetimeDependenceSpecifier getSelfLifetimeDependenceSpecifier(
-      SourceLoc loc, ParsedLifetimeDependenceKind kind =
-                         ParsedLifetimeDependenceKind::Default) {
-    return {loc, SpecifierKind::Self, kind, {}};
+  static LifetimeEntry
+  getSelfLifetimeEntry(SourceLoc loc,
+                       ParsedLifetimeDependenceKind kind =
+                           ParsedLifetimeDependenceKind::Default) {
+    return {loc, LifetimeEntryKind::Self, kind, {}};
   }
 
   SourceLoc getLoc() const { return loc; }
 
-  SpecifierKind getSpecifierKind() const { return specifierKind; }
+  LifetimeEntryKind getLifetimeEntryKind() const { return lifetimeEntryKind; }
 
   ParsedLifetimeDependenceKind getParsedLifetimeDependenceKind() const {
     return parsedLifetimeDependenceKind;
   }
 
   Identifier getName() const {
-    assert(specifierKind == SpecifierKind::Named);
+    assert(lifetimeEntryKind == LifetimeEntryKind::Named);
     return value.Named.name;
   }
 
   unsigned getIndex() const {
-    assert(specifierKind == SpecifierKind::Ordered);
+    assert(lifetimeEntryKind == LifetimeEntryKind::Ordered);
     return value.Ordered.index;
   }
 
   std::string getParamString() const {
-    switch (specifierKind) {
-    case SpecifierKind::Named:
+    switch (lifetimeEntryKind) {
+    case LifetimeEntryKind::Named:
       return value.Named.name.str().str();
-    case SpecifierKind::Self:
+    case LifetimeEntryKind::Self:
       return "self";
-    case SpecifierKind::Ordered:
+    case LifetimeEntryKind::Ordered:
       return std::to_string(value.Ordered.index);
-    case SpecifierKind::Immortal:
+    case LifetimeEntryKind::Immortal:
       return "immortal";
     }
-    llvm_unreachable("Invalid LifetimeDependenceSpecifier::SpecifierKind");
+    llvm_unreachable("Invalid LifetimeEntryKind");
   }
 
-  std::string getLifetimeDependenceSpecifierString() const {
+  std::string getDependsOnString() const {
     switch (parsedLifetimeDependenceKind) {
     case ParsedLifetimeDependenceKind::Default:
       return "dependsOn(" + getParamString() + ")";
@@ -139,8 +138,7 @@ public:
     case ParsedLifetimeDependenceKind::Inherit:
       return "dependsOn(inherited " + getParamString() + ")";
     }
-    llvm_unreachable(
-        "Invalid LifetimeDependenceSpecifier::ParsedLifetimeDependenceKind");
+    llvm_unreachable("Invalid LifetimeEntry::ParsedLifetimeDependenceKind");
   }
 };
 
@@ -155,10 +153,10 @@ class LifetimeDependenceInfo {
                                             unsigned sourceIndex,
                                             LifetimeDependenceKind kind);
 
-  /// Builds LifetimeDependenceInfo on a result or parameter from a swift decl
+  /// Builds LifetimeDependenceInfo from dependsOn type modifier
   static std::optional<LifetimeDependenceInfo>
-  fromTypeRepr(AbstractFunctionDecl *afd, LifetimeDependentTypeRepr *typeRepr,
-               unsigned targetIndex);
+  fromDependsOn(AbstractFunctionDecl *afd, TypeRepr *targetRepr,
+                Type targetType, unsigned targetIndex);
 
   /// Infer LifetimeDependenceInfo on result
   static std::optional<LifetimeDependenceInfo> infer(AbstractFunctionDecl *afd);
@@ -173,9 +171,9 @@ class LifetimeDependenceInfo {
 
   /// Builds LifetimeDependenceInfo from SIL function type
   static std::optional<LifetimeDependenceInfo>
-  fromTypeRepr(LifetimeDependentTypeRepr *lifetimeDependentRepr,
-               unsigned targetIndex, ArrayRef<SILParameterInfo> params,
-               DeclContext *dc);
+  fromDependsOn(LifetimeDependentTypeRepr *lifetimeDependentRepr,
+                unsigned targetIndex, ArrayRef<SILParameterInfo> params,
+                DeclContext *dc);
 
 public:
   LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,

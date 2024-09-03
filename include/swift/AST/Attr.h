@@ -2630,19 +2630,19 @@ public:
 
 class LifetimeAttr final
     : public DeclAttribute,
-      private llvm::TrailingObjects<LifetimeAttr, LifetimeDependenceSpecifier> {
+      private llvm::TrailingObjects<LifetimeAttr, LifetimeEntry> {
 
   friend TrailingObjects;
 
   unsigned NumEntries = 0;
 
   explicit LifetimeAttr(SourceLoc atLoc, SourceRange baseRange, bool implicit,
-                        ArrayRef<LifetimeDependenceSpecifier> entries);
+                        ArrayRef<LifetimeEntry> entries);
 
 public:
   static LifetimeAttr *create(ASTContext &context, SourceLoc atLoc,
                               SourceRange baseRange, bool implicit,
-                              ArrayRef<LifetimeDependenceSpecifier> entries);
+                              ArrayRef<LifetimeEntry> entries);
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Lifetime;

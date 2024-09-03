@@ -3043,20 +3043,18 @@ AllowFeatureSuppressionAttr *AllowFeatureSuppressionAttr::create(
 }
 
 LifetimeAttr::LifetimeAttr(SourceLoc atLoc, SourceRange baseRange,
-                           bool implicit,
-                           ArrayRef<LifetimeDependenceSpecifier> entries)
+                           bool implicit, ArrayRef<LifetimeEntry> entries)
     : DeclAttribute(DeclAttrKind::Lifetime, atLoc, baseRange, implicit),
       NumEntries(entries.size()) {
   std::copy(entries.begin(), entries.end(),
-            getTrailingObjects<LifetimeDependenceSpecifier>());
+            getTrailingObjects<LifetimeEntry>());
 }
 
-LifetimeAttr *
-LifetimeAttr::create(ASTContext &context, SourceLoc atLoc,
-                     SourceRange baseRange, bool implicit,
-                     ArrayRef<LifetimeDependenceSpecifier> entries) {
-  unsigned size = totalSizeToAlloc<LifetimeDependenceSpecifier>(entries.size());
-  void *mem = context.Allocate(size, alignof(LifetimeDependenceSpecifier));
+LifetimeAttr *LifetimeAttr::create(ASTContext &context, SourceLoc atLoc,
+                                   SourceRange baseRange, bool implicit,
+                                   ArrayRef<LifetimeEntry> entries) {
+  unsigned size = totalSizeToAlloc<LifetimeEntry>(entries.size());
+  void *mem = context.Allocate(size, alignof(LifetimeEntry));
   return new (mem) LifetimeAttr(atLoc, baseRange, implicit, entries);
 }
 
