@@ -158,6 +158,12 @@
 #define SWIFT_NONCOPYABLE \
   __attribute__((swift_attr("~Copyable")))
 
+/// Specifies that a specific c++ type such class or struct should be imported
+/// as a non-escapable Swift value type when the non-escapable language feature
+/// is enabled.
+#define SWIFT_NONESCAPABLE \
+  __attribute__((swift_attr("~Escapable")))
+
 #else  // #if _CXX_INTEROP_HAS_ATTRIBUTE(swift_attr)
 
 // Empty defines for compilers that don't support `attribute(swift_attr)`.
@@ -172,6 +178,7 @@
 #define SWIFT_MUTATING 
 #define SWIFT_UNCHECKED_SENDABLE
 #define SWIFT_NONCOPYABLE
+#define SWIFT_NONESCAPABLE
 
 #endif // #if _CXX_INTEROP_HAS_ATTRIBUTE(swift_attr)
 

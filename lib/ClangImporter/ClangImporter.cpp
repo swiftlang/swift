@@ -7370,6 +7370,10 @@ static bool hasNonCopyableAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, "~Copyable");
 }
 
+bool importer::hasNonEscapableAttr(const clang::RecordDecl *decl) {
+  return hasSwiftAttribute(decl, "~Escapable");
+}
+
 /// Recursively checks that there are no pointers in any fields or base classes.
 /// Does not check C++ records with specific API annotations.
 static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
