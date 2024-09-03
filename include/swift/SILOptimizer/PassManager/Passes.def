@@ -421,6 +421,8 @@ SWIFT_FUNCTION_PASS(Simplification, "simplification",
     "Peephole simplifications")
 SWIFT_FUNCTION_PASS(OnoneSimplification, "onone-simplification",
     "Peephole simplifications which runs at -Onone")
+SWIFT_FUNCTION_PASS(ConstPropagation, "const-propagation",
+    "Compile-time value propagation")
 SWIFT_FUNCTION_PASS(LateOnoneSimplification, "late-onone-simplification",
     "Peephole simplifications which can only run late in the -Onone pipeline")
 SWIFT_FUNCTION_PASS(CleanupDebugSteps, "cleanup-debug-steps",
@@ -514,6 +516,8 @@ PASS(DiagnoseUnnecessaryPreconcurrencyImports, "sil-diagnose-unnecessary-preconc
      "Diagnose any preconcurrency imports that Sema and TransferNonSendable did not use")
 PASS(ThunkLowering, "sil-thunk-lowering",
      "Lower thunk instructions to actual thunks")
+PASS(DiagnoseUnknownCompileTimeValues, "sil-diagnose-unknown-compiletime-values",
+     "Diagnose any '@const' entities which could not be simplified to a compile-time value")
 PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AliasInfoDumper, PruneVTables)

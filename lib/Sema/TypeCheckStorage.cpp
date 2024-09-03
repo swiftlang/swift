@@ -487,13 +487,14 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
       binding->diagnose(diag::require_let_for_const);
     }
     // Diagnose when an init isn't given and it's not a compile-time constant
-    if (auto *init = binding->getInit(entryNumber)) {
-      if (!init->isSemanticallyConstExpr()) {
-        binding->diagnose(diag::require_const_initializer_for_const);
-      }
-    } else {
-      binding->diagnose(diag::require_const_initializer_for_const);
-    }
+    // ACTODO: Remove
+//    if (auto *init = binding->getInit(entryNumber)) {
+//      if (!init->isSemanticallyConstExpr()) {
+//        binding->diagnose(diag::require_const_initializer_for_const);
+//      }
+//    } else {
+//      binding->diagnose(diag::require_const_initializer_for_const);
+//    }
   }
 
   auto isInitAccessorProperty = [](Pattern *pattern) {
