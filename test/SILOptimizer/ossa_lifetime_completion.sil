@@ -763,3 +763,32 @@ backedge2(%c2 : @owned $C, %b2 : @reborrow @guaranteed $C):
 exit:
   unreachable
 }
+
+
+// CHECK-LABEL: begin running test {{.*}} on test_borrowed_from: ossa_lifetime_completion
+// CHECK-LABEL: sil [ossa] @test_borrowed_from : {{.*}} {
+// CHECK:       bb1([[A:%.*]] : @reborrow @guaranteed $C):
+// CHECK:         [[BF:%.*]] = borrowed [[A]] : $C from (%0 : $C)
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow [[BF]] : $C
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'test_borrowed_from'
+// CHECK-LABEL: end running test {{.*}} on test_borrowed_from: ossa_lifetime_completion
+sil [ossa] @test_borrowed_from : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0 : $C
+  br bb1(%1 : $C)
+
+bb1(%3 : @reborrow @guaranteed $C):
+  %4 = borrowed %3 : $C from (%0 : $C)
+  specify_test "ossa_lifetime_completion %3 availability"
+  cond_br undef, bb2, bb3
+
+bb2:
+  unreachable
+
+bb3:
+  end_borrow %4 : $C
+  return %0 : $C
+}
+
