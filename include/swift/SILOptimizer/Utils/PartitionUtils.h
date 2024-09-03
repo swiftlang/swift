@@ -1226,9 +1226,12 @@ public:
       }
 
       // Next see if we are disconnected and have the same isolation. In such a
-      // case, we do not transfer since the disconnected value is allowed to be
-      // resued after we return.
-      if (transferredRegionIsolation.isDisconnected() && calleeIsolationInfo &&
+      // case, if we are not marked explicitly as sending, we do not transfer
+      // since the disconnected value is allowed to be resued after we
+      // return. If we are passed as a sending parameter, we cannot do this.
+      if (auto fas = FullApplySite::isa(op.getSourceInst());
+          (!fas || !fas.isSending(*op.getSourceOp())) &&
+          transferredRegionIsolation.isDisconnected() && calleeIsolationInfo &&
           transferredRegionIsolation.hasSameIsolation(calleeIsolationInfo))
         return;
 
