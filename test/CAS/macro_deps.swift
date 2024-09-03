@@ -29,6 +29,11 @@
 // RUN: %swift_frontend_plain @%t/SwiftShims.cmd
 // RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json Foo > %t/Foo.cmd
 // RUN: %swift_frontend_plain @%t/Foo.cmd
+// RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json Bar > %t/Bar.cmd
+// RUN: %swift_frontend_plain @%t/Bar.cmd
+
+// RUN: %FileCheck %s --check-prefix=PLUGIN_SEARCH --input-file=%t/Bar.cmd
+// PLUGIN_SEARCH-NOT: -external-plugin-path
 
 // RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json MyApp > %t/MyApp.cmd
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps.json > %t/map.json
@@ -87,6 +92,11 @@ public func assertFalse() {
     #assert(false)
 }
 
+//--- include/Bar.swiftinterface
+// swift-interface-format-version: 1.0
+// swift-module-flags: -enable-library-evolution -swift-version 5 -O -module-name Bar -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib
+public func bar()
+
 //--- test.swift
 import Foo
 @inlinable
@@ -96,6 +106,7 @@ public func test() {
 
 //--- main.swift
 import Test
+import Bar
 @freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroTwo", type: "StringifyMacro")
 
 func appTest() {

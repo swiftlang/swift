@@ -813,6 +813,9 @@ public:
   void addMacroDependency(StringRef macroModuleName, StringRef libraryPath,
                           StringRef executablePath);
 
+  /// For a Source/Textual dependency, if it Has macro dependency.
+  bool hasMacroDependencies() const;
+
   /// Whether or not a queried module name is a `@Testable` import dependency
   /// of this module. Can only return `true` for Swift source modules.
   bool isTestableImport(StringRef moduleName) const;
