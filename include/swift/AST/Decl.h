@@ -3335,16 +3335,8 @@ public:
   /// that this declaration dynamically replaces.
   ValueDecl *getDynamicallyReplacedDecl() const;
 
-  /// Find references to 'Self' in the type signature of this declaration in the
-  /// context of the given existential base type.
-  ///
-  /// \param treatNonResultCovariantSelfAsInvariant When set, covariant 'Self'
-  /// references that are not in covariant result type position are considered
-  /// invariant. This position is the uncurried interface type of a declaration,
-  /// stripped of any optionality. For example, this is true for 'Self' in
-  /// 'func foo(Int) -> () -> Self?'.
-  GenericParameterReferenceInfo findExistentialSelfReferences(
-      Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const;
+  /// Find references to 'Self' in the type signature of this declaration.
+  GenericParameterReferenceInfo findExistentialSelfReferences() const;
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -9532,8 +9524,8 @@ public:
 /// specifies the index of the parameter that shall be skipped.
 GenericParameterReferenceInfo
 findGenericParameterReferences(const ValueDecl *value, CanGenericSignature sig,
-                               GenericTypeParamType *genericParam,
-                               bool treatNonResultCovarianceAsInvariant,
+                               GenericTypeParamType *origParam,
+                               GenericTypeParamType *openedParam,
                                std::optional<unsigned> skipParamIndex);
 
 inline void

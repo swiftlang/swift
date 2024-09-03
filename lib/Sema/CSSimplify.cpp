@@ -1577,23 +1577,27 @@ shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   if (genericParam->getDepth() < genericSig->getMaxDepth())
     return std::nullopt;
 
+  Type existentialTy;
+  if (auto existentialMetaTy = argTy->getAs<ExistentialMetatypeType>())
+    existentialTy = existentialMetaTy->getInstanceType();
+  else
+    existentialTy = argTy;
+
+  ASSERT(existentialTy->isExistentialType());
+
+  auto &ctx = cs.getASTContext();
+
   // If the existential argument conforms to all of protocol requirements on
   // the formal parameter's type, don't open unless ImplicitOpenExistentials is
   // enabled.
 
   // If all of the conformance requirements on the formal parameter's type
   // are self-conforming, don't open.
-  ASTContext &ctx = argTy->getASTContext();
   if (!ctx.LangOpts.hasFeature(Feature::ImplicitOpenExistentials)) {
-    Type existentialObjectType;
-    if (auto existentialMetaTy = argTy->getAs<ExistentialMetatypeType>())
-      existentialObjectType = existentialMetaTy->getInstanceType();
-    else
-      existentialObjectType = argTy;
     bool containsNonSelfConformance = false;
     for (auto proto : genericSig->getRequiredProtocols(genericParam)) {
       auto conformance = lookupExistentialConformance(
-          existentialObjectType, proto);
+          existentialTy, proto);
       if (conformance.isInvalid()) {
         containsNonSelfConformance = true;
         break;
@@ -1604,11 +1608,13 @@ shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
       return std::nullopt;
   }
 
+  auto existentialSig = ctx.getOpenedExistentialSignature(existentialTy);
+
   // Ensure that the formal parameter is only used in covariant positions,
   // because it won't match anywhere else.
   auto referenceInfo = findGenericParameterReferences(
-      callee, genericSig, genericParam,
-      /*treatNonResultCovarianceAsInvariant=*/false,
+      callee, existentialSig.OpenedSig, genericParam,
+      existentialSig.SelfType->castTo<GenericTypeParamType>(),
       /*skipParamIdx=*/paramIdx);
   if (referenceInfo.selfRef > TypePosition::Covariant ||
       referenceInfo.assocTypeRef > TypePosition::Covariant)

@@ -7390,36 +7390,34 @@ ExtendedExistentialTypeShapeInfo::get(CanType existentialType) {
     existentialType = metatype.getInstanceType();
   }
 
-  auto genInfo = ExistentialTypeGeneralization::get(existentialType);
+  auto &ctx = existentialType->getASTContext();
+  auto existentialSig = ctx.getOpenedExistentialSignature(existentialType);
 
-  auto result = get(genInfo, metatypeDepth);
-  result.genSubs = genInfo.Generalization;
-  return result;
-}
-
-ExtendedExistentialTypeShapeInfo
-ExtendedExistentialTypeShapeInfo::get(
-                                const ExistentialTypeGeneralization &genInfo,
-                                      unsigned metatypeDepth) {
-  auto shapeType = genInfo.Shape->getCanonicalType();
+  auto shapeType = existentialSig.Shape;
   for (unsigned i = 0; i != metatypeDepth; ++i)
     shapeType = CanExistentialMetatypeType::get(shapeType);
 
   CanGenericSignature genSig;
-  if (genInfo.Generalization)
-    genSig = genInfo.Generalization.getGenericSignature()
-                                   .getCanonicalSignature();
+  if (existentialSig.Generalization) {
+    genSig = existentialSig.Generalization.getGenericSignature()
+                                          .getCanonicalSignature();
+  }
 
   auto linkage = getExistentialShapeLinkage(genSig, shapeType);
   assert(linkage != FormalLinkage::PublicUnique && linkage != FormalLinkage::PackageUnique);
 
-  return { genSig, shapeType, SubstitutionMap(), linkage };
+  return {genSig,
+          shapeType,
+          existentialSig.Generalization,
+          existentialSig.OpenedSig,
+          linkage};
 }
 
 llvm::Constant *
 irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
                               const ExtendedExistentialTypeShapeInfo &info) {
   CanGenericSignature genSig = info.genSig;
+  CanGenericSignature reqSig = info.reqSig;
   CanType shapeType = info.shapeType;
   bool isUnique = info.isUnique();
   bool isShared = info.isShared();
@@ -7452,11 +7450,9 @@ irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
       metatypeDepth++;
     }
 
-    CanGenericSignature reqSig =
-      IGM.Context.getOpenedExistentialSignature(existentialType, genSig);
-
     CanType typeExpression;
     if (metatypeDepth > 0) {
+      // FIXME: reqSig.getGenericParams()[0] is always tau_0_0
       typeExpression = CanType(reqSig.getGenericParams()[0]);
       for (unsigned i = 0; i != metatypeDepth; ++i)
         typeExpression = CanMetatypeType::get(typeExpression);
