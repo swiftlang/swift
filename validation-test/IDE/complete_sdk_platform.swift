@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: ln -s %sdk %t/sdk
 
-// RUN: %batch-code-completion -F %xcode-extra-frameworks-dir -I %xcode-extra-platform-swift-modules
+// RUN: %batch-code-completion %xcode-extra-platform-search-paths
 
 // Works if SDK is specified as a symlink too.
-// RUN: %batch-code-completion -sdk %t/sdk -F %xcode-extra-frameworks-dir -I %xcode-extra-platform-swift-modules
+// RUN: %batch-code-completion -sdk %t/sdk %xcode-extra-platform-search-paths
 
 // REQUIRES: VENDOR=apple
 
