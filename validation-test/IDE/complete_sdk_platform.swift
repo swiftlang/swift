@@ -6,7 +6,7 @@
 // Works if SDK is specified as a symlink too.
 // RUN: %batch-code-completion -sdk %t/sdk %xcode-extra-platform-search-paths
 
-// REQUIRES: VENDOR=apple
+// REQUIRES: OS=macosx
 
 // rdar://131854240 - Make sure modules found in the platform dir are treated
 // as system.
