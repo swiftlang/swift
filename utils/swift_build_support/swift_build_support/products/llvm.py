@@ -134,7 +134,7 @@ class LLVM(cmake_product.CMakeProduct):
                       ' into the local clang build directory {}.'.format(
                           host_cxx_builtins_dir, dest_builtins_dir))
 
-                for _os in ['ios', 'watchos', 'tvos']:
+                for _os in ['ios', 'watchos', 'tvos', 'xros']:
                     # Copy over the device .a when necessary
                     lib_name = 'libclang_rt.{}.a'.format(_os)
                     host_lib_path = os.path.join(host_cxx_builtins_dir, lib_name)
