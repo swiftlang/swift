@@ -415,9 +415,11 @@ combineSubstitutionMaps(SubstitutionMap firstSubMap,
         return QuerySubstitutionMap{firstSubMap}(gp);
 
       auto *replacement = GenericTypeParamType::get(
-          gp->isParameterPack(),
+          gp->getParamKind(),
           gp->getDepth() + secondDepth - firstDepth,
-          gp->getIndex(), ctx);
+          gp->getIndex(),
+          gp->getValueType(),
+          ctx);
       return QuerySubstitutionMap{secondSubMap}(replacement);
     },
     // We might not have enough information in the substitution maps alone.
