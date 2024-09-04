@@ -70,10 +70,6 @@ struct ModuleInterfaceOptions {
   /// Print imports that are missing from the source and used in API.
   bool PrintMissingImports = true;
 
-  /// If true, package-name flag is not printed in either public or private
-  /// interface file.
-  bool DisablePackageNameForNonPackageInterface = false;
-
   /// Intentionally print invalid syntax into the file.
   bool DebugPrintInvalidSyntax = false;
 
