@@ -368,9 +368,10 @@ ModuleAliases("module-alias",
             llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
-    SkipDeinit("skip-deinit",
-               llvm::cl::desc("Whether to skip printing destructors"),
-               llvm::cl::cat(Category), llvm::cl::init(false));
+SkipDeinit("skip-deinit",
+           llvm::cl::desc("Whether to skip printing destructors"),
+           llvm::cl::cat(Category),
+           llvm::cl::init(true));
 
 static llvm::cl::opt<bool>
 SkipImports("skip-imports",
