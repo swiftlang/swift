@@ -808,8 +808,7 @@ SubstitutionMap TypeBase::getContextSubstitutionMap() {
   std::reverse(replacementTypes.begin(), replacementTypes.end());
 
   auto subMap = SubstitutionMap::get(
-    genericSig,
-    QueryReplacementTypeArray{genericSig, replacementTypes},
+    genericSig, replacementTypes,
     LookUpConformanceInModule());
 
   nominalTy->ContextSubMap = subMap;
