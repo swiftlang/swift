@@ -169,7 +169,10 @@ Solution ConstraintSystem::finalize() {
   }
 
   // Remember the opened existential types.
-  for (const auto &openedExistential : OpenedExistentialTypes) {
+  for (auto &openedExistential : OpenedExistentialTypes) {
+    openedExistential.second = simplifyType(openedExistential.second)
+        ->castTo<OpenedArchetypeType>();
+
     assert(solution.OpenedExistentialTypes.count(openedExistential.first) == 0||
            solution.OpenedExistentialTypes[openedExistential.first]
              == openedExistential.second &&
