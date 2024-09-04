@@ -4,26 +4,11 @@
 #include <vector>
 #include <set>
 
-// FIXME swift-ci linux tests do not support std::span
-#if __has_include(<span>)
-#include <span>
-#endif
-
-static const size_t spanSize = 50000;
-
-using ArrayOfU32 = uint32_t[spanSize];
 using VectorOfU32 = std::vector<uint32_t>;
 using SetOfU32 = std::set<uint32_t>;
-#if __has_include(<span>)
-using SpanOfU32 = std::span<uint32_t>;
-#endif
 
-static inline ArrayOfU32 array;
 static inline VectorOfU32 vec;
 static inline SetOfU32 set;
-#if __has_include(<span>)
-static inline SpanOfU32 span;
-#endif
 
 inline void initVector(size_t size) {
     if (!vec.empty()) {
@@ -43,18 +28,6 @@ inline void initSet(size_t size) {
         set.insert(uint32_t(i));
     }
 }
-
-#if __has_include(<span>)
-inline void initSpan() {
-    if (!span.empty()) {
-        return;
-    }
-    for (size_t i = 0; i < spanSize; ++i) {
-        array[i] = uint32_t(i);
-    }
-    span = SpanOfU32(array);
-}
-#endif
 
 inline VectorOfU32 makeVector32(size_t size) {
     initVector(size);
