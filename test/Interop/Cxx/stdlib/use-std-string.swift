@@ -148,6 +148,54 @@ StdStringTestSuite.test("std::u32string::append") {
     expectEqual(s1, std.u32string("0123abc"))
 }
 
+StdStringTestSuite.test("std::string comparison") {
+    let s1 = std.string("abc")
+    let s2 = std.string("def")
+    let s3 = std.string("abc")
+
+    expectTrue(s1 < s2)
+    expectFalse(s2 < s1)
+    expectTrue(s1 <= s2)
+    expectFalse(s2 <= s1)
+    expectTrue(s2 > s1)
+    expectFalse(s1 > s2)
+    expectTrue(s2 >= s1)
+    expectFalse(s1 >= s2)
+    expectTrue(s1 == s3)
+}
+
+StdStringTestSuite.test("std::u16string comparison") {
+    let s1 = std.u16string("abc")
+    let s2 = std.u16string("def")
+    let s3 = std.u16string("abc")
+
+    expectTrue(s1 < s2)
+    expectFalse(s2 < s1)
+    expectTrue(s1 <= s2)
+    expectFalse(s2 <= s1)
+    expectTrue(s2 > s1)
+    expectFalse(s1 > s2)
+    expectTrue(s2 >= s1)
+    expectFalse(s1 >= s2)
+    expectTrue(s1 == s3)
+}
+
+StdStringTestSuite.test("std::u32string comparison") {
+    let s1 = std.u32string("abc")
+    let s2 = std.u32string("def")
+    let s3 = std.u32string("abc")
+
+    expectTrue(s1 < s2)
+    expectFalse(s2 < s1)
+    expectTrue(s1 <= s2)
+    expectFalse(s2 <= s1)
+    expectTrue(s2 > s1)
+    expectFalse(s1 > s2)
+    expectTrue(s2 >= s1)
+    expectFalse(s1 >= s2)
+    expectTrue(s1 == s3)
+}
+
 StdStringTestSuite.test("std::string as Hashable") {
     let s0 = std.string()
     let h0 = s0.hashValue
