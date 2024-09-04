@@ -792,11 +792,7 @@ void UnboundImport::validateInterfaceWithPackageName(ModuleDecl *topLevelModule,
 
 void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
                                        SourceFile &SF) {
-  ASTContext &ctx = SF.getASTContext();
-
-  // Per getTopLevelModule(), we'll only get nullptr here for non-Swift modules,
-  // so these two really mean the same thing.
-  if (!topLevelModule || topLevelModule.get()->isNonSwiftModule())
+  if (!topLevelModule)
     return;
 
   // If the module we're validating is the builtin one, then just return because
@@ -804,6 +800,7 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
   // itself with resiliency. This can occur when one has passed
   // '-enable-builtin-module' and is explicitly importing the Builtin module in
   // their sources.
+  ASTContext &ctx = SF.getASTContext();
   if (topLevelModule.get() == ctx.TheBuiltinModule)
     return;
 
@@ -841,7 +838,8 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
   }
 
   // Report public imports of non-resilient modules from a resilient module.
-  if (import.options.contains(ImportFlags::ImplementationOnly) ||
+  if (topLevelModule.get()->isNonSwiftModule() ||
+      import.options.contains(ImportFlags::ImplementationOnly) ||
       import.accessLevel < AccessLevel::Public)
     return;
 
