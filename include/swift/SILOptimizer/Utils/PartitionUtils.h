@@ -1229,11 +1229,14 @@ public:
       // case, if we are not marked explicitly as sending, we do not transfer
       // since the disconnected value is allowed to be resued after we
       // return. If we are passed as a sending parameter, we cannot do this.
-      if (auto fas = FullApplySite::isa(op.getSourceInst());
-          (!fas || !fas.isSending(*op.getSourceOp())) &&
-          transferredRegionIsolation.isDisconnected() && calleeIsolationInfo &&
-          transferredRegionIsolation.hasSameIsolation(calleeIsolationInfo))
-        return;
+      if (auto *sourceInst = Impl::getSourceInst(op)) {
+        if (auto fas = FullApplySite::isa(sourceInst);
+            (!fas || !fas.isSending(*op.getSourceOp())) &&
+            transferredRegionIsolation.isDisconnected() &&
+            calleeIsolationInfo &&
+            transferredRegionIsolation.hasSameIsolation(calleeIsolationInfo))
+          return;
+      }
 
       // Mark op.getOpArgs()[0] as transferred.
       TransferringOperandState &state = operandToStateMap.get(op.getSourceOp());
@@ -1581,6 +1584,9 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
 
   static SILLocation getLoc(SILInstruction *inst) { return inst->getLoc(); }
   static SILLocation getLoc(Operand *op) { return op->getUser()->getLoc(); }
+  static SILInstruction *getSourceInst(const PartitionOp &partitionOp) {
+    return partitionOp.getSourceInst();
+  }
   static SILIsolationInfo getIsolationInfo(const PartitionOp &partitionOp) {
     return SILIsolationInfo::get(partitionOp.getSourceInst());
   }
