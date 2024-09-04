@@ -29,6 +29,9 @@ LocalArchetypeRequirementCollector::LocalArchetypeRequirementCollector(
     : Context(ctx), OuterSig(sig), Depth(sig.getNextDepth()) {}
 
 void LocalArchetypeRequirementCollector::addOpenedExistential(Type constraint) {
+  if (auto existential = constraint->getAs<ExistentialType>())
+    constraint = existential->getConstraintType();
+
   assert(constraint->isConstraintType() ||
          constraint->getClassOrBoundGenericClass());
   assert(OuterSig || !constraint->hasTypeParameter() &&
@@ -134,10 +137,9 @@ GenericSignature swift::buildGenericSignatureWithCapturedEnvironments(
       break;
 
     case GenericEnvironment::Kind::OpenedExistential: {
-      auto constraint = genericEnv->getOpenedExistentialType();
-      if (auto existential = constraint->getAs<ExistentialType>())
-        constraint = existential->getConstraintType()->mapTypeOutOfContext();
-      collector.addOpenedExistential(constraint);
+      auto existentialTy = genericEnv->getOpenedExistentialType()
+          ->mapTypeOutOfContext();
+      collector.addOpenedExistential(existentialTy);
       continue;
     }
     case GenericEnvironment::Kind::OpenedElement: {
