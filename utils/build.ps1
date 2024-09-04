@@ -1502,6 +1502,7 @@ function Build-XML2([Platform]$Platform, $Arch) {
       BUILD_SHARED_LIBS = "NO";
       CMAKE_INSTALL_BINDIR = "bin/$Platform/$ArchName";
       CMAKE_INSTALL_LIBDIR = "lib/$Platform/$ArchName";
+      CMAKE_POSITION_INDEPENDENT_CODE = "YES";
       CMAKE_SYSTEM_NAME = $Platform.ToString();
       LIBXML2_WITH_ICONV = "NO";
       LIBXML2_WITH_ICU = "NO";
@@ -1568,6 +1569,7 @@ function Build-CURL([Platform]$Platform, $Arch) {
       BUILD_SHARED_LIBS = "NO";
       BUILD_TESTING = "NO";
       CMAKE_INSTALL_LIBDIR = "lib/$Platform/$ArchName";
+      CMAKE_POSITION_INDEPENDENT_CODE = "YES";
       CMAKE_SYSTEM_NAME = $Platform.ToString();
       BUILD_CURL_EXE = "NO";
       BUILD_LIBCURL_DOCS = "NO";
