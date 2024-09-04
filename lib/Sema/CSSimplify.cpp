@@ -5619,6 +5619,7 @@ bool ConstraintSystem::repairFailures(
     // Matching a witness to an protocol requirement.
     if (isa<ProtocolDecl>(VD->getDeclContext()) &&
         VD->isProtocolRequirement() &&
+        VD->preconcurrency() &&
         path[0].is<LocatorPathElt::Witness>() &&
         // Note that the condition below is very important,
         // we need to wait until the very last moment to strip

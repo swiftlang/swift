@@ -1261,9 +1261,12 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
       // If there are no other issues, let's check whether this are
       // missing Sendable conformances when matching ObjC requirements.
-      // This is not an error until Swift 6 because `swift_attr` wasn't
-      // allowed in type contexts initially.
-      return solution->getFixedScore()
+      // This is not an error until Swift 6 because i.e. `swift_attr` wasn't
+      // allowed in type contexts initially and introducing new concurrency
+      // attributes shouldn't break witnesses without strict concurrency
+      // enabled.
+      return req->preconcurrency() &&
+             solution->getFixedScore()
                      .Data[SK_MissingSynthesizableConformance] > 0;
     }();
 
