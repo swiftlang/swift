@@ -2011,6 +2011,8 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
   assert(!method->isStatic() ||
          method->getNameInfo().getName().getCXXOverloadedOperator() ==
              clang::OO_Call);
+  // instance to static `operator ()` call.
+  bool isInstanceToStatic = method->isStatic();
   // When emitting symbolic decls, the method might not have a concrete
   // record type as this type.
   if (ImporterImpl.importSymbolicCXXDecls && !method->isStatic() &&
@@ -2120,32 +2122,6 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
       clangSema.DelayedDiagnostics.getCurrentPool()};
   auto diagState = clangSema.DelayedDiagnostics.push(diagPool);
 
-  // Construct the method's body.
-  clang::Expr *thisExpr = new (clangCtx) clang::CXXThisExpr(
-      clang::SourceLocation(), newMethod->getThisType(), /*IsImplicit=*/false);
-  if (castThisToNonConstThis) {
-    auto baseClassPtr =
-        clangCtx.getPointerType(clangCtx.getRecordType(derivedClass));
-    clang::CastKind Kind;
-    clang::CXXCastPath Path;
-    clangSema.CheckPointerConversion(thisExpr, baseClassPtr, Kind, Path,
-                                     /*IgnoreBaseAccess=*/false,
-                                     /*Diagnose=*/true);
-    auto conv = clangSema.ImpCastExprToType(thisExpr, baseClassPtr, Kind,
-                                            clang::VK_PRValue, &Path);
-    if (!conv.isUsable())
-      return nullptr;
-    thisExpr = conv.get();
-  }
-
-  auto memberExpr = clangSema.BuildMemberExpr(
-      thisExpr, /*isArrow=*/true, clang::SourceLocation(),
-      clang::NestedNameSpecifierLoc(), clang::SourceLocation(),
-      const_cast<clang::CXXMethodDecl *>(method),
-      clang::DeclAccessPair::make(const_cast<clang::CXXMethodDecl *>(method),
-                                  clang::AS_public),
-      /*HadMultipleCandidates=*/false, method->getNameInfo(),
-      clangCtx.BoundMemberTy, clang::VK_PRValue, clang::OK_Ordinary);
   llvm::SmallVector<clang::Expr *, 4> args;
   for (size_t i = 0; i < newMethod->getNumParams(); ++i) {
     auto *param = newMethod->getParamDecl(i);
@@ -2156,9 +2132,51 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
         clangCtx, param, false, type, clang::ExprValueKind::VK_LValue,
         clang::SourceLocation()));
   }
-  auto memberCall = clangSema.BuildCallToMemberFunction(
-      nullptr, memberExpr, clang::SourceLocation(), args,
-      clang::SourceLocation());
+
+  clang::ExprResult memberCall;
+  if (isInstanceToStatic) {
+    // Constuct a direct call to a static member instead of going
+    // through a member expression to avoid clang's semantic analysis failure
+    // when analysis the return on a member with non-existing `this`.
+    auto memberExpr = new (clangCtx) clang::DeclRefExpr(
+        clangCtx, const_cast<clang::CXXMethodDecl *>(method), false,
+        method->getType(), clang::ExprValueKind::VK_LValue,
+        clang::SourceLocation());
+    memberCall =
+        clangSema.BuildCallExpr(nullptr, memberExpr, clang::SourceLocation(),
+                                args, clang::SourceLocation());
+  } else {
+    // Construct the method's body.
+    clang::Expr *thisExpr = new (clangCtx)
+        clang::CXXThisExpr(clang::SourceLocation(), newMethod->getThisType(),
+                           /*IsImplicit=*/false);
+    if (castThisToNonConstThis) {
+      auto baseClassPtr =
+          clangCtx.getPointerType(clangCtx.getRecordType(derivedClass));
+      clang::CastKind Kind;
+      clang::CXXCastPath Path;
+      clangSema.CheckPointerConversion(thisExpr, baseClassPtr, Kind, Path,
+                                       /*IgnoreBaseAccess=*/false,
+                                       /*Diagnose=*/true);
+      auto conv = clangSema.ImpCastExprToType(thisExpr, baseClassPtr, Kind,
+                                              clang::VK_PRValue, &Path);
+      if (!conv.isUsable())
+        return nullptr;
+      thisExpr = conv.get();
+    }
+    auto memberExpr = clangSema.BuildMemberExpr(
+        thisExpr, /*isArrow=*/true, clang::SourceLocation(),
+        clang::NestedNameSpecifierLoc(), clang::SourceLocation(),
+        const_cast<clang::CXXMethodDecl *>(method),
+        clang::DeclAccessPair::make(const_cast<clang::CXXMethodDecl *>(method),
+                                    clang::AS_public),
+        /*HadMultipleCandidates=*/false, method->getNameInfo(),
+        clangCtx.BoundMemberTy, clang::VK_PRValue, clang::OK_Ordinary);
+
+    memberCall = clangSema.BuildCallToMemberFunction(
+        nullptr, memberExpr, clang::SourceLocation(), args,
+        clang::SourceLocation());
+  }
   if (!memberCall.isUsable())
     return nullptr;
   auto returnStmt =
