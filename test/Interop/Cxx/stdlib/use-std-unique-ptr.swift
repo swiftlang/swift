@@ -41,5 +41,17 @@ StdUniquePtrTestSuite.test("custom dtor") {
   expectEqual(dtorCalled, true)
 }
 
+StdUniquePtrTestSuite.test("Test move only types behind smart pointers") {
+  let sp = getNonCopyableSharedPtr()
+  let up = getNonCopyableUniquePtr()
+  let f1 = sp.pointee.x
+  expectEqual(f1, 42)
+  expectEqual(sp.pointee.method(1), 42)
+  let f2 = up.pointee.x
+  expectEqual(f2, 42)
+  expectEqual(up.pointee.method(1), 42)
+  let _ = up.pointee.x
+}
+
 runAllTests()
 

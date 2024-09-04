@@ -98,9 +98,13 @@ extension std.u32string: ExpressibleByStringLiteral {
 
 // MARK: Concatenating and comparing C++ strings
 
-extension std.string: Equatable {
+extension std.string: Equatable, Comparable {
   public static func ==(lhs: std.string, rhs: std.string) -> Bool {
     return lhs.compare(rhs) == 0
+  }
+
+  public static func <(lhs: std.string, rhs: std.string) -> Bool {
+    return lhs.compare(rhs) < 0
   }
 
   public static func +=(lhs: inout std.string, rhs: std.string) {
@@ -119,9 +123,13 @@ extension std.string: Equatable {
   }
 }
 
-extension std.u16string: Equatable {
+extension std.u16string: Equatable, Comparable {
   public static func ==(lhs: std.u16string, rhs: std.u16string) -> Bool {
     return lhs.compare(rhs) == 0
+  }
+
+  public static func <(lhs: std.u16string, rhs: std.u16string) -> Bool {
+    return lhs.compare(rhs) < 0
   }
 
   public static func +=(lhs: inout std.u16string, rhs: std.u16string) {
@@ -140,9 +148,13 @@ extension std.u16string: Equatable {
   }
 }
 
-extension std.u32string: Equatable {
+extension std.u32string: Equatable, Comparable {
   public static func ==(lhs: std.u32string, rhs: std.u32string) -> Bool {
     return lhs.compare(rhs) == 0
+  }
+
+  public static func <(lhs: std.u32string, rhs: std.u32string) -> Bool {
+    return lhs.compare(rhs) < 0
   }
 
   public static func +=(lhs: inout std.u32string, rhs: std.u32string) {
