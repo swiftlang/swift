@@ -4516,7 +4516,7 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
       ASTContext &ctx = decl->getASTContext();
       SmallString<64> scratch;
       Printer << " = "
-              << extractInlinableText(ctx.SourceMgr, decl->definition, scratch);
+              << extractInlinableText(ctx, decl->definition, scratch);
     } else {
       auto def = decl->getDefinition();
       switch (def.kind) {
