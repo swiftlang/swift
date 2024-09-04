@@ -137,8 +137,9 @@ GenericSignature swift::buildGenericSignatureWithCapturedEnvironments(
       break;
 
     case GenericEnvironment::Kind::OpenedExistential: {
-      auto existentialTy = genericEnv->getOpenedExistentialType()
-          ->mapTypeOutOfContext();
+      auto existentialTy = genericEnv->maybeApplyOuterContextSubstitutions(
+          genericEnv->getOpenedExistentialType())
+              ->mapTypeOutOfContext();
       collector.addOpenedExistential(existentialTy);
       continue;
     }

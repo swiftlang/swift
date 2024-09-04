@@ -3389,7 +3389,8 @@ Type ArchetypeType::getExistentialType() const {
   // Opened types hold this directly.
   if (auto *opened = dyn_cast<OpenedArchetypeType>(this)) {
     if (opened->isRoot()) {
-      return genericEnv->getOpenedExistentialType();
+      return genericEnv->maybeApplyOuterContextSubstitutions(
+          genericEnv->getOpenedExistentialType());
     }
   }
 
@@ -3398,10 +3399,7 @@ Type ArchetypeType::getExistentialType() const {
   auto genericSig = genericEnv->getGenericSignature();
 
   auto existentialType = genericSig->getExistentialType(interfaceType);
-  if (existentialType->hasTypeParameter())
-    existentialType = genericEnv->mapTypeIntoContext(existentialType);
-
-  return existentialType;
+  return genericEnv->maybeApplyOuterContextSubstitutions(existentialType);
 }
 
 bool ArchetypeType::requiresClass() const {
@@ -3536,10 +3534,6 @@ OpenedArchetypeType::OpenedArchetypeType(
                        environment)
 {
   assert(!interfaceType->isParameterPack());
-}
-
-UUID OpenedArchetypeType::getOpenedExistentialID() const {
-  return getGenericEnvironment()->getOpenedExistentialUUID();
 }
 
 PackArchetypeType::PackArchetypeType(

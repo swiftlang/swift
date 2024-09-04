@@ -4219,10 +4219,13 @@ namespace {
     void visitOpenedArchetypeType(OpenedArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "opened_archetype_type", label);
 
-      printFieldQuoted(T->getOpenedExistentialID(), "opened_existential_id");
+      auto *env = T->getGenericEnvironment();
+      printFieldQuoted(env->getOpenedExistentialUUID(), "opened_existential_id");
 
       printArchetypeCommonRec(T);
-      printRec(T->getGenericEnvironment()->getOpenedExistentialType(), "opened_existential");
+      printRec(env->getOpenedExistentialType(), "opened_existential");
+      if (auto subMap = env->getOuterSubstitutions())
+        printRec(subMap, "substitutions");
 
       printFoot();
     }

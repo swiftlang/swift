@@ -2854,18 +2854,21 @@ TypeResolver::resolveOpenedExistentialArchetype(
 
     archetypeType = ErrorType::get(interfaceType->getASTContext());
   } {
-    // The constraint type is written with respect to the surrounding
-    // generic environment.
-    constraintType = GenericEnvironment::mapTypeIntoContext(
-        resolution.getGenericSignature().getGenericEnvironment(),
-        constraintType);
-
     // The opened existential type is formed by mapping the interface type
     // into a new opened generic environment.
     auto *env = GenericEnvironment::forOpenedExistential(
         constraintType->getCanonicalType(),
         openedAttr->getUUID());
-    return env->mapTypeIntoContext(interfaceType);
+
+    // Rewrite the interface type into one with the correct depth.
+    interfaceType = Type(interfaceType).subst(
+        [&](SubstitutableType *type) -> Type {
+          return env->getGenericSignature().getGenericParams().back();
+        },
+        MakeAbstractConformanceForGenericType());
+
+    archetypeType = env->mapTypeIntoContext(interfaceType);
+    ASSERT(archetypeType->is<OpenedArchetypeType>());
   }
 
   return archetypeType;

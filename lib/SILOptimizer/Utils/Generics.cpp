@@ -1420,7 +1420,8 @@ public:
       SubstitutionMap::get(
         SpecializedGenericSig,
         [&](SubstitutableType *type) -> Type {
-          return CalleeGenericEnv->mapTypeIntoContext(
+          return GenericEnvironment::mapTypeIntoContext(
+              CalleeGenericEnv,
               SpecializedGenericSig.getReducedType(type));
         },
         LookUpConformanceInModule());
