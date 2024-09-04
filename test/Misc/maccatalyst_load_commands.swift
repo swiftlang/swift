@@ -1,5 +1,6 @@
 // REQUIRES: OS=maccatalyst || OS=macosx
 // REQUIRES: maccatalyst_support
+// REQUIRES: CPU=x86_64
 
 
 // Zippered libraries
