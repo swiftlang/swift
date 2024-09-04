@@ -2319,6 +2319,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::LValueObject:
     llvm_unreachable("Bad constraint kind in matchTupleTypes()");
   }
 
@@ -2679,6 +2680,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::LValueObject:
     return true;
   }
 
@@ -3324,6 +3326,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::LValueObject:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -7185,6 +7188,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::ExplicitGenericArguments:
     case ConstraintKind::SameShape:
     case ConstraintKind::MaterializePackExpansion:
+    case ConstraintKind::LValueObject:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -14158,6 +14162,80 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   return SolutionKind::Solved;
 }
 
+ConstraintSystem::SolutionKind 
+ConstraintSystem::simplifyLValueObjectConstraint(
+    Type type1, Type type2, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  auto lvalueTy = simplifyType(type1);
+
+  auto formUnsolved = [&]() {
+    // If we're supposed to generate constraints, do so.
+    if (flags.contains(TMF_GenerateConstraints)) {
+      auto *lvalueObject =
+          Constraint::create(*this, ConstraintKind::LValueObject,
+                             type1, type2, getConstraintLocator(locator));
+
+      addUnsolvedConstraint(lvalueObject);
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  };
+
+  auto isOrCanBeLValueType = [](Type type) {
+    if (auto *typeVar = type->getAs<TypeVariableType>()) {
+      return typeVar->getImpl().canBindToLValue();
+    }
+    return type->is<LValueType>();
+  };
+
+  if (lvalueTy->isPlaceholder()) {
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
+
+    recordAnyTypeVarAsPotentialHole(type2);
+    return SolutionKind::Solved;
+  }
+
+  if (!isOrCanBeLValueType(lvalueTy)) {
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
+
+    auto assessImpact = [&]() -> unsigned {
+      // If this is a projection of a member reference
+      // let's check whether the member is unconditionally
+      // settable, if so than it's a problem with its base.
+      if (locator.directlyAt<UnresolvedDotExpr>()) {
+        auto *memberLoc = getConstraintLocator(locator.getAnchor(),
+                                               ConstraintLocator::Member);
+        if (auto selected = findSelectedOverloadFor(memberLoc)) {
+          if (auto *storage = dyn_cast_or_null<AbstractStorageDecl>(
+                  selected->choice.getDeclOrNull())) {
+            return storage->isSettable(nullptr) ? 1 : 2;
+          }
+        }
+      }
+      return 2;
+    };
+
+    if (recordFix(
+            TreatRValueAsLValue::create(*this, getConstraintLocator(locator)),
+            assessImpact()))
+      return SolutionKind::Error;
+
+    lvalueTy = LValueType::get(lvalueTy);
+  }
+
+  if (lvalueTy->isTypeVariableOrMember())
+    return formUnsolved();
+
+  // TODO: This operation deserves its own locator just like OptionalObject.
+  addConstraint(ConstraintKind::Equal,
+                lvalueTy->castTo<LValueType>()->getObjectType(), type2,
+                getConstraintLocator(locator));
+  return SolutionKind::Solved;
+}
+
 static llvm::PointerIntPair<Type, 3, unsigned>
 getBaseTypeForPointer(TypeBase *type) {
   unsigned unwrapCount = 0;
@@ -15625,6 +15703,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
     return simplifyMaterializePackExpansionConstraint(first, second, subflags,
                                                       locator);
 
+  case ConstraintKind::LValueObject:
+    return simplifyLValueObjectConstraint(first, second, subflags, locator);
+
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueWitness:
@@ -16218,6 +16299,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::MaterializePackExpansion:
     return simplifyMaterializePackExpansionConstraint(
+        constraint.getFirstType(), constraint.getSecondType(),
+        /*flags*/ std::nullopt, constraint.getLocator());
+
+  case ConstraintKind::LValueObject:
+    return simplifyLValueObjectConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
         /*flags*/ std::nullopt, constraint.getLocator());
   }

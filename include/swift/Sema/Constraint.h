@@ -221,6 +221,8 @@ enum class ConstraintKind : char {
   /// The first type is a tuple containing a single unlabeled element that is a
   /// pack expansion. The second type is its pattern type.
   MaterializePackExpansion,
+  /// The first type is a l-value type whose object type is the second type.
+  LValueObject,
 };
 
 /// Classification of the different kinds of constraints.
@@ -691,6 +693,7 @@ public:
     case ConstraintKind::PackElementOf:
     case ConstraintKind::SameShape:
     case ConstraintKind::MaterializePackExpansion:
+    case ConstraintKind::LValueObject:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::ValueMember:

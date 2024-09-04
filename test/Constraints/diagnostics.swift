@@ -647,6 +647,7 @@ func r23560128() {
   var a : (Int,Int)?
   a.0 = 42 // expected-error{{value of optional type '(Int, Int)?' must be unwrapped to refer to member '0' of wrapped base type '(Int, Int)'}}
   // expected-note@-1{{chain the optional }}
+  // expected-note@-2 {{force-unwrap using '!' }}
 }
 
 // <rdar://problem/21890157> QoI: wrong error message when accessing properties on optional structs without unwrapping
@@ -656,6 +657,7 @@ struct ExampleStruct21890157 {
 var example21890157: ExampleStruct21890157?
 example21890157.property = "confusing"  // expected-error {{value of optional type 'ExampleStruct21890157?' must be unwrapped to refer to member 'property' of wrapped base type 'ExampleStruct21890157'}}
   // expected-note@-1{{chain the optional }}
+  // expected-note@-2 {{force-unwrap using '!' }}
 
 
 struct UnaryOp {}
