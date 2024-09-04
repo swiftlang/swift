@@ -407,6 +407,22 @@ extension UInt8? {
   public static func != (i: Self, s: Unicode.Scalar) -> Bool {
     return i != UInt8(ifASCII: s)
   }
+  /// Returns a Boolean value indicating whether the optional `UInt8` is equal to the provided Unicode scalar.
+  ///
+  /// - Parameters:
+  ///   - s: The Unicode scalar to compare against.
+  ///   - i: The optional `UInt8` value to compare.
+  /// - Returns: `true` if the optional `UInt8` is equal to the provided Unicode scalar; otherwise, `false`.
+  @_transparent @_alwaysEmitIntoClient
+  public static func == (s: Unicode.Scalar, i: Self) -> Bool {
+    return i == UInt8(ifASCII: s)
+  }
+
+  /// Returns a Boolean value indicating whether the optional `UInt8` is not equal to the provided Unicode scalar.
+  @_transparent @_alwaysEmitIntoClient
+  public static func != (s: Unicode.Scalar, i: Self) -> Bool {
+    return i != UInt8(ifASCII: s)
+  }
 
   /// Allows pattern matching of Unicode scalars in switch statements.
   @_transparent @_alwaysEmitIntoClient
