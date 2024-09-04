@@ -3011,14 +3011,16 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
 
   auto substFormalTypeIntoThunkContext =
       [&](CanType t) -> CanType {
-    return genericEnv->mapTypeIntoContext(
+    return GenericEnvironment::mapTypeIntoContext(
+        genericEnv,
         mapLocalArchetypesOutOfContext(t, baseGenericSig, capturedEnvs))
                ->getCanonicalType();
   };
   auto substLoweredTypeIntoThunkContext =
       [&](CanSILFunctionType t) -> CanSILFunctionType {
     return cast<SILFunctionType>(
-        genericEnv->mapTypeIntoContext(
+        GenericEnvironment::mapTypeIntoContext(
+          genericEnv,
           mapLocalArchetypesOutOfContext(t, baseGenericSig, capturedEnvs))
               ->getCanonicalType());
   };
