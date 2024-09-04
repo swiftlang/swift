@@ -1347,9 +1347,6 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
       } else if (!ParseState && Id.str() == "deallocator") {
         Kind = SILDeclRef::Kind::Deallocator;
         ParseState = 1;
-      } else if (!ParseState && Id.str() == "isolateddeallocator") {
-        Kind = SILDeclRef::Kind::IsolatedDeallocator;
-        ParseState = 1;
       } else if (!ParseState && Id.str() == "globalaccessor") {
         Kind = SILDeclRef::Kind::GlobalAccessor;
         ParseState = 1;

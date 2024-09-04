@@ -1033,7 +1033,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     if (!Options.PrintUserInaccessibleAttrs &&
         DeclAttribute::isUserInaccessible(DA->getKind()))
       continue;
-    if (Options.excludeAttr(DA))
+    if (Options.excludeAttrKind(DA->getKind()))
       continue;
 
     // In the public interfaces of -library-level=api modules, skip attributes

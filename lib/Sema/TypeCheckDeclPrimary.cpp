@@ -2308,7 +2308,8 @@ public:
       (void) VD->getFormalAccess();
 
       // Compute overrides.
-      checkOverrideActorIsolation(VD);
+      if (!VD->getOverriddenDecls().empty())
+        checkOverrideActorIsolation(VD);
 
       // Check whether the member is @objc or dynamic.
       (void) VD->isObjC();
