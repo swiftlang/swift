@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "InlinableText.h"
+#include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTVisitor.h"
@@ -17,6 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/Parse/Lexer.h"
 
 #include "llvm/ADT/SmallVector.h"
@@ -291,8 +293,28 @@ static void appendRange(
   }
 }
 
-StringRef swift::extractInlinableText(SourceManager &sourceMgr, ASTNode node,
+extern "C"
+BridgedStringRef swift_ASTGen_extractInlinableText(
+    BridgedASTContext ctx, BridgedStringRef sourceText);
+
+StringRef swift::extractInlinableText(ASTContext &ctx, ASTNode node,
                                       SmallVectorImpl<char> &scratch) {
+  SourceManager &sourceMgr = ctx.SourceMgr;
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  CharSourceRange sourceTextRange =
+      Lexer::getCharSourceRangeFromSourceRange(
+        sourceMgr, node.getSourceRange());
+  StringRef sourceText = sourceMgr.extractText(sourceTextRange);
+  auto resultText = swift_ASTGen_extractInlinableText(ctx, sourceText);
+
+  scratch.clear();
+  scratch.insert(scratch.begin(),
+                 resultText.unbridged().begin(),
+                 resultText.unbridged().end());
+  swift_ASTGen_freeBridgedString(resultText);
+  return { scratch.data(), scratch.size() };
+#else
   // Extract inactive ranges from the text of the node.
   ExtractInactiveRanges extractor(sourceMgr);
   node.walk(extractor);
@@ -316,4 +338,5 @@ StringRef swift::extractInlinableText(SourceManager &sourceMgr, ASTNode node,
   }
 
   return { scratch.data(), scratch.size() };
+#endif
 }

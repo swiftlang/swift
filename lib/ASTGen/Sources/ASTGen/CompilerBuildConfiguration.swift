@@ -370,3 +370,27 @@ public func evaluatePoundIfCondition(
 
   return (isActive ? 0x1 : 0) | (syntaxErrorsAllowed ? 0x2 : 0)
 }
+
+@_cdecl("swift_ASTGen_extractInlinableText")
+public func extractInlinableText(
+  astContext: BridgedASTContext,
+  sourceText: BridgedStringRef
+) -> BridgedStringRef {
+  let textBuffer = UnsafeBufferPointer<UInt8>(start: sourceText.data, count: sourceText.count)
+  var parser = Parser(textBuffer)
+  let syntax = SourceFileSyntax.parse(from: &parser)
+
+  let configuration = CompilerBuildConfiguration(
+    ctx: astContext,
+    sourceBuffer: textBuffer
+  )
+
+  // Remove any inactive #if regions.
+  let syntaxWithoutInactive = syntax.removingInactive(
+    in: configuration,
+    retainFeatureCheckIfConfigs: true
+  ).result
+
+  // Remove comments and return the result.
+  return allocateBridgedString(syntaxWithoutInactive.descriptionWithoutCommentsAndSourceLocations)
+}
