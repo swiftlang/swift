@@ -463,6 +463,10 @@ option(SWIFT_STDLIB_ENABLE_SIB_TARGETS
        "Should we generate sib targets for the stdlib or not?"
        FALSE)
 
+option(SWIFT_STDLIB_BUILD_SYMBOL_GRAPHS
+       "Whether to build symbol graphs for the stdlib, for use in documentation."
+       FALSE)
+
 
 set(SWIFT_DARWIN_SUPPORTED_ARCHS "" CACHE STRING
   "Semicolon-separated list of architectures to configure on Darwin platforms. \
