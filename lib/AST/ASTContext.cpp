@@ -5351,9 +5351,8 @@ CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
   if (!knownID)
     knownID = UUID::fromTime();
 
-  auto *genericEnv =
-    GenericEnvironment::forOpenedExistential(
-      existential, SubstitutionMap(), *knownID);
+  auto *genericEnv = GenericEnvironment::forOpenedExistential(
+      existential, *knownID);
 
   // Map the interface type into that environment.
   auto result = genericEnv->mapTypeIntoContext(interfaceType)
@@ -5546,8 +5545,17 @@ GenericEnvironment *GenericEnvironment::forOpaqueType(
 
 /// Create a new generic environment for an opened archetype.
 GenericEnvironment *
+GenericEnvironment::forOpenedExistential(Type existential, UUID uuid) {
+  auto &ctx = existential->getASTContext();
+  auto signature = ctx.getOpenedExistentialSignature(existential, GenericSignature());
+  return forOpenedExistential(signature, existential, SubstitutionMap(), uuid);
+}
+
+/// Create a new generic environment for an opened archetype.
+GenericEnvironment *
 GenericEnvironment::forOpenedExistential(
-    Type existential, SubstitutionMap subs, UUID uuid) {
+    GenericSignature signature, Type existential,
+    SubstitutionMap subs, UUID uuid) {
   assert(existential->isExistentialType());
 
   // TODO: We could attempt to preserve type sugar in the substitution map.
@@ -5569,14 +5577,12 @@ GenericEnvironment::forOpenedExistential(
   if (found != environments.end()) {
     auto *existingEnv = found->second;
     assert(existingEnv->getOpenedExistentialType()->isEqual(existential));
+    assert(existingEnv->getGenericSignature().getPointer() == signature.getPointer());
     assert(existingEnv->getOuterSubstitutions() == subs);
     assert(existingEnv->getOpenedExistentialUUID() == uuid);
 
     return existingEnv;
   }
-
-  auto parentSig = subs.getGenericSignature().getCanonicalSignature();
-  auto signature = ctx.getOpenedExistentialSignature(existential, parentSig);
 
   // Allocate and construct the new environment.
   unsigned numGenericParams = signature.getGenericParams().size();

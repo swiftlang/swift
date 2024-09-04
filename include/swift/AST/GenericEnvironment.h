@@ -232,11 +232,21 @@ public:
   /// Create a new generic environment for an opened existential.
   ///
   /// \param existential The subject existential type
+  /// \param uuid The unique identifier for this opened existential
+  static GenericEnvironment *
+  forOpenedExistential(Type existential, UUID uuid);
+
+  /// Create a new generic environment for an opened existential.
+  ///
+  /// \param signature The opened existential signature
+  /// \param existential The generalized existential type
   /// \param outerSubs The substitution map containing archetypes from the
   /// outer generic context
   /// \param uuid The unique identifier for this opened existential
   static GenericEnvironment *
-  forOpenedExistential(Type existential, SubstitutionMap outerSubs, UUID uuid);
+  forOpenedExistential(GenericSignature signature,
+                       Type existential, SubstitutionMap outerSubs,
+                       UUID uuid);
 
   /// Create a new generic environment for an opened element.
   ///

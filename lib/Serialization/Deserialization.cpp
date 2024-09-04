@@ -1660,7 +1660,10 @@ Expected<GenericEnvironment *> ModuleFile::getGenericEnvironmentChecked(
   switch (GenericEnvironmentKind(kind)) {
   case GenericEnvironmentKind::OpenedExistential:
     genericEnv = GenericEnvironment::forOpenedExistential(
-        existentialOrShapeTypeOrError.get(), contextSubsOrError.get(), UUID::fromTime());
+        genericSigOrError.get(),
+        existentialOrShapeTypeOrError.get(),
+        contextSubsOrError.get(),
+        UUID::fromTime());
     break;
 
   case GenericEnvironmentKind::OpenedElement:

@@ -2863,7 +2863,7 @@ TypeResolver::resolveOpenedExistentialArchetype(
     // The opened existential type is formed by mapping the interface type
     // into a new opened generic environment.
     auto *env = GenericEnvironment::forOpenedExistential(
-        constraintType->getCanonicalType(), SubstitutionMap(),
+        constraintType->getCanonicalType(),
         openedAttr->getUUID());
     return env->mapTypeIntoContext(interfaceType);
   }
