@@ -1649,6 +1649,7 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
 done:
+  ; // Suppress a -Wc++23-extensions warning
 #endif
 }
 
