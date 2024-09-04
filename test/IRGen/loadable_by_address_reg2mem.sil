@@ -306,3 +306,16 @@ bb0(%0 : $*X):
   dealloc_stack %1 : $*Y
   return %13 : $()
 }
+
+// CHECK: sil @test14
+// CHECK:   [[VAL:%.*]] = load {{.*}} : $*X
+// CHECK:   throw [[VAL]]
+// CHECK: } // end sil function 'test14'
+sil @test14 : $@convention(thin) (@in X) -> @error X {
+bb0(%0 : $*X):
+  %1 = alloc_stack $X
+  copy_addr [take] %0 to [init] %1 : $*X
+  %3 = load %1 : $*X
+  dealloc_stack %1 : $*X
+  throw %3 : $X
+}
