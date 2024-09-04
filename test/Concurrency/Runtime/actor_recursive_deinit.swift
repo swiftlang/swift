@@ -28,6 +28,16 @@ import WinSDK
 typealias ThreadID = UInt32
 func getCurrentThreadID() -> ThreadID { GetCurrentThreadId() }
 func equalThreadIDs(_ a: ThreadID, _ b: ThreadID) -> Bool { a == b }
+#elseif os(WASI)
+#if _runtime(multithreaded)
+typealias ThreadID = pthread_t
+func getCurrentThreadID() -> ThreadID { pthread_self() }
+func equalThreadIDs(_ a: ThreadID, _ b: ThreadID) -> Bool { pthread_equal(a, b) != 0 }
+#else
+typealias ThreadID = Void
+func getCurrentThreadID() -> ThreadID {}
+func equalThreadIDs(_ a: ThreadID, _ b: ThreadID) -> Bool { true }
+#endif
 #endif
 
 var mainThread: ThreadID?
