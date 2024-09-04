@@ -1456,19 +1456,6 @@ public:
   /// particular, the opened archetype signature does not have requirements for
   /// conformances inherited from superclass constraints while existential
   /// values do.
-  CanGenericSignature getOpenedExistentialSignature(Type type,
-                                                    GenericSignature parentSig);
-
-  /// Retrieve a generic signature with a single type parameter conforming
-  /// to the given protocol or composition type, like <T: P>.
-  ///
-  /// The opened archetype may have a different set of conformances from the
-  /// corresponding existential. The opened archetype conformances are dictated
-  /// by the ABI for generic arguments, while the existential value conformances
-  /// are dictated by their layout (see \c Type::getExistentialLayout()). In
-  /// particular, the opened archetype signature does not have requirements for
-  /// conformances inherited from superclass constraints while existential
-  /// values do.
   OpenedExistentialSignature getOpenedExistentialSignature(Type type);
 
   /// Get a generic signature where the generic parameter τ_d_i represents

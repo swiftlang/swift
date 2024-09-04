@@ -6786,15 +6786,6 @@ class OpenedArchetypeType final : public LocalArchetypeType,
          LayoutConstraint layout);
 
 public:
-  /// Compute the parameter that serves as the \c Self type for an opened
-  /// archetype from the given outer generic signature.
-  ///
-  /// This type is a generic parameter one level deeper
-  /// than the deepest generic context depth.
-  static Type getSelfInterfaceTypeFromContext(GenericSignature parentSig,
-                                              ASTContext &ctx);
-
-public:
   /// Get or create an archetype that represents the opened type
   /// of an existential value.
   ///
@@ -6813,9 +6804,6 @@ public:
   ///
   /// \param existential The existential type or existential metatype to open.
   static Type getAny(Type existential);
-
-  /// Retrieve the ID number of this opened existential.
-  UUID getOpenedExistentialID() const;
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OpenedArchetype;

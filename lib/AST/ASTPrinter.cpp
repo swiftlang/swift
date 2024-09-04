@@ -6928,8 +6928,12 @@ public:
 
   void visitOpenedArchetypeType(OpenedArchetypeType *T) {
     if (Options.PrintForSIL) {
-      Printer << "@opened(\"" << T->getOpenedExistentialID() << "\", ";
-      visit(T->getGenericEnvironment()->getOpenedExistentialType());
+      auto *env = T->getGenericEnvironment();
+
+      Printer << "@opened(\"" << env->getOpenedExistentialUUID() << "\", ";
+      auto existentialTy = env->maybeApplyOuterContextSubstitutions(
+          env->getOpenedExistentialType());
+      visit(existentialTy);
       Printer << ") ";
 
       llvm::DenseMap<CanType, Identifier> newAlternativeTypeNames;
