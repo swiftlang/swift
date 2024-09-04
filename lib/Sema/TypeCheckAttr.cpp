@@ -110,18 +110,6 @@ public:
     return true;
   }
 
-  void diagnoseIsolatedDeinitInValueTypes(DeclAttribute *attr) {
-    if (isa<DestructorDecl>(D)) {
-      if (auto nominal = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
-        if (!isa<ClassDecl>(nominal)) {
-          // only classes and actors can have isolated deinit.
-          diagnoseAndRemoveAttr(attr, diag::isolated_deinit_on_value_type);
-          return;
-        }
-      }
-    }
-  }
-
   template <typename... ArgTypes>
   InFlightDiagnostic diagnose(ArgTypes &&... Args) const {
     return Ctx.Diags.diagnose(std::forward<ArgTypes>(Args)...);
@@ -341,7 +329,6 @@ public:
 
   void visitReasyncAttr(ReasyncAttr *attr);
   void visitNonisolatedAttr(NonisolatedAttr *attr);
-  void visitIsolatedAttr(IsolatedAttr *attr);
 
   void visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr);
   
@@ -4320,7 +4307,6 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   // If the nominal type is a global actor, let the global actor attribute
   // retrieval request perform checking for us.
   if (nominal->isGlobalActor()) {
-    diagnoseIsolatedDeinitInValueTypes(attr);
     (void)D->getGlobalActorAttr();
     if (auto value = dyn_cast<ValueDecl>(D)) {
       (void)getActorIsolation(value);
@@ -7249,8 +7235,6 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
     }
   }
 
-  diagnoseIsolatedDeinitInValueTypes(attr);
-
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     //'nonisolated(unsafe)' is meaningless for computed properties, functions etc.
     auto var = dyn_cast<VarDecl>(VD);
@@ -7267,10 +7251,6 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   }
 }
 
-void AttributeChecker::visitIsolatedAttr(IsolatedAttr *attr) {
-  diagnoseIsolatedDeinitInValueTypes(attr);
-}
-
 void AttributeChecker::visitGlobalActorAttr(GlobalActorAttr *attr) {
   auto nominal = dyn_cast<NominalTypeDecl>(D);
   if (!nominal)
@@ -7284,8 +7264,6 @@ void AttributeChecker::visitGlobalActorAttr(GlobalActorAttr *attr) {
                            "task-to-thread concurrency model");
     return;
   }
-
-  diagnoseIsolatedDeinitInValueTypes(attr);
 
   (void)nominal->isGlobalActor();
 }
