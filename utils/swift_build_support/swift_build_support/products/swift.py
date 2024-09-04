@@ -89,6 +89,8 @@ class Swift(product.Product):
 
         self.cmake_options.extend(self._enable_embedded_stdlib_cross_compiling)
 
+        self.cmake_options.extend(self._enable_stdlib_symbol_graphs)
+
         self.cmake_options.extend(
             self._swift_tools_ld64_lto_codegen_only_for_supporting_targets)
 
@@ -270,6 +272,11 @@ updated without updating swift.py?")
     def _enable_embedded_stdlib_cross_compiling(self):
         return [('SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING',
                  self.args.build_embedded_stdlib_cross_compiling)]
+
+    @property
+    def _enable_stdlib_symbol_graphs(self):
+        return [('SWIFT_STDLIB_BUILD_SYMBOL_GRAPHS:BOOL',
+                 self.args.build_stdlib_docs)]
 
     def _handle_swift_debuginfo_non_lto_args(self):
         if ('swift_debuginfo_non_lto_args' not in self.args

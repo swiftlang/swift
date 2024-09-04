@@ -274,6 +274,8 @@ EXPECTED_DEFAULTS = {
     'swift_tools_max_parallel_lto_link_jobs':
         defaults.SWIFT_MAX_PARALLEL_LTO_LINK_JOBS,
     'swift_user_visible_version': defaults.SWIFT_USER_VISIBLE_VERSION,
+    'build_stdlib_docs': False,
+    'preview_stdlib_docs': False,
     'symbols_package': None,
     'clean_libdispatch': True,
     'clean_foundation': True,
@@ -578,6 +580,8 @@ EXPECTED_OPTIONS = [
     SetTrueOption('--build-minimal-stdlib', dest='build_minimalstdlib'),
     SetTrueOption('--build-wasm-stdlib', dest='build_wasmstdlib'),
     SetTrueOption('--wasmkit', dest='build_wasmkit'),
+    SetTrueOption('--build-stdlib-docs'),
+    SetTrueOption('--preview-stdlib-docs'),
     SetTrueOption('-B', dest='benchmark'),
     SetTrueOption('-S', dest='skip_build'),
     SetTrueOption('-b', dest='build_llbuild'),
