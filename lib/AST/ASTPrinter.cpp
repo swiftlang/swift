@@ -182,18 +182,6 @@ static bool shouldPrintAllSemanticDetails(const PrintOptions &options) {
   return false;
 }
 
-bool PrintOptions::excludeAttr(const DeclAttribute *DA) const {
-  if (excludeAttrKind(DA->getKind())) {
-    return true;
-  }
-  if (auto CA = dyn_cast<CustomAttr>(DA)) {
-    if (std::any_of(ExcludeCustomAttrList.begin(), ExcludeCustomAttrList.end(),
-                    [CA](CustomAttr *other) { return other == CA; }))
-      return true;
-  }
-  return false;
-}
-
 PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
@@ -834,13 +822,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
     if (D->getDeclContext()->isLocalContext())
       return;
     
-    if (Options.SuppressIsolatedDeinit &&
-        D->getFormalAccess() == AccessLevel::Open &&
-        usesFeatureIsolatedDeinit(D)) {
-      printAccess(AccessLevel::Public);
-    } else {
-      printAccess(D->getFormalAccess());
-    }
+    printAccess(D->getFormalAccess());
     bool shouldSkipSetterAccess =
         llvm::is_contained(Options.ExcludeAttrList, DeclAttrKind::SetterAccess);
 
@@ -1235,10 +1217,6 @@ void PrintAST::printAttributes(const Decl *D) {
   // Save the current number of exclude attrs to restore once we're done.
   unsigned originalExcludeAttrCount = Options.ExcludeAttrList.size();
 
-  // ExcludeCustomAttrList stores instances of attributes, which are specific
-  // for each decl They cannot be shared across different decls.
-  assert(Options.ExcludeCustomAttrList.empty());
-
   if (Options.PrintImplicitAttrs) {
 
     // Don't print a redundant 'final' if we are printing a 'static' decl.
@@ -1330,19 +1308,9 @@ void PrintAST::printAttributes(const Decl *D) {
     Options.ExcludeAttrList.push_back(DeclAttrKind::Borrowing);
   }
 
-  if (isa<DestructorDecl>(D) && Options.SuppressIsolatedDeinit) {
-    Options.ExcludeAttrList.push_back(DeclAttrKind::Nonisolated);
-    Options.ExcludeAttrList.push_back(DeclAttrKind::Isolated);
-    if (auto globalActor = D->getGlobalActorAttr()) {
-      Options.ExcludeCustomAttrList.push_back(globalActor->first);
-    }
-  }
-  
   attrs.print(Printer, Options, D);
 
-
   Options.ExcludeAttrList.resize(originalExcludeAttrCount);
-  Options.ExcludeCustomAttrList.clear();
 }
 
 void PrintAST::printTypedPattern(const TypedPattern *TP) {
@@ -3086,13 +3054,6 @@ suppressingFeatureBitwiseCopyable2(PrintOptions &options,
   llvm::SaveAndRestore<bool> scope(options.SuppressBitwiseCopyable, true);
   action();
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
-}
-
-static void
-suppressingFeatureIsolatedDeinit(PrintOptions &options,
-                                 llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<bool> scope(options.SuppressIsolatedDeinit, true);
-  action();
 }
 
 static void

@@ -815,19 +815,15 @@ public:
 
   /// Generates code for class/move only deallocating destructor. This calls the
   /// destroying destructor and then deallocates 'self'.
-  void emitDeallocatingDestructor(DestructorDecl *dd, bool isIsolated);
+  void emitDeallocatingDestructor(DestructorDecl *dd);
 
-  /// Generates code for a class (isolated-)deallocating destructor. This
+  /// Generates code for a class deallocating destructor. This
   /// calls the destroying destructor and then deallocates 'self'.
-  void emitDeallocatingClassDestructor(DestructorDecl *dd, bool isIsolated);
+  void emitDeallocatingClassDestructor(DestructorDecl *dd);
 
   /// Generates code for the deinit of the move only type and destroys all of
   /// the fields.
   void emitDeallocatingMoveOnlyDestructor(DestructorDecl *dd);
-
-  /// Generates code for a class deallocating destructor that switches executor
-  /// and calls isolated deallocating destuctor on the right executor.
-  void emitIsolatingDestructor(DestructorDecl *dd);
 
   /// Whether we are inside a constructor whose hops are injected by
   /// definite initialization.
@@ -906,8 +902,12 @@ public:
   ///
   /// \param selfValue The 'self' value.
   /// \param cd The class declaration whose members are being destroyed.
+  /// \param finishBB If set, used as the basic block after members have been
+  ///                 destroyed, and we're ready to perform final cleanups
+  ///                 before returning.
   void emitClassMemberDestruction(ManagedValue selfValue, ClassDecl *cd,
-                                  CleanupLocation cleanupLoc);
+                                  CleanupLocation cleanupLoc,
+                                  SILBasicBlock* finishBB);
 
   /// Generates code to destroy the instance variables of a move only non-class
   /// nominal type.
@@ -2522,8 +2522,9 @@ public:
   /// corresponding SIL function for it.
   void emitDistributedActorFactory(FuncDecl *fd); // TODO(distributed): this is the "resolve"
 
-  void emitDistributedIfRemoteBranch(SILLocation Loc, SILValue selfValue,
-                                     Type selfTy, SILBasicBlock *isRemoteBB,
+  void emitDistributedIfRemoteBranch(SILLocation Loc,
+                                     ManagedValue selfValue, Type selfTy,
+                                     SILBasicBlock *isRemoteBB,
                                      SILBasicBlock *isLocalBB);
 
   /// Notify transport that actor has initialized successfully,
@@ -2546,14 +2547,22 @@ public:
   /// \param actorSelf the SIL value representing the distributed actor instance
   void emitDistributedActorSystemResignIDCall(SILLocation loc,
                               ClassDecl *actorDecl, ManagedValue actorSelf);
+  
+  /// Emit code that tests whether the distributed actor is local, and if so,
+  /// resigns the distributed actor's identity.
+  /// \param continueBB the target block where execution will continue after
+  ///                   the conditional call, whether actor is local or remote.
+  void emitConditionalResignIdentityCall(SILLocation loc,
+                                         ClassDecl *actorDecl,
+                                         ManagedValue actorSelf,
+                                         SILBasicBlock *continueBB,
+                                         SILBasicBlock *finishBB);
 
-  /// Emits check for remote actor and a branch that implements deallocating
-  /// deinit for remote proxy. Calls \p emitLocalDeinit to generate branch for
-  /// local actor.
-  void
-  emitDistributedRemoteActorDeinit(SILValue selfValue, DestructorDecl *dd,
-                                   bool isIsolated,
-                                   llvm::function_ref<void()> emitLocalDeinit);
+  void emitDistributedActorClassMemberDestruction(
+      SILLocation cleanupLoc, ManagedValue selfValue, ClassDecl *cd,
+      SILBasicBlock *normalMemberDestroyBB,
+      SILBasicBlock *remoteMemberDestroyBB,
+      SILBasicBlock *finishBB);
 
   //===--------------------------------------------------------------------===//
   // Declarations
@@ -2657,9 +2666,6 @@ public:
 
   /// Destroy the class member.
   void destroyClassMember(SILLocation L, ManagedValue selfValue, VarDecl *D);
-
-  /// Destroy the default actor implementation.
-  void emitDestroyDefaultActor(CleanupLocation cleanupLoc, SILValue selfValue);
 
   /// Enter a cleanup to deallocate a stack variable.
   CleanupHandle enterDeallocStackCleanup(SILValue address);

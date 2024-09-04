@@ -2871,14 +2871,6 @@ static CanSILFunctionType getNativeSILFunctionType(
           DefaultConventions(NormalParameterConvention::Guaranteed));
     case SILDeclRef::Kind::Deallocator:
       return getSILFunctionTypeForConventions(DeallocatorConventions());
-    case SILDeclRef::Kind::IsolatedDeallocator: {
-      // Use @convention(thin) instead of @convention(method) to properly bridge
-      // with runtime function. The latter expects 'work' argument to be
-      // SWIFT_CC(swift) aka @convention(thin). But the 'self' parameter must
-      // remain owned.
-      return getSILFunctionTypeForConventions(
-          DefaultConventions(NormalParameterConvention::Owned));
-    }
 
     case SILDeclRef::Kind::AsyncEntryPoint:
       return getSILFunctionTypeForConventions(
@@ -3723,7 +3715,6 @@ static ObjCSelectorFamily getObjCSelectorFamily(SILDeclRef c) {
   /// These constants don't correspond to method families we care about yet.
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
-  case SILDeclRef::Kind::IsolatedDeallocator:
   case SILDeclRef::Kind::IVarDestroyer:
     return ObjCSelectorFamily::None;
 
@@ -4030,7 +4021,6 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     case SILDeclRef::Kind::StoredPropertyInitializer:
     case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
-    case SILDeclRef::Kind::IsolatedDeallocator:
       return SILFunctionTypeRepresentation::Thin;
 
     case SILDeclRef::Kind::Func:
@@ -4430,7 +4420,6 @@ static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   case SILDeclRef::Kind::EnumElement:
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
-  case SILDeclRef::Kind::IsolatedDeallocator:
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::DefaultArgGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:

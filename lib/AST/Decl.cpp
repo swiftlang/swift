@@ -997,26 +997,6 @@ std::optional<CustomAttrNominalPair> Decl::getGlobalActorAttr() const {
       ctx.evaluator, GlobalActorAttributeRequest{mutableThis}, std::nullopt);
 }
 
-bool Decl::hasExplicitIsolationAttribute() const {
-  if (auto nonisolatedAttr = getAttrs().getAttribute<NonisolatedAttr>()) {
-    if (!nonisolatedAttr->isImplicit())
-      return true;
-  }
-
-  if (auto isolatedAttr = getAttrs().getAttribute<IsolatedAttr>()) {
-    if (!isolatedAttr->isImplicit()) {
-      return true;
-    }
-  }
-
-  if (auto globalActorAttr = getGlobalActorAttr()) {
-    if (!globalActorAttr->first->isImplicit())
-      return true;
-  }
-
-  return false;
-}
-
 bool Decl::preconcurrency() const {
   if (getAttrs().hasAttribute<PreconcurrencyAttr>())
     return true;
@@ -3330,16 +3310,6 @@ ValueDecl *ValueDecl::getOverriddenDecl() const {
 
   // FIXME: Arbitrarily pick the first overridden declaration.
   return overridden.front();
-}
-
-ValueDecl *ValueDecl::getOverriddenDeclOrSuperDeinit() const {
-  if (auto overridden = getOverriddenDecl()) {
-    return overridden;
-  }
-  if (auto dtor = dyn_cast<DestructorDecl>(this)) {
-    return dtor->getSuperDeinit();
-  }
-  return nullptr;
 }
 
 bool ValueDecl::overriddenDeclsComputed() const {
@@ -10896,16 +10866,6 @@ ObjCSelector DestructorDecl::getObjCSelector() const {
   // Deinitializers are always called "dealloc".
   auto &ctx = getASTContext();
   return ObjCSelector(ctx, 0, ctx.Id_dealloc);
-}
-
-DestructorDecl *DestructorDecl::getSuperDeinit() const {
-  auto declContext = getDeclContext()->getImplementedObjCContext();
-  if (auto classDecl = dyn_cast<ClassDecl>(declContext)) {
-    if (auto superclass = classDecl->getSuperclassDecl()) {
-      return superclass->getDestructor();
-    }
-  }
-  return nullptr;
 }
 
 SourceRange FuncDecl::getSourceRange() const {
