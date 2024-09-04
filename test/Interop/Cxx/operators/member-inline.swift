@@ -443,6 +443,13 @@ OperatorsTestSuite.test("HasStaticOperatorCallBase.call") {
   expectEqual(43, res)
 }
 
+OperatorsTestSuite.test("HasStaticOperatorCallBase2.call") {
+  let m = NonTrivial()
+  let h = HasStaticOperatorCallBaseNonTrivial()
+  let res = h(m)
+  expectEqual(48, res)
+}
+
 OperatorsTestSuite.test("HasStaticOperatorCallDerived.call") {
   let h = HasStaticOperatorCallDerived()
   let res = h(0)

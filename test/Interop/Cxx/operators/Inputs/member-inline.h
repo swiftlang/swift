@@ -482,6 +482,15 @@ public:
   static int operator()(int x) { return x + 42; }
 };
 
+class HasStaticOperatorCallBaseNonTrivial: public NonTrivial {
+public:
+  HasStaticOperatorCallBaseNonTrivial() {}
+  HasStaticOperatorCallBaseNonTrivial(const HasStaticOperatorCallBaseNonTrivial &self) : NonTrivial(self) {}
+  HasStaticOperatorCallBaseNonTrivial(HasStaticOperatorCallBaseNonTrivial &&self) : NonTrivial(self) {}
+
+  static int operator()(const NonTrivial &arg) { return arg.f + 42; }
+};
+
 class HasStaticOperatorCallDerived : public HasStaticOperatorCallBase {};
 
 class HasStaticOperatorCallWithConstOperator {
