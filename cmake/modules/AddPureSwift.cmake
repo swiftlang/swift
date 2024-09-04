@@ -125,15 +125,19 @@ function(_set_pure_swift_package_options target_name package_name)
     return()
   endif()
 
-  # Enable package CMO if possible
+  # Enable package CMO if possible.
+  # NOTE: '-enable-library-evolution' is required for package CMO even when we
+  # don't need '.swiftinterface'. E.g. executables.
   if(Swift_COMPILER_PACKAGE_CMO_SUPPORT STREQUAL "IMPLEMENTED")
     target_compile_options("${target_name}" PRIVATE
+      "-enable-library-evolution"
       "SHELL:-package-name ${package_name}"
       "SHELL:-Xfrontend -package-cmo"
       "SHELL:-Xfrontend -allow-non-resilient-access"
     )
   elseif(Swift_COMPILER_PACKAGE_CMO_SUPPORT STREQUAL "EXPERIMENTAL")
     target_compile_options("${target_name}" PRIVATE
+      "-enable-library-evolution"
       "SHELL:-package-name ${package_name}"
       "SHELL:-Xfrontend -experimental-package-cmo"
       "SHELL:-Xfrontend -experimental-allow-non-resilient-access"
