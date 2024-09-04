@@ -100,7 +100,7 @@ struct Symbol::Storage final
     DEBUG_ASSERT(kind == Symbol::Kind::Superclass ||
                  kind == Symbol::Kind::ConcreteType);
     ASSERT(!type->hasUnboundGenericType());
-    DEBUG_ASSERT(!type->hasTypeVariable());
+    ASSERT(!type->hasTypeVariable());
     ASSERT(type->hasTypeParameter() != substitutions.empty());
 
     Kind = kind;

@@ -18,6 +18,7 @@
 #ifndef SWIFT_AST_TYPETRANSFORM_H
 #define SWIFT_AST_TYPETRANSFORM_H
 
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/SILLayout.h"
 
 namespace swift {
@@ -136,7 +137,29 @@ case TypeKind::Id:
                                           newSubMap);
     }
 
-    case TypeKind::OpenedArchetype:
+    case TypeKind::OpenedArchetype: {
+      auto *local = cast<LocalArchetypeType>(base);
+      if (auto result = asDerived().transformLocalArchetypeType(local, pos))
+        return *result;
+
+      auto *env = local->getGenericEnvironment();
+
+      auto genericSig = env->getGenericSignature();
+      auto existentialTy = env->getOpenedExistentialType();
+      auto subMap = env->getOuterSubstitutions();
+      auto uuid = env->getOpenedExistentialUUID();
+
+      auto newSubMap = asDerived().transformSubMap(subMap);
+      if (newSubMap == subMap)
+        return t;
+      if (!newSubMap)
+        return Type();
+
+      auto *newEnv = GenericEnvironment::forOpenedExistential(
+          genericSig, existentialTy, newSubMap, uuid);
+      return newEnv->mapTypeIntoContext(local->getInterfaceType());
+    }
+
     case TypeKind::ElementArchetype: {
       auto *local = cast<LocalArchetypeType>(base);
       if (auto result = asDerived().transformLocalArchetypeType(local, pos))
