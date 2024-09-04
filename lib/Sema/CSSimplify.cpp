@@ -5616,16 +5616,16 @@ bool ConstraintSystem::repairFailures(
   }
 
   if (auto *VD = getAsDecl<ValueDecl>(anchor)) {
-    // Matching a witness to an ObjC protocol requirement.
-    if (VD->isObjC() &&
-        isa<ProtocolDecl>(VD->getDeclContext()) &&
+    // Matching a witness to an protocol requirement.
+    if (isa<ProtocolDecl>(VD->getDeclContext()) &&
         VD->isProtocolRequirement() &&
         path[0].is<LocatorPathElt::Witness>() &&
         // Note that the condition below is very important,
         // we need to wait until the very last moment to strip
-        // the concurrency annotations from the inner most type.
+        // the concurrency annotations from the innermost type.
         conversionsOrFixes.empty()) {
-      // Allow requirements to introduce `swift_attr` annotations
+      // Allow requirements to introduce `swift_attr` and other
+      // concurrency related annotations (e.g. `& Sendable` or `@Sendable`)
       // (note that `swift_attr` in type contexts weren't supported
       // before) and for witnesses to adopt them gradually by matching
       // with a warning in non-strict concurrency mode.
@@ -5637,11 +5637,15 @@ bool ConstraintSystem::repairFailures(
         auto strippedRHS = rhs->stripConcurrency(/*recursive=*/true,
                                                  /*dropGlobalActor=*/true);
 
-        auto result = matchTypes(strippedLHS, strippedRHS, matchKind,
-                                 flags | TMF_ApplyingFix, locator);
-        if (!result.isFailure()) {
-          increaseScore(SK_MissingSynthesizableConformance, locator);
-          return true;
+        // If nothing got stripped there is no reason to re-match
+        // the types.
+        if (!strippedLHS->isEqual(lhs) || !strippedRHS->isEqual(rhs)) {
+          auto result = matchTypes(strippedLHS, strippedRHS, matchKind,
+                                   flags | TMF_ApplyingFix, locator);
+          if (!result.isFailure()) {
+            increaseScore(SK_MissingSynthesizableConformance, locator);
+            return true;
+          }
         }
       }
     }

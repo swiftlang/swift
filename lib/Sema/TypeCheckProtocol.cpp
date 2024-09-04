@@ -1263,8 +1263,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
       // missing Sendable conformances when matching ObjC requirements.
       // This is not an error until Swift 6 because `swift_attr` wasn't
       // allowed in type contexts initially.
-      return req->isObjC() &&
-             solution->getFixedScore()
+      return solution->getFixedScore()
                      .Data[SK_MissingSynthesizableConformance] > 0;
     }();
 

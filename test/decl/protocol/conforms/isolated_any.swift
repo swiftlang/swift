@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-swift-frontend -typecheck -verify -swift-version 6 %s
 
 struct A<T> {
   // expected-note @+1 {{candidate has non-matching type}}
