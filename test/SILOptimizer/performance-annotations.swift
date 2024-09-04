@@ -501,6 +501,15 @@ func testLargeTuple() {
     _ = GenericStruct<SixInt8s>()
 }
 
+struct Ptr<T> {
+  public var p: UnsafeMutablePointer<T>
+
+  @_noAllocation
+  init(p: UnsafeMutablePointer<T>) {
+    self.p = p
+  }
+}
+
 struct NonCopyableStruct: ~Copyable {
   func foo() {}
 }
