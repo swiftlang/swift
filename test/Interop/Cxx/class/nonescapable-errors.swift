@@ -11,8 +11,12 @@ module Test {
 //--- Inputs/nonescapable.h
 #include "swift/bridging"
 
-struct SWIFT_NONESCAPABLE A {
-    int a;
+struct SWIFT_NONESCAPABLE View {
+    View() : member(nullptr) {}
+    View(const int *p [[clang::lifetimebound]]) : member(p) {}
+    View(const View&) = default;
+private:
+    const int *member;
 };
 
 //--- test.swift
@@ -20,6 +24,6 @@ struct SWIFT_NONESCAPABLE A {
 import Test
 
 // CHECK: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
-public func test() -> A {
-    A()
+public func noAnnotations() -> View {
+    View()
 }
