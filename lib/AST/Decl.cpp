@@ -7236,8 +7236,14 @@ VarDecl::mutability(const DeclContext *UseDC,
   // declaration.  To handle top-level code properly, we look through
   // the TopLevelCode decl on the use (if present) since the vardecl may be
   // one level up.
-  if (getDeclContext() == UseDC)
+  if (getDeclContext() == UseDC) {
+    // Treat values of tuple type as mutable in these contexts, because
+    // SILGen wants to see them as lvalues.
+    if (getInterfaceType()->is<TupleType>())
+      return StorageMutability::Mutable;
+
     return StorageMutability::Initializable;
+  }
 
   if (isa<TopLevelCodeDecl>(UseDC) &&
       getDeclContext() == UseDC->getParent())
