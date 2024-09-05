@@ -133,19 +133,14 @@ namespace swift {
                                              ForEachStmt *forEach);
 
   class BaseDiagnosticWalker : public ASTWalker {
-    PreWalkAction walkToDeclPre(Decl *D) override;
-
-    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-      return false;
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
     }
 
     // Only emit diagnostics in the expansion of macros.
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
     }
-
-  private:
-    static bool shouldWalkIntoDeclInClosureContext(Decl *D);
   };
 
   // A simple, deferred diagnostic container.

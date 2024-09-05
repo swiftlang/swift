@@ -1012,12 +1012,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         return nullptr;
     }
 
-    // If the closure was separately type checked and we don't want to
-    // visit separately-checked closure bodies, bail out now.
-    if (expr->isSeparatelyTypeChecked() &&
-        !Walker.shouldWalkIntoSeparatelyCheckedClosure(expr))
-      return expr;
-
     // Handle other closures.
     if (BraceStmt *body = cast_or_null<BraceStmt>(doIt(expr->getBody()))) {
       expr->setBody(body);

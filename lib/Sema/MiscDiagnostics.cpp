@@ -59,32 +59,6 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
   return nullptr;
 }
 
-ASTWalker::PreWalkAction BaseDiagnosticWalker::walkToDeclPre(Decl *D) {
-  return Action::VisitNodeIf(isa<ClosureExpr>(D->getDeclContext()) &&
-                             shouldWalkIntoDeclInClosureContext(D));
-}
-
-bool BaseDiagnosticWalker::shouldWalkIntoDeclInClosureContext(Decl *D) {
-  auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext());
-  assert(closure);
-
-  if (closure->isSeparatelyTypeChecked())
-    return false;
-
-  // Let's not walk into declarations contained in a multi-statement
-  // closure because they'd be handled via `typeCheckDecl` that runs
-  // syntactic diagnostics.
-  if (!closure->hasSingleExpressionBody()) {
-    // Since pattern bindings get their types through solution application,
-    // `typeCheckDecl` doesn't touch initializers (because they are already
-    // fully type-checked), so pattern bindings have to be allowed to be
-    // walked to diagnose syntactic issues.
-    return isa<PatternBindingDecl>(D);
-  }
-
-  return true;
-}
-
 /// Diagnose syntactic restrictions of expressions.
 ///
 ///   - Module values may only occur as part of qualification.
@@ -125,10 +99,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
-    }
-
-    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
-      return Action::SkipNode(P);
     }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
@@ -1607,10 +1577,6 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
       auto *DRE = dyn_cast<DeclRefExpr>(E);
       return DRE && DRE->isImplicit() && isa<VarDecl>(DRE->getDecl()) &&
              cast<VarDecl>(DRE->getDecl())->isSelfParameter();
-    }
-
-    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-      return false;
     }
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
@@ -4594,10 +4560,6 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
   public:
     DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) { }
 
-    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-      return false;
-    }
-
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
     MacroWalking getMacroWalkingBehavior() const override {
@@ -4722,10 +4684,6 @@ class ObjCSelectorWalker : public ASTWalker {
 public:
   ObjCSelectorWalker(const DeclContext *dc, Type selectorTy)
     : Ctx(dc->getASTContext()), DC(dc), SelectorTy(selectorTy) { }
-
-  bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-    return false;
-  }
 
   bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
@@ -5589,10 +5547,6 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       }
     }
 
-    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-      return false;
-    }
-
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
     MacroWalking getMacroWalkingBehavior() const override {
@@ -5666,10 +5620,6 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
           }
         }
       }
-    }
-
-    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-      return false;
     }
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
@@ -5974,10 +5924,6 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
   public:
     DiagnoseWalker(const DeclContext *DC) : Ctx(DC->getASTContext()), DC(DC) {}
 
-    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-      return false;
-    }
-
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
     }
@@ -6132,10 +6078,6 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
     }
   public:
     DiagnoseWalker(const DeclContext *DC) : Ctx(DC->getASTContext()) {}
-
-    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-      return false;
-    }
 
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
