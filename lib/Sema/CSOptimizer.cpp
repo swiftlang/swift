@@ -91,6 +91,11 @@ void forEachDisjunctionChoice(
   }
 }
 
+static bool isOverloadedDeclRef(Constraint *disjunction) {
+  assert(disjunction->getKind() == ConstraintKind::Disjunction);
+  return disjunction->getLocator()->directlyAt<OverloadedDeclRefExpr>();
+}
+
 } // end anonymous namespace
 
 /// Given a set of disjunctions, attempt to determine
@@ -232,6 +237,7 @@ static void determineBestChoicesInContext(
     enum class MatchFlag {
       OnParam,
       Literal,
+      ExactOnly,
     };
 
     using MatchOptions = OptionSet<MatchFlag>;
@@ -250,6 +256,9 @@ static void determineBestChoicesInContext(
         scoreCandidateMatch = [&](GenericSignature genericSig,
                                   Type candidateType, Type paramType,
                                   MatchOptions options) -> double {
+      if (options.contains(MatchFlag::ExactOnly))
+        return candidateType->isEqual(paramType) ? 1 : 0;
+
       // Exact match between candidate and parameter types.
       if (candidateType->isEqual(paramType))
         return options.contains(MatchFlag::Literal) ? 0.3 : 1;
@@ -267,17 +276,17 @@ static void determineBestChoicesInContext(
         paramType = paramType->lookThroughAllOptionalTypes(paramOptionals);
 
         if (!candidateOptionals.empty() || !paramOptionals.empty()) {
-          if (paramOptionals.size() >= candidateOptionals.size())
+          if (paramOptionals.size() >= candidateOptionals.size()) {
             return scoreCandidateMatch(genericSig, candidateType, paramType,
                                        options);
+          }
 
           // Optionality mismatch.
           return 0;
         }
       }
 
-      // Candidate could be injected into optional parameter type
-      // or converted to a superclass.
+      // Candidate could be converted to a superclass.
       if (isSubclassOf(candidateType, paramType))
         return 1;
 
@@ -343,6 +352,8 @@ static void determineBestChoicesInContext(
     double bestScore = 0.0;
     SmallVector<std::pair<Constraint *, double>, 2> favoredChoices;
 
+    bool isOverloadedDeclRefDisjunction = isOverloadedDeclRef(disjunction);
+
     forEachDisjunctionChoice(
         cs, disjunction,
         [&](Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
@@ -366,6 +377,20 @@ static void determineBestChoicesInContext(
               matchArguments(choice->getOverloadChoice(), overloadType);
           if (!matchings)
             return;
+
+          bool favorExactMatchesOnly = false;
+          // Preserves old behavior where for unary calls to members
+          // the solver would not consider choices that didn't match on
+          // the number of parameters (regardless of defaults) and only
+          // exact matches were favored.
+          if (!isOverloadedDeclRefDisjunction && argumentList->size() == 1) {
+            // Old behavior completely disregarded the fact that some of
+            // the parameters could be defaulted.
+            if (overloadType->getNumParams() != 1)
+              return;
+
+            favorExactMatchesOnly = true;
+          }
 
           double score = 0.0;
           for (unsigned paramIdx = 0, n = overloadType->getNumParams();
@@ -444,6 +469,8 @@ static void determineBestChoicesInContext(
               MatchOptions options(MatchFlag::OnParam);
               if (isLiteralDefault)
                 options |= MatchFlag::Literal;
+              if (favorExactMatchesOnly)
+                options |= MatchFlag::ExactOnly;
 
               auto score = scoreCandidateMatch(genericSig, candidateType,
                                                paramType, options);
