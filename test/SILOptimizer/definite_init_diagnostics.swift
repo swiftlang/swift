@@ -1626,6 +1626,14 @@ struct S {
   }
 }
 
+// rdar://135028163 - trying local 'lets' of tuple type as immutable rvalues, i.e.,
+// the same issue as the above rdar://129031705.
+func tupleAsLocal() {
+  let rotation: (Int, Int)
+  rotation.0 = 0
+  rotation.1 = rotation.0
+}
+
 // rdar://128890586: Init accessors
 final class HasInitAccessors {
   private var _ints: [Int] = []
