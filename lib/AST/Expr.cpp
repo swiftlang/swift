@@ -479,6 +479,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   NO_REFERENCE(Tap);
   NO_REFERENCE(TypeJoin);
   SIMPLE_REFERENCE(MacroExpansion, getMacroRef);
+  NO_REFERENCE(TypeValue);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE
@@ -827,6 +828,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::UnderlyingToOpaque:
   case ExprKind::Unreachable:
   case ExprKind::ActorIsolationErasure:
+  case ExprKind::TypeValue:
     // Implicit conversion nodes have no syntax of their own; defer to the
     // subexpression.
     return cast<ImplicitConversionExpr>(this)->getSubExpr()
@@ -917,6 +919,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::DotSyntaxBaseIgnored:
   case ExprKind::UnresolvedSpecialize:
   case ExprKind::OpenExistential:
+  case ExprKind::TypeValue:
     return true;
 
   // For these cases we need to ensure the type expr is the function or base.
@@ -2366,6 +2369,15 @@ bool Expr::isSelfExprOf(const AbstractFunctionDecl *AFD, bool sameBase) const {
     return DRE->getDecl() == AFD->getImplicitSelfDecl();
 
   return false;
+}
+
+TypeValueExpr *TypeValueExpr::createForDecl(DeclNameLoc Loc, TypeDecl *Decl,
+                                            DeclContext *DC) {
+  ASTContext &C = Decl->getASTContext();
+  assert(Loc.isValid());
+  auto *Repr = UnqualifiedIdentTypeRepr::create(C, Loc, Decl->createNameRef());
+  Repr->setValue(Decl, DC);
+  return new (C) TypeValueExpr(Repr);
 }
 
 OpenedArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {

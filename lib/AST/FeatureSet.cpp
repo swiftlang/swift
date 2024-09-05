@@ -14,6 +14,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -231,6 +232,22 @@ static bool usesFeatureAllowUnsafeAttribute(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(WarnUnsafe)
+
+static bool usesFeatureValueGenerics(Decl *decl) {
+  auto genericContext = decl->getAsGenericContext();
+
+  if (!genericContext || !genericContext->getGenericParams())
+    return false;
+
+  for (auto param : genericContext->getGenericParams()->getParams()) {
+    if (param->isValue())
+      return true;
+
+    continue;
+  }
+
+  return false;
+}
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

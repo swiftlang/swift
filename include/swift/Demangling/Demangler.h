@@ -639,6 +639,8 @@ protected:
 
   NodePointer demangleLifetimeDependence();
 
+  NodePointer demangleIntegerType();
+
   void dump();
 
 public:

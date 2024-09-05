@@ -3407,9 +3407,8 @@ static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
   if (!sig1 || !sig2)
     return TypeChecker::compareDeclarations(DC, decl1, decl2);
 
-  auto selfParam = GenericTypeParamType::get(/*isParameterPack*/ false,
-                                             /*depth*/ 0, /*index*/ 0,
-                                             decl1->getASTContext());
+  auto selfParam = GenericTypeParamType::getType(/*depth*/ 0, /*index*/ 0,
+                                                 decl1->getASTContext());
 
   // Collect the protocols required by extension 1.
   Type class1;

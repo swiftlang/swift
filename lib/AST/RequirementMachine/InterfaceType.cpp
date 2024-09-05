@@ -286,13 +286,11 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
         continue;
 
       case Symbol::Kind::Protocol:
-        handleRoot(GenericTypeParamType::get(/*isParameterPack*/ false, 0, 0,
-                                             ctx.getASTContext()));
+        handleRoot(GenericTypeParamType::getType(0, 0, ctx.getASTContext()));
         continue;
 
       case Symbol::Kind::AssociatedType:
-        handleRoot(GenericTypeParamType::get(/*isParameterPack*/ false, 0, 0,
-                                             ctx.getASTContext()));
+        handleRoot(GenericTypeParamType::getType(0, 0, ctx.getASTContext()));
 
         // An associated type symbol at the root means we have a dependent
         // member type rooted at Self; handle the associated type below.
@@ -584,8 +582,7 @@ RewriteContext::getRelativeSubstitutionSchemaFromType(
 
         result.push_back(Term::get(term, *this));
 
-        return CanGenericTypeParamType::get(/*isParameterPack=*/false,
-                                            /*depth=*/0, index, Context);
+        return CanGenericTypeParamType::getType(/*depth=*/0, index, Context);
       }));
 }
 
@@ -625,7 +622,6 @@ RewriteContext::getSubstitutionSchemaFromType(CanType concreteType,
 
         result.push_back(Term::get(term, *this));
 
-        return CanGenericTypeParamType::get(/*isParameterPack=*/false,
-                                            /*depth=*/0, index, Context);
+        return CanGenericTypeParamType::getType(/*depth=*/0, index, Context);
       }));
 }

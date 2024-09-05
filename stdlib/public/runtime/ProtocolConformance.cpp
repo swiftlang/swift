@@ -1649,6 +1649,59 @@ checkGenericPackRequirement(
 }
 
 static std::optional<TypeLookupError>
+checkGenericValueRequirement(const GenericRequirementDescriptor &req,
+                             llvm::SmallVectorImpl<const void *> &extraArguments,
+                             SubstGenericParameterFn substGenericParam,
+                             SubstDependentWitnessTableFn substWitnessTable,
+                     llvm::SmallVectorImpl<InvertibleProtocolSet> &suppressed) {
+  assert(req.getFlags().isValueRequirement());
+
+  // Make sure we understand the requirement we're dealing with.
+  if (!req.hasKnownKind())
+    return TypeLookupError("unknown kind");
+
+  // Resolve the subject generic value.
+  auto result = swift::getTypeValueByMangledName(
+      req.getParam(), extraArguments.data(),
+      substGenericParam, substWitnessTable);
+
+  if (result.getError())
+    return *result.getError();
+
+  auto subjectValue = result.getType();
+
+  // Check the requirement.
+  switch (req.getKind()) {
+  case GenericRequirementKind::SameType: {
+    // Resolve the constraint generic value.
+    auto result = swift::getTypeValueByMangledName(
+        req.getMangledTypeName(), extraArguments.data(),
+        substGenericParam, substWitnessTable);
+
+    if (result.getError())
+      return *result.getError();
+
+    auto constraintValue = result.getType();
+
+    if (subjectValue != constraintValue) {
+      return TYPE_LOOKUP_ERROR_FMT(
+            "subject value %" PRIiPTR " does not match constraint value %" PRIiPTR,
+            subjectValue,
+            constraintValue);
+    }
+
+    return std::nullopt;
+  }
+
+  default: {
+    // Value requirements can only be same type'd at the moment.
+    return TYPE_LOOKUP_ERROR_FMT("unknown value generic requirement kind %u",
+                                 (unsigned)req.getKind());
+  }
+  }
+}
+
+static std::optional<TypeLookupError>
 checkInvertibleRequirementsStructural(const Metadata *type,
                                         InvertibleProtocolSet ignored) {
   switch (type->getKind()) {
@@ -1874,6 +1927,13 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
                                                allSuppressed);
       if (error)
         return error;
+    } else if (req.getFlags().isValueRequirement()) {
+      auto error = checkGenericValueRequirement(req, extraArguments,
+                                                substGenericParam,
+                                                substWitnessTable,
+                                                allSuppressed);
+      if (error)
+        return error;
     } else {
       auto error = checkGenericRequirement(req, extraArguments,
                                            substGenericParam,
@@ -1897,15 +1957,15 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
     if (index < allSuppressed.size())
       suppressed = allSuppressed[index];
 
-    MetadataOrPack metadataOrPack(substGenericParamOrdinal(index, keyIndex));
+    MetadataPackOrValue MetadataPackOrValue(substGenericParamOrdinal(index, keyIndex));
     switch (genericParams[index].getKind()) {
     case GenericParamKind::Type: {
-      if (!metadataOrPack || metadataOrPack.isMetadataPack()) {
+      if (!MetadataPackOrValue || MetadataPackOrValue.isMetadataPack()) {
         return TYPE_LOOKUP_ERROR_FMT(
             "unexpected pack for generic parameter %u", index);
       }
 
-      auto metadata = metadataOrPack.getMetadata();
+      auto metadata = MetadataPackOrValue.getMetadata();
       if (auto error = checkInvertibleRequirements(metadata, suppressed))
         return error;
 
@@ -1914,15 +1974,15 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
 
     case GenericParamKind::TypePack: {
       // NULL can be used to indicate an empty pack.
-      if (!metadataOrPack)
+      if (!MetadataPackOrValue)
         break;
 
-      if (metadataOrPack.isMetadata()) {
+      if (MetadataPackOrValue.isMetadata()) {
         return TYPE_LOOKUP_ERROR_FMT(
             "unexpected metadata for generic pack parameter %u", index);
       }
 
-      auto pack = metadataOrPack.getMetadataPack();
+      auto pack = MetadataPackOrValue.getMetadataPack();
       if (pack.getElements() != 0) {
         llvm::ArrayRef<const Metadata *> elements(
             pack.getElements(), pack.getNumElements());
@@ -1931,6 +1991,11 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
             return error;
         }
       }
+      break;
+    }
+
+    case GenericParamKind::Value: {
+      // Value parameter can never conform to protocols or the inverse thereof.
       break;
     }
 

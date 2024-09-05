@@ -2766,6 +2766,18 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addDeclRef(decl), functionRefs);
     break;
   }
+
+  case SILInstructionKind::TypeValueInst: {
+    auto *tvi = cast<TypeValueInst>(&SI);
+    auto valueTy = tvi->getType();
+
+    SILTypeValueLayout::emitRecord(Out, ScratchRecord,
+                                   SILAbbrCodes[SILTypeValueLayout::Code],
+                                   S.addTypeRef(valueTy.getRawASTType()),
+                                   (unsigned)valueTy.getCategory(),
+                                   S.addTypeRef(tvi->getParamType()));
+    break;
+  }
   }
   // Non-void values get registered in the value table.
   for (auto result : SI.getResults()) {
@@ -3224,6 +3236,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILOpenPackElementLayout>();
   registerSILAbbr<SILPackElementGetLayout>();
   registerSILAbbr<SILPackElementSetLayout>();
+  registerSILAbbr<SILTypeValueLayout>();
 
   registerSILAbbr<VTableLayout>();
   registerSILAbbr<VTableEntryLayout>();

@@ -846,14 +846,12 @@ Type ASTBuilder::createGenericTypeParameterType(unsigned depth,
   if (!ParameterPacks.empty()) {
     for (auto pair : ParameterPacks) {
       if (pair.first == depth && pair.second == index) {
-        return GenericTypeParamType::get(/*isParameterPack*/ true,
-                                         depth, index, Ctx);
+        return GenericTypeParamType::getPack(depth, index, Ctx);
       }
     }
   }
 
-  return GenericTypeParamType::get(/*isParameterPack*/ false,
-                                   depth, index, Ctx);
+  return GenericTypeParamType::getType(depth, index, Ctx);
 }
 
 Type ASTBuilder::createDependentMemberType(StringRef member,
@@ -1035,6 +1033,14 @@ Type ASTBuilder::createDictionaryType(Type key, Type value) {
 
 Type ASTBuilder::createParenType(Type base) {
   return ParenType::get(Ctx, base);
+}
+
+Type ASTBuilder::createIntegerType(intptr_t value) {
+  return IntegerType::get(std::to_string(value), /*isNegative*/ false, Ctx);
+}
+
+Type ASTBuilder::createNegativeIntegerType(intptr_t value) {
+  return IntegerType::get(std::to_string(value), /*isNegative*/ true, Ctx);
 }
 
 GenericSignature

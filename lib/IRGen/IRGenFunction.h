@@ -404,7 +404,9 @@ public:
   llvm::Value *emitTypeMetadataRefForLayout(SILType type);
   llvm::Value *emitTypeMetadataRefForLayout(SILType type,
                                             DynamicMetadataRequest request);
-  
+
+  llvm::Value *emitValueGenericRef(CanType type);
+
   llvm::Value *emitValueWitnessTableRef(SILType type,
                                         llvm::Value **metadataSlot = nullptr);
   llvm::Value *emitValueWitnessTableRef(SILType type,
@@ -450,6 +452,15 @@ public:
 
   /// Emit a non-mergeable trap call, optionally followed by a terminator.
   void emitTrap(StringRef failureMessage, bool EmitUnreachable);
+
+  /// Given at least a src address to a list of elements, runs body over each
+  /// element passing its address. An optional destination address can be
+  /// provided which this will run over as well to perform things like
+  /// 'initWithTake' from src to dest.
+  void emitLoopOverElements(const TypeInfo &elementTypeInfo,
+                            SILType elementType, CanType countType,
+                            Address dest, Address src,
+                          std::function<void (Address dest, Address src)> body);
 
 private:
   llvm::Instruction *AllocaIP;

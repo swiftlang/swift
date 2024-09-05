@@ -3155,6 +3155,7 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
   case TypeReprKind::Existential:
   case TypeReprKind::LifetimeDependent:
   case TypeReprKind::Sending:
+  case TypeReprKind::Integer:
     return result;
 
   case TypeReprKind::Fixed:
@@ -3625,10 +3626,13 @@ createOpaqueParameterGenericParams(GenericContext *genericContext, GenericParamL
     for (auto repr : typeReprs) {
    
       // Allocate a new generic parameter to represent this opaque type.
+      //
+      // Note: Opaque parameters are always treated as
+      // GenericTypeParamKind::Type right now. The opaque type representation
+      // indicates it's an opaque parameter.
       auto *gp = GenericTypeParamDecl::createImplicit(
           dc, Identifier(), GenericTypeParamDecl::InvalidDepth, index++,
-          /*isParameterPack*/ false, /*isOpaqueType*/ true, repr,
-          /*nameLoc*/ repr->getStartLoc());
+          GenericTypeParamKind::Type, repr, /*nameLoc*/ repr->getStartLoc());
 
       // Use the underlying constraint as the constraint on the generic parameter.
       //  The underlying constraint is only present for OpaqueReturnTypeReprs
@@ -3658,7 +3662,7 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     // Builtin.TheTupleType has a single pack generic parameter: <each Element>
     auto *genericParam = GenericTypeParamDecl::createImplicit(
         tupleDecl->getDeclContext(), ctx.Id_Element, /*depth*/ 0, /*index*/ 0,
-        /*isParameterPack*/ true);
+        GenericTypeParamKind::Pack);
 
     return GenericParamList::create(ctx, SourceLoc(), genericParam,
                                     SourceLoc());
@@ -3714,7 +3718,7 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     auto &ctx = value->getASTContext();
     auto selfId = ctx.Id_Self;
     auto selfDecl = GenericTypeParamDecl::createImplicit(
-        proto, selfId, /*depth*/ 0, /*index*/ 0);
+        proto, selfId, /*depth*/ 0, /*index*/ 0, GenericTypeParamKind::Type);
     auto protoType = proto->getDeclaredInterfaceType();
     InheritedEntry selfInherited[1] = {
       InheritedEntry(TypeLoc::withoutLoc(protoType)) };

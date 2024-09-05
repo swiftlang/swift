@@ -584,6 +584,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, MayRead, DoesNotRelease)
   SINGLE_VALUE_INST(ObjCProtocolInst, objc_protocol,
                     SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(TypeValueInst, type_value,
+                    SingleValueInstruction, None, DoesNotRelease)
 
   // Aggregate Types
   SINGLE_VALUE_INST(ObjectInst, object,

@@ -1172,8 +1172,8 @@ bool diagnoseSelfAssignment(const Expr *E);
 /// some reason it could not.
 bool getDefaultGenericArgumentsString(
     SmallVectorImpl<char> &buf, const GenericTypeDecl *typeDecl,
-    llvm::function_ref<Type(const GenericTypeParamDecl *)> getPreferredType =
-        [](const GenericTypeParamDecl *) { return Type(); });
+    llvm::function_ref<Type(const GenericTypeParamType *)> getPreferredType =
+        [](const GenericTypeParamType *) { return Type(); });
 
 /// Attempt to omit needless words from the name of the given declaration.
 std::optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);

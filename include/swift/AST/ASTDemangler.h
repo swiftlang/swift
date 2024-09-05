@@ -231,6 +231,10 @@ public:
 
   Type createParenType(Type base);
 
+  Type createIntegerType(intptr_t value);
+
+  Type createNegativeIntegerType(intptr_t value);
+
   BuiltGenericSignature
   createGenericSignature(ArrayRef<BuiltType> params,
                          ArrayRef<BuiltRequirement> requirements);

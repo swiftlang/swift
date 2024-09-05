@@ -1778,7 +1778,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     } else if (auto array = attr->getArrayLikeTypeAndCount()) {
       Printer << "likeArrayOf: ";
       array->first->print(Printer, Options);
-      Printer << ", count: " << array->second;
+      Printer << ", count: ";
+      array->second->print(Printer, Options);
     } else {
       llvm_unreachable("unhandled @_rawLayout form");
     }
@@ -2220,8 +2221,18 @@ Type TypeEraserAttr::getResolvedType(const ProtocolDecl *PD) const {
 Type RawLayoutAttr::getResolvedLikeType(StructDecl *sd) const {
   auto &ctx = sd->getASTContext();
   return evaluateOrDefault(ctx.evaluator,
-                           ResolveRawLayoutLikeTypeRequest{sd,
-                               const_cast<RawLayoutAttr *>(this)},
+                           ResolveRawLayoutTypeRequest{sd,
+                              const_cast<RawLayoutAttr *>(this),
+                              /*isLikeType*/ true},
+                           ErrorType::get(ctx));
+}
+
+Type RawLayoutAttr::getResolvedCountType(StructDecl *sd) const {
+  auto &ctx = sd->getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           ResolveRawLayoutTypeRequest{sd,
+                              const_cast<RawLayoutAttr *>(this),
+                              /*isLikeType*/ false},
                            ErrorType::get(ctx));
 }
 

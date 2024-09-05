@@ -245,9 +245,16 @@ createGenericParam(ASTContext &ctx, const char *name, unsigned index,
                    bool isParameterPack = false) {
   ModuleDecl *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
+
+  auto paramKind = GenericTypeParamKind::Type;
+
+  if (isParameterPack) {
+    paramKind = GenericTypeParamKind::Pack;
+  }
+
   return GenericTypeParamDecl::createImplicit(
       &M->getMainFile(FileUnitKind::Builtin), ident, /*depth*/ 0, index,
-                      isParameterPack);
+                      paramKind);
 }
 
 /// Create a generic parameter list with multiple generic parameters.

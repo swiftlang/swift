@@ -2529,19 +2529,22 @@ public:
 /// Specifies the raw storage used by a type.
 class RawLayoutAttr final : public DeclAttribute {
   /// The element type to share size and alignment with, if any.
-  TypeRepr *LikeType;
+  TypeRepr *LikeType = nullptr;
   /// The number of elements in an array to share stride and alignment with,
-  /// or zero if no such size was specified. If `LikeType` is null, this is
-  /// the size in bytes of the raw storage.
-  unsigned SizeOrCount;
+  /// or nullptr if no such size was specified.
+  TypeRepr *CountType = nullptr;
+  /// The size in bytes of the raw storage.
+  unsigned Size = 0;
   /// If `LikeType` is null, the alignment in bytes to use for the raw storage.
-  unsigned Alignment;
+  unsigned Alignment = 0;
   /// If a value of this raw layout type should move like its `LikeType`.
   bool MovesAsLike = false;
   /// The resolved like type.
   mutable Type CachedResolvedLikeType = Type();
+  /// The resolved count type.
+  mutable Type CachedResolvedCountType = Type();
 
-  friend class ResolveRawLayoutLikeTypeRequest;
+  friend class ResolveRawLayoutTypeRequest;
 
 public:
   /// Construct a `@_rawLayout(like: T)` attribute.
@@ -2549,31 +2552,27 @@ public:
                 SourceRange Range)
       : DeclAttribute(DeclAttrKind::RawLayout, AtLoc, Range,
                       /*implicit*/ false),
-        LikeType(LikeType), SizeOrCount(0), Alignment(~0u),
-        MovesAsLike(movesAsLike) {}
+        LikeType(LikeType), MovesAsLike(movesAsLike) {}
 
   /// Construct a `@_rawLayout(likeArrayOf: T, count: N)` attribute.
-  RawLayoutAttr(TypeRepr *LikeType, unsigned Count, bool movesAsLike,
+  RawLayoutAttr(TypeRepr *LikeType, TypeRepr *CountType, bool movesAsLike,
                 SourceLoc AtLoc, SourceRange Range)
       : DeclAttribute(DeclAttrKind::RawLayout, AtLoc, Range,
                       /*implicit*/ false),
-        LikeType(LikeType), SizeOrCount(Count), Alignment(0),
-        MovesAsLike(movesAsLike) {}
+        LikeType(LikeType), CountType(CountType), MovesAsLike(movesAsLike) {}
 
   /// Construct a `@_rawLayout(size: N, alignment: M)` attribute.
   RawLayoutAttr(unsigned Size, unsigned Alignment, SourceLoc AtLoc,
                 SourceRange Range)
       : DeclAttribute(DeclAttrKind::RawLayout, AtLoc, Range,
                       /*implicit*/ false),
-        LikeType(nullptr), SizeOrCount(Size), Alignment(Alignment) {}
+        Size(Size), Alignment(Alignment) {}
 
   /// Return the type whose single-element layout the attribute type should get
   /// its layout from. Returns null if the attribute specifies an array or manual
   /// layout.
   TypeRepr *getScalarLikeType() const {
-    if (!LikeType)
-      return nullptr;
-    if (Alignment != ~0u)
+    if (!LikeType || CountType)
       return nullptr;
     return LikeType;
   }
@@ -2581,13 +2580,11 @@ public:
   /// Return the type whose array layout the attribute type should get its
   /// layout from, along with the size of that array. Returns None if the
   /// attribute specifies scalar or manual layout.
-  std::optional<std::pair<TypeRepr *, unsigned>>
+  std::optional<std::pair<TypeRepr *, TypeRepr *>>
   getArrayLikeTypeAndCount() const {
-    if (!LikeType)
+    if (!LikeType || !CountType)
       return std::nullopt;
-    if (Alignment == ~0u)
-      return std::nullopt;
-    return std::make_pair(LikeType, SizeOrCount);
+    return std::make_pair(LikeType, CountType);
   }
 
   /// Return the size and alignment of the attributed type. Returns
@@ -2595,18 +2592,17 @@ public:
   std::optional<std::pair<unsigned, unsigned>> getSizeAndAlignment() const {
     if (LikeType)
       return std::nullopt;
-    return std::make_pair(SizeOrCount, Alignment);
+    return std::make_pair(Size, Alignment);
   }
 
   Type getResolvedLikeType(StructDecl *sd) const;
+  Type getResolvedCountType(StructDecl *sd) const;
 
   /// Return the type whose single-element layout the attribute type should get
   /// its layout from. Returns None if the attribute specifies an array or manual
   /// layout.
   std::optional<Type> getResolvedScalarLikeType(StructDecl *sd) const {
-    if (!LikeType)
-      return std::nullopt;
-    if (Alignment != ~0u)
+    if (!LikeType || CountType)
       return std::nullopt;
     return getResolvedLikeType(sd);
   }
@@ -2614,13 +2610,11 @@ public:
   /// Return the type whose array layout the attribute type should get its
   /// layout from, along with the size of that array. Returns None if the
   /// attribute specifies scalar or manual layout.
-  std::optional<std::pair<Type, unsigned>>
+  std::optional<std::pair<Type, Type>>
   getResolvedArrayLikeTypeAndCount(StructDecl *sd) const {
-    if (!LikeType)
+    if (!LikeType || !CountType)
       return std::nullopt;
-    if (Alignment == ~0u)
-      return std::nullopt;
-    return std::make_pair(getResolvedLikeType(sd), SizeOrCount);
+    return std::make_pair(getResolvedLikeType(sd), getResolvedCountType(sd));
   }
 
   /// Whether a value of this raw layout should move like its `LikeType`.

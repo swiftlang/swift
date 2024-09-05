@@ -2328,7 +2328,13 @@ public:
     // abstracted as scalars.
     bool isParameterPack = (withinExpansion && pattern.isTypeParameterPack());
 
-    auto gp = GenericTypeParamType::get(isParameterPack, 0, paramIndex,
+    auto paramKind = GenericTypeParamKind::Type;
+
+    if (isParameterPack) {
+      paramKind = GenericTypeParamKind::Pack;
+    }
+
+    auto gp = GenericTypeParamType::get(paramKind, 0, paramIndex, Type(),
                                         TC.Context);
     substGenericParams.push_back(gp);
 

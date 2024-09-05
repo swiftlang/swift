@@ -1176,6 +1176,19 @@ namespace {
       printCommon(decl, "generic_type_param", label);
       printField(decl->getDepth(), "depth");
       printField(decl->getIndex(), "index");
+
+      switch (decl->getParamKind()) {
+      case GenericTypeParamKind::Type:
+        printField((StringRef)"type", "param_kind");
+        break;
+      case GenericTypeParamKind::Pack:
+        printField((StringRef)"pack", "param_kind");
+        break;
+      case GenericTypeParamKind::Value:
+        printField((StringRef)"value", "param_kind");
+        break;
+      }
+
       printFoot();
     }
 
@@ -3257,6 +3270,17 @@ public:
 
     printFoot();
   }
+
+  void visitTypeValueExpr(TypeValueExpr *E, StringRef label) {
+    printCommon(E, "type_value_expr", label);
+
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
+    printFieldQuoted(Type(E->getParamType()).getString(PO), "param_type",
+                     TypeColor);
+
+    printFoot();
+  }
 };
 
 } // end anonymous namespace
@@ -3560,6 +3584,17 @@ public:
           "");
     }
     printRec(T->getBase());
+    printFoot();
+  }
+
+  void visitIntegerTypeRepr(IntegerTypeRepr *T, StringRef label) {
+    printCommon("type_integer", label);
+
+    if (T->getMinusLoc()) {
+      printCommon("is_negative", label);
+    }
+
+    printFieldQuoted(T->getValue(), "value", IdentifierColor);
     printFoot();
   }
 };
@@ -4258,9 +4293,21 @@ namespace {
       printCommon("generic_type_param_type", label);
       printField(T->getDepth(), "depth");
       printField(T->getIndex(), "index");
-      if (auto decl = T->getDecl())
-        printFieldQuoted(decl->printRef(), "decl");
-      printFlag(T->isParameterPack(), "pack");
+      if (!T->isCanonical())
+        printFieldQuoted(T->getName(), "name");
+
+      switch (T->getParamKind()) {
+      case GenericTypeParamKind::Type:
+        printField((StringRef)"type", "param_kind");
+        break;
+      case GenericTypeParamKind::Pack:
+        printField((StringRef)"pack", "param_kind");
+        break;
+      case GenericTypeParamKind::Value:
+        printField((StringRef)"value", "param_kind");
+        printRec(T->getValueType(), "value_type");
+      }
+
       printFoot();
     }
 
@@ -4533,6 +4580,13 @@ namespace {
       printCommon("error_union_type", label);
       for (auto term : T->getTerms())
         printRec(term);
+      printFoot();
+    }
+
+    void visitIntegerType(IntegerType *T, StringRef label) {
+      printCommon("integer_type", label);
+      printFlag(T->isNegative(), "is_negative");
+      printFieldQuoted(T->getValue(), "value", LiteralValueColor);
       printFoot();
     }
 

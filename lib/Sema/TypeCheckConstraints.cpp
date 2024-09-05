@@ -202,10 +202,8 @@ bool TypeVariableType::Implementation::isOpaqueType() const {
   if (!GP)
     return false;
 
-  if (auto *GPT = GP->getType()->getAs<GenericTypeParamType>()) {
-    auto *decl = GPT->getDecl();
-    return decl && decl->isOpaqueType();
-  }
+  if (auto *GPT = GP->getType()->getAs<GenericTypeParamType>())
+    return (GPT->getOpaqueDecl() != nullptr);
 
   return false;
 }

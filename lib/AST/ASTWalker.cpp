@@ -1431,6 +1431,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitTypeValueExpr(TypeValueExpr *E) {
+    return E;
+  }
+
   //===--------------------------------------------------------------------===//
   //                           Everything Else
   //===--------------------------------------------------------------------===//
@@ -2381,6 +2385,10 @@ bool Traversal::visitSILBoxTypeRepr(SILBoxTypeRepr *T) {
 
 bool Traversal::visitLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *T) {
   return doIt(T->getBase());
+}
+
+bool Traversal::visitIntegerTypeRepr(IntegerTypeRepr *T) {
+  return false;
 }
 
 Expr *Expr::walk(ASTWalker &walker) {

@@ -172,8 +172,8 @@ template <typename T> class TypeLookupErrorOr {
 public:
   TypeLookupErrorOr() : Value(TypeLookupError("freshly constructed error")) {}
 
-  TypeLookupErrorOr(const T &t) : Value(t) {
-    if (!t)
+  TypeLookupErrorOr(const T &t, bool ignoreValueCheck = false) : Value(t) {
+    if (!t && !ignoreValueCheck)
       Value = TypeLookupError("unknown error");
   }
 

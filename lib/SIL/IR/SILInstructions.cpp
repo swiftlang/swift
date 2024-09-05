@@ -3397,3 +3397,16 @@ void HasSymbolInst::getReferencedFunctions(
     fns.push_back(fn);
   });
 }
+
+TypeValueInst *TypeValueInst::create(SILFunction &F, SILDebugLocation loc,
+                                     SILType valueType, CanType paramType) {
+  SmallVector<SILValue, 8> typeDependentOperands;
+  collectTypeDependentOperands(typeDependentOperands, F, paramType);
+
+  size_t size =
+    totalSizeToAlloc<swift::Operand>(typeDependentOperands.size());
+  void *buffer =
+    F.getModule().allocateInst(size, alignof(TypeValueInst));
+  return ::new (buffer)
+      TypeValueInst(loc, typeDependentOperands, valueType, paramType);
+}

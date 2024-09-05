@@ -255,6 +255,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::SILPack:
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
+  case TypeKind::Integer:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -1662,20 +1663,11 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::GenericTypeParam: {
     GenericTypeParamType *gp = cast<GenericTypeParamType>(this);
     auto gpDecl = gp->getDecl();
-
-    // If we haven't set a depth for this generic parameter, try to do so.
-    // FIXME: This is a dreadful hack.
-    if (gpDecl->getDepth() == GenericTypeParamDecl::InvalidDepth) {
-      auto *dc = gpDecl->getDeclContext();
-      auto *gpList = dc->getAsDecl()->getAsGenericContext()->getGenericParams();
-      gpList->setDepth(dc->getGenericContextDepth());
-    }
-
-    assert(gpDecl->getDepth() != GenericTypeParamDecl::InvalidDepth &&
-           "parameter hasn't been validated");
+    auto &C = gpDecl->getASTContext();
     Result =
-        GenericTypeParamType::get(gpDecl->isParameterPack(), gpDecl->getDepth(),
-                                  gpDecl->getIndex(), gpDecl->getASTContext());
+        GenericTypeParamType::get(gp->getParamKind(), gp->getDepth(),
+                                  gp->getIndex(), gp->getValueType(),
+                                  C);
     break;
   }
 
@@ -1984,36 +1976,72 @@ ArrayRef<Type> TypeAliasType::getDirectGenericArgs() const {
   return getSubstitutionMap().getInnermostReplacementTypes();
 }
 
-unsigned GenericTypeParamType::getDepth() const {
-  if (auto param = getDecl()) {
-    return param->getDepth();
-  }
-
-  auto fixedNum = ParamOrDepthIndex.get<DepthIndexTy>();
-  return (fixedNum & ~GenericTypeParamType::TYPE_SEQUENCE_BIT) >> 16;
+GenericTypeParamType::GenericTypeParamType(GenericTypeParamDecl *param,
+                                           RecursiveTypeProperties props)
+  : SubstitutableType(TypeKind::GenericTypeParam, nullptr, props),
+    Decl(param) {
+  ASSERT(param->getDepth() != GenericTypeParamDecl::InvalidDepth);
+  Depth = param->getDepth();
+  IsDecl = true;
+  Index = param->getIndex();
+  ParamKind = param->getParamKind();
+  ValueType = param->getValueType();
 }
 
-unsigned GenericTypeParamType::getIndex() const {
-  if (auto param = getDecl()) {
-    return param->getIndex();
-  }
+GenericTypeParamType::GenericTypeParamType(Identifier name,
+                                           GenericTypeParamType *canType,
+                                           const ASTContext &ctx)
+    : SubstitutableType(TypeKind::GenericTypeParam, nullptr,
+                        canType->getRecursiveProperties()),
+      Decl(nullptr) {
+  Name = name;
+  Depth = canType->getDepth();
+  IsDecl = false;
+  Index = canType->getIndex();
+  ParamKind = canType->getParamKind();
+  ValueType = canType->getValueType();
 
-  auto fixedNum = ParamOrDepthIndex.get<DepthIndexTy>();
-  return fixedNum & 0xFFFF;
+  setCanonicalType(CanType(canType));
+}
+
+GenericTypeParamType::GenericTypeParamType(GenericTypeParamKind paramKind,
+                                           unsigned depth, unsigned index,
+                                           Type valueType,
+                                           RecursiveTypeProperties props,
+                                           const ASTContext &ctx)
+    : SubstitutableType(TypeKind::GenericTypeParam, &ctx, props),
+      Decl(nullptr) {
+  Depth = depth;
+  IsDecl = false;
+  Index = index;
+  ParamKind = paramKind;
+  ValueType = valueType;
+}
+
+GenericTypeParamDecl *GenericTypeParamType::getOpaqueDecl() const {
+  auto *decl = getDecl();
+  if (decl && decl->isOpaqueType())
+    return decl;
+  return nullptr;
 }
 
 Identifier GenericTypeParamType::getName() const {
   // Use the declaration name if we still have that sugar.
   if (auto decl = getDecl())
     return decl->getName();
-  
+
+  if (!isCanonical())
+    return Name;
+
   // Otherwise, we're canonical. Produce an anonymous '<tau>_n_n' name.
-  assert(isCanonical());
+
   // getASTContext() doesn't actually mutate an already-canonical type.
   auto &C = const_cast<GenericTypeParamType*>(this)->getASTContext();
   auto &names = C.CanonicalGenericTypeParamTypeNames;
-  unsigned depthIndex = ParamOrDepthIndex.get<DepthIndexTy>();
-  auto cached = names.find(depthIndex);
+
+  auto key = (getDepth() << 16) | getIndex();
+
+  auto cached = names.find(key);
   if (cached != names.end())
     return cached->second;
   
@@ -2024,8 +2052,15 @@ Identifier GenericTypeParamType::getName() const {
 
   os << tau << getDepth() << '_' << getIndex();
   Identifier name = C.getIdentifier(os.str());
-  names.insert({depthIndex, name});
+  names.insert({key, name});
   return name;
+}
+
+Type GenericTypeParamType::getValueType() const {
+  if (getDecl())
+    return getDecl()->getValueType();
+
+  return ValueType;
 }
 
 const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
@@ -2145,6 +2180,13 @@ bool TypeBase::isExactSuperclassOf(Type ty) {
       return true;
   } while ((ty = ty->getSuperclass()));
   return false;
+}
+
+bool TypeBase::isValueParameter() {
+  Type t(this);
+
+  return t->is<GenericTypeParamType>() &&
+         t->castTo<GenericTypeParamType>()->isValue();
 }
 
 namespace {
@@ -3408,6 +3450,13 @@ bool ArchetypeType::requiresClass() const {
   return false;
 }
 
+Type ArchetypeType::getValueType() const {
+  if (auto gp = getInterfaceType()->getAs<GenericTypeParamType>())
+    return gp->getValueType();
+
+  return Type();
+}
+
 Type ArchetypeType::getNestedType(AssociatedTypeDecl *assocType) {
   Type interfaceType = getInterfaceType();
   Type memberInterfaceType =
@@ -3540,9 +3589,9 @@ PackArchetypeType::PackArchetypeType(
     const ASTContext &Ctx, GenericEnvironment *GenericEnv, Type InterfaceType,
     ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
     LayoutConstraint Layout, PackShape Shape,
-    RecursiveTypeProperties Properties
-) : ArchetypeType(TypeKind::PackArchetype, Ctx, Properties,
-                  InterfaceType, ConformsTo, Superclass, Layout, GenericEnv) {
+    RecursiveTypeProperties Properties)
+  : ArchetypeType(TypeKind::PackArchetype, Ctx, Properties,
+                    InterfaceType, ConformsTo, Superclass, Layout, GenericEnv) {
   assert(InterfaceType->isParameterPack());
   *getTrailingObjects<PackShape>() = Shape;
 }
@@ -4251,6 +4300,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::SILPack:
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
+  case TypeKind::Integer:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -4439,10 +4489,8 @@ bool TypeBase::hasSimpleTypeRepr() const {
   }
 
   case TypeKind::GenericTypeParam: {
-    if (auto *decl = cast<const GenericTypeParamType>(this)->getDecl()) {
-      return !decl->isOpaqueType();
-    }
-
+    if (cast<const GenericTypeParamType>(this)->getOpaqueDecl())
+      return false;
     return true;
   }
 
@@ -4753,6 +4801,11 @@ SILFunctionType::withPatternSpecialization(CanGenericSignature sig,
                           subs, SubstitutionMap(),
                           const_cast<SILFunctionType*>(this)->getASTContext(),
                           witnessConformance);
+}
+
+APInt IntegerType::getValue() const {
+  return BuiltinIntegerWidth::arbitrary().parse(getDigitsText(), /*radix*/ 0,
+                                                isNegative());
 }
 
 SourceLoc swift::extractNearestSourceLoc(Type ty) {

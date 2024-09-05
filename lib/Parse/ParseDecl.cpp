@@ -4030,10 +4030,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return makeParserSuccess();
       }
      
-      unsigned count;
-      SourceLoc countLoc;
-      if (parseUnsignedInteger(count, countLoc,
-                               diag::attr_rawlayout_expected_integer_count)) {
+      auto countType = parseType(diag::expected_type);
+      if (countType.isNull()) {
         return makeParserSuccess();
       }
       
@@ -4053,8 +4051,9 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return makeParserSuccess();
       }
       
-      attr = new (Context) RawLayoutAttr(likeType.get(), count, movesAsLike,
-                                         AtLoc, SourceRange(Loc, rParenLoc));
+      attr = new (Context) RawLayoutAttr(likeType.get(), countType.get(),
+                                         movesAsLike, AtLoc,
+                                         SourceRange(Loc, rParenLoc));
     } else {
       diagnose(Loc, diag::attr_rawlayout_expected_label,
                "'size', 'like', or 'likeArrayOf'");

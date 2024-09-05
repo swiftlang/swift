@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
+// RUN: %target-sil-opt %s -enable-experimental-feature ValueGenerics | %target-sil-opt -enable-experimental-feature ValueGenerics | %FileCheck %s
 
 import Builtin
 import Swift
@@ -404,4 +404,13 @@ exit:
 die:
   dealloc_box [dead_end] %b : ${ var Klass }
   unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @test_type_value : $@convention(thin) <let N : Int> () -> Int {
+// CHECK:         type_value $Int for N
+// CHECK-LABEL: } // end sil function 'test_type_value
+sil [ossa] @test_type_value : $@convention(thin) <let N : Int> () -> Int {
+entry:
+  %val = type_value $Int for N
+  return %val : $Int
 }

@@ -891,6 +891,11 @@ void SILBoxTypeRepr::printImpl(ASTPrinter &Printer,
   Printer.printKeyword("sil_box", Opts);
 }
 
+void IntegerTypeRepr::printImpl(ASTPrinter &Printer,
+                                const PrintOptions &Opts) const {
+  Printer.printText(getValue());
+}
+
 void ErrorTypeRepr::dischargeDiagnostic(swift::ASTContext &Context) {
   if (!DelayedDiag)
     return;

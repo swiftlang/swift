@@ -3964,6 +3964,29 @@ mangleNonUniqueExtendedExistentialTypeShapeSymbolicReference(Node *node,
   // We don't support absolute references in the mangling of these
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
+
+ManglingError Remangler::mangleInteger(Node *node, unsigned int depth) {
+  Buffer << "$" << node->getIndex();
+
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleNegativeInteger(Node *node, unsigned int depth) {
+  Buffer << "$n" << -node->getIndex();
+
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleDependentGenericParamValueMarker(Node *node,
+                                                               unsigned depth) {
+  DEMANGLER_ASSERT(node->getNumChildren() == 1, node);
+  DEMANGLER_ASSERT(node->getChild(0)->getKind() == Node::Kind::Type, node);
+  RETURN_IF_ERROR(mangleType(node->getChild(0)->getChild(1), depth + 1));
+  Buffer << "RV";
+  mangleDependentGenericParamIndex(node->getChild(0)->getChild(0));
+  return ManglingError::Success;
+}
+
 } // anonymous namespace
 
 /// The top-level interface to the remangler.

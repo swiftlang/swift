@@ -7535,6 +7535,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     case TypeKind::ErrorUnion:
       break;
+
+    case TypeKind::Integer:
+      if (shouldAttemptFixes())
+        break;
+
+      // If we're asking if two integer types are the same, then we know they
+      // aren't.
+      return getTypeMatchFailure(locator);
     }
   }
 
@@ -7684,7 +7692,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       }
     }
   }
-  
+
   if (kind == ConstraintKind::BindToPointerType) {
     if (desugar2->isEqual(getASTContext().TheEmptyTupleType))
       return getTypeMatchSuccess();
@@ -8210,6 +8218,10 @@ ConstraintSystem::simplifyConstructionConstraint(
       break;
 
     return SolutionKind::Error;
+  }
+
+  case TypeKind::Integer: {
+    llvm_unreachable("implement me");
   }
   }
 

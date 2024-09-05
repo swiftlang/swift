@@ -1061,6 +1061,15 @@ void swift_initRawStructMetadata(StructMetadata *self,
                                  const TypeLayout *likeType,
                                  int32_t count);
 
+/// Initialize the value witness table for a struct using the provided like type
+/// as the basis for the layout.
+SWIFT_RUNTIME_EXPORT
+void swift_initRawStructMetadata2(StructMetadata *self,
+                                  StructLayoutFlags structLayoutFlags,
+                                  const TypeLayout *likeType,
+                                  intptr_t count,
+                                  RawLayoutFlags rawLayoutFlags);
+
 /// Check if the given generic arguments are valid inputs for the generic type
 /// context and if so call the metadata access function and return the metadata.
 ///
