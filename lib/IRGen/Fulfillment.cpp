@@ -118,6 +118,10 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::Metatype:
   case TypeKind::ExistentialMetatype:
     return false;
+
+  // Integer types are leaves.
+  case TypeKind::Integer:
+    return true;
   }
   llvm_unreachable("bad type kind");
 }
@@ -428,6 +432,17 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
       hadFulfillment |=
         searchWitnessTable(IGM, arg, requirement.getProtocol(),
                            source, std::move(argPath), keys);
+      break;
+    }
+    case GenericRequirement::Kind::Value: {
+      // Refine the path.
+      MetadataPath argPath = path;
+      argPath.addNominalValueArgumentComponent(reqtIndex);
+
+      hadFulfillment |=
+        addFulfillment(GenericRequirement::forValue(arg), source,
+                       std::move(argPath), MetadataState::Complete);
+
       break;
     }
     }

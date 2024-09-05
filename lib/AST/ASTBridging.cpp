@@ -2608,14 +2608,28 @@ BridgedGenericParamList BridgedGenericParamList_createParsed(
 
 BridgedGenericTypeParamDecl BridgedGenericTypeParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cEachLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, BridgedNullableTypeRepr bridgedInheritedType,
-    size_t index) {
-  auto eachLoc = cEachLoc.unbridged();
+    size_t index, BridgedGenericTypeParamKind cParamKind) {
+  auto specifierLoc = cSpecifierLoc.unbridged();
+
+  GenericTypeParamKind paramKind;
+
+  switch (cParamKind) {
+  case BridgedGenericTypeParamKindType:
+    paramKind = GenericTypeParamKind::Type;
+    break;
+  case BridgedGenericTypeParamKindPack:
+    paramKind = GenericTypeParamKind::Pack;
+    break;
+  case BridgedGenericTypeParamKindValue:
+    paramKind = GenericTypeParamKind::Value;
+    break;
+  }
+
   auto *decl = GenericTypeParamDecl::createParsed(
       cDeclContext.unbridged(), cName.unbridged(), cNameLoc.unbridged(),
-      eachLoc, index,
-      /*isParameterPack*/ eachLoc.isValid());
+      specifierLoc, index, paramKind);
 
   if (auto *inheritedType = bridgedInheritedType.unbridged()) {
     auto entry = InheritedEntry(inheritedType);

@@ -231,6 +231,25 @@ static void desugarSameTypeRequirement(
         }
       }
 
+      if (firstType->isValueParameter() || secondType->isValueParameter()) {
+        // FIXME: If we ever support other value types in the future besides
+        // 'Int', then we'd want to check their underlying value type to ensure
+        // they are the same.
+        if (firstType->isValueParameter() &&
+            !(secondType->isValueParameter() || secondType->is<IntegerType>())) {
+          errors.push_back(RequirementError::forInvalidValueGenericSameType(
+              sugaredFirstType, secondType, loc));
+          return true;
+        }
+
+        if (secondType->isValueParameter() &&
+            !(firstType->isValueParameter() || firstType->is<IntegerType>())) {
+          errors.push_back(RequirementError::forInvalidValueGenericSameType(
+              secondType, sugaredFirstType, loc));
+          return true;
+        }
+      }
+
       if (firstType->isTypeParameter() && secondType->isTypeParameter()) {
         result.emplace_back(kind, sugaredFirstType, secondType);
         return true;
@@ -336,6 +355,15 @@ static void desugarConformanceRequirement(
 
   // Fast path.
   if (constraintType->is<ProtocolType>()) {
+    // Diagnose attempts to introduce a value generic like 'let N: P' where 'P'
+    // is some protocol in either the defining context or in an extension where
+    // clause.
+    if (req.getFirstType()->isValueParameter()) {
+      errors.push_back(
+        RequirementError::forInvalidValueGenericConformance(req, loc));
+      return;
+    }
+
     if (req.getFirstType()->isTypeParameter()) {
       result.push_back(req);
       return;
@@ -510,6 +538,22 @@ static void realizeTypeRequirement(DeclContext *dc,
     result.push_back({Requirement(RequirementKind::Superclass,
                                   subjectType, constraintType),
                       loc});
+  } else if (subjectType->isValueParameter() && !isa<ExtensionDecl>(dc)) {
+    // This is a correct value generic definition where 'let N: Int'.
+    //
+    // Note: This definition is only valid in non-extension contexts. If we are
+    // in an extension context then the user has written something like:
+    // 'extension T where N: Int' which is weird and not supported.
+    if (constraintType->isLegalValueGenericType()) {
+      return;
+    }
+
+    // Otherwise, we're trying to define a value generic parameter with an
+    // unsupported type right now e.g. 'let N: UInt8'.
+    errors.push_back(
+        RequirementError::forInvalidValueGenericType(subjectType,
+                                                     constraintType,
+                                                     loc));
   } else {
     errors.push_back(
         RequirementError::forInvalidTypeRequirement(subjectType,
@@ -773,6 +817,11 @@ void swift::rewriting::applyInverses(
     // Noncopyable checking support for parameter packs is not implemented yet.
     if (canSubject->isParameterPack()) {
       errors.push_back(RequirementError::forInvalidInverseSubject(inverse));
+      continue;
+    }
+
+    // Value generics never have inverse requirements (or the positive thereof).
+    if (canSubject->isValueParameter()) {
       continue;
     }
 

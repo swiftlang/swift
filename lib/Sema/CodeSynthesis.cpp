@@ -548,7 +548,7 @@ createDesignatedInitOverrideGenericParams(ASTContext &ctx,
   for (auto *param : genericParams->getParams()) {
     auto *newParam = GenericTypeParamDecl::createImplicit(
         classDecl, param->getName(), depth, param->getIndex(),
-        param->isParameterPack(), param->isOpaqueType());
+        param->getParamKind());
     newParams.push_back(newParam);
   }
 

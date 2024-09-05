@@ -405,8 +405,8 @@ SWIFT_REQUEST(TypeChecker, ConformanceHasEffectRequest,
 SWIFT_REQUEST(TypeChecker, ResolveTypeRequest,
               Type (const TypeResolution *, TypeRepr *, GenericParamList *),
               Uncached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, ResolveRawLayoutLikeTypeRequest,
-              Type(StructDecl *, RawLayoutAttr *),
+SWIFT_REQUEST(TypeChecker, ResolveRawLayoutTypeRequest,
+              Type(StructDecl *, RawLayoutAttr *, bool),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SPIGroupsRequest,
               llvm::ArrayRef<Identifier>(Decl *),
@@ -596,3 +596,6 @@ SWIFT_REQUEST(TypeChecker, ParamCaptureInfoRequest,
 SWIFT_REQUEST(TypeChecker, IsUnsafeRequest,
               bool(Decl *),
               SeparatelyCached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, GenericTypeParamDeclGetValueTypeRequest,
+              Type(GenericTypeParamDecl *), Cached, NoLocationInfo)

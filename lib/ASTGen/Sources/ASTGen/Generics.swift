@@ -38,14 +38,23 @@ extension ASTGenVisitor {
       preconditionFailure("Node not part of the parent?")
     }
 
+    var paramKind: BridgedGenericTypeParamKind = .type
+
+    if node.specifier?.tokenKind == .keyword(.each) {
+      paramKind = .pack
+    } else if node.specifier?.tokenKind == .keyword(.let) {
+      paramKind = .value
+    }
+
     return .createParsed(
       self.ctx,
       declContext: self.declContext,
-      eachKeywordLoc: self.generateSourceLoc(node.eachKeyword),
+      specifierLoc: self.generateSourceLoc(node.specifier),
       name: name,
       nameLoc: nameLoc,
       inheritedType: self.generate(type: node.inheritedType),
-      index: genericParameterIndex
+      index: genericParameterIndex,
+      paramKind: paramKind
     )
   }
 

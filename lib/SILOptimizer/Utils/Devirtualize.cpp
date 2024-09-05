@@ -415,9 +415,11 @@ combineSubstitutionMaps(SubstitutionMap firstSubMap,
         return QuerySubstitutionMap{firstSubMap}(gp);
 
       auto *replacement = GenericTypeParamType::get(
-          gp->isParameterPack(),
+          gp->getParamKind(),
           gp->getDepth() + secondDepth - firstDepth,
-          gp->getIndex(), ctx);
+          gp->getIndex(),
+          gp->getValueType(),
+          ctx);
       return QuerySubstitutionMap{secondSubMap}(replacement);
     },
     // We might not have enough information in the substitution maps alone.
@@ -1033,18 +1035,16 @@ getWitnessMethodSubstitutions(
         }
 
         if (depth < baseDepth) {
-          paramType = GenericTypeParamType::get(
-              paramType->isParameterPack(),
-              depth, paramType->getIndex(), ctx);
+          paramType = GenericTypeParamType::get(paramType->getParamKind(),
+              depth, paramType->getIndex(), paramType->getValueType(), ctx);
 
           return Type(paramType).subst(baseSubMap);
         }
 
         depth = depth - baseDepth + 1;
 
-        paramType = GenericTypeParamType::get(
-            paramType->isParameterPack(),
-            depth, paramType->getIndex(), ctx);
+        paramType = GenericTypeParamType::get(paramType->getParamKind(),
+            depth, paramType->getIndex(), paramType->getValueType(), ctx);
         return Type(paramType).subst(origSubMap);
       },
       [&](CanType type, Type substType, ProtocolDecl *proto) {
@@ -1064,9 +1064,8 @@ getWitnessMethodSubstitutions(
         if (depth < baseDepth) {
           type = CanType(type.transformRec([&](TypeBase *t) -> std::optional<Type> {
             if (t == paramType) {
-              return Type(GenericTypeParamType::get(
-                  paramType->isParameterPack(),
-                  depth, paramType->getIndex(), ctx));
+              return Type(GenericTypeParamType::get(paramType->getParamKind(),
+                  depth, paramType->getIndex(), paramType->getValueType(), ctx));
             }
 
             assert(!isa<GenericTypeParamType>(t));
@@ -1079,10 +1078,9 @@ getWitnessMethodSubstitutions(
         depth = depth - baseDepth + 1;
 
         type = CanType(type.transformRec([&](TypeBase *t) -> std::optional<Type> {
-          if (t ==paramType) {
-            return Type(GenericTypeParamType::get(
-                paramType->isParameterPack(),
-                depth, paramType->getIndex(), ctx));
+          if (t == paramType) {
+            return Type(GenericTypeParamType::get(paramType->getParamKind(),
+                depth, paramType->getIndex(), paramType->getValueType(), ctx));
           }
 
           assert(!isa<GenericTypeParamType>(t));

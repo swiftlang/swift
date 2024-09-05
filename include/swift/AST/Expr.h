@@ -1385,8 +1385,47 @@ public:
     return E->getKind() == ExprKind::Type;
   }
 };
-  
-  
+
+class TypeValueExpr : public Expr {
+  TypeLoc paramTypeLoc;
+
+public:
+  /// Create a \c TypeValueExpr from an underlying parameter \c TypeRepr.
+  TypeValueExpr(TypeRepr *paramRepr) :
+      Expr(ExprKind::TypeValue, /*implicit*/ false), paramTypeLoc(paramRepr) {}
+
+  /// Create a \c TypeValueExpr for a given \c TypeDecl at the specified
+  /// location.
+  ///
+  /// The given location must be valid. If it is not, you must use
+  /// \c TypeExpr::createImplicitForDecl instead.
+  static TypeValueExpr *createForDecl(DeclNameLoc Loc, TypeDecl *D,
+                                      DeclContext *DC);
+
+  TypeRepr *getParamTypeRepr() const {
+    return paramTypeLoc.getTypeRepr();
+  }
+
+  /// Retrieves the corresponding parameter type of the value referenced by this
+  /// expression.
+  ArchetypeType *getParamType() const {
+    return paramTypeLoc.getType()->castTo<ArchetypeType>();
+  }
+
+  /// Sets the corresponding parameter type of the value referenced by this
+  /// expression.
+  void setParamType(Type paramType) {
+    paramTypeLoc.setType(paramType);
+  }
+
+  SourceRange getSourceRange() const {
+    return paramTypeLoc.getSourceRange();
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::TypeValue;
+  }
+};
 
 /// A reference to another initializer from within a constructor body,
 /// either to a delegating initializer or to a super.init invocation.

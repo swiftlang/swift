@@ -176,16 +176,6 @@ void TypeBase::getTypeParameterPacks(
   });
 }
 
-bool GenericTypeParamType::isParameterPack() const {
-  if (auto param = getDecl()) {
-    return param->isParameterPack();
-  }
-
-  auto fixedNum = ParamOrDepthIndex.get<DepthIndexTy>();
-  return (fixedNum & GenericTypeParamType::TYPE_SEQUENCE_BIT) ==
-         GenericTypeParamType::TYPE_SEQUENCE_BIT;
-}
-
 bool TypeBase::isParameterPack() {
   Type t(this);
 

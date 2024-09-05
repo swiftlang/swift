@@ -531,7 +531,7 @@ static void printSILFunctionNameAndType(
 
       // Opaque parameter types are printed as their canonical types and not
       // the unparseable "<anonymous>".
-      if (sugaredTy->getDecl() && sugaredTy->getDecl()->isOpaqueType())
+      if (sugaredTy->getOpaqueDecl())
         continue;
 
       Identifier name = sugaredTy->getName();
@@ -2566,6 +2566,10 @@ public:
 
   void visitFixLifetimeInst(FixLifetimeInst *RI) {
     *this << getIDAndType(RI->getOperand());
+  }
+
+  void visitTypeValueInst(TypeValueInst *tvi) {
+    *this << tvi->getType() << " for " << tvi->getParamType();
   }
 
   void visitEndLifetimeInst(EndLifetimeInst *ELI) {

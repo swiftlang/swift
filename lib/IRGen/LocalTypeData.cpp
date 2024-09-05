@@ -780,6 +780,11 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
 
       break;
     }
+
+    case GenericRequirement::Kind::Value: {
+      localDataKind = LocalTypeDataKind::forValue();
+      break;
+    }
     }
 
     // Find the chain for the key.
@@ -929,6 +934,8 @@ void LocalTypeDataKind::print(llvm::raw_ostream &out) const {
     out << "ValueWitnessTable";
   } else if (Value == Shape) {
     out << "Shape";
+  } else if (Value == GenericValue) {
+    out << "GenericValue";
   } else {
     assert(isSingletonKind());
     if (Value >= ValueWitnessDiscriminatorBase) {

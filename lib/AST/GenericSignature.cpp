@@ -1259,6 +1259,10 @@ void GenericSignatureImpl::getRequirementsWithInverses(
     if (getSuperclassBound(gp) || getConcreteType(gp))
       continue;
 
+    // Variable generics never have inverses (or the positive thereof).
+    if (gp->isValue())
+      continue;
+
     for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
 

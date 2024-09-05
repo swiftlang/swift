@@ -3054,6 +3054,56 @@ void swift::swift_initRawStructMetadata(StructMetadata *structType,
   vwtable->extraInhabitantCount = extraInhabitantCount;
 }
 
+/// Initialize the value witness table for a @_rawLayout struct.
+SWIFT_RUNTIME_EXPORT
+void swift::swift_initRawStructMetadata2(StructMetadata *structType,
+                                         StructLayoutFlags structLayoutFlags,
+                                         const TypeLayout *likeTypeLayout,
+                                         intptr_t count,
+                                         RawLayoutFlags rawLayoutFlags) {
+  auto vwtable = getMutableVWTableForInit(structType, structLayoutFlags);
+
+  // The existing vwt function entries are all fine to preserve, the only thing
+  // we need to initialize is the actual type layout.
+  auto size = likeTypeLayout->size;
+  auto stride = likeTypeLayout->stride;
+  auto alignMask = likeTypeLayout->flags.getAlignmentMask();
+  auto extraInhabitantCount = likeTypeLayout->extraInhabitantCount;
+
+  if (isRawLayoutArray(rawLayoutFlags)) {
+    // Our count value may be negative, so use 0 if that's the case.
+    stride *= std::max(count, (intptr_t)0);
+    size = stride;
+  }
+
+  vwtable->size = size;
+  vwtable->stride = stride;
+  vwtable->flags = ValueWitnessFlags()
+                    .withAlignmentMask(alignMask)
+                    .withCopyable(false)
+                    .withBitwiseTakable(true); // All raw layouts are assumed
+                                               // to be bitwise takable unless
+                                               // movesAsLike is present.
+  vwtable->extraInhabitantCount = extraInhabitantCount;
+
+  if (shouldRawLayoutMoveAsLike(rawLayoutFlags)) {
+    vwtable->flags = vwtable->flags
+                .withBitwiseTakable(likeTypeLayout->flags.isBitwiseTakable());
+  }
+
+  // If the calculated size of this raw layout type is available to be put in
+  // value buffers, then set the inline storage bit if our like type is also
+  // able to be put into inline storage.
+  if (size <= NumWords_ValueBuffer) {
+    vwtable->flags = vwtable->flags
+                .withInlineStorage(likeTypeLayout->flags.isInlineStorage());
+  } else {
+    // Otherwise, we're too big to fit in inline storage regardless of the like
+    // type's ability to be put in inline storage.
+    vwtable->flags = vwtable->flags.withInlineStorage(false);
+  }
+}
+
 /***************************************************************************/
 /*** Classes ***************************************************************/
 /***************************************************************************/
@@ -7182,6 +7232,10 @@ static bool findAnyTransitiveMetadata(const Metadata *type, T &&predicate) {
         }
 
         ++packIdx;
+        break;
+      }
+
+      case GenericParamKind::Value: {
         break;
       }
 

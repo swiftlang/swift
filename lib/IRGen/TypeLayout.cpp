@@ -3853,6 +3853,263 @@ LLVM_DUMP_METHOD void TypeInfoBasedTypeLayoutEntry::dump() const {
 }
 #endif
 
+void ArrayLayoutEntry::computeProperties() {
+  // does not add anything.
+}
+
+void ArrayLayoutEntry::Profile(llvm::FoldingSetNodeID &id) const {
+  ArrayLayoutEntry::Profile(id, elementLayout, elementType, countType);
+}
+
+void ArrayLayoutEntry::Profile(llvm::FoldingSetNodeID &id,
+                               TypeLayoutEntry *elementLayout,
+                               SILType elementType, CanType countType) {
+  id.AddPointer(elementLayout);
+  id.AddPointer(elementType.getASTType().getPointer());
+  id.AddPointer(countType.getPointer());
+}
+
+ArrayLayoutEntry::~ArrayLayoutEntry() {}
+
+llvm::Value *ArrayLayoutEntry::alignmentMask(IRGenFunction &IGF) const {
+  return elementLayout->alignmentMask(IGF);
+}
+
+llvm::Value *ArrayLayoutEntry::size(IRGenFunction &IGF) const {
+  auto &elementTypeInfo = IGF.IGM.getTypeInfo(elementType);
+  auto stride = elementTypeInfo.getStride(IGF, elementType);
+  auto count = IGF.emitValueGenericRef(countType);
+
+  return IGF.Builder.CreateMul(stride, count);
+}
+
+bool ArrayLayoutEntry::isFixedSize(IRGenModule &IGM) const {
+  // We're only fixed if our element and count are.
+  return elementLayout->isFixedSize(IGM) && countType->is<IntegerType>();
+}
+
+std::optional<Size> ArrayLayoutEntry::fixedSize(IRGenModule &IGM) const {
+  if (!isFixedSize(IGM)) {
+    return std::nullopt;
+  }
+
+  auto &elementTypeInfo = cast<FixedTypeInfo>(IGM.getTypeInfo(elementType));
+  auto integer = countType->castTo<IntegerType>();
+
+  if (integer->isNegative()) {
+    return Size(0);
+  }
+
+  auto count = integer->getValue();
+
+  return elementTypeInfo.getFixedStride() * count.getZExtValue();
+}
+
+std::optional<Alignment>
+ArrayLayoutEntry::fixedAlignment(IRGenModule &IGM) const {
+  if (!isFixedSize(IGM)) {
+    return std::nullopt;
+  }
+
+  return elementLayout->fixedAlignment(IGM);
+}
+
+std::optional<uint32_t> ArrayLayoutEntry::fixedXICount(IRGenModule &IGM) const {
+  if (!isFixedSize(IGM)) {
+    return std::nullopt;
+  }
+
+  return elementLayout->fixedXICount(IGM);
+}
+
+bool ArrayLayoutEntry::isTriviallyDestroyable() const {
+  return elementLayout->isTriviallyDestroyable();
+}
+
+bool ArrayLayoutEntry::canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                                        unsigned index) const {
+  return elementLayout->canValueWitnessExtraInhabitantsUpTo(IGM, index);
+}
+
+bool ArrayLayoutEntry::isSingleRetainablePointer() const {
+  // Be conservative because we may not have access to a static count.
+  return false;
+}
+
+llvm::Value *ArrayLayoutEntry::extraInhabitantCount(IRGenFunction &IGF) const {
+  return elementLayout->extraInhabitantCount(IGF);
+}
+
+llvm::Value *ArrayLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
+  return elementLayout->isBitwiseTakable(IGF);
+}
+
+void IRGenFunction::emitLoopOverElements(const TypeInfo &elementTypeInfo,
+                                         SILType elementType, CanType countType,
+                                         Address dest, Address src,
+                          std::function<void(Address dest, Address src)> body) {
+  auto count = emitValueGenericRef(countType);
+
+  auto i = createAlloca(IGM.SizeTy, IGM.getPointerAlignment());
+  Builder.CreateStore(llvm::ConstantInt::get(IGM.SizeTy, 0), i);
+
+  auto condBlock = createBasicBlock("cond");
+  auto loop = createBasicBlock("loop");
+  auto exit = createBasicBlock("exit");
+
+  Builder.CreateBr(condBlock);
+  Builder.emitBlock(condBlock);
+
+  auto load = Builder.CreateLoad(i);
+
+  // FIXME: If we ever support generic value types other than Int, then
+  // this needs to change to not assume signedness.
+  auto cond = Builder.CreateICmpSGT(count,
+                                    llvm::ConstantInt::get(IGM.SizeTy, 0));
+  Builder.CreateCondBr(cond, loop, exit);
+
+  Builder.emitBlock(loop);
+
+  auto increment = Builder.CreateAdd(load,
+                                     llvm::ConstantInt::get(IGM.SizeTy, 1));
+
+  Builder.CreateStore(increment, i);
+
+  Address srcEltAddr;
+  Address destEltAddr;
+
+  // If we have a fixed type, we can use a typed GEP to index into the array.
+  // Otherwise, we need to advance by bytes given the stride from the VWT of
+  // the element type.
+  if (auto fixedElementType = dyn_cast<FixedTypeInfo>(&elementTypeInfo)) {
+    srcEltAddr = Address(Builder.CreateInBoundsGEP(
+                            fixedElementType->getStorageType(),
+                            src.getAddress(),
+                            load),
+                         fixedElementType->getStorageType(),
+                         src.getAlignment());
+
+    if (dest.isValid()) {
+      destEltAddr = Address(Builder.CreateInBoundsGEP(
+                              fixedElementType->getStorageType(),
+                              dest.getAddress(),
+                              load),
+                            fixedElementType->getStorageType(),
+                            dest.getAlignment());
+    }
+  } else {
+    auto eltSize = elementTypeInfo.getStride(*this, elementType);
+    auto offset = Builder.CreateMul(load, eltSize);
+
+    srcEltAddr = Address(Builder.CreateInBoundsGEP(
+                            IGM.Int8Ty,
+                            src.getAddress(),
+                            offset),
+                         IGM.Int8Ty,
+                         src.getAlignment());
+
+    if (dest.isValid()) {
+      destEltAddr = Address(Builder.CreateInBoundsGEP(
+                              IGM.Int8Ty,
+                              dest.getAddress(),
+                              offset),
+                            IGM.Int8Ty,
+                            dest.getAlignment());
+    }
+  }
+
+  body(destEltAddr, srcEltAddr);
+
+  auto eqCond = Builder.CreateICmpEQ(increment, count);
+  Builder.CreateCondBr(eqCond, exit, condBlock);
+
+  // We're done.
+  Builder.emitBlock(exit);
+}
+
+void ArrayLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
+  auto &elementTypeInfo = IGF.IGM.getTypeInfo(elementType);
+
+  IGF.emitLoopOverElements(elementTypeInfo, elementType, countType, Address(), addr,
+      [&](Address dest, Address src){
+    elementLayout->destroy(IGF, src);
+  });
+}
+
+void ArrayLayoutEntry::assignWithCopy(IRGenFunction &IGF, Address dest,
+                                      Address src) const {
+  auto &elementTypeInfo = IGF.IGM.getTypeInfo(elementType);
+
+  IGF.emitLoopOverElements(elementTypeInfo, elementType, countType, dest, src,
+      [&](Address dest, Address src){
+    elementLayout->assignWithCopy(IGF, dest, src);
+  });
+}
+
+void ArrayLayoutEntry::assignWithTake(IRGenFunction &IGF, Address dest,
+                                      Address src) const {
+  auto &elementTypeInfo = IGF.IGM.getTypeInfo(elementType);
+
+  IGF.emitLoopOverElements(elementTypeInfo, elementType, countType, dest, src,
+      [&](Address dest, Address src){
+    elementLayout->assignWithTake(IGF, dest, src);
+  });
+}
+
+void ArrayLayoutEntry::initWithCopy(IRGenFunction &IGF, Address dest,
+                                    Address src) const {
+  auto &elementTypeInfo = IGF.IGM.getTypeInfo(elementType);
+
+  IGF.emitLoopOverElements(elementTypeInfo, elementType, countType, dest, src,
+      [&](Address dest, Address src){
+    elementLayout->initWithCopy(IGF, dest, src);
+  });
+}
+
+void ArrayLayoutEntry::initWithTake(IRGenFunction &IGF, Address dest,
+                                    Address src) const {
+  auto &elementTypeInfo = IGF.IGM.getTypeInfo(elementType);
+
+  IGF.emitLoopOverElements(elementTypeInfo, elementType, countType, dest, src,
+      [&](Address dest, Address src){
+    elementLayout->initWithTake(IGF, dest, src);
+  });
+}
+
+llvm::Value *ArrayLayoutEntry::getEnumTagSinglePayload(
+    IRGenFunction &IGF, llvm::Value *numEmptyCases, Address value) const {
+  return elementLayout->getEnumTagSinglePayload(IGF, numEmptyCases, value);
+}
+
+void ArrayLayoutEntry::storeEnumTagSinglePayload(
+    IRGenFunction &IGF, llvm::Value *tag, llvm::Value *numEmptyCases,
+    Address addr) const {
+  elementLayout->storeEnumTagSinglePayload(IGF, tag, numEmptyCases, addr);
+}
+
+llvm::Constant *ArrayLayoutEntry::layoutString(IRGenModule &IGM,
+                                           GenericSignature genericSig) const {
+  return nullptr;
+}
+
+bool ArrayLayoutEntry::refCountString(
+    IRGenModule &IGM, LayoutStringBuilder &B,
+    GenericSignature genericSig) const {
+  return false;
+}
+
+std::optional<const FixedTypeInfo *>ArrayLayoutEntry::getFixedTypeInfo() const {
+  return std::nullopt;
+}
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+LLVM_DUMP_METHOD void ArrayLayoutEntry::dump() const {
+  llvm::dbgs() << "{ array element: \n";
+  elementLayout->dump();
+  llvm::dbgs() << "}\n";
+}
+#endif
+
 ScalarTypeLayoutEntry *
 TypeLayoutCache::getOrCreateScalarEntry(const TypeInfo &ti,
                                         SILType representative,
@@ -3982,6 +4239,26 @@ TypeLayoutCache::getOrCreateTypeInfoBasedEntry(const TypeInfo &ti,
   return newEntry;
 }
 
+ArrayLayoutEntry *TypeLayoutCache::getOrCreateArrayEntry(TypeLayoutEntry *elementLayout,
+                                                         SILType elementType,
+                                                         CanType countType) {
+  llvm::FoldingSetNodeID id;
+  ArrayLayoutEntry::Profile(id, elementLayout, elementType, countType);
+  // Grab the entry from the cache countType we have one
+  void *insertPos;
+  if (auto *entry = arrayEntries.FindNodeOrInsertPos(id, insertPos)) {
+    return entry;
+  }
+  // Otherwise, create a new one.
+  const auto bytes = sizeof(ArrayLayoutEntry);
+  auto mem = bumpAllocator.Allocate(bytes, alignof(ArrayLayoutEntry));
+  auto newEntry = new (mem) ArrayLayoutEntry(elementLayout, elementType,
+                                             countType);
+  arrayEntries.InsertNode(newEntry, insertPos);
+  newEntry->computeProperties();
+  return newEntry;
+}
+
 TypeLayoutCache::~TypeLayoutCache() {
   for (auto &entry : scalarEntries) {
     entry.~ScalarTypeLayoutEntry();
@@ -4000,5 +4277,8 @@ TypeLayoutCache::~TypeLayoutCache() {
   }
   for (auto &entry : typeInfoBasedEntries) {
     entry.~TypeInfoBasedTypeLayoutEntry();
+  }
+  for (auto &entry : arrayEntries) {
+    entry.~ArrayLayoutEntry();
   }
 }

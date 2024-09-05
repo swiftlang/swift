@@ -266,6 +266,20 @@ _buildDemanglingForMetadataPack(MetadataPackPointer pack, size_t count,
   return node;
 }
 
+static Demangle::NodePointer
+_buildDemanglingForValue(intptr_t value, GenericValueDescriptor valueDescriptor,
+                         Demangle::Demangler &Dem) {
+  switch (valueDescriptor.Type) {
+  case GenericValueType::Int: {
+    if (value < 0) {
+      return Dem.createNode(Node::Kind::NegativeInteger, value);
+    }
+
+    return Dem.createNode(Node::Kind::Integer, value);
+  }
+  }
+}
+
 /// Build an array of demangling trees for each generic argument to the given
 /// generic type context descriptor.
 ///
@@ -297,7 +311,7 @@ static bool _buildDemanglingForGenericArgs(
   auto packHeader = generics->getGenericPackShapeHeader();
   auto packDescriptors = generics->getGenericPackShapeDescriptors();
 
-  llvm::SmallVector<MetadataOrPack> allGenericArgs;
+  llvm::SmallVector<MetadataPackOrValue> allGenericArgs;
 
   auto numKeyArgs = 0;
   for (auto param : generics->getGenericParams()) {
@@ -356,6 +370,25 @@ static bool _buildDemanglingForGenericArgs(
 
       demangledGenerics.push_back(genericArgDemangling);
       packIndex += 1;
+      break;
+    }
+
+    case GenericParamKind::Value: {
+      // FIXME: We really want to get the specific value descriptor when
+      // building a demangling, but when all value parameters become non-key
+      // we lose the value header. May need to do extra work to walk up parents
+      // and find this parameter's specific value descriptor.
+
+      auto valueDescriptor = GenericValueDescriptor{GenericValueType::Int};
+      auto value = genericArg.getValue();
+      auto genericArgDemangling = _buildDemanglingForValue(value,
+                                                           valueDescriptor,
+                                                           Dem);
+
+      if (!genericArgDemangling)
+        return false;
+
+      demangledGenerics.push_back(genericArgDemangling);
       break;
     }
 

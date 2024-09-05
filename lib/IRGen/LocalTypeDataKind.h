@@ -50,6 +50,7 @@ private:
     RepresentationTypeMetadata,
     ValueWitnessTable,
     Shape,
+    GenericValue,
     // <- add more special cases here
 
     // The first enumerator for an individual value witness.
@@ -100,6 +101,11 @@ public:
   /// A reference to the shape expression of a pack type.
   static LocalTypeDataKind forPackShapeExpression() {
     return LocalTypeDataKind(Shape);
+  }
+
+  /// A reference to the value of a variable generic argument.
+  static LocalTypeDataKind forValue() {
+    return LocalTypeDataKind(GenericValue);
   }
 
   /// A reference to a protocol witness table for an archetype.

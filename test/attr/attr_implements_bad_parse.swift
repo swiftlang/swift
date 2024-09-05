@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -parse -verify %s
 
 struct S0 {
-  @_implements(1, Foo) // expected-error {{expected type}}
+  @_implements(1, Foo) // OK. We can parse integers as types now, so this is fine. We will diagnose its incorrect usage during type checking.
   func f() { }
 }
 

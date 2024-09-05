@@ -699,8 +699,7 @@ void Symbol::dump(llvm::raw_ostream &out) const {
       llvm::raw_string_ostream os(s);
       os << substitution;
 
-      auto key = CanType(GenericTypeParamType::get(
-          /*isParameterPack=*/false, 0, index, ctx));
+      auto key = CanType(GenericTypeParamType::getType(0, index, ctx));
       substitutionNames[key] = ctx.getIdentifier(s);
     }
   }

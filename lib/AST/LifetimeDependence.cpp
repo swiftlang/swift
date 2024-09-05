@@ -441,6 +441,10 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
     return std::nullopt;
   }
 
+  if (getResultOrYield(afd)->hasError()) {
+    return std::nullopt;
+  }
+
   // Setters infer 'self' dependence on 'newValue'.
   if (auto accessor = dyn_cast<AccessorDecl>(afd)) {
     if (accessor->getAccessorKind() == AccessorKind::Set) {
