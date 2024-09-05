@@ -18,6 +18,11 @@ module ClassTemplateWithOutOfLineMember {
   requires cplusplus
 }
 
+module ClassTemplateWithSIMDParameter {
+  header "class-template-with-simd-parameter.h"
+  requires cplusplus
+}
+
 module NotPreDefinedClassTemplate {
   header "not-pre-defined-class-template.h"
   requires cplusplus
