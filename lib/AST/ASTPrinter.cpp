@@ -182,6 +182,24 @@ static bool shouldPrintAllSemanticDetails(const PrintOptions &options) {
   return false;
 }
 
+/// Forces printing types with the `some` keyword, instead of the full stable
+/// reference.
+struct PrintWithOpaqueResultTypeKeywordRAII {
+  PrintWithOpaqueResultTypeKeywordRAII(PrintOptions &Options)
+      : Options(Options) {
+    SavedMode = Options.OpaqueReturnTypePrinting;
+    Options.OpaqueReturnTypePrinting =
+        PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword;
+  }
+  ~PrintWithOpaqueResultTypeKeywordRAII() {
+    Options.OpaqueReturnTypePrinting = SavedMode;
+  }
+
+private:
+  PrintOptions &Options;
+  PrintOptions::OpaqueReturnTypePrintingMode SavedMode;
+};
+
 PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
@@ -3745,13 +3763,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     }
     Printer.printDeclResultTypePre(decl, tyLoc);
 
-    // HACK: When printing result types for vars with opaque result types,
-    //       always print them using the `some` keyword instead of printing
-    //       the full stable reference.
-    llvm::SaveAndRestore<PrintOptions::OpaqueReturnTypePrintingMode>
-    x(Options.OpaqueReturnTypePrinting,
-      PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
-
+    PrintWithOpaqueResultTypeKeywordRAII x(Options);
     printTypeLocForImplicitlyUnwrappedOptional(
       tyLoc, decl->isImplicitlyUnwrappedOptional());
   }
@@ -4127,13 +4139,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         }
       }
 
-      // HACK: When printing result types for funcs with opaque result types,
-      //       always print them using the `some` keyword instead of printing
-      //       the full stable reference.
-      llvm::SaveAndRestore<PrintOptions::OpaqueReturnTypePrintingMode>
-      x(Options.OpaqueReturnTypePrinting,
-        PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
-
+      PrintWithOpaqueResultTypeKeywordRAII x(Options);
       printTypeLocForImplicitlyUnwrappedOptional(
           ResultTyLoc, decl->isImplicitlyUnwrappedOptional());
       Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
@@ -4283,13 +4289,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     Printer.printDeclResultTypePre(decl, elementTy);
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
-    // HACK: When printing result types for subscripts with opaque result types,
-    //       always print them using the `some` keyword instead of printing
-    //       the full stable reference.
-    llvm::SaveAndRestore<PrintOptions::OpaqueReturnTypePrintingMode>
-    x(Options.OpaqueReturnTypePrinting,
-      PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
-
+    PrintWithOpaqueResultTypeKeywordRAII x(Options);
     printTypeLocForImplicitlyUnwrappedOptional(
       elementTy, decl->isImplicitlyUnwrappedOptional());
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
