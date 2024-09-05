@@ -46,6 +46,9 @@ private func symbol<T>(_ handle: UnsafeMutableRawPointer, _ name: String) -> T {
   return unsafeBitCast(result, to: T.self)
 }
 
+// Define UniChar
+typealias UniChar = UInt16
+
 private enum Sym {
   // CRCopySanitizedPath
   static let CRCopySanitizedPath: @convention(c) (CFString, CFIndex) -> CFString =
@@ -130,6 +133,12 @@ private enum Sym {
                     UnsafeMutableRawPointer?, CFIndex,
                     UnsafeMutablePointer<CFIndex>?) -> CFIndex =
     symbol(coreFoundationHandle, "CFStringGetBytes")
+  static let CFStringGetCharactersPtr:
+    @convention(c) (CFString) -> UnsafePointer<UniChar> =
+    symbol(coreFoundationHandle, "CFStringGetCharactersPtr")
+  static let CFStringGetCharacters:
+    @convention(c) (CFString, CFRange, UnsafeMutablePointer<UniChar>) =
+    symbol(coreFoundationHandle, "CFStringGetCharacters")
 }
 
 // .. Core Foundation miscellany ...............................................
@@ -175,6 +184,17 @@ internal func CFStringGetBytes(_ s: CFString,
                               usedBufLen)
 }
 
+internal func CFStringGetCharactersPtr(_ s: CFString) {
+  return Sym.CFStringGetCharactersPtr(s);
+}
+
+internal func CFStringGetCharacters(
+    _ s: CFString,
+    _ range: CFRange,
+    _ buffer: UnsafeMutablePointer<UniChar>) {
+  Sym.CFStringGetCharacters(s, range, buffer)
+}
+
 // .. Crash Reporter support ...................................................
 
 // We can't import swiftFoundation here, so there's no automatic bridging for
@@ -201,28 +221,18 @@ private func fromCFString(_ cf: CFString) -> String {
                                      CFStringBuiltInEncodings.ASCII.rawValue) {
     return String(decoding: UnsafeRawBufferPointer(start: ptr, count: length),
                   as: UTF8.self)
+  } 
+  
+  if let ptr = CFStringGetCharactersPtr(cf) {
+    return String(characters: ptr, count: length)
   } else {
-    var byteLen = CFIndex(0)
-
-    _ = CFStringGetBytes(cf,
-                         CFRangeMake(0, length),
-                         CFStringBuiltInEncodings.UTF8.rawValue,
-                         0,
-                         false,
-                         nil,
-                         0,
-                         &byteLen)
-
-    let buffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: byteLen)
+    let buffer = UnsafeMutableBufferPointer<UniChar>.allocate(capacity: length)
     defer {
       buffer.deallocate()
     }
 
-    _ = CFStringGetBytes(cf, CFRangeMake(0, length),
-                         CFStringBuiltInEncodings.UTF8.rawValue,
-                         0, false, buffer.baseAddress, buffer.count, nil)
-
-    return String(decoding: buffer, as: UTF8.self)
+    CFStringGetCharacters(cf, CFRangeMake(0, length), buffer.baseAddress);
+    return String(characters: buffer, length)
   }
 }
 
