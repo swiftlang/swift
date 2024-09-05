@@ -4337,6 +4337,9 @@ public:
           case KeyPathExpr::Component::Kind::CodeCompletion:
             printHead("completion", ASTNodeColor, label);
             break;
+          case KeyPathExpr::Component::Kind::UnresolvedApply:
+            printHead("unresolved_apply", ASTNodeColor, label);
+            break;
           }
           printTypeField(GetTypeOfKeyPathComponent(E, i), Label::always("type"));
           if (auto *args = component.getArgs()) {
