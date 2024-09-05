@@ -5741,7 +5741,7 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
 
         assert(keyPathExpr->getComponents().size() > 0);
         auto &component = keyPathExpr->getComponents().back();
-        if (component.getKind() == KeyPathExpr::Component::Kind::Property) {
+        if (component.getKind() == KeyPathExpr::Component::Kind::Member) {
           auto *storage =
             cast<AbstractStorageDecl>(component.getDeclRef().getDecl());
           if (!storage->isSettable(nullptr) ||
@@ -5817,7 +5817,7 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       }
       for (auto *keyPathArg : keyPathArgs) {
         auto lastComponent = keyPathArg->getComponents().back();
-        if (lastComponent.getKind() != KeyPathExpr::Component::Kind::Property)
+        if (lastComponent.getKind() != KeyPathExpr::Component::Kind::Member)
           continue;
         auto property = lastComponent.getDeclRef().getDecl();
         if (!property)
