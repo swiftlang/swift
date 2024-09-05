@@ -4278,15 +4278,15 @@ public:
             printDeclRefField(component.getDeclRef(), Label::always("decl"));
             break;
 
+          case KeyPathExpr::Component::Kind::UnresolvedMember:
+            printHead("unresolved_member", ASTNodeColor, label);
+            printFieldQuoted(component.getUnresolvedDeclName(),
+                             Label::always("decl_name"), IdentifierColor);
+            break;
+
           case KeyPathExpr::Component::Kind::Subscript:
             printHead("subscript", ASTNodeColor, label);
             printDeclRefField(component.getDeclRef(), Label::always("decl"));
-            break;
-
-          case KeyPathExpr::Component::Kind::UnresolvedProperty:
-            printHead("unresolved_property", ASTNodeColor, label);
-            printFieldQuoted(component.getUnresolvedDeclName(),
-                             Label::always("decl_name"), IdentifierColor);
             break;
 
           case KeyPathExpr::Component::Kind::UnresolvedSubscript:

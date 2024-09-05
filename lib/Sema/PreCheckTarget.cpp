@@ -2455,7 +2455,7 @@ void PreCheckTarget::resolveKeyPathExpr(KeyPathExpr *KPE) {
         expr = SE->getSubExpr();
       } else if (auto UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
         // .foo
-        components.push_back(KeyPathExpr::Component::forUnresolvedProperty(
+        components.push_back(KeyPathExpr::Component::forUnresolvedMember(
             UDE->getName(), UDE->getLoc()));
 
         expr = UDE->getBase();
