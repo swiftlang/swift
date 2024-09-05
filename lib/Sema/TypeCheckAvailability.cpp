@@ -3472,10 +3472,6 @@ public:
   explicit ExprAvailabilityWalker(const ExportContext &Where)
     : Context(Where.getDeclContext()->getASTContext()), Where(Where) {}
 
-  bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-    return false;
-  }
-
   MacroWalking getMacroWalkingBehavior() const override {
     // Expanded source should be type checked and diagnosed separately.
     return MacroWalking::Arguments;
