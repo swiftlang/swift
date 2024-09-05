@@ -184,8 +184,9 @@ protected:
       isUnchecked : 1
     );
 
-    SWIFT_INLINE_BITFIELD(ObjCImplementationAttr, DeclAttribute, 2,
+    SWIFT_INLINE_BITFIELD(ObjCImplementationAttr, DeclAttribute, 3,
       isCategoryNameInvalid : 1,
+      hasInvalidImplicitLangAttrs : 1,
       isEarlyAdopter : 1
     );
 
@@ -2434,6 +2435,7 @@ public:
       : DeclAttribute(DeclAttrKind::ObjCImplementation, AtLoc, Range, Implicit),
         CategoryName(CategoryName) {
     Bits.ObjCImplementationAttr.isCategoryNameInvalid = isCategoryNameInvalid;
+    Bits.ObjCImplementationAttr.hasInvalidImplicitLangAttrs = false;
     Bits.ObjCImplementationAttr.isEarlyAdopter = isEarlyAdopter;
   }
 
@@ -2449,6 +2451,16 @@ public:
 
   void setCategoryNameInvalid(bool newValue = true) {
     Bits.ObjCImplementationAttr.isCategoryNameInvalid = newValue;
+  }
+
+  /// Has at least one implicitly ObjC member failed to validate? If so,
+  /// diagnostics that might be duplicative will be suppressed.
+  bool hasInvalidImplicitLangAttrs() const {
+    return Bits.ObjCImplementationAttr.hasInvalidImplicitLangAttrs;
+  }
+
+  void setHasInvalidImplicitLangAttrs(bool newValue = true) {
+    Bits.ObjCImplementationAttr.hasInvalidImplicitLangAttrs = newValue;
   }
 
   static bool classof(const DeclAttribute *DA) {

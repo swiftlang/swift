@@ -6,3 +6,7 @@ module CLibrary {
 module RawLayoutCXX {
   header "raw_layout_cxx.h"
 }
+
+module objc_implementation {
+  header "objc_implementation.h"
+}
