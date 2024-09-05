@@ -120,6 +120,18 @@ void ModuleDependencyInfo::addMacroDependency(StringRef macroModuleName,
     llvm_unreachable("Unexpected dependency kind");
 }
 
+bool ModuleDependencyInfo::hasMacroDependencies() const {
+  if (auto sourceModule =
+          dyn_cast<SwiftSourceModuleDependenciesStorage>(storage.get()))
+    return !sourceModule->textualModuleDetails.macroDependencies.empty();
+
+  if (auto interfaceModule =
+          dyn_cast<SwiftInterfaceModuleDependenciesStorage>(storage.get()))
+    return !interfaceModule->textualModuleDetails.macroDependencies.empty();
+
+  llvm_unreachable("Unexpected dependency kind");
+}
+
 bool ModuleDependencyInfo::isTestableImport(StringRef moduleName) const {
   if (auto swiftSourceDepStorage = getAsSwiftSourceModule())
     return swiftSourceDepStorage->testableImports.contains(moduleName);
