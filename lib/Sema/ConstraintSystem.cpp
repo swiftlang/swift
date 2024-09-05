@@ -724,7 +724,8 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
   }
 
   // If we have a locator that starts with a key path component element, we
-  // may have a callee given by a property or subscript component.
+  // may have a callee given by a property, subscript, initializer, or method
+  // component.
   if (auto componentElt =
       locator->getFirstElementAs<LocatorPathElt::KeyPathComponent>()) {
     auto *kpExpr = castToExpr<KeyPathExpr>(anchor);
@@ -744,6 +745,8 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     case ComponentKind::TupleElement:
       llvm_unreachable("Not implemented by CSGen");
       break;
+    case ComponentKind::UnresolvedApply:
+    case ComponentKind::Apply:
     case ComponentKind::Invalid:
     case ComponentKind::OptionalForce:
     case ComponentKind::OptionalChain:
@@ -5061,6 +5064,36 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
   if (rootTy->isPlaceholder())
     return fail();
 
+  auto isKnownSendability =
+      [&](const KeyPathExpr::Component &component) -> bool {
+    if (!Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures))
+      return true;
+
+    // Key path is sendable only when all of its captures are sendable.
+    if (auto *args = component.getArgs()) {
+      auto *sendable = Context.getProtocol(KnownProtocolKind::Sendable);
+
+      for (const auto &arg : *args) {
+        // No need to check more or delay since we already know
+        // that the type is not Sendable.
+        if (!isSendable)
+          break;
+
+        auto argTy = simplifyType(getType(arg.getExpr()));
+
+        // Sendability cannot be determined until the argument
+        // is fully resolved.
+        if (argTy->hasTypeVariable())
+          return false;
+
+        auto conformance = lookupConformance(argTy, sendable);
+        isSendable &= bool(conformance) && !conformance.hasMissingConformance();
+      }
+    }
+
+    return true;
+  };
+
   auto mutability = KeyPathMutability::Writable;
   for (unsigned i : indices(keyPath->getComponents())) {
     auto &component = keyPath->getComponents()[i];
@@ -5074,33 +5107,16 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       return fail();
     }
 
+    case KeyPathExpr::Component::Kind::Apply:
+    case KeyPathExpr::Component::Kind::UnresolvedApply: {
+      if (!isKnownSendability(component))
+        return delay();
+      break;
+    }
     case KeyPathExpr::Component::Kind::UnresolvedSubscript:
     case KeyPathExpr::Component::Kind::Subscript: {
-      if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
-        // Key path is sendable only when all of its captures are sendable.
-        if (auto *args = component.getArgs()) {
-          auto *sendable = Context.getProtocol(KnownProtocolKind::Sendable);
-
-          for (const auto &arg : *args) {
-            // No need to check more or delay since we already known
-            // that the type is not Sendable.
-            if (!isSendable)
-              break;
-
-            auto argTy = simplifyType(getType(arg.getExpr()));
-
-            // Sendability cannot be determined until the argument
-            // is fully resolved.
-            if (argTy->hasTypeVariable())
-              return delay();
-
-            auto conformance = lookupConformance(argTy, sendable);
-            isSendable &=
-                bool(conformance) &&
-                !conformance.hasMissingConformance();
-          }
-        }
-      }
+      if (!isKnownSendability(component))
+        return delay();
       LLVM_FALLTHROUGH;
     }
     case KeyPathExpr::Component::Kind::Member:
@@ -5128,18 +5144,19 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       if (!choice.isDecl())
         return fail();
 
-      auto storage = dyn_cast<AbstractStorageDecl>(choice.getDecl());
-
       if (hasFixFor(componentLoc, FixKind::AllowInvalidRefInKeyPath) ||
           hasFixFor(componentLoc, FixKind::UnwrapOptionalBase) ||
           hasFixFor(componentLoc,
                     FixKind::UnwrapOptionalBaseWithOptionalResult))
         return fail();
 
-      if (!storage)
+      auto *storageDecl = dyn_cast<AbstractStorageDecl>(choice.getDecl());
+      if (!isa<AbstractFunctionDecl>(choice.getDecl()) && !storageDecl) {
         return fail();
+      }
 
-      switch (getActorIsolation(storage)) {
+      // Shared switch logic for actor isolation.
+      switch (getActorIsolation(choice.getDecl())) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
       case ActorIsolation::CallerIsolationInheriting:
@@ -5149,22 +5166,24 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       case ActorIsolation::Erased:
         llvm_unreachable("storage cannot have opaque isolation");
 
-      // A reference to an actor isolated state make key path non-Sendable.
+      // A reference to an actor isolated state makes key path non-Sendable.
       case ActorIsolation::ActorInstance:
       case ActorIsolation::GlobalActor:
         isSendable = false;
         break;
       }
 
-      if (isReadOnlyKeyPathComponent(storage, component.getLoc())) {
-        mutability = KeyPathMutability::ReadOnly;
-        continue;
-      }
+      if (storageDecl) {
+        if (isReadOnlyKeyPathComponent(storageDecl, component.getLoc())) {
+          mutability = KeyPathMutability::ReadOnly;
+          continue;
+        }
 
-      // A nonmutating setter indicates a reference-writable base.
-      if (!storage->isSetterMutating()) {
-        mutability = KeyPathMutability::ReferenceWritable;
-        continue;
+        // A nonmutating setter indicates a reference-writable base.
+        if (!storageDecl->isSetterMutating()) {
+          mutability = KeyPathMutability::ReferenceWritable;
+          continue;
+        }
       }
 
       // Otherwise, the key path maintains its current capability.
