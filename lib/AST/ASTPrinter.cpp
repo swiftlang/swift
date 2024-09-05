@@ -1335,6 +1335,8 @@ void PrintAST::printTypedPattern(const TypedPattern *TP) {
   printPattern(TP->getSubPattern());
   Printer << ": ";
 
+  PrintWithOpaqueResultTypeKeywordRAII x(Options);
+
   // Make sure to check if the underlying var decl is an implicitly unwrapped
   // optional.
   bool isIUO = false;
