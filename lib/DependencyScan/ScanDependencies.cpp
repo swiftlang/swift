@@ -160,6 +160,24 @@ parseBatchScanInputFile(ASTContext &ctx, StringRef batchInputPath,
   return result;
 }
 
+static void removeMacroSearchPaths(std::vector<std::string> &cmd) {
+  // Macro search path options.
+  static const llvm::StringSet<> macroSearchOptions = {
+      "-plugin-path",
+      "-external-plugin-path",
+      "-load-plugin-library",
+      "-load-plugin-executable",
+      "-in-process-plugin-server-path",
+  };
+
+  // Remove macro search path option and its argument.
+  for (auto it = cmd.begin(), ie=cmd.end(); it != ie; ++it) {
+    if (macroSearchOptions.contains(*it) && it + 1 != ie) {
+      it = cmd.erase(it, it + 2);
+    }
+  }
+}
+
 static llvm::Expected<llvm::cas::ObjectRef>
 updateModuleCacheKey(ModuleDependencyInfo &depInfo,
                      ModuleDependenciesCache &cache,
@@ -379,9 +397,15 @@ static llvm::Error resolveExplicitModuleInputs(
     // Update build command line.
     if (resolvingDepInfo.isSwiftInterfaceModule() ||
         resolvingDepInfo.isSwiftSourceModule()) {
-      // Update with casfs option.
       std::vector<std::string> newCommandLine =
           dependencyInfoCopy.getCommandline();
+
+      // If there are no external macro dependencies, drop all plugin search
+      // paths.
+      if (!resolvingDepInfo.hasMacroDependencies())
+        removeMacroSearchPaths(newCommandLine);
+
+      // Update with casfs option.
       for (auto rootID : rootIDs) {
         newCommandLine.push_back("-cas-fs");
         newCommandLine.push_back(rootID);
@@ -391,6 +415,7 @@ static llvm::Error resolveExplicitModuleInputs(
         newCommandLine.push_back("-clang-include-tree-root");
         newCommandLine.push_back(tree);
       }
+
       dependencyInfoCopy.updateCommandLine(newCommandLine);
     }
 
