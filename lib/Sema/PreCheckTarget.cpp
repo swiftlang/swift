@@ -760,6 +760,13 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     }
 
     auto *LookupDC = Lookup[0].getDeclContext();
+    bool makeTypeValue = false;
+
+    if (isa<GenericTypeParamDecl>(D) &&
+        cast<GenericTypeParamDecl>(D)->isValue()) {
+      makeTypeValue = true;
+    }
+
     if (UDRE->isImplicit()) {
       return TypeExpr::createImplicitForDecl(
           UDRE->getNameLoc(), D, LookupDC,
@@ -770,7 +777,11 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           LookupDC ? LookupDC->mapTypeIntoContext(D->getInterfaceType())
                    : D->getInterfaceType());
     } else {
-      return TypeExpr::createForDecl(UDRE->getNameLoc(), D, LookupDC);
+      if (makeTypeValue) {
+        return TypeValueExpr::createForDecl(UDRE->getNameLoc(), D, LookupDC);
+      } else {
+        return TypeExpr::createForDecl(UDRE->getNameLoc(), D, LookupDC);
+      }
     }
   };
 

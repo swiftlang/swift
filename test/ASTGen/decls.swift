@@ -1,7 +1,7 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only > %t/cpp-parser.ast.raw
+// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ParserASTGen -enable-experimental-feature ValueGenerics > %t/astgen.ast.raw
+// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ValueGenerics > %t/cpp-parser.ast.raw
 
 // Filter out any addresses in the dump, since they can differ.
 // RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/cpp-parser.ast.raw > %t/cpp-parser.ast
@@ -9,7 +9,7 @@
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -enable-experimental-feature SwiftParser -enable-experimental-feature ParserASTGen)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -enable-experimental-feature SwiftParser -enable-experimental-feature ParserASTGen -enable-experimental-feature ValueGenerics)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
@@ -284,3 +284,9 @@ struct TestStruct {
 // FIXME: Compute 'static' location
 //  static func instance(arg: Int) -> TestStruct { return TestStruct() }
 }
+
+struct ValueStruct<let N: Int> {}
+
+func genericTest1<T>(_: T) {}
+func genericTest2<each T>(_: repeat each T) {}
+func genericTest4<let T: Int>(_: ValueStruct<T>) {}

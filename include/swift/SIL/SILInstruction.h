@@ -11540,6 +11540,40 @@ public:
   }
 };
 
+/// Instruction that takes a value generic parameter type and produces a value
+/// of the underlying parameter type.
+///
+/// E.g. type_value $Int for let N produces an Int value from the let N type.
+class TypeValueInst final
+    : public NullaryInstructionWithTypeDependentOperandsBase<
+                                              SILInstructionKind::TypeValueInst,
+                                              TypeValueInst,
+                                              SingleValueInstruction> {
+  friend TrailingObjects;
+  friend SILBuilder;
+
+  CanType ParamType;
+
+  TypeValueInst(SILDebugLocation loc,
+                ArrayRef<SILValue> typeDependentOperands,
+                SILType valueType,
+                CanType paramType)
+    : NullaryInstructionWithTypeDependentOperandsBase(loc,
+                                                      typeDependentOperands,
+                                                      valueType),
+      ParamType(paramType) {}
+
+  static TypeValueInst *create(SILFunction &parent,
+                               SILDebugLocation loc,
+                               SILType valueType,
+                               CanType paramType);
+public:
+  /// Return the parameter type that defined this value.
+  CanType getParamType() const {
+    return ParamType;
+  }
+};
+
 inline SILType *AllocRefInstBase::getTypeStorage() {
   // If the size of the subclasses are equal, then all of this compiles away.
   if (auto I = dyn_cast<AllocRefInst>(this))

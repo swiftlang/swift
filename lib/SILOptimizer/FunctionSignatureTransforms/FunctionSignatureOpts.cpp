@@ -290,6 +290,11 @@ static bool usesGenerics(SILFunction *F,
         }
       }
 
+      // Scan the parameter type of a 'type_value'.
+      if (auto tvi = dyn_cast<TypeValueInst>(&I)) {
+        tvi->getParamType().visit(FindArchetypesAndGenericTypes);
+      }
+
       // Scan the result type of the instruction.
       for (auto V : I.getResults()) {
         V->getType().getASTType().visit(FindArchetypesAndGenericTypes);

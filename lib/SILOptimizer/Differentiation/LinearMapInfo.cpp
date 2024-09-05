@@ -42,7 +42,7 @@ static GenericParamList *cloneGenericParameters(ASTContext &ctx,
   for (auto paramType : sig.getGenericParams()) {
     auto *clonedParam = GenericTypeParamDecl::createImplicit(
         dc, paramType->getName(), paramType->getDepth(), paramType->getIndex(),
-        paramType->isParameterPack());
+        paramType->getParamKind());
     clonedParam->setDeclContext(dc);
     clonedParams.push_back(clonedParam);
   }

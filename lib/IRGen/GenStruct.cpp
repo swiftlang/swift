@@ -1019,20 +1019,26 @@ namespace {
           return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
         }
 
-        auto likeType = rawLayout->getResolvedLikeType(decl)->getCanonicalType();
-        SILType loweredLikeType = IGM.getLoweredType(likeType);
-
         // The given struct type T that we're building is fully concrete, but
         // our like type is still in terms of the potential archetype of the
         // type.
         auto subs = T.getASTType()->getContextSubstitutionMap(decl);
-
-        loweredLikeType = loweredLikeType.subst(IGM.getSILModule(), subs);
-
-        // Array like raw layouts are still handled correctly even though the
-        // type layout entry is only that of the like type.
-        return IGM.getTypeInfo(loweredLikeType)
+        auto likeType = rawLayout->getResolvedLikeType(decl).subst(subs);
+        auto loweredLikeType = IGM.getLoweredType(likeType->getCanonicalType());
+        auto likeTypeLayout = IGM.getTypeInfo(loweredLikeType)
             .buildTypeLayoutEntry(IGM, loweredLikeType, useStructLayouts);
+
+        // If we're an array, use the ArrayLayoutEntry.
+        if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(decl)) {
+          auto countType = likeArray->second.subst(subs)->getCanonicalType();
+          return IGM.typeLayoutCache.getOrCreateArrayEntry(likeTypeLayout,
+                                                           loweredLikeType,
+                                                           countType);
+        }
+
+        // Otherwise, this is just going to use the same layout entry as the
+        // like type.
+        return likeTypeLayout;
       }
 
       std::vector<TypeLayoutEntry *> fields;
@@ -1138,21 +1144,26 @@ namespace {
         // raw layout because those are always fixed, so only dependent layouts
         // will be non-fixed.
 
-        auto likeType = rawLayout->getResolvedLikeType(decl)->getCanonicalType();
-        SILType loweredLikeType = IGM.getLoweredType(likeType);
-
-        // The given struct type T that we're building may be in a generic
-        // environment that is different than that which was built our
-        // resolved rawLayout like type. Map our like type into the given
-        // environment.
+        // The given struct type T that we're building is fully concrete, but
+        // our like type is still in terms of the potential archetype of the
+        // type.
         auto subs = T.getASTType()->getContextSubstitutionMap(decl);
-
-        loweredLikeType = loweredLikeType.subst(IGM.getSILModule(), subs);
-
-        // Array like raw layouts are still handled correctly even though the
-        // type layout entry is only that of the like type.
-        return IGM.getTypeInfo(loweredLikeType)
+        auto likeType = rawLayout->getResolvedLikeType(decl).subst(subs);
+        auto loweredLikeType = IGM.getLoweredType(likeType->getCanonicalType());
+        auto likeTypeLayout = IGM.getTypeInfo(loweredLikeType)
             .buildTypeLayoutEntry(IGM, loweredLikeType, useStructLayouts);
+
+        // If we're an array, use the ArrayLayoutEntry.
+        if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(decl)) {
+          auto countType = likeArray->second.subst(subs)->getCanonicalType();
+          return IGM.typeLayoutCache.getOrCreateArrayEntry(likeTypeLayout,
+                                                           loweredLikeType,
+                                                           countType);
+        }
+
+        // Otherwise, this is just going to use the same layout entry as the
+        // like type.
+        return likeTypeLayout;
       }
 
       std::vector<TypeLayoutEntry *> fields;

@@ -173,6 +173,7 @@ namespace sil_block {
     SIL_OPEN_PACK_ELEMENT,
     SIL_PACK_ELEMENT_GET,
     SIL_PACK_ELEMENT_SET,
+    SIL_TYPE_VALUE,
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -587,6 +588,13 @@ namespace sil_block {
     SIL_INST_HAS_SYMBOL,
     ValueIDField,               // decl
     BCArray<IdentifierIDField>  // referenced functions
+  >;
+
+  using SILTypeValueLayout = BCRecordLayout<
+    SIL_TYPE_VALUE,
+    TypeIDField,          // Value type
+    SILTypeCategoryField,
+    TypeIDField           // Generic type
   >;
 
 // clang-format on

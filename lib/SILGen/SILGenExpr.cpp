@@ -593,6 +593,7 @@ namespace {
     RValue visitCopyExpr(CopyExpr *E, SGFContext C);
     RValue visitMacroExpansionExpr(MacroExpansionExpr *E, SGFContext C);
     RValue visitCurrentContextIsolationExpr(CurrentContextIsolationExpr *E, SGFContext C);
+    RValue visitTypeValueExpr(TypeValueExpr *E, SGFContext C);
   };
 } // end anonymous namespace
 
@@ -1563,9 +1564,8 @@ RValueEmitter::visitConditionalBridgeFromObjCExpr(
   auto conversion = cast<FuncDecl>(conversionRef.getDecl());
   auto subs = conversionRef.getSubstitutions();
 
-  auto nativeType = Type(GenericTypeParamType::get(/*isParameterPack*/ false,
-                                                   /*depth*/ 0, /*index*/ 0,
-                                                   SGF.getASTContext()))
+  auto nativeType = Type(GenericTypeParamType::getType(/*depth*/ 0, /*index*/ 0,
+                                                       SGF.getASTContext()))
                         .subst(subs);
 
   auto metatypeType = SGF.getLoweredType(MetatypeType::get(nativeType));
@@ -3803,8 +3803,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       // Get the Equatable conformance from the Hashable conformance.
       auto equatable = hashable.getAssociatedConformance(
           formalTy,
-          GenericTypeParamType::get(/*isParameterPack*/ false,
-                                    /*depth*/ 0, /*index*/ 0, C),
+          GenericTypeParamType::getType(/*depth*/ 0, /*index*/ 0, C),
           equatableProtocol);
 
       assert(equatable.isAbstract() == hashable.isAbstract());
@@ -6782,6 +6781,13 @@ RValue RValueEmitter::visitCurrentContextIsolationExpr(
   }
 
   return visit(E->getActor(), C);
+}
+
+RValue RValueEmitter::visitTypeValueExpr(TypeValueExpr *E, SGFContext C) {
+  auto paramType = E->getParamType()->getCanonicalType();
+
+  return RValue(SGF, E, ManagedValue::forObjectRValueWithoutOwnership(
+    SGF.B.createTypeValue(E, SGF.getLoweredType(E->getType()), paramType)));
 }
 
 ManagedValue

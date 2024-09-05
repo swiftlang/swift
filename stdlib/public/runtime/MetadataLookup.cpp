@@ -1336,7 +1336,7 @@ namespace {
 /// Use with \c _getTypeByMangledName to decode potentially-generic types.
 class SubstGenericParametersFromWrittenArgs {
   /// The complete set of generic arguments.
-  const llvm::SmallVectorImpl<MetadataOrPack> &allGenericArgs;
+  const llvm::SmallVectorImpl<MetadataPackOrValue> &allGenericArgs;
 
   /// The counts of generic parameters at each level.
   const llvm::SmallVectorImpl<unsigned> &genericParamCounts;
@@ -1353,13 +1353,13 @@ public:
   /// \param genericParamCounts The count of generic parameters at each
   /// generic level, typically gathered by _gatherGenericParameterCounts.
   explicit SubstGenericParametersFromWrittenArgs(
-      const llvm::SmallVectorImpl<MetadataOrPack> &allGenericArgs,
+      const llvm::SmallVectorImpl<MetadataPackOrValue> &allGenericArgs,
       const llvm::SmallVectorImpl<unsigned> &genericParamCounts)
       : allGenericArgs(allGenericArgs),
         genericParamCounts(genericParamCounts) {}
 
-  MetadataOrPack getMetadata(unsigned depth, unsigned index) const;
-  MetadataOrPack getMetadataFullOrdinal(unsigned ordinal) const;
+  MetadataPackOrValue getMetadata(unsigned depth, unsigned index) const;
+  MetadataPackOrValue getMetadataFullOrdinal(unsigned ordinal) const;
   const WitnessTable *getWitnessTable(const Metadata *type,
                                       unsigned index) const;
 };
@@ -1368,7 +1368,7 @@ public:
 
 static std::optional<TypeLookupError>
 _gatherGenericParameters(const ContextDescriptor *context,
-                         llvm::ArrayRef<MetadataOrPack> genericArgs,
+                         llvm::ArrayRef<MetadataPackOrValue> genericArgs,
                          const Metadata *parent,
                          llvm::SmallVectorImpl<unsigned> &genericParamCounts,
                          llvm::SmallVectorImpl<const void *> &allGenericArgsVec,
@@ -1393,11 +1393,13 @@ _gatherGenericParameters(const ContextDescriptor *context,
       str += " <";
 
       bool first = true;
-      for (MetadataOrPack metadata : genericArgs) {
+      for (MetadataPackOrValue metadata : genericArgs) {
         if (!first)
           str += ", ";
         first = false;
-        str += metadata.nameForMetadata();
+        char *metadataStr;
+        swift_asprintf(&metadataStr, "%p", metadata.Ptr);
+        str += metadataStr;
       }
 
       str += "> ";
@@ -1442,7 +1444,7 @@ _gatherGenericParameters(const ContextDescriptor *context,
   // requirements and fill in the generic arguments vector.
   if (!genericParamCounts.empty()) {
     // Compute the set of generic arguments "as written".
-    llvm::SmallVector<MetadataOrPack, 8> allGenericArgs;
+    llvm::SmallVector<MetadataPackOrValue, 8> allGenericArgs;
 
     auto generics = context->getGenericContext();
     assert(generics);
@@ -1555,6 +1557,13 @@ _gatherGenericParameters(const ContextDescriptor *context,
 
             allGenericArgsVec.push_back(argPack.getPointer());
             ++packIdx;
+          }
+
+          break;
+        }
+        case GenericParamKind::Value: {
+          if (param.hasKeyArgument()) {
+            allGenericArgsVec.push_back(arg.Ptr);
           }
 
           break;
@@ -1740,7 +1749,7 @@ private:
   std::vector<std::pair<MetadataPackPointer, size_t>> ActivePackExpansions;
 
 public:
-  using BuiltType = MetadataOrPack;
+  using BuiltType = MetadataPackOrValue;
 
   struct BuiltLayoutConstraint {
     bool operator==(BuiltLayoutConstraint rhs) const { return true; }
@@ -1831,7 +1840,7 @@ public:
       return BuiltType();
     auto outerContext = descriptor->Parent.get();
 
-    llvm::SmallVector<MetadataOrPack, 8> allGenericArgs;
+    llvm::SmallVector<MetadataPackOrValue, 8> allGenericArgs;
     for (auto argSet : genericArgs)
       allGenericArgs.append(argSet.begin(), argSet.end());
     
@@ -2432,6 +2441,19 @@ public:
     // Mangled types for building metadata don't contain sugared types
     return BuiltType();
   }
+
+  TypeLookupErrorOr<BuiltType> createIntegerType(intptr_t value) {
+    // Note: We explicitly ignore the value check here because when the
+    // integer happens to be '0', we'll compare a MetadataPackOrValue against
+    // 'nullptr' which this is. We know this is still a good value for
+    // integers.
+    return TypeLookupErrorOr<BuiltType>(BuiltType(value),
+                                        /*ignoreValueCheck*/ true);
+  }
+
+  TypeLookupErrorOr<BuiltType> createNegativeIntegerType(intptr_t value) {
+    return BuiltType(value);
+  }
 };
 
 }
@@ -2768,6 +2790,31 @@ swift::getTypePackByMangledName(StringRef typeName,
   return type.getType().getMetadataPack();
 }
 
+TypeLookupErrorOr<intptr_t>
+swift::getTypeValueByMangledName(StringRef typeName,
+                                const void *const *origArgumentVector,
+                                SubstGenericParameterFn substGenericParam,
+                                SubstDependentWitnessTableFn substWitnessTable) {
+  DemanglerForRuntimeTypeResolution<StackAllocatedDemangler<2048>> demangler;
+
+  NodePointer node = demangler.demangleTypeRef(typeName);
+  if (!node)
+    return TypeLookupError("Demangling failed");
+
+  DecodedMetadataBuilder builder(demangler, substGenericParam,
+                                 substWitnessTable);
+  auto type = Demangle::decodeMangledType(builder, node);
+
+  if (type.isError())
+    return *type.getError();
+
+  // Note: We explicitly ignore the value check here because when the
+  // integer happens to be '0', we'll do '!value' which in this case converts
+  // the integer to a boolean, but '0' is a valid value.
+  return TypeLookupErrorOr<intptr_t>(type.getType().getValue(),
+                                     /*ignoreValueCheck*/ true);
+}
+
 // ==== Function metadata functions ----------------------------------------------
 
 static std::optional<llvm::StringRef> cstrToStringRef(const char *typeNameStart,
@@ -3099,7 +3146,7 @@ const Metadata *swift::_swift_instantiateCheckedGenericMetadata(
   // _instantiateCheckedGenericMetadata expects generic args to NOT begin with
   // shape classes.
   llvm::ArrayRef<const void *> genericArgsRef(genericArgs, genericArgsSize);
-  llvm::SmallVector<MetadataOrPack, 8> writtenGenericArgs;
+  llvm::SmallVector<MetadataPackOrValue, 8> writtenGenericArgs;
 
   // If we fail to fill in all of the generic parameters, just fail.
   if (!_gatherWrittenGenericParameters(context, genericArgsRef,
@@ -3363,26 +3410,26 @@ void SubstGenericParametersFromMetadata::setup() const {
   }
 }
 
-MetadataOrPack
+MetadataPackOrValue
 SubstGenericParametersFromMetadata::getMetadata(
                                         unsigned depth, unsigned index) const {
   // Don't attempt anything if we have no generic parameters.
   if (genericArgs == nullptr)
-    return MetadataOrPack();
+    return MetadataPackOrValue();
 
   // On first access, compute the descriptor path.
   setup();
 
   // If the depth is too great, there is nothing to do.
   if (depth >= descriptorPath.size())
-    return MetadataOrPack();
+    return MetadataPackOrValue();
 
   /// Retrieve the descriptor path element at this depth.
   auto &pathElement = descriptorPath[depth];
 
   // Check whether the index is clearly out of bounds.
   if (index >= pathElement.numTotalGenericParams)
-    return MetadataOrPack();
+    return MetadataPackOrValue();
 
   // Compute the flat index.
   unsigned flatIndex = pathElement.numKeyGenericParamsInParent + numShapeClasses;
@@ -3393,7 +3440,7 @@ SubstGenericParametersFromMetadata::getMetadata(
 
     // Make sure that the requested parameter itself has a key argument.
     if (!genericParams[index].hasKeyArgument())
-      return MetadataOrPack();
+      return MetadataPackOrValue();
 
     // Increase the flat index for each parameter with a key argument, up to
     // the given index.
@@ -3405,19 +3452,19 @@ SubstGenericParametersFromMetadata::getMetadata(
     flatIndex += index;
   }
 
-  return MetadataOrPack(genericArgs[flatIndex]);
+  return MetadataPackOrValue(genericArgs[flatIndex]);
 }
 
-MetadataOrPack SubstGenericParametersFromMetadata::getMetadataKeyArgOrdinal(
+MetadataPackOrValue SubstGenericParametersFromMetadata::getMetadataKeyArgOrdinal(
     unsigned ordinal) const {
   // Don't attempt anything if we have no generic parameters.
   if (genericArgs == nullptr)
-    return MetadataOrPack();
+    return MetadataPackOrValue();
 
   // On first access, compute the descriptor path.
   setup();
 
-  return MetadataOrPack(genericArgs[numShapeClasses + ordinal]);
+  return MetadataPackOrValue(genericArgs[numShapeClasses + ordinal]);
 }
 
 const WitnessTable *
@@ -3434,25 +3481,25 @@ SubstGenericParametersFromMetadata::getWitnessTable(const Metadata *type,
       index + numKeyGenericParameters + numShapeClasses];
 }
 
-MetadataOrPack SubstGenericParametersFromWrittenArgs::getMetadata(
+MetadataPackOrValue SubstGenericParametersFromWrittenArgs::getMetadata(
                                         unsigned depth, unsigned index) const {
   if (auto flatIndex =
           _depthIndexToFlatIndex(depth, index, genericParamCounts)) {
     if (*flatIndex < allGenericArgs.size()) {
-      return MetadataOrPack(allGenericArgs[*flatIndex]);
+      return MetadataPackOrValue(allGenericArgs[*flatIndex]);
     }
   }
 
-  return MetadataOrPack();
+  return MetadataPackOrValue();
 }
 
-MetadataOrPack SubstGenericParametersFromWrittenArgs::getMetadataFullOrdinal(
+MetadataPackOrValue SubstGenericParametersFromWrittenArgs::getMetadataFullOrdinal(
     unsigned ordinal) const {
   if (ordinal < allGenericArgs.size()) {
-    return MetadataOrPack(allGenericArgs[ordinal]);
+    return MetadataPackOrValue(allGenericArgs[ordinal]);
   }
 
-  return MetadataOrPack();
+  return MetadataPackOrValue();
 }
 
 const WitnessTable *
@@ -3483,7 +3530,7 @@ demangleToGenericParamRef(StringRef typeName) {
 bool swift::_gatherWrittenGenericParameters(
     const TypeContextDescriptor *descriptor,
     llvm::ArrayRef<const void *> keyArgs,
-    llvm::SmallVectorImpl<MetadataOrPack> &genericArgs,
+    llvm::SmallVectorImpl<MetadataPackOrValue> &genericArgs,
     Demangle::Demangler &Dem) {
   if (!descriptor) {
     return false;
@@ -3503,17 +3550,18 @@ bool swift::_gatherWrittenGenericParameters(
     // The type should have a key argument unless it's been same-typed to
     // another type.
     if (param.hasKeyArgument()) {
-      genericArgs.push_back(MetadataOrPack(keyArgs[argIndex]));
+      genericArgs.push_back(MetadataPackOrValue(keyArgs[argIndex]));
 
       argIndex += 1;
     } else {
       // Leave a gap for us to fill in by looking at same-type requirements.
-      genericArgs.push_back(MetadataOrPack());
+      genericArgs.push_back(MetadataPackOrValue());
       missingWrittenArguments = true;
     }
 
     assert((param.getKind() == GenericParamKind::Type ||
-           param.getKind() == GenericParamKind::TypePack) &&
+           param.getKind() == GenericParamKind::TypePack ||
+           param.getKind() == GenericParamKind::Value) &&
            "Unknown generic parameter kind");
   }
 
@@ -3554,21 +3602,40 @@ bool swift::_gatherWrittenGenericParameters(
       return false;
 
     if (!genericArgs[*lhsFlatIndex]) {
-      // Substitute into the right-hand side.
-      auto *genericArg =
-          swift_getTypeByMangledName(MetadataState::Abstract,
-            req.getMangledTypeName(),
-            keyArgs.data(),
-            [&substitutions](unsigned depth, unsigned index) {
-              return substitutions.getMetadata(depth, index).Ptr;
-            },
-            [&substitutions](const Metadata *type, unsigned index) {
-              return substitutions.getWitnessTable(type, index);
-            }).getType().getMetadata();
-      if (!genericArg)
-        return false;
+      MetadataPackOrValue genericArg;
 
-      genericArgs[*lhsFlatIndex] = MetadataOrPack(genericArg);
+      if (req.Flags.isValueRequirement()) {
+        auto genericArgValue =
+            swift::getTypeValueByMangledName(
+              req.getMangledTypeName(),
+              keyArgs.data(),
+              [&substitutions](unsigned depth, unsigned index) {
+                return substitutions.getMetadata(depth, index).Ptr;
+              },
+              [&substitutions](const Metadata *type, unsigned index) {
+                return substitutions.getWitnessTable(type, index);
+              }).getType();
+
+        genericArg = MetadataPackOrValue(genericArgValue);
+      } else {
+        auto *genericArgMetadata =
+            swift_getTypeByMangledName(MetadataState::Abstract,
+              req.getMangledTypeName(),
+              keyArgs.data(),
+              [&substitutions](unsigned depth, unsigned index) {
+                return substitutions.getMetadata(depth, index).Ptr;
+              },
+              [&substitutions](const Metadata *type, unsigned index) {
+                return substitutions.getWitnessTable(type, index);
+              }).getType().getMetadata();
+        if (!genericArgMetadata)
+          return false;
+
+        genericArg = MetadataPackOrValue(genericArgMetadata);
+      }
+
+      // Substitute into the right-hand side.
+      genericArgs[*lhsFlatIndex] = genericArg;
       continue;
     }
 

@@ -5294,85 +5294,106 @@ Type TypeAliasDecl::getStructuralType() const {
 }
 
 GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
-                                           SourceLoc nameLoc, SourceLoc eachLoc,
+                                           SourceLoc nameLoc,
+                                           SourceLoc specifierLoc,
                                            unsigned depth, unsigned index,
-                                           bool isParameterPack,
+                                           GenericTypeParamKind paramKind,
                                            bool isOpaqueType,
                                            TypeRepr *opaqueTypeRepr)
     : TypeDecl(DeclKind::GenericTypeParam, dc, name, nameLoc, {}) {
-  assert(!(eachLoc && !isParameterPack) &&
-         "'each' keyword always means type parameter pack");
+  ASSERT(!(specifierLoc &&
+         !(paramKind == GenericTypeParamKind::Pack || paramKind == GenericTypeParamKind::Value)) &&
+    "'each' or 'let' keyword imply a parameter pack or value generic parameter");
+  ASSERT(isOpaqueType || !opaqueTypeRepr);
 
   Bits.GenericTypeParamDecl.Depth = depth;
   assert(Bits.GenericTypeParamDecl.Depth == depth && "Truncation");
   Bits.GenericTypeParamDecl.Index = index;
   assert(Bits.GenericTypeParamDecl.Index == index && "Truncation");
-  Bits.GenericTypeParamDecl.ParameterPack = isParameterPack;
+  Bits.GenericTypeParamDecl.ParamKind = (uint8_t) paramKind;
   Bits.GenericTypeParamDecl.IsOpaqueType = isOpaqueType;
-  assert(isOpaqueType || !opaqueTypeRepr);
-  if (isOpaqueType)
-    *getTrailingObjects<TypeRepr *>() = opaqueTypeRepr;
-  if (isParameterPack)
-    *getTrailingObjects<SourceLoc>() = eachLoc;
 
-  auto &ctx = dc->getASTContext();
-  RecursiveTypeProperties props = RecursiveTypeProperties::HasTypeParameter;
+  if (this->isOpaqueType())
+    *getTrailingObjects<TypeRepr *>() = opaqueTypeRepr;
+
   if (this->isParameterPack())
-    props |= RecursiveTypeProperties::HasParameterPack;
-  auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this, props);
-  setInterfaceType(MetatypeType::get(type, ctx));
+    *getTrailingObjects<SourceLoc>() = specifierLoc;
+
+  if (this->isValue())
+    *getTrailingObjects<SourceLoc>() = specifierLoc;
 }
 
 GenericTypeParamDecl *GenericTypeParamDecl::create(
-    DeclContext *dc, Identifier name, SourceLoc nameLoc, SourceLoc eachLoc,
-    unsigned depth, unsigned index, bool isParameterPack, bool isOpaqueType,
-    TypeRepr *opaqueTypeRepr) {
+    DeclContext *dc, Identifier name, SourceLoc nameLoc, SourceLoc specifierLoc,
+    unsigned depth, unsigned index, GenericTypeParamKind paramKind,
+    bool isOpaqueType, TypeRepr *opaqueTypeRepr) {
   auto &ctx = dc->getASTContext();
-  auto allocSize = totalSizeToAlloc<TypeRepr *, SourceLoc>(
-      isOpaqueType ? 1 : 0, isParameterPack ? 1 : 0);
+
+  auto numTypeReprs = 0;
+
+  if (isOpaqueType)
+    numTypeReprs = 1;
+
+  auto numSourceLocs = 0;
+
+  if (paramKind == GenericTypeParamKind::Pack ||
+      paramKind == GenericTypeParamKind::Value)
+    numSourceLocs = 1;
+
+  auto allocSize = totalSizeToAlloc<TypeRepr *, SourceLoc>(numTypeReprs,
+                                                           numSourceLocs);
   auto mem = ctx.Allocate(allocSize, alignof(GenericTypeParamDecl));
   return new (mem)
-      GenericTypeParamDecl(dc, name, nameLoc, eachLoc, depth, index,
-                           isParameterPack, isOpaqueType, opaqueTypeRepr);
+      GenericTypeParamDecl(dc, name, nameLoc, specifierLoc, depth, index,
+                           paramKind, isOpaqueType, opaqueTypeRepr);
 }
 
 GenericTypeParamDecl *GenericTypeParamDecl::createDeserialized(
     DeclContext *dc, Identifier name, unsigned depth, unsigned index,
-    bool isParameterPack, bool isOpaqueType) {
-  return GenericTypeParamDecl::create(dc, name, SourceLoc(), SourceLoc(), depth,
-                                      index, isParameterPack, isOpaqueType,
+    GenericTypeParamKind paramKind, bool isOpaqueType) {
+  return GenericTypeParamDecl::create(dc, name, SourceLoc(), SourceLoc(),
+                                      depth, index, paramKind,
+                                      isOpaqueType,
                                       /*opaqueRepr*/ nullptr);
 }
 
 GenericTypeParamDecl *
 GenericTypeParamDecl::createParsed(DeclContext *dc, Identifier name,
-                                   SourceLoc nameLoc, SourceLoc eachLoc,
-                                   unsigned index, bool isParameterPack) {
+                                   SourceLoc nameLoc, SourceLoc specifierLoc,
+                                   unsigned index,
+                                   GenericTypeParamKind paramKind) {
   // We always create generic type parameters with an invalid depth.
   // Semantic analysis fills in the depth when it processes the generic
   // parameter list.
   return GenericTypeParamDecl::create(
-      dc, name, nameLoc, eachLoc, GenericTypeParamDecl::InvalidDepth, index,
-      isParameterPack, /*isOpaqueType*/ false, /*opaqueTypeRepr*/ nullptr);
+      dc, name, nameLoc, specifierLoc, GenericTypeParamDecl::InvalidDepth,
+      index, paramKind, /*isOpaqueType*/ false, /*opaqueTypeRepr*/ nullptr);
 }
 
 GenericTypeParamDecl *GenericTypeParamDecl::createImplicit(
     DeclContext *dc, Identifier name, unsigned depth, unsigned index,
-    bool isParameterPack, bool isOpaqueType, TypeRepr *opaqueTypeRepr,
-    SourceLoc nameLoc, SourceLoc eachLoc) {
-  auto *param = GenericTypeParamDecl::create(dc, name, nameLoc, eachLoc, depth,
-                                             index, isParameterPack,
-                                             isOpaqueType, opaqueTypeRepr);
+    GenericTypeParamKind paramKind, TypeRepr *opaqueTypeRepr, SourceLoc nameLoc,
+    SourceLoc specifierLoc) {
+  auto *param = GenericTypeParamDecl::create(dc, name, nameLoc, specifierLoc,
+                                             depth, index, paramKind,
+                                             (bool)opaqueTypeRepr,
+                                             opaqueTypeRepr);
   param->setImplicit();
   return param;
+}
+
+Type GenericTypeParamDecl::getValueType() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+    GenericTypeParamDeclGetValueTypeRequest{const_cast<GenericTypeParamDecl *>(this)},
+    Type());
 }
 
 SourceRange GenericTypeParamDecl::getSourceRange() const {
   auto startLoc = getNameLoc();
   auto endLoc = getNameLoc();
 
-  if (const auto eachLoc = getEachLoc())
-    startLoc = eachLoc;
+  if (const auto specifierLoc = getSpecifierLoc())
+    startLoc = specifierLoc;
 
   if (!getInherited().empty())
     endLoc = getInherited().getEndLoc();

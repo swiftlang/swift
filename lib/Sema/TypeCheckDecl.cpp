@@ -2389,10 +2389,23 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::MissingMember:
   case DeclKind::Module:
   case DeclKind::OpaqueType:
-  case DeclKind::GenericTypeParam:
   case DeclKind::MacroExpansion:
     llvm_unreachable("should not get here");
     return Type();
+
+  case DeclKind::GenericTypeParam: {
+    auto *paramDecl = cast<GenericTypeParamDecl>(D);
+
+    // If we haven't set a depth for this generic parameter yet, do so.
+    if (paramDecl->getDepth() == GenericTypeParamDecl::InvalidDepth) {
+      auto *dc = paramDecl->getDeclContext();
+      auto *gpList = dc->getAsDecl()->getAsGenericContext()->getGenericParams();
+      gpList->setDepth(dc->getGenericContextDepth());
+    }
+
+    auto type = GenericTypeParamType::get(paramDecl);
+    return MetatypeType::get(type, Context);
+  }
 
   case DeclKind::AssociatedType: {
     auto assocType = cast<AssociatedTypeDecl>(D);

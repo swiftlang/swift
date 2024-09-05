@@ -2828,9 +2828,24 @@ FUNCTION(GenericInstantiateLayoutString,
 //                                  int32_t count);
 FUNCTION(InitRawStructMetadata,
          swift_initRawStructMetadata,
-         C_CC, AlwaysAvailable,
+         C_CC, InitRawStructMetadataAvailability,
          RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy, SizeTy, Int8PtrPtrTy->getPointerTo(0), Int32Ty),
+         ATTRS(NoUnwind),
+         EFFECT(MetaData),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_initRawStructMetadata2(Metadata *structType,
+//                                   StructLayoutFlags structLayoutFlags,
+//                                   const TypeLayout *likeType,
+//                                   intptr_t count,
+//                                   RawLayoutFlags rawLayoutFlags);
+FUNCTION(InitRawStructMetadata2,
+         swift_initRawStructMetadata2,
+         C_CC, InitRawStructMetadata2Availability,
+         RETURNS(VoidTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, Int8PtrPtrTy->getPointerTo(0), SizeTy,
+              SizeTy),
          ATTRS(NoUnwind),
          EFFECT(MetaData),
          UNKNOWN_MEMEFFECTS)

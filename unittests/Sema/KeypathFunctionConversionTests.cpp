@@ -28,12 +28,12 @@ TEST_F(SemaTest, TestKeypathFunctionConversionPrefersNarrowConversion) {
   auto stringType = getStdlibType("String");
 
   auto *genericParam1 = GenericTypeParamDecl::createImplicit(
-      DC, Context.getIdentifier("T"), 0, 0);
+      DC, Context.getIdentifier("T"), 0, 0, GenericTypeParamKind::Type);
   auto genericType1 =
       genericParam1->getDeclaredInterfaceType()->getAs<GenericTypeParamType>();
 
   auto *genericParam2 = GenericTypeParamDecl::createImplicit(
-      DC, Context.getIdentifier("T"), 0, 1);
+      DC, Context.getIdentifier("T"), 0, 1, GenericTypeParamKind::Type);
   auto genericType2 =
       genericParam2->getDeclaredInterfaceType()->getAs<GenericTypeParamType>();
 

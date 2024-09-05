@@ -3671,9 +3671,9 @@ public:
   void cacheResult(Type value) const;
 };
 
-class ResolveRawLayoutLikeTypeRequest
-    : public SimpleRequest<ResolveRawLayoutLikeTypeRequest,
-                           Type (StructDecl*, RawLayoutAttr *),
+class ResolveRawLayoutTypeRequest
+    : public SimpleRequest<ResolveRawLayoutTypeRequest,
+                           Type (StructDecl*, RawLayoutAttr *, bool),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3684,7 +3684,8 @@ private:
   // Evaluation.
   Type evaluate(Evaluator &evaluator,
                 StructDecl *sd,
-                RawLayoutAttr *attr) const;
+                RawLayoutAttr *attr,
+                bool isLikeType) const;
 
 public:
   // Separate caching.
@@ -5082,6 +5083,22 @@ public:
   bool isCached() const { return true; }
   std::optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
+};
+
+class GenericTypeParamDeclGetValueTypeRequest
+    : public SimpleRequest<GenericTypeParamDeclGetValueTypeRequest,
+                           Type(GenericTypeParamDecl *decl),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  Type evaluate(Evaluator &evaluator, GenericTypeParamDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
 };
 
 #define SWIFT_TYPEID_ZONE TypeChecker

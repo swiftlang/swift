@@ -113,7 +113,7 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
       IsKnownAlwaysFixedSize = IsFixedSize;
     } else {
       std::optional<Type> likeType = std::nullopt;
-      unsigned count = 0;
+      std::optional<Type> countType = std::nullopt;
 
       if (auto like = rawLayout->getResolvedScalarLikeType(sd)) {
         likeType = like;
@@ -121,7 +121,7 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
 
       if (auto like = rawLayout->getResolvedArrayLikeTypeAndCount(sd)) {
         likeType = like->first;
-        count = like->second;
+        countType = like->second;
       }
 
       // If our likeType is dependent, then all calls to try and lay it out will
@@ -129,15 +129,33 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
       // substitute it out.
       auto subs = (*type)->getContextSubstitutionMap();
       auto loweredLikeType = IGM.getLoweredType(likeType->subst(subs));
-      const TypeInfo &likeTypeInfo = IGM.getTypeInfo(loweredLikeType);
-                                      
+      auto &likeTypeInfo = IGM.getTypeInfo(loweredLikeType);
+      auto likeFixedType = dyn_cast<FixedTypeInfo>(&likeTypeInfo);
+
+      // Substitute our count type if we have one.
+      if (countType) {
+        countType = countType->subst(subs);
+      }
+
       // Take layout attributes from the like type.
-      if (const FixedTypeInfo *likeFixedType = dyn_cast<FixedTypeInfo>(&likeTypeInfo)) {
-        // If we have no count, treat this as a scalar.
-        if (count == 0) {
-          MinimumSize = likeFixedType->getFixedSize();
+      //
+      // We can only fixup the type's layout when either this is a scalar and
+      // the like type is a fixed type or if we're an array and both the like
+      // type and count are statically known. Otherwise this is opaque.
+      if (likeFixedType && (!countType || countType.value()->is<IntegerType>())) {
+        // If we have a count type, then we're the array variant so
+        // 'stride * count'. Otherwise we're a scalar which is just 'size'.
+        if (countType) {
+          auto integer = countType.value()->getAs<IntegerType>();
+
+          if (integer->isNegative()) {
+            MinimumSize = Size(0);
+          } else {
+            MinimumSize = likeFixedType->getFixedStride() *
+                integer->getValue().getZExtValue();
+          }
         } else {
-          MinimumSize = likeFixedType->getFixedStride() * count;
+          MinimumSize = likeFixedType->getFixedSize();
         }
 
         SpareBits.extendWithClearBits(MinimumSize.getValueInBits());

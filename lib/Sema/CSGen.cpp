@@ -1704,6 +1704,21 @@ namespace {
       return MetatypeType::get(type);
     }
 
+    Type visitTypeValueExpr(TypeValueExpr *E) {
+      auto locator = CS.getConstraintLocator(E);
+      auto type = resolveTypeReferenceInExpression(E->getParamTypeRepr(),
+                                              TypeResolverContext::InExpression,
+                                                  locator);
+
+      if (!type || type->hasError()) {
+        return Type();
+      }
+
+      auto archetype = type->castTo<ArchetypeType>();
+      E->setParamType(archetype);
+      return archetype->getValueType();
+    }
+
     Type visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
       llvm_unreachable("Already type-checked");
     }

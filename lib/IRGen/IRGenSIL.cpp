@@ -1120,11 +1120,16 @@ public:
     auto runtimeTy = IGM.getRuntimeReifiedType(Ty->getCanonicalType());
     if (!IGM.IRGen.Opts.shouldOptimize() && runtimeTy->hasArchetype())
       runtimeTy.visit([&](CanType t) {
-        if (auto archetype = dyn_cast<ArchetypeType>(t))
+        if (auto archetype = dyn_cast<ArchetypeType>(t)) {
+          if (archetype->getValueType()) {
+            emitValueGenericRef(archetype);
+            return;
+          }
+
           emitTypeMetadataRef(archetype);
-        else if (auto packArchetype = dyn_cast<PackArchetypeType>(t))
+        } else if (auto packArchetype = dyn_cast<PackArchetypeType>(t)) {
           emitTypeMetadataRef(packArchetype);
-        else if (auto packtype = dyn_cast<SILPackType>(t)) {
+        } else if (auto packtype = dyn_cast<SILPackType>(t)) {
           llvm::Value *Shape = emitPackShapeExpression(t);
           emitPackCountDebugVariable(Shape);
         } else if (auto packtype = dyn_cast<PackType>(t)) {
@@ -1497,6 +1502,8 @@ public:
   }
 
   void visitHasSymbolInst(HasSymbolInst *i);
+
+  void visitTypeValueInst(TypeValueInst *i);
 
   void visitWeakCopyValueInst(swift::WeakCopyValueInst *i);
   void visitUnownedCopyValueInst(swift::UnownedCopyValueInst *i);
@@ -8247,4 +8254,9 @@ void IRGenSILFunction::visitAwaitAsyncContinuationInst(
     addIncomingExplosionToPHINodes(*this, normalDest, firstIndex, resumeResult);
     assert(firstIndex == normalDest.phis.size());
   }
+}
+
+void IRGenSILFunction::visitTypeValueInst(TypeValueInst *i) {
+  auto value = emitValueGenericRef(i->getParamType());
+  setLoweredSingletonExplosion(i, value);
 }

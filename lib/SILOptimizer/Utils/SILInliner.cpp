@@ -906,8 +906,10 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::TuplePackElementAddrInst:
     return InlineCost::Expensive;
 
-  // pack_length is just a few adds, which is close enough to free.
+  // pack_length and type_value is just a few adds, which is close enough to
+  // free.
   case SILInstructionKind::PackLengthInst:
+  case SILInstructionKind::TypeValueInst:
     return InlineCost::Free;
 
   // dynamic_pack_index is free.  The other pack-indexing instructions

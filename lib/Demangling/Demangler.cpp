@@ -80,6 +80,7 @@ static bool isEntity(Node::Kind kind) {
 static bool isRequirement(Node::Kind kind) {
   switch (kind) {
     case Node::Kind::DependentGenericParamPackMarker:
+    case Node::Kind::DependentGenericParamValueMarker:
     case Node::Kind::DependentGenericSameTypeRequirement:
     case Node::Kind::DependentGenericSameShapeRequirement:
     case Node::Kind::DependentGenericLayoutRequirement:
@@ -1100,6 +1101,7 @@ recur:
       // outlined copy functions. We treat such a suffix as "unmangled suffix".
       pushBack();
       return createNode(Node::Kind::Suffix, consumeAll());
+    case '$': return demangleIntegerType();
     default:
       pushBack();
       return demangleIdentifier();
@@ -4153,10 +4155,21 @@ NodePointer Demangler::demangleGenericSignature(bool hasParamCounts) {
 NodePointer Demangler::demangleGenericRequirement() {
 
   enum { Generic, Assoc, CompoundAssoc, Substitution } TypeKind;
-  enum { Protocol, BaseClass, SameType, SameShape, Layout, PackMarker, Inverse } ConstraintKind;
+
+  enum {
+    Protocol,
+    BaseClass,
+    SameType,
+    SameShape,
+    Layout,
+    PackMarker,
+    Inverse,
+    ValueMarker
+  } ConstraintKind;
 
   NodePointer inverseKind = nullptr;
   switch (nextChar()) {
+    case 'V': ConstraintKind = ValueMarker; TypeKind = Generic; break;
     case 'v': ConstraintKind = PackMarker; TypeKind = Generic; break;
     case 'c': ConstraintKind = BaseClass; TypeKind = Assoc; break;
     case 'C': ConstraintKind = BaseClass; TypeKind = CompoundAssoc; break;
@@ -4211,6 +4224,10 @@ NodePointer Demangler::demangleGenericRequirement() {
   }
 
   switch (ConstraintKind) {
+  case ValueMarker:
+    return createWithChildren(
+        Node::Kind::DependentGenericParamValueMarker, ConstrTy,
+        popNode(Node::Kind::Type));
   case PackMarker:
     return createWithChild(
         Node::Kind::DependentGenericParamPackMarker, ConstrTy);
@@ -4399,4 +4416,21 @@ NodePointer Demangler::demangleMacroExpansion() {
   if (privateDiscriminator)
     result->addChild(privateDiscriminator, *this);
   return result;
+}
+
+NodePointer Demangler::demangleIntegerType() {
+  NodePointer integer = nullptr;
+
+  switch (peekChar()) {
+  case 'n':
+    nextChar();
+    integer = createNode(Node::Kind::NegativeInteger, -demangleNatural());
+    break;
+
+  default:
+    integer = createNode(Node::Kind::Integer, demangleNatural());
+    break;
+  }
+
+  return createType(integer);
 }

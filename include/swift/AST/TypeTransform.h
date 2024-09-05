@@ -112,6 +112,7 @@ case TypeKind::Id:
     case TypeKind::SILToken:
     case TypeKind::Module:
     case TypeKind::BuiltinTuple:
+    case TypeKind::Integer:
       return t;
 
     case TypeKind::PrimaryArchetype:

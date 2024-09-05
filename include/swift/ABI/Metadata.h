@@ -2145,7 +2145,7 @@ public:
 
   RuntimeGenericSignature<Runtime> getRequirementSignature() const {
     return {ReqSigHeader, getReqSigParams(), getReqSigRequirements(),
-            {0, 0}, nullptr};
+            {0, 0}, nullptr, {0}, nullptr};
   }
 
   unsigned getNumReqSigParams() const {
@@ -2225,7 +2225,8 @@ public:
   RuntimeGenericSignature<Runtime> getGeneralizationSignature() const {
     if (!hasGeneralizationSignature()) return RuntimeGenericSignature<Runtime>();
     return {*getGenSigHeader(), getGenSigParams(), getGenSigRequirements(),
-            getGenSigPackShapeHeader(), getGenSigPackShapeDescriptors()};
+            getGenSigPackShapeHeader(), getGenSigPackShapeDescriptors(),
+            {0}, nullptr};
   }
 
   unsigned getNumGenSigParams() const {

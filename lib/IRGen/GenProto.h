@@ -111,6 +111,7 @@ namespace irgen {
     unsigned numShapes;
     unsigned numTypeMetadataPtrs;
     unsigned numWitnessTablePtrs;
+    unsigned numValues;
   };
 
   /// Add the witness parameters necessary for calling a function with
