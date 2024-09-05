@@ -2557,7 +2557,7 @@ KeyPathExpr::Component::Component(
     : Decl(decl), ArgList(argList), KindValue(kind), ComponentType(type),
       Loc(loc) {
   assert(kind == Kind::Subscript || kind == Kind::UnresolvedSubscript ||
-         kind == Kind::UnresolvedApply);
+         kind == Kind::UnresolvedApply || kind == Kind::Apply);
   assert(argList);
   assert(argList->size() == indexHashables.size() || indexHashables.empty());
   HashableConformancesData =
