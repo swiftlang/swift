@@ -3601,7 +3601,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
       auto argIdx = applyArgElt->getArgIdx();
       if (auto *kpe = getAsExpr<KeyPathExpr>(anchor)) {
         auto component = kpe->getComponents()[elt.getIndex()];
-        auto *args = component.getSubscriptArgs();
+        auto *args = component.getArgs();
         assert(args && "Trying to apply a component without args?");
         if (argIdx < args->size()) {
           anchor = args->getExpr(argIdx);
@@ -4290,7 +4290,7 @@ ConstraintLocator *ConstraintSystem::getArgumentLocator(Expr *expr) {
     if (!idx)
       return nullptr;
     loc = getConstraintLocator(KP, {LocatorPathElt::KeyPathComponent(*idx)});
-    argList = KP->getComponents()[*idx].getSubscriptArgs();
+    argList = KP->getComponents()[*idx].getArgs();
   } else {
     loc = getConstraintLocator(application);
   }
@@ -5078,7 +5078,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
     case KeyPathExpr::Component::Kind::Subscript: {
       if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
         // Key path is sendable only when all of its captures are sendable.
-        if (auto *args = component.getSubscriptArgs()) {
+        if (auto *args = component.getArgs()) {
           auto *sendable = Context.getProtocol(KnownProtocolKind::Sendable);
 
           for (const auto &arg : *args) {

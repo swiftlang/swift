@@ -4311,8 +4311,8 @@ public:
             break;
           }
           printTypeField(GetTypeOfKeyPathComponent(E, i), Label::always("type"));
-          if (auto *args = component.getSubscriptArgs()) {
-            printRec(args, Label::optional("subscript_args"));
+          if (auto *args = component.getArgs()) {
+            printRec(args, Label::optional("args"));
           }
           printFoot();
         }, Label::optional("component"));
