@@ -818,11 +818,13 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
       import.implementationOnlyRange.isValid()) {
     if (SF.getParentModule()->isResilient()) {
       // Encourage replacing `@_implementationOnly` with `internal import`.
-      auto inFlight =
-        ctx.Diags.diagnose(import.importLoc,
-                           diag::implementation_only_deprecated);
-      inFlight.fixItReplace(import.implementationOnlyRange, "internal");
-    } else if ( // Non-resilient
+      if (!topLevelModule.get()->isNonSwiftModule()) {
+        auto inFlight =
+          ctx.Diags.diagnose(import.importLoc,
+                             diag::implementation_only_deprecated);
+        inFlight.fixItReplace(import.implementationOnlyRange, "internal");
+      }
+    } else if ( // Non-resilient client
       !(((targetName.str() == "CCryptoBoringSSL" ||
           targetName.str() == "CCryptoBoringSSLShims") &&
          (importerName.str() == "Crypto" ||

@@ -53,9 +53,7 @@ import ClangModuleB
 import SwiftModuleB
 
 @_implementationOnly import ClangModuleA
-// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 @_implementationOnly import ClangModuleA.Submodule
-// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 import ClangModuleB
 
 //--- Crypto.swift
