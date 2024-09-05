@@ -2753,54 +2753,6 @@ public:
   
 class OpaqueTypeDecl;
 
-/// Describes the least favorable positions at which a requirement refers
-/// to a given generic parameter in terms of variance, for use in the
-/// is-inheritable and is-available-existential checks.
-class GenericParameterReferenceInfo final {
-  using OptionalTypePosition = OptionalEnum<decltype(TypePosition::Covariant)>;
-
-public:
-  /// Whether the uncurried interface type of the declaration, stripped of any
-  /// optionality, is a direct reference to the generic parameter at hand. For
-  /// example, "func foo(x: Int) -> () -> Self?" has a covariant 'Self' result.
-  bool hasCovariantSelfResult;
-
-  OptionalTypePosition selfRef;
-  OptionalTypePosition assocTypeRef;
-
-  /// A reference to 'Self'.
-  static GenericParameterReferenceInfo forSelfRef(TypePosition position) {
-    return GenericParameterReferenceInfo(false, position, std::nullopt);
-  }
-
-  /// A reference to the generic parameter in covariant result position.
-  static GenericParameterReferenceInfo forCovariantResult() {
-    return GenericParameterReferenceInfo(true, TypePosition::Covariant,
-                                         std::nullopt);
-  }
-
-  /// A reference to 'Self' through an associated type.
-  static GenericParameterReferenceInfo forAssocTypeRef(TypePosition position) {
-    return GenericParameterReferenceInfo(false, std::nullopt, position);
-  }
-
-  GenericParameterReferenceInfo &operator|=(const GenericParameterReferenceInfo &other);
-
-  explicit operator bool() const {
-    return hasCovariantSelfResult || selfRef || assocTypeRef;
-  }
-
-  GenericParameterReferenceInfo()
-      : hasCovariantSelfResult(false), selfRef(std::nullopt),
-        assocTypeRef(std::nullopt) {}
-
-private:
-  GenericParameterReferenceInfo(bool hasCovariantSelfResult, OptionalTypePosition selfRef,
-                    OptionalTypePosition assocTypeRef)
-      : hasCovariantSelfResult(hasCovariantSelfResult), selfRef(selfRef),
-        assocTypeRef(assocTypeRef) {}
-};
-
 /// ValueDecl - All named decls that are values in the language.  These can
 /// have a type, etc.
 class ValueDecl : public Decl {
@@ -3334,9 +3286,6 @@ public:
   /// @_dynamicReplacement(for: ...), compute the original declaration
   /// that this declaration dynamically replaces.
   ValueDecl *getDynamicallyReplacedDecl() const;
-
-  /// Find references to 'Self' in the type signature of this declaration.
-  GenericParameterReferenceInfo findExistentialSelfReferences() const;
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -9516,17 +9465,6 @@ public:
     return expansion->getFreestandingMacroKind() == FreestandingMacroKind::Decl;
   }
 };
-
-/// Find references to the given generic parameter in the type signature of the
-/// given declaration using the given generic signature.
-///
-/// \param skipParamIndex If the value is a function or subscript declaration,
-/// specifies the index of the parameter that shall be skipped.
-GenericParameterReferenceInfo
-findGenericParameterReferences(const ValueDecl *value, CanGenericSignature sig,
-                               GenericTypeParamType *origParam,
-                               GenericTypeParamType *openedParam,
-                               std::optional<unsigned> skipParamIndex);
 
 inline void
 AbstractStorageDecl::overwriteSetterAccess(AccessLevel accessLevel) {

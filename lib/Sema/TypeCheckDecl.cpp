@@ -720,35 +720,6 @@ ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
   return true;
 }
 
-bool HasSelfOrAssociatedTypeRequirementsRequest::evaluate(
-    Evaluator &evaluator, ProtocolDecl *decl) const {
-  // ObjC protocols do not require `any`.
-  if (decl->isObjC())
-    return false;
-
-  for (auto member : decl->getMembers()) {
-    // Existential types require `any` if the protocol has an associated type.
-    if (isa<AssociatedTypeDecl>(member))
-      return true;
-
-    // For value members, look at their type signatures.
-    if (auto valueMember = dyn_cast<ValueDecl>(member)) {
-      const auto info = valueMember->findExistentialSelfReferences();
-      if (info.selfRef > TypePosition::Covariant || info.assocTypeRef) {
-        return true;
-      }
-    }
-  }
-
-  // Check whether any of the inherited protocols require `any`.
-  for (auto proto : decl->getInheritedProtocols()) {
-    if (proto->hasSelfOrAssociatedTypeRequirements())
-      return true;
-  }
-
-  return false;
-}
-
 ArrayRef<AssociatedTypeDecl *>
 PrimaryAssociatedTypesRequest::evaluate(Evaluator &evaluator,
                                         ProtocolDecl *decl) const {

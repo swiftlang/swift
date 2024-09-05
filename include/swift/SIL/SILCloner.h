@@ -85,6 +85,11 @@ struct SubstitutionMapWithLocalArchetypes {
                                     ProtocolDecl *proto) {
     if (isa<LocalArchetypeType>(origType))
       return swift::lookupConformance(substType, proto);
+
+    if (isa<PrimaryArchetypeType>(origType) ||
+        isa<PackArchetypeType>(origType))
+      origType = origType->mapTypeOutOfContext()->getCanonicalType();
+
     if (SubsMap)
       return SubsMap->lookupConformance(origType, proto);
 
