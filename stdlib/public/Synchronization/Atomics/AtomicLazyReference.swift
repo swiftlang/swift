@@ -17,8 +17,7 @@
 @available(SwiftStdlib 6.0, *)
 @frozen
 @_staticExclusiveOnly
-@_moveOnly
-public struct AtomicLazyReference<Instance: AnyObject> {
+public struct AtomicLazyReference<Instance: AnyObject>: ~Copyable {
   @usableFromInline
   let storage: Atomic<Unmanaged<Instance>?>
 

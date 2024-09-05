@@ -193,8 +193,7 @@ extension UnownedJob: CustomStringConvertible {
 @available(SwiftStdlib 5.9, *)
 @available(*, deprecated, renamed: "ExecutorJob")
 @frozen
-@_moveOnly
-public struct Job: Sendable {
+public struct Job: ~Copyable, Sendable {
   internal var context: Builtin.Job
 
   @usableFromInline
@@ -262,8 +261,7 @@ extension Job {
 /// you don't generally interact with jobs directly.
 @available(SwiftStdlib 5.9, *)
 @frozen
-@_moveOnly
-public struct ExecutorJob: Sendable {
+public struct ExecutorJob: ~Copyable, Sendable {
   internal var context: Builtin.Job
 
   @usableFromInline
