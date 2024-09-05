@@ -23,7 +23,6 @@ public enum PubEnum {
   case red, green
 }
 
-// CHECK: -package-name barpkg
 // CHECK: public enum PubEnum {
 // CHECK:   case red, green
 // CHECK:   public static func == (a: Bar.PubEnum, b: Bar.PubEnum) -> Swift.Bool

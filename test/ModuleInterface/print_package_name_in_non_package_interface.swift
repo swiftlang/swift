@@ -1,12 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-/// Do not print package-name for public or private interfaces
+/// By default, package-name is only printed in package interface
 // RUN: %target-build-swift -emit-module %t/Bar.swift -I %t \
 // RUN:   -module-name Bar -package-name foopkg \
 // RUN:   -enable-library-evolution -swift-version 6 \
 // RUN:   -package-name barpkg \
-// RUN:   -Xfrontend -disable-print-package-name-for-non-package-interface \
 // RUN:   -emit-module-interface-path %t/Bar.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/Bar.private.swiftinterface \
 // RUN:   -emit-package-module-interface-path %t/Bar.package.swiftinterface
@@ -44,10 +43,11 @@
 // RUN: rm -rf %t/Bar.private.swiftinterface
 // RUN: rm -rf %t/Bar.package.swiftinterface
 
-/// By default, -package-name is printed in all interfaces.
+/// Print -package-name in public or private interface.
 // RUN: %target-build-swift -emit-module %t/Bar.swift -I %t \
 // RUN:   -module-name Bar -package-name barpkg \
 // RUN:   -enable-library-evolution -swift-version 6 \
+// RUN:   -Xfrontend -print-package-name-in-non-package-interface \
 // RUN:   -emit-module-interface-path %t/Bar.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/Bar.private.swiftinterface \
 // RUN:   -emit-package-module-interface-path %t/Bar.package.swiftinterface
