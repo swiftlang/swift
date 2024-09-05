@@ -1323,6 +1323,7 @@ bool swift::extractCompilerFlagsFromInterface(
   // we have loaded a Swift interface from a different-but-compatible
   // architecture slice. Use the compatible subarchitecture.
   for (unsigned I = 1; I < SubArgs.size(); ++I) {
+    // FIXME: Also fix up -target-variant (rdar://135322077).
     if (strcmp(SubArgs[I - 1], "-target") != 0) {
       continue;
     }

@@ -1771,7 +1771,6 @@ SILValue SILGenFunction::emitZipperedOSVersionRangeCheck(
   // macCatalyst process it will use the iOS version.
   llvm::Triple VariantTriple = *getASTContext().LangOpts.TargetVariant;
   llvm::Triple TargetTriple = getASTContext().LangOpts.Target;
-  assert(triplesAreValidForZippering(TargetTriple, VariantTriple));
 
   // From perspective of the driver and most of the frontend,
   // -target and -target-variant are symmetric. That is, the user
