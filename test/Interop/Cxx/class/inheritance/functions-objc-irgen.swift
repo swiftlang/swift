@@ -5,21 +5,21 @@
 
 import FunctionsObjC
 
-// CHECK: define linkonce_odr noundef ptr @_ZNK7Derived36__synthesizedBaseCall_virtual_methodEv(ptr noundef nonnull align {{4|8}} dereferenceable(12) %[[THIS:.*]])
+// CHECK: define linkonce_odr noundef ptr @_ZNK7Derived36__synthesizedBaseCall_virtual_methodEv(ptr noundef nonnull align {{4|8}} dereferenceable({{8|12}}) %[[THIS:.*]])
 // CHECK: %[[THIS_ADDR:.*]] = alloca ptr,
 // CHECK: store ptr %[[THIS]], ptr %[[THIS_ADDR]],
 // CHECK: %[[THIS1:.*]] = load ptr, ptr %[[THIS_ADDR]],
 // CHECK: %[[VTABLE:.*]] = load ptr, ptr %[[THIS1]],
 // CHECK: %[[VFN:.*]] = getelementptr inbounds ptr, ptr %[[VTABLE]], i64 0
 // CHECK: %[[V0:.*]] = load ptr, ptr %[[VFN]],
-// CHECK: %[[CALL:.*]] = call noundef ptr %[[V0]](ptr noundef nonnull align {{4|8}} dereferenceable(12) %[[THIS1]])
+// CHECK: %[[CALL:.*]] = call noundef ptr %[[V0]](ptr noundef nonnull align {{4|8}} dereferenceable({{8|12}}) %[[THIS1]])
 // CHECK: ret ptr %[[CALL]]
 
-// CHECK: define linkonce_odr noundef ptr @_ZNK7Derived40__synthesizedBaseCall_non_virtual_methodEv(ptr noundef nonnull align {{4|8}} dereferenceable(12) %[[THIS:.*]])
+// CHECK: define linkonce_odr noundef ptr @_ZNK7Derived40__synthesizedBaseCall_non_virtual_methodEv(ptr noundef nonnull align {{4|8}} dereferenceable({{8|12}}) %[[THIS:.*]])
 // CHECK: %[[THIS_ADDR:.*]] = alloca ptr,
 // CHECK: store ptr %[[THIS]], ptr %[[THIS_ADDR]],
 // CHECK: %[[THIS1:.*]] = load ptr, ptr %[[THIS_ADDR]],
-// CHECK: %[[CALL:.*]] = call noundef ptr @_ZNK4Base18non_virtual_methodEv(ptr noundef nonnull align {{4|8}} dereferenceable(12) %[[THIS1]])
+// CHECK: %[[CALL:.*]] = call noundef ptr @_ZNK4Base18non_virtual_methodEv(ptr noundef nonnull align {{4|8}} dereferenceable({{8|12}}) %[[THIS1]])
 // CHECK: ret ptr %[[CALL]]
 
 func testBaseMethodCall() -> C {
