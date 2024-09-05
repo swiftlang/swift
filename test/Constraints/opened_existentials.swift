@@ -416,3 +416,10 @@ struct S<T, U> {
     }
   }
 }
+
+func nestedMetatypeCallee<T>(_ t: T) {}
+
+func nestedMetatypeCaller() {
+  let t = String.Type.Type.Type.self as (any Q.Type.Type.Type.Type)
+  nestedMetatypeCallee(t)
+}

@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CSDiagnostics.h"
+#include "OpenedExistentials.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckEffects.h"
 #include "swift/AST/ASTPrinter.h"
@@ -1440,66 +1441,13 @@ public:
   }
 };
 
-namespace {
-  /// Flags that should be applied to the existential argument type after
-  /// opening.
-  enum class OpenedExistentialAdjustmentFlags {
-    /// The argument should be made inout after opening.
-    InOut = 0x01,
-    LValue = 0x02,
-  };
-
-  using OpenedExistentialAdjustments =
-    OptionSet<OpenedExistentialAdjustmentFlags>;
-}
-
-/// Determine whether we should open up the existential argument to the
-/// given parameters.
-///
-/// \param callee The function or subscript being called.
-/// \param paramIdx The index specifying which function parameter is being
-/// initialized.
-/// \param paramTy The type of the parameter as it was opened in the constraint
-/// system.
-/// \param argTy The type of the argument.
-///
-/// \returns If the argument type is existential and opening it can bind a
-/// generic parameter in the callee, returns the generic parameter, type
-/// variable (from the opened parameter type) the existential type that needs
-/// to be opened (from the argument type), and the adjustments that need to be
-/// applied to the existential type after it is opened.
 static std::optional<std::tuple<GenericTypeParamType *, TypeVariableType *,
                                 Type, OpenedExistentialAdjustments>>
 shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
                                   Type paramTy, Type argTy, Expr *argExpr,
                                   ConstraintSystem &cs) {
-  if (!callee)
-    return std::nullopt;
-
-  // Only applies to functions and subscripts.
-  if (!isa<AbstractFunctionDecl>(callee) && !isa<SubscriptDecl>(callee))
-    return std::nullopt;
-
-  // Special semantics prohibit opening existentials.
-  switch (TypeChecker::getDeclTypeCheckingSemantics(callee)) {
-  case DeclTypeCheckingSemantics::OpenExistential:
-  case DeclTypeCheckingSemantics::TypeOf:
-    // type(of:) and _openExistential handle their own opening.
-    return std::nullopt;
-
-  case DeclTypeCheckingSemantics::Normal:
-  case DeclTypeCheckingSemantics::WithoutActuallyEscaping:
-    break;
-  }
-
-  // C++ function templates require specialization, which is not possible with
-  // opened existential archetypes, so do not open.
-  if (isa_and_nonnull<clang::FunctionTemplateDecl>(callee->getClangDecl()))
-    return std::nullopt;
-
-  // The actual parameter type needs to involve a type variable, otherwise
-  // type inference won't be possible.
-  if (!paramTy->hasTypeVariable())
+  auto result = canOpenExistentialCallArgument(callee, paramIdx, paramTy, argTy);
+  if (!result)
     return std::nullopt;
 
   // An argument expression that explicitly coerces to an existential
@@ -1517,110 +1465,7 @@ shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
     }
   }
 
-  OpenedExistentialAdjustments adjustments;
-
-  // The argument may be a "var" instead of a "let".
-  if (auto lv = argTy->getAs<LValueType>()) {
-    argTy = lv->getObjectType();
-    adjustments |= OpenedExistentialAdjustmentFlags::LValue;
-  }
-
-  // If the argument is inout, strip it off and we can add it back.
-  if (auto inOutArg = argTy->getAs<InOutType>()) {
-    argTy = inOutArg->getObjectType();
-    adjustments |= OpenedExistentialAdjustmentFlags::InOut;
-  }
-
-  // The argument type needs to be an existential type or metatype thereof.
-  if (!argTy->isAnyExistentialType())
-    return std::nullopt;
-
-  auto param = getParameterAt(callee, paramIdx);
-  if (!param)
-    return std::nullopt;
-
-  // If the parameter is non-generic variadic, don't open.
-  if (param->isVariadic())
-    return std::nullopt;
-
-  // Look through an inout and optional types on the formal type of the
-  // parameter.
-  auto formalParamTy = param->getInterfaceType()->getInOutObjectType()
-      ->lookThroughSingleOptionalType();
-
-  // If the argument is of an existential metatype, look through the
-  // metatype on the parameter.
-  if (argTy->is<AnyMetatypeType>()) {
-    formalParamTy = formalParamTy->getMetatypeInstanceType();
-    paramTy = paramTy->getMetatypeInstanceType();
-  }
-
-  // Look through an inout and optional types on the parameter.
-  paramTy = paramTy->getInOutObjectType()->lookThroughSingleOptionalType();
-
-  // The parameter type must be a type variable.
-  auto paramTypeVar = paramTy->getAs<TypeVariableType>();
-  if (!paramTypeVar)
-    return std::nullopt;
-
-  auto genericParam = formalParamTy->getAs<GenericTypeParamType>();
-  if (!genericParam)
-    return std::nullopt;
-
-  // Only allow opening the innermost generic parameters.
-  auto genericContext = callee->getAsGenericContext();
-  if (!genericContext || !genericContext->isGeneric())
-    return std::nullopt;
-
-  auto genericSig = callee->getInnermostDeclContext()
-      ->getGenericSignatureOfContext().getCanonicalSignature();
-  if (genericParam->getDepth() < genericSig->getMaxDepth())
-    return std::nullopt;
-
-  Type existentialTy;
-  if (auto existentialMetaTy = argTy->getAs<ExistentialMetatypeType>())
-    existentialTy = existentialMetaTy->getInstanceType();
-  else
-    existentialTy = argTy;
-
-  ASSERT(existentialTy->isExistentialType());
-
-  auto &ctx = cs.getASTContext();
-
-  // If the existential argument conforms to all of protocol requirements on
-  // the formal parameter's type, don't open unless ImplicitOpenExistentials is
-  // enabled.
-
-  // If all of the conformance requirements on the formal parameter's type
-  // are self-conforming, don't open.
-  if (!ctx.LangOpts.hasFeature(Feature::ImplicitOpenExistentials)) {
-    bool containsNonSelfConformance = false;
-    for (auto proto : genericSig->getRequiredProtocols(genericParam)) {
-      auto conformance = lookupExistentialConformance(
-          existentialTy, proto);
-      if (conformance.isInvalid()) {
-        containsNonSelfConformance = true;
-        break;
-      }
-    }
-
-    if (!containsNonSelfConformance)
-      return std::nullopt;
-  }
-
-  auto existentialSig = ctx.getOpenedExistentialSignature(existentialTy);
-
-  // Ensure that the formal parameter is only used in covariant positions,
-  // because it won't match anywhere else.
-  auto referenceInfo = findGenericParameterReferences(
-      callee, existentialSig.OpenedSig, genericParam,
-      existentialSig.SelfType->castTo<GenericTypeParamType>(),
-      /*skipParamIdx=*/paramIdx);
-  if (referenceInfo.selfRef > TypePosition::Covariant ||
-      referenceInfo.assocTypeRef > TypePosition::Covariant)
-    return std::nullopt;
-
-  return std::make_tuple(genericParam, paramTypeVar, argTy, adjustments);
+  return result;
 }
 
 // Match the argument of a call to the parameter.
