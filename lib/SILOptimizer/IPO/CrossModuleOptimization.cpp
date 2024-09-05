@@ -934,9 +934,15 @@ void CrossModuleOptimization::makeSubstUsableFromInline(
 class CrossModuleOptimizationPass: public SILModuleTransform {
   void run() override {
     auto &M = *getModule();
-    if (M.getSwiftModule()->isResilient() &&
-        !M.getSwiftModule()->serializePackageEnabled())
+    if (M.getSwiftModule()->serializePackageEnabled()) {
+      assert(M.getSwiftModule()->isResilient() &&
+             "Package CMO requires library-evolution");
+    } else if (M.getSwiftModule()->isResilient()) {
+      // If no Package CMO flags are passed and library
+      // evolution is enabled, just return.
       return;
+    }
+
     if (!M.isWholeModule())
       return;
 
@@ -960,6 +966,9 @@ class CrossModuleOptimizationPass: public SILModuleTransform {
         M.getOptions().CMOMode == swift::CrossModuleOptimizationMode::Off) {
       return;
     }
+
+    if (isPackageCMOEnabled(M.getSwiftModule()))
+      assert(conservative && "Package CMO requires conservative CMO mode");
 
     CrossModuleOptimization CMO(M, conservative, everything);
     CMO.serializeFunctionsInModule(PM);
