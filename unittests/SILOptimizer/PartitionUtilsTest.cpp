@@ -62,6 +62,10 @@ struct MockedPartitionOpEvaluator final
     return {};
   }
 
+  static SILInstruction *getSourceInst(const PartitionOp &partitionOp) {
+    return nullptr;
+  }
+
   static bool doesFunctionHaveSendingResult(const PartitionOp &partitionOp) {
     return false;
   }
@@ -106,6 +110,10 @@ struct MockedPartitionOpEvaluatorWithFailureCallback final
 
   static SILIsolationInfo getIsolationInfo(const PartitionOp &partitionOp) {
     return {};
+  }
+
+  static SILInstruction *getSourceInst(const PartitionOp &partitionOp) {
+    return nullptr;
   }
 };
 
