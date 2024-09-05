@@ -511,11 +511,11 @@ public:
   /// This always returns a valid name as it defaults to the module name if
   /// no public module name is set.
   ///
-  /// If `mustBeVisible`, return the normal module name when the module
+  /// If `onlyIfImported`, return the normal module name when the module
   /// corresponding to the public module name isn't imported. Users working
   /// in between both modules will then see the normal module name,
   /// this may be more useful for diagnostics at that level.
-  Identifier getPublicModuleName(bool mustBeVisible) const;
+  Identifier getPublicModuleName(bool onlyIfImported) const;
 
   void setPublicModuleName(Identifier name) {
     PublicModuleName = name;

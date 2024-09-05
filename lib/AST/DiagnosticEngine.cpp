@@ -800,7 +800,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
     DeclName name;
     if (includeName) {
       if (auto MD = dyn_cast<ModuleDecl>(D))
-        name = MD->getPublicModuleName(/*mustBeVisible=*/true);
+        name = MD->getPublicModuleName(/*onlyIfImported=*/true);
       else if (auto VD = dyn_cast<ValueDecl>(D))
         name = VD->getName();
       else if (auto PGD = dyn_cast<PrecedenceGroupDecl>(D))
@@ -1374,7 +1374,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
           SmallVector<StringRef, 4> nameComponents;
           while (dc) {
             auto publicName = cast<ModuleDecl>(dc)->
-                                getPublicModuleName(/*mustBeVisible*/true);
+                                getPublicModuleName(/*onlyIfImported*/true);
             nameComponents.push_back(publicName.str());
             dc = dc->getParent();
           }

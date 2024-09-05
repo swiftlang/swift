@@ -1127,7 +1127,7 @@ void Serializer::writeHeader() {
       }
 
       Identifier publicModuleName =
-        M->getPublicModuleName(/*mustBeVisible=*/false);
+        M->getPublicModuleName(/*onlyIfImported=*/false);
       if (publicModuleName != M->getName()) {
         options_block::PublicModuleNameLayout PublicModuleName(Out);
         PublicModuleName.emit(ScratchRecord, publicModuleName.str());

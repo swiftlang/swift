@@ -1922,9 +1922,9 @@ ImportedModule::removeDuplicates(SmallVectorImpl<ImportedModule> &imports) {
   imports.erase(last, imports.end());
 }
 
-Identifier ModuleDecl::getPublicModuleName(bool mustBeVisible) const {
+Identifier ModuleDecl::getPublicModuleName(bool onlyIfImported) const {
   if (!PublicModuleName.empty()) {
-    if (!mustBeVisible)
+    if (!onlyIfImported)
       return PublicModuleName;
 
     bool publicModuleIsImported =
