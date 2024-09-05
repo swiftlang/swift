@@ -38,6 +38,7 @@ add_swift_host_library(swiftSema STATIC
   InstrumenterSupport.cpp
   LookupVisibleDecls.cpp
   MiscDiagnostics.cpp
+  OpenedExistentials.cpp
   PCMacro.cpp
   PlaygroundTransform.cpp
   PreCheckTarget.cpp
