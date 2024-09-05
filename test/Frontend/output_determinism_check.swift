@@ -12,7 +12,13 @@
 /// FAIL:  %target-swift-frontend -module-name test -emit-reference-dependencies-path %t/test.swiftdeps -c -o %t/test.o -primary-file %s -enable-deterministic-check -always-compile-output-files
 
 /// Explicit module build. Check building swiftmodule from interface file.
-// RUN: %target-swift-frontend -scan-dependencies -module-name test -o %t/test.json %s -enable-deterministic-check  -load-dependency-scan-cache -dependency-scan-cache-path %t/deps-cache -serialize-dependency-scan-cache 2>&1 | %FileCheck %s --check-prefix=DEPSCAN_OUTPUT --check-prefix=DEPSCAN_CACHE_OUTPUT
+// RUN: %target-swift-frontend -scan-dependencies -module-name test -o %t/test1.json %s  -load-dependency-scan-cache -dependency-scan-cache-path %t/deps-cache -serialize-dependency-scan-cache
+// RUN: %target-swift-frontend -scan-dependencies -module-name test -o %t/test2.json %s  -load-dependency-scan-cache -dependency-scan-cache-path %t/deps-cache -serialize-dependency-scan-cache
+// RUN: %target-swift-frontend -scan-dependencies -module-name test -o %t/test3.json %s  -load-dependency-scan-cache -dependency-scan-cache-path %t/deps-cache -serialize-dependency-scan-cache
+
+// RUN: diff %t/test1.json %t/test2.json
+// RUN: diff %t/test1.json %t/test3.json
+
 /// TODO: Implicit module build use a different compiler instance so it doesn't support checking yet.
 // RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t/test.swiftinterface %s -O -enable-deterministic-check 2>&1 | %FileCheck %s --check-prefix=INTERFACE_OUTPUT
 /// Hit cache and not emit the second time.
