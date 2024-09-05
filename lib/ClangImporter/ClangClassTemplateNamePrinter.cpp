@@ -129,6 +129,12 @@ struct TemplateInstantiationNamePrinter
 
     return buffer.str().str();
   }
+
+  std::string VisitVectorType(const clang::VectorType *type) {
+    return (Twine("SIMD") + std::to_string(type->getNumElements()) + "<" +
+            Visit(type->getElementType().getTypePtr()) + ">")
+        .str();
+  }
 };
 
 std::string swift::importer::printClassTemplateSpecializationName(
