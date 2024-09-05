@@ -5912,8 +5912,8 @@ public:
       DeclNameOrRef(ConcreteDeclRef rd) : ResolvedDecl(rd) {}
     } Decl;
 
-    ArgumentList *SubscriptArgList;
-    const ProtocolConformanceRef *SubscriptHashableConformancesData;
+    ArgumentList *ArgList;
+    const ProtocolConformanceRef *HashableConformancesData;
 
     unsigned TupleIndex;
     Kind KindValue;
@@ -6023,7 +6023,7 @@ public:
     }
     
     SourceRange getSourceRange() const {
-      if (auto *args = getSubscriptArgs()) {
+      if (auto *args = getArgs()) {
         return args->getSourceRange();
       }
       return Loc;
@@ -6061,11 +6061,11 @@ public:
       llvm_unreachable("unhandled kind");
     }
 
-    ArgumentList *getSubscriptArgs() const {
+    ArgumentList *getArgs() const {
       switch (getKind()) {
       case Kind::Subscript:
       case Kind::UnresolvedSubscript:
-        return SubscriptArgList;
+        return ArgList;
 
       case Kind::Invalid:
       case Kind::OptionalChain:
@@ -6082,18 +6082,17 @@ public:
       llvm_unreachable("unhandled kind");
     }
 
-    void setSubscriptArgs(ArgumentList *newArgs) {
-      assert(getSubscriptArgs() && "Should be replacing existing args");
-      SubscriptArgList = newArgs;
+    void setArgs(ArgumentList *newArgs) {
+      assert(getArgs() && "Should be replacing existing args");
+      ArgList = newArgs;
     }
 
-    ArrayRef<ProtocolConformanceRef>
-    getSubscriptIndexHashableConformances() const {
+    ArrayRef<ProtocolConformanceRef> getIndexHashableConformances() const {
       switch (getKind()) {
       case Kind::Subscript:
-        if (!SubscriptHashableConformancesData)
+        if (!HashableConformancesData)
           return {};
-        return {SubscriptHashableConformancesData, SubscriptArgList->size()};
+        return {HashableConformancesData, ArgList->size()};
 
       case Kind::UnresolvedSubscript:
       case Kind::Invalid:
