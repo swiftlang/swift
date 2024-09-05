@@ -3621,18 +3621,18 @@ namespace {
         }
       }
 
-      if (name && name.isSimpleName()) {
-        assert(importedName.hasCustomName() &&
-               "imported function with simple name?");
-        // Just fill in empty argument labels.
-        name = DeclName(Impl.SwiftContext, name.getBaseName(), bodyParams);
-      }
-
       if (!bodyParams) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(diag::invoked_func_not_imported, decl),
             decl->getSourceRange().getBegin());
         return nullptr;
+      }
+
+      if (name && name.isSimpleName()) {
+        assert(importedName.hasCustomName() &&
+               "imported function with simple name?");
+        // Just fill in empty argument labels.
+        name = DeclName(Impl.SwiftContext, name.getBaseName(), bodyParams);
       }
 
       if (name && name.getArgumentNames().size() != bodyParams->size()) {
