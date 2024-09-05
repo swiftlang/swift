@@ -24,6 +24,25 @@ struct X {
   var x16: Int
 }
 
+struct X2 {
+  var x1 : Int
+  var x2 : Int
+  var x3 : Int
+  var x4: Int
+  var x5: Int
+  var x6: Int
+  var x7: Int
+  var x8: Int
+  var x9: Int
+  var x10: Int
+  var x11: Int
+  var x12: Int
+  var x13: Int
+  var x14: Int
+  var x15: Int
+  var x16: Int
+}
+
 struct Y {
   var y1 : X
   var y2: X
@@ -313,4 +332,22 @@ bb0:
   dealloc_stack %0 : $*X
   %t = tuple ()
   return %t : $()
+}
+
+// CHECK: sil @test13
+// CHECK:  [[ADDR:%.*]] = unchecked_addr_cast %1 : $*X to $*Y
+// CHECK:  copy_addr [take] [[ADDR]] to [init] %2 : $*Y
+// CHECK: } // end sil function 'test13'
+sil @test13 : $@convention(thin) (@in X) -> () {
+bb0(%0 : $*X):
+  %1 = alloc_stack $Y
+  %2 = alloc_stack $X
+  copy_addr [take] %0 to [init] %2 : $*X
+  %4 = load %2 : $*X
+  %7 = unchecked_bitwise_cast %4 : $X to $Y
+  store %7 to %1: $*Y
+  %13 = tuple ()
+  dealloc_stack %2 : $*X
+  dealloc_stack %1 : $*Y
+  return %13 : $()
 }
