@@ -1173,6 +1173,39 @@ namespace {
       return outputTy;
     }
 
+    /// Add constraints for argument resolution for `UnresolvedApply` key path
+    /// component kind.
+    Type addApplyConstraints(
+        Expr *anchor, Type memberTy, ArgumentList *argList,
+        ConstraintLocator *applyComponentLoc,
+        SmallVectorImpl<TypeVariableType *> *addedTypeVars = nullptr) {
+      // Locators used in this expression.
+      assert(applyComponentLoc != nullptr && "applyComponentLoc should not be null");
+
+      auto fnLocator = CS.getConstraintLocator(
+          applyComponentLoc, ConstraintLocator::ApplyFunction);
+
+      auto fnResultLocator = CS.getConstraintLocator(
+          applyComponentLoc, ConstraintLocator::FunctionResult);
+
+      CS.associateArgumentList(applyComponentLoc, argList);
+
+      Type outputTy = CS.createTypeVariable(
+          fnResultLocator, TVO_CanBindToLValue | TVO_CanBindToNoEscape);
+      if (addedTypeVars)
+        addedTypeVars->push_back(outputTy->castTo<TypeVariableType>());
+
+      SmallVector<AnyFunctionType::Param, 8> params;
+      getMatchingParams(argList, params);
+
+      // Add the constraint that the index expression's type be convertible
+      // to the input type of the subscript operator.
+      CS.addApplicationConstraint(FunctionType::get(params, outputTy), memberTy,
+                                  /*trailingClosureMatching=*/std::nullopt,
+                                  CurDC, fnLocator);
+      return outputTy;
+    }
+
     Type openPackElement(Type packType, ConstraintLocator *locator,
                          PackExpansionExpr *packElementEnvironment) {
       if (!packElementEnvironment) {
@@ -3781,8 +3814,9 @@ namespace {
                                                            // needed
                   : component.getDeclRef().getDecl()->createNameRef();
 
+          auto refKind = component.getFunctionRefInfo();
           CS.addValueMemberConstraint(base, lookupName, memberTy, CurDC,
-                                      FunctionRefInfo::unapplied(lookupName),
+                                      refKind,
                                       /*outerAlternatives=*/{}, memberLocator);
           base = memberTy;
           break;
@@ -3812,6 +3846,13 @@ namespace {
             componentTypeVars.append(referencedVars.begin(),
                                      referencedVars.end());
           }
+          break;
+        }
+
+        case KeyPathExpr::Component::Kind::UnresolvedApply:
+        case KeyPathExpr::Component::Kind::Apply: {
+          base = addApplyConstraints(E, base, component.getArgs(),
+                                     memberLocator, &componentTypeVars);
           break;
         }
 
