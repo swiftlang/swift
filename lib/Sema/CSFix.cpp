@@ -1252,7 +1252,6 @@ bool AllowInvalidRefInKeyPath::diagnose(const Solution &solution,
     return failure.diagnose(asNote);
   }
 
-  case RefKind::Method:
   case RefKind::Initializer: {
     InvalidMethodRefInKeyPath failure(solution, Member, getLocator());
     return failure.diagnose(asNote);
@@ -1306,22 +1305,11 @@ AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, Type baseType,
           cs, baseType, RefKind::StaticMember, member, locator);
   }
 
-  // Referencing (instance or static) methods in key path is
-  // not currently allowed.
-  if (isa<FuncDecl>(member))
-    return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::Method,
-                                            member, locator);
-
   // Referencing enum cases in key path is not currently allowed.
   if (isa<EnumElementDecl>(member)) {
     return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::EnumCase,
                                             member, locator);
   }
-
-  // Referencing initializers in key path is not currently allowed.
-  if (isa<ConstructorDecl>(member))
-    return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::Initializer,
-                                            member, locator);
 
   if (auto *storage = dyn_cast<AbstractStorageDecl>(member)) {
     // Referencing members with mutating getters in key path is not
