@@ -67,7 +67,6 @@ extension Parser.ExperimentalFeatures {
     mapFeature(.ThenStatements, to: .thenStatements)
     mapFeature(.DoExpressions, to: .doExpressions)
     mapFeature(.NonescapableTypes, to: .nonescapableTypes)
-    mapFeature(.SendingArgsAndResults, to: .sendingArgsAndResults)
     mapFeature(.TrailingComma, to: .trailingComma)
   }
 }
