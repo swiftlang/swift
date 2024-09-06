@@ -322,8 +322,9 @@ struct ConcreteVectorMovesAsLike: ~Copyable {
 // CHECK-SAME:  , {{i64|i32}} 16
 // stride
 // CHECK-SAME:  , {{i64|i32}} 16
-// flags: alignment 3, not copyable
-// CHECK-SAME:  , <i32 0x800003>
+// flags: alignment 3, not copyable, (on 32-bit platforms) not storable inline
+// CHECK-64-SAME:  , <i32 0x800003>
+// CHECK-32-SAME:  , <i32 0x820003>
 struct ConcreteVectorIntMovesAsLike: ~Copyable {
   let vector: VectorMovesAsLike<Int32, 4>
 }
