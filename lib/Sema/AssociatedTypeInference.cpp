@@ -1921,11 +1921,15 @@ static Type getWithoutProtocolTypeAliases(Type type) {
 /// Also see simplifyCurrentTypeWitnesses().
 static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
                                       ValueDecl *witness) {
-  if (witness->isRecursiveValidation())
+  if (witness->isRecursiveValidation()) {
+    LLVM_DEBUG(llvm::dbgs() << "Recursive validation\n";);
     return Type();
+  }
 
-  if (witness->isInvalid())
+  if (witness->isInvalid()) {
+    LLVM_DEBUG(llvm::dbgs() << "Invalid witness\n";);
     return Type();
+  }
 
   if (!witness->getDeclContext()->isTypeContext()) {
     // FIXME: Could we infer from 'Self' to make these work?
