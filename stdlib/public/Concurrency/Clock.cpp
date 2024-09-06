@@ -147,10 +147,8 @@ switch (clock_id) {
 #elif (defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__))
       clock_getres(CLOCK_MONOTONIC, &continuous);
 #elif defined(_WIN32)
-      LARGE_INTEGER freq;
-      QueryPerformanceFrequency(&freq);
       continuous.tv_sec = 0;
-      continuous.tv_nsec = 1'000'000'000 / freq.QuadPart;
+      continuous.tv_nsec = 100;
 #else
 #error Missing platform continuous time definition
 #endif
