@@ -19,6 +19,7 @@
 #include "CSDiagnostics.h"
 #include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
+#include "OpenedExistentials.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckMacros.h"
 #include "TypeCheckProtocol.h"
@@ -965,7 +966,7 @@ namespace {
       auto *env = record.Archetype->getGenericEnvironment();
 
       if (resultTy->hasLocalArchetypeFromEnvironment(env)) {
-        Type erasedTy = constraints::typeEraseOpenedArchetypesFromEnvironment(
+        Type erasedTy = typeEraseOpenedArchetypesFromEnvironment(
             resultTy, env);
         auto range = result->getSourceRange();
         result = coerceToType(result, erasedTy, locator);
@@ -1676,7 +1677,7 @@ namespace {
         } else {
           // Erase opened existentials from the type of the thunk; we're
           // going to open the existential inside the thunk's body.
-          containerTy = constraints::typeEraseOpenedArchetypesFromEnvironment(
+          containerTy = typeEraseOpenedArchetypesFromEnvironment(
               containerTy, knownOpened->second->getGenericEnvironment());
           selfTy = containerTy;
         }
@@ -1740,7 +1741,7 @@ namespace {
           // If the base was an opened existential, erase the opened
           // existential.
           if (openedExistential) {
-            refType = constraints::typeEraseOpenedArchetypesFromEnvironment(
+            refType = typeEraseOpenedArchetypesFromEnvironment(
                 refType, baseTy->castTo<OpenedArchetypeType>()->getGenericEnvironment());
           }
 
@@ -1966,7 +1967,7 @@ namespace {
               getConstraintSystem().getConstraintLocator(memberLocator));
           if (knownOpened != solution.OpenedExistentialTypes.end()) {
             curryThunkTy =
-                constraints::typeEraseOpenedArchetypesFromEnvironment(
+                typeEraseOpenedArchetypesFromEnvironment(
                   curryThunkTy, knownOpened->second->getGenericEnvironment())
                     ->castTo<FunctionType>();
           }
@@ -3203,6 +3204,13 @@ namespace {
     Expr *visitTypeExpr(TypeExpr *expr) {
       auto toType = simplifyType(cs.getType(expr));
       assert(toType->is<MetatypeType>());
+      cs.setType(expr, toType);
+      return expr;
+    }
+
+    Expr *visitTypeValueExpr(TypeValueExpr *expr) {
+      auto toType = simplifyType(cs.getType(expr));
+      assert(toType->isEqual(expr->getParamType()->getValueType()));
       cs.setType(expr, toType);
       return expr;
     }
@@ -7750,6 +7758,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::GenericFunction:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
+  case TypeKind::Integer:
     break;
   }
 
@@ -7828,6 +7837,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::Pack:
   case TypeKind::PackExpansion:
   case TypeKind::PackElement:
+  case TypeKind::Integer:
     break;
 
   case TypeKind::BuiltinTuple:

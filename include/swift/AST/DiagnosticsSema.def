@@ -2830,7 +2830,7 @@ ERROR(protocol_has_missing_requirements_versioned,none,
       (Type, Type, llvm::VersionTuple, llvm::VersionTuple))
 ERROR(requirement_restricts_self,none,
       "%kindonly0 requirement %0 cannot add constraint "
-      "'%1%select{:|:| ==|:| has same shape as}2 %3' on 'Self'",
+      "'%1%select{:|:| ==|:| has same shape as|}2 %3' on 'Self'",
       (const ValueDecl *, StringRef, unsigned, StringRef))
 ERROR(witness_argument_name_mismatch,none,
       "%kind0 has different argument labels "
@@ -4109,6 +4109,8 @@ ERROR(attr_rawlayout_cannot_have_stored_properties,none,
       "type with @_rawLayout cannot have stored properties", ())
 ERROR(attr_rawlayout_cannot_have_alignment_attr,none,
       "type with @_rawLayout cannot also have an @_alignment attribute", ())
+ERROR(attr_rawlayout_invalid_count_type,none,
+      "@_rawLayout count must either be integer literal or a generic argument", ())
       
 // lazy
 ERROR(lazy_not_on_let,none,
@@ -7697,7 +7699,7 @@ ERROR(copyable_illegal_deinit, none,
       (const ValueDecl *))
 ERROR(inverse_cannot_be_conditional_on_requirement, none,
       "conditional conformance to suppressible %kind0 cannot depend on "
-      "'%noformat1%select{:|:| ==|:| has same shape as}2 %noformat3'",
+      "'%noformat1%select{:|:| ==|:| has same shape as|}2 %noformat3'",
       (const ProtocolDecl *, Type, unsigned, Type))
 ERROR(inverse_type_member_in_conforming_type,none,
       "%select{stored property %2|associated value %2}1 of "
@@ -7995,6 +7997,38 @@ WARNING(reference_to_unsafe_typed_decl,none,
       (bool, const ValueDecl *, Type))
 NOTE(unsafe_decl_here,none,
      "unsafe %kindbase0 declared here", (const ValueDecl *))
+
+//===----------------------------------------------------------------------===//
+// MARK: Value Generics
+//===----------------------------------------------------------------------===//
+
+ERROR(invalid_value_value_generic,none,
+      "%0 requires that %1 must be a valid value for %2",
+      (Type, Type, Type))
+NOTE(invalid_value_value_generic_requirement,none,
+     "requirement specified as %0 == %1%2",
+     (Type, Type, StringRef))
+ERROR(cannot_pass_type_for_value_generic,none,
+      "cannot pass type %0 as a value for generic value %1", (Type, Type))
+ERROR(value_type_used_in_type_parameter,none,
+      "cannot use value type %0 for generic argument %1", (Type, Type))
+ERROR(invalid_value_type_value_generic,none,
+      "%0 is not a supported value type for %1", (Type, Type))
+ERROR(invalid_value_generic_conformance,none,
+      "value generic type %0 cannot conform to protocol %1", (Type, Type))
+ERROR(invalid_value_generic_same_type,none,
+      "cannot constrain value parameter %0 to be type %1", (Type, Type))
+ERROR(integer_type_not_accepted,none,
+      "integer unexpectedly used in a type position", ())
+ERROR(value_generic_unexpected,none,
+      "using value generic %0 here is not allowed", (Type))
+ERROR(missing_value_generic_type,none,
+      "value generic %0 must have an explicit value type declared", (Identifier))
+ERROR(value_generics_missing_feature,none,
+      "value generics require '-enable-experimental-feature ValueGenerics'", ())
+ERROR(availability_value_generic_type_only_version_newer, none,
+      "values in generic types are only available in %0 %1 or newer",
+      (StringRef, llvm::VersionTuple))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

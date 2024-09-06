@@ -1293,7 +1293,8 @@ public:
   struct Entry {
     enum Kind {
       Metadata,
-      Shape
+      Shape,
+      Value
     };
 
     Kind kind;
@@ -1314,6 +1315,9 @@ public:
       SmallString<16> EncodeBuffer;
       llvm::raw_svector_ostream OS(EncodeBuffer);
       switch (Kind) {
+      case Entry::Kind::Value:
+        OS << "v";
+        break;
       case Entry::Kind::Shape:
         OS << "s";
         break;
@@ -1390,10 +1394,18 @@ public:
       switch (Bindings[i].getKind()) {
       case GenericRequirement::Kind::Shape:
       case GenericRequirement::Kind::Metadata:
-      case GenericRequirement::Kind::MetadataPack: {
-        auto Kind = (Bindings[i].getKind() == GenericRequirement::Kind::Shape
-                     ? Entry::Kind::Shape
-                     : Entry::Kind::Metadata);
+      case GenericRequirement::Kind::MetadataPack:
+      case GenericRequirement::Kind::Value: {
+        auto Kind = Entry::Kind::Metadata;
+
+        if (Bindings[i].getKind() == GenericRequirement::Kind::Shape) {
+          Kind = Entry::Kind::Shape;
+        }
+
+        if (Bindings[i].getKind() == GenericRequirement::Kind::Value) {
+          Kind = Entry::Kind::Value;
+        }
+
         auto Source = SourceBuilder.createClosureBinding(i);
         auto BindingType = Bindings[i].getTypeParameter().subst(Subs);
         auto InterfaceType = BindingType->mapTypeOutOfContext();
@@ -1448,6 +1460,10 @@ public:
       case GenericRequirement::Kind::Metadata:
       case GenericRequirement::Kind::MetadataPack:
         Kind = Entry::Kind::Metadata;
+        break;
+
+      case GenericRequirement::Kind::Value:
+        Kind = Entry::Kind::Value;
         break;
 
       case GenericRequirement::Kind::WitnessTable:

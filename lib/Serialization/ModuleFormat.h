@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 888; // public-module-name
+const uint16_t SWIFTMODULE_VERSION_MINOR = 889; // public-module-name
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -699,6 +699,15 @@ enum class FunctionTypeIsolation : uint8_t {
 };
 using FunctionTypeIsolationField = TypeIDField;
 
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class GenericParamKind : uint8_t {
+  Type   = 0,
+  Pack   = 1,
+  Value  = 2,
+};
+using GenericParamKindField = BCFixed<2>;
+
 // Encodes a VersionTuple:
 //
 //  Major
@@ -1219,10 +1228,12 @@ namespace decls_block {
 
   TYPE_LAYOUT(GenericTypeParamTypeLayout,
     GENERIC_TYPE_PARAM_TYPE,
-    BCFixed<1>,  // parameter pack?
-    DeclIDField, // generic type parameter decl or depth
-    BCVBR<4> // index + 1, or zero if we have a generic type
-            // parameter decl
+    GenericParamKindField, // param kind
+    BCFixed<1>,            // has decl?
+    BCFixed<15>,           // depth
+    BCFixed<16>,           // index
+    DeclIDField,           // generic type parameter decl or identifier
+    TypeIDField            // value type (if param kind == Value)
   );
 
   TYPE_LAYOUT(DependentMemberTypeLayout,
@@ -1470,6 +1481,12 @@ namespace decls_block {
     BCArray<TypeIDField>// component types
   );
 
+  TYPE_LAYOUT(IntegerTypeLayout,
+    INTEGER_TYPE,
+    BCFixed<1>,   // is negative?
+    BCBlob        // integer value text
+  );
+
   using TypeAliasLayout = BCRecordLayout<
     TYPE_ALIAS_DECL,
     IdentifierIDField, // name
@@ -1484,12 +1501,10 @@ namespace decls_block {
   >;
 
   using GenericTypeParamDeclLayout = BCRecordLayout<GENERIC_TYPE_PARAM_DECL,
-    IdentifierIDField, // name
-    BCFixed<1>,        // implicit flag
-    BCFixed<1>,        // parameter pack?
-    BCVBR<4>,          // depth
-    BCVBR<4>,          // index
-    BCFixed<1>         // opaque type?
+    IdentifierIDField,     // name
+    BCFixed<1>,            // implicit flag
+    BCFixed<1>,            // is opaque?
+    TypeIDField            // interface type
   >;
 
   using AssociatedTypeDeclLayout = BCRecordLayout<
@@ -2176,6 +2191,7 @@ namespace decls_block {
     RawLayout_DECL_ATTR,
     BCFixed<1>, // implicit
     TypeIDField, // like type
+    TypeIDField, // count type
     BCVBR<32>, // size
     BCVBR<8>, // alignment
     BCFixed<1> // movesAsLike

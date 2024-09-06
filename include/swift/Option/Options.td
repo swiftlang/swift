@@ -731,7 +731,11 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
 def disable_print_package_name_for_non_package_interface :
   Flag<["-"], "disable-print-package-name-for-non-package-interface">,
   Flags<[FrontendOption, NoDriverOption, HelpHidden]>,
-  HelpText<"Disable adding package name to public or private interface">;
+  HelpText<"No op; package name is only printed in package interface by default">;
+def print_package_name_in_non_package_interface :
+  Flag<["-"], "print-package-name-in-non-package-interface">,
+  Flags<[FrontendOption, NoDriverOption, HelpHidden]>,
+  HelpText<"Print package name in public or private interface">;
 
 def lto : Joined<["-"], "lto=">,
   Flags<[FrontendOption, NoInteractiveOption]>,

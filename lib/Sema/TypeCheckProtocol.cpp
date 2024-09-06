@@ -17,6 +17,7 @@
 #include "TypeCheckProtocol.h"
 #include "DerivedConformances.h"
 #include "MiscDiagnostics.h"
+#include "OpenedExistentials.h"
 #include "TypeAccessScopeChecker.h"
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
@@ -1132,7 +1133,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
         // defining a non-final class conforming to 'Collection' which uses
         // the default witness for 'Collection.Iterator', which is defined
         // as 'IndexingIterator<Self>'.
-        const auto selfRefInfo = req->findExistentialSelfReferences();
+        const auto selfRefInfo = findExistentialSelfReferences(req);
         if (!selfRefInfo.assocTypeRef) {
           covariantSelf = classDecl;
         }
@@ -1259,9 +1260,11 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
       // If there are no other issues, let's check whether this are
       // missing Sendable conformances when matching ObjC requirements.
-      // This is not an error until Swift 6 because `swift_attr` wasn't
-      // allowed in type contexts initially.
-      return req->isObjC() &&
+      // This is not an error until Swift 6 because i.e. `swift_attr` wasn't
+      // allowed in type contexts initially and introducing new concurrency
+      // attributes shouldn't break witnesses without strict concurrency
+      // enabled.
+      return req->preconcurrency() &&
              solution->getFixedScore()
                      .Data[SK_MissingSynthesizableConformance] > 0;
     }();
@@ -4034,7 +4037,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
 
   // Check whether this requirement uses Self in a way that might
   // prevent conformance from succeeding.
-  const auto selfRefInfo = requirement->findExistentialSelfReferences();
+  const auto selfRefInfo = findExistentialSelfReferences(requirement);
 
   if (selfRefInfo.selfRef == TypePosition::Invariant ||
       (selfRefInfo.selfRef == TypePosition::Covariant &&

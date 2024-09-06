@@ -156,6 +156,8 @@ LayoutConstraint Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
 ///     type-collection
 ///     type-array
 ///     '_'
+///     integer-literal
+///     '-' integer-literal
 ///     'Pack' '{' (type (',' type)*)? '}'    (only in SIL files)a
 ParserResult<TypeRepr> Parser::parseTypeSimple(
     Diag<> MessageID, ParseTypeReason reason) {
@@ -172,6 +174,12 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
   SourceLoc tildeLoc;
   if (Tok.isTilde()) {
     tildeLoc = consumeToken();
+  }
+
+  // Eat any '-' preceding the type.
+  SourceLoc minusLoc;
+  if (Tok.isMinus()) {
+    minusLoc = consumeToken();
   }
 
   switch (Tok.getKind()) {
@@ -230,6 +238,12 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     }
     return makeParserCodeCompletionResult<TypeRepr>(
         ErrorTypeRepr::create(Context, consumeToken(tok::code_complete)));
+  case tok::integer_literal: {
+    auto text = copyAndStripUnderscores(Tok.getText());
+    auto loc = consumeToken(tok::integer_literal);
+    ty = makeParserResult(new (Context) IntegerTypeRepr(text, loc, minusLoc));
+    break;
+  }
   case tok::l_square: {
     ty = parseTypeCollection();
     break;
@@ -1574,7 +1588,7 @@ bool Parser::canParseType() {
       return false;
     break;
   case tok::oper_prefix:
-    if (Tok.getText() != "~") {
+    if (Tok.getText() != "~" && Tok.getText() != "-") {
       return false;
     }
 
@@ -1610,7 +1624,9 @@ bool Parser::canParseType() {
   case tok::kw__:
     consumeToken();
     break;
-
+  case tok::integer_literal:
+    consumeToken();
+    break;
 
   default:
     return false;

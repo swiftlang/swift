@@ -112,6 +112,7 @@ case TypeKind::Id:
     case TypeKind::SILToken:
     case TypeKind::Module:
     case TypeKind::BuiltinTuple:
+    case TypeKind::Integer:
       return t;
 
     case TypeKind::PrimaryArchetype:
@@ -998,9 +999,7 @@ case TypeKind::Id:
       return subs;
 
     auto sig = subs.getGenericSignature();
-    return SubstitutionMap::get(sig,
-        QueryReplacementTypeArray{sig, newSubs},
-        LookUpConformanceInModule());
+    return SubstitutionMap::get(sig, newSubs, LookUpConformanceInModule());
   }
 
   CanType transformSILField(CanType fieldTy, TypePosition pos) {

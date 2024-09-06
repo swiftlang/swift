@@ -75,7 +75,8 @@ TYPEREPR(Fixed, TypeRepr)
 TYPEREPR(SILBox, TypeRepr)
 TYPEREPR(Self, TypeRepr)
 TYPEREPR(LifetimeDependent, TypeRepr)
-LAST_TYPEREPR(Self)
+TYPEREPR(Integer, TypeRepr)
+LAST_TYPEREPR(Integer)
 
 #undef SPECIFIER_TYPEREPR
 #undef ABSTRACT_TYPEREPR

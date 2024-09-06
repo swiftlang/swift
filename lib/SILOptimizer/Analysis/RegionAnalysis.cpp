@@ -2764,6 +2764,7 @@ CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
 CONSTANT_TRANSLATION(DebugStepInst, Ignored)
 CONSTANT_TRANSLATION(IncrementProfilerCounterInst, Ignored)
 CONSTANT_TRANSLATION(SpecifyTestInst, Ignored)
+CONSTANT_TRANSLATION(TypeValueInst, Ignored)
 
 //===---
 // Require

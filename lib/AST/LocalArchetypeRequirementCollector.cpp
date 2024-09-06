@@ -117,8 +117,7 @@ GenericTypeParamType *LocalArchetypeRequirementCollector::addParameter() {
     index = Params.back()->getIndex() + 1;
   }
 
-  auto *param = GenericTypeParamType::get(/*pack*/ false, Depth,
-                                          index, Context);
+  auto *param = GenericTypeParamType::getType(Depth, index, Context);
   Params.push_back(param);
   return param;
 }
@@ -177,9 +176,8 @@ Type MapLocalArchetypesOutOfContext::getInterfaceType(
   unsigned depth = baseGenericSig.getNextDepth();
   for (auto *capturedEnv : capturedEnvs) {
     if (capturedEnv == genericEnv) {
-      return GenericTypeParamType::get(/*isParameterPack=*/false,
-                                       depth, rootParam->getIndex(),
-                                       rootParam->getASTContext());
+      return GenericTypeParamType::getType(depth, rootParam->getIndex(),
+                                           rootParam->getASTContext());
     }
 
     ++depth;

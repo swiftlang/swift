@@ -2216,6 +2216,11 @@ namespace {
       llvm_unreachable("error type should not appear in IRGen");
     }
 
+    MetadataResponse visitIntegerType(CanIntegerType type,
+                                      DynamicMetadataRequest request) {
+      llvm_unreachable("integer type should not appear in IRGen");
+    }
+
     // These types are artificial types used for internal purposes and
     // should never appear in a metadata request.
 #define INTERNAL_ONLY_TYPE(ID)                                               \
@@ -3579,6 +3584,15 @@ IRGenFunction::emitTypeMetadataRefForLayout(SILType ty,
   auto response = emitTypeMetadataRef(layoutEquivalentType, request);
   setScopedLocalTypeMetadataForLayout(ty.getObjectType(), response);
   return response.getMetadata();
+}
+
+llvm::Value *IRGenFunction::emitValueGenericRef(CanType type) {
+  if (auto integer = type->getAs<IntegerType>()) {
+    return llvm::ConstantInt::get(IGM.SizeTy,
+                    integer->getValue().zextOrTrunc(IGM.SizeTy->getBitWidth()));
+  }
+
+  return tryGetLocalTypeData(type, LocalTypeDataKind::forValue());
 }
 
 namespace {

@@ -755,6 +755,9 @@ static GenericSignature getPlaceholderGenericSignature(
     ASTContext &ctx, ArrayRef<GenericTypeParamType *> genericParams) {
   SmallVector<Requirement, 2> requirements;
   for (auto param : genericParams) {
+    if (param->isValue())
+      continue;
+
     for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
       requirements.emplace_back(RequirementKind::Conformance, param,
@@ -822,6 +825,10 @@ InferredGenericSignatureRequest::evaluate(
              "Parsed an empty generic parameter list?");
 
       for (auto *gpDecl : *gpList) {
+        if (gpDecl->isValue() &&
+            !gpDecl->getASTContext().LangOpts.hasFeature(Feature::ValueGenerics))
+          gpDecl->diagnose(diag::value_generics_missing_feature);
+
         auto *gpType = gpDecl->getDeclaredInterfaceType()
                              ->castTo<GenericTypeParamType>();
         genericParams.push_back(gpType);

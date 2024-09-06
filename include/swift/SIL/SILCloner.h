@@ -85,6 +85,11 @@ struct SubstitutionMapWithLocalArchetypes {
                                     ProtocolDecl *proto) {
     if (isa<LocalArchetypeType>(origType))
       return swift::lookupConformance(substType, proto);
+
+    if (isa<PrimaryArchetypeType>(origType) ||
+        isa<PackArchetypeType>(origType))
+      origType = origType->mapTypeOutOfContext()->getCanonicalType();
+
     if (SubsMap)
       return SubsMap->lookupConformance(origType, proto);
 
@@ -2850,6 +2855,16 @@ void SILCloner<ImplClass>::visitDeinitExistentialValueInst(
   recordClonedInstruction(
       Inst, getBuilder().createDeinitExistentialValue(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitTypeValueInst(TypeValueInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+
+  recordClonedInstruction(
+      Inst, getBuilder().createTypeValue(getOpLocation(Inst->getLoc()),
+                                         getOpType(Inst->getType()),
+                                         getOpASTType(Inst->getParamType())));
 }
 
 template <typename ImplClass>

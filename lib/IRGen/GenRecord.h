@@ -203,9 +203,10 @@ public:
     }
 
     if (auto rawLayout = T.getRawLayout()) {
-      return takeRawLayout(IGF, dest, src, T, isOutlined,
-                           /* zeroizeIfSensitive */ false, rawLayout,
-                           /* isInit */ false);
+      return handleRawLayout(IGF, dest, src, T, isOutlined, rawLayout,
+            [&](const TypeInfo &ti, SILType type, Address dest, Address src) {
+        ti.assignWithTake(IGF, dest, src, type, isOutlined);
+      });
     }
 
     if (isOutlined || T.hasParameterizedExistential()) {
@@ -268,8 +269,10 @@ public:
       // If the fields are not ABI-accessible, use the value witness table.
       return emitInitializeWithTakeCall(IGF, T, dest, src);
     } else if (auto rawLayout = T.getRawLayout()) {
-      return takeRawLayout(IGF, dest, src, T, isOutlined, zeroizeIfSensitive,
-                           rawLayout, /* isInit */ true);
+      return handleRawLayout(IGF, dest, src, T, isOutlined, rawLayout,
+            [&](const TypeInfo &ti, SILType type, Address dest, Address src) {
+        ti.initializeWithTake(IGF, dest, src, type, isOutlined, zeroizeIfSensitive);
+      });
     } else if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
@@ -289,9 +292,10 @@ public:
       fillWithZerosIfSensitive(IGF, src, T);
   }
 
-  void takeRawLayout(IRGenFunction &IGF, Address dest, Address src, SILType T,
-                     bool isOutlined, bool zeroizeIfSensitive,
-                     RawLayoutAttr *rawLayout, bool isInit) const {
+  void handleRawLayout(IRGenFunction &IGF, Address dest, Address src, SILType T,
+                       bool isOutlined, RawLayoutAttr *rawLayout,
+                       std::function<void
+                          (const TypeInfo &, SILType, Address, Address)> body) const {
     if (rawLayout->shouldMoveAsLikeType()) {
       // Because we have a rawlayout attribute, we know this has to be a struct.
       auto structDecl = T.getStructOrBoundGenericStruct();
@@ -302,73 +306,24 @@ public:
         auto loweredLikeType = IGF.IGM.getLoweredType(likeType->subst(subs));
         auto &likeTypeInfo = IGF.IGM.getTypeInfo(loweredLikeType);
 
-        if (isInit) {
-          likeTypeInfo.initializeWithTake(IGF, dest, src, loweredLikeType,
-                                        isOutlined, zeroizeIfSensitive);
-        } else {
-          likeTypeInfo.assignWithTake(IGF, dest, src, loweredLikeType,
-                                      isOutlined);
-        }
+        body(likeTypeInfo, loweredLikeType, dest, src);
       }
 
       if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(structDecl)) {
         auto likeType = likeArray->first;
-        unsigned count = likeArray->second;
+        auto countType = likeArray->second;
 
         auto astT = T.getASTType();
         auto subs = astT->getContextSubstitutionMap();
         auto loweredLikeType = IGF.IGM.getLoweredType(likeType.subst(subs));
         auto &likeTypeInfo = IGF.IGM.getTypeInfo(loweredLikeType);
+        countType = countType.subst(subs);
 
-        for (unsigned i = 0; i != count; i += 1) {
-          auto index = llvm::ConstantInt::get(IGF.IGM.SizeTy, i);
-
-          Address srcEltAddr;
-          Address destEltAddr;
-
-          // If we have a fixed type, we can use a typed GEP to index into the
-          // array raw layout. Otherwise, we need to advance by bytes given the
-          // stride from the VWT of the like type.
-          if (auto fixedLikeType = dyn_cast<FixedTypeInfo>(&likeTypeInfo)) {
-            srcEltAddr = Address(IGF.Builder.CreateInBoundsGEP(
-                                    fixedLikeType->getStorageType(),
-                                    src.getAddress(),
-                                    index),
-                                 fixedLikeType->getStorageType(),
-                                 src.getAlignment());
-            destEltAddr = Address(IGF.Builder.CreateInBoundsGEP(
-                                    fixedLikeType->getStorageType(),
-                                    dest.getAddress(),
-                                    index),
-                                 fixedLikeType->getStorageType(),
-                                 dest.getAlignment());
-          } else {
-            auto eltSize = likeTypeInfo.getStride(IGF, loweredLikeType);
-            auto offset = IGF.Builder.CreateMul(index, eltSize);
-
-            srcEltAddr = Address(IGF.Builder.CreateInBoundsGEP(
-                                    IGF.IGM.Int8Ty,
-                                    src.getAddress(),
-                                    offset),
-                                 IGF.IGM.Int8Ty,
-                                 src.getAlignment());
-            destEltAddr = Address(IGF.Builder.CreateInBoundsGEP(
-                                    IGF.IGM.Int8Ty,
-                                    dest.getAddress(),
-                                    offset),
-                                 IGF.IGM.Int8Ty,
-                                 dest.getAlignment());
-          }
-
-          if (isInit) {
-            likeTypeInfo.initializeWithTake(IGF, destEltAddr, srcEltAddr,
-                                            loweredLikeType, isOutlined,
-                                            zeroizeIfSensitive);
-          } else {
-            likeTypeInfo.assignWithTake(IGF, destEltAddr, srcEltAddr,
-                                        loweredLikeType, isOutlined);
-          }
-        }
+        IGF.emitLoopOverElements(likeTypeInfo, loweredLikeType,
+                                 countType->getCanonicalType(), dest, src,
+            [&](Address dest, Address src) {
+          body(likeTypeInfo, loweredLikeType, dest, src);
+        });
       }
     }
   }
@@ -378,6 +333,13 @@ public:
     // If the fields are not ABI-accessible, use the value witness table.
     if (!AreFieldsABIAccessible) {
       return emitDestroyCall(IGF, T, addr);
+    }
+
+    if (auto rawLayout = T.getRawLayout()) {
+      return handleRawLayout(IGF, Address(), addr, T, isOutlined, rawLayout,
+            [&](const TypeInfo &ti, SILType type, Address dest, Address src) {
+        ti.destroy(IGF, src, type, isOutlined);
+      });
     }
 
     if (isOutlined || T.hasParameterizedExistential()) {

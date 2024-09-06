@@ -323,6 +323,8 @@ struct BridgedASTType {
 
   BRIDGED_INLINE bool isNoEscape() const;
 
+  BRIDGED_INLINE bool isInteger() const;
+
   inline bool mayEscape() const { return !isNoEscape() && isEscapable(); }
 
   // =========================================================================//
@@ -1019,6 +1021,8 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool ApplySite_isCalleeNoReturn() const;
   BRIDGED_INLINE SwiftInt FullApplySite_numIndirectResultArguments() const;
   BRIDGED_INLINE bool ConvertFunctionInst_withoutActuallyEscaping() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType TypeValueInst_getParamType() const;
+  BRIDGED_INLINE SwiftInt TypeValueInst_getValue() const;
 
   // =========================================================================//
   //                   VarDeclInst and DebugVariableInst

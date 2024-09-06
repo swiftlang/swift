@@ -4811,357 +4811,6 @@ void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
   }
 }
 
-GenericParameterReferenceInfo &
-GenericParameterReferenceInfo::operator|=(const GenericParameterReferenceInfo &other) {
-  hasCovariantSelfResult |= other.hasCovariantSelfResult;
-  if (other.selfRef > selfRef) {
-    selfRef = other.selfRef;
-  }
-  if (other.assocTypeRef > assocTypeRef) {
-    assocTypeRef = other.assocTypeRef;
-  }
-  return *this;
-}
-
-/// Forward declaration.
-static GenericParameterReferenceInfo
-findGenericParameterReferencesRec(CanGenericSignature,
-                                  GenericTypeParamType *,
-                                  GenericTypeParamType *,
-                                  Type, TypePosition, bool);
-
-/// Determine whether a function type with the given result type may have
-/// a covariant generic parameter type result. This is true if the result type
-/// is either a function type, or a generic parameter, possibly wrapped in some
-/// level of optionality.
-static bool canResultTypeHaveCovariantGenericParameterResult(Type resultTy) {
-  if (resultTy->is<AnyFunctionType>())
-    return true;
-
-  resultTy = resultTy->lookThroughAllOptionalTypes();
-  return resultTy->is<GenericTypeParamType>();
-}
-
-/// Report references to the given generic parameter within the given function
-/// type using the given generic signature.
-///
-/// \param position The current position in terms of variance.
-/// \param skipParamIndex The index of the parameter that shall be skipped.
-static GenericParameterReferenceInfo findGenericParameterReferencesInFunction(
-    CanGenericSignature genericSig,
-    GenericTypeParamType *origParam,
-    GenericTypeParamType *openedParam,
-    const AnyFunctionType *fnType, TypePosition position,
-    bool canBeCovariantResult, std::optional<unsigned> skipParamIndex) {
-  // If there are no type parameters, we're done.
-  if (!isa<GenericFunctionType>(fnType) && !fnType->hasTypeParameter())
-    return GenericParameterReferenceInfo();
-
-  auto inputInfo = GenericParameterReferenceInfo();
-  const auto params = fnType->getParams();
-  for (const auto paramIdx : indices(params)) {
-    // If this is the parameter we were supposed to skip, do so.
-    if (skipParamIndex && paramIdx == *skipParamIndex)
-      continue;
-
-    const auto &param = params[paramIdx];
-    // inout types are invariant.
-    if (param.isInOut()) {
-      inputInfo |= ::findGenericParameterReferencesRec(
-          genericSig, origParam, openedParam, param.getPlainType(),
-          TypePosition::Invariant, /*canBeCovariantResult=*/false);
-      continue;
-    }
-
-    // Parameters are contravariant, but if we're prior to the skipped
-    // parameter treat them as invariant because we're not allowed to
-    // reference the parameter at all.
-    TypePosition paramPos = position.flipped();
-    if (skipParamIndex && paramIdx < *skipParamIndex)
-      paramPos = TypePosition::Invariant;
-
-    inputInfo |= ::findGenericParameterReferencesRec(
-        genericSig, origParam, openedParam, param.getParameterType(), paramPos,
-        /*canBeCovariantResult=*/false);
-  }
-
-  canBeCovariantResult =
-      // &= does not short-circuit.
-      canBeCovariantResult &&
-      canResultTypeHaveCovariantGenericParameterResult(fnType->getResult());
-
-  const auto resultInfo = ::findGenericParameterReferencesRec(
-      genericSig, origParam, openedParam, fnType->getResult(),
-      position, canBeCovariantResult);
-
-  return inputInfo |= resultInfo;
-}
-
-/// Report references to the given generic parameter within the given type
-/// using the given generic signature.
-///
-/// \param position The current position in terms of variance.
-static GenericParameterReferenceInfo
-findGenericParameterReferencesRec(CanGenericSignature genericSig,
-                                  GenericTypeParamType *origParam,
-                                  GenericTypeParamType *openedParam,
-                                  Type type,
-                                  TypePosition position,
-                                  bool canBeCovariantResult) {
-  // If there are no type parameters, we're done.
-  if (!type->getCanonicalType()->hasTypeParameter())
-    return GenericParameterReferenceInfo();
-
-  // Tuples preserve variance.
-  if (auto tuple = type->getAs<TupleType>()) {
-    auto info = GenericParameterReferenceInfo();
-    for (auto &elt : tuple->getElements()) {
-      info |= findGenericParameterReferencesRec(
-          genericSig, origParam, openedParam, elt.getType(), position,
-          /*canBeCovariantResult=*/false);
-    }
-
-    return info;
-  }
-
-  // Function types preserve variance in the result type, and flip variance in
-  // the parameter type.
-  if (auto funcTy = type->getAs<AnyFunctionType>()) {
-    return findGenericParameterReferencesInFunction(
-        genericSig, origParam, openedParam, funcTy,
-        position, canBeCovariantResult,
-        /*skipParamIndex=*/std::nullopt);
-  }
-
-  // Metatypes preserve variance.
-  if (auto metaTy = type->getAs<MetatypeType>()) {
-    return findGenericParameterReferencesRec(genericSig, origParam, openedParam,
-                                             metaTy->getInstanceType(),
-                                             position, canBeCovariantResult);
-  }
-
-  // Optionals preserve variance.
-  if (auto optType = type->getOptionalObjectType()) {
-    return findGenericParameterReferencesRec(
-        genericSig, origParam, openedParam, optType,
-        position, canBeCovariantResult);
-  }
-
-  // DynamicSelfType preserves variance.
-  if (auto selfType = type->getAs<DynamicSelfType>()) {
-    return findGenericParameterReferencesRec(genericSig, origParam, openedParam,
-                                             selfType->getSelfType(), position,
-                                             /*canBeCovariantResult=*/false);
-  }
-
-  if (auto *const nominal = type->getAs<NominalOrBoundGenericNominalType>()) {
-    auto info = GenericParameterReferenceInfo();
-
-    // Don't forget to look in the parent.
-    if (const auto parent = nominal->getParent()) {
-      info |= findGenericParameterReferencesRec(
-          genericSig, origParam, openedParam, parent, TypePosition::Invariant,
-          /*canBeCovariantResult=*/false);
-    }
-
-    // Most bound generic types are invariant.
-    if (auto *const bgt = type->getAs<BoundGenericType>()) {
-      if (bgt->isArray()) {
-        // Swift.Array preserves variance in its 'Value' type.
-        info |= findGenericParameterReferencesRec(
-            genericSig, origParam, openedParam, bgt->getGenericArgs().front(),
-            position, /*canBeCovariantResult=*/false);
-      } else if (bgt->isDictionary()) {
-        // Swift.Dictionary preserves variance in its 'Element' type.
-        info |= findGenericParameterReferencesRec(
-            genericSig, origParam, openedParam, bgt->getGenericArgs().front(),
-            TypePosition::Invariant, /*canBeCovariantResult=*/false);
-        info |= findGenericParameterReferencesRec(
-            genericSig, origParam, openedParam, bgt->getGenericArgs().back(),
-            position, /*canBeCovariantResult=*/false);
-      } else {
-        for (const auto &paramType : bgt->getGenericArgs()) {
-          info |= findGenericParameterReferencesRec(
-              genericSig, origParam, openedParam, paramType,
-              TypePosition::Invariant, /*canBeCovariantResult=*/false);
-        }
-      }
-    }
-
-    return info;
-  }
-
-  // If the signature of an opaque result type has a same-type constraint
-  // that references Self, it's invariant.
-  if (auto opaque = type->getAs<OpaqueTypeArchetypeType>()) {
-    auto info = GenericParameterReferenceInfo();
-    auto opaqueSig = opaque->getDecl()->getOpaqueInterfaceGenericSignature();
-    for (const auto &req : opaqueSig.getRequirements()) {
-      switch (req.getKind()) {
-      case RequirementKind::SameShape:
-        llvm_unreachable("Same-shape requirement not supported here");
-
-      case RequirementKind::Conformance:
-      case RequirementKind::Layout:
-        continue;
-
-      case RequirementKind::SameType:
-        info |= findGenericParameterReferencesRec(
-            genericSig, origParam, openedParam, req.getFirstType(),
-            TypePosition::Invariant, /*canBeCovariantResult=*/false);
-
-        LLVM_FALLTHROUGH;
-
-      case RequirementKind::Superclass:
-        info |= findGenericParameterReferencesRec(
-            genericSig, origParam, openedParam, req.getSecondType(),
-            TypePosition::Invariant, /*canBeCovariantResult=*/false);
-        break;
-      }
-    }
-
-    return info;
-  }
-
-  if (auto *existential = type->getAs<ExistentialType>())
-    type = existential->getConstraintType();
-
-  // Protocol compositions are invariant.
-  if (auto *comp = type->getAs<ProtocolCompositionType>()) {
-    auto info = GenericParameterReferenceInfo();
-
-    for (auto member : comp->getMembers()) {
-      info |= findGenericParameterReferencesRec(
-          genericSig, origParam, openedParam, member,
-          TypePosition::Invariant, /*canBeCovariantResult=*/false);
-    }
-
-    return info;
-  }
-
-  // Packs are invariant.
-  if (auto *pack = type->getAs<PackType>()) {
-    auto info = GenericParameterReferenceInfo();
-
-    for (auto arg : pack->getElementTypes()) {
-      info |= findGenericParameterReferencesRec(
-          genericSig, origParam, openedParam, arg,
-          TypePosition::Invariant, /*canBeCovariantResult=*/false);
-    }
-
-    return info;
-  }
-
-  // Pack expansions are invariant.
-  if (auto *expansion = type->getAs<PackExpansionType>()) {
-    return findGenericParameterReferencesRec(
-        genericSig, origParam, openedParam, expansion->getPatternType(),
-        TypePosition::Invariant, /*canBeCovariantResult=*/false);
-  }
-
-  // Specifically ignore parameterized protocols and existential
-  // metatypes because we can erase them to the upper bound.
-  if (type->is<ParameterizedProtocolType>() ||
-      type->is<ExistentialMetatypeType>()) {
-    return GenericParameterReferenceInfo();
-  }
-
-  // Everything else should be a type parameter.
-  if (!type->isTypeParameter()) {
-    llvm::errs() << "Unhandled type:\n";
-    type->dump(llvm::errs());
-    abort();
-  }
-
-  if (!type->getRootGenericParam()->isEqual(origParam)) {
-    return GenericParameterReferenceInfo();
-  }
-
-  // A direct reference to 'Self'.
-  if (type->is<GenericTypeParamType>()) {
-    if (position == TypePosition::Covariant && canBeCovariantResult)
-      return GenericParameterReferenceInfo::forCovariantResult();
-
-    return GenericParameterReferenceInfo::forSelfRef(position);
-  }
-
-  if (origParam != openedParam) {
-    // Replace the original parameter with the parameter in the opened
-    // signature.
-    type = type.subst(
-      [&](SubstitutableType *type) {
-        ASSERT(type->isEqual(origParam));
-        return openedParam;
-      },
-      MakeAbstractConformanceForGenericType());
-  }
-
-  if (genericSig) {
-    // If the type parameter is beyond the domain of the opened
-    // signature, ignore it.
-    if (!genericSig->isValidTypeParameter(type)) {
-      return GenericParameterReferenceInfo();
-    }
-
-    if (auto reducedTy = genericSig.getReducedType(type)) {
-      if (!reducedTy->isEqual(type)) {
-        // Note: origParam becomes openedParam for the recursive call,
-        // because concreteTy is written in terms of genericSig and not
-        // the signature of the old origParam.
-        return findGenericParameterReferencesRec(
-            CanGenericSignature(), openedParam, openedParam, reducedTy,
-            position, canBeCovariantResult);
-      }
-    }
-  }
-
-  // A reference to an associated type rooted on 'Self'.
-  return GenericParameterReferenceInfo::forAssocTypeRef(position);
-}
-
-GenericParameterReferenceInfo
-swift::findGenericParameterReferences(const ValueDecl *value,
-                                      CanGenericSignature sig,
-                                      GenericTypeParamType *origParam,
-                                      GenericTypeParamType *openedParam,
-                                      std::optional<unsigned> skipParamIndex) {
-  if (isa<TypeDecl>(value))
-    return GenericParameterReferenceInfo();
-
-  auto type = value->getInterfaceType();
-
-  // Skip invalid declarations.
-  if (type->hasError())
-    return GenericParameterReferenceInfo();
-
-  // For functions and subscripts, take skipParamIndex into account.
-  if (isa<AbstractFunctionDecl>(value) || isa<SubscriptDecl>(value)) {
-    // And for a method, skip the 'self' parameter.
-    if (value->hasCurriedSelf())
-      type = type->castTo<AnyFunctionType>()->getResult();
-
-    return ::findGenericParameterReferencesInFunction(
-        sig, origParam, openedParam, type->castTo<AnyFunctionType>(),
-        TypePosition::Covariant, /*canBeCovariantResult=*/true,
-        skipParamIndex);
-  }
-
-  return ::findGenericParameterReferencesRec(sig, origParam, openedParam, type,
-                                             TypePosition::Covariant,
-                                             /*canBeCovariantResult=*/true);
-}
-
-GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences() const {
-  auto *dc = getDeclContext();
-  ASSERT(dc->getSelfProtocolDecl());
-
-  auto sig = dc->getGenericSignatureOfContext().getCanonicalSignature();
-  auto genericParam = dc->getSelfInterfaceType()->castTo<GenericTypeParamType>();
-
-  return findGenericParameterReferences(this, sig, genericParam, genericParam,
-                                        std::nullopt);
-}
-
 TypeDecl::CanBeInvertible::Result
 NominalTypeDecl::canConformTo(InvertibleProtocolKind ip) const {
   auto *proto = getASTContext().getProtocol(getKnownProtocolKind(ip));
@@ -5645,85 +5294,106 @@ Type TypeAliasDecl::getStructuralType() const {
 }
 
 GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
-                                           SourceLoc nameLoc, SourceLoc eachLoc,
+                                           SourceLoc nameLoc,
+                                           SourceLoc specifierLoc,
                                            unsigned depth, unsigned index,
-                                           bool isParameterPack,
+                                           GenericTypeParamKind paramKind,
                                            bool isOpaqueType,
                                            TypeRepr *opaqueTypeRepr)
     : TypeDecl(DeclKind::GenericTypeParam, dc, name, nameLoc, {}) {
-  assert(!(eachLoc && !isParameterPack) &&
-         "'each' keyword always means type parameter pack");
+  ASSERT(!(specifierLoc &&
+         !(paramKind == GenericTypeParamKind::Pack || paramKind == GenericTypeParamKind::Value)) &&
+    "'each' or 'let' keyword imply a parameter pack or value generic parameter");
+  ASSERT(isOpaqueType || !opaqueTypeRepr);
 
   Bits.GenericTypeParamDecl.Depth = depth;
   assert(Bits.GenericTypeParamDecl.Depth == depth && "Truncation");
   Bits.GenericTypeParamDecl.Index = index;
   assert(Bits.GenericTypeParamDecl.Index == index && "Truncation");
-  Bits.GenericTypeParamDecl.ParameterPack = isParameterPack;
+  Bits.GenericTypeParamDecl.ParamKind = (uint8_t) paramKind;
   Bits.GenericTypeParamDecl.IsOpaqueType = isOpaqueType;
-  assert(isOpaqueType || !opaqueTypeRepr);
-  if (isOpaqueType)
-    *getTrailingObjects<TypeRepr *>() = opaqueTypeRepr;
-  if (isParameterPack)
-    *getTrailingObjects<SourceLoc>() = eachLoc;
 
-  auto &ctx = dc->getASTContext();
-  RecursiveTypeProperties props = RecursiveTypeProperties::HasTypeParameter;
+  if (this->isOpaqueType())
+    *getTrailingObjects<TypeRepr *>() = opaqueTypeRepr;
+
   if (this->isParameterPack())
-    props |= RecursiveTypeProperties::HasParameterPack;
-  auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this, props);
-  setInterfaceType(MetatypeType::get(type, ctx));
+    *getTrailingObjects<SourceLoc>() = specifierLoc;
+
+  if (this->isValue())
+    *getTrailingObjects<SourceLoc>() = specifierLoc;
 }
 
 GenericTypeParamDecl *GenericTypeParamDecl::create(
-    DeclContext *dc, Identifier name, SourceLoc nameLoc, SourceLoc eachLoc,
-    unsigned depth, unsigned index, bool isParameterPack, bool isOpaqueType,
-    TypeRepr *opaqueTypeRepr) {
+    DeclContext *dc, Identifier name, SourceLoc nameLoc, SourceLoc specifierLoc,
+    unsigned depth, unsigned index, GenericTypeParamKind paramKind,
+    bool isOpaqueType, TypeRepr *opaqueTypeRepr) {
   auto &ctx = dc->getASTContext();
-  auto allocSize = totalSizeToAlloc<TypeRepr *, SourceLoc>(
-      isOpaqueType ? 1 : 0, isParameterPack ? 1 : 0);
+
+  auto numTypeReprs = 0;
+
+  if (isOpaqueType)
+    numTypeReprs = 1;
+
+  auto numSourceLocs = 0;
+
+  if (paramKind == GenericTypeParamKind::Pack ||
+      paramKind == GenericTypeParamKind::Value)
+    numSourceLocs = 1;
+
+  auto allocSize = totalSizeToAlloc<TypeRepr *, SourceLoc>(numTypeReprs,
+                                                           numSourceLocs);
   auto mem = ctx.Allocate(allocSize, alignof(GenericTypeParamDecl));
   return new (mem)
-      GenericTypeParamDecl(dc, name, nameLoc, eachLoc, depth, index,
-                           isParameterPack, isOpaqueType, opaqueTypeRepr);
+      GenericTypeParamDecl(dc, name, nameLoc, specifierLoc, depth, index,
+                           paramKind, isOpaqueType, opaqueTypeRepr);
 }
 
 GenericTypeParamDecl *GenericTypeParamDecl::createDeserialized(
     DeclContext *dc, Identifier name, unsigned depth, unsigned index,
-    bool isParameterPack, bool isOpaqueType) {
-  return GenericTypeParamDecl::create(dc, name, SourceLoc(), SourceLoc(), depth,
-                                      index, isParameterPack, isOpaqueType,
+    GenericTypeParamKind paramKind, bool isOpaqueType) {
+  return GenericTypeParamDecl::create(dc, name, SourceLoc(), SourceLoc(),
+                                      depth, index, paramKind,
+                                      isOpaqueType,
                                       /*opaqueRepr*/ nullptr);
 }
 
 GenericTypeParamDecl *
 GenericTypeParamDecl::createParsed(DeclContext *dc, Identifier name,
-                                   SourceLoc nameLoc, SourceLoc eachLoc,
-                                   unsigned index, bool isParameterPack) {
+                                   SourceLoc nameLoc, SourceLoc specifierLoc,
+                                   unsigned index,
+                                   GenericTypeParamKind paramKind) {
   // We always create generic type parameters with an invalid depth.
   // Semantic analysis fills in the depth when it processes the generic
   // parameter list.
   return GenericTypeParamDecl::create(
-      dc, name, nameLoc, eachLoc, GenericTypeParamDecl::InvalidDepth, index,
-      isParameterPack, /*isOpaqueType*/ false, /*opaqueTypeRepr*/ nullptr);
+      dc, name, nameLoc, specifierLoc, GenericTypeParamDecl::InvalidDepth,
+      index, paramKind, /*isOpaqueType*/ false, /*opaqueTypeRepr*/ nullptr);
 }
 
 GenericTypeParamDecl *GenericTypeParamDecl::createImplicit(
     DeclContext *dc, Identifier name, unsigned depth, unsigned index,
-    bool isParameterPack, bool isOpaqueType, TypeRepr *opaqueTypeRepr,
-    SourceLoc nameLoc, SourceLoc eachLoc) {
-  auto *param = GenericTypeParamDecl::create(dc, name, nameLoc, eachLoc, depth,
-                                             index, isParameterPack,
-                                             isOpaqueType, opaqueTypeRepr);
+    GenericTypeParamKind paramKind, TypeRepr *opaqueTypeRepr, SourceLoc nameLoc,
+    SourceLoc specifierLoc) {
+  auto *param = GenericTypeParamDecl::create(dc, name, nameLoc, specifierLoc,
+                                             depth, index, paramKind,
+                                             (bool)opaqueTypeRepr,
+                                             opaqueTypeRepr);
   param->setImplicit();
   return param;
+}
+
+Type GenericTypeParamDecl::getValueType() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+    GenericTypeParamDeclGetValueTypeRequest{const_cast<GenericTypeParamDecl *>(this)},
+    Type());
 }
 
 SourceRange GenericTypeParamDecl::getSourceRange() const {
   auto startLoc = getNameLoc();
   auto endLoc = getNameLoc();
 
-  if (const auto eachLoc = getEachLoc())
-    startLoc = eachLoc;
+  if (const auto specifierLoc = getSpecifierLoc())
+    startLoc = specifierLoc;
 
   if (!getInherited().empty())
     endLoc = getInherited().getEndLoc();
@@ -7587,8 +7257,14 @@ VarDecl::mutability(const DeclContext *UseDC,
   // declaration.  To handle top-level code properly, we look through
   // the TopLevelCode decl on the use (if present) since the vardecl may be
   // one level up.
-  if (getDeclContext() == UseDC)
+  if (getDeclContext() == UseDC) {
+    // Treat values of tuple type as mutable in these contexts, because
+    // SILGen wants to see them as lvalues.
+    if (getInterfaceType()->is<TupleType>())
+      return StorageMutability::Mutable;
+
     return StorageMutability::Initializable;
+  }
 
   if (isa<TopLevelCodeDecl>(UseDC) &&
       getDeclContext() == UseDC->getParent())

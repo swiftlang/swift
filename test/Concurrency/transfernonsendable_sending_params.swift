@@ -7,7 +7,9 @@
 // MARK: Declarations //
 ////////////////////////
 
-class NonSendableKlass {}
+class NonSendableKlass {
+  func use() {}
+}
 
 struct NonSendableStruct {
   var first = NonSendableKlass()
@@ -53,6 +55,9 @@ struct CustomActor {
 func throwingFunction() throws { fatalError() }
 
 func transferArg(_ x: sending NonSendableKlass) {
+}
+
+func transferArgAsync(_ x: sending NonSendableKlass) async {
 }
 
 func transferArgWithOtherParam(_ x: sending NonSendableKlass, _ y: NonSendableKlass) {
@@ -558,4 +563,57 @@ extension MyActor {
       // expected-note @-1:16 {{closure captures non-Sendable 'z'}}
     }
   }
+}
+
+// We would normally not error here since transferArg is nonisolated and c is
+// disconnected. Since c is passed as sending, we shouldn't squelch this.
+func disconnectedPassedSendingToNonIsolatedCallee(
+) async -> Void {
+    let c = NonSendableKlass()
+    transferArg(c) // expected-warning {{sending 'c' risks causing data races}}
+    // expected-note @-1 {{'c' used after being passed as a 'sending' parameter}}
+    c.use() // expected-note {{access can happen concurrently}}
+}
+
+// We would normally not error here since transferArg is nonisolated and c is
+// disconnected. Since c is passed as sending, we shouldn't squelch this.
+func disconnectedPassedSendingToAsyncNonIsolatedCallee(
+) async -> Void {
+    let c = NonSendableKlass()
+    await transferArgAsync(c) // expected-warning {{sending 'c' risks causing data races}}
+    // expected-note @-1 {{'c' used after being passed as a 'sending' parameter}}
+    c.use()  // expected-note {{access can happen concurrently}}
+}
+
+// We would normally not error here since transferArg is nonisolated and c is
+// disconnected. Since c is passed as sending, we shouldn't squelch this.
+func disconnectedPassedSendingToNonIsolatedCalleeIsolatedParam2(
+    isolation: isolated (any Actor)? = nil
+) async -> Void {
+    let c = NonSendableKlass()
+    transferArg(c) // expected-warning {{sending 'c' risks causing data races}}
+    // expected-note @-1 {{'c' used after being passed as a 'sending' parameter}}
+    c.use() // expected-note {{access can happen concurrently}}
+}
+
+// We would normally not error here since transferArg is nonisolated and c is
+// disconnected. Since c is passed as sending, we shouldn't squelch this.
+func disconnectedPassedSendingToAsyncNonIsolatedCalleeIsolatedParam2(
+  isolation: isolated (any Actor)? = nil
+) async -> Void {
+    let c = NonSendableKlass()
+    await transferArgAsync(c) // expected-warning {{sending 'c' risks causing data races}}
+    // expected-note @-1 {{'c' used after being passed as a 'sending' parameter}}
+    c.use() // expected-note {{access can happen concurrently}}
+}
+
+// We would normally not error here since transferArg is nonisolated and c is
+// disconnected. Since c is passed as sending, we shouldn't squelch this.
+func disconnectedPassedSendingToNonIsolatedCalleeIsolatedParam3(
+    isolation: isolated (any Actor)? = nil
+) -> Void {
+    let c = NonSendableKlass()
+    transferArg(c) // expected-warning {{sending 'c' risks causing data races}}
+    // expected-note @-1 {{'c' used after being passed as a 'sending' parameter}}
+    c.use() // expected-note {{access can happen concurrently}}
 }

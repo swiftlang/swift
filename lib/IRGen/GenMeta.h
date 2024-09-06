@@ -166,6 +166,15 @@ namespace irgen {
                                         unsigned reqtIndex,
                                         llvm::Value *metadata);
 
+  /// Given a reference to nominal type metadata of the given type,
+  /// derive a reference to the value for the nth argument metadata.
+  /// The type must have generic arguments.
+  llvm::Value *emitValueGenericRef(IRGenFunction &IGF,
+                                   NominalTypeDecl *theDecl,
+                                   const GenericTypeRequirements &reqts,
+                                   unsigned reqtIndex,
+                                   llvm::Value *metadata);
+
   /// Given a metatype value, read its instance type.
   llvm::Value *emitMetatypeInstanceType(IRGenFunction &IGF,
                                         llvm::Value *metatypeMetadata);
@@ -217,6 +226,12 @@ namespace irgen {
       : Kind(kind), Index(index), ReducedShape(reducedShape) {}
   };
 
+  struct GenericValueArgument {
+    CanType Type;
+
+    GenericValueArgument(CanType valueType) : Type(valueType) {}
+  };
+
   /// Description of the metadata emitted by adding generic requirements.
   struct GenericArgumentMetadata {
     unsigned NumParams = 0;
@@ -225,6 +240,7 @@ namespace irgen {
     unsigned NumGenericKeyArguments = 0;
     SmallVector<CanType, 1> ShapeClasses;
     SmallVector<GenericPackArgument, 1> GenericPackArguments;
+    SmallVector<GenericValueArgument, 1> GenericValueArguments;
   };
 
   /// Add generic parameters to the given constant struct builder.
@@ -269,6 +285,13 @@ namespace irgen {
                                       ConstantStructBuilder &B,
                                       ArrayRef<CanType> shapes,
                                       ArrayRef<GenericPackArgument> packArgs);
+
+  /// Add the generic value descriptors to the given constant struct builder.
+  ///
+  /// These appear in generic type metadata.
+  void addGenericValueDescriptors(IRGenModule &IGM,
+                                  ConstantStructBuilder &B,
+                                  ArrayRef<GenericValueArgument> values);
 
   llvm::GlobalValue *emitAsyncFunctionPointer(IRGenModule &IGM,
                                               llvm::Function *function,

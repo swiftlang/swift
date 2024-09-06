@@ -428,6 +428,7 @@ namespace {
     SmallVector<CanType, 2> ShapeClasses;
     SmallVector<GenericPackArgument, 2> GenericPackArguments;
     InvertibleProtocolSet ConditionalInvertedProtocols;
+    SmallVector<GenericValueArgument, 2> GenericValueArguments;
 
     GenericSignatureHeaderBuilder(IRGenModule &IGM,
                                   ConstantStructBuilder &builder)
@@ -450,6 +451,10 @@ namespace {
       }
 
       NumGenericKeyArguments += info.NumGenericKeyArguments;
+
+      for (auto value : info.GenericValueArguments) {
+        GenericValueArguments.push_back(value);
+      }
     }
 
     void finish(IRGenModule &IGM, ConstantStructBuilder &b) {
@@ -470,8 +475,9 @@ namespace {
       bool hasTypePacks = !GenericPackArguments.empty();
       bool hasConditionalInvertedProtocols =
           !ConditionalInvertedProtocols.empty();
+      bool hasValues = !GenericValueArguments.empty();
       GenericContextDescriptorFlags flags(
-          hasTypePacks, hasConditionalInvertedProtocols);
+          hasTypePacks, hasConditionalInvertedProtocols, hasValues);
       b.fillPlaceholderWithInt(FlagsPP, IGM.Int16Ty,
                                flags.getIntValue());
     }
@@ -527,6 +533,7 @@ namespace {
       asImpl().addGenericRequirements();
       asImpl().addGenericPackShapeDescriptors();
       asImpl().addConditionalInvertedProtocols();
+      asImpl().addGenericValueDescriptors();
       asImpl().finishGenericParameters();
     }
     
@@ -600,6 +607,20 @@ namespace {
 
       // Emit each GenericPackShapeDescriptor collected previously.
       irgen::addGenericPackShapeDescriptors(IGM, B, shapes, packArgs);
+    }
+
+    void addGenericValueDescriptors() {
+      auto values = SignatureHeader->GenericValueArguments;
+
+      // If we don't have any value arguments, there is nothing to emit.
+      if (values.empty())
+        return;
+
+      // NumValues
+      B.addInt(IGM.Int32Ty, values.size());
+
+      // Emit each GenericValueDescriptor collected previously.
+      irgen::addGenericValueDescriptors(IGM, B, values);
     }
 
     /// Retrieve the set of protocols that are suppressed in this context.
@@ -3192,9 +3213,9 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
                                 IGM.getPointerSize() * numFields);
 }
 
-static void emitInitializeRawLayoutOld(IRGenFunction &IGF, SILType likeType,
-                                       int32_t count, SILType T,
-                                       llvm::Value *metadata,
+static void emitInitializeRawLayoutOldOld(IRGenFunction &IGF, SILType likeType,
+                                          llvm::Value *count, SILType T,
+                                          llvm::Value *metadata,
                                        MetadataDependencyCollector *collector) {
   auto &IGM = IGF.IGM;
 
@@ -3248,9 +3269,9 @@ static void emitInitializeRawLayoutOld(IRGenFunction &IGF, SILType likeType,
                                        ValueWitnessFlags::IsNonPOD,
                                        "vwtFlags");
 
-  // Count is only ever -1 if we're not an array like layout.
-  if (count != -1) {
-    stride = IGF.Builder.CreateMul(stride, IGM.getSize(Size(count)));
+  // Count is only ever null if we're not an array like layout.
+  if (count != nullptr) {
+    stride = IGF.Builder.CreateMul(stride, count);
     size = stride;
   }
 
@@ -3275,11 +3296,11 @@ static void emitInitializeRawLayoutOld(IRGenFunction &IGF, SILType likeType,
   IGF.Builder.CreateLifetimeEnd(fieldLayouts, IGM.getPointerSize());
 }
 
-static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
-                                    int32_t count, SILType T,
-                                    llvm::Value *metadata,
-                                    MetadataDependencyCollector *collector) {
-  // If our deployment target doesn't contain the new swift_initRawStructMetadata,
+static void emitInitializeRawLayoutOld(IRGenFunction &IGF, SILType likeType,
+                                       llvm::Value *count, SILType T,
+                                       llvm::Value *metadata,
+                                       MetadataDependencyCollector *collector) {
+  // If our deployment target doesn't contain the swift_initRawStructMetadata,
   // emit a call to the swift_initStructMetadata tricking it into thinking
   // we have a single field.
   auto deploymentAvailability =
@@ -3289,7 +3310,7 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
   if (!IGF.IGM.Context.LangOpts.DisableAvailabilityChecking &&
       !deploymentAvailability.isContainedIn(initRawAvail) &&
       !IGF.IGM.getSwiftModule()->isStdlibModule()) {
-    emitInitializeRawLayoutOld(IGF, likeType, count, T, metadata, collector);
+    emitInitializeRawLayoutOldOld(IGF, likeType, count, T, metadata, collector);
     return;
   }
 
@@ -3297,10 +3318,59 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
   auto likeTypeLayout = emitTypeLayoutRef(IGF, likeType, collector);
   StructLayoutFlags flags = StructLayoutFlags::Swift5Algorithm;
 
+  // If we don't have a count, then we're the 'like:' variant and we need to
+  // pass '-1' to the runtime call.
+  if (!count) {
+    count = llvm::ConstantInt::get(IGF.IGM.Int32Ty, -1);
+  }
+
   // Call swift_initRawStructMetadata().
   IGF.Builder.CreateCall(IGM.getInitRawStructMetadataFunctionPointer(),
                          {metadata, IGM.getSize(Size(uintptr_t(flags))),
-                          likeTypeLayout, IGM.getInt32(count)});
+                          likeTypeLayout, count});
+}
+
+static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
+                                    llvm::Value *count, SILType T,
+                                    llvm::Value *metadata,
+                                    MetadataDependencyCollector *collector) {
+  // If our deployment target doesn't contain the swift_initRawStructMetadata2,
+  // emit a call to the older swift_initRawStructMetadata.
+  auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(IGF.IGM.Context);
+  auto initRaw2Avail = IGF.IGM.Context.getInitRawStructMetadata2Availability();
+
+  if (!IGF.IGM.Context.LangOpts.DisableAvailabilityChecking &&
+      !deploymentAvailability.isContainedIn(initRaw2Avail) &&
+      !IGF.IGM.getSwiftModule()->isStdlibModule()) {
+    emitInitializeRawLayoutOld(IGF, likeType, count, T, metadata, collector);
+    return;
+  }
+
+  auto &IGM = IGF.IGM;
+  auto rawLayout = T.getRawLayout();
+  auto likeTypeLayout = emitTypeLayoutRef(IGF, likeType, collector);
+  auto structLayoutflags = StructLayoutFlags::Swift5Algorithm;
+  auto rawLayoutFlags = (RawLayoutFlags) 0;
+
+  if (rawLayout->shouldMoveAsLikeType())
+    rawLayoutFlags |= RawLayoutFlags::MovesAsLike;
+
+  // If we don't have a count, then we're the 'like:' variant so just pass some
+  // 0 to the runtime call.
+  if (!count) {
+    count = IGM.getSize(Size(0));
+  } else {
+    rawLayoutFlags |= RawLayoutFlags::IsArray;
+  }
+
+  // Call swift_initRawStructMetadata2().
+  IGF.Builder.CreateCall(IGM.getInitRawStructMetadata2FunctionPointer(),
+                         {metadata,
+                          IGM.getSize(Size(uintptr_t(structLayoutflags))),
+                          likeTypeLayout,
+                          count,
+                          IGM.getSize(Size(uintptr_t(rawLayoutFlags)))});
 }
 
 static void emitInitializeValueMetadata(IRGenFunction &IGF,
@@ -3325,17 +3395,17 @@ static void emitInitializeValueMetadata(IRGenFunction &IGF,
     // is the wrong thing for these types.
     if (auto rawLayout = nominalDecl->getAttrs().getAttribute<RawLayoutAttr>()) {
       SILType loweredLikeType;
-      int32_t count = -1;
+      llvm::Value *count = nullptr;
 
       if (auto likeType = rawLayout->getResolvedScalarLikeType(sd)) {
         loweredLikeType = IGM.getLoweredType(AbstractionPattern::getOpaque(),
                                              *likeType);
       } else if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(sd)) {
         auto likeType = likeArray->first;
+        auto countType = likeArray->second;
         loweredLikeType = IGM.getLoweredType(AbstractionPattern::getOpaque(),
                                              likeType);
-
-        count = likeArray->second;
+        count = IGF.emitValueGenericRef(countType->getCanonicalType());
       }
 
       emitInitializeRawLayout(IGF, loweredLikeType, count, loweredTy, metadata,
@@ -4516,6 +4586,7 @@ namespace {
                                ClassDecl *forClass) {
       switch (requirement.getKind()) {
       case GenericRequirement::Kind::Shape:
+      case GenericRequirement::Kind::Value:
         B.addInt(cast<llvm::IntegerType>(requirement.getType(IGM)), 0);
         break;
       case GenericRequirement::Kind::Metadata:
@@ -6963,10 +7034,17 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
 
 static GenericParamDescriptor
 getGenericParamDescriptor(GenericTypeParamType *param, bool canonical) {
-  return GenericParamDescriptor(param->isParameterPack()
-                                ? GenericParamKind::TypePack
-                                : GenericParamKind::Type,
-                                /*key argument*/ canonical);
+  auto kind = GenericParamKind::Type;
+
+  if (param->isParameterPack()) {
+    kind = GenericParamKind::TypePack;
+  }
+
+  if (param->isValue()) {
+    kind = GenericParamKind::Value;
+  }
+
+  return GenericParamDescriptor(kind, /*key argument*/ canonical);
 }
 
 static bool canUseImplicitGenericParamDescriptors(CanGenericSignature sig) {
@@ -7013,6 +7091,13 @@ irgen::addGenericParameters(IRGenModule &IGM, ConstantStructBuilder &B,
 
       if (reducedShape->isEqual(param))
         metadata.ShapeClasses.push_back(reducedShape);
+    }
+
+    // Only key arguments count toward NumGenericValueArguments.
+    if (descriptor.hasKeyArgument() &&
+        descriptor.getKind() == GenericParamKind::Value) {
+      metadata.GenericValueArguments.push_back(
+          GenericValueArgument(param->getValueType()->getCanonicalType()));
     }
 
     if (descriptor.hasKeyArgument())
@@ -7081,6 +7166,7 @@ GenericArgumentMetadata irgen::addGenericRequirements(
   for (auto &requirement : requirements) {
     auto kind = requirement.getKind();
     bool isPackRequirement = requirement.getFirstType()->isParameterPack();
+    bool isValueRequirement = requirement.getFirstType()->isValueParameter();
 
     GenericRequirementKind abiKind;
     switch (kind) {
@@ -7111,7 +7197,8 @@ GenericArgumentMetadata irgen::addGenericRequirements(
         // Encode the class constraint.
         auto flags = GenericRequirementFlags(abiKind,
                                              /*key argument*/ false,
-                                             isPackRequirement);
+                                             isPackRequirement,
+                                             isValueRequirement);
         addGenericRequirement(IGM, B, metadata, sig, flags,
                               requirement.getFirstType(),
          [&]{ B.addInt32((uint32_t)GenericRequirementLayoutKind::Class); });
@@ -7137,8 +7224,9 @@ GenericArgumentMetadata irgen::addGenericRequirements(
 
         auto flags = GenericRequirementFlags(
             GenericRequirementKind::InvertedProtocols,
-            /*key argument*/ false,
-            /* is parameter pack */false);
+            /* key argument */ false,
+            /* is parameter pack */ false,
+            /* isValue */ false);
         addGenericRequirement(IGM, B, metadata, sig, flags,
                               requirement.getFirstType(),
          [&]{
@@ -7158,7 +7246,8 @@ GenericArgumentMetadata irgen::addGenericRequirements(
         Lowering::TypeConverter::protocolRequiresWitnessTable(protocol);
       auto flags = GenericRequirementFlags(abiKind,
                                            /*key argument*/needsWitnessTable,
-                                           isPackRequirement);
+                                           isPackRequirement,
+                                           isValueRequirement);
       auto descriptorRef =
         IGM.getConstantReferenceForProtocolDescriptor(protocol);
       addGenericRequirement(IGM, B, metadata, sig, flags,
@@ -7182,7 +7271,8 @@ GenericArgumentMetadata irgen::addGenericRequirements(
 
       auto flags = GenericRequirementFlags(abiKind,
                                            /*key argument*/false,
-                                           isPackRequirement);
+                                           isPackRequirement,
+                                           isValueRequirement);
       auto typeName =
           IGM.getTypeRef(requirement.getSecondType(), nullptr,
                          MangledTypeRefRole::Metadata).first;
@@ -7229,7 +7319,8 @@ GenericArgumentMetadata irgen::addGenericRequirements(
     auto flags = GenericRequirementFlags(
         GenericRequirementKind::InvertedProtocols,
         /*key argument*/ false,
-        genericParam->isParameterPack());
+        genericParam->isParameterPack(),
+        genericParam->isValue());
     addGenericRequirement(IGM, B, metadata, sig, flags,
                           Type(genericParam),
      [&]{ 
@@ -7261,6 +7352,29 @@ void irgen::addGenericPackShapeDescriptors(IRGenModule &IGM,
 
     // Unused
     B.addInt(IGM.Int16Ty, 0);
+  }
+}
+
+void irgen::addGenericValueDescriptors(IRGenModule &IGM,
+                                       ConstantStructBuilder &B,
+                                       ArrayRef<GenericValueArgument> values) {
+  for (auto value : values) {
+    auto valueType = 0;
+
+    if (value.Type->isInt()) {
+      valueType = 0;
+    } else {
+      llvm_unreachable("Unknown generic value value type?");
+    }
+
+    // TODO: Maybe this should be a relative pointer to the type that this value
+    // is? For the full generality of user defined value types. If we wanted to
+    // keep reserving this for just standard library types, then appending a kind
+    // here makes the most sense because we don't need to chase standard library
+    // type metadata at runtime.
+
+    // Value type
+    B.addInt(IGM.Int32Ty, valueType);
   }
 }
 

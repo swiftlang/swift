@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "OpenedExistentials.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckEffects.h"
 #include "swift/AST/ASTWalker.h"
@@ -820,7 +821,7 @@ static Type typeEraseOpenedArchetypes(Type type) {
   if (!env)
     return type;
 
-  return constraints::typeEraseOpenedArchetypesFromEnvironment(type, env);
+  return typeEraseOpenedArchetypesFromEnvironment(type, env);
 }
 
 /// A type expressing the result of classifying whether a call or function

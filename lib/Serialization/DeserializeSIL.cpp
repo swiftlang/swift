@@ -1365,6 +1365,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                         ValID3);
     RawOpCode = (unsigned)SILInstructionKind::PackElementSetInst;
     break;
+  case SIL_TYPE_VALUE:
+    SILTypeValueLayout::readRecord(scratch, TyID, TyCategory, TyID2);
+    RawOpCode = (unsigned)SILInstructionKind::TypeValueInst;
+    break;
   }
 
   // FIXME: validate
@@ -3443,6 +3447,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     for (auto fnID : ListOfValues) {
       (void)getFuncForReference(MF->getIdentifierText(fnID));
     }
+    break;
+  }
+  case SILInstructionKind::TypeValueInst: {
+    auto valueType = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory,
+                                Fn);
+    auto paramType = MF->getType(TyID2)->getCanonicalType();
+    ResultInst = Builder.createTypeValue(Loc, valueType, paramType);
     break;
   }
   }

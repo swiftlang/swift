@@ -2416,6 +2416,13 @@ public:
         getSILDebugLocation(Loc), valueTy, boxOperand));
   }
 
+  TypeValueInst *createTypeValue(SILLocation loc, SILType valueType,
+                                 CanType paramType) {
+    return insert(TypeValueInst::create(getFunction(),
+                              getSILDebugLocation(loc),
+                              valueType, paramType));
+  }
+
   //===--------------------------------------------------------------------===//
   // Unchecked cast helpers
   //===--------------------------------------------------------------------===//
