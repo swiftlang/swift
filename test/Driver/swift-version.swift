@@ -11,6 +11,9 @@
 // RUN: not %target-swiftc_driver -swift-version 5 -typecheck %s 2>&1 | %FileCheck --check-prefix ERROR_5 %s
 // RUN: not %target-swiftc_driver -swift-version 6 -typecheck %s 2>&1 | %FileCheck --check-prefix ERROR_6 %s
 
+// RUN: not %target-swiftc_driver -language-mode 4 -typecheck %s 2>&1 | %FileCheck --check-prefix ERROR_4 %s
+// RUN: not %target-swiftc_driver -language-mode 5 -typecheck %s 2>&1 | %FileCheck --check-prefix ERROR_5 %s
+
 // BAD: invalid value
 // BAD: note: valid arguments to '-swift-version' are '4', '4.2', '5', '6'
 
