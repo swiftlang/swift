@@ -1956,6 +1956,11 @@ Identifier ModuleDecl::getABIName() const {
   return getName();
 }
 
+void ModuleDecl::setABIName(Identifier name) {
+  getASTContext().moduleABINameWillChange(this, name);
+  ModuleABIName = name;
+}
+
 StringRef ModuleDecl::getModuleFilename() const {
   // FIXME: Audit uses of this function and figure out how to migrate them to
   // per-file names. Modules can consist of more than one file.
