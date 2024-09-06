@@ -944,7 +944,14 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // currently handle).
   if (BI->getArgs().empty() && !isa<SwitchEnumAddrInst>(destTerminator))
     return false;
-      
+
+  // Don't jump thread through a potential header - this can produce irreducible
+  // control flow and lead to infinite loop peeling.
+  bool DestIsLoopHeader = (LoopHeaders.count(DestBB) != 0);
+  if (DestIsLoopHeader) {
+    return false;
+  }
+
   // We don't have a great cost model at the SIL level, so we don't want to
   // blissly duplicate tons of code with a goal of improved performance (we'll
   // leave that to LLVM).  However, doing limited code duplication can lead to
@@ -1010,17 +1017,6 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // If we don't have anything that we can simplify, don't do it.
   if (ThreadingBudget <= 0)
     return false;
-
-  // Don't jump thread through a potential header - this can produce irreducible
-  // control flow and lead to infinite loop peeling.
-  bool DestIsLoopHeader = (LoopHeaders.count(DestBB) != 0);
-  if (DestIsLoopHeader) {
-    // Make an exception for switch_enum, but only if it's block was not already
-    // peeled out of it's original loop. In that case, further jump threading
-    // can accomplish nothing, and the loop will be infinitely peeled.
-    if (!isa<SwitchEnumInst>(destTerminator) || ClonedLoopHeaders.count(DestBB))
-      return false;
-  }
 
   // If it looks potentially interesting, decide whether we *can* do the
   // operation and whether the block is small enough to be worth duplicating.
