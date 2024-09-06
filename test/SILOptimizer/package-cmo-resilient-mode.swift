@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
+/// Enable Package CMO; conservative mode on resilient module.
 // RUN: %target-build-swift %t/Lib.swift \
 // RUN: -module-name=Lib -package-name Pkg \
 // RUN: -parse-as-library -emit-module -emit-module-path %t/Lib.swiftmodule -I%t \
@@ -18,10 +19,12 @@
 
 // RUN: rm -rf %t/Lib.swiftmodule
 
+/// Enable non-package CMO; conservative mode on non-resilient module,
+/// and compare results with Package CMO.
 // RUN: %target-build-swift %t/Lib.swift \
 // RUN: -module-name=Lib -package-name Pkg \
 // RUN: -parse-as-library -emit-module -emit-module-path %t/Lib.swiftmodule -I%t \
-// RUN: -Xfrontend -experimental-package-cmo -Xfrontend -experimental-allow-non-resilient-access \
+// RUN: -Xfrontend -enable-default-cmo \
 // RUN: -O -wmo
 
 // RUN: %target-sil-opt %t/Lib.swiftmodule -sil-verify-all -o %t/Lib-non-res.sil

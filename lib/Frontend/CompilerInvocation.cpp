@@ -2687,6 +2687,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
                      "-package-cmo",
                      "-allow-non-resilient-access");
+    } else if (!FEOpts.EnableLibraryEvolution) {
+      Diags.diagnose(SourceLoc(), diag::package_cmo_requires_library_evolution);
     } else {
       Opts.EnableSerializePackage = true;
       Opts.CMOMode = CrossModuleOptimizationMode::Default;
