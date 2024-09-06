@@ -43,32 +43,11 @@ void swift_get_time(
 #elif defined(_WIN32)
       // This needs to match what swift-corelibs-libdispatch does
 
-      // QueryInterruptTimePrecise() was added in Windows 10 and is, as
-      // the name suggests, more precise than QueryInterruptTime().
-      // Unfortunately, the symbol is not listed in any .lib file in the SDK and
-      // must be looked up dynamically at runtime even if our minimum deployment
-      // target is Windows 10.
-      typedef decltype(QueryInterruptTimePrecise) *QueryITP_FP;
-      static QueryITP_FP queryITP = nullptr;
-      static swift::once_t onceToken;
-      swift::once(onceToken, [] {
-        if (HMODULE hKernelBase = GetModuleHandleW(L"KernelBase.dll")) {
-          queryITP = reinterpret_cast<QueryITP_FP>(
-            GetProcAddress(hKernelBase, "QueryInterruptTimePrecise")
-          );
-        }
-      });
-
-      // Call whichever API is available. Both output a value measured in 100ns
+      // QueryInterruptTimePrecise() outputs a value measured in 100ns
       // units. We must divide the output by 10,000,000 to get a value in
       // seconds and multiply the remainder by 100 to get nanoseconds.
       ULONGLONG interruptTime;
-      if (queryITP) {
-        (* queryITP)(&interruptTime);
-      } else {
-        // Fall back to the older, less precise API.
-        (void)QueryInterruptTime(&interruptTime);
-      }
+      (void)QueryInterruptTimePrecise(&interruptTime);
       continuous.tv_sec = interruptTime / 10'000'000;
       continuous.tv_nsec = (interruptTime % 10'000'000) * 100;
 #else
@@ -91,32 +70,11 @@ void swift_get_time(
 #elif defined(_WIN32)
       // This needs to match what swift-corelibs-libdispatch does
 
-      // QueryUnbiasedInterruptTimePrecise() was added in Windows 10 and is, as
-      // the name suggests, more precise than QueryUnbiasedInterruptTime().
-      // Unfortunately, the symbol is not listed in any .lib file in the SDK and
-      // must be looked up dynamically at runtime even if our minimum deployment
-      // target is Windows 10.
-      typedef decltype(QueryUnbiasedInterruptTimePrecise) *QueryUITP_FP;
-      static QueryUITP_FP queryUITP = nullptr;
-      static swift::once_t onceToken;
-      swift::once(onceToken, [] {
-        if (HMODULE hKernelBase = GetModuleHandleW(L"KernelBase.dll")) {
-          queryUITP = reinterpret_cast<QueryUITP_FP>(
-            GetProcAddress(hKernelBase, "QueryUnbiasedInterruptTimePrecise")
-          );
-        }
-      });
-
-      // Call whichever API is available. Both output a value measured in 100ns
+      // QueryUnbiasedInterruptTimePrecise() outputs a value measured in 100ns
       // units. We must divide the output by 10,000,000 to get a value in
       // seconds and multiply the remainder by 100 to get nanoseconds.
       ULONGLONG unbiasedTime;
-      if (queryUITP) {
-        (* queryUITP)(&unbiasedTime);
-      } else {
-        // Fall back to the older, less precise API.
-        (void)QueryUnbiasedInterruptTime(&unbiasedTime);
-      }
+      (void)QueryUnbiasedInterruptTimePrecise(&unbiasedTime);
       suspending.tv_sec = unbiasedTime / 10'000'000;
       suspending.tv_nsec = (unbiasedTime % 10'000'000) * 100;
 #else
