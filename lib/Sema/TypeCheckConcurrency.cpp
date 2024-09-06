@@ -2905,8 +2905,6 @@ namespace {
       llvm_unreachable("expected a CallExpr in applyStack!");
     }
 
-    bool shouldWalkCaptureInitializerExpressions() override { return true; }
-
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
     }
