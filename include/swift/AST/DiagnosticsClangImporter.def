@@ -248,6 +248,9 @@ ERROR(failed_base_method_call_synthesis,none,
       "failed to synthesize call to the base method %0 of type %0",
       (ValueDecl *, ValueDecl *))
 
+ERROR(both_returns_retained_returns_unretained,none,
+      "%0 cannot be annotated with both swift_attr('returns_retained') and swift_attr('returns_unretained') attributes", (const clang::NamedDecl*))
+
 NOTE(unsupported_builtin_type, none, "built-in type '%0' not supported", (StringRef))
 NOTE(record_field_not_imported, none, "field %0 unavailable (cannot import)", (const clang::NamedDecl*))
 NOTE(invoked_func_not_imported, none, "function %0 unavailable (cannot import)", (const clang::NamedDecl*))
