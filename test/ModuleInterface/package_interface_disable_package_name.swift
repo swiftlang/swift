@@ -17,13 +17,20 @@
 
 // CHECK-PUBLIC-NOT: -package-name foopkg
 // CHECK-PUBLIC-NOT: -package-name barpkg
+// CHECK-PUBLIC-NOT: pkgVar
 // CHECK-PRIVATE-NOT: -package-name foopkg
 // CHECK-PRIVATE-NOT: -package-name barpkg
+// CHECK-PRIVATE-NOT: pkgVar
 // CHECK-PACKAGE-NOT: -package-name foopkg
 
 // CHECK-PUBLIC:  -enable-library-evolution -swift-version 6 -module-name Bar
 // CHECK-PRIVATE:  -enable-library-evolution -swift-version 6 -module-name Bar
 // CHECK-PACKAGE:  -enable-library-evolution -swift-version 6 -module-name Bar -package-name barpkg
+
+/// Typechecking interface files (without package-name in non-package interface) should succeed.
+// RUN: %target-swift-frontend -typecheck-module-from-interface %t/Bar.swiftinterface
+// RUN: %target-swift-frontend -typecheck-module-from-interface %t/Bar.private.swiftinterface -module-name Bar
+// RUN: %target-swift-frontend -typecheck-module-from-interface %t/Bar.package.swiftinterface -module-name Bar
 
 /// Verify building modules from non-package interfaces succeeds without the package-name flag.
 // RUN: %target-swift-frontend -compile-module-from-interface %t/Bar.swiftinterface -o %t/Bar.swiftmodule -module-name Bar
@@ -71,8 +78,13 @@
 // RUN: %target-swift-frontend -typecheck %t/Use.swift -I %t -package-name barpkg -experimental-package-interface-load -verify
 
 //--- Bar.swift
-public struct PubStruct {}
+public struct PubStruct {
+  public var pubVar: Int
+  package var pkgVar: Int
+}
+
 @_spi(bar) public struct SPIStruct {}
+
 package struct PkgStruct {}
 
 @usableFromInline
