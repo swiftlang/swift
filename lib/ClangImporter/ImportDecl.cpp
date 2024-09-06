@@ -3242,6 +3242,30 @@ namespace {
         return property->getParsedAccessor(AccessorKind::Set);
       }
 
+      // If a C++ decl is annotated with both swift_attr("returns_retained") and
+      // swift_attr("returns_unretained") then emit an error in the swift
+      // compiler. Note: this error is not emitted in the clang compiler because
+      // these attributes are used only for swift interop.
+      if (decl->hasAttrs()) {
+        bool returnsRetainedAttrIsPresent = false;
+        bool returnsUnretainedAttrIsPresent = false;
+        for (const auto *attr : decl->getAttrs()) {
+          if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
+            if (swiftAttr->getAttribute() == "returns_unretained") {
+              returnsUnretainedAttrIsPresent = true;
+            } else if (swiftAttr->getAttribute() == "returns_retained") {
+              returnsRetainedAttrIsPresent = true;
+            }
+          }
+        }
+
+        if (returnsRetainedAttrIsPresent && returnsUnretainedAttrIsPresent) {
+          HeaderLoc loc(decl->getLocation());
+          Impl.diagnose(loc, diag::both_returns_retained_returns_unretained,
+                        decl);
+        }
+      }
+
       return importFunctionDecl(decl, importedName, correctSwiftName,
                                 std::nullopt);
     }
