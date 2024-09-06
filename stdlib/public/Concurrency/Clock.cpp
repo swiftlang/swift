@@ -41,19 +41,36 @@ void swift_get_time(
 #elif (defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__))
       clock_gettime(CLOCK_MONOTONIC, &continuous);
 #elif defined(_WIN32)
-      LARGE_INTEGER freq;
-      QueryPerformanceFrequency(&freq);
-      LARGE_INTEGER count;
-      QueryPerformanceCounter(&count);
-      // Divide count (number of ticks) by frequency (number of ticks per
-      // second) to get the counter in seconds. We also need to multiply the
-      // count by 1,000,000,000 to get nanosecond resolution. By multiplying
-      // first, we maintain high precision. The resulting value is the tick
-      // count in nanoseconds. Use 128-bit math to avoid overflowing.
-      auto quadPart = static_cast<unsigned _BitInt(128)>(count.QuadPart);
-      auto ns = (quadPart * 1'000'000'000) / freq.QuadPart;
-      continuous.tv_sec = ns / 1'000'000'000;
-      continuous.tv_nsec = ns % 1'000'000'000;
+      // This needs to match what swift-corelibs-libdispatch does
+
+      // QueryInterruptTimePrecise() was added in Windows 10 and is, as
+      // the name suggests, more precise than QueryInterruptTime().
+      // Unfortunately, the symbol is not listed in any .lib file in the SDK and
+      // must be looked up dynamically at runtime even if our minimum deployment
+      // target is Windows 10.
+      typedef decltype(QueryInterruptTimePrecise) *QueryITP_FP;
+      static QueryITP_FP queryITP = nullptr;
+      static swift::once_t onceToken;
+      swift::once(onceToken, [] {
+        if (HMODULE hKernelBase = GetModuleHandleW(L"KernelBase.dll")) {
+          queryITP = reinterpret_cast<QueryITP_FP>(
+            GetProcAddress(hKernelBase, "QueryInterruptTimePrecise")
+          );
+        }
+      });
+
+      // Call whichever API is available. Both output a value measured in 100ns
+      // units. We must divide the output by 10,000,000 to get a value in
+      // seconds and multiply the remainder by 100 to get nanoseconds.
+      ULONGLONG interruptTime;
+      if (queryITP) {
+        (* queryITP)(&interruptTime);
+      } else {
+        // Fall back to the older, less precise API.
+        (void)QueryInterruptTime(&interruptTime);
+      }
+      continuous.tv_sec = interruptTime / 10'000'000;
+      continuous.tv_nsec = (interruptTime % 10'000'000) * 100;
 #else
 #error Missing platform continuous time definition
 #endif
@@ -72,6 +89,8 @@ void swift_get_time(
 #elif (defined(__OpenBSD__) || defined(__FreeBSD__))
       clock_gettime(CLOCK_UPTIME, &suspending);
 #elif defined(_WIN32)
+      // This needs to match what swift-corelibs-libdispatch does
+
       // QueryUnbiasedInterruptTimePrecise() was added in Windows 10 and is, as
       // the name suggests, more precise than QueryUnbiasedInterruptTime().
       // Unfortunately, the symbol is not listed in any .lib file in the SDK and
