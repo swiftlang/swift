@@ -164,6 +164,14 @@
 #define SWIFT_NONESCAPABLE \
   __attribute__((swift_attr("~Escapable")))
 
+/// Specifies that the return value is passed as owned for C++ functions and
+/// methods returning types annotated as `SWIFT_SHARED_REFERENCE`
+#define SWIFT_RETURNS_RETAINED __attribute__((swift_attr("returns_retained")))
+/// Specifies that the return value is passed as unowned for C++ functions and
+/// methods returning types annotated as `SWIFT_SHARED_REFERENCE`
+#define SWIFT_RETURNS_UNRETAINED                                               \
+  __attribute__((swift_attr("returns_unretained")))
+
 #else  // #if _CXX_INTEROP_HAS_ATTRIBUTE(swift_attr)
 
 // Empty defines for compilers that don't support `attribute(swift_attr)`.
@@ -179,6 +187,8 @@
 #define SWIFT_UNCHECKED_SENDABLE
 #define SWIFT_NONCOPYABLE
 #define SWIFT_NONESCAPABLE
+#define SWIFT_RETURNS_RETAINED
+#define SWIFT_RETURNS_UNRETAINED
 
 #endif // #if _CXX_INTEROP_HAS_ATTRIBUTE(swift_attr)
 

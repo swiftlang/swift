@@ -49,3 +49,7 @@ module DerivedFieldGetterReturnsOwnedFRT {
   requires cplusplus
 }
 
+module FunctionsAndMethodsReturningFRT {
+  header "cxx-functions-and-methods-returning-frt.h"
+  requires cplusplus
+}
