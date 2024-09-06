@@ -105,8 +105,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       return Action::Continue();
     }
 
-    bool shouldWalkCaptureInitializerExpressions() override { return true; }
-
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // See through implicit conversions of the expression.  We want to be able
       // to associate the parent of this expression with the ultimate callee.
@@ -1581,8 +1579,6 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
              cast<VarDecl>(DRE->getDecl())->isSelfParameter();
     }
 
-    bool shouldWalkCaptureInitializerExpressions() override { return true; }
-
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
     }
@@ -2227,8 +2223,6 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
       return parentContext->getInnermostClosureForSelfCapture();
     }
-
-    bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
     bool shouldRecordClosure(const AbstractClosureExpr *E) {
       // Record all closures in Swift 6 mode.
@@ -4561,8 +4555,6 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
   public:
     DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) { }
 
-    bool shouldWalkCaptureInitializerExpressions() override { return true; }
-
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
     }
@@ -4685,8 +4677,6 @@ class ObjCSelectorWalker : public ASTWalker {
 public:
   ObjCSelectorWalker(const DeclContext *dc, Type selectorTy)
     : Ctx(dc->getASTContext()), DC(dc), SelectorTy(selectorTy) { }
-
-  bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::Expansion;
@@ -5548,8 +5538,6 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       }
     }
 
-    bool shouldWalkCaptureInitializerExpressions() override { return true; }
-
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
     }
@@ -5622,8 +5610,6 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
         }
       }
     }
-
-    bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
