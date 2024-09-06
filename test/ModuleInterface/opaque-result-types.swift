@@ -25,6 +25,20 @@ public func foo<T: Foo>(_ x: T) -> some Foo {
   return x
 }
 
+// CHECK-LABEL: public var globalComputedVar: some OpaqueResultTypes.Foo {
+// CHECK-NEXT:    get
+// CHECK-NEXT:  }
+@available(SwiftStdlib 5.1, *)
+public var globalComputedVar: some Foo { 123 }
+
+// CHECK-LABEL: public var globalVar: some OpaqueResultTypes.Foo{{$}}
+@available(SwiftStdlib 5.1, *)
+public var globalVar: some Foo = 123
+
+// CHECK-LABEL: public var globalVarTuple: (some OpaqueResultTypes.Foo, some OpaqueResultTypes.Foo){{$}}
+@available(SwiftStdlib 5.1, *)
+public var globalVarTuple: (some Foo, some Foo) = (123, foo(123))
+
 public protocol AssocTypeInference {
   associatedtype Assoc: Foo
   associatedtype AssocProperty: Foo
