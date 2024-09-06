@@ -473,9 +473,7 @@ public:
   Identifier getABIName() const;
 
   /// Set the ABI name of the module;
-  void setABIName(Identifier name) {
-    ModuleABIName = name;
-  }
+  void setABIName(Identifier name);
 
   /// Get the package name of this module
   /// FIXME: remove this and bump module version rdar://104723918
