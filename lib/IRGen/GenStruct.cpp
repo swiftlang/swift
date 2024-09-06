@@ -1007,30 +1007,23 @@ namespace {
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
       }
 
-      auto decl = T.getASTType()->getStructOrBoundGenericStruct();
-      auto rawLayout = decl->getAttrs().getAttribute<RawLayoutAttr>();
-
       // If we have a raw layout struct who is fixed size, it means the
       // layout of the struct is fully concrete.
-      if (rawLayout) {
+      if (auto rawLayout = T.getRawLayout()) {
         // Defer to this fixed type info for type layout if the raw layout
         // specifies size and alignment.
         if (rawLayout->getSizeAndAlignment()) {
           return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
         }
 
-        // The given struct type T that we're building is fully concrete, but
-        // our like type is still in terms of the potential archetype of the
-        // type.
-        auto subs = T.getASTType()->getContextSubstitutionMap(decl);
-        auto likeType = rawLayout->getResolvedLikeType(decl).subst(subs);
-        auto loweredLikeType = IGM.getLoweredType(likeType->getCanonicalType());
+        auto likeType = T.getRawLayoutSubstitutedLikeType();
+        auto loweredLikeType = IGM.getLoweredType(likeType);
         auto likeTypeLayout = IGM.getTypeInfo(loweredLikeType)
             .buildTypeLayoutEntry(IGM, loweredLikeType, useStructLayouts);
 
         // If we're an array, use the ArrayLayoutEntry.
-        if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(decl)) {
-          auto countType = likeArray->second.subst(subs)->getCanonicalType();
+        if (rawLayout->getArrayLikeTypeAndCount()) {
+          auto countType = T.getRawLayoutSubstitutedCountType()->getCanonicalType();
           return IGM.typeLayoutCache.getOrCreateArrayEntry(likeTypeLayout,
                                                            loweredLikeType,
                                                            countType);
@@ -1133,29 +1126,22 @@ namespace {
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
       }
 
-      auto decl = T.getASTType()->getStructOrBoundGenericStruct();
-      auto rawLayout = decl->getAttrs().getAttribute<RawLayoutAttr>();
-
       // If we have a raw layout struct who is non-fixed size, it means the
       // layout of the struct is dependent on the archetype of the thing it's
       // like.
-      if (rawLayout) {
+      if (auto rawLayout = T.getRawLayout()) {
         // Note: We don't have to handle the size and alignment case here for
         // raw layout because those are always fixed, so only dependent layouts
         // will be non-fixed.
 
-        // The given struct type T that we're building is fully concrete, but
-        // our like type is still in terms of the potential archetype of the
-        // type.
-        auto subs = T.getASTType()->getContextSubstitutionMap(decl);
-        auto likeType = rawLayout->getResolvedLikeType(decl).subst(subs);
+        auto likeType = T.getRawLayoutSubstitutedLikeType();
         auto loweredLikeType = IGM.getLoweredType(likeType->getCanonicalType());
         auto likeTypeLayout = IGM.getTypeInfo(loweredLikeType)
             .buildTypeLayoutEntry(IGM, loweredLikeType, useStructLayouts);
 
         // If we're an array, use the ArrayLayoutEntry.
-        if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(decl)) {
-          auto countType = likeArray->second.subst(subs)->getCanonicalType();
+        if (rawLayout->getArrayLikeTypeAndCount()) {
+          auto countType = T.getRawLayoutSubstitutedCountType()->getCanonicalType();
           return IGM.typeLayoutCache.getOrCreateArrayEntry(likeTypeLayout,
                                                            loweredLikeType,
                                                            countType);

@@ -909,6 +909,12 @@ public:
     return sd->getAttrs().getAttribute<RawLayoutAttr>();
   }
 
+  /// If this is a raw layout type, returns the substituted like type.
+  Type getRawLayoutSubstitutedLikeType() const;
+
+  /// If this is a raw layout type, returns the substituted count type.
+  Type getRawLayoutSubstitutedCountType() const;
+
   /// If this is a SILBoxType, return getSILBoxFieldType(). Otherwise, return
   /// SILType().
   ///
