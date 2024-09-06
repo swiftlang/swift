@@ -2007,9 +2007,6 @@ class AllowInvalidRefInKeyPath final : public ConstraintFix {
     MutatingGetter,
     // Allow a reference to a method (instance or static) as
     // a key path component.
-    Method,
-    // Allow a reference to a initializer instance as a key path
-    // component.
     Initializer,
     // Allow a reference to an enum case as a key path component.
     EnumCase,
@@ -2034,10 +2031,6 @@ public:
     case RefKind::MutatingGetter:
       return "allow reference to a member with mutating getter as a key "
              "path component";
-    case RefKind::Method:
-      return "allow reference to a method as a key path component";
-    case RefKind::Initializer:
-      return "allow reference to an init method as a key path component";
     case RefKind::EnumCase:
       return "allow reference to an enum case as a key path component";
     }
