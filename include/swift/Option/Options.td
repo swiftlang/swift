@@ -790,11 +790,6 @@ def experimental_c_foreign_reference_types :
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
   HelpText<"Enable experimental C foreign references types (with reference counting).">;
 
-def experimental_cxx_stdlib :
-  Separate<["-"], "experimental-cxx-stdlib">,
-  Flags<[HelpHidden]>,
-  HelpText<"C++ standard library to use; forwarded to Clang's -stdlib flag">;
-
 def experimental_hermetic_seal_at_link:
   Flag<["-"], "experimental-hermetic-seal-at-link">,
   Flags<[FrontendOption, HelpHidden]>,
