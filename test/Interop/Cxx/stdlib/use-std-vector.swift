@@ -97,6 +97,11 @@ StdVectorTestSuite.test("VectorOfString as MutableCollection") {
     expectEqual(v[0], std.string("xyz"))
     expectEqual(v[1], std.string("abc"))
     expectEqual(v[2], std.string("ijk"))
+
+    v.sort() // Swift function
+    expectEqual(v[0], std.string("abc"))
+    expectEqual(v[1], std.string("ijk"))
+    expectEqual(v[2], std.string("xyz"))
 }
 #endif
 
