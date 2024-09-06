@@ -286,3 +286,22 @@ bb2(%8 : @reborrow @guaranteed $PairC, %9 : @guaranteed $C):
   return %99 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @unreachable_block :
+// CHECK:       bb1([[A1:%.*]] : @reborrow @guaranteed $C):
+// CHECK-NEXT:    = borrowed [[A1]] : $C from ()
+// CHECK:       bb2([[A2:%.*]] : @reborrow @guaranteed $C):
+// CHECK-NEXT:    = borrowed [[A2]] : $C from (%0 : $C)
+// CHECK:       } // end sil function 'unreachable_block'
+sil [ossa] @unreachable_block : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0 : $C
+  br bb2(%1 : $C)
+
+bb1(%3 : @guaranteed $C):
+  br bb2(%3 : $C)
+
+bb2(%5 : @guaranteed $C):
+  end_borrow %5 : $C
+  return %0 : $C
+}
+
