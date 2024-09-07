@@ -341,6 +341,51 @@ private struct InactiveCodeContainsReferenceCache {
   let configuredRegions: ConfiguredRegions
 }
 
+/// Search in inactive/unparsed code to look for evidence that something that
+/// looks unused is actually used in some configurations.
+private enum InactiveCodeChecker {
+  case name(String)
+  case tryOrThrow
+
+  /// Search for the kind of entity in the given syntax node.
+  func search(syntax: SourceFileSyntax, configuredRegions: ConfiguredRegions) -> Bool {
+    // If there are no regions, everything is active. This is the common case.
+    if configuredRegions.isEmpty {
+      return false
+    }
+
+    for token in syntax.tokens(viewMode: .sourceAccurate) {
+      // Match what we're looking for, and continue iterating if it doesn't
+      // match.
+      switch self {
+      case .name(let name):
+        guard let identifier = token.identifier, identifier.name == name else {
+          continue
+        }
+
+        break
+
+      case .tryOrThrow:
+        guard let keywordKind = token.keywordKind,
+              keywordKind == .try || keywordKind == .throw else {
+          continue
+        }
+
+        break
+      }
+
+      // We matched what we were looking for, now check whether it is in an
+      // inactive or unparsed region.
+      if configuredRegions.isActive(token) != .active {
+        // Found it in a non-active region.
+        return true
+      }
+    }
+
+    return false
+  }
+}
+
 /// Determine whether the inactive code within the given search range
 /// contains a token referring to the given name.
 @_cdecl("swift_ASTGen_inactiveCodeContainsReference")
@@ -378,26 +423,31 @@ public func inactiveCodeContainsReference(
     untypedCachePtr.pointee = .init(cache)
   }
 
-  // If there are no regions, everything is active. This is the common case.
-  if configuredRegions.isEmpty {
-    return false
-  }
+  return InactiveCodeChecker.name(String(bridged: bridgedName))
+    .search(syntax: syntax, configuredRegions: configuredRegions)
+}
 
-  // Walk all of the tokens in the search range looking for one that references
-  // the given name.
-  let name = String(bridged: bridgedName)
-  for token in syntax.tokens(viewMode: .sourceAccurate) {
-    guard let identifier = token.identifier else {
-      continue
-    }
+@_cdecl("swift_ASTGen_inactiveCodeContainsTryOrThrow")
+public func inactiveCodeContainsTryOrThrow(
+  astContext: BridgedASTContext,
+  sourceFileBuffer: BridgedStringRef,
+  searchRange: BridgedStringRef
+) -> Bool {
+  // Parse the region.
 
-    if identifier.name == name && configuredRegions.isActive(token) != .active {
-      // Found it in a non-active region.
-      return true
-    }
-  }
+  // FIXME: Use 'ExportedSourceFile' when C++ parser is replaced.
+  let searchRangeBuffer = UnsafeBufferPointer<UInt8>(start: searchRange.data, count: searchRange.count)
+  let syntax = Parser.parse(source: searchRangeBuffer)
 
-  return false
+  // Compute the configured regions within the search range.
+  let configuration = CompilerBuildConfiguration(
+    ctx: astContext,
+    sourceBuffer: searchRangeBuffer
+  )
+  let configuredRegions = syntax.configuredRegions(in: configuration)
+
+  return InactiveCodeChecker.tryOrThrow
+    .search(syntax: syntax, configuredRegions: configuredRegions)
 }
 
 @_cdecl("swift_ASTGen_freeInactiveCodeContainsReferenceCache")

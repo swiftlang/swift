@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckEffects.h"
+#include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
@@ -522,9 +523,7 @@ public:
     ShouldRecurse_t recurse = ShouldRecurse;
     // Skip the implementations of all local declarations... except
     // PBD.  We should really just have a PatternBindingStmt.
-    if (auto ic = dyn_cast<IfConfigDecl>(D)) {
-      recurse = asImpl().checkIfConfig(ic);
-    } else if (auto patternBinding = dyn_cast<PatternBindingDecl>(D)) {
+    if (auto patternBinding = dyn_cast<PatternBindingDecl>(D)) {
       if (patternBinding->isAsyncLet())
         recurse = asImpl().checkAsyncLet(patternBinding);
     } else if (auto macroExpansionDecl = dyn_cast<MacroExpansionDecl>(D)) {
@@ -1717,10 +1716,6 @@ private:
       return ShouldRecurse;
     }
 
-    ShouldRecurse_t checkIfConfig(IfConfigDecl *D) {
-      return ShouldRecurse;
-    }
-
     ShouldRecurse_t checkForEach(ForEachStmt *S) {
       classification.merge(Self.classifyForEach(S));
       return ShouldRecurse;
@@ -1829,10 +1824,6 @@ private:
       return ShouldRecurse;
     }
     ShouldRecurse_t checkInterpolatedStringLiteral(InterpolatedStringLiteralExpr *E) {
-      return ShouldRecurse;
-    }
-
-    ShouldRecurse_t checkIfConfig(IfConfigDecl *D) {
       return ShouldRecurse;
     }
 
@@ -2719,6 +2710,14 @@ public:
 
 };
 
+/// ASTGen helper function to look for a "try" or "throw" in inactive code
+/// within the given source file.
+extern "C" bool swift_ASTGen_inactiveCodeContainsTryOrThrow(
+    BridgedASTContext ctx,
+    BridgedStringRef sourceFileBuffer,
+    BridgedStringRef searchRange
+);
+
 /// A class to walk over a local context and validate the correctness
 /// of its error coverage.
 class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> {
@@ -3165,7 +3164,7 @@ private:
 
     S->getBody()->walk(*this);
 
-    diagnoseNoThrowInDo(S, scope);
+    diagnoseNoThrowInDo(S, scope, S->getBody()->getSourceRange());
 
     return MaxThrowingKind;
   }
@@ -3189,17 +3188,40 @@ private:
 
     S->getBody()->walk(*this);
 
-    diagnoseNoThrowInDo(S, scope);
+    diagnoseNoThrowInDo(S, scope, S->getBody()->getSourceRange());
 
     scope.preserveCoverageFromNonExhaustiveCatch();
     return MaxThrowingKind;
   }
 
-  void diagnoseNoThrowInDo(DoCatchStmt *S, ContextScope &scope) {
+  /// Determine whether the inactive code within the given body range
+  /// contains a "try" or a "throw".
+  bool inactiveCodeContainsTryOrThrow(SourceRange bodyRange) {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+    SourceManager &sourceMgr = Ctx.SourceMgr;
+    auto bufferID = sourceMgr.findBufferContainingLoc(bodyRange.Start);
+    StringRef sourceFileText = sourceMgr.getEntireTextForBuffer(bufferID);
+
+    // Extract the search text from that buffer.
+    auto searchTextCharRange = Lexer::getCharSourceRangeFromSourceRange(
+        sourceMgr, bodyRange);
+    StringRef searchText = sourceMgr.extractText(searchTextCharRange, bufferID);
+
+    return swift_ASTGen_inactiveCodeContainsTryOrThrow(
+        Ctx, sourceFileText, searchText);
+#else
+    return false;
+#endif
+  }
+
+  void diagnoseNoThrowInDo(
+      DoCatchStmt *S, ContextScope &scope, SourceRange bodyRange
+  ) {
     // Warn if nothing threw within the body, unless this is the
     // implicit do/catch in a debugger function.
     if (!Flags.has(ContextFlags::HasAnyThrowSite) &&
-        !scope.wasTopLevelDebuggerFunction()) {
+        !scope.wasTopLevelDebuggerFunction() &&
+        !inactiveCodeContainsTryOrThrow(bodyRange)) {
       Ctx.Diags.diagnose(S->getCatches().front()->getStartLoc(),
                          diag::no_throw_in_do_with_catch);
     }
@@ -3316,41 +3338,6 @@ private:
       E->getAppendingExpr()->walk(*this);
     scope.preserveCoverageFromInterpolatedString();
     return ShouldNotRecurse;
-  }
-
-  ShouldRecurse_t checkIfConfig(IfConfigDecl *ICD) {
-    // Check the inactive regions of a #if block to disable warnings that may
-    // be due to platform specific code.
-    struct ConservativeThrowChecker : public ASTWalker {
-      CheckEffectsCoverage &CEC;
-      ConservativeThrowChecker(CheckEffectsCoverage &CEC) : CEC(CEC) {}
-
-      MacroWalking getMacroWalkingBehavior() const override {
-        return MacroWalking::Arguments;
-      }
-
-      PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
-        if (isa<TryExpr>(E))
-          CEC.Flags.set(ContextFlags::HasAnyThrowSite);
-        return Action::Continue(E);
-      }
-
-      PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
-        if (isa<ThrowStmt>(S))
-          CEC.Flags.set(ContextFlags::HasAnyThrowSite);
-
-        return Action::Continue(S);
-      }
-    };
-
-    for (auto &clause : ICD->getClauses()) {
-      // Active clauses are handled by the normal AST walk.
-      if (clause.isActive) continue;
-
-      for (auto elt : clause.Elements)
-        elt.walk(ConservativeThrowChecker(*this));
-    }
-    return ShouldRecurse;
   }
 
   ShouldRecurse_t checkThrow(ThrowStmt *S) {
