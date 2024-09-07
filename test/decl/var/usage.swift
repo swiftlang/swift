@@ -247,6 +247,14 @@ func testBuildConfigs() {
 #endif
 }
 
+func postfixSuppression() -> Int {
+  let x = 10 // used to have warning: ... 'x' was never used...
+  return 5
+     #if FLAG
+     .modifier(x)
+     #endif
+}
+
 // same as above, but with a guard statement
 func testGuardWithPoundIf(x: Int?) {
   guard let x = x else { return }
