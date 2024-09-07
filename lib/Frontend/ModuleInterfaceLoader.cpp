@@ -214,10 +214,10 @@ namespace path = llvm::sys::path;
 
 static bool serializedASTLooksValid(const llvm::MemoryBuffer &buf,
                                     bool requiresOSSAModules,
-                                    StringRef requiredSDK) {
-  auto VI = serialization::validateSerializedAST(buf.getBuffer(),
-                                                 requiresOSSAModules,
-                                                 requiredSDK);
+                                    StringRef requiredSDK,
+                                    StringRef packageName) {
+  auto VI = serialization::validateSerializedAST(
+      buf.getBuffer(), requiresOSSAModules, requiredSDK, packageName);
   return VI.status == serialization::Status::Valid;
 }
 
@@ -260,6 +260,14 @@ struct ModuleRebuildInfo {
   };
   SmallVector<CandidateModule, 3> candidateModules;
 
+  /// Allows emitting remarks when rebuilding is required in an unusual situation.
+  /// E.g. In local builds, a package-external client can try to load a module
+  /// that's been built with a different package name; the module should not
+  /// be loaded for the client as it can contain package-specific optimized
+  /// content. In such case, we rebuild the module from interface, and emit
+  /// remarks on why rebuild is required, even without -Rmodule-interface-rebuild.
+  bool emitRemarks;
+
   CandidateModule &getOrInsertCandidateModule(StringRef path) {
     for (auto &mod : candidateModules) {
       if (mod.path == path) return mod;
@@ -285,7 +293,6 @@ struct ModuleRebuildInfo {
   void setSerializationStatus(StringRef path, serialization::Status status) {
     getOrInsertCandidateModule(path).serializationStatus = status;
   }
-
   /// Registers an out-of-date dependency at \c depPath for the module
   /// at \c modulePath.
   void addOutOfDateDependency(StringRef modulePath, StringRef depPath) {
@@ -358,6 +365,8 @@ struct ModuleRebuildInfo {
       return "target platform newer than current platform";
     case Status::SDKMismatch:
       return "SDK does not match";
+    case Status::PackageMismatch:
+      return "Package name does not match";
     case Status::Valid:
       return nullptr;
     }
@@ -495,14 +504,21 @@ public:
     // Clear the existing dependencies, because we're going to re-fill them
     // in validateSerializedAST.
     allDeps.clear();
-
+    serialization::ExtendedValidationInfo extendedInfo;
     LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << path << "\n");
+
     auto validationInfo = serialization::validateSerializedAST(
-        buf.getBuffer(), requiresOSSAModules,
-        ctx.LangOpts.SDKName, /*ExtendedValidationInfo=*/nullptr, &allDeps);
+        buf.getBuffer(), requiresOSSAModules, ctx.LangOpts.SDKName,
+        ctx.LangOpts.PackageName,
+        /*ExtendedValidationInfo=*/&extendedInfo, &allDeps);
 
     if (validationInfo.status != serialization::Status::Valid) {
       rebuildInfo.setSerializationStatus(path, validationInfo.status);
+      // When rebuild is unexpected, e.g. a client trying to load
+      // a module built with a different package name, emit remarks
+      // on why rebuild is required.
+      if (validationInfo.status == serialization::Status::PackageMismatch)
+        rebuildInfo.emitRemarks = true;
       return false;
     }
 
@@ -659,9 +675,9 @@ class ModuleInterfaceLoaderImpl {
     if (!modBuf)
       return false;
 
-    auto looksValid = serializedASTLooksValid(*modBuf.get(),
-                                              requiresOSSAModules,
-                                              ctx.LangOpts.SDKName);
+    auto looksValid =
+        serializedASTLooksValid(*modBuf.get(), requiresOSSAModules,
+                                ctx.LangOpts.SDKName, ctx.LangOpts.PackageName);
     if (!looksValid)
       return false;
 
@@ -1190,7 +1206,8 @@ class ModuleInterfaceLoaderImpl {
                            diag::rebuilding_module_from_interface, moduleName,
                            interfacePath);
     };
-    auto remarkRebuild = Opts.remarkOnRebuildFromInterface
+    auto remarkRebuild = Opts.remarkOnRebuildFromInterface ||
+                         rebuildInfo.emitRemarks
                        ? llvm::function_ref<void()>(remarkRebuildAll)
                        : nullptr;
 
@@ -2495,9 +2512,8 @@ bool ExplicitSwiftModuleLoader::canImportModule(
   }
 
   auto metaData = serialization::validateSerializedAST(
-      (*moduleBuf)->getBuffer(),
-      Ctx.SILOpts.EnableOSSAModules,
-      Ctx.LangOpts.SDKName);
+      (*moduleBuf)->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
+      Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName);
   versionInfo->setVersion(metaData.userModuleVersion,
                           ModuleVersionSourceKind::SwiftBinaryModule);
   return true;
@@ -2839,7 +2855,7 @@ bool ExplicitCASModuleLoader::canImportModule(
   }
   auto metaData = serialization::validateSerializedAST(
       (*moduleBuf)->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
-      Ctx.LangOpts.SDKName);
+      Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName);
   versionInfo->setVersion(metaData.userModuleVersion,
                           ModuleVersionSourceKind::SwiftBinaryModule);
   return true;

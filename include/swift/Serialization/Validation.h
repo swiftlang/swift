@@ -87,6 +87,10 @@ enum class Status {
   /// The module file was built with a different SDK than the one in use
   /// to build the client.
   SDKMismatch,
+
+  /// The module file was built with a different package name than
+  /// the one in use to build the client.
+  PackageMismatch,
 };
 
 /// Returns the string for the Status enum.
@@ -107,6 +111,7 @@ struct ValidationInfo {
   StringRef sdkVersion = {};
   StringRef problematicRevision = {};
   StringRef problematicChannel = {};
+  StringRef packageName = {};
   size_t bytes = 0;
   Status status = Status::Malformed;
   std::vector<StringRef> allowableClients;
@@ -275,14 +280,26 @@ struct SearchPath {
 /// compiled with -enable-ossa-modules.
 /// \param requiredSDK If not empty, only accept modules built with
 /// a compatible SDK. The StringRef represents the canonical SDK name.
+/// \param packageName Used to compare the package name between
+/// the module being serialized and the module loading it to determine whether
+/// the module being serialized should be accepted.
 /// \param[out] extendedInfo If present, will be populated with additional
 /// compilation options serialized into the AST at build time that may be
 /// necessary to load it properly.
 /// \param[out] dependencies If present, will be populated with list of
 /// input files the module depends on, if present in INPUT_BLOCK.
 ValidationInfo validateSerializedAST(
-    StringRef data, bool requiresOSSAModules,
-    StringRef requiredSDK,
+    StringRef data, bool requiresOSSAModules, StringRef requiredSDK,
+    StringRef PackageName, ExtendedValidationInfo *extendedInfo = nullptr,
+    SmallVectorImpl<SerializationOptions::FileDependency> *dependencies =
+        nullptr,
+    SmallVectorImpl<SearchPath> *searchPaths = nullptr);
+
+/// Calls validateSerializedAST above with an empty package name.
+/// FIXME: should be removed once the call site of this in
+/// lldb/source/Plugins/TypeSystem/Swift/SwiftASTContext.cpp is updated.
+ValidationInfo validateSerializedAST(
+    StringRef data, bool requiresOSSAModules, StringRef requiredSDK,
     ExtendedValidationInfo *extendedInfo = nullptr,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies =
         nullptr,

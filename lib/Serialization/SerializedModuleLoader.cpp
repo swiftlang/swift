@@ -315,7 +315,7 @@ SerializedModuleLoaderBase::getMatchingPackageOnlyImportsOfModule(
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       "", "", std::move(moduleBuf.get()), nullptr, nullptr, isFramework,
-      isRequiredOSSAModules, SDKName, recoverer, loadedModuleFile);
+      isRequiredOSSAModules, SDKName, packageName, recoverer, loadedModuleFile);
 
   if (loadedModuleFile->getModulePackageName() != packageName)
     return importedModuleNames;
@@ -491,7 +491,7 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       "", "", std::move(moduleBuf.get()), nullptr, nullptr, isFramework,
-      isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
+      isRequiredOSSAModules(), Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName,
       Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFile);
 
   if (Ctx.SearchPathOpts.ScannerModuleValidation) {
@@ -961,8 +961,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       moduleInterfacePath, moduleInterfaceSourcePath,
       std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
       std::move(moduleSourceInfoInputBuffer), isFramework,
-      isRequiredOSSAModules(),
-      Ctx.LangOpts.SDKName,
+      isRequiredOSSAModules(), Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName,
       Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFileCore);
   SerializedASTFile *fileUnit = nullptr;
 
@@ -1204,7 +1203,11 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     Ctx.Diags.diagnose(diagLoc, diagKind, loadInfo.name, ModuleName.str());
     break;
   }
-
+  case serialization::Status::PackageMismatch:
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_module_package_mismatch,
+                       ModuleName, loadInfo.packageName,
+                       Ctx.LangOpts.PackageName, moduleBufferID);
+    break;
   case serialization::Status::TargetIncompatible: {
     // FIXME: This doesn't handle a non-debugger REPL, which should also treat
     // this as a non-fatal error.
@@ -1260,6 +1263,7 @@ void swift::serialization::diagnoseSerializedASTLoadFailureTransitive(
   case serialization::Status::MalformedDocumentation:
   case serialization::Status::FailedToLoadBridgingHeader:
   case serialization::Status::NameMismatch:
+  case serialization::Status::PackageMismatch:
   case serialization::Status::TargetIncompatible:
   case serialization::Status::TargetTooNew:
   case serialization::Status::SDKMismatch:
@@ -1499,7 +1503,7 @@ bool SerializedModuleLoaderBase::canImportModule(
   if (moduleInputBuffer) {
     auto metaData = serialization::validateSerializedAST(
         moduleInputBuffer->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
-        Ctx.LangOpts.SDKName);
+        Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName);
 
     // If we only found binary module, make sure that is valid.
     if (metaData.status != serialization::Status::Valid &&

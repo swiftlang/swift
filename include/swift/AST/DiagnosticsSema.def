@@ -888,6 +888,9 @@ ERROR(serialization_target_incompatible,Fatal,
 ERROR(serialization_sdk_mismatch,Fatal,
       "cannot load module %0 built with SDK '%1' when using SDK '%2': %3",
       (Identifier, StringRef, StringRef, StringRef))
+REMARK(serialization_module_package_mismatch,none,
+      "cannot load module %0 built with package '%1' when using package '%2': %3",
+      (Identifier, StringRef, StringRef, StringRef))
 ERROR(serialization_target_incompatible_repl,none,
       "module %0 was created for incompatible target %1: %2",
       (Identifier, StringRef, StringRef))
