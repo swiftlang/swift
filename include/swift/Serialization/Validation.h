@@ -272,9 +272,8 @@ struct SearchPath {
 /// \param[out] dependencies If present, will be populated with list of
 /// input files the module depends on, if present in INPUT_BLOCK.
 ValidationInfo validateSerializedAST(
-    StringRef data, bool requiresOSSAModules,
-    StringRef requiredSDK,
-    ExtendedValidationInfo *extendedInfo = nullptr,
+    StringRef data, bool requiresOSSAModules, StringRef requiredSDK,
+    StringRef PackageName, ExtendedValidationInfo *extendedInfo = nullptr,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies =
         nullptr,
     SmallVectorImpl<SearchPath> *searchPaths = nullptr);

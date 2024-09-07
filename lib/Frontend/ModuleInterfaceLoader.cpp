@@ -214,10 +214,10 @@ namespace path = llvm::sys::path;
 
 static bool serializedASTLooksValid(const llvm::MemoryBuffer &buf,
                                     bool requiresOSSAModules,
-                                    StringRef requiredSDK) {
-  auto VI = serialization::validateSerializedAST(buf.getBuffer(),
-                                                 requiresOSSAModules,
-                                                 requiredSDK);
+                                    StringRef requiredSDK,
+                                    StringRef packageName) {
+  auto VI = serialization::validateSerializedAST(
+      buf.getBuffer(), requiresOSSAModules, requiredSDK, packageName);
   return VI.status == serialization::Status::Valid;
 }
 
@@ -495,11 +495,13 @@ public:
     // Clear the existing dependencies, because we're going to re-fill them
     // in validateSerializedAST.
     allDeps.clear();
-
+    serialization::ExtendedValidationInfo extendedInfo;
     LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << path << "\n");
+
     auto validationInfo = serialization::validateSerializedAST(
-        buf.getBuffer(), requiresOSSAModules,
-        ctx.LangOpts.SDKName, /*ExtendedValidationInfo=*/nullptr, &allDeps);
+        buf.getBuffer(), requiresOSSAModules, ctx.LangOpts.SDKName,
+        ctx.LangOpts.PackageName,
+        /*ExtendedValidationInfo=*/&extendedInfo, &allDeps);
 
     if (validationInfo.status != serialization::Status::Valid) {
       rebuildInfo.setSerializationStatus(path, validationInfo.status);
@@ -659,9 +661,9 @@ class ModuleInterfaceLoaderImpl {
     if (!modBuf)
       return false;
 
-    auto looksValid = serializedASTLooksValid(*modBuf.get(),
-                                              requiresOSSAModules,
-                                              ctx.LangOpts.SDKName);
+    auto looksValid =
+        serializedASTLooksValid(*modBuf.get(), requiresOSSAModules,
+                                ctx.LangOpts.SDKName, ctx.LangOpts.PackageName);
     if (!looksValid)
       return false;
 
@@ -2473,9 +2475,8 @@ bool ExplicitSwiftModuleLoader::canImportModule(
   }
 
   auto metaData = serialization::validateSerializedAST(
-      (*moduleBuf)->getBuffer(),
-      Ctx.SILOpts.EnableOSSAModules,
-      Ctx.LangOpts.SDKName);
+      (*moduleBuf)->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
+      Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName);
   versionInfo->setVersion(metaData.userModuleVersion,
                           ModuleVersionSourceKind::SwiftBinaryModule);
   return true;
@@ -2817,7 +2818,7 @@ bool ExplicitCASModuleLoader::canImportModule(
   }
   auto metaData = serialization::validateSerializedAST(
       (*moduleBuf)->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
-      Ctx.LangOpts.SDKName);
+      Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName);
   versionInfo->setVersion(metaData.userModuleVersion,
                           ModuleVersionSourceKind::SwiftBinaryModule);
   return true;

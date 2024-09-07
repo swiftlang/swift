@@ -417,10 +417,9 @@ private:
       std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
       std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
       std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-      bool isFramework,
-      bool requiresOSSAModules,
-      StringRef requiredSDK,
-      serialization::ValidationInfo &info, PathObfuscator &pathRecoverer);
+      bool isFramework, bool requiresOSSAModules, StringRef requiredSDK,
+      StringRef packageName, serialization::ValidationInfo &info,
+      PathObfuscator &pathRecoverer);
 
   /// Change the status of the current module.
   Status error(Status issue) {
@@ -555,15 +554,14 @@ public:
        std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-       bool isFramework, bool requiresOSSAModules,
-       StringRef requiredSDK, PathObfuscator &pathRecoverer,
+       bool isFramework, bool requiresOSSAModules, StringRef requiredSDK,
+       StringRef packageName, PathObfuscator &pathRecoverer,
        std::shared_ptr<const ModuleFileSharedCore> &theModule) {
     serialization::ValidationInfo info;
     auto *core = new ModuleFileSharedCore(
         std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
         std::move(moduleSourceInfoInputBuffer), isFramework,
-        requiresOSSAModules, requiredSDK, info,
-        pathRecoverer);
+        requiresOSSAModules, requiredSDK, packageName, info, pathRecoverer);
     if (!moduleInterfacePath.empty()) {
       ArrayRef<char> path;
       core->allocateBuffer(path, moduleInterfacePath);
