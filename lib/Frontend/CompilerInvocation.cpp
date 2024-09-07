@@ -2268,10 +2268,10 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
         return WarningAsErrorRule(WarningAsErrorRule::Action::Enable);
       case OPT_no_warnings_as_errors:
         return WarningAsErrorRule(WarningAsErrorRule::Action::Disable);
-      case OPT_warning_as_error:
+      case OPT_Werror:
         return WarningAsErrorRule(WarningAsErrorRule::Action::Enable,
                                   arg->getValue());
-      case OPT_no_warning_as_error:
+      case OPT_Wwarning:
         return WarningAsErrorRule(WarningAsErrorRule::Action::Disable,
                                   arg->getValue());
       default:
@@ -2321,6 +2321,10 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       Opts.LocalizationPath = A->getValue();
     }
   }
+  assert(!(Opts.SuppressWarnings &&
+           WarningAsErrorRule::hasConflictsWithSuppressWarnings(
+               Opts.WarningsAsErrorsRules)) &&
+         "conflicting arguments; should have been caught by driver");
 
   return false;
 }
