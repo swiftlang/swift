@@ -179,20 +179,33 @@ enum IfConfigError: Error, CustomStringConvertible {
   }
 }
 
+extension ExportedSourceFile {
+  /// Return the configured regions for this source file.
+  mutating func configuredRegions(astContext: BridgedASTContext) -> ConfiguredRegions {
+    if let _configuredRegions {
+      return _configuredRegions
+    }
+
+    let configuration = CompilerBuildConfiguration(
+      ctx: astContext,
+      sourceBuffer: buffer
+    )
+
+    let regions = syntax.configuredRegions(in: configuration)
+    _configuredRegions = regions
+    return regions
+  }
+}
 
 /// Extract the #if clause range information for the given source file.
 @_cdecl("swift_ASTGen_configuredRegions")
 public func configuredRegions(
   astContext: BridgedASTContext,
-  sourceFilePtr: UnsafeRawPointer,
+  sourceFilePtr: UnsafeMutableRawPointer,
   cRegionsOut: UnsafeMutablePointer<UnsafeMutablePointer<BridgedIfConfigClauseRangeInfo>?>
 ) -> Int {
   let sourceFilePtr = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1)
-  let configuration = CompilerBuildConfiguration(
-    ctx: astContext,
-    sourceBuffer: sourceFilePtr.pointee.buffer
-  )
-  let regions = sourceFilePtr.pointee.syntax.configuredRegions(in: configuration)
+  let regions = sourceFilePtr.pointee.configuredRegions(astContext: astContext)
 
   var cRegions: [BridgedIfConfigClauseRangeInfo] = []
 

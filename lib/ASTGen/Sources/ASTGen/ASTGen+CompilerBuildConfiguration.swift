@@ -25,10 +25,7 @@ extension ASTGenVisitor {
   /// produced due to the evaluation.
   func activeClause(in node: IfConfigDeclSyntax) -> IfConfigClauseSyntax? {
     // Determine the active clause.
-    let (activeClause, diagnostics) = node.activeClause(in: buildConfiguration)
-    diagnoseAll(diagnostics)
-
-    return activeClause
+    return configuredRegions.activeClause(for: node)
   }
 
   /// Visit a collection of elements that may contain #if clauses within it
