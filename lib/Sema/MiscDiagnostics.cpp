@@ -19,6 +19,7 @@
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckInvertible.h"
 #include "TypeChecker.h"
+#include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -3121,6 +3122,9 @@ class VarDeclUsageChecker : public ASTWalker {
   DeclContext *DC;
 
   DiagnosticEngine &Diags;
+
+  SourceRange FullRange;
+
   // Keep track of some information about a variable.
   enum {
     RK_Defined     = 1,      ///< Whether it was ever defined in this scope.
@@ -3156,8 +3160,9 @@ class VarDeclUsageChecker : public ASTWalker {
   void operator=(const VarDeclUsageChecker &) = delete;
 
 public:
-  VarDeclUsageChecker(DeclContext *DC,
-                      DiagnosticEngine &Diags) : DC(DC), Diags(Diags) {}
+  VarDeclUsageChecker(DeclContext *DC, DiagnosticEngine &Diags,
+                      SourceRange range)
+      : DC(DC), Diags(Diags), FullRange(range) {}
 
   // After we have scanned the entire region, diagnose variables that could be
   // declared with a narrower usage kind.
@@ -3227,11 +3232,6 @@ public:
     if (isa<TypeDecl>(D))
       return Action::SkipNode();
 
-    // The body of #if clauses are not walked into, we need custom processing
-    // for them.
-    if (auto *ICD = dyn_cast<IfConfigDecl>(D))
-      handleIfConfig(ICD);
-      
     // If this is a VarDecl, then add it to our list of things to track.
     if (auto *vd = dyn_cast<VarDecl>(D)) {
       if (shouldTrackVarDecl(vd)) {
@@ -3314,9 +3314,6 @@ public:
 
   /// The heavy lifting happens when visiting expressions.
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override;
-
-  /// handle #if directives.
-  void handleIfConfig(IfConfigDecl *ICD);
 
   /// Custom handling for statements.
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
@@ -3825,6 +3822,16 @@ SourceLoc swift::getFixItLocForVarToLet(VarDecl *var) {
   return SourceLoc();
 }
 
+extern "C" bool swift_ASTGen_inactiveCodeContainsReference(
+    BridgedASTContext ctx,
+    BridgedStringRef sourceFileBuffer,
+    BridgedStringRef searchRange,
+    BridgedStringRef name,
+    void **cache
+);
+
+extern "C" void swift_ASTGen_freeInactiveCodeContainsReferenceCache(void *cache);
+
 // After we have scanned the entire region, diagnose variables that could be
 // declared with a narrower usage kind.
 VarDeclUsageChecker::~VarDeclUsageChecker() {
@@ -3833,6 +3840,35 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
   // lets let the bigger issues get resolved first.
   if (sawError)
     return;
+
+  /// Check whether the given variable might have been referenced from an
+  /// inactive region of the source code.
+  void *usedInInactiveCache = nullptr;
+  auto isUsedInInactive = [&](VarDecl *var) -> bool {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+    // Extract the full buffer containing the source range.
+    ASTContext &ctx = DC->getASTContext();
+    SourceManager &sourceMgr = ctx.SourceMgr;
+    auto bufferID = sourceMgr.findBufferContainingLoc(FullRange.Start);
+    StringRef sourceFileText = sourceMgr.getEntireTextForBuffer(bufferID);
+
+    // Extract the search text from that buffer.
+    auto searchTextCharRange = Lexer::getCharSourceRangeFromSourceRange(
+        sourceMgr, FullRange);
+    StringRef searchText = sourceMgr.extractText(searchTextCharRange, bufferID);
+
+    return swift_ASTGen_inactiveCodeContainsReference(
+        ctx, sourceFileText, searchText, var->getName().str(),
+        &usedInInactiveCache);
+#else
+    return false;
+#endif
+  };
+  SWIFT_DEFER {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+    swift_ASTGen_freeInactiveCodeContainsReferenceCache(usedInInactiveCache);
+#endif
+  };
 
   for (auto p : VarDecls) {
     VarDecl *var;
@@ -3868,7 +3904,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         auto VD = dyn_cast<VarDecl>(FD->getStorage());
         if ((access & RK_Read) == 0) {
           auto found = AssociatedGetterRefExpr.find(VD);
-          if (found != AssociatedGetterRefExpr.end()) {
+          if (found != AssociatedGetterRefExpr.end() && !isUsedInInactive(VD)) {
             auto *DRE = found->second;
             Diags.diagnose(DRE->getLoc(), diag::unused_setter_parameter,
                            var->getName());
@@ -3902,6 +3938,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       // produce a fixit hint with a parent map, but this is a lot of effort for
       // a narrow case.
       if (access & RK_CaptureList) {
+        if (isUsedInInactive(var))
+          continue;
+
         Diags.diagnose(var->getLoc(), diag::capture_never_used,
                        var->getName());
         continue;
@@ -3915,6 +3954,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       if (auto *pbd = var->getParentPatternBinding()) {
         if (pbd->getSingleVar() == var && pbd->getInit(0) != nullptr &&
             !isa<TypedPattern>(pbd->getPattern(0))) {
+          if (isUsedInInactive(var))
+            continue;
+
           unsigned varKind = var->isLet();
           SourceRange replaceRange(
               pbd->getStartLoc(),
@@ -3945,6 +3987,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
               if (isa<NamedPattern>(LP->getSubPattern())) {
                 auto initExpr = SC->getCond()[0].getInitializer();
                 if (initExpr->getStartLoc().isValid()) {
+                  if (isUsedInInactive(var))
+                    continue;
+
                   unsigned noParens = initExpr->canAppendPostfixExpression();
 
                   // If the subexpr is an "as?" cast, we can rewrite it to
@@ -4012,6 +4057,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         });
 
         if (foundVP) {
+          if (isUsedInInactive(var))
+            continue;
+
           unsigned varKind = var->isLet();
           Diags
               .diagnose(var->getLoc(), diag::variable_never_used,
@@ -4023,6 +4071,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       
       // Otherwise, this is something more complex, perhaps
       //    let (a,b) = foo()
+      if (isUsedInInactive(var))
+        continue;
+
       if (isWrittenLet) {
         Diags.diagnose(var->getLoc(),
                        diag::immutable_value_never_used_but_assigned,
@@ -4045,6 +4096,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         // never mutated, but 'x' was.
         !isVarDeclPartOfPBDThatHadSomeMutation(var)) {
       SourceLoc FixItLoc = getFixItLocForVarToLet(var);
+
+      if (isUsedInInactive(var))
+        continue;
 
       // If this is a parameter explicitly marked 'var', remove it.
       if (FixItLoc.isInvalid()) {
@@ -4074,6 +4128,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     
     // If this is a variable that was only written to, emit a warning.
     if ((access & RK_Read) == 0) {
+      if (isUsedInInactive(var))
+        continue;
+
       Diags.diagnose(var->getLoc(), diag::variable_never_read, var->getName());
       continue;
     }
@@ -4295,56 +4352,12 @@ ASTWalker::PreWalkResult<Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   return Action::Continue(E);
 }
 
-/// handle #if directives.  All of the active clauses are already walked by the
-/// AST walker, but we also want to handle the inactive ones to avoid false
-/// positives.
-void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
-  struct ConservativeDeclMarker : public ASTWalker {
-    VarDeclUsageChecker &VDUC;
-    SourceFile *SF;
-
-    ConservativeDeclMarker(VarDeclUsageChecker &VDUC)
-      : VDUC(VDUC), SF(VDUC.DC->getParentSourceFile()) {}
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Arguments;
-    }
-
-    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
-      // If we see a bound reference to a decl in an inactive #if block, then
-      // conservatively mark it read and written.  This will silence "variable
-      // unused" and "could be marked let" warnings for it.
-      if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-        VDUC.addMark(DRE->getDecl(), RK_Read | RK_Written);
-      else if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(E)) {
-        auto name = declRef->getName();
-        auto loc = declRef->getLoc();
-        if (name.isSimpleName() && loc.isValid()) {
-          auto *varDecl = dyn_cast_or_null<VarDecl>(
-            ASTScope::lookupSingleLocalDecl(SF, name.getFullName(), loc));
-          if (varDecl)
-            VDUC.addMark(varDecl, RK_Read|RK_Written);
-        }
-      }
-      return Action::Continue(E);
-    }
-  };
-
-  for (auto &clause : ICD->getClauses()) {
-    // Active clauses are handled by the normal AST walk.
-    if (clause.isActive) continue;
-
-    for (auto elt : clause.Elements)
-      elt.walk(ConservativeDeclMarker(*this));
-  }
-}
-
 /// Apply the warnings managed by VarDeclUsageChecker to the top level
 /// code declarations that haven't been checked yet.
 void swift::
 performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD) {
   auto &ctx = TLCD->getDeclContext()->getASTContext();
-  VarDeclUsageChecker checker(TLCD, ctx.Diags);
+  VarDeclUsageChecker checker(TLCD, ctx.Diags, TLCD->getSourceRange());
   TLCD->walk(checker);
 }
 
@@ -4359,7 +4372,7 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
     // declared as constants. Skip local functions though, since they will
     // be checked as part of their parent function or TopLevelCodeDecl.
     auto &ctx = AFD->getDeclContext()->getASTContext();
-    VarDeclUsageChecker checker(AFD, ctx.Diags);
+    VarDeclUsageChecker checker(AFD, ctx.Diags, AFD->getBody()->getSourceRange());
     AFD->walk(checker);
   }
 

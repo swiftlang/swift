@@ -237,9 +237,22 @@ func testForceValueExpr() {
 func testBuildConfigs() {
   let abc = 42    // no warning.
   var mut = 18    // no warning.
+  let other = 15  // no warning?
+  var othermut = 15  // no warning
 #if false
   mut = abc    // These uses prevent abc/mut from being unused/unmutated.
 #endif
+#if compiler(>=10.0)
+  othermut = other    // This use prevents other/othermut from being unused/unmutated
+#endif
+}
+
+func postfixSuppression() -> Int {
+  let x = 10 // used to have warning: ... 'x' was never used...
+  return 5
+     #if FLAG
+     .modifier(x)
+     #endif
 }
 
 // same as above, but with a guard statement
