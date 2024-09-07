@@ -15,7 +15,10 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR}/Internal
 
 set(swift_concurrency_private_link_libraries)
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-  list(APPEND swift_concurrency_private_link_libraries Synchronization)
+  list(APPEND swift_concurrency_private_link_libraries
+    Synchronization
+    mincore.lib # For QueryInterruptTime()
+  )
 endif()
 
 set(swift_concurrency_incorporate_object_libraries_so swiftThreading)
