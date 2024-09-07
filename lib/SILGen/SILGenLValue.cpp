@@ -2227,7 +2227,7 @@ namespace {
       auto decl = cast<AccessorDecl>(Accessor.getFuncDecl());
 
       // 'modify' always returns an address of the right type.
-      if (decl->getAccessorKind() == AccessorKind::Modify) {
+      if (isYieldingDefaultMutatingAccessor(decl->getAccessorKind())) {
         assert(yields.size() == 1);
         return yields[0];
       }

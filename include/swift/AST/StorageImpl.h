@@ -49,6 +49,57 @@ enum class AccessorKind {
 #undef LAST_ACCESSOR
 };
 
+inline bool isYieldingAccessor(AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::Read:
+  case AccessorKind::Modify:
+    return true;
+  case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
+  case AccessorKind::Set:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
+  case AccessorKind::Address:
+  case AccessorKind::MutableAddress:
+  case AccessorKind::Init:
+    return false;
+  }
+}
+
+inline bool isYieldingDefaultNonmutatingAccessor(AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::Read:
+    return true;
+  case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
+  case AccessorKind::Set:
+  case AccessorKind::Modify:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
+  case AccessorKind::Address:
+  case AccessorKind::MutableAddress:
+  case AccessorKind::Init:
+    return false;
+  }
+}
+
+inline bool isYieldingDefaultMutatingAccessor(AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::Modify:
+    return true;
+  case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
+  case AccessorKind::Set:
+  case AccessorKind::Read:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
+  case AccessorKind::Address:
+  case AccessorKind::MutableAddress:
+  case AccessorKind::Init:
+    return false;
+  }
+}
+
 const unsigned NumAccessorKinds = unsigned(AccessorKind::Last) + 1;
 
 static inline IntRange<AccessorKind> allAccessorKinds() {
