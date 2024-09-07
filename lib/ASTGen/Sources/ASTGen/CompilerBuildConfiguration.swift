@@ -334,6 +334,83 @@ public func freeConfiguredRegions(
   UnsafeMutableBufferPointer(start: regions, count: numRegions).deallocate()
 }
 
+/// Cache used when checking for inactive code that might contain a reference
+/// to specific names.
+private struct InactiveCodeContainsReferenceCache {
+  let syntax: SourceFileSyntax
+  let configuredRegions: ConfiguredRegions
+}
+
+/// Determine whether the inactive code within the given search range
+/// contains a token referring to the given name.
+@_cdecl("swift_ASTGen_inactiveCodeContainsReference")
+public func inactiveCodeContainsReference(
+  astContext: BridgedASTContext,
+  sourceFileBuffer: BridgedStringRef,
+  searchRange: BridgedStringRef,
+  bridgedName: BridgedStringRef,
+  untypedCachePtr: UnsafeMutablePointer<UnsafeMutableRawPointer?>
+) -> Bool {
+  let syntax: SourceFileSyntax
+  let configuredRegions: ConfiguredRegions
+  if let untypedCachePtr = untypedCachePtr.pointee {
+    // Use the cache.
+    let cache = untypedCachePtr.assumingMemoryBound(to: InactiveCodeContainsReferenceCache.self)
+    syntax = cache.pointee.syntax
+    configuredRegions = cache.pointee.configuredRegions
+  } else {
+    // Parse the region.
+
+    // FIXME: Use 'ExportedSourceFile' when C++ parser is replaced.
+    let searchRangeBuffer = UnsafeBufferPointer<UInt8>(start: searchRange.data, count: searchRange.count)
+    syntax = Parser.parse(source: searchRangeBuffer)
+
+    // Compute the configured regions within the search range.
+    let configuration = CompilerBuildConfiguration(
+      ctx: astContext,
+      sourceBuffer: searchRangeBuffer
+    )
+    configuredRegions = syntax.configuredRegions(in: configuration)
+
+    let cache = UnsafeMutablePointer<InactiveCodeContainsReferenceCache>.allocate(capacity: 1)
+    cache.initialize(to: .init(syntax: syntax, configuredRegions: configuredRegions))
+
+    untypedCachePtr.pointee = .init(cache)
+  }
+
+  // If there are no regions, everything is active. This is the common case.
+  if configuredRegions.isEmpty {
+    return false
+  }
+
+  // Walk all of the tokens in the search range looking for one that references
+  // the given name.
+  let name = String(bridged: bridgedName)
+  for token in syntax.tokens(viewMode: .sourceAccurate) {
+    guard let identifier = token.identifier else {
+      continue
+    }
+
+    if identifier.name == name && configuredRegions.isActive(token) != .active {
+      // Found it in a non-active region.
+      return true
+    }
+  }
+
+  return false
+}
+
+@_cdecl("swift_ASTGen_freeInactiveCodeContainsReferenceCache")
+public func freeInactiveCodeContainsReferenceCache(pointer: UnsafeMutableRawPointer?) {
+  guard let pointer else {
+    return
+  }
+
+  let cache = pointer.assumingMemoryBound(to: InactiveCodeContainsReferenceCache.self)
+  cache.deinitialize(count: 1)
+  cache.deallocate()
+}
+
 /// Evaluate the #if condition at ifClauseLocationPtr.
 @_cdecl("swift_ASTGen_evaluatePoundIfCondition")
 public func evaluatePoundIfCondition(
