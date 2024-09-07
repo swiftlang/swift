@@ -170,10 +170,11 @@ static void removeMacroSearchPaths(std::vector<std::string> &cmd) {
   };
 
   // Remove macro search path option and its argument.
-  for (auto it = cmd.begin(), ie=cmd.end(); it != ie; ++it) {
-    if (macroSearchOptions.contains(*it) && it + 1 != ie) {
+  for (auto it = cmd.begin(); it != cmd.end();) {
+    if (macroSearchOptions.contains(*it) && it + 1 != cmd.end())
       it = cmd.erase(it, it + 2);
-    }
+    else
+      ++it;
   }
 }
 
