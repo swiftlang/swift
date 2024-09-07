@@ -102,7 +102,8 @@ static bool isOverloadedDeclRef(Constraint *disjunction) {
 /// favored choices in the current context.
 static Constraint *determineBestChoicesInContext(
     ConstraintSystem &cs, SmallVectorImpl<Constraint *> &disjunctions,
-    llvm::DenseMap<Constraint *, llvm::TinyPtrVector<Constraint *>>
+    llvm::DenseMap<Constraint *,
+                   std::pair<double, llvm::TinyPtrVector<Constraint *>>>
         &favorings) {
   double bestOverallScore = 0.0;
   // Tops scores across all of the disjunctions.
@@ -615,11 +616,10 @@ static Constraint *determineBestChoicesInContext(
   }
 
   for (auto &entry : disjunctionScores) {
-    if (entry.second != bestOverallScore)
-      continue;
-
+    TinyPtrVector<Constraint *> favoredChoices;
     for (auto *choice : favoredChoicesPerDisjunction[entry.first])
-      favorings[entry.first].push_back(choice);
+      favoredChoices.push_back(choice);
+    favorings[entry.first] = std::make_pair(entry.second, favoredChoices);
   }
 
   if (bestOverallScore == 0)
@@ -708,10 +708,12 @@ ConstraintSystem::selectDisjunction() {
   if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
     return std::make_pair(disjunction, llvm::TinyPtrVector<Constraint *>());
 
-  llvm::DenseMap<Constraint *, llvm::TinyPtrVector<Constraint *>> favorings;
+  llvm::DenseMap<Constraint *,
+                 std::pair</*bestScore=*/double, llvm::TinyPtrVector<Constraint *>>>
+      favorings;
   if (auto *bestDisjunction =
           determineBestChoicesInContext(*this, disjunctions, favorings))
-    return std::make_pair(bestDisjunction, favorings[bestDisjunction]);
+    return std::make_pair(bestDisjunction, favorings[bestDisjunction].second);
 
   // Pick the disjunction with the smallest number of favored, then active
   // choices.
@@ -720,21 +722,29 @@ ConstraintSystem::selectDisjunction() {
       [&](Constraint *first, Constraint *second) -> bool {
         unsigned firstActive = first->countActiveNestedConstraints();
         unsigned secondActive = second->countActiveNestedConstraints();
-        unsigned firstFavored = favorings[first].size();
-        unsigned secondFavored = favorings[second].size();
 
-        if (firstFavored == secondFavored) {
+        auto &[firstScore, firstFavoredChoices] = favorings[first];
+        auto &[secondScore, secondFavoredChoices] = favorings[second];
+
+        if (firstScore > secondScore)
+          return true;
+
+        unsigned numFirstFavored = firstFavoredChoices.size();
+        unsigned numSecondFavored = secondFavoredChoices.size();
+
+        if (numFirstFavored == numSecondFavored) {
           if (firstActive != secondActive)
             return firstActive < secondActive;
         }
 
-        firstFavored = firstFavored ? firstFavored : firstActive;
-        secondFavored = secondFavored ? secondFavored : secondActive;
-        return firstFavored < secondFavored;
+        numFirstFavored = numFirstFavored ? numFirstFavored : firstActive;
+        numSecondFavored = numSecondFavored ? numSecondFavored : secondActive;
+
+        return numFirstFavored < numSecondFavored;
       });
 
   if (bestDisjunction != disjunctions.end())
-    return std::make_pair(*bestDisjunction, favorings[*bestDisjunction]);
+    return std::make_pair(*bestDisjunction, favorings[*bestDisjunction].second);
 
   return std::nullopt;
 }
