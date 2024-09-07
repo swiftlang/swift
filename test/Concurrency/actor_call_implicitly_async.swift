@@ -576,3 +576,23 @@ func tryTheActorSubscripts(a : SubscriptA, t : SubscriptT, at : SubscriptAT) asy
 
   _ = try await at[0]
 }
+
+@MainActor
+final class IsolatedOperator: @preconcurrency Equatable {
+  static func == (lhs: IsolatedOperator, rhs: IsolatedOperator) -> Bool {
+    lhs.num == rhs.num
+  }
+
+  var num = 0
+
+  init(num: Int = 0) {
+    self.num = num
+  }
+
+  nonisolated func callEqual() async -> Bool {
+    let foo = await IsolatedOperator()
+    // expected-error@+2{{expression is 'async' but is not marked with 'await'}}
+    // expected-note@+1{{calls to operator function '==' from outside of its actor context are implicitly asynchronous}}
+    return foo == self
+  }
+}
