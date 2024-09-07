@@ -1,6 +1,7 @@
-if(SWIFT_BUILD_SDK_OVERLAY)
+if(SWIFT_BUILD_SDK_OVERLAY OR (SWIFT_BUILD_TEST_SUPPORT_MODULES AND NOT SWIFT_BUILD_DYNAMIC_SDK_OVERLAY_default))
   # SwiftPrivateThreadExtras makes use of Darwin/Glibc, which is part of the
-  # SDK overlay. It can't be built separately from the SDK overlay.
+  # SDK overlay. If the SDK overlay doesn't build by default, then it should
+  # be available in the SDK and DifferentiationUnittest can still be built.
   if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
     add_subdirectory(DifferentiationUnittest)
   endif()
@@ -20,7 +21,7 @@ if(SWIFT_BUILD_SDK_OVERLAY OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
   add_subdirectory(StdlibUnittest)
 endif()
 
-if(SWIFT_BUILD_SDK_OVERLAY)
+if(SWIFT_BUILD_SDK_OVERLAY OR (SWIFT_BUILD_TEST_SUPPORT_MODULES AND NOT SWIFT_BUILD_DYNAMIC_SDK_OVERLAY_default))
   add_subdirectory(OSLog)
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")

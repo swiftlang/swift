@@ -8,6 +8,7 @@
 
 import multiprocessing
 import os
+import platform
 
 import android.adb.commands
 
@@ -1140,7 +1141,7 @@ def create_argument_parser():
            help='build static variants of the Swift standard library')
 
     option('--build-swift-dynamic-sdk-overlay', toggle_true,
-           default=True,
+           default=platform.system() != "Darwin",
            help='build dynamic variants of the Swift SDK overlay')
 
     option('--build-swift-static-sdk-overlay', toggle_true,
