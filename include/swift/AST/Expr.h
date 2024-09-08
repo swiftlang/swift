@@ -4119,20 +4119,11 @@ class ClosureExpr : public AbstractClosureExpr {
 
 public:
   enum class BodyState {
-    /// The body was parsed, but not ready for type checking because
-    /// the closure parameters haven't been type checked.
+    /// The body was parsed.
     Parsed,
 
-    /// The type of the closure itself was type checked. But the body has not
-    /// been type checked yet.
-    ReadyForTypeChecking,
-
-    /// The body was typechecked with the enclosing closure.
-    /// i.e. single expression closure or result builder closure.
-    TypeCheckedWithSignature,
-
-    /// The body was type checked separately from the enclosing closure.
-    SeparatelyTypeChecked,
+    /// The body was type-checked.
+    TypeChecked,
   };
 
 private:
@@ -4368,13 +4359,6 @@ public:
   }
   void setBodyState(BodyState v) {
     ExplicitResultTypeAndBodyState.setInt(v);
-  }
-
-  /// Whether this closure's body is/was type checked separately from its
-  /// enclosing expression.
-  bool isSeparatelyTypeChecked() const {
-    return getBodyState() == BodyState::SeparatelyTypeChecked ||
-           getBodyState() == BodyState::ReadyForTypeChecking;
   }
 
   static bool classof(const Expr *E) {

@@ -463,8 +463,6 @@ std::optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
 /// Find the return statements within the body of the given function.
 std::vector<ReturnStmt *> findReturnStatements(AnyFunctionRef fn);
 
-bool typeCheckClosureBody(ClosureExpr *closure);
-
 bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
 
 Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
