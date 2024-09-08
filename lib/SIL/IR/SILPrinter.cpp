@@ -4591,7 +4591,6 @@ PrintOptions PrintOptions::printSIL(const SILPrintContext *ctx) {
   result.PrintForSIL = true;
   result.PrintInSILBody = true;
   result.PreferTypeRepr = false;
-  result.PrintIfConfig = false;
   result.OpaqueReturnTypePrinting =
      OpaqueReturnTypePrintingMode::StableReference;
   if (ctx && ctx->printFullConvention())

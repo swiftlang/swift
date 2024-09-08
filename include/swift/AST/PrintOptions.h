@@ -439,9 +439,6 @@ struct PrintOptions {
   /// Print all decls that have at least this level of access.
   AccessLevel AccessFilter = AccessLevel::Private;
 
-  /// Print IfConfigDecls.
-  bool PrintIfConfig = true;
-
   /// Whether we are printing for sil.
   bool PrintForSIL = false;
 
@@ -661,7 +658,6 @@ struct PrintOptions {
     result.ExcludeAttrList.push_back(DeclAttrKind::Rethrows);
     result.PrintOverrideKeyword = false;
     result.AccessFilter = accessFilter;
-    result.PrintIfConfig = false;
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::TypesOnly;
     result.PrintDocumentationComments = false;
