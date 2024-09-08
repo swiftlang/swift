@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-irgen %s -I %S/Inputs -cxx-interoperability-mode=default -Xcc -fno-exceptions -Xcc -fno-objc-exceptions | %FileCheck %s
+// RUN: %target-swift-emit-irgen %s -I %S/Inputs -cxx-interoperability-mode=default -Xcc -fno-exceptions -Xcc -fno-objc-exceptions | %FileCheck --dump-input-filter=all %s
 // REQUIRES: objc_interop
 
 // UNSUPPORTED: CPU=arm64e
