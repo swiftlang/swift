@@ -177,6 +177,21 @@ FailureDiagnostic::getArgumentListFor(ConstraintLocator *locator) const {
   return S.getArgumentList(locator);
 }
 
+StringRef FailureDiagnostic::getEditorPlaceholder(
+    StringRef description, Type ty,
+    llvm::SmallVectorImpl<char> &scratch) const {
+  llvm::raw_svector_ostream OS(scratch);
+  OS << "<#";
+  if (!ty || ty->is<UnresolvedType>()) {
+    OS << description;
+  } else {
+    OS << "T##";
+    ty.print(OS);
+  }
+  OS << "#>";
+  return StringRef(scratch.data(), scratch.size());
+}
+
 Expr *FailureDiagnostic::getBaseExprFor(const Expr *anchor) const {
   if (!anchor)
     return nullptr;
@@ -5177,6 +5192,9 @@ bool MissingArgumentsFailure::diagnoseAsError() {
     return true;
   }
 
+  if (diagnoseMissingResultBuilderElement())
+    return true;
+
   if (diagnoseInvalidTupleDestructuring())
     return true;
 
@@ -5511,6 +5529,55 @@ bool MissingArgumentsFailure::diagnoseClosure(const ClosureExpr *closure) {
     diag.fixItInsertAfter(params->getEndLoc(), OS.str());
   }
 
+  return true;
+}
+
+bool MissingArgumentsFailure::diagnoseMissingResultBuilderElement() const {
+  auto &ctx = getASTContext();
+
+  // Only handle a single missing argument in an empty builder for now. This
+  // should be the most common case though since most builders support N >= 1
+  // elements.
+  if (SynthesizedArgs.size() != 1)
+    return false;
+
+  auto *call = getAsExpr<CallExpr>(getRawAnchor());
+  if (!call || !call->isImplicit() || !call->getArgs()->empty())
+    return false;
+
+  auto *UDE = dyn_cast<UnresolvedDotExpr>(call->getFn());
+  if (!UDE || !isResultBuilderMethodReference(ctx, UDE))
+    return false;
+
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  if (!overload)
+    return false;
+
+  auto *decl = overload->choice.getDeclOrNull();
+  if (!decl || decl->getBaseName() != ctx.Id_buildBlock)
+    return false;
+
+  auto resultBuilder =
+      getType(UDE->getBase())->getMetatypeInstanceType()->getAnyNominal();
+  if (!resultBuilder)
+    return false;
+
+  auto paramType = resolveType(SynthesizedArgs.front().param.getPlainType());
+
+  SmallString<64> scratch;
+  auto fixIt = getEditorPlaceholder("result", paramType, scratch);
+  auto fixItLoc = call->getStartLoc();
+
+  if (paramType->is<UnresolvedType>()) {
+    emitDiagnostic(diag::result_builder_missing_element,
+                   resultBuilder->getName())
+        .fixItInsertAfter(fixItLoc, fixIt);
+  } else {
+    emitDiagnostic(diag::result_builder_missing_element_of_type, paramType,
+                   resultBuilder->getName())
+        .fixItInsertAfter(fixItLoc, fixIt);
+  }
+  emitDiagnosticAt(decl, diag::decl_declared_here, decl);
   return true;
 }
 
