@@ -68,12 +68,12 @@ enum HasAssociatedValues: Hashable {
   // CHECK:        @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: HasAssociatedValues, _ b: HasAssociatedValues) -> Bool {
   // CHECK-NEXT:     switch (a, b) {
   // CHECK-NEXT:     case (.a(let l0), .a(let r0)):
-  // CHECK-NEXT:       guard l0  r0 else {
+  // CHECK-NEXT:       guard l0 == r0 else {
   // CHECK-NEXT:         return false
   // CHECK-NEXT:       }
   // CHECK-NEXT:       return true
   // CHECK-NEXT:     case (.b(let l0), .b(let r0)):
-  // CHECK-NEXT:       guard l0  r0 else {
+  // CHECK-NEXT:       guard l0 == r0 else {
   // CHECK-NEXT:         return false
   // CHECK-NEXT:       }
   // CHECK-NEXT:       return true
@@ -158,7 +158,7 @@ enum HasAssociatedValuesAndUnavailableElement: Hashable {
   // CHECK:       @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: HasAssociatedValuesAndUnavailableElement, _ b: HasAssociatedValuesAndUnavailableElement) -> Bool {
   // CHECK-NEXT:    switch (a, b) {
   // CHECK-NEXT:    case (.a(let l0), .a(let r0)):
-  // CHECK-NEXT:      guard l0  r0 else {
+  // CHECK-NEXT:      guard l0 == r0 else {
   // CHECK-NEXT:        return false
   // CHECK-NEXT:      }
   // CHECK-NEXT:      return true

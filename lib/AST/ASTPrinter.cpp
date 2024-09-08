@@ -4792,6 +4792,10 @@ void PrintAST::visitBinaryExpr(BinaryExpr *expr) {
     Printer << operatorRef->getDecl()->getBaseName();
   } else if (auto *operatorRef = dyn_cast<DeclRefExpr>(expr->getFn())) {
     Printer << operatorRef->getDecl()->getBaseName();
+  } else if (auto *operatorRef =
+                 dyn_cast<UnresolvedDeclRefExpr>(expr->getFn())) {
+    // Synthesized `==` uses this.
+    Printer << operatorRef->getName();
   }
   Printer << " ";
   visit(expr->getRHS());
