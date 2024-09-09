@@ -10381,12 +10381,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     if (lookupUnviable(lookupOptions | NameLookupFlags::IgnoreAccessControl,
                        MemberLookupResult::UR_Inaccessible))
       return result;
-
-    // Ignore missing import statements in order to find more candidates that
-    // might have been missed before.
-    if (lookupUnviable(lookupOptions | NameLookupFlags::IgnoreMissingImports,
-                       MemberLookupResult::UR_MissingImport))
-      return result;
   }
   
   return result;
@@ -10587,11 +10581,9 @@ static ConstraintFix *fixMemberRef(
     }
 
     case MemberLookupResult::UR_Inaccessible:
-    case MemberLookupResult::UR_MissingImport:
       assert(choice.isDecl());
-      return AllowInaccessibleMember::create(
-          cs, baseTy, choice.getDecl(), memberName, locator,
-          *reason == MemberLookupResult::UR_MissingImport);
+      return AllowInaccessibleMember::create(cs, baseTy, choice.getDecl(),
+                                             memberName, locator);
 
     case MemberLookupResult::UR_UnavailableInExistential: {
       return choice.isDecl()

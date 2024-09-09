@@ -1980,10 +1980,6 @@ struct MemberLookupResult {
     /// The member is inaccessible (e.g. a private member in another file).
     UR_Inaccessible,
 
-    /// The member is not visible because it comes from a module that was not
-    /// imported.
-    UR_MissingImport,
-
     /// This is a `WritableKeyPath` being used to look up read-only member,
     /// used in situations involving dynamic member lookup via keypath,
     /// because it's not known upfront what access capability would the
