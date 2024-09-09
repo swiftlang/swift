@@ -9,10 +9,6 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx
 
-// The Darwin SDK overlay module in the macOS SDK cannot be imported in
-// embedded Swift mode.
-// XFAIL: OS=macosx
-
 import _Concurrency
 
 public func test() async -> Int {

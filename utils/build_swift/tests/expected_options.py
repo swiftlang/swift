@@ -8,7 +8,6 @@
 
 
 import multiprocessing
-import platform
 
 from build_swift import argparse
 from build_swift import defaults
@@ -80,7 +79,7 @@ EXPECTED_DEFAULTS = {
     'build_runtime_with_host_compiler': False,
     'build_stdlib_deployment_targets': ['all'],
     'build_subdir': None,
-    'build_swift_dynamic_sdk_overlay': platform.system() != "Darwin",
+    'build_swift_dynamic_sdk_overlay': True,
     'build_swift_dynamic_stdlib': True,
     'build_swift_inspect': False,
     'build_swift_private_stdlib': True,
