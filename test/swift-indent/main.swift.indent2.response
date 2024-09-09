@@ -37,7 +37,7 @@ func collatz(n: Int, m: String?) {
 
 #if true
 func foo() -> Int {
-  0
+0
 }
 #else
 1

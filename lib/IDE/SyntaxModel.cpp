@@ -416,7 +416,6 @@ public:
 private:
   static bool findUrlStartingLoc(StringRef Text, unsigned &Start,
                                  std::regex& Regex);
-  bool annotateIfConfigConditionIdentifiers(Expr *Cond);
   bool handleAttrs(const ParsedDeclAttributes &Attrs);
   bool handleAttrs(ArrayRef<TypeOrCustomAttr> Attrs);
 
@@ -1003,24 +1002,8 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
     }
     pushStructureNode(SN, VD);
 
-  } else if (auto *ConfigD = dyn_cast<IfConfigDecl>(D)) {
-    for (auto &Clause : ConfigD->getClauses()) {
-      if (Clause.Cond && !annotateIfConfigConditionIdentifiers(Clause.Cond))
-        return Action::SkipNode();
-
-      InactiveClauseRAII inactiveClauseRAII(inInactiveClause, !Clause.isActive);
-      for (auto &Element : Clause.Elements) {
-        if (auto *E = Element.dyn_cast<Expr*>()) {
-          E->walk(*this);
-        } else if (auto *S = Element.dyn_cast<Stmt*>()) {
-          S->walk(*this);
-        } else {
-          Element.get<Decl*>()->walk(*this);
-        }
-        NodesVisitedBefore.insert(Element);
-      }
-    }
-
+  } else if (isa<IfConfigDecl>(D)) {
+    // Note: nothing to do.
   } else if (auto *EnumCaseD = dyn_cast<EnumCaseDecl>(D)) {
     SyntaxStructureNode SN;
     setDecl(SN, D);
@@ -1171,17 +1154,6 @@ public:
   }
 };
 } // end anonymous namespace
-
-bool ModelASTWalker::annotateIfConfigConditionIdentifiers(Expr *Cond) {
-  if (!Cond)
-    return true;
-  auto passNode = [&](CharSourceRange R) {
-    return passNonTokenNode({ SyntaxNodeKind::BuildConfigId, R });
-  };
-
-  IdRefWalker<decltype(passNode)> Walker(passNode);
-  return Cond->walk(Walker);
-}
 
 bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
                                                 ArrayRef<Token> Toks) {
