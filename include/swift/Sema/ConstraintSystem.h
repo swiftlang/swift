@@ -960,6 +960,8 @@ enum ScoreKind: unsigned int {
   SK_Hole,
   /// A reference to an @unavailable declaration.
   SK_Unavailable,
+  /// A reference to a declaration from a module that has not been imported.
+  SK_MissingImport,
   /// A reference to an async function in a synchronous context.
   ///
   /// \note Any score kind after this is considered a conversion that doesn't
@@ -1123,6 +1125,9 @@ struct Score {
 
     case SK_Unavailable:
       return "use of an unavailable declaration";
+
+    case SK_MissingImport:
+      return "use of a declaration that has not been imported";
 
     case SK_AsyncInSyncMismatch:
       return "async-in-synchronous mismatch";

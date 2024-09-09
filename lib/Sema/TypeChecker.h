@@ -174,6 +174,14 @@ inline NameLookupOptions operator|(NameLookupFlags flag1,
 /// Default options for member name lookup.
 const NameLookupOptions defaultMemberLookupOptions;
 
+/// Default options for member name lookup in the constraint solver.
+/// Overloads which come from modules that have not been imported should be
+/// deprioritized by ranking and diagnosed by MiscDiagnostics, so we allow
+/// them to be found in constraint solver lookups to improve diagnostics
+/// overall.
+const NameLookupOptions defaultConstraintSolverMemberLookupOptions(
+    NameLookupFlags::IgnoreMissingImports);
+
 /// Default options for member type lookup.
 const NameLookupOptions defaultMemberTypeLookupOptions;
 
