@@ -14023,26 +14023,9 @@ ConstraintSystem::simplifyLValueObjectConstraint(
     if (!shouldAttemptFixes())
       return SolutionKind::Error;
 
-    auto assessImpact = [&]() -> unsigned {
-      // If this is a projection of a member reference
-      // let's check whether the member is unconditionally
-      // settable, if so than it's a problem with its base.
-      if (locator.directlyAt<UnresolvedDotExpr>()) {
-        auto *memberLoc = getConstraintLocator(locator.getAnchor(),
-                                               ConstraintLocator::Member);
-        if (auto selected = findSelectedOverloadFor(memberLoc)) {
-          if (auto *storage = dyn_cast_or_null<AbstractStorageDecl>(
-                  selected->choice.getDeclOrNull())) {
-            return storage->isSettable(nullptr) ? 1 : 2;
-          }
-        }
-      }
-      return 2;
-    };
-
-    if (recordFix(
-            TreatRValueAsLValue::create(*this, getConstraintLocator(locator)),
-            assessImpact()))
+    auto *fixLoc = getConstraintLocator(locator);
+    if (recordFix(TreatRValueAsLValue::create(*this, fixLoc),
+                  TreatRValueAsLValue::assessImpact(*this, fixLoc)))
       return SolutionKind::Error;
 
     lvalueTy = LValueType::get(lvalueTy);
@@ -15198,21 +15181,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   }
 
   case FixKind::TreatRValueAsLValue: {
-    unsigned impact = 1;
-    // If this is an attempt to use result of a function/subscript call as
-    // an l-value, it has to have an increased impact because it's either
-    // a function - which is completely incorrect, or it's a get-only
-    // subscript, which requires changes to declaration to become mutable.
-    impact += (locator.endsWith<LocatorPathElt::FunctionResult>() ||
-               locator.endsWith<LocatorPathElt::SubscriptMember>())
-                  ? 1
-                  : 0;
-    // An overload choice that isn't settable is least interesting for diagnosis.
-    if (auto overload = findSelectedOverloadFor(getCalleeLocator(fix->getLocator()))) {
-      if (auto *var = dyn_cast_or_null<VarDecl>(overload->choice.getDeclOrNull())) {
-         impact += !var->isSettableInSwift(DC) ? 1 : 0;
-      }
-    }
+    unsigned impact =
+        TreatRValueAsLValue::assessImpact(*this, fix->getLocator());
     return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
