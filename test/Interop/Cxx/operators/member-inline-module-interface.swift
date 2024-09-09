@@ -307,3 +307,7 @@
 // CHECK:   func callAsFunction(_ x: Int32, _ y: Int32) -> Int32
 // CHECK:   func callAsFunction(_ x: Int32) -> Int32
 // CHECK: }
+
+// CHECK: struct HasStaticOperatorCallWithUnimportableCxxType {
+// CHECK-NEXT:  init()
+// CHECK-NEXT: }
