@@ -17,7 +17,7 @@
 import StdlibUnittest
 
 func checkAssumeMainActor(echo: MainActorEcho) /* synchronous! */ {
-  // Echo.get("any") // error: main actor isolated, cannot perform async call here
+  // Echo.get("any") // error: MainActor isolated, cannot perform async call here
   MainActor.assumeIsolated {
     let input = "example"
     let got = echo.get(input)

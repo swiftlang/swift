@@ -141,7 +141,7 @@ do {
   _ = Test(obj: "Hello").utf8.count // Ok
 }
 
-// Global actor isolated properties.
+// global-actor-isolated properties.
 func testGlobalActorIsolatedReferences() {
   @MainActor struct Isolated {
     var data: Int = 42

@@ -218,7 +218,7 @@ struct Clock {
 @MainActor func testGlobalAndGlobalIsolatedPartialApplyMatch() {
   let ns = mainActorIsolatedGlobal
 
-  // This is not a transfer since ns is already main actor isolated.
+  // This is not a transfer since ns is already MainActor isolated.
   let _ = { @MainActor in
     print(ns)
   }
@@ -230,7 +230,7 @@ struct Clock {
   var ns = (NonSendableKlass(), NonSendableKlass())
   ns.0 = mainActorIsolatedGlobal
 
-  // This is not a transfer since ns is already main actor isolated.
+  // This is not a transfer since ns is already MainActor isolated.
   let _ = { @MainActor in
     print(ns)
   }
@@ -245,7 +245,7 @@ struct Clock {
     print(ns)
   }
 
-  // Since useValue is running in an actor isolated context, it is ok to use the
+  // Since useValue is running in an actor-isolated context, it is ok to use the
   // transferred value 'ns' here.
   useValue(ns)
 }

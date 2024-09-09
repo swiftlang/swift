@@ -296,7 +296,7 @@ final class NonSendable {
   var z: Int { 0 }
 }
 
-// This is not an error since t.update and t.x are both main actor isolated. We
+// This is not an error since t.update and t.x are both MainActor isolated. We
 // still get the returning main actor-isolated property 'x' error though.
 @available(SwiftStdlib 5.1, *)
 func testNonSendableBaseArg() async {
