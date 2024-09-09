@@ -2363,10 +2363,6 @@ void ConstraintSystem::forEachExpr(
       if (!NewE)
         return Action::Stop();
 
-      if (auto closure = dyn_cast<ClosureExpr>(E)) {
-        if (!CS.participatesInInference(closure))
-          return Action::SkipNode(NewE);
-      }
       return Action::Continue(NewE);
     }
 

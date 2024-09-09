@@ -7432,16 +7432,6 @@ bool ConstraintSystem::isArgumentGenericFunction(Type argType, Expr *argExpr) {
   return false;
 }
 
-bool ConstraintSystem::participatesInInference(ClosureExpr *closure) const {
-  if (getAppliedResultBuilderTransform(closure))
-    return true;
-
-  if (closure->hasEmptyBody())
-    return false;
-
-  return true;
-}
-
 ProtocolConformanceRef
 ConstraintSystem::lookupConformance(Type type, ProtocolDecl *protocol) {
   auto cacheKey = std::make_pair(type.getPointer(), protocol);

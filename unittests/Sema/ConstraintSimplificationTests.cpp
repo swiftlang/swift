@@ -109,6 +109,7 @@ TEST_F(SemaTest, TestClosureInferenceFromOptionalContext) {
   cs.setClosureType(closure, defaultTy);
 
   auto *closureTy = cs.createTypeVariable(closureLoc, /*options=*/0);
+  cs.setType(closure, closureTy);
 
   cs.addUnsolvedConstraint(Constraint::create(
       cs, ConstraintKind::FallbackType, closureTy, defaultTy,

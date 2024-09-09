@@ -1605,6 +1605,11 @@ NOTE(candidate_with_extraneous_args,none,
      "candidate %0 has %1 parameter%s1, but context %2 has %3",
      (Type, unsigned, Type, unsigned))
 
+ERROR(result_builder_missing_element,none,
+      "expected expression in result builder %0", (DeclName))
+ERROR(result_builder_missing_element_of_type,none,
+      "expected expression of type %0 in result builder %1", (Type, DeclName))
+
 ERROR(no_accessible_initializers,none,
       "%0 cannot be constructed because it has no accessible initializers",
       (Type))
