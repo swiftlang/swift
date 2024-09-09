@@ -11,6 +11,10 @@
 // REQUIRES: VENDOR=apple
 // REQUIRES: OS=macosx
 
+// The Darwin SDK overlay module in the macOS SDK cannot be imported in
+// embedded Swift mode.
+// XFAIL: OS=macosx
+
 // BEGIN BridgingHeader.h
 
 #include <unistd.h>
