@@ -11031,9 +11031,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         impact += 10;
       }
 
-      if (instanceTy->isAny() || instanceTy->isAnyObject())
-        impact += 5;
-
       auto *anchorExpr = getAsExpr(locator->getAnchor());
       if (anchorExpr) {
         if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchorExpr)) {
