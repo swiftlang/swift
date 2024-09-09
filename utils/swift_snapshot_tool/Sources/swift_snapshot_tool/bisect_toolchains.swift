@@ -18,7 +18,7 @@ struct BisectToolchains: AsyncParsableCommand {
     help: """
       The directory where toolchains should be downloaded to.
       """)
-  var workspace: String = "/tmp/workspace"
+  var workspace: String = "/tmp/swift_snapshot_tool_workspace_v1"
 
   @Option(
     help: """
