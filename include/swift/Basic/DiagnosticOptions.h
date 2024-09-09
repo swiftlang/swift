@@ -13,7 +13,9 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICOPTIONS_H
 #define SWIFT_BASIC_DIAGNOSTICOPTIONS_H
 
+#include "swift/Basic/WarningAsErrorRule.h"
 #include "llvm/ADT/Hashing.h"
+#include <vector>
 
 namespace swift {
 
@@ -58,8 +60,8 @@ public:
   /// Suppress all remarks
   bool SuppressRemarks = false;
 
-  /// Treat all warnings as errors
-  bool WarningsAsErrors = false;
+  /// Rules for escalating warnings to errors
+  std::vector<WarningAsErrorRule> WarningsAsErrorsRules;
 
   /// When printing diagnostics, include the diagnostic name (diag::whatever) at
   /// the end.

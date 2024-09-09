@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
@@ -78,26 +79,29 @@ struct StoredDiagnosticInfo {
   bool isAPIDigesterBreakage : 1;
   bool isDeprecation : 1;
   bool isNoUsage : 1;
+  DiagGroupID groupID;
 
   constexpr StoredDiagnosticInfo(DiagnosticKind k, bool firstBadToken,
                                  bool fatal, bool isAPIDigesterBreakage,
-                                 bool deprecation, bool noUsage)
+                                 bool deprecation, bool noUsage,
+                                 DiagGroupID groupID)
       : kind(k), pointsToFirstBadToken(firstBadToken), isFatal(fatal),
-        isAPIDigesterBreakage(isAPIDigesterBreakage), isDeprecation(deprecation),
-        isNoUsage(noUsage) {}
-  constexpr StoredDiagnosticInfo(DiagnosticKind k, DiagnosticOptions opts)
+        isAPIDigesterBreakage(isAPIDigesterBreakage),
+        isDeprecation(deprecation), isNoUsage(noUsage), groupID(groupID) {}
+  constexpr StoredDiagnosticInfo(DiagnosticKind k, DiagnosticOptions opts,
+                                 DiagGroupID groupID)
       : StoredDiagnosticInfo(k,
                              opts == DiagnosticOptions::PointsToFirstBadToken,
                              opts == DiagnosticOptions::Fatal,
                              opts == DiagnosticOptions::APIDigesterBreakage,
                              opts == DiagnosticOptions::Deprecation,
-                             opts == DiagnosticOptions::NoUsage) {}
+                             opts == DiagnosticOptions::NoUsage, groupID) {}
 };
 
 // Reproduce the DiagIDs, as we want both the size and access to the raw ids
 // themselves.
 enum LocalDiagID : uint32_t {
-#define DIAG(KIND, ID, Options, Text, Signature) ID,
+#define DIAG(KIND, ID, Group, Options, Text, Signature) ID,
 #include "swift/AST/DiagnosticsAll.def"
   NumDiags
 };
@@ -105,14 +109,18 @@ enum LocalDiagID : uint32_t {
 
 // TODO: categorization
 static const constexpr StoredDiagnosticInfo storedDiagnosticInfos[] = {
-#define ERROR(ID, Options, Text, Signature)                                    \
-  StoredDiagnosticInfo(DiagnosticKind::Error, DiagnosticOptions::Options),
-#define WARNING(ID, Options, Text, Signature)                                  \
-  StoredDiagnosticInfo(DiagnosticKind::Warning, DiagnosticOptions::Options),
+#define GROUPED_ERROR(ID, Group, Options, Text, Signature)                     \
+  StoredDiagnosticInfo(DiagnosticKind::Error, DiagnosticOptions::Options,      \
+                       DiagGroupID::Group),
+#define GROUPED_WARNING(ID, Group, Options, Text, Signature)                   \
+  StoredDiagnosticInfo(DiagnosticKind::Warning, DiagnosticOptions::Options,    \
+                       DiagGroupID::Group),
 #define NOTE(ID, Options, Text, Signature)                                     \
-  StoredDiagnosticInfo(DiagnosticKind::Note, DiagnosticOptions::Options),
+  StoredDiagnosticInfo(DiagnosticKind::Note, DiagnosticOptions::Options,       \
+                       DiagGroupID::no_group),
 #define REMARK(ID, Options, Text, Signature)                                   \
-  StoredDiagnosticInfo(DiagnosticKind::Remark, DiagnosticOptions::Options),
+  StoredDiagnosticInfo(DiagnosticKind::Remark, DiagnosticOptions::Options,     \
+                       DiagGroupID::no_group),
 #include "swift/AST/DiagnosticsAll.def"
 };
 static_assert(sizeof(storedDiagnosticInfos) / sizeof(StoredDiagnosticInfo) ==
@@ -120,25 +128,25 @@ static_assert(sizeof(storedDiagnosticInfos) / sizeof(StoredDiagnosticInfo) ==
               "array size mismatch");
 
 static constexpr const char * const diagnosticStrings[] = {
-#define DIAG(KIND, ID, Options, Text, Signature) Text,
+#define DIAG(KIND, ID, Group, Options, Text, Signature) Text,
 #include "swift/AST/DiagnosticsAll.def"
     "<not a diagnostic>",
 };
 
 static constexpr const char *const debugDiagnosticStrings[] = {
-#define DIAG(KIND, ID, Options, Text, Signature) Text " [" #ID "]",
+#define DIAG(KIND, ID, Group, Options, Text, Signature) Text " [" #ID "]",
 #include "swift/AST/DiagnosticsAll.def"
     "<not a diagnostic>",
 };
 
 static constexpr const char *const diagnosticIDStrings[] = {
-#define DIAG(KIND, ID, Options, Text, Signature) #ID,
+#define DIAG(KIND, ID, Group, Options, Text, Signature) #ID,
 #include "swift/AST/DiagnosticsAll.def"
     "<not a diagnostic>",
 };
 
 static constexpr const char *const fixItStrings[] = {
-#define DIAG(KIND, ID, Options, Text, Signature)
+#define DIAG(KIND, ID, Group, Options, Text, Signature)
 #define FIXIT(ID, Text, Signature) Text,
 #include "swift/AST/DiagnosticsAll.def"
     "<not a fix-it>",
@@ -171,6 +179,8 @@ static constexpr auto educationalNotes = _EducationalNotes.value;
 DiagnosticState::DiagnosticState() {
   // Initialize our ignored diagnostics to default
   ignoredDiagnostics.resize(LocalDiagID::NumDiags);
+  // Initialize warningsAsErrors to default
+  warningsAsErrors.resize(LocalDiagID::NumDiags);
 }
 
 static CharSourceRange toCharSourceRange(SourceManager &SM, SourceRange SR) {
@@ -512,6 +522,44 @@ bool DiagnosticEngine::finishProcessing() {
     hadError |= Consumer->finishProcessing();
   }
   return hadError;
+}
+
+void DiagnosticEngine::setWarningsAsErrorsRules(
+    const std::vector<WarningAsErrorRule> &rules) {
+  std::vector<std::string> unknownGroups;
+  for (const auto &rule : rules) {
+    bool isEnabled = [&] {
+      switch (rule.getAction()) {
+      case WarningAsErrorRule::Action::Enable:
+        return true;
+      case WarningAsErrorRule::Action::Disable:
+        return false;
+      }
+    }();
+    auto target = rule.getTarget();
+    if (auto group = std::get_if<WarningAsErrorRule::TargetGroup>(&target)) {
+      auto name = std::string_view(group->name);
+      // Validate the group name and set the new behavior for each diagnostic
+      // associated with the group and all its subgroups.
+      if (auto groupID = getDiagGroupIDByName(name);
+          groupID && *groupID != DiagGroupID::no_group) {
+        getDiagGroupInfoByID(*groupID).traverseDepthFirst([&](auto group) {
+          for (DiagID diagID : group.diagnostics) {
+            state.setWarningAsErrorForDiagID(diagID, isEnabled);
+          }
+        });
+      } else {
+        unknownGroups.push_back(std::string(name));
+      }
+    } else if (std::holds_alternative<WarningAsErrorRule::TargetAll>(target)) {
+      state.setAllWarningsAsErrors(isEnabled);
+    } else {
+      llvm_unreachable("unhandled WarningAsErrorRule::Target");
+    }
+  }
+  for (const auto &unknownGroup : unknownGroups) {
+    diagnose(SourceLoc(), diag::unknown_warning_group, unknownGroup);
+  }
 }
 
 /// Skip forward to one of the given delimiters.
@@ -1196,7 +1244,7 @@ DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
   //   4) If the user substituted a different behavior for this behavior, apply
   //      that change
   if (lvl == DiagnosticBehavior::Warning) {
-    if (warningsAsErrors)
+    if (getWarningAsErrorForDiagID(diag.getID()))
       lvl = DiagnosticBehavior::Error;
     if (suppressWarnings)
       lvl = DiagnosticBehavior::Ignore;
