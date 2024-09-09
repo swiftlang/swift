@@ -2041,8 +2041,7 @@ function Install-Platform([Platform]$Platform, $Arch) {
       Copy-File "$($Arch.SwiftTestingInstallRoot)\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\libTesting.so" "$SwiftTestingInstallRoot\usr\lib\$($Arch.BinaryDir)\"
     }
   }
-  Copy-File "$($Arch.SwiftTestingInstallRoot)\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\$($Arch.LLVMName)\Testing.swiftmodule" "$SwiftTestingInstallRoot\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\Testing.swiftmodule\$($Arch.LLVMTarget).swiftmodule"
-  Copy-File "$($Arch.SwiftTestingInstallRoot)\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\$($Arch.LLVMName)\Testing.swiftdoc" "$SwiftTestingInstallRoot\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\Testing.swiftmodule\$($Arch.LLVMTarget).swiftdoc"
+  Copy-Directory "$($Arch.SwiftTestingInstallRoot)\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\Testing.swiftmodule" "$SwiftTestingInstallRoot\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\Testing.swiftmodule"
 }
 
 function Build-SQLite($Arch) {
