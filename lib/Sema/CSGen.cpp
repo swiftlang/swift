@@ -2555,10 +2555,7 @@ namespace {
         // If this is a multi-statement closure, let's mark result
         // as potential hole right away.
         return Type(CS.createTypeVariable(
-            resultLocator,
-            (!CS.participatesInInference(closure) || allowResultBindToHole)
-                ? TVO_CanBindToHole
-                : 0));
+            resultLocator, allowResultBindToHole ? TVO_CanBindToHole : 0));
       }();
 
       // Determine the isolation of the closure.

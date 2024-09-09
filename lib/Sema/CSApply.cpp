@@ -8853,28 +8853,21 @@ namespace {
         // Note that in this mode `ClosuresToTypeCheck` acts
         // as a stack because multi-statement closures could
         // have other multi-statement closures in the body.
-        if (cs.participatesInInference(closure)) {
-          hadError |= cs.applySolutionToBody(
-              solution, closure, Rewriter.dc,
-              [&](SyntacticElementTarget target) {
-                auto resultTarget = rewriteTarget(target);
-                if (resultTarget) {
-                  if (auto expr = resultTarget->getAsExpr())
-                    solution.setExprTypes(expr);
-                }
+        hadError |= cs.applySolutionToBody(
+            solution, closure, Rewriter.dc, [&](SyntacticElementTarget target) {
+              auto resultTarget = rewriteTarget(target);
+              if (resultTarget) {
+                if (auto expr = resultTarget->getAsExpr())
+                  solution.setExprTypes(expr);
+              }
 
-                return resultTarget;
-              });
+              return resultTarget;
+            });
 
-          if (!hadError) {
-            TypeChecker::checkClosureAttributes(closure);
-            TypeChecker::checkParameterList(closure->getParameters(), closure);
-          }
-
-          continue;
+        if (!hadError) {
+          TypeChecker::checkClosureAttributes(closure);
+          TypeChecker::checkParameterList(closure->getParameters(), closure);
         }
-
-        hadError |= TypeChecker::typeCheckClosureBody(closure);
       }
 
       return hadError;
