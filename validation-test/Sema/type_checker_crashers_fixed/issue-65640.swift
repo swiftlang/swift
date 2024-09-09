@@ -4,6 +4,7 @@
 
 @propertyWrapper
 struct Wrapper {
+  // expected-error@-1{{property wrapper type 'Wrapper' does not contain a non-static property named 'wrappedValue'}}
   init(wrappedValue: Int) {}
 }
 func test(@Wrapper x: Int) {}
