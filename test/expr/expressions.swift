@@ -619,8 +619,8 @@ class C {
 }
 
 _ = C(3) // expected-error {{missing argument label 'other:' in call}}
-// expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'C?'}}
-_ = C(other: 3) // expected-error {{cannot convert value of type 'Int' to expected argument type 'C?'}}
+// expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'C'}}
+_ = C(other: 3) // expected-error {{cannot convert value of type 'Int' to expected argument type 'C'}}
 
 //===----------------------------------------------------------------------===//
 // Unary Operators
