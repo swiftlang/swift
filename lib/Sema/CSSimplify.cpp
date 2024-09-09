@@ -6965,6 +6965,54 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::Conversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentConversion: {
+      {
+        if (typeVar1 && !typeVar2) {
+          if (auto *structTy = dyn_cast<BoundGenericStructType>(desugar2)) {
+            if (auto eltTy = structTy->isArrayType()) {
+              auto loc = getConstraintLocator(locator);
+              auto eltTypeVar = createTypeVariable(loc,
+                                           TVO_CanBindToLValue |
+                                           TVO_CanBindToNoEscape);
+              auto fixedType = ArraySliceType::get(eltTypeVar);
+
+              addUnsolvedConstraint(
+                  Constraint::create(*this, ConstraintKind::Bind, typeVar1, fixedType,
+                                     getConstraintLocator(locator)));
+              addUnsolvedConstraint(
+                  Constraint::create(*this, ConstraintKind::Subtype, eltTypeVar, eltTy,
+                                     getConstraintLocator(locator)));
+              return getTypeMatchSuccess();
+            }
+          }
+        }
+        if (!typeVar1 && typeVar2) {
+          llvm::errs() << "hello world\n";
+          desugar1->dump();
+          desugar2->dump();
+          if (auto *structTy = dyn_cast<BoundGenericStructType>(desugar1)) {
+            if (auto eltTy = structTy->isArrayType()) {
+              auto loc = getConstraintLocator(locator);
+              auto eltTypeVar = createTypeVariable(loc,
+                                           TVO_CanBindToLValue |
+                                           TVO_CanBindToNoEscape);
+              auto fixedType = ArraySliceType::get(eltTypeVar);
+
+              auto *x1 = Constraint::create(*this, ConstraintKind::Bind, fixedType, typeVar2,
+                                     getConstraintLocator(locator));
+              addUnsolvedConstraint(x1);
+              activateConstraint(x1);
+
+              auto *x2 = 
+                  Constraint::create(*this, ConstraintKind::Subtype, eltTy, eltTypeVar,
+                                     getConstraintLocator(locator));
+              addUnsolvedConstraint(x2);
+              activateConstraint(x2);
+              return getTypeMatchSuccess();
+            }
+          }
+        }
+      }
+
       if (typeVar1) {
         // Performance optimization: Propagate fully or partially resolved
         // contextual type down into the body of result builder transformed
