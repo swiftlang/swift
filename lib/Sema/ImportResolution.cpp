@@ -797,6 +797,9 @@ void UnboundImport::validateInterfaceWithPackageName(ModuleDecl *topLevelModule,
 /// be hidden from clients.
 static bool shouldSuppressNonResilientImplementationOnlyImportDiagnostic(
     StringRef targetName, StringRef importerName) {
+  if (targetName == "SwiftConcurrencyInternalShims")
+    return importerName == "_Concurrency";
+
   if (targetName == "CCryptoBoringSSL" || targetName == "CCryptoBoringSSLShims")
     return importerName == "Crypto" || importerName == "_CryptoExtras" ||
            importerName == "CryptoBoringWrapper";
