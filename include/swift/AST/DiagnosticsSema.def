@@ -2672,10 +2672,10 @@ NOTE(add_preconcurrency_to_conformance,none,
      "add '@preconcurrency' to the %0 conformance to defer isolation checking to run time", (DeclName))
 WARNING(remove_public_import,none,
         "public import of %0 was not used in public declarations or inlinable code",
-        (const ModuleDecl *))
+        (Identifier))
 WARNING(remove_package_import,none,
         "package import of %0 was not used in package declarations",
-        (const ModuleDecl *))
+        (Identifier))
 WARNING(public_decl_needs_sendable,none,
         "public %kind0 does not specify whether it is 'Sendable' or not",
         (const ValueDecl *))

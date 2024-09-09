@@ -2552,7 +2552,7 @@ void swift::diagnoseUnnecessaryPublicImports(SourceFile &SF) {
                                           diag::remove_package_import;
     auto inFlight = ctx.Diags.diagnose(import.importLoc,
                                        diagId,
-                                       importedModule);
+                                       importedModule->getName());
 
     if (levelUsed == AccessLevel::Package) {
       inFlight.fixItReplace(import.accessLevelRange, "package");
