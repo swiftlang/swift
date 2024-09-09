@@ -244,17 +244,10 @@ option(SWIFT_BUILD_CLANG_OVERLAYS
   "Build Swift overlays for the clang builtin modules"
   TRUE)
 
-# The SDK overlay is provided by the SDK itself on Darwin platforms.
-if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
-  set(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY_default FALSE)
-else()
-  set(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY_default TRUE)
-endif()
-
 option(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY
     "Build dynamic variants of the Swift SDK overlay"
-    "${SWIFT_BUILD_DYNAMIC_SDK_OVERLAY_default}")
-  
+    TRUE)
+
 option(SWIFT_BUILD_STATIC_SDK_OVERLAY
     "Build static variants of the Swift SDK overlay"
     FALSE)
