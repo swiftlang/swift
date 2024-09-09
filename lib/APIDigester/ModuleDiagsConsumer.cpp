@@ -26,7 +26,7 @@ namespace {
 // Reproduce the DiagIDs, as we want both the size and access to the raw ids
 // themselves.
 enum LocalDiagID : uint32_t {
-#define DIAG(KIND, ID, Options, Text, Signature) ID,
+#define DIAG(KIND, ID, Group, Options, Text, Signature) ID,
 #include "swift/AST/DiagnosticsAll.def"
   NumDiags
 };
@@ -90,9 +90,9 @@ ModuleDifferDiagsConsumer::ModuleDifferDiagsConsumer(bool DiagnoseModuleDiff,
                                                      llvm::raw_ostream &OS):
     PrintingDiagnosticConsumer(OS), OS(OS),
     DiagnoseModuleDiff(DiagnoseModuleDiff) {
-#define DIAG(KIND, ID, Options, Text, Signature)                              \
-  auto ID = getCategoryName(LocalDiagID::ID);                                 \
-  assert(!ID.empty());                                                        \
+#define DIAG(KIND, ID, Group, Options, Text, Signature)                        \
+  auto ID = getCategoryName(LocalDiagID::ID);                                  \
+  assert(!ID.empty());                                                         \
   AllDiags[ID] = std::set<std::string>();
 #include "swift/AST/DiagnosticsModuleDiffer.def"
 }

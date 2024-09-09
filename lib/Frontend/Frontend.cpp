@@ -727,9 +727,8 @@ void CompilerInstance::setUpDiagnosticOptions() {
   if (Invocation.getDiagnosticOptions().SuppressRemarks) {
     Diagnostics.setSuppressRemarks(true);
   }
-  if (Invocation.getDiagnosticOptions().WarningsAsErrors) {
-    Diagnostics.setWarningsAsErrors(true);
-  }
+  Diagnostics.setWarningsAsErrorsRules(
+      Invocation.getDiagnosticOptions().WarningsAsErrorsRules);
   if (Invocation.getDiagnosticOptions().PrintDiagnosticNames) {
     Diagnostics.setPrintDiagnosticNames(true);
   }

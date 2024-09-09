@@ -801,14 +801,30 @@ def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,
   HelpText<"Suppress all warnings">;
 
+def warning_treating_Group : OptionGroup<"<options to control warning treating>">;
+
 def warnings_as_errors : Flag<["-"], "warnings-as-errors">,
+  Group<warning_treating_Group>,
   Flags<[FrontendOption]>,
   HelpText<"Treat warnings as errors">;
 
+def Werror : Separate<["-"], "Werror">,
+  Group<warning_treating_Group>,
+  Flags<[FrontendOption, HelpHidden]>,
+  MetaVarName<"<diagnostic_group>">,
+  HelpText<"Treat this warning group as error">;
+
 def no_warnings_as_errors : Flag<["-"], "no-warnings-as-errors">,
+  Group<warning_treating_Group>,
   Flags<[FrontendOption]>,
-  HelpText<"Don't treat warnings as errors">;
-  
+  HelpText<"Treat warnings as warnings">;
+
+def Wwarning : Separate<["-"], "Wwarning">,
+  Group<warning_treating_Group>,
+  Flags<[FrontendOption, HelpHidden]>,
+  MetaVarName<"<diagnostic_group>">,
+  HelpText<"Treat this warning group as warning">;
+
 def suppress_remarks : Flag<["-"], "suppress-remarks">,
   Flags<[FrontendOption]>,
   HelpText<"Suppress all remarks">;
