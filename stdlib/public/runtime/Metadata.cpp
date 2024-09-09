@@ -904,7 +904,7 @@ MetadataResponse swift::swift_getCanonicalSpecializedMetadata(
 
   using CachedMetadata = std::atomic<const Metadata *>;
   auto cachedMetadataAddr = ((CachedMetadata *)cacheMetadataPtr);
-  auto *cachedMetadata = cachedMetadataAddr->load(SWIFT_MEMORY_ORDER_CONSUME);
+  auto *cachedMetadata = cachedMetadataAddr->load(std::memory_order_consume);
   if (SWIFT_LIKELY(cachedMetadata != nullptr)) {
     // Cached metadata pointers are always complete.
     return MetadataResponse{(const Metadata *)cachedMetadata,
@@ -6116,7 +6116,7 @@ getNondependentWitnessTable(const ProtocolConformanceDescriptor *conformance,
   auto tablePtr = reinterpret_cast<std::atomic<WitnessTable*> *>(
                      conformance->getGenericWitnessTable()->PrivateData.get());
   
-  auto existingTable = tablePtr->load(SWIFT_MEMORY_ORDER_CONSUME);
+  auto existingTable = tablePtr->load(std::memory_order_consume);
   if (existingTable) {
     return existingTable;
   }
@@ -6133,7 +6133,7 @@ getNondependentWitnessTable(const ProtocolConformanceDescriptor *conformance,
   // See whether we can claim to be the one true table.
   WitnessTable *orig = nullptr;
   if (!tablePtr->compare_exchange_strong(orig, table, std::memory_order_release,
-                                         SWIFT_MEMORY_ORDER_CONSUME)) {
+                                         std::memory_order_consume)) {
     // Someone beat us to the punch. Throw away our table and return the
     // existing one.
     allocator.Deallocate(buffer);

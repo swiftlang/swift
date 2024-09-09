@@ -299,7 +299,7 @@ reportOnCrash(uint32_t flags, const char *message)
 
   oldMessage = std::atomic_load_explicit(
     (volatile std::atomic<char *> *)&gCRAnnotations.message,
-    SWIFT_MEMORY_ORDER_CONSUME);
+    std::memory_order_consume);
 
   do {
     if (newMessage) {
@@ -316,12 +316,12 @@ reportOnCrash(uint32_t flags, const char *message)
              (volatile std::atomic<char *> *)&gCRAnnotations.message,
              &oldMessage, newMessage,
              std::memory_order_release,
-             SWIFT_MEMORY_ORDER_CONSUME));
+             std::memory_order_consume));
 #else
   const char *previous = nullptr;
   char *current = nullptr;
   previous =
-      std::atomic_load_explicit(&kFatalErrorMessage, SWIFT_MEMORY_ORDER_CONSUME);
+      std::atomic_load_explicit(&kFatalErrorMessage, std::memory_order_consume);
 
   do {
     ::free(current);
@@ -335,7 +335,7 @@ reportOnCrash(uint32_t flags, const char *message)
                                                          &previous,
                                                          static_cast<const char *>(current),
                                                          std::memory_order_release,
-                                                         SWIFT_MEMORY_ORDER_CONSUME));
+                                                         std::memory_order_consume));
 #endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 }
 

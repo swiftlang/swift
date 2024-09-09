@@ -1478,7 +1478,7 @@ void DefaultActorImpl::enqueueStealer(Job *job, JobPriority priority) {
 void DefaultActorImpl::processIncomingQueue() {
   // Pairs with the store release in DefaultActorImpl::enqueue
   bool distributedActorIsRemote = swift_distributed_actor_is_remote(this);
-  auto oldState = _status().load(SWIFT_MEMORY_ORDER_CONSUME);
+  auto oldState = _status().load(std::memory_order_consume);
   _swift_tsan_consume(this);
 
   // We must ensure that any jobs not seen by collectJobs() don't have any

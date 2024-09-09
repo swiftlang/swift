@@ -763,20 +763,22 @@ class RefCounts {
   }
   
   void setIsImmortal(bool immortal) {
-    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto oldbits = refCounts.load(memory_order_consume);
     if (oldbits.isImmortal(true)) {
       return;
     }
     RefCountBits newbits;
+
     do {
       newbits = oldbits;
       newbits.setIsImmortal(immortal);
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
-                                              std::memory_order_relaxed));
+                                              std::memory_order_release,
+                                              std::memory_order_consume));
   }
   
   void setPureSwiftDeallocation(bool nonobjc) {
-    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto oldbits = refCounts.load(memory_order_relaxed);
 
     // Having a side table precludes using bits this way, but also precludes
     // doing the pure Swift deallocation path. So trying to turn this off
@@ -795,11 +797,12 @@ class RefCounts {
       newbits = oldbits;
       newbits.setPureSwiftDeallocation(nonobjc);
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
-                                              std::memory_order_relaxed));
+                                              std::memory_order_release,
+                                              std::memory_order_consume));
   }
   
   bool getPureSwiftDeallocation() {
-    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto bits = refCounts.load(std::memory_order_acquire);
     return bits.pureSwiftDeallocation();
   }
   
@@ -816,7 +819,7 @@ class RefCounts {
   // incrementSlow() a tail call.
   SWIFT_ALWAYS_INLINE
   HeapObject *increment(uint32_t inc = 1) {
-    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto oldbits = refCounts.load(std::memory_order_consume);
     
     // Constant propagation will remove this in swift_retain, it should only
     // be present in swift_retain_n.
@@ -834,13 +837,14 @@ class RefCounts {
         return incrementSlow(oldbits, inc);
       }
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
-                                              std::memory_order_relaxed));
+                                              std::memory_order_release,
+                                              std::memory_order_consume));
     return getHeapObject();
   }
 
   SWIFT_ALWAYS_INLINE
   void incrementNonAtomic(uint32_t inc = 1) {
-    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto oldbits = refCounts.load(std::memory_order_relaxed);
     
     // Constant propagation will remove this in swift_retain, it should only
     // be present in swift_retain_n.
@@ -861,7 +865,7 @@ class RefCounts {
   // Increment the reference count, unless the object is deiniting.
   SWIFT_ALWAYS_INLINE
   bool tryIncrement() {
-    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto oldbits = refCounts.load(std::memory_order_consume);
     RefCountBits newbits;
     do {
       if (!oldbits.hasSideTable() && oldbits.getIsDeiniting())
@@ -875,13 +879,14 @@ class RefCounts {
         return tryIncrementSlow(oldbits);
       }
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
-                                              std::memory_order_relaxed));
+                                              std::memory_order_release,
+                                              std::memory_order_consume));
     return true;
   }
 
   SWIFT_ALWAYS_INLINE
   bool tryIncrementNonAtomic() {
-    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto oldbits = refCounts.load(std::memory_order_relaxed);
     if (!oldbits.hasSideTable() && oldbits.getIsDeiniting())
       return false;
 
@@ -924,7 +929,7 @@ class RefCounts {
   // Precondition: the reference count must be 1.
   SWIFT_ALWAYS_INLINE
   void decrementFromOneNonAtomic() {
-    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto bits = refCounts.load(std::memory_order_relaxed);
     if (bits.isImmortal(true)) {
       return;
     }
@@ -941,7 +946,7 @@ class RefCounts {
   // Return the reference count.
   // Once deinit begins the reference count is undefined.
   uint32_t getCount() const {
-    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto bits = refCounts.load(std::memory_order_consume);
     if (bits.hasSideTable())
       return bits.getSideTable()->getCount();
     
@@ -951,7 +956,7 @@ class RefCounts {
   // Return whether the reference count is exactly 1.
   // Once deinit begins the reference count is undefined.
   bool isUniquelyReferenced() const {
-    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto bits = refCounts.load(std::memory_order_consume);
     if (bits.hasSideTable())
       return bits.getSideTable()->isUniquelyReferenced();
     
@@ -961,7 +966,7 @@ class RefCounts {
 
   // Return true if the object has started deiniting.
   bool isDeiniting() const {
-    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto bits = refCounts.load(std::memory_order_consume);
     if (bits.hasSideTable())
       return bits.getSideTable()->isDeiniting();
     else
@@ -969,12 +974,12 @@ class RefCounts {
   }
 
   bool hasSideTable() const {
-    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto bits = refCounts.load(std::memory_order_consume);
     return bits.hasSideTable();
   }
 
   void *getSideTable() const {
-    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto bits = refCounts.load(std::memory_order_consume);
     if (!bits.hasSideTable())
       return nullptr;
     return bits.getSideTable();
@@ -988,7 +993,7 @@ class RefCounts {
   ///   unowned reference count is 1
   /// The object is assumed to be deiniting with no strong references already.
   bool canBeFreedNow() const {
-    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto bits = refCounts.load(std::memory_order_consume);
     return (!bits.hasSideTable() &&
             bits.getIsDeiniting() &&
             bits.getStrongExtraRefCount() == 0 &&
@@ -1046,9 +1051,8 @@ class RefCounts {
       }
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_release,
-                                              std::memory_order_relaxed));
+                                              std::memory_order_acquire));
     if (performDeinit && deinitNow) {
-      std::atomic_thread_fence(std::memory_order_acquire);
       _swift_release_dealloc(getHeapObject());
     }
 
@@ -1107,7 +1111,7 @@ class RefCounts {
   template <PerformDeinit performDeinit>
   SWIFT_ALWAYS_INLINE
   bool doDecrement(uint32_t dec) {
-    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto oldbits = refCounts.load(std::memory_order_consume);
     RefCountBits newbits;
     
     // Constant propagation will remove this in swift_release, it should only
@@ -1129,7 +1133,7 @@ class RefCounts {
       }
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_release,
-                                              std::memory_order_relaxed));
+                                              std::memory_order_consume));
 
     return false;  // don't deinit
   }
@@ -1144,7 +1148,7 @@ class RefCounts {
   public:
   // Increment the unowned reference count.
   void incrementUnowned(uint32_t inc) {
-    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto oldbits = refCounts.load(std::memory_order_consume);
     if (oldbits.isImmortal(true))
       return;
     RefCountBits newbits;
@@ -1161,11 +1165,12 @@ class RefCounts {
         return incrementUnownedSlow(inc);
 
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
-                                              std::memory_order_relaxed));
+                                              std::memory_order_release,
+                                              std::memory_order_consume));
   }
 
   void incrementUnownedNonAtomic(uint32_t inc) {
-    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto oldbits = refCounts.load(std::memory_order_consume);
     if (oldbits.isImmortal(true))
       return;
     if (oldbits.hasSideTable())
@@ -1185,7 +1190,7 @@ class RefCounts {
   // Decrement the unowned reference count.
   // Return true if the caller should free the object.
   bool decrementUnownedShouldFree(uint32_t dec) {
-    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto oldbits = refCounts.load(std::memory_order_consume);
     if (oldbits.isImmortal(true))
       return false;
     RefCountBits newbits;
@@ -1208,12 +1213,13 @@ class RefCounts {
       }
       // FIXME: underflow check?
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
-                                              std::memory_order_relaxed));
+                                              std::memory_order_release,
+                                              std::memory_order_consume));
     return performFree;
   }
 
   bool decrementUnownedShouldFreeNonAtomic(uint32_t dec) {
-    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto oldbits = refCounts.load(std::memory_order_consume);
     if (oldbits.isImmortal(true))
       return false;
     if (oldbits.hasSideTable())
@@ -1239,7 +1245,7 @@ class RefCounts {
   // Return unowned reference count.
   // Note that this is not equal to the number of outstanding unowned pointers.
   uint32_t getUnownedCount() const {
-    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto bits = refCounts.load(std::memory_order_consume);
     if (bits.hasSideTable())
       return bits.getSideTable()->getUnownedCount();
     else 
@@ -1258,7 +1264,7 @@ class RefCounts {
 
   // Increment the weak reference count.
   void incrementWeak() {
-    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto oldbits = refCounts.load(std::memory_order_consume);
     RefCountBits newbits;
     do {
       newbits = oldbits;
@@ -1268,11 +1274,12 @@ class RefCounts {
       if (newbits.getWeakRefCount() < oldbits.getWeakRefCount())
         swift_abortWeakRetainOverflow();
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
-                                              std::memory_order_relaxed));
+                                              std::memory_order_release,
+                                              std::memory_order_consume));
   }
   
   bool decrementWeakShouldCleanUp() {
-    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto oldbits = refCounts.load(std::memory_order_consume);
     RefCountBits newbits;
 
     bool performFree;
@@ -1280,13 +1287,14 @@ class RefCounts {
       newbits = oldbits;
       performFree = newbits.decrementWeakRefCount();
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
-                                              std::memory_order_relaxed));
+                                              std::memory_order_release,
+                                              std::memory_order_consume));
 
     return performFree;
   }
 
   bool decrementWeakShouldCleanUpNonAtomic() {
-    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto oldbits = refCounts.load(std::memory_order_relaxed);
 
     auto newbits = oldbits;
     auto performFree = newbits.decrementWeakRefCount();
@@ -1536,7 +1544,7 @@ RefCounts<InlineRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
   // Therefore there is no other thread that can be concurrently
   // manipulating this object's retain counts.
 
-  auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+  auto oldbits = refCounts.load(std::memory_order_relaxed);
 
   // Use slow path if we can't guarantee atomicity.
   if (oldbits.hasSideTable() || oldbits.getUnownedRefCount() != 1)
@@ -1601,7 +1609,7 @@ doDecrementNonAtomicSideTable(SideTableRefCountBits oldbits, uint32_t dec) {
 
 template <>
 inline uint32_t RefCounts<InlineRefCountBits>::getWeakCount() const {
-  auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+  auto bits = refCounts.load(std::memory_order_consume);
   if (bits.hasSideTable()) {
     return bits.getSideTable()->getWeakCount();
   } else {
@@ -1613,7 +1621,7 @@ inline uint32_t RefCounts<InlineRefCountBits>::getWeakCount() const {
 
 template <>
 inline uint32_t RefCounts<SideTableRefCountBits>::getWeakCount() const {
-  auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+  auto bits = refCounts.load(std::memory_order_consume);
   return bits.getWeakRefCount();
 }
 

@@ -176,7 +176,6 @@ public:
       
       storage = newStorage;
       Capacity = newCapacity;
-
       Elements.store(storage, std::memory_order_release);
     }
     
@@ -192,7 +191,7 @@ public:
 
   Snapshot snapshot() {
     incrementReaders();
-    auto *storage = Elements.load(SWIFT_MEMORY_ORDER_CONSUME);
+    auto *storage = Elements.load(std::memory_order_consume);
     if (storage == nullptr) {
       return Snapshot(this, nullptr, 0);
     }
