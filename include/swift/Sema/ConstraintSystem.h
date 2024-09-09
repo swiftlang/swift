@@ -5687,11 +5687,6 @@ public:
   /// imported from C/ObjectiveC.
   bool isArgumentOfImportedDecl(ConstraintLocatorBuilder locator);
 
-  /// Check whether given closure should participate in inference e.g.
-  /// if it's a single-expression closure - it always does, but
-  /// multi-statement closures require special flags.
-  bool participatesInInference(ClosureExpr *closure) const;
-
   /// Visit each subexpression that will be part of the constraint system
   /// of the given expression, including those in closure bodies that will be
   /// part of the constraint system.

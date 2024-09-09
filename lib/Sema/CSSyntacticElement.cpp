@@ -1171,18 +1171,6 @@ private:
         for (const auto &capture : captureList->getCaptureList())
           visitPatternBinding(capture.PBD, elements);
       }
-
-      // Let's not walk into the body if empty or multi-statement closure
-      // doesn't participate in inference.
-      if (!cs.participatesInInference(closure)) {
-        // Although the body doesn't participate in inference we still
-        // want to type-check captures to make sure that the context
-        // is valid.
-        if (captureList)
-          createConjunction(elements, locator);
-
-        return;
-      }
     }
 
     if (isChildOf(StmtKind::Case)) {
@@ -2598,7 +2586,6 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
 
   // Otherwise, we need to delay type checking of the closure until later.
   solution.setExprTypes(closure);
-  closure->setBodyState(ClosureExpr::BodyState::ReadyForTypeChecking);
   return SolutionApplicationToFunctionResult::Delay;
 }
 

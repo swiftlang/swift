@@ -1013,3 +1013,19 @@ func test_partially_resolved_closure_params() {
     42
   }
 }
+
+func testMissingElementInEmptyBuilder() {
+  @resultBuilder
+  struct SingleElementBuilder {
+    static func buildBlock<T>(_ x: T) -> T { x }
+    // expected-note@-1 2{{'buildBlock' declared here}}
+  }
+
+  func test1(@SingleElementBuilder fn: () -> Int) {}
+  test1 {}
+  // expected-error@-1 {{expected expression of type 'Int' in result builder 'SingleElementBuilder'}} {{10-10=<#T##Int#>}}
+
+  @SingleElementBuilder
+  func test2() -> Int {}
+  // expected-error@-1 {{expected expression of type 'Int' in result builder 'SingleElementBuilder'}} {{24-24=<#T##Int#>}}
+}

@@ -1822,11 +1822,8 @@ static void findAvailabilityFixItNodes(
   InnermostAncestorFinder::MatchPredicate IsGuardable =
       [](ASTNode Node, ASTWalker::ParentTy Parent) {
         if (Expr *ParentExpr = Parent.getAsExpr()) {
-          auto *ParentClosure = dyn_cast<ClosureExpr>(ParentExpr);
-          if (!ParentClosure ||
-              ParentClosure->isSeparatelyTypeChecked()) {
+          if (!isa<ClosureExpr>(ParentExpr))
             return false;
-          }
         } else if (auto *ParentStmt = Parent.getAsStmt()) {
           if (!isa<BraceStmt>(ParentStmt)) {
             return false;

@@ -104,12 +104,7 @@ namespace {
 
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
         CE->setParent(ParentDC);
-
-        // If the closure was type checked within its enclosing context,
-        // we need to walk into it. Otherwise, it'll have been separately
-        // type-checked.
-        if (!CE->isSeparatelyTypeChecked())
-          CE->getBody()->walk(ContextualizeClosuresAndMacros(CE));
+        CE->getBody()->walk(ContextualizeClosuresAndMacros(CE));
 
         TypeChecker::computeCaptures(CE);
         return Action::SkipNode(E);
@@ -283,18 +278,14 @@ namespace {
         if(CE->getRawDiscriminator() == ClosureExpr::InvalidDiscriminator)
           CE->setDiscriminator(NextClosureDiscriminator++);
 
-        // If the closure was type checked within its enclosing context,
-        // we need to walk into it with a new sequence.
-        // Otherwise, it'll have been separately type-checked.
-        if (!CE->isSeparatelyTypeChecked()) {
-          SetLocalDiscriminators innerVisitor;
-          if (auto params = CE->getParameters()) {
-            for (auto *param : *params) {
-              innerVisitor.setLocalDiscriminator(param);
-            }
+        // We need to walk into closure bodies with a new sequence.
+        SetLocalDiscriminators innerVisitor;
+        if (auto params = CE->getParameters()) {
+          for (auto *param : *params) {
+            innerVisitor.setLocalDiscriminator(param);
           }
-          CE->getBody()->walk(innerVisitor);
         }
+        CE->getBody()->walk(innerVisitor);
 
         return Action::SkipNode(E);
       }
@@ -2976,25 +2967,6 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
   }
 
   return hadError ? errorBody() : body;
-}
-
-bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
-  TypeChecker::checkClosureAttributes(closure);
-  TypeChecker::checkParameterList(closure->getParameters(), closure);
-
-  BraceStmt *body = closure->getBody();
-
-  std::optional<FunctionBodyTimer> timer;
-  const auto &tyOpts = closure->getASTContext().TypeCheckerOpts;
-  if (tyOpts.DebugTimeFunctionBodies || tyOpts.WarnLongFunctionBodies)
-    timer.emplace(closure);
-
-  bool HadError = StmtChecker(closure).typeCheckBody(body);
-  if (body) {
-    closure->setBody(body);
-  }
-  closure->setBodyState(ClosureExpr::BodyState::SeparatelyTypeChecked);
-  return HadError;
 }
 
 bool TypeChecker::typeCheckTapBody(TapExpr *expr, DeclContext *DC) {

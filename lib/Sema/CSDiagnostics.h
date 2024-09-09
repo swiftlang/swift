@@ -203,6 +203,11 @@ protected:
           [](GenericTypeParamType *, Type) {});
 
   bool conformsToKnownProtocol(Type type, KnownProtocolKind protocol) const;
+
+  /// Retrieve an editor placeholder with a given description, or a given
+  /// type if specified.
+  StringRef getEditorPlaceholder(StringRef description, Type ty,
+                                 llvm::SmallVectorImpl<char> &scratch) const;
 };
 
 /// Base class for all of the diagnostics related to generic requirement
@@ -1504,6 +1509,9 @@ private:
   /// If missing arguments come from a closure,
   /// let's produce tailored diagnostics.
   bool diagnoseClosure(const ClosureExpr *closure);
+
+  /// Diagnose a single missing argument to a buildBlock call.
+  bool diagnoseMissingResultBuilderElement() const;
 
   /// Diagnose cases when instead of multiple distinct arguments
   /// call got a single tuple argument with expected arity/types.
