@@ -531,6 +531,8 @@ public:
 
   virtual StringRef getExportedModuleName() const override;
 
+  virtual StringRef getPublicModuleName() const override;
+
   ValueDecl *getMainDecl() const override;
 
   bool hasEntryPoint() const override;

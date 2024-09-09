@@ -847,7 +847,9 @@ static void formatDiagnosticArgument(StringRef Modifier,
     // Figure out the name we want to print.
     DeclName name;
     if (includeName) {
-      if (auto VD = dyn_cast<ValueDecl>(D))
+      if (auto MD = dyn_cast<ModuleDecl>(D))
+        name = MD->getPublicModuleName(/*onlyIfImported=*/true);
+      else if (auto VD = dyn_cast<ValueDecl>(D))
         name = VD->getName();
       else if (auto PGD = dyn_cast<PrecedenceGroupDecl>(D))
         name = PGD->getName();
@@ -1419,7 +1421,9 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
           // build the name of the buffer.
           SmallVector<StringRef, 4> nameComponents;
           while (dc) {
-            nameComponents.push_back(cast<ModuleDecl>(dc)->getName().str());
+            auto publicName = cast<ModuleDecl>(dc)->
+                                getPublicModuleName(/*onlyIfImported*/true);
+            nameComponents.push_back(publicName.str());
             dc = dc->getParent();
           }
 
