@@ -213,7 +213,6 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   result.IsForSwiftInterface = true;
   result.PrintLongAttrsOnSeparateLines = true;
   result.TypeDefinitions = true;
-  result.PrintIfConfig = false;
   result.CurrentModule = ModuleToPrint;
   result.FullyQualifiedTypes = true;
   result.FullyQualifiedTypesIfAmbiguous = true;
@@ -2281,7 +2280,7 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
   }
 
   if (isa<IfConfigDecl>(D)) {
-    return Options.PrintIfConfig;
+    return false;
   }
 
   return true;
@@ -3360,21 +3359,7 @@ void PrintAST::visitTopLevelCodeDecl(TopLevelCodeDecl *decl) {
 }
 
 void PrintAST::visitIfConfigDecl(IfConfigDecl *ICD) {
-  if (!Options.PrintIfConfig)
-    return;
-
-  for (auto &Clause : ICD->getClauses()) {
-    if (&Clause == &*ICD->getClauses().begin())
-      Printer << tok::pound_if << " /* condition */"; // FIXME: print condition
-    else if (Clause.Cond)
-      Printer << tok::pound_elseif << " /* condition */"; // FIXME: print condition
-    else
-      Printer << tok::pound_else;
-    printASTNodes(Clause.Elements);
-    Printer.printNewline();
-    indent();
-  }
-  Printer << tok::pound_endif;
+  // Never printed
 }
 
 void PrintAST::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
@@ -5603,7 +5588,7 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
   }
 
   if (isa<IfConfigDecl>(this)) {
-    return PO.PrintIfConfig;
+    return false;
   }
 
   // Print everything else.
