@@ -501,6 +501,23 @@ public:
    }
 };
 
+
+// This type is intentionally unimportable,
+// to ensure that the function that uses in a parameter
+// cannot import its parameter list.
+struct UnimportableCxxTypeByDefault {
+private:
+  UnimportableCxxTypeByDefault(const UnimportableCxxTypeByDefault &) = delete;
+  UnimportableCxxTypeByDefault(UnimportableCxxTypeByDefault &&) = delete;
+};
+
+struct HasStaticOperatorCallWithUnimportableCxxType {
+  // This operator won't be imported.
+  static int operator()(const UnimportableCxxTypeByDefault &) noexcept {
+      return 0;
+  }
+};
+
 struct ClassWithOperatorStarAvailable {
   int value;
 
