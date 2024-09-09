@@ -8,4 +8,4 @@ public func add(_ lhs: inout LoadableIntWrapper, _ rhs: LoadableIntWrapper) -> L
 // CHECK-SYSV: declare {{.*}}{{i32|i64}} [[NAME]](ptr {{.*}}, {{i32|\[1 x i32\]|i64|%struct.LoadableIntWrapper\* .*byval\(%struct.LoadableIntWrapper\)}}{{.*}})
 
 // CHECK-WIN: call void [[NAME:@"\?\?HLoadableIntWrapper@@QEBA\?AU0@U0@@Z"]](ptr %{{[0-9]+}}, ptr sret(%struct.LoadableIntWrapper) {{.*}}, i32 %{{[0-9]+}})
-// CHECK-WIN: declare dso_local void [[NAME]](ptr {{.*}}, ptr sret(%struct.LoadableIntWrapper) {{.*}}, i32)
+// CHECK-WIN: declare dso_local void [[NAME]](ptr {{.*}}, ptr {{.*}} sret(%struct.LoadableIntWrapper) {{.*}}, i32)
