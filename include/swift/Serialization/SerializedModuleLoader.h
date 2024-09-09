@@ -179,7 +179,18 @@ protected:
   /// Load the module file into a buffer and also collect its module name.
   static std::unique_ptr<llvm::MemoryBuffer>
   getModuleName(ASTContext &Ctx, StringRef modulePath, std::string &Name);
-  
+
+  /// If the module has a package name matching the one
+  /// specified, return a set of package-only imports for this module.
+  static llvm::ErrorOr<llvm::StringSet<>>
+  getMatchingPackageOnlyImportsOfModule(Twine modulePath,
+                                        bool isFramework,
+                                        bool isRequiredOSSAModules,
+                                        StringRef SDKName,
+                                        StringRef packageName,
+                                        llvm::vfs::FileSystem *fileSystem,
+                                        PathObfuscator &recoverer);
+
 public:
   virtual ~SerializedModuleLoaderBase();
   SerializedModuleLoaderBase(const SerializedModuleLoaderBase &) = delete;
