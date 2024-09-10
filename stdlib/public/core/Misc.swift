@@ -97,6 +97,7 @@ func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
 
 @available(SwiftStdlib 5.3, *)
 @_silgen_name("swift_getMangledTypeName")
+@_preInverseGenerics
 public func _getMangledTypeName(_ type: any ~Copyable.Type)
   -> (UnsafePointer<UInt8>, Int)
 
