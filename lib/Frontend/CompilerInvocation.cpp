@@ -2686,6 +2686,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableThrowsPrediction = Args.hasFlag(
       OPT_enable_throws_prediction, OPT_disable_throws_prediction,
       Opts.EnableThrowsPrediction);
+  Opts.EnableNoReturnCold = Args.hasFlag(
+      OPT_enable_noreturn_prediction, OPT_disable_noreturn_prediction,
+      Opts.EnableNoReturnCold);
   Opts.EnableActorDataRaceChecks |= Args.hasFlag(
       OPT_enable_actor_data_race_checks,
       OPT_disable_actor_data_race_checks, /*default=*/false);

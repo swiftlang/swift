@@ -545,6 +545,11 @@ def enable_throws_prediction : Flag<["-"], "enable-throws-prediction">,
 def disable_throws_prediction : Flag<["-"], "disable-throws-prediction">,
   HelpText<"Disables optimization assumption that functions rarely throw errors.">;
 
+def enable_noreturn_prediction : Flag<["-"], "enable-noreturn-prediction">,
+  HelpText<"Enables optimization assumption that calls to no-return functions are cold.">;
+def disable_noreturn_prediction : Flag<["-"], "disable-noreturn-prediction">,
+  HelpText<"Disables optimization assumption that calls to no-return functions are cold.">;
+
 def disable_access_control : Flag<["-"], "disable-access-control">,
   HelpText<"Don't respect access control restrictions">;
 def enable_access_control : Flag<["-"], "enable-access-control">,

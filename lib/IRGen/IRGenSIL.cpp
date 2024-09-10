@@ -1905,6 +1905,10 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
   if (f->hasSemanticsAttr(semantics::USE_FRAME_POINTER))
     CurFn->addFnAttr("frame-pointer", "all");
 
+  // If we have a @_semantics("cold"), mark this function as cold.
+  if (f->hasSemanticsAttr(semantics::COLD))
+    CurFn->addFnAttr(llvm::Attribute::Cold);
+
   // Disable inlining of coroutine functions until we split.
   if (f->getLoweredFunctionType()->isCoroutine()) {
     CurFn->addFnAttr(llvm::Attribute::NoInline);

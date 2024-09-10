@@ -122,6 +122,9 @@ public:
   /// within the optimizer. This influences static branch prediction.
   bool EnableThrowsPrediction = false;
 
+  /// Controls whether to say that blocks ending in an 'unreachable' are cold.
+  bool EnableNoReturnCold = true;
+
   /// Should we run any SIL performance optimizations
   ///
   /// Useful when you want to enable -O LLVM opts but not -O SIL opts.
