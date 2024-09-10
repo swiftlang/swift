@@ -29,6 +29,7 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
+#include "llvm/Support/Process.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
@@ -66,6 +67,11 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_prebuilt_module_cache_path)) {
     Opts.PrebuiltModuleCachePath = A->getValue();
   }
+  if (auto envPrebuiltModuleCachePath =
+      llvm::sys::Process::GetEnv("SWIFT_OVERLOAD_PREBUILT_MODULE_CACHE_PATH")) {
+    Opts.PrebuiltModuleCachePath = *envPrebuiltModuleCachePath;
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_module_cache_path)) {
     Opts.ExplicitModulesOutputPath = A->getValue();
   } else {
