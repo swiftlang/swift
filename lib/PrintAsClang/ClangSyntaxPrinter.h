@@ -94,6 +94,9 @@ public:
   bool printNominalTypeOutsideMemberDeclInnerStaticAssert(
       const NominalTypeDecl *typeDecl);
 
+  // Returns true when no qualifiers were printed.
+  bool printNestedTypeNamespaceQualifiers(const ValueDecl *D) const;
+
   /// Print out the C++ class access qualifier for the given Swift  type
   /// declaration.
   ///
@@ -134,6 +137,13 @@ public:
   void printNamespace(StringRef name,
                       llvm::function_ref<void(raw_ostream &OS)> bodyPrinter,
                       NamespaceTrivia trivia = NamespaceTrivia::None) const;
+
+  /// Prints the C++ namespaces of the outer types for a nested type.
+  /// E.g., for struct Foo { struct Bar {...} } it will print
+  /// namespace __FooNested { ..body.. } // namespace __FooNested
+  void printParentNamespaceForNestedTypes(
+      const ValueDecl *D, llvm::function_ref<void(raw_ostream &OS)> bodyPrinter,
+      NamespaceTrivia trivia = NamespaceTrivia::None) const;
 
   /// Print an extern C block with given body.
   void
