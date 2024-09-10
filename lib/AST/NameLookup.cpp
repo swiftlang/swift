@@ -2325,8 +2325,7 @@ static bool missingImportForMemberDecl(const DeclContext *dc, ValueDecl *decl) {
   if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility))
     return false;
 
-  auto declModule = decl->getDeclContext()->getParentModule();
-  return !ctx.getImportCache().isImportedBy(declModule, dc);
+  return !dc->isDeclImported(decl);
 }
 
 /// Determine whether the given declaration is an acceptable lookup
@@ -2502,6 +2501,11 @@ bool DeclContext::lookupQualified(Type type,
 
   return lookupQualified(nominalTypesToLookInto, member,
                          loc, options, decls);
+}
+
+bool DeclContext::isDeclImported(const Decl *decl) const {
+  auto declModule = decl->getDeclContext()->getParentModule();
+  return getASTContext().getImportCache().isImportedBy(declModule, this);
 }
 
 static void installPropertyWrapperMembersIfNeeded(NominalTypeDecl *target,

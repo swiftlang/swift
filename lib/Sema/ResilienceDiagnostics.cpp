@@ -279,8 +279,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
   // Some diagnostics emitted with the `MemberImportVisibility` feature enabled
   // subsume these diagnostics.
   if (originKind == DisallowedOriginKind::MissingImport &&
-      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility) && SF &&
-      SF->hasDelayedMissingImportForMemberDiagnostic(D))
+      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility) && SF)
     return false;
 
   if (auto accessor = dyn_cast<AccessorDecl>(D)) {

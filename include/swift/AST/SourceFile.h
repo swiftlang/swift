@@ -507,11 +507,6 @@ public:
     MissingImportForMemberDiagnostics[decl].push_back(loc);
   }
 
-  /// Returns true if there is a pending missing import diagnostic for \p decl.
-  bool hasDelayedMissingImportForMemberDiagnostic(const ValueDecl *decl) const {
-    return MissingImportForMemberDiagnostics.contains(decl);
-  }
-
   DelayedMissingImportForMemberDiags
   takeDelayedMissingImportForMemberDiagnostics() {
     DelayedMissingImportForMemberDiags diags;
