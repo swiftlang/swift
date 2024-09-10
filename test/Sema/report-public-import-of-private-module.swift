@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 // REQUIRES: VENDOR=apple
-// REQUIRES: asserts
 
 /// Prepare the SDK.
 // RUN: cp -r %S/Inputs/public-private-sdk %t/sdk
