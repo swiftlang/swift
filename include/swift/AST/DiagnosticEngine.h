@@ -868,7 +868,7 @@ namespace swift {
     /// Don't emit any remarks
     bool suppressRemarks = false;
 
-    /// Treat these warnings as errors. Indicies here corespond to DiagID enum
+    /// Treat these warnings as errors. Indices here correspond to DiagID enum
     llvm::BitVector warningsAsErrors;
 
     /// Whether a fatal error has occurred
@@ -1136,7 +1136,7 @@ namespace swift {
     }
 
     /// Apply rules specifing what warnings should or shouldn't be treated as
-    /// errors. For group rules the string is either a group name defined by
+    /// errors. For group rules the string is a group name defined by
     /// DiagnosticGroups.def
     /// Rules are applied in order they appear in the vector.
     /// In case the vector contains rules affecting the same diagnostic ID
