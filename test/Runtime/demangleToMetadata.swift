@@ -529,7 +529,7 @@ if #available(SwiftStdlib 5.3, *) {
 
   DemangleToMetadataTests.test("Check _MangledTypeName with any ~Copyable.Type") {
     let type: any ~Copyable.Type = NonCopyable.self
-    expectEqual("s11NonCopyableV", _mangledTypeName(type))
+    expectEqual("4main11NonCopyableV", _mangledTypeName(type))
   }
 }
 
