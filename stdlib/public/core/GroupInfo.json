@@ -198,7 +198,8 @@
     "UnsafeRawBufferPointer.swift"
   ],
   "Span": [
-    "RawSpan.swift"
+    "RawSpan.swift",
+    "Span.swift"
   ],
   "Protocols": [
     "CompilerProtocols.swift",
