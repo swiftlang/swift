@@ -13,7 +13,7 @@ enum Singleton {
 // CHECK-macosx: _DATA__TtC1A1G = internal constant {{.*}} { i32 {{(128|129)}}, i32 {{(16|8|40)}}
 // CHECK-ios: _DATA__TtC1A1G = internal constant {{.*}} { i32 {{(128|129)}}, i32 {{(16|8|40)}}
 // CHECK-watchos: _DATA__TtC1A1G = internal constant {{.*}} { i32 {{(128|129)}}, i32 {{(16|8|40)}}
-// CHECK-tvos: _DATA__TtC1A1G = internal constant {{.*}} { i32 128, i32 {{(16|8)}}
+// CHECK-tvos: _DATA__TtC1A1G = internal constant {{.*}} { i32 {{(128|129)}}, i32 {{(16|8|40)}}
 
 class G {
   var zeroSizedField = Singleton.only
