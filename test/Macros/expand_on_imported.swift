@@ -1,0 +1,26 @@
+// REQUIRES: swift_swift_parser, executable_test
+
+// RUN: %empty-directory(%t)
+// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath -swift-version 5
+
+// Diagnostics testing
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -swift-version 5 -enable-experimental-feature CodeItemMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name ModuleUser %s
+
+@attached(peer, names: overloaded)
+public macro AddAsync() = #externalMacro(module: "MacroDefinition", type: "AddAsyncMacro")
+
+import CompletionHandlerGlobals
+
+// Make sure that @AddAsync works at all.
+@AddAsync
+@available(SwiftStdlib 5.1, *)
+func asyncTest(_ value: Int, completionHandler: @escaping (String) -> Void) {
+  completionHandler(String(value))
+}
+
+@available(SwiftStdlib 5.1, *)
+func testAll(x: Double, y: Double) async {
+  _ = await asyncTest(17)
+
+  let _: Double = await async_divide(1.0, 2.0)
+}
