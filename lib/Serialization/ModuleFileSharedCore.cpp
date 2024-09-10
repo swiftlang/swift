@@ -209,6 +209,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::SERIALIZE_PACKAGE_ENABLED:
       extendedInfo.setSerializePackageEnabled(true);
       break;
+    case options_block::PUBLIC_MODULE_NAME:
+      extendedInfo.setPublicModuleName(blobData);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -1474,6 +1477,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       ModuleABIName = extInfo.getModuleABIName();
       ModulePackageName = extInfo.getModulePackageName();
       ModuleExportAsName = extInfo.getExportAsName();
+      PublicModuleName = extInfo.getPublicModuleName();
 
       hasValidControlBlock = true;
       break;

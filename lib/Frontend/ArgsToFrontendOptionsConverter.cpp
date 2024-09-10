@@ -288,6 +288,9 @@ bool ArgsToFrontendOptionsConverter::convert(
       Opts.ExportAsName = exportAs;
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_public_module_name))
+    Opts.PublicModuleName = A->getValue();
+
   // This must be called after computing module name, module abi name,
   // and module link name. If computing module aliases is unsuccessful,
   // return early.
