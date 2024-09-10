@@ -16,8 +16,8 @@ func withGenericArg<T>(_ msg: T) async {
 
   await forceSplit()
   // CHECK-LABEL: {{^define .*}} @"$s1M14withGenericArgyyxYalFTQ0_"(ptr swiftasync %0)
-  // CHECK-DAG: #dbg_declare(ptr %0, ![[MSG_R:[0-9]+]], !DIExpression({{.*}}DW_OP_plus_uconst, [[OFFSET:[0-9]+]], DW_OP_plus_uconst, {{[0-9]+}}, DW_OP_deref),
-  // CHECK-DAG: #dbg_declare(ptr %0, ![[TAU_R:[0-9]+]], !DIExpression({{.*}}DW_OP_deref, DW_OP_plus_uconst, [[OFFSET]], DW_OP_plus_uconst, {{[0-9]+}}),
+  // CHECK-DAG: #dbg_declare(ptr %0, ![[MSG_R:[0-9]+]], !DIExpression({{.*}}DW_OP_plus_uconst, {{[0-9]+}}, DW_OP_deref),
+  // CHECK-DAG: #dbg_declare(ptr %0, ![[TAU_R:[0-9]+]], !DIExpression({{.*}}DW_OP_deref, DW_OP_plus_uconst, {{[0-9]+}}),
   use(msg)
 }
 // CHECK-LABEL: {{^define }}
