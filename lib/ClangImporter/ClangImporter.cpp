@@ -4717,6 +4717,17 @@ bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
       }
     }
 
+    // Visit auxiliary declarations to check for name matches.
+    decl->visitAuxiliaryDecls([&](Decl *aux) {
+      if (auto auxValue = dyn_cast<ValueDecl>(aux)) {
+        if (auxValue->getName().matchesRef(name) &&
+            auxValue->getDeclContext()->isModuleScopeContext()) {
+          consumer.foundDecl(auxValue, DeclVisibilityKind::VisibleAtTopLevel);
+          anyMatching = true;
+        }
+      }
+    });
+
     // If we have a declaration and nothing matched so far, try the names used
     // in other versions of Swift.
     if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {

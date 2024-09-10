@@ -23,6 +23,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTNode.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
@@ -39,6 +40,7 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Bridging/ASTGen.h"
 #include "swift/Bridging/Macros.h"
 #include "swift/Demangling/Demangler.h"
@@ -1021,7 +1023,10 @@ createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
   auto macroSourceFile = new (ctx) SourceFile(
       *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
       /*parsingOpts=*/{}, /*isPrimary=*/false);
-  macroSourceFile->setImports(dc->getParentSourceFile()->getImports());
+  if (auto parentSourceFile = dc->getParentSourceFile())
+    macroSourceFile->setImports(parentSourceFile->getImports());
+  else if (isa<ClangModuleUnit>(dc->getModuleScopeContext()))
+    macroSourceFile->setImports({});
   return macroSourceFile;
 }
 
@@ -1346,8 +1351,44 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
   if (!attrSourceFile)
     return nullptr;
 
-  auto declSourceFile =
+  SourceFile *declSourceFile =
       moduleDecl->getSourceFileContainingLocation(attachedTo->getStartLoc());
+  if (!declSourceFile && isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
+    // Pretty-print the declaration into a buffer so we can macro-expand
+    // it.
+    // FIXME: Turn this into a request.
+    llvm::SmallString<128> buffer;
+    {
+      llvm::raw_svector_ostream out(buffer);
+      StreamPrinter printer(out);
+      attachedTo->print(
+          printer,
+          PrintOptions::printForDiagnostics(
+              AccessLevel::Public,
+              ctx.TypeCheckerOpts.PrintFullConvention));
+    }
+
+    // Create the buffer.
+    SourceManager &sourceMgr = ctx.SourceMgr;
+    auto bufferID = sourceMgr.addMemBufferCopy(buffer);
+    auto memBufferStartLoc = sourceMgr.getLocForBufferStart(bufferID);
+    sourceMgr.setGeneratedSourceInfo(
+        bufferID,
+        GeneratedSourceInfo{
+          GeneratedSourceInfo::PrettyPrinted,
+          CharSourceRange(),
+          CharSourceRange(memBufferStartLoc, buffer.size()),
+          ASTNode(const_cast<Decl *>(attachedTo)).getOpaqueValue(),
+          nullptr
+        }
+    );
+
+    // Create a source file to go with it.
+    declSourceFile = new (ctx)
+        SourceFile(*moduleDecl, SourceFileKind::Library, bufferID);
+    moduleDecl->addAuxiliaryFile(*declSourceFile);
+  }
+
   if (!declSourceFile)
     return nullptr;
 
@@ -1486,13 +1527,18 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     if (auto var = dyn_cast<VarDecl>(attachedTo))
       searchDecl = var->getParentPatternBinding();
 
+    auto startLoc = searchDecl->getStartLoc();
+    if (startLoc.isInvalid() && isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
+      startLoc = ctx.SourceMgr.getLocForBufferStart(*declSourceFile->getBufferID());
+    }
+
     BridgedStringRef evaluatedSourceOut{nullptr, 0};
     assert(!externalDef.isError());
     swift_Macros_expandAttachedMacro(
         &ctx.Diags, externalDef.get(), discriminator->c_str(),
         extendedType.c_str(), conformanceList.c_str(), getRawMacroRole(role),
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
-        astGenDeclSourceFile, searchDecl->getStartLoc().getOpaquePointerValue(),
+        astGenDeclSourceFile, startLoc.getOpaquePointerValue(),
         astGenParentDeclSourceFile, parentDeclLoc, &evaluatedSourceOut);
     if (!evaluatedSourceOut.unbridged().data())
       return nullptr;
