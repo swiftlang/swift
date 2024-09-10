@@ -45,16 +45,34 @@ public protocol ResilientSelfDefault : ResilientBaseProtocol {
   func protocolMethod()
 }
 
+@available(SwiftStdlib 5.10, *)
 public protocol ResilientSendableBase: Sendable {
   func f()
 }
 
+@available(SwiftStdlib 5.10, *)
 public protocol ResilientSendable: ResilientSendableBase {
   func g()
 }
 
-
+@available(SwiftStdlib 5.10, *)
 public struct ConformsToResilientSendable: ResilientSendable {
+  public func f() { }
+  public func g() { }
+}
+
+@available(SwiftStdlib 6.0, *)
+public protocol NewResilientSendableBase: Sendable {
+  func f()
+}
+
+@available(SwiftStdlib 6.0, *)
+public protocol NewResilientSendable: NewResilientSendableBase {
+  func g()
+}
+
+@available(SwiftStdlib 6.0, *)
+public struct ConformsToNewResilientSendable: NewResilientSendable {
   public func f() { }
   public func g() { }
 }

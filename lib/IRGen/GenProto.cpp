@@ -1037,24 +1037,20 @@ static bool isSynthesizedNonUnique(const RootProtocolConformance *conformance) {
 }
 
 /// Determine whether a protocol can ever have a dependent conformance.
-static bool protocolCanHaveDependentConformance(ProtocolDecl *proto) {
+static bool protocolCanHaveDependentConformance(
+    ProtocolDecl *proto,
+    bool treatSendableConformanceAsDependent
+) {
   // Objective-C protocols have never been able to have a dependent conformance.
   if (proto->isObjC())
     return false;
 
-  // Prior to Swift 6.0, only Objective-C protocols were never able to have
-  // a dependent conformance. This is overly pessimistic when the protocol
-  // is a marker protocol (since they don't have requirements), but we must
-  // retain backward compatibility with binaries built for earlier deployment
-  // targets that concluded that these protocols might involve dependent
-  // conformances.
-  ASTContext &ctx = proto->getASTContext();
-  if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget(
-          ctx.LangOpts.Target)) {
-    if (runtimeCompatVersion < llvm::VersionTuple(6, 0) &&
-        proto->isSpecificProtocol(KnownProtocolKind::Sendable))
-      return true;
-  }
+  // If we are supposed to treat a Sendable conformance as dependent, do so.
+  // See the comment in IRGenModule::isDependentConformance() for the historical
+  // reason for this.
+  if (treatSendableConformanceAsDependent &&
+      proto->isSpecificProtocol(KnownProtocolKind::Sendable))
+    return true;
 
   return Lowering::TypeConverter::protocolRequiresWitnessTable(proto);
 }
@@ -1062,6 +1058,7 @@ static bool protocolCanHaveDependentConformance(ProtocolDecl *proto) {
 static bool isDependentConformance(
               IRGenModule &IGM,
               const RootProtocolConformance *rootConformance,
+              bool treatSendableConformanceAsDependent,
               llvm::SmallPtrSet<const NormalProtocolConformance *, 4> &visited){
   // Self-conformances are never dependent.
   auto conformance = dyn_cast<NormalProtocolConformance>(rootConformance);
@@ -1091,7 +1088,8 @@ static bool isDependentConformance(
       continue;
 
     auto assocProtocol = req.getProtocolDecl();
-    if (!protocolCanHaveDependentConformance(assocProtocol))
+    if (!protocolCanHaveDependentConformance(
+            assocProtocol, treatSendableConformanceAsDependent))
       continue;
 
     auto assocConformance =
@@ -1105,6 +1103,7 @@ static bool isDependentConformance(
         isDependentConformance(IGM,
                                assocConformance.getConcrete()
                                  ->getRootConformance(),
+                               treatSendableConformanceAsDependent,
                                visited))
       return true;
   }
@@ -1172,8 +1171,27 @@ static bool hasConditionalConformances(IRGenModule &IGM,
 /// tables to be dependently-generated?
 bool IRGenModule::isDependentConformance(
     const RootProtocolConformance *conformance) {
+  // Prior to Swift 6.0, only Objective-C protocols were never able to have
+  // a dependent conformance. This is overly pessimistic when the protocol
+  // is a marker protocol (since they don't have requirements), but we must
+  // retain backward compatibility with binaries built for earlier deployment
+  // targets that concluded that these protocols might involve dependent
+  // conformances. Do so by identifying resilient protocols with pre-6.0
+  // deployment targets. Such protocols request us to treat Sendable as having
+  // a dependent conformance.
+  bool treatSendableConformanceAsDependent = false;
+  auto proto = conformance->getProtocol();
+  if (proto->isResilient()) {
+    ASTContext &ctx = proto->getASTContext();
+    AvailabilityContext protoInfo =
+        AvailabilityInference::availableRange(proto, ctx);
+    if (!protoInfo.isContainedIn(ctx.getSwift60Availability()))
+      treatSendableConformanceAsDependent = true;
+  }
+
   llvm::SmallPtrSet<const NormalProtocolConformance *, 4> visited;
-  return ::isDependentConformance(*this, conformance, visited);
+  return ::isDependentConformance(
+      *this, conformance, treatSendableConformanceAsDependent, visited);
 }
 
 static llvm::Value *
