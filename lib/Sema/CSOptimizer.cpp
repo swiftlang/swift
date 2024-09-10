@@ -34,6 +34,48 @@ using namespace constraints;
 
 namespace {
 
+static bool isSupportedOperator(Constraint *disjunction) {
+  if (!isOperatorDisjunction(disjunction))
+    return false;
+
+  auto choices = disjunction->getNestedConstraints();
+  auto *decl = getOverloadChoiceDecl(choices.front());
+
+  auto name = decl->getBaseIdentifier();
+  if (name.isArithmeticOperator() || name.isStandardComparisonOperator() ||
+      name.is("^")) {
+    return true;
+  }
+
+  // Operators like &<<, &>>, &+, .== etc.
+  if (llvm::any_of(choices, [](Constraint *choice) {
+        return isSIMDOperator(getOverloadChoiceDecl(choice));
+      })) {
+    return true;
+  }
+
+  return false;
+}
+
+static bool isSupportedDisjunction(Constraint *disjunction) {
+  auto choices = disjunction->getNestedConstraints();
+
+  if (isSupportedOperator(disjunction))
+    return true;
+
+  // Non-operator disjunctions are supported only if they don't
+  // have any generic choices.
+  return llvm::all_of(choices, [&](Constraint *choice) {
+    if (choice->getKind() != ConstraintKind::BindOverload)
+      return false;
+
+    if (auto *decl = getOverloadChoiceDecl(choice))
+      return decl->getInterfaceType()->is<FunctionType>();
+
+    return false;
+  });
+}
+
 NullablePtr<Constraint> getApplicableFnConstraint(ConstraintGraph &CG,
                                                   Constraint *disjunction) {
   auto *boundVar = disjunction->getNestedConstraints()[0]
@@ -112,6 +154,9 @@ static Constraint *determineBestChoicesInContext(
       favoredChoicesPerDisjunction;
 
   for (auto *disjunction : disjunctions) {
+    if (!isSupportedDisjunction(disjunction))
+      continue;
+
     auto applicableFn =
         getApplicableFnConstraint(cs.getConstraintGraph(), disjunction);
 
@@ -337,7 +382,7 @@ static Constraint *determineBestChoicesInContext(
       // types match i.e. Array<Element> as a parameter.
       //
       // This is slightly better than all of the conformances matching
-      // because the parameter is concrete and could split the graph.
+      // because the parameter is concrete and could split the graph.      
       if (paramType->hasTypeParameter()) {
         auto *candidateDecl = candidateType->getAnyNominal();
         auto *paramDecl = paramType->getAnyNominal();
@@ -365,13 +410,6 @@ static Constraint *determineBestChoicesInContext(
             } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
               genericSig = SD->getGenericSignature();
             }
-
-            // Let's not consider non-operator generic overloads because we
-            // need conformance checking functionality to determine best
-            // favoring, preferring such overloads based on concrete types
-            // alone leads to subpar choices due to missed information.
-            if (genericSig && !decl->isOperator())
-              return;
           }
 
           auto matchings =
