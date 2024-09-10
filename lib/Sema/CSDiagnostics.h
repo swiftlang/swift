@@ -1640,13 +1640,11 @@ private:
 /// ```
 class InaccessibleMemberFailure final : public FailureDiagnostic {
   ValueDecl *Member;
-  bool IsMissingImport;
 
 public:
   InaccessibleMemberFailure(const Solution &solution, ValueDecl *member,
-                            ConstraintLocator *locator, bool isMissingImport)
-      : FailureDiagnostic(solution, locator), Member(member),
-        IsMissingImport(isMissingImport) {}
+                            ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), Member(member) {}
 
   bool diagnoseAsError() override;
 };

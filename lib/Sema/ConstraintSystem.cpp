@@ -292,8 +292,8 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclNameRef name,
   if (result) return *result;
 
   // Lookup the member.
-  result = TypeChecker::lookupMember(DC, base, name, loc,
-                                     defaultMemberLookupOptions);
+  result = TypeChecker::lookupMember(
+      DC, base, name, loc, defaultConstraintSolverMemberLookupOptions);
 
   // If we are in an @_unsafeInheritExecutor context, swap out
   // declarations for their _unsafeInheritExecutor_ counterparts if they
@@ -3965,6 +3965,12 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // If the declaration is unavailable, note that in the score.
     if (isDeclUnavailable(decl, locator))
       increaseScore(SK_Unavailable, locator);
+
+    // If the declaration is from a module that hasn't been imported, note that.
+    if (getASTContext().LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+      if (!useDC->isDeclImported(decl))
+        increaseScore(SK_MissingImport, locator);
+    }
 
     // If this overload is disfavored, note that.
     if (decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>())

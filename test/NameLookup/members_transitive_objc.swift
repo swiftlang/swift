@@ -19,9 +19,9 @@ func test(x: X) {
   x.fromOverlayForA()
   x.fromB()
   x.fromOverlayForB()
-  x.fromC() // expected-member-visibility-error {{class method 'fromC()' is not available due to missing import of defining module 'Categories_C'}}
+  x.fromC() // expected-member-visibility-error {{instance method 'fromC()' is not available due to missing import of defining module 'Categories_C'}}
   x.fromOverlayForC() // expected-member-visibility-error {{instance method 'fromOverlayForC()' is not available due to missing import of defining module 'Categories_C'}}
-  x.fromSubmoduleOfD() // expected-member-visibility-error {{class method 'fromSubmoduleOfD()' is not available due to missing import of defining module 'Categories_D'}}
+  x.fromSubmoduleOfD() // expected-member-visibility-error {{instance method 'fromSubmoduleOfD()' is not available due to missing import of defining module 'Categories_D'}}
   x.fromBridgingHeader()
 }
 

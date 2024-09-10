@@ -1,4 +1,6 @@
-public struct X { }
+public struct X {
+  public init() {}
+}
 
 public protocol P { }
 

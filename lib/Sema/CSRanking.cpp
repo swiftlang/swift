@@ -963,7 +963,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
              ? SolutionCompareResult::Better
              : SolutionCompareResult::Worse;
   }
-  
+
   // Compute relative score.
   unsigned score1 = 0;
   unsigned score2 = 0;
