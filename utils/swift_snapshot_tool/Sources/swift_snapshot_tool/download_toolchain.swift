@@ -55,7 +55,9 @@ private func downloadFile(url: URL, localPath: URL, verboseDownload: Bool = true
   }
 }
 
-private func shell(_ command: String, environment: [String: String] = [:]) -> (
+private func shell(_ command: String, environment: [String: String] = [:],
+                   mustSucceed: Bool = true,verbose: Bool = false,
+                   extraArgs: [String] = []) -> (
   stdout: String, stderr: String, exitCode: Int
 ) {
   let task = Process()
@@ -64,11 +66,15 @@ private func shell(_ command: String, environment: [String: String] = [:]) -> (
 
   task.standardOutput = stdout
   task.standardError = stderr
-  task.arguments = ["-c", command]
+  var newCommand = command
+  if extraArgs.count != 0 {
+    newCommand = newCommand.appending(" ").appending(extraArgs.joined(separator: " "))
+  }
+  task.arguments = ["-c", newCommand]
   if !environment.isEmpty {
     if let e = task.environment {
-      print("Task Env: \(e)")
-      print("Passed in Env: \(environment)")
+      log("Task Env: \(e)")
+      log("Passed in Env: \(environment)")
       task.environment = e.merging(
         environment,
         uniquingKeysWith: {
@@ -78,7 +84,9 @@ private func shell(_ command: String, environment: [String: String] = [:]) -> (
       task.environment = environment
     }
   }
-
+  if verbose {
+    log("Command: \(command)\n")
+  }
   task.launchPath = "/bin/zsh"
   task.standardInput = nil
   task.launch()
@@ -88,20 +96,22 @@ private func shell(_ command: String, environment: [String: String] = [:]) -> (
     decoding: stderr.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
   let stdoutData = String(
     decoding: stdout.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-  if task.terminationStatus != 0 {
-    log("Command Failed: \(command)")
+  if verbose {
     log("StdErr:\n\(stderrData)\n")
     log("StdOut:\n\(stdoutData)\n")
+  }
+  if mustSucceed && task.terminationStatus != 0 {
+    log("Command Failed!")
     fatalError()
   }
-
   return (stdout: stdoutData, stderr: stderrData, Int(task.terminationStatus))
 }
 
 func downloadToolchainAndRunTest(
   platform: Platform, tag: Tag, branch: Branch,
   workspace: String, script: String,
-  verboseDownload: Bool = true
+  extraArgs: [String],
+  verbose: Bool = false
 ) async throws -> Int {
   let fileType = platform.fileType
   let toolchainType = platform.toolchainType
@@ -117,6 +127,8 @@ func downloadToolchainAndRunTest(
     log("[INFO] Starting Download: \(downloadURL) -> \(downloadPath)")
     try await downloadFile(url: downloadURL, localPath: downloadPath)
     log("[INFO] Finished Download: \(downloadURL) -> \(downloadPath)")
+  } else {
+    log("[INFO] File exists! No need to download! Path: \(downloadPath)")
   }
 
   switch platform {
@@ -126,16 +138,21 @@ func downloadToolchainAndRunTest(
       _ = shell("pkgutil --expand \(downloadPath.path) \(toolchainDir)")
       let payloadPath = "\(toolchainDir)/\(tag.name)-osx-package.pkg/Payload"
       _ = shell("tar -xf \(payloadPath) -C \(toolchainDir)")
-      let swiftcPath = "\(toolchainDir)/usr/bin/swiftc"
-      let swiftFrontendPath = "\(toolchainDir)/usr/bin/swift-frontend"
-      log(shell("\(swiftcPath) --version").stdout)
-      let exitCode = shell(
-        "\(script)", environment: ["SWIFTC": swiftcPath, "SWIFT_FRONTEND": swiftFrontendPath]
-      ).exitCode
-      log("[INFO] Exit code: \(exitCode). Tag: \(tag.name). Script: \(script)")
-      return exitCode
+    } else {
+      log("[INFO] No need to install: \(downloadPath)")
     }
-    return 0
+
+    let swiftcPath = "\(toolchainDir)/usr/bin/swiftc"
+    let swiftFrontendPath = "\(toolchainDir)/usr/bin/swift-frontend"
+    log(shell("\(swiftcPath) --version").stdout)
+    let exitCode = shell(
+      "\(script)", environment: ["SWIFTC": swiftcPath, "SWIFT_FRONTEND": swiftFrontendPath],
+      mustSucceed: false,
+      verbose: verbose,
+      extraArgs: extraArgs
+    ).exitCode
+    log("[INFO] Exit code: \(exitCode). Tag: \(tag.name). Script: \(script)")
+    return exitCode
   case .ubuntu1404, .ubuntu1604, .ubuntu1804:
     fatalError("Unsupported platform: \(platform)")
   }
