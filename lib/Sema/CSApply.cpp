@@ -3032,7 +3032,9 @@ namespace {
         auto macro = cast<MacroDecl>(overload.choice.getDecl());
         ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
         auto *expansion = MacroExpansionExpr::create(
-            dc, expr->getStartLoc(), DeclNameRef(macro->getName()),
+            dc, expr->getStartLoc(),
+            /*module name=*/DeclNameRef(), /*module name loc=*/DeclNameLoc(),
+            DeclNameRef(macro->getName()),
             DeclNameLoc(expr->getLoc()), SourceLoc(), {}, SourceLoc(), nullptr,
             MacroRole::Expression, /*isImplicit=*/true, expandedType);
         expansion->setMacroRef(macroRef);
