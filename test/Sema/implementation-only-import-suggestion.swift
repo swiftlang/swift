@@ -42,12 +42,12 @@
 // RUN:   -library-level ipi -module-name MainLib
 //--- PublicImports.swift
 import PublicSwift
-import PrivateSwift // expected-error{{private module 'PrivateSwift' is imported publicly from the public module 'MainLib'}}
+import PrivateSwift // expected-error{{private module 'PrivateSwift' is imported publicly from the public module 'MainLib'}}{{1-1=internal }}
 
 import PublicClang
-import PublicClang_Private // expected-error{{private module 'PublicClang_Private' is imported publicly from the public module 'MainLib'}}
-import FullyPrivateClang // expected-error{{private module 'FullyPrivateClang' is imported publicly from the public module 'MainLib'}}
-import LocalClang // expected-error{{private module 'LocalClang' is imported publicly from the public module 'MainLib'}}
+import PublicClang_Private // expected-error{{private module 'PublicClang_Private' is imported publicly from the public module 'MainLib'}}{{1-1=internal }}
+import FullyPrivateClang // expected-error{{private module 'FullyPrivateClang' is imported publicly from the public module 'MainLib'}}{{1-1=internal }}
+import LocalClang // expected-error{{private module 'LocalClang' is imported publicly from the public module 'MainLib'}}{{1-1=internal }}
 @_exported import MainLib // expected-warning{{private module 'MainLib' is imported publicly from the public module 'MainLib'}}
 
 /// Expect no errors with implementation-only imports.
@@ -146,16 +146,27 @@ private import LocalClang
 // RUN:   -library-level api -verify
 //--- ExplicitlyPublicImports.swift
 public import PublicSwift
-// expected-warning @-1 {{public import of 'PublicSwift' was not used in public declarations or inlinable code}}
-public import PrivateSwift // expected-error{{private module 'PrivateSwift' is imported publicly from the public module 'MainLib'}}
-// expected-warning @-1 {{public import of 'PrivateSwift' was not used in public declarations or inlinable code}}
+// expected-warning @-1 {{public import of 'PublicSwift' was not used in public declarations or inlinable code}}{{1-7=internal}}
+public import PrivateSwift // expected-error{{private module 'PrivateSwift' is imported publicly from the public module 'MainLib'}}{{1-7=internal}}
+// expected-warning @-1 {{public import of 'PrivateSwift' was not used in public declarations or inlinable code}}{{1-7=internal}}
 
 public import PublicClang
-// expected-warning @-1 {{public import of 'PublicClang' was not used in public declarations or inlinable code}}
-public import PublicClang_Private // expected-error{{private module 'PublicClang_Private' is imported publicly from the public module 'MainLib'}}
-// expected-warning @-1 {{public import of 'PublicClang_Private' was not used in public declarations or inlinable code}}
-public import FullyPrivateClang // expected-error{{private module 'FullyPrivateClang' is imported publicly from the public module 'MainLib'}}
-// expected-warning @-1 {{public import of 'FullyPrivateClang' was not used in public declarations or inlinable code}}
-public import LocalClang // expected-error{{private module 'LocalClang' is imported publicly from the public module 'MainLib'}}
-// expected-warning @-1 {{public import of 'LocalClang' was not used in public declarations or inlinable code}}
-@_exported public import MainLib // expected-warning{{private module 'MainLib' is imported publicly from the public module 'MainLib'}}
+// expected-warning @-1 {{public import of 'PublicClang' was not used in public declarations or inlinable code}}{{1-7=internal}}
+public import PublicClang_Private // expected-error{{private module 'PublicClang_Private' is imported publicly from the public module 'MainLib'}}{{1-7=internal}}
+// expected-warning @-1 {{public import of 'PublicClang_Private' was not used in public declarations or inlinable code}}{{1-7=internal}}
+public import FullyPrivateClang // expected-error{{private module 'FullyPrivateClang' is imported publicly from the public module 'MainLib'}}{{1-7=internal}}
+// expected-warning @-1 {{public import of 'FullyPrivateClang' was not used in public declarations or inlinable code}}{{1-7=internal}}
+public import LocalClang // expected-error{{private module 'LocalClang' is imported publicly from the public module 'MainLib'}}{{1-7=internal}}
+// expected-warning @-1 {{public import of 'LocalClang' was not used in public declarations or inlinable code}}{{1-7=internal}}
+@_exported public import MainLib // expected-warning{{private module 'MainLib' is imported publicly from the public module 'MainLib'}}{{12-18=internal}}
+
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/ImplictlyInternalImports.swift \
+// RUN:   -module-name MainLib -module-cache-path %t \
+// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault \
+// RUN:   -library-level api -verify
+//--- ImplictlyInternalImports.swift
+public import PublicSwift
+// expected-warning @-1 {{public import of 'PublicSwift' was not used in public declarations or inlinable code}}{{1-8=}}
+public import PrivateSwift // expected-error{{private module 'PrivateSwift' is imported publicly from the public module 'MainLib'}}{{1-8=}}
+// expected-warning @-1 {{public import of 'PrivateSwift' was not used in public declarations or inlinable code}}{{1-8=}}
