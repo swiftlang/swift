@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 // TODO(swift): rename the file to ExecutorJob.swift eventually, we don't use PartialTask terminology anymore
 

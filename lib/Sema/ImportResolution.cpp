@@ -790,6 +790,26 @@ void UnboundImport::validateInterfaceWithPackageName(ModuleDecl *topLevelModule,
   }
 }
 
+/// Returns true if the importer and importee tuple are on an allow list for
+/// use of `@_implementationOnly import`, which is deprecated. Some existing
+/// uses of `@_implementationOnly import` cannot be safely replaced by
+/// `internal import` because the existence of the imported module must always
+/// be hidden from clients.
+static bool shouldSuppressNonResilientImplementationOnlyImportDiagnostic(
+    StringRef targetName, StringRef importerName) {
+  if (targetName == "SwiftConcurrencyInternalShims")
+    return importerName == "_Concurrency";
+
+  if (targetName == "CCryptoBoringSSL" || targetName == "CCryptoBoringSSLShims")
+    return importerName == "Crypto" || importerName == "_CryptoExtras" ||
+           importerName == "CryptoBoringWrapper";
+
+  if (targetName == "CNIOBoringSSL" || targetName == "CNIOBoringSSLShims")
+    return importerName != "NIOSSL";
+
+  return false;
+}
+
 void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
                                        SourceFile &SF) {
   if (!topLevelModule)
@@ -825,14 +845,8 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
         inFlight.fixItReplace(import.implementationOnlyRange, "internal");
       }
     } else if ( // Non-resilient client
-      !(((targetName.str() == "CCryptoBoringSSL" ||
-          targetName.str() == "CCryptoBoringSSLShims") &&
-         (importerName.str() == "Crypto" ||
-          importerName.str() == "_CryptoExtras" ||
-          importerName.str() == "CryptoBoringWrapper")) ||
-        ((targetName.str() == "CNIOBoringSSL" ||
-          targetName.str() == "CNIOBoringSSLShims") &&
-         importerName.str() == "NIOSSL"))) {
+        !shouldSuppressNonResilientImplementationOnlyImportDiagnostic(
+            targetName.str(), importerName.str())) {
       ctx.Diags.diagnose(import.importLoc,
                          diag::implementation_only_requires_library_evolution,
                          importerName);
