@@ -192,6 +192,14 @@ struct ExtractInactiveRanges : public ASTWalker {
 };
 } // end anonymous namespace
 
+#if SWIFT_BUILD_SWIFT_SYNTAX
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
+extern "C" BridgedStringRef
+swift_ASTGen_extractInlinableText(BridgedASTContext ctx,
+                                  BridgedStringRef sourceText);
+#pragma clang diagnostic pop
+#else
 /// Appends the textual contents of the provided source range, stripping
 /// the contents of comments that appear in the source.
 ///
@@ -292,10 +300,7 @@ static void appendRange(
     scratch.append(text.begin(), text.end());
   }
 }
-
-extern "C"
-BridgedStringRef swift_ASTGen_extractInlinableText(
-    BridgedASTContext ctx, BridgedStringRef sourceText);
+#endif // SWIFT_BUILD_SWIFT_SYNTAX
 
 StringRef swift::extractInlinableText(ASTContext &ctx, ASTNode node,
                                       SmallVectorImpl<char> &scratch) {

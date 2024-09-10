@@ -4215,6 +4215,12 @@ void ASTMangler::appendAnyProtocolConformance(
       conformance.getRequirement()->isMarkerProtocol())
     return;
 
+  // While all invertible protocols are marker protocols, do not mangle them for
+  // compatability reasons. See equivalent hack in `conformanceRequirementIndex`
+  // where only invertible protocols are unconditionally skipped.
+  if (conformance.getRequirement()->getInvertibleProtocolKind())
+    return;
+
   if (conformingType->isTypeParameter()) {
     assert(genericSig && "Need a generic signature to resolve conformance");
     auto path = genericSig->getConformancePath(conformingType,
