@@ -133,7 +133,7 @@ public func useTypesC(a: FarClangType) {}
 //--- ExportedClient_FileA.swift
 /// Prefer the defining module.
 public import NotLib // expected-warning {{public import of 'NotLib' was not used in public declarations or inlinable code}}
-public import LibCore
+public import LibCore // We should warn here.
 public import Lib
 
 public func useTypesA(a: ExportedType) {}
@@ -162,7 +162,7 @@ public func useTypesD(a: ExportedType) {}
 
 //--- SwiftLibClient_FileA.swift
 /// Prefer the import matching public-module-name.
-public import SwiftPublicNameCore
+public import SwiftPublicNameCore // We should warn here.
 public import SwiftPublicName
 
 public func useTypesA(a: SwiftStruct) {}
