@@ -2949,17 +2949,44 @@ SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
   assert(targetModule != getParentModule() &&
          "getImportAccessLevel doesn't support checking for a self-import");
 
+  /// Order of relevancy of `import` to reach `targetModule`.
+  /// Lower is better/more authoritative.
+  auto rateImport = [&](const ImportAccessLevel import) -> int {
+    auto importedModule = import->module.importedModule;
+
+    // Prioritize public names:
+    if (targetModule->getExportAsName() == importedModule->getBaseIdentifier())
+      return 0;
+    if (targetModule->getPublicModuleName(/*onlyIfImported*/false) ==
+          importedModule->getName())
+      return 1;
+
+    // The defining module or overlay:
+    if (targetModule == importedModule)
+      return 2;
+    if (targetModule == importedModule->getUnderlyingModuleIfOverlay())
+      return 3;
+
+    // Any import in the sources.
+    if (import->importLoc.isValid())
+      return 4;
+
+    return 10;
+  };
+
+  // Find the import with the least restrictive access-level.
+  // Among those prioritize more relevant one.
   auto &imports = getASTContext().getImportCache();
   ImportAccessLevel restrictiveImport = std::nullopt;
-
   for (auto &import : *Imports) {
     if ((!restrictiveImport.has_value() ||
-         import.accessLevel > restrictiveImport->accessLevel) &&
+         import.accessLevel > restrictiveImport->accessLevel ||
+         (import.accessLevel == restrictiveImport->accessLevel &&
+          rateImport(import) < rateImport(restrictiveImport))) &&
         imports.isImportedBy(targetModule, import.module.importedModule)) {
       restrictiveImport = import;
     }
   }
-
   return restrictiveImport;
 }
 
