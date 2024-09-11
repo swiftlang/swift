@@ -1,5 +1,5 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -Xcc -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_DEBUG)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -Xcc -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_DEBUG -D HARDENING_ENABLED)
 
 // FIXME swift-ci linux tests do not support std::span
 // UNSUPPORTED: OS=linux-gnu
@@ -650,6 +650,20 @@ StdSpanTestSuite.test("Span as arg to generic func") {
   accessSpanAsSomeGenericParam(ispan)
   accessSpanAsSomeGenericParam(scspan)
   accessSpanAsSomeGenericParam(sspan)
+}
+
+// TODO CxxRandomAccessCollection
+StdSpanTestSuite.test("Check if the correct index function is called") {
+  #if !HARDENING_ENABLED
+  expectEqual(icspan.size(), 3)
+  let _ = icspan[3]
+  expectEqual(ispan.size(), 3)
+  let _ = ispan[3]
+  expectEqual(scspan.size(), 3)
+  let _ = scspan[3]
+  expectEqual(sspan.size(), 3)
+  let _ = sspan[3]
+  #endif
 }
 
 runAllTests()
