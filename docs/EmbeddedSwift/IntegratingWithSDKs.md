@@ -8,7 +8,7 @@ For an introduction and motivation into Embedded Swift, please see "[A Vision fo
 
 The following document sketches how to integrate Swift code into some popular embedded platforms' SDKs and build systems.
 
-## Integrating with Raspberry Pi Pico (W) build system:
+## Integrating with Raspberry Pi Pico / Pico W / Pico 2 build system:
 
 Development for [Raspberry Pi Pico and Pico W](https://www.raspberrypi.com/products/raspberry-pi-pico/) normally uses the [Pico SDK](https://github.com/raspberrypi/pico-sdk) and the vendor provides several [sample projects in the pico-examples repository](https://github.com/raspberrypi/pico-examples). The SDK and sample project setup is described in:
 
@@ -58,6 +58,9 @@ Notice that we're using functions and variables defined in C in the Pico SDK. Fo
 
 Finally, we need to define the application's build rules in CMake that will be using CMake logic from the Pico SDK. The following content of `CMakeLists.txt` shows how to *manually call swiftc, the Swift compiler* instead of using the recently added CMake native support for Swift, so that we can see the full Swift compilation command.
 
+We'll also make sure to dynamically set the Swift compiler's target architecture based on the pico board used. This is to support both RP2040 and RP2350 in ARM mode, and RP2350's RISC-V mode.
+
+
 ```cmake
 cmake_minimum_required(VERSION 3.13)
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
@@ -66,12 +69,28 @@ project(swift-blinky)
 pico_sdk_init()
 execute_process(COMMAND xcrun -f swiftc OUTPUT_VARIABLE SWIFTC OUTPUT_STRIP_TRAILING_WHITESPACE)
 
+set(SWIFT_TARGET "armv6m-none-none-eabi")
+list(APPEND CLANG_ARCH_ABI_FLAGS "-Xcc") 
+
+if(PICO_PLATFORM STREQUAL "rp2350-arm-s")
+    message(STATUS "PICO_PLATFORM is set to rp2350-arm-s, using armv7em")
+    set(SWIFT_TARGET "armv7em-none-none-eabi")
+    list(APPEND CLANG_ARCH_ABI_FLAGS "-mfloat-abi=soft")
+elseif(PICO_PLATFORM STREQUAL "rp2040")
+    message(STATUS "PICO_PLATFORM is set to RP2040, using armv6m")
+    list(APPEND CLANG_ARCH_ABI_FLAGS "-mfloat-abi=soft")
+elseif(PICO_PLATFORM STREQUAL "rp2350-riscv")
+    message(STATUS "PICO_PLATFORM is set to rp2350-riscv, using riscv32.")
+    set(SWIFT_TARGET "riscv32-none-none-eabi")
+    list(APPEND CLANG_ARCH_ABI_FLAGS "-march=rv32imac_zicsr_zifencei_zba_zbb_zbs_zbkb" "-Xcc" "-mabi=ilp32")
+endif()
+
 add_executable(swift-blinky)
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/_swiftcode.o
     COMMAND
         ${SWIFTC}
-        -target armv6m-none-none-eabi -Xcc -mfloat-abi=soft -Xcc -fshort-enums
+        ${SWIFT_TARGET} ${CLANG_ARCH_ABI_FLAGS} -Xcc -fshort-enums
         -Xfrontend -function-sections -enable-experimental-feature Embedded -wmo -parse-as-library
         $$\( echo '$<TARGET_PROPERTY:swift-blinky,INCLUDE_DIRECTORIES>' | tr '\;' '\\n' | sed -e 's/\\\(.*\\\)/-Xcc -I\\1/g' \)
         $$\( echo '${CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES}'             | tr ' '  '\\n' | sed -e 's/\\\(.*\\\)/-Xcc -I\\1/g' \)
@@ -95,10 +114,11 @@ pico_add_extra_outputs(swift-blinky)
 With these three files, we can now configure and build a Swift firmware for the Pico:
 
 ```bash
-$ export TOOLCHAINS=org.swift.59202401301a
-$ export PICO_BOARD=pico
+$ export TOOLCHAINS=org.swift.59202401301a # any toolchain that supports embedded
+$ export PICO_BOARD=pico # or any other RP-based board (including pico2)
+$ export PICO_PLATFORM=<platform> # optional; possible values: rp2040, rp2350-arm-s or rp2350-riscv 
 $ export PICO_SDK_PATH=<path_to_pico_sdk>
-$ export PICO_TOOLCHAIN_PATH=<path_to_arm_toolchain>
+$ export PICO_TOOLCHAIN_PATH=<path_to_toolchain> # ARM / RISC-V toolchain
 $ ls -al
 -rw-r--r--   1 kuba  staff    39B Feb  2 22:08 BridgingHeader.h
 -rw-r--r--   1 kuba  staff   1.3K Feb  2 22:08 CMakeLists.txt
