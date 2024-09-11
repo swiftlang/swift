@@ -469,6 +469,7 @@ private:
     case Node::Kind::MethodDescriptor:
     case Node::Kind::MethodLookupFunction:
     case Node::Kind::ModifyAccessor:
+    case Node::Kind::Modify2Accessor:
     case Node::Kind::NativeOwningAddressor:
     case Node::Kind::NativeOwningMutableAddressor:
     case Node::Kind::NativePinningAddressor:
@@ -2723,6 +2724,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::ModifyAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
                                 "modify");
+  case Node::Kind::Modify2Accessor:
+    return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
+                                "modify2");
   case Node::Kind::InitAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
                                 "init");

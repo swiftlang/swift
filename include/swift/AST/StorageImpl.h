@@ -28,6 +28,8 @@ class raw_ostream;
 
 namespace swift {
 
+class ASTContext;
+
 enum StorageIsMutable_t : bool {
   StorageIsNotMutable = false,
   StorageIsMutable = true
@@ -57,6 +59,8 @@ enum class AccessorKind {
 
 inline bool requiresFeatureCoroutineAccessors(AccessorKind kind) {
   switch (kind) {
+  case AccessorKind::Modify2:
+    return true;
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
   case AccessorKind::Set:
@@ -75,6 +79,7 @@ inline bool isYieldingAccessor(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Read:
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
     return true;
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
@@ -96,6 +101,7 @@ inline bool isYieldingDefaultNonmutatingAccessor(AccessorKind kind) {
   case AccessorKind::DistributedGet:
   case AccessorKind::Set:
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::Address:
@@ -108,6 +114,7 @@ inline bool isYieldingDefaultNonmutatingAccessor(AccessorKind kind) {
 inline bool isYieldingDefaultMutatingAccessor(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
     return true;
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
@@ -297,8 +304,11 @@ enum class WriteImplKind {
   /// There's a mutable addressor.
   MutableAddress,
 
-  /// There's a modify coroutine.
+  /// There's a _modify coroutine.
   Modify,
+
+  /// There's a modify coroutine.
+  Modify2,
 };
 enum { NumWriteImplKindBits = 4 };
 
@@ -316,8 +326,11 @@ enum class ReadWriteImplKind {
   /// Do a read into a temporary and then a write back.
   MaterializeToTemporary,
 
-  /// There's a modify coroutine.
+  /// There's a _modify coroutine.
   Modify,
+
+  /// There's a modify coroutine.
+  Modify2,
 
   /// We have a didSet, so we're either going to use
   /// MaterializeOrTemporary or the "simple didSet"
@@ -391,6 +404,13 @@ public:
       assert(readWriteImpl == ReadWriteImplKind::Modify);
       return;
 
+    case WriteImplKind::Modify2:
+      assert(readImpl == ReadImplKind::Get ||
+             readImpl == ReadImplKind::Address ||
+             readImpl == ReadImplKind::Read);
+      assert(readWriteImpl == ReadWriteImplKind::Modify2);
+      return;
+
     case WriteImplKind::MutableAddress:
       assert(readImpl == ReadImplKind::Get ||
              readImpl == ReadImplKind::Address ||
@@ -411,8 +431,9 @@ public:
   }
 
   static StorageImplInfo getOpaque(StorageIsMutable_t isMutable,
-                                   OpaqueReadOwnership ownership) {
-    return (isMutable ? getMutableOpaque(ownership)
+                                   OpaqueReadOwnership ownership,
+                                   const ASTContext &ctx) {
+    return (isMutable ? getMutableOpaque(ownership, ctx)
                       : getImmutableOpaque(ownership));
   }
 
@@ -422,7 +443,8 @@ public:
   }
 
   /// Describe the implementation of a mutable property implemented opaquely.
-  static StorageImplInfo getMutableOpaque(OpaqueReadOwnership ownership);
+  static StorageImplInfo getMutableOpaque(OpaqueReadOwnership ownership,
+                                          const ASTContext &ctx);
 
   static StorageImplInfo getComputed(StorageIsMutable_t isMutable) {
     return (isMutable ? getMutableComputed()

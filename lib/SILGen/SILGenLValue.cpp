@@ -3252,7 +3252,8 @@ namespace {
       }
 
       case AccessorKind::Read:
-      case AccessorKind::Modify: {
+      case AccessorKind::Modify:
+      case AccessorKind::Modify2: {
         auto typeData =
             getPhysicalStorageTypeData(SGF.getTypeExpansionContext(), SGF.SGM,
                                        AccessKind, Storage, Subs,

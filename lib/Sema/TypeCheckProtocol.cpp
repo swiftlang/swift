@@ -268,6 +268,7 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witness,
     break;
 
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
     if (auto setter = witness->getParsedAccessor(AccessorKind::Set))
       return setter;
     if (auto addressor = witness->getParsedAccessor(AccessorKind::MutableAddress))
@@ -6577,6 +6578,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
     case AccessorKind::MutableAddress:
     case AccessorKind::Read:
     case AccessorKind::Modify:
+    case AccessorKind::Modify2:
     case AccessorKind::Init:
       // These accessors are never exposed to Objective-C.
       return result;

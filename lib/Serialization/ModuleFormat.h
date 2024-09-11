@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 891; // external macro
+const uint16_t SWIFTMODULE_VERSION_MINOR = 892; // modify accessor
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -218,6 +218,7 @@ enum class WriteImplKind : uint8_t {
   Set,
   MutableAddress,
   Modify,
+  Modify2,
 };
 using WriteImplKindField = BCFixed<3>;
 
@@ -229,6 +230,7 @@ enum class ReadWriteImplKind : uint8_t {
   MutableAddress,
   MaterializeToTemporary,
   Modify,
+  Modify2,
   StoredWithDidSet,
   InheritedWithDidSet,
 };
@@ -334,6 +336,7 @@ enum AccessorKind : uint8_t {
   MutableAddress,
   Read,
   Modify,
+  Modify2,
   Init,
   DistributedGet,
 };

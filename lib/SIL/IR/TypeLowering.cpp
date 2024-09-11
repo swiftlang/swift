@@ -4407,6 +4407,9 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
           case WriteImplKind::Modify:
             collectAccessorCaptures(AccessorKind::Modify);
             break;
+          case WriteImplKind::Modify2:
+            collectAccessorCaptures(AccessorKind::Modify2);
+            break;
           case WriteImplKind::InheritedWithObservers:
             llvm_unreachable("inherited local variable");
           }
@@ -4423,6 +4426,9 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
             break;
           case ReadWriteImplKind::Modify:
             collectAccessorCaptures(AccessorKind::Modify);
+            break;
+          case ReadWriteImplKind::Modify2:
+            collectAccessorCaptures(AccessorKind::Modify2);
             break;
           case ReadWriteImplKind::StoredWithDidSet:
             // We've already processed the didSet operation.

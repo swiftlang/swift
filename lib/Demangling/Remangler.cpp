@@ -2343,6 +2343,10 @@ ManglingError Remangler::mangleModifyAccessor(Node *node, unsigned depth) {
   return mangleAbstractStorage(node->getFirstChild(), "M", depth + 1);
 }
 
+ManglingError Remangler::mangleModify2Accessor(Node *node, unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "x", depth + 1);
+}
+
 ManglingError Remangler::mangleModule(Node *node, unsigned depth) {
   auto text = node->getText();
   if (text == STDLIB_NAME) {

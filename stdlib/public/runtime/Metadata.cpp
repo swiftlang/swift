@@ -5863,6 +5863,7 @@ static void initProtocolWitness(void **slot, void *witness,
   case ProtocolRequirementFlags::Kind::Setter:
   case ProtocolRequirementFlags::Kind::ReadCoroutine:
   case ProtocolRequirementFlags::Kind::ModifyCoroutine:
+  case ProtocolRequirementFlags::Kind::Modify2Coroutine:
     swift_ptrauth_init_code_or_data(slot, witness,
                                     reqt.Flags.getExtraDiscriminator(),
                                     !reqt.Flags.isAsync());
@@ -5904,6 +5905,7 @@ static void copyProtocolWitness(void **dest, void * const *src,
   case ProtocolRequirementFlags::Kind::Setter:
   case ProtocolRequirementFlags::Kind::ReadCoroutine:
   case ProtocolRequirementFlags::Kind::ModifyCoroutine:
+  case ProtocolRequirementFlags::Kind::Modify2Coroutine:
     swift_ptrauth_copy_code_or_data(
         dest, src, reqt.Flags.getExtraDiscriminator(), !reqt.Flags.isAsync(),
         /*allowNull*/ true); // NULL allowed for VFE (methods in the vtable

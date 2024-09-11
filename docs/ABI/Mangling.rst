@@ -388,10 +388,11 @@ Entities
   ACCESSOR ::= 'w'                           // willSet
   ACCESSOR ::= 'W'                           // didSet
   ACCESSOR ::= 'r'                           // read
-  ACCESSOR ::= 'M'                           // modify (temporary)
+  ACCESSOR ::= 'M'                           // _modify (temporary)
   ACCESSOR ::= 'a' ADDRESSOR-KIND            // mutable addressor
   ACCESSOR ::= 'l' ADDRESSOR-KIND            // non-mutable addressor
   ACCESSOR ::= 'p'                           // pseudo accessor referring to the storage itself
+  ACCESSOR ::= 'x'                           // modify
 
   ADDRESSOR-KIND ::= 'u'                     // unsafe addressor (no owner)
   ADDRESSOR-KIND ::= 'O'                     // owning addressor (non-native owner), not used anymore

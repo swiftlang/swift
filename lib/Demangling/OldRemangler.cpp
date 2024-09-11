@@ -1313,6 +1313,11 @@ ManglingError Remangler::mangleModifyAccessor(Node *node, EntityContext &ctx,
   return mangleAccessor(node->getFirstChild(), "M", ctx, depth + 1);
 }
 
+ManglingError Remangler::mangleModify2Accessor(Node *node, EntityContext &ctx,
+                                               unsigned depth) {
+  return mangleAccessor(node->getFirstChild(), "x", ctx, depth + 1);
+}
+
 ManglingError Remangler::mangleExplicitClosure(Node *node, EntityContext &ctx,
                                                unsigned depth) {
   return mangleNamedAndTypedEntity(node, 'F', "U", ctx,

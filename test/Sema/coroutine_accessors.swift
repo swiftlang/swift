@@ -253,4 +253,250 @@ var iuas_m: Int {
   }
 }
 
+// Get+Set+Modify
+
+// +---+---+---+
+// | g | s |m |
+// +---+---+---+
+// | n | n | n | ok  ( ingnsnm )
+// | y | n | n | bad ( ignsnm )
+// | n | y | n | bad ( ingsnm )
+// | y | y | n | bad ( igsnm )
+// | n | n | y | bad ( ingnsm )
+// | y | n | y | ok  ( ignsm )
+// | n | y | y | ok  ( ingsm )
+// | y | y | y | ok  ( igsm )
+// +---+---+---+
+
+var ingnsnm: Int {
+  get { 0 }
+  nonmutating set {}
+  nonmutating modify {
+    var fake: Int
+    yield &fake
+  }
+}
+var ignsnm: Int {
+  mutating get { 0 }
+  nonmutating set {}
+  nonmutating modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when the getter is 'mutating'}}
+                        // expected-note@-3{{getter defined here}}
+    var fake: Int
+    yield &fake
+  }
+}
+var ingsnm: Int {
+  get { 0 }
+  set {}
+  nonmutating modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when the setter is not 'nonmutating'}}
+                        // expected-note@-2{{setter defined here}}
+    var fake: Int
+    yield &fake
+  }
+}
+var igsnm: Int {
+  mutating get { 0 }
+  set {}
+  nonmutating modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when either the setter is not 'nonmutating' or the getter is 'mutating'}}
+                        // expected-note@-2{{setter defined here}}
+                        // expected-note@-4{{getter defined here}}
+    var fake: Int
+    yield &fake
+  }
+}
+var ingnsm: Int {
+  get { 0 }
+  nonmutating set {}
+  modify { // expected-error{{'modify' accessor cannot be 'mutating' when both the setter is 'nonmutating' and the getter is not 'mutating'}}
+            // expected-note@-2{{setter defined here}}
+            // expected-note@-4{{getter defined here}}
+    yield &i
+  }
+}
+var ignsm: Int {
+  mutating get { 0 }
+  nonmutating set {}
+  modify {
+    yield &i
+  }
+}
+var ingsm: Int {
+  get { 0 }
+  set {}
+  modify {
+    yield &i
+  }
+}
+var igsm: Int {
+  mutating get { 0 }
+  nonmutating set {}
+  modify {
+    yield &i
+  }
+}
+
+// _Read+Set+Modify
+
+// +---+---+---+
+// | _r | s |m |
+// +---+---+---+
+// | n | n | n | ok  ( in_rnsnm )
+// | y | n | n | bad ( i_rnsnm )
+// | n | y | n | bad ( in_rsnm )
+// | y | y | n | bad ( i_rsnm )
+// | n | n | y | bad ( in_rnsm )
+// | y | n | y | ok  ( i_rnsm )
+// | n | y | y | ok  ( in_rsm )
+// | y | y | y | ok  ( i_rsm )
+// +---+---+---+
+
+var in_rnsnm: Int {
+  _read { yield i }
+  nonmutating set {}
+  nonmutating modify {
+    var fake: Int
+    yield &fake
+  }
+}
+var i_rnsnm: Int {
+  mutating _read { yield i }
+  nonmutating set {}
+  nonmutating modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when the 'read' accessor is 'mutating'}}
+                        // expected-note@-3{{'read' accessor defined here}}
+    var fake: Int
+    yield &fake
+  }
+}
+var in_rsnm: Int {
+  _read { yield i }
+  set {}
+  nonmutating modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when the setter is not 'nonmutating'}}
+                        // expected-note@-2{{setter defined here}}
+    var fake: Int
+    yield &fake
+  }
+}
+var i_rsnm: Int {
+  mutating _read { yield i }
+  set {}
+  nonmutating modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when either the setter is not 'nonmutating' or the 'read' accessor is 'mutating'}}
+                        // expected-note@-2{{setter defined here}}
+                        // expected-note@-4{{'read' accessor defined here}}
+    var fake: Int
+    yield &fake
+  }
+}
+var in_rnsm: Int {
+  _read { yield i }
+  nonmutating set {}
+  modify { // expected-error{{'modify' accessor cannot be 'mutating' when both the setter is 'nonmutating' and the 'read' accessor is not 'mutating'}}
+            // expected-note@-2{{setter defined here}}
+            // expected-note@-4{{'read' accessor defined here}}
+    yield &i
+  }
+}
+var i_rnsm: Int {
+  mutating _read { yield i }
+  nonmutating set {}
+  modify {
+    yield &i
+  }
+}
+var in_rsm: Int {
+  _read { yield i }
+  set {}
+  modify {
+    yield &i
+  }
+}
+var i_rsm: Int {
+  mutating _read { yield i }
+  nonmutating set {}
+  modify {
+    yield &i
+  }
+}
+
+// UnsafeAddress+Set+Modify
+
+// +---+---+---+
+// |ua | s |m |
+// +---+---+---+
+// | n | n | n | ok  ( inuansnm )
+// | y | n | n | bad ( iuansnm )
+// | n | y | n | bad ( inuasnm )
+// | y | y | n | bad ( iuasnm )
+// | n | n | y | bad ( inuansm )
+// | y | n | y | ok  ( iuansm )
+// | n | y | y | ok  ( inuasm )
+// | y | y | y | ok  ( iuasm )
+// +---+---+---+
+
+var inuansnm: Int {
+  unsafeAddress { UnsafePointer(bitPattern: 0x0)! }
+  nonmutating set {}
+  nonmutating modify {
+    var fake: Int
+    yield &fake
+  }
+}
+var iuansnm: Int {
+  mutating unsafeAddress { UnsafePointer(bitPattern: 0x0)! }
+  nonmutating set {}
+  nonmutating modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when the addressor is 'mutating'}}
+                        // expected-note@-3{{addressor defined here}}
+    var fake: Int
+    yield &fake
+  }
+}
+var inuasnm: Int {
+  unsafeAddress { UnsafePointer(bitPattern: 0x0)! }
+  set {}
+  nonmutating modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when the setter is not 'nonmutating'}}
+                        // expected-note@-2{{setter defined here}}
+    var fake: Int
+    yield &fake
+  }
+}
+var iuasnm: Int {
+  mutating unsafeAddress { UnsafePointer(bitPattern: 0x0)! }
+  set {}
+  nonmutating modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when either the setter is not 'nonmutating' or the addressor is 'mutating'}}
+                        // expected-note@-2{{setter defined here}}
+                        // expected-note@-4{{addressor defined here}}
+    var fake: Int
+    yield &fake
+  }
+}
+var inuansm: Int {
+  unsafeAddress { UnsafePointer(bitPattern: 0x0)! }
+  nonmutating set {}
+  modify { // expected-error{{'modify' accessor cannot be 'mutating' when both the setter is 'nonmutating' and the addressor is not 'mutating'}}
+            // expected-note@-2{{setter defined here}}
+            // expected-note@-4{{addressor defined here}}
+    yield &i
+  }
+}
+var iuansm: Int {
+  mutating unsafeAddress { UnsafePointer(bitPattern: 0x0)! }
+  nonmutating set {}
+  modify {
+    yield &i
+  }
+}
+var inuasm: Int {
+  unsafeAddress { UnsafePointer(bitPattern: 0x0)! }
+  set {}
+  modify {
+    yield &i
+  }
+}
+var iuasm: Int {
+  mutating unsafeAddress { UnsafePointer(bitPattern: 0x0)! }
+  nonmutating set {}
+  modify {
+    yield &i
+  }
+}
+
 }

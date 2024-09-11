@@ -342,6 +342,7 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
   case AccessorKind::Set: {
     auto writeImpl = storage->getWriteImpl();
     if (!isObjC && (writeImpl == WriteImplKind::Modify ||
+                    writeImpl == WriteImplKind::Modify2 ||
                     writeImpl == WriteImplKind::MutableAddress ||
                     writeImpl == WriteImplKind::StoredWithObservers))
       return false;
@@ -353,6 +354,11 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
     return false;
   case AccessorKind::Modify: {
     if (!isObjC && storage->getWriteImpl() == WriteImplKind::Modify)
+      return storage->isDynamic();
+    return false;
+  }
+  case AccessorKind::Modify2: {
+    if (!isObjC && storage->getWriteImpl() == WriteImplKind::Modify2)
       return storage->isDynamic();
     return false;
   }
@@ -1639,6 +1645,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::MutableAddress:
     case AccessorKind::Set:
     case AccessorKind::Modify:
+    case AccessorKind::Modify2:
       if (AD->isInstanceMember() && AD->getDeclContext()->hasValueSemantics())
         return SelfAccessKind::Mutating;
       break;
@@ -2105,6 +2112,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     // If we add yield types to the function type, we'll need to update this.
     case AccessorKind::Read:
     case AccessorKind::Modify:
+    case AccessorKind::Modify2:
       return TupleType::getEmpty(ctx);
     }
   }

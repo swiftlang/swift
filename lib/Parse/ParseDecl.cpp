@@ -7862,6 +7862,7 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   case AccessorKind::DidSet:
   case AccessorKind::Read:
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
     return false;
 
   case AccessorKind::Init:
@@ -7897,6 +7898,7 @@ struct Parser::ParsedAccessors {
     if (Init) return Init;
     if (Set) return Set;
     if (Modify) return Modify;
+    if (Modify2) return Modify2;
     if (MutableAddress) return MutableAddress;
     return nullptr;
   }
@@ -7946,6 +7948,23 @@ static ParserStatus parseAccessorIntroducer(Parser &P,
     return Status;
   }
 #define ACCESSOR_KEYWORD(KEYWORD)
+// Existing source code may have an implicit getter whose first expression is a
+// call to a function named experimental_accessor passing a trailing closure.
+// To maintain compatibility, if the feature corresponding to
+// experimental_accessor is not enabled, do not parse the token as an
+// introducer, so that it can be parsed as such a function call.
+#define EXPERIMENTAL_COROUTINE_ACCESSOR(ID, KEYWORD, FEATURE)                  \
+  else if (P.Tok.getRawText() == #KEYWORD) {                                   \
+    if (!P.Context.LangOpts.hasFeature(Feature::FEATURE)) {                    \
+      if (featureUnavailable)                                                  \
+        *featureUnavailable = true;                                            \
+      if (isFirstAccessor) {                                                   \
+        Status.setIsParseError();                                              \
+        return Status;                                                         \
+      }                                                                        \
+    }                                                                          \
+    Kind = AccessorKind::ID;                                                   \
+  }
 #define SINGLETON_ACCESSOR(ID, KEYWORD)                                        \
   else if (P.Tok.getRawText() == #KEYWORD) {                                   \
     Kind = AccessorKind::ID;                                                   \
@@ -8055,6 +8074,12 @@ bool Parser::parseAccessorAfterIntroducer(
   if (auto existingAccessor = accessors.add(accessor)) {
     diagnoseRedundantAccessors(*this, Loc, Kind, isa<SubscriptDecl>(storage),
                                existingAccessor);
+  }
+
+  if (requiresFeatureCoroutineAccessors(Kind) &&
+      !Context.LangOpts.hasFeature(Feature::CoroutineAccessors)) {
+    diagnose(Tok, diag::accessor_requires_coroutine_accessors,
+             getAccessorNameForDiagnostic(Kind, /*article*/ false));
   }
 
   // There should be no body in the limited syntax; diagnose unexpected
@@ -8542,9 +8567,9 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
       P.diagnose(mutator->getLoc(),
                  // Don't mention the more advanced accessors if the user
                  // only provided a setter without a getter.
-                 (MutableAddress || Modify)
-                   ? diag::missing_reading_accessor
-                   : diag::missing_getter,
+                 (MutableAddress || Modify || Modify2)
+                     ? diag::missing_reading_accessor
+                     : diag::missing_getter,
                  isa<SubscriptDecl>(storage),
                  getAccessorNameForDiagnostic(mutator, /*article*/ true));
     }

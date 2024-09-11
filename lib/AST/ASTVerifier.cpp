@@ -3411,10 +3411,11 @@ public:
           abort();
         }
         if (FD->isDynamic() != storageDecl->isDynamic() &&
-            // We allow a non dynamic setter if there is a dynamic modify,
-            // observer, or mutable addressor.
+            // We allow a non dynamic setter if there is a dynamic
+            // _modify/modify, observer, or mutable addressor.
             !(FD->isSetter() &&
               (storageDecl->getWriteImpl() == WriteImplKind::Modify ||
+               storageDecl->getWriteImpl() == WriteImplKind::Modify2 ||
                storageDecl->getWriteImpl() ==
                    WriteImplKind::StoredWithObservers ||
                storageDecl->getWriteImpl() == WriteImplKind::MutableAddress) &&

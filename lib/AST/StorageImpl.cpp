@@ -16,13 +16,18 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/StorageImpl.h"
+#include "swift/AST/ASTContext.h"
 
 using namespace swift;
 
-StorageImplInfo
-StorageImplInfo::getMutableOpaque(OpaqueReadOwnership ownership) {
-  return {getOpaqueReadImpl(ownership), WriteImplKind::Set,
-          ReadWriteImplKind::Modify};
+StorageImplInfo StorageImplInfo::getMutableOpaque(OpaqueReadOwnership ownership,
+                                                  const ASTContext &ctx) {
+  ReadWriteImplKind rwKind;
+  if (ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
+    rwKind = ReadWriteImplKind::Modify2;
+  else
+    rwKind = ReadWriteImplKind::Modify;
+  return {getOpaqueReadImpl(ownership, ctx), WriteImplKind::Set, rwKind};
 }
 
 ReadImplKind StorageImplInfo::getOpaqueReadImpl(OpaqueReadOwnership ownership) {

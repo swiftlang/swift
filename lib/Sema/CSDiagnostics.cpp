@@ -4702,6 +4702,7 @@ bool InvalidMemberRefOnExistential::diagnoseAsError() {
     case AccessorKind::DistributedGet:
     case AccessorKind::Read:
     case AccessorKind::Modify:
+    case AccessorKind::Modify2:
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
       PD = SD->getIndices()->get(idx);

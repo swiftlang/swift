@@ -636,6 +636,9 @@ private:
         case AccessorKind::Init:
           Kind = ".init";
           break;
+        case AccessorKind::Modify2:
+          Kind = ".modify2";
+          break;
         }
 
         SmallVector<char, 64> Buf;

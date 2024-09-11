@@ -265,6 +265,8 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
       return Flags::Kind::ReadCoroutine;
     case AccessorKind::Modify:
       return Flags::Kind::ModifyCoroutine;
+    case AccessorKind::Modify2:
+      return Flags::Kind::Modify2Coroutine;
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
     case AccessorKind::ID:

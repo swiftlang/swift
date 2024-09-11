@@ -107,6 +107,8 @@ static StringRef getCodeForAccessorKind(AccessorKind kind) {
     return "au";
   case AccessorKind::Init:
     return "i";
+  case AccessorKind::Modify2:
+    return "x";
   }
   llvm_unreachable("bad accessor kind");
 }

@@ -248,6 +248,8 @@ static StringRef getDumpString(WriteImplKind kind) {
     return "mutable_addressor";
   case WriteImplKind::Modify:
     return "modify_coroutine";
+  case WriteImplKind::Modify2:
+    return "modify2_coroutine";
   }
   llvm_unreachable("bad kind");
 }
@@ -264,6 +266,8 @@ static StringRef getDumpString(ReadWriteImplKind kind) {
     return "materialize_to_temporary";
   case ReadWriteImplKind::Modify:
     return "modify_coroutine";
+  case ReadWriteImplKind::Modify2:
+    return "modify2_coroutine";
   case ReadWriteImplKind::StoredWithDidSet:
     return "stored_with_didset";
   case ReadWriteImplKind::InheritedWithDidSet:

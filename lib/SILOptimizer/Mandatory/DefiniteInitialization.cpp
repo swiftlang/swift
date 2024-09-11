@@ -1775,6 +1775,7 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
           return false;
         case AccessorKind::Set:
         case AccessorKind::Modify:
+        case AccessorKind::Modify2:
         case AccessorKind::MutableAddress:
         case AccessorKind::DidSet:
         case AccessorKind::WillSet:

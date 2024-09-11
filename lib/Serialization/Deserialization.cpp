@@ -3092,6 +3092,7 @@ getActualWriteImplKind(unsigned rawKind) {
   CASE(InheritedWithObservers)
   CASE(MutableAddress)
   CASE(Modify)
+  CASE(Modify2)
 #undef CASE
   }
   return std::nullopt;
@@ -3108,6 +3109,7 @@ getActualReadWriteImplKind(unsigned rawKind) {
   CASE(MutableAddress)
   CASE(MaterializeToTemporary)
   CASE(Modify)
+  CASE(Modify2)
   CASE(StoredWithDidSet)
   CASE(InheritedWithDidSet)
 #undef CASE

@@ -691,8 +691,8 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
   return checkMutability(*accessor);
 }
 
-/// As a special extra check, if the user also gave us a modify coroutine,
-/// check that it has the same mutatingness as the setter.
+/// As a special extra check, if the user also gave us a _modify or modify
+/// coroutine, check that it has the same mutatingness as the setter.
 /// TODO: arguably this should require the spelling to match even when it's
 /// the implied value.
 static void diagnoseReadWriteMutatingnessMismatch(
@@ -811,6 +811,9 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
     diagnoseReadWriteMutatingnessMismatch(
         storage, result, WriteImplKind::Set, AccessorKind::Set,
         ReadWriteImplKind::Modify, AccessorKind::Modify);
+    diagnoseReadWriteMutatingnessMismatch(
+        storage, result, WriteImplKind::Set, AccessorKind::Set,
+        ReadWriteImplKind::Modify2, AccessorKind::Modify2);
 
     return result;
   }
@@ -822,6 +825,9 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   case WriteImplKind::Modify:
     return storage->getParsedAccessor(AccessorKind::Modify)
       ->isMutating();
+
+  case WriteImplKind::Modify2:
+    return storage->getParsedAccessor(AccessorKind::Modify2)->isMutating();
   }
   llvm_unreachable("bad storage kind");
 }
@@ -1900,7 +1906,7 @@ synthesizeMutableAddressSetterBody(AccessorDecl *setter, ASTContext &ctx) {
                                                 setter->getStorage(), ctx);
 }
 
-/// Synthesize the body of a setter which just delegates to a modify
+/// Synthesize the body of a setter which just delegates to a _modify
 /// coroutine accessor.
 static std::pair<BraceStmt *, bool>
 synthesizeModifyCoroutineSetterBody(AccessorDecl *setter, ASTContext &ctx) {
@@ -1908,6 +1914,15 @@ synthesizeModifyCoroutineSetterBody(AccessorDecl *setter, ASTContext &ctx) {
   return synthesizeTrivialSetterBodyWithStorage(setter,
                                                 TargetImpl::Implementation,
                                                 setter->getStorage(), ctx);
+}
+
+/// Synthesize the body of a setter which just delegates to a modify
+/// coroutine accessor.
+static std::pair<BraceStmt *, bool>
+synthesizeModify2CoroutineSetterBody(AccessorDecl *setter, ASTContext &ctx) {
+  // This should call the modify coroutine.
+  return synthesizeTrivialSetterBodyWithStorage(
+      setter, TargetImpl::Implementation, setter->getStorage(), ctx);
 }
 
 static Expr *maybeWrapInOutExpr(Expr *expr, ASTContext &ctx) {
@@ -2099,6 +2114,9 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
 
   case WriteImplKind::Modify:
     return synthesizeModifyCoroutineSetterBody(setter, ctx);
+
+  case WriteImplKind::Modify2:
+    return synthesizeModify2CoroutineSetterBody(setter, ctx);
   }
   llvm_unreachable("bad WriteImplKind");
 }
@@ -2269,6 +2287,7 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
     return synthesizeReadCoroutineBody(accessor, ctx);
 
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
     return synthesizeModifyCoroutineBody(accessor, ctx);
 
   case AccessorKind::WillSet:
@@ -2458,6 +2477,11 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
       asAvailableAs.push_back(mod);
     }
     break;
+  case WriteImplKind::Modify2:
+    if (auto mod = storage->getOpaqueAccessor(AccessorKind::Modify2)) {
+      asAvailableAs.push_back(mod);
+    }
+    break;
   }
   
   if (!asAvailableAs.empty()) {
@@ -2552,6 +2576,11 @@ createModifyCoroutinePrototype(AbstractStorageDecl *storage,
   return createCoroutineAccessorPrototype(storage, AccessorKind::Modify, ctx);
 }
 
+static AccessorDecl *
+createModify2CoroutinePrototype(AbstractStorageDecl *storage, ASTContext &ctx) {
+  return createCoroutineAccessorPrototype(storage, AccessorKind::Modify2, ctx);
+}
+
 AccessorDecl *
 SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
                                     AbstractStorageDecl *storage,
@@ -2571,6 +2600,9 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
 
   case AccessorKind::Modify:
     return createModifyCoroutinePrototype(storage, ctx);
+
+  case AccessorKind::Modify2:
+    return createModify2CoroutinePrototype(storage, ctx);
 
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
@@ -2781,12 +2813,14 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
     case WriteImplKind::Stored:
     case WriteImplKind::MutableAddress:
     case WriteImplKind::Modify:
+    case WriteImplKind::Modify2:
       break;
     }
     break;
 
   case AccessorKind::Read:
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
   case AccessorKind::Init:
     break;
 
@@ -3417,7 +3451,8 @@ static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage,
     info = StorageImplInfo::getComputed(info.supportsMutation());
   } else {
     info = StorageImplInfo::getOpaque(info.supportsMutation(),
-                                      storage->getOpaqueReadOwnership());
+                                      storage->getOpaqueReadOwnership(),
+                                      storage->getASTContext());
   }
 }
 
@@ -3671,6 +3706,7 @@ bool HasStorageRequest::evaluate(Evaluator &evaluator,
       storage->getParsedAccessor(AccessorKind::Address) ||
       storage->getParsedAccessor(AccessorKind::Set) ||
       storage->getParsedAccessor(AccessorKind::Modify) ||
+      storage->getParsedAccessor(AccessorKind::Modify2) ||
       storage->getParsedAccessor(AccessorKind::MutableAddress) ||
       storage->getParsedAccessor(AccessorKind::Init))
     return false;
@@ -3825,6 +3861,7 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
   bool hasSetter = storage->getParsedAccessor(AccessorKind::Set);
   bool hasModify = storage->getParsedAccessor(AccessorKind::Modify);
+  bool hasModify2 = storage->getParsedAccessor(AccessorKind::Modify2);
   bool hasMutableAddress = storage->getParsedAccessor(AccessorKind::MutableAddress);
   bool hasInit = storage->getParsedAccessor(AccessorKind::Init);
 
@@ -3840,7 +3877,8 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
   // If there's a writing accessor of any sort, there must also be a
   // reading accessor.
-  } else if (hasInit || hasSetter || hasModify || hasMutableAddress) {
+  } else if (hasInit || hasSetter || hasModify || hasModify2 ||
+             hasMutableAddress) {
     readImpl = ReadImplKind::Get;
 
   // Subscripts always have to have some sort of accessor; they can't be
@@ -3874,11 +3912,16 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   ReadWriteImplKind readWriteImpl;
   if (hasSetter) {
     writeImpl = WriteImplKind::Set;
-    if (hasModify) {
+    if (hasModify2) {
+      readWriteImpl = ReadWriteImplKind::Modify2;
+    } else if (hasModify) {
       readWriteImpl = ReadWriteImplKind::Modify;
     } else {
       readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
     }
+  } else if (hasModify2) {
+    writeImpl = WriteImplKind::Modify2;
+    readWriteImpl = ReadWriteImplKind::Modify2;
   } else if (hasModify) {
     writeImpl = WriteImplKind::Modify;
     readWriteImpl = ReadWriteImplKind::Modify;

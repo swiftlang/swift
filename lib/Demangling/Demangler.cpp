@@ -3933,6 +3933,7 @@ NodePointer Demangler::demangleAccessor(NodePointer ChildNode) {
     case 'W': Kind = Node::Kind::DidSet; break;
     case 'r': Kind = Node::Kind::ReadAccessor; break;
     case 'M': Kind = Node::Kind::ModifyAccessor; break;
+    case 'x': Kind = Node::Kind::Modify2Accessor; break;
     case 'i': Kind = Node::Kind::InitAccessor; break;
     case 'a':
       switch (nextChar()) {
