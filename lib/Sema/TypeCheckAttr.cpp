@@ -4932,6 +4932,12 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   if (auto *DD = dyn_cast<DestructorDecl>(D))
     return Diagnostic(diag::availability_decl_no_potential, D);
 
+  // Observing accessors are always called implicitly.
+  if (auto *AD = dyn_cast<AccessorDecl>(D)) {
+    if (AD->isObservingAccessor())
+      return Diagnostic(diag::availability_decl_no_potential, D);
+  }
+
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (!VD->hasStorageOrWrapsStorage())
       return std::nullopt;
@@ -4986,6 +4992,12 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
   // associated types.
   if (auto *AT = dyn_cast<AssociatedTypeDecl>(D))
     return Diagnostic(diag::availability_decl_no_unavailable, D);
+
+  // Observing accessors are always called implicitly.
+  if (auto *AD = dyn_cast<AccessorDecl>(D)) {
+    if (AD->isObservingAccessor())
+      return Diagnostic(diag::availability_decl_no_unavailable, D);
+  }
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (!VD->hasStorageOrWrapsStorage())
