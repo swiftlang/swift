@@ -564,9 +564,11 @@ public:
           .collectMetadataForOutlining(collector, loweredLikeType);
 
       if (auto countType = T.getRawLayoutSubstitutedCountType()) {
-        auto loweredCountType = collector.IGF.IGM.getLoweredType(countType);
-        collector.IGF.IGM.getTypeInfo(loweredCountType)
-          .collectMetadataForOutlining(collector, loweredCountType);
+        if (countType->isValueParameter()) {
+          auto loweredCountType = collector.IGF.IGM.getLoweredType(countType);
+          collector.IGF.IGM.getTypeInfo(loweredCountType)
+            .collectMetadataForOutlining(collector, loweredCountType);
+        }
       }
     }
 
