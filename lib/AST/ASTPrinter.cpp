@@ -3141,10 +3141,8 @@ suppressingFeatureSendingArgsAndResults(PrintOptions &options,
 static void
 suppressingFeatureBitwiseCopyable2(PrintOptions &options,
                                    llvm::function_ref<void()> action) {
-  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
   llvm::SaveAndRestore<bool> scope(options.SuppressBitwiseCopyable, true);
   action();
-  options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
 static void
