@@ -729,9 +729,8 @@ void CompilerInstance::setUpDiagnosticOptions() {
   }
   Diagnostics.setWarningsAsErrorsRules(
       Invocation.getDiagnosticOptions().WarningsAsErrorsRules);
-  if (Invocation.getDiagnosticOptions().PrintDiagnosticNames) {
-    Diagnostics.setPrintDiagnosticNames(true);
-  }
+  Diagnostics.setPrintDiagnosticNamesMode(
+      Invocation.getDiagnosticOptions().PrintDiagnosticNames);
   Diagnostics.setDiagnosticDocumentationPath(
       Invocation.getDiagnosticOptions().DiagnosticDocumentationPath);
   Diagnostics.setLanguageVersion(
