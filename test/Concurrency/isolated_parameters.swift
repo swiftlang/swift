@@ -483,7 +483,7 @@ actor A2 {
     await { (self: isolated Self) in }(self)
     // expected-typechecker-error@-1 {{cannot convert value of type 'A2' to expected argument type 'Self'}}
     await { (self: isolated Self?) in }(self)
-    // expected-typechecker-error@-1 {{cannot convert value of type 'A2' to expected argument type 'Self?'}}
+    // expected-typechecker-error@-1 {{cannot convert value of type 'A2' to expected argument type 'Self'}}
 #endif
   }
   nonisolated func f2() async -> Self {

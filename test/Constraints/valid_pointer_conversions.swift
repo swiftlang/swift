@@ -30,8 +30,8 @@ func givesPtr(_ str: String) {
   takesMutableDoubleOptionalPtr(&arr)
   takesMutableDoubleOptionalTypedPtr(&d)
 
-  takesDoubleOptionalPtr(i) // expected-error {{cannot convert value of type 'Int' to expected argument type 'UnsafeRawPointer??'}}
-  takesMutableDoubleOptionalPtr(arr) // expected-error {{cannot convert value of type '[Int]' to expected argument type 'UnsafeMutableRawPointer??'}}
+  takesDoubleOptionalPtr(i) // expected-error {{cannot convert value of type 'Int' to expected argument type 'UnsafeRawPointer?'}}
+  takesMutableDoubleOptionalPtr(arr) // expected-error {{cannot convert value of type '[Int]' to expected argument type 'UnsafeMutableRawPointer?'}}
 
   takesMutableDoubleOptionalTypedPtr(&i) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutablePointer<Double>'}}
   // expected-note@-1 {{arguments to generic parameter 'Pointee' ('Int' and 'Double') are expected to be equal}}

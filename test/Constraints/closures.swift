@@ -356,7 +356,7 @@ var afterMessageCount : Int?
 func uintFunc() -> UInt {}
 func takeVoidVoidFn(_ a : () -> ()) {}
 takeVoidVoidFn { () -> Void in
-  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int?'}} {{23-23=Int(}} {{33-33=)}}
+  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int'}} {{23-23=Int(}} {{33-33=)}}
 }
 
 // <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure

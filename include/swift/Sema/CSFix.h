@@ -620,6 +620,10 @@ public:
     return diagnose(*commonFixes.front().first);
   }
 
+  /// Assess the impact this fix is going to have at the given location.
+  static unsigned assessImpact(ConstraintSystem &cs,
+                               ConstraintLocator *atLoc);
+
   static TreatRValueAsLValue *create(ConstraintSystem &cs,
                                      ConstraintLocator *locator);
 
