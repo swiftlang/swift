@@ -435,6 +435,40 @@ class NotSendable {}
         expectTrue(expectation.fulfilled)
       }
 
+      // MARK: - Multiple consumers
+
+      tests.test("finish behavior with multiple consumers") {
+        let (stream, continuation) = AsyncStream<Int>.makeStream()
+        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
+        var controlIterator = controlStream.makeAsyncIterator()
+
+        func makeConsumingTaskWithIndex(_ index: Int) -> Task<Void, Never> {
+          Task { @MainActor in
+            controlContinuation.yield(index)
+            for await i in stream {
+              controlContinuation.yield(i)
+            }
+          }
+        }
+
+        // Set up multiple consumers
+        let consumer1 = makeConsumingTaskWithIndex(1)
+        expectEqual(await controlIterator.next(isolation: #isolation), 1)
+
+        let consumer2 = makeConsumingTaskWithIndex(2)
+        expectEqual(await controlIterator.next(isolation: #isolation), 2)
+
+        // Ensure the iterators are suspended
+        await MainActor.run {}
+
+        // Terminate the stream
+        continuation.finish()
+
+        // Ensure the consuming Tasks both complete
+        _ = await consumer1.value
+        _ = await consumer2.value
+      }
+
       await runAllTestsAsync()
     }
   }
