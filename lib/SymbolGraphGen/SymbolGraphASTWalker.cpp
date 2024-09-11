@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Module.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -57,20 +61,32 @@ SymbolGraphASTWalker::SymbolGraphASTWalker(
       QualifiedExportedImports(QualifiedExportedImports),
       MainGraph(*this, M, std::nullopt, Ctx) {}
 
+ModuleDecl *SymbolGraphASTWalker::getRealModuleOf(const Decl *D) const {
+  ModuleDecl *Module = D->getModuleContext();
+  if (auto *ClangDecl = D->getClangDecl())
+    if (auto *ClangModule = ClangDecl->getOwningModule())
+      if (auto *ClangModuleLoader = D->getASTContext().getClangModuleLoader())
+        if (auto *M = ClangModuleLoader->getWrapperForModule(ClangModule))
+          Module = M;
+
+  return Module;
+}
+
 /// Get a "sub" symbol graph for the parent module of a type that
 /// the main module `M` is extending.
 SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
-  auto *M = D->getModuleContext();
+  auto *M = getRealModuleOf(D);
   const auto *DC = D->getDeclContext();
   SmallVector<const NominalTypeDecl *, 2> ParentTypes = {};
   const Decl *ExtendedNominal = nullptr;
   while (DC) {
-    M = DC->getParentModule();
     if (const auto *NTD = dyn_cast_or_null<NominalTypeDecl>(DC->getAsDecl())) {
       DC = NTD->getDeclContext();
+      M = getRealModuleOf(NTD);
       ParentTypes.push_back(NTD);
     } else if (const auto *Ext = dyn_cast_or_null<ExtensionDecl>(DC->getAsDecl())) {
       DC = Ext->getExtendedNominal()->getDeclContext();
+      M = getRealModuleOf(Ext->getExtendedNominal());
       if (!ExtendedNominal)
         ExtendedNominal = Ext->getExtendedNominal();
     } else {

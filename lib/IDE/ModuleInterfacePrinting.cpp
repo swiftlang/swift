@@ -446,9 +446,6 @@ void swift::ide::printModuleInterface(
        const PrintOptions &Options,
        const bool PrintSynthesizedExtensions) {
 
-  // Clang submodules aren't handled well by `getDisplayDecls()` (no decls are
-  // returned), so map them to their top-level module and filter out the extra
-  // results below.
   const clang::Module *TargetClangMod = TargetMod->findUnderlyingClangModule();
   ModuleDecl *TopLevelMod = TargetMod->getTopLevelModule();
   bool IsSubmodule = TargetMod != TopLevelMod;
@@ -460,8 +457,8 @@ void swift::ide::printModuleInterface(
   auto AdjustedOptions = Options;
   adjustPrintOptions(AdjustedOptions);
 
-  SmallVector<Decl *, 1> Decls;
-  swift::getTopLevelDeclsForDisplay(TopLevelMod, Decls);
+  SmallVector<ModuleDecl *, 1> ModuleList;
+  ModuleList.push_back(TargetMod);
 
   SmallVector<ImportDecl *, 1> ImportDecls;
   llvm::DenseSet<const clang::Module *> ClangModulesForImports;
@@ -485,6 +482,10 @@ void swift::ide::printModuleInterface(
 
         ClangDecls.insert({ CM, {} });
 
+        if (CM != TargetClangMod)
+          if (auto *OwningModule = Importer.getWrapperForModule(CM))
+            ModuleList.push_back(OwningModule);
+
         // If we're supposed to visit submodules, add them now.
         if (TraversalOptions & ModuleTraversal::VisitSubmodules) {
           for (clang::Module * submodule: CM->submodules()) {
@@ -497,6 +498,12 @@ void swift::ide::printModuleInterface(
     } else {
       ClangDecls.insert({ TargetClangMod, {} });
     }
+  }
+
+  SmallVector<Decl *, 1> Decls;
+
+  for (ModuleDecl *M : ModuleList) {
+    swift::getTopLevelDeclsForDisplay(M, Decls);
   }
 
   // Collect those submodules that are actually imported but have no import

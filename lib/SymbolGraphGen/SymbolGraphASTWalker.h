@@ -130,6 +130,10 @@ public:
   /// extension block symbol, or if its members should be directly associated
   /// with its extended nominal.
   virtual bool shouldBeRecordedAsExtension(const ExtensionDecl *ED) const;
+
+  /// Returns the owning module of the given decl. Loads the module from Clang if necessary, to
+  /// correctly fetch owning submodules.
+  virtual ModuleDecl *getRealModuleOf(const Decl *D) const;
 };
 
 } // end namespace symbolgraphgen
