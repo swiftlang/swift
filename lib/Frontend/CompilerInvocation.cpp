@@ -2349,7 +2349,11 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       }
     }());
   }
-  Opts.PrintDiagnosticNames |= Args.hasArg(OPT_debug_diagnostic_names);
+  if (Args.hasArg(OPT_debug_diagnostic_names)) {
+    Opts.PrintDiagnosticNames = PrintDiagnosticNamesMode::Identifier;
+  } else if (Args.hasArg(OPT_print_diagnostic_groups)) {
+    Opts.PrintDiagnosticNames = PrintDiagnosticNamesMode::Group;
+  }
   Opts.PrintEducationalNotes |= Args.hasArg(OPT_print_educational_notes);
   if (Arg *A = Args.getLastArg(OPT_diagnostic_documentation_path)) {
     Opts.DiagnosticDocumentationPath = A->getValue();

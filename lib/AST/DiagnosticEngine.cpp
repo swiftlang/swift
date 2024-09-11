@@ -133,12 +133,6 @@ static constexpr const char * const diagnosticStrings[] = {
     "<not a diagnostic>",
 };
 
-static constexpr const char *const debugDiagnosticStrings[] = {
-#define DIAG(KIND, ID, Group, Options, Text, Signature) Text " [" #ID "]",
-#include "swift/AST/DiagnosticsAll.def"
-    "<not a diagnostic>",
-};
-
 static constexpr const char *const diagnosticIDStrings[] = {
 #define DIAG(KIND, ID, Group, Options, Text, Signature) #ID,
 #include "swift/AST/DiagnosticsAll.def"
@@ -1522,7 +1516,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
 
   return DiagnosticInfo(
       diagnostic.getID(), loc, toDiagnosticKind(behavior),
-      diagnosticStringFor(diagnostic.getID(), getPrintDiagnosticNames()),
+      diagnosticStringFor(diagnostic.getID(), getPrintDiagnosticNamesMode()),
       diagnostic.getArgs(), Category, getDefaultDiagnosticLoc(),
       /*child note info*/ {}, diagnostic.getRanges(), fixIts,
       diagnostic.isChildNote());
@@ -1687,18 +1681,38 @@ DiagnosticKind DiagnosticEngine::declaredDiagnosticKindFor(const DiagID id) {
   return storedDiagnosticInfos[(unsigned)id].kind;
 }
 
-llvm::StringRef
-DiagnosticEngine::diagnosticStringFor(const DiagID id,
-                                      bool printDiagnosticNames) {
-  auto defaultMessage = printDiagnosticNames
-                            ? debugDiagnosticStrings[(unsigned)id]
-                            : diagnosticStrings[(unsigned)id];
-
-  if (auto producer = localization.get()) {
-    auto localizedMessage = producer->getMessageOr(id, defaultMessage);
-    return localizedMessage;
+llvm::StringRef DiagnosticEngine::diagnosticStringFor(
+    const DiagID id, PrintDiagnosticNamesMode printDiagnosticNamesMode) {
+  llvm::StringRef message = diagnosticStrings[(unsigned)id];
+  if (auto localizationProducer = localization.get()) {
+    message = localizationProducer->getMessageOr(id, message);
   }
-  return defaultMessage;
+  auto formatMessageWithName = [&](StringRef message, StringRef name) {
+    const int additionalCharsLength = 3; // ' ', '[', ']'
+    std::string messageWithName;
+    messageWithName.reserve(message.size() + name.size() +
+                            additionalCharsLength);
+    messageWithName += message;
+    messageWithName += " [";
+    messageWithName += name;
+    messageWithName += "]";
+    return DiagnosticStringsSaver.save(messageWithName);
+  };
+  switch (printDiagnosticNamesMode) {
+  case PrintDiagnosticNamesMode::None:
+    break;
+  case PrintDiagnosticNamesMode::Identifier:
+    message = formatMessageWithName(message, diagnosticIDStringFor(id));
+    break;
+  case PrintDiagnosticNamesMode::Group:
+    auto groupID = storedDiagnosticInfos[(unsigned)id].groupID;
+    if (groupID != DiagGroupID::no_group) {
+      message =
+          formatMessageWithName(message, getDiagGroupInfoByID(groupID).name);
+    }
+    break;
+  }
+  return message;
 }
 
 llvm::StringRef

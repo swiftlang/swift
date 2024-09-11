@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift                       \
 // RUN:     -disable-availability-checking                   \
-// RUN:     -debug-diagnostic-names
+// RUN:     -print-diagnostic-groups
 
-struct S : _BitwiseCopyable {} // expected-warning {{'_BitwiseCopyable' is deprecated: Use BitwiseCopyable}}
+struct S : _BitwiseCopyable {} // expected-warning {{'_BitwiseCopyable' is deprecated: Use BitwiseCopyable [availability_deprecated]}}
 
-func f<T : _BitwiseCopyable>(_ t: T) {} // expected-warning {{'_BitwiseCopyable' is deprecated: Use BitwiseCopyable}}
+func f<T : _BitwiseCopyable>(_ t: T) {} // expected-warning {{'_BitwiseCopyable' is deprecated: Use BitwiseCopyable [availability_deprecated]}}
