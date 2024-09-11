@@ -4,7 +4,8 @@
 // RUN:   -enable-throws-prediction \
 // RUN:   -Xllvm --debug-only=cold-block-info 2> %t/debug.txt
 
-// RUN: %FileCheck %s --input-file=%t/debug.txt
+// RUN: %FileCheck %s --input-file=%t/debug.txt \
+// RUN:               --implicit-check-not 'converged after {{[3-9]}} iters'
 
 public enum MyError: Error { case err; case number(Int) }
 
@@ -131,7 +132,7 @@ public func pleasePleasePlease(_ i: Int) throws {
 }
 
 
-// CHECK-LABEL: --> Final for $s4main21nestedTreesOfThrowingyySi_S3itAA7MyErrorOYKF | converged after 1 iters
+// CHECK-LABEL: --> Final for $s4main21nestedTreesOfThrowingyySi_S3itAA7MyErrorOYKF
 // CHECK-NOT: bb0
 // CHECK: }
 public func nestedTreesOfThrowing(_ i: Int, _ j: Int, _ k: Int, _ l: Int) throws(MyError) {

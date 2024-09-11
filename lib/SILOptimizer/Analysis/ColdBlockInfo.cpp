@@ -17,6 +17,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "llvm/ADT/PostOrderIterator.h"
 
 #define DEBUG_TYPE "cold-block-info"
 
@@ -385,13 +386,16 @@ void ColdBlockInfo::analyze(SILFunction *fn) {
   bool changed;
   do {
     changed = false;
-    // TODO: We could use a worklist so we progressively visit fewer blocks
-    //  on each iteration, as we only need to visit non-cold/non-leaf blocks.
-    for (auto &BB : llvm::reverse(*fn)) {
+
+
+    // We're bubbling up coldness from the leaves of the function up towards the
+    // entry block, so walk the blocks in post-order to converge faster.
+    for (auto *BB : llvm::post_order(fn)) {
+
       // Only on the first pass, search recursively for an expected value,
-      // now that more temperature data has been seeded.
-      if (!completedIters && !foundExpectedCond.contains(&BB)) {
-        if (auto *CBI = dyn_cast<CondBranchInst>(BB.getTerminator())) {
+      // if needed, now that more temperature data has been determined.
+      if (!completedIters && !foundExpectedCond.contains(BB)) {
+        if (auto *CBI = dyn_cast<CondBranchInst>(BB->getTerminator())) {
           auto cond = getCondition(CBI->getCondition());
           if (auto val = searchForExpectedValue(cond)) {
             setExpectedCondition(CBI, val);
@@ -401,15 +405,15 @@ void ColdBlockInfo::analyze(SILFunction *fn) {
       }
 
       // Nothing to propagate from.
-      if (BB.getNumSuccessors() == 0)
+      if (BB->getNumSuccessors() == 0)
         continue;
 
       // Coldness already exists here.
-      if (isCold(&BB))
+      if (isCold(BB))
         continue;
 
-      if (llvm::all_of(BB.getSuccessorBlocks(), isColdBlock)) {
-        resetToCold(&BB);
+      if (llvm::all_of(BB->getSuccessorBlocks(), isColdBlock)) {
+        resetToCold(BB);
         changed = true;
       }
     }
