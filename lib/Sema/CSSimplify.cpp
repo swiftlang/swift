@@ -13858,6 +13858,23 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
     return genericParams;
   };
 
+  auto fixInvalidSpecialization = [&](ValueDecl *decl) -> SolutionKind {
+    if (isa<AbstractFunctionDecl>(decl)) {
+      return recordFix(AllowFunctionSpecialization::create(
+                 *this, decl, getConstraintLocator(locator)))
+                 ? SolutionKind::Error
+                 : SolutionKind::Solved;
+    }
+
+    // Allow concrete macros to have specializations with just a warning.
+    return recordFix(AllowConcreteTypeSpecialization::create(
+               *this, type1, decl, getConstraintLocator(locator),
+               isa<MacroDecl>(decl) ? FixBehavior::DowngradeToWarning
+                                    : FixBehavior::Error))
+               ? SolutionKind::Error
+               : SolutionKind::Solved;
+  };
+
   ValueDecl *decl;
   SmallVector<OpenedType, 2> openedTypes;
   if (auto *bound = dyn_cast<TypeAliasType>(type1.getPointer())) {
@@ -13916,6 +13933,12 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
     decl = overloadChoice.getDecl();
 
     auto openedOverloadTypes = getOpenedTypes(overloadLocator);
+    // Attempting to specialize a non-generic declaration.
+    if (openedOverloadTypes.empty()) {
+      // Note that this is unconditional because the fix is
+      // downgraded to a warning in swift language modes < 6.
+      return fixInvalidSpecialization(decl);
+    }
 
     auto genericParams = getGenericParams(decl);
     if (genericParams) {
@@ -13931,22 +13954,8 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   }
 
   auto genericParams = getGenericParams(decl);
-  if (!decl->getAsGenericContext() || !genericParams) {
-    if (isa<AbstractFunctionDecl>(decl)) {
-      return recordFix(AllowFunctionSpecialization::create(
-                 *this, decl, getConstraintLocator(locator)))
-                 ? SolutionKind::Error
-                 : SolutionKind::Solved;
-    }
-
-    // Allow concrete macros to have specializations with just a warning.
-    return recordFix(AllowConcreteTypeSpecialization::create(
-               *this, type1, decl, getConstraintLocator(locator),
-               isa<MacroDecl>(decl) ? FixBehavior::DowngradeToWarning
-                                    : FixBehavior::Error))
-               ? SolutionKind::Error
-               : SolutionKind::Solved;
-  }
+  if (!decl->getAsGenericContext() || !genericParams)
+    return fixInvalidSpecialization(decl);
 
   // Map the generic parameters we have over to their opened types.
   bool hasParameterPack = false;
