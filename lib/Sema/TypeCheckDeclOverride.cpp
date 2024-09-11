@@ -1701,6 +1701,7 @@ namespace  {
     UNINTERESTING_ATTR(UnsafeNonEscapableResult)
     UNINTERESTING_ATTR(StaticExclusiveOnly)
     UNINTERESTING_ATTR(PreInverseGenerics)
+    UNINTERESTING_ATTR(Lifetime)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
