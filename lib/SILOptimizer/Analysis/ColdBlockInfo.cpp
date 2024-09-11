@@ -209,10 +209,10 @@ static std::optional<bool> getExpectedValue(SILValue Cond) {
 /// The minimum probability that an edge is taken to be considered "warm".
 constexpr double WARM_EDGE_MINIMUM = 3.0 / 100.0;
 
-// Using the profile data on the terminator of this block, annotate successors
-// with cold/warm information.
-//
-// \returns true if an inference was made
+/// Using the profile data on the terminator of this block, annotate successors
+/// with cold/warm information.
+///
+/// \returns true if an inference was made
 bool ColdBlockInfo::inferFromEdgeProfile(SILBasicBlock *BB) {
   ProfileCounter totalCount{0};
   SmallVector<ProfileCounter, 2> succCount;
