@@ -85,7 +85,6 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
     rawLayout = decl->getAttrs().getAttribute<RawLayoutAttr>();
   }
   if (rawLayout && type) {
-    auto sd = cast<StructDecl>(decl);
     IsKnownTriviallyDestroyable = triviallyDestroyable;
     IsKnownBitwiseTakable = bitwiseTakable;
     SpareBits.clear();
@@ -112,30 +111,18 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
       IsFixedLayout = true;
       IsKnownAlwaysFixedSize = IsFixedSize;
     } else {
-      std::optional<Type> likeType = std::nullopt;
+      auto loweredType = IGM.getLoweredType(*type);
+
+      Type likeType = loweredType.getRawLayoutSubstitutedLikeType();
       std::optional<Type> countType = std::nullopt;
 
-      if (auto like = rawLayout->getResolvedScalarLikeType(sd)) {
-        likeType = like;
+      if (rawLayout->getArrayLikeTypeAndCount()) {
+        countType = loweredType.getRawLayoutSubstitutedCountType();
       }
 
-      if (auto like = rawLayout->getResolvedArrayLikeTypeAndCount(sd)) {
-        likeType = like->first;
-        countType = like->second;
-      }
-
-      // If our likeType is dependent, then all calls to try and lay it out will
-      // be non-fixed, but in a concrete case we want a fixed layout, so try to
-      // substitute it out.
-      auto subs = (*type)->getContextSubstitutionMap();
-      auto loweredLikeType = IGM.getLoweredType(likeType->subst(subs));
+      auto loweredLikeType = IGM.getLoweredType(likeType);
       auto &likeTypeInfo = IGM.getTypeInfo(loweredLikeType);
       auto likeFixedType = dyn_cast<FixedTypeInfo>(&likeTypeInfo);
-
-      // Substitute our count type if we have one.
-      if (countType) {
-        countType = countType->subst(subs);
-      }
 
       // Take layout attributes from the like type.
       //
