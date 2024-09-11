@@ -277,7 +277,7 @@ func rdar_60185506() {
 func rdar60727310() {
   func myAssertion<T>(_ a: T, _ op: ((T,T)->Bool), _ b: T) {}
   var e: Error? = nil
-  myAssertion(e, ==, nil) // expected-error {{binary operator '==' cannot be applied to two '(any Error)?' operands}}
+  myAssertion(e, ==, nil) // expected-error {{cannot convert value of type '(any Error)?' to expected argument type '(any Any.Type)?'}}
 }
 
 // https://github.com/apple/swift/issues/54877
