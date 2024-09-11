@@ -6,7 +6,7 @@
 
 // RUN: %FileCheck %s --input-file=%t/debug.txt
 
-enum MyError: Error { case err; case number(Int) }
+public enum MyError: Error { case err; case number(Int) }
 
 @inline(never)
 func dump(_ s: String) { print(s) }
@@ -127,5 +127,94 @@ public func pleasePleasePlease(_ i: Int) throws {
     fatalError("oof")
   } else {
     throw MyError.number(i)
+  }
+}
+
+
+// CHECK-LABEL: --> Final for $s4main21nestedTreesOfThrowingyySi_S3itAA7MyErrorOYKF | converged after 1 iters
+// CHECK-NOT: bb0
+// CHECK: }
+public func nestedTreesOfThrowing(_ i: Int, _ j: Int, _ k: Int, _ l: Int) throws(MyError) {
+  switch i {
+  case 0:
+    switch j {
+    case 0:
+      switch k {
+        case 0:
+        switch l {
+          case 0: throw MyError.number(0)
+          case 1: throw MyError.number(1)
+          default: return  // <-- the one non-throwing case that prevents bb0 from being cold!
+        }
+        case 1:
+        switch l {
+          case 0: throw MyError.number(1)
+          case 1: throw MyError.number(2)
+          default: throw MyError.err
+        }
+        default:
+          throw MyError.err
+      }
+    case 1:
+      switch k {
+        case 0:
+        switch l {
+          case 0: throw MyError.number(1)
+          case 1: throw MyError.number(2)
+          default: throw MyError.err
+        }
+        case 1:
+        switch l {
+          case 0: throw MyError.number(2)
+          case 1: throw MyError.number(3)
+          default: throw MyError.err
+        }
+        default:
+          throw MyError.err
+      }
+    default:
+      throw MyError.err
+    }
+  case 1:
+    switch j {
+    case 0:
+      switch k {
+        case 0:
+        switch l {
+          case 0: throw MyError.number(1)
+          case 1: throw MyError.number(2)
+          default: throw MyError.err
+        }
+        case 1:
+        switch l {
+          case 0: throw MyError.number(2)
+          case 1: throw MyError.number(3)
+          default: throw MyError.err
+        }
+        default:
+          throw MyError.err
+      }
+    case 1:
+      switch k {
+        case 0:
+        switch l {
+          case 0: throw MyError.number(2)
+          case 1: throw MyError.number(3)
+          default: throw MyError.err
+        }
+        case 1:
+        switch l {
+          case 0: throw MyError.number(3)
+          case 1: throw MyError.number(4)
+          default: throw MyError.err
+        }
+        default:
+          throw MyError.err
+      }
+    default:
+      throw MyError.err
+    }
+  default:
+    throw MyError.err
   }
 }
