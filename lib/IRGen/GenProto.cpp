@@ -1030,7 +1030,10 @@ static bool isSynthesizedNonUnique(const RootProtocolConformance *conformance) {
 }
 
 /// Determine whether a protocol can ever have a dependent conformance.
-static bool protocolCanHaveDependentConformance(ProtocolDecl *proto) {
+static bool protocolCanHaveDependentConformance(
+    ProtocolDecl *proto,
+    bool isResilient
+) {
   // Objective-C protocols have never been able to have a dependent conformance.
   if (proto->isObjC())
     return false;
@@ -1040,13 +1043,14 @@ static bool protocolCanHaveDependentConformance(ProtocolDecl *proto) {
   // is a marker protocol (since they don't have requirements), but we must
   // retain backward compatibility with binaries built for earlier deployment
   // targets that concluded that these protocols might involve dependent
-  // conformances.
-  ASTContext &ctx = proto->getASTContext();
-  if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget(
-          ctx.LangOpts.Target)) {
-    if (runtimeCompatVersion < llvm::VersionTuple(6, 0) &&
-        proto->isSpecificProtocol(KnownProtocolKind::Sendable))
-      return true;
+  // conformances. Only do this for resilient protocols.
+  if (isResilient && proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+    ASTContext &ctx = proto->getASTContext();
+    if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget(
+            ctx.LangOpts.Target)) {
+      if (runtimeCompatVersion < llvm::VersionTuple(6, 0))
+        return true;
+    }
   }
 
   return Lowering::TypeConverter::protocolRequiresWitnessTable(proto);
@@ -1055,6 +1059,7 @@ static bool protocolCanHaveDependentConformance(ProtocolDecl *proto) {
 static bool isDependentConformance(
               IRGenModule &IGM,
               const RootProtocolConformance *rootConformance,
+              bool isResilient,
               llvm::SmallPtrSet<const NormalProtocolConformance *, 4> &visited){
   // Self-conformances are never dependent.
   auto conformance = dyn_cast<NormalProtocolConformance>(rootConformance);
@@ -1084,7 +1089,8 @@ static bool isDependentConformance(
       continue;
 
     auto assocProtocol = req.getProtocolDecl();
-    if (!protocolCanHaveDependentConformance(assocProtocol))
+    if (!protocolCanHaveDependentConformance(
+            assocProtocol, isResilient))
       continue;
 
     auto assocConformance =
@@ -1098,6 +1104,7 @@ static bool isDependentConformance(
         isDependentConformance(IGM,
                                assocConformance.getConcrete()
                                  ->getRootConformance(),
+                               isResilient,
                                visited))
       return true;
   }
@@ -1166,7 +1173,8 @@ static bool hasConditionalConformances(IRGenModule &IGM,
 bool IRGenModule::isDependentConformance(
     const RootProtocolConformance *conformance) {
   llvm::SmallPtrSet<const NormalProtocolConformance *, 4> visited;
-  return ::isDependentConformance(*this, conformance, visited);
+  return ::isDependentConformance(
+      *this, conformance, conformance->getProtocol()->isResilient(), visited);
 }
 
 static llvm::Value *
