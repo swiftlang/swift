@@ -203,7 +203,7 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public var _byteOffsets: Range<Int> {
-    .init(uncheckedBounds: (0, byteCount))
+    .init(_uncheckedBounds: (0, byteCount))
   }
 }
 
@@ -435,7 +435,7 @@ extension RawSpan {
     fromByteOffset offset: Int = 0, as: T.Type
   ) -> T {
     _precondition(boundsContain(
-      Range(uncheckedBounds: (offset, offset+MemoryLayout<T>.size))
+      Range(_uncheckedBounds: (offset, offset+MemoryLayout<T>.size))
     ))
     return unsafeLoad(fromUncheckedByteOffset: offset, as: T.self)
   }
@@ -486,7 +486,7 @@ extension RawSpan {
     fromByteOffset offset: Int = 0, as: T.Type
   ) -> T {
     _precondition(boundsContain(
-      Range(uncheckedBounds: (offset, offset+MemoryLayout<T>.size))
+      Range(_uncheckedBounds: (offset, offset+MemoryLayout<T>.size))
     ))
     return unsafeLoadUnaligned(fromUncheckedByteOffset: offset, as: T.self)
   }
@@ -548,7 +548,7 @@ extension RawSpan {
       s = _start.distance(to: span._start)
       e = s + span._count
     }
-    return Range(uncheckedBounds: (s, e))
+    return Range(_uncheckedBounds: (s, e))
   }
 }
 

@@ -354,7 +354,7 @@ extension Span where Element: ~Copyable /*& ~Escapable*/ {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public var _indices: Range<Int> {
-    .init(uncheckedBounds: (0, _count))
+    Range(_uncheckedBounds: (0, _count))
   }
 }
 
@@ -683,7 +683,7 @@ extension Span where Element: ~Copyable /*& ~Escapable*/ {
       s = _start.distance(to: span._start)/MemoryLayout<Element>.stride
       e = s + span._count
     }
-    return Range(uncheckedBounds: (s, e))
+    return Range(_uncheckedBounds: (s, e))
   }
 }
 
