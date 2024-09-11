@@ -7,6 +7,6 @@ The deprecated group is a supergroup designed to manage all kinds of warnings re
 ## Usage Example
 
 ```sh
-swiftc -warning-as-error deprecated file.swift
-swiftc -warnings-as-errors -no-warning-as-error deprecated file.swift
+swiftc -Werror deprecated file.swift
+swiftc -warnings-as-errors -Wwarning deprecated file.swift
 ```
