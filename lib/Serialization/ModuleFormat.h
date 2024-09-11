@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 889; // public-module-name
+const uint16_t SWIFTMODULE_VERSION_MINOR = 890; // @lifetime attribute
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2489,6 +2489,15 @@ namespace decls_block {
                                //   - argument labels
                                // trialed by introduced conformances
   >;
+
+  using LifetimeDeclAttrLayout =
+      BCRecordLayout<Lifetime_DECL_ATTR,
+                     BCVBR<4>,           // targetIndex
+                     BCFixed<1>,         // isImmortal
+                     BCFixed<1>,         // hasInheritLifetimeParamIndices
+                     BCFixed<1>,         // hasScopeLifetimeParamIndices
+                     BCArray<BCFixed<1>> // concatenated param indices
+                     >;
 
 #undef SYNTAX_SUGAR_TYPE_LAYOUT
 #undef TYPE_LAYOUT
