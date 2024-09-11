@@ -8002,12 +8002,6 @@ NOTE(unsafe_decl_here,none,
 // MARK: Value Generics
 //===----------------------------------------------------------------------===//
 
-ERROR(invalid_value_value_generic,none,
-      "%0 requires that %1 must be a valid value for %2",
-      (Type, Type, Type))
-NOTE(invalid_value_value_generic_requirement,none,
-     "requirement specified as %0 == %1%2",
-     (Type, Type, StringRef))
 ERROR(cannot_pass_type_for_value_generic,none,
       "cannot pass type %0 as a value for generic value %1", (Type, Type))
 ERROR(value_type_used_in_type_parameter,none,
@@ -8029,6 +8023,8 @@ ERROR(value_generics_missing_feature,none,
 ERROR(availability_value_generic_type_only_version_newer, none,
       "values in generic types are only available in %0 %1 or newer",
       (StringRef, llvm::VersionTuple))
+ERROR(invalid_value_for_type_same_type,none,
+      "cannot constrain type parameter %0 to be integer %1", (Type, Type))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
