@@ -4982,6 +4982,11 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
     return Diagnostic(diag::availability_decl_no_unavailable, D);
   }
 
+  // The conformance checker does not know what to do with unavailable
+  // associated types.
+  if (auto *AT = dyn_cast<AssociatedTypeDecl>(D))
+    return Diagnostic(diag::availability_decl_no_unavailable, D);
+
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (!VD->hasStorageOrWrapsStorage())
       return std::nullopt;
