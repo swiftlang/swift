@@ -234,7 +234,7 @@ public:
 #endif
 
   void destroy() const;
-};
+} SWIFT_SELF_CONTAINED;
 
 SWIFT_NAME("getter:BridgedOwnedString.data(self:)")
 BRIDGED_INLINE 
