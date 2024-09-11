@@ -25,6 +25,6 @@ The `availability_deprecated` group covers the following warnings:
 ## Usage Example
 
 ```sh
-swiftc -warning-as-error availability_deprecated file.swift
-swiftc -warnings-as-errors -no-warning-as-error availability_deprecated file.swift
+swiftc -Werror availability_deprecated file.swift
+swiftc -warnings-as-errors -Wwarning availability_deprecated file.swift
 ```
