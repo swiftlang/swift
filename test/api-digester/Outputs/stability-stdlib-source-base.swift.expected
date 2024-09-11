@@ -364,6 +364,7 @@ Func ContiguousArray.withUnsafeMutableBufferPointer(_:) is now without @rethrows
 // Adoption of @unsafe
 Func unsafeBitCast(_:to:) is now with @unsafe
 Func unsafeDowncast(_:to:) is now with @unsafe
+Struct CVaListPointer is now with @unsafe
 Struct OpaquePointer is now with @unsafe
 Struct Unmanaged is now with @unsafe
 Struct UnsafeBufferPointer is now with @unsafe
