@@ -1190,7 +1190,7 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
     invocationArgs.reserve(driverArgs.size());
     llvm::for_each(driverArgs, [&](const std::string &Arg) {
       if (ctx.LangOpts.Target.isOSWindows() &&
-          ctx.LangOpts.CXXStdlib != ctx.LangOpts.PlatformDefaultCXXStdlib &&
+          !ctx.LangOpts.isUsingPlatformDefaultCXXStdlib() &&
           StringRef(Arg).starts_with("-stdlib=")) {
         // Drop the -stdlib argument when using libc++ on Windows, as the
         // windows Clang driver doesn't explicitly support custom libc++,
@@ -2402,7 +2402,7 @@ ModuleDecl *ClangImporter::Implementation::loadModule(
     // The 'CxxStdlib' module is not importable when using a custom
     // C++ standard libary on Windows, as it supports the MSVC ABI only.
     if (ctx.LangOpts.Target.isOSWindows() &&
-        ctx.LangOpts.CXXStdlib != ctx.LangOpts.PlatformDefaultCXXStdlib)
+        !ctx.LangOpts.isUsingPlatformDefaultCXXStdlib())
       return nullptr;
     ImportPath::Builder adjustedPath(ctx.getIdentifier("std"), importLoc);
     adjustedPath.append(path.getSubmodulePath());
@@ -2797,7 +2797,7 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   // map shipped with custom libc++ is expected to be broken into 'std_*'
   // top level modules, and also have a renamed top-level 'std' module.
   if (SwiftContext.LangOpts.Target.isOSWindows() &&
-      SwiftContext.LangOpts.CXXStdlib != SwiftContext.LangOpts.PlatformDefaultCXXStdlib &&
+      !ctx.LangOpts.isUsingPlatformDefaultCXXStdlib() &&
       isCxxStdModule(underlying) &&
       underlying->Name == "std") {
     diagnose(SourceLoc(),
