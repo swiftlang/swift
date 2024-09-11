@@ -34,7 +34,7 @@ public struct Span<Element: ~Copyable & ~Escapable>: Copyable, ~Escapable {
 @available(*, unavailable)
 extension Span: Sendable {}
 
-extension UnsafePointer where Pointee: ~Copyable /*& ~Escapable*/ {
+extension UnsafePointer where Pointee: ~Copyable {
 
   @_alwaysEmitIntoClient
   var isAligned: Bool {
@@ -42,7 +42,7 @@ extension UnsafePointer where Pointee: ~Copyable /*& ~Escapable*/ {
   }
 }
 
-extension Span where Element: ~Copyable /*& ~Escapable*/ {
+extension Span where Element: ~Copyable {
   @_alwaysEmitIntoClient
   internal init(
     _unchecked elements: UnsafeBufferPointer<Element>
@@ -311,7 +311,7 @@ extension Span where Element: Equatable {
   }
 }
 
-extension Span where Element: ~Copyable /*& ~Escapable*/ {
+extension Span where Element: ~Copyable {
   /// Returns a Boolean value indicating whether two `RawSpan` instances
   /// refer to the same region in memory.
   @_alwaysEmitIntoClient
@@ -320,7 +320,7 @@ extension Span where Element: ~Copyable /*& ~Escapable*/ {
   }
 }
 
-extension Span where Element: ~Copyable /*& ~Escapable*/ {
+extension Span where Element: ~Copyable {
 
   private var _address: String {
     String(UInt(bitPattern: _pointer), radix: 16, uppercase: false)
@@ -331,7 +331,7 @@ extension Span where Element: ~Copyable /*& ~Escapable*/ {
   }
 }
 
-extension Span where Element: ~Copyable /*& ~Escapable*/ {
+extension Span where Element: ~Copyable {
 
   /// The number of elements in the span.
   ///
@@ -359,7 +359,7 @@ extension Span where Element: ~Copyable /*& ~Escapable*/ {
 }
 
 //MARK: Bounds Checking
-extension Span where Element: ~Copyable /*& ~Escapable*/ {
+extension Span where Element: ~Copyable {
 
   /// Return true if `offset` is a valid offset into this `Span`
   ///
@@ -403,7 +403,7 @@ extension Span where Element: BitwiseCopyable {
 }
 
 //MARK: integer offset subscripts
-extension Span where Element: ~Copyable /*& ~Escapable*/ {
+extension Span where Element: ~Copyable {
 
   /// Accesses the element at the specified position in the `Span`.
   ///
@@ -472,7 +472,7 @@ extension Span where Element: BitwiseCopyable {
 }
 
 //MARK: extracting sub-spans
-extension Span where Element: ~Copyable /*& ~Escapable*/ {
+extension Span where Element: ~Copyable {
 
   /// Constructs a new span over the items within the supplied range of
   /// positions within this span.
@@ -572,7 +572,7 @@ extension Span where Element: ~Copyable /*& ~Escapable*/ {
 }
 
 //MARK: withUnsafePointer, etc.
-extension Span where Element: ~Copyable  /*& ~Escapable*/ {
+extension Span where Element: ~Copyable  {
 
   //FIXME: mark closure parameter as non-escaping
   /// Calls a closure with a pointer to the viewed contiguous storage.
@@ -650,7 +650,7 @@ extension Span where Element: Copyable {
   }
 }
 
-extension Span where Element: ~Copyable /*& ~Escapable*/ {
+extension Span where Element: ~Copyable {
 
   /// Returns true if the memory represented by `span` is a subrange of
   /// the memory represented by `self`
@@ -688,7 +688,7 @@ extension Span where Element: ~Copyable /*& ~Escapable*/ {
 }
 
 //MARK: one-sided slicing operations
-extension Span where Element: ~Copyable /*& ~Escapable*/ {
+extension Span where Element: ~Copyable {
 
   /// Returns a span containing the initial elements of this span,
   /// up to the specified maximum length.
