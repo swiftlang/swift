@@ -64,9 +64,9 @@ extension Span where Element: ~Copyable /*& ~Escapable*/ {
   public init(
     _unsafeElements buffer: UnsafeBufferPointer<Element>
   ) -> dependsOn(immortal) Self {
-    precondition(
+    _precondition(
       buffer.count == 0 || buffer.baseAddress.unsafelyUnwrapped.isAligned,
-      "baseAddress must be properly aligned for accessing \(Element.self)"
+      "baseAddress must be properly aligned to access Element"
     )
     self.init(_unchecked: buffer)
   }
@@ -103,10 +103,10 @@ extension Span where Element: ~Copyable /*& ~Escapable*/ {
     _unsafeStart start: UnsafePointer<Element>,
     count: Int
   ) -> dependsOn(immortal) Self {
-    precondition(count >= 0, "Count must not be negative")
-    precondition(
+    _precondition(count >= 0, "Count must not be negative")
+    _precondition(
       start.isAligned,
-      "baseAddress must be properly aligned for accessing \(Element.self)"
+      "baseAddress must be properly aligned to access Element"
     )
     self.init(_unchecked: start, count: count)
   }
@@ -162,7 +162,7 @@ extension Span where Element: BitwiseCopyable {
     _unsafeStart start: UnsafePointer<Element>,
     count: Int
   ) -> dependsOn(immortal) Self {
-    precondition(count >= 0, "Count must not be negative")
+    _precondition(count >= 0, "Count must not be negative")
     self.init(_unchecked: start, count: count)
   }
 
@@ -185,9 +185,9 @@ extension Span where Element: BitwiseCopyable {
     _unsafeBytes buffer: UnsafeRawBufferPointer
   ) -> dependsOn(immortal) Self {
     let (byteCount, stride) = (buffer.count, MemoryLayout<Element>.stride)
-    precondition(byteCount >= 0, "Count must not be negative")
+    _precondition(byteCount >= 0, "Count must not be negative")
     let (count, remainder) = byteCount.quotientAndRemainder(dividingBy: stride)
-    precondition(remainder == 0)
+    _precondition(remainder == 0)
     self.init(
       _unchecked: buffer.baseAddress?.assumingMemoryBound(to: Element.self),
       count: count
@@ -231,10 +231,10 @@ extension Span where Element: BitwiseCopyable {
     _unsafeStart pointer: UnsafeRawPointer,
     byteCount: Int
   ) -> dependsOn(immortal) Self {
-    precondition(byteCount >= 0, "Count must not be negative")
+    _precondition(byteCount >= 0, "Count must not be negative")
     let stride = MemoryLayout<Element>.stride
     let (count, remainder) = byteCount.quotientAndRemainder(dividingBy: stride)
-    precondition(remainder == 0)
+    _precondition(remainder == 0)
     self.init(
       _unchecked: pointer.assumingMemoryBound(to: Element.self),
       count: count
@@ -414,7 +414,7 @@ extension Span where Element: ~Copyable /*& ~Escapable*/ {
   @_alwaysEmitIntoClient
   public subscript(_ position: Int) -> Element {
     _read {
-      precondition(boundsContain(position))
+      _precondition(boundsContain(position))
       yield self[unchecked: position]
     }
   }
@@ -449,7 +449,7 @@ extension Span where Element: BitwiseCopyable {
   @_alwaysEmitIntoClient
   public subscript(_ position: Int) -> Element {
     get {
-      precondition(boundsContain(position))
+      _precondition(boundsContain(position))
       return self[unchecked: position]
     }
   }
@@ -489,7 +489,7 @@ extension Span where Element: ~Copyable /*& ~Escapable*/ {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public func extracting(_ bounds: Range<Int>) -> Self {
-    precondition(boundsContain(bounds))
+    _precondition(boundsContain(bounds))
     return extracting(unchecked: bounds)
   }
 
@@ -677,7 +677,7 @@ extension Span where Element: ~Copyable /*& ~Escapable*/ {
   /// Returns: A range of offsets within `self`
   @_alwaysEmitIntoClient
   public func offsets(of span: borrowing Self) -> Range<Int> {
-    precondition(contains(span))
+    _precondition(contains(span))
     var (s, e) = (0, 0)
     if _pointer != nil && span._pointer != nil {
       s = _start.distance(to: span._start)/MemoryLayout<Element>.stride
@@ -707,7 +707,7 @@ extension Span where Element: ~Copyable /*& ~Escapable*/ {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public func extracting(first maxLength: Int) -> Self {
-    precondition(maxLength >= 0, "Can't have a prefix of negative length.")
+    _precondition(maxLength >= 0, "Can't have a prefix of negative length.")
     let newCount = min(maxLength, count)
     return Self(_unchecked: _pointer, count: newCount)
   }
@@ -728,7 +728,7 @@ extension Span where Element: ~Copyable /*& ~Escapable*/ {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public func extracting(droppingLast k: Int) -> Self {
-    precondition(k >= 0, "Can't drop a negative number of elements.")
+    _precondition(k >= 0, "Can't drop a negative number of elements.")
     let droppedCount = min(k, count)
     return Self(_unchecked: _pointer, count: count&-droppedCount)
   }
@@ -750,7 +750,7 @@ extension Span where Element: ~Copyable /*& ~Escapable*/ {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public func extracting(last maxLength: Int) -> Self {
-    precondition(maxLength >= 0, "Can't have a suffix of negative length.")
+    _precondition(maxLength >= 0, "Can't have a suffix of negative length.")
     let newCount = min(maxLength, count)
     let newStart = _pointer?.advanced(by: (count&-newCount)*MemoryLayout<Element>.stride)
     return Self(_unchecked: newStart, count: newCount)
@@ -772,7 +772,7 @@ extension Span where Element: ~Copyable /*& ~Escapable*/ {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public func extracting(droppingFirst k: Int) -> Self {
-    precondition(k >= 0, "Can't drop a negative number of elements.")
+    _precondition(k >= 0, "Can't drop a negative number of elements.")
     let droppedCount = min(k, count)
     let newStart = _pointer?.advanced(by: droppedCount*MemoryLayout<Element>.stride)
     return Self(_unchecked: newStart, count: count&-droppedCount)
