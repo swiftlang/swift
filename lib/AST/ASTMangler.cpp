@@ -3264,10 +3264,6 @@ void ASTMangler::appendFunctionResultType(
   } else {
     appendType(resultType, sig, forDecl);
   }
-
-  if (AllowLifetimeDependencies && lifetimeDependence.has_value()) {
-    appendLifetimeDependence(*lifetimeDependence);
-  }
 }
 
 void ASTMangler::appendTypeList(Type listTy, GenericSignature sig,
@@ -3320,29 +3316,10 @@ void ASTMangler::appendParameterTypeListElement(
   if (flags.isCompileTimeConst())
     appendOperator("Yt");
 
-  if (AllowLifetimeDependencies && lifetimeDependence) {
-    appendLifetimeDependence(*lifetimeDependence);
-  }
-
   if (!name.empty())
     appendIdentifier(name.str());
   if (flags.isVariadic())
     appendOperator("d");
-}
-
-void ASTMangler::appendLifetimeDependence(LifetimeDependenceInfo info) {
-  if (auto *inheritIndices = info.getInheritIndices()) {
-    assert(!inheritIndices->isEmpty());
-    appendOperator("Yli");
-    appendIndexSubset(inheritIndices);
-    appendOperator("_");
-  }
-  if (auto *scopeIndices = info.getScopeIndices()) {
-    assert(!scopeIndices->isEmpty());
-    appendOperator("Yls");
-    appendIndexSubset(scopeIndices);
-    appendOperator("_");
-  }
 }
 
 void ASTMangler::appendTupleTypeListElement(Identifier name, Type elementType,
@@ -4213,6 +4190,12 @@ void ASTMangler::appendAnyProtocolConformance(
   // emit marker protocols, skip it.
   if (!AllowMarkerProtocols &&
       conformance.getRequirement()->isMarkerProtocol())
+    return;
+
+  // While all invertible protocols are marker protocols, do not mangle them for
+  // compatability reasons. See equivalent hack in `conformanceRequirementIndex`
+  // where only invertible protocols are unconditionally skipped.
+  if (conformance.getRequirement()->getInvertibleProtocolKind())
     return;
 
   if (conformingType->isTypeParameter()) {

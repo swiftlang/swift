@@ -121,7 +121,7 @@ public func throwFunctionWithPossibleReturn(_ a: Int) throws -> Int {
 // CHECK: SWIFT_INLINE_THUNK swift::ThrowingResult<swift::Int> throwFunctionWithPossibleReturn(swift::Int a) SWIFT_SYMBOL("s:9Functions31throwFunctionWithPossibleReturnyS2iKF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK: void* opaqueError = nullptr;
 // CHECK: void* _ctx = nullptr;
-// CHECK: auto returnValue = _impl::$s9Functions31throwFunctionWithPossibleReturnyS2iKF(a, _ctx, &opaqueError);
+// CHECK: auto returnValue = Functions::_impl::$s9Functions31throwFunctionWithPossibleReturnyS2iKF(a, _ctx, &opaqueError);
 // CHECK: if (opaqueError != nullptr)
 // CHECK: #ifdef __cpp_exceptions
 // CHECK: throw (swift::Error(opaqueError));
@@ -141,7 +141,7 @@ public func throwFunctionWithReturn() throws -> Int {
 // CHECK: SWIFT_INLINE_THUNK swift::ThrowingResult<swift::Int> throwFunctionWithReturn() SWIFT_SYMBOL("s:9Functions23throwFunctionWithReturnSiyKF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK: void* opaqueError = nullptr;
 // CHECK: void* _ctx = nullptr;
-// CHECK: auto returnValue = _impl::$s9Functions23throwFunctionWithReturnSiyKF(_ctx, &opaqueError);
+// CHECK: auto returnValue = Functions::_impl::$s9Functions23throwFunctionWithReturnSiyKF(_ctx, &opaqueError);
 // CHECK: #ifdef __cpp_exceptions
 // CHECK: throw (swift::Error(opaqueError));
 // CHECK: #else

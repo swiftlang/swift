@@ -189,6 +189,8 @@ extension ASTGenVisitor {
         fatalError("unimplemented")
       case .allowFeatureSuppression:
         return self.generateAllowFeatureSuppressionAttr(attribute: node)?.asDeclAttribute
+      case .lifetime:
+        fatalError("unimplemented")
 
       // Simple attributes.
       case .alwaysEmitConformanceMetadata,

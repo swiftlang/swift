@@ -379,7 +379,7 @@ Type ResultBuilderTypeRequest::evaluate(Evaluator &evaluator,
 
   // Resolve a type for the attribute.
   auto mutableAttr = const_cast<CustomAttr*>(attr);
-  auto dc = decl->getDeclContext();
+  auto *dc = decl->getInnermostDeclContext();
   auto &ctx = dc->getASTContext();
   Type type = evaluateOrDefault(
       evaluator,

@@ -1178,6 +1178,10 @@ public:
       MacroSyntax syntax, SourceLoc AtLoc, SourceLoc Loc
   );
 
+  /// Parse the @lifetime attribute.
+  ParserResult<LifetimeAttr> parseLifetimeAttribute(SourceLoc AtLoc,
+                                                    SourceLoc Loc);
+
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                   SourceLoc AtEndLoc,
@@ -1266,8 +1270,8 @@ public:
                                         ConventionTypeAttr *&result,
                                         bool justChecking);
 
-  ParserStatus parseLifetimeDependenceSpecifiers(
-      SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList);
+  ParserStatus
+  parseLifetimeEntries(SmallVectorImpl<LifetimeEntry> &specifierList);
 
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
@@ -1470,7 +1474,7 @@ public:
     SourceLoc ConstLoc;
     SourceLoc SendingLoc;
     SmallVector<TypeOrCustomAttr> Attributes;
-    SmallVector<LifetimeDependenceSpecifier> lifetimeDependenceSpecifiers;
+    SmallVector<LifetimeEntry> lifetimeEntries;
 
     ParsedTypeAttributeList(ParseTypeReason reason) : ParseReason(reason) {}
 

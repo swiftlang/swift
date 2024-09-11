@@ -22,6 +22,7 @@
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Basic/PrintDiagnosticNamesMode.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
 #include "swift/Basic/WarningAsErrorRule.h"
@@ -868,7 +869,7 @@ namespace swift {
     /// Don't emit any remarks
     bool suppressRemarks = false;
 
-    /// Treat these warnings as errors. Indicies here corespond to DiagID enum
+    /// Treat these warnings as errors. Indices here correspond to DiagID enum
     llvm::BitVector warningsAsErrors;
 
     /// Whether a fatal error has occurred
@@ -1065,6 +1066,13 @@ namespace swift {
     /// diagnostic message.
     std::unique_ptr<diag::LocalizationProducer> localization;
 
+    /// This allocator will retain diagnostic strings containing the
+    /// diagnostic's message and identifier as `message [id]` for the duration
+    /// of compiler invocation. This will be used when the frontend flags
+    /// `-debug-diagnostic-names` or `-print-diagnostic-groups` are used.
+    llvm::BumpPtrAllocator DiagnosticStringsAllocator;
+    llvm::StringSaver DiagnosticStringsSaver;
+
     /// The number of open diagnostic transactions. Diagnostics are only
     /// emitted once all transactions have closed.
     unsigned TransactionCount = 0;
@@ -1074,9 +1082,11 @@ namespace swift {
     /// input being compiled.
     /// May be invalid.
     SourceLoc bufferIndirectlyCausingDiagnostic;
-    
-    /// Print diagnostic names after their messages
-    bool printDiagnosticNames = false;
+
+    /// When printing diagnostics, include either the diagnostic name
+    /// (diag::whatever) at the end or the associated diagnostic group.
+    PrintDiagnosticNamesMode printDiagnosticNamesMode =
+        PrintDiagnosticNamesMode::None;
 
     /// Path to diagnostic documentation directory.
     std::string diagnosticDocumentationPath = "";
@@ -1102,7 +1112,8 @@ namespace swift {
   public:
     explicit DiagnosticEngine(SourceManager &SourceMgr)
         : SourceMgr(SourceMgr), ActiveDiagnostic(),
-          TransactionStrings(TransactionAllocator) {}
+          TransactionStrings(TransactionAllocator),
+          DiagnosticStringsSaver(DiagnosticStringsAllocator) {}
 
     /// hadAnyError - return true if any *error* diagnostics have been emitted.
     bool hadAnyError() const { return state.hadAnyError(); }
@@ -1136,7 +1147,7 @@ namespace swift {
     }
 
     /// Apply rules specifing what warnings should or shouldn't be treated as
-    /// errors. For group rules the string is either a group name defined by
+    /// errors. For group rules the string is a group name defined by
     /// DiagnosticGroups.def
     /// Rules are applied in order they appear in the vector.
     /// In case the vector contains rules affecting the same diagnostic ID
@@ -1144,11 +1155,11 @@ namespace swift {
     void setWarningsAsErrorsRules(const std::vector<WarningAsErrorRule> &rules);
 
     /// Whether to print diagnostic names after their messages
-    void setPrintDiagnosticNames(bool val) {
-      printDiagnosticNames = val;
+    void setPrintDiagnosticNamesMode(PrintDiagnosticNamesMode val) {
+      printDiagnosticNamesMode = val;
     }
-    bool getPrintDiagnosticNames() const {
-      return printDiagnosticNames;
+    PrintDiagnosticNamesMode getPrintDiagnosticNamesMode() const {
+      return printDiagnosticNamesMode;
     }
 
     void setDiagnosticDocumentationPath(std::string path) {
@@ -1169,8 +1180,7 @@ namespace swift {
     void setLocalization(StringRef locale, StringRef path) {
       assert(!locale.empty());
       assert(!path.empty());
-      localization = diag::LocalizationProducer::producerFor(
-          locale, path, getPrintDiagnosticNames());
+      localization = diag::LocalizationProducer::producerFor(locale, path);
     }
 
     void ignoreDiagnostic(DiagID id) {
@@ -1426,8 +1436,9 @@ namespace swift {
   public:
     DiagnosticKind declaredDiagnosticKindFor(const DiagID id);
 
-    llvm::StringRef diagnosticStringFor(const DiagID id,
-                                        bool printDiagnosticNames);
+    llvm::StringRef
+    diagnosticStringFor(const DiagID id,
+                        PrintDiagnosticNamesMode printDiagnosticNamesMode);
 
     static llvm::StringRef diagnosticIDStringFor(const DiagID id);
 

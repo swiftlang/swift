@@ -648,7 +648,6 @@ private:
     case Node::Kind::SymbolicExtendedExistentialType:
     case Node::Kind::HasSymbolQuery:
     case Node::Kind::ObjectiveCProtocolSymbolicReference:
-    case Node::Kind::LifetimeDependence:
     case Node::Kind::DependentGenericInverseConformanceRequirement:
     case Node::Kind::DependentGenericParamValueMarker:
       return false;
@@ -1814,21 +1813,6 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "@noDerivative ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
-  case Node::Kind::LifetimeDependence: {
-    auto kind = (MangledLifetimeDependenceKind)Node->getChild(0)->getIndex();
-    switch (kind) {
-    case MangledLifetimeDependenceKind::Inherit:
-      Printer << "inherit lifetime dependence: ";
-      break;
-    case MangledLifetimeDependenceKind::Scope:
-      Printer << "scope lifetime dependence: ";
-      break;
-    }
-    print(Node->getChild(1), depth + 1);
-    Printer << " ";
-    print(Node->getChild(2), depth + 1);
-    return nullptr;
-  }
   case Node::Kind::NonObjCAttribute:
     Printer << "@nonobjc ";
     return nullptr;

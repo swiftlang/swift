@@ -35,19 +35,19 @@
 
 //--- function_bodies.swift
 
-// FIXME: The access level of some of these fix-its should be public/package instead of internal.
+// FIXME: The access level on the fix-it for PackageUsesOnly is wrong.
 import Swift // Just here to anchor the fix-its
 // expected-note      {{add import of module 'InternalUsesOnly'}}{{1-1=internal import InternalUsesOnly\n}}
 // expected-note@-1   {{add import of module 'InternalUsesOnlyDefaultedImport'}}{{1-1=import InternalUsesOnlyDefaultedImport\n}}
-// expected-note@-2   {{add import of module 'PackageUsesOnly'}}{{1-1=internal import PackageUsesOnly\n}}
-// expected-note@-3   {{add import of module 'PublicUsesOnly'}}{{1-1=internal import PublicUsesOnly\n}}
+// expected-note@-2   {{add import of module 'PackageUsesOnly'}}{{1-1=public import PackageUsesOnly\n}}
+// expected-note@-3   {{add import of module 'PublicUsesOnly'}}{{1-1=public import PublicUsesOnly\n}}
 // expected-note@-4   {{add import of module 'PublicUsesOnlyDefaultedImport'}}{{1-1=import PublicUsesOnlyDefaultedImport\n}}
-// expected-note@-5 3 {{add import of module 'MixedUses'}}{{1-1=internal import MixedUses\n}}
+// expected-note@-5 3 {{add import of module 'MixedUses'}}{{1-1=public import MixedUses\n}}
 // expected-note@-6   {{add import of module 'InternalUsesOnlyTransitivelyImported'}}{{1-1=internal import InternalUsesOnlyTransitivelyImported\n}}
 // expected-note@-7   {{add import of module 'InternalUsesOnlySPIOnly'}}{{1-1=internal import InternalUsesOnlySPIOnly\n}}
 // expected-public-by-default-note@-8     {{add import of module 'InternalUsesOnlyDefaultedImportSPIOnly'}}{{1-1=@_spiOnly import InternalUsesOnlyDefaultedImportSPIOnly\n}}
 // expected-internal-by-default-note@-9   {{add import of module 'InternalUsesOnlyDefaultedImportSPIOnly'}}{{1-1=import InternalUsesOnlyDefaultedImportSPIOnly\n}}
-// expected-note@-10  {{add import of module 'PublicUsesOnlySPIOnly'}}{{1-1=internal import PublicUsesOnlySPIOnly\n}}
+// expected-note@-10  {{add import of module 'PublicUsesOnlySPIOnly'}}{{1-1=@_spiOnly public import PublicUsesOnlySPIOnly\n}}
 
 
 func internalFunc(_ x: Int) {

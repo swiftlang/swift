@@ -67,7 +67,7 @@ bool CodeCompletionDiagnostics::getDiagnostics(
     typename swift::detail::PassArgument<ArgTypes>::type... VArgs) {
   DiagID id = ID.ID;
   std::vector<DiagnosticArgument> DiagArgs{std::move(VArgs)...};
-  auto format = Engine.diagnosticStringFor(id, /*printDiagnosticNames=*/false);
+  auto format = Engine.diagnosticStringFor(id, PrintDiagnosticNamesMode::None);
   DiagnosticEngine::formatDiagnosticText(Out, format, DiagArgs);
   severity = getSeverity(Engine.declaredDiagnosticKindFor(id));
 

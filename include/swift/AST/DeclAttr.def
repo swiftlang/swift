@@ -506,6 +506,10 @@ SIMPLE_DECL_ATTR(unsafe, Unsafe,
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   160)
 
+DECL_ATTR(lifetime, Lifetime,
+  OnAccessor | OnConstructor | OnFunc | OnSubscript | LongAttribute | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  161)
+
 LAST_DECL_ATTR(Unsafe)
 
 #undef DECL_ATTR_ALIAS

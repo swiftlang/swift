@@ -1394,9 +1394,6 @@ def platform_c_calling_convention_EQ :
     Joined<["-"], "experimental-platform-c-calling-convention=">,
     Alias<platform_c_calling_convention>;
 
-def disable_experimental_parser_round_trip : Flag<["-"],
-  "disable-experimental-parser-round-trip">,
-  HelpText<"Disable round trip through the new swift parser">;
 
 def disable_sending_args_and_results_with_region_isolation : Flag<["-"],
   "disable-sending-args-and-results-with-region-based-isolation">,
@@ -1416,3 +1413,8 @@ def platform_availability_inheritance_map_path
     HelpText<"Path of the platform inheritance platform map">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
+
+def disable_experimental_parser_round_trip : Flag<["-"],
+  "disable-experimental-parser-round-trip">,
+  HelpText<"Disable round trip through the new swift parser">,
+  Flags<[FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable]>;

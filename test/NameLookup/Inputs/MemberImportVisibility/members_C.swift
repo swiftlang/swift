@@ -12,6 +12,13 @@ extension X {
   public struct NestedInC {}
 }
 
+// Members with the same names are also declared in B.
+extension X {
+  public init(_ x: Bool) { self.init() }
+  public func ambiguous() -> Bool { return false }
+  @_disfavoredOverload public func ambiguousDisfavored() -> Bool { return false }
+}
+
 extension Y {
   public func YinC() { }
 

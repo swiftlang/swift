@@ -620,6 +620,10 @@ public:
     return diagnose(*commonFixes.front().first);
   }
 
+  /// Assess the impact this fix is going to have at the given location.
+  static unsigned assessImpact(ConstraintSystem &cs,
+                               ConstraintLocator *atLoc);
+
   static TreatRValueAsLValue *create(ConstraintSystem &cs,
                                      ConstraintLocator *locator);
 
@@ -1926,14 +1930,11 @@ public:
 };
 
 class AllowInaccessibleMember final : public AllowInvalidMemberRef {
-  bool IsMissingImport;
-
   AllowInaccessibleMember(ConstraintSystem &cs, Type baseType,
                           ValueDecl *member, DeclNameRef name,
-                          ConstraintLocator *locator, bool isMissingImport)
+                          ConstraintLocator *locator)
       : AllowInvalidMemberRef(cs, FixKind::AllowInaccessibleMember, baseType,
-                              member, name, locator),
-        IsMissingImport(isMissingImport) {}
+                              member, name, locator) {}
 
 public:
   std::string getName() const override {
@@ -1948,8 +1949,7 @@ public:
 
   static AllowInaccessibleMember *create(ConstraintSystem &cs, Type baseType,
                                          ValueDecl *member, DeclNameRef name,
-                                         ConstraintLocator *locator,
-                                         bool isMissingImport);
+                                         ConstraintLocator *locator);
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowInaccessibleMember;
