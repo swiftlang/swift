@@ -86,7 +86,7 @@ extension RawSpan {
     _unsafeStart pointer: UnsafeRawPointer,
     byteCount: Int
   ) -> dependsOn(immortal) Self {
-    precondition(byteCount >= 0, "Count must not be negative")
+    _precondition(byteCount >= 0, "Count must not be negative")
     self.init(_unchecked: pointer, byteCount: byteCount)
   }
 
@@ -138,7 +138,7 @@ extension RawSpan {
     _unsafeStart pointer: UnsafePointer<T>,
     count: Int
   ) -> dependsOn(immortal) Self {
-    precondition(count >= 0, "Count must not be negative")
+    _precondition(count >= 0, "Count must not be negative")
     self.init(
       _unchecked: pointer, byteCount: count*MemoryLayout<T>.stride
     )
@@ -259,7 +259,7 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @usableFromInline func _extracting(_ bounds: Range<Int>) -> Self {
-    precondition(boundsContain(bounds))
+    _precondition(boundsContain(bounds))
     return _extracting(unchecked: bounds)
   }
 
@@ -434,7 +434,7 @@ extension RawSpan {
   public func unsafeLoad<T>(
     fromByteOffset offset: Int = 0, as: T.Type
   ) -> T {
-    precondition(boundsContain(
+    _precondition(boundsContain(
       Range(uncheckedBounds: (offset, offset+MemoryLayout<T>.size))
     ))
     return unsafeLoad(fromUncheckedByteOffset: offset, as: T.self)
@@ -485,7 +485,7 @@ extension RawSpan {
   public func unsafeLoadUnaligned<T: BitwiseCopyable>(
     fromByteOffset offset: Int = 0, as: T.Type
   ) -> T {
-    precondition(boundsContain(
+    _precondition(boundsContain(
       Range(uncheckedBounds: (offset, offset+MemoryLayout<T>.size))
     ))
     return unsafeLoadUnaligned(fromUncheckedByteOffset: offset, as: T.self)
@@ -542,7 +542,7 @@ extension RawSpan {
   /// Returns: A range of offsets within `self`
   @_alwaysEmitIntoClient
   public func offsets(of span: borrowing Self) -> Range<Int> {
-    precondition(contains(span))
+    _precondition(contains(span))
     var (s, e) = (0, 0)
     if _pointer != nil && span._pointer != nil {
       s = _start.distance(to: span._start)
@@ -572,7 +572,7 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @usableFromInline func _extracting(first maxLength: Int) -> Self {
-    precondition(maxLength >= 0, "Can't have a prefix of negative length.")
+    _precondition(maxLength >= 0, "Can't have a prefix of negative length.")
     let newCount = min(maxLength, byteCount)
     return Self(_unchecked: _pointer, byteCount: newCount)
   }
@@ -598,7 +598,7 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @usableFromInline func _extracting(droppingLast k: Int) -> Self {
-    precondition(k >= 0, "Can't drop a negative number of elements.")
+    _precondition(k >= 0, "Can't drop a negative number of elements.")
     let dc = min(k, byteCount)
     return Self(_unchecked: _pointer, byteCount: byteCount&-dc)
   }
@@ -625,7 +625,7 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @usableFromInline func _extracting(last maxLength: Int) -> Self {
-    precondition(maxLength >= 0, "Can't have a suffix of negative length.")
+    _precondition(maxLength >= 0, "Can't have a suffix of negative length.")
     let newCount = min(maxLength, byteCount)
     let newStart = _pointer?.advanced(by: byteCount&-newCount)
     return Self(_unchecked: newStart, byteCount: newCount)
@@ -652,7 +652,7 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @usableFromInline func _extracting(droppingFirst k: Int) -> Self {
-    precondition(k >= 0, "Can't drop a negative number of elements.")
+    _precondition(k >= 0, "Can't drop a negative number of elements.")
     let dc = min(k, byteCount)
     let newStart = _pointer?.advanced(by: dc)
     return Self(_unchecked: newStart, byteCount: byteCount&-dc)
