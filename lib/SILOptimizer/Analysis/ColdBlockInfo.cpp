@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILModule.h"
@@ -266,12 +267,17 @@ bool ColdBlockInfo::inferFromEdgeProfile(SILBasicBlock *BB) {
 }
 
 void ColdBlockInfo::analyze(SILFunction *fn) {
+  SWIFT_DEFER { changedMap = false; };
+
+  LLVM_DEBUG(llvm::dbgs()
+    << "ColdBlockInfo::analyze on " << fn->getName() << "\n");
   LLVM_DEBUG(llvm::dbgs() << "--> Before Stage 1\n");
   LLVM_DEBUG(dump());
 
   BasicBlockSet foundExpectedCond(fn);
 
   // Stage 1: Seed the graph with warm/cold blocks.
+  changedMap = false;
   for (auto &BB : *fn) {
     auto *term = BB.getTerminator();
 
@@ -304,9 +310,20 @@ void ColdBlockInfo::analyze(SILFunction *fn) {
 
   LLVM_DEBUG(llvm::dbgs() << "--> After Stage 1; changedMap = "
                           << changedMap << "\n");
-  LLVM_DEBUG(dump(); changedMap = false);
+  LLVM_DEBUG(dump());
+
+  /// Latter stages are only for propagating coldness from other cold blocks.
+  ///
+  /// If we haven't changed the energy map at all in Stage 1, then we didn't
+  /// find any new coldness, so stop early.
+  if (!changedMap) {
+    LLVM_DEBUG(llvm::dbgs()
+      << "--> Stopping early in "<< fn->getName() << "\n");
+    return;
+  }
 
   // Stage 2: Propagate via dominators
+  changedMap = false;
   SmallVector<SILBasicBlock *, 8> scratch;
   for (auto &BB : *fn) {
     scratch.clear();
@@ -354,9 +371,10 @@ void ColdBlockInfo::analyze(SILFunction *fn) {
 
   LLVM_DEBUG(llvm::dbgs() << "--> After Stage 2; changedMap = "
                           << changedMap << "\n");
-  LLVM_DEBUG(dump(); changedMap = false);
+  LLVM_DEBUG(dump());
 
   /// Stage 3: Backwards propagate coldness from successors.
+  changedMap = false;
   auto isColdBlock = [&](auto *bb) { return isCold(bb); };
 
   unsigned completedIters = 0;
@@ -398,7 +416,7 @@ void ColdBlockInfo::analyze(SILFunction *fn) {
                           " | converged after " << completedIters << " iters"
                           << " over " << fn->size() << " blocks; "
                           << " changedMap = " << changedMap << "\n");
-  LLVM_DEBUG(dump(); changedMap = false);
+  LLVM_DEBUG(dump());
 }
 
 inline bool isColdEnergy(ColdBlockInfo::Energy e) {
@@ -416,15 +434,21 @@ bool ColdBlockInfo::isCold(const SILBasicBlock *BB) const {
 
 void ColdBlockInfo::resetToCold(const SILBasicBlock *BB) {
   auto &entry = EnergyMap.getOrInsertDefault(BB);
-  LLVM_DEBUG(isColdEnergy(entry) ? false : changedMap = true);
+  if (isColdEnergy(entry))
+    return;
+
   entry.removeAll();
   entry.insert(State::Cold);
+  changedMap = true;
 }
 
 void ColdBlockInfo::set(const SILBasicBlock *BB, State::Temperature temp) {
   auto &entry = EnergyMap.getOrInsertDefault(BB);
-  LLVM_DEBUG(entry.contains(temp) ? false : changedMap = true);
+  if (entry.contains(temp))
+    return;
+
   entry.insert(temp);
+  changedMap = true;
 }
 
 void ColdBlockInfo::setExpectedCondition(CondBranchInst *CBI, ExpectedValue value) {

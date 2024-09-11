@@ -54,14 +54,16 @@ private:
   PostDominanceAnalysis *PDA;
 
   /// Each block in this map has been determined to be cold and/or warm.
+  /// Make sure to always use the set/resetToCold methods to update this!
   llvm::DenseMap<const SILBasicBlock*, Energy> EnergyMap;
-  bool changedMap = false;
 
   // This is a cache and shouldn't be copied around.
   ColdBlockInfo(const ColdBlockInfo &) = delete;
   ColdBlockInfo &operator=(const ColdBlockInfo &) = delete;
   LLVM_DUMP_METHOD void dump() const;
 
+  /// Tracks whether any information was changed in the energy map.
+  bool changedMap = false;
   void resetToCold(const SILBasicBlock *BB);
   void set(const SILBasicBlock *BB, State::Temperature temp);
 

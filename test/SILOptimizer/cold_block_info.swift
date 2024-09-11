@@ -41,13 +41,23 @@ public func goBoom(_ i: Int?) -> Int {
 }
 
 
-// CHECK-LABEL: --> Final for $s4main19goBoom_preconditionyySbF
-// CHECK: {
-// CHECK-NEXT: STATISTICS: warm 0 | cold 0
-// CHECK-NEXT: }
+// CHECK-LABEL: --> Stopping early in $s4main19goBoom_preconditionyySbF
 public func goBoom_precondition(_ b: Bool) {
-  // NOTE: cond_fail instructions aren't terminators, so there's nothing cold.
+  // NOTE: cond_fail instructions from preconditions aren't terminators,
+  // so there's nothing cold in this function!
   precondition(b)
+
+  var x = random()
+  precondition(x >= 0)
+
+  if (x > 100) {
+    x = 0
+  }
+
+  for i in 0..<x {
+    precondition(i <= 100)
+    dump(i)
+  }
 }
 
 // CHECK-LABEL: --> Final for $s4main17goBoom_fatalErroryySiF
