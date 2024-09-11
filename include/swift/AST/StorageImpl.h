@@ -55,6 +55,22 @@ enum class AccessorKind {
 #undef LAST_ACCESSOR
 };
 
+inline bool requiresFeatureCoroutineAccessors(AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
+  case AccessorKind::Set:
+  case AccessorKind::Read:
+  case AccessorKind::Modify:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
+  case AccessorKind::Address:
+  case AccessorKind::MutableAddress:
+  case AccessorKind::Init:
+    return false;
+  }
+}
+
 inline bool isYieldingAccessor(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Read:

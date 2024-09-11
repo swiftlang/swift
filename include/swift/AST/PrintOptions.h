@@ -390,6 +390,9 @@ struct PrintOptions {
   /// Suppress ~Escapable types and lifetime dependence annotations
   bool SuppressNonEscapableTypes = false;
 
+  /// Suppress modify/read accessors.
+  bool SuppressCoroutineAccessors = false;
+
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {
       DeclAttrKind::Transparent, DeclAttrKind::Effects,

@@ -3164,6 +3164,13 @@ suppressingFeatureNonescapableTypes(PrintOptions &options,
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
+static void
+suppressingFeatureCoroutineAccessors(PrintOptions &options,
+                                     llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressCoroutineAccessors, true);
+  action();
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
@@ -4038,6 +4045,10 @@ bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
 }
 
 void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
+  if (Options.SuppressCoroutineAccessors &&
+      requiresFeatureCoroutineAccessors(decl->getAccessorKind())) {
+    return;
+  }
   printDocumentationComment(decl);
   printAttributes(decl);
   // Explicitly print 'mutating' and 'nonmutating' if needed.

@@ -310,6 +310,14 @@ static bool usesFeatureValueGenerics(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureCoroutineAccessors(Decl *decl) {
+  auto *accessor = dyn_cast<AccessorDecl>(decl);
+  if (!accessor) {
+    return false;
+  }
+  return requiresFeatureCoroutineAccessors(accessor->getAccessorKind());
+}
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------
