@@ -292,7 +292,7 @@ extension RawSpan {
   }
 
   @_alwaysEmitIntoClient
-  public mutating func _shrink(unchecked bounds: Range<Int>) {
+  public mutating func _shrink(toUnchecked bounds: Range<Int>) {
     self = _extracting(unchecked: bounds)
   }
 
@@ -342,7 +342,7 @@ extension RawSpan {
   }
 
   @_alwaysEmitIntoClient
-  public mutating func _shrink(unchecked bounds: some RangeExpression<Int>) {
+  public mutating func _shrink(toUnchecked bounds: some RangeExpression<Int>) {
     self = _extracting(unchecked: bounds)
   }
 

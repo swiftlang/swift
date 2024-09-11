@@ -488,9 +488,14 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  public func extracting(_ bounds: Range<Int>) -> Self {
+  @usableFromInline func _extracting(_ bounds: Range<Int>) -> Self {
     _precondition(boundsContain(bounds))
-    return extracting(unchecked: bounds)
+    return _extracting(unchecked: bounds)
+  }
+
+  @_alwaysEmitIntoClient
+  public mutating func _shrink(to bounds: Range<Int>) {
+    self = _extracting(bounds)
   }
 
   /// Constructs a new span over the items within the supplied range of
@@ -509,13 +514,18 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  public func extracting(unchecked bounds: Range<Int>) -> Self {
+  @usableFromInline func _extracting(unchecked bounds: Range<Int>) -> Self {
     Span(
       _unchecked: _pointer?.advanced(by: bounds.lowerBound*MemoryLayout<Element>.stride),
       count: bounds.count
     )
   }
 
+  @_alwaysEmitIntoClient
+  public mutating func _shrink(toUnchecked bounds: Range<Int>) {
+    self = _extracting(unchecked: bounds)
+  }
+
   /// Constructs a new span over the items within the supplied range of
   /// positions within this span.
   ///
@@ -530,8 +540,13 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  public func extracting(_ bounds: some RangeExpression<Int>) -> Self {
-    extracting(bounds.relative(to: _indices))
+  @usableFromInline func _extracting(_ bounds: some RangeExpression<Int>) -> Self {
+    _extracting(bounds.relative(to: _indices))
+  }
+
+  @_alwaysEmitIntoClient
+  public mutating func _shrink(to bounds: some RangeExpression<Int>) {
+    self = _extracting(bounds)
   }
 
   /// Constructs a new span over the items within the supplied range of
@@ -550,10 +565,15 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  public func extracting(
+  @usableFromInline func _extracting(
     uncheckedBounds bounds: some RangeExpression<Int>
   ) -> Self {
-    extracting(unchecked: bounds.relative(to: _indices))
+    _extracting(unchecked: bounds.relative(to: _indices))
+  }
+
+  @_alwaysEmitIntoClient
+  public mutating func _shrink(toUnchecked bounds: some RangeExpression<Int>) {
+    self = _extracting(unchecked: bounds)
   }
 
   /// Constructs a new span over all the items of this span.
@@ -566,7 +586,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  public func extracting(_: UnboundedRange) -> Self {
+  @usableFromInline func _extracting(_: UnboundedRange) -> Self {
     self
   }
 }
@@ -706,10 +726,15 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  public func extracting(first maxLength: Int) -> Self {
+  @usableFromInline func _extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length.")
     let newCount = min(maxLength, count)
     return Self(_unchecked: _pointer, count: newCount)
+  }
+
+  @_alwaysEmitIntoClient
+  public mutating func _shrink(toFirst maxLength: Int) {
+    self = _extracting(first: maxLength)
   }
 
   /// Returns a span over all but the given number of trailing elements.
@@ -727,10 +752,15 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  public func extracting(droppingLast k: Int) -> Self {
+  @usableFromInline func _extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements.")
     let droppedCount = min(k, count)
     return Self(_unchecked: _pointer, count: count&-droppedCount)
+  }
+
+  @_alwaysEmitIntoClient
+  public mutating func _shrink(droppingLast k: Int) {
+    self = _extracting(droppingLast: k)
   }
 
   /// Returns a span containing the final elements of the span,
@@ -749,11 +779,16 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  public func extracting(last maxLength: Int) -> Self {
+  @usableFromInline func _extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length.")
     let newCount = min(maxLength, count)
     let newStart = _pointer?.advanced(by: (count&-newCount)*MemoryLayout<Element>.stride)
     return Self(_unchecked: newStart, count: newCount)
+  }
+
+  @_alwaysEmitIntoClient
+  public mutating func _shrink(toLast maxLength: Int) {
+    self = _extracting(last: maxLength)
   }
 
   /// Returns a span over all but the given number of initial elements.
@@ -771,10 +806,15 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  public func extracting(droppingFirst k: Int) -> Self {
+  @usableFromInline func _extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements.")
     let droppedCount = min(k, count)
     let newStart = _pointer?.advanced(by: droppedCount*MemoryLayout<Element>.stride)
     return Self(_unchecked: newStart, count: count&-droppedCount)
+  }
+
+  @_alwaysEmitIntoClient
+  public mutating func _shrink(droppingFirst k: Int) {
+    self = _extracting(droppingFirst: k)
   }
 }
