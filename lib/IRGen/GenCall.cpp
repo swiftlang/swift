@@ -3031,7 +3031,7 @@ public:
 
         if (nativeSchema.requiresIndirect() ||
             errorSchema.shouldReturnTypedErrorIndirectly() ||
-            errorSchema.empty()) { // direct empty typed errors are passed
+            (errorSchema.empty() && fnConv.hasIndirectSILResults())) { // direct empty typed errors are passed
                                    // indirectly for compatibility with generic
                                    // functions.
           // Return the error indirectly.

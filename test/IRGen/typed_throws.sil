@@ -489,3 +489,30 @@ bb1(%12 : $()):
 bb2(%19 : $Never):
   unreachable
 }
+
+sil @callee2 : $@convention(thin) @async (Int) -> (Int, @error Never) {
+bb0(%0 :  $Int):
+  %5 = integer_literal $Builtin.Int64, 66
+  %6 = struct $Int (%5 : $Builtin.Int64)
+  return %6 : $Int
+}
+
+// CHECK: define{{.*}} swifttailcc void @callee2(ptr swiftasync %0, i64 %1)
+
+// CHECK: define{{.*}} swifttailcc void @caller2(ptr swiftasync %0)
+// CHECK: [[CTXT:%.*]] = call swiftcc ptr @swift_task_alloc
+// CHECK: @llvm.coro.suspend.async.sl_p0i64p0s({{.*}} ptr @callee2, ptr [[CTXT]], i64 67)
+sil @caller2 : $@convention(thin) @async () -> () {
+bb0:
+  %5 = integer_literal $Builtin.Int64, 67
+  %6 = struct $Int (%5 : $Builtin.Int64)
+  %10 = function_ref @callee2 : $@convention(thin) @async (Int) -> (Int, @error Never)
+  try_apply %10(%6) : $@convention(thin) @async (Int) -> (Int, @error Never), normal bb1, error bb2
+
+bb1(%12 : $Int):
+  %17 = tuple ()
+  return %17 : $()
+
+bb2(%19 : $Never):
+  unreachable
+}
