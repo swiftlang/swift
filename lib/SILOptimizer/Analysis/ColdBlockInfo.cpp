@@ -144,11 +144,13 @@ ColdBlockInfo::searchForExpectedValue(SILValue Cond,
       auto *predBB = Pair.first;
       auto predArg = Pair.second;
 
+      // We only want to consider values coming from a non-cold path of preds.
       if (isCold(predBB))
         continue;
 
       std::optional<bool> predecessorValue;
 
+      // Look for an integer literal, otherwise, recurse.
       if (auto *IL = dyn_cast<IntegerLiteralInst>(predArg)) {
         predecessorValue = IL->getValue().getBoolValue();
       } else {
@@ -274,6 +276,8 @@ void ColdBlockInfo::analyze(SILFunction *fn) {
   LLVM_DEBUG(llvm::dbgs() << "--> Before Stage 1\n");
   LLVM_DEBUG(dump());
 
+  // The set of blocks for which we can skip searching for an expected
+  // conditional value, as we've already determined which successor is cold.
   BasicBlockSet foundExpectedCond(fn);
 
   // Stage 1: Seed the graph with warm/cold blocks.
