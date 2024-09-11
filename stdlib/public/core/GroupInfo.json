@@ -199,7 +199,8 @@
   ],
   "Span": [
     "RawSpan.swift",
-    "Span.swift"
+    "Span.swift",
+    "StdlibSpanExtensions.swift"
   ],
   "Protocols": [
     "CompilerProtocols.swift",
