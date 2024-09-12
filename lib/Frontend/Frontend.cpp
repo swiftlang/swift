@@ -564,7 +564,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
   setupStatsReporter();
 
   if (setupDiagnosticVerifierIfNeeded()) {
-    Error = "Setting up diagnostics verified failed";
+    Error = "Setting up diagnostics verifier failed";
     return true;
   }
 
