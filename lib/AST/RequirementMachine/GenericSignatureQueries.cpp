@@ -48,30 +48,21 @@ using namespace rewriting;
 /// Collects all requirements on a type parameter that are used to construct
 /// its ArchetypeType in a GenericEnvironment.
 GenericSignature::LocalRequirements
-RequirementMachine::getLocalRequirements(
-    Type depType,
-    ArrayRef<GenericTypeParamType *> genericParams) const {
+RequirementMachine::getLocalRequirements(Type depType) const {
   auto term = Context.getMutableTermForType(depType->getCanonicalType(),
                                             /*proto=*/nullptr);
   System.simplify(term);
   verify(term);
 
   GenericSignature::LocalRequirements result;
-  result.anchor = Map.getTypeForTerm(term, genericParams);
-  result.packShape = getReducedShape(depType, genericParams);
+  result.packShape = getReducedShape(depType, {});
 
   auto *props = Map.lookUpProperties(term);
   if (!props)
     return result;
 
-  if (props->isConcreteType()) {
-    result.concreteType = props->getConcreteType({}, term, Map);
-    return result;
-  }
-
-  if (props->hasSuperclassBound()) {
+  if (props->hasSuperclassBound())
     result.superclass = props->getSuperclassBound({}, term, Map);
-  }
 
   for (const auto *proto : props->getConformsTo())
     result.protos.push_back(const_cast<ProtocolDecl *>(proto));

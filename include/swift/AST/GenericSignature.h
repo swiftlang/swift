@@ -170,9 +170,6 @@ public:
   /// Stores a set of requirements on a type parameter. Used by
   /// GenericEnvironment for building archetypes.
   struct LocalRequirements {
-    Type anchor;
-
-    Type concreteType;
     Type superclass;
 
     RequiredProtocols protos;

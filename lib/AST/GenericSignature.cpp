@@ -327,8 +327,7 @@ GenericSignature::LocalRequirements
 GenericSignatureImpl::getLocalRequirements(Type depType) const {
   assert(depType->isTypeParameter() && "Expected a type parameter here");
 
-  return getRequirementMachine()->getLocalRequirements(
-      depType, getGenericParams());
+  return getRequirementMachine()->getLocalRequirements(depType);
 }
 
 ASTContext &GenericSignatureImpl::getASTContext() const {
