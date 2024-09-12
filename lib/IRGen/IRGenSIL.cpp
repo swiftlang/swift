@@ -2183,8 +2183,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
       auto &errorTI = cast<FixedTypeInfo>(IGF.getTypeInfo(inContextErrorType));
       auto &native = resultTI.nativeReturnValueSchema(IGF.IGM);
       auto &nativeError = errorTI.nativeReturnValueSchema(IGF.IGM);
-      if (funcTy->isAsync() || fnConv.hasIndirectSILResults() ||
-          native.requiresIndirect() ||
+      if (funcTy->isAsync() || native.requiresIndirect() ||
           nativeError.shouldReturnTypedErrorIndirectly()) {
         IGF.setCallerTypedErrorResultSlot(
             Address(emission->getCallerTypedErrorResultArgument(),
@@ -3926,8 +3925,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
       auto &resultSchema = resultTI.nativeReturnValueSchema(IGM);
       auto &errorSchema = errorTI.nativeReturnValueSchema(IGM);
 
-      if (isAsync() || substConv.hasIndirectSILResults() ||
-          substConv.hasIndirectSILErrorResults() ||
+      if (isAsync() || substConv.hasIndirectSILErrorResults() ||
           resultSchema.requiresIndirect() ||
           errorSchema.shouldReturnTypedErrorIndirectly()) {
         Explosion errorValue;
@@ -4394,7 +4392,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
            funcLang == SILFunctionLanguage::C && "Need to handle all cases");
     SILType errorType;
     if (fnType->hasErrorResult() && conv.isTypedError() &&
-        !conv.hasIndirectSILResults() && !conv.hasIndirectSILErrorResults()) {
+        !conv.hasIndirectSILErrorResults()) {
       errorType =
           conv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext());
     }
@@ -4449,8 +4447,7 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
         auto &errorSchema = errorTI.nativeReturnValueSchema(IGM);
 
         Builder.CreateStore(flag, getCallerErrorResultSlot());
-        if (conv.hasIndirectSILResults() || conv.hasIndirectSILErrorResults() ||
-            resultSchema.requiresIndirect() ||
+        if (resultSchema.requiresIndirect() ||
             errorSchema.shouldReturnTypedErrorIndirectly()) {
           errorTI.initialize(*this, errorResult, getCallerTypedErrorResultSlot(),
                              false);

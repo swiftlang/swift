@@ -144,13 +144,3 @@ func directErrorMergePtrAndInt(x: Bool, y: AnyObject) throws(SmallError) -> (Any
 
   return try directErrorMergePtrAndInt(x: !x, y: y)
 }
-
-// This used to crash at compile time, because it was trying to use a direct
-// error return in combination with an indirect result, which is illegal.
-func genericThrows<T>(x: Bool, y: T) throws(SmallError) -> T {
-  guard x else {
-    throw SmallError(x: 1)
-  }
-
-  return y
-}
