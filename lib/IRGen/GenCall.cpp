@@ -416,13 +416,10 @@ CombinedResultAndErrorType irgen::combineResultAndTypedErrorType(
     assert(error->isIntOrPtrTy() &&
            "Direct errors must only consist of int or ptr values");
     result.errorValueMapping.push_back(combined.size());
-
-    if (res == error) {
+    if (res->getPrimitiveSizeInBits() >= error->getPrimitiveSizeInBits()) {
       combined.push_back(res);
     } else {
-      auto maxSize = std::max(IGM.DataLayout.getTypeSizeInBits(res),
-                              IGM.DataLayout.getTypeSizeInBits(error));
-      combined.push_back(llvm::IntegerType::get(IGM.getLLVMContext(), maxSize));
+      combined.push_back(error);
     }
 
     ++resIt;
@@ -2868,12 +2865,10 @@ public:
         if (auto *structTy = dyn_cast<llvm::StructType>(
                 nativeSchema.getExpandedType(IGF.IGM))) {
           for (unsigned i = 0, e = structTy->getNumElements(); i < e; ++i) {
-            auto *nativeTy = structTy->getElementType(i);
-            resultExplosion.add(convertIfNecessary(nativeTy, values[i]));
+            resultExplosion.add(values[i]);
           }
         } else {
-          resultExplosion.add(
-              convertIfNecessary(combined.combinedTy, values[0]));
+          resultExplosion.add(values[0]);
         }
         out = nativeSchema.mapFromNative(IGF.IGM, IGF, resultExplosion,
                                          resultType);
@@ -5744,9 +5739,6 @@ void IRGenFunction::emitScalarReturn(SILType returnResultType,
                 eltTy->getPrimitiveSizeInBits()) {
           assert(nativeTy->getPrimitiveSizeInBits() >
                  eltTy->getPrimitiveSizeInBits());
-          if (eltTy->isPointerTy()) {
-            return Builder.CreatePtrToInt(elt, nativeTy);
-          }
           return Builder.CreateZExt(elt, nativeTy);
         }
         return elt;

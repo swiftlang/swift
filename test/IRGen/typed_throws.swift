@@ -115,19 +115,3 @@ func catchesSmallError() -> Int {
     return error.x
   }
 }
-
-struct MyError: Error {
-  let x: AnyObject
-}
-
-// CHECK: define hidden swiftcc { float, i64, float } @"$s12typed_throws8mayThrow1x1ySf_s5Int32VSftSb_yXltAA7MyErrorVYKF"
-// CHECK:   [[CONVERTED:%.*]] = ptrtoint ptr {{%.*}} to i64
-// CHECK:   insertvalue { float, i64, float } undef, i64 [[CONVERTED]], 1
-// CHECK: }
-@inline(never)
-func mayThrow(x: Bool, y: AnyObject) throws(MyError) -> (Float, Int32, Float) {
-  guard x else {
-    throw MyError(x: y)
-  }
-  return (3.0, 4, 5.0)
-}
