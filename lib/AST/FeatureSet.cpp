@@ -300,6 +300,7 @@ static bool usesFeatureAllowUnsafeAttribute(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(WarnUnsafe)
+UNINTERESTING_FEATURE(SafeInterop)
 
 static bool usesFeatureValueGenerics(Decl *decl) {
   auto genericContext = decl->getAsGenericContext();
