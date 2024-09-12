@@ -157,14 +157,14 @@ private:
   friend ArchetypeType;
   friend QueryInterfaceTypeSubstitutions;
 
-  /// Add a mapping of a generic parameter to a specific type (which may be
-  /// an archetype)
-  void addMapping(GenericParamKey key, Type contextType);
+  /// Add a mapping of a type parameter to a contextual type, usually
+  /// an archetype.
+  void addMapping(CanType depType, Type contextType);
 
-  /// Retrieve the mapping for the given generic parameter, if present.
+  /// Retrieve the mapping for the given type parameter, if present.
   ///
   /// This is only useful when lazily populating a generic environment.
-  std::optional<Type> getMappingIfPresent(GenericParamKey key) const;
+  Type getMappingIfPresent(CanType depType) const;
 
 public:
   GenericSignature getGenericSignature() const {

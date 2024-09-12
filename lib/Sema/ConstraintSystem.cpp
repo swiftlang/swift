@@ -2051,7 +2051,7 @@ static void bindArchetypesFromContext(
   // Find the innermost non-type context.
   for (const auto *parentDC = outerDC;
        !parentDC->isModuleScopeContext();
-       parentDC = parentDC->getParent()) {
+       parentDC = parentDC->getParentForLookup()) {
     if (parentDC->isTypeContext()) {
       if (parentDC != outerDC && parentDC->getSelfProtocolDecl()) {
         auto selfTy = parentDC->getSelfInterfaceType();
