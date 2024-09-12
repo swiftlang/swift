@@ -205,14 +205,3 @@ func mayThrowAsyncTiny(x: Bool) async throws(TinyError) -> Bool {
 func callsMayThrowAsyncTiny(x: Bool) async {
   _ = try! await mayThrowAsyncTiny(x: x)
 }
-
-struct EmptyError: Error {}
-
-@available(SwiftStdlib 6.0, *)
-func mayThrowEmptyErrorAsync(x: Bool) async throws(EmptyError) -> String? {
-  guard x else {
-    throw EmptyError()
-  }
-
-  return ""
-}
