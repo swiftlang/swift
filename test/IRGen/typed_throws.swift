@@ -40,8 +40,8 @@ func buildMetatype() -> Any.Type {
   return Fn.self
 }
 
-// // CHECK-NOMANGLE: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sySi12typed_throws10MyBigErrorOYKcMa"
-// // CHECK-NOMANGLE: @swift_getExtendedFunctionTypeMetadata({{.*}}@"$s12typed_throws10MyBigErrorOMf"
+// CHECK-NOMANGLE: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sySi12typed_throws10MyBigErrorOYKcMa"
+// CHECK-NOMANGLE: @swift_getExtendedFunctionTypeMetadata({{.*}}@"$s12typed_throws10MyBigErrorOMf"
 
 protocol P {
   associatedtype A
@@ -153,38 +153,4 @@ func genericThrows<T>(x: Bool, y: T) throws(SmallError) -> T {
   }
 
   return y
-}
-
-func throwsGeneric<T: Error>(x: Bool, y: T) throws(T) -> Int {
-  guard x else {
-    throw y
-  }
-
-  return 32
-}
-
-@available(SwiftStdlib 6.0, *)
-func mayThrowAsync(x: Bool, y: AnyObject) async throws(MyError) -> (Float, Int32, Float) {
-  guard x else {
-    throw MyError(x: y)
-  }
-  return (3.0, 4, 5.0)
-}
-
-@available(SwiftStdlib 6.0, *)
-func genericThrowsAsync<T>(x: Bool, y: T) async throws(SmallError) -> T {
-  guard x else {
-    throw SmallError(x: 1)
-  }
-
-  return y
-}
-
-@available(SwiftStdlib 6.0, *)
-func throwsGenericAsync<T: Error>(x: Bool, y: T) async throws(T) -> Int {
-  guard x else {
-    throw y
-  }
-
-  return 32
 }

@@ -274,10 +274,6 @@ namespace irgen {
   void forwardAsyncCallResult(IRGenFunction &IGF, CanSILFunctionType fnType,
                               AsyncContextLayout &layout, llvm::CallInst *call);
 
-  /// Converts a value for async direct errors.
-  llvm::Value *convertForAsyncDirect(IRGenFunction &IGF, llvm::Value *value,
-                                     llvm::Type *toTy, bool forExtraction);
-
 } // end namespace irgen
 } // end namespace swift
 
