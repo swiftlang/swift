@@ -110,11 +110,6 @@ protected:
                                    TemporarySet &temporaries,
                                    bool isOutlined);
 
-  bool mayReturnTypedErrorDirectly() const;
-  void emitToUnmappedExplosionWithDirectTypedError(SILType resultType,
-                                                   llvm::Value *result,
-                                                   Explosion &out);
-
   CallEmission(IRGenFunction &IGF, llvm::Value *selfValue, Callee &&callee)
       : IGF(IGF), selfValue(selfValue), CurCallee(std::move(callee)) {}
 
