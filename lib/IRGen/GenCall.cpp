@@ -3030,10 +3030,7 @@ public:
             IGF.IGM.getTypeInfo(silErrorTy).nativeReturnValueSchema(IGF.IGM);
 
         if (nativeSchema.requiresIndirect() ||
-            errorSchema.shouldReturnTypedErrorIndirectly() ||
-            (errorSchema.empty() && fnConv.hasIndirectSILResults())) { // direct empty typed errors are passed
-                                   // indirectly for compatibility with generic
-                                   // functions.
+            errorSchema.shouldReturnTypedErrorIndirectly()) {
           // Return the error indirectly.
           auto buf = IGF.getCalleeTypedErrorResultSlot(silErrorTy);
           Args[--LastArgWritten] = buf.getAddress();
