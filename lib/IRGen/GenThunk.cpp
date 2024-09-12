@@ -153,8 +153,7 @@ void IRGenThunk::prepareArguments() {
       auto &resultSchema = resultTI.nativeReturnValueSchema(IGF.IGM);
 
       if (resultSchema.requiresIndirect() ||
-          errorSchema.shouldReturnTypedErrorIndirectly() ||
-          conv.hasIndirectSILResults()) {
+          errorSchema.shouldReturnTypedErrorIndirectly()) {
         auto directTypedErrorAddr = original.takeLast();
         IGF.setCalleeTypedErrorResultSlot(Address(directTypedErrorAddr,
                                                   errorTI.getStorageType(),
@@ -406,21 +405,7 @@ void IRGenThunk::emit() {
       errorArgValues.add(errorValue);
       emitAsyncReturn(IGF, *asyncLayout, origTy, errorArgValues.claimAll());
     } else {
-      if (!error->empty()) {
-        // Map the direct error explosion from the call back to the native
-        // explosion for the return.
-        SILType silErrorTy = conv.getSILErrorType(expansionContext);
-        auto &errorTI = IGF.IGM.getTypeInfo(silErrorTy);
-        auto &errorSchema = errorTI.nativeReturnValueSchema(IGF.IGM);
-        auto combined =
-            combineResultAndTypedErrorType(IGF.IGM, schema, errorSchema);
-        Explosion nativeAgg;
-        buildDirectError(IGF, combined, errorSchema, silErrorTy, *error,
-                         /*forAsync*/ false, nativeAgg);
-        IGF.emitScalarReturn(IGF.CurFn->getReturnType(), nativeAgg);
-      } else {
-        IGF.emitScalarReturn(IGF.CurFn->getReturnType(), *error);
-      }
+      IGF.emitScalarReturn(IGF.CurFn->getReturnType(), *error);
     }
     IGF.Builder.emitBlock(successBB);
   } else {

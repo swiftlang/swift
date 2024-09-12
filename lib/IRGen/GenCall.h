@@ -278,11 +278,6 @@ namespace irgen {
   llvm::Value *convertForDirectError(IRGenFunction &IGF, llvm::Value *value,
                                      llvm::Type *toTy, bool forExtraction);
 
-  void buildDirectError(IRGenFunction &IGF,
-                        const CombinedResultAndErrorType &combined,
-                        const NativeConventionSchema &errorSchema,
-                        SILType silErrorTy, Explosion &errorResult,
-                        bool forAsync, Explosion &out);
 } // end namespace irgen
 } // end namespace swift
 
