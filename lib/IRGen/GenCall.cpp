@@ -4406,9 +4406,6 @@ void CallEmission::emitToUnmappedExplosionWithDirectTypedError(
     auto *eltTy = elt->getType();
     if (nativeTy->isIntOrPtrTy() && eltTy->isIntOrPtrTy() &&
         nativeTy->getPrimitiveSizeInBits() != eltTy->getPrimitiveSizeInBits()) {
-      if (nativeTy->isPointerTy() && eltTy == IGF.IGM.IntPtrTy) {
-        return IGF.Builder.CreateIntToPtr(elt, nativeTy);
-      }
       return IGF.Builder.CreateTruncOrBitCast(elt, nativeTy);
     }
     return elt;

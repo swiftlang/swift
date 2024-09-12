@@ -131,16 +131,3 @@ func mayThrow(x: Bool, y: AnyObject) throws(MyError) -> (Float, Int32, Float) {
   }
   return (3.0, 4, 5.0)
 }
-
-// CHECK: define hidden swiftcc { i64, i64 } @"$s12typed_throws25directErrorMergePtrAndInt1x1yyXl_SitSb_yXltAA05SmallD0VYKF"
-// CHECK:   [[RES:%.*]] = call swiftcc { i64, i64 } @"$s12typed_throws25directErrorMergePtrAndInt1x1yyXl_SitSb_yXltAA05SmallD0VYKF"
-// CHECK:   [[R0:%.*]] = extractvalue { i64, i64 } [[RES]], 0
-// CHECK:   inttoptr i64 [[R0]] to ptr
-// CHECK: }
-func directErrorMergePtrAndInt(x: Bool, y: AnyObject) throws(SmallError) -> (AnyObject, Int) {
-  guard x else {
-    throw SmallError(x: 1)
-  }
-
-  return try directErrorMergePtrAndInt(x: !x, y: y)
-}
