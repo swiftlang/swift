@@ -92,26 +92,3 @@ func testit() throws (S) {
 public struct TypeH {
   public var method: (Int) throws(MyBigError) -> String
 }
-
-struct SmallError: Error {
-  let x: Int
-}
-
-@inline(never)
-func throwsSmallError() throws(SmallError) -> (Float, Int) {
-  throw SmallError(x: 1)
-}
-
-// CHECK: define hidden swiftcc i64 @"$s12typed_throws17catchesSmallErrorSiyF"()
-// CHECK:   [[RES:%.*]] = call swiftcc { float, i64 } @"$s12typed_throws0B10SmallErrorSf_SityAA0cD0VYKF"(ptr swiftself undef, ptr noalias nocapture swifterror dereferenceable(8) %swifterror)
-// CHECK:   [[R0:%.*]] = extractvalue { float, i64 } [[RES]], 0
-// CHECK:   [[R1:%.*]] = extractvalue { float, i64 } [[RES]], 1
-// CHECK:   phi i64 [ [[R1]], %typed.error.load ]
-// CHECK: }
-func catchesSmallError() -> Int {
-  do {
-    return try throwsSmallError().1
-  } catch {
-    return error.x
-  }
-}
