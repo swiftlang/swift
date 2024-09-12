@@ -143,22 +143,14 @@ void IRGenThunk::prepareArguments() {
 
     // Set the typed error value result slot.
     if (conv.isTypedError() && !conv.hasIndirectSILErrorResults()) {
+      auto directTypedErrorAddr = original.takeLast();
       auto errorType =
         conv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext());
       auto &errorTI = cast<FixedTypeInfo>(IGF.getTypeInfo(errorType));
-      auto &errorSchema = errorTI.nativeReturnValueSchema(IGF.IGM);
-      auto resultType =
-          conv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext());
-      auto &resultTI = cast<FixedTypeInfo>(IGF.getTypeInfo(resultType));
-      auto &resultSchema = resultTI.nativeReturnValueSchema(IGF.IGM);
 
-      if (isAsync || resultSchema.requiresIndirect() ||
-          errorSchema.shouldReturnTypedErrorIndirectly()) {
-        auto directTypedErrorAddr = original.takeLast();
-        IGF.setCalleeTypedErrorResultSlot(Address(directTypedErrorAddr,
-                                                  errorTI.getStorageType(),
-                                                  errorTI.getFixedAlignment()));
-      }
+     IGF.setCalleeTypedErrorResultSlot(Address(directTypedErrorAddr,
+                                               errorTI.getStorageType(),
+                                               errorTI.getFixedAlignment()));
     } else if (conv.isTypedError()) {
       auto directTypedErrorAddr = original.takeLast();
       // Store for later processing when we know the argument index.
@@ -335,8 +327,7 @@ void IRGenThunk::emit() {
 
   llvm::Value *errorValue = nullptr;
 
-  if (emission->getTypedErrorExplosion() ||
-      (isAsync && origTy->hasErrorResult())) {
+  if (isAsync && origTy->hasErrorResult()) {
     SILType errorType = conv.getSILErrorType(expansionContext);
     Address calleeErrorSlot = emission->getCalleeErrorSlot(
         errorType, /*isCalleeAsync=*/origTy->isAsync());
@@ -344,28 +335,6 @@ void IRGenThunk::emit() {
   }
 
   emission->end();
-
-  // FIXME: we shouldn't have to generate all of this. We should just forward
-  // the value as is
-  if (auto &error = emission->getTypedErrorExplosion()) {
-    llvm::BasicBlock *successBB = IGF.createBasicBlock("success");
-    llvm::BasicBlock *errorBB = IGF.createBasicBlock("failure");
-
-    llvm::Value *nil = llvm::ConstantPointerNull::get(
-        cast<llvm::PointerType>(errorValue->getType()));
-    auto *hasError = IGF.Builder.CreateICmpNE(errorValue, nil);
-
-    // Predict no error is thrown.
-    hasError =
-        IGF.IGM.getSILModule().getOptions().EnableThrowsPrediction ?
-        IGF.Builder.CreateExpectCond(IGF.IGM, hasError, false) : hasError;
-
-    IGF.Builder.CreateCondBr(hasError, errorBB, successBB);
-
-    IGF.Builder.emitBlock(errorBB);
-    IGF.emitScalarReturn(IGF.CurFn->getReturnType(), *error);
-    IGF.Builder.emitBlock(successBB);
-  }
 
   if (isAsync) {
     Explosion error;
@@ -377,11 +346,7 @@ void IRGenThunk::emit() {
 
   // Return the result.
   if (result.empty()) {
-    if (emission->getTypedErrorExplosion()) {
-      IGF.Builder.CreateRet(llvm::UndefValue::get(IGF.CurFn->getReturnType()));
-    } else {
-      IGF.Builder.CreateRetVoid();
-    }
+    IGF.Builder.CreateRetVoid();
     return;
   }
 
