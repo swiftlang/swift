@@ -412,12 +412,7 @@ bool GenericSignatureImpl::isRequirementSatisfied(
     auto *genericEnv = getGenericEnvironment();
 
     requirement = requirement.subst(
-        [&](SubstitutableType *type) -> Type {
-          if (auto *paramType = type->getAs<GenericTypeParamType>())
-            return genericEnv->mapTypeIntoContext(paramType);
-
-          return type;
-        },
+        QueryInterfaceTypeSubstitutions{genericEnv},
         LookUpConformanceInModule());
   }
 
