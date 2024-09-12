@@ -1777,11 +1777,6 @@ static void swift_task_asyncMainDrainQueueImpl() {
 }
 
 SWIFT_CC(swift)
-void (*swift::swift_task_asyncMainDrainQueue_hook)(
-    swift_task_asyncMainDrainQueue_original original,
-    swift_task_asyncMainDrainQueue_override compatOverride) = nullptr;
-
-SWIFT_CC(swift)
 static void swift_task_startOnMainActorImpl(AsyncTask* task) {
   AsyncTask * originalTask = _swift_task_clearCurrent();
   SerialExecutorRef mainExecutor = swift_task_getMainExecutor();

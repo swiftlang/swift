@@ -24,8 +24,14 @@
 ///
 ///===------------------------------------------------------------------===///
 
+#include "swift/Runtime/Concurrency.h"
+
+#include "ExecutorHooks.h"
+
+using namespace swift;
+
 SWIFT_CC(swift)
-static void swift_task_enqueueGlobalImpl(Job *job) {
+void swift::swift_task_enqueueGlobalImpl(Job *job) {
   assert(job && "no job provided");
 
   swift_reportError(0, "operation unsupported without libdispatch: "
@@ -33,7 +39,7 @@ static void swift_task_enqueueGlobalImpl(Job *job) {
 }
 
 SWIFT_CC(swift)
-static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
+void swift::swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
                                                   Job *job) {
   assert(job && "no job provided");
 
@@ -42,7 +48,7 @@ static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
 }
 
 SWIFT_CC(swift)
-static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
+void swift::swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
                                                      long long nsec,
                                                      long long tsec,
                                                      long long tnsec,
@@ -55,7 +61,7 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
 
 /// Enqueues a task on the main executor.
 SWIFT_CC(swift)
-static void swift_task_enqueueMainExecutorImpl(Job *job) {
+void swift::swift_task_enqueueMainExecutorImpl(Job *job) {
   assert(job && "no job provided");
 
   swift_reportError(0, "operation unsupported without libdispatch: "
@@ -63,8 +69,16 @@ static void swift_task_enqueueMainExecutorImpl(Job *job) {
 }
 
 SWIFT_CC(swift)
-static void swift_task_checkIsolatedImpl(SerialExecutorRef executor) {
-  _task_serialExecutor_checkIsolated(
-      executor.getIdentity(), swift_getObjectType(executor.getIdentity()),
-      executor.getSerialExecutorWitnessTable());
+void swift::swift_task_checkIsolatedImpl(SerialExecutorRef executor) {
+  swift_task_invokeSwiftCheckIsolated(executor);
+}
+
+SWIFT_CC(swift)
+SerialExecutorRef swift::swift_task_getMainExecutorImpl() {
+  return SerialExecutorRef::generic();
+}
+
+SWIFT_CC(swift)
+bool swift::swift_task_isMainExecutorImpl(SerialExecutorRef executor) {
+  return executor.isGeneric();
 }

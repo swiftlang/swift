@@ -18,10 +18,15 @@
 ///   swift_task_enqueueGlobalImpl
 ///   swift_task_enqueueGlobalWithDelayImpl
 ///   swift_task_enqueueMainExecutorImpl
-///   swift_task_checkIsolated
+///   swift_task_checkIsolatedImpl
 /// as well as any Dispatch-specific functions for the runtime.
 ///
 ///===------------------------------------------------------------------===///
+
+#include <cstddef>
+
+#include "swift/Runtime/Concurrency.h"
+#include "swift/Runtime/EnvironmentVariables.h"
 
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include "swift/Runtime/HeapObject.h"
@@ -37,6 +42,12 @@
 #include <dispatch/private.h>
 #define SWIFT_CONCURRENCY_HAS_DISPATCH_PRIVATE 1
 #endif
+
+#include "Error.h"
+#include "ExecutorHooks.h"
+#include "TaskPrivate.h"
+
+using namespace swift;
 
 // Ensure that Job's layout is compatible with what Dispatch expects.
 // Note: MinimalDispatchObjectHeader just has the fields we care about, it is
@@ -203,7 +214,7 @@ static dispatch_queue_t getTimerQueue(JobPriority priority) {
 }
 
 SWIFT_CC(swift)
-static void swift_task_enqueueGlobalImpl(Job *job) {
+void swift::swift_task_enqueueGlobalImpl(Job *job) {
   assert(job && "no job provided");
   // We really want four things from the global execution service:
   //  - Enqueuing work should have minimal runtime and memory overhead.
@@ -244,8 +255,8 @@ static void swift_task_enqueueGlobalImpl(Job *job) {
 
 
 SWIFT_CC(swift)
-static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
-                                              Job *job) {
+void swift::swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
+                                                  Job *job) {
   assert(job && "no job provided");
 
   dispatch_function_t dispatchFunction = &__swift_run_job;
@@ -333,7 +344,7 @@ clock_and_value_to_time(int clock, long long deadline) {
 }
 
 SWIFT_CC(swift)
-static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
+void swift::swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
                                                      long long nsec,
                                                      long long tsec,
                                                      long long tnsec,
@@ -378,7 +389,7 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
 }
 
 SWIFT_CC(swift)
-static void swift_task_enqueueMainExecutorImpl(Job *job) {
+void swift::swift_task_enqueueMainExecutorImpl(Job *job) {
   assert(job && "no job provided");
 
   JobPriority priority = job->getPriority();
@@ -422,7 +433,7 @@ static dispatch_queue_s *getAsDispatchSerialQueue(SerialExecutorRef executor) {
 /// to perform this assertion on earlier platforms, where the `checkIsolated`
 /// requirement/witness was not shipping yet.
 SWIFT_CC(swift)
-static void swift_task_checkIsolatedImpl(SerialExecutorRef executor) {
+void swift::swift_task_checkIsolatedImpl(SerialExecutorRef executor) {
   // If it is the main executor, compare with the Main queue
   if (executor.isMainExecutor()) {
     dispatch_assert_queue(dispatch_get_main_queue());
@@ -430,12 +441,8 @@ static void swift_task_checkIsolatedImpl(SerialExecutorRef executor) {
   }
 
   // if able to, use the checkIsolated implementation in Swift
-  if (executor.hasSerialExecutorWitnessTable()) {
-    _task_serialExecutor_checkIsolated(
-        executor.getIdentity(), swift_getObjectType(executor.getIdentity()),
-        executor.getSerialExecutorWitnessTable());
+  if (swift_task_invokeSwiftCheckIsolated(executor))
     return;
-  }
 
   if (auto queue = getAsDispatchSerialQueue(executor)) {
     // if the executor was not SerialExecutor for some reason but we're able
@@ -447,4 +454,17 @@ static void swift_task_checkIsolatedImpl(SerialExecutorRef executor) {
   // otherwise, we have no way to check, so report an error
   // TODO: can we swift_getTypeName(swift_getObjectType(executor.getIdentity()), false).data safely in the message here?
   swift_Concurrency_fatalError(0, "Incorrect actor executor assumption");
+}
+
+SWIFT_CC(swift)
+SerialExecutorRef swift::swift_task_getMainExecutorImpl() {
+  return SerialExecutorRef::forOrdinary(
+           reinterpret_cast<HeapObject*>(&_dispatch_main_q),
+           _swift_task_getDispatchQueueSerialExecutorWitnessTable());
+}
+
+SWIFT_CC(swift)
+bool swift::swift_task_isMainExecutorImpl(SerialExecutorRef executor) {
+  return executor.getIdentity()
+    == reinterpret_cast<HeapObject *>(&_dispatch_main_q);
 }

@@ -23,6 +23,8 @@
 ///
 ///===------------------------------------------------------------------===///
 
+#include "swift/Runtime/Concurrency.h"
+
 #include <chrono>
 #ifndef SWIFT_THREADING_NONE
 # include <thread>
@@ -36,6 +38,10 @@
 #ifndef NSEC_PER_SEC
 # define NSEC_PER_SEC 1000000000ull
 #endif
+
+#include "ExecutorHooks.h"
+
+using namespace swift;
 
 namespace {
 
@@ -104,14 +110,14 @@ static Job *DelayedJobQueue = nullptr;
 
 /// Insert a job into the cooperative global queue.
 SWIFT_CC(swift)
-static void swift_task_enqueueGlobalImpl(Job *job) {
+void swift::swift_task_enqueueGlobalImpl(Job *job) {
   assert(job && "no job provided");
   JobQueue.enqueue(job);
 }
 
 /// Enqueues a task on the main executor.
 SWIFT_CC(swift)
-static void swift_task_enqueueMainExecutorImpl(Job *job) {
+void swift::swift_task_enqueueMainExecutorImpl(Job *job) {
   // The cooperative executor does not distinguish between the main
   // queue and the global queue.
   swift_task_enqueueGlobalImpl(job);
@@ -136,15 +142,13 @@ static void insertDelayedJob(Job *newJob, JobDeadline deadline) {
 }
 
 SWIFT_CC(swift)
-static void swift_task_checkIsolatedImpl(SerialExecutorRef executor) {
-  _task_serialExecutor_checkIsolated(
-      executor.getIdentity(), swift_getObjectType(executor.getIdentity()),
-      executor.getSerialExecutorWitnessTable());
+void swift::swift_task_checkIsolatedImpl(SerialExecutorRef executor) {
+  swift_task_invokeSwiftCheckIsolated(executor);
 }
 
 /// Insert a job into the cooperative global queue with a delay.
 SWIFT_CC(swift)
-static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
+void swift::swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
                                                   Job *newJob) {
   assert(newJob && "no job provided");
 
@@ -157,7 +161,7 @@ static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
 }
 
 SWIFT_CC(swift)
-static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
+void swift::swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
                                                      long long nsec,
                                                      long long tsec,
                                                      long long tnsec,
@@ -251,4 +255,14 @@ swift_task_donateThreadToGlobalExecutorUntil(bool (*condition)(void *),
     if (!job) return;
     swift_job_run(job, SerialExecutorRef::generic());
   }
+}
+
+SWIFT_CC(swift)
+SerialExecutorRef swift::swift_task_getMainExecutorImpl() {
+  return SerialExecutorRef::generic();
+}
+
+SWIFT_CC(swift)
+bool swift::swift_task_isMainExecutorImpl(SerialExecutorRef executor) {
+  return executor.isGeneric();
 }

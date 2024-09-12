@@ -1,0 +1,75 @@
+//===--- Concurrency.h - Runtime interface for concurrency ------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// Hooks for concurrency
+//
+//===----------------------------------------------------------------------===//
+
+// To use this file, define the following macros:
+//
+//   SWIFT_CONCURRENCY_HOOK(returnType, name, ...)
+//   SWIFT_CONCURRENCY_HOOK0(returnType, name)
+//   SWIFT_CONCURRENCY_HOOK_OVERRIDE0(returnType, name)
+//
+// Then include the file somewhere.
+
+#ifndef SWIFT_CONCURRENCY_HOOK
+#define SWIFT_CONCURRENCY_HOOK(returnType, name, ...)
+#endif
+
+#ifndef SWIFT_CONCURRENCY_HOOK0
+#define SWIFT_CONCURRENCY_HOOK0(returnType, name)
+#endif
+
+#ifndef SWIFT_CONCURRENCY_HOOK_OVERRIDE0
+#define SWIFT_CONCURRENCY_HOOK_OVERRIDE0(returnType, name)
+#endif
+
+// .............................................................................
+
+SWIFT_CONCURRENCY_HOOK(void, swift_task_enqueueGlobal, Job *job);
+
+SWIFT_CONCURRENCY_HOOK(void, swift_task_enqueueGlobalWithDelay,
+                 unsigned long long delay, Job *job);
+
+SWIFT_CONCURRENCY_HOOK(void, swift_task_enqueueGlobalWithDeadline,
+    long long sec,
+    long long nsec,
+    long long tsec,
+    long long tnsec,
+    int clock, Job *job);
+
+SWIFT_CONCURRENCY_HOOK(void, swift_task_checkIsolated, SerialExecutorRef executor);
+
+SWIFT_CONCURRENCY_HOOK(bool, swift_task_isOnExecutor,
+    HeapObject *executor,
+    const Metadata *selfType,
+    const SerialExecutorWitnessTable *wtable);
+
+SWIFT_CONCURRENCY_HOOK(void, swift_task_enqueueMainExecutor, Job *job);
+
+SWIFT_CONCURRENCY_HOOK0(SerialExecutorRef, swift_task_getMainExecutor);
+
+SWIFT_CONCURRENCY_HOOK(bool, swift_task_isMainExecutor, SerialExecutorRef);
+
+/// A hook to override the entrypoint to the main runloop used to drive the
+/// concurrency runtime and drain the main queue. This function must not return.
+/// Note: If the hook is wrapping the original function and the `compatOverride`
+///       is passed in, the `original` function pointer must be passed into the
+///       compatibility override function as the original function.
+SWIFT_CONCURRENCY_HOOK_OVERRIDE0(void, swift_task_asyncMainDrainQueue);
+
+// .............................................................................
+
+#undef SWIFT_CONCURRENCY_HOOK
+#undef SWIFT_CONCURRENCY_HOOK0
+#undef SWIFT_CONCURRENCY_HOOK_OVERRIDE0
