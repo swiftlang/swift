@@ -188,20 +188,3 @@ func throwsGenericAsync<T: Error>(x: Bool, y: T) async throws(T) -> Int {
 
   return 32
 }
-
-enum TinyError: Error {
-  case a
-}
-
-@available(SwiftStdlib 6.0, *)
-func mayThrowAsyncTiny(x: Bool) async throws(TinyError) -> Bool {
-  guard x else {
-    throw .a
-  }
-  return false
-}
-
-@available(SwiftStdlib 6.0, *)
-func callsMayThrowAsyncTiny(x: Bool) async {
-  _ = try! await mayThrowAsyncTiny(x: x)
-}

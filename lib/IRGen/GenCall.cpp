@@ -3232,19 +3232,7 @@ public:
 
     bool mayReturnErrorDirectly = mayReturnTypedErrorDirectly();
     if (mayReturnErrorDirectly && !nativeSchema.requiresIndirect()) {
-      llvm::Value *resultAgg;
-      if (resultTys.size() == 1) {
-        resultAgg = Builder.CreateExtractValue(result, numAsyncContextParams);
-      } else {
-        auto resultTy = llvm::StructType::get(IGM.getLLVMContext(), resultTys);
-        resultAgg = llvm::UndefValue::get(resultTy);
-        for (unsigned i = 0, e = resultTys.size(); i != e; ++i) {
-          llvm::Value *elt =
-              Builder.CreateExtractValue(result, numAsyncContextParams + i);
-          resultAgg = Builder.CreateInsertValue(resultAgg, elt, i);
-        }
-      }
-      return emitToUnmappedExplosionWithDirectTypedError(resultType, resultAgg,
+      return emitToUnmappedExplosionWithDirectTypedError(resultType, result,
                                                          out);
     } else if (resultTys.size() == 1) {
       result = Builder.CreateExtractValue(result, numAsyncContextParams);
