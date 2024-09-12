@@ -4192,18 +4192,26 @@ void ASTMangler::appendAnyProtocolConformance(
       conformance.getRequirement()->isMarkerProtocol())
     return;
 
-  // While all invertible protocols are marker protocols, do not mangle them for
-  // compatability reasons. See equivalent hack in `conformanceRequirementIndex`
-  // where only invertible protocols are unconditionally skipped.
-  if (conformance.getRequirement()->getInvertibleProtocolKind())
-    return;
+  // While all invertible protocols are marker protocols, do not mangle them
+  // as a dependent conformance. See `conformanceRequirementIndex` which skips
+  // these, too. In theory, invertible conformances should never be mangled,
+  // but we *might* have let that slip by for the other cases below, so the
+  // early-exits are highly conservative.
+  const bool forInvertible =
+      conformance.getRequirement()->getInvertibleProtocolKind().has_value();
 
   if (conformingType->isTypeParameter()) {
     assert(genericSig && "Need a generic signature to resolve conformance");
+    if (forInvertible)
+      return;
+
     auto path = genericSig->getConformancePath(conformingType,
                                                conformance.getAbstract());
     appendDependentProtocolConformance(path, genericSig);
   } else if (auto opaqueType = conformingType->getAs<OpaqueTypeArchetypeType>()) {
+    if (forInvertible)
+      return;
+
     GenericSignature opaqueSignature =
         opaqueType->getDecl()->getOpaqueInterfaceGenericSignature();
     ConformancePath conformancePath =
