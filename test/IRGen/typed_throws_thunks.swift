@@ -65,3 +65,60 @@ extension P {
   public func g3(body: () throws(FixedSize) -> Void) throws(FixedSize) {
   }
 }
+
+protocol P2 {
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s19typed_throws_thunks2P2P1fyyAA1EOYKFTj"(
+// CHECK-SAME:      ptr noalias swiftself %0, 
+// CHECK-SAME:      ptr noalias nocapture swifterror dereferenceable(8) %1, 
+// CHECK-SAME:      ptr %2, ptr %3
+// CHECK-SAME:  )
+// CHECK-SAME:  {
+// CHECK:       failure:
+// CHECK-NOT:     ret void undef
+// CHECK:         ret void
+// CHECK:       success:
+// CHECK-NEXT:    ret void
+    func f() throws(E)
+// CHECK-LABEL: define{{.*}} swiftcc i8 @"$s19typed_throws_thunks2P2P1gyys4Int8VYKFTj"(
+// CHECk-SAME:      ptr noalias swiftself %0
+// CHECK-SAME:      ptr noalias nocapture swifterror dereferenceable(8) %1
+// CHECK-SAME:      ptr %2
+// CHECK-SAME:      ptr %3
+// CHECK-SAME:  )
+// CHECK-SAME:  {
+// CHECK:       failure:
+// CHECK-NEXT:    ret i8 %{{.*}}
+// CHECK:       success:
+// CHECK-NEXT:    ret i8 undef
+    func g() throws(Int8)
+// CHECK-LABEL: define{{.*}} swiftcc i8 @"$s19typed_throws_thunks2P2P1hs4Int8VyAA1EOYKFTj"(
+// CHECK-SAME:      ptr noalias swiftself %0
+// CHECK-SAME:      ptr noalias nocapture swifterror dereferenceable(8) %1
+// CHECK-SAME:      ptr %2 
+// CHECK-SAME:      ptr %3
+// CHECK-SAME:  )
+// CHECK-SAME:  {
+// CHECK:       failure:
+// CHECK-NEXT:    ret void
+// CHECK:       success:
+// CHECK-NEXT:    ret i8 %{{.*}}
+    func h() throws(E) -> Int8
+// CHECK-LABEL: define{{.*}} swiftcc i8 @"$s19typed_throws_thunks2P2P1is4Int8VyAFYKFTj"(
+// CHECK-SAME:      ptr noalias swiftself %0
+// CHECK-SAME:      ptr noalias nocapture swifterror dereferenceable(8) %1
+// CHECK-SAME:      ptr %2
+// CHECK-SAME:      ptr %3
+// CHECK-SAME:  )
+// CHECK-SAME:  {
+// CHECK:       failure:
+// CHECK-NEXT:    ret i8 %{{.*}}
+// CHECK:       success:
+// CHECK-NEXT:    ret i8 %{{.*}}
+    func i() throws(Int8) -> Int8
+}
+
+extension Int8 : Error {}
+
+enum E: Error {
+    case e
+}
