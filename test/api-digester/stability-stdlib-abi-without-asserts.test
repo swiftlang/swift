@@ -793,6 +793,9 @@ Var UnsafeBufferPointer.debugDescription has mangled name changing from 'Swift.U
 Var UnsafeBufferPointer.debugDescription is now with @_preInverseGenerics
 Var UnsafeMutableBufferPointer.debugDescription has mangled name changing from 'Swift.UnsafeMutableBufferPointer.debugDescription : Swift.String' to '(extension in Swift):Swift.UnsafeMutableBufferPointer< where A: ~Swift.Copyable>.debugDescription : Swift.String'
 Var UnsafeMutableBufferPointer.debugDescription is now with @_preInverseGenerics
+Func _isPOD(_:) has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
+Func _isPOD(_:) has mangled name changing from 'Swift._isPOD<A>(A.Type) -> Swift.Bool' to 'Swift._isPOD<A where A: ~Swift.Copyable, A: ~Swift.Escapable>(A.Type) -> Swift.Bool'
+Func _isPOD(_:) is now with @_preInverseGenerics
 
 Func FixedWidthInteger.&*(_:_:) has been added as a protocol requirement
 
