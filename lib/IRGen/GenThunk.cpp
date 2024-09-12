@@ -384,14 +384,14 @@ void IRGenThunk::emit() {
             for (unsigned i : combined.errorValueMapping) {
               llvm::Value *elt = nativeError.claimNext();
               auto *nativeTy = structTy->getElementType(i);
-              elt = convertForDirectError(IGF, elt, nativeTy,
+              elt = convertForAsyncDirect(IGF, elt, nativeTy,
                                           /*forExtraction*/ false);
               expandedResult =
                   IGF.Builder.CreateInsertValue(expandedResult, elt, i);
             }
             IGF.emitAllExtractValues(expandedResult, structTy, errorArgValues);
           } else if (!errorSchema.getExpandedType(IGM)->isVoidTy()) {
-            errorArgValues = convertForDirectError(IGF, nativeError.claimNext(),
+            errorArgValues = convertForAsyncDirect(IGF, nativeError.claimNext(),
                                                    combined.combinedTy,
                                                    /*forExtraction*/ false);
           }
