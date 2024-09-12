@@ -161,15 +161,6 @@ extension RawSpan {
 }
 
 extension RawSpan {
-  /// Returns a Boolean value indicating whether two `RawSpan` instances
-  /// refer to the same region in memory.
-  @_alwaysEmitIntoClient
-  public static func ===(_ a: Self, _ b: Self) -> Bool {
-    (a._pointer == b._pointer) && (a._count == b._count)
-  }
-}
-
-extension RawSpan {
 
   private var _address: String {
     String(UInt(bitPattern: _pointer), radix: 16, uppercase: false)
@@ -517,6 +508,12 @@ extension RawSpan {
 }
 
 extension RawSpan {
+  /// Returns a Boolean value indicating whether two `RawSpan` instances
+  /// refer to the same region in memory.
+  @_alwaysEmitIntoClient
+  public func isIdentical(to other: Self) -> Bool {
+    (self._pointer == other._pointer) && (self._count == other._count)
+  }
 
   /// Returns true if the memory represented by `span` is a subrange of
   /// the memory represented by `self`
@@ -525,11 +522,12 @@ extension RawSpan {
   /// - span: a span of the same type as `self`
   /// Returns: whether `span` is a subrange of `self`
   @_alwaysEmitIntoClient
-  public func contains(_ span: borrowing Self) -> Bool {
-    if span._count > _count { return false }
-    if _count == 0 || span._count == 0 { return true }
-    if _start > span._start { return false }
-    return span._start.advanced(by: span._count) <= _start.advanced(by: _count)
+  public func isWithin(_ span: borrowing Self) -> Bool {
+    if _count > span._count { return false }
+    if _count == 0 { return true }
+    if _start < span._start { return false }
+    let lower = span._start.distance(to: _start)
+    return lower + _count <= span._count
   }
 
   /// Returns the offsets where the memory of `span` is located within
@@ -541,14 +539,14 @@ extension RawSpan {
   /// - span: a subrange of `self`
   /// Returns: A range of offsets within `self`
   @_alwaysEmitIntoClient
-  public func offsets(of span: borrowing Self) -> Range<Int> {
-    _precondition(contains(span))
-    var (s, e) = (0, 0)
-    if _pointer != nil && span._pointer != nil {
-      s = _start.distance(to: span._start)
-      e = s + span._count
-    }
-    return Range(_uncheckedBounds: (s, e))
+  public func byteOffsetsWithin(_ span: borrowing Self) -> Range<Int>? {
+    if _count > span._count { return nil }
+    if _count == 0 { return Range(uncheckedBounds: (0, 0)) }
+    if _start < span._start { return nil }
+    let lower = span._start.distance(to: _start)
+    let upper = lower + _count
+    guard upper <= span._count else { return nil }
+    return Range(uncheckedBounds: (lower, upper))
   }
 }
 
