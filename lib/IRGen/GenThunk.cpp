@@ -436,7 +436,8 @@ void IRGenThunk::emit() {
 
   // Return the result.
   if (result.empty()) {
-    if (emission->getTypedErrorExplosion()) {
+    if (emission->getTypedErrorExplosion() &&
+        !IGF.CurFn->getReturnType()->isVoidTy()) {
       IGF.Builder.CreateRet(llvm::UndefValue::get(IGF.CurFn->getReturnType()));
     } else {
       IGF.Builder.CreateRetVoid();
