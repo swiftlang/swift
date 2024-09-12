@@ -507,21 +507,14 @@ Type QueryInterfaceTypeSubstitutions::operator()(SubstitutableType *type) const{
   return Type();
 }
 
-Type GenericEnvironment::mapTypeIntoContext(
-                                Type type,
-                                LookupConformanceFn lookupConformance) const {
+Type GenericEnvironment::mapTypeIntoContext(Type type) const {
   assert(!type->hasPrimaryArchetype() && "already have a contextual type");
 
   Type result = type.subst(QueryInterfaceTypeSubstitutions(this),
-                           lookupConformance,
+                           LookUpConformanceInModule(),
                            SubstFlags::PreservePackExpansionLevel);
   ASSERT(getKind() != Kind::Primary || !result->hasTypeParameter());
   return result;
-
-}
-
-Type GenericEnvironment::mapTypeIntoContext(Type type) const {
-  return mapTypeIntoContext(type, LookUpConformanceInModule());
 }
 
 Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {

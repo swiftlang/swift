@@ -157,8 +157,6 @@ private:
   friend ArchetypeType;
   friend QueryInterfaceTypeSubstitutions;
 
-  Type getOrCreateArchetypeFromInterfaceType(Type depType);
-
   /// Add a mapping of a generic parameter to a specific type (which may be
   /// an archetype)
   void addMapping(GenericParamKey key, Type contextType);
@@ -283,12 +281,11 @@ public:
   /// Map an interface type to a contextual type.
   Type mapTypeIntoContext(Type type) const;
 
-  /// Map an interface type to a contextual type.
-  Type mapTypeIntoContext(Type type,
-                          LookupConformanceFn lookupConformance) const;
-
   /// Map a generic parameter type to a contextual type.
   Type mapTypeIntoContext(GenericTypeParamType *type) const;
+
+  /// Map a type parameter type to a contextual type.
+  Type getOrCreateArchetypeFromInterfaceType(Type depType);
 
   /// Map an interface type containing parameter packs to a contextual
   /// type in the opened element generic context.
