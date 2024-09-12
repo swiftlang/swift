@@ -312,20 +312,13 @@ extension Span where Element: Equatable {
 }
 
 extension Span where Element: ~Copyable {
-  /// Returns a Boolean value indicating whether two `RawSpan` instances
-  /// refer to the same region in memory.
+
   @_alwaysEmitIntoClient
-  public static func ===(_ a: Self, _ b: Self) -> Bool {
-    (a._pointer == b._pointer) && (a._count == b._count)
-  }
-}
-
-extension Span where Element: ~Copyable {
-
-  private var _address: String {
+  var _address: String {
     String(UInt(bitPattern: _pointer), radix: 16, uppercase: false)
   }
 
+  @_alwaysEmitIntoClient
   public var description: String {
     "(0x\(_address), \(_count))"
   }
@@ -573,7 +566,7 @@ extension Span where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
   public mutating func _shrink(toUnchecked bounds: some RangeExpression<Int>) {
-    self = _extracting(unchecked: bounds)
+    self = _extracting(uncheckedBounds: bounds)
   }
 
   /// Constructs a new span over all the items of this span.
@@ -671,6 +664,12 @@ extension Span where Element: Copyable {
 }
 
 extension Span where Element: ~Copyable {
+  /// Returns a Boolean value indicating whether two `Span` instances
+  /// refer to the same region in memory.
+  @_alwaysEmitIntoClient
+  public func isIdentical(to other: Self) -> Bool {
+    (self._pointer == other._pointer) && (self._count == other._count)
+  }
 
   /// Returns true if the memory represented by `span` is a subrange of
   /// the memory represented by `self`
@@ -679,12 +678,22 @@ extension Span where Element: ~Copyable {
   /// - span: a span of the same type as `self`
   /// Returns: whether `span` is a subrange of `self`
   @_alwaysEmitIntoClient
-  public func contains(_ span: borrowing Self) -> Bool {
-    if span._count > _count { return false }
-    if _count == 0 || span._count == 0 { return true }
-    if _start > span._start { return false }
+  public func isWithin(_ span: borrowing Self) -> Bool {
+    if _count > span._count { return false }
+    if _count == 0 { return true }
+    if _start < span._start { return false }
     let stride = MemoryLayout<Element>.stride
-    return span._start.advanced(by: span._count*stride) <= _start.advanced(by: _count*stride)
+    if _isPOD(Element.self) {
+      let byteOffset = span._start.distance(to: _start)
+      let (lower, r) = byteOffset.quotientAndRemainder(dividingBy: stride)
+      guard r == 0 else { return false }
+      return lower + _count <= span._count
+    } else {
+      // we have an alignment precondition, so we can omit a stride check
+      let selfEnd = self._start.advanced(by: self._count*stride)
+      let spanEnd = span._start.advanced(by: span._count*stride)
+      return selfEnd <= spanEnd
+    }
   }
 
   /// Returns the offsets where the memory of `span` is located within
@@ -696,14 +705,17 @@ extension Span where Element: ~Copyable {
   /// - span: a subrange of `self`
   /// Returns: A range of offsets within `self`
   @_alwaysEmitIntoClient
-  public func offsets(of span: borrowing Self) -> Range<Int> {
-    _precondition(contains(span))
-    var (s, e) = (0, 0)
-    if _pointer != nil && span._pointer != nil {
-      s = _start.distance(to: span._start)/MemoryLayout<Element>.stride
-      e = s + span._count
-    }
-    return Range(_uncheckedBounds: (s, e))
+  public func indicesWithin(_ span: borrowing Self) -> Range<Int>? {
+    if _count > span._count { return nil }
+    if _count == 0 { return Range(_uncheckedBounds: (0, 0)) }
+    if _start < span._start { return nil }
+    let stride = MemoryLayout<Element>.stride
+    let byteOffset = span._start.distance(to: _start)
+    let (lower, r) = byteOffset.quotientAndRemainder(dividingBy: stride)
+    guard r == 0 else { return nil }
+    let upper = lower + _count
+    guard upper <= span._count else { return nil }
+    return Range(_uncheckedBounds: (lower, upper))
   }
 }
 
