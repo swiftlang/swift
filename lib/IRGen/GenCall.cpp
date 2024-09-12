@@ -2330,14 +2330,17 @@ void SignatureExpansion::expandAsyncAwaitType() {
     if (!nativeError.shouldReturnTypedErrorIndirectly()) {
       auto combined = combineResultAndTypedErrorType(IGM, native, nativeError);
 
-      if (!combined.combinedTy->isVoidTy()) {
-        if (auto *structTy = dyn_cast<llvm::StructType>(combined.combinedTy)) {
-          for (auto *elem : structTy->elements()) {
-            components.push_back(elem);
-          }
-        } else {
-          components.push_back(combined.combinedTy);
+      if (combined.combinedTy->isVoidTy()) {
+        addErrorResult();
+        return;
+      }
+
+      if (auto *structTy = dyn_cast<llvm::StructType>(combined.combinedTy)) {
+        for (auto *elem : structTy->elements()) {
+          components.push_back(elem);
         }
+      } else {
+        components.push_back(combined.combinedTy);
       }
       addErrorResult();
       ResultIRType = llvm::StructType::get(IGM.getLLVMContext(), components);

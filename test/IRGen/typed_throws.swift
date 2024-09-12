@@ -6,8 +6,6 @@
 
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-library-evolution
 
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -O
-
 // XFAIL: CPU=arm64e
 // REQUIRES: PTRSIZE=64
 
@@ -233,17 +231,4 @@ protocol Proto {
 
   // This used to crash.
   static func f2() throws(SP) -> Int64
-}
-
-@inline(never)
-@available(SwiftStdlib 6.0, *)
-public func passthroughAsync<T, E: Error>(f: () async throws(E) -> T) async throws(E) -> T {
-  try await f()
-}
-
-@available(SwiftStdlib 6.0, *)
-public func reabstractAsyncVoidThrowsNever() async {
-  await passthroughAsync {
-    ()
-  }
 }
