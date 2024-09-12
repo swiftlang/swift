@@ -358,21 +358,6 @@ class ModelASTWalker : public ASTWalker {
   /// is considered as one, e.g. object literal expression.
   uint8_t AvoidPassingSyntaxToken = 0;
 
-  class InactiveClauseRAII {
-    const bool wasInInactiveClause;
-    bool &isInInactiveClause;
-
-  public:
-    InactiveClauseRAII(bool &isInInactiveClauseArg, bool enteringInactiveClause)
-        : wasInInactiveClause(isInInactiveClauseArg),
-          isInInactiveClause(isInInactiveClauseArg) {
-      isInInactiveClause |= enteringInactiveClause;
-    }
-    ~InactiveClauseRAII() { isInInactiveClause = wasInInactiveClause; }
-  };
-  friend class InactiveClauseRAII;
-  bool inInactiveClause = false;
-
 public:
   SyntaxModelWalker &Walker;
   ArrayRef<SyntaxNode> TokenNodes;
