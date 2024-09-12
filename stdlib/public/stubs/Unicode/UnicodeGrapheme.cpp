@@ -16,7 +16,6 @@
 #include "swift/Runtime/Debug.h"
 #endif
 #include "swift/shims/UnicodeData.h"
-#include <stdint.h>
 
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
@@ -68,7 +67,7 @@ __swift_bool _swift_stdlib_isLinkingConsonant(__swift_uint32_t scalar) {
                                           _swift_stdlib_linkingConsonant,
                                           _swift_stdlib_linkingConsonant_ranks);
 
-  if (idx == INTPTR_MAX) {
+  if (idx == __swift_intptr_max) {
     return false;
   }
 

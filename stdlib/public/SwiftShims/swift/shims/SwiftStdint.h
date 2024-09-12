@@ -43,6 +43,8 @@ typedef __UINT64_TYPE__ __swift_uint64_t;
 #else
 typedef unsigned __INT64_TYPE__ __swift_uint64_t;
 #endif
+#define __swift_int64_max __INT64_MAX__
+#define __swift_uint64_max __UINT64_MAX__
 
 typedef __INT32_TYPE__ __swift_int32_t;
 #ifdef __UINT32_TYPE__
@@ -50,6 +52,8 @@ typedef __UINT32_TYPE__ __swift_uint32_t;
 #else
 typedef unsigned __INT32_TYPE__ __swift_uint32_t;
 #endif
+#define __swift_int32_max __INT32_MAX__
+#define __swift_uint32_max __UINT32_MAX__
 
 typedef __INT16_TYPE__ __swift_int16_t;
 #ifdef __UINT16_TYPE__
@@ -57,6 +61,8 @@ typedef __UINT16_TYPE__ __swift_uint16_t;
 #else
 typedef unsigned __INT16_TYPE__ __swift_uint16_t;
 #endif
+#define __swift_int16_max __INT16_MAX__
+#define __swift_uint16_max __UINT16_MAX__
 
 typedef __INT8_TYPE__ __swift_int8_t;
 #ifdef __UINT8_TYPE__
@@ -64,11 +70,15 @@ typedef __UINT8_TYPE__ __swift_uint8_t;
 #else
 typedef unsigned __INT8_TYPE__ __swift_uint8_t;
 #endif
+#define __swift_int8_max __INT8_MAX__
+#define __swift_uint8_max __UINT8_MAX__
 
 #define __swift_join3(a,b,c) a ## b ## c
 
 #define __swift_intn_t(n) __swift_join3(__swift_int, n, _t)
 #define __swift_uintn_t(n) __swift_join3(__swift_uint, n, _t)
+#define __swift_intn_max(n) __swift_join3(__swift_int, n, _max)
+#define __swift_uintn_max(n) __swift_join3(__swift_uint, n, _max)
 
 #if defined(_MSC_VER) && !defined(__clang__)
 #if defined(_WIN64)
@@ -83,6 +93,8 @@ typedef __swift_uint32_t __swift_uintptr_t;
 #else
 typedef __swift_intn_t(__INTPTR_WIDTH__) __swift_intptr_t;
 typedef __swift_uintn_t(__INTPTR_WIDTH__) __swift_uintptr_t;
+#define __swift_intptr_max __swift_intn_max(__INTPTR_WIDTH__)
+#define __swift_uintptr_max __swift_uintn_max(__INTPTR_WIDTH__)
 #endif
 #endif
 

@@ -23,7 +23,6 @@
 #endif
 
 #include "swift/shims/UnicodeData.h"
-#include <stdint.h>
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint16_t _swift_stdlib_getNormData(__swift_uint32_t scalar) {
@@ -42,7 +41,7 @@ __swift_uint16_t _swift_stdlib_getNormData(__swift_uint32_t scalar) {
 
   // If we don't have an index into the data indices, then this scalar has no
   // normalization information.
-  if (dataIdx == INTPTR_MAX) {
+  if (dataIdx == __swift_intptr_max) {
     return 0;
   }
 
@@ -91,7 +90,7 @@ __swift_uint32_t _swift_stdlib_getComposition(__swift_uint32_t x,
   auto realY = (array[0] << 11) >> 11;
 
   if (y != realY) {
-    return UINT32_MAX;
+    return __swift_uint32_max;
   }
 
   auto count = array[0] >> 21;
@@ -134,6 +133,6 @@ __swift_uint32_t _swift_stdlib_getComposition(__swift_uint32_t x,
   // If we made it out here, then our scalar was not found in the composition
   // array.
   // Return the max here to indicate that we couldn't find one.
-  return UINT32_MAX;
+  return __swift_uint32_max;
 #endif
 }
