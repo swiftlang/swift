@@ -198,8 +198,10 @@ takesMutableRaw(&ResilientStruct.staticStoredProperty, 5) // expected-error {{ca
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
 // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-// FIXME: This should also produce an error.
-takesMutableRaw(&type(of: topLevelResilientS).staticStoredProperty, 5)
+
+takesMutableRaw(&type(of: topLevelResilientS).staticStoredProperty, 5) // expected-error {{cannot use inout expression here; argument #1 must be a pointer that outlives the call to 'takesMutableRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
+// expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
 //   - Resilient struct or class bases
 
@@ -221,8 +223,10 @@ takesRaw(&topLevelP.property) // expected-error {{cannot use inout expression he
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
 // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-// FIXME: This should also produce an error.
-takesRaw(&type(of: topLevelP).staticProperty)
+
+takesRaw(&type(of: topLevelP).staticProperty) // expected-error {{cannot use inout expression here; argument #1 must be a pointer that outlives the call to 'takesRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
+// expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
 takesRaw(&topLevelP[]) // expected-error {{cannot use inout expression here; argument #1 must be a pointer that outlives the call to 'takesRaw'}}
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
