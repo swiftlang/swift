@@ -1923,15 +1923,11 @@ ImportedModule::removeDuplicates(SmallVectorImpl<ImportedModule> &imports) {
 }
 
 Identifier ModuleDecl::getPublicModuleName(bool onlyIfImported) const {
-  if (!PublicModuleName.empty()) {
-    if (!onlyIfImported)
-      return PublicModuleName;
+  if (!PublicModuleName.empty() &&
+      (!onlyIfImported ||
+       getASTContext().getLoadedModule(PublicModuleName)))
+    return PublicModuleName;
 
-    bool publicModuleIsImported =
-      getASTContext().getModuleByIdentifier(PublicModuleName);
-    if (publicModuleIsImported)
-      return PublicModuleName;
-  }
   return getName();
 }
 

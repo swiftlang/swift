@@ -47,6 +47,7 @@
 // RUN:   -verify
 // RUN: not %target-swift-frontend -typecheck %t/ClientMiddle.swift -o %t -I %t \
 // RUN:   -enable-library-evolution -swift-version 6 \
+// RUN:   -diagnostic-style llvm \
 // RUN:   2>&1 | %FileCheck %t/ClientMiddle.swift
 
 /// Test more diagnostics referencing modules.
@@ -69,6 +70,7 @@
 // RUN:   -verify
 // RUN: not %target-swift-frontend -typecheck %t/ClientMiddle.swift -o %t -I %t \
 // RUN:   -enable-library-evolution -swift-version 6 \
+// RUN:   -diagnostic-style llvm \
 // RUN:   2>&1 | %FileCheck %t/ClientMiddle.swift
 
 // RUN: %target-swift-frontend -typecheck %t/ClientAccessLevelOnImports.swift -o %t -I %t \
