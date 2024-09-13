@@ -1493,6 +1493,19 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
     return ObjCReason(ObjCReason::MemberOfObjCProtocol);
   }
 
+  // Emulating old logic:
+  // A member implementation of an @objcImplementation extension is @objc...
+  if (VD->isObjCMemberImplementation()) {
+    auto ext = VD->getDeclContext()->getAsDecl();
+    auto attr = ext->getAttrs()
+                  .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
+
+    // ...for early adopters only. (There's new logic for non-early adopters
+    // below.)
+    if (attr->isEarlyAdopter())
+      return ObjCReason(ObjCReason::MemberOfObjCImplementationExtension, attr);
+  }
+
   // A @nonobjc is not @objc, even if it is an override of an @objc, so check
   // for @nonobjc first.
   if (VD->getAttrs().hasAttribute<NonObjCAttr>() ||
@@ -1500,6 +1513,10 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
        cast<ExtensionDecl>(VD->getDeclContext())->getAttrs()
         .hasAttribute<NonObjCAttr>()))
     return std::nullopt;
+
+  // Set to non-null to indicate a difference between early-adopter and final
+  // objcImpl behavior.
+  ObjCImplementationAttr *attrToWarnOfObjCImplBehaviorChange = nullptr;
 
   if (isMemberOfObjCImplementationExtension(VD)) {
     // A `final` member of an @objc @implementation extension is not @objc.
@@ -1510,7 +1527,14 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
       auto ext = VD->getDeclContext()->getAsDecl();
       auto attr = ext->getAttrs()
                    .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
-      return ObjCReason(ObjCReason::MemberOfObjCImplementationExtension, attr);
+
+      if (!attr->isEarlyAdopter())
+        return ObjCReason(ObjCReason::MemberOfObjCImplementationExtension,attr);
+
+      // If we got here, that means the new syntax might behave differently from
+      // the old one, unless one of the remaining `return ObjCReason`s below
+      // would have made it isObjC() anyway.
+      attrToWarnOfObjCImplBehaviorChange = attr;
     }
   }
   else if (isMemberOfObjCClassExtension(VD) &&
@@ -1530,6 +1554,19 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
       findWitnessedObjCRequirements(VD, /*anySingleRequirement=*/true);
     if (!requirements.empty())
       return ObjCReason::witnessToObjC(requirements.front());
+  }
+
+  if (attrToWarnOfObjCImplBehaviorChange) {
+    bool suggestFinal = !isa<ConstructorDecl>(VD);
+    VD->diagnose(diag::objc_implementation_lock_down_non_member_impl_behavior,
+                 VD, suggestFinal)
+      .fixItInsert(VD->getAttributeInsertionLoc(suggestFinal),
+                   suggestFinal ? "final " : "@nonobjc ");
+
+    VD->diagnose(diag::make_decl_objc, VD->getDescriptiveKind())
+      .fixItInsert(VD->getAttributeInsertionLoc(/*modifier=*/false), "@objc ");
+
+    attrToWarnOfObjCImplBehaviorChange->setHasInvalidImplicitLangAttrs();
   }
 
   return std::nullopt;
@@ -2412,6 +2449,11 @@ bool swift::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
         continue;
     }
 
+    // Skip declarations that are member implementations;
+    // ObjCImplmentationChecker will ensure they match a redeclared method.
+    if (method->isObjCMemberImplementation())
+      continue;
+
     auto classDecl = method->getDeclContext()->getSelfClassDecl();
     if (!classDecl)
       continue; // error-recovery path, only
@@ -3263,6 +3305,9 @@ private:
         continue;
 
       if (auto VD = dyn_cast<ValueDecl>(member)) {
+        // Force isObjC() to make sure hasInvalidImplicitLangAttrs() is set.
+        (void)VD->isObjC();
+
         // Skip non-member implementations.
         // FIXME: Should we consider them if only rejected for access level?
         if (!VD->isObjCMemberImplementation()) {
@@ -3283,7 +3328,8 @@ private:
       return ObjCSelector(VD->getASTContext(), 0, { ident });
     }
     if (auto objcAttr = VD->getAttrs().getAttribute<ObjCAttr>())
-      return objcAttr->getName().value_or(ObjCSelector());
+      if (!objcAttr->isNameImplicit())
+        return objcAttr->getName().value_or(ObjCSelector());
     return ObjCSelector();
   }
 
@@ -3870,7 +3916,8 @@ public:
   void diagnoseEarlyAdopterDeprecation() {
     // Only encourage use of @implementation for early adopters, and only when
     // there are no mismatches that they might be working around with it.
-    if (hasDiagnosed || !getAttr()->isEarlyAdopter())
+    if (hasDiagnosed || !getAttr()->isEarlyAdopter()
+          || getAttr()->hasInvalidImplicitLangAttrs())
       return;
 
     // Only encourage adoption if the corresponding language feature is enabled.

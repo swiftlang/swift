@@ -1814,6 +1814,12 @@ ERROR(attr_implementation_category_goes_on_objc_attr,none,
       "'@implementation'",
       ())
 
+WARNING(objc_implementation_lock_down_non_member_impl_behavior,none,
+        "%kind0 will become implicitly '@objc' after adopting '@objc "
+        "@implementation'; add '%select{@nonobjc|final}1' to keep the current "
+        "behavior",
+        (const ValueDecl *, bool))
+
 ERROR(member_of_objc_implementation_not_objc_or_final,none,
       "%kind0 does not match any %kindonly0 declared in the headers for %1; "
       "did you use the %kindonly0's Swift name?",

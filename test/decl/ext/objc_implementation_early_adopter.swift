@@ -443,8 +443,8 @@ protocol EmptySwiftProto {}
   }
 
   private func privateNonObjCMethod(_: EmptySwiftProto) {
-    // expected-warning@-1 {{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
-    // expected-note@-2 {{protocol-constrained type containing protocol 'EmptySwiftProto' cannot be represented in Objective-C}}
+    // expected-warning@-1 {{instance method 'privateNonObjCMethod' will become implicitly '@objc' after adopting '@objc @implementation'; add 'final' to keep the current behavior}} {{3-3=final }}
+    // expected-note@-2 {{add '@objc' to expose this instance method to Objective-C}} {{3-3=@objc }}
   }
 }
 
