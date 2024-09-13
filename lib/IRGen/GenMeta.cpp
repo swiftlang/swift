@@ -3304,7 +3304,7 @@ static void emitInitializeRawLayoutOld(IRGenFunction &IGF, SILType likeType,
   // emit a call to the swift_initStructMetadata tricking it into thinking
   // we have a single field.
   auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(IGF.IGM.Context);
+      AvailabilityRange::forDeploymentTarget(IGF.IGM.Context);
   auto initRawAvail = IGF.IGM.Context.getInitRawStructMetadataAvailability();
 
   if (!IGF.IGM.Context.LangOpts.DisableAvailabilityChecking &&
@@ -3337,7 +3337,7 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
   // If our deployment target doesn't contain the swift_initRawStructMetadata2,
   // emit a call to the older swift_initRawStructMetadata.
   auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(IGF.IGM.Context);
+      AvailabilityRange::forDeploymentTarget(IGF.IGM.Context);
   auto initRaw2Avail = IGF.IGM.Context.getInitRawStructMetadata2Availability();
 
   if (!IGF.IGM.Context.LangOpts.DisableAvailabilityChecking &&
@@ -5166,7 +5166,7 @@ diagnoseUnsupportedObjCImplLayout(IRGenModule &IGM, ClassDecl *classDecl,
     // runtimes.
     auto requiredAvailability=ctx.getUpdatePureObjCClassMetadataAvailability();
     // FIXME: Take the class's availability into account
-    auto currentAvailability = AvailabilityContext::forDeploymentTarget(ctx);
+    auto currentAvailability = AvailabilityRange::forDeploymentTarget(ctx);
     if (currentAvailability.isContainedIn(requiredAvailability))
       break;
 

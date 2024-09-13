@@ -22,7 +22,7 @@
 
 namespace swift {
 
-class AvailabilityContext;
+class AvailabilityRange;
 class ASTContext;
 
 namespace irgen {

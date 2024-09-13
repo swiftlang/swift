@@ -43,7 +43,7 @@ class SILGenFunctionBuilder;
 ///    code-reuse in between these different SILFunction creation sites.
 class SILFunctionBuilder {
   SILModule &mod;
-  AvailabilityContext availCtx;
+  AvailabilityRange availCtx;
 
   friend class SILParserFunctionBuilder;
   friend class SILSerializationFunctionBuilder;
@@ -51,11 +51,10 @@ class SILFunctionBuilder {
   friend class Lowering::SILGenFunctionBuilder;
 
   SILFunctionBuilder(SILModule &mod)
-      : SILFunctionBuilder(mod,
-                           AvailabilityContext::forDeploymentTarget(
-                             mod.getASTContext())) {}
+      : SILFunctionBuilder(
+            mod, AvailabilityRange::forDeploymentTarget(mod.getASTContext())) {}
 
-  SILFunctionBuilder(SILModule &mod, AvailabilityContext availCtx)
+  SILFunctionBuilder(SILModule &mod, AvailabilityRange availCtx)
       : mod(mod), availCtx(availCtx) {}
 
   /// Return the declaration of a utility function that can, but needn't, be
