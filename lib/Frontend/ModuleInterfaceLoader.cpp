@@ -1670,6 +1670,19 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     GenericArgs.push_back(triple);
   }
 
+  // Inherit the target SDK name and version
+  if (!LangOpts.SDKName.empty()) {
+    genericSubInvocation.getLangOptions().SDKName = LangOpts.SDKName;
+    GenericArgs.push_back("-target-sdk-name");
+    GenericArgs.push_back(ArgSaver.save(LangOpts.SDKName));
+  }
+  if (LangOpts.SDKVersion.has_value()) {
+    genericSubInvocation.getLangOptions().SDKVersion = LangOpts.SDKVersion;
+    GenericArgs.push_back("-target-sdk-version");
+    GenericArgs.push_back(ArgSaver.save(LangOpts.SDKVersion.value()
+                                                .getAsString()));
+  }
+
   // Inherit the Swift language version
   genericSubInvocation.getLangOptions().EffectiveLanguageVersion =
     LangOpts.EffectiveLanguageVersion;
