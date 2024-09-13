@@ -1177,19 +1177,8 @@ public:
     llvm::Value *errorResultPtr = origParams.claimNext();
     args.add(errorResultPtr);
     if (origConv.isTypedError()) {
-      auto errorType =
-        origConv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
-      auto silResultTy =
-        origConv.getSILResultType(IGM.getMaximalTypeExpansionContext());
-      auto &errorTI = IGM.getTypeInfo(errorType);
-      auto &resultTI = IGM.getTypeInfo(silResultTy);
-      auto &resultSchema = resultTI.nativeReturnValueSchema(IGM);
-      auto &errorSchema = errorTI.nativeReturnValueSchema(IGM);
-
-      if (resultSchema.requiresIndirect() || errorSchema.shouldReturnTypedErrorIndirectly() || outConv.hasIndirectSILErrorResults()) {
-        auto *typedErrorResultPtr = origParams.claimNext();
-        args.add(typedErrorResultPtr);
-      }
+      auto *typedErrorResultPtr = origParams.claimNext();
+      args.add(typedErrorResultPtr);
     }
   }
   llvm::CallInst *createCall(FunctionPointer &fnPtr) override {
@@ -1365,21 +1354,8 @@ public:
     // The error result pointer is already in the appropriate position but the
     // type error address is not.
     if (origConv.isTypedError()) {
-      auto errorType =
-          origConv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
-      auto silResultTy =
-          origConv.getSILResultType(IGM.getMaximalTypeExpansionContext());
-      auto &errorTI = IGM.getTypeInfo(errorType);
-      auto &resultTI = IGM.getTypeInfo(silResultTy);
-      auto &resultSchema = resultTI.nativeReturnValueSchema(IGM);
-      auto &errorSchema = errorTI.nativeReturnValueSchema(IGM);
-
-      if (resultSchema.requiresIndirect() ||
-          errorSchema.shouldReturnTypedErrorIndirectly() ||
-          outConv.hasIndirectSILErrorResults()) {
-        auto *typedErrorResultPtr = origParams.claimNext();
-        args.add(typedErrorResultPtr);
-      }
+      auto *typedErrorResultPtr = origParams.claimNext();
+      args.add(typedErrorResultPtr);
     }
   }
   llvm::CallInst *createCall(FunctionPointer &fnPtr) override {
@@ -2917,11 +2893,9 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
           : originalAuthInfo;
   auto callee = FunctionPointer::createSigned(
       fnPtr.getKind(), fnPtrArg, newAuthInfo, fnPtr.getSignature());
-
   auto call = Builder.CreateCall(callee, callArgs);
   call->setTailCallKind(IGM.AsyncTailCallKind);
   Builder.CreateRetVoid();
-
   return dispatch;
 }
 
