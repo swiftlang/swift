@@ -404,14 +404,6 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   // requirements.
   auto requirements = genericSig->getLocalRequirements(reducedType);
 
-  // Substitute into the superclass.
-  Type superclass = requirements.superclass;
-  if (superclass && superclass->hasTypeParameter()) {
-    superclass = mapTypeIntoContext(superclass);
-    if (superclass->is<ErrorType>())
-      superclass = Type();
-  }
-
   Type result;
 
   auto sugaredType = genericSig->getSugaredType(reducedType);
@@ -422,11 +414,13 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
     if (rootGP->isParameterPack()) {
       result = PackArchetypeType::get(ctx, this, sugaredType,
                                       requirements.packShape,
-                                      requirements.protos, superclass,
+                                      requirements.protos,
+                                      requirements.superclass,
                                       requirements.layout);
     } else {
       result = PrimaryArchetypeType::getNew(ctx, this, sugaredType,
-                                            requirements.protos, superclass,
+                                            requirements.protos,
+                                            requirements.superclass,
                                             requirements.layout);
     }
 
@@ -442,7 +436,8 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
     }
 
     result = OpaqueTypeArchetypeType::getNew(this, sugaredType,
-                                             requirements.protos, superclass,
+                                             requirements.protos,
+                                             requirements.superclass,
                                              requirements.layout);
     break;
   }
@@ -468,10 +463,12 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
         protos.push_back(proto);
 
       result = OpenedArchetypeType::getNew(this, sugaredType, protos,
-                                           superclass, requirements.layout);
+                                           requirements.superclass,
+                                           requirements.layout);
     } else {
       result = OpenedArchetypeType::getNew(this, sugaredType,
-                                           requirements.protos, superclass,
+                                           requirements.protos,
+                                           requirements.superclass,
                                            requirements.layout);
     }
 
@@ -485,7 +482,8 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
     }
 
     result = ElementArchetypeType::getNew(this, sugaredType,
-                                          requirements.protos, superclass,
+                                          requirements.protos,
+                                          requirements.superclass,
                                           requirements.layout);
     break;
   }

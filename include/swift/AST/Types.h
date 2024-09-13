@@ -6580,11 +6580,7 @@ public:
   bool requiresClass() const;
 
   /// Retrieve the superclass of this type, if such a requirement exists.
-  Type getSuperclass() const {
-    if (!Bits.ArchetypeType.HasSuperclass) return Type();
-
-    return *getSubclassTrailingObjects<Type>();
-  }
+  Type getSuperclass() const;
 
   /// Retrieve the layout constraint of this type, if such a requirement exists.
   LayoutConstraint getLayoutConstraint() const {
