@@ -504,6 +504,11 @@ CanType GenericSignatureImpl::getReducedType(Type type) const {
       type, { })->getCanonicalType();
 }
 
+CanType GenericSignatureImpl::getReducedTypeParameter(CanType type) const {
+  return getRequirementMachine()->getReducedTypeParameter(
+      type, { })->getCanonicalType();
+}
+
 bool GenericSignatureImpl::isValidTypeParameter(Type type) const {
   return getRequirementMachine()->isValidTypeParameter(type);
 }

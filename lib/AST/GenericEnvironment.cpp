@@ -378,7 +378,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   auto genericSig = getGenericSignature();
 
   // Reduce it.
-  auto reducedType = genericSig.getReducedType(canType);
+  auto reducedType = genericSig->getReducedTypeParameter(canType);
 
   // If this type parameter is equivalent to a concrete type,
   // map the concrete type into context and cache the result.

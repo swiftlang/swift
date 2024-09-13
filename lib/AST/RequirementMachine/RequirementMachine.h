@@ -154,6 +154,8 @@ public:
                        const ProtocolDecl *proto=nullptr) const;
   bool areReducedTypeParametersEqual(Type depType1, Type depType2) const;
   bool isReducedType(Type type) const;
+  Type getReducedTypeParameter(CanType type,
+                      ArrayRef<GenericTypeParamType *> genericParams) const;
   Type getReducedType(Type type,
                       ArrayRef<GenericTypeParamType *> genericParams) const;
   bool isValidTypeParameter(Type type) const;
