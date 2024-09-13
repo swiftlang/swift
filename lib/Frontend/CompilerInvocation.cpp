@@ -3461,6 +3461,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_enable_split_cold_code,
                    OPT_disable_split_cold_code,
                    Opts.EnableHotColdSplit);
+  Opts.EmitAsyncFramePushPopMetadata =
+    Args.hasFlag(OPT_enable_async_frame_push_pop_metadata,
+                 OPT_disable_async_frame_push_pop_metadata,
+                 Opts.EmitAsyncFramePushPopMetadata);
   Opts.EnableLargeLoadableTypesReg2Mem =
       Args.hasFlag(OPT_enable_large_loadable_types_reg2mem,
                    OPT_disable_large_loadable_types_reg2mem,

@@ -2523,6 +2523,10 @@ void IRGenSILFunction::emitSILFunction() {
                              CurFn,
                              LinkEntity::forSILFunction(CurSILFn),
                              getAsyncContextLayout(*this).getSize());
+
+    if (IGM.getOptions().EmitAsyncFramePushPopMetadata) {
+      CurFn->addFnAttr("async_entry");
+    }
   }
   if (isAsyncFn) {
     IGM.noteSwiftAsyncFunctionDef();
