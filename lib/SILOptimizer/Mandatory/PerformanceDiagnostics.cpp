@@ -203,7 +203,7 @@ bool PerformanceDiagnostics::visitFunctionEmbeddedSwift(
     SILFunction *function, LocWithParent *parentLoc) {
   // Don't check generic functions in embedded Swift, they're about to be
   // removed anyway.
-  if (function->getLoweredFunctionType()->getSubstGenericSignature())
+  if (function->isGeneric())
     return false;
 
   if (!function->isDefinition())
