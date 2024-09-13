@@ -27,14 +27,41 @@ struct BisectToolchains: AsyncParsableCommand {
       """)
   var script: String
 
-  @Option(help: "Oldest tag. Expected to pass")
-  var goodTag: String
+  @Option(help: "Oldest Date. Expected to Pass. We use the first snapshot produced before the given date")
+  var oldDate: String
 
-  @Option(help: "Newest tag. Expected to fail. If not set, use newest snapshot")
-  var badTag: String?
+  var oldDateAsDate: Date {
+    let d = DateFormatter()
+    d.dateFormat = "yyyy-MM-dd"
+    guard let result = d.date(from: oldDate) else {
+      log("Improperly formatted date: \(oldDate)! Expected format: yyyy_MM_dd.")
+      fatalError()
+    }
+    return result
+  }
+
+  @Option(help: """
+    Newest Date. Expected to fail. If not set, use newest snapshot. We use the
+    first snapshot after new date
+    """)
+  var newDate: String?
+
+  var newDateAsDate: Date? {
+    guard let newDate = self.newDate else { return nil }
+    let d = DateFormatter()
+    d.dateFormat = "yyyy-MM-dd"
+    guard let result = d.date(from: newDate) else {
+      log("Improperly formatted date: \(newDate)! Expected format: yyyy_MM_dd.")
+      fatalError()
+    }
+    return result
+  }
 
   @Flag(help: "Invert the test so that we assume the newest succeeds")
   var invert = false
+
+  @Argument(help: "Extra constant arguments to pass to the test")
+  var extraArgs: [String] = []
 
   mutating func run() async throws {
     if !FileManager.default.fileExists(atPath: workspace) {
@@ -49,20 +76,25 @@ struct BisectToolchains: AsyncParsableCommand {
     }
 
     // Load our tags from swift's github repo
-    let tags = try! await getTagsFromSwiftRepo(branch: branch)
+    let tags = try! await getTagsFromSwiftRepo(branch: branch, dryRun: true)
 
-    guard let goodTagIndex = tags.firstIndex(where: { $0.name == self.goodTag }) else {
-      log("Failed to find tag: \(self.goodTag)")
+    // Newest is first. So 0 maps to the newest tag. We do this so someone can
+    // just say 50 toolchains ago. To get a few weeks worth. This is easier than
+    // writing dates a lot.
+    let oldDateAsDate = self.oldDateAsDate
+    guard let goodTagIndex = tags.firstIndex(where: { $0.tag.date(branch: self.branch) < oldDateAsDate }) else {
+      log("Failed to find tag with date: \(oldDateAsDate)")
       fatalError()
     }
 
-    let badTagIndex: Array<Tag>.Index
-    if let badTag = self.badTag {
-      guard let n = tags.firstIndex(where: { $0.name == badTag }) else {
-        log("Failed to find tag: \(badTag)")
+    let badTagIndex: Int
+    if let newDateAsDate = self.newDateAsDate {
+      let b = tags.firstIndex(where: { $0.tag.date(branch: self.branch) < newDateAsDate })
+      guard let b else {
+        log("Failed to find tag newer than date: \(newDateAsDate)")
         fatalError()
       }
-      badTagIndex = n
+      badTagIndex = b
     } else {
       badTagIndex = 0
     }
@@ -73,22 +105,60 @@ struct BisectToolchains: AsyncParsableCommand {
       fatalError()
     }
 
-    log("[INFO] Testing \(totalTags) toolchains")
-
     var startIndex = goodTagIndex
     var endIndex = badTagIndex
-    while startIndex != endIndex && startIndex != (endIndex - 1) {
+
+    // First check if the newest toolchain succeeds. We assume this in our bisection.
+    do {
+      log("Testing that Oldest Tag Succeeds: \(tags[startIndex].tag))")
+      let result = try! await downloadToolchainAndRunTest(
+        platform: platform, tag: tags[startIndex].tag, branch: branch, workspace: workspace, script: script,
+        extraArgs: extraArgs)
+      var success = result == 0
+      if self.invert {
+        success = !success
+      }
+      if !success {
+        log("[INFO] Oldest snapshot fails?! We assume that the oldest snapshot is known good!")
+      } else {
+        log("[INFO] Oldest snapshot passes test. Snapshot: \(tags[startIndex])")
+      }
+    }
+
+    do {
+      log("Testing that Newest Tag Fails: \(tags[endIndex].tag))")
+      let result = try! await downloadToolchainAndRunTest(
+        platform: platform, tag: tags[endIndex].tag, branch: branch, workspace: workspace, script: script,
+        extraArgs: extraArgs)
+      var success = result != 0
+      if self.invert {
+        success = !success
+      }
+      if !success {
+        log("[INFO] Newest snapshot succeceds?! We assume that the newest snapshot is known bad!")
+      } else {
+        log("[INFO] Newest snapshot passes test. Snapshot: \(tags[endIndex])")
+      }
+    }
+
+    log("[INFO] Testing \(totalTags) toolchains")
+    while startIndex != endIndex && startIndex != endIndex {
       let mid = (startIndex + endIndex) / 2
+
+      let midValue = tags[mid].tag
       log(
-        "[INFO] Visiting Mid: \(mid) with (Start, End) = (\(startIndex),\(endIndex)). Tag: \(tags[mid])"
+        "[INFO] Visiting Mid: \(mid) with (Start, End) = (\(startIndex),\(endIndex)). Tag: \(midValue)"
       )
       let result = try! await downloadToolchainAndRunTest(
-        platform: platform, tag: tags[mid], branch: branch, workspace: workspace, script: script)
+        platform: platform, tag: midValue, branch: branch, workspace: workspace, script: script,
+        extraArgs: extraArgs)
 
       var success = result == 0
       if self.invert {
         success = !success
       }
+
+      let midIsEndIndex = mid == endIndex
 
       if success {
         log("[INFO] PASSES! Setting start to mid!")
@@ -96,6 +166,11 @@ struct BisectToolchains: AsyncParsableCommand {
       } else {
         log("[INFO] FAILS! Setting end to mid")
         endIndex = mid
+      }
+
+      if midIsEndIndex {
+        log("Last successful value: \(tags[mid+1])")
+        break
       }
     }
   }

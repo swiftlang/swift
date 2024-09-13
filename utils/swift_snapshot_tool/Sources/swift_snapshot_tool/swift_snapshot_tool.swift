@@ -6,6 +6,7 @@ struct SwiftSnapshotTool: ParsableCommand {
     subcommands: [
       BisectToolchains.self,
       ListSnapshots.self,
+      RunToolchains.self,
     ])
 }
 
