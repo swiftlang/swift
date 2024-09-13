@@ -5747,6 +5747,7 @@ void irgen::emitAsyncReturn(
   // Setup the coro.end.async intrinsic call.
   auto &Builder = IGF.Builder;
   auto mustTailCallFn = IGF.createAsyncDispatchFn(fnPtr,Args);
+
   auto handle = IGF.getCoroutineHandle();
   auto rawFnPtr =
       Builder.CreateBitOrPointerCast(fnPtr.getRawPointer(), IGF.IGM.Int8PtrTy);
