@@ -88,3 +88,14 @@ actor NestedAsyncInSyncActor {
     _ = middle
   }
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s24local_function_isolation13outerFunctionyyScA_pYaF : $@convention(thin) @async (@guaranteed any Actor) -> () {
+func outerFunction(_ a: any Actor) async {
+  // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation13outerFunctionyyScA_pYaF06middleE0L_yyScA_pYaF : $@convention(thin) @async (@guaranteed any Actor) -> () {
+  func middleFunction(_ isolated: any Actor) async {
+    // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation13outerFunctionyyScA_pYaF06middleE0L_yyScA_pYaF05innerE0L_yyYaF : $@convention(thin) @async () -> () {
+    func innerFunction() async {}
+  }
+
+  await middleFunction(a)
+}
