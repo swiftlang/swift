@@ -3134,10 +3134,11 @@ ERROR(witness_unavailable,none,
         "unavailable %kind0 was used to satisfy a requirement of protocol %1%select{|: %2}2",
         (const ValueDecl *, const ProtocolDecl *, StringRef))
 
-WARNING(witness_deprecated,none,
-        "deprecated default implementation is used to satisfy %kind0 required by "
-        "protocol %1%select{|: %2}2",
-        (const ValueDecl *, Identifier, StringRef))
+GROUPED_WARNING(
+    witness_deprecated, DeprecatedDeclaration, none,
+    "deprecated default implementation is used to satisfy %kind0 required by "
+    "protocol %1%select{|: %2}2",
+    (const ValueDecl *, Identifier, StringRef))
 
 WARNING(unavailable_conformance,none,
         "conformance of %0 to protocol %1 is already unavailable",
@@ -6652,14 +6653,14 @@ NOTE(availability_obsoleted, none,
      "%0 was obsoleted in %1 %2",
      (const ValueDecl *, StringRef, llvm::VersionTuple))
 
-GROUPED_WARNING(availability_deprecated, availability_deprecated, Deprecation,
+GROUPED_WARNING(availability_deprecated, DeprecatedDeclaration, Deprecation,
                 "%0 %select{is|%select{is|was}3}1 "
                 "deprecated%select{| in %2%select{| %4}3}1%select{|: %5}5",
                 (const ValueDecl *, bool, StringRef, bool, llvm::VersionTuple,
                  StringRef))
 
 GROUPED_WARNING(
-      availability_deprecated_rename, availability_deprecated, Deprecation,
+      availability_deprecated_rename, DeprecatedDeclaration, Deprecation,
       "%0 %select{is|%select{is|was}3}1 "
       "deprecated%select{| in %2%select{| %4}3}1: "
       "%select{renamed to|replaced by}5%" REPLACEMENT_DECL_KIND_SELECT "6 "
@@ -6837,11 +6838,12 @@ NOTE(conformance_availability_obsoleted, none,
      "conformance of %0 to %1 was obsoleted in %2 %3",
      (Type, Type, StringRef, llvm::VersionTuple))
 
-WARNING(conformance_availability_deprecated, Deprecation,
-        "conformance of %0 to %1 %select{is|%select{is|was}4}2 "
-        "deprecated%select{| in %3%select{| %5}4}2%select{|: %6}6",
-        (Type, Type, bool, StringRef, bool, llvm::VersionTuple,
-         StringRef))
+GROUPED_WARNING(conformance_availability_deprecated,
+                DeprecatedDeclaration, Deprecation,
+                "conformance of %0 to %1 %select{is|%select{is|was}4}2 "
+                "deprecated%select{| in %3%select{| %5}4}2%select{|: %6}6",
+                (Type, Type, bool, StringRef, bool, llvm::VersionTuple,
+                 StringRef))
 
 ERROR(conformance_availability_only_version_newer, none,
       "conformance of %0 to %1 is only available in %2 %3 or newer",
@@ -7107,15 +7109,19 @@ ERROR(override_nsobject_hash_error,none,
       "'NSObject.hash(into:)' is not overridable; "
       "did you mean to override 'NSObject.hash'?", ())
 
-WARNING(hashvalue_implementation,Deprecation,
-        "'Hashable.hashValue' is deprecated as a protocol requirement; "
-        "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",
-        (Type))
+GROUPED_WARNING(
+    hashvalue_implementation, DeprecatedDeclaration, Deprecation,
+    "'Hashable.hashValue' is deprecated as a protocol requirement; "
+    "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",
+    (Type))
 
-WARNING(executor_enqueue_deprecated_owned_job_implementation,Deprecation,
-        "'Executor.enqueue(Job)' is deprecated as a protocol requirement; "
-        "conform type %0 to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead",
-        (Type))
+GROUPED_WARNING(
+    executor_enqueue_deprecated_owned_job_implementation,
+    DeprecatedDeclaration, Deprecation,
+    "'Executor.enqueue(Job)' is deprecated as a protocol requirement; "
+    "conform type %0 to 'Executor' by implementing 'func enqueue(ExecutorJob)' "
+    "instead",
+    (Type))
 WARNING(executor_enqueue_unused_implementation, none,
         "'Executor.enqueue(ExecutorJob)' will never be used, due to the presence of "
         "'enqueue(UnownedJob)'",

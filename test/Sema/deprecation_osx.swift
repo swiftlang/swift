@@ -26,11 +26,11 @@ func useClassThatTriggersImportOfDeprecatedEnum() {
 }
 
 func directUseShouldStillTriggerDeprecationWarning() {
-  _ = NSDeprecatedOptions.first // expected-warning {{'NSDeprecatedOptions' was deprecated in macOS 51: Use a different API [availability_deprecated]}}
-  _ = NSDeprecatedEnum.first    // expected-warning {{'NSDeprecatedEnum' was deprecated in macOS 51: Use a different API [availability_deprecated]}}
+  _ = NSDeprecatedOptions.first // expected-warning {{'NSDeprecatedOptions' was deprecated in macOS 51: Use a different API [DeprecatedDeclaration]}}
+  _ = NSDeprecatedEnum.first    // expected-warning {{'NSDeprecatedEnum' was deprecated in macOS 51: Use a different API [DeprecatedDeclaration]}}
 }
 
-func useInSignature(options: NSDeprecatedOptions) { // expected-warning {{'NSDeprecatedOptions' was deprecated in macOS 51: Use a different API [availability_deprecated]}}
+func useInSignature(options: NSDeprecatedOptions) { // expected-warning {{'NSDeprecatedOptions' was deprecated in macOS 51: Use a different API [DeprecatedDeclaration]}}
 }
 
 
@@ -83,20 +83,20 @@ class ClassWithComputedPropertyDeprecatedIn51 {
     }
   }
 
-  var unannotatedPropertyDeprecatedIn51 : ClassDeprecatedIn51 { // expected-warning {{ClassDeprecatedIn51' was deprecated in macOS 51 [availability_deprecated]}}
+  var unannotatedPropertyDeprecatedIn51 : ClassDeprecatedIn51 { // expected-warning {{ClassDeprecatedIn51' was deprecated in macOS 51 [DeprecatedDeclaration]}}
     get {
-      return ClassDeprecatedIn51() // expected-warning {{ClassDeprecatedIn51' was deprecated in macOS 51 [availability_deprecated]}}
+      return ClassDeprecatedIn51() // expected-warning {{ClassDeprecatedIn51' was deprecated in macOS 51 [DeprecatedDeclaration]}}
     }
     set(newValue) {
-      _ = ClassDeprecatedIn51() // expected-warning {{ClassDeprecatedIn51' was deprecated in macOS 51 [availability_deprecated]}}
+      _ = ClassDeprecatedIn51() // expected-warning {{ClassDeprecatedIn51' was deprecated in macOS 51 [DeprecatedDeclaration]}}
     }
   }
 
-  var unannotatedStoredPropertyOfTypeDeprecatedIn51 : ClassDeprecatedIn51? = nil // expected-warning {{ClassDeprecatedIn51' was deprecated in macOS 51 [availability_deprecated]}}
+  var unannotatedStoredPropertyOfTypeDeprecatedIn51 : ClassDeprecatedIn51? = nil // expected-warning {{ClassDeprecatedIn51' was deprecated in macOS 51 [DeprecatedDeclaration]}}
 }
 
 func usesFunctionDeprecatedIn51() {
-  _ = ClassDeprecatedIn51() // expected-warning {{ClassDeprecatedIn51' was deprecated in macOS 51 [availability_deprecated]}}
+  _ = ClassDeprecatedIn51() // expected-warning {{ClassDeprecatedIn51' was deprecated in macOS 51 [DeprecatedDeclaration]}}
 }
 
 @available(OSX, introduced: 10.8, deprecated: 51)
@@ -104,34 +104,34 @@ func annotatedUsesFunctionDeprecatedIn51() {
   _ = ClassDeprecatedIn51()
 }
 
-func hasParameterDeprecatedIn51(p: ClassDeprecatedIn51) { // expected-warning {{ClassDeprecatedIn51' was deprecated in macOS 51 [availability_deprecated]}}
+func hasParameterDeprecatedIn51(p: ClassDeprecatedIn51) { // expected-warning {{ClassDeprecatedIn51' was deprecated in macOS 51 [DeprecatedDeclaration]}}
 }
 
 @available(OSX, introduced: 10.8, deprecated: 51)
 func annotatedHasParameterDeprecatedIn51(p: ClassDeprecatedIn51) {
 }
 
-func hasReturnDeprecatedIn51() -> ClassDeprecatedIn51 { // expected-warning {{ClassDeprecatedIn51' was deprecated in macOS 51 [availability_deprecated]}}
+func hasReturnDeprecatedIn51() -> ClassDeprecatedIn51 { // expected-warning {{ClassDeprecatedIn51' was deprecated in macOS 51 [DeprecatedDeclaration]}}
 }
 
 @available(OSX, introduced: 10.8, deprecated: 51)
 func annotatedHasReturnDeprecatedIn51() -> ClassDeprecatedIn51 {
 }
 
-var globalWithDeprecatedType : ClassDeprecatedIn51? = nil // expected-warning {{ClassDeprecatedIn51' was deprecated in macOS 51 [availability_deprecated]}}
+var globalWithDeprecatedType : ClassDeprecatedIn51? = nil // expected-warning {{ClassDeprecatedIn51' was deprecated in macOS 51 [DeprecatedDeclaration]}}
 
 @available(OSX, introduced: 10.8, deprecated: 51)
 var annotatedGlobalWithDeprecatedType : ClassDeprecatedIn51?
 
 
 enum EnumWithDeprecatedCasePayload {
-  case WithDeprecatedPayload(p: ClassDeprecatedIn51) // expected-warning {{ClassDeprecatedIn51' was deprecated in macOS 51 [availability_deprecated]}}
+  case WithDeprecatedPayload(p: ClassDeprecatedIn51) // expected-warning {{ClassDeprecatedIn51' was deprecated in macOS 51 [DeprecatedDeclaration]}}
 
   @available(OSX, introduced: 10.8, deprecated: 51)
   case AnnotatedWithDeprecatedPayload(p: ClassDeprecatedIn51)
 }
 
-extension ClassDeprecatedIn51 { // expected-warning {{'ClassDeprecatedIn51' was deprecated in macOS 51 [availability_deprecated]}}
+extension ClassDeprecatedIn51 { // expected-warning {{'ClassDeprecatedIn51' was deprecated in macOS 51 [DeprecatedDeclaration]}}
 
 }
 
@@ -142,9 +142,9 @@ extension ClassDeprecatedIn51 {
 }
 
 func callMethodInDeprecatedExtension() {
-  let o = ClassDeprecatedIn51() // expected-warning {{'ClassDeprecatedIn51' was deprecated in macOS 51 [availability_deprecated]}}
+  let o = ClassDeprecatedIn51() // expected-warning {{'ClassDeprecatedIn51' was deprecated in macOS 51 [DeprecatedDeclaration]}}
 
-  o.methodInExtensionOfClassDeprecatedIn51() // expected-warning {{'methodInExtensionOfClassDeprecatedIn51()' was deprecated in macOS 51 [availability_deprecated]}}
+  o.methodInExtensionOfClassDeprecatedIn51() // expected-warning {{'methodInExtensionOfClassDeprecatedIn51()' was deprecated in macOS 51 [DeprecatedDeclaration]}}
 }
 
 func functionWithDeprecatedMethodInDeadElseBranch() {
@@ -179,7 +179,7 @@ class I59843_A {
   func method(with: Int) {}
 
   func f() {
-    self.method(a: "a", b: "b") // expected-warning{{'method(a:b:)' was deprecated in macOS 51: renamed to 'method(with:)' [availability_deprecated]}}
+    self.method(a: "a", b: "b") // expected-warning{{'method(a:b:)' was deprecated in macOS 51: renamed to 'method(with:)' [DeprecatedDeclaration]}}
     // expected-note@-1{{use 'method(with:)' instead}} {{none}} 
   }
 }
@@ -207,18 +207,18 @@ class I59843_B {
   static func contextDiff(with: Int, and: Int) {}
   
   func f() {
-    self.method(a: "a", b: "b") // expected-warning{{'method(a:b:)' was deprecated in macOS 51: renamed to 'method(with:and:)' [availability_deprecated]}}
+    self.method(a: "a", b: "b") // expected-warning{{'method(a:b:)' was deprecated in macOS 51: renamed to 'method(with:and:)' [DeprecatedDeclaration]}}
     // expected-note@-1{{use 'method(with:and:)' instead}} {{17-18=with}} {{25-26=and}}
   }
 }
 
 func I59843_f() {
-  I59843_A.configure(a: "a", b: "b") // expected-warning{{'configure(a:b:)' was deprecated in macOS 51: renamed to 'configure(with:)' [availability_deprecated]}}
+  I59843_A.configure(a: "a", b: "b") // expected-warning{{'configure(a:b:)' was deprecated in macOS 51: renamed to 'configure(with:)' [DeprecatedDeclaration]}}
   // expected-note@-1{{use 'configure(with:)' instead}} {{none}}
-  I59843_B.configure(a: "a", b: "b") // expected-warning{{'configure(a:b:)' was deprecated in macOS 51: renamed to 'configure(with:and:)' [availability_deprecated]}}
+  I59843_B.configure(a: "a", b: "b") // expected-warning{{'configure(a:b:)' was deprecated in macOS 51: renamed to 'configure(with:and:)' [DeprecatedDeclaration]}}
   // expected-note@-1{{use 'configure(with:and:)' instead}} {{22-23=with}} {{30-31=and}}
-  I59843_B.context(a: "a", b: "b") // expected-warning{{'context(a:b:)' was deprecated in macOS 51: replaced by 'I59843_B.context(with:and:)' [availability_deprecated]}}
+  I59843_B.context(a: "a", b: "b") // expected-warning{{'context(a:b:)' was deprecated in macOS 51: replaced by 'I59843_B.context(with:and:)' [DeprecatedDeclaration]}}
   // expected-note@-1{{use 'I59843_B.context(with:and:)' instead}} {{20-21=with}} {{28-29=and}}
-  I59843_B.contextDiff(a: "a", b: "b") // expected-warning{{'contextDiff(a:b:)' was deprecated in macOS 51: replaced by 'I59843_A.contextDiff(with:and:)' [availability_deprecated]}}
+  I59843_B.contextDiff(a: "a", b: "b") // expected-warning{{'contextDiff(a:b:)' was deprecated in macOS 51: replaced by 'I59843_A.contextDiff(with:and:)' [DeprecatedDeclaration]}}
   // expected-note@-1{{use 'I59843_A.contextDiff(with:and:)' instead}} {{3-23=I59843_A.contextDiff}} {{24-25=with}} {{32-33=and}}
 }

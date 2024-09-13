@@ -2,6 +2,6 @@
 // RUN:     -disable-availability-checking                   \
 // RUN:     -print-diagnostic-groups
 
-struct S : _BitwiseCopyable {} // expected-warning {{'_BitwiseCopyable' is deprecated: Use BitwiseCopyable [availability_deprecated]}}
+struct S : _BitwiseCopyable {} // expected-warning {{'_BitwiseCopyable' is deprecated: Use BitwiseCopyable [DeprecatedDeclaration]}}
 
-func f<T : _BitwiseCopyable>(_ t: T) {} // expected-warning {{'_BitwiseCopyable' is deprecated: Use BitwiseCopyable [availability_deprecated]}}
+func f<T : _BitwiseCopyable>(_ t: T) {} // expected-warning {{'_BitwiseCopyable' is deprecated: Use BitwiseCopyable [DeprecatedDeclaration]}}

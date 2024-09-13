@@ -89,7 +89,7 @@ ERROR(error_missing_arg_value,none,
       (StringRef, unsigned))
 ERROR(error_unknown_arg,none,
       "unknown argument: '%0'", (StringRef))
-GROUPED_WARNING(unknown_warning_group, unknown_warning_group, none,
+GROUPED_WARNING(unknown_warning_group, UnknownWarningGroup, none,
                 "unknown warning group: '%0'", (StringRef))
 ERROR(error_invalid_arg_value,none,
       "invalid value '%1' in '%0'", (StringRef, StringRef))

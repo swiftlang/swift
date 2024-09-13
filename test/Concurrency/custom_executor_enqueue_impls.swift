@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=targeted %s
-// RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=complete %s
-// RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation %s
+// RUN: %target-swift-frontend -print-diagnostic-groups -disable-availability-checking -emit-sil -o /dev/null -verify %s
+// RUN: %target-swift-frontend -print-diagnostic-groups -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=targeted %s
+// RUN: %target-swift-frontend -print-diagnostic-groups -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=complete %s
+// RUN: %target-swift-frontend -print-diagnostic-groups -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -41,7 +41,7 @@ final class TripleExecutor: SerialExecutor {
 
   // expected-warning@+2{{'Job' is deprecated: renamed to 'ExecutorJob'}}
   // expected-note@+1{{use 'ExecutorJob' instead}}
-  func enqueue(_ job: __owned Job) {} // expected-warning{{'Executor.enqueue(Job)' is deprecated as a protocol requirement; conform type 'TripleExecutor' to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead}}
+  func enqueue(_ job: __owned Job) {} // expected-warning{{'Executor.enqueue(Job)' is deprecated as a protocol requirement; conform type 'TripleExecutor' to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead [DeprecatedDeclaration]}}
 
   func enqueue(_ job: consuming ExecutorJob) {}
 
@@ -65,7 +65,7 @@ final class NoneExecutor: SerialExecutor { // expected-error{{type 'NoneExecutor
 final class StillDeprecated: SerialExecutor {
   // expected-warning@+2{{'Job' is deprecated: renamed to 'ExecutorJob'}}
   // expected-note@+1{{use 'ExecutorJob' instead}}
-  func enqueue(_ job: __owned Job) {} // expected-warning{{'Executor.enqueue(Job)' is deprecated as a protocol requirement; conform type 'StillDeprecated' to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead}}
+  func enqueue(_ job: __owned Job) {} // expected-warning{{'Executor.enqueue(Job)' is deprecated as a protocol requirement; conform type 'StillDeprecated' to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead [DeprecatedDeclaration]}}
 
   func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     UnownedSerialExecutor(ordinary: self)

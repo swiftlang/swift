@@ -6,36 +6,36 @@
 class D {}
 
 protocol P<T1> {
-  associatedtype T1 = D // expected-warning {{'D' is deprecated [availability_deprecated]}}
-  associatedtype T2: P where T2: D // expected-warning {{'D' is deprecated [availability_deprecated]}}
+  associatedtype T1 = D // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
+  associatedtype T2: P where T2: D // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
 }
 
-class C<T1>: D { // expected-warning {{'D' is deprecated [availability_deprecated]}}
+class C<T1>: D { // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
   struct Nested<T2> {
-    let d: D // expected-warning {{'D' is deprecated [availability_deprecated]}}
+    let d: D // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
   }
 }
-extension C<D> {} // expected-warning {{'D' is deprecated [availability_deprecated]}}
+extension C<D> {} // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
 
 func f<each T>(
   _: (
-    D, // expected-warning {{'D' is deprecated [availability_deprecated]}}
-    (D), // expected-warning {{'D' is deprecated [availability_deprecated]}}
-    C<D> // expected-warning {{'D' is deprecated [availability_deprecated]}}
-      .Nested<D>, // expected-warning {{'D' is deprecated [availability_deprecated]}}
-    () -> D, // expected-warning {{'D' is deprecated [availability_deprecated]}}
-    (inout D) -> Void, // expected-warning {{'D' is deprecated [availability_deprecated]}}
-    (D...) -> Void, // expected-warning {{'D' is deprecated [availability_deprecated]}}
-    D?, // expected-warning {{'D' is deprecated [availability_deprecated]}}
-    [D], // expected-warning {{'D' is deprecated [availability_deprecated]}}
-    [Int : D], // expected-warning {{'D' is deprecated [availability_deprecated]}}
+    D, // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
+    (D), // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
+    C<D> // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
+      .Nested<D>, // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
+    () -> D, // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
+    (inout D) -> Void, // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
+    (D...) -> Void, // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
+    D?, // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
+    [D], // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
+    [Int : D], // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
     // FIXME: Emitted twice.
-    some P<D>, // expected-warning 2 {{'D' is deprecated [availability_deprecated]}}
-    any P<D>, // expected-warning {{'D' is deprecated [availability_deprecated]}}
-    any C<D> & P, // expected-warning {{'D' is deprecated [availability_deprecated]}}
-    D.Type, // expected-warning {{'D' is deprecated [availability_deprecated]}}
-    repeat (D, each T) // expected-warning {{'D' is deprecated [availability_deprecated]}}
+    some P<D>, // expected-warning 2 {{'D' is deprecated [DeprecatedDeclaration]}}
+    any P<D>, // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
+    any C<D> & P, // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
+    D.Type, // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
+    repeat (D, each T) // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
   ),
-  _: @escaping (D) -> Void // expected-warning {{'D' is deprecated [availability_deprecated]}}
+  _: @escaping (D) -> Void // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
 )
-where repeat each T: D {} // expected-warning {{'D' is deprecated [availability_deprecated]}}
+where repeat each T: D {} // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
