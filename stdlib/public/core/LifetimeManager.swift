@@ -243,18 +243,6 @@ public func _withUnprotectedUnsafePointer<
 ///
 /// This function is similar to `withUnsafePointer`, except that it
 /// doesn't trigger stack protection for the pointer.
-///
-/// - Parameters:
-///   - value: An instance to temporarily use via pointer.
-///   - body: A closure that takes a pointer to `value` as its sole argument. If
-///     the closure has a return value, that value is also used as the return
-///     value of the `withUnsafePointer(to:_:)` function. The pointer argument
-///     is valid only for the duration of the function's execution.
-///     It is undefined behavior to try to mutate through the pointer argument
-///     by converting it to `UnsafeMutablePointer` or any other mutable pointer
-///     type. If you need to mutate the argument through the pointer, use
-///     `withUnsafeMutablePointer(to:_:)` instead.
-/// - Returns: The return value, if any, of the `body` closure.
 @_alwaysEmitIntoClient
 public func _withUnprotectedUnsafePointer<
   T: ~Copyable, E: Error, Result: ~Copyable
