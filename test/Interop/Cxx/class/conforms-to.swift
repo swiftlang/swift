@@ -38,6 +38,15 @@ func caller(_ x: Playable) {
 func caller(_ x: DerivedFromHasPlay) { callee(x) }
 func caller(_ x: DerivedFromDerivedFromHasPlay) { callee(x) }
 
+func caller(_ x: ConformsToBothHasTestAndHasPlay) {
+    callee(x as Testable)
+    callee(x as Playable)
+}
+func caller(_ x: DerivedFromHasTestAndHasPlay) {
+    callee(x as Testable)
+    callee(x as Playable)
+}
+
 func caller(_ x: HasTestAndPlay) {
     callee(x as Testable)
     callee(x as Playable)

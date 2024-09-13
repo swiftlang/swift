@@ -15,6 +15,10 @@ struct  __attribute__((swift_attr("conforms_to:Mod.X"))) CModInv {};
 struct  __attribute__((swift_attr("conforms_to:SwiftTest.X"))) CX {};
 struct  __attribute__((swift_attr("conforms_to:SwiftTest.A"))) CA {};
 struct  __attribute__((swift_attr("conforms_to:SwiftTest.B"))) CB {};
+struct  __attribute__((swift_attr("conforms_to:SwiftTest.A"))) \
+    __attribute__((swift_attr("conforms_to:SwiftTest.B"))) ConformsToValidAProtocolButAlsoStructB {};
+struct  __attribute__((swift_attr("conforms_to:SwiftTest.A"))) \
+    __attribute__((swift_attr("conforms_to:X"))) ConformsToValidAProtocolButInvalidX {};
 
 //--- test.swift
 
@@ -30,5 +34,7 @@ protocol A {}
 // CHECK: error: protocol 'X' in specified protocol conformance is not found in module 'SwiftTest'
 // CHECK: error: ambiguous reference to protocol 'A' in specified protocol conformance; module 'SwiftTest' contains multiple protocols named 'A'
 // CHECK: error: struct 'B' referenced in protocol conformance 'SwiftTest.B' is not a protocol
+// CHECK: conforms to both protocol A and a struct B it should error: struct 'B' referenced in protocol conformance 'SwiftTest.B' is not a protocol
+// CHECK: conforms to both protocol A and a X it should error: expected module name and protocol name separated by '.' in protocol conformance; 'X' is invalid
 
-func test(_ inv: CInv, _ invMod: CModInv, _ x: CX, _ a: CA, _ b: CB) {}
+func test(_ inv: CInv, _ invMod: CModInv, _ x: CX, _ a: CA, _ b: CB, c: ConformsToValidAProtocolButAlsoStructB, d: ConformsToValidAProtocolButInvalidX) {}
