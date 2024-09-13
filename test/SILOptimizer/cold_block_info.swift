@@ -7,6 +7,8 @@
 // RUN: %FileCheck %s --input-file=%t/debug.txt \
 // RUN:               --implicit-check-not 'converged after {{[3-9]}} iters'
 
+// REQUIRES: asserts
+
 public enum MyError: Error { case err; case number(Int) }
 
 @inline(never)
