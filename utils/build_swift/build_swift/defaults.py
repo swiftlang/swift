@@ -55,7 +55,9 @@ DARWIN_XCRUN_TOOLCHAIN = 'default'
 DARWIN_DEPLOYMENT_VERSION_OSX = '13.0'
 DARWIN_DEPLOYMENT_VERSION_IOS = '16.0'
 DARWIN_DEPLOYMENT_VERSION_TVOS = '16.0'
-DARWIN_DEPLOYMENT_VERSION_WATCHOS = '9.0'
+# FIXME: 9.0 would be the aligned watchOS version, but is held back to keep
+# support for armv7k (dropped in 9) and i386 simulator (dropped in 7)
+DARWIN_DEPLOYMENT_VERSION_WATCHOS = '6.0'
 DARWIN_DEPLOYMENT_VERSION_XROS = '1.0'
 
 UNIX_INSTALL_PREFIX = '/usr'
