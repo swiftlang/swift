@@ -478,20 +478,17 @@ func rdar75146811() {
 
   var arr: [Double]! = []
 
-  test(&arr) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test(&arr) // Ok
   test((&arr)) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
-  // expected-error@-1 {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
-  test(&(arr)) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test(&(arr)) // Ok
 
-  test_tuple(&arr, x: 0) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test_tuple(&arr, x: 0) // Ok
   test_tuple((&arr), x: 0) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
-  // expected-error@-1 {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
-  test_tuple(&(arr), x: 0) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test_tuple(&(arr), x: 0) // Ok
 
-  test_named(x: &arr) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test_named(x: &arr) // Ok
   test_named(x: (&arr)) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
-  // expected-error@-1 {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
-  test_named(x: &(arr)) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test_named(x: &(arr)) // Ok
 }
 
 // rdar://75514153 - Unable to produce a diagnostic for ambiguities related to use of `nil`
