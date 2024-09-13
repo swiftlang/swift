@@ -358,7 +358,7 @@ EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 
 /// Enable non-escapable type attributes and function attributes that support
 /// lifetime-dependent results.
-EXPERIMENTAL_FEATURE(NonescapableTypes, true)
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NonescapableTypes, true)
 
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
