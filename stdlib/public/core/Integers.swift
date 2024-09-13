@@ -1502,12 +1502,9 @@ extension BinaryInteger {
   @inline(__always)
   public func advanced(by n: Int) -> Self {
     // This compares its maximum bit width versus Int.bitWidth.
+    // All small unsigned integers are bounded by [0, Int.max].
     // It should constant-fold since we use constant arguments.
-    let typeIsSmall  = Self.isSigned
-    ? Self(exactly:  Int.max) == nil
-    : Self(exactly: UInt.max) == nil
-    
-    if typeIsSmall {
+    if Self(exactly: Int.min.magnitude) == nil {
       return Self(Int(truncatingIfNeeded: self) + n)
     } else if Self.isSigned {
       return self + Self(truncatingIfNeeded: n)
