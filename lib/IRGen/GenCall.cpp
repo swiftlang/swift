@@ -50,6 +50,7 @@
 #include "GenPoly.h"
 #include "GenProto.h"
 #include "GenType.h"
+#include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
@@ -219,6 +220,9 @@ llvm::CallInst *IRGenFunction::emitSuspendAsyncCall(
   auto *id = Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_suspend_async,
                                          {resultTy}, args);
   if (restoreCurrentContext) {
+    // This is setup code after the split point. Don't associate any line
+    // numbers to it.
+    irgen::PrologueLocation LocRAII(IGM.DebugInfo.get(), Builder);
     llvm::Value *calleeContext =
         Builder.CreateExtractValue(id, asyncContextIndex);
     calleeContext =
