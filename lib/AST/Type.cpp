@@ -3186,6 +3186,13 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
     ext2 = ext2.withSendable(false);
   }
 
+  if (matchMode.contains(TypeMatchFlags::IgnoreFunctionGlobalActorIsolation)) {
+    if (ext1.getGlobalActor())
+      ext1 = ext1.withoutIsolation();
+    if (ext2.getGlobalActor())
+      ext2 = ext2.withoutIsolation();
+  }
+
   // If specified, allow an escaping function parameter to override a
   // non-escaping function parameter when the parameter is optional.
   // Note that this is checking 'ext2' rather than 'ext1' because parameters
