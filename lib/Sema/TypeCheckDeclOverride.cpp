@@ -1776,10 +1776,9 @@ static bool isAvailabilitySafeForOverride(ValueDecl *override,
   // API availability ranges are contravariant: make sure the version range
   // of an overridden declaration is fully contained in the range of the
   // overriding declaration.
-  AvailabilityContext overrideInfo =
-    AvailabilityInference::availableRange(override, ctx);
-  AvailabilityContext baseInfo =
-    AvailabilityInference::availableRange(base, ctx);
+  AvailabilityRange overrideInfo =
+      AvailabilityInference::availableRange(override, ctx);
+  AvailabilityRange baseInfo = AvailabilityInference::availableRange(base, ctx);
 
   if (baseInfo.isContainedIn(overrideInfo))
     return true;

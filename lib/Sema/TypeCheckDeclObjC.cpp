@@ -522,16 +522,16 @@ static VersionRange getMinOSVersionForClassStubs(const llvm::Triple &target) {
   return VersionRange::all();
 }
 
-static AvailabilityContext getObjCClassStubAvailability(ASTContext &ctx) {
+static AvailabilityRange getObjCClassStubAvailability(ASTContext &ctx) {
   // FIXME: This should just be ctx.getSwift51Availability(), but that breaks
   // tests on arm64 arches.
-  return AvailabilityContext(getMinOSVersionForClassStubs(ctx.LangOpts.Target));
+  return AvailabilityRange(getMinOSVersionForClassStubs(ctx.LangOpts.Target));
 }
 
 static bool checkObjCClassStubAvailability(ASTContext &ctx, const Decl *decl) {
   auto stubAvailability = getObjCClassStubAvailability(ctx);
 
-  auto deploymentTarget = AvailabilityContext::forDeploymentTarget(ctx);
+  auto deploymentTarget = AvailabilityRange::forDeploymentTarget(ctx);
   if (deploymentTarget.isContainedIn(stubAvailability))
     return true;
 

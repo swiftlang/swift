@@ -1504,10 +1504,11 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
     canRemoveOldDecls = true;
   } else {
     // Check if the availability of nominal is high enough to be using the ExecutorJob version
-    AvailabilityContext requirementInfo
-        = AvailabilityInference::availableRange(moveOnlyEnqueueRequirement, C);
-    AvailabilityContext declInfo =
-        TypeChecker::overApproximateAvailabilityAtLocation(nominal->getLoc(), dyn_cast<DeclContext>(nominal));
+    AvailabilityRange requirementInfo =
+        AvailabilityInference::availableRange(moveOnlyEnqueueRequirement, C);
+    AvailabilityRange declInfo =
+        TypeChecker::overApproximateAvailabilityAtLocation(
+            nominal->getLoc(), dyn_cast<DeclContext>(nominal));
     canRemoveOldDecls = declInfo.isContainedIn(requirementInfo);
   }
 
