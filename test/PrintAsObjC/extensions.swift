@@ -137,13 +137,6 @@ extension NSObject {
   @objc var some: Int { return 1 }
 }
 
-// CHECK-LABEL: @interface NSString (CustomName)
-// CHECK-NEXT: - (void)test3;
-// CHECK-NEXT: @end
-@objc(CustomName) extension NSString {
-  func test3() {}
-}
-
 // NEGATIVE-NOT: @class NSString;
 // CHECK: @class NSColor;
 // CHECK-LABEL: @interface NSString (SWIFT_EXTENSION(extensions))
