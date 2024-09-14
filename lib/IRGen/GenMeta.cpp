@@ -2715,20 +2715,18 @@ namespace {
         auto underlyingDependentType = R.getFirstType()->getCanonicalType();
 
         auto underlyingType =
-            underlyingDependentType.subst(substitutions)->getCanonicalType();
+            underlyingDependentType.subst(substitutions);
         auto underlyingConformance =
             substitutions.lookupConformance(underlyingDependentType, P);
 
         if (underlyingType->hasTypeParameter()) {
-          underlyingConformance = underlyingConformance.subst(
-              underlyingType, QueryInterfaceTypeSubstitutions(genericEnv),
-              LookUpConformanceInModule());
-
-          underlyingType = genericEnv->mapTypeIntoContext(underlyingType)
-                               ->getCanonicalType();
+          std::tie(underlyingType, underlyingConformance)
+              = GenericEnvironment::mapConformanceRefIntoContext(
+                    genericEnv, underlyingType, underlyingConformance);
         }
 
-        return emitWitnessTableRef(IGF, underlyingType, underlyingConformance);
+        return emitWitnessTableRef(IGF, underlyingType->getCanonicalType(),
+                                   underlyingConformance);
       }
     };
   };

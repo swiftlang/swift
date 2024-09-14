@@ -3450,6 +3450,14 @@ bool ArchetypeType::requiresClass() const {
   return false;
 }
 
+Type ArchetypeType::getSuperclass() const {
+  if (!Bits.ArchetypeType.HasSuperclass) return Type();
+
+  auto *genericEnv = getGenericEnvironment();
+  return genericEnv->mapTypeIntoContext(
+      *getSubclassTrailingObjects<Type>());
+}
+
 Type ArchetypeType::getValueType() const {
   if (auto gp = getInterfaceType()->getAs<GenericTypeParamType>())
     return gp->getValueType();
@@ -3509,7 +3517,12 @@ RecursiveTypeProperties ArchetypeType::archetypeProperties(
     }
   }
 
-  if (superclass) properties |= superclass->getRecursiveProperties();
+  if (superclass) {
+    auto superclassProps = superclass->getRecursiveProperties();
+    superclassProps.removeHasTypeParameter();
+    superclassProps.removeHasDependentMember();
+    properties |= superclassProps;
+  }
 
   return properties;
 }
