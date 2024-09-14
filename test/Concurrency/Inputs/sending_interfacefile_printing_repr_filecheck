@@ -1,0 +1,18 @@
+
+// CHECK: #if compiler(>=5.3) && $SendingArgsAndResults
+// CHECK-NEXT: public func test() -> sending NonSendableKlass
+// CHECK-NEXT: #else
+// CHECK-NEXT: public func test() -> NonSendableKlass
+// CHECK-NEXT: #endif
+
+// CHECK: #if compiler(>=5.3) && $SendingArgsAndResults
+// CHECK-NEXT: public func test2(_ x: sending NonSendableKlass)
+// CHECK-NEXT: #else
+// CHECK-NEXT: public func test2(_ x: __owned NonSendableKlass)
+// CHECK-NEXT: #endif
+
+// CHECK: #if compiler(>=5.3) && $SendingArgsAndResults
+// CHECK-NEXT: @_Concurrency.MainActor public var closure: () -> sending NonSendableKlass
+// CHECK-NEXT: #else
+// CHECK-NEXT: @_Concurrency.MainActor public var closure: () -> NonSendableKlass
+// CHECK-NEXT: #endif
