@@ -1094,7 +1094,7 @@ public:
   /// \p Attr is where to store the parsed attribute
   bool parseSpecializeAttribute(
       swift::tok ClosingBrace, SourceLoc AtLoc, SourceLoc Loc,
-      SpecializeAttr *&Attr, AvailabilityContext *SILAvailability,
+      SpecializeAttr *&Attr, AvailabilityRange *SILAvailability,
       llvm::function_ref<bool(Parser &)> parseSILTargetName =
           [](Parser &) { return false; },
       llvm::function_ref<bool(Parser &)> parseSILSIPModule =
@@ -1106,7 +1106,7 @@ public:
       std::optional<bool> &Exported,
       std::optional<SpecializeAttr::SpecializationKind> &Kind,
       TrailingWhereClause *&TrailingWhereClause, DeclNameRef &targetFunction,
-      AvailabilityContext *SILAvailability,
+      AvailabilityRange *SILAvailability,
       SmallVectorImpl<Identifier> &spiGroups,
       SmallVectorImpl<AvailableAttr *> &availableAttrs,
       size_t &typeErasedParamsCount,

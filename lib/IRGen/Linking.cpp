@@ -1446,7 +1446,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::KnownAsyncFunctionPointer:
     auto &context = module->getASTContext();
     auto deploymentAvailability =
-        AvailabilityContext::forDeploymentTarget(context);
+        AvailabilityRange::forDeploymentTarget(context);
     return !deploymentAvailability.isContainedIn(
         context.getConcurrencyAvailability());
   }

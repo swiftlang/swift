@@ -527,7 +527,7 @@ static ImportedType rectifySubscriptTypes(Type getterType, bool getterIsIUO,
 
 /// Add an AvailableAttr to the declaration for the given
 /// version range.
-static void applyAvailableAttribute(Decl *decl, AvailabilityContext &info,
+static void applyAvailableAttribute(Decl *decl, AvailabilityRange &info,
                                     ASTContext &C) {
   // If the range is "all", this is the same as not having an available
   // attribute.
@@ -566,13 +566,13 @@ static void inferProtocolMemberAvailability(ClangImporter::Implementation &impl,
   if (!valueDecl)
     return;
 
-  AvailabilityContext requiredRange =
+  AvailabilityRange requiredRange =
       AvailabilityInference::inferForType(valueDecl->getInterfaceType());
 
   ASTContext &C = impl.SwiftContext;
 
   const Decl *innermostDecl = dc->getInnermostDeclarationDeclContext();
-  AvailabilityContext containingDeclRange =
+  AvailabilityRange containingDeclRange =
       AvailabilityInference::availableRange(innermostDecl, C);
 
   requiredRange.intersectWith(containingDeclRange);
@@ -6714,7 +6714,7 @@ bool SwiftDeclConverter::existingConstructorIsWorse(
   // FIXME: But if one of them is now deprecated, should we prefer the
   // other?
   llvm::VersionTuple introduced = findLatestIntroduction(objcMethod);
-  AvailabilityContext existingAvailability =
+  AvailabilityRange existingAvailability =
       AvailabilityInference::availableRange(existingCtor, Impl.SwiftContext);
   assert(!existingAvailability.isKnownUnreachable());
 
@@ -9000,8 +9000,8 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
 
       if (proto->getAttrs().hasAttribute<AvailableAttr>()) {
         if (!result->getAttrs().hasAttribute<AvailableAttr>()) {
-          AvailabilityContext protoRange =
-            AvailabilityInference::availableRange(proto, SwiftContext);
+          AvailabilityRange protoRange =
+              AvailabilityInference::availableRange(proto, SwiftContext);
           applyAvailableAttribute(result, protoRange, SwiftContext);
         }
       } else {

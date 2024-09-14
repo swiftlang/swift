@@ -69,7 +69,7 @@ namespace swift {
   class AbstractFunctionDecl;
   class ASTContext;
   enum class Associativity : unsigned char;
-  class AvailabilityContext;
+  class AvailabilityRange;
   class BoundGenericType;
   class BuiltinTupleDecl;
   class ClangModuleLoader;
@@ -870,25 +870,25 @@ public:
 
   /// Get the availability of features introduced in the specified version
   /// of the Swift compiler for the target platform.
-  AvailabilityContext getSwiftAvailability(unsigned major, unsigned minor) const;
+  AvailabilityRange getSwiftAvailability(unsigned major, unsigned minor) const;
 
   // For each feature defined in FeatureAvailability, define two functions;
   // the latter, with the suffix RuntimeAvailabilty, is for use with
-  // AvailabilityContext::forRuntimeTarget(), and only looks at the Swift
+  // AvailabilityRange::forRuntimeTarget(), and only looks at the Swift
   // runtime version.
-#define FEATURE(N, V)                                                       \
-  inline AvailabilityContext get##N##Availability() const {                 \
-    return getSwiftAvailability V;                                          \
-  }                                                                         \
-  inline AvailabilityContext get##N##RuntimeAvailability() const {          \
-    return AvailabilityContext(VersionRange::allGTE(llvm::VersionTuple V)); \
+#define FEATURE(N, V)                                                          \
+  inline AvailabilityRange get##N##Availability() const {                      \
+    return getSwiftAvailability V;                                             \
+  }                                                                            \
+  inline AvailabilityRange get##N##RuntimeAvailability() const {               \
+    return AvailabilityRange(VersionRange::allGTE(llvm::VersionTuple V));      \
   }
 
-  #include "swift/AST/FeatureAvailability.def"
+#include "swift/AST/FeatureAvailability.def"
 
   /// Get the runtime availability of features that have been introduced in the
   /// Swift compiler for future versions of the target platform.
-  AvailabilityContext getSwiftFutureAvailability() const;
+  AvailabilityRange getSwiftFutureAvailability() const;
 
   /// Returns `true` if versioned availability annotations are supported for the
   /// target triple.
@@ -903,78 +903,78 @@ public:
 
   /// Get the runtime availability of features introduced in the Swift 5.0
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift50Availability() const {
+  inline AvailabilityRange getSwift50Availability() const {
     return getSwiftAvailability(5, 0);
   }
 
   /// Get the runtime availability of features introduced in the Swift 5.1
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift51Availability() const {
+  inline AvailabilityRange getSwift51Availability() const {
     return getSwiftAvailability(5, 1);
   }
 
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift52Availability() const {
+  inline AvailabilityRange getSwift52Availability() const {
     return getSwiftAvailability(5, 2);
   }
 
   /// Get the runtime availability of features introduced in the Swift 5.3
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift53Availability() const {
+  inline AvailabilityRange getSwift53Availability() const {
     return getSwiftAvailability(5, 3);
   }
 
   /// Get the runtime availability of features introduced in the Swift 5.4
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift54Availability() const {
+  inline AvailabilityRange getSwift54Availability() const {
     return getSwiftAvailability(5, 4);
   }
 
   /// Get the runtime availability of features introduced in the Swift 5.5
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift55Availability() const {
+  inline AvailabilityRange getSwift55Availability() const {
     return getSwiftAvailability(5, 5);
   }
 
   /// Get the runtime availability of features introduced in the Swift 5.6
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift56Availability() const {
+  inline AvailabilityRange getSwift56Availability() const {
     return getSwiftAvailability(5, 6);
   }
 
   /// Get the runtime availability of features introduced in the Swift 5.7
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift57Availability() const {
+  inline AvailabilityRange getSwift57Availability() const {
     return getSwiftAvailability(5, 7);
   }
 
   /// Get the runtime availability of features introduced in the Swift 5.8
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift58Availability() const {
+  inline AvailabilityRange getSwift58Availability() const {
     return getSwiftAvailability(5, 8);
   }
 
   /// Get the runtime availability of features introduced in the Swift 5.9
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift59Availability() const {
+  inline AvailabilityRange getSwift59Availability() const {
     return getSwiftAvailability(5, 9);
   }
 
   /// Get the runtime availability of features introduced in the Swift 5.10
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift510Availability() const {
+  inline AvailabilityRange getSwift510Availability() const {
     return getSwiftAvailability(5, 10);
   }
 
   /// Get the runtime availability of features introduced in the Swift 6.0
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift60Availability() const {
+  inline AvailabilityRange getSwift60Availability() const {
     return getSwiftAvailability(6, 0);
   }
 
   /// Get the runtime availability for a particular version of Swift (5.0+).
-  inline AvailabilityContext
+  inline AvailabilityRange
   getSwift5PlusAvailability(llvm::VersionTuple swiftVersion) const {
     return getSwiftAvailability(swiftVersion.getMajor(),
                                 *swiftVersion.getMinor());
@@ -982,7 +982,7 @@ public:
 
   /// Get the runtime availability of getters and setters of multi payload enum
   /// tag single payloads.
-  inline AvailabilityContext getMultiPayloadEnumTagSinglePayload() const {
+  inline AvailabilityRange getMultiPayloadEnumTagSinglePayload() const {
     // This didn't fit the pattern, so needed renaming
     return getMultiPayloadEnumTagSinglePayloadAvailability();
   }

@@ -64,7 +64,7 @@ namespace swift {
   enum class AccessSemantics : unsigned char;
   class AccessorDecl;
   class ApplyExpr;
-  class AvailabilityContext;
+  class AvailabilityRange;
   class GenericEnvironment;
   class ArchetypeType;
   class ASTContext;
@@ -1326,7 +1326,7 @@ public:
     return getAttrs().hasAttribute<NoImplicitCopyAttr>();
   }
 
-  AvailabilityContext getAvailabilityForLinkage() const;
+  AvailabilityRange getAvailabilityForLinkage() const;
 
   /// Whether this declaration or one of its outer contexts has the
   /// @_weakLinked attribute.

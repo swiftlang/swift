@@ -106,13 +106,11 @@ public:
   static GenericSignature buildTypeErasedSignature(
       GenericSignature sig, ArrayRef<Type> typeErasedParams);
 
-  static SILSpecializeAttr *create(SILModule &M,
-                                   GenericSignature specializedSignature,
-                                   ArrayRef<Type> typeErasedParams,
-                                   bool exported, SpecializationKind kind,
-                                   SILFunction *target, Identifier spiGroup,
-                                   const ModuleDecl *spiModule,
-                                   AvailabilityContext availability);
+  static SILSpecializeAttr *
+  create(SILModule &M, GenericSignature specializedSignature,
+         ArrayRef<Type> typeErasedParams, bool exported,
+         SpecializationKind kind, SILFunction *target, Identifier spiGroup,
+         const ModuleDecl *spiModule, AvailabilityRange availability);
 
   bool isExported() const {
     return exported;
@@ -158,7 +156,7 @@ public:
     return spiModule;
   }
 
-  AvailabilityContext getAvailability() const {
+  AvailabilityRange getAvailability() const {
     return availability;
   }
 
@@ -171,7 +169,7 @@ private:
   GenericSignature unerasedSpecializedSignature;
   llvm::SmallVector<Type, 2> typeErasedParams;
   Identifier spiGroup;
-  AvailabilityContext availability;
+  AvailabilityRange availability;
   const ModuleDecl *spiModule = nullptr;
   SILFunction *F = nullptr;
   SILFunction *targetFunction = nullptr;
@@ -182,7 +180,7 @@ private:
                     ArrayRef<Type> typeErasedParams,
                     SILFunction *target, Identifier spiGroup,
                     const ModuleDecl *spiModule,
-                    AvailabilityContext availability);
+                    AvailabilityRange availability);
 };
 
 /// SILFunction - A function body that has been lowered to SIL. This consists of
@@ -334,7 +332,7 @@ private:
 
   /// The availability used to determine if declarations of this function
   /// should use weak linking.
-  AvailabilityContext Availability;
+  AvailabilityRange Availability;
 
   Purpose specialPurpose = Purpose::None;
 
@@ -928,11 +926,11 @@ public:
 
   /// Returns the availability context used to determine if the function's
   /// symbol should be weakly referenced across module boundaries.
-  AvailabilityContext getAvailabilityForLinkage() const {
+  AvailabilityRange getAvailabilityForLinkage() const {
     return Availability;
   }
 
-  void setAvailabilityForLinkage(AvailabilityContext availability) {
+  void setAvailabilityForLinkage(AvailabilityRange availability) {
     Availability = availability;
   }
 

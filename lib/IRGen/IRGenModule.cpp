@@ -811,9 +811,9 @@ namespace RuntimeConstants {
 
   bool
   isDeploymentAvailabilityContainedIn(ASTContext &Context,
-                                      AvailabilityContext featureAvailability) {
+                                      AvailabilityRange featureAvailability) {
     auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(Context);
+        AvailabilityRange::forDeploymentTarget(Context);
     return deploymentAvailability.isContainedIn(featureAvailability);
   }
 
@@ -1353,8 +1353,8 @@ ModuleDecl *IRGenModule::getSwiftModule() const {
   return IRGen.SIL.getSwiftModule();
 }
 
-AvailabilityContext IRGenModule::getAvailabilityContext() const {
-  return AvailabilityContext::forDeploymentTarget(Context);
+AvailabilityRange IRGenModule::getAvailabilityRange() const {
+  return AvailabilityRange::forDeploymentTarget(Context);
 }
 
 Lowering::TypeConverter &IRGenModule::getSILTypes() const {
@@ -1438,7 +1438,7 @@ void IRGenerator::addBackDeployedObjCActorInitialization(ClassDecl *ClassDecl) {
 
   // If we are not back-deploying concurrency, there's nothing to do.
   ASTContext &ctx = ClassDecl->getASTContext();
-  auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(ctx);
+  auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(ctx);
   if (deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability()))
     return;
 
@@ -2110,19 +2110,18 @@ bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
 // runtime targets because the runtime library is always statically linked
 // to the program.
 
-#define FEATURE(N, V)                                                   \
-bool IRGenModule::is##N##FeatureAvailable(const ASTContext &context) {  \
-  if (Context.LangOpts.hasFeature(Feature::Embedded))                   \
-    return true;                                                        \
-  auto deploymentAvailability                                           \
-    = AvailabilityContext::forDeploymentTarget(context);                \
-  auto runtimeAvailability                                              \
-    = AvailabilityContext::forRuntimeTarget(context);                   \
-  return deploymentAvailability.isContainedIn(                          \
-    context.get##N##Availability())                                     \
-    && runtimeAvailability.isContainedIn(                               \
-      context.get##N##RuntimeAvailability());                           \
-}
+#define FEATURE(N, V)                                                          \
+  bool IRGenModule::is##N##FeatureAvailable(const ASTContext &context) {       \
+    if (Context.LangOpts.hasFeature(Feature::Embedded))                        \
+      return true;                                                             \
+    auto deploymentAvailability =                                              \
+        AvailabilityRange::forDeploymentTarget(context);                       \
+    auto runtimeAvailability = AvailabilityRange::forRuntimeTarget(context);   \
+    return deploymentAvailability.isContainedIn(                               \
+               context.get##N##Availability()) &&                              \
+           runtimeAvailability.isContainedIn(                                  \
+               context.get##N##RuntimeAvailability());                         \
+  }
 
 #include "swift/AST/FeatureAvailability.def"
 
@@ -2134,8 +2133,7 @@ bool IRGenModule::shouldPrespecializeGenericMetadata() {
     return IRGen.Opts.PrespecializeGenericMetadata;
   }
   auto &context = getSwiftModule()->getASTContext();
-  auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(context);
+  auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(context);
   return IRGen.Opts.PrespecializeGenericMetadata &&
          deploymentAvailability.isContainedIn(
              context.getPrespecializedGenericMetadataAvailability()) &&
@@ -2307,8 +2305,7 @@ void IRGenModule::emitSwiftAsyncExtendedFrameInfoWeakRef() {
 
 bool IRGenModule::isConcurrencyAvailable() {
   auto &ctx = getSwiftModule()->getASTContext();
-  auto deploymentAvailability =
-    AvailabilityContext::forDeploymentTarget(ctx);
+  auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(ctx);
   return deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability());
 }
 

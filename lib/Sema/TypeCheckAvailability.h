@@ -103,7 +103,7 @@ enum class ExportabilityReason : unsigned {
 /// without producing a warning or error, respectively.
 class ExportContext {
   DeclContext *DC;
-  AvailabilityContext RunningOSVersion;
+  AvailabilityRange RunningOSVersion;
   FragileFunctionKind FragileKind;
   unsigned SPI : 1;
   unsigned Exported : 1;
@@ -113,7 +113,7 @@ class ExportContext {
   unsigned Platform : 8;
   unsigned Reason : 3;
 
-  ExportContext(DeclContext *DC, AvailabilityContext runningOSVersion,
+  ExportContext(DeclContext *DC, AvailabilityRange runningOSVersion,
                 FragileFunctionKind kind, bool spi, bool exported,
                 bool implicit, bool deprecated,
                 std::optional<PlatformKind> unavailablePlatformKind);
@@ -156,11 +156,11 @@ public:
   /// Produce a new context with the same properties as this one, except the
   /// availability context is constrained by \p availability if necessary.
   ExportContext
-  withRefinedAvailability(const AvailabilityContext &availability) const;
+  withRefinedAvailability(const AvailabilityRange &availability) const;
 
   DeclContext *getDeclContext() const { return DC; }
 
-  AvailabilityContext getAvailabilityContext() const {
+  AvailabilityRange getAvailabilityRange() const {
     return RunningOSVersion;
   }
 

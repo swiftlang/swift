@@ -1302,8 +1302,8 @@ FunctionPointer IRGenModule::getFixedClassInitializationFn() {
   if (ObjCInterop) {
     // In new enough ObjC runtimes, objc_opt_self provides a direct fast path
     // to realize a class.
-    if (getAvailabilityContext()
-         .isContainedIn(Context.getSwift51Availability())) {
+    if (getAvailabilityRange().isContainedIn(
+            Context.getSwift51Availability())) {
       fn = getObjCOptSelfFunctionPointer();
     }
     // Otherwise, the Swift runtime always provides a `get
@@ -1384,7 +1384,7 @@ llvm::Value *IRGenFunction::emitLoadRefcountedPtr(Address addr,
 llvm::Value *IRGenFunction::
 emitIsUniqueCall(llvm::Value *value, ReferenceCounting style, SourceLoc loc, bool isNonNull) {
   FunctionPointer fn;
-  bool nonObjC = !IGM.getAvailabilityContext().isContainedIn(
+  bool nonObjC = !IGM.getAvailabilityRange().isContainedIn(
       IGM.Context.getObjCIsUniquelyReferencedAvailability());
   switch (style) {
   case ReferenceCounting::Native: {
