@@ -8996,9 +8996,11 @@ namespace {
 
       switch (result) {
       case SolutionApplicationToFunctionResult::Success: {
-        if (auto closure = dyn_cast_or_null<ClosureExpr>(
-                fn.getAbstractClosureExpr()))
+        if (auto closure =
+                dyn_cast_or_null<ClosureExpr>(fn.getAbstractClosureExpr())) {
           TypeChecker::checkClosureAttributes(closure);
+          TypeChecker::checkParameterList(closure->getParameters(), closure);
+        }
         return false;
       }
 
