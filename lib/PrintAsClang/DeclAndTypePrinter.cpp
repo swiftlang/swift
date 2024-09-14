@@ -424,10 +424,7 @@ private:
       os << "\n";
     os << "@interface " << getNameForObjC(baseClass);
     maybePrintObjCGenericParameters(baseClass);
-    if (ED->getObjCCategoryName().empty())
-      os << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
-    else
-      os << " (" << ED->getObjCCategoryName() << ")";
+    os << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
     printProtocols(ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
     printMembers(ED->getMembers());
