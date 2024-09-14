@@ -1220,7 +1220,15 @@ Type TypeResolution::applyUnboundGenericArguments(
       if (result->hasTypeParameter()) {
         if (const auto contextSig = getGenericSignature()) {
           auto *genericEnv = contextSig.getGenericEnvironment();
-          return genericEnv->mapTypeIntoContext(result);
+          // FIXME: This should just use mapTypeIntoContext(), but we can't yet
+          // because we sometimes have type parameters here that are invalid for
+          // our generic signature. This can happen if the type parameter was
+          // found via unqualified lookup, but the current context's
+          // generic signature failed to build because of circularity or
+          // completion failure.
+          return result.subst(QueryInterfaceTypeSubstitutions{genericEnv},
+                              LookUpConformanceInModule(),
+                              SubstFlags::PreservePackExpansionLevel);
         }
       }
       return result;
