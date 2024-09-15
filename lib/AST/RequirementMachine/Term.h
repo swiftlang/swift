@@ -76,7 +76,7 @@ public:
     return begin()->getRootProtocol();
   }
 
-  bool containsUnresolvedSymbols() const;
+  bool containsNameSymbols() const;
 
   void dump(llvm::raw_ostream &out) const;
 
