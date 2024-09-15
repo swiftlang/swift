@@ -142,6 +142,28 @@ struct TupleMe2: Tupled, Tupled2 {
   }
 }
 
+protocol Tupled3 {
+  associatedtype TupleType
+
+  var tuple: TupleType { @TupleBuilder get }
+}
+
+struct TupleMe3: Tupled3 {
+  var condition: Bool
+
+  // FIXME: Not inferred from getter requirement
+  // expected-error@+1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
+  var tuple: some Any {
+    "hello" // expected-warning{{literal is unused}}
+    if condition {
+      "nested" // expected-warning{{literal is unused}}
+    }
+    3.14159 // expected-warning{{literal is unused}}
+    "world" // expected-warning{{literal is unused}}
+    // expected-note@-1 {{did you mean to return the last expression?}}
+  }
+}
+
 protocol OtherTupled {
   associatedtype OtherTupleType
   
@@ -231,5 +253,37 @@ extension DynamicTupled3: OtherTupled {
     // expected-note@-2{{apply result builder 'OtherTupleBuilder' (inferred from protocol 'OtherTupled')}}
     // expected-note@-3{{apply result builder 'TupleBuilder' (inferred from dynamic replacement of 'dynamicTuple')}}
     0
+  }
+}
+
+do {
+  @resultBuilder
+  enum BuildBoolFrom<T> {
+    static func buildBlock(_ t: T...) -> Bool {}
+  }
+
+  protocol P {
+    @BuildBoolFrom<String>
+    var property: Bool { get }
+  }
+
+  struct Conformer1: P {
+    @BuildBoolFrom<Int>
+    var property: Bool {
+      // OK, explicit result builder disables inference through protocol.
+      1
+      2
+    }
+  }
+
+  struct Conformer2: P {
+    var property: Bool {
+      @BuildBoolFrom<Int>
+      get {
+        // OK, explicit result builder disables inference through protocol.
+        1
+        2
+      }
+    }
   }
 }
