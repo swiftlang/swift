@@ -201,7 +201,7 @@ AttachedResultBuilderRequest::evaluate(Evaluator &evaluator,
 /// Attempt to infer the result builder type for a declaration.
 static Type inferResultBuilderType(ValueDecl *decl)  {
   auto dc = decl->getDeclContext();
-  if (!dc->isTypeContext() || isa<ProtocolDecl>(dc))
+  if (isa<ProtocolDecl>(dc))
     return Type();
 
   auto funcDecl = dyn_cast<FuncDecl>(decl);
@@ -209,21 +209,27 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
       !decl->getDeclContext()->getParentSourceFile())
     return Type();
 
+  // For a getter, always favor the result builder type of its storage
+  // declaration if not null. Other accessors are not supported by inference.
+  if (auto accessor = dyn_cast<AccessorDecl>(funcDecl)) {
+    if (accessor->getAccessorKind() != AccessorKind::Get)
+      return Type();
+
+    if (auto type = accessor->getStorage()->getResultBuilderType()) {
+      return type;
+    }
+  }
+
+  // FIXME: We could infer from a dynamically replaced decl in non-type contexts too.
+  if (!dc->isTypeContext()) {
+    return Type();
+  }
+
   // Check whether there are any return statements in the function's body.
   // If there are, the result builder transform will be disabled,
   // so don't infer a result builder.
   if (!TypeChecker::findReturnStatements(funcDecl).empty())
     return Type();
-
-  // Only getters can have result builders. When we find one, look at
-  // the storage declaration for the purposes of witness matching.
-  auto lookupDecl = decl;
-  if (auto accessor = dyn_cast<AccessorDecl>(funcDecl)) {
-    if (accessor->getAccessorKind() != AccessorKind::Get)
-      return Type();
-
-    lookupDecl = accessor->getStorage();
-  }
 
   // Find all of the potentially inferred result builder types.
   struct Match {
@@ -322,6 +328,13 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
       }
     }
   };
+
+  ValueDecl *lookupDecl = nullptr;
+  if (auto *accessor = dyn_cast<AccessorDecl>(funcDecl)) {
+    lookupDecl = accessor->getStorage();
+  } else {
+    lookupDecl = decl;
+  }
 
   addConformanceMatches(lookupDecl);
 
