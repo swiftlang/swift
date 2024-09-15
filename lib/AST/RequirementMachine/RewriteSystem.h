@@ -65,9 +65,6 @@ class RewriteSystem final {
   /// top-level generic signature and this array is empty.
   ArrayRef<const ProtocolDecl *> Protos;
 
-  /// The requirements written in source code.
-  std::vector<StructuralRequirement> WrittenRequirements;
-
   /// The rules added so far, including rules from our client, as well
   /// as rules introduced by the completion procedure.
   std::vector<Rule> Rules;
