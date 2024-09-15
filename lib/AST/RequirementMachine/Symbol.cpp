@@ -113,7 +113,7 @@ struct Symbol::Storage final
   }
 
   Storage(CanType type, ArrayRef<Term> substitutions, const ProtocolDecl *proto) {
-    DEBUG_ASSERT(!type->hasTypeVariable());
+    ASSERT(!type->hasTypeVariable());
     ASSERT(type->hasTypeParameter() != substitutions.empty());
 
     Kind = Symbol::Kind::ConcreteConformance;
