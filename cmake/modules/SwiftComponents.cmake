@@ -103,6 +103,12 @@ macro(swift_configure_components)
       NOT "compiler-swift-syntax-lib" IN_LIST SWIFT_INSTALL_COMPONENTS)
     list(APPEND SWIFT_INSTALL_COMPONENTS "compiler-swift-syntax-lib")
   endif()
+  # 'compiler' depends on 'swift-syntax-lib' component.
+  # FIXME: Remove this. Clients should specify the components explicitly.
+  if ("compiler" IN_LIST SWIFT_INSTALL_COMPONENTS AND
+      NOT "swift-syntax-lib" IN_LIST SWIFT_INSTALL_COMPONENTS)
+    list(APPEND SWIFT_INSTALL_COMPONENTS "swift-syntax-lib")
+  endif()
 
   foreach(component ${_SWIFT_DEFINED_COMPONENTS})
     add_custom_target(${component})
