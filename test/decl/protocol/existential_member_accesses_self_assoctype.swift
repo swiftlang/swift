@@ -1063,3 +1063,10 @@ func packExpansionResult(p: any PackExpansionResult) {
   p.foo(t: 1, "hi")
   // expected-error@-1 {{member 'foo' cannot be used on value of type 'any PackExpansionResult'; consider using a generic constraint instead}}
 }
+
+// rdar://135974645 - invalid error: heterogeneous collection literal could only be inferred to '[Any]'
+extension StringProtocol {
+  func test(target: any StringProtocol, idx: Int) {
+    let _ = [target.prefix(idx), target.suffix(idx)] // Ok
+  }
+}
