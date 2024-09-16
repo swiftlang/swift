@@ -3,13 +3,14 @@
 // RUN: %empty-directory(%t)
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath -swift-version 5
 
-// Diagnostics testing
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -swift-version 5 -enable-experimental-feature CodeItemMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name ModuleUser %s
+// Build the macro library to give us access to AddAsync.
+// RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/macro_library.swiftmodule %S/Inputs/macro_library.swift -module-name macro_library -load-plugin-library %t/%target-library-name(MacroDefinition)
 
-@attached(peer, names: overloaded)
-public macro AddAsync() = #externalMacro(module: "MacroDefinition", type: "AddAsyncMacro")
+// Diagnostics testing
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -swift-version 5 -enable-experimental-feature CodeItemMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name ModuleUser %s -I %t
 
 import CompletionHandlerGlobals
+import macro_library
 
 // Make sure that @AddAsync works at all.
 @AddAsync
