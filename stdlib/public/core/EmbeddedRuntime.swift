@@ -291,6 +291,17 @@ func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32) {
 
   let resultingRefcount = subFetchAcquireRelease(refcount, n: Int(n)) & HeapObject.refcountMask
   if resultingRefcount == 0 {
+    // Set the refcount to immortalRefCount before calling the object destroyer
+    // to prevent future retains/releases from having any effect. Unlike the
+    // full Swift runtime, we don't track the refcount inside deinit, so we
+    // won't be able to detect escapes or over-releases of `self` in deinit. We
+    // might want to reconsider that in the future.
+    //
+    // There can only be one thread with a reference at this point (because
+    // we're releasing the last existing reference), so a relaxed store is
+    // enough.
+    storeRelaxed(refcount, newValue: HeapObject.immortalRefCount)
+
     _swift_embedded_invoke_heap_object_destroy(object)
   } else if resultingRefcount < 0 {
     fatalError("negative refcount")
@@ -344,6 +355,9 @@ fileprivate func storeRelease(_ atomic: UnsafeMutablePointer<Int>, newValue: Int
   Builtin.atomicstore_release_Word(atomic._rawValue, newValue._builtinWordValue)
 }
 
+fileprivate func storeRelaxed(_ atomic: UnsafeMutablePointer<Int>, newValue: Int) {
+  Builtin.atomicstore_monotonic_Word(atomic._rawValue, newValue._builtinWordValue)
+}
 
 /// Exclusivity checking
 
