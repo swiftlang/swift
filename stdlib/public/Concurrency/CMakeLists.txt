@@ -319,4 +319,25 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
 
     add_dependencies(embedded-concurrency embedded-concurrency-${mod})
   endforeach()
+
+  # Copy the ExecutorImpl.h header into the local include directory
+  # and install it in the compiler toolchain
+  add_custom_command(
+    OUTPUT "${SWIFT_INCLUDE_DIR}/swift/ExecutorImpl.h"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/ExecutorImpl.h"
+    COMMAND "${CMAKE_COMMAND}" "-E" "copy"
+            "${CMAKE_CURRENT_SOURCE_DIR}/ExecutorImpl.h"
+            "${SWIFT_INCLUDE_DIR}/swift")
+
+  add_custom_target("copy_executor_impl_header"
+    DEPENDS "${SWIFT_INCLUDE_DIR}/swift/ExecutorImpl.h"
+    COMMENT "Copying executor implementation header to ${SWIFT_INCLUDE_DIR}/swift")
+
+  swift_install_in_component(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/ExecutorImpl.h"
+    DESTINATION "include/swift"
+    COMPONENT compiler)
+
+  add_dependencies(embedded-concurrency "copy_executor_impl_header")
 endif()
+
