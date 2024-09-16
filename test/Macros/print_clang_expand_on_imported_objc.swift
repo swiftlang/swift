@@ -1,4 +1,4 @@
-// REQUIRES: swift_swift_parser, executable_test, concurrency
+// REQUIRES: swift_swift_parser, executable_test, objc_interop, concurrency
 
 // RUN: %empty-directory(%t)
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath -swift-version 5
@@ -11,9 +11,6 @@
 
 import CompletionHandlerGlobals
 
-// CHECK: func async_divide(_ x: Double, _ y: Double, _ completionHandler: @convention(c) (Double) -> Void)
-
-// CHECK: extension SlowComputer
-// CHECK: public func divide(_ x: Double, _ y: Double) async -> Double
-
-// CHECK: func async_divide(_ x: Double, _ y: Double) async -> Double
+// CHECK: class Computer
+// FIXME: The "open" is odd here. We want this to be "final", but can't yet.
+// CHECK: open func multiply(_ x: Double, by y: Double) async -> Double

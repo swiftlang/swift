@@ -1,4 +1,4 @@
-// REQUIRES: swift_swift_parser, executable_test, concurrency
+// REQUIRES: swift_swift_parser, executable_test, objc_interop, concurrency
 
 // RUN: %empty-directory(%t)
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath -swift-version 5
@@ -12,17 +12,10 @@
 import CompletionHandlerGlobals
 import macro_library
 
-// Make sure that @AddAsync works at all.
-@AddAsync
 @available(SwiftStdlib 5.1, *)
-func asyncTest(_ value: Int, completionHandler: @escaping (String) -> Void) {
-  completionHandler(String(value))
-}
+func testAll(x: Double, y: Double, computer: Computer, untypedComputer: AnyObject) async {
+  let _: Double = await computer.multiply(x, by: y)
 
-@available(SwiftStdlib 5.1, *)
-func testAll(x: Double, y: Double, computer: SlowComputer) async {
-  _ = await asyncTest(17)
-
-  let _: Double = await async_divide(1.0, 2.0)
-  let _: Double = await computer.divide(x, y)
+  // expected-error@+1{{missing argument for parameter 'afterDone' in call}}
+  untypedComputer.multiply(x, by: y)
 }
