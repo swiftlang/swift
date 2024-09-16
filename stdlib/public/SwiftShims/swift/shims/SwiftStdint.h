@@ -36,6 +36,16 @@ typedef int8_t __swift_int8_t;
 typedef uint8_t __swift_uint8_t;
 typedef intptr_t __swift_intptr_t;
 typedef uintptr_t __swift_uintptr_t;
+#define __swift_int64_max INT64_MAX
+#define __swift_uint64_max UINT64_MAX
+#define __swift_int32_max INT32_MAX
+#define __swift_uint32_max UINT32_MAX
+#define __swift_int16_max INT16_MAX
+#define __swift_uint16_max UINT16_MAX
+#define __swift_int8_max INT8_MAX
+#define __swift_uint8_max UINT8_MAX
+#define __swift_intptr_max INTPTR_MAX
+#define __swift_uintptr_max UINTPTR_MAX
 #else
 typedef __INT64_TYPE__ __swift_int64_t;
 #ifdef __UINT64_TYPE__
@@ -84,9 +94,13 @@ typedef unsigned __INT8_TYPE__ __swift_uint8_t;
 #if defined(_WIN64)
 typedef __swift_int64_t __swift_intptr_t;
 typedef __swift_uint64_t __swift_uintptr_t;
+#define __swift_intptr_max __swift_int64_max
+#define __swift_uintptr_max __swift_uint64_max
 #elif defined(_WIN32)
 typedef __swift_int32_t __swift_intptr_t;
 typedef __swift_uint32_t __swift_uintptr_t;
+#define __swift_intptr_max __swift_int32_max
+#define __swift_uintptr_max __swift_uint32_max
 #else
 #error unknown windows pointer width
 #endif
