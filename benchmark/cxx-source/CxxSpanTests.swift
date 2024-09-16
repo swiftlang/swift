@@ -12,6 +12,8 @@
 
 import TestsUtils
 import CxxStdlibPerformance
+import Cxx
+import CxxStdlib
 
 let iterRepeatFactor = 7
 
