@@ -780,6 +780,10 @@ struct BridgedSubstitutionMap {
 struct BridgedTypeArray {
   BridgedArrayRef typeArray;
 
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64,
+  BridgedTypeArray() : typeArray() {}
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedTypeArray(llvm::ArrayRef<swift::Type> types) : typeArray(types) {}
 
