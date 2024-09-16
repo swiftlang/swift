@@ -2523,6 +2523,46 @@ private:
 };
 } // namespace
 
+static void applySolutionToClosurePropertyWrappers(ClosureExpr *closure,
+                                                   const Solution &solution) {
+  for (auto *param : *closure->getParameters()) {
+    if (!param->hasAttachedPropertyWrapper())
+      continue;
+
+    // Set the interface type of each property wrapper synthesized var
+    auto *backingVar = param->getPropertyWrapperBackingProperty();
+    auto backingType = solution.simplifyType(solution.getType(backingVar))
+                           ->mapTypeOutOfContext();
+    backingVar->setInterfaceType(backingType);
+
+    if (auto *projectionVar = param->getPropertyWrapperProjectionVar()) {
+      projectionVar->setInterfaceType(
+          solution.simplifyType(solution.getType(projectionVar))
+              ->mapTypeOutOfContext());
+    }
+
+    auto *wrappedValueVar = param->getPropertyWrapperWrappedValueVar();
+    auto wrappedValueType =
+        solution.simplifyType(solution.getType(wrappedValueVar))
+            ->mapTypeOutOfContext();
+    wrappedValueVar->setInterfaceType(
+        wrappedValueType->getWithoutSpecifierType());
+
+    if (param->hasImplicitPropertyWrapper()) {
+      if (wrappedValueType->is<LValueType>())
+        wrappedValueVar->setImplInfo(StorageImplInfo::getMutableComputed());
+
+      // Add an explicit property wrapper attribute, which is needed for
+      // synthesizing the accessors.
+      auto &context = wrappedValueVar->getASTContext();
+      auto *typeExpr = TypeExpr::createImplicit(backingType, context);
+      auto *attr =
+          CustomAttr::create(context, SourceLoc(), typeExpr, /*implicit=*/true);
+      wrappedValueVar->getAttrs().add(attr);
+    }
+  }
+}
+
 SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
     Solution &solution, AnyFunctionRef fn,
     DeclContext *&currentDC,
@@ -2553,6 +2593,8 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
     if (closure->hasExplicitResultType()) {
       closure->setExplicitResultType(closureFnType->getResult());
     }
+
+    applySolutionToClosurePropertyWrappers(closure, solution);
   }
 
   // Enter the context of the function before performing any additional
