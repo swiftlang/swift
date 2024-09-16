@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -print-ast %s | %FileCheck %s --check-prefixes=CHECK,CHECK-PRE-SWIFT5_9
-// RUN: %target-swift-frontend -application-extension -print-ast %s | %FileCheck %s --check-prefixes=CHECK,CHECK-PRE-SWIFT5_9
-// RUN: %target-swift-frontend -target %target-cpu-apple-macosx51 -print-ast %s | %FileCheck %s --check-prefixes=CHECK,CHECK-PRE-SWIFT5_9
+// RUN: %target-swift-frontend -target %target-swift-abi-5.8-triple -print-ast %s | %FileCheck %s --check-prefixes=CHECK,CHECK-PRE-SWIFT5_9
+// RUN: %target-swift-frontend -target %target-swift-abi-5.8-triple -application-extension -print-ast %s | %FileCheck %s --check-prefixes=CHECK,CHECK-PRE-SWIFT5_9
+// RUN: %target-swift-frontend -target %target-swift-abi-5.8-triple -print-ast %s | %FileCheck %s --check-prefixes=CHECK,CHECK-PRE-SWIFT5_9
 // RUN: %target-swift-frontend -target %target-cpu-apple-macosx14 -print-ast %s | %FileCheck %s --check-prefixes=CHECK,CHECK-SWIFT5_9
 // REQUIRES: OS=macosx
 
