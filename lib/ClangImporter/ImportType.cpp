@@ -2788,7 +2788,15 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   }
 
   // Form the parameter list.
-  return ParameterList::create(SwiftContext, parameters);
+  // Estimate locations for the begin and end of parameter list.
+  auto begin = clangDecl->getLocation();
+  auto end = begin;
+  if (!params.empty()) {
+    begin = params.front()->getBeginLoc();
+    end = params.back()->getEndLoc();
+  }
+  return ParameterList::create(SwiftContext, importSourceLoc(begin), parameters,
+                               importSourceLoc(end));
 }
 
 static bool isObjCMethodResultAudited(const clang::Decl *decl) {
