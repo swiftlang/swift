@@ -752,10 +752,6 @@ Types
   differentiable ::= 'Yjr'                   // @differentiable(reverse) on function type
   differentiable ::= 'Yjd'                   // @differentiable on function type
   differentiable ::= 'Yjl'                   // @differentiable(_linear) on function type
- #if SWIFT_RUNTIME_VERSION >= 5.TBD
-  lifetime-dependence ::= 'Yli' INDEX-SUBSET '_'         // inherit lifetime dependence
-  lifetime-dependence ::= 'Yls' INDEX-SUBSET '_'         // scoped lifetime dependence
-#endif
   type-list ::= list-type '_' list-type*     // list of types
   type-list ::= empty-list
 

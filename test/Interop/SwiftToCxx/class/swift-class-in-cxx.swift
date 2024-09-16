@@ -107,7 +107,7 @@ public final class register { }
 // CHECK: class SWIFT_SYMBOL("s:5Class8registerC") register_ final : public swift::_impl::RefCountedClass {
 
 // CHECK: SWIFT_INLINE_THUNK ClassWithIntField passThroughClassWithIntField(const ClassWithIntField& x) noexcept SWIFT_SYMBOL("s:5Class011passThroughA12WithIntFieldyAA0adeF0CADF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:  return _impl::_impl_ClassWithIntField::makeRetained(_impl::$s5Class011passThroughA12WithIntFieldyAA0adeF0CADF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x)));
+// CHECK-NEXT:  return _impl::_impl_ClassWithIntField::makeRetained(Class::_impl::$s5Class011passThroughA12WithIntFieldyAA0adeF0CADF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x)));
 // CHECK-NEXT: }
 
 public func returnClassWithIntField() -> ClassWithIntField {
@@ -130,7 +130,7 @@ public func takeClassWithIntFieldInout(_ x: inout ClassWithIntField) {
 }
 
 // CHECK: SWIFT_INLINE_THUNK ClassWithIntField returnClassWithIntField() noexcept SWIFT_SYMBOL("s:5Class06returnA12WithIntFieldAA0acdE0CyF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_ClassWithIntField::makeRetained(_impl::$s5Class06returnA12WithIntFieldAA0acdE0CyF());
+// CHECK-NEXT:   return _impl::_impl_ClassWithIntField::makeRetained(Class::_impl::$s5Class06returnA12WithIntFieldAA0acdE0CyF());
 // CHECK-NEXT: }
 
 // CHECK: SWIFT_INLINE_THUNK void takeClassWithIntField(const ClassWithIntField& x) noexcept SWIFT_SYMBOL("s:5Class04takeA12WithIntFieldyyAA0acdE0CF") {

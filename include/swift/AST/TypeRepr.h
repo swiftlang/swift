@@ -1533,8 +1533,7 @@ private:
 
 class LifetimeDependentTypeRepr final
     : public SpecifierTypeRepr,
-      private llvm::TrailingObjects<LifetimeDependentTypeRepr,
-                                    LifetimeDependenceSpecifier> {
+      private llvm::TrailingObjects<LifetimeDependentTypeRepr, LifetimeEntry> {
   friend TrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<LifetimeDependentTypeRepr>) const {
@@ -1542,22 +1541,20 @@ class LifetimeDependentTypeRepr final
   }
 
 public:
-  LifetimeDependentTypeRepr(TypeRepr *base,
-                            ArrayRef<LifetimeDependenceSpecifier> specifiers)
+  LifetimeDependentTypeRepr(TypeRepr *base, ArrayRef<LifetimeEntry> specifiers)
       : SpecifierTypeRepr(TypeReprKind::LifetimeDependent, base,
                           specifiers.front().getLoc()) {
     assert(base);
     Bits.LifetimeDependentTypeRepr.NumDependencies = specifiers.size();
     std::uninitialized_copy(specifiers.begin(), specifiers.end(),
-                            getTrailingObjects<LifetimeDependenceSpecifier>());
+                            getTrailingObjects<LifetimeEntry>());
   }
 
-  static LifetimeDependentTypeRepr *
-  create(ASTContext &C, TypeRepr *base,
-         ArrayRef<LifetimeDependenceSpecifier> specifiers);
+  static LifetimeDependentTypeRepr *create(ASTContext &C, TypeRepr *base,
+                                           ArrayRef<LifetimeEntry> specifiers);
 
-  ArrayRef<LifetimeDependenceSpecifier> getLifetimeDependencies() const {
-    return {getTrailingObjects<LifetimeDependenceSpecifier>(),
+  ArrayRef<LifetimeEntry> getLifetimeDependencies() const {
+    return {getTrailingObjects<LifetimeEntry>(),
             Bits.LifetimeDependentTypeRepr.NumDependencies};
   }
 

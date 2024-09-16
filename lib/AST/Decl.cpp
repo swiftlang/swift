@@ -1190,13 +1190,13 @@ LifetimeAnnotation Decl::getLifetimeAnnotation() const {
   return getLifetimeAnnotationFromAttributes();
 }
 
-AvailabilityContext Decl::getAvailabilityForLinkage() const {
+AvailabilityRange Decl::getAvailabilityForLinkage() const {
   ASTContext &ctx = getASTContext();
 
   // When computing availability for linkage, use the "before" version from
   // the @backDeployed attribute, if present.
   if (auto backDeployVersion = getBackDeployedBeforeOSVersion(ctx))
-    return AvailabilityContext{VersionRange::allGTE(*backDeployVersion)};
+    return AvailabilityRange{VersionRange::allGTE(*backDeployVersion)};
 
   auto containingContext =
       AvailabilityInference::annotatedAvailableRange(this, getASTContext());
@@ -1230,7 +1230,7 @@ AvailabilityContext Decl::getAvailabilityForLinkage() const {
   else if (auto *nominal = dyn_cast<NominalTypeDecl>(dc))
     return nominal->getAvailabilityForLinkage();
 
-  return AvailabilityContext::alwaysAvailable();
+  return AvailabilityRange::alwaysAvailable();
 }
 
 bool Decl::isAlwaysWeakImported() const {
@@ -1287,7 +1287,7 @@ bool Decl::isWeakImported(ModuleDecl *fromModule) const {
     return false;
 
   auto &ctx = fromModule->getASTContext();
-  auto deploymentTarget = AvailabilityContext::forDeploymentTarget(ctx);
+  auto deploymentTarget = AvailabilityRange::forDeploymentTarget(ctx);
 
   if (ctx.LangOpts.WeakLinkAtTarget)
     return !availability.isSupersetOf(deploymentTarget);

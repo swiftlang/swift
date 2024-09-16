@@ -25,6 +25,10 @@ function(includeSwiftSyntax)
   file(TO_CMAKE_PATH "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}" swift_syntax_path)
   FetchContent_Declare(CompilerSwiftSyntax SOURCE_DIR "${swift_syntax_path}")
   FetchContent_MakeAvailable(CompilerSwiftSyntax)
+
+  # FIXME: Use FetchContent_Declare's EXCLUDE_FROM_ALL after CMake 3.28
+  FetchContent_GetProperties(CompilerSwiftSyntax BINARY_DIR binary_dir)
+  set_property(DIRECTORY "${binary_dir}" PROPERTY EXCLUDE_FROM_ALL TRUE)
 endfunction()
 includeSwiftSyntax()
 

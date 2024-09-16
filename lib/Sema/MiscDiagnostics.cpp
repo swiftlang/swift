@@ -6163,6 +6163,40 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
   const_cast<Expr *>(E)->walk(Walker);
 }
 
+// Verifies that references to members are valid under the restrictions of the
+// MemberImportVisibility feature.
+static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
+    const DeclContext *dc;
+
+  public:
+    DiagnoseWalker(const DeclContext *dc) : dc(dc) {}
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (auto declRef = E->getReferencedDecl())
+        checkDecl(declRef.getDecl(), E->getLoc());
+
+      return Action::Continue(E);
+    }
+
+    void checkDecl(const ValueDecl *decl, SourceLoc loc) {
+      // Only diagnose uses of members.
+      if (!decl->getDeclContext()->isTypeContext())
+        return;
+
+      if (!dc->isDeclImported(decl))
+        maybeDiagnoseMissingImportForMember(decl, dc, loc);
+    }
+  };
+
+  auto &ctx = DC->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility))
+    return;
+
+  DiagnoseWalker walker(DC);
+  const_cast<Expr *>(E)->walk(walker);
+}
+
 //===----------------------------------------------------------------------===//
 // High-level entry points.
 //===----------------------------------------------------------------------===//
@@ -6189,6 +6223,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseConstantArgumentRequirement(E, DC);
   diagUnqualifiedAccessToMethodNamedSelf(E, DC);
   diagnoseDictionaryLiteralDuplicateKeyEntries(E, DC);
+  diagnoseMissingMemberImports(E, DC);
 }
 
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {

@@ -87,6 +87,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         # Build only static stdlib
         self.cmake_options.define('SWIFT_BUILD_STATIC_STDLIB:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_BUILD_DYNAMIC_STDLIB:BOOL', 'FALSE')
+        self.cmake_options.define('SWIFT_BUILD_STATIC_SDK_OVERLAY:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_STDLIB_TRACING:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_STDLIB_HAS_ASLR:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_STDLIB_CONCURRENCY_TRACING:BOOL', 'FALSE')

@@ -680,6 +680,9 @@ public:
   /// Looks up a precedence group with a given \p name.
   PrecedenceGroupLookupResult lookupPrecedenceGroup(Identifier name) const;
 
+  /// Returns true if the parent module of \p decl is imported by this context.
+  bool isDeclImported(const Decl *decl) const;
+
   /// Return the ASTContext for a specified DeclContext by
   /// walking up to the enclosing module and returning its ASTContext.
   LLVM_READONLY

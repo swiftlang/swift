@@ -719,9 +719,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     llvm::VersionTuple available;
     DECODE_VER_TUPLE(available);
     fn->setAvailabilityForLinkage(
-      available.empty()
-      ? AvailabilityContext::alwaysAvailable()
-      : AvailabilityContext(VersionRange::allGTE(available)));
+        available.empty() ? AvailabilityRange::alwaysAvailable()
+                          : AvailabilityRange(VersionRange::allGTE(available)));
 
     fn->setIsDynamic(IsDynamicallyReplaceable_t(isDynamic));
     fn->setIsExactSelfClass(IsExactSelfClass_t(isExactSelfClass));
@@ -838,9 +837,9 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     llvm::VersionTuple available;
     DECODE_VER_TUPLE(available);
-    auto availability = available.empty()
-      ? AvailabilityContext::alwaysAvailable()
-      : AvailabilityContext(VersionRange::allGTE(available));
+    auto availability =
+        available.empty() ? AvailabilityRange::alwaysAvailable()
+                          : AvailabilityRange(VersionRange::allGTE(available));
 
     llvm::SmallVector<Type, 4> typeErasedParams;
     for (auto id : typeErasedParamsIDs) {

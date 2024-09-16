@@ -5419,20 +5419,13 @@ DependentMemberType *DependentMemberType::get(Type base,
   return known;
 }
 
-/// Compute the recursive type properties of an opaque type archetype.
-static RecursiveTypeProperties getOpaqueTypeArchetypeProperties(
-    SubstitutionMap subs) {
-  RecursiveTypeProperties properties =
-    RecursiveTypeProperties::HasOpaqueArchetype;
-  properties |= subs.getRecursiveProperties();
-  return properties;
-}
-
 OpaqueTypeArchetypeType *OpaqueTypeArchetypeType::getNew(
     GenericEnvironment *environment, Type interfaceType,
     ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
     LayoutConstraint layout) {
-  auto properties = getOpaqueTypeArchetypeProperties(
+  auto properties = archetypeProperties(
+      RecursiveTypeProperties::HasOpaqueArchetype,
+      conformsTo, superclass,
       environment->getOuterSubstitutions());
   auto arena = getArena(properties);
   auto size = OpaqueTypeArchetypeType::totalSizeToAlloc<
@@ -5451,19 +5444,12 @@ Type OpaqueTypeArchetypeType::get(
   return env->getOrCreateArchetypeFromInterfaceType(interfaceType);
 }
 
-/// Compute the recursive type properties of an opened existential archetype.
-static RecursiveTypeProperties getOpenedArchetypeProperties(SubstitutionMap subs) {
-  RecursiveTypeProperties properties =
-    RecursiveTypeProperties::HasOpenedExistential;
-  properties |= subs.getRecursiveProperties();
-  return properties;
-}
-
 CanTypeWrapper<OpenedArchetypeType> OpenedArchetypeType::getNew(
     GenericEnvironment *environment, Type interfaceType,
     ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
     LayoutConstraint layout) {
-  auto properties = getOpenedArchetypeProperties(
+  auto properties = archetypeProperties(
+      RecursiveTypeProperties::HasOpenedExistential, conformsTo, superclass,
       environment->getOuterSubstitutions());
   auto arena = getArena(properties);
   auto size = OpenedArchetypeType::totalSizeToAlloc<
@@ -5658,7 +5644,8 @@ GenericEnvironment *GenericEnvironment::forOpaqueType(
 
   auto &ctx = opaque->getASTContext();
 
-  auto properties = getOpaqueTypeArchetypeProperties(subs);
+  auto properties = ArchetypeType::archetypeProperties(
+      RecursiveTypeProperties::HasOpaqueArchetype, { }, Type(), subs);
   auto arena = getArena(properties);
   auto &environments
     = ctx.getImpl().getArena(arena).OpaqueArchetypeEnvironments;
@@ -5706,7 +5693,11 @@ GenericEnvironment::forOpenedExistential(
 
   auto &ctx = existential->getASTContext();
 
-  auto properties = getOpenedArchetypeProperties(subs);
+  auto layout = existential->getExistentialLayout();
+  auto properties = ArchetypeType::archetypeProperties(
+      RecursiveTypeProperties::HasOpenedExistential,
+      layout.getProtocols(), layout.getSuperclass(), subs);
+
   auto arena = getArena(properties);
 
   auto key = std::make_pair(subs, uuid);

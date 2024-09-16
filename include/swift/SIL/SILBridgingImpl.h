@@ -690,7 +690,8 @@ bool BridgedFunction::isSwift51RuntimeAvailable() const {
     return false;
 
   swift::ASTContext &ctxt = getFunction()->getModule().getASTContext();
-  return swift::AvailabilityContext::forDeploymentTarget(ctxt).isContainedIn(ctxt.getSwift51Availability());
+  return swift::AvailabilityRange::forDeploymentTarget(ctxt).isContainedIn(
+      ctxt.getSwift51Availability());
 }
 
 bool BridgedFunction::isPossiblyUsedExternally() const {

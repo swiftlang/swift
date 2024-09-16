@@ -1943,10 +1943,6 @@ ManglingError Remangler::mangleNoDerivative(Node *node, unsigned depth) {
   return mangleSingleChildNode(node, depth + 1); // type
 }
 
-ManglingError Remangler::mangleLifetimeDependence(Node *node, unsigned depth) {
-  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
-}
-
 ManglingError Remangler::mangleTuple(Node *node, unsigned depth) {
   size_t NumElems = node->getNumChildren();
   if (NumElems > 0 &&

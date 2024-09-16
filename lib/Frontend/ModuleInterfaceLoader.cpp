@@ -1670,6 +1670,19 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     GenericArgs.push_back(triple);
   }
 
+  // Inherit the target SDK name and version
+  if (!LangOpts.SDKName.empty()) {
+    genericSubInvocation.getLangOptions().SDKName = LangOpts.SDKName;
+    GenericArgs.push_back("-target-sdk-name");
+    GenericArgs.push_back(ArgSaver.save(LangOpts.SDKName));
+  }
+  if (LangOpts.SDKVersion.has_value()) {
+    genericSubInvocation.getLangOptions().SDKVersion = LangOpts.SDKVersion;
+    GenericArgs.push_back("-target-sdk-version");
+    GenericArgs.push_back(ArgSaver.save(LangOpts.SDKVersion.value()
+                                                .getAsString()));
+  }
+
   // Inherit the Swift language version
   genericSubInvocation.getLangOptions().EffectiveLanguageVersion =
     LangOpts.EffectiveLanguageVersion;
@@ -1953,9 +1966,13 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     genericSubInvocation.getFrontendOptions()
         .DependencyScanningSubInvocation = true;
   } else if (LoaderOpts.strictImplicitModuleContext ||
-             // Explicit module Interface verification jobs still spawn a sub-instance
-             // and we must ensure this sub-instance gets all of the Xcc flags.
-             LoaderOpts.disableImplicitSwiftModule) {
+             // Explicit module Interface verification jobs still spawn a
+             // sub-instance and we must ensure this sub-instance gets all of
+             // the Xcc flags.
+             LoaderOpts.disableImplicitSwiftModule ||
+             // If using direct cc1 argument mode for lldb or typecheck
+             // interface, inherit all clang arguments.
+             clangImporterOpts.DirectClangCC1ModuleBuild) {
     // If the compiler has been asked to be strict with ensuring downstream
     // dependencies get the parent invocation's context, inherit the extra Clang
     // arguments also. Inherit any clang-specific state of the compilation

@@ -154,10 +154,13 @@ class COWArrayOpt {
   // analyzing.
   SILValue CurrentArrayAddr;
 public:
-  COWArrayOpt(RCIdentityFunctionInfo *RCIA, SILLoop *L, DominanceAnalysis *DA)
+  COWArrayOpt(RCIdentityFunctionInfo *RCIA, SILLoop *L, DominanceAnalysis *DA,
+              PostDominanceAnalysis *PDA)
       : RCIA(RCIA), Function(L->getHeader()->getParent()), Loop(L),
         Preheader(L->getLoopPreheader()), DomTree(DA->get(Function)),
-        ColdBlocks(DA), CachedSafeLoop(false, false), ReachingBlocks(Function) {}
+        ColdBlocks(DA, PDA), CachedSafeLoop(false, false), ReachingBlocks(Function) {
+    ColdBlocks.analyze(Function);
+  }
 
   bool run();
 
@@ -1063,6 +1066,7 @@ class COWArrayOptPass : public SILFunctionTransform {
                             << getFunction()->getName() << "\n");
 
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
+    auto *PDA = PM->getAnalysis<PostDominanceAnalysis>();
     auto *LA = PM->getAnalysis<SILLoopAnalysis>();
     auto *RCIA =
       PM->getAnalysis<RCIdentityAnalysis>()->get(getFunction());
@@ -1084,7 +1088,7 @@ class COWArrayOptPass : public SILFunctionTransform {
 
     bool HasChanged = false;
     for (auto *L : Loops)
-      HasChanged |= COWArrayOpt(RCIA, L, DA).run();
+      HasChanged |= COWArrayOpt(RCIA, L, DA, PDA).run();
 
     if (HasChanged)
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);

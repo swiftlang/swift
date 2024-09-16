@@ -2404,10 +2404,13 @@ public:
         InFlightDiagnostic inFlight =
             Ctx.Diags.diagnose(ID, diag::error_public_import_of_private_module,
                                target->getName(), importer->getName());
-        if (ID->getAttrs().isEmpty()) {
-           inFlight.fixItInsert(ID->getStartLoc(),
-                              "@_implementationOnly ");
-        }
+        if (auto attr = ID->getAttrs().getAttribute<AccessControlAttr>()) {
+          if (Ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault))
+            inFlight.fixItRemove(attr->getLocation());
+          else
+            inFlight.fixItReplace(attr->getLocation(), "internal");
+        } else
+          inFlight.fixItInsert(ID->getStartLoc(), "internal ");
 
 #ifndef NDEBUG
         static bool enableTreatAsError = true;

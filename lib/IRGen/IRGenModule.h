@@ -664,7 +664,7 @@ public:
   const llvm::Triple VariantTriple;
   std::unique_ptr<llvm::TargetMachine> TargetMachine;
   ModuleDecl *getSwiftModule() const;
-  AvailabilityContext getAvailabilityContext() const;
+  AvailabilityRange getAvailabilityRange() const;
   Lowering::TypeConverter &getSILTypes() const;
   SILModule &getSILModule() const { return IRGen.SIL; }
   const IRGenOptions &getOptions() const { return IRGen.Opts; }

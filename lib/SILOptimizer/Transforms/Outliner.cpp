@@ -1196,6 +1196,11 @@ bool ObjCMethodCall::matchInstSequence(SILBasicBlock::iterator I) {
   unsigned Idx = 0;
   IsBridgedArgument.resize(BridgedCall->getNumArguments(), false);
   IsGuaranteedArgument.resize(BridgedCall->getNumArguments(), false);
+  // Map from owned values whose bridged versions we've seen in the apply to
+  // the index in the apply at which they appear or UINT_MAX if we've seen them
+  // more than once (which means we've already nulled out all the
+  // BridgedArguments' ReleaseAfterBridge).
+  llvm::DenseMap<SILValue, unsigned> seenOwnedBridgedValues;
   for (auto &Param : BridgedCall->getArgumentOperands()) {
     unsigned CurIdx = Idx++;
 
@@ -1216,8 +1221,31 @@ bool ObjCMethodCall::matchInstSequence(SILBasicBlock::iterator I) {
 
     BridgedArguments.push_back(BridgedArg);
     IsBridgedArgument.set(CurIdx);
-    if (BridgedArg.isGuaranteed())
+    if (BridgedArg.isGuaranteed()) {
       IsGuaranteedArgument.set(CurIdx);
+      continue;
+    }
+    // Record that this owned value was used at CurIdx.
+    auto pair =
+        seenOwnedBridgedValues.insert({BridgedArg.BridgedValue, CurIdx});
+    auto firstSighting = pair.second;
+    if (firstSighting) {
+      continue;
+    }
+    // This owned value was already seen.  Convert the current argument to
+    // guaranteed and the previous argument as well if necessary.
+    auto iterator = pair.first;
+    if (iterator->second != UINT_MAX) {
+      // This is the _second_ time the value has been seen.  Clear the previous
+      // occurrence's ReleaseAfterBridge and sink the destroy after the apply.
+      BridgedArguments[iterator->second].ReleaseAfterBridge->moveAfter(
+          BridgedCall);
+      BridgedArguments[iterator->second].ReleaseAfterBridge = nullptr;
+      IsGuaranteedArgument.set(iterator->second);
+      iterator->second = UINT_MAX;
+    }
+    BridgedArguments[CurIdx].ReleaseAfterBridge = nullptr;
+    IsGuaranteedArgument.set(CurIdx);
   }
 
   // Try to match a bridged return value.

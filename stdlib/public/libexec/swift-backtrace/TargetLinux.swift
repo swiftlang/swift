@@ -29,7 +29,7 @@ import _Backtracing
 @_spi(MemoryReaders) import _Backtracing
 @_spi(Utils) import _Backtracing
 
-@_implementationOnly import Runtime
+internal import Runtime
 
 enum SomeBacktrace {
   case raw(Backtrace)

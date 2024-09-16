@@ -33,7 +33,7 @@ struct ParsedSpecAttr {
   SILFunction *target = nullptr;
   Identifier spiGroupID;
   ModuleDecl *spiModule;
-  AvailabilityContext availability = AvailabilityContext::alwaysAvailable();
+  AvailabilityRange availability = AvailabilityRange::alwaysAvailable();
 };
 
 /// The parser for an individual SIL function.

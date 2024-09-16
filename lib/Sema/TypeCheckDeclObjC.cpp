@@ -153,7 +153,12 @@ void ObjCReason::describe(const Decl *D) const {
 }
 
 void ObjCReason::setAttrInvalid() const {
-  if (requiresAttr(kind))
+  if (!requiresAttr(kind))
+    return;
+
+  if (kind == MemberOfObjCImplementationExtension)
+    cast<ObjCImplementationAttr>(getAttr())->setHasInvalidImplicitLangAttrs();
+  else
     getAttr()->setInvalid();
 }
 
@@ -517,16 +522,16 @@ static VersionRange getMinOSVersionForClassStubs(const llvm::Triple &target) {
   return VersionRange::all();
 }
 
-static AvailabilityContext getObjCClassStubAvailability(ASTContext &ctx) {
+static AvailabilityRange getObjCClassStubAvailability(ASTContext &ctx) {
   // FIXME: This should just be ctx.getSwift51Availability(), but that breaks
   // tests on arm64 arches.
-  return AvailabilityContext(getMinOSVersionForClassStubs(ctx.LangOpts.Target));
+  return AvailabilityRange(getMinOSVersionForClassStubs(ctx.LangOpts.Target));
 }
 
 static bool checkObjCClassStubAvailability(ASTContext &ctx, const Decl *decl) {
   auto stubAvailability = getObjCClassStubAvailability(ctx);
 
-  auto deploymentTarget = AvailabilityContext::forDeploymentTarget(ctx);
+  auto deploymentTarget = AvailabilityRange::forDeploymentTarget(ctx);
   if (deploymentTarget.isContainedIn(stubAvailability))
     return true;
 
@@ -3074,6 +3079,17 @@ class ObjCImplementationChecker {
 
   bool hasDiagnosed = false;
 
+  bool hasInvalidLangAttr(ValueDecl *cand) {
+    // If isObjC() found a problem, it will have set the invalid bit on either
+    // the candidate's ObjCAttr, if it has one, or the controlling
+    // ObjCImplementationAttr otherwise.
+    if (auto objc = cand->getAttrs()
+                            .getAttribute<ObjCAttr>(/*AllowInvalid=*/true))
+      return objc->isInvalid();
+
+    return getAttr()->hasInvalidImplicitLangAttrs() || getAttr()->isInvalid();
+  }
+
 public:
   ObjCImplementationChecker(Decl *D)
       : decl(D), hasDiagnosed(getAttr()->isInvalid())
@@ -3158,18 +3174,11 @@ private:
       return;
 
     // Don't diagnose if we already diagnosed an unrelated ObjC interop issue,
-    // like an un-representable type. If there's an `@objc` attribute on the
-    // member, this will be indicated by its `isInvalid()` bit; otherwise we'll
-    // use the enclosing extension's `@_objcImplementation` attribute.
-    DeclAttribute *attr = afd->getAttrs()
-                              .getAttribute<ObjCAttr>(/*AllowInvalid=*/true);
-    if (!attr)
-      attr = member->getDeclContext()->getAsDecl()->getAttrs()
-                 .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
-    assert(attr && "expected @_objcImplementation on context of member checked "
-                   "by ObjCImplementationChecker");
-    if (attr->isInvalid())
+    // like an un-representable type.
+    if (hasInvalidLangAttr(member)) {
+      hasDiagnosed = true;
       return;
+    }
 
     if (auto init = dyn_cast<ConstructorDecl>(afd)) {
       if (!init->isObjC() && (init->isRequired() ||
@@ -3651,6 +3660,13 @@ private:
 
   void diagnoseOutcome(MatchOutcome outcome, ValueDecl *req, ValueDecl *cand,
                        ObjCSelector explicitObjCName) {
+    // If the candidate was invalid, we've already diagnosed the likely cause of
+    // the mismatch. Don't dogpile.
+    if (hasInvalidLangAttr(cand)) {
+      hasDiagnosed = true;
+      return;
+    }
+
     auto reqObjCName = getObjCName(req);
 
     switch (outcome) {

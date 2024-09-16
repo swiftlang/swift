@@ -6556,6 +6556,14 @@ protected:
   }
 
 public:
+  /// Compute the recursive type properties for an archtype, merging the
+  /// given properties with those derived from the other arguments.
+  static RecursiveTypeProperties archetypeProperties(
+      RecursiveTypeProperties properties,
+      ArrayRef<ProtocolDecl *> conformsTo,
+      Type superclass,
+      SubstitutionMap subs);
+
   /// Retrieve the name of this archetype.
   Identifier getName() const;
 
@@ -6580,11 +6588,7 @@ public:
   bool requiresClass() const;
 
   /// Retrieve the superclass of this type, if such a requirement exists.
-  Type getSuperclass() const {
-    if (!Bits.ArchetypeType.HasSuperclass) return Type();
-
-    return *getSubclassTrailingObjects<Type>();
-  }
+  Type getSuperclass() const;
 
   /// Retrieve the layout constraint of this type, if such a requirement exists.
   LayoutConstraint getLayoutConstraint() const {

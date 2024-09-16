@@ -48,6 +48,9 @@ func e(with a: A<Int>) {} // expected-error {{cannot pass type 'Int' as a value 
 struct Generic<T: ~Copyable & ~Escapable> {}
 struct GenericWithIntParam<T: ~Copyable & ~Escapable, let N: Int> {}
 
+extension Generic where T == 123 {} // expected-error {{cannot constrain type parameter 'T' to be integer '123'}}
+extension Generic where T == 123.Type {} // expected-error {{integer unexpectedly used in a type position}}
+
 func f(_: Generic<123>) {} // expected-error {{integer unexpectedly used in a type position}}
 func g<let N: Int>(_: Generic<N>) {} // expected-error {{cannot use value type 'N' for generic argument 'T'}}
 func h(_: (Int, 123)) {} // expected-error {{integer unexpectedly used in a type position}}

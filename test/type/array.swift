@@ -126,3 +126,11 @@ do {
   // expected-note@-2 {{remove the space between the elements to silence this warning}}{{14-15=}}
   ]
 }
+
+struct TupleWith<T> {
+  typealias And<U> = (T, U)
+}
+_ = [TupleWith<String>.And<Int>](repeating: ("", 0), count: 0)
+_ = [TupleWith.And<Int>](repeating: ("", 0), count: 0)
+_ = [TupleWith<String>.And](repeating: ("", 0), count: 0)
+_ = [TupleWith.And](repeating: ("", 0), count: 0)

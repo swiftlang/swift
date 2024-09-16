@@ -29,19 +29,19 @@
 
 using namespace swift;
 
-AvailabilityContext AvailabilityContext::forDeploymentTarget(const ASTContext &Ctx) {
-  return AvailabilityContext(
+AvailabilityRange
+AvailabilityRange::forDeploymentTarget(const ASTContext &Ctx) {
+  return AvailabilityRange(
       VersionRange::allGTE(Ctx.LangOpts.getMinPlatformVersion()));
 }
 
-AvailabilityContext AvailabilityContext::forInliningTarget(const ASTContext &Ctx) {
-  return AvailabilityContext(
+AvailabilityRange AvailabilityRange::forInliningTarget(const ASTContext &Ctx) {
+  return AvailabilityRange(
       VersionRange::allGTE(Ctx.LangOpts.MinimumInliningTargetVersion));
 }
 
-AvailabilityContext AvailabilityContext::forRuntimeTarget(const ASTContext &Ctx) {
-  return AvailabilityContext(
-    VersionRange::allGTE(Ctx.LangOpts.RuntimeVersion));
+AvailabilityRange AvailabilityRange::forRuntimeTarget(const ASTContext &Ctx) {
+  return AvailabilityRange(VersionRange::allGTE(Ctx.LangOpts.RuntimeVersion));
 }
 
 namespace {
@@ -413,7 +413,7 @@ Decl::getSemanticAvailableRangeAttr() const {
                            std::nullopt);
 }
 
-std::optional<AvailabilityContext>
+std::optional<AvailabilityRange>
 AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
   auto bestAvailAttr = attrForAnnotatedAvailableRange(D, Ctx);
   if (!bestAvailAttr)
@@ -517,9 +517,8 @@ bool Decl::requiresUnavailableDeclABICompatibilityStubs() const {
   return isUnreachableAtRuntime();
 }
 
-AvailabilityContext
-AvailabilityInference::annotatedAvailableRangeForAttr(const SpecializeAttr* attr,
-                                                      ASTContext &ctx) {
+AvailabilityRange AvailabilityInference::annotatedAvailableRangeForAttr(
+    const SpecializeAttr *attr, ASTContext &ctx) {
 
   const AvailableAttr *bestAvailAttr = nullptr;
 
@@ -538,7 +537,7 @@ AvailabilityInference::annotatedAvailableRangeForAttr(const SpecializeAttr* attr
   if (bestAvailAttr)
     return availableRange(bestAvailAttr, ctx);
 
-  return AvailabilityContext::alwaysAvailable();
+  return AvailabilityRange::alwaysAvailable();
 }
 
 static const AvailableAttr *attrForAvailableRange(const Decl *D,
@@ -564,13 +563,13 @@ static const AvailableAttr *attrForAvailableRange(const Decl *D,
   return nullptr;
 }
 
-AvailabilityContext AvailabilityInference::availableRange(const Decl *D,
-                                                          ASTContext &Ctx) {
+AvailabilityRange AvailabilityInference::availableRange(const Decl *D,
+                                                        ASTContext &Ctx) {
   if (auto attr = attrForAvailableRange(D, Ctx))
     return availableRange(attr, Ctx);
 
   // Treat unannotated declarations as always available.
-  return AvailabilityContext::alwaysAvailable();
+  return AvailabilityRange::alwaysAvailable();
 }
 
 bool AvailabilityInference::isAvailableAsSPI(const Decl *D, ASTContext &Ctx) {
@@ -580,7 +579,7 @@ bool AvailabilityInference::isAvailableAsSPI(const Decl *D, ASTContext &Ctx) {
   return false;
 }
 
-AvailabilityContext
+AvailabilityRange
 AvailabilityInference::availableRange(const AvailableAttr *attr,
                                       ASTContext &Ctx) {
   assert(attr->isActivePlatform(Ctx));
@@ -592,7 +591,7 @@ AvailabilityInference::availableRange(const AvailableAttr *attr,
       attr, Ctx, Platform, RemappedIntroducedVersion))
     IntroducedVersion = RemappedIntroducedVersion;
 
-  return AvailabilityContext{VersionRange::allGTE(IntroducedVersion)};
+  return AvailabilityRange{VersionRange::allGTE(IntroducedVersion)};
 }
 
 namespace {
@@ -600,7 +599,7 @@ namespace {
 class AvailabilityInferenceTypeWalker : public TypeWalker {
 public:
   ASTContext &AC;
-  AvailabilityContext AvailabilityInfo = AvailabilityContext::alwaysAvailable();
+  AvailabilityRange AvailabilityInfo = AvailabilityRange::alwaysAvailable();
 
   AvailabilityInferenceTypeWalker(ASTContext &AC) : AC(AC) {}
 
@@ -615,54 +614,53 @@ public:
 };
 } // end anonymous namespace
 
-
-AvailabilityContext AvailabilityInference::inferForType(Type t) {
+AvailabilityRange AvailabilityInference::inferForType(Type t) {
   AvailabilityInferenceTypeWalker walker(t->getASTContext());
   t.walk(walker);
   return walker.AvailabilityInfo;
 }
 
-AvailabilityContext ASTContext::getSwiftFutureAvailability() const {
+AvailabilityRange ASTContext::getSwiftFutureAvailability() const {
   auto target = LangOpts.Target;
 
   if (target.isMacOSX() ) {
-    return AvailabilityContext(
+    return AvailabilityRange(
         VersionRange::allGTE(llvm::VersionTuple(99, 99, 0)));
   } else if (target.isiOS()) {
-    return AvailabilityContext(
+    return AvailabilityRange(
         VersionRange::allGTE(llvm::VersionTuple(99, 99, 0)));
   } else if (target.isWatchOS()) {
-    return AvailabilityContext(
+    return AvailabilityRange(
         VersionRange::allGTE(llvm::VersionTuple(99, 99, 0)));
   } else {
-    return AvailabilityContext::alwaysAvailable();
+    return AvailabilityRange::alwaysAvailable();
   }
 }
 
-AvailabilityContext
-ASTContext::getSwiftAvailability(unsigned major, unsigned minor) const {
+AvailabilityRange ASTContext::getSwiftAvailability(unsigned major,
+                                                   unsigned minor) const {
   auto target = LangOpts.Target;
 
   // Deal with special cases for Swift 5.3 and lower
   if (major == 5 && minor <= 3) {
     if (target.getArchName() == "arm64e")
-      return AvailabilityContext::alwaysAvailable();
+      return AvailabilityRange::alwaysAvailable();
     if (target.isMacOSX() && target.isAArch64())
-      return AvailabilityContext::alwaysAvailable();
+      return AvailabilityRange::alwaysAvailable();
     if (target.isiOS() && target.isAArch64()
         && (target.isSimulatorEnvironment()
             || target.isMacCatalystEnvironment()))
-      return AvailabilityContext::alwaysAvailable();
+      return AvailabilityRange::alwaysAvailable();
     if (target.isWatchOS() && target.isArch64Bit())
-      return AvailabilityContext::alwaysAvailable();
+      return AvailabilityRange::alwaysAvailable();
   }
 
   switch (major) {
 #define MAJOR_VERSION(V) case V: switch (minor) {
 #define END_MAJOR_VERSION(V) } break;
-#define PLATFORM(P, V)                                                  \
-    if (IS_PLATFORM(P))                                                 \
-      return AvailabilityContext(VersionRange::allGTE(llvm::VersionTuple V));
+#define PLATFORM(P, V)                                                         \
+  if (IS_PLATFORM(P))                                                          \
+    return AvailabilityRange(VersionRange::allGTE(llvm::VersionTuple V));
 #define IS_PLATFORM(P) PLATFORM_TEST_##P
 #define FUTURE                  return getSwiftFutureAvailability();
 #define PLATFORM_TEST_macOS     target.isMacOSX()
@@ -673,12 +671,12 @@ ASTContext::getSwiftAvailability(unsigned major, unsigned minor) const {
 #define _SECOND(A, B) B
 #define SECOND(T) _SECOND T
 
-#define RUNTIME_VERSION(V, PLATFORMS)           \
-     case SECOND(V):                            \
-        PLATFORMS                               \
-        return AvailabilityContext::alwaysAvailable();
+#define RUNTIME_VERSION(V, PLATFORMS)                                          \
+  case SECOND(V):                                                              \
+    PLATFORMS                                                                  \
+    return AvailabilityRange::alwaysAvailable();
 
-    #include "swift/AST/RuntimeVersions.def"
+#include "swift/AST/RuntimeVersions.def"
 
 #undef PLATFORM_TEST_macOS
 #undef PLATFORM_TEST_iOS

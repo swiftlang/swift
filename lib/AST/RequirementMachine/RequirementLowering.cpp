@@ -250,6 +250,18 @@ static void desugarSameTypeRequirement(
         }
       }
 
+      if (!firstType->isValueParameter() && secondType->is<IntegerType>()) {
+        errors.push_back(RequirementError::forInvalidValueForTypeSameType(
+            sugaredFirstType, secondType, loc));
+        return true;
+      }
+
+      if (!secondType->isValueParameter() && firstType->is<IntegerType>()) {
+        errors.push_back(RequirementError::forInvalidValueForTypeSameType(
+            secondType, sugaredFirstType, loc));
+        return true;
+      }
+
       if (firstType->isTypeParameter() && secondType->isTypeParameter()) {
         result.emplace_back(kind, sugaredFirstType, secondType);
         return true;

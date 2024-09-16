@@ -630,9 +630,7 @@ function(_compile_swift_files
   list(APPEND swift_flags "-enable-experimental-feature" "SE427NoInferenceOnExtension")
   list(APPEND swift_flags "-enable-experimental-feature" "AllowUnsafeAttribute")
 
-  if(SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES)
-    list(APPEND swift_flags "-enable-experimental-feature" "NonescapableTypes")
-  endif()
+  list(APPEND swift_flags "-enable-experimental-feature" "NonescapableTypes")
 
   list(APPEND swift_flags "-enable-experimental-feature" "ExtensionImportVisiblity")
 

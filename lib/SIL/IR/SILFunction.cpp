@@ -102,7 +102,7 @@ SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
                                      ArrayRef<Type> typeErasedParams,
                                      SILFunction *target, Identifier spiGroup,
                                      const ModuleDecl *spiModule,
-                                     AvailabilityContext availability)
+                                     AvailabilityRange availability)
     : kind(kind), exported(exported), specializedSignature(specializedSig),
       unerasedSpecializedSignature(unerasedSpecializedSig),
       typeErasedParams(typeErasedParams.begin(), typeErasedParams.end()),
@@ -118,7 +118,7 @@ SILSpecializeAttr::create(SILModule &M, GenericSignature specializedSig,
                           bool exported, SpecializationKind kind,
                           SILFunction *target, Identifier spiGroup,
                           const ModuleDecl *spiModule,
-                          AvailabilityContext availability) {
+                          AvailabilityRange availability) {
   auto erasedSpecializedSig =
       SILSpecializeAttr::buildTypeErasedSignature(specializedSig,
                                                   typeErasedParams);
@@ -218,7 +218,7 @@ SILFunction::SILFunction(
     IsRuntimeAccessible_t isRuntimeAccessible)
     : SwiftObjectHeader(functionMetatype), Module(Module),
       index(Module.getNewFunctionIndex()),
-      Availability(AvailabilityContext::alwaysAvailable()) {
+      Availability(AvailabilityRange::alwaysAvailable()) {
   init(Linkage, Name, LoweredType, genericEnv, isBareSILFunction, isTrans,
        serializedKind, entryCount, isThunk, classSubclassScope, inlineStrategy, E,
        DebugScope, isDynamic, isExactSelfClass, isDistributed,
@@ -248,7 +248,7 @@ void SILFunction::init(
   this->LoweredType = LoweredType;
   this->SpecializationInfo = nullptr;
   this->EntryCount = entryCount;
-  this->Availability = AvailabilityContext::alwaysAvailable();
+  this->Availability = AvailabilityRange::alwaysAvailable();
   this->Bare = isBareSILFunction;
   this->Transparent = isTrans;
   this->SerializedKind = serializedKind;
@@ -624,7 +624,7 @@ bool SILFunction::isWeakImported(ModuleDecl *module) const {
     return false;
 
   auto deploymentTarget =
-      AvailabilityContext::forDeploymentTarget(getASTContext());
+      AvailabilityRange::forDeploymentTarget(getASTContext());
 
   if (getASTContext().LangOpts.WeakLinkAtTarget)
     return !Availability.isSupersetOf(deploymentTarget);

@@ -24,6 +24,7 @@
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/KnownProtocols.h"
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
@@ -184,8 +185,9 @@ protected:
       isUnchecked : 1
     );
 
-    SWIFT_INLINE_BITFIELD(ObjCImplementationAttr, DeclAttribute, 2,
+    SWIFT_INLINE_BITFIELD(ObjCImplementationAttr, DeclAttribute, 3,
       isCategoryNameInvalid : 1,
+      hasInvalidImplicitLangAttrs : 1,
       isEarlyAdopter : 1
     );
 
@@ -2434,6 +2436,7 @@ public:
       : DeclAttribute(DeclAttrKind::ObjCImplementation, AtLoc, Range, Implicit),
         CategoryName(CategoryName) {
     Bits.ObjCImplementationAttr.isCategoryNameInvalid = isCategoryNameInvalid;
+    Bits.ObjCImplementationAttr.hasInvalidImplicitLangAttrs = false;
     Bits.ObjCImplementationAttr.isEarlyAdopter = isEarlyAdopter;
   }
 
@@ -2449,6 +2452,16 @@ public:
 
   void setCategoryNameInvalid(bool newValue = true) {
     Bits.ObjCImplementationAttr.isCategoryNameInvalid = newValue;
+  }
+
+  /// Has at least one implicitly ObjC member failed to validate? If so,
+  /// diagnostics that might be duplicative will be suppressed.
+  bool hasInvalidImplicitLangAttrs() const {
+    return Bits.ObjCImplementationAttr.hasInvalidImplicitLangAttrs;
+  }
+
+  void setHasInvalidImplicitLangAttrs(bool newValue = true) {
+    Bits.ObjCImplementationAttr.hasInvalidImplicitLangAttrs = newValue;
   }
 
   static bool classof(const DeclAttribute *DA) {
@@ -2624,6 +2637,31 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::RawLayout;
+  }
+};
+
+class LifetimeAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<LifetimeAttr, LifetimeEntry> {
+
+  friend TrailingObjects;
+
+  unsigned NumEntries = 0;
+
+  explicit LifetimeAttr(SourceLoc atLoc, SourceRange baseRange, bool implicit,
+                        ArrayRef<LifetimeEntry> entries);
+
+public:
+  static LifetimeAttr *create(ASTContext &context, SourceLoc atLoc,
+                              SourceRange baseRange, bool implicit,
+                              ArrayRef<LifetimeEntry> entries);
+
+  ArrayRef<LifetimeEntry> getLifetimeEntries() const {
+    return {getTrailingObjects<LifetimeEntry>(), NumEntries};
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Lifetime;
   }
 };
 

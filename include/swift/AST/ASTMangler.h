@@ -91,9 +91,6 @@ protected:
   /// a critical role.
   bool AllowTypedThrows = true;
 
-  /// If enabled, lifetime dependencies can be encoded in the mangled name.
-  bool AllowLifetimeDependencies = true;
-
   /// If enabled, declarations annotated with @_originallyDefinedIn are mangled
   /// as if they're part of their original module. Disabled for debug mangling,
   /// because lldb wants to find declarations in the modules they're currently

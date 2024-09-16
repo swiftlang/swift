@@ -8883,7 +8883,8 @@ namespace {
         rewriteFunction(closure);
 
         if (AnyFunctionRef(closure).hasExternalPropertyWrapperParameters()) {
-          return Action::SkipNode(rewriteClosure(closure));
+          return Action::SkipNode(Rewriter.buildSingleCurryThunk(
+              closure, closure, Rewriter.cs.getConstraintLocator(closure)));
         }
 
         return Action::SkipNode(closure);
@@ -8935,49 +8936,6 @@ namespace {
     std::optional<SyntacticElementTarget>
     rewriteTarget(SyntacticElementTarget target);
 
-    AutoClosureExpr *rewriteClosure(ClosureExpr *closure) {
-      auto &solution = Rewriter.solution;
-
-      // Apply types to synthesized property wrapper vars.
-      for (auto *param : *closure->getParameters()) {
-        if (!param->hasAttachedPropertyWrapper())
-          continue;
-
-        // Set the interface type of each property wrapper synthesized var
-        auto *backingVar = param->getPropertyWrapperBackingProperty();
-        auto backingType =
-            solution.simplifyType(solution.getType(backingVar))->mapTypeOutOfContext();
-        backingVar->setInterfaceType(backingType);
-
-        if (auto *projectionVar = param->getPropertyWrapperProjectionVar()) {
-          projectionVar->setInterfaceType(
-              solution.simplifyType(solution.getType(projectionVar))->mapTypeOutOfContext());
-        }
-
-        auto *wrappedValueVar = param->getPropertyWrapperWrappedValueVar();
-        auto wrappedValueType =
-            solution.simplifyType(solution.getType(wrappedValueVar))->mapTypeOutOfContext();
-        wrappedValueVar->setInterfaceType(wrappedValueType->getWithoutSpecifierType());
-
-        if (param->hasImplicitPropertyWrapper()) {
-          if (wrappedValueType->is<LValueType>())
-            wrappedValueVar->setImplInfo(StorageImplInfo::getMutableComputed());
-
-          // Add an explicit property wrapper attribute, which is needed for
-          // synthesizing the accessors.
-          auto &context = wrappedValueVar->getASTContext();
-          auto *typeExpr = TypeExpr::createImplicit(backingType, context);
-          auto *attr = CustomAttr::create(context, SourceLoc(), typeExpr, /*implicit=*/true);
-          wrappedValueVar->getAttrs().add(attr);
-        }
-      }
-
-      TypeChecker::checkParameterList(closure->getParameters(), closure);
-
-      return Rewriter.buildSingleCurryThunk(
-          closure, closure, Rewriter.cs.getConstraintLocator(closure));
-    }
-
     /// Rewrite the function for the given solution.
     ///
     /// \returns true if an error occurred.
@@ -8996,9 +8954,11 @@ namespace {
 
       switch (result) {
       case SolutionApplicationToFunctionResult::Success: {
-        if (auto closure = dyn_cast_or_null<ClosureExpr>(
-                fn.getAbstractClosureExpr()))
+        if (auto closure =
+                dyn_cast_or_null<ClosureExpr>(fn.getAbstractClosureExpr())) {
           TypeChecker::checkClosureAttributes(closure);
+          TypeChecker::checkParameterList(closure->getParameters(), closure);
+        }
         return false;
       }
 

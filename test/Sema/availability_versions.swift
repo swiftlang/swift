@@ -1801,3 +1801,21 @@ class StoredPropertiesWithAvailabilityInClosures {
     return 0
   }()
 }
+
+struct PropertyObservers {
+  var hasPotentiallyUnavailableObservers: Int {
+    @available(macOS 51, *) // expected-error {{willSet observer for property cannot be marked potentially unavailable with '@available'}}
+    willSet { }
+
+    @available(macOS 51, *) // expected-error {{didSet observer for property cannot be marked potentially unavailable with '@available'}}
+    didSet { }
+  }
+
+  var hasObsoletedObservers: Int {
+    @available(macOS, obsoleted: 10.9) // expected-error {{willSet observer for property cannot be marked unavailable with '@available'}}
+    willSet { }
+
+    @available(macOS, obsoleted: 10.9) // expected-error {{didSet observer for property cannot be marked unavailable with '@available'}}
+    didSet { }
+  }
+}

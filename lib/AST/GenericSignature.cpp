@@ -327,8 +327,7 @@ GenericSignature::LocalRequirements
 GenericSignatureImpl::getLocalRequirements(Type depType) const {
   assert(depType->isTypeParameter() && "Expected a type parameter here");
 
-  return getRequirementMachine()->getLocalRequirements(
-      depType, getGenericParams());
+  return getRequirementMachine()->getLocalRequirements(depType);
 }
 
 ASTContext &GenericSignatureImpl::getASTContext() const {
@@ -412,12 +411,7 @@ bool GenericSignatureImpl::isRequirementSatisfied(
     auto *genericEnv = getGenericEnvironment();
 
     requirement = requirement.subst(
-        [&](SubstitutableType *type) -> Type {
-          if (auto *paramType = type->getAs<GenericTypeParamType>())
-            return genericEnv->mapTypeIntoContext(paramType);
-
-          return type;
-        },
+        QueryInterfaceTypeSubstitutions{genericEnv},
         LookUpConformanceInModule());
   }
 
@@ -507,6 +501,11 @@ CanType GenericSignatureImpl::getReducedType(Type type) const {
     return CanType(type);
 
   return getRequirementMachine()->getReducedType(
+      type, { })->getCanonicalType();
+}
+
+CanType GenericSignatureImpl::getReducedTypeParameter(CanType type) const {
+  return getRequirementMachine()->getReducedTypeParameter(
       type, { })->getCanonicalType();
 }
 

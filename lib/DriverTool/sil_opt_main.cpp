@@ -294,6 +294,10 @@ struct SILOptOptions {
                      llvm::cl::desc("Enables optimization assumption that functions rarely throw errors."));
 
   llvm::cl::opt<bool>
+  EnableNoReturnCold = llvm::cl::opt<bool>("enable-noreturn-prediction",
+                     llvm::cl::desc("Enables optimization assumption that calls to no-return functions are cold."));
+
+  llvm::cl::opt<bool>
   EnableMoveInoutStackProtection = llvm::cl::opt<bool>("enable-move-inout-stack-protector",
                     llvm::cl::desc("Enable the stack protector by moving values to temporaries."));
 
@@ -717,8 +721,10 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   Invocation.getLangOptions().BypassResilienceChecks =
       options.BypassResilienceChecks;
-  Invocation.getDiagnosticOptions().PrintDiagnosticNames =
-      options.DebugDiagnosticNames;
+  if (options.DebugDiagnosticNames) {
+    Invocation.getDiagnosticOptions().PrintDiagnosticNames =
+        PrintDiagnosticNamesMode::Identifier;
+  }
 
   for (auto &featureName : options.UpcomingFeatures) {
     auto feature = getUpcomingFeature(featureName);
@@ -852,6 +858,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.EnableSpeculativeDevirtualization = options.EnableSpeculativeDevirtualization;
   SILOpts.EnableAsyncDemotion = options.EnableAsyncDemotion;
   SILOpts.EnableThrowsPrediction = options.EnableThrowsPrediction;
+  SILOpts.EnableNoReturnCold = options.EnableNoReturnCold;
   SILOpts.IgnoreAlwaysInline = options.IgnoreAlwaysInline;
   SILOpts.EnableOSSAModules = options.EnableOSSAModules;
   SILOpts.EnableSILOpaqueValues = options.EnableSILOpaqueValues;
