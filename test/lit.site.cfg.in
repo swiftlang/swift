@@ -145,8 +145,6 @@ if "@SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY@" == "TRUE":
     config.available_features.add('concurrency')
 if "@SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED@" == "TRUE":
     config.available_features.add('distributed')
-if "@SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES@" == "TRUE":
-    config.available_features.add('nonescapable_types')
 if "@SWIFT_STDLIB_STATIC_PRINT@" == "TRUE":
     config.available_features.add('stdlib_static_print')
 if "@SWIFT_STDLIB_ENABLE_UNICODE_DATA" == "TRUE":
