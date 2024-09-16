@@ -525,6 +525,9 @@ extension String.Index {
   }
 
   /// A textual representation of this instance.
+  ///
+  /// - Important: The contents of the returned string are not guaranteed to
+  ///    remain stable: they may arbitrarily change in any Swift release.
   @_alwaysEmitIntoClient // FIXME: Use @backDeployed
   @inline(never)
   public var description: String {
