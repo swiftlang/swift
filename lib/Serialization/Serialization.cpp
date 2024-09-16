@@ -531,6 +531,7 @@ static uint8_t getRawReadImplKind(swift::ReadImplKind kind) {
   CASE(Inherited)
   CASE(Address)
   CASE(Read)
+  CASE(Read2)
 #undef CASE
   }
   llvm_unreachable("bad kind");

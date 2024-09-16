@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 892; // modify accessor
+const uint16_t SWIFTMODULE_VERSION_MINOR = 893; // read accessor
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -205,6 +205,7 @@ enum class ReadImplKind : uint8_t {
   Inherited,
   Address,
   Read,
+  Read2,
 };
 using ReadImplKindField = BCFixed<3>;
 
@@ -335,6 +336,7 @@ enum AccessorKind : uint8_t {
   Address,
   MutableAddress,
   Read,
+  Read2,
   Modify,
   Modify2,
   Init,

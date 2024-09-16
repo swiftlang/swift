@@ -4386,6 +4386,9 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
           case ReadImplKind::Read:
             collectAccessorCaptures(AccessorKind::Read);
             break;
+          case ReadImplKind::Read2:
+            collectAccessorCaptures(AccessorKind::Read2);
+            break;
           case ReadImplKind::Inherited:
             llvm_unreachable("inherited local variable?");
           }

@@ -2999,6 +2999,10 @@ ManglingError Remangler::mangleReadAccessor(Node *node, unsigned depth) {
   return mangleAbstractStorage(node->getFirstChild(), "r", depth + 1);
 }
 
+ManglingError Remangler::mangleRead2Accessor(Node *node, unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "y", depth + 1);
+}
+
 ManglingError Remangler::mangleKeyPathThunkHelper(Node *node, StringRef op,
                                                   unsigned depth) {
   for (NodePointer Child : *node)

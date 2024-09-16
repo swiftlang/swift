@@ -275,6 +275,7 @@ SymbolSubKind index::getSubKindForAccessor(AccessorKind AK) {
   case AccessorKind::MutableAddress:
     return SymbolSubKind::SwiftAccessorMutableAddressor;
   case AccessorKind::Read:      return SymbolSubKind::SwiftAccessorRead;
+  case AccessorKind::Read2:     return SymbolSubKind::SwiftAccessorRead;
   case AccessorKind::Modify:    return SymbolSubKind::SwiftAccessorModify;
   case AccessorKind::Modify2:   return SymbolSubKind::SwiftAccessorModify;
   case AccessorKind::Init:      return SymbolSubKind::SwiftAccessorInit;

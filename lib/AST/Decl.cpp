@@ -263,6 +263,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
        return DescriptiveDeclKind::MutableAddressor;
 
      case AccessorKind::Read:
+     case AccessorKind::Read2:
        return DescriptiveDeclKind::ReadAccessor;
 
      case AccessorKind::Modify:
@@ -2688,6 +2689,9 @@ getDirectReadAccessStrategy(const AbstractStorageDecl *storage) {
   case ReadImplKind::Read:
     return AccessStrategy::getAccessor(AccessorKind::Read,
                                        /*dispatch*/ false);
+  case ReadImplKind::Read2:
+    return AccessStrategy::getAccessor(AccessorKind::Read2,
+                                       /*dispatch*/ false);
   }
   llvm_unreachable("bad impl kind");
 }
@@ -2902,6 +2906,7 @@ bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
   case AccessorKind::Set:
     return requiresOpaqueSetter();
   case AccessorKind::Read:
+  case AccessorKind::Read2:
     return requiresOpaqueReadCoroutine();
   case AccessorKind::Modify:
   case AccessorKind::Modify2:
@@ -6765,6 +6770,7 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
   case AccessorKind::MutableAddress:
     return article ? "a mutable addressor" : "mutable addressor";
   case AccessorKind::Read:
+  case AccessorKind::Read2:
     return article ? "a 'read' accessor" : "'read' accessor";
   case AccessorKind::Modify:
   case AccessorKind::Modify2:
@@ -9007,6 +9013,7 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
     case AccessorKind::Get:
     case AccessorKind::DistributedGet:
     case AccessorKind::Read:
+    case AccessorKind::Read2:
     case AccessorKind::Modify:
     case AccessorKind::Modify2:
       return subscript ? subscript->getName()
@@ -10316,6 +10323,7 @@ StringRef AccessorDecl::implicitParameterNameFor(AccessorKind kind) {
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
   case AccessorKind::Read:
+  case AccessorKind::Read2:
   case AccessorKind::Modify:
   case AccessorKind::Modify2:
   case AccessorKind::Address:
@@ -10330,6 +10338,7 @@ bool AccessorDecl::isAssumedNonMutating() const {
   case AccessorKind::DistributedGet:
   case AccessorKind::Address:
   case AccessorKind::Read:
+  case AccessorKind::Read2:
     return true;
 
   case AccessorKind::Set:

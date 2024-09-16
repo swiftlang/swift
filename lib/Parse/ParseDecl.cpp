@@ -7861,6 +7861,7 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::Read:
+  case AccessorKind::Read2:
   case AccessorKind::Modify:
   case AccessorKind::Modify2:
     return false;
@@ -8554,9 +8555,12 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
   // 'get', 'read', and a non-mutable addressor are all exclusive.
   if (Get) {
     diagnoseConflictingAccessors(P, Get, Read);
+    diagnoseConflictingAccessors(P, Get, Read2);
     diagnoseConflictingAccessors(P, Get, Address);
   } else if (Read) {
     diagnoseConflictingAccessors(P, Read, Address);
+  } else if (Read2) {
+    diagnoseConflictingAccessors(P, Read2, Address);
   } else if (Address) {
     // Nothing can go wrong.
 

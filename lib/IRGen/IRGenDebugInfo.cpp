@@ -639,6 +639,9 @@ private:
         case AccessorKind::Modify2:
           Kind = ".modify2";
           break;
+        case AccessorKind::Read2:
+          Kind = ".read2";
+          break;
         }
 
         SmallVector<char, 64> Buf;

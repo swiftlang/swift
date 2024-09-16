@@ -372,6 +372,7 @@ public:
     Setter,
     ModifyCoroutine,
     ReadCoroutine,
+    Read2Coroutine,
     Modify2Coroutine,
   };
 
@@ -595,6 +596,7 @@ public:
     ModifyCoroutine,
     AssociatedTypeAccessFunction,
     AssociatedConformanceAccessFunction,
+    Read2Coroutine,
     Modify2Coroutine,
   };
 

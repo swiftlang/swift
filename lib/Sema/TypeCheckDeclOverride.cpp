@@ -1865,6 +1865,7 @@ isRedundantAccessorOverrideAvailabilityDiagnostic(ValueDecl *override,
     break;
 
   case AccessorKind::Read:
+  case AccessorKind::Read2:
     if (accessorOverrideAlreadyDiagnosed(AccessorKind::Get))
       return true;
     break;
@@ -2376,6 +2377,7 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
     case AccessorKind::Get:
     case AccessorKind::Set:
     case AccessorKind::Read:
+    case AccessorKind::Read2:
     case AccessorKind::Modify:
     case AccessorKind::Modify2:
       break;
@@ -2415,6 +2417,7 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
       case AccessorKind::Get:
       case AccessorKind::DistributedGet:
       case AccessorKind::Read:
+      case AccessorKind::Read2:
         break;
 
       case AccessorKind::Modify:

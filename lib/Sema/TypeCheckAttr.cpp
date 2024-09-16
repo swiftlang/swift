@@ -5364,6 +5364,7 @@ static DescriptiveDeclKind getAccessorDescriptiveDeclKind(AccessorKind kind) {
   case AccessorKind::Set:
     return DescriptiveDeclKind::Setter;
   case AccessorKind::Read:
+  case AccessorKind::Read2:
     return DescriptiveDeclKind::ReadAccessor;
   case AccessorKind::Modify:
   case AccessorKind::Modify2:

@@ -59,6 +59,7 @@ enum class AccessorKind {
 
 inline bool requiresFeatureCoroutineAccessors(AccessorKind kind) {
   switch (kind) {
+  case AccessorKind::Read2:
   case AccessorKind::Modify2:
     return true;
   case AccessorKind::Get:
@@ -78,6 +79,7 @@ inline bool requiresFeatureCoroutineAccessors(AccessorKind kind) {
 inline bool isYieldingAccessor(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Read:
+  case AccessorKind::Read2:
   case AccessorKind::Modify:
   case AccessorKind::Modify2:
     return true;
@@ -96,6 +98,7 @@ inline bool isYieldingAccessor(AccessorKind kind) {
 inline bool isYieldingDefaultNonmutatingAccessor(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Read:
+  case AccessorKind::Read2:
     return true;
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
@@ -120,6 +123,7 @@ inline bool isYieldingDefaultMutatingAccessor(AccessorKind kind) {
   case AccessorKind::DistributedGet:
   case AccessorKind::Set:
   case AccessorKind::Read:
+  case AccessorKind::Read2:
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::Address:
@@ -278,8 +282,11 @@ enum class ReadImplKind {
   /// There's an immutable addressor.
   Address,
 
-  /// There's a read coroutine.
+  /// There's a _read coroutine.
   Read,
+
+  /// There's a read coroutine.
+  Read2,
 };
 enum { NumReadImplKindBits = 4 };
 
@@ -392,29 +399,30 @@ public:
     case WriteImplKind::Set:
       assert(readImpl == ReadImplKind::Get ||
              readImpl == ReadImplKind::Address ||
-             readImpl == ReadImplKind::Read);
+             readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2);
       assert(readWriteImpl == ReadWriteImplKind::MaterializeToTemporary ||
-             readWriteImpl == ReadWriteImplKind::Modify);
+             readWriteImpl == ReadWriteImplKind::Modify ||
+             readWriteImpl == ReadWriteImplKind::Modify2);
       return;
 
     case WriteImplKind::Modify:
       assert(readImpl == ReadImplKind::Get ||
              readImpl == ReadImplKind::Address ||
-             readImpl == ReadImplKind::Read);
+             readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2);
       assert(readWriteImpl == ReadWriteImplKind::Modify);
       return;
 
     case WriteImplKind::Modify2:
       assert(readImpl == ReadImplKind::Get ||
              readImpl == ReadImplKind::Address ||
-             readImpl == ReadImplKind::Read);
+             readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2);
       assert(readWriteImpl == ReadWriteImplKind::Modify2);
       return;
 
     case WriteImplKind::MutableAddress:
       assert(readImpl == ReadImplKind::Get ||
              readImpl == ReadImplKind::Address ||
-             readImpl == ReadImplKind::Read);
+             readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2);
       assert(readWriteImpl == ReadWriteImplKind::MutableAddress);
       return;
     }
@@ -434,12 +442,13 @@ public:
                                    OpaqueReadOwnership ownership,
                                    const ASTContext &ctx) {
     return (isMutable ? getMutableOpaque(ownership, ctx)
-                      : getImmutableOpaque(ownership));
+                      : getImmutableOpaque(ownership, ctx));
   }
 
   /// Describe the implementation of a immutable property implemented opaquely.
-  static StorageImplInfo getImmutableOpaque(OpaqueReadOwnership ownership) {
-    return { getOpaqueReadImpl(ownership) };
+  static StorageImplInfo getImmutableOpaque(OpaqueReadOwnership ownership,
+                                            const ASTContext &ctx) {
+    return {getOpaqueReadImpl(ownership, ctx)};
   }
 
   /// Describe the implementation of a mutable property implemented opaquely.
@@ -492,7 +501,8 @@ public:
   }
 
 private:
-  static ReadImplKind getOpaqueReadImpl(OpaqueReadOwnership ownership);
+  static ReadImplKind getOpaqueReadImpl(OpaqueReadOwnership ownership,
+                                        const ASTContext &ctx);
 };
 
 llvm::StringRef getAccessorLabel(AccessorKind kind);

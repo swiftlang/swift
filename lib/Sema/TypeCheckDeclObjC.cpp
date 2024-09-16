@@ -733,6 +733,7 @@ bool swift::isRepresentableInObjC(
       return false;
 
     case AccessorKind::Read:
+    case AccessorKind::Read2:
     case AccessorKind::Modify:
     case AccessorKind::Modify2:
       diagnoseAndRemoveAttr(accessor, Reason.getAttr(),
@@ -1462,6 +1463,7 @@ shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit,
       case AccessorKind::Modify:
       case AccessorKind::Modify2:
       case AccessorKind::Read:
+      case AccessorKind::Read2:
       case AccessorKind::WillSet:
       case AccessorKind::Init:
       case AccessorKind::DistributedGet:

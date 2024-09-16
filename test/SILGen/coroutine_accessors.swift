@@ -8,7 +8,15 @@ public var o: any AnyObject
 public var _i: Int = 0
 
 public var irm: Int {
-  _read {
+// CHECK-LABEL: sil [ossa] @$s19coroutine_accessors1SV3irmSivy : 
+// CHECK-SAME:      $@yield_once
+// CHECK-SAME:      @convention(method)
+// CHECK-SAME:      (@guaranteed S)
+// CHECK-SAME:      ->
+// CHECK-SAME:      @yields Int
+// CHECK-SAME:  {
+// CHECK-LABEL: } // end sil function '$s19coroutine_accessors1SV3irmSivy'
+  read {
     yield _i
   }
 // CHECK-LABEL: sil [ossa] @$s19coroutine_accessors1SV3irmSivx : 
@@ -22,6 +30,20 @@ public var irm: Int {
   modify {
     yield &_i
   }
+// CHECK-LABEL: sil {{.*}}[ossa] @$s19coroutine_accessors1SV3irmSivg :
+// CHECK-SAME:      $@convention(method)
+// CHECK-SAME:      (@guaranteed S)
+// CHECK-SAME:      ->
+// CHECK-SAME:      Int
+// CHECK-SAME:  {
+// CHECK:       bb0(
+// CHECK-SAME:      [[SELF:%[^,]+]] :
+// CHECK-SAME:  ):
+// CHECK:         [[READ_ACCESSOR:%[^,]+]] = function_ref @$s19coroutine_accessors1SV3irmSivy
+// CHECK:         ([[VALUE:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[READ_ACCESSOR]]([[SELF]])
+// CHECK:         end_apply [[TOKEN]]
+// CHECK:         return [[VALUE:%[^,]+]]
+// CHECK-LABEL: } // end sil function '$s19coroutine_accessors1SV3irmSivg'
 // CHECK-LABEL: sil {{.*}}[ossa] @$s19coroutine_accessors1SV3irmSivs :
 // CHECK-SAME:      $@convention(method)
 // CHECK-SAME:      (Int, @inout S)

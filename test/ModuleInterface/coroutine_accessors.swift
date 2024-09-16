@@ -11,6 +11,7 @@ var _i: Int = 0
 // CHECK:      #if compiler(>=5.3) && $CoroutineAccessors
 // CHECK-NEXT: public var i: Swift.Int {
 // CHECK-NEXT:   _read
+// CHECK-NEXT:   read
 // CHECK-NEXT:   _modify
 // CHECK-NEXT:   modify
 // CHECK-NEXT: }
@@ -22,6 +23,9 @@ var _i: Int = 0
 // CHECK-NEXT: #endif
 public var i: Int {
   _read {
+    yield _i
+  }
+  read {
     yield _i
   }
   _modify {

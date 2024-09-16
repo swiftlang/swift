@@ -13,11 +13,39 @@ var _i: Int = 0
 // - get
 // - unsafeAddress
 // - _read
+// - read
 // writers:
 // - set
 // - unsafeMutableAddress
 // - _modify
 // - modify
+
+// =============================================================================
+// Two reads
+// =============================================================================
+
+// enabled: ok
+// disabled: implicit getter.
+var ir_r: Int {
+  read { // expected-disabled-error{{cannot_find_in_scope}}
+    fatalError()
+  }
+  _read { // expected-disabled-error{{cannot_find_in_scope}}
+    fatalError()
+  }
+}
+
+// enabled: ok
+var igr: Int {
+  get {
+    1
+  }
+  read { // expected-error{{variable cannot provide both a 'read' accessor and a getter}}
+         // expected-note@-4{{previous_accessor}}
+         // expected-disabled-error@-2{{'read' accessor is only valid when experimental feature coroutine accessors is enabled}}
+    yield _i
+  }
+}
 
 // =============================================================================
 // One read, one write.
@@ -78,11 +106,99 @@ var i_rm: Int {
   }
 }
 
+// enabled: ok
+// disabled: implicit getter.
 var im_r: Int {
   modify { // expected-disabled-error{{cannot_find_in_scope}}
     fatalError()
   }
   _read { // expected-disabled-error{{cannot_find_in_scope}}
+    fatalError()
+  }
+}
+
+// enabled: ok
+// disabled: implicit getter
+var irm: Int {
+  read { // expected-disabled-error{{cannot_find_in_scope}}
+    fatalError()
+  }
+  modify { // expected-disabled-error{{cannot_find_in_scope}}
+    fatalError()
+  }
+}
+
+// enabled: ok
+// disabled: implicit getter.
+var imr: Int {
+  modify { // expected-disabled-error{{cannot_find_in_scope}}
+    fatalError()
+  }
+  read { // expected-disabled-error{{cannot_find_in_scope}}
+    fatalError()
+  }
+}
+
+// enabled: ok
+// disabled: implicit getter
+var irs: Int {
+  read { // expected-disabled-error{{cannot_find_in_scope}}
+    fatalError()
+  }
+  set { // expected-disabled-error{{cannot_find_in_scope}}
+  }
+}
+
+// enabled: ok
+// disabled: bad keyword
+var isr: Int {
+  set {
+  }
+  read { // expected-disabled-error{{'read' accessor is only valid when experimental feature coroutine accessors is enabled}}
+    fatalError()
+  }
+}
+
+// enabled: ok
+// disabled: implicit getter.
+var iruma: Int {
+  read { // expected-disabled-error{{cannot_find_in_scope}}
+    fatalError()
+  }
+  unsafeMutableAddress { // expected-disabled-error{{cannot_find_in_scope}}
+    UnsafeMutablePointer<Int>(bitPattern: 0x0)!
+  }
+}
+
+// enabled: ok
+// disabled: implicit getter.
+var iumar: Int {
+  read { // expected-disabled-error{{cannot_find_in_scope}}
+    fatalError()
+  }
+  unsafeMutableAddress { // expected-disabled-error{{cannot_find_in_scope}}
+    UnsafeMutablePointer<Int>(bitPattern: 0x0)!
+  }
+}
+
+// enabled: ok
+// disabled: implicit getter
+var ir_m: Int {
+  read { // expected-disabled-error{{cannot_find_in_scope}}
+    fatalError()
+  }
+  _modify { // expected-disabled-error{{cannot_find_in_scope}}
+    fatalError()
+  }
+}
+
+// enabled: ok
+// disabled: bad keyword
+var i_mr: Int {
+  _modify {
+    fatalError()
+  }
+  read { // expected-disabled-error{{'read' accessor is only valid when experimental feature coroutine accessors is enabled}}
     fatalError()
   }
 }
@@ -189,5 +305,22 @@ var i_rm_m: Int {
   }
   _modify {
     yield &_i
+  }
+}
+
+// enabled: ok
+// disabled: implicit getter
+var ir_rm_m: Int {
+  read { // expected-disabled-error{{cannot_find_in_scope}}
+    fatalError()
+  }
+  _read { // expected-disabled-error{{cannot_find_in_scope}}
+    fatalError()
+  }
+  modify { // expected-disabled-error{{cannot_find_in_scope}}
+    fatalError()
+  }
+  _modify { // expected-disabled-error{{cannot_find_in_scope}}
+    fatalError()
   }
 }

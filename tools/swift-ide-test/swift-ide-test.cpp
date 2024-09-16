@@ -3425,6 +3425,9 @@ public:
       case AccessorKind::Read:
         OS << "<read accessor for ";
         break;
+      case AccessorKind::Read2:
+        OS << "<read2 accessor for ";
+        break;
       case AccessorKind::Modify:
         OS << "<modify accessor for ";
         break;

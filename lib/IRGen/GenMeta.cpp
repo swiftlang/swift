@@ -263,6 +263,8 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
       return Flags::Kind::Setter;
     case AccessorKind::Read:
       return Flags::Kind::ReadCoroutine;
+    case AccessorKind::Read2:
+      return Flags::Kind::Read2Coroutine;
     case AccessorKind::Modify:
       return Flags::Kind::ModifyCoroutine;
     case AccessorKind::Modify2:

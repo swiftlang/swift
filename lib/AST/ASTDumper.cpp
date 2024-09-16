@@ -228,6 +228,8 @@ static StringRef getDumpString(ReadImplKind kind) {
     return "addressor";
   case ReadImplKind::Read:
     return "read_coroutine";
+  case ReadImplKind::Read2:
+    return "read2_coroutine";
   }
   llvm_unreachable("bad kind");
 }

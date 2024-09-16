@@ -56,6 +56,7 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
     case AccessorKind::DistributedGet:
     case AccessorKind::Address:
     case AccessorKind::Read:
+    case AccessorKind::Read2:
       return storage->getFormalAccess();
     case AccessorKind::Set:
     case AccessorKind::MutableAddress:

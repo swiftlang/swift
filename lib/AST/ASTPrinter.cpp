@@ -2539,6 +2539,13 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     case ReadImplKind::Read:
       AddAccessorToPrint(AccessorKind::Read);
       break;
+    case ReadImplKind::Read2:
+      if (ASD->getAccessor(AccessorKind::Read) &&
+          shouldPrintUnderscoredCoroutineAccessors(ASD)) {
+        AddAccessorToPrint(AccessorKind::Read);
+      }
+      AddAccessorToPrint(AccessorKind::Read2);
+      break;
     }
     switch (impl.getWriteImpl()) {
     case WriteImplKind::Immutable:
@@ -4079,6 +4086,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   case AccessorKind::DistributedGet:
   case AccessorKind::Address:
   case AccessorKind::Read:
+  case AccessorKind::Read2:
   case AccessorKind::Modify:
   case AccessorKind::Modify2:
   case AccessorKind::DidSet:

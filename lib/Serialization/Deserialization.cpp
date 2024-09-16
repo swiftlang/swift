@@ -3074,6 +3074,7 @@ getActualReadImplKind(unsigned rawKind) {
   CASE(Inherited)
   CASE(Address)
   CASE(Read)
+  CASE(Read2)
 #undef CASE
   }
   return std::nullopt;

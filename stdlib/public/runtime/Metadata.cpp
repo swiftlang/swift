@@ -5862,6 +5862,7 @@ static void initProtocolWitness(void **slot, void *witness,
   case ProtocolRequirementFlags::Kind::Getter:
   case ProtocolRequirementFlags::Kind::Setter:
   case ProtocolRequirementFlags::Kind::ReadCoroutine:
+  case ProtocolRequirementFlags::Kind::Read2Coroutine:
   case ProtocolRequirementFlags::Kind::ModifyCoroutine:
   case ProtocolRequirementFlags::Kind::Modify2Coroutine:
     swift_ptrauth_init_code_or_data(slot, witness,
@@ -5904,6 +5905,7 @@ static void copyProtocolWitness(void **dest, void * const *src,
   case ProtocolRequirementFlags::Kind::Getter:
   case ProtocolRequirementFlags::Kind::Setter:
   case ProtocolRequirementFlags::Kind::ReadCoroutine:
+  case ProtocolRequirementFlags::Kind::Read2Coroutine:
   case ProtocolRequirementFlags::Kind::ModifyCoroutine:
   case ProtocolRequirementFlags::Kind::Modify2Coroutine:
     swift_ptrauth_copy_code_or_data(

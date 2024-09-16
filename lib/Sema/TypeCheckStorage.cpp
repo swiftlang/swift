@@ -644,6 +644,9 @@ directAccessorKindForReadImpl(ReadImplKind reader) {
 
   case ReadImplKind::Read:
     return AccessorKind::Read;
+
+  case ReadImplKind::Read2:
+    return AccessorKind::Read2;
   }
   llvm_unreachable("bad impl kind");
 }
@@ -1605,11 +1608,21 @@ synthesizeAddressedGetterBody(AccessorDecl *getter, ASTContext &ctx) {
   return synthesizeTrivialGetterBody(getter, TargetImpl::Implementation, ctx);
 }
 
-/// Synthesize the body of a getter which just delegates to a read
+/// Synthesize the body of a getter which just delegates to a _read
 /// coroutine accessor.
 static std::pair<BraceStmt *, bool>
 synthesizeReadCoroutineGetterBody(AccessorDecl *getter, ASTContext &ctx) {
   assert(getter->getStorage()->getParsedAccessor(AccessorKind::Read));
+
+  // This should call the _read coroutine.
+  return synthesizeTrivialGetterBody(getter, TargetImpl::Implementation, ctx);
+}
+
+/// Synthesize the body of a getter which just delegates to a read coroutine
+/// accessor.
+static std::pair<BraceStmt *, bool>
+synthesizeRead2CoroutineGetterBody(AccessorDecl *getter, ASTContext &ctx) {
+  assert(getter->getStorage()->getParsedAccessor(AccessorKind::Read2));
 
   // This should call the read coroutine.
   return synthesizeTrivialGetterBody(getter, TargetImpl::Implementation, ctx);
@@ -1852,6 +1865,9 @@ synthesizeGetterBody(AccessorDecl *getter, ASTContext &ctx) {
 
   case ReadImplKind::Read:
     return synthesizeReadCoroutineGetterBody(getter, ctx);
+
+  case ReadImplKind::Read2:
+    return synthesizeRead2CoroutineGetterBody(getter, ctx);
   }
   llvm_unreachable("bad ReadImplKind");
 }
@@ -2246,10 +2262,17 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
            /*isTypeChecked=*/true };
 }
 
-/// Synthesize the body of a read coroutine.
+/// Synthesize the body of a _read coroutine.
 static std::pair<BraceStmt *, bool>
 synthesizeReadCoroutineBody(AccessorDecl *read, ASTContext &ctx) {
   assert(read->getStorage()->getReadImpl() != ReadImplKind::Read);
+  return synthesizeCoroutineAccessorBody(read, ctx);
+}
+
+/// Synthesize the body of a read coroutine.
+static std::pair<BraceStmt *, bool>
+synthesizeRead2CoroutineBody(AccessorDecl *read, ASTContext &ctx) {
+  assert(read->getStorage()->getReadImpl() != ReadImplKind::Read2);
   return synthesizeCoroutineAccessorBody(read, ctx);
 }
 
@@ -2285,6 +2308,9 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
 
   case AccessorKind::Read:
     return synthesizeReadCoroutineBody(accessor, ctx);
+
+  case AccessorKind::Read2:
+    return synthesizeRead2CoroutineBody(accessor, ctx);
 
   case AccessorKind::Modify:
   case AccessorKind::Modify2:
@@ -2570,6 +2596,11 @@ createReadCoroutinePrototype(AbstractStorageDecl *storage,
   return createCoroutineAccessorPrototype(storage, AccessorKind::Read, ctx);
 }
 
+static AccessorDecl *createRead2CoroutinePrototype(AbstractStorageDecl *storage,
+                                                   ASTContext &ctx) {
+  return createCoroutineAccessorPrototype(storage, AccessorKind::Read2, ctx);
+}
+
 static AccessorDecl *
 createModifyCoroutinePrototype(AbstractStorageDecl *storage,
                                ASTContext &ctx) {
@@ -2597,6 +2628,9 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
 
   case AccessorKind::Read:
     return createReadCoroutinePrototype(storage, ctx);
+
+  case AccessorKind::Read2:
+    return createRead2CoroutinePrototype(storage, ctx);
 
   case AccessorKind::Modify:
     return createModifyCoroutinePrototype(storage, ctx);
@@ -2819,6 +2853,7 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
     break;
 
   case AccessorKind::Read:
+  case AccessorKind::Read2:
   case AccessorKind::Modify:
   case AccessorKind::Modify2:
   case AccessorKind::Init:
@@ -3703,6 +3738,7 @@ bool HasStorageRequest::evaluate(Evaluator &evaluator,
   // Any accessors that read or write imply that there is no storage.
   if (storage->getParsedAccessor(AccessorKind::Get) ||
       storage->getParsedAccessor(AccessorKind::Read) ||
+      storage->getParsedAccessor(AccessorKind::Read2) ||
       storage->getParsedAccessor(AccessorKind::Address) ||
       storage->getParsedAccessor(AccessorKind::Set) ||
       storage->getParsedAccessor(AccessorKind::Modify) ||
@@ -3870,6 +3906,8 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   ReadImplKind readImpl;
   if (storage->getParsedAccessor(AccessorKind::Get)) {
     readImpl = ReadImplKind::Get;
+  } else if (storage->getParsedAccessor(AccessorKind::Read2)) {
+    readImpl = ReadImplKind::Read2;
   } else if (storage->getParsedAccessor(AccessorKind::Read)) {
     readImpl = ReadImplKind::Read;
   } else if (storage->getParsedAccessor(AccessorKind::Address)) {
