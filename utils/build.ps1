@@ -1757,8 +1757,8 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         -Test `
         -Src $SourceCache\swift-foundation `
         -Bin $OutDir `
-        -Arch $HostArch
-        -v
+        -Arch $HostArch `
+        -v `
         --very-verbose
     }
 
