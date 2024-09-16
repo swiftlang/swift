@@ -20,8 +20,9 @@ func asyncTest(_ value: Int, completionHandler: @escaping (String) -> Void) {
 }
 
 @available(SwiftStdlib 5.1, *)
-func testAll(x: Double, y: Double) async {
+func testAll(x: Double, y: Double, computer: SlowComputer) async {
   _ = await asyncTest(17)
 
   let _: Double = await async_divide(1.0, 2.0)
+  let _: Double = await computer.divide(x, y)
 }
