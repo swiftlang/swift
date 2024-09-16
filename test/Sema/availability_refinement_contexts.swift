@@ -273,3 +273,16 @@ struct SomeStruct {
   @available(OSX 52, *)
   func someMethodAvailable52() -> Int { return 52 }
 }
+
+// CHECK-NEXT: {{^}}  (decl version=51 decl=SomeEnum
+// CHECK-NEXT: {{^}}    (decl version=52 decl=a
+// CHECK-NEXT: {{^}}    (decl version=53 decl=b
+
+@available(OSX 51, *)
+enum SomeEnum {
+  @available(OSX 52, *)
+  case a
+
+  @available(OSX 53, *)
+  case b, c
+}

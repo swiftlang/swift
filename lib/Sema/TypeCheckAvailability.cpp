@@ -640,6 +640,7 @@ private:
   /// if no new context should be introduced.
   TypeRefinementContext *getNewContextForSignatureOfDecl(Decl *D) {
     if (!isa<ValueDecl>(D) &&
+        !isa<EnumCaseDecl>(D) &&
         !isa<ExtensionDecl>(D) &&
         !isa<MacroExpansionDecl>(D) &&
         !isa<PatternBindingDecl>(D))
@@ -657,6 +658,11 @@ private:
       if (var->getParentPatternBinding())
         return nullptr;
     }
+
+    // Don't introduce for enum element declarations. All the relevant
+    // information is on the enum case declaration.
+    if (isa<EnumElementDecl>(D))
+      return nullptr;
 
     // Declarations with an explicit availability attribute always get a TRC.
     if (hasActiveAvailableAttribute(D, Context)) {
