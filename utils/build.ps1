@@ -1557,6 +1557,8 @@ function Build-XCTest([Platform]$Platform, $Arch, [switch]$Test = $false) {
 }
 
 function Build-SwiftTesting([Platform]$Platform, $Arch, [switch]$Test = $false) {
+  $DispatchBinaryCache = Get-TargetProjectBinaryCache $Arch Dispatch
+  $FoundationBinaryCache = Get-TargetProjectBinaryCache $Arch Foundation
   $SwiftTestingBinaryCache = Get-TargetProjectBinaryCache $Arch SwiftTesting
 
   Isolate-EnvVars {
@@ -1579,6 +1581,8 @@ function Build-SwiftTesting([Platform]$Platform, $Arch, [switch]$Test = $false) 
       -Defines (@{
         BUILD_SHARED_LIBS = "YES";
         CMAKE_BUILD_WITH_INSTALL_RPATH = "YES";
+        dispatch_DIR = "$DispatchBinaryCache\cmake\modules";
+        Foundation_DIR = "$FoundationBinaryCache\cmake\modules";
         SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
         # FIXME: Build the plugin for the builder and specify the path.
         SwiftTesting_MACRO = "NO";
