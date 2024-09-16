@@ -2777,7 +2777,7 @@ llvm::Constant *irgen::emitObjCProtocolData(IRGenModule &IGM,
   // situation when both an objective c object and a swift object define the
   // protocol under the same symbol name.
   auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(IGM.Context);
+      AvailabilityRange::forDeploymentTarget(IGM.Context);
   bool canUseClangEmission = deploymentAvailability.isContainedIn(
     IGM.Context.getSwift58Availability());
 
@@ -2965,7 +2965,7 @@ IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
     // If the Objective-C runtime is new enough, we can just use the update
     // pattern unconditionally.
     auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(Context);
+        AvailabilityRange::forDeploymentTarget(Context);
     if (deploymentAvailability.isContainedIn(
           Context.getObjCMetadataUpdateCallbackAvailability()))
       return ClassMetadataStrategy::Update;

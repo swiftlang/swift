@@ -564,7 +564,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
   setupStatsReporter();
 
   if (setupDiagnosticVerifierIfNeeded()) {
-    Error = "Setting up diagnostics verified failed";
+    Error = "Setting up diagnostics verifier failed";
     return true;
   }
 
@@ -727,12 +727,10 @@ void CompilerInstance::setUpDiagnosticOptions() {
   if (Invocation.getDiagnosticOptions().SuppressRemarks) {
     Diagnostics.setSuppressRemarks(true);
   }
-  if (Invocation.getDiagnosticOptions().WarningsAsErrors) {
-    Diagnostics.setWarningsAsErrors(true);
-  }
-  if (Invocation.getDiagnosticOptions().PrintDiagnosticNames) {
-    Diagnostics.setPrintDiagnosticNames(true);
-  }
+  Diagnostics.setWarningsAsErrorsRules(
+      Invocation.getDiagnosticOptions().WarningsAsErrorsRules);
+  Diagnostics.setPrintDiagnosticNamesMode(
+      Invocation.getDiagnosticOptions().PrintDiagnosticNames);
   Diagnostics.setDiagnosticDocumentationPath(
       Invocation.getDiagnosticOptions().DiagnosticDocumentationPath);
   Diagnostics.setLanguageVersion(
@@ -1465,6 +1463,10 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     if (!Invocation.getFrontendOptions().ExportAsName.empty()) {
       MainModule->setExportAsName(getASTContext().getIdentifier(
           Invocation.getFrontendOptions().ExportAsName));
+    }
+    if (!Invocation.getFrontendOptions().PublicModuleName.empty()) {
+      MainModule->setPublicModuleName(getASTContext().getIdentifier(
+          Invocation.getFrontendOptions().PublicModuleName));
     }
     if (Invocation.getFrontendOptions().EnableLibraryEvolution)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);

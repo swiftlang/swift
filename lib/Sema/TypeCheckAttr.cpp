@@ -366,6 +366,7 @@ public:
   void visitWeakLinkedAttr(WeakLinkedAttr *attr);
   void visitSILGenNameAttr(SILGenNameAttr *attr);
   void visitUnsafeAttr(UnsafeAttr *attr);
+  void visitLifetimeAttr(LifetimeAttr *attr);
 };
 
 } // end anonymous namespace
@@ -1679,7 +1680,7 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
     // While it's possible that @objc @implementation would function with
     // pre-stable runtimes, this isn't a configuration that's been tested or
     // supported.
-    auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(Ctx);
+    auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(Ctx);
     if (!deploymentAvailability.isContainedIn(Ctx.getSwift50Availability())) {
       auto diag = diagnose(
           attr->getLocation(),
@@ -2177,8 +2178,8 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   // range annotation and ensure that this attribute's available version range
   // is fully contained within that declaration's range. If there is no such
   // enclosing declaration, then there is nothing to check.
-  std::optional<AvailabilityContext> EnclosingAnnotatedRange;
-  AvailabilityContext AttrRange =
+  std::optional<AvailabilityRange> EnclosingAnnotatedRange;
+  AvailabilityRange AttrRange =
       AvailabilityInference::availableRange(attr, Ctx);
 
   if (auto *parent = getEnclosingDeclForDecl(D)) {
@@ -2219,11 +2220,11 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     }
   }
 
-  std::optional<Diag<>> MaybeNotAllowed =
+  std::optional<Diagnostic> MaybeNotAllowed =
       TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D);
   if (MaybeNotAllowed.has_value()) {
-    AvailabilityContext DeploymentRange
-        = AvailabilityContext::forDeploymentTarget(Ctx);
+    AvailabilityRange DeploymentRange =
+        AvailabilityRange::forDeploymentTarget(Ctx);
     if (EnclosingAnnotatedRange.has_value())
       DeploymentRange.intersectWith(*EnclosingAnnotatedRange);
 
@@ -3030,7 +3031,7 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
 
   if (!mainFunction) {
     const bool hasAsyncSupport =
-        AvailabilityContext::forDeploymentTarget(context).isContainedIn(
+        AvailabilityRange::forDeploymentTarget(context).isContainedIn(
             context.getBackDeployedConcurrencyAvailability());
     context.Diags.diagnose(attr->getLocation(),
                            diag::attr_MainType_without_main,
@@ -4923,13 +4924,19 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   return ReferenceStorageType::get(type, ownershipKind, var->getASTContext());
 }
 
-std::optional<Diag<>>
+std::optional<Diagnostic>
 TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   auto *DC = D->getDeclContext();
 
   // A destructor is always called if declared.
   if (auto *DD = dyn_cast<DestructorDecl>(D))
-    return diag::availability_deinit_no_potential;
+    return Diagnostic(diag::availability_decl_no_potential, D);
+
+  // Observing accessors are always called implicitly.
+  if (auto *AD = dyn_cast<AccessorDecl>(D)) {
+    if (AD->isObservingAccessor())
+      return Diagnostic(diag::availability_decl_no_potential, D);
+  }
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (!VD->hasStorageOrWrapsStorage())
@@ -4963,7 +4970,7 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   return std::nullopt;
 }
 
-std::optional<Diag<>>
+std::optional<Diagnostic>
 TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
   auto parentIsUnavailable = [](const Decl *D) -> bool {
     if (auto *parent =
@@ -4978,7 +4985,18 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
     if (parentIsUnavailable(D))
       return std::nullopt;
 
-    return diag::availability_deinit_no_unavailable;
+    return Diagnostic(diag::availability_decl_no_unavailable, D);
+  }
+
+  // The conformance checker does not know what to do with unavailable
+  // associated types.
+  if (auto *AT = dyn_cast<AssociatedTypeDecl>(D))
+    return Diagnostic(diag::availability_decl_no_unavailable, D);
+
+  // Observing accessors are always called implicitly.
+  if (auto *AD = dyn_cast<AccessorDecl>(D)) {
+    if (AD->isObservingAccessor())
+      return Diagnostic(diag::availability_decl_no_unavailable, D);
   }
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
@@ -7673,6 +7691,8 @@ void AttributeChecker::visitUnsafeAttr(UnsafeAttr *attr) {
 
   diagnoseAndRemoveAttr(attr, diag::unsafe_attr_disabled);
 }
+
+void AttributeChecker::visitLifetimeAttr(LifetimeAttr *attr) {}
 
 namespace {
 

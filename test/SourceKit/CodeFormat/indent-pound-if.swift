@@ -35,7 +35,7 @@ print(false)
 // RUN: %FileCheck --strict-whitespace %s <%t.response
 
 // CHECK: key.sourcetext: "#else"
-// CHECK: key.sourcetext: "        let i = 3"
-// CHECK: key.sourcetext: "    func b () {"
+// CHECK: key.sourcetext: "let i = 3"
+// CHECK: key.sourcetext: "func b () {"
 // CHECK: key.sourcetext: "#elseif os(OSX)"
-// CHECK: key.sourcetext: "    func b () {"
+// CHECK: key.sourcetext: "func b () {"

@@ -58,9 +58,8 @@ Parser::ParsedTypeAttributeList::applyAttributesToType(Parser &p,
     ty = new (p.Context) SendingTypeRepr(ty, SendingLoc);
   }
 
-  if (!lifetimeDependenceSpecifiers.empty()) {
-    ty = LifetimeDependentTypeRepr::create(p.Context, ty,
-                                           lifetimeDependenceSpecifiers);
+  if (!lifetimeEntries.empty()) {
+    ty = LifetimeDependentTypeRepr::create(p.Context, ty, lifetimeEntries);
   }
   return ty;
 }
@@ -176,9 +175,9 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     tildeLoc = consumeToken();
   }
 
-  // Eat any '-' preceding the type.
+  // Eat any '-' preceding integer literals.
   SourceLoc minusLoc;
-  if (Tok.isMinus()) {
+  if (Tok.isMinus() && peekToken().is(tok::integer_literal)) {
     minusLoc = consumeToken();
   }
 
@@ -1588,13 +1587,26 @@ bool Parser::canParseType() {
       return false;
     break;
   case tok::oper_prefix:
-    if (Tok.getText() != "~" && Tok.getText() != "-") {
+    if (!Tok.isTilde() && !Tok.isMinus()) {
       return false;
     }
 
-    consumeToken();
-    if (!canParseTypeIdentifier())
-      return false;
+    // '~' can only appear before type identifiers like '~Copyable'.
+    if (Tok.isTilde()) {
+      consumeToken();
+
+      if (!canParseTypeIdentifier())
+        return false;
+    }
+
+    // '-' can only appear before integers being used as types like '-123'.
+    if (Tok.isMinus()) {
+      consumeToken();
+
+      if (!Tok.is(tok::integer_literal))
+        return false;
+    }
+
     break;
   case tok::kw_protocol:
     return canParseOldStyleProtocolComposition();

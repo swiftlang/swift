@@ -587,6 +587,10 @@ public:
     return Core->ModuleExportAsName;
   }
 
+  StringRef getPublicModuleName() const {
+    return Core->PublicModuleName;
+  }
+
   /// The ABI name of the module.
   StringRef getModuleABIName() const {
     return Core->ModuleABIName;
@@ -1080,9 +1084,8 @@ public:
   maybeReadLifetimeDependence(unsigned numParams);
 
   // Reads lifetime dependence specifier from decl if present
-  bool maybeReadLifetimeDependenceSpecifier(
-      SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList,
-      unsigned numDeclParams, bool hasSelf);
+  bool maybeReadLifetimeEntry(SmallVectorImpl<LifetimeEntry> &specifierList,
+                              unsigned numDeclParams, bool hasSelf);
 
   /// Reads inlinable body text from \c DeclTypeCursor, if present.
   std::optional<StringRef> maybeReadInlinableBodyText();

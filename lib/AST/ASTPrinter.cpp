@@ -1978,6 +1978,11 @@ void PrintAST::printSingleDepthOfGenericSignature(
       if (dependsOnOpaque(inverse.subject))
         continue;
 
+      if (inverse.getKind() == InvertibleProtocolKind::Escapable &&
+          Options.SuppressNonEscapableTypes) {
+        continue;
+      }
+
       if (isFirstReq) {
         if (printRequirements)
           Printer << " " << tok::kw_where << " ";
@@ -3099,6 +3104,16 @@ suppressingFeatureAllowUnsafeAttribute(PrintOptions &options,
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
+static void
+suppressingFeatureNonescapableTypes(PrintOptions &options,
+                                    llvm::function_ref<void()> action) {
+  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
+  options.ExcludeAttrList.push_back(DeclAttrKind::Lifetime);
+  llvm::SaveAndRestore<bool> scope(options.SuppressNonEscapableTypes, true);
+  action();
+  options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
@@ -4107,10 +4122,12 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       Printer.printDeclResultTypePre(decl, ResultTyLoc);
       Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
       {
-        if (auto *typeRepr = dyn_cast_or_null<LifetimeDependentTypeRepr>(
-                decl->getResultTypeRepr())) {
-          for (auto &dep : typeRepr->getLifetimeDependencies()) {
-            Printer << " " << dep.getLifetimeDependenceSpecifierString() << " ";
+        if (!Options.SuppressNonEscapableTypes) {
+          if (auto *typeRepr = dyn_cast_or_null<LifetimeDependentTypeRepr>(
+                  decl->getResultTypeRepr())) {
+            for (auto &dep : typeRepr->getLifetimeDependencies()) {
+              Printer << " " << dep.getDependsOnString() << " ";
+            }
           }
         }
       }
@@ -4330,15 +4347,17 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 
       printGenericDeclGenericParams(decl);
       printFunctionParameters(decl);
-      if (decl->hasLifetimeDependentReturn()) {
-        Printer << " -> ";
-        auto *typeRepr =
-            cast<LifetimeDependentTypeRepr>(decl->getResultTypeRepr());
-        for (auto &dep : typeRepr->getLifetimeDependencies()) {
-          Printer << dep.getLifetimeDependenceSpecifierString() << " ";
+      if (!Options.SuppressNonEscapableTypes) {
+        if (decl->hasLifetimeDependentReturn()) {
+          Printer << " -> ";
+          auto *typeRepr =
+              cast<LifetimeDependentTypeRepr>(decl->getResultTypeRepr());
+          for (auto &dep : typeRepr->getLifetimeDependencies()) {
+            Printer << dep.getDependsOnString() << " ";
+          }
+          // TODO: Handle failable initializers with lifetime dependent returns
+          Printer << "Self";
         }
-        // TODO: Handle failable initializers with lifetime dependent returns
-        Printer << "Self";
       }
     });
 
@@ -7796,7 +7815,28 @@ swift::getInheritedForPrinting(
         }
         continue;
       }
+
+      // Suppress Escapable and ~Escapable.
+      if (options.SuppressNonEscapableTypes) {
+        if (auto pct = ty->getAs<ProtocolCompositionType>()) {
+          auto inverses = pct->getInverses();
+          if (inverses.contains(InvertibleProtocolKind::Escapable)) {
+            inverses.remove(InvertibleProtocolKind::Escapable);
+            ty = ProtocolCompositionType::get(decl->getASTContext(),
+                                              pct->getMembers(), inverses,
+                                              pct->hasExplicitAnyObject());
+            if (ty->isAny())
+              continue;
+          }
+        }
+
+        if (auto protoTy = ty->getAs<ProtocolType>())
+          if (protoTy->getDecl()->isSpecificProtocol(
+                  KnownProtocolKind::Escapable))
+            continue;
+      }
     }
+
     if (options.SuppressConformanceSuppression &&
         inherited.getEntry(i).isSuppressed()) {
       continue;

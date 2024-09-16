@@ -762,7 +762,10 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
     if (actorIsolation.getKind() == ActorIsolation::ActorInstance) {
       if (auto *var = actorIsolation.getActorInstance()) {
         assert(isa<ParamDecl>(var));
-        finder.addCapture(CapturedValue(var, 0, AFD->getLoc()));
+        // Don't capture anything if the isolation parameter is a parameter
+        // of the local function.
+        if (var->getDeclContext() != AFD)
+          finder.addCapture(CapturedValue(var, 0, AFD->getLoc()));
       }
     }
   }

@@ -2,12 +2,12 @@
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/MemberImportVisibility/members_A.swift
 // RUN: %target-swift-frontend -emit-module -I %t -o %t -package-name TestPackage %S/Inputs/MemberImportVisibility/members_B.swift
 // RUN: %target-swift-frontend -emit-module -I %t -o %t %S/Inputs/MemberImportVisibility/members_C.swift
-// RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 5 -package-name TestPackage
-// RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 6 -package-name TestPackage
+// RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 5 -package-name TestPackage -verify-additional-prefix ambiguity-
+// RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 6 -package-name TestPackage -verify-additional-prefix ambiguity-
 // RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 5 -package-name TestPackage -enable-experimental-feature MemberImportVisibility -verify-additional-prefix member-visibility-
 
 import members_C
-// expected-member-visibility-note 12{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
+// expected-member-visibility-note 15{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
 
 
 func testExtensionMembers(x: X, y: Y<Z>) {
@@ -20,6 +20,24 @@ func testExtensionMembers(x: X, y: Y<Z>) {
 
   x.XinC()
   y.YinC()
+
+  _ = X(true)
+  _ = X(1) // expected-member-visibility-error{{initializer 'init(_:)' is not available due to missing import of defining module 'members_B'}}
+
+  _ = x.ambiguous() // expected-ambiguity-error{{ambiguous use of 'ambiguous()'}}
+  let _: Bool = x.ambiguous()
+  let _: Int = x.ambiguous() // expected-member-visibility-error{{instance method 'ambiguous()' is not available due to missing import of defining module 'members_B'}}
+
+  // ambiguousDisfavored() has two overloads:
+  // - members_B: public func ambiguousDisfavored() -> Int
+  // - members_C: @_disfavoredOverload public func ambiguousDisfavored() -> Bool
+  // With MemberImportVisibility, the overload from members_C should be picked.
+  // Otherwise, the overload from members_B should be picked.
+  let disfavoredResult = x.ambiguousDisfavored()
+  let _: Bool = disfavoredResult // expected-ambiguity-error{{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+  let _: Int = disfavoredResult // expected-member-visibility-error{{cannot convert value of type 'Bool' to specified type 'Int'}}
+  let _: Bool = x.ambiguousDisfavored()
+  let _: Int = x.ambiguousDisfavored() // expected-member-visibility-error{{instance method 'ambiguousDisfavored()' is not available due to missing import of defining module 'members_B'}}
 }
 
 func testOperatorMembers(x: X, y: Y<Z>) {

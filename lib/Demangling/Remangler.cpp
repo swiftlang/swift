@@ -2250,16 +2250,6 @@ ManglingError Remangler::mangleNoDerivative(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
-ManglingError Remangler::mangleLifetimeDependence(Node *node, unsigned depth) {
-  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));
-  Buffer
-      << "Yl"
-      << (char)node->getChild(0)->getIndex(); // mangle lifetime dependence kind
-  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1)); // mangle index subset
-  Buffer << "_";
-  return ManglingError::Success;
-}
-
 ManglingError Remangler::mangleInfixOperator(Node *node, unsigned depth) {
   mangleIdentifierImpl(node, /*isOperator*/ true);
   Buffer << "oi";

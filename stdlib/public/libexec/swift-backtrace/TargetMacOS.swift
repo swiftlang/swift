@@ -25,8 +25,8 @@ import _Backtracing
 @_spi(Contexts) import _Backtracing
 @_spi(MemoryReaders) import _Backtracing
 
-@_implementationOnly import Runtime
-@_implementationOnly import OS.Darwin
+internal import Runtime
+internal import OS.Darwin
 
 #if arch(x86_64)
 typealias MContext = darwin_x86_64_mcontext
@@ -249,11 +249,12 @@ class Target {
 
       if info.thread_id == crashingThread {
         ctx = HostContext.fromHostMContext(mcontext)
-        crashingThreadNdx = Int(ndx)
+        crashingThreadNdx = threads.count
       } else {
         guard let threadCtx = HostContext.fromHostThread(ports[Int(ndx)]) else {
           // This can happen legitimately, e.g. when looking at a Rosetta 2
           // process, where there are ARM64 threads AS WELL AS the x86_64 ones.
+          mach_port_deallocate(mach_task_self_, ports[Int(ndx)])
           continue
         }
         ctx = threadCtx

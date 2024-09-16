@@ -261,6 +261,18 @@ bool swift::rewriting::diagnoseRequirementErrors(
       diagnosedError = true;
       break;
     }
+
+    case RequirementError::Kind::InvalidValueForTypeSameType: {
+      auto req = error.getRequirement();
+
+      if (req.hasError())
+        break;
+
+      ctx.Diags.diagnose(loc, diag::invalid_value_for_type_same_type,
+                         req.getFirstType(), req.getSecondType());
+      diagnosedError = true;
+      break;
+    }
     }
   }
 

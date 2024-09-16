@@ -776,7 +776,7 @@ bool Parser::parseSpecializeAttributeArguments(
     std::optional<bool> &Exported,
     std::optional<SpecializeAttr::SpecializationKind> &Kind,
     swift::TrailingWhereClause *&TrailingWhereClause,
-    DeclNameRef &targetFunction, AvailabilityContext *SILAvailability,
+    DeclNameRef &targetFunction, AvailabilityRange *SILAvailability,
     SmallVectorImpl<Identifier> &spiGroups,
     SmallVectorImpl<AvailableAttr *> &availableAttrs,
     size_t &typeErasedParamsCount,
@@ -825,7 +825,7 @@ bool Parser::parseSpecializeAttributeArguments(
                                  diag::sil_availability_expected_version))
           return false;
 
-        *SILAvailability = AvailabilityContext(VersionRange::allGTE(version));
+        *SILAvailability = AvailabilityRange(VersionRange::allGTE(version));
       }
       if (ParamLabel == "availability") {
         SourceRange attrRange;
@@ -1090,7 +1090,7 @@ bool Parser::parseAvailability(
 
 bool Parser::parseSpecializeAttribute(
     swift::tok ClosingBrace, SourceLoc AtLoc, SourceLoc Loc,
-    SpecializeAttr *&Attr, AvailabilityContext *SILAvailability,
+    SpecializeAttr *&Attr, AvailabilityRange *SILAvailability,
     llvm::function_ref<bool(Parser &)> parseSILTargetName,
     llvm::function_ref<bool(Parser &)> parseSILSIPModule) {
   assert(ClosingBrace == tok::r_paren || ClosingBrace == tok::r_square);
@@ -2801,6 +2801,92 @@ static std::optional<Identifier> parseSingleAttrOptionImpl(
   return P.Context.getIdentifier(parsedName);
 }
 
+ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(SourceLoc atLoc,
+                                                          SourceLoc loc) {
+  ParserStatus status;
+  SmallVector<LifetimeEntry> lifetimeEntries;
+
+  if (!Context.LangOpts.hasFeature(Feature::NonescapableTypes)) {
+    diagnose(loc, diag::requires_experimental_feature, "lifetime attribute",
+             false, getFeatureName(Feature::NonescapableTypes));
+    status.setIsParseError();
+    return status;
+  }
+
+  if (!Tok.isFollowingLParen()) {
+    diagnose(loc, diag::expected_lparen_after_lifetime_dependence);
+    status.setIsParseError();
+    return status;
+  }
+  // consume the l_paren
+  auto lParenLoc = consumeToken();
+
+  SourceLoc rParenLoc;
+  bool foundParamId = false;
+  status = parseList(
+      tok::r_paren, lParenLoc, rParenLoc, /*AllowSepAfterLast*/ false,
+      diag::expected_rparen_after_lifetime_dependence, [&]() -> ParserStatus {
+        ParserStatus listStatus;
+        foundParamId = true;
+        switch (Tok.getKind()) {
+        case tok::identifier: {
+          Identifier paramName;
+          auto paramLoc =
+              consumeIdentifier(paramName, /*diagnoseDollarPrefix=*/false);
+          if (paramName.is("immortal")) {
+            lifetimeEntries.push_back(
+                LifetimeEntry::getImmortalLifetimeEntry(paramLoc));
+          } else {
+            lifetimeEntries.push_back(
+                LifetimeEntry::getNamedLifetimeEntry(paramLoc, paramName));
+          }
+          break;
+        }
+        case tok::integer_literal: {
+          SourceLoc paramLoc;
+          unsigned paramNum;
+          if (parseUnsignedInteger(
+                  paramNum, paramLoc,
+                  diag::expected_param_index_lifetime_dependence)) {
+            listStatus.setIsParseError();
+            return listStatus;
+          }
+          lifetimeEntries.push_back(
+              LifetimeEntry::getOrderedLifetimeEntry(paramLoc, paramNum));
+          break;
+        }
+        case tok::kw_self: {
+          auto paramLoc = consumeToken(tok::kw_self);
+          lifetimeEntries.push_back(
+              LifetimeEntry::getSelfLifetimeEntry(paramLoc));
+          break;
+        }
+        default:
+          diagnose(
+              Tok,
+              diag::
+                  expected_identifier_or_index_or_self_after_lifetime_dependence);
+          listStatus.setIsParseError();
+          return listStatus;
+        }
+        return listStatus;
+      });
+
+  if (!foundParamId) {
+    diagnose(
+        Tok,
+        diag::expected_identifier_or_index_or_self_after_lifetime_dependence);
+    status.setIsParseError();
+    return status;
+  }
+
+  assert(!lifetimeEntries.empty());
+  SourceRange range(loc, rParenLoc);
+  return ParserResult<LifetimeAttr>(
+      LifetimeAttr::create(Context, atLoc, SourceRange(loc, rParenLoc),
+                           /* implicit */ false, lifetimeEntries));
+}
+
 /// Parses a (possibly optional) argument for an attribute containing a single, arbitrary identifier.
 ///
 /// \param P The parser object.
@@ -4062,6 +4148,13 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     Attributes.add(attr);
     break;
   }
+  case DeclAttrKind::Lifetime: {
+    auto Attr = parseLifetimeAttribute(AtLoc, Loc);
+    Status |= Attr;
+    if (Attr.isNonNull())
+      Attributes.add(Attr.get());
+    break;
+  }
   }
 
   if (DuplicateAttribute) {
@@ -5090,8 +5183,8 @@ static ParsedLifetimeDependenceKind getSILLifetimeDependenceKind(const Token &T)
   return ParsedLifetimeDependenceKind::Scope;
 }
 
-ParserStatus Parser::parseLifetimeDependenceSpecifiers(
-    SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList) {
+ParserStatus
+Parser::parseLifetimeEntries(SmallVectorImpl<LifetimeEntry> &specifierList) {
   ParserStatus status;
   // TODO: Add fixits for diagnostics in this function.
   do {
@@ -5141,13 +5234,10 @@ ParserStatus Parser::parseLifetimeDependenceSpecifiers(
                 consumeIdentifier(paramName, /*diagnoseDollarPrefix=*/false);
             if (paramName.is("immortal")) {
               specifierList.push_back(
-                  LifetimeDependenceSpecifier::
-                      getImmortalLifetimeDependenceSpecifier(paramLoc));
+                  LifetimeEntry::getImmortalLifetimeEntry(paramLoc));
             } else {
-              specifierList.push_back(
-                  LifetimeDependenceSpecifier::
-                      getNamedLifetimeDependenceSpecifier(
-                          paramLoc, lifetimeDependenceKind, paramName));
+              specifierList.push_back(LifetimeEntry::getNamedLifetimeEntry(
+                  paramLoc, paramName, lifetimeDependenceKind));
             }
             break;
           }
@@ -5160,17 +5250,14 @@ ParserStatus Parser::parseLifetimeDependenceSpecifiers(
               listStatus.setIsParseError();
               return listStatus;
             }
-            specifierList.push_back(
-                LifetimeDependenceSpecifier::
-                    getOrderedLifetimeDependenceSpecifier(
-                        paramLoc, lifetimeDependenceKind, paramNum));
+            specifierList.push_back(LifetimeEntry::getOrderedLifetimeEntry(
+                paramLoc, paramNum, lifetimeDependenceKind));
             break;
           }
           case tok::kw_self: {
             auto paramLoc = consumeToken(tok::kw_self);
-            specifierList.push_back(
-                LifetimeDependenceSpecifier::getSelfLifetimeDependenceSpecifier(
-                    paramLoc, lifetimeDependenceKind));
+            specifierList.push_back(LifetimeEntry::getSelfLifetimeEntry(
+                paramLoc, lifetimeDependenceKind));
             break;
           }
           default:
@@ -5499,8 +5586,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
                    "lifetime dependence specifier", false,
                    getFeatureName(Feature::NonescapableTypes));
       }
-      status |=
-          P.parseLifetimeDependenceSpecifiers(lifetimeDependenceSpecifiers);
+      status |= P.parseLifetimeEntries(lifetimeEntries);
       continue;
     }
 

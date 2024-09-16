@@ -62,6 +62,9 @@ struct RequirementError {
     /// A value generic type was used to same-type to an unrelated type,
     /// e.g. 'where N == Int' where N == 'let N: Int'.
     InvalidValueGenericSameType,
+    /// A value type, either an integer '123' or a value generic parameter 'N',
+    /// was used to same type a regular type parameter, e.g. 'T == 123'.
+    InvalidValueForTypeSameType,
   } kind;
 
 private:
@@ -176,6 +179,13 @@ public:
                                                          SourceLoc loc) {
     Requirement requirement(RequirementKind::Conformance, subjectType, constraint);
     return {Kind::InvalidValueGenericSameType, requirement, loc};
+  }
+
+  static RequirementError forInvalidValueForTypeSameType(Type subjectType,
+                                                         Type constraint,
+                                                         SourceLoc loc) {
+    Requirement requirement(RequirementKind::Conformance, subjectType, constraint);
+    return {Kind::InvalidValueForTypeSameType, requirement, loc};
   }
 };
 

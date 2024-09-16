@@ -2448,38 +2448,38 @@ AssociatedTypeInference::computeFailureTypeWitness(
   // Look for AsyncIteratorProtocol.next() and infer the Failure type from
   // it.
   for (const auto &witness : valueWitnesses) {
-    if (isAsyncIteratorProtocolNext(witness.first)) {
-      // We use a dyn_cast_or_null since we can get a nullptr here if we fail to
-      // match a witness. In such a case, we should just fail here.
-      if (auto witnessFunc = dyn_cast_or_null<AbstractFunctionDecl>(witness.second)) {
-        auto thrownError = witnessFunc->getEffectiveThrownErrorType();
+    if (!isAsyncIteratorProtocolNext(witness.first))
+      continue;
 
-        // If it doesn't throw, Failure == Never.
-        if (!thrownError)
-          return AbstractTypeWitness(assocType, ctx.getNeverType());
+    if (!witness.second || witness.second->getDeclContext() != dc)
+      continue;
 
-        // If it isn't 'rethrows', use the thrown error type;.
-        if (!witnessFunc->getAttrs().hasAttribute<RethrowsAttr>()) {
-          return AbstractTypeWitness(assocType,
-                                     dc->mapTypeIntoContext(*thrownError));
-        }
+    if (auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness.second)) {
+      auto thrownError = witnessFunc->getEffectiveThrownErrorType();
 
-        for (auto req : witnessFunc->getGenericSignature().getRequirements()) {
-          if (req.getKind() == RequirementKind::Conformance) {
-            auto proto = req.getProtocolDecl();
-            if (proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol) ||
-                proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence)) {
-              auto failureAssocType = proto->getAssociatedType(ctx.Id_Failure);
-              auto failureType = DependentMemberType::get(req.getFirstType(), failureAssocType);
-              return AbstractTypeWitness(assocType, dc->mapTypeIntoContext(failureType));
-            }
-          }
-        }
+      // If it doesn't throw, Failure == Never.
+      if (!thrownError)
+        return AbstractTypeWitness(assocType, ctx.getNeverType());
 
-        return AbstractTypeWitness(assocType, ctx.getErrorExistentialType());
+      // If it isn't 'rethrows', use the thrown error type;.
+      if (!witnessFunc->getAttrs().hasAttribute<RethrowsAttr>()) {
+        return AbstractTypeWitness(assocType,
+                                   dc->mapTypeIntoContext(*thrownError));
       }
 
-      break;
+      for (auto req : witnessFunc->getGenericSignature().getRequirements()) {
+        if (req.getKind() == RequirementKind::Conformance) {
+          auto proto = req.getProtocolDecl();
+          if (proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol) ||
+              proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence)) {
+            auto failureAssocType = proto->getAssociatedType(ctx.Id_Failure);
+            auto failureType = DependentMemberType::get(req.getFirstType(), failureAssocType);
+            return AbstractTypeWitness(assocType, dc->mapTypeIntoContext(failureType));
+          }
+        }
+      }
+
+      return AbstractTypeWitness(assocType, ctx.getErrorExistentialType());
     }
   }
 

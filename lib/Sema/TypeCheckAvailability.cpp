@@ -45,7 +45,7 @@
 using namespace swift;
 
 ExportContext::ExportContext(
-    DeclContext *DC, AvailabilityContext runningOSVersion,
+    DeclContext *DC, AvailabilityRange runningOSVersion,
     FragileFunctionKind kind, bool spi, bool exported, bool implicit,
     bool deprecated, std::optional<PlatformKind> unavailablePlatformKind)
     : DC(DC), RunningOSVersion(runningOSVersion), FragileKind(kind) {
@@ -231,8 +231,9 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
   auto fragileKind = DC->getFragileFunctionKind();
   auto runningOSVersion =
       (Ctx.LangOpts.DisableAvailabilityChecking
-       ? AvailabilityContext::alwaysAvailable()
-       : TypeChecker::overApproximateAvailabilityAtLocation(D->getLoc(), DC));
+           ? AvailabilityRange::alwaysAvailable()
+           : TypeChecker::overApproximateAvailabilityAtLocation(D->getLoc(),
+                                                                DC));
   bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
   bool deprecated = false;
@@ -259,8 +260,8 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
   auto fragileKind = DC->getFragileFunctionKind();
   auto runningOSVersion =
       (Ctx.LangOpts.DisableAvailabilityChecking
-       ? AvailabilityContext::alwaysAvailable()
-       : TypeChecker::overApproximateAvailabilityAtLocation(loc, DC));
+           ? AvailabilityRange::alwaysAvailable()
+           : TypeChecker::overApproximateAvailabilityAtLocation(loc, DC));
 
   bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
@@ -304,7 +305,7 @@ ExportContext ExportContext::withExported(bool exported) const {
 }
 
 ExportContext ExportContext::withRefinedAvailability(
-    const AvailabilityContext &availability) const {
+    const AvailabilityRange &availability) const {
   auto copy = *this;
   copy.RunningOSVersion.intersectWith(availability);
   return copy;
@@ -352,7 +353,7 @@ static bool hasActiveAvailableAttribute(Decl *D,
 static bool computeContainedByDeploymentTarget(TypeRefinementContext *TRC,
                                                ASTContext &ctx) {
   return TRC->getAvailabilityInfo()
-                  .isContainedIn(AvailabilityContext::forDeploymentTarget(ctx));
+                  .isContainedIn(AvailabilityRange::forDeploymentTarget(ctx));
 }
 
 /// Returns true if the reference or any of its parents is an
@@ -659,7 +660,7 @@ private:
 
     // Declarations with an explicit availability attribute always get a TRC.
     if (hasActiveAvailableAttribute(D, Context)) {
-      AvailabilityContext DeclaredAvailability =
+      AvailabilityRange DeclaredAvailability =
           swift::AvailabilityInference::availableRange(D, Context);
 
       return TypeRefinementContext::createForDecl(
@@ -673,9 +674,9 @@ private:
     // internal property in a public struct can be effectively less available
     // than the containing struct decl because the internal property will only
     // be accessed by code running at the deployment target or later.
-    AvailabilityContext CurrentAvailability =
+    AvailabilityRange CurrentAvailability =
         getCurrentTRC()->getAvailabilityInfo();
-    AvailabilityContext EffectiveAvailability =
+    AvailabilityRange EffectiveAvailability =
         getEffectiveAvailabilityForDeclSignature(D, CurrentAvailability);
     if (CurrentAvailability.isSupersetOf(EffectiveAvailability))
       return TypeRefinementContext::createForDeclImplicit(
@@ -685,9 +686,9 @@ private:
     return nullptr;
   }
 
-  AvailabilityContext getEffectiveAvailabilityForDeclSignature(
-      Decl *D, const AvailabilityContext BaseAvailability) {
-    AvailabilityContext EffectiveAvailability = BaseAvailability;
+  AvailabilityRange getEffectiveAvailabilityForDeclSignature(
+      Decl *D, const AvailabilityRange BaseAvailability) {
+    AvailabilityRange EffectiveAvailability = BaseAvailability;
 
     // As a special case, extension decls are treated as effectively as
     // available as the nominal type they extend, up to the deployment target.
@@ -704,14 +705,14 @@ private:
         // the extension, so limit the effective availability to the deployment
         // target.
         EffectiveAvailability.unionWith(
-            AvailabilityContext::forDeploymentTarget(Context));
+            AvailabilityRange::forDeploymentTarget(Context));
       }
     }
 
     EffectiveAvailability.intersectWith(getCurrentTRC()->getAvailabilityInfo());
     if (shouldConstrainSignatureToDeploymentTarget(D))
       EffectiveAvailability.intersectWith(
-          AvailabilityContext::forDeploymentTarget(Context));
+          AvailabilityRange::forDeploymentTarget(Context));
 
     return EffectiveAvailability;
   }
@@ -778,8 +779,8 @@ private:
   // target for `range` in decl `D`.
   TypeRefinementContext *
   createImplicitDeclContextForDeploymentTarget(Decl *D, SourceRange range){
-    AvailabilityContext Availability =
-        AvailabilityContext::forDeploymentTarget(Context);
+    AvailabilityRange Availability =
+        AvailabilityRange::forDeploymentTarget(Context);
     Availability.intersectWith(getCurrentTRC()->getAvailabilityInfo());
 
     return TypeRefinementContext::createForDeclImplicit(
@@ -931,8 +932,8 @@ private:
   /// There is no need for the caller to explicitly traverse the children
   /// of this node.
   void buildIfStmtRefinementContext(IfStmt *IS) {
-    std::optional<AvailabilityContext> ThenRange;
-    std::optional<AvailabilityContext> ElseRange;
+    std::optional<AvailabilityRange> ThenRange;
+    std::optional<AvailabilityRange> ElseRange;
     std::tie(ThenRange, ElseRange) =
         buildStmtConditionRefinementContext(IS->getCond());
 
@@ -977,7 +978,7 @@ private:
   /// There is no need for the caller to explicitly traverse the children
   /// of this node.
   void buildWhileStmtRefinementContext(WhileStmt *WS) {
-    std::optional<AvailabilityContext> BodyRange =
+    std::optional<AvailabilityRange> BodyRange =
         buildStmtConditionRefinementContext(WS->getCond()).first;
 
     if (BodyRange.has_value()) {
@@ -1007,8 +1008,8 @@ private:
     // This is slightly tricky because, unlike our other control constructs,
     // the refined region is not lexically contained inside the construct
     // introducing the refinement context.
-    std::optional<AvailabilityContext> FallthroughRange;
-    std::optional<AvailabilityContext> ElseRange;
+    std::optional<AvailabilityRange> FallthroughRange;
+    std::optional<AvailabilityRange> ElseRange;
     std::tie(FallthroughRange, ElseRange) =
         buildStmtConditionRefinementContext(GS->getCond());
 
@@ -1041,8 +1042,8 @@ private:
   /// of optional version ranges, the first for the true branch and the second
   /// for the false branch. A value of None for a given branch indicates that
   /// the branch does not introduce a new refinement.
-  std::pair<std::optional<AvailabilityContext>,
-            std::optional<AvailabilityContext>>
+  std::pair<std::optional<AvailabilityRange>,
+            std::optional<AvailabilityRange>>
   buildStmtConditionRefinementContext(StmtCondition Cond) {
 
     // Any refinement contexts introduced in the statement condition
@@ -1055,7 +1056,7 @@ private:
     unsigned NestedCount = 0;
 
     // Tracks the potential version range when the condition is false.
-    auto FalseFlow = AvailabilityContext::neverAvailable();
+    auto FalseFlow = AvailabilityRange::neverAvailable();
 
     TypeRefinementContext *StartingTRC = getCurrentTRC();
 
@@ -1064,9 +1065,9 @@ private:
 
     for (StmtConditionElement Element : Cond) {
       TypeRefinementContext *CurrentTRC = getCurrentTRC();
-      AvailabilityContext CurrentInfo = CurrentTRC->getAvailabilityInfo();
-      AvailabilityContext CurrentExplicitInfo =
-        CurrentTRC->getExplicitAvailabilityInfo();
+      AvailabilityRange CurrentInfo = CurrentTRC->getAvailabilityInfo();
+      AvailabilityRange CurrentExplicitInfo =
+          CurrentTRC->getExplicitAvailabilityInfo();
 
       // If the element is not a condition, walk it in the current TRC.
       if (Element.getKind() != StmtConditionElement::CK_Availability) {
@@ -1118,7 +1119,7 @@ private:
         continue;
       }
 
-      AvailabilityContext NewConstraint = contextForSpec(Spec, false);
+      AvailabilityRange NewConstraint = contextForSpec(Spec, false);
       Query->setAvailableRange(contextForSpec(Spec, true).getRawVersionRange());
 
       // When compiling zippered for macCatalyst, we need to collect both
@@ -1194,7 +1195,7 @@ private:
       ++NestedCount;
     }
 
-    std::optional<AvailabilityContext> FalseRefinement = std::nullopt;
+    std::optional<AvailabilityRange> FalseRefinement = std::nullopt;
     // The version range for the false branch should never have any versions
     // that weren't possible when the condition started evaluating.
     assert(FalseFlow.isContainedIn(StartingTRC->getAvailabilityInfo()));
@@ -1209,8 +1210,8 @@ private:
     }
 
     auto makeResult =
-        [isUnavailability](std::optional<AvailabilityContext> TrueRefinement,
-                           std::optional<AvailabilityContext> FalseRefinement) {
+        [isUnavailability](std::optional<AvailabilityRange> TrueRefinement,
+                           std::optional<AvailabilityRange> FalseRefinement) {
           if (isUnavailability.has_value() && isUnavailability.value()) {
             // If this is an unavailability check, invert the result.
             return std::make_pair(FalseRefinement, TrueRefinement);
@@ -1279,10 +1280,10 @@ private:
   }
 
   /// Return the availability context for the given spec.
-  AvailabilityContext contextForSpec(AvailabilitySpec *Spec,
-                                    bool GetRuntimeContext) {
+  AvailabilityRange contextForSpec(AvailabilitySpec *Spec,
+                                   bool GetRuntimeContext) {
     if (isa<OtherPlatformAvailabilitySpec>(Spec)) {
-      return AvailabilityContext::alwaysAvailable();
+      return AvailabilityRange::alwaysAvailable();
     }
 
     auto *VersionSpec = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
@@ -1291,7 +1292,7 @@ private:
                                     VersionSpec->getRuntimeVersion() :
                                     VersionSpec->getVersion());
 
-    return AvailabilityContext(VersionRange::allGTE(Version));
+    return AvailabilityRange(VersionRange::allGTE(Version));
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -1319,7 +1320,7 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF) {
     // The root type refinement context reflects the fact that all parts of
     // the source file are guaranteed to be executing on at least the minimum
     // platform version for inlining.
-    auto MinPlatformReq = AvailabilityContext::forInliningTarget(Context);
+    auto MinPlatformReq = AvailabilityRange::forInliningTarget(Context);
     RootTRC = TypeRefinementContext::createForSourceFile(&SF, MinPlatformReq);
     SF.setTypeRefinementContext(RootTRC);
   }
@@ -1364,10 +1365,9 @@ ExpandChildTypeRefinementContextsRequest::evaluate(
   return parentTRC->Children;
 }
 
-AvailabilityContext
-TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
-                                                   const DeclContext *DC,
-                                                   const TypeRefinementContext **MostRefined) {
+AvailabilityRange TypeChecker::overApproximateAvailabilityAtLocation(
+    SourceLoc loc, const DeclContext *DC,
+    const TypeRefinementContext **MostRefined) {
   SourceFile *SF;
   if (loc.isValid())
     SF = DC->getParentModule()->getSourceFileContainingLocation(loc);
@@ -1390,7 +1390,7 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
   // this will be a real problem.
 
   // We can assume we are running on at least the minimum inlining target.
-  auto OverApproximateContext = AvailabilityContext::forInliningTarget(Context);
+  auto OverApproximateContext = AvailabilityRange::forInliningTarget(Context);
   auto isInvalidLoc = [SF](SourceLoc loc) {
     return SF ? loc.isInvalid() : true;
   };
@@ -1401,7 +1401,7 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
 
     loc = D->getLoc();
 
-    std::optional<AvailabilityContext> Info =
+    std::optional<AvailabilityRange> Info =
         AvailabilityInference::annotatedAvailableRange(D, Context);
 
     if (Info.has_value()) {
@@ -1430,7 +1430,7 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
 
 bool TypeChecker::isDeclarationUnavailable(
     const Decl *D, const DeclContext *referenceDC,
-    llvm::function_ref<AvailabilityContext()> getAvailabilityContext) {
+    llvm::function_ref<AvailabilityRange()> getAvailabilityRange) {
   ASTContext &Context = referenceDC->getASTContext();
   if (Context.LangOpts.DisableAvailabilityChecking) {
     return false;
@@ -1442,13 +1442,13 @@ bool TypeChecker::isDeclarationUnavailable(
     return false;
   }
 
-  AvailabilityContext safeRangeUnderApprox{
+  AvailabilityRange safeRangeUnderApprox{
       AvailabilityInference::availableRange(D, Context)};
 
   if (safeRangeUnderApprox.isAlwaysAvailable())
     return false;
 
-  AvailabilityContext runningOSOverApprox = getAvailabilityContext();
+  AvailabilityRange runningOSOverApprox = getAvailabilityRange();
 
   // The reference is safe if an over-approximation of the running OS
   // versions is fully contained within an under-approximation
@@ -1458,7 +1458,7 @@ bool TypeChecker::isDeclarationUnavailable(
   return !runningOSOverApprox.isContainedIn(safeRangeUnderApprox);
 }
 
-std::optional<AvailabilityContext>
+std::optional<AvailabilityRange>
 TypeChecker::checkDeclarationAvailability(const Decl *D,
                                           const ExportContext &Where) {
   // Skip computing potential unavailability if the declaration is explicitly
@@ -1468,7 +1468,7 @@ TypeChecker::checkDeclarationAvailability(const Decl *D,
       return std::nullopt;
 
   if (isDeclarationUnavailable(D, Where.getDeclContext(), [&Where] {
-        return Where.getAvailabilityContext();
+        return Where.getAvailabilityRange();
       })) {
     auto &Context = Where.getDeclContext()->getASTContext();
     return AvailabilityInference::availableRange(D, Context);
@@ -1477,7 +1477,7 @@ TypeChecker::checkDeclarationAvailability(const Decl *D,
   return std::nullopt;
 }
 
-std::optional<AvailabilityContext>
+std::optional<AvailabilityRange>
 TypeChecker::checkConformanceAvailability(const RootProtocolConformance *conf,
                                           const ExtensionDecl *ext,
                                           const ExportContext &where) {
@@ -1856,7 +1856,7 @@ static void findAvailabilityFixItNodes(
 /// on the given declaration for the given version range.
 static void
 fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
-                       const AvailabilityContext &RequiredAvailability,
+                       const AvailabilityRange &RequiredAvailability,
                        ASTContext &Context) {
   assert(D);
 
@@ -1905,7 +1905,7 @@ fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
 /// condition to the required range.
 static bool fixAvailabilityByNarrowingNearbyVersionCheck(
     SourceRange ReferenceRange, const DeclContext *ReferenceDC,
-    const AvailabilityContext &RequiredAvailability, ASTContext &Context,
+    const AvailabilityRange &RequiredAvailability, ASTContext &Context,
     InFlightDiagnostic &Err) {
   const TypeRefinementContext *TRC = nullptr;
   (void)TypeChecker::overApproximateAvailabilityAtLocation(ReferenceRange.Start,
@@ -1913,7 +1913,7 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
   if (!TRC)
     return false;
 
-  AvailabilityContext AvailabilityAtLoc = TRC->getExplicitAvailabilityInfo();
+  AvailabilityRange AvailabilityAtLoc = TRC->getExplicitAvailabilityInfo();
   if (!AvailabilityAtLoc.isAlwaysAvailable() &&
       !RequiredAvailability.isAlwaysAvailable() &&
       TRC->getReason() != TypeRefinementContext::Reason::Root &&
@@ -1950,7 +1950,7 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
 /// Emit a diagnostic note and Fix-It to add an if #available(...) { } guard
 /// that checks for the given version range around the given node.
 static void fixAvailabilityByAddingVersionCheck(
-    ASTNode NodeToWrap, const AvailabilityContext &RequiredAvailability,
+    ASTNode NodeToWrap, const AvailabilityRange &RequiredAvailability,
     SourceRange ReferenceRange, ASTContext &Context) {
   // If this is an implicit variable that wraps an expression,
   // let's point to it's initializer. For example, result builder
@@ -2025,7 +2025,7 @@ static void fixAvailabilityByAddingVersionCheck(
 /// requiting the given OS version range.
 static void fixAvailability(SourceRange ReferenceRange,
                             const DeclContext *ReferenceDC,
-                            const AvailabilityContext &RequiredAvailability,
+                            const AvailabilityRange &RequiredAvailability,
                             ASTContext &Context) {
   if (ReferenceRange.isInvalid())
     return;
@@ -2059,7 +2059,7 @@ static void fixAvailability(SourceRange ReferenceRange,
 
 void TypeChecker::diagnosePotentialUnavailability(
     SourceRange ReferenceRange, Diag<StringRef, llvm::VersionTuple> Diag,
-    const DeclContext *ReferenceDC, const AvailabilityContext &Availability) {
+    const DeclContext *ReferenceDC, const AvailabilityRange &Availability) {
   ASTContext &Context = ReferenceDC->getASTContext();
 
   {
@@ -2077,7 +2077,7 @@ void TypeChecker::diagnosePotentialUnavailability(
 }
 
 bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
-                                    AvailabilityContext RequiredAvailability,
+                                    AvailabilityRange RequiredAvailability,
                                     Diag<StringRef, llvm::VersionTuple> Diag,
                                     const DeclContext *ReferenceDC) {
   ASTContext &ctx = ReferenceDC->getASTContext();
@@ -2106,9 +2106,9 @@ void TypeChecker::checkConcurrencyAvailability(SourceRange ReferenceRange,
 }
 
 static bool
-requiresDeploymentTargetOrEarlier(const AvailabilityContext &availability,
+requiresDeploymentTargetOrEarlier(const AvailabilityRange &availability,
                                   ASTContext &ctx) {
-  auto deploymentTarget = AvailabilityContext::forDeploymentTarget(ctx);
+  auto deploymentTarget = AvailabilityRange::forDeploymentTarget(ctx);
   return deploymentTarget.isContainedIn(availability);
 }
 
@@ -2116,7 +2116,7 @@ requiresDeploymentTargetOrEarlier(const AvailabilityContext &availability,
 /// \p IsError accordingly.
 static Diagnostic getPotentialUnavailabilityDiagnostic(
     const ValueDecl *D, const DeclContext *ReferenceDC,
-    const AvailabilityContext &Availability, bool WarnBeforeDeploymentTarget,
+    const AvailabilityRange &Availability, bool WarnBeforeDeploymentTarget,
     bool &IsError) {
   ASTContext &Context = ReferenceDC->getASTContext();
   auto Platform = Context.getTargetPlatformStringForDiagnostics();
@@ -2141,7 +2141,7 @@ static Diagnostic getPotentialUnavailabilityDiagnostic(
 
 bool TypeChecker::diagnosePotentialUnavailability(
     const ValueDecl *D, SourceRange ReferenceRange,
-    const DeclContext *ReferenceDC, const AvailabilityContext &Availability,
+    const DeclContext *ReferenceDC, const AvailabilityRange &Availability,
     bool WarnBeforeDeploymentTarget = false) {
   ASTContext &Context = ReferenceDC->getASTContext();
 
@@ -2164,7 +2164,7 @@ bool TypeChecker::diagnosePotentialUnavailability(
 
 void TypeChecker::diagnosePotentialAccessorUnavailability(
     const AccessorDecl *Accessor, SourceRange ReferenceRange,
-    const DeclContext *ReferenceDC, const AvailabilityContext &Availability,
+    const DeclContext *ReferenceDC, const AvailabilityRange &Availability,
     bool ForInout) {
   ASTContext &Context = ReferenceDC->getASTContext();
 
@@ -2210,7 +2210,7 @@ behaviorLimitForExplicitUnavailability(
 void TypeChecker::diagnosePotentialUnavailability(
     const RootProtocolConformance *rootConf, const ExtensionDecl *ext,
     SourceLoc loc, const DeclContext *dc,
-    const AvailabilityContext &availability) {
+    const AvailabilityRange &availability) {
   ASTContext &ctx = dc->getASTContext();
 
   {
@@ -2679,7 +2679,7 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
   auto *ReferenceDC = Where.getDeclContext();
   auto &Context = ReferenceDC->getASTContext();
   if (!Context.LangOpts.DisableAvailabilityChecking) {
-    AvailabilityContext RunningOSVersions = Where.getAvailabilityContext();
+    AvailabilityRange RunningOSVersions = Where.getAvailabilityRange();
     if (RunningOSVersions.isKnownUnreachable()) {
       // Suppress a deprecation warning if the availability checking machinery
       // thinks the reference program location will not execute on any
@@ -2763,7 +2763,7 @@ bool TypeChecker::diagnoseIfDeprecated(SourceLoc loc,
   auto *dc = where.getDeclContext();
   auto &ctx = dc->getASTContext();
   if (!ctx.LangOpts.DisableAvailabilityChecking) {
-    AvailabilityContext runningOSVersion = where.getAvailabilityContext();
+    AvailabilityRange runningOSVersion = where.getAvailabilityRange();
     if (runningOSVersion.isKnownUnreachable()) {
       // Suppress a deprecation warning if the availability checking machinery
       // thinks the reference program location will not execute on any

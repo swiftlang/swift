@@ -60,10 +60,10 @@ public func retObjClassNullable() -> ObjCKlass? {
 // CHECK-NEXT: void $s9UseObjCTy04takeB14CClassNullableyySo0B6CKlassCSgF(ObjCKlass *_Nullable x) SWIFT_NOEXCEPT SWIFT_CALL;
 
 // CHECK: SWIFT_INLINE_THUNK ObjCKlass *_Nonnull retObjClass() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT: return (__bridge_transfer ObjCKlass *)(__bridge void *)_impl::$s9UseObjCTy03retB5ClassSo0B6CKlassCyF();
+// CHECK-NEXT: return (__bridge_transfer ObjCKlass *)(__bridge void *)UseObjCTy::_impl::$s9UseObjCTy03retB5ClassSo0B6CKlassCyF();
 
 // CHECK: SWIFT_INLINE_THUNK ObjCKlass *_Nullable retObjClassNullable() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT: return (__bridge_transfer ObjCKlass *)(__bridge void *)_impl::$s9UseObjCTy03retB13ClassNullableSo0B6CKlassCSgyF();
+// CHECK-NEXT: return (__bridge_transfer ObjCKlass *)(__bridge void *)UseObjCTy::_impl::$s9UseObjCTy03retB13ClassNullableSo0B6CKlassCSgyF();
 
 // CHECK: void takeObjCClass(ObjCKlass *_Nonnull x) noexcept SWIFT_SYMBOL({{.*}}) {
 // CHECK-NEXT: _impl::$s9UseObjCTy04takeB6CClassyySo0B6CKlassCF(x);

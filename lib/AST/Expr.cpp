@@ -2295,36 +2295,6 @@ TypeExpr *TypeExpr::createForSpecializedDecl(DeclRefTypeRepr *ParentTR,
     specializedTR->setValue(boundDecl, ParentTR->getDeclContext());
   } else {
     auto *const qualIdentTR = cast<QualifiedIdentTypeRepr>(ParentTR);
-    if (isa<TypeAliasDecl>(boundDecl)) {
-      // If any of our parent types are unbound, bail out and let
-      // the constraint solver can infer generic parameters for them.
-      //
-      // This is because a type like GenericClass.GenericAlias<Int>
-      // cannot be represented directly.
-      //
-      // This also means that [GenericClass.GenericAlias<Int>]()
-      // won't parse correctly, whereas if we fully specialize
-      // GenericClass, it does.
-      //
-      // FIXME: Once we can model generic typealiases properly, rip
-      // this out.
-      QualifiedIdentTypeRepr *currTR = qualIdentTR;
-      while (auto *declRefBaseTR =
-                 dyn_cast<DeclRefTypeRepr>(currTR->getBase())) {
-        if (!declRefBaseTR->hasGenericArgList()) {
-          auto *decl =
-              dyn_cast_or_null<GenericTypeDecl>(declRefBaseTR->getBoundDecl());
-          if (decl && decl->isGeneric())
-            return nullptr;
-        }
-
-        currTR = dyn_cast<QualifiedIdentTypeRepr>(declRefBaseTR);
-        if (!currTR) {
-          break;
-        }
-      }
-    }
-
     specializedTR = QualifiedIdentTypeRepr::create(
         C, qualIdentTR->getBase(), ParentTR->getNameLoc(),
         ParentTR->getNameRef(), Args, AngleLocs);

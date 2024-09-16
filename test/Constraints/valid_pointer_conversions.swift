@@ -30,8 +30,8 @@ func givesPtr(_ str: String) {
   takesMutableDoubleOptionalPtr(&arr)
   takesMutableDoubleOptionalTypedPtr(&d)
 
-  takesDoubleOptionalPtr(i) // expected-error {{cannot convert value of type 'Int' to expected argument type 'UnsafeRawPointer??'}}
-  takesMutableDoubleOptionalPtr(arr) // expected-error {{cannot convert value of type '[Int]' to expected argument type 'UnsafeMutableRawPointer??'}}
+  takesDoubleOptionalPtr(i) // expected-error {{cannot convert value of type 'Int' to expected argument type 'UnsafeRawPointer?'}}
+  takesMutableDoubleOptionalPtr(arr) // expected-error {{cannot convert value of type '[Int]' to expected argument type 'UnsafeMutableRawPointer?'}}
 
   takesMutableDoubleOptionalTypedPtr(&i) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutablePointer<Double>'}}
   // expected-note@-1 {{arguments to generic parameter 'Pointee' ('Int' and 'Double') are expected to be equal}}
@@ -50,4 +50,22 @@ do {
 //problem/68254165 - Bad diagnostic when using String init(decodingCString:) with an incorrect pointer type
 func rdar68254165(ptr: UnsafeMutablePointer<Int8>) {
   _ = String(decodingCString: ptr, as: .utf8) // expected-error {{generic parameter 'Encoding' could not be inferred}}
+}
+
+// The base of leading-dot syntax could be inferred through an implicit pointer conversion.
+do {
+  struct S {
+    static var prop = S()
+  }
+
+  func inference_through_optional(_ ptr: UnsafePointer<S>?) {}
+
+  inference_through_optional(&.prop) // Ok
+
+  func inference_through_force_unwrap(name: String) {
+    func test(_: UnsafeMutablePointer<Float>!) {}
+
+    var outputs = [String: [Float]]()
+    test(&outputs[name]!) // Ok
+  }
 }

@@ -3450,6 +3450,14 @@ bool ArchetypeType::requiresClass() const {
   return false;
 }
 
+Type ArchetypeType::getSuperclass() const {
+  if (!Bits.ArchetypeType.HasSuperclass) return Type();
+
+  auto *genericEnv = getGenericEnvironment();
+  return genericEnv->mapTypeIntoContext(
+      *getSubclassTrailingObjects<Type>());
+}
+
 Type ArchetypeType::getValueType() const {
   if (auto gp = getInterfaceType()->getAs<GenericTypeParamType>())
     return gp->getValueType();
@@ -3494,11 +3502,14 @@ std::string ArchetypeType::getFullName() const {
 }
 
 /// Determine the recursive type properties for an archetype.
-static RecursiveTypeProperties archetypeProperties(
+RecursiveTypeProperties ArchetypeType::archetypeProperties(
     RecursiveTypeProperties properties,
     ArrayRef<ProtocolDecl *> conformsTo,
-    Type superclass
+    Type superclass,
+    SubstitutionMap subs
 ) {
+  properties |= subs.getRecursiveProperties();
+
   for (auto proto : conformsTo) {
     if (proto->isUnsafe()) {
       properties |= RecursiveTypeProperties::IsUnsafe;
@@ -3506,7 +3517,12 @@ static RecursiveTypeProperties archetypeProperties(
     }
   }
 
-  if (superclass) properties |= superclass->getRecursiveProperties();
+  if (superclass) {
+    auto superclassProps = superclass->getRecursiveProperties();
+    superclassProps.removeHasTypeParameter();
+    superclassProps.removeHasDependentMember();
+    properties |= superclassProps;
+  }
 
   return properties;
 }
@@ -3538,7 +3554,7 @@ PrimaryArchetypeType::getNew(const ASTContext &Ctx,
 
   RecursiveTypeProperties Properties = archetypeProperties(
     RecursiveTypeProperties::HasPrimaryArchetype,
-    ConformsTo, Superclass);
+    ConformsTo, Superclass, SubstitutionMap());
   assert(!Properties.hasTypeVariable());
 
   auto arena = AllocationArena::Permanent;
@@ -3611,7 +3627,7 @@ PackArchetypeType::get(const ASTContext &Ctx,
   RecursiveTypeProperties properties = archetypeProperties(
     (RecursiveTypeProperties::HasPrimaryArchetype |
      RecursiveTypeProperties::HasPackArchetype),
-    ConformsTo, Superclass);
+    ConformsTo, Superclass, SubstitutionMap());
   assert(!properties.hasTypeVariable());
 
   auto arena = AllocationArena::Permanent;

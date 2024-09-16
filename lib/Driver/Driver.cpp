@@ -158,11 +158,20 @@ static void validateBridgingHeaderArgs(DiagnosticEngine &diags,
 
 static void validateWarningControlArgs(DiagnosticEngine &diags,
                                        const ArgList &args) {
-  if (args.hasArg(options::OPT_suppress_warnings) &&
-      args.hasFlag(options::OPT_warnings_as_errors,
-                   options::OPT_no_warnings_as_errors, false)) {
-    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
-                   "-warnings-as-errors", "-suppress-warnings");
+  if (args.hasArg(options::OPT_suppress_warnings)) {
+    if (args.hasFlag(options::OPT_warnings_as_errors,
+                     options::OPT_no_warnings_as_errors, false)) {
+      diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                     "-warnings-as-errors", "-suppress-warnings");
+    }
+    if (args.hasArg(options::OPT_Wwarning)) {
+      diags.diagnose(SourceLoc(), diag::error_conflicting_options, "-Wwarning",
+                     "-suppress-warnings");
+    }
+    if (args.hasArg(options::OPT_Werror)) {
+      diags.diagnose(SourceLoc(), diag::error_conflicting_options, "-Werror",
+                     "-suppress-warnings");
+    }
   }
 }
 

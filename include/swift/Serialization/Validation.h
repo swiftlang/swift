@@ -129,6 +129,7 @@ class ExtendedValidationInfo {
   StringRef ModuleABIName;
   StringRef ModulePackageName;
   StringRef ExportAsName;
+  StringRef PublicModuleName;
   CXXStdlibKind CXXStdlib;
   struct {
     unsigned ArePrivateImportsEnabled : 1;
@@ -229,6 +230,9 @@ public:
 
   StringRef getModulePackageName() const { return ModulePackageName; }
   void setModulePackageName(StringRef name) { ModulePackageName = name; }
+
+  StringRef getPublicModuleName() const { return PublicModuleName; }
+  void setPublicModuleName(StringRef name) { PublicModuleName = name; }
 
   StringRef getExportAsName() const { return ExportAsName; }
   void setExportAsName(StringRef name) { ExportAsName = name; }

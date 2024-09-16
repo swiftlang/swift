@@ -600,7 +600,7 @@ static bool isCheckExpectedExecutorIntrinsicAvailable(SILGenModule &SGM) {
   // in main-actor context.
   auto &C = checkExecutor->getASTContext();
   if (!C.LangOpts.DisableAvailabilityChecking) {
-    auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(C);
+    auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(C);
     auto declAvailability =
         AvailabilityInference::availableRange(checkExecutor, C);
     return deploymentAvailability.isContainedIn(declAvailability);

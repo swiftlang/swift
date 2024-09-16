@@ -1094,7 +1094,7 @@ public:
   /// \p Attr is where to store the parsed attribute
   bool parseSpecializeAttribute(
       swift::tok ClosingBrace, SourceLoc AtLoc, SourceLoc Loc,
-      SpecializeAttr *&Attr, AvailabilityContext *SILAvailability,
+      SpecializeAttr *&Attr, AvailabilityRange *SILAvailability,
       llvm::function_ref<bool(Parser &)> parseSILTargetName =
           [](Parser &) { return false; },
       llvm::function_ref<bool(Parser &)> parseSILSIPModule =
@@ -1106,7 +1106,7 @@ public:
       std::optional<bool> &Exported,
       std::optional<SpecializeAttr::SpecializationKind> &Kind,
       TrailingWhereClause *&TrailingWhereClause, DeclNameRef &targetFunction,
-      AvailabilityContext *SILAvailability,
+      AvailabilityRange *SILAvailability,
       SmallVectorImpl<Identifier> &spiGroups,
       SmallVectorImpl<AvailableAttr *> &availableAttrs,
       size_t &typeErasedParamsCount,
@@ -1177,6 +1177,10 @@ public:
   ParserResult<MacroRoleAttr> parseMacroRoleAttribute(
       MacroSyntax syntax, SourceLoc AtLoc, SourceLoc Loc
   );
+
+  /// Parse the @lifetime attribute.
+  ParserResult<LifetimeAttr> parseLifetimeAttribute(SourceLoc AtLoc,
+                                                    SourceLoc Loc);
 
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
@@ -1266,8 +1270,8 @@ public:
                                         ConventionTypeAttr *&result,
                                         bool justChecking);
 
-  ParserStatus parseLifetimeDependenceSpecifiers(
-      SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList);
+  ParserStatus
+  parseLifetimeEntries(SmallVectorImpl<LifetimeEntry> &specifierList);
 
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
@@ -1470,7 +1474,7 @@ public:
     SourceLoc ConstLoc;
     SourceLoc SendingLoc;
     SmallVector<TypeOrCustomAttr> Attributes;
-    SmallVector<LifetimeDependenceSpecifier> lifetimeDependenceSpecifiers;
+    SmallVector<LifetimeEntry> lifetimeEntries;
 
     ParsedTypeAttributeList(ParseTypeReason reason) : ParseReason(reason) {}
 

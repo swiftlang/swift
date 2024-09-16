@@ -1126,6 +1126,13 @@ void Serializer::writeHeader() {
         ExportAs.emit(ScratchRecord, M->getExportAsName().str());
       }
 
+      Identifier publicModuleName =
+        M->getPublicModuleName(/*onlyIfImported=*/false);
+      if (publicModuleName != M->getName()) {
+        options_block::PublicModuleNameLayout PublicModuleName(Out);
+        PublicModuleName.emit(ScratchRecord, publicModuleName.str());
+      }
+
       if (M->isConcurrencyChecked()) {
         options_block::IsConcurrencyCheckedLayout IsConcurrencyChecked(Out);
         IsConcurrencyChecked.emit(ScratchRecord);
@@ -3375,6 +3382,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       RawLayoutDeclAttrLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
         typeID, countID, rawSize, rawAlign, attr->shouldMoveAsLikeType());
+      return;
+    }
+    case DeclAttrKind::Lifetime: {
+      return;
     }
     }
   }

@@ -465,6 +465,7 @@ SourceLoc extractNearestSourceLoc(CustomRefCountingOperationDescriptor desc);
 struct CustomRefCountingOperationResult {
   enum CustomRefCountingOperationResultKind {
     noAttribute,
+    tooManyAttributes,
     immortal,
     notFound,
     tooManyFound,

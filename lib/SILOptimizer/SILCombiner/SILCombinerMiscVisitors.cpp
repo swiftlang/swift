@@ -1804,7 +1804,7 @@ shouldReplaceCallByContiguousArrayStorageAnyObject(SILFunction &F,
 
   // On SwiftStdlib 5.7 we can replace the call.
   auto &ctxt = storageMetaTy->getASTContext();
-  auto deployment = AvailabilityContext::forDeploymentTarget(ctxt);
+  auto deployment = AvailabilityRange::forDeploymentTarget(ctxt);
   if (!deployment.isContainedIn(ctxt.getSwift57Availability()))
     return std::nullopt;
 

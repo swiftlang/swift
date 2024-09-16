@@ -357,17 +357,17 @@ let x = [
 var array: [String] = []
 #else
 var array: [String] = {
-    return ["one",
-            "two"]
+return ["one",
+"two"]
 }()
 #endif
 #if os(iOS)
 var source: String? {
-    if true {
-        if otherCondition {
-            return "true"
-        }
-    }
+if true {
+if otherCondition {
+return "true"
+}
+}
 }
 #endif
 

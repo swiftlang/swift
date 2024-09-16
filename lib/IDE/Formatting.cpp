@@ -487,15 +487,6 @@ private:
     if (D->isImplicit())
       return Action::Continue();
 
-    // Walk into inactive config regions.
-    if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
-      for (auto Clause : ICD->getClauses()) {
-        for (auto Member : Clause.Elements)
-          Member.walk(*this);
-      }
-      return Action::SkipNode();
-    }
-
     SourceLoc ContextLoc = D->getStartLoc();
 
     if (auto *GC = D->getAsGenericContext()) {
@@ -1396,17 +1387,6 @@ private:
       }
     }
 
-    // Walk into inactive config regions.
-    if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
-      if (Action.shouldVisitChildren()) {
-        for (auto Clause : ICD->getClauses()) {
-          for (auto Member : Clause.Elements)
-            Member.walk(*this);
-        }
-      }
-      return Action::SkipNode();
-    }
-
     // FIXME: We ought to be able to use Action::VisitChildrenIf here, but we'd
     // need to ensure the AST is walked in source order (currently not the case
     // for things like postfix operators).
@@ -1931,19 +1911,6 @@ private:
           return IndentContext {ContextLoc, true};
       }
       return IndentContext {ContextLoc, !OutdentChecker::hasOutdent(SM, D)};
-    }
-
-    if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
-      for (auto &Clause: ICD->getClauses()) {
-        if (Clause.Loc == TargetLocation)
-          break;
-        if (auto *Cond = Clause.Cond) {
-          SourceRange CondRange = Cond->getSourceRange();
-          if (CondRange.isValid() && overlapsTarget(CondRange))
-            return IndentContext {Clause.Loc, true};
-        }
-      }
-      return IndentContext { ICD->getStartLoc(), false };
     }
 
     switch (D->getKind()) {

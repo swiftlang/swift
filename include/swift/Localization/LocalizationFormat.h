@@ -159,20 +159,9 @@ public:
 };
 
 class LocalizationProducer {
-  /// This allocator will retain localized diagnostic strings containing the
-  /// diagnostic's message and identifier as `message [id]` for the duration of
-  /// compiler invocation. This will be used when the frontend flag
-  /// `-debug-diagnostic-names` is used.
-  llvm::BumpPtrAllocator localizationAllocator;
-  llvm::StringSaver localizationSaver;
-  bool printDiagnosticNames;
   LocalizationProducerState state = NotInitialized;
 
 public:
-  LocalizationProducer(bool printDiagnosticNames = false)
-      : localizationSaver(localizationAllocator),
-        printDiagnosticNames(printDiagnosticNames) {}
-
   /// If the  message isn't available/localized in current context
   /// return the fallback default message.
   virtual llvm::StringRef getMessageOr(swift::DiagID id,
@@ -183,8 +172,7 @@ public:
   /// `StringsLocalizationProducer` if the `.strings` file is available. If both
   /// files aren't available returns a `nullptr`.
   static std::unique_ptr<LocalizationProducer>
-  producerFor(llvm::StringRef locale, llvm::StringRef path,
-              bool printDiagnosticNames);
+  producerFor(llvm::StringRef locale, llvm::StringRef path);
 
   virtual ~LocalizationProducer() {}
 
@@ -208,9 +196,8 @@ class StringsLocalizationProducer final : public LocalizationProducer {
   std::vector<std::string> diagnostics;
 
 public:
-  explicit StringsLocalizationProducer(llvm::StringRef filePath,
-                                       bool printDiagnosticNames = false)
-      : LocalizationProducer(printDiagnosticNames), filePath(filePath) {}
+  explicit StringsLocalizationProducer(llvm::StringRef filePath)
+      : LocalizationProducer(), filePath(filePath) {}
 
   /// Iterate over all of the available (non-empty) translations
   /// maintained by this producer, callback gets each translation
@@ -236,8 +223,7 @@ class SerializedLocalizationProducer final : public LocalizationProducer {
 
 public:
   explicit SerializedLocalizationProducer(
-      std::unique_ptr<llvm::MemoryBuffer> buffer,
-      bool printDiagnosticNames = false);
+      std::unique_ptr<llvm::MemoryBuffer> buffer);
 
 protected:
   bool initializeImpl() override;

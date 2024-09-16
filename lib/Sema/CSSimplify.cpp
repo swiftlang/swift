@@ -3978,8 +3978,19 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
                    path.back().is<LocatorPathElt::GenericArgument>()))
                 path.pop_back();
 
+              auto *fixLoc = getConstraintLocator(anchor, path);
+              // If after looking through optionals and generic arguments
+              // we end up directly on assignment this is a source/destination
+              // type mismatch.
+              if (fixLoc->directlyAt<AssignExpr>()) {
+                auto *fix = IgnoreAssignmentDestinationType::create(
+                    *this, type1, type2, fixLoc);
+                return recordFix(fix) ? getTypeMatchFailure(locator)
+                                      : getTypeMatchSuccess();
+              }
+
               auto *fix = AllowNonClassTypeToConvertToAnyObject::create(
-                  *this, type1, getConstraintLocator(anchor, path));
+                  *this, type1, fixLoc);
 
               return recordFix(fix) ? getTypeMatchFailure(locator)
                                     : getTypeMatchSuccess();
@@ -5341,6 +5352,9 @@ bool ConstraintSystem::repairFailures(
       if (repairViaBridgingCast(*this, lhs, rhs, conversionsOrFixes, locator))
         return true;
 
+      if (hasAnyRestriction())
+        return false;
+
       // If destination is `AnyObject` it means that source doesn't conform.
       if (rhs->getWithoutSpecifierType()
               ->lookThroughAllOptionalTypes()
@@ -5348,60 +5362,6 @@ bool ConstraintSystem::repairFailures(
         conversionsOrFixes.push_back(IgnoreAssignmentDestinationType::create(
             *this, lhs, rhs, getConstraintLocator(locator)));
         return true;
-      }
-
-      // If we are trying to assign e.g. `Array<Int>` to `Array<Float>` let's
-      // give solver a chance to determine which generic parameters are
-      // mismatched and produce a fix for that.
-      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
-        return false;
-
-      // An attempt to assign `Int?` to `String?`.
-      if (hasConversionOrRestriction(
-              ConversionRestrictionKind::OptionalToOptional)) {
-        conversionsOrFixes.push_back(IgnoreAssignmentDestinationType::create(
-            *this, lhs, rhs, getConstraintLocator(locator)));
-        return true;
-      }
-
-      // If the situation has to do with protocol composition types and
-      // destination doesn't have one of the conformances e.g. source is
-      // `X & Y` but destination is only `Y` or vice versa, there is a
-      // tailored "missing conformance" fix for that.
-      if (hasConversionOrRestriction(ConversionRestrictionKind::Existential))
-        return false;
-
-      if (hasConversionOrRestriction(
-              ConversionRestrictionKind::MetatypeToExistentialMetatype) ||
-          hasConversionOrRestriction(
-              ConversionRestrictionKind::ExistentialMetatypeToMetatype) ||
-          hasConversionOrRestriction(ConversionRestrictionKind::Superclass)) {
-        conversionsOrFixes.push_back(IgnoreAssignmentDestinationType::create(
-            *this, lhs, rhs, getConstraintLocator(locator)));
-        return true;
-      }
-
-      if (hasConversionOrRestriction(
-              ConversionRestrictionKind::ValueToOptional)) {
-        lhs = lhs->lookThroughAllOptionalTypes();
-        rhs = rhs->lookThroughAllOptionalTypes();
-
-        // If both object types are functions, let's allow the solver to
-        // structurally compare them before trying to fix anything.
-        if (lhs->is<FunctionType>() && rhs->is<FunctionType>())
-          return false;
-
-        // If either object type is a generic, nominal or existential type
-        // it means that follow-up to value-to-optional is going to be:
-        //
-        // 1. "deep equality" check, which is handled by generic argument(s)
-        //    or contextual mismatch fix, or
-        // 2. "existential" check, which is handled by a missing conformance
-        //    fix.
-        if ((lhs->is<BoundGenericType>() && rhs->is<BoundGenericType>()) ||
-            (lhs->is<NominalType>() && rhs->is<NominalType>()) ||
-            rhs->isAnyExistentialType())
-          return false;
       }
 
       auto *destExpr = AE->getDest();
@@ -7723,15 +7683,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           // scalar or array.
           if (auto inoutType1 = dyn_cast<InOutType>(desugar1)) {
             if (!isAutoClosureArgument) {
-              auto inoutBaseType = inoutType1->getInOutObjectType();
+              auto inoutBaseType = getFixedTypeRecursive(
+                  inoutType1->getInOutObjectType(), /*wantRValue=*/true);
 
-              auto baseIsArray =
-                  getFixedTypeRecursive(inoutBaseType, /*wantRValue=*/true)
-                      ->isArrayType();
+              // Wait until the base type of `inout` is sufficiently resolved
+              // before making any assessments regarding conversions.
+              if (inoutBaseType->isTypeVariableOrMember())
+                return formUnsolvedResult();
 
-              // FIXME: If the base is still a type variable, we can't tell
-              // what to do here. Might have to try \c ArrayToPointer and make
-              // it more robust.
+              auto baseIsArray = inoutBaseType->isArrayType();
+
               if (baseIsArray)
                 conversionsOrFixes.push_back(
                     ConversionRestrictionKind::ArrayToPointer);
@@ -10346,7 +10307,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // include them in the unviable candidates list.
   if (result.ViableCandidates.empty() && result.UnviableCandidates.empty() &&
       includeInaccessibleMembers) {
-    NameLookupOptions lookupOptions = defaultMemberLookupOptions;
+    NameLookupOptions lookupOptions =
+        defaultConstraintSolverMemberLookupOptions;
 
     // Local function that looks up additional candidates using the given lookup
     // options, recording the results as unviable candidates.
@@ -10379,12 +10341,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     // before.
     if (lookupUnviable(lookupOptions | NameLookupFlags::IgnoreAccessControl,
                        MemberLookupResult::UR_Inaccessible))
-      return result;
-
-    // Ignore missing import statements in order to find more candidates that
-    // might have been missed before.
-    if (lookupUnviable(lookupOptions | NameLookupFlags::IgnoreMissingImports,
-                       MemberLookupResult::UR_MissingImport))
       return result;
   }
   
@@ -10586,11 +10542,9 @@ static ConstraintFix *fixMemberRef(
     }
 
     case MemberLookupResult::UR_Inaccessible:
-    case MemberLookupResult::UR_MissingImport:
       assert(choice.isDecl());
-      return AllowInaccessibleMember::create(
-          cs, baseTy, choice.getDecl(), memberName, locator,
-          *reason == MemberLookupResult::UR_MissingImport);
+      return AllowInaccessibleMember::create(cs, baseTy, choice.getDecl(),
+                                             memberName, locator);
 
     case MemberLookupResult::UR_UnavailableInExistential: {
       return choice.isDecl()
@@ -11030,9 +10984,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       if (instanceTy->is<AnyFunctionType>()) {
         impact += 10;
       }
-
-      if (instanceTy->isAny() || instanceTy->isAnyObject())
-        impact += 5;
 
       auto *anchorExpr = getAsExpr(locator->getAnchor());
       if (anchorExpr) {
@@ -13868,6 +13819,23 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
     return genericParams;
   };
 
+  auto fixInvalidSpecialization = [&](ValueDecl *decl) -> SolutionKind {
+    if (isa<AbstractFunctionDecl>(decl)) {
+      return recordFix(AllowFunctionSpecialization::create(
+                 *this, decl, getConstraintLocator(locator)))
+                 ? SolutionKind::Error
+                 : SolutionKind::Solved;
+    }
+
+    // Allow concrete macros to have specializations with just a warning.
+    return recordFix(AllowConcreteTypeSpecialization::create(
+               *this, type1, decl, getConstraintLocator(locator),
+               isa<MacroDecl>(decl) ? FixBehavior::DowngradeToWarning
+                                    : FixBehavior::Error))
+               ? SolutionKind::Error
+               : SolutionKind::Solved;
+  };
+
   ValueDecl *decl;
   SmallVector<OpenedType, 2> openedTypes;
   if (auto *bound = dyn_cast<TypeAliasType>(type1.getPointer())) {
@@ -13926,6 +13894,12 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
     decl = overloadChoice.getDecl();
 
     auto openedOverloadTypes = getOpenedTypes(overloadLocator);
+    // Attempting to specialize a non-generic declaration.
+    if (openedOverloadTypes.empty()) {
+      // Note that this is unconditional because the fix is
+      // downgraded to a warning in swift language modes < 6.
+      return fixInvalidSpecialization(decl);
+    }
 
     auto genericParams = getGenericParams(decl);
     if (genericParams) {
@@ -13941,22 +13915,8 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   }
 
   auto genericParams = getGenericParams(decl);
-  if (!decl->getAsGenericContext() || !genericParams) {
-    if (isa<AbstractFunctionDecl>(decl)) {
-      return recordFix(AllowFunctionSpecialization::create(
-                 *this, decl, getConstraintLocator(locator)))
-                 ? SolutionKind::Error
-                 : SolutionKind::Solved;
-    }
-
-    // Allow concrete macros to have specializations with just a warning.
-    return recordFix(AllowConcreteTypeSpecialization::create(
-               *this, type1, decl, getConstraintLocator(locator),
-               isa<MacroDecl>(decl) ? FixBehavior::DowngradeToWarning
-                                    : FixBehavior::Error))
-               ? SolutionKind::Error
-               : SolutionKind::Solved;
-  }
+  if (!decl->getAsGenericContext() || !genericParams)
+    return fixInvalidSpecialization(decl);
 
   // Map the generic parameters we have over to their opened types.
   bool hasParameterPack = false;
@@ -14063,26 +14023,9 @@ ConstraintSystem::simplifyLValueObjectConstraint(
     if (!shouldAttemptFixes())
       return SolutionKind::Error;
 
-    auto assessImpact = [&]() -> unsigned {
-      // If this is a projection of a member reference
-      // let's check whether the member is unconditionally
-      // settable, if so than it's a problem with its base.
-      if (locator.directlyAt<UnresolvedDotExpr>()) {
-        auto *memberLoc = getConstraintLocator(locator.getAnchor(),
-                                               ConstraintLocator::Member);
-        if (auto selected = findSelectedOverloadFor(memberLoc)) {
-          if (auto *storage = dyn_cast_or_null<AbstractStorageDecl>(
-                  selected->choice.getDeclOrNull())) {
-            return storage->isSettable(nullptr) ? 1 : 2;
-          }
-        }
-      }
-      return 2;
-    };
-
-    if (recordFix(
-            TreatRValueAsLValue::create(*this, getConstraintLocator(locator)),
-            assessImpact()))
+    auto *fixLoc = getConstraintLocator(locator);
+    if (recordFix(TreatRValueAsLValue::create(*this, fixLoc),
+                  TreatRValueAsLValue::assessImpact(*this, fixLoc)))
       return SolutionKind::Error;
 
     lvalueTy = LValueType::get(lvalueTy);
@@ -14140,6 +14083,12 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     // This induces conversions to occur within closures instead of
     // outside of them wherever possible.
     if (locator.isFunctionConversion()) {
+      // This conversion exists only to check adjustments in the member
+      // type, so the fact that adjustments also cause a function conversion
+      // is unrelated.
+      if (locator.isForExistentialMemberAccessConversion())
+        return;
+
       increaseScore(SK_FunctionConversion, locator);
     }
   };
@@ -14216,14 +14165,23 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       if (hasFixFor(loc, FixKind::AllowTupleTypeMismatch))
         return true;
 
-      if (restriction == ConversionRestrictionKind::ValueToOptional ||
-          restriction == ConversionRestrictionKind::OptionalToOptional)
-        ++impact;
+      if (restriction == ConversionRestrictionKind::ValueToOptional) {
+        // If this is an optional injection we can drop optional from
+        // "to" type since it's not significant for the diagnostic.
+        toType = toType->getOptionalObjectType();
+      }
 
-      auto *fix =
-          loc->isLastElement<LocatorPathElt::ApplyArgToParam>()
-              ? AllowArgumentMismatch::create(*this, fromType, toType, loc)
-              : ContextualMismatch::create(*this, fromType, toType, loc);
+      ConstraintFix *fix = nullptr;
+      if (loc->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+        fix = AllowArgumentMismatch::create(*this, fromType, toType, loc);
+      } else if (loc->isForAssignment()) {
+        fix = IgnoreAssignmentDestinationType::create(*this, fromType, toType,
+                                                      loc);
+      } else {
+        fix = ContextualMismatch::create(*this, fromType, toType, loc);
+      }
+
+      assert(fix);
       return !recordFix(fix, impact);
     }
 
@@ -15229,21 +15187,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   }
 
   case FixKind::TreatRValueAsLValue: {
-    unsigned impact = 1;
-    // If this is an attempt to use result of a function/subscript call as
-    // an l-value, it has to have an increased impact because it's either
-    // a function - which is completely incorrect, or it's a get-only
-    // subscript, which requires changes to declaration to become mutable.
-    impact += (locator.endsWith<LocatorPathElt::FunctionResult>() ||
-               locator.endsWith<LocatorPathElt::SubscriptMember>())
-                  ? 1
-                  : 0;
-    // An overload choice that isn't settable is least interesting for diagnosis.
-    if (auto overload = findSelectedOverloadFor(getCalleeLocator(fix->getLocator()))) {
-      if (auto *var = dyn_cast_or_null<VarDecl>(overload->choice.getDeclOrNull())) {
-         impact += !var->isSettableInSwift(DC) ? 1 : 0;
-      }
-    }
+    unsigned impact =
+        TreatRValueAsLValue::assessImpact(*this, fix->getLocator());
     return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
   }
 

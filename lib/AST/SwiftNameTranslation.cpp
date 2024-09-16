@@ -244,8 +244,8 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
         return {Unsupported, UnrepresentableGeneric};
       genericSignature = typeDecl->getGenericSignature();
     }
-    // Nested types are not yet supported.
-    if (!typeDecl->hasClangNode() &&
+    // Nested classes are not yet supported.
+    if (isa<ClassDecl>(VD) && !typeDecl->hasClangNode() &&
         isa_and_nonnull<NominalTypeDecl>(
             typeDecl->getDeclContext()->getAsDecl()))
       return {Unsupported, UnrepresentableNested};

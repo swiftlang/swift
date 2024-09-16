@@ -33,13 +33,13 @@ struct NC : ~Copyable {
 
 // Rewrite the mark_dependence to depend on the incoming argument rather than the nested access.
 //
-// CHECK-LABEL: sil hidden @$s4test13bv_get_mutate9containerAA2BVVYlsS_AA2NCVz_tF : $@convention(thin) (@inout NC) -> _scope(0)  @owned BV {
+// CHECK-LABEL: sil hidden @$s4test13bv_get_mutate9containerAA2BVVAA2NCVz_tF : $@convention(thin) (@inout NC) -> _scope(0)  @owned BV {
 // CHECK: bb0(%0 : $*NC):
 // CHECK:   [[A:%.*]] = begin_access [read] [static] %0 : $*NC
 // CHECK:   [[L:%.*]] = load [[A]] : $*NC
 // CHECK:   [[R:%.*]] = apply %{{.*}}([[L]]) : $@convention(method) (@guaranteed NC) -> _scope(0) @owned BV
 // CHECK:   [[M:%.*]] = mark_dependence [nonescaping] [[R]] : $BV on %0 : $*NC
-// CHECK-LABEL: } // end sil function '$s4test13bv_get_mutate9containerAA2BVVYlsS_AA2NCVz_tF'
+// CHECK-LABEL: } // end sil function '$s4test13bv_get_mutate9containerAA2BVVAA2NCVz_tF'
 func bv_get_mutate(container: inout NC) -> dependsOn(container) BV {
   container.getBV()
 }

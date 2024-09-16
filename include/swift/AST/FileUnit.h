@@ -335,6 +335,12 @@ public:
     return getParentModule()->getRealName().str();
   }
 
+  /// Returns the public facing name of this module, only if it is set
+  /// explicitly.
+  virtual StringRef getPublicModuleName() const {
+    return {};
+  }
+
   SWIFT_DEBUG_DUMPER(dumpDisplayDecls());
   SWIFT_DEBUG_DUMPER(dumpTopLevelDecls());
 

@@ -3264,10 +3264,6 @@ void ASTMangler::appendFunctionResultType(
   } else {
     appendType(resultType, sig, forDecl);
   }
-
-  if (AllowLifetimeDependencies && lifetimeDependence.has_value()) {
-    appendLifetimeDependence(*lifetimeDependence);
-  }
 }
 
 void ASTMangler::appendTypeList(Type listTy, GenericSignature sig,
@@ -3320,29 +3316,10 @@ void ASTMangler::appendParameterTypeListElement(
   if (flags.isCompileTimeConst())
     appendOperator("Yt");
 
-  if (AllowLifetimeDependencies && lifetimeDependence) {
-    appendLifetimeDependence(*lifetimeDependence);
-  }
-
   if (!name.empty())
     appendIdentifier(name.str());
   if (flags.isVariadic())
     appendOperator("d");
-}
-
-void ASTMangler::appendLifetimeDependence(LifetimeDependenceInfo info) {
-  if (auto *inheritIndices = info.getInheritIndices()) {
-    assert(!inheritIndices->isEmpty());
-    appendOperator("Yli");
-    appendIndexSubset(inheritIndices);
-    appendOperator("_");
-  }
-  if (auto *scopeIndices = info.getScopeIndices()) {
-    assert(!scopeIndices->isEmpty());
-    appendOperator("Yls");
-    appendIndexSubset(scopeIndices);
-    appendOperator("_");
-  }
 }
 
 void ASTMangler::appendTupleTypeListElement(Identifier name, Type elementType,
@@ -4215,12 +4192,26 @@ void ASTMangler::appendAnyProtocolConformance(
       conformance.getRequirement()->isMarkerProtocol())
     return;
 
+  // While all invertible protocols are marker protocols, do not mangle them
+  // as a dependent conformance. See `conformanceRequirementIndex` which skips
+  // these, too. In theory, invertible conformances should never be mangled,
+  // but we *might* have let that slip by for the other cases below, so the
+  // early-exits are highly conservative.
+  const bool forInvertible =
+      conformance.getRequirement()->getInvertibleProtocolKind().has_value();
+
   if (conformingType->isTypeParameter()) {
     assert(genericSig && "Need a generic signature to resolve conformance");
+    if (forInvertible)
+      return;
+
     auto path = genericSig->getConformancePath(conformingType,
                                                conformance.getAbstract());
     appendDependentProtocolConformance(path, genericSig);
   } else if (auto opaqueType = conformingType->getAs<OpaqueTypeArchetypeType>()) {
+    if (forInvertible)
+      return;
+
     GenericSignature opaqueSignature =
         opaqueType->getDecl()->getOpaqueInterfaceGenericSignature();
     ConformancePath conformancePath =
