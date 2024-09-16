@@ -33,10 +33,10 @@ final class Awaitable<Value, Failure>: Sendable where Value: Sendable, Failure: 
 // CHECK:   [[DEST_HANDLE_PTR:%.*]] = getelementptr inbounds %T15Synchronization5MutexV, ptr [[DEST]], i32 0, i32 0
 // CHECK:   [[SRC_HANDLE_PTR:%.*]] = getelementptr inbounds %T15Synchronization5MutexV, ptr [[SRC]], i32 0, i32 0
 // CHECK:   call void @llvm.memcpy.p0.p0.i{{32|64}}(ptr {{.*}} [[DEST_HANDLE_PTR]], ptr {{.*}} [[SRC_HANDLE_PTR]], i{{32|64}} {{.*}}, i1 false)
-// CHECK:   [[DEST_MUTEX_VALUE_OFFSET_PTR:%.*]] = getelementptr inbounds i32, ptr [[MUTEX]], i{{32|64}} 7
+// CHECK:   [[DEST_MUTEX_VALUE_OFFSET_PTR:%.*]] = getelementptr inbounds i32, ptr [[MUTEX]], i{{32 4|64 7}}
 // CHECK:   [[DEST_MUTEX_VALUE_OFFSET:%.*]] = load i32, ptr [[DEST_MUTEX_VALUE_OFFSET_PTR]]
 // CHECK:   [[DEST_VALUE_PTR:%.*]] = getelementptr inbounds i8, ptr [[DEST]], i32 [[DEST_MUTEX_VALUE_OFFSET]]
-// CHECK:   [[SRC_MUTEX_VALUE_OFFSET_PTR:%.*]] = getelementptr inbounds i32, ptr [[MUTEX]], i{{32|64}} 7
+// CHECK:   [[SRC_MUTEX_VALUE_OFFSET_PTR:%.*]] = getelementptr inbounds i32, ptr [[MUTEX]], i{{32 4|64 7}}
 // CHECK:   [[SRC_MUTEX_VALUE_OFFSET:%.*]] = load i32, ptr [[SRC_MUTEX_VALUE_OFFSET_PTR]]
 // CHECK:   [[SRC_VALUE_PTR:%.*]] = getelementptr inbounds i8, ptr [[SRC]], i32 [[SRC_MUTEX_VALUE_OFFSET]]
 
