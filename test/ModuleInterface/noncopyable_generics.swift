@@ -117,7 +117,11 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC: extension {{.*}}.Outer.InnerVariation2 : Swift.Escapable where D : Swift.Escapable {
 
 // CHECK-MISC: extension {{.*}}.Outer.InnerStruct {
+// CHECK-MISC-NEXT: #if compiler(>=5.3) && $NonescapableTypes
 // CHECK-MISC-NEXT:   public func hello<T>(_ t: T) where T : ~Escapable
+// CHECK-MISC-NEXT:   #else
+// CHECK-MISC-NEXT:   public func hello<T>(_ t: T)
+// CHECK-MISC-NEXT:   #endif
 
 // CHECK-MISC: @_preInverseGenerics public func old_swap<T>(_ a: inout T, _ b: inout T) where T : ~Copyable
 
