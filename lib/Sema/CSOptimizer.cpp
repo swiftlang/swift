@@ -57,6 +57,15 @@ static bool isSupportedOperator(Constraint *disjunction) {
   return false;
 }
 
+static bool isStandardComparisonOperator(ValueDecl *decl) {
+  return decl->isOperator() &&
+         decl->getBaseIdentifier().isStandardComparisonOperator();
+}
+
+static bool isArithmeticOperator(ValueDecl *decl) {
+  return decl->isOperator() && decl->getBaseIdentifier().isArithmeticOperator();
+}
+
 static bool isSupportedDisjunction(Constraint *disjunction) {
   auto choices = disjunction->getNestedConstraints();
 
@@ -561,9 +570,7 @@ static Constraint *determineBestChoicesInContext(
           // ones that all have the same result type), regular
           // functions/methods and especially initializers could end up
           // with a lot of favored overloads because on the result type alone.
-          if (score > 0 ||
-              (decl->isOperator() &&
-               !decl->getBaseIdentifier().isStandardComparisonOperator())) {
+          if (decl->isOperator() && !isStandardComparisonOperator(decl)) {
             if (llvm::any_of(resultTypes, [&](const Type candidateResultTy) {
                   return scoreCandidateMatch(genericSig,
                                              overloadType->getResult(),
@@ -575,14 +582,13 @@ static Constraint *determineBestChoicesInContext(
           }
 
           if (score > 0) {
-            if (decl->isOperator() &&
-                decl->getBaseIdentifier().isArithmeticOperator() &&
+            // Nudge the score slightly to prefer homogeneous arithmetic operators.
+            //
+            // This is an opportunistic optimization based on the operator
+            // use patterns where homogeneous operators are the most
+            // heavily used ones.
+            if (isArithmeticOperator(decl) &&
                 overloadType->getNumParams() == 2) {
-              // Nudge the score slightly to prefer homogeneous operators.
-              //
-              // This is an opportunistic optimization based on the operator
-              // use patterns where homogeneous operators are the most
-              // heavily used ones.
               auto resultTy = overloadType->getResult();
               if (llvm::all_of(overloadType->getParams(),
                                [&resultTy](const auto &param) {
