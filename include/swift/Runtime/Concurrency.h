@@ -780,16 +780,16 @@ void swift_task_enqueueOnDispatchQueue(Job *job, HeapObject *queue);
     (*name##_hook_t)(name##_original original);                         \
   SWIFT_EXPORT_FROM(swift_Concurrency) name##_hook_t name##_hook
 
-#define SWIFT_CONCURRENCY_HOOK_OVERRIDE0(returnType, name)              \
-  typedef SWIFT_CC(swift) returnType (*name##_original)();              \
-  typedef SWIFT_CC(swift) returnType (*name##_override)(                \
-    name##_original original);                                          \
-  typedef SWIFT_CC(swift) returnType                                    \
-    (*name##_hook_t)(name##_original original,                          \
-                     name##_override compatOverride);                   \
-  SWIFT_EXPORT_FROM(swift_Concurrency) name##_hook_t name##_hook
-
 #include "ConcurrencyHooks.def"
+
+// This is a compatibility hook, *not* a concurrency hook
+typedef SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_original)();
+typedef SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_override)(
+    swift_task_asyncMainDrainQueue_original original);
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_hook)(
+    swift_task_asyncMainDrainQueue_original original,
+    swift_task_asyncMainDrainQueue_override compatOverride);
 
 /// Initialize the runtime storage for a default actor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
@@ -878,10 +878,15 @@ extern "C" SWIFT_CC(swift)
 void swift_continuation_logFailedCheck(const char *message);
 
 /// Drain the queue
-/// If the binary links CoreFoundation, uses CFRunLoopRun
-/// Otherwise it uses dispatchMain.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_asyncMainDrainQueue [[noreturn]]();
+
+/// Drain the global executor.  This does the same as the above, but
+/// swift_task_asyncMainDrainQueue() is a compatibility override point,
+/// whereas this function has a concurrency hook.  The default
+/// swift_task_asyncMainDrainQueue() implementation just calls this function.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_drainGlobalExecutor [[noreturn]]();
 
 /// Establish that the current thread is running as the given
 /// executor, then run a job.
@@ -953,16 +958,12 @@ JobPriority swift_task_getCurrentThreadPriority(void);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_startOnMainActor(AsyncTask* job);
 
-#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
-
 /// Donate this thread to the global executor until either the
 /// given condition returns true or we've run out of cooperative
 /// tasks to run.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
                                                   void *context);
-
-#endif
 
 enum swift_clock_id : int {
   swift_clock_id_continuous = 1,

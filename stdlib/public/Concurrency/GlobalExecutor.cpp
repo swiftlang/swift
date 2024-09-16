@@ -58,7 +58,7 @@
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "TaskPrivate.h"
 #include "Error.h"
-#include "ExecutorHooks.h"
+#include "ExecutorImpl.h"
 
 using namespace swift;
 
@@ -81,31 +81,30 @@ bool swift::swift_task_invokeSwiftCheckIsolated(SerialExecutorRef executor)
   return true;
 }
 
-// Implemented in Swift because we need to obtain the user-defined flags on the executor ref.
-//
-// We could inline this with effort, though.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
-extern "C" SWIFT_CC(swift)
-SerialExecutorRef _task_serialExecutor_getExecutorRef(
-        HeapObject *executor, const Metadata *selfType,
-        const SerialExecutorWitnessTable *wtable);
-#pragma clang diagnostic pop
-
-/// WARNING: This method is expected to CRASH in new runtimes, and cannot be
-/// used to implement "log warnings" mode. We would need a new entry point to
-/// implement a "only log warnings" actor isolation checking mode, and it would
-/// no be able handle more complex situations, as `SerialExecutor.checkIsolated`
-/// is able to (by calling into dispatchPrecondition on old runtimes).
-SWIFT_CC(swift)
-bool swift::swift_task_isOnExecutorImpl(HeapObject *executor,
-                                        const Metadata *selfType,
-                                        const SerialExecutorWitnessTable *wtable)
+extern "C" bool _swift_task_invokeSwiftCheckIsolated_c(SwiftExecutorRef executor)
 {
-  auto executorRef = _task_serialExecutor_getExecutorRef(executor,
-                                                         selfType,
-                                                         wtable);
-  return swift_task_isCurrentExecutor(executorRef);
+  return swift_task_invokeSwiftCheckIsolated(*reinterpret_cast<SerialExecutorRef *>(&executor));
+}
+
+extern "C" void _swift_job_run_c(SwiftJob *job, SwiftExecutorRef executor)
+{
+  swift_job_run(reinterpret_cast<Job *>(job),
+                *reinterpret_cast<SerialExecutorRef *>(&executor));
+}
+
+extern "C" SwiftTime swift_time_now(SwiftClockId clock)
+{
+  SwiftTime result;
+  swift_get_time(&result.seconds, &result.nanoseconds, (swift_clock_id)clock);
+  return result;
+}
+
+extern "C" SwiftTime swift_time_getResolution(SwiftClockId clock)
+{
+  SwiftTime result;
+  swift_get_clock_res(&result.seconds, &result.nanoseconds,
+                      (swift_clock_id)clock);
+  return result;
 }
 
 bool swift::swift_executor_isComplexEquality(SerialExecutorRef ref) {
@@ -123,12 +122,30 @@ uint64_t swift::swift_task_getJobTaskId(Job *job) {
   }
 }
 
+SWIFT_EXPORT_FROM(swift_Concurrency)
+void *swift_job_alloc(SwiftJob *job, size_t size) {
+  auto task = cast<AsyncTask>(reinterpret_cast<Job *>(job));
+  return _swift_task_alloc_specific(task, size);
+}
+
+SWIFT_EXPORT_FROM(swift_Concurrency)
+void swift_job_dealloc(SwiftJob *job, void *ptr) {
+  auto task = cast<AsyncTask>(reinterpret_cast<Job *>(job));
+  return _swift_task_dealloc_specific(task, ptr);
+}
+
 /*****************************************************************************/
 /****************************** MAIN EXECUTOR  *******************************/
 /*****************************************************************************/
 
 bool SerialExecutorRef::isMainExecutor() const {
   return swift_task_isMainExecutor(*this);
+}
+
+SWIFT_EXPORT_FROM(swift_Concurrency)
+bool _swift_task_isMainExecutor_c(SwiftExecutorRef executor) {
+  SerialExecutorRef ref = *reinterpret_cast<SerialExecutorRef *>(&executor);
+  return swift_task_isMainExecutor(ref);
 }
 
 #define OVERRIDE_GLOBAL_EXECUTOR COMPATIBILITY_OVERRIDE

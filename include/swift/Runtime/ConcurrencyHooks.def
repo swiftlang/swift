@@ -30,10 +30,6 @@
 #define SWIFT_CONCURRENCY_HOOK0(returnType, name)
 #endif
 
-#ifndef SWIFT_CONCURRENCY_HOOK_OVERRIDE0
-#define SWIFT_CONCURRENCY_HOOK_OVERRIDE0(returnType, name)
-#endif
-
 // .............................................................................
 
 SWIFT_CONCURRENCY_HOOK(void, swift_task_enqueueGlobal, Job *job);
@@ -61,12 +57,8 @@ SWIFT_CONCURRENCY_HOOK0(SerialExecutorRef, swift_task_getMainExecutor);
 
 SWIFT_CONCURRENCY_HOOK(bool, swift_task_isMainExecutor, SerialExecutorRef);
 
-/// A hook to override the entrypoint to the main runloop used to drive the
-/// concurrency runtime and drain the main queue. This function must not return.
-/// Note: If the hook is wrapping the original function and the `compatOverride`
-///       is passed in, the `original` function pointer must be passed into the
-///       compatibility override function as the original function.
-SWIFT_CONCURRENCY_HOOK_OVERRIDE0(void, swift_task_asyncMainDrainQueue);
+SWIFT_CONCURRENCY_HOOK(void, swift_task_donateThreadToGlobalExecutorUntil,
+                       bool (*condition)(void *), void *context);
 
 // .............................................................................
 

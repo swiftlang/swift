@@ -15,15 +15,20 @@
 /// This file is included into GlobalExecutor.cpp only when
 /// the cooperative global executor is enabled.  It is expected to
 /// declare the following functions:
+///   swift_task_asyncMainDrainQueueImpl
+///   swift_task_checkIsolatedImpl
+///   swift_task_donateThreadToGlobalExecutorUntilImpl
 ///   swift_task_enqueueGlobalImpl
+///   swift_task_enqueueGlobalWithDeadlineImpl
 ///   swift_task_enqueueGlobalWithDelayImpl
 ///   swift_task_enqueueMainExecutorImpl
-///   swift_task_checkIsolatedImpl
+///   swift_task_getMainExecutorImpl
+///   swift_task_isMainExecutorImpl
 /// as well as any cooperative-executor-specific functions in the runtime.
 ///
 ///===------------------------------------------------------------------===///
 
-#include "swift/Runtime/Concurrency.h"
+#include "swift/shims/Visibility.h"
 
 #include <chrono>
 #ifndef SWIFT_THREADING_NONE
@@ -39,29 +44,29 @@
 # define NSEC_PER_SEC 1000000000ull
 #endif
 
-#include "ExecutorHooks.h"
+#include "ExecutorImpl.h"
 
 using namespace swift;
 
 namespace {
 
 struct JobQueueTraits {
-  static Job *&storage(Job *cur) {
-    return reinterpret_cast<Job*&>(cur->SchedulerPrivate[0]);
+  static SwiftJob *&storage(SwiftJob *cur) {
+    return reinterpret_cast<SwiftJob*&>(cur->schedulerPrivate[0]);
   }
 
-  static Job *getNext(Job *job) {
+  static SwiftJob *getNext(SwiftJob *job) {
     return storage(job);
   }
-  static void setNext(Job *job, Job *next) {
+  static void setNext(SwiftJob *job, SwiftJob *next) {
     storage(job) = next;
   }
-  enum { prioritiesCount = PriorityBucketCount };
-  static int getPriorityIndex(Job *job) {
-    return getPriorityBucketIndex(job->getPriority());
+  enum { prioritiesCount = SwiftJobPriorityBucketCount };
+  static int getPriorityIndex(SwiftJob *job) {
+    return swift_priority_getBucketIndex(swift_job_getPriority(job));
   }
 };
-using JobPriorityQueue = PriorityQueue<Job*, JobQueueTraits>;
+using JobPriorityQueue = PriorityQueue<SwiftJob*, JobQueueTraits>;
 
 using JobDeadline = std::chrono::time_point<std::chrono::steady_clock>;
 
@@ -69,36 +74,36 @@ template <bool = (sizeof(JobDeadline) <= sizeof(void*) &&
                   alignof(JobDeadline) <= alignof(void*))>
 struct JobDeadlineStorage;
 
-/// Specialization for when JobDeadline fits in SchedulerPrivate.
+/// Specialization for when JobDeadline fits in schedulerPrivate.
 template <>
 struct JobDeadlineStorage<true> {
-  static JobDeadline &storage(Job *job) {
-    return reinterpret_cast<JobDeadline&>(job->SchedulerPrivate[1]);
+  static JobDeadline &storage(SwiftJob *job) {
+    return reinterpret_cast<JobDeadline&>(job->schedulerPrivate[1]);
   }
-  static JobDeadline get(Job *job) {
+  static JobDeadline get(SwiftJob *job) {
     return storage(job);
   }
-  static void set(Job *job, JobDeadline deadline) {
+  static void set(SwiftJob *job, JobDeadline deadline) {
     new(static_cast<void*>(&storage(job))) JobDeadline(deadline);
   }
-  static void destroy(Job *job) {
+  static void destroy(SwiftJob *job) {
     storage(job).~JobDeadline();
   }
 };
 
-/// Specialization for when JobDeadline doesn't fit in SchedulerPrivate.
+/// Specialization for when JobDeadline doesn't fit in schedulerPrivate.
 template <>
 struct JobDeadlineStorage<false> {
-  static JobDeadline *&storage(Job *job) {
-    return reinterpret_cast<JobDeadline*&>(job->SchedulerPrivate[1]);
+  static JobDeadline *&storage(SwiftJob *job) {
+    return reinterpret_cast<JobDeadline*&>(job->schedulerPrivate[1]);
   }
-  static JobDeadline get(Job *job) {
+  static JobDeadline get(SwiftJob *job) {
     return *storage(job);
   }
-  static void set(Job *job, JobDeadline deadline) {
+  static void set(SwiftJob *job, JobDeadline deadline) {
     storage(job) = new JobDeadline(deadline);
   }
-  static void destroy(Job *job) {
+  static void destroy(SwiftJob *job) {
     delete storage(job);
   }
 };
@@ -106,25 +111,25 @@ struct JobDeadlineStorage<false> {
 } // end anonymous namespace
 
 static JobPriorityQueue JobQueue;
-static Job *DelayedJobQueue = nullptr;
+static SwiftJob *DelayedJobQueue = nullptr;
 
 /// Insert a job into the cooperative global queue.
 SWIFT_CC(swift)
-void swift::swift_task_enqueueGlobalImpl(Job *job) {
+void swift_task_enqueueGlobalImpl(SwiftJob *job) {
   assert(job && "no job provided");
   JobQueue.enqueue(job);
 }
 
 /// Enqueues a task on the main executor.
 SWIFT_CC(swift)
-void swift::swift_task_enqueueMainExecutorImpl(Job *job) {
+void swift_task_enqueueMainExecutorImpl(SwiftJob *job) {
   // The cooperative executor does not distinguish between the main
   // queue and the global queue.
   swift_task_enqueueGlobalImpl(job);
 }
 
-static void insertDelayedJob(Job *newJob, JobDeadline deadline) {
-  Job **position = &DelayedJobQueue;
+static void insertDelayedJob(SwiftJob *newJob, JobDeadline deadline) {
+  SwiftJob **position = &DelayedJobQueue;
   while (auto cur = *position) {
     // If we find a job with a later deadline, insert here.
     // Note that we maintain FIFO order.
@@ -142,14 +147,14 @@ static void insertDelayedJob(Job *newJob, JobDeadline deadline) {
 }
 
 SWIFT_CC(swift)
-void swift::swift_task_checkIsolatedImpl(SerialExecutorRef executor) {
-  swift_task_invokeSwiftCheckIsolated(executor);
+void swift_task_checkIsolatedImpl(SwiftExecutorRef executor) {
+  swift_executor_invokeSwiftCheckIsolated(executor);
 }
 
 /// Insert a job into the cooperative global queue with a delay.
 SWIFT_CC(swift)
-void swift::swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
-                                                  Job *newJob) {
+void swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,
+                                           SwiftJob *newJob) {
   assert(newJob && "no job provided");
 
   auto deadline = std::chrono::steady_clock::now()
@@ -161,18 +166,16 @@ void swift::swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
 }
 
 SWIFT_CC(swift)
-void swift::swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
-                                                     long long nsec,
-                                                     long long tsec,
-                                                     long long tnsec,
-                                                     int clock, Job *newJob) {
+void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
+                                              long long nsec,
+                                              long long tsec,
+                                              long long tnsec,
+                                              int clock, SwiftJob *newJob) {
   assert(newJob && "no job provided");
 
-  long long nowSec;
-  long long nowNsec;
-  swift_get_time(&nowSec, &nowNsec, (swift_clock_id)clock);
+  SwiftTime now = swift_time_now(clock);
 
-  uint64_t delta = (sec - nowSec) * NSEC_PER_SEC + nsec - nowNsec;
+  uint64_t delta = (sec - now.seconds) * NSEC_PER_SEC + nsec - now.nanoseconds;
 
   auto deadline = std::chrono::steady_clock::now()
                 + std::chrono::duration_cast<JobDeadline::duration>(
@@ -225,7 +228,7 @@ static void sleepThisThreadUntil(JobDeadline deadline) {
 }
 
 /// Claim the next job from the cooperative global queue.
-static Job *claimNextFromCooperativeGlobalQueue() {
+static SwiftJob *claimNextFromCooperativeGlobalQueue() {
   while (true) {
     // Move any delayed jobs that are now ready into the primary queue.
     recognizeReadyDelayedJobs();
@@ -247,22 +250,31 @@ static Job *claimNextFromCooperativeGlobalQueue() {
   }
 }
 
-void swift::
-swift_task_donateThreadToGlobalExecutorUntil(bool (*condition)(void *),
-                                             void *conditionContext) {
+SWIFT_CC(swift) void
+swift_task_donateThreadToGlobalExecutorUntilImpl(bool (*condition)(void *),
+                                                 void *conditionContext) {
   while (!condition(conditionContext)) {
     auto job = claimNextFromCooperativeGlobalQueue();
     if (!job) return;
-    swift_job_run(job, SerialExecutorRef::generic());
+    swift_job_run(job, swift_executor_generic());
+  }
+}
+
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_CC(swift)
+void swift_task_asyncMainDrainQueueImpl() {
+  while (true) {
+    auto job = claimNextFromCooperativeGlobalQueue();
+    assert(job && "We should never run out of jobs on the async main queue.");
+    swift_job_run(job, swift_executor_generic());
   }
 }
 
 SWIFT_CC(swift)
-SerialExecutorRef swift::swift_task_getMainExecutorImpl() {
-  return SerialExecutorRef::generic();
+SwiftExecutorRef swift_task_getMainExecutorImpl() {
+  return swift_executor_generic();
 }
 
 SWIFT_CC(swift)
-bool swift::swift_task_isMainExecutorImpl(SerialExecutorRef executor) {
-  return executor.isGeneric();
+bool swift_task_isMainExecutorImpl(SwiftExecutorRef executor) {
+  return swift_executor_isGeneric(executor);
 }

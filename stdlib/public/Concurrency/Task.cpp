@@ -1725,56 +1725,16 @@ void swift::swift_continuation_logFailedCheck(const char *message) {
   swift_reportError(0, message);
 }
 
-SWIFT_RUNTIME_ATTRIBUTE_NORETURN
+// This has moved; the implementation is now in the executor; the declaration
+// needs to be here because unlike other things implemented by the executor,
+// this function is a compatibility override hook.
+extern "C" SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_CC(swift)
+void swift_task_asyncMainDrainQueueImpl();
+
 SWIFT_CC(swift)
-static void swift_task_asyncMainDrainQueueImpl() {
-#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
-  bool Finished = false;
-  swift_task_donateThreadToGlobalExecutorUntil([](void *context) {
-    return *reinterpret_cast<bool*>(context);
-  }, &Finished);
-  swift_unreachable(
-      "Returned from swift_task_donateThreadToGlobalExecutorUntil()");
-#elif !SWIFT_CONCURRENCY_ENABLE_DISPATCH
-  // FIXME: consider implementing a concurrent global main queue for
-  // these environments?
-  swift_reportError(0, "operation unsupported without libdispatch: "
-                       "swift_task_asyncMainDrainQueue");
-#else
-#if defined(_WIN32)
-  HMODULE hModule = LoadLibraryW(L"dispatch.dll");
-  if (hModule == NULL) {
-    swift_Concurrency_fatalError(0,
-      "unable to load dispatch.dll: %lu", GetLastError());
-  }
-
-  auto pfndispatch_main = reinterpret_cast<void (FAR *)(void)>(
-    GetProcAddress(hModule, "dispatch_main"));
-  if (pfndispatch_main == NULL) {
-    swift_Concurrency_fatalError(0,
-      "unable to locate dispatch_main in dispatch.dll: %lu", GetLastError());
-  }
-
-  pfndispatch_main();
-  swift_unreachable("Returned from dispatch_main()");
-#else
-  // CFRunLoop is not available on non-Darwin targets.  Foundation has an
-  // implementation, but CoreFoundation is not meant to be exposed.  We can only
-  // assume the existence of `CFRunLoopRun` on Darwin platforms, where the
-  // system provides an implementation of CoreFoundation.
-#if defined(__APPLE__)
-  auto runLoop =
-      reinterpret_cast<void (*)(void)>(dlsym(RTLD_DEFAULT, "CFRunLoopRun"));
-  if (runLoop) {
-    runLoop();
-    exit(0);
-  }
-#endif
-
-    dispatch_main();
-#endif
-#endif
-}
+void (*swift::swift_task_asyncMainDrainQueue_hook)(
+    swift_task_asyncMainDrainQueue_original original,
+    swift_task_asyncMainDrainQueue_override compatOverride) = nullptr;
 
 SWIFT_CC(swift)
 static void swift_task_startOnMainActorImpl(AsyncTask* task) {
