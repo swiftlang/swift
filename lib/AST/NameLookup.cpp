@@ -1722,7 +1722,8 @@ SmallVector<MacroDecl *, 1> namelookup::lookupMacros(DeclContext *dc,
 
     // When resolving macro names for imported entities, we look for any
     // loaded module.
-    if (!moduleDecl && isa<ClangModuleUnit>(moduleScopeDC)) {
+    if (!moduleDecl && isa<ClangModuleUnit>(moduleScopeDC) &&
+        ctx.LangOpts.hasFeature(Feature::MacrosOnImports)) {
       moduleDecl = ctx.getLoadedModule(moduleName.getBaseIdentifier());
       moduleScopeDC = moduleDecl;
     }
