@@ -1758,6 +1758,8 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         -Src $SourceCache\swift-foundation `
         -Bin $OutDir `
         -Arch $HostArch
+        -v
+        --very-verbose
     }
 
     $OutDir = Join-Path -Path $HostArch.BinaryCache -ChildPath foundation-tests
