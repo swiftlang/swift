@@ -186,6 +186,7 @@ struct BridgedCloner {
   SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
   bool isValueCloned(BridgedValue v) const;
   void clone(BridgedInstruction inst);
+  void recordFoldedValue(BridgedValue origValue, BridgedValue mappedValue);
 };
 
 struct BridgedSpecializationCloner {
