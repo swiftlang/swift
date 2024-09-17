@@ -200,13 +200,8 @@ AttachedResultBuilderRequest::evaluate(Evaluator &evaluator,
 
 /// Attempt to infer the result builder type for a declaration.
 static Type inferResultBuilderType(ValueDecl *decl)  {
-  auto dc = decl->getDeclContext();
-  if (isa<ProtocolDecl>(dc))
-    return Type();
-
   auto funcDecl = dyn_cast<FuncDecl>(decl);
-  if (!funcDecl || !funcDecl->hasBody() ||
-      !decl->getDeclContext()->getParentSourceFile())
+  if (!funcDecl)
     return Type();
 
   // For a getter, always favor the result builder type of its storage
@@ -220,16 +215,20 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
     }
   }
 
+  auto *dc = decl->getDeclContext();
+  if (isa<ProtocolDecl>(dc)) {
+    return Type();
+  }
+
   // FIXME: We could infer from a dynamically replaced decl in non-type contexts too.
   if (!dc->isTypeContext()) {
     return Type();
   }
 
-  // Check whether there are any return statements in the function's body.
-  // If there are, the result builder transform will be disabled,
-  // so don't infer a result builder.
-  if (!TypeChecker::findReturnStatements(funcDecl).empty())
+  if (!funcDecl->hasBody() || !dc->getParentSourceFile() ||
+      !TypeChecker::findReturnStatements(funcDecl).empty()) {
     return Type();
+  }
 
   // Find all of the potentially inferred result builder types.
   struct Match {
@@ -305,7 +304,22 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
         if (!requirement)
           continue;
 
-        Type resultBuilderType = requirement->getResultBuilderType();
+        Type resultBuilderType;
+        {
+          auto *inferenceSource = requirement;
+
+          // If the given declaration is a witness to a storage declaration
+          // requirement, then we are inferring for a getter and, hence, should
+          // infer from the getter requirement.
+          if (auto *storage = dyn_cast<AbstractStorageDecl>(requirement)) {
+            if (auto *getter = storage->getAccessor(AccessorKind::Get)) {
+              inferenceSource = getter;
+            }
+          }
+
+          resultBuilderType = inferenceSource->getResultBuilderType();
+        }
+
         if (!resultBuilderType)
           continue;
 

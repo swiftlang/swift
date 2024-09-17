@@ -151,16 +151,13 @@ protocol Tupled3 {
 struct TupleMe3: Tupled3 {
   var condition: Bool
 
-  // FIXME: Not inferred from getter requirement
-  // expected-error@+1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
   var tuple: some Any {
-    "hello" // expected-warning{{literal is unused}}
+    "hello"
     if condition {
-      "nested" // expected-warning{{literal is unused}}
+      "nested"
     }
-    3.14159 // expected-warning{{literal is unused}}
-    "world" // expected-warning{{literal is unused}}
-    // expected-note@-1 {{did you mean to return the last expression?}}
+    3.14159
+    "world"
   }
 }
 
