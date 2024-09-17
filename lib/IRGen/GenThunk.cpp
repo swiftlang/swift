@@ -419,7 +419,12 @@ void IRGenThunk::emit() {
                          /*forAsync*/ false, nativeAgg);
         IGF.emitScalarReturn(IGF.CurFn->getReturnType(), nativeAgg);
       } else {
-        IGF.emitScalarReturn(IGF.CurFn->getReturnType(), *error);
+        if (IGF.CurFn->getReturnType()->isVoidTy()) {
+          IGF.Builder.CreateRetVoid();
+        } else {
+          IGF.Builder.CreateRet(
+              llvm::UndefValue::get(IGF.CurFn->getReturnType()));
+        }
       }
     }
     IGF.Builder.emitBlock(successBB);
