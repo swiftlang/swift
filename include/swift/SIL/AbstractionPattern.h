@@ -1516,6 +1516,10 @@ public:
   /// the abstraction pattern for its self type.
   AbstractionPattern getDynamicSelfSelfType() const;
 
+  /// Given that the value being abstracted is a protocol composition
+  /// type, return the abstraction pattern for one of its member types.
+  AbstractionPattern getProtocolCompositionMemberType(unsigned i) const;
+
   /// Given that the value being abstracted is a parameterized protocol
   /// type, return the abstraction pattern for one of its argument types.
   AbstractionPattern getParameterizedProtocolArgType(unsigned i) const;
