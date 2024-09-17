@@ -31,7 +31,7 @@
 
 using namespace swift;
 
-extern "C" void __cxa_begin_catch(void *);
+extern "C" void *__cxa_begin_catch(void *);
 
 SWIFT_RUNTIME_STDLIB_API _Unwind_Reason_Code
 _swift_exceptionPersonality(int version,
