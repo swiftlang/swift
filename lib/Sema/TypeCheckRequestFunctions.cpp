@@ -201,12 +201,9 @@ AttachedResultBuilderRequest::evaluate(Evaluator &evaluator,
 /// Attempt to infer the result builder type for a declaration.
 static Type inferResultBuilderType(ValueDecl *decl)  {
   auto dc = decl->getDeclContext();
-  if (isa<ProtocolDecl>(dc))
-    return Type();
 
   auto funcDecl = dyn_cast<FuncDecl>(decl);
-  if (!funcDecl || !funcDecl->hasBody() ||
-      !decl->getDeclContext()->getParentSourceFile())
+  if (!funcDecl || !dc->getParentSourceFile())
     return Type();
 
   // For a getter, always favor the result builder type of its storage
@@ -224,7 +221,15 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
   // Attempt inference through a dynamically replaced declaration or protocol
   // requirements that the given declaration witnesses.
 
-  if (!dc->isTypeContext()) {
+  if (!dc->isTypeContext() || isa<ProtocolDecl>(dc)) {
+    return Type();
+  }
+
+  // Do not infer if the body is missing. This means that either a result
+  // builder cannot be employed, or that the parent file is a module interface
+  // and there is no way of knowing whether the omitted body suppresses
+  // inference (e.g. with a return statement).
+  if (!funcDecl->hasBody()) {
     return Type();
   }
 
@@ -308,7 +313,22 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
         if (!requirement)
           continue;
 
-        Type resultBuilderType = requirement->getResultBuilderType();
+        Type resultBuilderType;
+        {
+          auto *inferenceSource = requirement;
+
+          // If the given declaration is a witness to a storage declaration
+          // requirement, then we are inferring for a getter and, hence, should
+          // infer from the getter requirement.
+          if (auto *storage = dyn_cast<AbstractStorageDecl>(requirement)) {
+            if (auto *getter = storage->getAccessor(AccessorKind::Get)) {
+              inferenceSource = getter;
+            }
+          }
+
+          resultBuilderType = inferenceSource->getResultBuilderType();
+        }
+
         if (!resultBuilderType)
           continue;
 
