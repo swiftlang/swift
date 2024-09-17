@@ -48,10 +48,10 @@ struct Options {
 
     var integerValue: Int {
       switch self {
-      case .debug: 0
-      case .release: 1
-      case .unchecked: 2
-      case .unknown: fatalError()
+      case .debug:      return 0
+      case .release:    return 1
+      case .unchecked:  return 2
+      case .unknown:    fatalError()
       }
     }
   }
