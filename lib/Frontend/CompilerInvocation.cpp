@@ -3177,6 +3177,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   const Arg *ProfileUse = Args.getLastArg(OPT_profile_use);
   Opts.UseProfile = ProfileUse ? ProfileUse->getValue() : "";
 
+  const Arg *ProfileSampleUse = Args.getLastArg(OPT_profile_sample_use);
+  Opts.UseSampleProfile = ProfileSampleUse ? ProfileSampleUse->getValue() : "";
+
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
   // Always producing all outputs when caching is enabled.
   Opts.AlwaysCompile |= Args.hasArg(OPT_always_compile_output_files) ||
