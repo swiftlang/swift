@@ -638,31 +638,6 @@ extension Span where Element: BitwiseCopyable {
   }
 }
 
-// `first` and `last` can't exist where Element: ~Copyable
-// because we can't construct an Optional of a borrow
-extension Span where Element: Copyable {
-
-  /// The first element in the span.
-  ///
-  /// If the span is empty, the value of this property is `nil`.
-  ///
-  /// - Returns: The first element in the span, or `nil` if empty
-  @_alwaysEmitIntoClient
-  public var first: Element? {
-    isEmpty ? nil : self[unchecked: 0]
-  }
-
-  /// The last element in the span.
-  ///
-  /// If the span is empty, the value of this property is `nil`.
-  ///
-  /// - Returns: The last element in the span, or `nil` if empty
-  @_alwaysEmitIntoClient
-  public var last: Element? {
-    isEmpty ? nil : self[unchecked: count &- 1]
-  }
-}
-
 extension Span where Element: ~Copyable {
   /// Returns a Boolean value indicating whether two `Span` instances
   /// refer to the same region in memory.
