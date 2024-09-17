@@ -1761,8 +1761,9 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
   importInfo.StdlibKind = ImplicitStdlibKind::Stdlib;
   auto *M = ModuleDecl::create(ctx.getIdentifier(Invocation.getModuleName()),
                                ctx, importInfo);
+  auto bufferID = ctx.SourceMgr.addMemBufferCopy("// nothing\n");
   auto *SF =
-      new (ctx) SourceFile(*M, SourceFileKind::Main, /*BufferID*/ std::nullopt);
+      new (ctx) SourceFile(*M, SourceFileKind::Main, bufferID);
   M->addFile(*SF);
   performImportResolution(*SF);
 
@@ -2618,7 +2619,7 @@ static int doPrintExpressionTypes(const CompilerInvocation &InitInvok,
   llvm::SmallString<256> TypeBuffer;
   llvm::raw_svector_ostream OS(TypeBuffer);
   SourceFile &SF = *CI.getPrimarySourceFile();
-  auto Source = SF.getASTContext().SourceMgr.getRangeForBuffer(*SF.getBufferID()).str();
+  auto Source = SF.getASTContext().SourceMgr.getRangeForBuffer(SF.getBufferID()).str();
   std::vector<std::pair<unsigned, std::string>> SortedTags;
 
   std::vector<const char*> Usrs;
@@ -4003,9 +4004,8 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
       break;
   }
   assert(SF && "no source file?");
-  assert(SF->getBufferID().has_value() && "no buffer id?");
   SourceManager &SM = SF->getASTContext().SourceMgr;
-  unsigned bufferID = SF->getBufferID().value();
+  unsigned bufferID = SF->getBufferID();
   SourceLoc StartLoc = SM.getLocForLineCol(bufferID, StartLineCol.first,
                                            StartLineCol.second);
   SourceLoc EndLoc = SM.getLocForLineCol(bufferID, EndLineCol.first,
@@ -4109,7 +4109,6 @@ static int doPrintIndexedSymbols(const CompilerInvocation &InitInvok,
       break;
   }
   assert(SF && "no source file?");
-  assert(SF->getBufferID().has_value() && "no buffer id?");
 
   llvm::outs() << llvm::sys::path::filename(SF->getFilename()) << '\n';
   llvm::outs() << "------------\n";

@@ -1044,7 +1044,7 @@ static void addParameterEntities(CompilerInstance &CI,
     auto SF = dyn_cast<SourceFile>(Unit);
     if (!SF)
       continue;
-    FuncWalker Walker(CI.getSourceMgr(), *SF->getBufferID(), FuncEnts);
+    FuncWalker Walker(CI.getSourceMgr(), SF->getBufferID(), FuncEnts);
     SF->walk(Walker);
   }
 }
@@ -1058,7 +1058,7 @@ static void reportSourceAnnotations(const SourceTextInfo &IFaceInfo,
       continue;
 
     SyntaxModelContext SyntaxContext(*SF);
-    DocSyntaxWalker SyntaxWalker(CI.getSourceMgr(), *SF->getBufferID(),
+    DocSyntaxWalker SyntaxWalker(CI.getSourceMgr(), SF->getBufferID(),
                                  IFaceInfo.References, Consumer);
     SyntaxContext.walk(SyntaxWalker);
     SyntaxWalker.finished();
@@ -1428,7 +1428,7 @@ void SwiftLangSupport::findLocalRenameRanges(
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &SF = AstUnit->getPrimarySourceFile();
-      swift::ide::RangeConfig Range{*SF.getBufferID(), Line, Column, Length};
+      swift::ide::RangeConfig Range{SF.getBufferID(), Line, Column, Length};
       SourceManager &SM = SF.getASTContext().SourceMgr;
       auto SyntacticRenameRanges =
           swift::ide::findLocalRenameRanges(&SF, Range);
@@ -1481,7 +1481,7 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
   unsigned BufferID = ParseCI.getInputBufferIDs().back();
   for (auto Unit : ParseCI.getMainModule()->getFiles()) {
     if (auto Current = dyn_cast<SourceFile>(Unit)) {
-      if (Current->getBufferID().value() == BufferID) {
+      if (Current->getBufferID() == BufferID) {
         SF = Current;
         break;
       }

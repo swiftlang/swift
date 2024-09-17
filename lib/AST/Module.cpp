@@ -775,8 +775,8 @@ namespace {
     SourceManager *sourceMgr;
 
     bool operator()(SourceFile *lhs, SourceFile *rhs) const {
-      auto lhsRange = sourceMgr->getRangeForBuffer(*lhs->getBufferID());
-      auto rhsRange = sourceMgr->getRangeForBuffer(*rhs->getBufferID());
+      auto lhsRange = sourceMgr->getRangeForBuffer(lhs->getBufferID());
+      auto rhsRange = sourceMgr->getRangeForBuffer(rhs->getBufferID());
 
       std::less<const char *> pointerCompare;
       return pointerCompare(
@@ -785,7 +785,7 @@ namespace {
     }
 
     bool operator()(SourceFile *lhs, SourceLoc rhsLoc) const {
-      auto lhsRange = sourceMgr->getRangeForBuffer(*lhs->getBufferID());
+      auto lhsRange = sourceMgr->getRangeForBuffer(lhs->getBufferID());
 
       std::less<const char *> pointerCompare;
       return pointerCompare(
@@ -794,7 +794,7 @@ namespace {
     }
 
     bool operator()(SourceLoc lhsLoc, SourceFile *rhs) const {
-      auto rhsRange = sourceMgr->getRangeForBuffer(*rhs->getBufferID());
+      auto rhsRange = sourceMgr->getRangeForBuffer(rhs->getBufferID());
 
       std::less<const char *> pointerCompare;
       return pointerCompare(
@@ -835,8 +835,7 @@ void ModuleDecl::updateSourceFileLocationMap() {
   // First, add all of the source files with a backing buffer.
   for (auto *fileUnit : files) {
     if (auto sourceFile = dyn_cast<SourceFile>(fileUnit)) {
-      if (sourceFile->getBufferID())
-        sourceFileLocationMap->allSourceFiles.push_back(sourceFile);
+      sourceFileLocationMap->allSourceFiles.push_back(sourceFile);
     }
   }
 
@@ -872,7 +871,7 @@ SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
   // in to see if it contains this.
   if (sourceFileLocationMap) {
     if (auto lastSourceFile = sourceFileLocationMap->lastSourceFile) {
-      auto range = sourceMgr.getRangeForBuffer(*lastSourceFile->getBufferID());
+      auto range = sourceMgr.getRangeForBuffer(lastSourceFile->getBufferID());
       if (range.contains(adjustedLoc))
         return lastSourceFile;
     }
@@ -888,7 +887,7 @@ SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
     return nullptr;
 
   auto foundSourceFile = *found;
-  auto foundRange = sourceMgr.getRangeForBuffer(*foundSourceFile->getBufferID());
+  auto foundRange = sourceMgr.getRangeForBuffer(foundSourceFile->getBufferID());
   // Positions inside an empty file or at EOF should still be considered within
   // this file.
   if (!foundRange.contains(adjustedLoc) && adjustedLoc != foundRange.getEnd())
@@ -1192,7 +1191,7 @@ SourceRange SourceFile::getMacroInsertionRange() const {
     return SourceRange();
 
   auto generatedInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
   auto origRange = generatedInfo.originalSourceRange;
   return {origRange.getStart(), origRange.getEnd()};
 }
@@ -1202,7 +1201,7 @@ CustomAttr *SourceFile::getAttachedMacroAttribute() const {
     return nullptr;
 
   auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
   return genInfo.attachedMacroCustomAttr;
 }
 
@@ -1211,7 +1210,7 @@ std::optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
     return std::nullopt;
 
   auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
   switch (genInfo.kind) {
 #define MACRO_ROLE(Name, Description)               \
   case GeneratedSourceInfo::Name##MacroExpansion: \
@@ -1231,7 +1230,7 @@ SourceFile *SourceFile::getEnclosingSourceFile() const {
     return nullptr;
 
   auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
   auto sourceLoc = genInfo.originalSourceRange.getStart();
   return getParentModule()->getSourceFileContainingLocation(sourceLoc);
 }
@@ -1242,7 +1241,7 @@ ASTNode SourceFile::getNodeInEnclosingSourceFile() const {
     return nullptr;
 
   auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
   return ASTNode::getFromOpaqueValue(genInfo.astNode);
 }
 
@@ -1470,7 +1469,7 @@ SourceFile::getExternalRawLocsForDecl(const Decl *D) const {
   bool InGeneratedBuffer =
       !SM.rangeContainsTokenLoc(SM.getRangeForBuffer(BufferID), MainLoc);
   if (InGeneratedBuffer) {
-    int UnderlyingBufferID;
+    unsigned UnderlyingBufferID;
     std::tie(UnderlyingBufferID, MainLoc) =
         D->getModuleContext()->getOriginalLocation(MainLoc);
     if (BufferID != UnderlyingBufferID)
@@ -2108,8 +2107,8 @@ bool ModuleDecl::registerEntryPointFile(
     if (existingDecl) {
       existingDiagLoc = sourceFile->getMainDeclDiagLoc();
     } else {
-      if (auto bufID = sourceFile->getBufferID())
-        existingDiagLoc = getASTContext().SourceMgr.getLocForBufferStart(*bufID);
+      auto bufID = sourceFile->getBufferID();
+      existingDiagLoc = getASTContext().SourceMgr.getLocForBufferStart(bufID);
     }
   }
 
@@ -3296,10 +3295,8 @@ llvm::StringMap<SourceFilePathInfo>
 SourceFile::getInfoForUsedFilePaths() const {
   llvm::StringMap<SourceFilePathInfo> result;
 
-  if (BufferID != -1) {
-    result[getFilename()].physicalFileLoc =
-        getASTContext().SourceMgr.getLocForBufferStart(BufferID);
-  }
+  result[getFilename()].physicalFileLoc =
+      getASTContext().SourceMgr.getLocForBufferStart(BufferID);
 
   for (auto &vpath : VirtualFilePaths) {
     result[vpath.Item].virtualFileLocs.insert(vpath.Loc);
@@ -3433,9 +3430,9 @@ ModuleDecl::computeFileIDMap(bool shouldDiagnose) const {
 }
 
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
-                       std::optional<unsigned> bufferID,
+                       unsigned bufferID,
                        ParsingOptions parsingOpts, bool isPrimary)
-    : FileUnit(FileUnitKind::Source, M), BufferID(bufferID ? *bufferID : -1),
+    : FileUnit(FileUnitKind::Source, M), BufferID(bufferID),
       ParsingOpts(parsingOpts), IsPrimary(isPrimary), Kind(K) {
   M.getASTContext().addDestructorCleanup(*this);
 
@@ -3643,8 +3640,6 @@ bool SourceFile::walk(ASTWalker &walker) {
 }
 
 StringRef SourceFile::getFilename() const {
-  if (BufferID == -1)
-    return "";
   SourceManager &SM = getASTContext().SourceMgr;
   return SM.getIdentifierForBuffer(BufferID);
 }

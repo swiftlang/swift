@@ -6622,9 +6622,8 @@ void VarDecl::setOriginalWrappedProperty(VarDecl *originalProperty) {
 static bool isSourceLocInOrignalBuffer(const Decl *D, SourceLoc Loc) {
   assert(Loc.isValid());
   auto bufferID = D->getDeclContext()->getParentSourceFile()->getBufferID();
-  assert(bufferID.has_value() && "Source buffer ID must be set");
   auto &SM = D->getASTContext().SourceMgr;
-  return SM.getRangeForBuffer(*bufferID).contains(Loc);
+  return SM.getRangeForBuffer(bufferID).contains(Loc);
 }
 #endif
 
