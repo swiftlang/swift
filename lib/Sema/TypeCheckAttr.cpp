@@ -363,7 +363,7 @@ public:
 
   void visitUnsafeInheritExecutorAttr(UnsafeInheritExecutorAttr *attr);
 
-  bool visitLifetimeAttr(DeclAttribute *attr);
+  bool visitOwnershipAttr(DeclAttribute *attr);
   void visitEagerMoveAttr(EagerMoveAttr *attr);
   void visitNoEagerMoveAttr(NoEagerMoveAttr *attr);
 
@@ -403,7 +403,7 @@ void AttributeChecker::visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr) {
   }
 
   if (auto *funcDecl = dyn_cast<FuncDecl>(D)) {
-    if (visitLifetimeAttr(attr))
+    if (visitOwnershipAttr(attr))
       return;
 
     // We only handle non-lvalue arguments today.
@@ -7480,7 +7480,7 @@ void AttributeChecker::visitUnsafeInheritExecutorAttr(
   }
 }
 
-bool AttributeChecker::visitLifetimeAttr(DeclAttribute *attr) {
+bool AttributeChecker::visitOwnershipAttr(DeclAttribute *attr) {
   if (auto *funcDecl = dyn_cast<FuncDecl>(D)) {
     auto declContext = funcDecl->getDeclContext();
     // eagerMove attribute may only appear in type context
@@ -7493,7 +7493,7 @@ bool AttributeChecker::visitLifetimeAttr(DeclAttribute *attr) {
 }
 
 void AttributeChecker::visitEagerMoveAttr(EagerMoveAttr *attr) {
-  if (visitLifetimeAttr(attr))
+  if (visitOwnershipAttr(attr))
     return;
   if (auto *nominal = dyn_cast<NominalTypeDecl>(D)) {
     if (nominal->getSelfTypeInContext()->isNoncopyable()) {
@@ -7517,7 +7517,7 @@ void AttributeChecker::visitEagerMoveAttr(EagerMoveAttr *attr) {
 }
 
 void AttributeChecker::visitNoEagerMoveAttr(NoEagerMoveAttr *attr) {
-  if (visitLifetimeAttr(attr))
+  if (visitOwnershipAttr(attr))
     return;
   // @_noEagerMove and @_eagerMove are opposites and can't be combined.
   if (D->getAttrs().hasAttribute<EagerMoveAttr>()) {
