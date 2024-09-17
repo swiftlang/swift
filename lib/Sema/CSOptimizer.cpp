@@ -675,15 +675,15 @@ static Constraint *determineBestChoicesInContext(
     getLogger() << ")\n";
   }
 
+  if (bestOverallScore == 0)
+    return nullptr;
+
   for (auto &entry : disjunctionScores) {
     TinyPtrVector<Constraint *> favoredChoices;
     for (auto *choice : favoredChoicesPerDisjunction[entry.first])
       favoredChoices.push_back(choice);
     favorings[entry.first] = std::make_pair(entry.second, favoredChoices);
   }
-
-  if (bestOverallScore == 0)
-    return nullptr;
 
   Constraint *bestDisjunction = nullptr;
   for (auto *disjunction : disjunctions) {
@@ -786,8 +786,13 @@ ConstraintSystem::selectDisjunction() {
         auto &[firstScore, firstFavoredChoices] = favorings[first];
         auto &[secondScore, secondFavoredChoices] = favorings[second];
 
-        if (firstScore > secondScore)
-          return true;
+        // Rank based on scores only if both disjunctions are supported.
+        if (isSupportedDisjunction(first) && isSupportedDisjunction(second)) {
+          // If both disjunctions have the same score they should be ranked
+          // based on number of favored/active choices.
+          if (firstScore != secondScore)
+            return firstScore > secondScore;
+        }
 
         unsigned numFirstFavored = firstFavoredChoices.size();
         unsigned numSecondFavored = secondFavoredChoices.size();
