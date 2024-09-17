@@ -372,6 +372,7 @@ bool SILDeclRef::hasUserWrittenCode() const {
   case Kind::EnumElement:
   case Kind::Destroyer:
   case Kind::Deallocator:
+  case Kind::IsolatedDeallocator:
   case Kind::GlobalAccessor:
   case Kind::DefaultArgGenerator:
   case Kind::IVarInitializer:
@@ -480,6 +481,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   case Kind::Allocator:
   case Kind::Initializer:
   case Kind::Deallocator:
+  case Kind::IsolatedDeallocator:
   case Kind::Destroyer: {
     // @_alwaysEmitIntoClient declarations are like the default arguments of
     // public functions; they are roots for dead code elimination and have
@@ -1281,12 +1283,16 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 
   case SILDeclRef::Kind::Deallocator:
     return mangler.mangleDestructorEntity(cast<DestructorDecl>(getDecl()),
-                                          /*isDeallocating*/ true,
-                                          SKind);
+                                          DestructorKind::Deallocating, SKind);
 
   case SILDeclRef::Kind::Destroyer:
     return mangler.mangleDestructorEntity(cast<DestructorDecl>(getDecl()),
-                                          /*isDeallocating*/ false,
+                                          DestructorKind::NonDeallocating,
+                                          SKind);
+
+  case SILDeclRef::Kind::IsolatedDeallocator:
+    return mangler.mangleDestructorEntity(cast<DestructorDecl>(getDecl()),
+                                          DestructorKind::IsolatedDeallocating,
                                           SKind);
 
   case SILDeclRef::Kind::Allocator:

@@ -369,6 +369,7 @@ private:
     case Node::Kind::CurryThunk:
     case Node::Kind::DispatchThunk:
     case Node::Kind::Deallocator:
+    case Node::Kind::IsolatedDeallocator:
     case Node::Kind::DeclContext:
     case Node::Kind::DefaultArgumentInitializer:
     case Node::Kind::DefaultAssociatedTypeMetadataAccessor:
@@ -2743,6 +2744,12 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
                        /*hasName*/ false,
                        isClassType(Node->getChild(0)) ? "__deallocating_deinit"
                                                       : "deinit");
+  case Node::Kind::IsolatedDeallocator:
+    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
+                       /*hasName*/ false,
+                       isClassType(Node->getChild(0))
+                           ? "__isolated_deallocating_deinit"
+                           : "deinit");
   case Node::Kind::IVarInitializer:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/ false, "__ivar_initializer");

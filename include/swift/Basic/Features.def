@@ -408,6 +408,8 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AllowUnsafeAttribute, true)
 /// Warn on use of unsafe constructs.
 EXPERIMENTAL_FEATURE(WarnUnsafe, true)
 
+EXPERIMENTAL_FEATURE(IsolatedDeinit, true)
+
 // Enable values in generic signatures, e.g. <let N: Int>
 EXPERIMENTAL_FEATURE(ValueGenerics, true)
 
