@@ -2023,8 +2023,10 @@ ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
   } else {
     SourceRange genericArgsRange = macroRef.getGenericArgsRange();
     macroExpansion = MacroExpansionExpr::create(
-      dc, macroRef.getSigilLoc(), macroRef.getMacroName(),
-      macroRef.getMacroNameLoc(), genericArgsRange.Start,
+      dc, macroRef.getSigilLoc(),
+      macroRef.getModuleName(), macroRef.getModuleNameLoc(),
+      macroRef.getMacroName(), macroRef.getMacroNameLoc(),
+      genericArgsRange.Start,
       macroRef.getGenericArgs(), genericArgsRange.End,
       macroRef.getArgs(), roles);
   }
