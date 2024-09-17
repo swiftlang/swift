@@ -173,6 +173,8 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
       llvm_unreachable("invalid loc decl for SILDeclRef!");
     }
   } else if (auto *ACE = baseLoc.dyn_cast<AbstractClosureExpr *>()) {
+    assert((!asForeign || thunkType) &&
+           "thunk type needed for foreign type for closures");
     loc = ACE;
     kind = Kind::Func;
     if (ACE->getASTContext().LangOpts.hasFeature(
