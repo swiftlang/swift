@@ -57,6 +57,7 @@ import CountAlgo
 import CreateObjects
 // rdar://128520766
 // import CxxSetToCollection
+import CxxSpanTests
 import CxxStringConversion
 // rdar://128520766
 // import CxxVectorSum
@@ -255,6 +256,7 @@ register(ClassArrayGetter.benchmarks)
 register(CreateObjects.benchmarks)
 // rdar://128520766
 // register(CxxSetToCollection.benchmarks)
+register(CxxSpanTests.benchmarks)
 register(CxxStringConversion.benchmarks)
 // rdar://128520766
 // register(CxxVectorSum.benchmarks)
