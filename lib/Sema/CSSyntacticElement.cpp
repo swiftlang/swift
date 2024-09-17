@@ -2541,9 +2541,8 @@ static void applySolutionToClosurePropertyWrappers(ClosureExpr *closure,
   }
 }
 
-SolutionApplicationToFunctionResult
-ConstraintSystem::applySolution(AnyFunctionRef fn,
-                                SyntacticElementTargetRewriter &rewriter) {
+bool ConstraintSystem::applySolution(AnyFunctionRef fn,
+                                     SyntacticElementTargetRewriter &rewriter) {
   auto &solution = rewriter.getSolution();
   auto &cs = solution.getConstraintSystem();
   auto *closure = getAsExpr<ClosureExpr>(fn.getAbstractClosureExpr());
@@ -2590,14 +2589,10 @@ ConstraintSystem::applySolution(AnyFunctionRef fn,
     fn.setParsedBody(transform->transformedBody);
 
     ResultBuilderRewriter builderRewriter(fn, *transform, rewriter);
-    return builderRewriter.apply() ? SolutionApplicationToFunctionResult::Failure
-                                   : SolutionApplicationToFunctionResult::Success;
+    return builderRewriter.apply();
   }
   assert(closure && "Can only get here with a closure at the moment");
-
-  bool hadError = applySolutionToBody(closure, rewriter);
-  return hadError ? SolutionApplicationToFunctionResult::Failure
-                  : SolutionApplicationToFunctionResult::Success;
+  return applySolutionToBody(closure, rewriter);
 }
 
 bool ConstraintSystem::applySolutionToBody(

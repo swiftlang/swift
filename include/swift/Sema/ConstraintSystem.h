@@ -2080,15 +2080,6 @@ enum class ConstraintSystemPhase {
   Finalization
 };
 
-/// Describes the result of applying a solution to a given function.
-enum class SolutionApplicationToFunctionResult {
-  /// Application of the solution succeeded.
-  Success,
-  /// Application of the solution failed.
-  /// TODO: This should probably go away entirely.
-  Failure,
-};
-
 /// Retrieve the closure type from the constraint system.
 struct GetClosureType {
   ConstraintSystem &cs;
@@ -5543,8 +5534,8 @@ public:
   /// \param fn The function to which the solution is being applied.
   /// \param rewriter The rewriter to apply the solution with.
   ///
-  SolutionApplicationToFunctionResult
-  applySolution(AnyFunctionRef fn, SyntacticElementTargetRewriter &rewriter);
+  bool applySolution(AnyFunctionRef fn,
+                     SyntacticElementTargetRewriter &rewriter);
 
   /// Apply the given solution to the given closure body.
   ///

@@ -8907,13 +8907,7 @@ namespace {
     ///
     /// \returns true if an error occurred.
     bool rewriteFunction(AnyFunctionRef fn) {
-      switch (Rewriter.cs.applySolution(fn, *this)) {
-      case SolutionApplicationToFunctionResult::Success:
-        return false;
-
-      case SolutionApplicationToFunctionResult::Failure:
-        return true;
-      }
+      return Rewriter.cs.applySolution(fn, *this);
     }
 
     bool rewriteSingleValueStmtExpr(SingleValueStmtExpr *SVE) {
