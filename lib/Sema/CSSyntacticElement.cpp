@@ -2573,6 +2573,9 @@ ConstraintSystem::applySolution(AnyFunctionRef fn,
     }
 
     applySolutionToClosurePropertyWrappers(closure, solution);
+
+    TypeChecker::checkClosureAttributes(closure);
+    TypeChecker::checkParameterList(closure->getParameters(), closure);
   }
 
   // Enter the context of the function before performing any additional
