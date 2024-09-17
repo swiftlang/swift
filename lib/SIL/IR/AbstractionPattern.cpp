@@ -1023,6 +1023,14 @@ AbstractionPattern AbstractionPattern::getDynamicSelfSelfType() const {
 }
 
 AbstractionPattern
+AbstractionPattern::getProtocolCompositionMemberType(unsigned argIndex) const {
+  assert(getKind() == Kind::Type);
+  return AbstractionPattern(getGenericSubstitutions(),
+                            getGenericSignature(),
+            cast<ProtocolCompositionType>(getType()).getMembers()[argIndex]);
+}
+
+AbstractionPattern
 AbstractionPattern::getParameterizedProtocolArgType(unsigned argIndex) const {
   assert(getKind() == Kind::Type);
   return AbstractionPattern(getGenericSubstitutions(),
@@ -2699,20 +2707,42 @@ public:
   CanType visitParameterizedProtocolType(CanParameterizedProtocolType ppt,
                                          AbstractionPattern pattern) {
     // Recurse into the arguments of the parameterized protocol.
-    SmallVector<Type, 4> substArgs;
     auto origPPT = pattern.getAs<ParameterizedProtocolType>();
     if (!origPPT)
       return ppt;
     
+    SmallVector<Type, 4> substArgs;
     for (unsigned i = 0; i < ppt->getArgs().size(); ++i) {
       auto argTy = ppt.getArgs()[i];
       auto origArgTy = pattern.getParameterizedProtocolArgType(i);
-      auto substEltTy = visit(argTy, origArgTy);
-      substArgs.push_back(substEltTy);
+      auto substArgTy = visit(argTy, origArgTy);
+      substArgs.push_back(substArgTy);
     }
 
     return CanType(ParameterizedProtocolType::get(
         TC.Context, ppt->getBaseType(), substArgs));
+  }
+
+  CanType visitProtocolCompositionType(CanProtocolCompositionType pct,
+                                       AbstractionPattern pattern) {
+    // Recurse into the arguments of the protocol composition.
+    auto origPCT = pattern.getAs<ProtocolCompositionType>();
+    if (!origPCT)
+      return pct;
+    
+    SmallVector<Type, 4> substMembers;
+    for (unsigned i = 0; i < pct->getMembers().size(); ++i) {
+      auto memberTy = CanType(pct->getMembers()[i]);
+      auto origMemberTy = pattern.getProtocolCompositionMemberType(i);
+      auto substMemberTy = visit(memberTy, origMemberTy);
+      substMembers.push_back(substMemberTy);
+    }
+
+    return CanType(ProtocolCompositionType::get(
+        TC.Context,
+        substMembers,
+        pct->getInverses(),
+        pct->hasExplicitAnyObject()));
   }
 
   /// Visit a tuple pattern.  Note that, because of vanishing tuples,
