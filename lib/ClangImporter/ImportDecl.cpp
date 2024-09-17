@@ -3823,14 +3823,6 @@ namespace {
       recordObjCOverride(result);
     }
 
-    static bool hasUnsafeAPIAttr(const clang::Decl *decl) {
-      return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
-               if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-                 return swiftAttr->getAttribute() == "import_unsafe";
-               return false;
-             });
-    }
-
     static bool hasComputedPropertyAttr(const clang::Decl *decl) {
       return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
                if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
