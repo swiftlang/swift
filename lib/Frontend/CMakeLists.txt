@@ -23,7 +23,7 @@ add_swift_host_library(swiftFrontend STATIC
   Serialization.cpp
   SerializedDiagnosticConsumer.cpp)
 add_dependencies(swiftFrontend
-  SwiftOptions)
+  SwiftOptionDefinitions)
 target_link_libraries(swiftFrontend PRIVATE
   swiftAPIDigester
   swiftAST
