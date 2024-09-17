@@ -34,6 +34,20 @@ using namespace constraints;
 
 namespace {
 
+// TODO: both `isIntegerType` and `isFloatType` should be available on Type
+// as `isStdlib{Integer, Float}Type`.
+
+static bool isIntegerType(Type type) {
+  return type->isInt() || type->isInt8() || type->isInt16() ||
+         type->isInt32() || type->isInt64() || type->isUInt() ||
+         type->isUInt8() || type->isUInt16() || type->isUInt32() ||
+         type->isUInt64();
+}
+
+static bool isFloatType(Type type) {
+  return type->isFloat() || type->isDouble() || type->isFloat80();
+}
+
 static bool isSupportedOperator(Constraint *disjunction) {
   if (!isOperatorDisjunction(disjunction))
     return false;
@@ -57,6 +71,16 @@ static bool isSupportedOperator(Constraint *disjunction) {
   return false;
 }
 
+static bool isSupportedSpecialConstructor(ConstructorDecl *ctor) {
+  if (auto *selfDecl = ctor->getImplicitSelfDecl()) {
+    auto selfTy = selfDecl->getInterfaceType();
+    /// Support `Int*`, `Float*` and `Double` initializers since their generic
+    /// overloads are not too complicated.
+    return selfTy && (isIntegerType(selfTy) || isFloatType(selfTy));
+  }
+  return false;
+}
+
 static bool isStandardComparisonOperator(ValueDecl *decl) {
   return decl->isOperator() &&
          decl->getBaseIdentifier().isStandardComparisonOperator();
@@ -71,6 +95,12 @@ static bool isSupportedDisjunction(Constraint *disjunction) {
 
   if (isSupportedOperator(disjunction))
     return true;
+
+  if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(
+          getOverloadChoiceDecl(choices.front()))) {
+    if (isSupportedSpecialConstructor(ctor))
+      return true;
+  }
 
   // Non-operator disjunctions are supported only if they don't
   // have any generic choices.
