@@ -34,14 +34,6 @@ public struct Span<Element: ~Copyable & ~Escapable>: Copyable, ~Escapable {
 @available(*, unavailable)
 extension Span: Sendable {}
 
-extension UnsafePointer where Pointee: ~Copyable {
-
-  @usableFromInline @inline(__always)
-  var isAligned: Bool {
-    (Int(bitPattern: self) & (MemoryLayout<Pointee>.alignment&-1)) == 0
-  }
-}
-
 extension Span where Element: ~Copyable {
   @usableFromInline @inline(__always)
   internal init(
@@ -65,7 +57,9 @@ extension Span where Element: ~Copyable {
     _unsafeElements buffer: UnsafeBufferPointer<Element>
   ) -> dependsOn(immortal) Self {
     _precondition(
-      buffer.count == 0 || buffer.baseAddress.unsafelyUnwrapped.isAligned,
+      buffer.count == 0 ||
+      ((Int(bitPattern: buffer.baseAddress.unsafelyUnwrapped) &
+        (MemoryLayout<Element>.alignment&-1)) == 0),
       "baseAddress must be properly aligned to access Element"
     )
     self.init(_unchecked: buffer)
@@ -104,11 +98,7 @@ extension Span where Element: ~Copyable {
     count: Int
   ) -> dependsOn(immortal) Self {
     _precondition(count >= 0, "Count must not be negative")
-    _precondition(
-      start.isAligned,
-      "baseAddress must be properly aligned to access Element"
-    )
-    self.init(_unchecked: start, count: count)
+    self.init(_unsafeElements: .init(_uncheckedStart: start, count: count))
   }
 }
 
