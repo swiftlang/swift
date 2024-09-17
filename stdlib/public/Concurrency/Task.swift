@@ -194,17 +194,28 @@ extension Task {
     }
   }
 
-  /// Indicates that the task should stop running.
+  /// Marks this task as cancelled.
   ///
   /// Task cancellation is cooperative:
   /// a task that supports cancellation
-  /// checks whether it has been canceled at various points during its work.
+  /// checks whether it has been canceled at various points during its work,
+  /// and may either return early or throw an error in order to
+  /// finish running earlier than it would if it wasn't cancelled.
   ///
-  /// Calling this method on a task that doesn't support cancellation
-  /// has no effect.
+  /// Calling this method only has the effect of setting the cancelled
+  /// flag on the task (or its child tasks), and unless the tasks itself
+  /// react on this flag, there is no observable runtime behavior change
+  /// of the tasks. Specifically, tasks are never "interrupted and stopped"
+  /// forcefully, and are always allowed to execute code until returning or throwing/
+  ///
   /// Likewise, if the task has already run
   /// past the last point where it would stop early,
   /// calling this method has no effect.
+  ///
+  /// It is safe to call `cancel` from any task or thread.
+  /// The `cancel` call is idempotent, and may be called multiple times,
+  /// and cancellation handlers will trigger only a single (first) 
+  /// time the task is cancelled.
   ///
   /// - SeeAlso: `Task.checkCancellation()`
   public func cancel() {
