@@ -2783,8 +2783,10 @@ TypeJoinExpr::forBranchesOfSingleValueStmtExpr(ASTContext &ctx, Type joinType,
 }
 
 MacroExpansionExpr *MacroExpansionExpr::create(
-    DeclContext *dc, SourceLoc sigilLoc, DeclNameRef macroName,
-    DeclNameLoc macroNameLoc, SourceLoc leftAngleLoc,
+    DeclContext *dc, SourceLoc sigilLoc,
+    DeclNameRef moduleName, DeclNameLoc moduleNameLoc,
+    DeclNameRef macroName, DeclNameLoc macroNameLoc,
+    SourceLoc leftAngleLoc,
     ArrayRef<TypeRepr *> genericArgs, SourceLoc rightAngleLoc,
     ArgumentList *argList, MacroRoles roles, bool isImplicit,
     Type ty
@@ -2792,8 +2794,8 @@ MacroExpansionExpr *MacroExpansionExpr::create(
   ASTContext &ctx = dc->getASTContext();
   MacroExpansionInfo *info = new (ctx) MacroExpansionInfo{
       sigilLoc,
-      /*moduleName*/ DeclNameRef(),
-      /*moduleNameLoc*/ DeclNameLoc(),
+      moduleName,
+      moduleNameLoc,
       macroName,
       macroNameLoc,
       leftAngleLoc,
