@@ -1,4 +1,4 @@
-// swift-tools-version:5.4
+// swift-tools-version:5.9
 
 import PackageDescription
 import Foundation
@@ -127,11 +127,9 @@ targets.append(
     dependencies: swiftBenchDeps,
     path: "utils",
     sources: ["main.swift"],
-    swiftSettings: [.unsafeFlags(["-cxx-interoperability-mode=default",
-                                  "-I",
-                                  "utils/CxxTests",
-                                  // FIXME(rdar://136138941): these flags should be redundant because of cxxLanguageStandard
-                                  "-Xcc", "-std=c++20"])]))
+    swiftSettings: [.interoperabilityMode(.Cxx),
+                    .unsafeFlags(["-I",
+                                  "utils/CxxTests"])]))
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 targets.append(
@@ -167,11 +165,9 @@ targets += cxxSingleSourceLibraries.map { name in
     dependencies: singleSourceDeps,
     path: "cxx-source",
     sources: ["\(name).swift"],
-    swiftSettings: [.unsafeFlags(["-cxx-interoperability-mode=default",
-                                  "-I",
+    swiftSettings: [.interoperabilityMode(.Cxx),
+                    .unsafeFlags(["-I",
                                   "utils/CxxTests",
-                                  // FIXME(rdar://136138941): these flags should be redundant because of cxxLanguageStandard
-                                  "-Xcc", "-std=c++20",
                                   // FIXME: https://github.com/apple/swift/issues/61453
                                   "-Xfrontend", "-validate-tbd-against-ir=none"])])
 }
