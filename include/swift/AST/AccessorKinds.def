@@ -108,11 +108,6 @@
 #define INIT_ACCESSOR(ID, KEYWORD) SINGLETON_ACCESSOR(ID, KEYWORD)
 #endif
 
-// Suppress entries for accessors which can't be written in source code.
-#ifndef SUPPRESS_ARTIFICIAL_ACCESSORS
-#define SUPPRESS_ARTIFICIAL_ACCESSORS 0
-#endif
-
 /// This is a getter: a function that is called when a value is loaded
 /// from the storage.  It returns an owned value of the storage type.
 ///

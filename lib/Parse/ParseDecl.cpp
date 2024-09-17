@@ -7945,7 +7945,6 @@ static ParserStatus parseAccessorIntroducer(Parser &P,
     Status.setIsParseError();
     return Status;
   }
-#define SUPPRESS_ARTIFICIAL_ACCESSORS 1
 #define ACCESSOR_KEYWORD(KEYWORD)
 #define SINGLETON_ACCESSOR(ID, KEYWORD)                                        \
   else if (P.Tok.getRawText() == #KEYWORD) {                                   \
