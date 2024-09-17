@@ -1669,7 +1669,7 @@ class SyntacticElementSolutionApplication
 protected:
   Solution &solution;
   SyntacticElementContext context;
-  RewriteTargetFn rewriteTarget;
+  SyntacticElementTargetRewriter &rewriter;
 
   /// All `func`s declared in the body of the closure.
   SmallVector<FuncDecl *, 4> LocalFuncs;
@@ -1680,8 +1680,8 @@ public:
 
   SyntacticElementSolutionApplication(Solution &solution,
                                       SyntacticElementContext context,
-                                      RewriteTargetFn rewriteTarget)
-      : solution(solution), context(context), rewriteTarget(rewriteTarget) {}
+                                      SyntacticElementTargetRewriter &rewriter)
+      : solution(solution), context(context), rewriter(rewriter) {}
 
   virtual ~SyntacticElementSolutionApplication() {}
 
@@ -1748,7 +1748,7 @@ private:
         return;
       }
 
-      if (!rewriteTarget(target)) {
+      if (!rewriter.rewriteTarget(target)) {
         hadError = true;
         return;
       }
@@ -1803,7 +1803,7 @@ private:
 
   ASTNode visitIfStmt(IfStmt *ifStmt) {
     // Rewrite the condition.
-    if (auto condition = rewriteTarget(SyntacticElementTarget(
+    if (auto condition = rewriter.rewriteTarget(SyntacticElementTarget(
             ifStmt->getCond(), context.getAsDeclContext())))
       ifStmt->setCond(*condition->getAsStmtCondition());
     else
@@ -1819,7 +1819,7 @@ private:
   }
 
   ASTNode visitGuardStmt(GuardStmt *guardStmt) {
-    if (auto condition = rewriteTarget(SyntacticElementTarget(
+    if (auto condition = rewriter.rewriteTarget(SyntacticElementTarget(
             guardStmt->getCond(), context.getAsDeclContext())))
       guardStmt->setCond(*condition->getAsStmtCondition());
     else
@@ -1831,7 +1831,7 @@ private:
   }
 
   ASTNode visitWhileStmt(WhileStmt *whileStmt) {
-    if (auto condition = rewriteTarget(SyntacticElementTarget(
+    if (auto condition = rewriter.rewriteTarget(SyntacticElementTarget(
             whileStmt->getCond(), context.getAsDeclContext())))
       whileStmt->setCond(*condition->getAsStmtCondition());
     else
@@ -1855,7 +1855,7 @@ private:
     // Rewrite the condition.
     auto &cs = solution.getConstraintSystem();
     auto target = *cs.getTargetFor(repeatWhileStmt->getCond());
-    if (auto condition = rewriteTarget(target))
+    if (auto condition = rewriter.rewriteTarget(target))
       repeatWhileStmt->setCond(condition->getAsExpr());
     else
       hadError = true;
@@ -1870,7 +1870,7 @@ private:
     // Rewrite the condition.
     auto target = *cs.getTargetFor(poundAssertStmt->getCondition());
 
-    if (auto result = rewriteTarget(target))
+    if (auto result = rewriter.rewriteTarget(target))
       poundAssertStmt->setCondition(result->getAsExpr());
     else
       hadError = true;
@@ -1883,7 +1883,7 @@ private:
 
     // Rewrite the error.
     auto target = *cs.getTargetFor(throwStmt->getSubExpr());
-    if (auto result = rewriteTarget(target))
+    if (auto result = rewriter.rewriteTarget(target))
       throwStmt->setSubExpr(result->getAsExpr());
     else
       hadError = true;
@@ -1896,7 +1896,7 @@ private:
 
     // Rewrite the `discard` expression.
     auto target = *cs.getTargetFor(discardStmt->getSubExpr());
-    if (auto result = rewriteTarget(target))
+    if (auto result = rewriter.rewriteTarget(target))
       discardStmt->setSubExpr(result->getAsExpr());
     else
       hadError = true;
@@ -1907,7 +1907,7 @@ private:
   ASTNode visitForEachStmt(ForEachStmt *forEachStmt) {
     ConstraintSystem &cs = solution.getConstraintSystem();
 
-    auto forEachTarget = rewriteTarget(*cs.getTargetFor(forEachStmt));
+    auto forEachTarget = rewriter.rewriteTarget(*cs.getTargetFor(forEachStmt));
 
     if (!forEachTarget)
       hadError = true;
@@ -1927,7 +1927,7 @@ private:
     ConstraintSystem &cs = solution.getConstraintSystem();
 
     // Rewrite the switch subject.
-    auto subjectTarget = rewriteTarget(*cs.getTargetFor(switchStmt));
+    auto subjectTarget = rewriter.rewriteTarget(*cs.getTargetFor(switchStmt));
     if (subjectTarget) {
       switchStmt->setSubjectExpr(subjectTarget->getAsExpr());
     } else {
@@ -1985,7 +1985,7 @@ private:
     // Translate the patterns and guard expressions for each case label item.
     for (auto &caseItem : caseStmt->getMutableCaseLabelItems()) {
       SyntacticElementTarget caseTarget(&caseItem, context.getAsDeclContext());
-      if (!rewriteTarget(caseTarget)) {
+      if (!rewriter.rewriteTarget(caseTarget)) {
         hadError = true;
       }
     }
@@ -2017,7 +2017,7 @@ private:
     if (auto *expr = node.dyn_cast<Expr *>()) {
       // Rewrite the expression.
       auto target = *cs.getTargetFor(expr);
-      if (auto rewrittenTarget = rewriteTarget(target)) {
+      if (auto rewrittenTarget = rewriter.rewriteTarget(target)) {
         node = rewrittenTarget->getAsExpr();
 
         if (target.isDiscardedExpr())
@@ -2164,7 +2164,7 @@ private:
       target.setExprContextualTypePurpose(CTP_Unused);
     }
 
-    if (auto newResultTarget = rewriteTarget(target)) {
+    if (auto newResultTarget = rewriter.rewriteTarget(target)) {
       resultExpr = newResultTarget->getAsExpr();
     }
 
@@ -2211,7 +2211,7 @@ private:
     target->setExprConversionType(ty);
 
     auto *resultExpr = thenStmt->getResult();
-    if (auto newResultTarget = rewriteTarget(*target))
+    if (auto newResultTarget = rewriter.rewriteTarget(*target))
       resultExpr = newResultTarget->getAsExpr();
 
     thenStmt->setResult(resultExpr);
@@ -2249,12 +2249,12 @@ class ResultBuilderRewriter : public SyntacticElementSolutionApplication {
   const AppliedBuilderTransform &Transform;
 
 public:
-  ResultBuilderRewriter(Solution &solution, AnyFunctionRef context,
+  ResultBuilderRewriter(AnyFunctionRef context,
                         const AppliedBuilderTransform &transform,
-                        RewriteTargetFn rewriteTarget)
+                        SyntacticElementTargetRewriter &rewriter)
       : SyntacticElementSolutionApplication(
-            solution, SyntacticElementContext::forFunctionRef(context),
-            rewriteTarget),
+            rewriter.getSolution(),
+            SyntacticElementContext::forFunctionRef(context), rewriter),
         Transform(transform) {}
 
   bool apply() {
@@ -2558,10 +2558,10 @@ static void applySolutionToClosurePropertyWrappers(ClosureExpr *closure,
   }
 }
 
-SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
-    Solution &solution, AnyFunctionRef fn,
-    DeclContext *&currentDC,
-    RewriteTargetFn rewriteTarget) {
+SolutionApplicationToFunctionResult
+ConstraintSystem::applySolution(AnyFunctionRef fn,
+                                SyntacticElementTargetRewriter &rewriter) {
+  auto &solution = rewriter.getSolution();
   auto &cs = solution.getConstraintSystem();
   auto *closure = getAsExpr<ClosureExpr>(fn.getAbstractClosureExpr());
   FunctionType *closureFnType = nullptr;
@@ -2594,7 +2594,8 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
 
   // Enter the context of the function before performing any additional
   // transformations.
-  llvm::SaveAndRestore<DeclContext *> savedDC(currentDC, fn.getAsDeclContext());
+  llvm::SaveAndRestore<DeclContext *> savedDC(rewriter.getCurrentDC(),
+                                              fn.getAsDeclContext());
 
   // Apply the result builder transform, if there is one.
   if (auto transform = solution.getAppliedBuilderTransform(fn)) {
@@ -2602,9 +2603,9 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
 
     fn.setParsedBody(transform->transformedBody);
 
-    ResultBuilderRewriter rewriter(solution, fn, *transform, rewriteTarget);
-    return rewriter.apply() ? SolutionApplicationToFunctionResult::Failure
-                            : SolutionApplicationToFunctionResult::Success;
+    ResultBuilderRewriter builderRewriter(fn, *transform, rewriter);
+    return builderRewriter.apply() ? SolutionApplicationToFunctionResult::Failure
+                                   : SolutionApplicationToFunctionResult::Success;
   }
   assert(closure && "Can only get here with a closure at the moment");
 
@@ -2615,8 +2616,7 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
   // wait until all of the `ExtInfo` flags are propagated from the context
   // e.g. parameter could be no-escape if closure is applied to a call.
   if (closure->hasSingleExpressionBody()) {
-    bool hadError =
-        applySolutionToBody(solution, closure, currentDC, rewriteTarget);
+    bool hadError = applySolutionToBody(closure, rewriter);
     return hadError ? SolutionApplicationToFunctionResult::Failure
                     : SolutionApplicationToFunctionResult::Success;
   }
@@ -2626,16 +2626,16 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
   return SolutionApplicationToFunctionResult::Delay;
 }
 
-bool ConstraintSystem::applySolutionToBody(Solution &solution,
-                                           AnyFunctionRef fn,
-                                           DeclContext *&currentDC,
-                                           RewriteTargetFn rewriteTarget) {
+bool ConstraintSystem::applySolutionToBody(
+    AnyFunctionRef fn, SyntacticElementTargetRewriter &rewriter) {
   // Enter the context of the function before performing any additional
   // transformations.
-  llvm::SaveAndRestore<DeclContext *> savedDC(currentDC, fn.getAsDeclContext());
+  llvm::SaveAndRestore<DeclContext *> savedDC(rewriter.getCurrentDC(),
+                                              fn.getAsDeclContext());
 
+  auto &solution = rewriter.getSolution();
   SyntacticElementSolutionApplication application(
-      solution, SyntacticElementContext::forFunctionRef(fn), rewriteTarget);
+      solution, SyntacticElementContext::forFunctionRef(fn), rewriter);
 
   auto *body = application.apply();
 
@@ -2646,11 +2646,11 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution,
   return false;
 }
 
-bool ConstraintSystem::applySolutionToBody(Solution &solution, TapExpr *tapExpr,
-                                           DeclContext *&currentDC,
-                                           RewriteTargetFn rewriteTarget) {
+bool ConstraintSystem::applySolutionToBody(
+    TapExpr *tapExpr, SyntacticElementTargetRewriter &rewriter) {
+  auto &solution = rewriter.getSolution();
   SyntacticElementSolutionApplication application(
-      solution, SyntacticElementContext::forTapExpr(tapExpr), rewriteTarget);
+      solution, SyntacticElementContext::forTapExpr(tapExpr), rewriter);
 
   auto body = application.apply();
 
@@ -2662,12 +2662,12 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution, TapExpr *tapExpr,
 }
 
 bool ConstraintSystem::applySolutionToSingleValueStmt(
-    Solution &solution, SingleValueStmtExpr *SVE, DeclContext *DC,
-    RewriteTargetFn rewriteTarget) {
+    SingleValueStmtExpr *SVE, SyntacticElementTargetRewriter &rewriter) {
+  auto &solution = rewriter.getSolution();
+  setType(SVE, solution.getResolvedType(SVE));
 
   auto context = SyntacticElementContext::forSingleValueStmtExpr(SVE);
-  SyntacticElementSolutionApplication application(solution, context,
-                                                  rewriteTarget);
+  SyntacticElementSolutionApplication application(solution, context, rewriter);
   auto *stmt = application.apply();
   if (!stmt || application.hadError)
     return true;
