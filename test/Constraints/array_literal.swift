@@ -415,3 +415,13 @@ do {
     ]
   }
 }
+
+
+do {
+  func f<R>(fn: () -> [R]) -> [R] { [] }
+
+  // Requires collection upcast from Array<(key: String, value: String)> to `Array<(String, String)>`
+  func g(v: [String: String]) {
+    let _: [(String, String)] = f { return Array(v) } + v // Ok
+  }
+}
