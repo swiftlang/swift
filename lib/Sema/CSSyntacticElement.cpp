@@ -2592,21 +2592,9 @@ ConstraintSystem::applySolution(AnyFunctionRef fn,
   }
   assert(closure && "Can only get here with a closure at the moment");
 
-  // If this closure is checked as part of the enclosing expression, handle
-  // that now.
-  //
-  // Multi-statement closures are handled separately because they need to
-  // wait until all of the `ExtInfo` flags are propagated from the context
-  // e.g. parameter could be no-escape if closure is applied to a call.
-  if (closure->hasSingleExpressionBody()) {
-    bool hadError = applySolutionToBody(closure, rewriter);
-    return hadError ? SolutionApplicationToFunctionResult::Failure
-                    : SolutionApplicationToFunctionResult::Success;
-  }
-
-  // Otherwise, we need to delay type checking of the closure until later.
-  solution.setExprTypes(closure);
-  return SolutionApplicationToFunctionResult::Delay;
+  bool hadError = applySolutionToBody(closure, rewriter);
+  return hadError ? SolutionApplicationToFunctionResult::Failure
+                  : SolutionApplicationToFunctionResult::Success;
 }
 
 bool ConstraintSystem::applySolutionToBody(

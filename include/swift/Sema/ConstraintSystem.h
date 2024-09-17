@@ -2087,9 +2087,6 @@ enum class SolutionApplicationToFunctionResult {
   /// Application of the solution failed.
   /// TODO: This should probably go away entirely.
   Failure,
-  /// The solution could not be applied immediately, and type checking for
-  /// this function should be delayed until later.
-  Delay,
 };
 
 /// Retrieve the closure type from the constraint system.

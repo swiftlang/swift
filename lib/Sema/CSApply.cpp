@@ -6453,12 +6453,6 @@ static bool applyTypeToClosureExpr(ConstraintSystem &cs,
   // If we found an explicit ClosureExpr, update its type.
   if (auto CE = dyn_cast<ClosureExpr>(expr)) {
     cs.setType(CE, toType);
-
-    // If solution application for this closure is delayed, let's write the
-    // type into the ClosureExpr directly here, since the visitor won't.
-    if (!CE->hasSingleExpressionBody())
-      CE->setType(toType);
-
     return true;
   }
 
@@ -8822,15 +8816,12 @@ namespace {
 
   class ExprWalker : public ASTWalker, public SyntacticElementTargetRewriter {
     ExprRewriter &Rewriter;
-    SmallVector<ClosureExpr *, 4> ClosuresToTypeCheck;
     SmallVector<Decl *, 4> LocalDeclsToTypeCheck;
 
   public:
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
 
     ~ExprWalker() {
-      assert(ClosuresToTypeCheck.empty());
-
       // Type-check any local decls encountered.
       for (auto *D : LocalDeclsToTypeCheck)
         TypeChecker::typeCheckDecl(D);
@@ -8847,37 +8838,6 @@ namespace {
       // Property wrapper placeholder underlying values are filled in
       // with already-type-checked expressions. Don't walk into them.
       return false;
-    }
-
-    /// Check if there are any closures or tap expressions left to process separately.
-    bool hasDelayedTasks() { return !ClosuresToTypeCheck.empty(); }
-
-    /// Process delayed closure bodies and `Tap` expressions.
-    ///
-    /// \returns true if any part of the processing fails.
-    bool processDelayed() {
-      bool hadError = false;
-      auto &solution = Rewriter.solution;
-      auto &cs = solution.getConstraintSystem();
-
-      while (!ClosuresToTypeCheck.empty()) {
-        auto *closure = ClosuresToTypeCheck.pop_back_val();
-        // If experimental multi-statement closure support
-        // is enabled, solution should have all of required
-        // information.
-        //
-        // Note that in this mode `ClosuresToTypeCheck` acts
-        // as a stack because multi-statement closures could
-        // have other multi-statement closures in the body.
-        hadError |= cs.applySolutionToBody(closure, *this);
-
-        if (!hadError) {
-          TypeChecker::checkClosureAttributes(closure);
-          TypeChecker::checkParameterList(closure->getParameters(), closure);
-        }
-      }
-
-      return hadError;
     }
 
     MacroWalking getMacroWalkingBehavior() const override {
@@ -8959,12 +8919,6 @@ namespace {
 
       case SolutionApplicationToFunctionResult::Failure:
         return true;
-
-      case SolutionApplicationToFunctionResult::Delay: {
-        auto closure = cast<ClosureExpr>(fn.getAbstractClosureExpr());
-        ClosuresToTypeCheck.push_back(closure);
-        return false;
-      }
       }
     }
 
@@ -9817,31 +9771,8 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
     result.setExpr(resultExpr);
 
     if (cs.isDebugMode()) {
-      // If target is a multi-statement closure or
-      // a tap expression, expression will not be fully
-      // type checked until these expressions are visited in
-      // processDelayed().
-      bool isPartial = false;
-      resultExpr->forEachChildExpr([&](Expr *child) -> Expr * {
-        if (auto *closure = dyn_cast<ClosureExpr>(child)) {
-          if (!closure->hasSingleExpressionBody()) {
-            isPartial = true;
-            return nullptr;
-          }
-        }
-        if (isa<TapExpr>(child)) {
-          isPartial = true;
-          return nullptr;
-        }
-      return child;
-      });
-      
       auto &log = llvm::errs();
-      if (isPartial) {
-        log << "\n---Partially type-checked expression---\n";
-      } else {
-        log << "\n---Type-checked expression---\n";
-      }
+      log << "\n---Type-checked expression---\n";
       resultExpr->dump(log);
       log << "\n";
     }
@@ -9902,29 +9833,6 @@ ConstraintSystem::applySolution(Solution &solution,
   if (!resultTarget)
     return std::nullopt;
 
-  auto needsPostProcessing = walker.hasDelayedTasks();
-  
-  // Visit closures that have non-single expression bodies, tap expressions,
-  // and possibly other types of AST nodes which could only be processed
-  // after contextual expression.
-  bool hadError = walker.processDelayed();
-
-  // If any of them failed to type check, bail.
-  if (hadError)
-    return std::nullopt;
-
-  if (isDebugMode()) {
-    // If we had partially type-checked expressions, lets print
-    // fully type-checked target after processDelayed is done.
-    auto node = target.getAsASTNode();
-    if (node && needsPostProcessing) {
-      auto &log = llvm::errs();
-      log << "\n---Fully type-checked target---\n";
-      node.dump(log);
-      log << "\n";
-    }
-  }
-  
   rewriter.finalize();
 
   return resultTarget;
