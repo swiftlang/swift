@@ -3446,6 +3446,8 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
     (void)problem;
   }
 
+  M.getASTContext().SourceMgr.recordSourceFile(bufferID, this);
+
   if (Kind == SourceFileKind::MacroExpansion ||
       Kind == SourceFileKind::DefaultArgument)
     M.addAuxiliaryFile(*this);
