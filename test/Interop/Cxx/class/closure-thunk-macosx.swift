@@ -78,3 +78,45 @@ public func testConstRefTrivial() {
 public func testConstRefStrong() {
   cfuncConstRefStrong({S in });
 }
+
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSo10NonTrivialVIegn_ABIeyBn_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in_guaranteed NonTrivial) -> (), @in_guaranteed NonTrivial) -> () {
+// CHECK: bb0(%[[V0:.*]] : $*@block_storage @callee_guaranteed (@in_guaranteed NonTrivial) -> (), %[[V1:.*]] : $*NonTrivial):
+// CHECK: %[[V2:.*]] = project_block_storage %[[V0]] : $*@block_storage @callee_guaranteed (@in_guaranteed NonTrivial) -> ()
+// CHECK: %[[V3:.*]] = load [copy] %[[V2]] : $*@callee_guaranteed (@in_guaranteed NonTrivial) -> ()
+// CHECK: %[[V4:.*]] = begin_borrow %[[V3]] : $@callee_guaranteed (@in_guaranteed NonTrivial) -> ()
+// CHECK: apply %[[V4]](%[[V1]]) : $@callee_guaranteed (@in_guaranteed NonTrivial) -> ()
+// CHECK: end_borrow %[[V4]] : $@callee_guaranteed (@in_guaranteed NonTrivial) -> ()
+// CHECK: destroy_value %[[V3]] : $@callee_guaranteed (@in_guaranteed NonTrivial) -> ()
+
+public func testBlockConstRefNonTrivial() {
+  blockConstRefNonTrivial({S in });
+}
+
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSo7TrivialVIegy_ABIeyBn_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (Trivial) -> (), @in_guaranteed Trivial) -> () {
+// CHECK: bb0(%[[V0:.*]] : $*@block_storage @callee_guaranteed (Trivial) -> (), %[[V1:.*]] : $*Trivial):
+// CHECK: %[[V2:.*]] = project_block_storage %[[V0]] : $*@block_storage @callee_guaranteed (Trivial) -> ()
+// CHECK: %[[V3:.*]] = load [copy] %[[V2]] : $*@callee_guaranteed (Trivial) -> ()
+// CHECK: %[[V4:.*]] = load [trivial] %[[V1]] : $*Trivial
+// CHECK: %[[V5:.*]] = begin_borrow %[[V3]] : $@callee_guaranteed (Trivial) -> ()
+// CHECK: apply %[[V5]](%[[V4]]) : $@callee_guaranteed (Trivial) -> ()
+// CHECK: end_borrow %[[V5]] : $@callee_guaranteed (Trivial) -> ()
+// CHECK: destroy_value %[[V3]] : $@callee_guaranteed (Trivial) -> ()
+
+public func testBlockConstRefTrivial() {
+  blockConstRefTrivial({S in });
+}
+
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSo9ARCStrongVIegg_ABIeyBn_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@guaranteed ARCStrong) -> (), @in_guaranteed ARCStrong) -> () {
+// CHECK: bb0(%[[V0:.*]] : $*@block_storage @callee_guaranteed (@guaranteed ARCStrong) -> (), %[[V1:.*]] : $*ARCStrong):
+// CHECK: %[[V2:.*]] = project_block_storage %[[V0]] : $*@block_storage @callee_guaranteed (@guaranteed ARCStrong) -> ()
+// CHECK: %[[V3:.*]] = load [copy] %[[V2]] : $*@callee_guaranteed (@guaranteed ARCStrong) -> ()
+// CHECK: %[[V4:.*]] = load_borrow %[[V1]] : $*ARCStrong
+// CHECK: %[[V5:.*]] = begin_borrow %[[V3]] : $@callee_guaranteed (@guaranteed ARCStrong) -> ()
+// CHECK: apply %[[V5]](%[[V4]]) : $@callee_guaranteed (@guaranteed ARCStrong) -> ()
+// CHECK: end_borrow %[[V5]] : $@callee_guaranteed (@guaranteed ARCStrong) -> ()
+// CHECK: end_borrow %[[V4]] : $ARCStrong
+// CHECK: destroy_value %[[V3]] : $@callee_guaranteed (@guaranteed ARCStrong) -> ()
+
+public func testBlockConstRefStrong() {
+  blockConstRefStrong({S in });
+}

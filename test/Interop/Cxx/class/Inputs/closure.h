@@ -51,8 +51,11 @@ void (* _Nonnull getFnPtr2() noexcept)(ARCWeak) noexcept;
 
 void cfuncConstRefNonTrivial(void (*_Nonnull)(const NonTrivial &));
 void cfuncConstRefTrivial(void (*_Nonnull)(const Trivial &));
+void blockConstRefNonTrivial(void (^_Nonnull)(const NonTrivial &));
+void blockConstRefTrivial(void (^_Nonnull)(const Trivial &));
 #if __OBJC__
 void cfuncConstRefStrong(void (*_Nonnull)(const ARCStrong &));
+void blockConstRefStrong(void (^_Nonnull)(const ARCStrong &));
 #endif
 
 #endif // __CLOSURE__
