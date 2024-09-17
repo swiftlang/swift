@@ -2059,28 +2059,25 @@ struct DynamicCallableMethods {
   }
 };
 
-/// A function that rewrites a syntactic element target in the context
-/// of solution application.
-using RewriteTargetFn = std::function<std::optional<SyntacticElementTarget>(
-    SyntacticElementTarget)>;
+/// Abstract base class for applying a solution to a SyntacticElementTarget.
+class SyntacticElementTargetRewriter {
+public:
+  virtual Solution &getSolution() const = 0;
+  virtual DeclContext *&getCurrentDC() const = 0;
+
+  virtual void addLocalDeclToTypeCheck(Decl *D) = 0;
+
+  virtual std::optional<SyntacticElementTarget>
+  rewriteTarget(SyntacticElementTarget target) = 0;
+
+  virtual ~SyntacticElementTargetRewriter() = default;
+};
 
 enum class ConstraintSystemPhase {
   ConstraintGeneration,
   Solving,
   Diagnostics,
   Finalization
-};
-
-/// Describes the result of applying a solution to a given function.
-enum class SolutionApplicationToFunctionResult {
-  /// Application of the solution succeeded.
-  Success,
-  /// Application of the solution failed.
-  /// TODO: This should probably go away entirely.
-  Failure,
-  /// The solution could not be applied immediately, and type checking for
-  /// this function should be delayed until later.
-  Delay,
 };
 
 /// Retrieve the closure type from the constraint system.
@@ -5534,67 +5531,38 @@ public:
   /// Apply the given solution to the given function's body and, for
   /// closure expressions, the expression itself.
   ///
-  /// \param solution The solution to apply.
   /// \param fn The function to which the solution is being applied.
-  /// \param currentDC The declaration context in which transformations
-  /// will be applied.
-  /// \param rewriteTarget Function that performs a rewrite of any targets
-  /// within the context.
+  /// \param rewriter The rewriter to apply the solution with.
   ///
-  SolutionApplicationToFunctionResult
-  applySolution(Solution &solution, AnyFunctionRef fn, DeclContext *&currentDC,
-                std::function<std::optional<SyntacticElementTarget>(
-                    SyntacticElementTarget)>
-                    rewriteTarget);
+  bool applySolution(AnyFunctionRef fn,
+                     SyntacticElementTargetRewriter &rewriter);
 
   /// Apply the given solution to the given closure body.
   ///
-  ///
-  /// \param solution The solution to apply.
   /// \param fn The function or closure to which the solution is being applied.
-  /// \param currentDC The declaration context in which transformations
-  /// will be applied.
-  /// \param rewriteTarget Function that performs a rewrite of any targets
-  /// within the context.
+  /// \param rewriter The rewriter to apply the solution with.
   ///
   /// \returns true if solution cannot be applied.
-  bool applySolutionToBody(Solution &solution, AnyFunctionRef fn,
-                           DeclContext *&currentDC,
-                           std::function<std::optional<SyntacticElementTarget>(
-                               SyntacticElementTarget)>
-                               rewriteTarget);
+  bool applySolutionToBody(AnyFunctionRef fn,
+                           SyntacticElementTargetRewriter &rewriter);
 
   /// Apply the given solution to the given SingleValueStmtExpr.
   ///
-  /// \param solution The solution to apply.
   /// \param SVE The SingleValueStmtExpr to rewrite.
-  /// \param DC The declaration context in which transformations will be
-  /// applied.
-  /// \param rewriteTarget Function that performs a rewrite of any targets
-  /// within the context.
+  /// \param rewriter The rewriter to apply the solution with.
   ///
   /// \returns true if solution cannot be applied.
-  bool applySolutionToSingleValueStmt(
-      Solution &solution, SingleValueStmtExpr *SVE, DeclContext *DC,
-      std::function<
-          std::optional<SyntacticElementTarget>(SyntacticElementTarget)>
-          rewriteTarget);
+  bool applySolutionToSingleValueStmt(SingleValueStmtExpr *SVE,
+                                      SyntacticElementTargetRewriter &rewriter);
 
   /// Apply the given solution to the given tap expression.
   ///
-  /// \param solution The solution to apply.
   /// \param tapExpr The tap expression to which the solution is being applied.
-  /// \param currentDC The declaration context in which transformations
-  /// will be applied.
-  /// \param rewriteTarget Function that performs a rewrite of any
-  /// solution application target within the context.
+  /// \param rewriter The rewriter to apply the solution with.
   ///
   /// \returns true if solution cannot be applied.
-  bool applySolutionToBody(Solution &solution, TapExpr *tapExpr,
-                           DeclContext *&currentDC,
-                           std::function<std::optional<SyntacticElementTarget>(
-                               SyntacticElementTarget)>
-                               rewriteTarget);
+  bool applySolutionToBody(TapExpr *tapExpr,
+                           SyntacticElementTargetRewriter &rewriter);
 
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully

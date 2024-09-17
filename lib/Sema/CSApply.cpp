@@ -6453,12 +6453,6 @@ static bool applyTypeToClosureExpr(ConstraintSystem &cs,
   // If we found an explicit ClosureExpr, update its type.
   if (auto CE = dyn_cast<ClosureExpr>(expr)) {
     cs.setType(CE, toType);
-
-    // If solution application for this closure is delayed, let's write the
-    // type into the ClosureExpr directly here, since the visitor won't.
-    if (!CE->hasSingleExpressionBody())
-      CE->setType(toType);
-
     return true;
   }
 
@@ -8820,59 +8814,30 @@ namespace {
     }
   };
 
-  class ExprWalker : public ASTWalker {
+  class ExprWalker : public ASTWalker, public SyntacticElementTargetRewriter {
     ExprRewriter &Rewriter;
-    SmallVector<ClosureExpr *, 4> ClosuresToTypeCheck;
+    SmallVector<Decl *, 4> LocalDeclsToTypeCheck;
 
   public:
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
 
-    ~ExprWalker() { assert(ClosuresToTypeCheck.empty()); }
+    ~ExprWalker() {
+      // Type-check any local decls encountered.
+      for (auto *D : LocalDeclsToTypeCheck)
+        TypeChecker::typeCheckDecl(D);
+    }
+
+    Solution &getSolution() const override { return Rewriter.solution; }
+    DeclContext *&getCurrentDC() const override { return Rewriter.dc; }
+
+    void addLocalDeclToTypeCheck(Decl *D) override {
+      LocalDeclsToTypeCheck.push_back(D);
+    }
 
     bool shouldWalkIntoPropertyWrapperPlaceholderValue() override {
       // Property wrapper placeholder underlying values are filled in
       // with already-type-checked expressions. Don't walk into them.
       return false;
-    }
-
-    /// Check if there are any closures or tap expressions left to process separately.
-    bool hasDelayedTasks() { return !ClosuresToTypeCheck.empty(); }
-
-    /// Process delayed closure bodies and `Tap` expressions.
-    ///
-    /// \returns true if any part of the processing fails.
-    bool processDelayed() {
-      bool hadError = false;
-      auto &solution = Rewriter.solution;
-      auto &cs = solution.getConstraintSystem();
-
-      while (!ClosuresToTypeCheck.empty()) {
-        auto *closure = ClosuresToTypeCheck.pop_back_val();
-        // If experimental multi-statement closure support
-        // is enabled, solution should have all of required
-        // information.
-        //
-        // Note that in this mode `ClosuresToTypeCheck` acts
-        // as a stack because multi-statement closures could
-        // have other multi-statement closures in the body.
-        hadError |= cs.applySolutionToBody(
-            solution, closure, Rewriter.dc, [&](SyntacticElementTarget target) {
-              auto resultTarget = rewriteTarget(target);
-              if (resultTarget) {
-                if (auto expr = resultTarget->getAsExpr())
-                  solution.setExprTypes(expr);
-              }
-
-              return resultTarget;
-            });
-
-        if (!hadError) {
-          TypeChecker::checkClosureAttributes(closure);
-          TypeChecker::checkParameterList(closure->getParameters(), closure);
-        }
-      }
-
-      return hadError;
     }
 
     MacroWalking getMacroWalkingBehavior() const override {
@@ -8936,81 +8901,26 @@ namespace {
 
     /// Rewrite the target, producing a new target.
     std::optional<SyntacticElementTarget>
-    rewriteTarget(SyntacticElementTarget target);
+    rewriteTarget(SyntacticElementTarget target) override;
 
     /// Rewrite the function for the given solution.
     ///
     /// \returns true if an error occurred.
     bool rewriteFunction(AnyFunctionRef fn) {
-      auto result = Rewriter.cs.applySolution(
-          Rewriter.solution, fn, Rewriter.dc,
-          [&](SyntacticElementTarget target) {
-            auto resultTarget = rewriteTarget(target);
-            if (resultTarget) {
-              if (auto expr = resultTarget->getAsExpr())
-                Rewriter.solution.setExprTypes(expr);
-            }
-
-            return resultTarget;
-          });
-
-      switch (result) {
-      case SolutionApplicationToFunctionResult::Success: {
-        if (auto closure =
-                dyn_cast_or_null<ClosureExpr>(fn.getAbstractClosureExpr())) {
-          TypeChecker::checkClosureAttributes(closure);
-          TypeChecker::checkParameterList(closure->getParameters(), closure);
-        }
-        return false;
-      }
-
-      case SolutionApplicationToFunctionResult::Failure:
-        return true;
-
-      case SolutionApplicationToFunctionResult::Delay: {
-        auto closure = cast<ClosureExpr>(fn.getAbstractClosureExpr());
-        ClosuresToTypeCheck.push_back(closure);
-        return false;
-      }
-      }
+      return Rewriter.cs.applySolution(fn, *this);
     }
 
     bool rewriteSingleValueStmtExpr(SingleValueStmtExpr *SVE) {
-      auto &solution = Rewriter.solution;
-      auto resultTy = solution.getResolvedType(SVE);
-      Rewriter.cs.setType(SVE, resultTy);
-
-      return Rewriter.cs.applySolutionToSingleValueStmt(
-          solution, SVE, solution.getDC(), [&](SyntacticElementTarget target) {
-            auto resultTarget = rewriteTarget(target);
-            if (!resultTarget)
-              return resultTarget;
-
-            if (auto expr = resultTarget->getAsExpr())
-              solution.setExprTypes(expr);
-
-            return resultTarget;
-         });
+      return Rewriter.cs.applySolutionToSingleValueStmt(SVE, *this);
     }
 
     void rewriteTapExpr(TapExpr *tap) {
-      auto &solution = Rewriter.solution;
-
       // First, let's visit the tap expression itself
       // and set all of the inferred types.
       Rewriter.visitTapExpr(tap);
 
       // Now, let's apply solution to the body
-      (void)Rewriter.cs.applySolutionToBody(
-          solution, tap, Rewriter.dc, [&](SyntacticElementTarget target) {
-            auto resultTarget = rewriteTarget(target);
-            if (resultTarget) {
-              if (auto expr = resultTarget->getAsExpr())
-                solution.setExprTypes(expr);
-            }
-
-            return resultTarget;
-          });
+      (void)Rewriter.cs.applySolutionToBody(tap, *this);
     }
   };
 } // end anonymous namespace
@@ -9179,14 +9089,14 @@ static Expr *wrapAsyncLetInitializer(
 
 static Pattern *rewriteExprPattern(const SyntacticElementTarget &matchTarget,
                                    Type patternTy,
-                                   RewriteTargetFn rewriteTarget) {
+                                   SyntacticElementTargetRewriter &rewriter) {
   auto *EP = matchTarget.getExprPattern();
 
   // See if we can simplify to another kind of pattern.
   if (auto simplified = TypeChecker::trySimplifyExprPattern(EP, patternTy))
     return simplified.get();
 
-  auto resultTarget = rewriteTarget(matchTarget);
+  auto resultTarget = rewriter.rewriteTarget(matchTarget);
   if (!resultTarget)
     return nullptr;
 
@@ -9200,14 +9110,14 @@ static Pattern *rewriteExprPattern(const SyntacticElementTarget &matchTarget,
 /// an ExprPattern, e.g an EnumElementPattern that could not refer to an enum
 /// case.
 static std::optional<Pattern *>
-tryRewriteExprPattern(Pattern *P, Solution &solution, Type patternTy,
-                      RewriteTargetFn rewriteTarget) {
+tryRewriteExprPattern(Pattern *P, Type patternTy,
+                      SyntacticElementTargetRewriter &rewriter) {
   // See if we have a match expression target.
-  auto matchTarget = solution.getTargetFor(P);
+  auto matchTarget = rewriter.getSolution().getTargetFor(P);
   if (!matchTarget)
     return std::nullopt;
 
-  return rewriteExprPattern(*matchTarget, patternTy, rewriteTarget);
+  return rewriteExprPattern(*matchTarget, patternTy, rewriter);
 }
 
 NullablePtr<Pattern> ExprWalker::rewritePattern(Pattern *pattern,
@@ -9223,8 +9133,7 @@ NullablePtr<Pattern> ExprWalker::rewritePattern(Pattern *pattern,
   patternOptions |= TypeResolutionFlags::OverrideType;
 
   auto tryRewritePattern = [&](Pattern *EP, Type ty) {
-    return ::tryRewriteExprPattern(
-        EP, solution, ty, [&](auto target) { return rewriteTarget(target); });
+    return ::tryRewriteExprPattern(EP, ty, *this);
   };
 
   auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
@@ -9236,9 +9145,9 @@ NullablePtr<Pattern> ExprWalker::rewritePattern(Pattern *pattern,
 ///
 /// \returns the resulting initialization expression.
 static std::optional<SyntacticElementTarget>
-applySolutionToInitialization(Solution &solution, SyntacticElementTarget target,
-                              Expr *initializer,
-                              RewriteTargetFn rewriteTarget) {
+applySolutionToInitialization(SyntacticElementTarget target, Expr *initializer,
+                              SyntacticElementTargetRewriter &rewriter) {
+  auto &solution = rewriter.getSolution();
   auto wrappedVar = target.getInitializationWrappedVar();
   Type initType;
   if (wrappedVar) {
@@ -9304,7 +9213,7 @@ applySolutionToInitialization(Solution &solution, SyntacticElementTarget target,
   finalPatternType = finalPatternType->reconstituteSugar(/*recursive =*/false);
 
   auto tryRewritePattern = [&](Pattern *EP, Type ty) {
-    return ::tryRewriteExprPattern(EP, solution, ty, rewriteTarget);
+    return ::tryRewriteExprPattern(EP, ty, rewriter);
   };
 
   // Apply the solution to the pattern as well.
@@ -9350,12 +9259,11 @@ applySolutionToInitialization(Solution &solution, SyntacticElementTarget target,
   return resultTarget;
 }
 
-static std::optional<SequenceIterationInfo> applySolutionToForEachStmt(
-    Solution &solution, ForEachStmt *stmt, SequenceIterationInfo info,
-    DeclContext *dc,
-    llvm::function_ref<
-        std::optional<SyntacticElementTarget>(SyntacticElementTarget)>
-        rewriteTarget) {
+static std::optional<SequenceIterationInfo>
+applySolutionToForEachStmt(ForEachStmt *stmt, SequenceIterationInfo info,
+                           DeclContext *dc,
+                           SyntacticElementTargetRewriter &rewriter) {
+  auto &solution = rewriter.getSolution();
   auto &cs = solution.getConstraintSystem();
 
   auto *parsedSequence = stmt->getParsedSequence();
@@ -9371,7 +9279,7 @@ static std::optional<SequenceIterationInfo> applySolutionToForEachStmt(
 
   auto makeIteratorTarget = *cs.getTargetFor({makeIteratorVar, /*index=*/0});
 
-  auto rewrittenTarget = rewriteTarget(makeIteratorTarget);
+  auto rewrittenTarget = rewriter.rewriteTarget(makeIteratorTarget);
   if (!rewrittenTarget)
     return std::nullopt;
 
@@ -9387,7 +9295,7 @@ static std::optional<SequenceIterationInfo> applySolutionToForEachStmt(
   {
     auto nextTarget = *cs.getTargetFor(info.nextCall);
 
-    auto rewrittenTarget = rewriteTarget(nextTarget);
+    auto rewrittenTarget = rewriter.rewriteTarget(nextTarget);
     if (!rewrittenTarget)
       return std::nullopt;
 
@@ -9483,7 +9391,7 @@ static std::optional<SequenceIterationInfo> applySolutionToForEachStmt(
   if (auto *whereExpr = stmt->getWhere()) {
     auto whereTarget = *cs.getTargetFor(whereExpr);
 
-    auto rewrittenTarget = rewriteTarget(whereTarget);
+    auto rewrittenTarget = rewriter.rewriteTarget(whereTarget);
     if (!rewrittenTarget)
       return std::nullopt;
 
@@ -9493,19 +9401,17 @@ static std::optional<SequenceIterationInfo> applySolutionToForEachStmt(
   return info;
 }
 
-static std::optional<PackIterationInfo> applySolutionToForEachStmt(
-    Solution &solution, ForEachStmt *stmt, PackIterationInfo info,
-    llvm::function_ref<
-        std::optional<SyntacticElementTarget>(SyntacticElementTarget)>
-        rewriteTarget) {
-
+static std::optional<PackIterationInfo>
+applySolutionToForEachStmt(ForEachStmt *stmt, PackIterationInfo info,
+                           SyntacticElementTargetRewriter &rewriter) {
+  auto &solution = rewriter.getSolution();
   auto &cs = solution.getConstraintSystem();
   auto *sequenceExpr = stmt->getParsedSequence();
   PackExpansionExpr *expansion = cast<PackExpansionExpr>(sequenceExpr);
 
   // First, let's apply the solution to the pack expansion.
   auto makeExpansionTarget = *cs.getTargetFor(expansion);
-  auto rewrittenTarget = rewriteTarget(makeExpansionTarget);
+  auto rewrittenTarget = rewriter.rewriteTarget(makeExpansionTarget);
   if (!rewrittenTarget)
     return std::nullopt;
 
@@ -9518,11 +9424,9 @@ static std::optional<PackIterationInfo> applySolutionToForEachStmt(
 /// Apply the given solution to the for-each statement target.
 ///
 /// \returns the resulting initialization expression.
-static std::optional<SyntacticElementTarget> applySolutionToForEachStmt(
-    Solution &solution, SyntacticElementTarget target,
-    llvm::function_ref<
-        std::optional<SyntacticElementTarget>(SyntacticElementTarget)>
-        rewriteTarget) {
+static std::optional<SyntacticElementTarget>
+applySolutionToForEachStmt(SyntacticElementTarget target,
+                           SyntacticElementTargetRewriter &rewriter) {
   auto resultTarget = target;
   auto &forEachStmtInfo = resultTarget.getForEachStmtInfo();
   auto *stmt = target.getAsForEachStmt();
@@ -9531,7 +9435,7 @@ static std::optional<SyntacticElementTarget> applySolutionToForEachStmt(
 
   if (auto *info = forEachStmtInfo.dyn_cast<SequenceIterationInfo>()) {
     auto resultInfo = applySolutionToForEachStmt(
-        solution, stmt, *info, target.getDeclContext(), rewriteTarget);
+        stmt, *info, target.getDeclContext(), rewriter);
     if (!resultInfo) {
       return std::nullopt;
     }
@@ -9540,8 +9444,7 @@ static std::optional<SyntacticElementTarget> applySolutionToForEachStmt(
     rewrittenPatternType = resultInfo->initType;
   } else {
     auto resultInfo = applySolutionToForEachStmt(
-        solution, stmt, forEachStmtInfo.get<PackIterationInfo>(),
-        rewriteTarget);
+        stmt, forEachStmtInfo.get<PackIterationInfo>(), rewriter);
     if (!resultInfo) {
       return std::nullopt;
     }
@@ -9556,7 +9459,7 @@ static std::optional<SyntacticElementTarget> applySolutionToForEachStmt(
     options |= TypeResolutionFlags::OverrideType;
 
     auto tryRewritePattern = [&](Pattern *EP, Type ty) {
-      return ::tryRewriteExprPattern(EP, solution, ty, rewriteTarget);
+      return ::tryRewriteExprPattern(EP, ty, rewriter);
     };
 
     // Apply the solution to the pattern as well.
@@ -9598,9 +9501,8 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
     /// Handle special cases for expressions.
     switch (target.getExprContextualTypePurpose()) {
     case CTP_Initialization: {
-      auto initResultTarget = applySolutionToInitialization(
-          solution, target, rewrittenExpr,
-          [&](auto target) { return rewriteTarget(target); });
+      auto initResultTarget =
+          applySolutionToInitialization(target, rewrittenExpr, *this);
       if (!initResultTarget)
         return std::nullopt;
 
@@ -9763,8 +9665,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
     }
 
     auto tryRewritePattern = [&](Pattern *EP, Type ty) {
-      return ::tryRewriteExprPattern(
-          EP, solution, ty, [&](auto target) { return rewriteTarget(target); });
+      return ::tryRewriteExprPattern(EP, ty, *this);
     };
 
     if (auto coercedPattern = TypeChecker::coercePatternToType(
@@ -9776,16 +9677,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
 
     return std::nullopt;
   } else if (auto *forEach = target.getAsForEachStmt()) {
-    auto forEachResultTarget = applySolutionToForEachStmt(
-        solution, target, [&](SyntacticElementTarget target) {
-          auto resultTarget = rewriteTarget(target);
-          if (resultTarget) {
-            if (auto expr = resultTarget->getAsExpr())
-              solution.setExprTypes(expr);
-          }
-
-          return resultTarget;
-        });
+    auto forEachResultTarget = applySolutionToForEachStmt(target, *this);
     if (!forEachResultTarget)
       return std::nullopt;
 
@@ -9867,31 +9759,8 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
     result.setExpr(resultExpr);
 
     if (cs.isDebugMode()) {
-      // If target is a multi-statement closure or
-      // a tap expression, expression will not be fully
-      // type checked until these expressions are visited in
-      // processDelayed().
-      bool isPartial = false;
-      resultExpr->forEachChildExpr([&](Expr *child) -> Expr * {
-        if (auto *closure = dyn_cast<ClosureExpr>(child)) {
-          if (!closure->hasSingleExpressionBody()) {
-            isPartial = true;
-            return nullptr;
-          }
-        }
-        if (isa<TapExpr>(child)) {
-          isPartial = true;
-          return nullptr;
-        }
-      return child;
-      });
-      
       auto &log = llvm::errs();
-      if (isPartial) {
-        log << "\n---Partially type-checked expression---\n";
-      } else {
-        log << "\n---Type-checked expression---\n";
-      }
+      log << "\n---Type-checked expression---\n";
       resultExpr->dump(log);
       log << "\n";
     }
@@ -9952,29 +9821,6 @@ ConstraintSystem::applySolution(Solution &solution,
   if (!resultTarget)
     return std::nullopt;
 
-  auto needsPostProcessing = walker.hasDelayedTasks();
-  
-  // Visit closures that have non-single expression bodies, tap expressions,
-  // and possibly other types of AST nodes which could only be processed
-  // after contextual expression.
-  bool hadError = walker.processDelayed();
-
-  // If any of them failed to type check, bail.
-  if (hadError)
-    return std::nullopt;
-
-  if (isDebugMode()) {
-    // If we had partially type-checked expressions, lets print
-    // fully type-checked target after processDelayed is done.
-    auto node = target.getAsASTNode();
-    if (node && needsPostProcessing) {
-      auto &log = llvm::errs();
-      log << "\n---Fully type-checked target---\n";
-      node.dump(log);
-      log << "\n";
-    }
-  }
-  
   rewriter.finalize();
 
   return resultTarget;
