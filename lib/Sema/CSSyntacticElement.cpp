@@ -1671,9 +1671,6 @@ protected:
   SyntacticElementContext context;
   SyntacticElementTargetRewriter &rewriter;
 
-  /// All `func`s declared in the body of the closure.
-  SmallVector<FuncDecl *, 4> LocalFuncs;
-
 public:
   /// Whether an error was encountered while generating constraints.
   bool hadError = false;
@@ -1729,44 +1726,37 @@ private:
     return rewritten;
   }
 
+  bool visitPatternBindingDecl(PatternBindingDecl *PBD) {
+    // If this is a placeholder variable with an initializer, we just need to
+    // set the inferred type.
+    if (isPlaceholderVar(PBD) && PBD->getInit(0)) {
+      auto *pattern = PBD->getPattern(0);
+      pattern->setType(solution.getResolvedType(PBD->getSingleVar()));
+      return false;
+    }
+
+    SyntacticElementTarget target(PBD);
+    return !rewriter.rewriteTarget(target).has_value();
+  }
+
   void visitDecl(Decl *decl) {
     if (isa<IfConfigDecl>(decl))
       return;
 
-    // Generate constraints for pattern binding declarations.
-    if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
-      SyntacticElementTarget target(patternBinding);
-
-      // If this is a placeholder varaible with an initializer, let's set
-      // the inferred type, and ask `typeCheckDecl` to type-check initializer.
-      if (isPlaceholderVar(patternBinding) && patternBinding->getInit(0)) {
-        auto *pattern = patternBinding->getPattern(0);
-        pattern->setType(
-            solution.getResolvedType(patternBinding->getSingleVar()));
-
-        TypeChecker::typeCheckDecl(decl);
-        return;
-      }
-
-      if (!rewriter.rewriteTarget(target)) {
+    if (auto *PBD = dyn_cast<PatternBindingDecl>(decl)) {
+      if (visitPatternBindingDecl(PBD)) {
         hadError = true;
         return;
       }
-
-      // Allow `typeCheckDecl` to be called after solution is applied
-      // to a pattern binding. That would materialize required
+      // Fall through to allow `typeCheckDecl` to be called after solution is
+      // applied to a pattern binding. That will materialize required
       // information e.g. accessors and do access/availability checks.
     }
 
-    // Local functions cannot be type-checked in-order because they can
-    // capture variables declared after them. Let's save them to be
-    // processed after the solution has been applied to the body.
-    if (auto *func = dyn_cast<FuncDecl>(decl)) {
-      LocalFuncs.push_back(func);
-      return;
-    }
-
-    TypeChecker::typeCheckDecl(decl);
+    // Delay the type-checking of local decls to ensure that parent closures
+    // have solutions applied, which is needed by MiscDiagnostics passes such as
+    // `diagnoseImplicitSelfUseInClosure`
+    rewriter.addLocalDeclToTypeCheck(decl);
   }
 
   ASTNode visitBreakStmt(BreakStmt *breakStmt) {
@@ -1792,7 +1782,7 @@ private:
   }
 
   ASTNode visitDeferStmt(DeferStmt *deferStmt) {
-    TypeChecker::typeCheckDecl(deferStmt->getTempDecl());
+    rewriter.addLocalDeclToTypeCheck(deferStmt->getTempDecl());
 
     Expr *theCall = deferStmt->getCallExpr();
     TypeChecker::typeCheckExpression(theCall, context.getAsDeclContext());
@@ -2234,13 +2224,6 @@ public:
   /// Apply the solution to the context and return updated statement.
   Stmt *apply() {
     auto body = visit(context.getStmt());
-
-    // Since local functions can capture variables that are declared
-    // after them, let's type-check them after all of the pattern
-    // bindings have been resolved by applying solution to the body.
-    for (auto *func : LocalFuncs)
-      TypeChecker::typeCheckDecl(func);
-
     return body ? body.get<Stmt *>() : nullptr;
   }
 };

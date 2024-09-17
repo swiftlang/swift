@@ -2065,6 +2065,8 @@ public:
   virtual Solution &getSolution() const = 0;
   virtual DeclContext *&getCurrentDC() const = 0;
 
+  virtual void addLocalDeclToTypeCheck(Decl *D) = 0;
+
   virtual std::optional<SyntacticElementTarget>
   rewriteTarget(SyntacticElementTarget target) = 0;
 

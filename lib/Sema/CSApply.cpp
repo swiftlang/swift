@@ -8823,14 +8823,25 @@ namespace {
   class ExprWalker : public ASTWalker, public SyntacticElementTargetRewriter {
     ExprRewriter &Rewriter;
     SmallVector<ClosureExpr *, 4> ClosuresToTypeCheck;
+    SmallVector<Decl *, 4> LocalDeclsToTypeCheck;
 
   public:
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
 
-    ~ExprWalker() { assert(ClosuresToTypeCheck.empty()); }
+    ~ExprWalker() {
+      assert(ClosuresToTypeCheck.empty());
+
+      // Type-check any local decls encountered.
+      for (auto *D : LocalDeclsToTypeCheck)
+        TypeChecker::typeCheckDecl(D);
+    }
 
     Solution &getSolution() const override { return Rewriter.solution; }
     DeclContext *&getCurrentDC() const override { return Rewriter.dc; }
+
+    void addLocalDeclToTypeCheck(Decl *D) override {
+      LocalDeclsToTypeCheck.push_back(D);
+    }
 
     bool shouldWalkIntoPropertyWrapperPlaceholderValue() override {
       // Property wrapper placeholder underlying values are filled in
