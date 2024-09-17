@@ -634,8 +634,8 @@ struct BridgedFunction {
   };
 
   SWIFT_NAME("init(obj:)")
-  SWIFT_IMPORT_UNSAFE BridgedFunction(SwiftObject obj) : obj(obj) {}
-  SWIFT_IMPORT_UNSAFE BridgedFunction() {}
+  BridgedFunction(SwiftObject obj) : obj(obj) {}
+  BridgedFunction() {}
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::SILFunction * _Nonnull getFunction() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getName() const;
   BridgedOwnedString getDebugDescription() const;
