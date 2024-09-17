@@ -6,7 +6,7 @@ add_swift_host_library(swiftFrontendTool STATIC
   MakeStyleDependencies.cpp
   TBD.cpp)
 add_dependencies(swiftFrontendTool
-  SwiftOptions)
+  SwiftOptionDefinitions)
 target_link_libraries(swiftFrontendTool INTERFACE
   clangAPINotes
   clangBasic)
