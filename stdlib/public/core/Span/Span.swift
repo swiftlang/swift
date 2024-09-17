@@ -21,8 +21,8 @@ public struct Span<Element: ~Copyable & ~Escapable>: Copyable, ~Escapable {
 
   @usableFromInline let _count: Int
 
-  @_alwaysEmitIntoClient
-  internal init(
+  @usableFromInline @inline(__always)
+  init(
     _unchecked start: UnsafeRawPointer?,
     count: Int
   ) -> dependsOn(immortal) Self {
@@ -36,14 +36,14 @@ extension Span: Sendable {}
 
 extension UnsafePointer where Pointee: ~Copyable {
 
-  @_alwaysEmitIntoClient
+  @usableFromInline @inline(__always)
   var isAligned: Bool {
     (Int(bitPattern: self) & (MemoryLayout<Pointee>.alignment&-1)) == 0
   }
 }
 
 extension Span where Element: ~Copyable {
-  @_alwaysEmitIntoClient
+  @usableFromInline @inline(__always)
   internal init(
     _unchecked elements: UnsafeBufferPointer<Element>
   ) -> dependsOn(immortal) Self {
@@ -314,13 +314,9 @@ extension Span where Element: Equatable {
 extension Span where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
-  var _address: String {
-    String(UInt(bitPattern: _pointer), radix: 16, uppercase: false)
-  }
-
-  @_alwaysEmitIntoClient
   public var description: String {
-    "(0x\(_address), \(_count))"
+    let addr = String(UInt(bitPattern: _pointer), radix: 16, uppercase: false)
+    return "(0x\(addr), \(_count))"
   }
 }
 
@@ -480,7 +476,6 @@ extension Span where Element: ~Copyable {
   /// - Returns: A `Span` over the items within `bounds`
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
   @usableFromInline func _extracting(_ bounds: Range<Int>) -> Self {
     _precondition(boundsContain(bounds))
     return _extracting(unchecked: bounds)
@@ -506,7 +501,6 @@ extension Span where Element: ~Copyable {
   /// - Returns: A `Span` over the items within `bounds`
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
   @usableFromInline func _extracting(unchecked bounds: Range<Int>) -> Self {
     Span(
       _unchecked: _pointer?.advanced(by: bounds.lowerBound*MemoryLayout<Element>.stride),
@@ -532,7 +526,6 @@ extension Span where Element: ~Copyable {
   /// - Returns: A `Span` over the items within `bounds`
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
   @usableFromInline func _extracting(_ bounds: some RangeExpression<Int>) -> Self {
     _extracting(bounds.relative(to: _indices))
   }
@@ -557,7 +550,6 @@ extension Span where Element: ~Copyable {
   /// - Returns: A `Span` over the items within `bounds`
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
   @usableFromInline func _extracting(
     uncheckedBounds bounds: some RangeExpression<Int>
   ) -> Self {
@@ -578,7 +570,6 @@ extension Span where Element: ~Copyable {
   /// - Returns: A `Span` over all the items of this span.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
   @usableFromInline func _extracting(_: UnboundedRange) -> Self {
     self
   }
@@ -712,7 +703,6 @@ extension Span where Element: ~Copyable {
   /// - Returns: A span with at most `maxLength` elements.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
   @usableFromInline func _extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length.")
     let newCount = min(maxLength, count)
@@ -738,7 +728,6 @@ extension Span where Element: ~Copyable {
   /// - Returns: A span leaving off the specified number of elements at the end.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
   @usableFromInline func _extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements.")
     let droppedCount = min(k, count)
@@ -765,7 +754,6 @@ extension Span where Element: ~Copyable {
   /// - Returns: A span with at most `maxLength` elements.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
   @usableFromInline func _extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length.")
     let newCount = min(maxLength, count)
@@ -792,7 +780,6 @@ extension Span where Element: ~Copyable {
   /// - Returns: A span starting after the specified number of elements.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
   @usableFromInline func _extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements.")
     let droppedCount = min(k, count)

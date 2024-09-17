@@ -21,8 +21,8 @@ public struct RawSpan: Copyable, ~Escapable {
 
   @usableFromInline let _count: Int
 
-  @_alwaysEmitIntoClient
-  internal init(
+  @usableFromInline @inline(__always)
+  init(
     _unchecked start: UnsafeRawPointer?,
     byteCount: Int
   ) -> dependsOn(immortal) Self {
@@ -162,12 +162,10 @@ extension RawSpan {
 
 extension RawSpan {
 
-  private var _address: String {
-    String(UInt(bitPattern: _pointer), radix: 16, uppercase: false)
-  }
-
+  @_alwaysEmitIntoClient
   public var _description: String {
-    "(0x\(_address), \(_count))"
+    let addr = String(UInt(bitPattern: _pointer), radix: 16, uppercase: false)
+    return "(0x\(addr), \(_count))"
   }
 }
 
@@ -248,7 +246,6 @@ extension RawSpan {
   /// - Returns: A span over the bytes within `bounds`
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
   @usableFromInline func _extracting(_ bounds: Range<Int>) -> Self {
     _precondition(boundsContain(bounds))
     return _extracting(unchecked: bounds)
@@ -274,7 +271,6 @@ extension RawSpan {
   /// - Returns: A span over the bytes within `bounds`
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
   @usableFromInline func _extracting(unchecked bounds: Range<Int>) -> Self {
     RawSpan(
       _unchecked: _pointer?.advanced(by: bounds.lowerBound),
@@ -300,7 +296,6 @@ extension RawSpan {
   /// - Returns: A span over the bytes within `bounds`
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
   @usableFromInline func _extracting(_ bounds: some RangeExpression<Int>) -> Self {
     _extracting(bounds.relative(to: _byteOffsets))
   }
@@ -325,7 +320,6 @@ extension RawSpan {
   /// - Returns: A span over the bytes within `bounds`
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
   @usableFromInline func _extracting(
     unchecked bounds: some RangeExpression<Int>
   ) -> Self {
@@ -346,7 +340,6 @@ extension RawSpan {
   /// - Returns: A span over all the bytes of this span.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
   @usableFromInline func _extracting(_: UnboundedRange) -> Self {
     self
   }
@@ -568,7 +561,6 @@ extension RawSpan {
   /// - Returns: A span with at most `maxLength` bytes.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
   @usableFromInline func _extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length.")
     let newCount = min(maxLength, byteCount)
@@ -594,7 +586,6 @@ extension RawSpan {
   /// - Returns: A span leaving off the specified number of bytes at the end.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
   @usableFromInline func _extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements.")
     let dc = min(k, byteCount)
@@ -621,7 +612,6 @@ extension RawSpan {
   /// - Returns: A span with at most `maxLength` bytes.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
   @usableFromInline func _extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length.")
     let newCount = min(maxLength, byteCount)
@@ -648,7 +638,6 @@ extension RawSpan {
   /// - Returns: A span starting after the specified number of bytes.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
   @usableFromInline func _extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements.")
     let dc = min(k, byteCount)
