@@ -601,7 +601,7 @@ extension Span where Element: ~Copyable  {
   ///   parameter is valid only for the duration of its execution.
   /// - Returns: The return value of the `body` closure parameter.
   @_alwaysEmitIntoClient
-  public func withUnsafeBufferPointer<E: Error, Result: ~Copyable & ~Escapable>(
+  public func withUnsafeBufferPointer<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
     guard let pointer = _pointer, count > 0 else {
@@ -631,7 +631,7 @@ extension Span where Element: BitwiseCopyable {
   ///   its execution.
   /// - Returns: The return value of the `body` closure parameter.
   @_alwaysEmitIntoClient
-  public func withUnsafeBytes<E: Error, Result: ~Copyable & ~Escapable>(
+  public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
     try RawSpan(_unsafeSpan: self).withUnsafeBytes(body)

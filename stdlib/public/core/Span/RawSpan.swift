@@ -370,7 +370,7 @@ extension RawSpan {
   ///   its execution.
   /// - Returns: The return value of the `body` closure parameter.
   @_alwaysEmitIntoClient
-  public func withUnsafeBytes<E: Error, Result: ~Copyable & ~Escapable>(
+  public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
     try body(.init(start: (byteCount==0) ? nil : _start, count: byteCount))
@@ -394,9 +394,9 @@ extension RawSpan {
   ///   - type: The type as which to view the bytes of this span.
   /// - Returns: A typed span viewing these bytes as instances of `T`.
   @_alwaysEmitIntoClient
-  public func unsafeView<T: BitwiseCopyable>(
+  public func _unsafeView<T: BitwiseCopyable>(
     as type: T.Type
-  ) -> Span<T> {
+  ) -> dependsOn(immortal) Span<T> {
     Span(_unsafeStart: _start, byteCount: byteCount)
   }
 }
