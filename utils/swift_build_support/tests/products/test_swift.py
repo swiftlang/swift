@@ -108,7 +108,6 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP:BOOL=FALSE',
             '-DSWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL=FALSE',
-            '-DSWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION:BOOL=FALSE',
             '-DSWIFT_ENABLE_BACKTRACING:BOOL=FALSE',
@@ -143,7 +142,6 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP:BOOL=FALSE',
             '-DSWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL=FALSE',
-            '-DSWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION:BOOL=FALSE',
             '-DSWIFT_ENABLE_BACKTRACING:BOOL=FALSE',
@@ -420,19 +418,6 @@ class SwiftTestCase(unittest.TestCase):
              'TRUE'],
             [x for x in swift.cmake_options
              if 'DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED' in x])
-
-    def test_experimental_nonescapable_types_flags(self):
-        self.args.enable_experimental_nonescapable_types = True
-        swift = Swift(
-            args=self.args,
-            toolchain=self.toolchain,
-            source_dir='/path/to/src',
-            build_dir='/path/to/build')
-        self.assertEqual(
-            ['-DSWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES:BOOL='
-             'TRUE'],
-            [x for x in swift.cmake_options
-             if 'DSWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES' in x])
 
     def test_experimental_observation_flags(self):
         self.args.enable_experimental_observation = True
