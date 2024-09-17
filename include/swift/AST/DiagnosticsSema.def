@@ -5810,6 +5810,9 @@ ERROR(nonisolated_actor_sync_init,none,
 ERROR(nonisolated_wrapped_property,none,
       "'nonisolated' is not supported on properties with property wrappers",
       ())
+ERROR(nonisolated_lazy,none,
+      "'nonisolated' is not supported on lazy properties",
+      ())
 
 ERROR(non_sendable_from_deinit,none,
         "cannot access %1 %2 with a non-sendable type %0 from nonisolated deinit",
