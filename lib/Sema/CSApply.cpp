@@ -8858,11 +8858,6 @@ namespace {
         hadError |= cs.applySolutionToBody(
             solution, closure, Rewriter.dc, [&](SyntacticElementTarget target) {
               auto resultTarget = rewriteTarget(target);
-              if (resultTarget) {
-                if (auto expr = resultTarget->getAsExpr())
-                  solution.setExprTypes(expr);
-              }
-
               return resultTarget;
             });
 
@@ -8946,11 +8941,6 @@ namespace {
           Rewriter.solution, fn, Rewriter.dc,
           [&](SyntacticElementTarget target) {
             auto resultTarget = rewriteTarget(target);
-            if (resultTarget) {
-              if (auto expr = resultTarget->getAsExpr())
-                Rewriter.solution.setExprTypes(expr);
-            }
-
             return resultTarget;
           });
 
@@ -8983,12 +8973,6 @@ namespace {
       return Rewriter.cs.applySolutionToSingleValueStmt(
           solution, SVE, solution.getDC(), [&](SyntacticElementTarget target) {
             auto resultTarget = rewriteTarget(target);
-            if (!resultTarget)
-              return resultTarget;
-
-            if (auto expr = resultTarget->getAsExpr())
-              solution.setExprTypes(expr);
-
             return resultTarget;
          });
     }
@@ -9004,11 +8988,6 @@ namespace {
       (void)Rewriter.cs.applySolutionToBody(
           solution, tap, Rewriter.dc, [&](SyntacticElementTarget target) {
             auto resultTarget = rewriteTarget(target);
-            if (resultTarget) {
-              if (auto expr = resultTarget->getAsExpr())
-                solution.setExprTypes(expr);
-            }
-
             return resultTarget;
           });
     }
@@ -9779,11 +9758,6 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
     auto forEachResultTarget = applySolutionToForEachStmt(
         solution, target, [&](SyntacticElementTarget target) {
           auto resultTarget = rewriteTarget(target);
-          if (resultTarget) {
-            if (auto expr = resultTarget->getAsExpr())
-              solution.setExprTypes(expr);
-          }
-
           return resultTarget;
         });
     if (!forEachResultTarget)

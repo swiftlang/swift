@@ -2267,11 +2267,6 @@ public:
     assert(funcRef);
 
     funcRef->setTypecheckedBody(castToStmt<BraceStmt>(body));
-
-    if (auto *closure =
-            getAsExpr<ClosureExpr>(funcRef->getAbstractClosureExpr()))
-      solution.setExprTypes(closure);
-
     return false;
   }
 
