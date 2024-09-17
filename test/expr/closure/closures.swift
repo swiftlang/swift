@@ -1792,3 +1792,15 @@ class rdar129475277 {
     }
   }
 }
+
+class TestLazyLocal {
+  func bar() -> Int { 0 }
+  func foo() {
+    _ = { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+      lazy var x = bar()
+      // expected-error@-1 {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}}
+      // expected-note@-2 {{reference 'self.' explicitly}}
+      return x
+    }
+  }
+}
