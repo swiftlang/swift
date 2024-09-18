@@ -254,7 +254,6 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
   ModuleDecl *tmpM = ModuleDecl::create(Identifier(), *tmpCtx);
   SourceFile *tmpSF = new (*tmpCtx)
       SourceFile(*tmpM, oldSF->Kind, tmpBufferID, oldSF->getParsingOptions());
-  tmpM->addAuxiliaryFile(*tmpSF);
 
   // FIXME: Since we don't setup module loaders on the temporary AST context,
   // 'canImport()' conditional compilation directive always fails. That causes

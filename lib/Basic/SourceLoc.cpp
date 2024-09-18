@@ -215,6 +215,19 @@ SourceManager::getIDForBufferIdentifier(StringRef BufIdentifier) const {
   return It->second;
 }
 
+void SourceManager::recordSourceFile(unsigned bufferID, SourceFile *sourceFile){
+  bufferIDToSourceFiles[bufferID].push_back(sourceFile);
+}
+
+llvm::TinyPtrVector<SourceFile *>
+SourceManager::getSourceFilesForBufferID(unsigned bufferID) const {
+  auto found = bufferIDToSourceFiles.find(bufferID);
+  if (found == bufferIDToSourceFiles.end())
+    return { };
+
+  return found->second;
+}
+
 SourceManager::~SourceManager() {
   for (auto &generated : GeneratedSourceInfos) {
     free((void*)generated.second.onDiskBufferCopyFileName.data());

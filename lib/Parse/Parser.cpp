@@ -1144,7 +1144,6 @@ struct ParserUnit::Implementation {
 
     auto *M = ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx);
     SF = new (Ctx) SourceFile(*M, SFKind, BufferID, parsingOpts);
-    M->addAuxiliaryFile(*SF);
   }
 
   ~Implementation() {
