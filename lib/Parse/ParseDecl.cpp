@@ -7904,8 +7904,9 @@ struct Parser::ParsedAccessors {
 
 static ParserStatus parseAccessorIntroducer(Parser &P,
                                             DeclAttributes &Attributes,
-                                            AccessorKind &Kind,
-                                            SourceLoc &Loc) {
+                                            AccessorKind &Kind, SourceLoc &Loc,
+                                            bool isFirstAccessor,
+                                            bool *featureUnavailable) {
   ParserStatus Status;
   assert(Attributes.isEmpty());
   auto AttributeStatus = P.parseDeclAttributeList(Attributes);
@@ -8144,8 +8145,9 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
     DeclAttributes Attributes;
     AccessorKind Kind = AccessorKind::Get;
     SourceLoc Loc;
-    ParserStatus AccessorStatus =
-        parseAccessorIntroducer(*this, Attributes, Kind, Loc);
+    bool featureUnavailable = false;
+    ParserStatus AccessorStatus = parseAccessorIntroducer(
+        *this, Attributes, Kind, Loc, IsFirstAccessor, &featureUnavailable);
     Status |= AccessorStatus;
     if (AccessorStatus.isError() && !AccessorStatus.hasCodeCompletion()) {
       if (Tok.is(tok::code_complete)) {
@@ -8172,7 +8174,9 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
 
       // Cannot have an implicit getter after other accessor.
       if (!IsFirstAccessor) {
-        diagnose(Tok, diag::expected_accessor_kw);
+        if (!featureUnavailable) {
+          diagnose(Tok, diag::expected_accessor_kw);
+        }
         skipUntil(tok::r_brace);
         // Don't signal an error since we recovered.
         break;
@@ -8246,18 +8250,23 @@ void Parser::parseTopLevelAccessors(
   ParserStatus status;
   bool hasEffectfulGet = false;
   bool parsingLimitedSyntax = false;
+  bool IsFirstAccessor = true;
   while (!Tok.isAny(tok::r_brace, tok::eof)) {
     DeclAttributes attributes;
     AccessorKind kind = AccessorKind::Get;
     SourceLoc loc;
     ParserStatus accessorStatus =
-        parseAccessorIntroducer(*this, attributes, kind, loc);
+        parseAccessorIntroducer(*this, attributes, kind, loc, IsFirstAccessor,
+                                /*featureUnavailable=*/nullptr);
     if (accessorStatus.isError())
       break;
 
     (void)parseAccessorAfterIntroducer(loc, kind, accessors, hasEffectfulGet,
                                        parsingLimitedSyntax, attributes,
                                        PD_Default, storage, status);
+    if (IsFirstAccessor) {
+      IsFirstAccessor = false;
+    }
   }
 
   if (hadLBrace && Tok.is(tok::r_brace)) {
