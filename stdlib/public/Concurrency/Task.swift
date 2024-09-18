@@ -198,15 +198,18 @@ extension Task {
   ///
   /// Task cancellation is cooperative:
   /// a task that supports cancellation
-  /// checks whether it has been canceled at various points during its work,
-  /// and may either return early or throw an error in order to
-  /// finish running earlier than it would if it wasn't cancelled.
+  /// checks whether it has been canceled at various points during its work.
+  /// You determine what action a canceled task takes,
+  /// and whether cancellation does anything to that task.
+  /// The task can return early or throw an error
+  /// to stop running early.
   ///
-  /// Calling this method only has the effect of setting the cancelled
-  /// flag on the task (or its child tasks), and unless the tasks itself
-  /// react on this flag, there is no observable runtime behavior change
-  /// of the tasks. Specifically, tasks are never "interrupted and stopped"
-  /// forcefully, and are always allowed to execute code until returning or throwing/
+  /// Calling this method has only one effect:
+  /// setting the canceled flag on the task or its child tasks.
+  /// Unless the tasks react to this flag,
+  /// cancellation doesn't change the behavior of the tasks.
+  /// Specifically, tasks are never forcefully interrupted or stopped,
+  /// and are always allowed to execute code until they return or throw an error.
   ///
   /// Likewise, if the task has already run
   /// past the last point where it would stop early,
