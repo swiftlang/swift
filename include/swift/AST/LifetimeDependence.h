@@ -235,11 +235,6 @@ public:
   static std::optional<ArrayRef<LifetimeDependenceInfo>>
   get(AbstractFunctionDecl *decl);
 
-  /// Builds LifetimeDependenceInfo from the bitvectors passes as parameters.
-  static LifetimeDependenceInfo
-  get(ASTContext &ctx, const SmallBitVector &inheritLifetimeIndices,
-      const SmallBitVector &scopeLifetimeIndices);
-
   /// Builds LifetimeDependenceInfo from SIL
   static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
   get(FunctionTypeRepr *funcRepr, ArrayRef<SILParameterInfo> params,
