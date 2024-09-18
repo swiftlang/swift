@@ -194,6 +194,47 @@ ProtocolConformanceRef::getConditionalRequirements() const {
     return {};
 }
 
+Type ProtocolConformanceRef::getTypeWitness(Type conformingType,
+                                            AssociatedTypeDecl *assocType,
+                                            SubstOptions options) const {
+  if (isPack()) {
+    auto *pack = getPack();
+    ASSERT(conformingType->isEqual(pack->getType()));
+    return pack->getAssociatedType(assocType->getDeclaredInterfaceType());
+  }
+
+  auto failed = [&]() {
+    return DependentMemberType::get(ErrorType::get(conformingType),
+                                    assocType);
+  };
+
+  if (isInvalid())
+    return failed();
+
+  auto proto = getRequirement();
+  ASSERT(assocType->getProtocol() == proto);
+
+  if (isConcrete()) {
+    auto witnessType = getConcrete()->getTypeWitness(assocType, options);
+    if (!witnessType || witnessType->is<ErrorType>())
+      return failed();
+    return witnessType;
+  }
+
+  ASSERT(isAbstract());
+
+  if (auto *archetypeType = conformingType->getAs<ArchetypeType>()) {
+    return archetypeType->getNestedType(assocType);
+  }
+
+  CONDITIONAL_ASSERT(conformingType->isTypeParameter() ||
+                     conformingType->isTypeVariableOrMember() ||
+                     conformingType->is<UnresolvedType>() ||
+                     conformingType->is<PlaceholderType>());
+
+  return DependentMemberType::get(conformingType, assocType);
+}
+
 Type ProtocolConformanceRef::getAssociatedType(Type conformingType,
                                                Type assocType) const {
   if (isPack()) {
