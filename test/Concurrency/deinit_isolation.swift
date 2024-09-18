@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -emit-silgen -verify %s
-// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -emit-silgen -DSILGEN %s | %FileCheck %s
-// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -emit-silgen -DSILGEN %s | %FileCheck -check-prefix=CHECK-SYMB %s
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature IsolatedDeinit -emit-silgen -verify %s
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature IsolatedDeinit -emit-silgen -DSILGEN %s | %FileCheck %s
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature IsolatedDeinit -emit-silgen -DSILGEN %s | %FileCheck -check-prefix=CHECK-SYMB %s
 
 // REQUIRES: concurrency
 

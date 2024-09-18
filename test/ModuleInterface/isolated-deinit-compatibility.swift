@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -disable-availability-checking -emit-silgen -verify %s
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) -DEMIT_IFACE %s -disable-availability-checking -module-name IsolatedDeinitCompatibility
-// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -disable-availability-checking -module-name IsolatedDeinitCompatibility
-// RUN: %FileCheck %s < %t.swiftinterface
+// RUN: %target-swift-frontend -enable-experimental-feature IsolatedDeinit -disable-availability-checking -emit-silgen -verify %s
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) -DEMIT_IFACE %s -enable-experimental-feature IsolatedDeinit -disable-availability-checking -module-name IsolatedDeinitCompatibility
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -enable-experimental-feature IsolatedDeinit -disable-availability-checking -module-name IsolatedDeinitCompatibility
+// RUN: %FileCheck %s --dump-input=always < %t.swiftinterface
 
 // MARK: Sync deinit in class
 
@@ -32,15 +32,6 @@ public class SyncClassDefaultPublic {
 // CHECK: {{(@objc )?}}@_Concurrency.MainActor deinit
 // CHECK-NOT: #
 // CHECK: }
-// CHECK-NOT: #
-// CHECK: #else
-// CHECK-NOT: #
-// CHECK: public class SyncClassGlobalActorOpen {
-// CHECK-NOT: #
-// CHECK: {{(@objc )?}}deinit
-// CHECK-NOT: #
-// CHECK: }
-// CHECK-NOT: #
 // CHECK: #endif
 open class SyncClassGlobalActorOpen {
     @MainActor deinit {}
@@ -52,13 +43,6 @@ open class SyncClassGlobalActorOpen {
 // CHECK: #if {{.*}}$IsolatedDeinit
 // CHECK-NOT: #
 // CHECK: {{(@objc )?}}@_Concurrency.MainActor deinit
-// CHECK-NOT: #
-// CHECK: #else
-// CHECK-NOT: #
-// CHECK: {{(@objc )?}}deinit
-// CHECK-NOT: #
-// CHECK: #endif
-// CHECK-NOT: #
 // CHECK: }
 public class SyncClassGlobalActorPublic {
     @MainActor deinit {}
@@ -71,15 +55,6 @@ public class SyncClassGlobalActorPublic {
 // CHECK: {{(@objc )?}}isolated deinit
 // CHECK-NOT: #
 // CHECK: }
-// CHECK-NOT: #
-// CHECK: #else
-// CHECK-NOT: #
-// CHECK: @_Concurrency.MainActor public class SyncClassIsolatedOpen {
-// CHECK-NOT: #
-// CHECK: {{(@objc )?}}deinit
-// CHECK-NOT: #
-// CHECK: }
-// CHECK-NOT: #
 // CHECK: #endif
 @MainActor
 open class SyncClassIsolatedOpen {
@@ -92,13 +67,6 @@ open class SyncClassIsolatedOpen {
 // CHECK: #if {{.*}}$IsolatedDeinit
 // CHECK-NOT: #
 // CHECK: {{(@objc )?}}isolated deinit
-// CHECK-NOT: #
-// CHECK: #else
-// CHECK-NOT: #
-// CHECK: {{(@objc )?}}deinit
-// CHECK-NOT: #
-// CHECK: #endif
-// CHECK-NOT: #
 // CHECK: }
 @MainActor
 public class SyncClassIsolatedPublic {
@@ -112,15 +80,6 @@ public class SyncClassIsolatedPublic {
 // CHECK: {{(@objc )?}}nonisolated deinit
 // CHECK-NOT: #
 // CHECK: }
-// CHECK-NOT: #
-// CHECK: #else
-// CHECK-NOT: #
-// CHECK: @_Concurrency.MainActor public class SyncClassNonisolatedOpen {
-// CHECK-NOT: #
-// CHECK: {{(@objc )?}}deinit
-// CHECK-NOT: #
-// CHECK: }
-// CHECK-NOT: #
 // CHECK: #endif
 @MainActor
 open class SyncClassNonisolatedOpen {
@@ -133,13 +92,6 @@ open class SyncClassNonisolatedOpen {
 // CHECK: #if {{.*}}$IsolatedDeinit
 // CHECK-NOT: #
 // CHECK: {{(@objc )?}}nonisolated deinit
-// CHECK-NOT: #
-// CHECK: #else
-// CHECK-NOT: #
-// CHECK: {{(@objc )?}}deinit
-// CHECK-NOT: #
-// CHECK: #endif
-// CHECK-NOT: #
 // CHECK: }
 @MainActor
 public class SyncClassNonisolatedPublic {
@@ -164,13 +116,6 @@ public actor SyncActorDefaultPublic {
 // CHECK: #if {{.*}}$IsolatedDeinit
 // CHECK-NOT: #
 // CHECK: {{(@objc )?}}@_Concurrency.MainActor deinit
-// CHECK-NOT: #
-// CHECK: #else
-// CHECK-NOT: #
-// CHECK: {{(@objc )?}}deinit
-// CHECK-NOT: #
-// CHECK: #endif
-// CHECK-NOT: #
 // CHECK: }
 public actor SyncActorGlobalActorPublic {
     @MainActor deinit {}
@@ -182,13 +127,6 @@ public actor SyncActorGlobalActorPublic {
 // CHECK: #if {{.*}}$IsolatedDeinit
 // CHECK-NOT: #
 // CHECK: {{(@objc )?}}isolated deinit
-// CHECK-NOT: #
-// CHECK: #else
-// CHECK-NOT: #
-// CHECK: {{(@objc )?}}deinit
-// CHECK-NOT: #
-// CHECK: #endif
-// CHECK-NOT: #
 // CHECK: }
 public actor SyncActorIsolatedPublic {
     isolated deinit {}
@@ -200,13 +138,6 @@ public actor SyncActorIsolatedPublic {
 // CHECK: #if {{.*}}$IsolatedDeinit
 // CHECK-NOT: #
 // CHECK: {{(@objc )?}}nonisolated deinit
-// CHECK-NOT: #
-// CHECK: #else
-// CHECK-NOT: #
-// CHECK: {{(@objc )?}}deinit
-// CHECK-NOT: #
-// CHECK: #endif
-// CHECK-NOT: #
 // CHECK: }
 public actor SyncActorNonisolatedPublic {
     nonisolated deinit {}

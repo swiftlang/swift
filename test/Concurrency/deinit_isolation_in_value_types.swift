@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -emit-silgen -verify %s
+// RUN: %target-swift-frontend -disable-availability-checking -enable-experimental-feature IsolatedDeinit -parse-as-library -emit-silgen -verify %s
 
 @globalActor final actor FirstActor {
   static let shared = FirstActor()

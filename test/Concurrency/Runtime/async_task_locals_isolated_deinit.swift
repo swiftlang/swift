@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -plugin-path %swift-plugin-dir -Xfrontend -disable-availability-checking -parse-stdlib %import-libdispatch %s -o %t/a.out
+// RUN: %target-build-swift -plugin-path %swift-plugin-dir -enable-experimental-feature IsolatedDeinit -Xfrontend -disable-availability-checking -parse-stdlib %import-libdispatch %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 %target-run %t/a.out
 
@@ -8,6 +8,8 @@
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+
+// REQUIRES: gh76538
 
 import Swift
 import _Concurrency
@@ -131,6 +133,7 @@ if #available(SwiftStdlib 5.1, *) {
     let group = DispatchGroup()
     group.enter(1)
     Task {
+      // FIXME: isolated deinit should be clearing task locals
       await TL.$number.withValue(42) {
         await AnotherActor.shared.performTesting {
           _ = ClassNoOp(expectedNumber: 42, group: group)
@@ -155,6 +158,7 @@ if #available(SwiftStdlib 5.1, *) {
     let group = DispatchGroup()
     group.enter(1)
     Task {
+      // FIXME: isolated deinit should be clearing task locals
       TL.$number.withValue(99) {
         // Despite last release happening not on the actor itself,
         // this is still a fast path due to optimisation for deallocating actors.

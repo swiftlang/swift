@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library)
+// RUN: %target-run-simple-swift( -enable-experimental-feature IsolatedDeinit -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: libdispatch

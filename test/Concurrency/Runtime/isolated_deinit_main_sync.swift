@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature IsolatedDeinit -Xfrontend -disable-availability-checking) | %FileCheck %s
 
 var isDead: Bool = false
 
