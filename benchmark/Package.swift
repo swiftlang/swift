@@ -129,7 +129,9 @@ targets.append(
     sources: ["main.swift"],
     swiftSettings: [.unsafeFlags(["-cxx-interoperability-mode=default",
                                   "-I",
-                                  "utils/CxxTests"])]))
+                                  "utils/CxxTests",
+                                  // FIXME(rdar://136138941): these flags should be redundant because of cxxLanguageStandard
+                                  "-Xcc", "-std=c++20"])]))
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 targets.append(
@@ -168,6 +170,8 @@ targets += cxxSingleSourceLibraries.map { name in
     swiftSettings: [.unsafeFlags(["-cxx-interoperability-mode=default",
                                   "-I",
                                   "utils/CxxTests",
+                                  // FIXME(rdar://136138941): these flags should be redundant because of cxxLanguageStandard
+                                  "-Xcc", "-std=c++20",
                                   // FIXME: https://github.com/apple/swift/issues/61453
                                   "-Xfrontend", "-validate-tbd-against-ir=none"])])
 }
