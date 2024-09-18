@@ -376,8 +376,10 @@ static Expected<ObjectRef> mergeCASFileSystem(ObjectStore &CAS,
 
 Expected<IntrusiveRefCntPtr<vfs::FileSystem>>
 createCASFileSystem(ObjectStore &CAS, ArrayRef<std::string> FSRoots,
-                    ArrayRef<std::string> IncludeTrees) {
-  assert(!FSRoots.empty() || !IncludeTrees.empty() && "no root ID provided");
+                    ArrayRef<std::string> IncludeTrees,
+                    ArrayRef<std::string> IncludeTreeFileList) {
+  assert(!FSRoots.empty() || !IncludeTrees.empty() ||
+         !IncludeTreeFileList.empty() && "no root ID provided");
   if (FSRoots.size() == 1 && IncludeTrees.empty()) {
     auto ID = CAS.parseID(FSRoots.front());
     if (!ID)
@@ -394,6 +396,7 @@ createCASFileSystem(ObjectStore &CAS, ArrayRef<std::string> FSRoots,
     return FS.takeError();
 
   auto CASFS = makeIntrusiveRefCnt<vfs::OverlayFileSystem>(std::move(*FS));
+  std::vector<clang::cas::IncludeTree::FileList::FileEntry> Files;
   // Push all Include File System onto overlay.
   for (auto &Tree : IncludeTrees) {
     auto ID = CAS.parseID(Tree);
@@ -407,11 +410,49 @@ createCASFileSystem(ObjectStore &CAS, ArrayRef<std::string> FSRoots,
     if (!IT)
       return IT.takeError();
 
-    auto ITFS = clang::cas::createIncludeTreeFileSystem(*IT);
-    if (!ITFS)
-      return ITFS.takeError();
-    CASFS->pushOverlay(std::move(*ITFS));
+    auto ITF = IT->getFileList();
+    if (!ITF)
+      return ITF.takeError();
+
+    auto Err = ITF->forEachFile(
+        [&](clang::cas::IncludeTree::File File,
+            clang::cas::IncludeTree::FileList::FileSizeTy Size) -> llvm::Error {
+          Files.push_back({File.getRef(), Size});
+          return llvm::Error::success();
+        });
+
+    if (Err)
+      return std::move(Err);
   }
+
+  for (auto &List: IncludeTreeFileList) {
+    auto ID = CAS.parseID(List);
+    if (!ID)
+      return ID.takeError();
+
+    auto Ref = CAS.getReference(*ID);
+    if (!Ref)
+      return createCASObjectNotFoundError(*ID);
+    auto IT = clang::cas::IncludeTree::FileList::get(CAS, *Ref);
+    if (!IT)
+      return IT.takeError();
+
+    auto Err = IT->forEachFile(
+        [&](clang::cas::IncludeTree::File File,
+            clang::cas::IncludeTree::FileList::FileSizeTy Size) -> llvm::Error {
+          Files.push_back({File.getRef(), Size});
+          return llvm::Error::success();
+        });
+
+    if (Err)
+      return std::move(Err);
+  }
+
+  auto ITFS = clang::cas::createIncludeTreeFileSystem(CAS, Files);
+  if (!ITFS)
+    return ITFS.takeError();
+
+  CASFS->pushOverlay(std::move(*ITFS));
 
   return CASFS;
 }
