@@ -162,10 +162,6 @@ enum class ResilienceStrategy : unsigned {
 
 class OverlayFile;
 
-/// A mapping used to find the source file that contains a particular source
-/// location.
-class ModuleSourceFileLocationMap;
-
 /// A unit that allows grouping of modules by a package name.
 ///
 /// PackageUnit is treated as an enclosing scope of ModuleDecl. Unlike other
@@ -302,13 +298,6 @@ private:
 
   SmallVector<FileUnit *, 2> Files;
 
-  /// Mapping used to find the source file associated with a given source
-  /// location.
-  ModuleSourceFileLocationMap *sourceFileLocationMap = nullptr;
-
-  /// The set of auxiliary source files build as part of this module.
-  SmallVector<SourceFile *, 2> AuxiliaryFiles;
-
   llvm::SmallDenseMap<Identifier, SmallVector<OverlayFile *, 1>>
     declaredCrossImports;
 
@@ -409,9 +398,6 @@ public:
   /// a file in the middle of e.g. semantic analysis, use a \c
   /// SynthesizedFileUnit instead.
   void addFile(FileUnit &newFile);
-
-  /// Add an auxiliary source file, introduced as part of the translation.
-  void addAuxiliaryFile(SourceFile &sourceFile);
 
   /// Produces the source file that contains the given source location, or
   /// \c nullptr if the source location isn't in this module.
@@ -565,9 +551,6 @@ private:
   /// along with the name of the required bystander module. Used by tooling to
   /// present overlays as if they were part of their underlying module.
   std::pair<ModuleDecl *, Identifier> getDeclaringModuleAndBystander();
-
-  /// Update the source-file location map to make it current.
-  void updateSourceFileLocationMap();
 
 public:
   ///  If this is a traditional (non-cross-import) overlay, get its underlying
