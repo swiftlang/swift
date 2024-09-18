@@ -10,5 +10,5 @@ func foo(_ x: Double) {}
 
 // Make sure we suggest completions for both CGFloat and Double.
 foo(.#^FOO^#)
-// FOO-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#CGFloat#]; name=init()
+// FOO-DAG: Decl[Constructor]/CurrNominal/IsSystem/TypeRelation[Convertible]: init()[#CGFloat#]; name=init()
 // FOO-DAG: Decl[Constructor]/CurrNominal/IsSystem/TypeRelation[Convertible]: init()[#Double#]; name=init()

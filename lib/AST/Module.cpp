@@ -3948,11 +3948,15 @@ bool IsNonUserModuleRequest::evaluate(Evaluator &evaluator, ModuleDecl *mod) con
   if (!mod->hasName() || mod->getFiles().empty())
     return false;
   
-  auto *LF = dyn_cast_or_null<LoadedFile>(mod->getFiles().front());
-  if (!LF)
-    return false;
-  
-  StringRef modulePath = LF->getSourceFilename();
+  StringRef modulePath;
+  auto fileUnit = mod->getFiles().front();
+  if (auto *LF = dyn_cast_or_null<LoadedFile>(fileUnit)) {
+    modulePath = LF->getSourceFilename();
+  } else if (auto *SF = dyn_cast_or_null<SourceFile>(fileUnit)) {
+    // Checking for SourceFiles lets custom tools get the correct is-system
+    // state for index units when compiling a textual interface directly.
+    modulePath = SF->getFilename();
+  }
   if (modulePath.empty())
     return false;
 
