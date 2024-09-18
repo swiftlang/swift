@@ -579,25 +579,8 @@ Type TypeSubstituter::transformDependentMemberType(DependentMemberType *dependen
     witnessTy = conformance.getPack()->getTypeWitness(assocType,
                                                       IFS.getOptions());
   } else if (conformance.isConcrete()) {
-    auto witness =
-        conformance.getConcrete()->getTypeWitnessAndDecl(assocType,
-                                                         IFS.getOptions());
-
-    witnessTy = witness.getWitnessType();
-    if (!witnessTy || witnessTy->hasError())
-      return failed();
-
-    // This is a hacky feature allowing code completion to migrate to
-    // using Type::subst() without changing output.
-    if (IFS.getOptions() & SubstFlags::DesugarMemberTypes) {
-      if (auto *aliasType = dyn_cast<TypeAliasType>(witnessTy.getPointer()))
-        witnessTy = aliasType->getSinglyDesugaredType();
-
-      // Another hack. If the type witness is a opaque result type. They can
-      // only be referred using the name of the associated type.
-      if (witnessTy->is<OpaqueTypeArchetypeType>())
-        witnessTy = witness.getWitnessDecl()->getDeclaredInterfaceType();
-    }
+    witnessTy = conformance.getConcrete()->getTypeWitness(assocType,
+                                                          IFS.getOptions());
   }
 
   if (!witnessTy || witnessTy->is<ErrorType>())

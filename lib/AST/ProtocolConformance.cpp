@@ -147,7 +147,27 @@ ProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
 
 Type ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType,
                                          SubstOptions options) const {
-  return getTypeWitnessAndDecl(assocType, options).getWitnessType();
+  auto witness = getTypeWitnessAndDecl(assocType, options);
+  auto witnessTy = witness.getWitnessType();
+  if (!witnessTy)
+    return witnessTy;
+
+  // This is a hacky feature allowing code completion to migrate to
+  // using Type::subst() without changing output.
+  //
+  // FIXME: Remove this hack and do whatever we need to do in the
+  // ASTPrinter instead.
+  if (options & SubstFlags::DesugarMemberTypes) {
+    if (auto *aliasType = dyn_cast<TypeAliasType>(witnessTy.getPointer()))
+      witnessTy = aliasType->getSinglyDesugaredType();
+
+    // Another hack. If the type witness is a opaque result type. They can
+    // only be referred using the name of the associated type.
+    if (witnessTy->is<OpaqueTypeArchetypeType>())
+      witnessTy = witness.getWitnessDecl()->getDeclaredInterfaceType();
+  }
+
+  return witnessTy;
 }
 
 ConcreteDeclRef
