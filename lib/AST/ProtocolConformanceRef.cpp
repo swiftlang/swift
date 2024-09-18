@@ -236,47 +236,14 @@ Type ProtocolConformanceRef::getTypeWitness(Type conformingType,
 
 Type ProtocolConformanceRef::getAssociatedType(Type conformingType,
                                                Type assocType) const {
-  if (isPack()) {
-    auto *pack = getPack();
-    ASSERT(conformingType->isEqual(pack->getType()));
-    return pack->getAssociatedType(assocType);
-  }
-
-  auto type = assocType->getCanonicalType();
-
-  // Fast path for generic parameters.
-  if (auto paramTy = dyn_cast<GenericTypeParamType>(type)) {
-    ASSERT(paramTy->getDepth() == 0 && paramTy->getIndex() == 0 &&
-           "type parameter in protocol was not Self");
-    return conformingType;
-  }
-
   if (isInvalid())
     return ErrorType::get(assocType->getASTContext());
 
   auto proto = getRequirement();
 
-  if (isConcrete()) {
-    if (auto selfType = conformingType->getAs<DynamicSelfType>())
-      conformingType = selfType->getSelfType();
-    ASSERT(getConcrete()->getType()->isEqual(conformingType));
-
-    // Fast path for dependent member types on 'Self' of our associated types.
-    auto memberType = cast<DependentMemberType>(type);
-    if (memberType.getBase()->isEqual(proto->getSelfInterfaceType()) &&
-        memberType->getAssocType()->getProtocol() == proto) {
-      auto witnessType = getConcrete()->getTypeWitness(
-          memberType->getAssocType());
-      if (!witnessType)
-        return ErrorType::get(assocType->getASTContext());
-      return witnessType;
-    }
-  }
-
-  // General case: consult the substitution map.
   auto substMap =
     SubstitutionMap::getProtocolSubstitutions(proto, conformingType, *this);
-  return type.subst(substMap);
+  return assocType.subst(substMap);
 }
 
 ProtocolConformanceRef
