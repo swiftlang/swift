@@ -243,19 +243,16 @@ public:
 
   /// Retrieve the ClassDecl for a type that maps to a Swift class or
   /// bound generic class type.
-  SWIFT_IMPORT_UNSAFE
   ClassDecl *getClassOrBoundGenericClass() const {
     return getASTType().getClassOrBoundGenericClass();
   }
   /// Retrieve the StructDecl for a type that maps to a Swift struct or
   /// bound generic struct type.
-  SWIFT_IMPORT_UNSAFE
   StructDecl *getStructOrBoundGenericStruct() const {
     return getASTType().getStructOrBoundGenericStruct();
   }
   /// Retrieve the EnumDecl for a type that maps to a Swift enum or
   /// bound generic enum type.
-  SWIFT_IMPORT_UNSAFE
   EnumDecl *getEnumOrBoundGenericEnum() const {
     return getASTType().getEnumOrBoundGenericEnum();
   }
@@ -286,7 +283,6 @@ public:
 
   bool isBuiltinBridgeObject() const { return is<BuiltinBridgeObjectType>(); }
 
-  SWIFT_IMPORT_UNSAFE
   SILType getBuiltinVectorElementType() const {
     auto vector = castTo<BuiltinVectorType>();
     return getPrimitiveObjectType(vector.getElementType());
@@ -294,7 +290,6 @@ public:
 
   /// Retrieve the NominalTypeDecl for a type that maps to a Swift
   /// nominal or bound generic nominal type.
-  SWIFT_IMPORT_UNSAFE
   NominalTypeDecl *getNominalOrBoundGenericNominal() const {
     return getASTType().getNominalOrBoundGenericNominal();
   }
