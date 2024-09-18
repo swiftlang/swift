@@ -203,17 +203,9 @@ SourceRange GenericParamScope::getSourceRangeOfThisASTNode(
 
 SourceRange ASTSourceFileScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  if (auto bufferID = SF->getBufferID()) {
-    auto charRange = getSourceManager().getRangeForBuffer(*bufferID);
-    return SourceRange(charRange.getStart(), charRange.getEnd());
-  }
-
-  if (SF->getTopLevelItems().empty())
-    return SourceRange();
-
-  // Use the source ranges of the declarations in the file.
-  return SourceRange(SF->getTopLevelItems().front().getStartLoc(),
-                     SF->getTopLevelItems().back().getEndLoc());
+  auto bufferID = SF->getBufferID();
+  auto charRange = getSourceManager().getRangeForBuffer(bufferID);
+  return SourceRange(charRange.getStart(), charRange.getEnd());
 }
 
 SourceRange GenericTypeOrExtensionScope::getSourceRangeOfThisASTNode(

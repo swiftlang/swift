@@ -3040,7 +3040,7 @@ std::pair<LineRange, std::string> swift::ide::reformat(LineRange Range,
     // default value.
     Options.TabWidth = Options.IndentWidth ? Options.IndentWidth : 4;
   }
-  auto SourceBufferID = SF.getBufferID().value();
+  auto SourceBufferID = SF.getBufferID();
   StringRef Text = SM.getLLVMSourceMgr()
     .getMemoryBuffer(SourceBufferID)->getBuffer();
   size_t Offset = getOffsetOfLine(Range.startLine(), Text, /*Trim*/true);

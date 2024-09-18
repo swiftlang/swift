@@ -8132,14 +8132,18 @@ unsigned ClangImporter::Implementation::getClangSwiftAttrSourceBuffer(
 }
 
 SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
-    ModuleDecl &module) {
+    ModuleDecl &module, unsigned bufferID) {
   auto known = ClangSwiftAttrSourceFiles.find(&module);
   if (known != ClangSwiftAttrSourceFiles.end())
     return *known->second;
 
   auto sourceFile = new (SwiftContext)
-      SourceFile(module, SourceFileKind::Library, std::nullopt);
+      SourceFile(module, SourceFileKind::Library, bufferID);
   ClangSwiftAttrSourceFiles.insert({&module, sourceFile});
+
+  // Record this attribute in the module.
+  module.addAuxiliaryFile(*sourceFile);
+
   return *sourceFile;
 }
 
@@ -8297,7 +8301,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
 
       // Dig out a source file we can use for parsing.
       auto &sourceFile = getClangSwiftAttrSourceFile(
-          *MappedDecl->getDeclContext()->getParentModule());
+          *MappedDecl->getDeclContext()->getParentModule(), bufferID);
 
       // Spin up a parser.
       swift::Parser parser(

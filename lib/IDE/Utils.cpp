@@ -708,9 +708,8 @@ void swift::ide::SourceEditConsumer::acceptMacroExpansionBuffer(
       containingSF->getParentModule()->getSourceFileContainingLocation(
           originalSourceRange.getStart());
   StringRef originalPath;
-  if (originalFile->getBufferID().has_value() &&
-      containingSF->getBufferID() != originalFile->getBufferID()) {
-    originalPath = SM.getIdentifierForBuffer(*originalFile->getBufferID());
+  if (containingSF->getBufferID() != originalFile->getBufferID()) {
+    originalPath = SM.getIdentifierForBuffer(originalFile->getBufferID());
   }
 
   StringRef bufferName;

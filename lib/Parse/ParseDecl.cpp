@@ -257,10 +257,7 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
   // Perform round-trip and/or validation checking.
   if (parsingOpts.contains(ParsingFlags::RoundTrip) &&
       swift_ASTGen_roundTripCheck(exportedSourceFile)) {
-    SourceLoc loc;
-    if (auto bufferID = SF.getBufferID()) {
-      loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
-    }
+    SourceLoc loc = Context.SourceMgr.getLocForBufferStart(SF.getBufferID());
     diagnose(loc, diag::parser_round_trip_error);
     return;
   }
@@ -277,10 +274,7 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
       // which case we still have `hadAnyError() == false`. To avoid
       // emitting the same warnings from SwiftParser, only emit errors from
       // SwiftParser
-      SourceLoc loc;
-      if (auto bufferID = SF.getBufferID()) {
-          loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
-      }
+      SourceLoc loc = Context.SourceMgr.getLocForBufferStart(SF.getBufferID());
       diagnose(loc, diag::parser_new_parser_errors);
     }
   }
@@ -298,10 +292,7 @@ void *ExportedSourceFileRequest::evaluate(Evaluator &evaluator,
   auto &SM = ctx.SourceMgr;
 
   auto bufferID = SF->getBufferID();
-  if (!bufferID)
-    return nullptr;
-
-  StringRef contents = SM.extractText(SM.getRangeForBuffer(*bufferID));
+  StringRef contents = SM.extractText(SM.getRangeForBuffer(bufferID));
 
   // Parse the source file.
   auto exportedSourceFile = swift_ASTGen_parseSourceFile(

@@ -28,7 +28,7 @@ swift::ide::resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
                                    StringRef NewName, SourceFile &SF,
                                    DiagnosticEngine &Diags) {
   SourceManager &SM = SF.getASTContext().SourceMgr;
-  unsigned BufferID = SF.getBufferID().value();
+  unsigned BufferID = SF.getBufferID();
 
   std::vector<SourceLoc> UnresolvedLocs;
   for (const RenameLoc &RenameLoc : RenameLocs) {
