@@ -8118,9 +8118,6 @@ SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
       SourceFile(module, SourceFileKind::Library, bufferID);
   ClangSwiftAttrSourceFiles.insert({&module, sourceFile});
 
-  // Record this attribute in the module.
-  module.addAuxiliaryFile(*sourceFile);
-
   return *sourceFile;
 }
 

@@ -226,7 +226,6 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
         SourceFile::ParsingOptions parsingOpts;
         auto sourceFile = new (Ctx) SourceFile(
             *moduleDecl, SourceFileKind::Interface, bufferID, parsingOpts);
-        moduleDecl->addAuxiliaryFile(*sourceFile);
         std::vector<StringRef> ArgsRefs(Args.begin(), Args.end());
         std::vector<StringRef> compiledCandidatesRefs(compiledCandidates.begin(),
                                                       compiledCandidates.end());
