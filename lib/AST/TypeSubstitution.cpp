@@ -576,10 +576,8 @@ Type TypeSubstituter::transformDependentMemberType(DependentMemberType *dependen
 
   // Retrieve the type witness.
   if (conformance.isPack()) {
-    auto *packConformance = conformance.getPack();
-
-    witnessTy = packConformance->getAssociatedType(
-        assocType->getDeclaredInterfaceType());
+    witnessTy = conformance.getPack()->getTypeWitness(assocType,
+                                                      IFS.getOptions());
   } else if (conformance.isConcrete()) {
     auto witness =
         conformance.getConcrete()->getTypeWitnessAndDecl(assocType,

@@ -199,7 +199,7 @@ Type ProtocolConformanceRef::getTypeWitness(Type conformingType,
   if (isPack()) {
     auto *pack = getPack();
     ASSERT(conformingType->isEqual(pack->getType()));
-    return pack->getAssociatedType(assocType->getDeclaredInterfaceType());
+    return pack->getTypeWitness(assocType);
   }
 
   auto failed = [&]() {
