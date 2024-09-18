@@ -20,6 +20,7 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PackConformance.h"
@@ -250,7 +251,8 @@ ProtocolConformanceRef
 ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
                                                  Type assocType,
                                                  ProtocolDecl *protocol) const {
-  // If this is a pack conformance, project the associated conformances.
+  // If this is a pack conformance, project the associated conformances from
+  // each pack element.
   if (isPack()) {
     auto *pack = getPack();
     assert(conformingType->isEqual(pack->getType()));
@@ -258,21 +260,49 @@ ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
         pack->getAssociatedConformance(assocType, protocol));
   }
 
-  // If this is a concrete conformance, look up the associated conformance.
+  // If this is a concrete conformance, project the associated conformance.
   if (isConcrete()) {
     auto conformance = getConcrete();
     assert(conformance->getType()->isEqual(conformingType));
     return conformance->getAssociatedConformance(assocType, protocol);
   }
 
-  // Otherwise, apply the substitution {self -> conformingType}
-  // to the abstract conformance requirement laid upon the dependent type
-  // by the protocol.
-  auto subMap =
-    SubstitutionMap::getProtocolSubstitutions(getRequirement(),
-                                              conformingType, *this);
-  auto abstractConf = ProtocolConformanceRef(protocol);
-  return abstractConf.subst(assocType, subMap);
+  // An associated conformance of an archetype might be known to be
+  // a concrete conformance, if the subject type is fixed to a concrete
+  // type in the archetype's generic signature. We don't actually have
+  // any way to recover the conformance in this case, except via global
+  // conformance lookup.
+  //
+  // However, if we move to a first-class representation of abstract
+  // conformances where they store their subject types, we can also
+  // cache the lookups inside the abstract conformance instance too.
+  if (auto archetypeType = conformingType->getAs<ArchetypeType>()) {
+    conformingType = archetypeType->getInterfaceType();
+    auto *genericEnv = archetypeType->getGenericEnvironment();
+
+    auto subjectType = assocType.transformRec(
+      [&](TypeBase *t) -> std::optional<Type> {
+        if (isa<GenericTypeParamType>(t))
+          return conformingType;
+        return std::nullopt;
+      });
+
+    return lookupConformance(
+        genericEnv->mapTypeIntoContext(subjectType),
+        protocol);
+  }
+
+  // Associated conformances of type parameters and type variables
+  // are always abstract, because we don't know the output generic
+  // signature of the substitution (or in the case of type variables,
+  // we have no visibility into constraints). See the parallel hack
+  // to handle this in SubstitutionMap::lookupConformance().
+  CONDITIONAL_ASSERT(conformingType->isTypeParameter() ||
+                     conformingType->isTypeVariableOrMember() ||
+                     conformingType->is<UnresolvedType>() ||
+                     conformingType->is<PlaceholderType>());
+
+  return ProtocolConformanceRef(protocol);
 }
 
 /// Check of all types used by the conformance are canonical.
