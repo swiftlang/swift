@@ -1,7 +1,7 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-EARLY
 // RUN: %target-sil-opt -enable-sil-verify-all %s -late-onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-LATE
-// RUN: %target-sil-opt -enable-sil-verify-all %s -assert-conf-id=1 -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-NOASSERTS
-// RUN: %target-sil-opt -enable-sil-verify-all %s -assert-conf-id=2 -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-NOASSERTS
+// RUN: %target-sil-opt -enable-sil-verify-all %s -assert-conf-id=1 -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-NOASSERTS1
+// RUN: %target-sil-opt -enable-sil-verify-all %s -assert-conf-id=2 -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-NOASSERTS2
 
 // REQUIRES: swift_in_compiler
 
@@ -417,8 +417,9 @@ bb0:
 
 // CHECK-LABEL: sil @remove_assert_configuration
 // CHECK-NOT:     builtin "assert_configuration"
-// CHECK-EARLY:     [[L:%.*]] = integer_literal $Builtin.Int8, 1
-// CHECK-NOASSERTS: [[L:%.*]] = integer_literal $Builtin.Int8, 0
+// CHECK-EARLY:     [[L:%.*]] = integer_literal $Builtin.Int8, 0
+// CHECK-NOASSERTS1: [[L:%.*]] = integer_literal $Builtin.Int8, 1
+// CHECK-NOASSERTS2: [[L:%.*]] = integer_literal $Builtin.Int8, 2
 // CHECK:         [[R:%.*]] = struct $Int8 ([[L]] : $Builtin.Int8)
 // CHECK:         return [[R]]
 // CHECK:       } // end sil function 'remove_assert_configuration'
