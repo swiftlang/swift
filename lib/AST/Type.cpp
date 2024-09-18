@@ -3747,12 +3747,16 @@ void ParameterizedProtocolType::getRequirements(
   assert(argTypes.size() <= assocTypes.size());
 
   auto conformance = lookupConformance(baseType, protoDecl);
+  auto subMap = SubstitutionMap::getProtocolSubstitutions(
+      protoDecl, baseType, conformance);
 
   for (unsigned i : indices(argTypes)) {
     auto argType = argTypes[i];
     auto *assocType = assocTypes[i];
-    auto subjectType = conformance.getAssociatedType(
-        baseType, assocType->getDeclaredInterfaceType());
+    // Do a general type substitution here because the associated type might be
+    // from an inherited protocol, in which case we will evaluate a non-trivial
+    // conformance path.
+    auto subjectType = assocType->getDeclaredInterfaceType().subst(subMap);
     reqs.emplace_back(RequirementKind::SameType, subjectType, argType);
   }
 }
