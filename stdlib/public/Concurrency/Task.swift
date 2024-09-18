@@ -194,7 +194,7 @@ extension Task {
     }
   }
 
-  /// Marks this task as cancelled.
+  /// Marks this task as canceled.
   ///
   /// Task cancellation is cooperative:
   /// a task that supports cancellation
