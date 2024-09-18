@@ -188,7 +188,8 @@ public:
   static std::unique_ptr<ClangImporter>
   create(ASTContext &ctx,
          std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
-         DWARFImporterDelegate *dwarfImporterDelegate = nullptr);
+         DWARFImporterDelegate *dwarfImporterDelegate = nullptr,
+         bool ignoreFileMapping = false);
 
   static std::vector<std::string>
   getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget = false);
