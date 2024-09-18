@@ -24,6 +24,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangSwiftTypeCorrespondence.h"
 #include "swift/AST/Comment.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignAsyncConvention.h"
@@ -2155,16 +2156,16 @@ public:
     auto proto = ctx.getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
     if (!proto) return nullptr;
 
+    auto declaredType = nominal->getDeclaredInterfaceType();
+
     // Determine whether this nominal type is _ObjectiveCBridgeable.
-    SmallVector<ProtocolConformance *, 2> conformances;
-    if (!nominal->lookupConformance(proto, conformances))
+    auto conformance = lookupConformance(declaredType, proto);
+    if (!conformance)
       return nullptr;
 
     // Dig out the Objective-C type.
-    auto conformance = conformances.front();
-    Type objcType = ProtocolConformanceRef(conformance).getTypeWitnessByName(
-                                           nominal->getDeclaredType(),
-                                           ctx.Id_ObjectiveCType);
+    Type objcType = conformance.getTypeWitnessByName(
+        declaredType, ctx.Id_ObjectiveCType);
 
     // Dig out the Objective-C class.
     return objcType->getClassOrBoundGenericClass();
