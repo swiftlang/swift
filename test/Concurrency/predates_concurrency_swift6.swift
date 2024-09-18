@@ -130,6 +130,15 @@ do {
       nil
     }
 
+    @preconcurrency
+    open var test5: (@MainActor () -> Void)? { // expected-note {{overridden declaration is here}}
+      nil
+    }
+
+    @preconcurrency
+    func test6(_: (@MainActor () -> Void)? = nil) { // expected-note {{overridden declaration is here}}
+    }
+
     init() {
       self.test1 = nil
       self.test2 = [:]
@@ -159,6 +168,15 @@ do {
     override var test4: (((any Sendable)?) -> Void)? {
       // expected-error@-1 {{declaration 'test4' has a type with different sendability from any potential overrides}}
       nil
+    }
+
+    override var test5: (() -> Void)? {
+      // expected-error@-1 {{declaration 'test5' has a type with different global actor isolation from any potential overrides}}
+      nil
+    }
+
+    override func test6(_: (() -> Void)?) {
+      // expected-error@-1 {{declaration 'test6' has a type with different global actor isolation from any potential overrides}}
     }
   }
 }

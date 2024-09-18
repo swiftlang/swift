@@ -3329,6 +3329,9 @@ ERROR(override_multiple_decls_base,none,
 ERROR(override_sendability_mismatch,none,
       "declaration %0 has a type with different sendability from any potential "
       "overrides", (DeclName))
+ERROR(override_global_actor_isolation_mismatch,none,
+      "declaration %0 has a type with different global actor isolation from any potential "
+      "overrides", (DeclName))
 ERROR(override_multiple_decls_arg_mismatch,none,
       "declaration %0 has different argument labels from any potential "
       "overrides", (DeclName))
