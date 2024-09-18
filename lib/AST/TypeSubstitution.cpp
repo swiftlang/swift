@@ -1022,21 +1022,17 @@ Type TypeBase::getTypeOfMember(const VarDecl *member) {
 
 Type TypeBase::getTypeOfMember(const ValueDecl *member,
                                Type memberType) {
-  assert(memberType);
-  assert(!memberType->is<GenericFunctionType>() &&
+  auto *dc = member->getDeclContext();
+
+  ASSERT(dc->isTypeContext());
+  ASSERT(!memberType->is<GenericFunctionType>() &&
          "Generic function types are not supported");
+  ASSERT(isa<VarDecl>(member) || isa<EnumElementDecl>(member));
 
-  if (is<ErrorType>())
-    return ErrorType::get(getASTContext());
+  if (!memberType->hasTypeParameter())
+    return memberType;
 
-  if (auto *lvalue = getAs<LValueType>()) {
-    auto objectTy = lvalue->getObjectType();
-    return objectTy->getTypeOfMember(member, memberType);
-  }
-
-  // Perform the substitution.
-  auto substitutions = getMemberSubstitutionMap(member);
-  return memberType.subst(substitutions);
+  return memberType.subst(getContextSubstitutionMap(dc));
 }
 
 Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
