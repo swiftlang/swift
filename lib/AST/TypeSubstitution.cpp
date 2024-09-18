@@ -282,20 +282,6 @@ Type DependentMemberType::substBaseType(Type substBase,
                               /*level=*/0);
 }
 
-Type DependentMemberType::substRootParam(Type newRoot,
-                                         LookupConformanceFn lookupConformance,
-                                         SubstOptions options) {
-  auto base = getBase();
-  if (base->is<GenericTypeParamType>()) {
-    return substBaseType(newRoot, lookupConformance, options);
-  }
-  if (auto depMem = base->getAs<DependentMemberType>()) {
-    return substBaseType(depMem->substRootParam(newRoot, lookupConformance, options),
-                         lookupConformance, options);
-  }
-  return Type();
-}
-
 static Type substGenericFunctionType(GenericFunctionType *genericFnType,
                                      InFlightSubstitution &IFS) {
   // Substitute into the function type (without generic signature).
