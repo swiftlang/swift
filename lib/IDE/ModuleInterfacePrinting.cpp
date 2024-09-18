@@ -751,9 +751,7 @@ static SourceLoc getDeclStartPosition(SourceFile &File) {
 }
 
 static void printUntilFirstDeclStarts(SourceFile &File, ASTPrinter &Printer) {
-  if (!File.getBufferID().has_value())
-    return;
-  auto BufferID = *File.getBufferID();
+  auto BufferID = File.getBufferID();
 
   auto &SM = File.getASTContext().SourceMgr;
   CharSourceRange TextRange = SM.getRangeForBuffer(BufferID);

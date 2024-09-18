@@ -58,7 +58,7 @@ TypeRefinementContext::createForSourceFile(SourceFile *SF,
     // root context should be nested under.
     if (auto parentTRC =
             SF->getEnclosingSourceFile()->getTypeRefinementContext()) {
-      auto charRange = Ctx.SourceMgr.getRangeForBuffer(*SF->getBufferID());
+      auto charRange = Ctx.SourceMgr.getRangeForBuffer(SF->getBufferID());
       range = SourceRange(charRange.getStart(), charRange.getEnd());
       auto originalNode = SF->getNodeInEnclosingSourceFile();
       parentContext =

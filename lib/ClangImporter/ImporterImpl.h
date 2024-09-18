@@ -1062,7 +1062,7 @@ public:
 
   /// Retrieve the placeholder source file for use in parsing Swift attributes
   /// in the given module.
-  SourceFile &getClangSwiftAttrSourceFile(ModuleDecl &module);
+  SourceFile &getClangSwiftAttrSourceFile(ModuleDecl &module, unsigned bufferID);
 
   /// Utility function to import Clang attributes from a source Swift decl to
   /// synthesized Swift decl.

@@ -366,7 +366,7 @@ public:
       : AllTokensInFile(File.getAllTokens()),
         LangOpts(File.getASTContext().LangOpts),
         SM(File.getASTContext().SourceMgr),
-        BufferID(File.getBufferID().value()),
+        BufferID(File.getBufferID()),
         Ctx(File.getASTContext()),
         Walker(Walker) { }
 
