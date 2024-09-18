@@ -412,7 +412,8 @@ bool GenericSignatureImpl::isRequirementSatisfied(
 
     requirement = requirement.subst(
         QueryInterfaceTypeSubstitutions{genericEnv},
-        LookUpConformanceInModule());
+        LookUpConformanceInModule(),
+        SubstFlags::PreservePackExpansionLevel);
   }
 
   SmallVector<Requirement, 2> subReqs;
