@@ -44,6 +44,8 @@ class WasmStdlib(cmake_product.CMakeProduct):
     def _build(self, host_target, target_triple):
         self.cmake_options.define('CMAKE_INSTALL_PREFIX:PATH', '/usr')
         self.cmake_options.define('CMAKE_BUILD_TYPE:STRING', self._build_variant)
+        self.cmake_options.define('CMAKE_SYSTEM_NAME:STRING', 'WASI')
+        self.cmake_options.define('CMAKE_SYSTEM_PROCESSOR:STRING', 'wasm32')
         self.cmake_options.define(
             'SWIFT_STDLIB_BUILD_TYPE:STRING', self._build_variant)
 
