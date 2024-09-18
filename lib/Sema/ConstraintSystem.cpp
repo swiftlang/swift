@@ -1383,7 +1383,7 @@ getPropertyWrapperInformationFromOverload(
       VarDecl *memberDecl;
       std::tie(memberDecl, type) = *declInformation;
       if (Type baseType = resolvedOverload.choice.getBaseType()) {
-        type = baseType->getTypeOfMember(memberDecl, type);
+        type = baseType->getRValueType()->getTypeOfMember(memberDecl, type);
       }
       return std::make_pair(decl, type);
     }
