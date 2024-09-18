@@ -194,33 +194,44 @@ extension Task {
     }
   }
 
-  /// Marks this task as canceled.
+  /// Cancels this task.
   ///
-  /// Task cancellation is cooperative:
-  /// a task that supports cancellation
-  /// checks whether it has been canceled at various points during its work.
-  /// You determine what action a canceled task takes,
-  /// and whether cancellation does anything to that task.
-  /// The task can return early or throw an error
-  /// to stop running early.
+  /// Cancelling a task has three primary effects:
   ///
-  /// Calling this method has only one effect:
-  /// setting the canceled flag on the task or its child tasks.
-  /// Unless the tasks react to this flag,
-  /// cancellation doesn't change the behavior of the tasks.
-  /// Specifically, tasks are never forcefully interrupted or stopped,
-  /// and are always allowed to execute code until they return or throw an error.
+  /// - It flags the task as cancelled.
+  /// - It causes any active cancellation handlers on the task to run (once).
+  /// - It cancels any child tasks and task groups of the task, including
+  ///   those created in the future. If those tasks have cancellation handlers, 
+  ///   they also are triggered.
   ///
-  /// Likewise, if the task has already run
-  /// past the last point where it would stop early,
-  /// calling this method has no effect.
+  /// Task cancellation is cooperative and idempotent.
   ///
-  /// It is safe to call `cancel` from any task or thread.
-  /// The `cancel` call is idempotent, and may be called multiple times,
-  /// and cancellation handlers will trigger only a single (first) 
-  /// time the task is cancelled.
+  /// Cancelling a task does not automatically cause arbitrary functions on the task
+  /// to stop running or throw errors. A function _may_ choose to react
+  /// to cancellation by ending its work early, and it is conventional to
+  /// signal that to callers by throwing CancellationError. However,
+  /// a function that doesn't specifically check for cancellation will
+  /// run to completion normally even if the task it is running on is
+  /// cancelled. (Of course, it may still end early if it calls something
+  /// else that handles cancellation by throwing and then doesn't
+  /// handle the error.)
+  ///
+  /// It is safe to cancel a task from any task or thread. It is safe for
+  /// multiple tasks or threads to cancel the same task at the same
+  /// time. Cancelling a task that has already been cancelled has no
+  /// additional effect.
+  ///
+  /// `cancel` may need to acquire locks and synchronously run
+  /// arbitrary cancellation-handler code associated with the
+  /// cancelled task. To reduce the risk of deadlock, it is
+  /// recommended that callers release any locks they might be
+  /// holding before they call cancel.
+  ///
+  /// If the task has already run past the last point where it could have 
+  /// performed a cancellation check, cancelling it may have no observable effects.
   ///
   /// - SeeAlso: `Task.checkCancellation()`
+  /// - SeeAlso: `withTaskCancellationHandler(operation:onCancel:isolation:)`
   public func cancel() {
     Builtin.cancelAsyncTask(_task)
   }
