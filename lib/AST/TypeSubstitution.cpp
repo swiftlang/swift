@@ -264,24 +264,6 @@ operator()(CanType dependentType, Type conformingReplacementType,
   return ProtocolConformanceRef(conformedProtocol);
 }
 
-Type DependentMemberType::substBaseType(Type substBase) {
-  return substBaseType(substBase, LookUpConformanceInModule(),
-                       std::nullopt);
-}
-
-Type DependentMemberType::substBaseType(Type substBase,
-                                        LookupConformanceFn lookupConformance,
-                                        SubstOptions options) {
-  if (substBase.getPointer() == getBase().getPointer() &&
-      substBase->hasTypeParameter())
-    return this;
-
-  InFlightSubstitution IFS(nullptr, lookupConformance, options);
-  return getMemberForBaseType(IFS, getBase(), substBase,
-                              getAssocType(), getName(),
-                              /*level=*/0);
-}
-
 static Type substGenericFunctionType(GenericFunctionType *genericFnType,
                                      InFlightSubstitution &IFS) {
   // Substitute into the function type (without generic signature).
