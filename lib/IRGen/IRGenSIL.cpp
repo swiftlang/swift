@@ -2528,6 +2528,11 @@ void IRGenSILFunction::emitSILFunction() {
       CurFn->addFnAttr("async_entry");
       CurFn->addFnAttr(llvm::Attribute::NoInline);
     }
+
+    // For debugging purposes we always want a frame that stores the async
+    // context.
+    if (IGM.getOptions().AsyncFramePointerAll)
+      CurFn->addFnAttr("frame-pointer", "all");
   }
   if (isAsyncFn) {
     IGM.noteSwiftAsyncFunctionDef();
