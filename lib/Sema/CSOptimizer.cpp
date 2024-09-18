@@ -268,6 +268,19 @@ static Constraint *determineBestChoicesInContext(
       resultTypes.push_back(resultType);
     }
 
+    // Determine whether all of the argument candidates are inferred from literals.
+    // This information is going to be used later on when we need to decide how to
+    // score a matching choice.
+    bool onlyLiteralCandidates =
+        argFuncType->getNumParams() > 0 &&
+        llvm::none_of(
+            indices(argFuncType->getParams()), [&](const unsigned argIdx) {
+              auto &candidates = candidateArgumentTypes[argIdx];
+              return llvm::any_of(candidates, [&](const auto &candidate) {
+                return !candidate.second;
+              });
+            });
+
     // Match arguments to the given overload choice.
     auto matchArguments = [&](OverloadChoice choice, FunctionType *overloadType)
 			-> std::optional<MatchCallArgumentResult> {
@@ -591,6 +604,18 @@ static Constraint *determineBestChoicesInContext(
           // Average the score to avoid disfavoring disjunctions with fewer
           // parameters.
           score /= (overloadType->getNumParams() - numDefaulted);
+
+          // Make sure that the score is uniform for all disjunction
+          // choices that match on literals only, this would make sure that
+          // in operator chains that consist purely of literals we'd
+          // always prefer outermost disjunction instead of innermost
+          // one.
+          //
+          // Preferring outer disjunction first works better in situations
+          // when contextual type for the whole chain becomes available at
+          // some point during solving at it would allow for faster pruning.
+          if (score > 0 && onlyLiteralCandidates)
+            score = 0.1;
 
           // If one of the result types matches exactly, that's a good
           // indication that overload choice should be favored.
