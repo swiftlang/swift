@@ -3742,8 +3742,9 @@ filterProtocolRequirements(
 
   const auto getProtocolSubstitutionMap = [&](ValueDecl *Req) {
     auto *const PD = cast<ProtocolDecl>(Req->getDeclContext());
+    auto Conformance = lookupConformance(Adoptee, PD);
     return SubstitutionMap::getProtocolSubstitutions(
-        PD, Adoptee, ProtocolConformanceRef(PD));
+        PD, Adoptee, Conformance);
   };
 
   llvm::SmallDenseMap<DeclName, llvm::SmallVector<ValueDecl *, 2>, 4>
@@ -5058,7 +5059,7 @@ hasInvalidTypeInConformanceContext(const ValueDecl *requirement,
 
   const auto subs = SubstitutionMap::getProtocolSubstitutions(
       conformance->getProtocol(),
-      conformance->getDeclContext()->mapTypeIntoContext(conformance->getType()),
+      conformance->getType(),
       ProtocolConformanceRef(conformance));
 
   class Walker final : public TypeWalker {
