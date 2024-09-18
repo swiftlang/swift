@@ -92,101 +92,6 @@ CanGenericFunctionType::substGenericArgs(SubstitutionMap subs) const {
            getPointer()->substGenericArgs(subs)->getCanonicalType());
 }
 
-static Type getMemberForBaseType(InFlightSubstitution &IFS,
-                                 Type origBase,
-                                 Type substBase,
-                                 AssociatedTypeDecl *assocType,
-                                 Identifier name,
-                                 unsigned level) {
-  // Produce a dependent member type for the given base type.
-  auto getDependentMemberType = [&](Type baseType) {
-    if (assocType)
-      return DependentMemberType::get(baseType, assocType);
-
-    return DependentMemberType::get(baseType, name);
-  };
-
-  // Produce a failed result.
-  auto failed = [&]() -> Type {
-    Type baseType = ErrorType::get(substBase ? substBase : origBase);
-    if (assocType)
-      return DependentMemberType::get(baseType, assocType);
-
-    return DependentMemberType::get(baseType, name);
-  };
-
-  if (auto *selfType = substBase->getAs<DynamicSelfType>())
-    substBase = selfType->getSelfType();
-
-  // If the parent is a type variable or a member rooted in a type variable,
-  // or if the parent is a type parameter, we're done. Also handle
-  // UnresolvedType here, which can come up in diagnostics.
-  if (substBase->isTypeVariableOrMember() ||
-      substBase->isTypeParameter() ||
-      substBase->is<UnresolvedType>())
-    return getDependentMemberType(substBase);
-
-  // All remaining cases require an associated type declaration and not just
-  // the name of a member type.
-  if (!assocType)
-    return failed();
-
-  // If the parent is an archetype, extract the child archetype with the
-  // given name.
-  if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
-    if (Type memberArchetypeByName = archetypeParent->getNestedType(assocType))
-      return memberArchetypeByName;
-
-    // If looking for an associated type and the archetype is constrained to a
-    // class, continue to the default associated type lookup
-    if (!assocType || !archetypeParent->getSuperclass())
-      return failed();
-  }
-
-  auto proto = assocType->getProtocol();
-  ProtocolConformanceRef conformance =
-    IFS.lookupConformance(origBase->getCanonicalType(), substBase,
-                          proto, level);
-
-  if (conformance.isInvalid())
-    return failed();
-
-  Type witnessTy;
-
-  // Retrieve the type witness.
-  if (conformance.isPack()) {
-    auto *packConformance = conformance.getPack();
-
-    witnessTy = packConformance->getAssociatedType(
-        assocType->getDeclaredInterfaceType());
-  } else if (conformance.isConcrete()) {
-    auto witness =
-        conformance.getConcrete()->getTypeWitnessAndDecl(assocType,
-                                                         IFS.getOptions());
-
-    witnessTy = witness.getWitnessType();
-    if (!witnessTy || witnessTy->hasError())
-      return failed();
-
-    // This is a hacky feature allowing code completion to migrate to
-    // using Type::subst() without changing output.
-    if (IFS.getOptions() & SubstFlags::DesugarMemberTypes) {
-      if (auto *aliasType = dyn_cast<TypeAliasType>(witnessTy.getPointer()))
-        witnessTy = aliasType->getSinglyDesugaredType();
-
-      // Another hack. If the type witness is a opaque result type. They can
-      // only be referred using the name of the associated type.
-      if (witnessTy->is<OpaqueTypeArchetypeType>())
-        witnessTy = witness.getWitnessDecl()->getDeclaredInterfaceType();
-    }
-  }
-
-  if (!witnessTy || witnessTy->is<ErrorType>())
-    return failed();
-
-  return witnessTy;
-}
-
 ProtocolConformanceRef LookUpConformanceInModule::
 operator()(CanType dependentType, Type conformingReplacementType,
            ProtocolDecl *conformedProtocol) const {
@@ -609,12 +514,98 @@ Type TypeSubstituter::transformPackElementType(PackElementType *element,
 
 Type TypeSubstituter::transformDependentMemberType(DependentMemberType *dependent,
                                                    TypePosition pos) {
-  auto newBase = doIt(dependent->getBase(), TypePosition::Invariant);
-  return getMemberForBaseType(IFS,
-                              dependent->getBase(), newBase,
-                              dependent->getAssocType(),
-                              dependent->getName(),
-                              level);
+  auto origBase = dependent->getBase();
+  auto substBase = doIt(origBase, TypePosition::Invariant);
+
+  auto *assocType = dependent->getAssocType();
+
+  // Produce a dependent member type for the given base type.
+  auto getDependentMemberType = [&](Type baseType) {
+    if (assocType)
+      return DependentMemberType::get(baseType, assocType);
+
+    return DependentMemberType::get(baseType, dependent->getName());
+  };
+
+  // Produce a failed result.
+  auto failed = [&]() -> Type {
+    Type baseType = ErrorType::get(substBase);
+    if (assocType)
+      return DependentMemberType::get(baseType, assocType);
+
+    return DependentMemberType::get(baseType, dependent->getName());
+  };
+
+  if (auto *selfType = substBase->getAs<DynamicSelfType>())
+    substBase = selfType->getSelfType();
+
+  // If the parent is a type variable or a member rooted in a type variable,
+  // or if the parent is a type parameter, we're done. Also handle
+  // UnresolvedType here, which can come up in diagnostics.
+  if (substBase->isTypeVariableOrMember() ||
+      substBase->isTypeParameter() ||
+      substBase->is<UnresolvedType>())
+    return getDependentMemberType(substBase);
+
+  // All remaining cases require an associated type declaration and not just
+  // the name of a member type.
+  if (!assocType)
+    return failed();
+
+  // If the parent is an archetype, extract the child archetype with the
+  // given name.
+  if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
+    if (Type memberArchetypeByName = archetypeParent->getNestedType(assocType))
+      return memberArchetypeByName;
+
+    // If looking for an associated type and the archetype is constrained to a
+    // class, continue to the default associated type lookup
+    if (!assocType || !archetypeParent->getSuperclass())
+      return failed();
+  }
+
+  auto proto = assocType->getProtocol();
+  ProtocolConformanceRef conformance =
+    IFS.lookupConformance(origBase->getCanonicalType(), substBase,
+                          proto, level);
+
+  if (conformance.isInvalid())
+    return failed();
+
+  Type witnessTy;
+
+  // Retrieve the type witness.
+  if (conformance.isPack()) {
+    auto *packConformance = conformance.getPack();
+
+    witnessTy = packConformance->getAssociatedType(
+        assocType->getDeclaredInterfaceType());
+  } else if (conformance.isConcrete()) {
+    auto witness =
+        conformance.getConcrete()->getTypeWitnessAndDecl(assocType,
+                                                         IFS.getOptions());
+
+    witnessTy = witness.getWitnessType();
+    if (!witnessTy || witnessTy->hasError())
+      return failed();
+
+    // This is a hacky feature allowing code completion to migrate to
+    // using Type::subst() without changing output.
+    if (IFS.getOptions() & SubstFlags::DesugarMemberTypes) {
+      if (auto *aliasType = dyn_cast<TypeAliasType>(witnessTy.getPointer()))
+        witnessTy = aliasType->getSinglyDesugaredType();
+
+      // Another hack. If the type witness is a opaque result type. They can
+      // only be referred using the name of the associated type.
+      if (witnessTy->is<OpaqueTypeArchetypeType>())
+        witnessTy = witness.getWitnessDecl()->getDeclaredInterfaceType();
+    }
+  }
+
+  if (!witnessTy || witnessTy->is<ErrorType>())
+    return failed();
+
+  return witnessTy;
 }
 
 SubstitutionMap TypeSubstituter::transformSubstitutionMap(SubstitutionMap subs) {
