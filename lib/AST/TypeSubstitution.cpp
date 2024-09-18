@@ -445,7 +445,7 @@ Type TypeSubstituter::transformPrimaryArchetypeType(ArchetypeType *primary,
     return primary;
 
   auto known = IFS.substType(primary, level);
-  ASSERT(known && "Opaque type replacement shouldn't fail");
+  ASSERT(known && "Primary archetype replacement shouldn't fail");
 
   return known;
 }
@@ -459,7 +459,7 @@ TypeSubstituter::transformOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *opaqu
     return std::nullopt;
 
   auto known = IFS.substType(opaque, level);
-  ASSERT(known && "Opaque type replacement shouldn't fail");
+  ASSERT(known && "Opaque archetype replacement shouldn't fail");
 
   // If we return an opaque archetype unchanged, recurse into its substitutions
   // as a special case.
@@ -517,76 +517,18 @@ Type TypeSubstituter::transformDependentMemberType(DependentMemberType *dependen
   auto origBase = dependent->getBase();
   auto substBase = doIt(origBase, TypePosition::Invariant);
 
-  auto *assocType = dependent->getAssocType();
-
-  // Produce a dependent member type for the given base type.
-  auto getDependentMemberType = [&](Type baseType) {
-    if (assocType)
-      return DependentMemberType::get(baseType, assocType);
-
-    return DependentMemberType::get(baseType, dependent->getName());
-  };
-
-  // Produce a failed result.
-  auto failed = [&]() -> Type {
-    Type baseType = ErrorType::get(substBase);
-    if (assocType)
-      return DependentMemberType::get(baseType, assocType);
-
-    return DependentMemberType::get(baseType, dependent->getName());
-  };
-
   if (auto *selfType = substBase->getAs<DynamicSelfType>())
     substBase = selfType->getSelfType();
 
-  // If the parent is a type variable or a member rooted in a type variable,
-  // or if the parent is a type parameter, we're done. Also handle
-  // UnresolvedType here, which can come up in diagnostics.
-  if (substBase->isTypeVariableOrMember() ||
-      substBase->isTypeParameter() ||
-      substBase->is<UnresolvedType>())
-    return getDependentMemberType(substBase);
-
-  // All remaining cases require an associated type declaration and not just
-  // the name of a member type.
-  if (!assocType)
-    return failed();
-
-  // If the parent is an archetype, extract the child archetype with the
-  // given name.
-  if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
-    if (Type memberArchetypeByName = archetypeParent->getNestedType(assocType))
-      return memberArchetypeByName;
-
-    // If looking for an associated type and the archetype is constrained to a
-    // class, continue to the default associated type lookup
-    if (!assocType || !archetypeParent->getSuperclass())
-      return failed();
-  }
+  auto *assocType = dependent->getAssocType();
+  ASSERT(assocType);
 
   auto proto = assocType->getProtocol();
   ProtocolConformanceRef conformance =
     IFS.lookupConformance(origBase->getCanonicalType(), substBase,
                           proto, level);
 
-  if (conformance.isInvalid())
-    return failed();
-
-  Type witnessTy;
-
-  // Retrieve the type witness.
-  if (conformance.isPack()) {
-    witnessTy = conformance.getPack()->getTypeWitness(assocType,
-                                                      IFS.getOptions());
-  } else if (conformance.isConcrete()) {
-    witnessTy = conformance.getConcrete()->getTypeWitness(assocType,
-                                                          IFS.getOptions());
-  }
-
-  if (!witnessTy || witnessTy->is<ErrorType>())
-    return failed();
-
-  return witnessTy;
+  return conformance.getTypeWitness(substBase, assocType, IFS.getOptions());
 }
 
 SubstitutionMap TypeSubstituter::transformSubstitutionMap(SubstitutionMap subs) {
