@@ -764,101 +764,14 @@ void ModuleDecl::addFile(FileUnit &newFile) {
   clearLookupCache();
 }
 
-void ModuleDecl::addAuxiliaryFile(SourceFile &sourceFile) {
-  AuxiliaryFiles.push_back(&sourceFile);
-}
-
-namespace {
-  /// Compare the source location ranges for two files, as an ordering to
-  /// use for fast searches.
-  struct SourceFileRangeComparison {
-    SourceManager *sourceMgr;
-
-    bool operator()(SourceFile *lhs, SourceFile *rhs) const {
-      auto lhsRange = sourceMgr->getRangeForBuffer(lhs->getBufferID());
-      auto rhsRange = sourceMgr->getRangeForBuffer(rhs->getBufferID());
-
-      std::less<const char *> pointerCompare;
-      return pointerCompare(
-          (const char *)lhsRange.getStart().getOpaquePointerValue(),
-          (const char *)rhsRange.getStart().getOpaquePointerValue());
-    }
-
-    bool operator()(SourceFile *lhs, SourceLoc rhsLoc) const {
-      auto lhsRange = sourceMgr->getRangeForBuffer(lhs->getBufferID());
-
-      std::less<const char *> pointerCompare;
-      return pointerCompare(
-          (const char *)lhsRange.getEnd().getOpaquePointerValue(),
-          (const char *)rhsLoc.getOpaquePointerValue());
-    }
-
-    bool operator()(SourceLoc lhsLoc, SourceFile *rhs) const {
-      auto rhsRange = sourceMgr->getRangeForBuffer(rhs->getBufferID());
-
-      std::less<const char *> pointerCompare;
-      return pointerCompare(
-          (const char *)lhsLoc.getOpaquePointerValue(),
-          (const char *)rhsRange.getEnd().getOpaquePointerValue());
-    }
-  };
-}
-
-class swift::ModuleSourceFileLocationMap {
-public:
-  unsigned numFiles = 0;
-  unsigned numAuxiliaryFiles = 0;
-  std::vector<SourceFile *> allSourceFiles;
-  SourceFile *lastSourceFile = nullptr;
-};
-
-void ModuleDecl::updateSourceFileLocationMap() {
-  // Allocate a source file location map, if we don't have one already.
-  if (!sourceFileLocationMap) {
-    ASTContext &ctx = getASTContext();
-    sourceFileLocationMap = ctx.Allocate<ModuleSourceFileLocationMap>();
-    ctx.addCleanup([sourceFileLocationMap=sourceFileLocationMap]() {
-      sourceFileLocationMap->~ModuleSourceFileLocationMap();
-    });
-  }
-
-  // If we are up-to-date, there's nothing to do.
-  ArrayRef<FileUnit *> files = Files;
-  if (sourceFileLocationMap->numFiles == files.size() &&
-      sourceFileLocationMap->numAuxiliaryFiles ==
-          AuxiliaryFiles.size())
-    return;
-
-  // Rebuild the range structure.
-  sourceFileLocationMap->allSourceFiles.clear();
-
-  // First, add all of the source files with a backing buffer.
-  for (auto *fileUnit : files) {
-    if (auto sourceFile = dyn_cast<SourceFile>(fileUnit)) {
-      sourceFileLocationMap->allSourceFiles.push_back(sourceFile);
-    }
-  }
-
-  // Next, add all of the macro expansion files.
-  for (auto *sourceFile : AuxiliaryFiles)
-    sourceFileLocationMap->allSourceFiles.push_back(sourceFile);
-
-  // Finally, sort them all so we can do a binary search for lookup.
-  std::sort(sourceFileLocationMap->allSourceFiles.begin(),
-            sourceFileLocationMap->allSourceFiles.end(),
-            SourceFileRangeComparison{&getASTContext().SourceMgr});
-
-  sourceFileLocationMap->numFiles = files.size();
-  sourceFileLocationMap->numAuxiliaryFiles = AuxiliaryFiles.size();
-}
-
 SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
   if (loc.isInvalid())
     return nullptr;
 
+  auto &sourceMgr = getASTContext().SourceMgr;
+
   // Check whether this location is in a "replaced" range, in which case
   // we want to use the original source file.
-  auto &sourceMgr = getASTContext().SourceMgr;
   SourceLoc adjustedLoc = loc;
   for (const auto &pair : sourceMgr.getReplacedRanges()) {
     if (sourceMgr.rangeContainsTokenLoc(pair.second, loc)) {
@@ -867,35 +780,14 @@ SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
     }
   }
 
-  // Before we do any extra work, check the last source file we found a result
-  // in to see if it contains this.
-  if (sourceFileLocationMap) {
-    if (auto lastSourceFile = sourceFileLocationMap->lastSourceFile) {
-      auto range = sourceMgr.getRangeForBuffer(lastSourceFile->getBufferID());
-      if (range.contains(adjustedLoc))
-        return lastSourceFile;
-    }
+  auto bufferID = sourceMgr.findBufferContainingLoc(adjustedLoc);
+  auto sourceFiles = sourceMgr.getSourceFilesForBufferID(bufferID);
+  for (auto sourceFile: sourceFiles) {
+    if (sourceFile->getParentModule() == this)
+      return sourceFile;
   }
 
-  updateSourceFileLocationMap();
-
-  auto found = std::lower_bound(sourceFileLocationMap->allSourceFiles.begin(),
-                                sourceFileLocationMap->allSourceFiles.end(),
-                                adjustedLoc,
-                                SourceFileRangeComparison{&sourceMgr});
-  if (found == sourceFileLocationMap->allSourceFiles.end())
-    return nullptr;
-
-  auto foundSourceFile = *found;
-  auto foundRange = sourceMgr.getRangeForBuffer(foundSourceFile->getBufferID());
-  // Positions inside an empty file or at EOF should still be considered within
-  // this file.
-  if (!foundRange.contains(adjustedLoc) && adjustedLoc != foundRange.getEnd())
-    return nullptr;
-
-  // Update the last source file.
-  sourceFileLocationMap->lastSourceFile = foundSourceFile;
-  return foundSourceFile;
+  return nullptr;
 }
 
 std::pair<unsigned, SourceLoc>
@@ -3447,10 +3339,6 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
   }
 
   M.getASTContext().SourceMgr.recordSourceFile(bufferID, this);
-
-  if (Kind == SourceFileKind::MacroExpansion ||
-      Kind == SourceFileKind::DefaultArgument)
-    M.addAuxiliaryFile(*this);
 }
 
 SourceFile::ParsingOptions
