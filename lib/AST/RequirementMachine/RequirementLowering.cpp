@@ -665,8 +665,7 @@ struct InferRequirementsWalker : public TypeWalker {
         auto addSameTypeConstraint = [&](Type firstType,
                                          AssociatedTypeDecl *assocType) {
           auto conformance = lookupConformance(firstType, differentiableProtocol);
-          auto secondType = conformance.getAssociatedType(
-              firstType, assocType->getDeclaredInterfaceType());
+          auto secondType = conformance.getTypeWitness(firstType, assocType);
           reqs.push_back({Requirement(RequirementKind::SameType,
                                       firstType, secondType),
                           SourceLoc()});

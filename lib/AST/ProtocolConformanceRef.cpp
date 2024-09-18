@@ -163,8 +163,7 @@ ProtocolConformanceRef::getTypeWitnessByName(Type type, Identifier name) const {
   if (!assocType)
     return ErrorType::get(proto->getASTContext());
 
-  return assocType->getDeclaredInterfaceType().subst(
-    SubstitutionMap::getProtocolSubstitutions(proto, type, *this));
+  return getTypeWitness(type, assocType);
 }
 
 ConcreteDeclRef

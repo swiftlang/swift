@@ -4467,8 +4467,7 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
   // Try to get the `TangentVector` associated type of `base`.
   // Return the associated type if it is valid.
   auto conformance = swift::lookupConformance(this, differentiableProtocol);
-  auto assocTy = conformance.getAssociatedType(
-      this, assocDecl->getDeclaredInterfaceType());
+  auto assocTy = conformance.getTypeWitness(this, assocDecl);
   if (!assocTy->hasError())
     return cache(TangentSpace::getTangentVector(assocTy));
 
