@@ -272,7 +272,7 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
 
     if (SF->Kind == SourceFileKind::DefaultArgument) {
       auto genInfo = *SF->getASTContext().SourceMgr.getGeneratedSourceInfo(
-          *SF->getBufferID());
+          SF->getBufferID());
       parentLoc = ASTNode::getFromOpaqueValue(genInfo.astNode).getStartLoc();
       if (auto parentScope =
               findStartingScopeForLookup(enclosingSF, parentLoc)) {

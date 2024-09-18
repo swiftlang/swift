@@ -44,8 +44,9 @@ TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
   auto *module = ModuleDecl::create(stdlibID, Ctx);
   Ctx.addLoadedModule(module);
 
+  auto bufferID = Ctx.SourceMgr.addMemBufferCopy("// nothing\n");
   FileForLookups = new (Ctx) SourceFile(*module, SourceFileKind::Library,
-                                        /*buffer*/ std::nullopt);
+                                        bufferID);
   module->addFile(*FileForLookups);
 
   if (optionals == DeclareOptionalTypes) {

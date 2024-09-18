@@ -1628,7 +1628,7 @@ static void resolveCursor(
       }
 
       SourceManager &SM = CompIns.getSourceMgr();
-      unsigned BufferID = SF->getBufferID().value();
+      unsigned BufferID = SF->getBufferID();
       SourceLoc Loc =
         Lexer::getLocForStartOfToken(SM, BufferID, Offset);
       if (Loc.isInvalid()) {
@@ -1802,7 +1802,7 @@ static void computeDiagnostics(
         : Receiver(Receiver) {}
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
-      unsigned BufferID = *AstUnit->getPrimarySourceFile().getBufferID();
+      unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID();
       auto &DiagConsumer = AstUnit->getEditorDiagConsumer();
       auto Diagnostics = DiagConsumer.getDiagnosticsForBuffer(BufferID);
       Receiver(RequestResult<DiagnosticsResult>::fromResult(Diagnostics));
@@ -1863,7 +1863,7 @@ static void resolveName(
       }
 
       SourceLoc Loc = Lexer::getLocForStartOfToken(CompIns.getSourceMgr(),
-                                                   *SF->getBufferID(), Offset);
+                                                   SF->getBufferID(), Offset);
       if (Loc.isInvalid()) {
         Receiver(RequestResult<NameTranslatingInfo>::fromError(
           "Unable to resolve the start of the token."));
@@ -2548,7 +2548,7 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
     // FIXME: Don't silently eat errors here.
     RelatedIdentsResult getRelatedIdents(SourceFile *SrcFile,
                                          CompilerInstance &CompInst) {
-      unsigned BufferID = SrcFile->getBufferID().value();
+      unsigned BufferID = SrcFile->getBufferID();
       SourceLoc Loc = Lexer::getLocForStartOfToken(CompInst.getSourceMgr(),
                                                    BufferID, Offset);
       if (Loc.isInvalid())
@@ -2722,7 +2722,7 @@ void SwiftLangSupport::findActiveRegionsInFile(
       }
 
       auto &SM = SF->getASTContext().SourceMgr;
-      auto BufferID = *SF->getBufferID();
+      auto BufferID = SF->getBufferID();
 
       SmallVector<IfConfigInfo> Configs;
       for (auto &range : SF->getIfConfigClauseRanges()) {
@@ -2812,7 +2812,7 @@ void SwiftLangSupport::semanticRefactoring(
         return;
       }
 
-      Opts.Range.BufferID = *SF->getBufferID();
+      Opts.Range.BufferID = SF->getBufferID();
       Opts.Range.Line = Info.Line;
       Opts.Range.Column = Info.Column;
       Opts.Range.Length = Info.Length;
@@ -2963,7 +2963,7 @@ void SwiftLangSupport::collectVariableTypes(
       SourceRange Range;
       if (Offset.has_value() && Length.has_value()) {
         auto &SM = CompInst.getSourceMgr();
-        unsigned BufferID = SF->getBufferID().value();
+        unsigned BufferID = SF->getBufferID();
         SourceLoc Start = Lexer::getLocForStartOfToken(SM, BufferID, *Offset);
         SourceLoc End =
             Lexer::getLocForStartOfToken(SM, BufferID, *Offset + *Length);
