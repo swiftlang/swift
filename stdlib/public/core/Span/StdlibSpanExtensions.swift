@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 extension UnsafeBufferPointer where Element: ~Copyable {
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withSpan<E: Error, Result: ~Copyable>(
     _ body: (_ elements: Span<Element>) throws(E) -> Result
@@ -18,6 +19,7 @@ extension UnsafeBufferPointer where Element: ~Copyable {
     try body(Span(_unsafeElements: self))
   }
 
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withBytes<E: Error, Result: ~Copyable>(
     _ body: (_ bytes: RawSpan) throws(E) -> Result
@@ -27,6 +29,7 @@ extension UnsafeBufferPointer where Element: ~Copyable {
 }
 
 extension UnsafeMutableBufferPointer where Element: ~Copyable {
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withSpan<E: Error, Result: ~Copyable>(
     _ body: (_ elements: Span<Element>) throws(E) -> Result
@@ -34,6 +37,7 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
     try body(Span(_unsafeElements: self))
   }
 
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withBytes<E: Error, Result: ~Copyable>(
     _ body: (_ bytes: RawSpan) throws(E) -> Result
@@ -43,6 +47,7 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
 }
 
 extension UnsafeRawBufferPointer {
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withBytes<E: Error, Result: ~Copyable>(
     _ body: (_ bytes: RawSpan) throws(E) -> Result
@@ -52,6 +57,7 @@ extension UnsafeRawBufferPointer {
 }
 
 extension UnsafeMutableRawBufferPointer {
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withBytes<E: Error, Result: ~Copyable>(
     _ body: (_ bytes: RawSpan) throws(E) -> Result
@@ -61,6 +67,7 @@ extension UnsafeMutableRawBufferPointer {
 }
 
 extension Slice {
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withSpan<Element, E: Error, Result: ~Copyable>(
     _ body: (_ elements: Span<Element>) throws(E) -> Result
@@ -69,6 +76,7 @@ extension Slice {
     try body(Span(_unsafeElements: UnsafeBufferPointer(rebasing: self)))
   }
 
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withBytes<Element: BitwiseCopyable, E: Error, Result: ~Copyable>(
     _ body: (_ bytes: RawSpan) throws(E) -> Result
@@ -77,6 +85,7 @@ extension Slice {
     try body(RawSpan(_unsafeBytes: .init(UnsafeBufferPointer(rebasing: self))))
   }
 
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withSpan<Element, E: Error, Result: ~Copyable>(
     _ body: (_ elements: Span<Element>) throws(E) -> Result
@@ -85,6 +94,7 @@ extension Slice {
     try body(Span(_unsafeElements: UnsafeBufferPointer(rebasing: self)))
   }
 
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withBytes<Element: BitwiseCopyable, E: Error, Result: ~Copyable>(
     _ body: (_ bytes: RawSpan) throws(E) -> Result
@@ -93,6 +103,7 @@ extension Slice {
     try body(RawSpan(_unsafeBytes: .init(UnsafeBufferPointer(rebasing: self))))
   }
 
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withBytes<E: Error, Result: ~Copyable>(
     _ body: (_ bytes: RawSpan) throws(E) -> Result
@@ -101,6 +112,7 @@ extension Slice {
     try body(RawSpan(_unsafeBytes: UnsafeRawBufferPointer(rebasing: self)))
   }
 
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withBytes<E: Error, Result: ~Copyable>(
     _ body: (_ bytes: RawSpan) throws(E) -> Result
@@ -141,6 +153,7 @@ extension Array {
   ///   for the `withUnsafeBufferPointer(_:)` method. The pointer argument is
   ///   valid only for the duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withSpan<E: Error, Result: ~Copyable>(
     _ body: (_ elements:  Span<Element>) throws(E) -> Result
@@ -187,6 +200,7 @@ extension Array {
 //    }
 //  }
 
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withBytes<E: Error, Result: ~Copyable>(
     _ body: (_ bytes:  RawSpan) throws(E) -> Result
@@ -211,6 +225,7 @@ extension Array {
 }
 
 extension ContiguousArray {
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withSpan<E: Error, Result: ~Copyable>(
     _ body: (_ elements:  Span<Element>) throws(E) -> Result
@@ -232,9 +247,8 @@ extension ContiguousArray {
     }
     return try result.get()
   }
-}
 
-extension ContiguousArray where Element: BitwiseCopyable {
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withBytes<E: Error, Result: ~Copyable>(
     _ body: (_ bytes:  RawSpan) throws(E) -> Result
@@ -259,6 +273,7 @@ extension ContiguousArray where Element: BitwiseCopyable {
 }
 
 extension ArraySlice {
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withSpan<E: Error, Result: ~Copyable>(
     _ body: (_ elements:  Span<Element>) throws(E) -> Result
@@ -280,9 +295,8 @@ extension ArraySlice {
     }
     return try result.get()
   }
-}
 
-extension ArraySlice where Element: BitwiseCopyable {
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withBytes<E: Error, Result: ~Copyable>(
     _ body: (_ bytes:  RawSpan) throws(E) -> Result
@@ -307,6 +321,7 @@ extension ArraySlice where Element: BitwiseCopyable {
 }
 
 extension String.UTF8View {
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withSpan<E: Error, Result: ~Copyable>(
     _ body: (_ elements:  Span<UTF8.CodeUnit>) throws(E) -> Result
@@ -332,6 +347,7 @@ extension String.UTF8View {
     return try ContiguousArray(self).withSpan(body)
   }
 
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withBytes<E: Error, Result: ~Copyable>(
     _ body: (_ bytes:  RawSpan) throws(E) -> Result
@@ -358,6 +374,7 @@ extension String.UTF8View {
 }
 
 extension Substring.UTF8View {
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withSpan<E: Error, Result: ~Copyable>(
     _ body: (_ elements:  Span<UTF8.CodeUnit>) throws(E) -> Result
@@ -383,6 +400,7 @@ extension Substring.UTF8View {
     return try ContiguousArray(self).withSpan(body)
   }
 
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withBytes<E: Error, Result: ~Copyable>(
     _ body: (_ bytes:  RawSpan) throws(E) -> Result
@@ -410,6 +428,7 @@ extension Substring.UTF8View {
 }
 
 extension CollectionOfOne {
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withSpan<E: Error, Result: ~Copyable>(
     _ body: (_ elements:  Span<Element>) throws(E) -> Result
@@ -423,13 +442,12 @@ extension CollectionOfOne {
       }
     }
   }
-}
 
-extension CollectionOfOne where Element: BitwiseCopyable {
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withBytes<E: Error, Result: ~Copyable>(
     _ body: (_ bytes:  RawSpan) throws(E) -> Result
-  ) throws(E) -> Result {
+  ) throws(E) -> Result where Element: BitwiseCopyable {
     var collection = self
     return try Swift.withUnsafeBytes(of: &collection) {
       bytes throws(E) -> Result in
@@ -439,6 +457,7 @@ extension CollectionOfOne where Element: BitwiseCopyable {
 }
 
 extension KeyValuePairs {
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withSpan<E: Error, Result: ~Copyable>(
     _ body: (
@@ -447,36 +466,38 @@ extension KeyValuePairs {
   ) throws(E) -> Result {
     try ContiguousArray(self).withSpan(body)
   }
-}
 
-extension KeyValuePairs where Element: BitwiseCopyable {
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withBytes<E: Error, Result: ~Copyable>(
     _ body: (_ bytes: RawSpan) throws(E) -> Result
-  ) throws(E) -> Result {
+  ) throws(E) -> Result where Element: BitwiseCopyable {
     try ContiguousArray(self).withBytes(body)
   }
 }
 
+@_disallowFeatureSuppression(NonescapableTypes)
 extension Span where Element: ~Copyable /*& ~Escapable*/ {
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public consuming func withSpan<E: Error, Result: ~Copyable>(
     _ body: (_ elements: Span<Element>) throws(E) -> Result
   ) throws(E) -> Result {
     try body(self)
   }
-}
 
-extension Span where Element: BitwiseCopyable {
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public consuming func withBytes<E: Error, Result: ~Copyable>(
     _ body: (_ bytes: RawSpan) throws(E) -> Result
-  ) throws(E) -> Result {
+  ) throws(E) -> Result where Element: BitwiseCopyable {
     try body(RawSpan(_unsafeSpan: self))
   }
 }
 
+@_disallowFeatureSuppression(NonescapableTypes)
 extension RawSpan {
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public consuming func withBytes<E: Error, Result: ~Copyable>(
     _ body: (_ bytes: RawSpan) throws(E) -> Result

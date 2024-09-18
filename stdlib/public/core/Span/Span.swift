@@ -12,6 +12,7 @@
 
 // A Span<Element> represents a span of memory which
 // contains initialized instances of `Element`.
+@_disallowFeatureSuppression(NonescapableTypes)
 @frozen
 public struct Span<Element: ~Copyable & ~Escapable>: Copyable, ~Escapable {
   @usableFromInline let _pointer: UnsafeRawPointer?
@@ -21,6 +22,7 @@ public struct Span<Element: ~Copyable & ~Escapable>: Copyable, ~Escapable {
 
   @usableFromInline let _count: Int
 
+  @_disallowFeatureSuppression(NonescapableTypes)
   @usableFromInline @inline(__always)
   init(
     _unchecked start: UnsafeRawPointer?,
@@ -31,10 +33,13 @@ public struct Span<Element: ~Copyable & ~Escapable>: Copyable, ~Escapable {
   }
 }
 
+@_disallowFeatureSuppression(NonescapableTypes)
 @available(*, unavailable)
 extension Span: Sendable {}
 
+@_disallowFeatureSuppression(NonescapableTypes)
 extension Span where Element: ~Copyable {
+  @_disallowFeatureSuppression(NonescapableTypes)
   @usableFromInline @inline(__always)
   internal init(
     _unchecked elements: UnsafeBufferPointer<Element>
@@ -52,6 +57,7 @@ extension Span where Element: ~Copyable {
   ///   - buffer: an `UnsafeBufferPointer` to initialized elements.
   ///   - owner: a binding whose lifetime must exceed that of
   ///            the newly created `Span`.
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public init(
     _unsafeElements buffer: UnsafeBufferPointer<Element>
@@ -74,6 +80,7 @@ extension Span where Element: ~Copyable {
   ///   - buffer: an `UnsafeMutableBufferPointer` to initialized elements.
   ///   - owner: a binding whose lifetime must exceed that of
   ///            the newly created `Span`.
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public init(
     _unsafeElements buffer: UnsafeMutableBufferPointer<Element>
@@ -92,6 +99,7 @@ extension Span where Element: ~Copyable {
   ///   - count: the number of initialized elements in the span.
   ///   - owner: a binding whose lifetime must exceed that of
   ///            the newly created `Span`.
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public init(
     _unsafeStart start: UnsafePointer<Element>,
@@ -102,6 +110,7 @@ extension Span where Element: ~Copyable {
   }
 }
 
+@_disallowFeatureSuppression(NonescapableTypes)
 extension Span where Element: BitwiseCopyable {
 
   /// Unsafely create a `Span` over initialized memory.
@@ -113,6 +122,7 @@ extension Span where Element: BitwiseCopyable {
   ///   - buffer: an `UnsafeBufferPointer` to initialized elements.
   ///   - owner: a binding whose lifetime must exceed that of
   ///            the newly created `Span`.
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public init(
     _unsafeElements buffer: UnsafeBufferPointer<Element>
@@ -129,6 +139,7 @@ extension Span where Element: BitwiseCopyable {
   ///   - buffer: an `UnsafeMutableBufferPointer` to initialized elements.
   ///   - owner: a binding whose lifetime must exceed that of
   ///            the newly created `Span`.
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public init(
     _unsafeElements buffer: UnsafeMutableBufferPointer<Element>
@@ -147,6 +158,7 @@ extension Span where Element: BitwiseCopyable {
   ///   - count: the number of initialized elements in the span.
   ///   - owner: a binding whose lifetime must exceed that of
   ///            the newly created `Span`.
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public init(
     _unsafeStart start: UnsafePointer<Element>,
@@ -170,6 +182,7 @@ extension Span where Element: BitwiseCopyable {
   ///   - type: the type to use when interpreting the bytes in memory.
   ///   - owner: a binding whose lifetime must exceed that of
   ///            the newly created `Span`.
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public init(
     _unsafeBytes buffer: UnsafeRawBufferPointer
@@ -198,6 +211,7 @@ extension Span where Element: BitwiseCopyable {
   ///   - type: the type to use when interpreting the bytes in memory.
   ///   - owner: a binding whose lifetime must exceed that of
   ///            the newly created `Span`.
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public init(
     _unsafeBytes buffer: UnsafeMutableRawBufferPointer
@@ -216,6 +230,7 @@ extension Span where Element: BitwiseCopyable {
   ///   - count: the number of initialized elements in the span.
   ///   - owner: a binding whose lifetime must exceed that of
   ///            the newly created `Span`.
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public init(
     _unsafeStart pointer: UnsafeRawPointer,
@@ -232,6 +247,7 @@ extension Span where Element: BitwiseCopyable {
   }
 }
 
+@_disallowFeatureSuppression(NonescapableTypes)
 extension Span where Element: Equatable {
 
   /// Returns a Boolean value indicating whether this and another span
@@ -244,6 +260,7 @@ extension Span where Element: Equatable {
   ///
   /// - Complexity: O(*m*), where *m* is the lesser of the length of the
   ///   sequence and the length of `other`.
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func _elementsEqual(_ other: Self) -> Bool {
     guard count == other.count else { return false }
@@ -271,6 +288,7 @@ extension Span where Element: Equatable {
   ///
   /// - Complexity: O(*m*), where *m* is the lesser of the length of the
   ///   sequence and the length of `other`.
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func _elementsEqual(_ other: some Collection<Element>) -> Bool {
     guard count == other.count else { return false }
@@ -289,6 +307,7 @@ extension Span where Element: Equatable {
   ///
   /// - Complexity: O(*m*), where *m* is the lesser of the length of the
   ///   sequence and the length of `other`.
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func _elementsEqual(_ other: some Sequence<Element>) -> Bool {
     var offset = 0
@@ -301,6 +320,7 @@ extension Span where Element: Equatable {
   }
 }
 
+@_disallowFeatureSuppression(NonescapableTypes)
 extension Span where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
@@ -310,6 +330,7 @@ extension Span where Element: ~Copyable {
   }
 }
 
+@_disallowFeatureSuppression(NonescapableTypes)
 extension Span where Element: ~Copyable {
 
   /// The number of elements in the span.
@@ -338,6 +359,7 @@ extension Span where Element: ~Copyable {
 }
 
 //MARK: Bounds Checking
+@_disallowFeatureSuppression(NonescapableTypes)
 extension Span where Element: ~Copyable {
 
   /// Return true if `offset` is a valid offset into this `Span`
@@ -345,6 +367,7 @@ extension Span where Element: ~Copyable {
   /// - Parameters:
   ///   - position: an index to validate
   /// - Returns: true if `offset` is a valid index
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func boundsContain(_ offset: Int) -> Bool {
     0 <= offset && offset < count
@@ -355,6 +378,7 @@ extension Span where Element: ~Copyable {
   /// - Parameters:
   ///   - offsets: a range of indices to validate
   /// - Returns: true if `offsets` is a valid range of indices
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func boundsContain(_ offsets: Range<Int>) -> Bool {
     0 <= offsets.lowerBound && offsets.upperBound <= count
@@ -365,23 +389,26 @@ extension Span where Element: ~Copyable {
   /// - Parameters:
   ///   - offsets: a range of indices to validate
   /// - Returns: true if `offsets` is a valid range of indices
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func boundsContain(_ offsets: ClosedRange<Int>) -> Bool {
     0 <= offsets.lowerBound && offsets.upperBound < count
   }
 }
 
+@_disallowFeatureSuppression(NonescapableTypes)
 extension Span where Element: BitwiseCopyable {
 
-#warning("Restore this computed property once lifetime annotations exist")
-//  /// Construct a RawSpan over the memory represented by this span
-//  ///
-//  /// - Returns: a RawSpan over the memory represented by this span
-//  @_alwaysEmitIntoClient
-//  public var rawSpan: RawSpan { RawSpan(self) }
+  /// Construct a RawSpan over the memory represented by this span
+  ///
+  /// - Returns: a RawSpan over the memory represented by this span
+  @_disallowFeatureSuppression(NonescapableTypes)
+  @_alwaysEmitIntoClient
+  public var _unsafeRawSpan: RawSpan { RawSpan(_unsafeSpan: self) }
 }
 
 //MARK: integer offset subscripts
+@_disallowFeatureSuppression(NonescapableTypes)
 extension Span where Element: ~Copyable {
 
   /// Accesses the element at the specified position in the `Span`.
@@ -417,6 +444,7 @@ extension Span where Element: ~Copyable {
   }
 }
 
+@_disallowFeatureSuppression(NonescapableTypes)
 extension Span where Element: BitwiseCopyable {
 
   /// Accesses the element at the specified position in the `Span`.
@@ -451,6 +479,7 @@ extension Span where Element: BitwiseCopyable {
 }
 
 //MARK: extracting sub-spans
+@_disallowFeatureSuppression(NonescapableTypes)
 extension Span where Element: ~Copyable {
 
   /// Constructs a new span over the items within the supplied range of
@@ -466,11 +495,13 @@ extension Span where Element: ~Copyable {
   /// - Returns: A `Span` over the items within `bounds`
   ///
   /// - Complexity: O(1)
+  @_disallowFeatureSuppression(NonescapableTypes)
   @usableFromInline func _extracting(_ bounds: Range<Int>) -> Self {
     _precondition(boundsContain(bounds))
     return _extracting(unchecked: bounds)
   }
 
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public mutating func _shrink(to bounds: Range<Int>) {
     self = _extracting(bounds)
@@ -491,6 +522,7 @@ extension Span where Element: ~Copyable {
   /// - Returns: A `Span` over the items within `bounds`
   ///
   /// - Complexity: O(1)
+  @_disallowFeatureSuppression(NonescapableTypes)
   @usableFromInline func _extracting(unchecked bounds: Range<Int>) -> Self {
     Span(
       _unchecked: _pointer?.advanced(by: bounds.lowerBound*MemoryLayout<Element>.stride),
@@ -498,6 +530,7 @@ extension Span where Element: ~Copyable {
     )
   }
 
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public mutating func _shrink(toUnchecked bounds: Range<Int>) {
     self = _extracting(unchecked: bounds)
@@ -516,10 +549,12 @@ extension Span where Element: ~Copyable {
   /// - Returns: A `Span` over the items within `bounds`
   ///
   /// - Complexity: O(1)
+  @_disallowFeatureSuppression(NonescapableTypes)
   @usableFromInline func _extracting(_ bounds: some RangeExpression<Int>) -> Self {
     _extracting(bounds.relative(to: _indices))
   }
 
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public mutating func _shrink(to bounds: some RangeExpression<Int>) {
     self = _extracting(bounds)
@@ -540,12 +575,14 @@ extension Span where Element: ~Copyable {
   /// - Returns: A `Span` over the items within `bounds`
   ///
   /// - Complexity: O(1)
+  @_disallowFeatureSuppression(NonescapableTypes)
   @usableFromInline func _extracting(
     uncheckedBounds bounds: some RangeExpression<Int>
   ) -> Self {
     _extracting(unchecked: bounds.relative(to: _indices))
   }
 
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public mutating func _shrink(toUnchecked bounds: some RangeExpression<Int>) {
     self = _extracting(uncheckedBounds: bounds)
@@ -560,12 +597,14 @@ extension Span where Element: ~Copyable {
   /// - Returns: A `Span` over all the items of this span.
   ///
   /// - Complexity: O(1)
+  @_disallowFeatureSuppression(NonescapableTypes)
   @usableFromInline func _extracting(_: UnboundedRange) -> Self {
     self
   }
 }
 
 //MARK: withUnsafePointer, etc.
+@_disallowFeatureSuppression(NonescapableTypes)
 extension Span where Element: ~Copyable  {
 
   //FIXME: mark closure parameter as non-escaping
@@ -581,6 +620,7 @@ extension Span where Element: ~Copyable  {
   ///   for the `withUnsafeBufferPointer(_:)` method. The closure's
   ///   parameter is valid only for the duration of its execution.
   /// - Returns: The return value of the `body` closure parameter.
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withUnsafeBufferPointer<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws(E) -> Result
@@ -594,6 +634,7 @@ extension Span where Element: ~Copyable  {
   }
 }
 
+@_disallowFeatureSuppression(NonescapableTypes)
 extension Span where Element: BitwiseCopyable {
 
   //FIXME: mark closure parameter as non-escaping
@@ -611,6 +652,7 @@ extension Span where Element: BitwiseCopyable {
   ///   The closure's parameter is valid only for the duration of
   ///   its execution.
   /// - Returns: The return value of the `body` closure parameter.
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
@@ -619,9 +661,11 @@ extension Span where Element: BitwiseCopyable {
   }
 }
 
+@_disallowFeatureSuppression(NonescapableTypes)
 extension Span where Element: ~Copyable {
   /// Returns a Boolean value indicating whether two `Span` instances
   /// refer to the same region in memory.
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func isIdentical(to other: Self) -> Bool {
     (self._pointer == other._pointer) && (self._count == other._count)
@@ -633,6 +677,7 @@ extension Span where Element: ~Copyable {
   /// Parameters:
   /// - span: a span of the same type as `self`
   /// Returns: whether `span` is a subrange of `self`
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func isWithin(_ span: borrowing Self) -> Bool {
     if _count > span._count { return false }
@@ -660,6 +705,7 @@ extension Span where Element: ~Copyable {
   /// Parameters:
   /// - span: a subrange of `self`
   /// Returns: A range of offsets within `self`
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func indicesWithin(_ span: borrowing Self) -> Range<Int>? {
     if _count > span._count { return nil }
@@ -676,6 +722,7 @@ extension Span where Element: ~Copyable {
 }
 
 //MARK: one-sided slicing operations
+@_disallowFeatureSuppression(NonescapableTypes)
 extension Span where Element: ~Copyable {
 
   /// Returns a span containing the initial elements of this span,
@@ -693,12 +740,14 @@ extension Span where Element: ~Copyable {
   /// - Returns: A span with at most `maxLength` elements.
   ///
   /// - Complexity: O(1)
+  @_disallowFeatureSuppression(NonescapableTypes)
   @usableFromInline func _extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length.")
     let newCount = min(maxLength, count)
     return Self(_unchecked: _pointer, count: newCount)
   }
 
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public mutating func _shrink(toFirst maxLength: Int) {
     self = _extracting(first: maxLength)
@@ -718,12 +767,14 @@ extension Span where Element: ~Copyable {
   /// - Returns: A span leaving off the specified number of elements at the end.
   ///
   /// - Complexity: O(1)
+  @_disallowFeatureSuppression(NonescapableTypes)
   @usableFromInline func _extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements.")
     let droppedCount = min(k, count)
     return Self(_unchecked: _pointer, count: count&-droppedCount)
   }
 
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public mutating func _shrink(droppingLast k: Int) {
     self = _extracting(droppingLast: k)
@@ -744,6 +795,7 @@ extension Span where Element: ~Copyable {
   /// - Returns: A span with at most `maxLength` elements.
   ///
   /// - Complexity: O(1)
+  @_disallowFeatureSuppression(NonescapableTypes)
   @usableFromInline func _extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length.")
     let newCount = min(maxLength, count)
@@ -751,6 +803,7 @@ extension Span where Element: ~Copyable {
     return Self(_unchecked: newStart, count: newCount)
   }
 
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public mutating func _shrink(toLast maxLength: Int) {
     self = _extracting(last: maxLength)
@@ -770,6 +823,7 @@ extension Span where Element: ~Copyable {
   /// - Returns: A span starting after the specified number of elements.
   ///
   /// - Complexity: O(1)
+  @_disallowFeatureSuppression(NonescapableTypes)
   @usableFromInline func _extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements.")
     let droppedCount = min(k, count)
@@ -777,6 +831,7 @@ extension Span where Element: ~Copyable {
     return Self(_unchecked: newStart, count: count&-droppedCount)
   }
 
+  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public mutating func _shrink(droppingFirst k: Int) {
     self = _extracting(droppingFirst: k)
