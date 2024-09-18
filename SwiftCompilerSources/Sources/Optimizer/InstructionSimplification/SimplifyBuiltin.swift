@@ -150,19 +150,20 @@ private extension BuiltinInst {
   }
 
   func optimizeAssertConfig(_ context: SimplifyContext) {
-    let literal: IntegerLiteralInst
-    switch context.options.assertConfiguration {
-    case .enabled:
+    // The values for the assert_configuration call are:
+    // 0: Debug
+    // 1: Release
+    // 2: Fast / Unchecked
+    let config = context.options.assertConfiguration
+    switch config {
+    case .debug, .release, .unchecked:
       let builder = Builder(before: self, context)
-      literal = builder.createIntegerLiteral(1,  type: type)
-    case .disabled:
-      let builder = Builder(before: self, context)
-      literal = builder.createIntegerLiteral(0,  type: type)
-    default:
+      let literal = builder.createIntegerLiteral(config.integerValue, type: type)
+      uses.replaceAll(with: literal, context)
+      context.erase(instruction: self)
+    case .unknown:
       return
     }
-    uses.replaceAll(with: literal, context)
-    context.erase(instruction: self)
   }
   
   func optimizeTargetTypeConst(_ context: SimplifyContext) {
