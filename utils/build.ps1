@@ -188,13 +188,7 @@ $WiXVersion = "4.0.5"
 # Avoid $env:ProgramFiles in case this script is running as x86
 $UnixToolsBinDir = "$env:SystemDrive\Program Files\Git\usr\bin"
 
-$python = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Shared\Python39_64\python.exe"
-if (-not (Test-Path $python)) {
-  $python = (where.exe python) | Select-Object -First 1
-  if (-not (Test-Path $python)) {
-    throw "Python.exe not found"
-  }
-}
+$PythonName = "Python{0}{1}" -f ([System.Version]$PythonVersion).Major, ([System.Version]$PythonVersion).Minor
 
 if ($Android -and ($AndroidSDKs.Length -eq 0)) {
   # Enable all android SDKs by default.
@@ -355,6 +349,10 @@ function Get-BisonExecutable {
   return Join-Path -Path $BinaryCache -ChildPath "win_flex_bison\win_bison.exe"
 }
 
+function Get-PythonExecutable {
+  return [IO.Path]::Combine($BinaryCache, "python", $PythonVersion, $HostArch.PythonName, $PythonName, "python.exe")
+}
+
 function Get-InstallDir($Arch) {
   if ($Arch -eq $HostArch) {
     $ProgramFilesName = "Program Files"
@@ -377,8 +375,6 @@ function Get-HostSwiftSDK() {
 
 $NugetRoot = "$BinaryCache\nuget"
 $PinnedToolchain = [IO.Path]::GetFileNameWithoutExtension($PinnedBuild)
-
-$PythonName = "Python{0}{1}" -f ([System.Version]$PythonVersion).Major, ([System.Version]$PythonVersion).Minor
 
 $LibraryRoot = "$ImageRoot\Library"
 
@@ -810,16 +806,14 @@ function Fetch-Dependencies {
   function Download-Python($Version, $Arch) {
     Download-PythonPackage $Version "python-$Version-$($Arch.PythonName).exe"
     Extract-Python "python-$Version-$($Arch.PythonName).exe" $BinaryCache $Arch.PythonName
-    # Ensure Python modules that are required as host build tools
-    if ($Arch -eq $HostArch) {
-      Ensure-PythonModules $BinaryCache\python\$Version\$($Arch.PythonName)\$PythonName\python.exe
-    }
   }
 
   Download-Python $PythonVersion $HostArch
   if ($IsCrossCompiling) {
     Download-Python $PythonVersion $BuildArch
   }
+  # Ensure Python modules that are required as host build tools
+  Ensure-PythonModules "$(Get-PythonExecutable)"
 
   if ($Android) {
     # Only a specific NDK version is supported right now.
@@ -1487,7 +1481,7 @@ function Build-Compilers() {
       }
     }
 
-    $PythonRoot = "$BinaryCache\python\$PythonVersion\$($Arch.PythonName)\$PythonName"
+    $PythonRoot = Get-PythonExecutable | Split-Path -Parent
 
     # The STL in VS 17.10 requires Clang 17 or higher, but Swift toolchains prior to version 6 include older versions
     # of Clang. If bootstrapping with an older toolchain, we need to relax to relax this requirement with
@@ -1793,7 +1787,7 @@ function Build-Runtime([Platform]$Platform, $Arch) {
       })
   }
 
-  Invoke-Program $python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" `
+  Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" `
     -OutFile "$($Arch.SDKInstallRoot)\SDKSettings.plist"
 }
 
@@ -2020,7 +2014,7 @@ function Build-Testing([Platform]$Platform, $Arch, [switch]$Test = $false) {
 
 function Write-PlatformInfoPlist($Arch) {
     $PList = Join-Path -Path $Arch.PlatformInstallRoot -ChildPath "Info.plist"
-    Invoke-Program $python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development', 'SWIFT_TESTING_VERSION': 'development', 'SWIFTC_FLAGS': ['-use-ld=lld'] } }), encoding='utf-8'))" `
+    Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development', 'SWIFT_TESTING_VERSION': 'development', 'SWIFTC_FLAGS': ['-use-ld=lld'] } }), encoding='utf-8'))" `
       -OutFile "$PList"
 }
 
