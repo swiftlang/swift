@@ -83,6 +83,10 @@ struct BridgedResultInfo {
   swift::TypeBase * _Nonnull type;
   BridgedResultConvention convention;
 
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedResultInfo() {}
+
 #ifdef USED_IN_CPP_SOURCE
   inline static BridgedResultConvention
   castToResultConvention(swift::ResultConvention convention) {
@@ -100,6 +104,10 @@ struct OptionalBridgedResultInfo {
   swift::TypeBase * _Nullable type = nullptr;
   BridgedResultConvention convention = BridgedResultConvention::Indirect;
 
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  OptionalBridgedResultInfo() {}
+
 #ifdef USED_IN_CPP_SOURCE
   OptionalBridgedResultInfo(std::optional<swift::SILResultInfo> resultInfo) {
     if (resultInfo) {
@@ -113,6 +121,10 @@ struct OptionalBridgedResultInfo {
 
 struct BridgedResultInfoArray {
   BridgedArrayRef resultInfoArray;
+
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedResultInfoArray() {}
 
 #ifdef USED_IN_CPP_SOURCE
   BridgedResultInfoArray(llvm::ArrayRef<swift::SILResultInfo> results)
@@ -217,6 +229,10 @@ struct BridgedParameterInfo {
 struct BridgedParameterInfoArray {
   BridgedArrayRef parameterInfoArray;
 
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedParameterInfoArray() {}
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedParameterInfoArray(llvm::ArrayRef<swift::SILParameterInfo> parameters)
     : parameterInfoArray(parameters) {}
@@ -234,6 +250,10 @@ struct BridgedParameterInfoArray {
 
 struct BridgedYieldInfoArray {
   BridgedArrayRef yieldInfoArray;
+
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedYieldInfoArray() {}
 
 #ifdef USED_IN_CPP_SOURCE
   BridgedYieldInfoArray(llvm::ArrayRef<swift::SILYieldInfo> yields)
@@ -255,6 +275,10 @@ struct BridgedLifetimeDependenceInfo {
   SwiftUInt targetIndex;
   bool immortal;
 
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedLifetimeDependenceInfo() {}
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedLifetimeDependenceInfo(swift::LifetimeDependenceInfo info)
       : inheritLifetimeParamIndices(info.getInheritIndices()),
@@ -272,6 +296,10 @@ struct BridgedLifetimeDependenceInfo {
 
 struct BridgedLifetimeDependenceInfoArray {
   BridgedArrayRef lifetimeDependenceInfoArray;
+
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedLifetimeDependenceInfoArray() {}
 
 #ifdef USED_IN_CPP_SOURCE
   BridgedLifetimeDependenceInfoArray(
@@ -373,6 +401,10 @@ struct BridgedType {
   struct EnumElementIterator {
     uint64_t storage[4];
 
+    // Ensure that this struct value type will be indirectly returned on
+    // Windows ARM64
+    EnumElementIterator() {}
+
 #ifdef USED_IN_CPP_SOURCE
     EnumElementIterator(swift::EnumDecl::ElementRange::iterator i) {
       static_assert(sizeof(EnumElementIterator) >= sizeof(swift::EnumDecl::ElementRange::iterator));
@@ -385,6 +417,10 @@ struct BridgedType {
 
     SWIFT_IMPORT_UNSAFE BRIDGED_INLINE EnumElementIterator getNext() const;
   };
+
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedType() {}
 
 #ifdef USED_IN_CPP_SOURCE
   BridgedType(swift::SILType t) : opaqueValue(t.getOpaqueValue()) {}
@@ -572,6 +608,10 @@ enum class BridgedMemoryBehavior {
 
 struct BridgedLocation {
   uint64_t storage[3];
+
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedLocation() {}
 
 #ifdef USED_IN_CPP_SOURCE
   BridgedLocation(const swift::SILDebugLocation &loc) {
@@ -804,6 +844,10 @@ struct BridgedTypeArray {
 struct BridgedSILTypeArray {
   BridgedArrayRef typeArray;
 
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedSILTypeArray() {}
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedSILTypeArray(llvm::ArrayRef<swift::SILType> silTypes)
       : typeArray(silTypes) {}
@@ -825,6 +869,10 @@ struct BridgedGenericSpecializationInformation {
 
 struct OptionalBridgedSILDebugVariable {
   uint64_t storage[16];
+
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  OptionalBridgedSILDebugVariable() {}
 
 #ifdef USED_IN_CPP_SOURCE
   using OptionalSILDebugVariable = std::optional<swift::SILDebugVariable>;
