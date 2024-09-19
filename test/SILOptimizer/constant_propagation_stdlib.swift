@@ -1,7 +1,9 @@
-// RUN: %target-swift-frontend -module-name constant_propagation_stdlib %s -parse-stdlib -emit-sil -o -    | %FileCheck --check-prefix=CHECK-ONONE %s
-// RUN: %target-swift-frontend -module-name constant_propagation_stdlib %s -parse-stdlib -emit-sil -o - -O | %FileCheck --check-prefix=CHECK-O %s
+// RUN: %target-swift-frontend -module-name constant_propagation_stdlib %s -emit-sil -enable-builtin-module -o -    | %FileCheck --check-prefix=CHECK-ONONE %s
+// RUN: %target-swift-frontend -module-name constant_propagation_stdlib %s -emit-sil -enable-builtin-module -o - -O | %FileCheck --check-prefix=CHECK-O %s
 
 // REQUIRES: swift_in_compiler
+
+import Builtin
 
 public struct MyInt {
   var v: Builtin.Int32

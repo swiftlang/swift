@@ -3,6 +3,7 @@
 sil_stage raw
 
 import Builtin
+import Swift
 
 typealias Int = Builtin.Int32
 
