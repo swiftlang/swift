@@ -1325,6 +1325,7 @@ function Build-CMark($Arch) {
     -Bin "$($Arch.BinaryCache)\cmark-gfm-0.29.0.gfm.13" `
     -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
     -Arch $Arch `
+    -UseMSVCCompilers C `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       BUILD_TESTING = "NO";
