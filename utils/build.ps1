@@ -133,7 +133,7 @@ param(
   [string[]] $Test = @(),
   [string] $Stage = "",
   [string] $BuildTo = "",
-  [string] $HostArchName = $(if ($env:PROCESSOR_ARCHITEW6432 -ne $null) { "$env:PROCESSOR_ARCHITEW6432" } else { "$env:PROCESSOR_ARCHITECTURE" }),
+  [string] $HostArchName = $(if ($null -ne $env:PROCESSOR_ARCHITEW6432) { "$env:PROCESSOR_ARCHITEW6432" } else { "$env:PROCESSOR_ARCHITECTURE" }),
   [switch] $Clean,
   [switch] $DebugInfo,
   [switch] $EnableCaching,
@@ -2630,7 +2630,7 @@ if ($Stage) {
 }
 
 if (-not $IsCrossCompiling) {
-  if ($Test -ne $null -and (Compare-Object $Test @("clang", "lld", "lldb", "llvm", "swift") -PassThru -IncludeEqual -ExcludeDifferent) -ne $null) {
+  if ($null -ne $Test -and $null -ne (Compare-Object $Test @("clang", "lld", "lldb", "llvm", "swift") -PassThru -IncludeEqual -ExcludeDifferent)) {
     $Tests = @{
       "-TestClang" = $Test -contains "clang";
       "-TestLLD" = $Test -contains "lld";
