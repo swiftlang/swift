@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -swift-version 6 -parse-as-library %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend -disable-availability-checking -swift-version 6 -parse-as-library %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend -disable-availability-checking -swift-version 6 -enable-experimental-feature GlobalActorInferenceCutoff -parse-as-library %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -22,8 +21,6 @@ struct ImplicitlySendable {
   // always okay
   nonisolated let b = 0
   nonisolated var c: Int { 0 }
-
-  // okay
   nonisolated var d = 0
 
   // never okay
@@ -37,10 +34,7 @@ struct ImplicitlyNonSendable {
   // always okay
   nonisolated let b = 0
   nonisolated var c: Int { 0 }
-
-  // not okay
-  nonisolated var d = 0  // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}
-  // expected-note@-1 {{convert 'd' to a 'let' constant or consider declaring it 'nonisolated(unsafe)' if manually managing concurrency safety}}
+  nonisolated var d = 0
 
   // never okay
   nonisolated lazy var e = 0  // expected-error {{'nonisolated' is not supported on lazy properties}}
@@ -51,8 +45,6 @@ public struct PublicSendable: Sendable {
   // always okay
   nonisolated let b = 0
   nonisolated var c: Int { 0 }
-
-  // okay
   nonisolated var d = 0
 
   // never okay
@@ -64,10 +56,7 @@ public struct PublicNonSendable {
   // always okay
   nonisolated let b = 0
   nonisolated var c: Int { 0 }
-
-  // not okay
-  nonisolated var d = 0  // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}
-  // expected-note@-1 {{convert 'd' to a 'let' constant or consider declaring it 'nonisolated(unsafe)' if manually managing concurrency safety}}
+  nonisolated var d = 0
 
   // never okay
   nonisolated lazy var e = 0  // expected-error {{'nonisolated' is not supported on lazy properties}}

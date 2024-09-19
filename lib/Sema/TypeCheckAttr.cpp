@@ -7127,6 +7127,15 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   // 'nonisolated' can be applied to global and static/class variables
   // that do not have storage.
   auto dc = D->getDeclContext();
+  auto &ctx = D->getASTContext();
+
+  if (!ctx.LangOpts.hasFeature(Feature::GlobalActorInferenceCutoff)) {
+    if (isa<ProtocolDecl>(D) || isa<ExtensionDecl>(D) || isa<ClassDecl>(D) ||
+        isa<StructDecl>(D) || isa<EnumDecl>(D)) {
+      diagnoseAndRemoveAttr(attr, diag::invalid_decl_modifier, attr);
+      return;
+    }
+  }
 
   // nonisolated(unsafe) is unsafe, but only under strict concurrency.
   if (attr->isUnsafe() &&
@@ -7149,12 +7158,14 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
           }
         }
 
-        // Additionally, a stored property of a non-'Sendable' type can be
-        // explicitly marked 'nonisolated'.
-        if (auto parentDecl = dc->getDeclaredTypeInContext())
-          if (!parentDecl->isSendableType()) {
-            canBeNonisolated = true;
-          }
+        if (ctx.LangOpts.hasFeature(Feature::GlobalActorInferenceCutoff)) {
+          // Additionally, a stored property of a non-'Sendable' type can be
+          // explicitly marked 'nonisolated'.
+          if (auto parentDecl = dc->getDeclaredTypeInContext())
+            if (!parentDecl->isSendableType()) {
+              canBeNonisolated = true;
+            }
+        }
 
         // Otherwise, this stored property has to be qualified as 'unsafe'.
         if (var->supportsMutation() && !attr->isUnsafe() && !canBeNonisolated) {
@@ -7166,12 +7177,15 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
 
         // 'nonisolated' without '(unsafe)' is not allowed on non-Sendable
         // variables, unless they are a member of a non-'Sendable' type.
-        if (!attr->isUnsafe() && !type->hasError() && !canBeNonisolated) {
-          bool diagnosed = diagnoseIfAnyNonSendableTypes(
-              type, SendableCheckContext(dc), Type(), SourceLoc(),
-              attr->getLocation(), diag::nonisolated_non_sendable);
-          if (diagnosed)
-            return;
+        if (!attr->isUnsafe() && !type->hasError()) {
+          if (!(canBeNonisolated &&
+                ctx.LangOpts.hasFeature(Feature::GlobalActorInferenceCutoff))) {
+            bool diagnosed = diagnoseIfAnyNonSendableTypes(
+                type, SendableCheckContext(dc), Type(), SourceLoc(),
+                attr->getLocation(), diag::nonisolated_non_sendable);
+            if (diagnosed)
+              return;
+          }
         }
       }
 
