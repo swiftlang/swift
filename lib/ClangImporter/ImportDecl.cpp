@@ -37,6 +37,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
@@ -8131,6 +8132,21 @@ bool swift::importer::isMutabilityAttr(const clang::SwiftAttrAttr *swiftAttr) {
          swiftAttr->getAttribute() == "nonmutating";
 }
 
+static bool importAsUnsafe(const ASTContext &context,
+                           const clang::RecordDecl *decl,
+                           const Decl *MappedDecl) {
+  if (!context.LangOpts.hasFeature(Feature::SafeInterop) ||
+      !context.LangOpts.hasFeature(Feature::AllowUnsafeAttribute) || !decl)
+    return false;
+
+  if (isa<ClassDecl>(MappedDecl))
+    return false;
+
+  // TODO: Add logic to cover structural rules.
+  return !importer::hasNonEscapableAttr(decl) &&
+         !importer::hasEscapableAttr(decl);
+}
+
 void
 ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
   auto ClangDecl =
@@ -8155,6 +8171,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
     //
     // __attribute__((swift_attr("attribute")))
     //
+    bool seenUnsafe = false;
     for (auto swiftAttr : ClangDecl->specific_attrs<clang::SwiftAttrAttr>()) {
       // FIXME: Hard-code @MainActor and @UIActor, because we don't have a
       // point at which to do name lookup for imported entities.
@@ -8264,8 +8281,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       if (swiftAttr->getAttribute() == "unsafe") {
         if (!SwiftContext.LangOpts.hasFeature(Feature::AllowUnsafeAttribute))
           continue;
-        auto attr = new (SwiftContext) UnsafeAttr(/*implicit=*/false);
-        MappedDecl->getAttrs().add(attr);
+        seenUnsafe = true;
         continue;
       }
 
@@ -8308,6 +8324,13 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         diagnose(attrLoc, diag::clang_swift_attr_unhandled,
                  swiftAttr->getAttribute());
       }
+    }
+
+    if (seenUnsafe ||
+        importAsUnsafe(SwiftContext, dyn_cast<clang::RecordDecl>(ClangDecl),
+                       MappedDecl)) {
+      auto attr = new (SwiftContext) UnsafeAttr(/*implicit=*/!seenUnsafe);
+      MappedDecl->getAttrs().add(attr);
     }
   };
   importAttrsFromDecl(ClangDecl);
