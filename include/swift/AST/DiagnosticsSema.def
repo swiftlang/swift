@@ -1419,6 +1419,15 @@ ERROR(optional_chain_isnt_chaining,none,
       ())
 ERROR(pattern_in_expr,none,
       "%0 cannot appear in an expression", (DescriptivePatternKind))
+ERROR(conditional_cast_in_type_casting_pattern,none,
+      "cannot conditionally downcast in a type-casting pattern",
+      ())
+ERROR(force_cast_in_type_casting_pattern,none,
+      "cannot force downcast in a type-casting pattern",
+      ())
+ERROR(cannot_bind_value_with_is,none,
+      "use 'as' keyword to bind a matched value",
+      ())
 NOTE(note_call_to_operator,none,
      "in call to operator %0", (const ValueDecl *))
 NOTE(note_call_to_func,none,

@@ -2604,6 +2604,18 @@ public:
       : FailureDiagnostic(solution, locator), P(pattern) {}
 
   bool diagnoseAsError() override;
+
+private:
+  /// Diagnose situations where a type-casting pattern that binds a value
+  /// expects 'as' but is given 'as!', 'as?' or 'is' instead
+  /// e.g:
+  ///
+  /// \code
+  /// case let x as? Int = y
+  /// case let x as! Int = y
+  /// case let x is Int = y
+  /// \endcode
+  bool diagnoseInvalidCheckedCast() const;
 };
 
 /// Diagnose situations where there is no context to determine a

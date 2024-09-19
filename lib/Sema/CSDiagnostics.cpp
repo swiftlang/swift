@@ -8699,8 +8699,45 @@ bool InvalidPatternInExprFailure::diagnoseAsError() {
       E = parent;
     }
   }
-  emitDiagnostic(diag::pattern_in_expr, P->getDescriptiveKind());
+  if (!diagnoseInvalidCheckedCast()) {
+    emitDiagnostic(diag::pattern_in_expr, P->getDescriptiveKind());
+  }
   return true;
+}
+
+bool InvalidPatternInExprFailure::diagnoseInvalidCheckedCast() const {
+  auto *E = findParentExpr(castToExpr(getAnchor()));
+  // Make sure we have a CheckedCastExpr and are in an argument of `~=`.
+  while (E && !isa<CheckedCastExpr>(E))
+    E = findParentExpr(E);
+  auto *castExpr = cast_or_null<CheckedCastExpr>(E);
+  if (!castExpr)
+    return false;
+  auto *parent = findParentExpr(castExpr);
+  while (parent && !isa<BinaryExpr>(parent))
+    parent = findParentExpr(parent);
+  auto *BE = cast_or_null<BinaryExpr>(parent);
+  if (!BE || !isPatternMatchingOperator(BE->getFn()))
+    return false;
+  // Emit the appropriate diagnostic based on the cast kind.
+  if (auto *forced = dyn_cast<ForcedCheckedCastExpr>(castExpr)) {
+    emitDiagnosticAt(castExpr->getLoc(),
+                     diag::force_cast_in_type_casting_pattern)
+        .fixItRemove(forced->getExclaimLoc());
+    return true;
+  }
+  if (auto *conditional = dyn_cast<ConditionalCheckedCastExpr>(castExpr)) {
+    emitDiagnosticAt(castExpr->getLoc(),
+                     diag::conditional_cast_in_type_casting_pattern)
+        .fixItRemove(conditional->getQuestionLoc());
+    return true;
+  }
+  if (auto *isExpr = dyn_cast<IsExpr>(castExpr)) {
+    emitDiagnosticAt(castExpr->getLoc(), diag::cannot_bind_value_with_is)
+        .fixItReplace(isExpr->getAsLoc(), "as");
+    return true;
+  }
+  return false;
 }
 
 bool MissingContextualTypeForNil::diagnoseAsError() {
