@@ -1314,8 +1314,6 @@ function Build-WiXProject() {
 }
 
 function Build-CMark($Arch) {
-  $ArchName = $Arch.LLVMName
-
   Build-CMakeProject `
     -Src $SourceCache\cmark `
     -Bin "$($Arch.BinaryCache)\cmark-gfm-0.29.0.gfm.13" `
@@ -1524,8 +1522,6 @@ function Build-XML2([Platform]$Platform, $Arch) {
 }
 
 function Build-RegsGen2($Arch) {
-  $ArchName = $Arch.LLVMName
-
   Build-CMakeProject `
     -Src $SourceCache\ds2\Tools\RegsGen2 `
     -Bin "$(Get-BuildProjectBinaryCache RegsGen2)" `
@@ -1735,6 +1731,7 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
     -Arch $Arch `
     -Platform $Platform `
     -UseBuiltCompilers C,CXX,Swift `
+    -BuildTargets $Targets `
     -Defines @{
       ENABLE_SWIFT = "YES";
     }
@@ -1863,12 +1860,12 @@ function Build-FoundationMacros() {
   Build-CMakeProject `
     -Src $SourceCache\swift-foundation\Sources\FoundationMacros `
     -Bin $FoundationMacrosBinaryCache `
-    -InstallTo:$InstallDir `
+    -InstallTo $InstallDir `
     -Arch $Arch `
     -Platform $Platform `
     -UseBuiltCompilers Swift `
-    -SwiftSDK:$SwiftSDK `
-    -BuildTargets:$Targets `
+    -SwiftSDK $SwiftSDK `
+    -BuildTargets $Targets `
     -Defines @{
       SwiftSyntax_DIR = $SwiftSyntaxCMakeModules;
     }
@@ -2375,12 +2372,12 @@ function Build-TestingMacros() {
   Build-CMakeProject `
     -Src $SourceCache\swift-testing\Sources\TestingMacros `
     -Bin $TestingMacrosBinaryCache `
-    -InstallTo:$InstallDir  `
+    -InstallTo $InstallDir  `
     -Arch $Arch `
     -Platform $Platform `
     -UseBuiltCompilers Swift `
-    -SwiftSDK:$SwiftSDK `
-    -BuildTargets:$Targets `
+    -SwiftSDK $SwiftSDK `
+    -BuildTargets $Targets `
     -Defines @{
       SwiftSyntax_DIR = $SwiftSyntaxCMakeModules;
     }
