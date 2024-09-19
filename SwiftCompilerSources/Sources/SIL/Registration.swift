@@ -256,4 +256,5 @@ public func registerSILClasses() {
   register(AwaitAsyncContinuationInst.self)
   register(CheckedCastBranchInst.self)
   register(CheckedCastAddrBranchInst.self)
+  register(ThunkInst.self)
 }

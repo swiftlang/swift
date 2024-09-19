@@ -5027,6 +5027,11 @@ public:
     return getCalleeConvention() == ParameterConvention::Direct_Guaranteed;
   }
 
+  /// Return a copy of this SILFunctionType with its CalleConvention changed to
+  /// \p newCalleeConvention.
+  CanSILFunctionType
+  getWithCalleeConvention(ParameterConvention newCalleeConvention);
+
   /// Is this some kind of coroutine?
   bool isCoroutine() const {
     return getCoroutineKind() != SILCoroutineKind::None;

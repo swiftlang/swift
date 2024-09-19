@@ -1601,3 +1601,6 @@ final public class CheckedCastAddrBranchInst : TermInst {
     }
   }
 }
+
+final public class ThunkInst : Instruction {
+}

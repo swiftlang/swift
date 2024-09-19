@@ -8107,6 +8107,40 @@ passed to a function (materializeForSet) which escapes the closure in a way not
 expressed by the convert's users. The mandatory pass must ensure the lifetime
 in a conservative way.
 
+
+thunk
+`````
+::
+
+  sil-instruction ::= 'thunk' sil-thunk-attr* sil-value sil-apply-substitution-list? () sil-type
+  sil-thunk-attr ::= '[' thunk-kind ']'
+  sil-thunk-kind ::= identity
+
+  %1 = thunk [identity] %0() : $@convention(thin) (T) -> U
+  // %0 must be of a function type $T -> U
+  // %1 will be of type @callee_guaranteed (T) -> U since we are creating an
+  // "identity" thunk.
+  
+  %1 = thunk [identity] %0<T>() : $@convention(thin) (τ_0_0) -> ()
+  // %0 must be of a function type $T -> ()
+  // %1 will be of type @callee_guaranteed <τ_0_0> (τ_0_0) -> () since we are creating a
+  // "identity" thunk.
+
+Takes in a function and depending on the kind produces a new function result
+that is ``@callee_guaranteed``. The specific way that the function type of the
+input is modified by this instruction depends on the specific sil-thunk-kind of
+the instruction. So for instance, the hop_to_mainactor_if_needed thunk just
+returns a callee_guaranteed version of the input function... but one could
+imagine a "reabstracted" thunk kind that would produce the appropriate
+reabstracted thunk kind.
+
+This instructions is lowered to a true think in Lowered SIL by the ThunkLowering
+pass.
+
+It is assumed that like `partial_apply`_, if we need a substitution map, it will be
+attached to `thunk`_. This ensures that we have the substitution
+map already created if we need to create a `partial_apply`_.
+
 classify_bridge_object
 ``````````````````````
 ::

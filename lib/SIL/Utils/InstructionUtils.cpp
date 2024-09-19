@@ -1005,6 +1005,10 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     }
     return rt;
   }
+  case SILInstructionKind::ThunkInst: {
+    // For now be conservative since we may lower to a partial_apply.
+    return RuntimeEffect::Allocating | RuntimeEffect::Releasing;
+  }
   case SILInstructionKind::WitnessMethodInst: {
     return RuntimeEffect::MetaData;
   }
