@@ -405,6 +405,44 @@ void IRGenThunk::emit() {
       }
       errorArgValues.add(errorValue);
       emitAsyncReturn(IGF, *asyncLayout, origTy, errorArgValues.claimAll());
+
+      IGF.Builder.emitBlock(successBB);
+
+      Explosion resultArgValues;
+      if (result.empty()) {
+        if (!combined.combinedTy->isVoidTy()) {
+          if (auto *structTy =
+                  dyn_cast<llvm::StructType>(combined.combinedTy)) {
+            IGF.emitAllExtractValues(llvm::UndefValue::get(structTy), structTy,
+                                     resultArgValues);
+          } else {
+            resultArgValues = llvm::UndefValue::get(combined.combinedTy);
+          }
+        }
+      } else {
+        if (auto *structTy = dyn_cast<llvm::StructType>(combined.combinedTy)) {
+          llvm::Value *expandedResult =
+              llvm::UndefValue::get(combined.combinedTy);
+          for (size_t i = 0, count = result.size(); i < count; i++) {
+            llvm::Value *elt = result.claimNext();
+            auto *nativeTy = structTy->getElementType(i);
+            elt = convertForDirectError(IGF, elt, nativeTy,
+                                        /*forExtraction*/ false);
+            expandedResult =
+                IGF.Builder.CreateInsertValue(expandedResult, elt, i);
+          }
+          IGF.emitAllExtractValues(expandedResult, structTy, resultArgValues);
+        } else {
+          resultArgValues = convertForDirectError(IGF, result.claimNext(),
+                                                  combined.combinedTy,
+                                                  /*forExtraction*/ false);
+        }
+      }
+
+      resultArgValues.add(errorValue);
+      emitAsyncReturn(IGF, *asyncLayout, origTy, resultArgValues.claimAll());
+
+      return;
     } else {
       if (!error->empty()) {
         // Map the direct error explosion from the call back to the native
@@ -426,8 +464,8 @@ void IRGenThunk::emit() {
               llvm::UndefValue::get(IGF.CurFn->getReturnType()));
         }
       }
+      IGF.Builder.emitBlock(successBB);
     }
-    IGF.Builder.emitBlock(successBB);
   } else {
     if (isAsync) {
       Explosion error;
