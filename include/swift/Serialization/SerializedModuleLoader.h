@@ -15,6 +15,7 @@
 
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -190,6 +191,9 @@ protected:
                                         StringRef packageName,
                                         llvm::vfs::FileSystem *fileSystem,
                                         PathObfuscator &recoverer);
+
+  std::optional<MacroPluginDependency>
+  resolveMacroPlugin(const ExternalMacroPlugin &macro, StringRef packageName);
 
 public:
   virtual ~SerializedModuleLoaderBase();
@@ -513,6 +517,9 @@ public:
   virtual void
   getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                      ModuleDecl::ImportFilter filter) const override;
+
+  virtual void getExternalMacros(
+      SmallVectorImpl<ExternalMacroPlugin> &macros) const override;
 
   virtual void
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const override;

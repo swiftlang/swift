@@ -29,6 +29,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/MacroDefinition.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -871,6 +872,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(input_block, DEPENDENCY_DIRECTORY);
   BLOCK_RECORD(input_block, MODULE_INTERFACE_PATH);
   BLOCK_RECORD(input_block, IMPORTED_MODULE_SPIS);
+  BLOCK_RECORD(input_block, EXTERNAL_MACRO);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
 #define RECORD(X) BLOCK_RECORD(decls_block, X);
@@ -1277,6 +1279,7 @@ void Serializer::writeInputBlock() {
   input_block::FileDependencyLayout FileDependency(Out);
   input_block::DependencyDirectoryLayout DependencyDirectory(Out);
   input_block::ModuleInterfaceLayout ModuleInterface(Out);
+  input_block::ExternalMacroLayout ExternMacro(Out);
 
   if (Options.SerializeOptionsForDebugging) {
     const auto &PathObfuscator = Options.PathObfuscator;
@@ -1314,6 +1317,42 @@ void Serializer::writeInputBlock() {
 
   if (!Options.ModuleInterface.empty())
     ModuleInterface.emit(ScratchRecord, Options.ModuleInterface);
+
+  SmallVector<ExternalMacroPlugin> macros;
+  M->getExternalMacros(macros);
+
+  // Unique the macro modules discovered and pick the most public access.
+  std::map<std::string, ExternalMacroPlugin::Access> uniqueMacros;
+  for (auto &plugin : macros) {
+    // Ignore internal macros when serializing since they are not visibile for
+    // clients.
+    if (plugin.MacroAccess <= ExternalMacroPlugin::Access::Internal)
+      continue;
+
+    auto entry =
+        uniqueMacros.try_emplace(plugin.ModuleName, plugin.MacroAccess);
+    if (entry.second)
+      continue;
+
+    if (plugin.MacroAccess > entry.first->second)
+      entry.first->second = plugin.MacroAccess;
+  }
+  for (auto &plugin : uniqueMacros) {
+    // Use the AccessLevel enums to encode the macro access but only some
+    // values are used for macro access.
+    serialization::AccessLevel stableAccessControl;
+    if (plugin.second == ExternalMacroPlugin::Access::Public)
+      stableAccessControl = serialization::AccessLevel::Public;
+    else if (plugin.second == ExternalMacroPlugin::Access::Package)
+      stableAccessControl = serialization::AccessLevel::Package;
+    else if (plugin.second == ExternalMacroPlugin::Access::Internal)
+      stableAccessControl = serialization::AccessLevel::Internal;
+    else
+      llvm_unreachable("unknown enum value");
+
+    ExternMacro.emit(ScratchRecord, static_cast<uint8_t>(stableAccessControl),
+                     plugin.first);
+  }
 
   SmallVector<ImportedModule, 8> allLocalImports;
   M->getImportedModules(allLocalImports, ModuleDecl::getImportFilterLocal());
