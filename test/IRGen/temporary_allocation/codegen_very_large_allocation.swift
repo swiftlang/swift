@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -primary-file %s -O -emit-ir | %FileCheck %s --check-prefixes=CHECK-LARGE-ALLOC,CHECK-LARGE-ALLOC-%target-vendor -DWORD=i%target-ptrsize
-// RUN: %target-swift-frontend -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=CHECK-LARGE-STACK-ALLOC -DWORD=i%target-ptrsize
-// RUN: %target-swift-frontend -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=CHECK-LARGE-HEAP-ALLOC -DWORD=i%target-ptrsize
+// RUN: %target-swift-frontend -target %target-swift-abi-5.5-triple -primary-file %s -O -emit-ir | %FileCheck %s --check-prefixes=CHECK-LARGE-ALLOC,CHECK-LARGE-ALLOC-%target-vendor -DWORD=i%target-ptrsize
+// RUN: %target-swift-frontend -target %target-swift-abi-5.5-triple -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=CHECK-LARGE-STACK-ALLOC -DWORD=i%target-ptrsize
+// RUN: %target-swift-frontend -target %target-swift-abi-5.5-triple -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=CHECK-LARGE-HEAP-ALLOC -DWORD=i%target-ptrsize
 
 // This test for conditionally checking the version with ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF
 // xrOS is always succeeds the availability check so there is no need to call
