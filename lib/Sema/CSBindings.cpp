@@ -1845,10 +1845,6 @@ void PotentialBindings::infer(Constraint *constraint) {
     break;
 
   case ConstraintKind::Disjunction:
-    // If there is additional context available via disjunction
-    // associated with closure literal (e.g. coercion to some other
-    // type) let's delay resolving the closure until the disjunction
-    // is attempted.
     DelayedBy.push_back(constraint);
     break;
 
