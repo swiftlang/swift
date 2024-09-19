@@ -1478,10 +1478,11 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
           .fixItInsert(getEndOfPreviousLoc(), "\n");
       }
 
+      llvm::TinyPtrVector<ASTNode> activeElements;
       llvm::SmallPtrSet<Expr *, 4> exprsWithBindOptional;
       auto ICD = parseIfConfig(
           IfConfigContext::PostfixExpr,
-          [&](SmallVectorImpl<ASTNode> &elements, bool isActive) {
+          [&](bool isActive) {
             // Although we know the '#if' body starts with period,
             // '#elseif'/'#else' bodies might start with invalid tokens.
             if (isAtStartOfPostfixExprSuffix() || Tok.is(tok::pound_if)) {
@@ -1491,13 +1492,14 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
                                                  exprHasBindOptional);
               if (exprHasBindOptional)
                 exprsWithBindOptional.insert(expr.get());
-              elements.push_back(expr.get());
+
+              if (isActive)
+                activeElements.push_back(expr.get());
             }
           });
-      if (ICD.isNull())
+      if (ICD.isErrorOrHasCompletion())
         break;
 
-      auto activeElements = ICD.get()->getActiveClauseElements();
       if (activeElements.empty())
         // There's no active clause, or it was empty. Keep the current result.
         continue;

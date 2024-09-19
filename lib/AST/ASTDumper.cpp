@@ -1634,12 +1634,6 @@ namespace {
       printFoot();
     }
 
-    void visitIfConfigDecl(IfConfigDecl *ICD, StringRef label) {
-      printCommon(ICD, "if_config_decl", label);
-      printRecRange(ICD->getClauses(), &ICD->getASTContext(), "clauses");
-      printFoot();
-    }
-
     void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD, StringRef label) {
       printCommon(PDD, "pound_diagnostic_decl", label);
       printField(PDD->isError() ? "error" : "warning", "kind");

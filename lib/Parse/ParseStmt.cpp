@@ -369,35 +369,31 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     // Parse the decl, stmt, or expression.
     PreviousHadSemi = false;
     if (Tok.is(tok::pound_if) && !isStartOfSwiftDecl()) {
+      SmallVector<ASTNode, 16> activeElements;
       auto IfConfigResult = parseIfConfig(
           IfConfigContext::BraceItems,
-          [&](SmallVectorImpl<ASTNode> &Elements, bool IsActive) {
-            parseBraceItems(Elements, Kind,
+          [&](bool IsActive) {
+            SmallVector<ASTNode, 16> elements;
+            parseBraceItems(elements, Kind,
                             IsActive
                                 ? BraceItemListKind::ActiveConditionalBlock
                                 : BraceItemListKind::InactiveConditionalBlock,
                             IsFollowingGuard);
+
+            if (IsActive)
+              activeElements = std::move(elements);
           });
       if (IfConfigResult.hasCodeCompletion() && isIDEInspectionFirstPass()) {
         consumeDecl(BeginParserPosition, IsTopLevel);
         return IfConfigResult;
       }
       BraceItemsStatus |= IfConfigResult;
-      if (auto ICD = IfConfigResult.getPtrOrNull()) {
-        Result = ICD;
-        // Add the #if block itself
-        Entries.push_back(ICD);
-
-        for (auto &Entry : ICD->getActiveClauseElements()) {
-          if (Entry.is<Decl *>() && isa<IfConfigDecl>(Entry.get<Decl *>()))
-            // Don't hoist nested '#if'.
-            continue;
-          Entries.push_back(Entry);
-        }
-      } else {
+      if (IfConfigResult.isError()) {
         NeedParseErrorRecovery = true;
         continue;
       }
+
+      Entries.append(activeElements);
     } else if (Tok.is(tok::pound_line)) {
       ParserStatus Status = parseLineDirective(true);
       BraceItemsStatus |= Status;
@@ -408,7 +404,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       NeedParseErrorRecovery = Status.isErrorOrHasCompletion();
     } else if (isStartOfSwiftDecl()) {
       SmallVector<Decl*, 8> TmpDecls;
-      ParserResult<Decl> DeclResult =
+      ParserStatus DeclResult =
           parseDecl(IsAtStartOfLineOrPreviousHadSemi,
                     /*IfConfigsAreDeclAttrs=*/true, [&](Decl *D) {
                       TmpDecls.push_back(D);
@@ -423,7 +419,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                           FD->setHasTopLevelLocalContextCaptures();
                     });
       BraceItemsStatus |= DeclResult;
-      if (DeclResult.isParseErrorOrHasCompletion()) {
+      if (DeclResult.isErrorOrHasCompletion()) {
         NeedParseErrorRecovery = true;
         if (DeclResult.hasCodeCompletion() && IsTopLevel &&
             isIDEInspectionFirstPass()) {
@@ -431,8 +427,14 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
           return DeclResult;
         }
       }
-      Result = DeclResult.getPtrOrNull();
       Entries.append(TmpDecls.begin(), TmpDecls.end());
+
+      // HACK: If any declarations were parsed, make the last one the "result".
+      // We should know whether this was in an #if or not.
+      if (!TmpDecls.empty()) {
+        Result = TmpDecls.back();
+      }
+
     } else if (IsTopLevel) {
       // If this is a statement or expression at the top level of the module,
       // Parse it as a child of a TopLevelCodeDecl.
@@ -2661,25 +2663,15 @@ Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
       // clauses.
       auto IfConfigResult =
           parseIfConfig(IfConfigContext::SwitchStmt,
-                        [&](SmallVectorImpl<ASTNode> &Elements, bool IsActive) {
-                          parseStmtCases(Elements, IsActive);
+                        [&](bool IsActive) {
+                          SmallVector<ASTNode, 16> elements;
+                          parseStmtCases(elements, IsActive);
+
+                          if (IsActive) {
+                            cases.append(elements);
+                          }
                         });
       Status |= IfConfigResult;
-      if (auto ICD = IfConfigResult.getPtrOrNull()) {
-        cases.emplace_back(ICD);
-
-        for (auto &Entry : ICD->getActiveClauseElements()) {
-          if (Entry.is<Decl*>() && 
-              (isa<IfConfigDecl>(Entry.get<Decl*>())))
-            // Don't hoist nested '#if'.
-            continue;
-
-          assert((Entry.is<Stmt*>() && isa<CaseStmt>(Entry.get<Stmt*>())) ||
-                 (Entry.is<Decl*>() && 
-                   isa<PoundDiagnosticDecl>(Entry.get<Decl*>())));
-          cases.push_back(Entry);
-        }
-      }
     } else if (Tok.is(tok::pound_warning) || Tok.is(tok::pound_error)) {
       auto PoundDiagnosticResult = parseDeclPoundDiagnostic();
       Status |= PoundDiagnosticResult;

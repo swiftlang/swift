@@ -265,12 +265,9 @@ static bool isViableElement(ASTNode element,
                             ConstraintSystem &cs) {
   if (auto *decl = element.dyn_cast<Decl *>()) {
     // - Ignore variable declarations, they are handled by pattern bindings;
-    // - Ignore #if, the chosen children should appear in the
-    // surrounding context;
     // - Skip #warning and #error, they are handled during solution
     //   application.
-    if (isa<VarDecl>(decl) || isa<IfConfigDecl>(decl) ||
-        isa<PoundDiagnosticDecl>(decl))
+    if (isa<VarDecl>(decl) || isa<PoundDiagnosticDecl>(decl))
       return false;
   }
 
@@ -835,12 +832,6 @@ private:
         return;
       }
     }
-
-    // Just ignore #if; the chosen children should appear in the
-    // surrounding context.  This isn't good for source tools but it
-    // at least works.
-    if (isa<IfConfigDecl>(decl))
-      return;
 
     // Skip #warning/#error; we'll handle them when applying the closure.
     if (isa<PoundDiagnosticDecl>(decl))
@@ -1740,9 +1731,6 @@ private:
   }
 
   void visitDecl(Decl *decl) {
-    if (isa<IfConfigDecl>(decl))
-      return;
-
     if (auto *PBD = dyn_cast<PatternBindingDecl>(decl)) {
       if (visitPatternBindingDecl(PBD)) {
         hadError = true;
