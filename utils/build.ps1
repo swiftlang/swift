@@ -776,9 +776,44 @@ function Fetch-Dependencies {
     }
   }
 
+  function Ensure-PythonModules($Python) {
+    # First ensure pip is installed, else bootstrap it
+    try {
+      Invoke-Program -OutNull $Python -m pip *> $null
+    } catch {
+      Write-Output "Installing pip ..."
+      Invoke-Program -OutNull $Python '-I' -m ensurepip -U --default-pip
+    }
+    # 'packaging' is required for building LLVM 18+
+    try {
+      Invoke-Program -OutNull $Python -c 'import packaging' *> $null
+    } catch {
+      $WheelURL = "https://files.pythonhosted.org/packages/08/aa/cc0199a5f0ad350994d660967a8efb233fe0416e4639146c089643407ce6/packaging-24.1-py3-none-any.whl"
+      $WheelHash = "5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124"
+      DownloadAndVerify $WheelURL "$BinaryCache\python\packaging-24.1-py3-none-any.whl" $WheelHash
+      Write-Output "Installing 'packaging-24.1-py3-none-any.whl' ..."
+      Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\packaging-24.1-py3-none-any.whl" *> $null
+    }
+    # 'setuptools' provides 'distutils' module for Python 3.12+, required for SWIG support
+    # https://github.com/swiftlang/llvm-project/issues/9289
+    try {
+      Invoke-Program -OutNull $Python -c 'import distutils' *> $null
+    } catch {
+      $WheelURL = "https://files.pythonhosted.org/packages/ff/ae/f19306b5a221f6a436d8f2238d5b80925004093fa3edea59835b514d9057/setuptools-75.1.0-py3-none-any.whl"
+      $WheelHash = "35ab7fd3bcd95e6b7fd704e4a1539513edad446c097797f2985e0e4b960772f2"
+      DownloadAndVerify $WheelURL "$BinaryCache\python\setuptools-75.1.0-py3-none-any.whl" $WheelHash
+      Write-Output "Installing 'setuptools-75.1.0-py3-none-any.whl' ..."
+      Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\setuptools-75.1.0-py3-none-any.whl" *> $null
+    }
+  }
+
   function Download-Python($Version, $Arch) {
     Download-PythonPackage $Version "python-$Version-$($Arch.PythonName).exe"
     Extract-Python "python-$Version-$($Arch.PythonName).exe" $BinaryCache $Arch.PythonName
+    # Ensure Python modules that are required as host build tools
+    if ($Arch -eq $HostArch) {
+      Ensure-PythonModules $BinaryCache\python\$Version\$($Arch.PythonName)\$PythonName\python.exe
+    }
   }
 
   Download-Python $PythonVersion $HostArch
@@ -1485,7 +1520,7 @@ function Build-Compilers() {
         LLVM_NATIVE_TOOL_DIR = $BuildTools;
         LLVM_TABLEGEN = (Join-Path $BuildTools -ChildPath "llvm-tblgen.exe");
         LLVM_USE_HOST_TOOLS = "NO";
-        Python3_EXECUTABLE = $python;
+        Python3_EXECUTABLE = "$PythonRoot\python.exe";
         Python3_INCLUDE_DIR = "$PythonRoot\include";
         Python3_LIBRARY = "$PythonRoot\libs\$($PythonName.ToLower()).lib";
         Python3_ROOT_DIR = $PythonRoot;
