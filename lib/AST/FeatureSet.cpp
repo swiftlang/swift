@@ -204,6 +204,7 @@ UNINTERESTING_FEATURE(ExtractConstantsFromMembers)
 UNINTERESTING_FEATURE(FixedArrays)
 UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
+UNINTERESTING_FEATURE(UnspecifiedMeansMainActorIsolated)
 
 static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   auto isFunctionTypeWithSending = [](Type type) {
@@ -300,6 +301,7 @@ static bool usesFeatureAllowUnsafeAttribute(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(WarnUnsafe)
+UNINTERESTING_FEATURE(SafeInterop)
 
 static bool usesFeatureValueGenerics(Decl *decl) {
   auto genericContext = decl->getAsGenericContext();

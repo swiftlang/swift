@@ -97,6 +97,7 @@ struct G {
 
 // CHECK-NOT: default_constructor.G.init()
 // CHECK-LABEL: default_constructor.G.init(bar: Swift.Optional<Swift.Int32>)
+// CHECK-NEXT: // Isolation:
 // CHECK-NEXT: sil hidden [ossa] @$s19default_constructor1GV{{[_0-9a-zA-Z]*}}fC
 // CHECK-NOT: default_constructor.G.init()
 

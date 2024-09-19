@@ -12,11 +12,11 @@
 
 /// Check serialization in SILGEN with resilience enabled.
 // RUN: %target-swift-emit-silgen -emit-verbose-sil -sil-verify-all -enable-library-evolution -module-name Utils %t/Utils.swift -package-name mypkg -I %t > %t/Utils-Res.sil
-// RUN: %FileCheck %s --check-prefixes=UTILS-RES,UTILS-COMMON < %t/Utils-Res.sil
+// RUN: %FileCheck %s --check-prefixes=UTILS-RES,UTILS-COMMON -input-file=%t/Utils-Res.sil
 
 /// Check for indirect access with a resiliently built module dependency.
 // RUN: %target-swift-emit-silgen -sil-verify-all %t/Client.swift -package-name mypkg -I %t > %t/Client-Res.sil
-// RUN: %FileCheck %s --check-prefixes=CLIENT-RES,CLIENT-COMMON < %t/Client-Res.sil
+// RUN: %FileCheck %s --check-prefixes=CLIENT-RES,CLIENT-COMMON -input-file=%t/Client-Res.sil
 
 // RUN: rm -rf %t/Utils.swiftmodule
 
@@ -30,11 +30,11 @@
 
 /// Check serialization in SILGEN with resilience not enabled.
 // RUN: %target-swift-emit-silgen -emit-verbose-sil -sil-verify-all -module-name Utils %t/Utils.swift -package-name mypkg -I %t > %t/Utils-NonRes.sil
-// RUN: %FileCheck %s --check-prefixes=UTILS-NONRES,UTILS-COMMON < %t/Utils-NonRes.sil
+// RUN: %FileCheck %s --check-prefixes=UTILS-NONRES,UTILS-COMMON -input-file %t/Utils-NonRes.sil
 
 /// Check for indirect access with a non-resiliently built module dependency.
 // RUN: %target-swift-emit-silgen -sil-verify-all %t/Client.swift -package-name mypkg -I %t > %t/Client-NonRes.sil
-// RUN: %FileCheck %s --check-prefixes=CLIENT-NONRES,CLIENT-COMMON < %t/Client-NonRes.sil
+// RUN: %FileCheck %s --check-prefixes=CLIENT-NONRES,CLIENT-COMMON -input-file %t/Client-NonRes.sil
 
 
 //--- Utils.swift
@@ -538,11 +538,14 @@ package func f(_ arg: PublicStruct) -> Int {
 }
 
 // CLIENT-RES-LABEL: // f(_:)
+// CLIENT-RES-NEXT: // Isolation: unspecified
 // CLIENT-RES-NEXT: sil package [ossa] @$s6Client1fySi5Utils12PublicStructVF : $@convention(thin) (@in_guaranteed PublicStruct) -> Int
 // CLIENT-RES-LABEL: // PublicStruct.data.getter
+// CLIENT-RES-NEXT: // Isolation: unspecified
 // CLIENT-RES-NEXT: sil @$s5Utils12PublicStructV4dataSivg : $@convention(method) (@in_guaranteed PublicStruct) -> Int
 
 // CLIENT-NONRES-LABEL: // f(_:)
+// CLIENT-NONRES-NEXT: // Isolation: unspecified
 // CLIENT-NONRES-NEXT: sil package [ossa] @$s6Client1fySi5Utils12PublicStructVF : $@convention(thin) (PublicStruct) -> Int
 
 public func ff(_ arg: PublicStruct) -> Int {
@@ -550,9 +553,11 @@ public func ff(_ arg: PublicStruct) -> Int {
 }
 
 // CLIENT-RES-LABEL: // ff(_:)
+// CLIENT-RES-NEXT: // Isolation: unspecified
 // CLIENT-RES-NEXT: sil [ossa] @$s6Client2ffySi5Utils12PublicStructVF : $@convention(thin) (@in_guaranteed PublicStruct) -> Int
 
 // CLIENT-NONRES-LABEL: // ff(_:)
+// CLIENT-NONRES-NEXT: // Isolation: unspecified
 // CLIENT-NONRES-NEXT: sil [ossa] @$s6Client2ffySi5Utils12PublicStructVF : $@convention(thin) (PublicStruct) -> Int
 
 
@@ -587,11 +592,14 @@ package func g(_ arg: PkgStruct) -> Int {
 }
 
 // CLIENT-RES-LABEL: // g(_:)
+// CLIENT-RES-NEXT: // Isolation: unspecified
 // CLIENT-RES-NEXT: sil package [ossa] @$s6Client1gySi5Utils9PkgStructVF : $@convention(thin) (@in_guaranteed PkgStruct) -> Int
 // CLIENT-RES-LABEL: // PkgStruct.data.getter
+// CLIENT-RES-NEXT: // Isolation: unspecified
 // CLIENT-RES-NEXT: sil package_external @$s5Utils9PkgStructV4dataSivg : $@convention(method) (@in_guaranteed PkgStruct) -> Int
 
 // CLIENT-NONRES-LABEL: // g(_:)
+// CLIENT-NONRES-NEXT: // Isolation: unspecified
 // CLIENT-NONRES-NEXT: sil package [ossa] @$s6Client1gySi5Utils9PkgStructVF : $@convention(thin) (PkgStruct) -> Int
 
 package func gx(_ arg: UfiPkgClass) -> Int {
@@ -599,6 +607,7 @@ package func gx(_ arg: UfiPkgClass) -> Int {
 }
 
 // CLIENT-COMMON-LABEL: // gx(_:)
+// CLIENT-COMMON-NEXT: // Isolation: unspecified
 // CLIENT-COMMON-NEXT: sil package [ossa] @$s6Client2gxySi5Utils11UfiPkgClassCF : $@convention(thin) (@guaranteed UfiPkgClass) -> Int {
 
 package func m<T>(_ arg: PkgStructGeneric<T>) -> T {
@@ -606,12 +615,15 @@ package func m<T>(_ arg: PkgStructGeneric<T>) -> T {
 }
 
 // CLIENT-RES-LABEL: // m<A>(_:)
+// CLIENT-RES-NEXT: // Isolation: unspecified
 // CLIENT-RES-NEXT: sil package [ossa] @$s6Client1myx5Utils16PkgStructGenericVyxGlF : $@convention(thin) <T> (@in_guaranteed PkgStructGeneric<T>) -> @out T {
 
 // CLIENT-RES-LABEL: // PkgStructGeneric.data.getter
+// CLIENT-RES-NEXT: // Isolation: unspecified
 // CLIENT-RES-NEXT: sil package_external @$s5Utils16PkgStructGenericV4dataxvg : $@convention(method) <τ_0_0> (@in_guaranteed PkgStructGeneric<τ_0_0>) -> @out τ_0_0
 
 // CLIENT-NONRES-LABEL: // m<A>(_:)
+// CLIENT-NONRES-NEXT: // Isolation: unspecified
 // CLIENT-NONRES-NEXT: sil package [ossa] @$s6Client1myx5Utils16PkgStructGenericVyxGlF : $@convention(thin) <T> (@in_guaranteed PkgStructGeneric<T>) -> @out T {
 
 
@@ -625,12 +637,16 @@ package func n(_ arg: PkgStructWithPublicMember) -> Int {
 }
 
 // CLIENT-RES-LABEL: // n(_:)
+// CLIENT-RES-NEXT: // Isolation: unspecified
 // CLIENT-RES-NEXT: sil package [ossa] @$s6Client1nySi5Utils25PkgStructWithPublicMemberVF : $@convention(thin) (@in_guaranteed PkgStructWithPublicMember) -> Int
+
 // CLIENT-RES-LABEL: // PkgStructWithPublicMember.member.getter
+// CLIENT-RES-NEXT: // Isolation: unspecified
 // CLIENT-RES-NEXT: sil package_external @$s5Utils25PkgStructWithPublicMemberV6memberAA0eC0Vvg : $@convention(method) (@in_guaranteed PkgStructWithPublicMember) -> @out PublicStruct
 
 
 // CLIENT-NONRES-LABEL: // n(_:)
+// CLIENT-NONRES-NEXT: // Isolation: unspecified
 // CLIENT-NONRES-NEXT: sil package [ossa] @$s6Client1nySi5Utils25PkgStructWithPublicMemberVF : $@convention(thin) (PkgStructWithPublicMember) -> Int
 
 package func p(_ arg: PkgStructWithPublicExistential) -> any PublicProto {
@@ -638,13 +654,16 @@ package func p(_ arg: PkgStructWithPublicExistential) -> any PublicProto {
 }
 
 // CLIENT-RES-LABEL: // p(_:)
+// CLIENT-RES-NEXT: // Isolation: unspecified
 // CLIENT-RES-NEXT: sil package [ossa] @$s6Client1py5Utils11PublicProto_pAC013PkgStructWithC11ExistentialVF : $@convention(thin) (@in_guaranteed PkgStructWithPublicExistential) -> @out any PublicProto {
 
 // CLIENT-RES-LABEL: // PkgStructWithPublicExistential.member.getter
+// CLIENT-RES-NEXT: // Isolation: unspecified
 // CLIENT-RES-NEXT: sil package_external @$s5Utils30PkgStructWithPublicExistentialV6memberAA0E5Proto_pvg : $@convention(method) (@in_guaranteed PkgStructWithPublicExistential) -> @out any PublicProto
 
 
 // CLIENT-NONRES-LABEL: // p(_:)
+// CLIENT-NONRES-NEXT: // Isolation: unspecified
 // CLIENT-NONRES-NEXT: sil package [ossa] @$s6Client1py5Utils11PublicProto_pAC013PkgStructWithC11ExistentialVF : $@convention(thin) (@in_guaranteed PkgStructWithPublicExistential) -> @out any PublicProto {
 
 package func q(_ arg: PkgStructWithPkgExistential) -> any PkgProto {
@@ -652,13 +671,16 @@ package func q(_ arg: PkgStructWithPkgExistential) -> any PkgProto {
 }
 
 // CLIENT-RES-LABEL: // q(_:)
+// CLIENT-RES-NEXT: // Isolation: unspecified
 // CLIENT-RES-NEXT: sil package [ossa] @$s6Client1qy5Utils8PkgProto_pAC0c10StructWithC11ExistentialVF : $@convention(thin) (@in_guaranteed PkgStructWithPkgExistential) -> @out any PkgProto {
 
 // CLIENT-RES-LABEL: // PkgStructWithPkgExistential.member.getter
+// CLIENT-RES-NEXT: // Isolation: unspecified
 // CLIENT-RES-NEXT: sil package_external @$s5Utils013PkgStructWithB11ExistentialV6memberAA0B5Proto_pvg : $@convention(method) (@in_guaranteed PkgStructWithPkgExistential) -> @out any PkgProto
 
 
 // CLIENT-NONRES-LABEL: // q(_:)
+// CLIENT-NONRES-NEXT: // Isolation: unspecified
 // CLIENT-NONRES-NEXT: sil package [ossa] @$s6Client1qy5Utils8PkgProto_pAC0c10StructWithC11ExistentialVF : $@convention(thin) (@in_guaranteed PkgStructWithPkgExistential) -> @out any PkgProto {
 
 package func r(_ arg: PublicProto) -> Int {
@@ -666,6 +688,7 @@ package func r(_ arg: PublicProto) -> Int {
 }
 
 // CLIENT-COMMON-LABEL: // r(_:)
+// CLIENT-COMMON-NEXT: // Isolation: unspecified
 // CLIENT-COMMON-NEXT: sil package [ossa] @$s6Client1rySi5Utils11PublicProto_pF : $@convention(thin) (@in_guaranteed any PublicProto) -> Int {
 
 package func s(_ arg: PkgProto) -> Int {
@@ -673,6 +696,7 @@ package func s(_ arg: PkgProto) -> Int {
 }
 
 // CLIENT-COMMON-LABEL: // s(_:)
+// CLIENT-COMMON-NEXT: // Isolation: unspecified
 // CLIENT-COMMON-NEXT: sil package [ossa] @$s6Client1sySi5Utils8PkgProto_pF : $@convention(thin) (@in_guaranteed any PkgProto) -> Int {
 
 public func t(_ arg: any PublicProto) -> Int {
@@ -700,4 +724,5 @@ package func w(_ arg: PkgKlass) -> Int {
 }
 
 // CLIENT-COMMON-LABEL: // w(_:)
+// CLIENT-COMMON-NEXT: // Isolation: unspecified
 // CLIENT-COMMON-NEXT: sil package [ossa] @$s6Client1wySi5Utils8PkgKlassCF : $@convention(thin) (@guaranteed PkgKlass) -> Int
