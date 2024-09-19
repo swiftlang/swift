@@ -629,6 +629,7 @@ static swiftscan_macro_dependency_set_t *createMacroDependencySet(
         create_clone(entry.second.LibraryPath.c_str());
     set->macro_dependencies[SI]->executablePath =
         create_clone(entry.second.ExecutablePath.c_str());
+    ++ SI;
   }
   return set;
 }
