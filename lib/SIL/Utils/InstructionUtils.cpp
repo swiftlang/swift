@@ -960,9 +960,16 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     case SILFunctionTypeRepresentation::Block:
       rt |= RuntimeEffect::ObjectiveC | RuntimeEffect::MetaData;
       break;
-    case SILFunctionTypeRepresentation::WitnessMethod:
-      rt |= RuntimeEffect::MetaData; // ???
+    case SILFunctionTypeRepresentation::WitnessMethod: {
+      auto conformance =
+          as.getOrigCalleeType()->getWitnessMethodConformanceOrInvalid();
+      if (conformance.getRequirement()->requiresClass()) {
+          rt |= RuntimeEffect::MetaData | RuntimeEffect::ExistentialClassBound;
+      } else {
+          rt |= RuntimeEffect::MetaData | RuntimeEffect::Existential;
+      }
       break;
+    }
     case SILFunctionTypeRepresentation::CFunctionPointer:
     case SILFunctionTypeRepresentation::CXXMethod:
     case SILFunctionTypeRepresentation::Thin:
