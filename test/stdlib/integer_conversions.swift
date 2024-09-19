@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
-// REQUIRES: reflection
 
 var a : Int
 

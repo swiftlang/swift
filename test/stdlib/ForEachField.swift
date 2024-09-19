@@ -13,7 +13,6 @@
 // RUN: %target-run-simple-swift
 // RUN: %target-run-simple-swift(-Xfrontend -disable-reflection-names -DNO_FIELD_NAMES)
 // REQUIRES: executable_test
-// REQUIRES: reflection
 
 // Only run these tests with a just-built stdlib.
 // UNSUPPORTED: use_os_stdlib

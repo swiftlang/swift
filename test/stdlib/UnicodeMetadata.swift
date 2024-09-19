@@ -2,7 +2,6 @@
 // RUN: %target-codesign %t.out
 // RUN: %target-run %t.out | %FileCheck %s
 // REQUIRES: executable_test
-// REQUIRES: reflection
 
 
 class myClass { }

@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
-// REQUIRES: reflection
 
 // These tests verify fixes in >5.9 Swift, and will
 // fail if run against earlier standard library versions.

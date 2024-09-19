@@ -301,14 +301,6 @@ public struct LinearCongruentialGenerator: RandomNumberGenerator {
   }
 }
 
-#if !SWIFT_ENABLE_REFLECTION
-
-public func dump<T, TargetStream: TextOutputStream>(_ value: T, to target: inout TargetStream) {
-  target.write("(reflection not available)")
-}
-
-#endif
-
 #if SWIFT_STDLIB_STATIC_PRINT
 
 public func print(_ s: Any, terminator: String = "\n") {

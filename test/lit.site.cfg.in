@@ -112,9 +112,6 @@ if "@SWIFT_OPTIMIZED@" == "TRUE":
 if "@SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY@" == "TRUE":
     config.available_features.add("single_threaded_concurrency")
 
-if "@SWIFT_ENABLE_REFLECTION@" == "TRUE":
-    config.available_features.add("reflection")
-
 if "@SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS@" == "TRUE":
     config.available_features.add('runtime_function_counters')
 

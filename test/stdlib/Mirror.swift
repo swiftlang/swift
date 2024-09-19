@@ -24,7 +24,6 @@
 
 // REQUIRES: executable_test
 // REQUIRES: shell
-// REQUIRES: reflection
 
 // rdar://96439408
 // UNSUPPORTED: back_deployment_runtime

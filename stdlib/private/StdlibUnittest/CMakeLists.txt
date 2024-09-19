@@ -15,10 +15,6 @@ if (NOT IS_BUILD_TYPE_OPTIMIZED)
   list(APPEND swift_stdlib_unittest_compile_flags "-DSWIFT_STDLIB_DEBUG")
 endif()
 
-if(SWIFT_ENABLE_REFLECTION)
-  list(APPEND swift_stdlib_unittest_compile_flags "-DSWIFT_ENABLE_REFLECTION")
-endif()
-
 if(SWIFT_STDLIB_STATIC_PRINT)
   list(APPEND swift_stdlib_unittest_compile_flags "-D" "SWIFT_STDLIB_STATIC_PRINT")
 endif()

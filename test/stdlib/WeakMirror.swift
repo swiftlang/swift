@@ -23,7 +23,6 @@
 
 // REQUIRES: executable_test
 // REQUIRES: shell
-// REQUIRES: reflection
 
 import StdlibUnittest
 

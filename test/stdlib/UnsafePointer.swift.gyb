@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
-// REQUIRES: reflection
 
 import StdlibUnittest
 

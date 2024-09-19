@@ -6,7 +6,6 @@
 // RUN: %target-run %t/a.out
 
 // REQUIRES: executable_test
-// REQUIRES: reflection
 
 import A
 import B
