@@ -2284,10 +2284,6 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
     return false;
   }
 
-  if (isa<IfConfigDecl>(D)) {
-    return false;
-  }
-
   return true;
 }
 
@@ -3371,10 +3367,6 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
 
 void PrintAST::visitTopLevelCodeDecl(TopLevelCodeDecl *decl) {
   printASTNodes(decl->getBody()->getElements(), /*NeedIndent=*/false);
-}
-
-void PrintAST::visitIfConfigDecl(IfConfigDecl *ICD) {
-  // Never printed
 }
 
 void PrintAST::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
@@ -5533,8 +5525,6 @@ void PrintAST::visitSwitchStmt(SwitchStmt *stmt) {
   for (auto N : stmt->getRawCases()) {
     if (N.is<Stmt*>())
       visit(cast<CaseStmt>(N.get<Stmt*>()));
-    else
-      visit(cast<IfConfigDecl>(N.get<Decl*>()));
     Printer.printNewline();
   }
   indent();
@@ -5631,10 +5621,6 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
         }
       }
     }
-  }
-
-  if (isa<IfConfigDecl>(this)) {
-    return false;
   }
 
   // Print everything else.

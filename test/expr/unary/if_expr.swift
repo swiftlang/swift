@@ -710,12 +710,12 @@ func returnBranches6PoundIf() -> Int {
 
 func returnBranches6PoundIf2() -> Int {
   // We don't allow multiple expressions.
-  let i = if .random() {
+  let i = if .random() { // expected-error{{expected expression in branch of 'if' expression}}
     #if false
     print("hello")
     0
     #endif
-  } else { // expected-error {{non-expression branch of 'if' expression may only end with a 'throw'}}
+  } else {
     1
   }
   return i
@@ -849,11 +849,11 @@ func testPoundIfBranch2() -> Int {
 }
 
 func testPoundIfBranch3() -> Int {
-  let x = if .random() {
+  let x = if .random() { // expected-error{{expected expression in branch of 'if' expression}}
     #if false
     0
     #endif
-  } else { // expected-error {{non-expression branch of 'if' expression may only end with a 'throw'}}
+  } else {
     0
   }
   return x
@@ -872,25 +872,25 @@ func testPoundIfBranch4() -> Int {
 }
 
 func testPoundIfBranch5() -> Int {
-  // Not allowed (matches the behavior of implict expression returns)
+  // Inactive #if regions don't count
   if .random() {
     #if false
     0
     #endif
-    0 // expected-warning {{integer literal is unused}}
+    0
   } else {
-    1 // expected-warning {{integer literal is unused}}
+    1
   }
 }
 
 func testPoundIfBranch6() -> Int {
-  // Not allowed (matches the behavior of implict expression returns)
+  // Inactive #if regions don't count
   let x = if .random() {
     #if false
     0
     #endif
-    0 // expected-warning {{integer literal is unused}}
-  } else {  // expected-error {{non-expression branch of 'if' expression may only end with a 'throw'}}
+    0
+  } else {
     1
   }
   return x
