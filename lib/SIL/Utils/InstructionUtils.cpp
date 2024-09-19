@@ -671,9 +671,13 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
            RuntimeEffect::MetaData | RuntimeEffect::Existential;
 
   case SILInstructionKind::InitExistentialRefInst:
+    impactType = inst->getOperand(0)->getType();
+    return RuntimeEffect::MetaData | RuntimeEffect::ExistentialClassBound;
+
   case SILInstructionKind::InitExistentialMetatypeInst:
     impactType = inst->getOperand(0)->getType();
     return RuntimeEffect::MetaData | RuntimeEffect::Existential;
+
   case SILInstructionKind::ObjCToThickMetatypeInst:
     impactType = inst->getOperand(0)->getType();
     return RuntimeEffect::MetaData;
@@ -693,14 +697,8 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     return RuntimeEffect::Existential;
 
   case SILInstructionKind::OpenExistentialRefInst: {
-    SILType opType = cast<OpenExistentialRefInst>(inst)->getOperand()->getType();
-    impactType = opType;
-    if (opType.getASTType()->isObjCExistentialType()) {
-      return RuntimeEffect::MetaData | RuntimeEffect::Existential;
-    }
-    return RuntimeEffect::MetaData | RuntimeEffect::Existential;
-    // TODO: should be Existential
-    //return RuntimeEffect::Existential;
+    impactType = inst->getOperand(0)->getType();
+    return RuntimeEffect::MetaData | RuntimeEffect::ExistentialClassBound;
   }
 
   case SILInstructionKind::UnconditionalCheckedCastInst:
@@ -963,7 +961,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       rt |= RuntimeEffect::ObjectiveC | RuntimeEffect::MetaData;
       break;
     case SILFunctionTypeRepresentation::WitnessMethod:
-      rt |= RuntimeEffect::MetaData | RuntimeEffect::Existential;
+      rt |= RuntimeEffect::MetaData; // ???
       break;
     case SILFunctionTypeRepresentation::CFunctionPointer:
     case SILFunctionTypeRepresentation::CXXMethod:

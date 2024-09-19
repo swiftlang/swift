@@ -1512,6 +1512,13 @@ public:
     /// Add reference to the protocol conformance descriptor that generated
     /// this table.
     void addProtocolConformanceDescriptor() {
+      // In Embedded Swift, there are no protocol conformance descriptors. Emit
+      // a null pointer instead to keep the same layout as regular Swift.
+      if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+        Table.addNullPointer(IGM.Int8PtrTy);
+        return;
+      }
+      
       auto descriptor =
         IGM.getAddrOfProtocolConformanceDescriptor(&Conformance);
       if (isRelative)
@@ -2560,7 +2567,9 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
 
 void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   if (Context.LangOpts.hasFeature(Feature::Embedded)) {
-    return;
+    // In Embedded Swift, only class-bound wtables are allowed.
+    if (!wt->getConformance()->getProtocol()->requiresClass())
+      return;
   }
 
   // Don't emit a witness table if it is a declaration.
@@ -3560,9 +3569,13 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
                                         CanType srcType,
                                         llvm::Value **srcMetadataCache,
                                         ProtocolConformanceRef conformance) {
-  assert(!srcType->getASTContext().LangOpts.hasFeature(Feature::Embedded));
-
   auto proto = conformance.getRequirement();
+
+  // In Embedded Swift, only class-bound wtables are allowed.
+  if (srcType->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    assert(proto->requiresClass());
+  }
+
   assert(Lowering::TypeConverter::protocolRequiresWitnessTable(proto)
          && "protocol does not have witness tables?!");
 
