@@ -727,13 +727,19 @@ function Fetch-Dependencies {
   Extract-Toolchain "$PinnedToolchain.exe" $BinaryCache $PinnedToolchain
 
   function Download-Python($ArchName) {
-    $PythonAMD64URL = "https://www.nuget.org/api/v2/package/python/$PythonVersion"
-    $PythonAMD64Hash = "ac43b491e9488ac926ed31c5594f0c9409a21ecbaf99dc7a93f8c7b24cf85867"
+    switch ($ArchName) {
+      "AMD64" {
+        $PythonURL = "https://www.nuget.org/api/v2/package/python/$PythonVersion"
+        $PythonHash = "ac43b491e9488ac926ed31c5594f0c9409a21ecbaf99dc7a93f8c7b24cf85867"
+      }
+      "ARM64" {
+        $PythonURL = "https://www.nuget.org/api/v2/package/pythonarm64/$PythonVersion"
+        $PythonHash = "429ada77e7f30e4bd8ff22953a1f35f98b2728e84c9b1d006712561785641f69"
+      }
+      Default { throw "Unsupported architecture $_" }
+    }
 
-    $PythonARM64URL = "https://www.nuget.org/api/v2/package/pythonarm64/$PythonVersion"
-    $PythonARM64Hash = "429ada77e7f30e4bd8ff22953a1f35f98b2728e84c9b1d006712561785641f69"
-
-    DownloadAndVerify (Get-Variable -Name "Python${ArchName}URL").Value $BinaryCache\Python$ArchName-$PythonVersion.zip (Get-Variable -Name "Python${ArchName}Hash").Value
+    DownloadAndVerify $PythonURL $BinaryCache\Python$ArchName-$PythonVersion.zip $PythonHash
 
     if (-not $ToBatch) {
       Extract-ZipFile Python$ArchName-$PythonVersion.zip $BinaryCache Python$ArchName-$PythonVersion
