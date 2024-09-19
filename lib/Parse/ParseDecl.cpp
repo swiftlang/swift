@@ -6247,13 +6247,17 @@ static Parser::ParseDeclOptions getParseDeclOptions(DeclContext *DC) {
 ///
 /// \param fromASTGen If true , this function in called from ASTGen as the
 /// fallback, so do not attempt a callback to ASTGen.
-ParserResult<Decl> Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
-                                     bool IfConfigsAreDeclAttrs,
-                                     llvm::function_ref<void(Decl *)> Handler,
-                                     bool fromASTGen) {
+ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
+                               bool IfConfigsAreDeclAttrs,
+                               llvm::function_ref<void(Decl *)> Handler,
+                               bool fromASTGen) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
-  if (IsForASTGen && !fromASTGen)
-    return parseDeclFromSyntaxTree();
+  if (IsForASTGen && !fromASTGen) {
+    auto result = parseDeclFromSyntaxTree();
+    if (auto resultDecl = result.getPtrOrNull())
+      Handler(resultDecl);
+    return result;
+  }
 #endif
   ParseDeclOptions Flags = getParseDeclOptions(CurDeclContext);
   ParserPosition BeginParserPosition;
@@ -6263,13 +6267,17 @@ ParserResult<Decl> Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
   if (Tok.is(tok::pound_if) && !ifConfigContainsOnlyAttributes()) {
     auto IfConfigResult = parseIfConfig(
         IfConfigContext::DeclItems,
-        [&](SmallVectorImpl<ASTNode> &Decls, bool IsActive) {
+        [&](bool IsActive) {
           ParserStatus Status;
           bool PreviousHadSemi = true;
           while (Tok.isNot(tok::pound_else, tok::pound_endif, tok::pound_elseif,
                            tok::r_brace, tok::eof)) {
             Status |= parseDeclItem(PreviousHadSemi,
-                                    [&](Decl *D) { Decls.emplace_back(D); });
+                                    [&](Decl *D) {
+              if (IsActive) {
+                Handler(D);
+              }
+            });
           }
         });
     if (IfConfigResult.hasCodeCompletion() && isIDEInspectionFirstPass()) {
@@ -6277,19 +6285,7 @@ ParserResult<Decl> Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
       return makeParserError();
     }
 
-    if (auto ICD = IfConfigResult.getPtrOrNull()) {
-      // The IfConfigDecl is ahead of its members in source order.
-      Handler(ICD);
-      // Copy the active members into the entries list.
-      for (auto activeMember : ICD->getActiveClauseElements()) {
-        auto *D = activeMember.get<Decl*>();
-        if (isa<IfConfigDecl>(D))
-          // Don't hoist nested '#if'.
-          continue;
-        Handler(D);
-      }
-    }
-    return IfConfigResult;
+    return makeParserSuccess();
   }
   if (Tok.isAny(tok::pound_warning, tok::pound_error)) {
     auto Result = parseDeclPoundDiagnostic();
@@ -7050,15 +7046,19 @@ ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
     return LineDirectiveStatus;
   }
 
-  ParserResult<Decl> Result =
+  Decl *LastResultDecl = nullptr;
+  ParserStatus Result =
       parseDecl(IsAtStartOfLineOrPreviousHadSemi,
-                /* IfConfigsAreDeclAttrs=*/false, handler);
-  if (Result.isParseErrorOrHasCompletion())
+                /* IfConfigsAreDeclAttrs=*/false, [&](Decl *decl) {
+        handler(decl);
+        LastResultDecl = decl;
+      });
+  if (Result.isErrorOrHasCompletion())
     skipUntilDeclRBrace(tok::semi, tok::pound_endif);
   SourceLoc SemiLoc;
   PreviousHadSemi = consumeIf(tok::semi, SemiLoc);
-  if (PreviousHadSemi && Result.isNonNull())
-    Result.get()->TrailingSemiLoc = SemiLoc;
+  if (PreviousHadSemi && LastResultDecl)
+    LastResultDecl->TrailingSemiLoc = SemiLoc;
   return Result;
 }
 

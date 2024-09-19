@@ -977,10 +977,10 @@ public:
 
   void consumeDecl(ParserPosition BeginParserPosition, bool IsTopLevel);
 
-  ParserResult<Decl> parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
-                               bool IfConfigsAreDeclAttrs,
-                               llvm::function_ref<void(Decl *)> Handler,
-                               bool fromASTGen = false);
+  ParserStatus parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
+                         bool IfConfigsAreDeclAttrs,
+                         llvm::function_ref<void(Decl *)> Handler,
+                         bool fromASTGen = false);
 
   std::pair<std::vector<Decl *>, std::optional<Fingerprint>>
   parseDeclListDelayed(IterableDeclContext *IDC);
@@ -1018,9 +1018,9 @@ public:
 
   /// Parse a #if ... #endif directive.
   /// Delegate callback function to parse elements in the blocks.
-  ParserResult<IfConfigDecl> parseIfConfig(
+  ParserStatus parseIfConfig(
       IfConfigContext ifConfigContext,
-      llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements);
+      llvm::function_ref<void(bool)> parseElements);
 
   /// Parse an #if ... #endif containing only attributes.
   ParserStatus parseIfConfigDeclAttributes(
