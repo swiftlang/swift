@@ -29,9 +29,6 @@ def AutolinkExtractOption : OptionFlag;
 // The option should be accepted by swift -modulewrap
 def ModuleWrapOption : OptionFlag;
 
-// The option should be accepted by swift-indent
-def SwiftIndentOption : OptionFlag;
-
 // The option should not be accepted by the driver.
 def NoDriverOption : OptionFlag;
 
@@ -218,7 +215,6 @@ def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
 
 def help : Flag<["-", "--"], "help">,
   Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
-         SwiftIndentOption,
          SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"Display available options">;
 def h : Flag<["-"], "h">, Alias<help>;
@@ -268,8 +264,8 @@ def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
 
 def o : JoinedOrSeparate<["-"], "o">,
   Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
-         NoInteractiveOption, SwiftIndentOption, ArgumentIsPath,
-         SwiftAPIDigesterOption, CacheInvariant]>,
+         NoInteractiveOption, ArgumentIsPath, SwiftAPIDigesterOption,
+         CacheInvariant]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
 def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
@@ -1146,28 +1142,28 @@ def AssertConfig : Separate<["-"], "assert-config">,
 def code_formatting_Group : OptionGroup<"<code formatting options>">;
 
 def use_tabs : Flag<["-"], "use-tabs">, Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption, SwiftIndentOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption]>,
   HelpText<"Use tabs for indentation.">;
 
 def indent_switch_case : Flag<["-"], "indent-switch-case">,
   Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption, SwiftIndentOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption]>,
   HelpText<"Indent cases in switch statements.">;
 
 def in_place : Flag<["-"], "in-place">, Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption, SwiftIndentOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption]>,
   HelpText<"Overwrite input file with formatted file.">;
 
 def tab_width : Separate<["-"], "tab-width">, Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption, SwiftIndentOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption]>,
   HelpText<"Width of tab character.">, MetaVarName<"<n>">;
 
 def indent_width : Separate<["-"], "indent-width">, Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption, SwiftIndentOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption]>,
   HelpText<"Number of characters to indent.">, MetaVarName<"<n>">;
 
 def line_range : Separate<["-"], "line-range">, Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption, SwiftIndentOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption]>,
   HelpText<"<start line>:<end line>. Formats a range of lines (1-based). "
            "Can only be used with one input file.">, MetaVarName<"<n:n>">;
 

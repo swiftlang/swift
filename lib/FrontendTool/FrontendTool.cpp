@@ -1078,7 +1078,6 @@ static void printSingleFrontendOpt(llvm::opt::OptTable &table, options::ID id,
   if (table.getOption(id).hasFlag(options::FrontendOption) ||
       table.getOption(id).hasFlag(options::AutolinkExtractOption) ||
       table.getOption(id).hasFlag(options::ModuleWrapOption) ||
-      table.getOption(id).hasFlag(options::SwiftIndentOption) ||
       table.getOption(id).hasFlag(options::SwiftSymbolGraphExtractOption) ||
       table.getOption(id).hasFlag(options::SwiftAPIDigesterOption)) {
     auto name = StringRef(table.getOptionName(id));
