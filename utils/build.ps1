@@ -958,6 +958,10 @@ function Build-CMakeProject {
     switch ($Platform) {
       Windows {
         $CFlags = @("/GS-", "/Gw", "/Gy", "/Oi", "/Oy", "/Zc:inline")
+        # If the current code page is not UTF-8, add "/utf-8" option to ensure the compiler is using it
+        if (65001 -ne [Console]::OutputEncoding.CodePage) {
+          $CFlags.Add("/utf-8")
+        }
       }
       Android {
         $CFlags = @("--sysroot=$(Get-AndroidNDKPath)\toolchains\llvm\prebuilt\windows-x86_64\sysroot")
