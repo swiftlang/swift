@@ -754,10 +754,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
 
   // If we have global actor isolation for our constant, put the isolation onto
   // the function.
-  if (auto isolation =
-          getActorIsolationOfContext(constant.getInnermostDeclContext())) {
-    F->setActorIsolation(isolation);
-  }
+  F->setActorIsolation(getActorIsolationOfContext(constant.getInnermostDeclContext()));
 
   assert(F && "SILFunction should have been defined");
 
@@ -1248,12 +1245,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant, SILFunction *F,
     F->setGenericEnvironment(genericEnv, capturedEnvs, forwardingSubs);
   }
 
-  // If we have global actor isolation for our constant, put the isolation onto
-  // the function.
-  if (auto isolation =
-          getActorIsolationOfContext(constant.getInnermostDeclContext())) {
-    F->setActorIsolation(isolation);
-  }
+  F->setActorIsolation(getActorIsolationOfContext(constant.getInnermostDeclContext()));
 
   // Create a debug scope for the function using astNode as source location.
   F->setDebugScope(new (M) SILDebugScope(Loc, F));

@@ -481,6 +481,7 @@ func testNoescape() {
 }
 
 // CHECK-LABEL: functions.testNoescape() -> ()
+// CHECK-NEXT: // Isolation:
 // CHECK-NEXT: sil hidden [ossa] @$s9functions12testNoescapeyyF : $@convention(thin) () -> ()
 // CHECK: function_ref closure #1 () -> () in functions.testNoescape() -> ()
 // CHECK-NEXT: function_ref @$s9functions12testNoescapeyyFyyXEfU_ : $@convention(thin) (@guaranteed { var Int }) -> ()

@@ -1425,9 +1425,9 @@ private:
       // our transferring operand. If so, we can squelch this.
       if (auto functionIsolation =
               transferringOp->getUser()->getFunction()->getActorIsolation()) {
-        if (functionIsolation.isActorIsolated() &&
+        if (functionIsolation->isActorIsolated() &&
             SILIsolationInfo::get(transferringOp->getUser())
-                .hasSameIsolation(functionIsolation))
+                .hasSameIsolation(*functionIsolation))
           return;
       }
     }
