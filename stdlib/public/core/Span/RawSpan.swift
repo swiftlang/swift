@@ -160,6 +160,7 @@ extension RawSpan {
   ///   - span: An existing `Span<T>`, which will define both this
   ///           `RawSpan`'s lifetime and the memory it represents.
   @_disallowFeatureSuppression(NonescapableTypes)
+  @unsafe // remove when fixing the lifetime annotation
   @_alwaysEmitIntoClient
   public init<T: BitwiseCopyable>(
     _unsafeSpan span: borrowing Span<T>
@@ -292,6 +293,7 @@ extension RawSpan {
   ///
   /// - Complexity: O(1)
   @_disallowFeatureSuppression(NonescapableTypes)
+  @unsafe
   @usableFromInline func _extracting(unchecked bounds: Range<Int>) -> Self {
     RawSpan(
       _unchecked: _pointer?.advanced(by: bounds.lowerBound),
@@ -300,6 +302,7 @@ extension RawSpan {
   }
 
   @_disallowFeatureSuppression(NonescapableTypes)
+  @unsafe
   @_alwaysEmitIntoClient
   public mutating func _shrink(toUnchecked bounds: Range<Int>) {
     self = _extracting(unchecked: bounds)
@@ -345,6 +348,7 @@ extension RawSpan {
   ///
   /// - Complexity: O(1)
   @_disallowFeatureSuppression(NonescapableTypes)
+  @unsafe
   @usableFromInline func _extracting(
     unchecked bounds: some RangeExpression<Int>
   ) -> Self {
@@ -352,6 +356,7 @@ extension RawSpan {
   }
 
   @_disallowFeatureSuppression(NonescapableTypes)
+  @unsafe
   @_alwaysEmitIntoClient
   public mutating func _shrink(toUnchecked bounds: some RangeExpression<Int>) {
     self = _extracting(unchecked: bounds)
@@ -417,6 +422,7 @@ extension RawSpan {
   ///   - type: The type as which to view the bytes of this span.
   /// - Returns: A typed span viewing these bytes as instances of `T`.
   @_disallowFeatureSuppression(NonescapableTypes)
+  @unsafe
   @_alwaysEmitIntoClient
   public func _unsafeView<T: BitwiseCopyable>(
     as type: T.Type
@@ -447,6 +453,7 @@ extension RawSpan {
   ///     `offset`. The returned instance is memory-managed and unassociated
   ///     with the value in the memory referenced by this pointer.
   @_disallowFeatureSuppression(NonescapableTypes)
+  @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoad<T>(
     fromByteOffset offset: Int = 0, as: T.Type
@@ -476,6 +483,7 @@ extension RawSpan {
   ///     `offset`. The returned instance is memory-managed and unassociated
   ///     with the value in the memory referenced by this pointer.
   @_disallowFeatureSuppression(NonescapableTypes)
+  @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoad<T>(
     fromUncheckedByteOffset offset: Int, as: T.Type
@@ -500,6 +508,7 @@ extension RawSpan {
   ///     `offset`. The returned instance isn't associated
   ///     with the value in the range of memory referenced by this pointer.
   @_disallowFeatureSuppression(NonescapableTypes)
+  @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoadUnaligned<T: BitwiseCopyable>(
     fromByteOffset offset: Int = 0, as: T.Type
@@ -528,6 +537,7 @@ extension RawSpan {
   ///     `offset`. The returned instance isn't associated
   ///     with the value in the range of memory referenced by this pointer.
   @_disallowFeatureSuppression(NonescapableTypes)
+  @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoadUnaligned<T: BitwiseCopyable>(
     fromUncheckedByteOffset offset: Int, as: T.Type

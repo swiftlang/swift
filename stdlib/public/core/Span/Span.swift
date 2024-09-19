@@ -403,6 +403,7 @@ extension Span where Element: BitwiseCopyable {
   ///
   /// - Returns: a RawSpan over the memory represented by this span
   @_disallowFeatureSuppression(NonescapableTypes)
+  @unsafe // remove when the lifetime inference is fixed
   @_alwaysEmitIntoClient
   public var _unsafeRawSpan: RawSpan { RawSpan(_unsafeSpan: self) }
 }
@@ -433,6 +434,7 @@ extension Span where Element: ~Copyable {
   ///     must be greater or equal to zero, and less than `count`.
   ///
   /// - Complexity: O(1)
+  @unsafe
   @_alwaysEmitIntoClient
   public subscript(unchecked position: Int) -> Element {
     _read {
@@ -469,6 +471,7 @@ extension Span where Element: BitwiseCopyable {
   ///     must be greater or equal to zero, and less than `count`.
   ///
   /// - Complexity: O(1)
+  @unsafe
   @_alwaysEmitIntoClient
   public subscript(unchecked position: Int) -> Element {
     get {
@@ -523,6 +526,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_disallowFeatureSuppression(NonescapableTypes)
+  @unsafe
   @usableFromInline func _extracting(unchecked bounds: Range<Int>) -> Self {
     Span(
       _unchecked: _pointer?.advanced(by: bounds.lowerBound*MemoryLayout<Element>.stride),
@@ -531,6 +535,7 @@ extension Span where Element: ~Copyable {
   }
 
   @_disallowFeatureSuppression(NonescapableTypes)
+  @unsafe
   @_alwaysEmitIntoClient
   public mutating func _shrink(toUnchecked bounds: Range<Int>) {
     self = _extracting(unchecked: bounds)
@@ -576,6 +581,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_disallowFeatureSuppression(NonescapableTypes)
+  @unsafe
   @usableFromInline func _extracting(
     uncheckedBounds bounds: some RangeExpression<Int>
   ) -> Self {
@@ -583,6 +589,7 @@ extension Span where Element: ~Copyable {
   }
 
   @_disallowFeatureSuppression(NonescapableTypes)
+  @unsafe
   @_alwaysEmitIntoClient
   public mutating func _shrink(toUnchecked bounds: some RangeExpression<Int>) {
     self = _extracting(uncheckedBounds: bounds)
