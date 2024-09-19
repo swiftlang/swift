@@ -757,7 +757,6 @@ public:
     case DeclKind::Accessor:
     case DeclKind::Constructor:
     case DeclKind::Destructor:
-    case DeclKind::IfConfig:
     case DeclKind::PoundDiagnostic:
       return true;
     case DeclKind::OpaqueType:
@@ -850,8 +849,7 @@ public:
 #ifndef NDEBUG
     // There are currently no symbols associated with the members of a protocol;
     // each conforming type has to handle them individually.
-    // (NB. anything within an active IfConfigDecls also appears outside). Let's
-    // assert this fact:
+    // Let's assert this fact:
     for (auto *member : PD->getMembers()) {
       assert(isExpectedProtocolMember(member) &&
              "unexpected member of protocol during TBD generation");
@@ -875,7 +873,6 @@ public:
   void visit##CLASS##Decl(CLASS##Decl *) {}
 
   UNINTERESTING_DECL(EnumCase)
-  UNINTERESTING_DECL(IfConfig)
   UNINTERESTING_DECL(Import)
   UNINTERESTING_DECL(MacroExpansion)
   UNINTERESTING_DECL(Missing)

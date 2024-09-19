@@ -2020,11 +2020,6 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   (void)SILProperty::create(M, /*serializedKind*/ 0, decl, component);
 }
 
-void SILGenModule::visitIfConfigDecl(IfConfigDecl *ICD) {
-  // Nothing to do for these kinds of decls - anything active has been added
-  // to the enclosing declaration.
-}
-
 void SILGenModule::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
   // Nothing to do for #error/#warning; they've already been emitted.
 }

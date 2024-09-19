@@ -990,7 +990,7 @@ ParserStatus Parser::parseIfConfig(
     });
 }
 
-ParserStatus Parser::parseIfConfigDeclAttributes(
+ParserStatus Parser::parseIfConfigAttributes(
     DeclAttributes &attributes, bool ifConfigsAreDeclAttrs,
     PatternBindingInitializer *initContext) {
   ParserStatus status = makeParserSuccess();

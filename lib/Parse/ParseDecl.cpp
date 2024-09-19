@@ -5284,7 +5284,7 @@ ParserStatus Parser::parseDeclAttributeList(
       if (!ifConfigsAreDeclAttrs && !ifConfigContainsOnlyAttributes())
         break;
 
-      Status |= parseIfConfigDeclAttributes(
+      Status |= parseIfConfigAttributes(
           Attributes, ifConfigsAreDeclAttrs, initContext);
     }
   }
@@ -5332,7 +5332,7 @@ ParserStatus Parser::parseClosureDeclAttributeList(DeclAttributes &Attributes) {
       if (!ifConfigsAreDeclAttrs && !ifConfigContainsOnlyAttributes()) {
         break;
       }
-      Status |= parseIfConfigDeclAttributes(Attributes, ifConfigsAreDeclAttrs,
+      Status |= parseIfConfigAttributes(Attributes, ifConfigsAreDeclAttrs,
                                             initContext);
     }
   }

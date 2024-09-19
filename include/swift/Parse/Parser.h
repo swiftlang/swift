@@ -1023,7 +1023,7 @@ public:
       llvm::function_ref<void(bool)> parseElements);
 
   /// Parse an #if ... #endif containing only attributes.
-  ParserStatus parseIfConfigDeclAttributes(
+  ParserStatus parseIfConfigAttributes(
     DeclAttributes &attributes, bool ifConfigsAreDeclAttrs,
     PatternBindingInitializer *initContext);
 

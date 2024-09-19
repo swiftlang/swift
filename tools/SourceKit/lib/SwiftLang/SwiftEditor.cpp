@@ -1599,24 +1599,6 @@ private:
       }
       return Action::Continue(E);
     }
-
-    PreWalkAction walkToDeclPre(Decl *D) override {
-      if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
-        // The base walker assumes the content of active IfConfigDecl clauses
-        // has been injected into the parent context and will be walked there.
-        // This doesn't hold for pre-typechecked ASTs, so walk them here.
-        for (auto Clause: ICD->getClauses()) {
-          if (!Clause.isActive)
-            continue;
-
-          for (auto Elem: Clause.Elements) {
-            Elem.walk(*this);
-          }
-        }
-        return Action::SkipNode();
-      }
-      return Action::Continue();
-    }
   };
 
   class ClosureTypeWalker: public ASTWalker {

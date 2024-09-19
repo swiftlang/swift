@@ -970,13 +970,6 @@ void IterableDeclContext::addMemberPreservingSourceOrder(Decl *member) {
     if (isa<EnumCaseDecl>(existingMember))
       continue;
 
-    // The elements of the active clause of an IfConfigDecl
-    // are added to the parent type. We ignore the IfConfigDecl
-    // since its source range overlaps with the source ranges
-    // of the active elements.
-    if (isa<IfConfigDecl>(existingMember))
-      continue;
-
     if (!SM.isBeforeInBuffer(existingMember->getEndLoc(), start))
       break;
 
@@ -1025,14 +1018,11 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
       return;
 
     auto shouldSkip = [](Decl *d) {
-      // PatternBindingDecl source ranges overlap with VarDecls,
-      // EnumCaseDecl source ranges overlap with EnumElementDecls,
-      // and IfConfigDecl source ranges overlap with the elements
-      // of the active clause. Skip them all here to avoid
-      // spurious assertions.
+      // PatternBindingDecl source ranges overlap with VarDecls and
+      // EnumCaseDecl source ranges overlap with EnumElementDecls.
+      // Skip them all here to avoid spurious assertions.
       if (isa<PatternBindingDecl>(d) ||
-          isa<EnumCaseDecl>(d) ||
-          isa<IfConfigDecl>(d))
+          isa<EnumCaseDecl>(d))
         return true;
 
       // Ignore source location information of implicit declarations.

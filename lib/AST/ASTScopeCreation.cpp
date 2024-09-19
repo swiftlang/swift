@@ -368,10 +368,6 @@ public:
   VISIT_AND_IGNORE(MissingDecl)
   VISIT_AND_IGNORE(MissingMemberDecl)
 
-  // Only members of the active clause are in scope, and those
-  // are visited separately.
-  VISIT_AND_IGNORE(IfConfigDecl)
-
   // This declaration is handled from the PatternBindingDecl
   VISIT_AND_IGNORE(VarDecl)
 
