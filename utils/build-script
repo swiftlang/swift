@@ -424,7 +424,7 @@ def apply_default_arguments(toolchain, args):
         for target in targets
         if (not target.platform.is_darwin or
             target.platform.sdk_supports_architecture(
-                target.arch, args.darwin_xcrun_toolchain))
+                target.arch, args.darwin_xcrun_toolchain, args))
     ]
 
     # Include the Darwin module-only architectures in the CMake options.

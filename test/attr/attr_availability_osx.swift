@@ -174,7 +174,7 @@ extension TestStruct {
   func introducedInExtensionSwift() {} // expected-note 2 {{'introducedInExtensionSwift()' was introduced in Swift 50.0}}
 }
 
-@available(macOS, introduced: 10.50)
+@available(macOS, introduced: 50)
 extension TestStruct {
   func introducedInExtensionMacOS() {}
 }
@@ -183,7 +183,7 @@ TestStruct().unavailInExtension() // expected-error {{'unavailInExtension()' is 
 TestStruct().obsoletedInExtension() // expected-error {{'obsoletedInExtension()' is unavailable}}
 TestStruct().deprecatedInExtension() // expected-warning {{'deprecatedInExtension()' was deprecated in macOS 10.0}}
 TestStruct().introducedInExtensionSwift() // expected-error {{'introducedInExtensionSwift()' is unavailable}}
-TestStruct().introducedInExtensionMacOS() // expected-error {{'introducedInExtensionMacOS()' is only available in macOS 10.50 or newer}}
+TestStruct().introducedInExtensionMacOS() // expected-error {{'introducedInExtensionMacOS()' is only available in macOS 50 or newer}}
 // expected-note@-1{{add 'if #available' version check}}
 
 extension TestStruct {
@@ -197,12 +197,12 @@ extension TestStruct {
 
 extension TestStruct { // expected-note{{add @available attribute to enclosing extension}}
   func availableFuncMacOS() { // expected-note{{add @available attribute to enclosing instance method}}
-    introducedInExtensionMacOS() // expected-error {{'introducedInExtensionMacOS()' is only available in macOS 10.50 or newer}}
+    introducedInExtensionMacOS() // expected-error {{'introducedInExtensionMacOS()' is only available in macOS 50 or newer}}
     // expected-note@-1{{add 'if #available' version check}}
   }
 }
 
-@available(macOS, introduced: 10.50)
+@available(macOS, introduced: 50)
 extension TestStruct {
   func futureFuncMacOS() {
     introducedInExtensionMacOS()
