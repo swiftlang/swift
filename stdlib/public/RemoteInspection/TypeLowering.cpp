@@ -2196,6 +2196,34 @@ class LowerType
   TypeConverter &TC;
   remote::TypeInfoProvider *ExternalTypeInfo;
 
+  const TypeInfo *CFRefTypeInfo(const TypeRef *TR) {
+    if (auto N = dyn_cast<NominalTypeRef>(TR)) {
+      Demangler Dem;
+      auto Node = N->getDemangling(Dem);
+      if (Node->getKind() == Node::Kind::Type && Node->getNumChildren() == 1) {
+	auto Alias = Node->getChild(0);
+	if (Alias->getKind() == Node::Kind::TypeAlias && Alias->getNumChildren() == 2) {
+	  auto Module = Alias->getChild(0);
+	  auto Name = Alias->getChild(1);
+	  if (Module->getKind() == Node::Kind::Module
+	      && Module->hasText()
+	      && Module->getText() == "__C"
+	      && Name->getKind() == Node::Kind::Identifier
+	      && Name->hasText()) {
+	    auto CName = Name->getText();
+	    // Heuristic: Hopefully good enough.
+	    if (CName.starts_with("CF") && CName.ends_with("Ref")) {
+	      // A CF reference is essentially the same as a Strong ObjC reference
+	      return TC.getReferenceTypeInfo(ReferenceKind::Strong,
+					     ReferenceCounting::Unknown);
+	    }
+	  }
+	}
+      }
+    }
+    return nullptr;
+  }
+
 public:
   using TypeRefVisitor<LowerType, const TypeInfo *>::visit;
 
@@ -2264,6 +2292,11 @@ public:
         // If we still have no type info ask the external provider.
         if (auto External = QueryExternalTypeInfoProvider())
           return External;
+
+	// CoreFoundation types require some special handling
+	if (auto CFTypeInfo = CFRefTypeInfo(TR))
+	  return CFTypeInfo;
+
 
         // If the external provider also fails we're out of luck.
         DEBUG_LOG(fprintf(stderr, "No TypeInfo for nominal type: "); TR->dump());
