@@ -208,9 +208,6 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToDeclPreProper(Decl *D) {
     Loc = PrecD->getLoc();
     if (Loc.isValid())
       NameLen = PrecD->getName().getLength();
-
-  } else if (isa<IfConfigDecl>(D)) {
-    // Nothing to do here.
   } else if (auto *MD = dyn_cast<MacroExpansionDecl>(D)) {
     if (auto *macro =
             dyn_cast_or_null<MacroDecl>(MD->getMacroRef().getDecl())) {
