@@ -9,6 +9,10 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     PACKAGE_NAME Toolchain
   )
 
+  # 'swift-plugin-server' is not a valid module name.
+  set_target_properties(swift-plugin-server PROPERTIES
+    Swift_MODULE_NAME SwiftPluginServer)
+
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
   add_pure_swift_host_library(SwiftInProcPluginServer SHARED
