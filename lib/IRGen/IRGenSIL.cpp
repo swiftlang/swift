@@ -2526,6 +2526,7 @@ void IRGenSILFunction::emitSILFunction() {
 
     if (IGM.getOptions().EmitAsyncFramePushPopMetadata) {
       CurFn->addFnAttr("async_entry");
+      CurFn->addFnAttr(llvm::Attribute::NoInline);
     }
   }
   if (isAsyncFn) {
