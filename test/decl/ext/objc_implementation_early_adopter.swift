@@ -454,6 +454,13 @@ protocol EmptySwiftProto {}
   }
 }
 
+@objc @_objcImplementation extension ObjCClassWithWeirdSwiftAttributeCombo {
+  static func staticFnPreviouslyTreatedAsAtObjcExtensionMember() {
+    // expected-warning@-1 {{static method 'staticFnPreviouslyTreatedAsAtObjcExtensionMember()' will no longer be implicitly '@objc' after adopting '@objc @implementation'; add '@objc' to keep the current behavior}} {{3-3=@objc }}
+    // expected-note@-2 {{add 'final' to define a Swift-only static method that cannot be overridden}} {{3-3=final }}
+  }
+}
+
 // Intentionally using `@_objcImplementation` for this test; do not upgrade!
 @_objcImplementation(EmptyCategory) extension ObjCClass {
   // expected-warning@-1 {{'@_objcImplementation' is deprecated; use '@implementation' instead}} {{1-36=@implementation}} {{1-1=@objc(EmptyCategory) }}

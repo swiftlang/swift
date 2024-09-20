@@ -453,6 +453,12 @@ protocol EmptySwiftProto {}
   }
 }
 
+@objc @implementation extension ObjCClassWithWeirdSwiftAttributeCombo {
+  static func staticFnPreviouslyTreatedAsAtObjcExtensionMember() {
+    // OK
+  }
+}
+
 // Intentionally using `@_objcImplementation` for this test; do not upgrade!
 @_objcImplementation(EmptyCategory) extension ObjCClass {
   // expected-warning@-1 {{'@_objcImplementation' is deprecated; use '@implementation' instead}} {{1-36=@implementation}} {{1-1=@objc(EmptyCategory) }}
