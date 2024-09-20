@@ -214,17 +214,24 @@ public:
     std::string SearchPath;
     std::string ServerPath;
   };
+  struct ResolvedPluginConfig {
+    std::string LibraryPath;
+    std::string ExecutablePath;
+    std::vector<std::string> ModuleNames;
+  };
 
   enum class Kind : uint8_t {
     LoadPluginLibrary,
     LoadPluginExecutable,
     PluginPath,
     ExternalPluginPath,
+    ResolvedPluginConfig,
   };
 
 private:
-  using Members = ExternalUnionMembers<LoadPluginLibrary, LoadPluginExecutable,
-                                       PluginPath, ExternalPluginPath>;
+  using Members =
+      ExternalUnionMembers<LoadPluginLibrary, LoadPluginExecutable, PluginPath,
+                           ExternalPluginPath, ResolvedPluginConfig>;
   static Members::Index getIndexForKind(Kind kind) {
     switch (kind) {
     case Kind::LoadPluginLibrary:
@@ -235,6 +242,8 @@ private:
       return Members::indexOf<PluginPath>();
     case Kind::ExternalPluginPath:
       return Members::indexOf<ExternalPluginPath>();
+    case Kind::ResolvedPluginConfig:
+      return Members::indexOf<ResolvedPluginConfig>();
     }
   };
   using Storage = ExternalUnion<Kind, Members, getIndexForKind>;
@@ -257,6 +266,10 @@ public:
   PluginSearchOption(const ExternalPluginPath &v)
       : kind(Kind::ExternalPluginPath) {
     storage.emplace<ExternalPluginPath>(kind, v);
+  }
+  PluginSearchOption(const ResolvedPluginConfig &v)
+      : kind(Kind::ResolvedPluginConfig) {
+    storage.emplace<ResolvedPluginConfig>(kind, v);
   }
   PluginSearchOption(const PluginSearchOption &o) : kind(o.kind) {
     storage.copyConstruct(o.kind, o.storage);

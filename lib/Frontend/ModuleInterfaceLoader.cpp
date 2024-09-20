@@ -1753,6 +1753,15 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
           ArgSaver.save(val.SearchPath + "#" + val.ServerPath));
       break;
     }
+    case PluginSearchOption::Kind::ResolvedPluginConfig: {
+      auto &val = entry.get<PluginSearchOption::ResolvedPluginConfig>();
+      for (auto &moduleName : val.ModuleNames) {
+        GenericArgs.push_back("-load-plugin-executable");
+        GenericArgs.push_back(ArgSaver.save(
+            val.LibraryPath + "#" + val.ExecutablePath + "#" + moduleName));
+      }
+      break;
+    }
     }
   }
 
