@@ -6341,7 +6341,7 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
       } else {
         if (auto *structTy = dyn_cast<llvm::StructType>(combinedTy)) {
           llvm::Value *nativeAgg = llvm::UndefValue::get(structTy);
-          for (unsigned i = 0, e = result.size(); i != e; ++i) {
+          for (unsigned i = 0, e = result.size(); i < e; ++i) {
             llvm::Value *elt = result.claimNext();
             auto *nativeTy = structTy->getElementType(i);
             elt = convertForDirectError(IGF, elt, nativeTy,
@@ -6353,10 +6353,12 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
           while (!out.empty()) {
             nativeResultsStorage.push_back(out.claimNext());
           }
-        } else {
+        } else if (!result.empty()) {
           auto *converted = convertForDirectError(
               IGF, result.claimNext(), combinedTy, /*forExtraction*/ false);
           nativeResultsStorage.push_back(converted);
+        } else {
+          nativeResultsStorage.push_back(llvm::UndefValue::get(combinedTy));
         }
       }
 
