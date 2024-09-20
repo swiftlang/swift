@@ -118,6 +118,23 @@ func expectRoundTripEqualityThroughPlist<T : Codable>(for value: T, lineNumber: 
     expectRoundTripEquality(of: value, encode: encode, decode: decode, lineNumber: lineNumber)
 }
 
+func expectDecodingErrorViaJSON<T : Codable>(
+    type: T.Type,
+    json: String,
+    errorKind: DecodingErrorKind,
+    lineNumber: Int = #line)
+{
+    let data = json.data(using: .utf8)!
+    do {
+        let value = try JSONDecoder().decode(T.self, from: data)
+        expectUnreachable(":\(lineNumber): Successfully decoded invalid \(T.self) <\(debugDescription(value))>")
+    } catch let error as DecodingError {
+        expectEqual(error.errorKind, errorKind, "\(#file):\(lineNumber): Incorrect error kind <\(error.errorKind)> not equal to expected <\(errorKind)>")
+    } catch {
+        expectUnreachableCatch(error, ":\(lineNumber): Unexpected error type when decoding \(T.self)")
+    }
+}
+
 // MARK: - Helper Types
 // A wrapper around a UUID that will allow it to be encoded at the top level of an encoder.
 struct UUIDCodingWrapper : Codable, Equatable, Hashable, CodingKeyRepresentable {
@@ -138,6 +155,24 @@ struct UUIDCodingWrapper : Codable, Equatable, Hashable, CodingKeyRepresentable 
 
     static func ==(_ lhs: UUIDCodingWrapper, _ rhs: UUIDCodingWrapper) -> Bool {
         return lhs.value == rhs.value
+    }
+}
+
+enum DecodingErrorKind {
+    case dataCorrupted
+    case keyNotFound
+    case typeMismatch
+    case valueNotFound
+}
+
+extension DecodingError {
+    var errorKind: DecodingErrorKind {
+        switch self {
+        case .dataCorrupted: .dataCorrupted
+        case .keyNotFound:   .keyNotFound
+        case .typeMismatch:  .typeMismatch
+        case .valueNotFound: .valueNotFound
+        }
     }
 }
 
@@ -391,6 +426,90 @@ class TestCodable : TestCodableSuper {
         let decoded = performEncodeAndDecode(of: value, encode: { try PropertyListEncoder().encode($0) }, decode: { try PropertyListDecoder().decode($0, from: $1)  }, lineNumber: #line)
         expectEqual(value.upperBound, decoded.upperBound, "\(#file):\(#line): Decoded ClosedRange upperBound <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
         expectEqual(value.lowerBound, decoded.lowerBound, "\(#file):\(#line): Decoded ClosedRange lowerBound <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
+    }
+    
+    func test_ClosedRange_JSON_Errors() {
+        expectDecodingErrorViaJSON(
+            type: ClosedRange<Int>.self,
+            json: "[5,0]",
+            errorKind: .dataCorrupted)
+        expectDecodingErrorViaJSON(
+            type: ClosedRange<Int>.self,
+            json: "[5,]",
+            errorKind: .valueNotFound)
+        expectDecodingErrorViaJSON(
+            type: ClosedRange<Int>.self,
+            json: "[0,Hello]",
+            errorKind: .dataCorrupted)
+    }
+
+    // MARK: - CollectionDifference
+    lazy var collectionDifferenceValues: [Int : CollectionDifference<Int>] = [
+        #line : [1, 2, 3].difference(from: [1, 2, 3]),
+        #line : [1, 2, 3].difference(from: [1, 2]),
+        #line : [1, 2, 3].difference(from: [2, 3, 4]),
+        #line : [1, 2, 3].difference(from: [6, 7, 8]),
+    ]
+    
+    func test_CollectionDifference_JSON() {
+        for (testLine, difference) in collectionDifferenceValues {
+            expectRoundTripEqualityThroughJSON(for: difference, lineNumber: testLine)
+        }
+    }
+    
+    func test_CollectionDifference_Plist() {
+        for (testLine, difference) in collectionDifferenceValues {
+            expectRoundTripEqualityThroughPlist(for: difference, lineNumber: testLine)
+        }
+    }
+
+    func test_CollectionDifference_JSON_Errors() {
+        // Valid serialization:
+        // {
+        //   "insertions" : [ { "associatedOffset" : null, "element" : 1, "isRemove" : false, "offset" : 0 } ],
+        //   "removals"   : [ { "associatedOffset" : null, "element" : 4, "isRemove" : true,  "offset" : 2 } ]
+        // }
+        
+        // Removal in insertion
+        expectDecodingErrorViaJSON(
+            type: CollectionDifference<Int>.self,
+            json: #"""
+                {
+                  "insertions" : [ { "associatedOffset" : null, "element" : 1, "isRemove" : true, "offset" : 0 } ],
+                  "removals"   : [ { "associatedOffset" : null, "element" : 4, "isRemove" : true,  "offset" : 2 } ]
+                }
+                """#,
+            errorKind: .dataCorrupted)
+        // Repeated offset
+        expectDecodingErrorViaJSON(
+            type: CollectionDifference<Int>.self,
+            json: #"""
+                {
+                  "insertions" : [ { "associatedOffset" : null, "element" : 1, "isRemove" : true, "offset" : 2 } ],
+                  "removals"   : [ { "associatedOffset" : null, "element" : 4, "isRemove" : true,  "offset" : 2 } ]
+                }
+                """#,
+            errorKind: .dataCorrupted)
+        // Invalid offset
+        expectDecodingErrorViaJSON(
+            type: CollectionDifference<Int>.self,
+            json: #"""
+                {
+                  "insertions" : [ { "associatedOffset" : null, "element" : 1, "isRemove" : true, "offset" : -2 } ],
+                  "removals"   : [ { "associatedOffset" : null, "element" : 4, "isRemove" : true,  "offset" : 2 } ]
+                }
+                """#,
+            errorKind: .dataCorrupted)
+        // Invalid associated offset
+        expectDecodingErrorViaJSON(
+            type: CollectionDifference<Int>.self,
+            json: #"""
+                {
+                  "insertions" : [ { "associatedOffset" : 2, "element" : 1, "isRemove" : true, "offset" : 0 } ],
+                  "removals"   : [ { "associatedOffset" : null, "element" : 4, "isRemove" : true,  "offset" : 2 } ]
+                }
+                """#,
+            errorKind: .dataCorrupted)
     }
 
     // MARK: - ContiguousArray
@@ -789,6 +908,21 @@ class TestCodable : TestCodableSuper {
         expectEqual(value.upperBound, decoded.upperBound, "\(#file):\(#line): Decoded Range upperBound<\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
         expectEqual(value.lowerBound, decoded.lowerBound, "\(#file):\(#line): Decoded Range lowerBound<\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
     }
+    
+    func test_Range_JSON_Errors() {
+        expectDecodingErrorViaJSON(
+            type: Range<Int>.self,
+            json: "[5,0]",
+            errorKind: .dataCorrupted)
+        expectDecodingErrorViaJSON(
+            type: Range<Int>.self,
+            json: "[5,]",
+            errorKind: .valueNotFound)
+        expectDecodingErrorViaJSON(
+            type: Range<Int>.self,
+            json: "[0,Hello]",
+            errorKind: .dataCorrupted)
+    }
 
     // MARK: - TimeZone
     lazy var timeZoneValues: [Int : TimeZone] = [
@@ -807,6 +941,13 @@ class TestCodable : TestCodableSuper {
         for (testLine, timeZone) in timeZoneValues {
             expectRoundTripEqualityThroughPlist(for: timeZone, lineNumber: testLine)
         }
+    }
+    
+    func test_TimeZone_JSON_Errors() {
+        expectDecodingErrorViaJSON(
+            type: TimeZone.self,
+            json: #"{"identifier": "invalid-time-zone"}"#,
+            errorKind: .dataCorrupted)
     }
 
     // MARK: - URL
@@ -844,6 +985,13 @@ class TestCodable : TestCodableSuper {
         for (testLine, url) in urlValues {
             expectRoundTripEqualityThroughPlist(for: url, lineNumber: testLine)
         }
+    }
+    
+    func test_URL_JSON_Errors() {
+        expectDecodingErrorViaJSON(
+            type: URL.self,
+            json: "http://swîft.org",
+            errorKind: .dataCorrupted)
     }
 
     // MARK: - URLComponents
@@ -1016,6 +1164,10 @@ var tests = [
     "test_CGVector_Plist" : TestCodable.test_CGVector_Plist,
     "test_ClosedRange_JSON" : TestCodable.test_ClosedRange_JSON,
     "test_ClosedRange_Plist" : TestCodable.test_ClosedRange_Plist,
+    "test_ClosedRange_JSON_Errors" : TestCodable.test_ClosedRange_JSON_Errors,
+    "test_CollectionDifference_JSON" : TestCodable.test_CollectionDifference_JSON,
+    "test_CollectionDifference_Plist" : TestCodable.test_CollectionDifference_Plist,
+    "test_CollectionDifference_JSON_Errors" : TestCodable.test_CollectionDifference_JSON_Errors,
     "test_ContiguousArray_JSON" : TestCodable.test_ContiguousArray_JSON,
     "test_ContiguousArray_Plist" : TestCodable.test_ContiguousArray_Plist,
     "test_DateComponents_JSON" : TestCodable.test_DateComponents_JSON,
@@ -1038,10 +1190,13 @@ var tests = [
     "test_PartialRangeUpTo_Plist" : TestCodable.test_PartialRangeUpTo_Plist,
     "test_Range_JSON" : TestCodable.test_Range_JSON,
     "test_Range_Plist" : TestCodable.test_Range_Plist,
+    "test_Range_JSON_Errors" : TestCodable.test_Range_JSON_Errors,
     "test_TimeZone_JSON" : TestCodable.test_TimeZone_JSON,
     "test_TimeZone_Plist" : TestCodable.test_TimeZone_Plist,
+    "test_TimeZone_JSON_Errors": TestCodable.test_TimeZone_JSON_Errors,
     "test_URL_JSON" : TestCodable.test_URL_JSON,
     "test_URL_Plist" : TestCodable.test_URL_Plist,
+    "test_URL_JSON_Errors" : TestCodable.test_URL_JSON_Errors,
     "test_UUID_JSON" : TestCodable.test_UUID_JSON,
     "test_UUID_Plist" : TestCodable.test_UUID_Plist,
 ]
