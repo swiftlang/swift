@@ -93,7 +93,7 @@ public:
   }
 
 #ifndef NDEBUG
-  void dump() { print(llvm::errs()); };
+  void dump() LLVM_ATTRIBUTE_USED { print(llvm::errs()); }
 #endif
 };
 
