@@ -1390,8 +1390,9 @@ static std::optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
 }
 
 /// Figure out if a declaration should be exported to Objective-C.
-static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
-                                                  bool allowImplicit) {
+static std::optional<ObjCReason>
+shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit,
+                 ObjCImplementationAttr *implAttr, bool isImplEarlyAdopter) {
   // If Objective-C interoperability is disabled, nothing gets marked as @objc.
   if (!VD->getASTContext().LangOpts.EnableObjCInterop)
     return std::nullopt;
@@ -1495,16 +1496,10 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
 
   // Emulating old logic:
   // A member implementation of an @objcImplementation extension is @objc...
-  if (VD->isObjCMemberImplementation()) {
-    auto ext = VD->getDeclContext()->getAsDecl();
-    auto attr = ext->getAttrs()
-                  .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
-
-    // ...for early adopters only. (There's new logic for non-early adopters
-    // below.)
-    if (attr->isEarlyAdopter())
-      return ObjCReason(ObjCReason::MemberOfObjCImplementationExtension, attr);
-  }
+  // for early adopters only. (There's new logic for non-early adopters below.)
+  if (isImplEarlyAdopter && VD->isObjCMemberImplementation())
+    return ObjCReason(ObjCReason::MemberOfObjCImplementationExtension,
+                      implAttr);
 
   // A @nonobjc is not @objc, even if it is an override of an @objc, so check
   // for @nonobjc first.
@@ -1514,25 +1509,13 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
         .hasAttribute<NonObjCAttr>()))
     return std::nullopt;
 
-  // Set to non-null to indicate a difference between early-adopter and final
-  // objcImpl behavior.
-  ObjCImplementationAttr *attrToWarnOfObjCImplBehaviorChange = nullptr;
-
   if (isMemberOfObjCImplementationExtension(VD)) {
     // A non-`final` member of an @objc @implementation extension is @objc
     // with a special reason.
     if (!VD->isFinal() && canInferImplicitObjC(/*allowAnyAccess*/true)) {
-      auto ext = VD->getDeclContext()->getAsDecl();
-      auto attr = ext->getAttrs()
-                   .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
-
-      if (!attr->isEarlyAdopter())
-        return ObjCReason(ObjCReason::MemberOfObjCImplementationExtension,attr);
-
-      // If we got here, that means the new syntax might behave differently from
-      // the old one, unless one of the remaining `return ObjCReason`s below
-      // would have made it isObjC() anyway.
-      attrToWarnOfObjCImplBehaviorChange = attr;
+      if (!isImplEarlyAdopter)
+        return ObjCReason(ObjCReason::MemberOfObjCImplementationExtension,
+                          implAttr);
     }
   }
   else if (isMemberOfObjCClassExtension(VD) &&
@@ -1554,20 +1537,64 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
       return ObjCReason::witnessToObjC(requirements.front());
   }
 
-  if (attrToWarnOfObjCImplBehaviorChange) {
-    bool suggestFinal = !isa<ConstructorDecl>(VD);
-    VD->diagnose(diag::objc_implementation_lock_down_non_member_impl_behavior,
-                 VD, suggestFinal)
+  return std::nullopt;
+}
+
+static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
+                                                  bool allowImplicit) {
+  // The real logic is in the four-argument version above. This wrapper just
+  // detects future `@objc @implementation` behavior changes and warns about
+  // them.
+
+  ObjCImplementationAttr *implAttr = nullptr;
+  if (auto ctxDecl = VD->getDeclContext()->getAsDecl())
+    implAttr = ctxDecl->getAttrs().getAttribute<ObjCImplementationAttr>(
+                                                 /*AllowInvalid=*/true);
+
+  bool isEarlyAdopter = implAttr ? implAttr->isEarlyAdopter() : false;
+
+  auto currentlyObjC = shouldMarkAsObjC(VD, allowImplicit,
+                                        implAttr, isEarlyAdopter);
+
+  // If we weren't an early adopter, there's no differences to detect.
+  if (!isEarlyAdopter)
+    return currentlyObjC;
+
+  // Re-run the logic, but with the early adopter flag forced to `false`.
+  auto eventuallyObjC = shouldMarkAsObjC(VD, allowImplicit,
+                                         implAttr, /*isEarlyAdopter=*/false);
+
+  // Would that have behaved differently? If so, warn about it so the developer
+  // knows they should update their code.
+  if (currentlyObjC.has_value() == eventuallyObjC.has_value())
+    return currentlyObjC;
+
+  bool suggestFinal = !isa<ConstructorDecl>(VD);
+
+  if (eventuallyObjC.has_value()) {
+    ASSERT(!currentlyObjC.has_value());
+
+    VD->diagnose(diag::objc_implementation_will_become_objc, VD, suggestFinal)
       .fixItInsert(VD->getAttributeInsertionLoc(suggestFinal),
                    suggestFinal ? "final " : "@nonobjc ");
 
     VD->diagnose(diag::make_decl_objc, VD->getDescriptiveKind())
-      .fixItInsert(VD->getAttributeInsertionLoc(/*modifier=*/false), "@objc ");
+      .fixItInsert(VD->getAttributeInsertionLoc(false), "@objc ");
+  } else {
+    ASSERT(currentlyObjC.has_value());
 
-    attrToWarnOfObjCImplBehaviorChange->setHasInvalidImplicitLangAttrs();
+    VD->diagnose(diag::objc_implementation_will_become_nonobjc, VD)
+      .fixItInsert(VD->getAttributeInsertionLoc(false), "@objc ");
+
+    VD->diagnose(diag::fixit_add_nonobjc_or_final_for_objc_implementation,
+                 VD->getDescriptiveKind(), suggestFinal)
+      .fixItInsert(VD->getAttributeInsertionLoc(suggestFinal),
+                   suggestFinal ? "final " : "@nonobjc ");
   }
 
-  return std::nullopt;
+  implAttr->setHasInvalidImplicitLangAttrs();
+
+  return currentlyObjC;
 }
 
 /// Determine whether the given type is a C integer type.
@@ -3900,14 +3927,11 @@ public:
       }
 
       // Initializers can't be 'final', but they can be '@nonobjc'
-      if (isa<ConstructorDecl>(cand))
-        diagnose(cand, diag::fixit_add_nonobjc_for_objc_implementation,
-                 cand->getDescriptiveKind())
-            .fixItInsert(cand->getAttributeInsertionLoc(false), "@nonobjc ");
-      else
-        diagnose(cand, diag::fixit_add_final_for_objc_implementation,
-                 cand->getDescriptiveKind())
-            .fixItInsert(cand->getAttributeInsertionLoc(true), "final ");
+      bool suggestFinal = !isa<ConstructorDecl>(cand);
+      diagnose(cand, diag::fixit_add_nonobjc_or_final_for_objc_implementation,
+               cand->getDescriptiveKind(), suggestFinal)
+          .fixItInsert(cand->getAttributeInsertionLoc(suggestFinal),
+                       suggestFinal ? "final " : "@nonobjc ");
     }
   }
 
