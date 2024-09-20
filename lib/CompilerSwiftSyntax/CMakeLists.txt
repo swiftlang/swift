@@ -55,3 +55,4 @@ swift_install_in_component(TARGETS ${compiler_swiftsyntax_libs}
   ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler-swift-syntax-lib
   LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler-swift-syntax-lib
   RUNTIME DESTINATION "bin" COMPONENT compiler-swift-syntax-lib)
+add_dependencies(compiler-swift-syntax-lib ${compiler_swiftsyntax_libs})
