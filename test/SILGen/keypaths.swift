@@ -1,4 +1,6 @@
-// RUN: %target-swift-emit-silgen -disable-availability-checking -parse-stdlib -module-name keypaths %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-experimental-feature KeyPathWithStaticMembers -disable-availability-checking -parse-stdlib -module-name keypaths %s | %FileCheck %s
+
+// REQUIRES: asserts
 
 import Swift
 

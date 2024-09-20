@@ -6339,13 +6339,19 @@ bool InvalidStaticMemberRefInKeyPath::diagnoseAsError() {
   auto rootTyRepr = KPE->getExplicitRootType();
   auto isProtocol = getBaseType()->isExistentialType();
 
-  if (rootTyRepr && !isProtocol) {
-    emitDiagnostic(diag::could_not_use_type_member_on_instance, getBaseType(),
-                   DeclNameRef(getMember()->getName()))
-        .fixItInsert(rootTyRepr->getEndLoc(), ".Type");
+  if (!getConstraintSystem().getASTContext().LangOpts.hasFeature(
+          Feature::KeyPathWithStaticMembers)) {
+    emitDiagnostic(diag::expr_keypath_static_member, getMember(),
+                   isForKeyPathDynamicMemberLookup());
   } else {
-    emitDiagnostic(diag::could_not_use_type_member_on_instance, getBaseType(),
-                   DeclNameRef(getMember()->getName()));
+    if (rootTyRepr && !isProtocol) {
+      emitDiagnostic(diag::could_not_use_type_member_on_instance, getBaseType(),
+                     DeclNameRef(getMember()->getName()))
+          .fixItInsert(rootTyRepr->getEndLoc(), ".Type");
+    } else {
+      emitDiagnostic(diag::could_not_use_type_member_on_instance, getBaseType(),
+                     DeclNameRef(getMember()->getName()));
+    }
   }
 
   return true;

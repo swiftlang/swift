@@ -689,21 +689,6 @@ Added: _$ss6Int128V8bitWidthSivpZMV
 Added: _$ss6UInt16V8bitWidthSivpZMV
 Added: _$ss6UInt32V8bitWidthSivpZMV
 Added: _$ss6UInt64V8bitWidthSivpZMV
-Added: _$ss7Float16V12signalingNaNABvpZMV
-Added: _$ss7Float16V13_exponentBiasSuvpZMV
-Added: _$ss7Float16V13_quietNaNMasks6UInt16VvpZMV
-Added: _$ss7Float16V16_significandMasks6UInt16VvpZMV
-Added: _$ss7Float16V16exponentBitCountSivpZMV
-Added: _$ss7Float16V17_infinityExponentSuvpZMV
-Added: _$ss7Float16V19significandBitCountSivpZMV
-Added: _$ss7Float16V20leastNormalMagnitudeABvpZMV
-Added: _$ss7Float16V21leastNonzeroMagnitudeABvpZMV
-Added: _$ss7Float16V23greatestFiniteMagnitudeABvpZMV
-Added: _$ss7Float16V2piABvpZMV
-Added: _$ss7Float16V3nanABvpZMV
-Added: _$ss7Float16V8infinityABvpZMV
-Added: _$ss7Float16V8quietNaNABvpZMV
-Added: _$ss7Float16V8ulpOfOneABvpZMV
 Added: _$ss7UInt128V3maxABvpZMV
 Added: _$ss7UInt128V3minABvpZMV
 Added: _$ss7UInt128V4zeroABvpZMV
@@ -729,11 +714,7 @@ Added: _$ss7UnicodeO23CanonicalCombiningClassV7overlayADvpZMV
 Added: _$ss7UnicodeO23CanonicalCombiningClassV9aboveLeftADvpZMV
 Added: _$ss7UnicodeO23CanonicalCombiningClassV9belowLeftADvpZMV
 Added: _$ss7UnicodeO4UTF8O27encodedReplacementCharacters06_ValidB6BufferVvpZMV
-Added: _$ss7UnicodeO5ASCIIO27encodedReplacementCharacters15CollectionOfOneVys5UInt8VGAdded: vpZMV
-Added: _$ss7UnicodeO5UTF16O20_replacementCodeUnits6UInt16VvpZMV
-Added: _$ss7UnicodeO5UTF16O27encodedReplacementCharacters11_UIntBufferVys6UInt16VGvpZAdded: MV
 Added: _$ss7UnicodeO5UTF32O20_replacementCodeUnits6UInt32VvpZMV
-Added: _$ss7UnicodeO5UTF32O27encodedReplacementCharacters15CollectionOfOneVys6UInt32VAdded: GvpZMV
 Added: _$ss8DurationV4zeroABvpZMV
 Added: _$ss8SIMDMaskVss5SIMD2VySiGRszrlE7allTrueAByAEGvpZMV
 Added: _$ss8SIMDMaskVss5SIMD2Vys4Int8VGRszrlE7allTrueAByAGGvpZMV
@@ -770,3 +751,24 @@ Added: _$ss8SIMDMaskVss6SIMD64Vys4Int8VGRszrlE7allTrueAByAGGvpZMV
 Added: _$ss8SIMDMaskVss6SIMD64Vys5Int16VGRszrlE7allTrueAByAGGvpZMV
 Added: _$ss8SIMDMaskVss6SIMD64Vys5Int32VGRszrlE7allTrueAByAGGvpZMV
 Added: _$ss8SIMDMaskVss6SIMD64Vys5Int64VGRszrlE7allTrueAByAGGvpZMV
+Added: _$sSo19_SwiftStdlibVersionasE6v6_1_0ABvpZMV
+Added: _$ss7Float80V12signalingNaNABvpZMV
+Added: _$ss7Float80V13_exponentBiasSuvpZMV
+Added: _$ss7Float80V13_quietNaNMasks6UInt64VvpZMV
+Added: _$ss7Float80V16_explicitBitMasks6UInt64VvpZMV
+Added: _$ss7Float80V16_significandMasks6UInt64VvpZMV
+Added: _$ss7Float80V16exponentBitCountSivpZMV
+Added: _$ss7Float80V17_infinityExponentSuvpZMV
+Added: _$ss7Float80V19significandBitCountSivpZMV
+Added: _$ss7Float80V20leastNormalMagnitudeABvpZMV
+Added: _$ss7Float80V21leastNonzeroMagnitudeABvpZMV
+Added: _$ss7Float80V23greatestFiniteMagnitudeABvpZMV
+Added: _$ss7Float80V2piABvpZMV
+Added: _$ss7Float80V3nanABvpZMV
+Added: _$ss7Float80V8infinityABvpZMV
+Added: _$ss7Float80V8quietNaNABvpZMV
+Added: _$ss7Float80V8ulpOfOneABvpZMV
+Added: _$ss7UnicodeO5ASCIIO27encodedReplacementCharacters15CollectionOfOneVys5UInt8VGvpZMV
+Added: _$ss7UnicodeO5UTF16O20_replacementCodeUnits6UInt16VvpZMV
+Added: _$ss7UnicodeO5UTF16O27encodedReplacementCharacters11_UIntBufferVys6UInt16VGvpZMV
+Added: _$ss7UnicodeO5UTF32O27encodedReplacementCharacters15CollectionOfOneVys6UInt32VGvpZMV

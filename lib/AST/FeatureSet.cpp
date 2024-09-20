@@ -196,6 +196,7 @@ UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
 UNINTERESTING_FEATURE(UnspecifiedMeansMainActorIsolated)
 UNINTERESTING_FEATURE(GlobalActorInferenceCutoff)
+UNINTERESTING_FEATURE(KeyPathWithStaticMembers)
 
 static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   auto isFunctionTypeWithSending = [](Type type) {

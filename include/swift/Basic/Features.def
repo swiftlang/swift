@@ -233,6 +233,7 @@ EXPERIMENTAL_FEATURE(TupleConformances, false)
 EXPERIMENTAL_FEATURE(FullTypedThrows, false)
 EXPERIMENTAL_FEATURE(SameElementRequirements, false)
 EXPERIMENTAL_FEATURE(GlobalActorInferenceCutoff, false)
+EXPERIMENTAL_FEATURE(KeyPathWithStaticMembers, false)
 
 // Whether to enable @_used and @_section attributes
 EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
