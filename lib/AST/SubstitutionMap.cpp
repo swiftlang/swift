@@ -491,7 +491,7 @@ LookUpConformanceInOverrideSubs::operator()(CanType type,
                                             Type substType,
                                             ProtocolDecl *proto) const {
   if (type->getRootGenericParam()->getDepth() >= info.BaseDepth)
-    return ProtocolConformanceRef(proto);
+    return ProtocolConformanceRef::forAbstract(substType, proto);
 
   if (auto conformance = info.BaseSubMap.lookupConformance(type, proto))
     return conformance;
@@ -696,7 +696,8 @@ ProtocolConformanceRef OuterSubstitutions::operator()(
                                         Type conformingReplacementType,
                                         ProtocolDecl *conformedProtocol) const {
   if (isUnsubstitutedTypeParameter(dependentType))
-    return ProtocolConformanceRef(conformedProtocol);
+    return ProtocolConformanceRef::forAbstract(
+      conformingReplacementType, conformedProtocol);
 
   return LookUpConformanceInSubstitutionMap(subs)(
       dependentType, conformingReplacementType, conformedProtocol);

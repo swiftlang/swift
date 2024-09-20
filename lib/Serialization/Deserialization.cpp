@@ -1133,7 +1133,8 @@ ModuleFile::getConformanceChecked(ProtocolConformanceID conformanceID) {
     if (!maybeProtocol)
       return maybeProtocol.takeError();
     auto proto = cast<ProtocolDecl>(maybeProtocol.get());
-    return ProtocolConformanceRef(proto);
+    // FIXME: Passing an empty Type() here temporarily.
+    return ProtocolConformanceRef::forAbstract(Type(), proto);
   }
 
   case SerializedProtocolConformanceKind::Concrete: {
@@ -8583,7 +8584,10 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
         // conformance to an Objective-C protocol for anything important.
         // There are no associated types and we don't emit a Swift conformance
         // record.
-        reqConformances.push_back(ProtocolConformanceRef(proto));
+        //
+        // FIXME: Passing an empty Type() here temporarily.
+        reqConformances.push_back(ProtocolConformanceRef::forAbstract(
+            Type(), proto));
       }
     }
   } else {

@@ -93,7 +93,7 @@ struct SubstitutionMapWithLocalArchetypes {
     if (SubsMap)
       return SubsMap->lookupConformance(origType, proto);
 
-    return ProtocolConformanceRef(proto);
+    return ProtocolConformanceRef::forAbstract(substType, proto);
   }
 
   void dump(llvm::raw_ostream &out) const {

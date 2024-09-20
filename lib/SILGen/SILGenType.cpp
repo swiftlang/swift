@@ -915,11 +915,12 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
   // Open the protocol type.
   auto openedType = OpenedArchetypeType::get(
       protocol->getDeclaredExistentialType()->getCanonicalType());
+  auto openedConf = ProtocolConformanceRef::forAbstract(openedType, protocol);
 
   // Form the substitutions for calling the witness.
   auto witnessSubs = SubstitutionMap::getProtocolSubstitutions(protocol,
                                           openedType,
-                                          ProtocolConformanceRef(protocol));
+                                          openedConf);
 
   // Substitute to get the formal substituted type of the thunk.
   auto reqtSubstTy =
@@ -1073,8 +1074,11 @@ public:
       addMissingDefault();
       return;
     }
+
+    auto Conf = ProtocolConformanceRef::forAbstract(
+        Proto->getSelfInterfaceType()->getCanonicalType(), Proto);
     SILFunction *witnessFn = SGM.emitProtocolWitness(
-        ProtocolConformanceRef(Proto), SILLinkage::Private, IsNotSerialized,
+        Conf, SILLinkage::Private, IsNotSerialized,
         requirementRef, witnessRef, isFree, witness);
     auto entry = SILWitnessTable::MethodWitness{requirementRef, witnessFn};
     DefaultWitnesses.push_back(entry);

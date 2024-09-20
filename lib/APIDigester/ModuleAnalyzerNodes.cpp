@@ -1976,7 +1976,8 @@ SwiftDeclCollector::addConformancesToTypeDecl(SDKNodeDeclType *Root,
   if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
     for (auto *inherited : PD->getAllInheritedProtocols()) {
       if (!Ctx.shouldIgnore(inherited)) {
-        ProtocolConformanceRef Conf(inherited);
+        auto Conf = ProtocolConformanceRef::forAbstract(
+          PD->getSelfInterfaceType(), inherited);
         auto ConfNode = SDKNodeInitInfo(Ctx, Conf)
             .createSDKNode(SDKNodeKind::Conformance);
         Root->addConformance(ConfNode);
