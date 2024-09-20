@@ -3232,19 +3232,27 @@ public:
     bool mayReturnErrorDirectly = mayReturnTypedErrorDirectly();
     if (mayReturnErrorDirectly && !nativeSchema.requiresIndirect()) {
       llvm::Value *resultAgg;
-      if (resultTys.size() == 1) {
+
+      auto directResultTys = resultTys.drop_back();
+      if (directResultTys.size() == 1) {
         resultAgg = Builder.CreateExtractValue(result, numAsyncContextParams);
       } else {
-        auto resultTy = llvm::StructType::get(IGM.getLLVMContext(), resultTys);
+        auto resultTy =
+            llvm::StructType::get(IGM.getLLVMContext(), directResultTys);
         resultAgg = llvm::UndefValue::get(resultTy);
-        for (unsigned i = 0, e = resultTys.size(); i != e; ++i) {
+        for (unsigned i = 0, e = directResultTys.size(); i != e; ++i) {
           llvm::Value *elt =
               Builder.CreateExtractValue(result, numAsyncContextParams + i);
           resultAgg = Builder.CreateInsertValue(resultAgg, elt, i);
         }
       }
-      return emitToUnmappedExplosionWithDirectTypedError(resultType, resultAgg,
-                                                         out);
+      emitToUnmappedExplosionWithDirectTypedError(resultType, resultAgg, out);
+      auto errorResult = Builder.CreateExtractValue(
+          result, numAsyncContextParams + directResultTys.size());
+      Address errorAddr =
+          IGF.getCalleeErrorResultSlot(errorType, substConv.isTypedError());
+      Builder.CreateStore(errorResult, errorAddr);
+      return;
     } else if (resultTys.size() == 1) {
       result = Builder.CreateExtractValue(result, numAsyncContextParams);
       if (hasError) {
