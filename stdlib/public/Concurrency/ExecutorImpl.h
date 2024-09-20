@@ -32,7 +32,6 @@
 #endif
 
 #include <inttypes.h>
-#include <stdalign.h>
 #include <stdbool.h>
 #include <stdlib.h>
 
@@ -92,11 +91,11 @@ static inline int swift_priority_getBucketIndex(SwiftJobPriority priority) {
 
 /// Used by the Concurrency runtime to represent a job.  The `schedulerPrivate`
 /// field may be freely used by the executor implementation.
-typedef struct alignas(2 * alignof(void *)) {
+typedef struct {
   SwiftHeapMetadata const *__ptrauth_objc_isa_pointer metadata;
   void *schedulerPrivate[2];
   SwiftJobFlags flags;
-} SwiftJob;
+} __attribute__((aligned(2 * sizeof(void *)))) SwiftJob;
 
 /// Indexes in the schedulerPrivate array
 enum {
@@ -173,7 +172,7 @@ swift_executor_complexEquality(SwiftHeapObject *identity,
 /// Get the type of executor (ordinary vs complex equality).
 static inline SwiftExecutorKind
 swift_executor_getKind(SwiftExecutorRef executor) {
-  const uintptr_t mask = ~uintptr_t(alignof(void *) - 1);
+  const uintptr_t mask = ~(uintptr_t)(sizeof(void *) - 1);
   return executor.implementation & ~mask;
 }
 
@@ -202,7 +201,7 @@ static inline bool swift_executor_hasWitnessTable(SwiftExecutorRef executor) {
 /// Retrieve the witness table of an executor.
 static inline const SwiftExecutorWitnessTable *
 swift_executor_getWitnessTable(SwiftExecutorRef executor) {
-  const uintptr_t mask = ~uintptr_t(alignof(void *) - 1);
+  const uintptr_t mask = ~(uintptr_t)(sizeof(void *) - 1);
   return (const SwiftExecutorWitnessTable *)(executor.implementation & mask);
 }
 
@@ -277,7 +276,7 @@ SWIFT_CC(swift) void swift_task_enqueueMainExecutorImpl(SwiftJob *job);
 SWIFT_CC(swift) void swift_task_checkIsolatedImpl(SwiftExecutorRef executor);
 
 /// Get a reference to the main executor.
-SWIFT_CC(swift) SwiftExecutorRef swift_task_getMainExecutorImpl();
+SWIFT_CC(swift) SwiftExecutorRef swift_task_getMainExecutorImpl(void);
 
 /// Check if the specified executor is the main executor.
 SWIFT_CC(swift) bool swift_task_isMainExecutorImpl(SwiftExecutorRef executor);
@@ -285,7 +284,7 @@ SWIFT_CC(swift) bool swift_task_isMainExecutorImpl(SwiftExecutorRef executor);
 /// Drain the main executor's queue, processing jobs enqueued on it; this
 /// should never return.
 SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_CC(swift) void
-  swift_task_asyncMainDrainQueueImpl();
+  swift_task_asyncMainDrainQueueImpl(void);
 
 /// Hand control of the current thread to the global executor until the
 /// condition function returns `true`.  Support for this function is optional,
