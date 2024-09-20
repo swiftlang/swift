@@ -979,8 +979,16 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
                                                Type t) {
   llvm::DenseMap<SubstitutableType *, TypeVariableType *> types;
 
-  return t.subst(
-    [&](SubstitutableType *origType) -> Type {
+  // FIXME: This operation doesn't really make sense with a generic function type.
+  // We should open the signature instead.
+  if (auto *gft = t->getAs<GenericFunctionType>()) {
+    t = FunctionType::get(gft->getParams(), gft->getResult(), gft->getExtInfo());
+  }
+
+  return t.transformRec(
+    [&](TypeBase *origType) -> std::optional<Type> {
+      // FIXME: By folding primary and opaque archetypes together, this doesn't
+      // really capture the correct semantics for opaque archetypes.
       if (auto archetypeTy = dyn_cast<ArchetypeType>(origType)) {
         return openTypeParameter(cs,
                                  archetypeTy->getInterfaceType(),
@@ -989,22 +997,20 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
       }
 
       // FIXME: Remove this case
-      auto *paramTy = cast<GenericTypeParamType>(origType);
-      auto found = types.find(paramTy);
-      if (found != types.end())
-        return found->second;
+      if (auto *paramTy = dyn_cast<GenericTypeParamType>(origType)) {
+        auto found = types.find(paramTy);
+        if (found != types.end())
+          return found->second;
 
-      auto locator = cs.getConstraintLocator({});
-      auto replacement = cs.createTypeVariable(locator,
-                                               TVO_CanBindToNoEscape);
-      types[paramTy] = replacement;
-      return replacement;
-    },
-    MakeAbstractConformanceForGenericType(),
-    // FIXME: By folding primary and opaque archetypes together, this doesn't
-    // really capture the correct semantics for opaque archetypes.
-    SubstFlags::SubstitutePrimaryArchetypes |
-    SubstFlags::SubstituteOpaqueArchetypes);
+        auto locator = cs.getConstraintLocator({});
+        auto replacement = cs.createTypeVariable(locator,
+                                                 TVO_CanBindToNoEscape);
+        types[paramTy] = replacement;
+        return replacement;
+      }
+
+      return std::nullopt;
+    });
 }
 
 bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
