@@ -1324,6 +1324,13 @@ def disable_async_frame_push_pop_metadata :
   Flag<["-"], "disable-async-frame-push-pop-metadata">,
   HelpText<"Disable async frame push pop metadata">;
 
+def enable_async_frame_pointer_all :
+  Flag<["-"], "enable-async-frame-pointer-all">,
+  HelpText<"Always emit async frame stack frames (frame-pointer=all)">;
+def disable_async_frame_pointer_all:
+  Flag<["-"], "disable-async-frame-pointer-all">,
+  HelpText<"Disable always emit async frame stack frames">;
+
 def enable_split_cold_code :
   Flag<["-"], "enable-split-cold-code">,
   HelpText<"Enable splitting of cold code when optimizing">;
