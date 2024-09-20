@@ -1730,6 +1730,8 @@ static ManagedValue convertCFunctionSignature(SILGenFunction &SGF,
   if (clangInfo.empty())
     loweredDestTy = SGF.getLoweredType(destTy);
   else
+    // This won't be necessary after we stop dropping clang types when
+    // canonicalizing function types.
     loweredDestTy = SGF.getLoweredType(
         AbstractionPattern(destTy->getCanonicalType(), clangInfo.getType()),
         destTy);
