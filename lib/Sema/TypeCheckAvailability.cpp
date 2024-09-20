@@ -1342,18 +1342,20 @@ private:
 } // end anonymous namespace
 
 void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF) {
-  TypeRefinementContext *RootTRC = SF.getTypeRefinementContext();
   ASTContext &Context = SF.getASTContext();
   assert(!Context.LangOpts.DisableAvailabilityChecking);
 
-  if (!RootTRC) {
-    // The root type refinement context reflects the fact that all parts of
-    // the source file are guaranteed to be executing on at least the minimum
-    // platform version for inlining.
-    auto MinPlatformReq = AvailabilityRange::forInliningTarget(Context);
-    RootTRC = TypeRefinementContext::createForSourceFile(&SF, MinPlatformReq);
-    SF.setTypeRefinementContext(RootTRC);
-  }
+  // If there's already a root node, then we're done.
+  if (SF.getTypeRefinementContext())
+    return;
+
+  // The root type refinement context reflects the fact that all parts of
+  // the source file are guaranteed to be executing on at least the minimum
+  // platform version for inlining.
+  auto MinPlatformReq = AvailabilityRange::forInliningTarget(Context);
+  TypeRefinementContext *RootTRC =
+      TypeRefinementContext::createForSourceFile(&SF, MinPlatformReq);
+  SF.setTypeRefinementContext(RootTRC);
 
   // Build refinement contexts, if necessary, for all declarations starting
   // with StartElem.
