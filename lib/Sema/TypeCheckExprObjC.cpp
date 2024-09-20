@@ -374,8 +374,9 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
 
       Type newType;
       if (lookupType && !lookupType->isAnyObject()) {
-        newType = lookupType->getTypeOfMember(type,
-                                              type->getDeclaredInterfaceType());
+        newType = type->getDeclaredInterfaceType().subst(
+            lookupType->getContextSubstitutionMap(
+                type->getDeclContext()));
       } else {
         newType = type->getDeclaredInterfaceType();
       }

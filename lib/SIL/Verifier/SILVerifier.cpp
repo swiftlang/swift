@@ -6284,9 +6284,10 @@ public:
 
         auto *genericEnv = archetype->getGenericEnvironment();
         auto interfaceTy = archetype->getInterfaceType();
+        auto rootParamTy = interfaceTy->getRootGenericParam();
 
         auto root = genericEnv->mapTypeIntoContext(
-            interfaceTy->getRootGenericParam())->castTo<ElementArchetypeType>();
+            rootParamTy)->castTo<ElementArchetypeType>();
         auto it = allOpened.find(root->getCanonicalType());
         assert(it != allOpened.end());
 
@@ -6299,12 +6300,12 @@ public:
           assert(!indexedShape && "pack substitution doesn't match in shape");
         }
 
-        if (interfaceTy->is<GenericTypeParamType>())
-          return packElementType;
-
-        return interfaceTy->castTo<DependentMemberType>()
-            ->substRootParam(packElementType, LookUpConformanceInModule(),
-                             std::nullopt);
+        return interfaceTy.subst(
+          [&](SubstitutableType *type) {
+            ASSERT(type->isEqual(rootParamTy));
+            return packElementType;
+          },
+          LookUpConformanceInModule());
       };
 
       // If the pack components and expected element types are SIL types,

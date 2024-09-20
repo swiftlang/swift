@@ -7158,22 +7158,6 @@ public:
   AssociatedTypeDecl *getAssocType() const {
     return NameOrAssocType.dyn_cast<AssociatedTypeDecl *>();
   }
-  
-  /// Substitute the base type, looking up our associated type in it if it is
-  /// non-dependent. Returns null if the member could not be found in the new
-  /// base.
-  Type substBaseType(Type base);
-
-  /// Substitute the base type, looking up our associated type in it if it is
-  /// non-dependent. Returns null if the member could not be found in the new
-  /// base.
-  Type substBaseType(Type base, LookupConformanceFn lookupConformance,
-                     SubstOptions options);
-
-  /// Substitute the root generic type, looking up the chain of associated types.
-  /// Returns null if the member could not be found in the new root.
-  Type substRootParam(Type newRoot, LookupConformanceFn lookupConformance,
-                      SubstOptions options);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
