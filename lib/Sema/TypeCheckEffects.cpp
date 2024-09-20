@@ -1167,8 +1167,8 @@ public:
           conditional = ConditionalEffectKind::Always;
 
         // Use the Failure type witness, when present.
-        Type thrownError = conformanceRef.getAssociatedType(
-            type, failureAssocType->getDeclaredInterfaceType());
+        Type thrownError = conformanceRef.getTypeWitness(
+            type, failureAssocType);
         return Classification::forThrows(
             thrownError, conditional,
             /*FIXME*/PotentialEffectReason::forConformance());

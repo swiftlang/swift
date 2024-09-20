@@ -4165,8 +4165,7 @@ struct TypeSimplifier {
           return memberTy;
         }
 
-        auto result = conformance.getAssociatedType(
-            lookupBaseType, assocType->getDeclaredInterfaceType());
+        auto result = conformance.getTypeWitness(lookupBaseType, assocType);
         if (result && !result->hasError())
           return result;
       }

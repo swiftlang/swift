@@ -302,8 +302,7 @@ ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
         return std::nullopt;
       }
 
-      return conformance.getAssociatedType(
-          *substBaseType, assocType->getDeclaredInterfaceType());
+      return conformance.getTypeWitness(*substBaseType, assocType);
     }
 
     // An unresolved DependentMemberType stores an identifier. Handle this
