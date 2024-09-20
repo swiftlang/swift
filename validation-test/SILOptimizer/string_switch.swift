@@ -7,6 +7,8 @@
 // REQUIRES: executable_test
 // UNSUPPORTED: threading_none
 
+// REQUIRES: rdar136304425
+
 import StdlibUnittest
 
 // CHECK-LABEL: // SmallEnum.init(rawValue:)
