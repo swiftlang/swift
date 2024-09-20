@@ -99,7 +99,7 @@ protocol P2 {
 // CHECK-SAME:  )
 // CHECK-SAME:  {
 // CHECK:       failure:
-// CHECK-NEXT:    ret void
+// CHECK-NEXT:    ret i8 undef
 // CHECK:       success:
 // CHECK-NEXT:    ret i8 %{{.*}}
     func h() throws(E) -> Int8
