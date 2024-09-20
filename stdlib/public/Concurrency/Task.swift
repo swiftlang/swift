@@ -198,10 +198,10 @@ extension Task {
   ///
   /// Cancelling a task has three primary effects:
   ///
-  /// - It flags the task as cancelled.
-  /// - It causes any active cancellation handlers on the task to run (once).
+  /// - It flags the task as canceled.
+  /// - It causes any active cancellation handlers on the task to run, once.
   /// - It cancels any child tasks and task groups of the task, including
-  ///   those created in the future. If those tasks have cancellation handlers, 
+  ///   those created in the future. If those tasks have cancellation handlers,
   ///   they also are triggered.
   ///
   /// Task cancellation is cooperative and idempotent.
@@ -209,21 +209,21 @@ extension Task {
   /// Cancelling a task does not automatically cause arbitrary functions on the task
   /// to stop running or throw errors. A function _may_ choose to react
   /// to cancellation by ending its work early, and it is conventional to
-  /// signal that to callers by throwing CancellationError. However,
+  /// signal that to callers by throwing `CancellationError`. However,
   /// a function that doesn't specifically check for cancellation will
-  /// run to completion normally even if the task it is running on is
-  /// cancelled. (Of course, it may still end early if it calls something
-  /// else that handles cancellation by throwing and then doesn't
-  /// handle the error.)
+  /// run to completion normally, even if the task it is running on is
+  /// canceled. However, that function might still end early if it calls
+  /// other code that handles cancellation by throwing and that function doesn't
+  /// handle the error.
   ///
-  /// It is safe to cancel a task from any task or thread. It is safe for
+  /// It's safe to cancel a task from any task or thread. It's safe for
   /// multiple tasks or threads to cancel the same task at the same
-  /// time. Cancelling a task that has already been cancelled has no
+  /// time. Cancelling a task that has already been canceled has no
   /// additional effect.
   ///
   /// `cancel` may need to acquire locks and synchronously run
   /// arbitrary cancellation-handler code associated with the
-  /// cancelled task. To reduce the risk of deadlock, it is
+  /// canceled task. To reduce the risk of deadlock, it is
   /// recommended that callers release any locks they might be
   /// holding before they call cancel.
   ///
