@@ -752,7 +752,7 @@ function Fetch-Dependencies {
       $WheelHash = "5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124"
       DownloadAndVerify $WheelURL "$BinaryCache\python\packaging-24.1-py3-none-any.whl" $WheelHash
       Write-Output "Installing 'packaging-24.1-py3-none-any.whl' ..."
-      Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\packaging-24.1-py3-none-any.whl" *> $null
+      Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\packaging-24.1-py3-none-any.whl" --disable-pip-version-check
     }
     # 'setuptools' provides 'distutils' module for Python 3.12+, required for SWIG support
     # https://github.com/swiftlang/llvm-project/issues/9289
@@ -763,7 +763,7 @@ function Fetch-Dependencies {
       $WheelHash = "35ab7fd3bcd95e6b7fd704e4a1539513edad446c097797f2985e0e4b960772f2"
       DownloadAndVerify $WheelURL "$BinaryCache\python\setuptools-75.1.0-py3-none-any.whl" $WheelHash
       Write-Output "Installing 'setuptools-75.1.0-py3-none-any.whl' ..."
-      Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\setuptools-75.1.0-py3-none-any.whl" *> $null
+      Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\setuptools-75.1.0-py3-none-any.whl" --disable-pip-version-check
     }
   }
 
