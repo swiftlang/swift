@@ -380,8 +380,8 @@ func consumeConsuming(_ k: consuming Klass) {
   _ = consume k
 }
 
-func consumeBorrowing(_ k: borrowing Klass) { // expected-error{{'k' is borrowed and cannot be consumed}}
-  _ = consume k // expected-note{{consumed here}}
+func consumeBorrowing(_ k: borrowing Klass) {
+  _ = consume k // expected-error {{'k' is borrowed, so it cannot be consumed here; you must 'copy k' before consumption}}
 }
 
 func consumeOwned(_ k: __owned Klass) {

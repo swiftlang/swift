@@ -404,9 +404,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     }
 
     void checkConsumeExpr(ConsumeExpr *consumeExpr) {
-      auto diags = findSyntacticErrorForConsume(DC->getParentModule(),
-                                                consumeExpr->getLoc(),
-                                                consumeExpr->getSubExpr());
+      auto diags =
+          findSyntacticErrorForConsume(DC->getParentModule(),
+                                      consumeExpr->getLoc(),
+                                      consumeExpr->getSubExpr(),
+                                      [](Expr* e){ return e->getType(); });
       for (auto &diag : diags)
         diag.emit(Ctx);
 
@@ -1478,12 +1480,12 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 }
 
 DeferredDiags swift::findSyntacticErrorForConsume(
-    ModuleDecl *module, SourceLoc loc, Expr *subExpr) {
+    ModuleDecl *module, SourceLoc loc, Expr *subExpr,
+    std::function<Type(Expr*)> getType) {
   assert(!isa<ConsumeExpr>(subExpr) && "operates on the sub-expr of a consume");
 
   DeferredDiags result;
-  const bool noncopyable =
-      subExpr->getType()->getCanonicalType()->isNoncopyable();
+  const bool noncopyable = getType(subExpr)->isNoncopyable();
 
   bool partial = false;
   Expr *current = subExpr;

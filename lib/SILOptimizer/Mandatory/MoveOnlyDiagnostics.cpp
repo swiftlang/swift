@@ -90,6 +90,74 @@ static void getVariableNameForValue(MarkUnresolvedNonCopyableValueInst *mmci,
 }
 
 //===----------------------------------------------------------------------===//
+//                           MARK: New Diagnostics
+//===----------------------------------------------------------------------===//
+
+static SILValue findSimpleDefinition(SILValue current) {
+  while (current) {
+    auto *inst = dyn_cast<SingleValueInstruction>(current);
+    if (!inst)
+      return current;
+
+    if (inst->getNumOperands() != 1)
+      return current;
+
+    /// Stop on specific instructions here...
+
+
+    current = inst->getOperand(0);
+  }
+
+  return current;
+}
+
+/// The numbers correspond to a %select in diagnostics.
+enum BorrowReason {
+    BR_NonSpecific = 0,
+    BR_ClosureCapture = 1,
+    BR_WithinDefer = 2,
+};
+
+/// Assuming this marked value is borrowed, describe more precisely why it is
+/// considered borrowed for user-facing diagnostics.
+static BorrowReason deriveBorrowReason(
+    MarkUnresolvedNonCopyableValueInst *markedValue) {
+  auto def = findSimpleDefinition(markedValue->getOperand());
+  if (auto *fArg = dyn_cast<SILFunctionArgument>(def)) {
+    if (fArg->getFunction()->isDefer())
+      return BR_WithinDefer;
+
+    if (fArg->isClosureCapture())
+      return BR_ClosureCapture;
+  }
+
+  return BR_NonSpecific;
+}
+
+void DiagnosticEmitter::diagnoseConsumeOfBorrowed(
+    MarkUnresolvedNonCopyableValueInst *markedValue,
+    SILInstruction *consumingUse) {
+  assert(markedValue->getCheckKind() !=
+    MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
+
+  // If it's move-only wrapped, then it's a Copyable type with no-implicit-copy
+  // semantics, so this kind of violation is solvable with an explicit copy.
+  bool suggestExplicitCopy = markedValue->getType().isMoveOnlyWrapped();
+
+  SmallString<64> varName;
+  getVariableNameForValue(markedValue, varName);
+
+  diagnose(fn->getASTContext(),
+           consumingUse,
+           diag::movechecker_consume_of_borrow,
+           varName,
+           suggestExplicitCopy,
+           deriveBorrowReason(markedValue));
+
+  registerDiagnosticEmitted(markedValue);
+}
+
+//===----------------------------------------------------------------------===//
 //                           MARK: Misc Diagnostics
 //===----------------------------------------------------------------------===//
 
@@ -256,44 +324,64 @@ void DiagnosticEmitter::emitMissingConsumeInDiscardingContext(
 
 void DiagnosticEmitter::emitObjectGuaranteedDiagnostic(
     MarkUnresolvedNonCopyableValueInst *markedValue) {
-  auto &astContext = fn->getASTContext();
-  SmallString<64> varName;
-  getVariableNameForValue(markedValue, varName);
 
-  // See if we have any closure capture uses and emit a better diagnostic.
-  if (getCanonicalizer().hasPartialApplyConsumingUse()) {
-    diagnose(astContext, markedValue,
-             diag::sil_movechecking_borrowed_parameter_captured_by_closure,
-             varName);
-    emitObjectDiagnosticsForPartialApplyUses(varName);
-    registerDiagnosticEmitted(markedValue);
+  for (auto *user : getCanonicalizer().consumingUsesNeedingCopy) {
+    diagnoseConsumeOfBorrowed(markedValue, user);
   }
 
-  // If we do not have any non-partial apply consuming uses... just exit early.
-  if (!getCanonicalizer().hasNonPartialApplyConsumingUse())
-    return;
-
-  registerDiagnosticEmitted(markedValue);
-
-  // Check if this value is closure captured. In such a case, emit a special
-  // error.
-  if (auto *fArg = dyn_cast<SILFunctionArgument>(
-          lookThroughCopyValueInsts(markedValue->getOperand()))) {
-    if (fArg->isClosureCapture()) {
-      diagnose(astContext, markedValue,
-               diag::sil_movechecking_capture_consumed,
-               varName);
-      emitObjectDiagnosticsForGuaranteedUses(
-          true /*ignore partial apply uses*/);
+  for (auto *user : getCanonicalizer().consumingBoundaryUsers) {
+    /// We want to diagnose the consume of a capture within the body of the
+    /// closure, not the formation of the closure itself.
+    ///
+    /// We have to pretend we emitted a diagnostic here because that influences
+    /// the assumptions that later checking code will make.
+    if (isa<PartialApplyInst>(user)) {
       registerDiagnosticEmitted(markedValue);
-      return;
+      continue;
     }
+
+    diagnoseConsumeOfBorrowed(markedValue, user);
   }
 
-  diagnose(astContext, markedValue,
-           diag::sil_movechecking_guaranteed_value_consumed, varName);
 
-  emitObjectDiagnosticsForGuaranteedUses(true /*ignore partial apply uses*/);
+//  auto &astContext = fn->getASTContext();
+//  SmallString<64> varName;
+//  getVariableNameForValue(markedValue, varName);
+//
+//  // See if we have any closure capture uses and emit a better diagnostic.
+//  if (getCanonicalizer().hasPartialApplyConsumingUse()) {
+//    diagnose(astContext, markedValue,
+//             diag::sil_movechecking_borrowed_parameter_captured_by_closure,
+//             varName);
+//    emitObjectDiagnosticsForPartialApplyUses(varName);
+//    registerDiagnosticEmitted(markedValue);
+//  }
+//
+//  // If we do not have any non-partial apply consuming uses... just exit early.
+//  if (!getCanonicalizer().hasNonPartialApplyConsumingUse())
+//    return;
+//
+//  registerDiagnosticEmitted(markedValue);
+//
+//  // Check if this value is closure captured. In such a case, emit a special
+//  // error.
+//  if (auto *fArg = dyn_cast<SILFunctionArgument>(
+//          lookThroughCopyValueInsts(markedValue->getOperand()))) {
+//    if (fArg->isClosureCapture()) {
+//      diagnose(astContext, markedValue,
+//               diag::sil_movechecking_capture_consumed,
+//               varName);
+//      emitObjectDiagnosticsForGuaranteedUses(
+//          true /*ignore partial apply uses*/);
+//      registerDiagnosticEmitted(markedValue);
+//      return;
+//    }
+//  }
+//
+//  diagnose(astContext, markedValue,
+//           diag::sil_movechecking_guaranteed_value_consumed, varName);
+//
+//  emitObjectDiagnosticsForGuaranteedUses(true /*ignore partial apply uses*/);
 }
 
 void DiagnosticEmitter::emitObjectOwnedDiagnostic(

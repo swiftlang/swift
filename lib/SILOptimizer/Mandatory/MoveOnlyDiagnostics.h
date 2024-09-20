@@ -111,6 +111,15 @@ public:
     return diagnosticEmittedByEarlierPassCount;
   }
 
+  ////// NEW DIAGNOSTICS
+
+  /// "X borrowed so it cannot be consumed"
+  void diagnoseConsumeOfBorrowed(
+      MarkUnresolvedNonCopyableValueInst *markedValue,
+      SILInstruction *consumingUse);
+
+  /////////////////////////////////////////////////////////////////////////////
+
   void
   emitEarlierPassEmittedDiagnostic(MarkUnresolvedNonCopyableValueInst *mmci) {
     ++diagnosticEmittedByEarlierPassCount;

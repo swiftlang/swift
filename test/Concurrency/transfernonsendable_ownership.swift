@@ -71,16 +71,16 @@ func testBorrowing(_ x: borrowing Klass) async {
   // expected-note @-1 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
 }
 
-func testBorrowingError(_ x: borrowing Klass) async { // expected-error {{'x' is borrowed and cannot be consumed}}
+func testBorrowingError(_ x: borrowing Klass) async {
   await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
-  print(x) // expected-note {{consumed here}}
+  print(x) // expected-error{{'x' is borrowed, so it cannot be consumed here}}
 }
 
-@CustomActor func testBorrowingErrorGlobalActor(_ x: borrowing Klass) async { // expected-error {{'x' is borrowed and cannot be consumed}}
+@CustomActor func testBorrowingErrorGlobalActor(_ x: borrowing Klass) async {
   await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending global actor 'CustomActor'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
-  print(x) // expected-note {{consumed here}}
+  print(x) // expected-error{{'x' is borrowed, so it cannot be consumed here}}
 }
 
 func testInOut(_ x: inout Klass) async {

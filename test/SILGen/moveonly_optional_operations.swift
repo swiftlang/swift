@@ -39,10 +39,10 @@ struct NCAO: ~Copyable {
     consuming func c3() -> NCAO { c3() } // expected-warning{{}}
 }
 
-func borrowingChains(nc: borrowing NC?, // expected-error{{'nc' is borrowed and cannot be consumed}}
+func borrowingChains(nc: borrowing NC?,
                      ncao: borrowing NCAO?) { // expected-error{{'ncao' is borrowed and cannot be consumed}}
     nc?.b()
-    nc?.c() // expected-note{{consumed here}}
+    nc?.c() // expected-error{{'nc' is borrowed, so it cannot be consumed here}}
 
     ncao?.b()
     ncao?.c() // expected-note{{consumed here}}

@@ -4696,6 +4696,16 @@ namespace {
       if (!src)
         return nullptr;
 
+      /// All assignments consume the source expression.
+//      if (canAddExplicitConsume(dc->getParentModule(), cs, src)) {
+//        auto srcTy = cs.getType(src);
+//        src = ConsumeExpr::createImplicit(cs.getASTContext(),
+//                                          src->getLoc(),
+//                                          src,
+//                                          srcTy);
+//        cs.setType(src, srcTy);
+//      }
+
       expr->setSrc(src);
 
       if (!SuppressDiagnostics) {
@@ -5622,7 +5632,7 @@ namespace {
       auto *module = dc->getParentModule();
       auto origType = cs.getType(injection->getSubExpr());
       if (willHaveConfusingConsumption(origType, locator, cs) &&
-          canAddExplicitConsume(module, injection->getSubExpr()))
+          canAddExplicitConsume(module, cs, injection->getSubExpr()))
         ConsumingCoercions.push_back(injection);
     }
 
@@ -5631,7 +5641,7 @@ namespace {
       auto *module = dc->getParentModule();
       auto fromType = cs.getType(fromExpr);
       if (willHaveConfusingConsumption(fromType, locator, cs) &&
-          canAddExplicitConsume(module, fromExpr)) {
+          canAddExplicitConsume(module, cs, fromExpr)) {
         ConsumingCoercions.push_back(toExpr);
       }
     }

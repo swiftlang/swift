@@ -3857,7 +3857,7 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
     RAIILLVMDebug l("main use gathering visitor");
 
     visitor.reset(markedAddress);
-    if (AddressUseKind::Unknown == std::move(visitor).walk(markedAddress)) {
+    if (AddressUseKind::Unknown == visitor.walk(markedAddress)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Failed access path visit: " << *markedAddress);
       return false;

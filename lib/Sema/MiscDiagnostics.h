@@ -165,7 +165,8 @@ namespace swift {
   /// \returns an empty collection if there are no errors.
   DeferredDiags findSyntacticErrorForConsume(ModuleDecl *module,
                                              SourceLoc loc,
-                                             Expr *subExpr);
+                                             Expr *subExpr,
+                                             std::function<Type(Expr*)> getType);
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H
