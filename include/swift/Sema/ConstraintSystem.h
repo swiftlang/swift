@@ -500,6 +500,10 @@ public:
   /// literal (represented by `ArrayExpr` and `DictionaryExpr` in AST).
   bool isCollectionLiteralType() const;
 
+  /// Determine whether this type variable represents a result type of a
+  /// function call.
+  bool isFunctionResult() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///
