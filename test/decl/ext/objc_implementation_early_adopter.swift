@@ -446,6 +446,12 @@ protocol EmptySwiftProto {}
     // expected-warning@-1 {{instance method 'privateNonObjCMethod' will become implicitly '@objc' after adopting '@objc @implementation'; add 'final' to keep the current behavior}} {{3-3=final }}
     // expected-note@-2 {{add '@objc' to expose this instance method to Objective-C}} {{3-3=@objc }}
   }
+
+  override public static func superclassClassMethod() {
+    // rdar://136113393: `static override` could make a non-`@objc` override
+    // of an `@objc` member when using new syntax. (We would get a warning here
+    // if that bug were still in place.)
+  }
 }
 
 // Intentionally using `@_objcImplementation` for this test; do not upgrade!

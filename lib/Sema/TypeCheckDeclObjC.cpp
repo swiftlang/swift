@@ -1519,11 +1519,9 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
   ObjCImplementationAttr *attrToWarnOfObjCImplBehaviorChange = nullptr;
 
   if (isMemberOfObjCImplementationExtension(VD)) {
-    // A `final` member of an @objc @implementation extension is not @objc.
-    if (VD->isFinal())
-      return std::nullopt;
-    // Other members get a special reason.
-    if (canInferImplicitObjC(/*allowAnyAccess*/true)) {
+    // A non-`final` member of an @objc @implementation extension is @objc
+    // with a special reason.
+    if (!VD->isFinal() && canInferImplicitObjC(/*allowAnyAccess*/true)) {
       auto ext = VD->getDeclContext()->getAsDecl();
       auto attr = ext->getAttrs()
                    .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);

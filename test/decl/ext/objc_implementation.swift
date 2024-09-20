@@ -446,6 +446,11 @@ protocol EmptySwiftProto {}
     // expected-error@-1 {{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
     // expected-note@-2 {{protocol-constrained type containing protocol 'EmptySwiftProto' cannot be represented in Objective-C}}
   }
+
+  override public static func superclassClassMethod() {
+    // rdar://136113393: `static override` could make a non-`@objc` override
+    // of an `@objc` member when using new syntax.
+  }
 }
 
 // Intentionally using `@_objcImplementation` for this test; do not upgrade!
