@@ -242,7 +242,7 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(core)
   add_subdirectory(SwiftOnoneSupport)
 
-  if(SWIFT_BUILD_CLANG_OVERLAYS)
+  if(SWIFT_BUILD_CLANG_OVERLAYS OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
     add_subdirectory(ClangOverlays)
   endif()
 endif()
@@ -287,13 +287,12 @@ if(SWIFT_BUILD_REMOTE_MIRROR)
   add_subdirectory(SwiftRemoteMirror)
 endif()
 
-if(SWIFT_BUILD_SDK_OVERLAY OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
+if(SWIFT_BUILD_SDK_OVERLAY OR (SWIFT_BUILD_TEST_SUPPORT_MODULES AND SWIFT_BUILD_DYNAMIC_SDK_OVERLAY_default))
   add_subdirectory(Platform)
 endif()
 
 if(SWIFT_BUILD_SDK_OVERLAY)
-  # On Apple platforms, we aren't building any overlays (other than Darwin in
-  # Platform above). Instead, we're picking them up from the SDK.
+  # On Apple platforms, we aren't building any overlays. Instead, we're picking them up from the SDK.
 
   if(WINDOWS IN_LIST SWIFT_SDKS)
     add_subdirectory(Windows)
