@@ -6481,8 +6481,10 @@ public:
   }
 
   static MacroExpansionExpr *
-  create(DeclContext *dc, SourceLoc sigilLoc, DeclNameRef macroName,
-         DeclNameLoc macroNameLoc, SourceLoc leftAngleLoc,
+  create(DeclContext *dc, SourceLoc sigilLoc,
+         DeclNameRef moduleName, DeclNameLoc moduleNameLoc,
+         DeclNameRef macroName, DeclNameLoc macroNameLoc,
+         SourceLoc leftAngleLoc,
          ArrayRef<TypeRepr *> genericArgs, SourceLoc rightAngleLoc,
          ArgumentList *argList, MacroRoles roles, bool isImplicit = false,
          Type ty = Type());

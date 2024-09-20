@@ -3329,6 +3329,9 @@ ERROR(override_multiple_decls_base,none,
 ERROR(override_sendability_mismatch,none,
       "declaration %0 has a type with different sendability from any potential "
       "overrides", (DeclName))
+ERROR(override_global_actor_isolation_mismatch,none,
+      "declaration %0 has a type with different global actor isolation from any potential "
+      "overrides", (DeclName))
 ERROR(override_multiple_decls_arg_mismatch,none,
       "declaration %0 has different argument labels from any potential "
       "overrides", (DeclName))
@@ -5810,6 +5813,9 @@ ERROR(nonisolated_actor_sync_init,none,
 ERROR(nonisolated_wrapped_property,none,
       "'nonisolated' is not supported on properties with property wrappers",
       ())
+ERROR(nonisolated_lazy,none,
+      "'nonisolated' is not supported on lazy properties",
+      ())
 
 ERROR(non_sendable_from_deinit,none,
         "cannot access %1 %2 with a non-sendable type %0 from nonisolated deinit",
@@ -7276,7 +7282,7 @@ NOTE(note_result_builder_control_flow, none,
       "builder %0", (DeclName))
 ERROR(result_builder_attribute_not_allowed_here, none,
       "result builder attribute %0 can only be applied to a parameter, "
-      "function, or computed property", (Identifier))
+      "function, subscript, or computed property", (Identifier))
 ERROR(result_builder_attribute_on_storage_without_getter, none,
       "result builder attribute %0 can only be applied to a "
       "%select{subscript|property|constant|variable}1 if it defines a getter",

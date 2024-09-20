@@ -151,7 +151,6 @@ enum class DescriptiveDeclKind : uint8_t {
   Extension,
   EnumCase,
   TopLevelCode,
-  IfConfig,
   PoundDiagnostic,
   PatternBinding,
   Var,
@@ -817,11 +816,6 @@ protected:
 
     /// Whether there is are lazily-loaded conformances for this extension.
     HasLazyConformances : 1
-  );
-
-  SWIFT_INLINE_BITFIELD(IfConfigDecl, Decl, 1,
-    /// Whether this decl is missing its closing '#endif'.
-    HadMissingEnd : 1
   );
 
   SWIFT_INLINE_BITFIELD(PoundDiagnosticDecl, Decl, 1+1,
@@ -2659,51 +2653,6 @@ public:
 
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::SerializedTopLevelCodeDecl;
-  }
-};
-
-/// IfConfigDecl - This class represents #if/#else/#endif blocks.
-/// Active and inactive block members are stored separately, with the intention
-/// being that active members will be handed back to the enclosing context.
-class IfConfigDecl : public Decl {
-  /// An array of clauses controlling each of the #if/#elseif/#else conditions.
-  /// The array is ASTContext allocated.
-  ArrayRef<IfConfigClause> Clauses;
-  SourceLoc EndLoc;
-  SourceLoc getLocFromSource() const { return Clauses[0].Loc; }
-  friend class Decl;
-public:
-  
-  IfConfigDecl(DeclContext *Parent, ArrayRef<IfConfigClause> Clauses,
-               SourceLoc EndLoc, bool HadMissingEnd)
-    : Decl(DeclKind::IfConfig, Parent), Clauses(Clauses), EndLoc(EndLoc)
-  {
-    Bits.IfConfigDecl.HadMissingEnd = HadMissingEnd;
-  }
-
-  ArrayRef<IfConfigClause> getClauses() const { return Clauses; }
-
-  /// Return the active clause, or null if there is no active one.
-  const IfConfigClause *getActiveClause() const {
-    for (auto &Clause : Clauses)
-      if (Clause.isActive) return &Clause;
-    return nullptr;
-  }
-
-  const ArrayRef<ASTNode> getActiveClauseElements() const {
-    if (auto *Clause = getActiveClause())
-      return Clause->Elements;
-    return {};
-  }
-  
-  SourceLoc getEndLoc() const { return EndLoc; }
-
-  bool hadMissingEnd() const { return Bits.IfConfigDecl.HadMissingEnd; }
-  
-  SourceRange getSourceRange() const;
-  
-  static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::IfConfig;
   }
 };
 

@@ -643,9 +643,9 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
       noteLoc = loc;
   }
 
-  const auto subMap = parentTy->getContextSubstitutions(dc);
+  const auto subMap = parentTy->getContextSubstitutionMap(dc);
   const auto substitutions = [&](SubstitutableType *type) -> Type {
-    auto result = QueryTypeSubstitutionMap{subMap}(type);
+    auto result = QuerySubstitutionMap{subMap}(type);
     if (result->hasTypeParameter()) {
       if (contextSig) {
         // Avoid building this generic environment unless we need it.

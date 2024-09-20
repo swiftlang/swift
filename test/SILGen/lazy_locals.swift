@@ -43,3 +43,11 @@ func lazyLocalWithNestedClosure() {
     return 3
   }()
 }
+
+func lazyLocalInClosure() {
+  // Make sure we can type-check.
+  _ = {
+    lazy var x = 0
+    return x
+  }
+}

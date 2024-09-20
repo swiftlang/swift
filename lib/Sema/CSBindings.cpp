@@ -1205,6 +1205,16 @@ bool BindingSet::isViable(PotentialBinding &binding, bool isTransitive) {
     if (!existingNTD || NTD != existingNTD)
       continue;
 
+    // What is going on here needs to be thoroughly re-evaluated,
+    // but at least for now, let's not filter bindings of different
+    // kinds so if we have a situation like: `Array<$T0> conv $T1`
+    // and `$T1 conv Array<(String, Int)>` we can't lose `Array<$T0>`
+    // as a binding because `$T0` could be inferred to
+    // `(key: String, value: Int)` and binding `$T1` to `Array<(String, Int)>`
+    // eagerly would be incorrect.
+    if (existing->Kind != binding.Kind)
+      continue;
+
     // If new type has a type variable it shouldn't
     // be considered  viable.
     if (type->hasTypeVariable())
@@ -1845,10 +1855,6 @@ void PotentialBindings::infer(Constraint *constraint) {
     break;
 
   case ConstraintKind::Disjunction:
-    // If there is additional context available via disjunction
-    // associated with closure literal (e.g. coercion to some other
-    // type) let's delay resolving the closure until the disjunction
-    // is attempted.
     DelayedBy.push_back(constraint);
     break;
 

@@ -1400,9 +1400,9 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
       // based on the requirements harvested from instance storage.
 
       // Form the where clause containing all of the requirements.
-      std::string whereClause;
+      SmallString<64> whereClause;
       {
-        llvm::raw_string_ostream out(whereClause);
+        llvm::raw_svector_ostream out(whereClause);
         llvm::interleaveComma(
             requirements, out,
             [&](const Requirement &req) {
@@ -5175,7 +5175,6 @@ getMemberIsolationPropagation(const ValueDecl *value) {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
-  case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
   case DeclKind::Missing:
@@ -5646,6 +5645,12 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
   ActorIsolation defaultIsolation = ActorIsolation::forUnspecified();
   IsolationSource defaultIsolationSource;
 
+  // If we are supposed to infer main actor isolation by default, make our
+  // default isolation main actor.
+  if (ctx.LangOpts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated)) {
+    defaultIsolation = ActorIsolation::forMainActor(ctx);
+  }
+
   if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
     // A @Sendable function is assumed to be actor-independent.
     if (func->isSendable()) {
@@ -5670,6 +5675,9 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
         IsolationSource(overriddenValue, IsolationSource::Override);
     overriddenIso = defaultIsolation;
   }
+
+  // NOTE: After this point, the default has been set. Only touch the default
+  // isolation above this point since code below assumes it is now constant.
 
   // Function used when returning an inferred isolation.
   auto inferredIsolation = [&](ActorIsolation inferred,
@@ -5770,6 +5778,32 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
           inferredIsolation(enclosingIsolation),
           IsolationSource(inferenceSource, IsolationSource::LexicalContext)
         };
+      }
+    }
+  }
+
+  // If this is an actor, use the actor isolation of the actor.
+  if (ctx.LangOpts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated)) {
+    // non-async inits and deinits need to be always nonisolated since we can
+    // run the deinit anywhere.
+    //
+    // TODO: We should add a check for if they are marked with global actor
+    // isolation.
+    if (auto *func = dyn_cast<AbstractFunctionDecl>(value)) {
+      if (isa<DestructorDecl>(func) && !func->isAsyncContext())
+        return {ActorIsolation::forNonisolated(false /*unsafe*/),
+                IsolationSource(func, IsolationSource::LexicalContext)};
+
+      if (isa<ConstructorDecl>(func) && !func->isAsyncContext())
+        return {ActorIsolation::forNonisolated(false /*unsafe*/),
+                IsolationSource(func, IsolationSource::LexicalContext)};
+    }
+
+    if (auto nominal = dyn_cast<NominalTypeDecl>(value)) {
+      if (nominal->isActor() && !nominal->isGlobalActor()) {
+        auto isolation = ActorIsolation::forActorInstanceSelf(value);
+        return {inferredIsolation(isolation),
+                IsolationSource(nominal, IsolationSource::LexicalContext)};
       }
     }
   }
@@ -7270,7 +7304,6 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::Struct:
   case DeclKind::TypeAlias:
   case DeclKind::EnumCase:
-  case DeclKind::IfConfig:
   case DeclKind::Import:
   case DeclKind::InfixOperator:
   case DeclKind::Missing:

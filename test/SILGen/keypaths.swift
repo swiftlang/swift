@@ -677,3 +677,12 @@ func test_optional_chaining_with_function_conversion() {
     _ = data.compactMap(\.elements!.db)
   }
 }
+
+protocol HasAlias {
+  var id: Self.ID { get }
+  typealias ID = Int
+}
+
+func testHasAlias() {
+  _ = \HasAlias.id
+}

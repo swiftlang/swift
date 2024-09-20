@@ -238,11 +238,8 @@ static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
   SF->getPrecedenceGroups(groups);
   C.NumPrecedenceGroups += groups.size();
 
-  auto bufID = SF->getBufferID();
-  if (bufID.has_value()) {
-    C.NumSourceLines +=
-      SM.getEntireTextForBuffer(bufID.value()).count('\n');
-  }
+  C.NumSourceLines +=
+    SM.getEntireTextForBuffer(SF->getBufferID()).count('\n');
 }
 
 static void countASTStats(UnifiedStatsReporter &Stats,

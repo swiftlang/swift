@@ -4881,7 +4881,6 @@ ASTMangler::BaseEntitySignature::BaseEntitySignature(const Decl *decl)
     case DeclKind::Extension:
     case DeclKind::TopLevelCode:
     case DeclKind::Import:
-    case DeclKind::IfConfig:
     case DeclKind::PoundDiagnostic:
     case DeclKind::PrecedenceGroup:
     case DeclKind::Missing:

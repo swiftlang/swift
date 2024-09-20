@@ -243,6 +243,25 @@ public:
     }
   }
 
+  static bool deepEquals(const Node *lhs, const Node *rhs) {
+    if (lhs == rhs)
+      return true;
+    if ((!lhs && rhs) || (lhs && !rhs))
+      return false;
+    if (!lhs->isSimilarTo(rhs))
+      return false;
+    for (auto li = lhs->begin(), ri = rhs->begin(), le = lhs->end(); li != le;
+         ++li, ++ri) {
+      if (!deepEquals(*li, *ri))
+        return false;
+    }
+    return true;
+  }
+
+  bool isDeepEqualTo(const Node *other) const {
+    return deepEquals(this, other);
+  }
+
   bool hasText() const { return NodePayloadKind == PayloadKind::Text; }
   llvm::StringRef getText() const {
     assert(hasText());

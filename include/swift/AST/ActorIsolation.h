@@ -133,6 +133,8 @@ public:
     return ActorIsolation(GlobalActor, globalActor);
   }
 
+  static ActorIsolation forMainActor(ASTContext &ctx);
+
   static ActorIsolation forErased() {
     return ActorIsolation(Erased);
   }

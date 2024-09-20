@@ -789,7 +789,7 @@ private:
   /// Creates a new source file for the main module.
   SourceFile *createSourceFileForMainModule(ModuleDecl *mod,
                                             SourceFileKind FileKind,
-                                            std::optional<unsigned> BufferID,
+                                            unsigned BufferID,
                                             bool isMainBuffer = false) const;
 
   /// Creates all the files to be added to the main module, appending them to

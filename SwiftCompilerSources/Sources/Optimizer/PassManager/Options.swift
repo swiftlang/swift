@@ -36,16 +36,31 @@ struct Options {
     _bridged.hasFeature(feature)
   }
 
+  // The values for the assert_configuration call are:
+  // 0: Debug
+  // 1: Release
+  // 2: Fast / Unchecked
   enum AssertConfiguration {
-    case enabled
-    case disabled
+    case debug
+    case release
+    case unchecked
     case unknown
+
+    var integerValue: Int {
+      switch self {
+      case .debug:      return 0
+      case .release:    return 1
+      case .unchecked:  return 2
+      case .unknown:    fatalError()
+      }
+    }
   }
 
   var assertConfiguration: AssertConfiguration {
     switch _bridged.getAssertConfiguration() {
-      case .Debug:               return .enabled
-      case .Release, .Unchecked: return .disabled
+      case .Debug:               return .debug
+      case .Release:             return .release
+      case .Unchecked:           return .unchecked
       default:                   return .unknown
     }
   }

@@ -175,10 +175,6 @@ protected:
 
     if (auto *decl = element.dyn_cast<Decl *>()) {
       switch (decl->getKind()) {
-        // Just ignore #if; the chosen children should appear in
-        // the surrounding context.  This isn't good for source
-        // tools but it at least works.
-      case DeclKind::IfConfig:
         // Skip #warning/#error; we'll handle them when applying
         // the builder.
       case DeclKind::PoundDiagnostic:

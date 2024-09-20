@@ -247,7 +247,7 @@ static void reportSyntacticAnnotations(CompilerInstance &CI,
                                        EditorConsumer &Consumer) {
   auto SF = dyn_cast<SourceFile>(CI.getMainModule()->getFiles()[0]);
   SyntaxModelContext SyntaxContext(*SF);
-  DocSyntaxWalker SyntaxWalker(CI.getSourceMgr(), *SF->getBufferID(),
+  DocSyntaxWalker SyntaxWalker(CI.getSourceMgr(), SF->getBufferID(),
                                Consumer);
   SyntaxContext.walk(SyntaxWalker);
 }
@@ -654,7 +654,7 @@ SwiftInterfaceGenContext::resolveEntityForOffset(unsigned Offset) const {
 
   SourceManager &SM = Impl.TextCI.getSourceMgr();
   auto SF = dyn_cast<SourceFile>(Impl.TextCI.getMainModule()->getFiles()[0]);
-  unsigned BufferID = *SF->getBufferID();
+  unsigned BufferID = SF->getBufferID();
   SourceLoc Loc = Lexer::getLocForStartOfToken(SM, BufferID, Offset);
   Offset = SM.getLocOffsetInBuffer(Loc, BufferID);
 

@@ -2316,10 +2316,6 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
     return false;
   }
 
-  if (isa<IfConfigDecl>(D)) {
-    return false;
-  }
-
   return true;
 }
 
@@ -3412,10 +3408,6 @@ void PrintAST::visitTopLevelCodeDecl(TopLevelCodeDecl *decl) {
   printASTNodes(decl->getBody()->getElements(), /*NeedIndent=*/false);
 }
 
-void PrintAST::visitIfConfigDecl(IfConfigDecl *ICD) {
-  // Never printed
-}
-
 void PrintAST::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
   /// TODO: Should we even print #error/#warning?
   if (PDD->isError()) {
@@ -4183,8 +4175,35 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       }
 
       PrintWithOpaqueResultTypeKeywordRAII x(Options);
-      printTypeLocForImplicitlyUnwrappedOptional(
-          ResultTyLoc, decl->isImplicitlyUnwrappedOptional());
+
+      // Check if we would go down the type repr path... in such a case, see if
+      // we can find a type repr and if that type has a sending type repr. In
+      // such a case, look through the sending type repr since we handle it here
+      // ourselves.
+      bool usedTypeReprPrinting = false;
+      {
+        llvm::SaveAndRestore<PrintOptions> printOptions(Options);
+        Options.PrintOptionalAsImplicitlyUnwrapped =
+            decl->isImplicitlyUnwrappedOptional();
+        if (willUseTypeReprPrinting(ResultTyLoc, CurrentType, Options)) {
+          if (auto repr = ResultTyLoc.getTypeRepr()) {
+            // If we are printing a sending result... and we found that we have
+            // to use type repr printing, look through sending type repr.
+            // Sending was already applied in our caller.
+            if (auto *sendingRepr = dyn_cast<SendingTypeRepr>(repr)) {
+              repr = sendingRepr->getBase();
+            }
+            repr->print(Printer, Options);
+            usedTypeReprPrinting = true;
+          }
+        }
+      }
+
+      // If we printed using type repr printing, do not print again.
+      if (!usedTypeReprPrinting) {
+        printTypeLocForImplicitlyUnwrappedOptional(
+            ResultTyLoc, decl->isImplicitlyUnwrappedOptional());
+      }
       Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
     }
     printDeclGenericRequirements(decl);
@@ -5545,8 +5564,6 @@ void PrintAST::visitSwitchStmt(SwitchStmt *stmt) {
   for (auto N : stmt->getRawCases()) {
     if (N.is<Stmt*>())
       visit(cast<CaseStmt>(N.get<Stmt*>()));
-    else
-      visit(cast<IfConfigDecl>(N.get<Decl*>()));
     Printer.printNewline();
   }
   indent();
@@ -5643,10 +5660,6 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
         }
       }
     }
-  }
-
-  if (isa<IfConfigDecl>(this)) {
-    return false;
   }
 
   // Print everything else.

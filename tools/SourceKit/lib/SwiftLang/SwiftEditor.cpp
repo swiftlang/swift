@@ -1102,11 +1102,7 @@ public:
       return;
     }
 
-    if (!AstUnit->getPrimarySourceFile().getBufferID().has_value()) {
-      LOG_WARN_FUNC("Primary SourceFile is expected to have a BufferID");
-      return;
-    }
-    unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().value();
+    unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID();
 
     SemanticAnnotator Annotator(CompIns.getSourceMgr(), BufferID);
     Annotator.walk(AstUnit->getPrimarySourceFile());
@@ -1602,24 +1598,6 @@ private:
         return Action::Stop();
       }
       return Action::Continue(E);
-    }
-
-    PreWalkAction walkToDeclPre(Decl *D) override {
-      if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
-        // The base walker assumes the content of active IfConfigDecl clauses
-        // has been injected into the parent context and will be walked there.
-        // This doesn't hold for pre-typechecked ASTs, so walk them here.
-        for (auto Clause: ICD->getClauses()) {
-          if (!Clause.isActive)
-            continue;
-
-          for (auto Elem: Clause.Elements) {
-            Elem.walk(*this);
-          }
-        }
-        return Action::SkipNode();
-      }
-      return Action::Continue();
     }
   };
 
@@ -2388,7 +2366,7 @@ void SwiftEditorDocument::reportDocumentStructure(SourceFile &SrcFile,
                                                   EditorConsumer &Consumer) {
   ide::SyntaxModelContext ModelContext(SrcFile);
   SwiftDocumentStructureWalker Walker(SrcFile.getASTContext().SourceMgr,
-                                      *SrcFile.getBufferID(),
+                                      SrcFile.getBufferID(),
                                       Consumer);
   ModelContext.walk(Walker);
 }
@@ -2612,7 +2590,7 @@ void SwiftLangSupport::getSemanticTokens(
             "Unable to find input file"));
         return;
       }
-      SemanticAnnotator Annotator(CompIns.getSourceMgr(), *SF->getBufferID());
+      SemanticAnnotator Annotator(CompIns.getSourceMgr(), SF->getBufferID());
       Annotator.walk(SF);
       Receiver(
           RequestResult<SemanticTokensResult>::fromResult(Annotator.SemaToks));

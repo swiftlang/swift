@@ -272,7 +272,7 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
 
     if (SF->Kind == SourceFileKind::DefaultArgument) {
       auto genInfo = *SF->getASTContext().SourceMgr.getGeneratedSourceInfo(
-          *SF->getBufferID());
+          SF->getBufferID());
       parentLoc = ASTNode::getFromOpaqueValue(genInfo.astNode).getStartLoc();
       if (auto parentScope =
               findStartingScopeForLookup(enclosingSF, parentLoc)) {
@@ -367,10 +367,6 @@ public:
   VISIT_AND_IGNORE(PoundDiagnosticDecl)
   VISIT_AND_IGNORE(MissingDecl)
   VISIT_AND_IGNORE(MissingMemberDecl)
-
-  // Only members of the active clause are in scope, and those
-  // are visited separately.
-  VISIT_AND_IGNORE(IfConfigDecl)
 
   // This declaration is handled from the PatternBindingDecl
   VISIT_AND_IGNORE(VarDecl)

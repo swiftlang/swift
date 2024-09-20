@@ -366,7 +366,7 @@ public:
       : AllTokensInFile(File.getAllTokens()),
         LangOpts(File.getASTContext().LangOpts),
         SM(File.getASTContext().SourceMgr),
-        BufferID(File.getBufferID().value()),
+        BufferID(File.getBufferID()),
         Ctx(File.getASTContext()),
         Walker(Walker) { }
 
@@ -987,8 +987,6 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
     }
     pushStructureNode(SN, VD);
 
-  } else if (isa<IfConfigDecl>(D)) {
-    // Note: nothing to do.
   } else if (auto *EnumCaseD = dyn_cast<EnumCaseDecl>(D)) {
     SyntaxStructureNode SN;
     setDecl(SN, D);

@@ -170,7 +170,6 @@ public:
 #define UNINTERESTING(KIND)                                                    \
   bool visit##KIND##Decl(const KIND##Decl *D) { return true; }
   UNINTERESTING(TopLevelCode);
-  UNINTERESTING(IfConfig);
   UNINTERESTING(Import);
   UNINTERESTING(PoundDiagnostic);
   UNINTERESTING(PrecedenceGroup);

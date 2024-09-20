@@ -204,6 +204,8 @@ UNINTERESTING_FEATURE(ExtractConstantsFromMembers)
 UNINTERESTING_FEATURE(FixedArrays)
 UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
+UNINTERESTING_FEATURE(UnspecifiedMeansMainActorIsolated)
+UNINTERESTING_FEATURE(GlobalActorInferenceCutoff)
 
 static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   auto isFunctionTypeWithSending = [](Type type) {
@@ -300,6 +302,7 @@ static bool usesFeatureAllowUnsafeAttribute(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(WarnUnsafe)
+UNINTERESTING_FEATURE(SafeInterop)
 
 bool swift::usesFeatureIsolatedDeinit(const Decl *decl) {
   if (auto cd = dyn_cast<ClassDecl>(decl)) {
