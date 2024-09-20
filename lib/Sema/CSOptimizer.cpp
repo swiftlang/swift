@@ -250,6 +250,23 @@ static Constraint *determineBestChoicesInContext(
                 {literal.second.getDefaultType(), /*fromLiteral=*/true});
           }
         }
+
+        // Helps situations like `1 + {Double, CGFloat}(...)` by inferring
+        // a type for the second operand of `+` based on a type being constructed.
+        //
+        // Currently limited to Double and CGFloat only since we need to 
+        // support implicit `Double<->CGFloat` conversion.
+        if (typeVar->getImpl().isFunctionResult() &&
+            isOperatorDisjunction(disjunction)) {
+          auto resultLoc = typeVar->getImpl().getLocator();
+          if (auto *call = getAsExpr<CallExpr>(resultLoc->getAnchor())) {
+            if (auto *typeExpr = dyn_cast<TypeExpr>(call->getFn())) {
+              auto instanceTy = cs.getType(typeExpr)->getMetatypeInstanceType();
+              if (instanceTy->isDouble() || instanceTy->isCGFloat())
+                types.push_back({instanceTy, /*fromLiteral=*/false});
+            }
+          }
+        }
       } else {
         types.push_back({argType, /*fromLiteral=*/false});
       }

@@ -342,3 +342,22 @@ func test_init_validation() {
     }
   }
 }
+
+do {
+  struct G<T> {
+    init(_: T) {}
+  }
+
+  func round(_: Double) -> Double {}
+  func round<T: FloatingPoint>(_: T) -> T {}
+
+  func test_cgfloat_over_double(withColors colors: Int, size: CGSize) -> G<CGFloat> {
+    let g = G(1.0 / CGFloat(colors))
+    return g // Ok
+  }
+
+  func test_no_ambiguity(width: Int, height: Int) -> CGFloat {
+    let v = round(CGFloat(width / height) * 10) / 10.0
+    return v // Ok
+  }
+}
