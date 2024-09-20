@@ -531,8 +531,8 @@ extension DistributedActorSystem {
     }
 
     // Decode the return type
-    func allocateReturnTypeBuffer<R>(_: R.Type) -> UnsafeRawPointer? {
-      return UnsafeRawPointer(UnsafeMutablePointer<R>.allocate(capacity: 1))
+    func allocateReturnTypeBuffer<R>(_: R.Type) -> UnsafeMutableRawPointer? {
+      return UnsafeMutableRawPointer(UnsafeMutablePointer<R>.allocate(capacity: 1))
     }
 
     let maybeReturnTypeFromTypeInfo =
@@ -555,12 +555,14 @@ extension DistributedActorSystem {
         errorCode: .typeDeserializationFailure)
     }
 
-    func destroyReturnTypeBuffer<R>(_: R.Type) {
-      resultBuffer.assumingMemoryBound(to: R.self).deallocate()
+    func doDestroyReturnTypeBuffer<R>(_: R.Type) {
+      let buf = resultBuffer.assumingMemoryBound(to: R.self)
+      buf.deinitialize(count: 1)
+      buf.deallocate()
     }
 
     defer {
-      _openExistential(returnTypeFromTypeInfo, do: destroyReturnTypeBuffer)
+      _openExistential(returnTypeFromTypeInfo, do: doDestroyReturnTypeBuffer)
     }
 
     do {
