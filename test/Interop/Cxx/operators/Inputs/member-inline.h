@@ -477,4 +477,28 @@ struct HasOperatorCallWithDefaultArg {
   int operator()(int x = 0) const { return value + x; }
 };
 
+class HasStaticOperatorCallBase {
+public:
+  static int operator()(int x) { return x + 42; }
+};
+
+class HasStaticOperatorCallBaseNonTrivial: public NonTrivial {
+public:
+  HasStaticOperatorCallBaseNonTrivial() {}
+  HasStaticOperatorCallBaseNonTrivial(const HasStaticOperatorCallBaseNonTrivial &self) : NonTrivial(self) {}
+  HasStaticOperatorCallBaseNonTrivial(HasStaticOperatorCallBaseNonTrivial &&self) : NonTrivial(self) {}
+
+  static int operator()(const NonTrivial &arg) { return arg.f + 42; }
+};
+
+class HasStaticOperatorCallDerived : public HasStaticOperatorCallBase {};
+
+class HasStaticOperatorCallWithConstOperator {
+public:
+  inline int operator()(int x, int y) const { return x + y; }
+  static int operator()(int x) {
+        return x - 1;
+   }
+};
+
 #endif
