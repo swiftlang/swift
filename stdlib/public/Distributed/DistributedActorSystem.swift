@@ -858,7 +858,7 @@ public protocol DistributedTargetInvocationResultHandler<SerializationRequiremen
   /// Implementations of this method must ensure that the `Success` type parameter conforms
   /// to the types' `SerializationRequirement`.
   @available(SwiftStdlib 6.0, *)
-  func onReturn<Success/*: SerializationRequirement*/>(value: Success) async throws
+  func onReturn<Success/*: SerializationRequirement*/>(value: consuming Success) async throws
 
   /// Invoked when the distributed target execution of a `Void` returning
   /// function has completed successfully.

@@ -324,6 +324,8 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
         handler: resultHandler
       )
 
+      defer { remoteCallResult = nil }
+      defer { remoteCallError = nil }
       switch (remoteCallResult, remoteCallError) {
       case (.some(let value), nil):
         print("  << remoteCall return: \(value)")
@@ -514,7 +516,7 @@ public struct FakeRoundtripResultHandler: DistributedTargetInvocationResultHandl
   }
 
   public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
-    print(" << onReturn: \(value)")
+    print(" << onReturn consume: \(value)")
     storeReturn(value)
   }
 
