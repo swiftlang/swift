@@ -1407,7 +1407,10 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
 }
 
 void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
-  assert(!SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded));
+  // In Embedded Swift, only class-bound wtables are allowed.
+  if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    assert(Conf->getProtocol()->requiresClass());
+  }
 
   if (auto *wt = SIL.lookUpWitnessTable(Conf)) {
     // Add it to the queue if it hasn't already been put there.
