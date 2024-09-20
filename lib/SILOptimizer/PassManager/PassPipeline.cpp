@@ -457,7 +457,13 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addMem2Reg();
 
   // Run the existential specializer Pass.
-  P.addExistentialSpecializer();
+  if (!P.getOptions().EmbeddedSwift) {
+    // MandatoryPerformanceOptimizations already took care of all specializations
+    // in embedded Swift mode, running the existential specializer might introduce
+    // more generic calls from non-generic functions, which breaks the assumptions
+    // of embedded Swift.
+    P.addExistentialSpecializer();
+  }
 
   // Cleanup, which is important if the inliner has restarted the pass pipeline.
   P.addPerformanceConstantPropagation();

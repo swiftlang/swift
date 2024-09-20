@@ -2478,10 +2478,6 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
   if (f->isExternalDeclaration())
     return;
 
-  if (Context.LangOpts.hasFeature(Feature::Embedded) &&
-      f->getLoweredFunctionType()->isPolymorphic())
-    return;
-
   // Do not emit bodies of public_external or package_external functions.
   if (hasPublicOrPackageVisibility(f->getLinkage(),
                                    f->getASTContext().SILOpts.EnableSerializePackage) &&
