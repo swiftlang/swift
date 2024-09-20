@@ -4244,19 +4244,25 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     CanType componentTy;
     if (!var->getDeclContext()->isTypeContext()) {
       componentTy = var->getInterfaceType()->getCanonicalType();
+    } else if (var->getDeclContext()->getSelfProtocolDecl() &&
+               baseTy->isExistentialType()) {
+      componentTy = var->getValueInterfaceType()->getCanonicalType();
+      ASSERT(!componentTy->hasTypeParameter());
     } else {
-      componentTy =
+      // The mapTypeIntoContext() / mapTypeOutOfContext() dance is there
+      // to handle the case where baseTy being a type parameter subject
+      // to a superclass requirement.
+      componentTy = var->getValueInterfaceType().subst(
         GenericEnvironment::mapTypeIntoContext(genericEnv, baseTy)
-          ->getTypeOfMember(var)
-          ->getReferenceStorageReferent()
+          ->getContextSubstitutionMap(var->getDeclContext()))
           ->mapTypeOutOfContext()
           ->getCanonicalType();
+    }
 
-      // The component type for an @objc optional requirement needs to be
-      // wrapped in an optional.
-      if (var->getAttrs().hasAttribute<OptionalAttr>()) {
-        componentTy = OptionalType::get(componentTy)->getCanonicalType();
-      }
+    // The component type for an @objc optional requirement needs to be
+    // wrapped in an optional.
+    if (var->getAttrs().hasAttribute<OptionalAttr>()) {
+      componentTy = OptionalType::get(componentTy)->getCanonicalType();
     }
   
     if (canStorageUseStoredKeyPathComponent(var, expansion)) {
