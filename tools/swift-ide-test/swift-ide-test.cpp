@@ -1229,9 +1229,9 @@ static int printConformingMethodList(
           llvm::outs() << " []";
         llvm::outs() << "\n";
         for (auto VD : Result->Members) {
-          auto funcTy = cast<FuncDecl>(VD)->getMethodInterfaceType();
-          funcTy = Result->ExprType->getTypeOfMember(VD, funcTy);
-          auto resultTy = funcTy->castTo<FunctionType>()->getResult();
+          auto resultTy = cast<FuncDecl>(VD)->getResultInterfaceType();
+          resultTy = resultTy.subst(
+                Result->ExprType->getMemberSubstitutionMap(VD));
 
           llvm::outs() << "   - Name: ";
           VD->getName().print(llvm::outs());
