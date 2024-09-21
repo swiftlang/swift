@@ -161,6 +161,10 @@ bool BridgedASTType::isNoEscape() const {
   return unbridged()->isNoEscape();
 }
 
+bool BridgedASTType::isInteger() const {
+  return unbridged()->is<swift::IntegerType>();
+}
+
 BridgedResultInfoArray
 BridgedASTType::SILFunctionType_getResultsWithError() const {
   return unbridged()->castTo<swift::SILFunctionType>()->getResultsWithError();
@@ -686,7 +690,8 @@ bool BridgedFunction::isSwift51RuntimeAvailable() const {
     return false;
 
   swift::ASTContext &ctxt = getFunction()->getModule().getASTContext();
-  return swift::AvailabilityContext::forDeploymentTarget(ctxt).isContainedIn(ctxt.getSwift51Availability());
+  return swift::AvailabilityRange::forDeploymentTarget(ctxt).isContainedIn(
+      ctxt.getSwift51Availability());
 }
 
 bool BridgedFunction::isPossiblyUsedExternally() const {
@@ -1408,6 +1413,23 @@ SwiftInt BridgedInstruction::FullApplySite_numIndirectResultArguments() const {
 
 bool BridgedInstruction::ConvertFunctionInst_withoutActuallyEscaping() const {
   return getAs<swift::ConvertFunctionInst>()->withoutActuallyEscaping();
+}
+
+BridgedASTType BridgedInstruction::TypeValueInst_getParamType() const {
+  return {getAs<swift::TypeValueInst>()->getParamType().getPointer()};
+}
+
+SwiftInt BridgedInstruction::TypeValueInst_getValue() const {
+  auto tvi = getAs<swift::TypeValueInst>();
+
+  // Assume we've already checked that the parameter type is an IntegerType.
+  auto integer = tvi->getParamType()->castTo<swift::IntegerType>();
+
+  if (integer->isNegative()) {
+    return integer->getValue().getSExtValue();
+  } else {
+    return integer->getValue().getZExtValue();
+  }
 }
 
 //===----------------------------------------------------------------------===//

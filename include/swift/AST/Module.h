@@ -162,10 +162,6 @@ enum class ResilienceStrategy : unsigned {
 
 class OverlayFile;
 
-/// A mapping used to find the source file that contains a particular source
-/// location.
-class ModuleSourceFileLocationMap;
-
 /// A unit that allows grouping of modules by a package name.
 ///
 /// PackageUnit is treated as an enclosing scope of ModuleDecl. Unlike other
@@ -243,6 +239,8 @@ class ModuleDecl
   /// Module name to use when referenced in clients module interfaces.
   mutable Identifier ExportAsName;
 
+  mutable Identifier PublicModuleName;
+
 public:
   /// Produces the components of a given module's full name in reverse order.
   ///
@@ -299,13 +297,6 @@ private:
   DebuggerClient *DebugClient = nullptr;
 
   SmallVector<FileUnit *, 2> Files;
-
-  /// Mapping used to find the source file associated with a given source
-  /// location.
-  ModuleSourceFileLocationMap *sourceFileLocationMap = nullptr;
-
-  /// The set of auxiliary source files build as part of this module.
-  SmallVector<SourceFile *, 2> AuxiliaryFiles;
 
   llvm::SmallDenseMap<Identifier, SmallVector<OverlayFile *, 1>>
     declaredCrossImports;
@@ -408,9 +399,6 @@ public:
   /// SynthesizedFileUnit instead.
   void addFile(FileUnit &newFile);
 
-  /// Add an auxiliary source file, introduced as part of the translation.
-  void addAuxiliaryFile(SourceFile &sourceFile);
-
   /// Produces the source file that contains the given source location, or
   /// \c nullptr if the source location isn't in this module.
   SourceFile *getSourceFileContainingLocation(SourceLoc loc);
@@ -473,9 +461,7 @@ public:
   Identifier getABIName() const;
 
   /// Set the ABI name of the module;
-  void setABIName(Identifier name) {
-    ModuleABIName = name;
-  }
+  void setABIName(Identifier name);
 
   /// Get the package name of this module
   /// FIXME: remove this and bump module version rdar://104723918
@@ -502,6 +488,21 @@ public:
 
   void setExportAsName(Identifier name) {
     ExportAsName = name;
+  }
+
+  /// Public facing name for this module in diagnostics and documentation.
+  ///
+  /// This always returns a valid name as it defaults to the module name if
+  /// no public module name is set.
+  ///
+  /// If `onlyIfImported`, return the normal module name when the module
+  /// corresponding to the public module name isn't imported. Users working
+  /// in between both modules will then see the normal module name,
+  /// this may be more useful for diagnostics at that level.
+  Identifier getPublicModuleName(bool onlyIfImported) const;
+
+  void setPublicModuleName(Identifier name) {
+    PublicModuleName = name;
   }
 
   /// Retrieve the actual module name of an alias used for this module (if any).
@@ -550,9 +551,6 @@ private:
   /// along with the name of the required bystander module. Used by tooling to
   /// present overlays as if they were part of their underlying module.
   std::pair<ModuleDecl *, Identifier> getDeclaringModuleAndBystander();
-
-  /// Update the source-file location map to make it current.
-  void updateSourceFileLocationMap();
 
 public:
   ///  If this is a traditional (non-cross-import) overlay, get its underlying

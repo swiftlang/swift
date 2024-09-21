@@ -329,6 +329,8 @@ private:
     case Node::Kind::SugaredArray:
     case Node::Kind::SugaredDictionary:
     case Node::Kind::SugaredParen:
+    case Node::Kind::Integer:
+    case Node::Kind::NegativeInteger:
       return true;
 
     case Node::Kind::Type:
@@ -646,8 +648,8 @@ private:
     case Node::Kind::SymbolicExtendedExistentialType:
     case Node::Kind::HasSymbolQuery:
     case Node::Kind::ObjectiveCProtocolSymbolicReference:
-    case Node::Kind::LifetimeDependence:
     case Node::Kind::DependentGenericInverseConformanceRequirement:
+    case Node::Kind::DependentGenericParamValueMarker:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -1086,6 +1088,30 @@ private:
       return false;
     };
 
+    auto isGenericParamValue = [&](unsigned depth, unsigned index) {
+      for (unsigned i = numGenericParams; i < firstRequirement; ++i) {
+        auto child = Node->getChild(i);
+        if (child->getKind() != Node::Kind::DependentGenericParamValueMarker)
+          continue;
+        child = child->getChild(0);
+
+        if (child->getKind() != Node::Kind::Type)
+          continue;
+
+        auto param = child->getChild(0);
+        auto type = child->getChild(1);
+        if (param->getKind() != Node::Kind::DependentGenericParamType)
+          continue;
+
+        if (index == param->getChild(0)->getIndex() &&
+            depth == param->getChild(1)->getIndex()) {
+          return std::make_pair(true, type);
+        }
+      }
+
+      return std::make_pair(false, NodePointer());
+    };
+
     unsigned gpDepth = 0;
     for (; gpDepth < numGenericParams; ++gpDepth) {
       if (gpDepth != 0)
@@ -1107,9 +1133,19 @@ private:
         if (isGenericParamPack(gpDepth, index))
           Printer << "each ";
 
+        auto value = isGenericParamValue(gpDepth, index);
+
+        if (value.first)
+          Printer << "let ";
+
         // FIXME: Depth won't match when a generic signature applies to a
         // method in generic type context.
         Printer << Options.GenericParameterName(gpDepth, index);
+
+        if (value.second) {
+          Printer << ": ";
+          print(value.second, depth + 1);
+        }
       }
     }
 
@@ -1777,21 +1813,6 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "@noDerivative ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
-  case Node::Kind::LifetimeDependence: {
-    auto kind = (MangledLifetimeDependenceKind)Node->getChild(0)->getIndex();
-    switch (kind) {
-    case MangledLifetimeDependenceKind::Inherit:
-      Printer << "inherit lifetime dependence: ";
-      break;
-    case MangledLifetimeDependenceKind::Scope:
-      Printer << "scope lifetime dependence: ";
-      break;
-    }
-    print(Node->getChild(1), depth + 1);
-    Printer << " ";
-    print(Node->getChild(2), depth + 1);
-    return nullptr;
-  }
   case Node::Kind::NonObjCAttribute:
     Printer << "@nonobjc ";
     return nullptr;
@@ -2880,6 +2901,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   }
   case Node::Kind::DependentGenericParamCount:
   case Node::Kind::DependentGenericParamPackMarker:
+  case Node::Kind::DependentGenericParamValueMarker:
     printer_unreachable("should be printed as a child of a "
                         "DependentGenericSignature");
   case Node::Kind::DependentGenericConformanceRequirement: {
@@ -3390,6 +3412,15 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::OpaqueReturnTypeIndex:
   case Node::Kind::OpaqueReturnTypeParent:
     return nullptr;
+  case Node::Kind::Integer:
+    Printer << Node->getIndex();
+    return nullptr;
+  case Node::Kind::NegativeInteger: {
+    intptr_t signedValue = Node->getIndex();
+
+    Printer << signedValue;
+    return nullptr;
+  }
   }
 
   printer_unreachable("bad node kind!");

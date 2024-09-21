@@ -58,9 +58,8 @@ Parser::ParsedTypeAttributeList::applyAttributesToType(Parser &p,
     ty = new (p.Context) SendingTypeRepr(ty, SendingLoc);
   }
 
-  if (!lifetimeDependenceSpecifiers.empty()) {
-    ty = LifetimeDependentTypeRepr::create(p.Context, ty,
-                                           lifetimeDependenceSpecifiers);
+  if (!lifetimeEntries.empty()) {
+    ty = LifetimeDependentTypeRepr::create(p.Context, ty, lifetimeEntries);
   }
   return ty;
 }
@@ -156,6 +155,8 @@ LayoutConstraint Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
 ///     type-collection
 ///     type-array
 ///     '_'
+///     integer-literal
+///     '-' integer-literal
 ///     'Pack' '{' (type (',' type)*)? '}'    (only in SIL files)a
 ParserResult<TypeRepr> Parser::parseTypeSimple(
     Diag<> MessageID, ParseTypeReason reason) {
@@ -172,6 +173,12 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
   SourceLoc tildeLoc;
   if (Tok.isTilde()) {
     tildeLoc = consumeToken();
+  }
+
+  // Eat any '-' preceding integer literals.
+  SourceLoc minusLoc;
+  if (Tok.isMinus() && peekToken().is(tok::integer_literal)) {
+    minusLoc = consumeToken();
   }
 
   switch (Tok.getKind()) {
@@ -230,6 +237,12 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     }
     return makeParserCodeCompletionResult<TypeRepr>(
         ErrorTypeRepr::create(Context, consumeToken(tok::code_complete)));
+  case tok::integer_literal: {
+    auto text = copyAndStripUnderscores(Tok.getText());
+    auto loc = consumeToken(tok::integer_literal);
+    ty = makeParserResult(new (Context) IntegerTypeRepr(text, loc, minusLoc));
+    break;
+  }
   case tok::l_square: {
     ty = parseTypeCollection();
     break;
@@ -1574,13 +1587,26 @@ bool Parser::canParseType() {
       return false;
     break;
   case tok::oper_prefix:
-    if (Tok.getText() != "~") {
+    if (!Tok.isTilde() && !Tok.isMinus()) {
       return false;
     }
 
-    consumeToken();
-    if (!canParseTypeIdentifier())
-      return false;
+    // '~' can only appear before type identifiers like '~Copyable'.
+    if (Tok.isTilde()) {
+      consumeToken();
+
+      if (!canParseTypeIdentifier())
+        return false;
+    }
+
+    // '-' can only appear before integers being used as types like '-123'.
+    if (Tok.isMinus()) {
+      consumeToken();
+
+      if (!Tok.is(tok::integer_literal))
+        return false;
+    }
+
     break;
   case tok::kw_protocol:
     return canParseOldStyleProtocolComposition();
@@ -1610,7 +1636,9 @@ bool Parser::canParseType() {
   case tok::kw__:
     consumeToken();
     break;
-
+  case tok::integer_literal:
+    consumeToken();
+    break;
 
   default:
     return false;

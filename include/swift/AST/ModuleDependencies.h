@@ -20,7 +20,6 @@
 
 #include "swift/AST/Import.h"
 #include "swift/AST/LinkLibrary.h"
-#include "swift/AST/SearchPathOptions.h"
 #include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/LLVM.h"
 #include "clang/CAS/CASOptions.h"
@@ -53,6 +52,7 @@ class ASTContext;
 class Identifier;
 class CompilerInstance;
 class IRGenOptions;
+class CompilerInvocation;
 
 /// Which kind of module dependencies we are looking for.
 enum class ModuleDependencyKind : int8_t {
@@ -813,6 +813,9 @@ public:
   void addMacroDependency(StringRef macroModuleName, StringRef libraryPath,
                           StringRef executablePath);
 
+  /// For a Source/Textual dependency, if it Has macro dependency.
+  bool hasMacroDependencies() const;
+
   /// Whether or not a queried module name is a `@Testable` import dependency
   /// of this module. Can only return `true` for Swift source modules.
   bool isTestableImport(StringRef moduleName) const;
@@ -945,7 +948,7 @@ public:
       : FS(FS.createProxyFS()), Mapper(Mapper) {}
 
   void startTracking();
-  void addCommonSearchPathDeps(const SearchPathOptions &Opts);
+  void addCommonSearchPathDeps(const CompilerInvocation &CI);
   void trackFile(const Twine &path) { (void)FS->status(path); }
   llvm::Expected<llvm::cas::ObjectProxy> createTreeFromDependencies();
 

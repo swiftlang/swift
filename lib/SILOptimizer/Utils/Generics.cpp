@@ -1420,7 +1420,8 @@ public:
       SubstitutionMap::get(
         SpecializedGenericSig,
         [&](SubstitutableType *type) -> Type {
-          return CalleeGenericEnv->mapTypeIntoContext(
+          return GenericEnvironment::mapTypeIntoContext(
+              CalleeGenericEnv,
               SpecializedGenericSig.getReducedType(type));
         },
         LookUpConformanceInModule());
@@ -1449,7 +1450,7 @@ public:
 
 GenericTypeParamType *
 FunctionSignaturePartialSpecializer::createGenericParam() {
-  auto GP = GenericTypeParamType::get(/*isParameterPack*/ false, 0, GPIdx++, Ctx);
+  auto GP = GenericTypeParamType::getType(0, GPIdx++, Ctx);
   AllGenericParams.push_back(GP);
   return GP;
 }
@@ -2888,7 +2889,7 @@ static bool usePrespecialized(
   if (refF->getSpecializeAttrs().empty())
     return false;
 
-  SmallVector<std::tuple<unsigned, ReabstractionInfo, AvailabilityContext>, 4>
+  SmallVector<std::tuple<unsigned, ReabstractionInfo, AvailabilityRange>, 4>
       layoutMatches;
 
   ReabstractionInfo specializedReInfo(funcBuilder.getModule().getSwiftModule(),
@@ -2916,7 +2917,7 @@ static bool usePrespecialized(
     // target depending which one is more recent.
     auto specializationAvail = SA->getAvailability();
     auto &ctxt = funcBuilder.getModule().getSwiftModule()->getASTContext();
-    auto deploymentAvail = AvailabilityContext::forDeploymentTarget(ctxt);
+    auto deploymentAvail = AvailabilityRange::forDeploymentTarget(ctxt);
     auto currentFn = apply.getFunction();
     auto isInlinableCtxt = (currentFn->getResilienceExpansion()
                              == ResilienceExpansion::Minimal);
@@ -3067,7 +3068,7 @@ static bool usePrespecialized(
 
   if (!layoutMatches.empty()) {
 
-    std::tuple<unsigned, ReabstractionInfo, AvailabilityContext> res =
+    std::tuple<unsigned, ReabstractionInfo, AvailabilityRange> res =
         layoutMatches[0];
     for (auto &tuple : layoutMatches) {
       if (std::get<0>(tuple) > std::get<0>(res))

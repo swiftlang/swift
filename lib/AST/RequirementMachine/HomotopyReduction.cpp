@@ -501,7 +501,7 @@ void RewriteSystem::minimizeRewriteSystem(const PropertyMap &map) {
   performHomotopyReduction([&](unsigned loopID, unsigned ruleID) -> bool {
     const auto &rule = getRule(ruleID);
 
-    if (rule.containsUnresolvedSymbols())
+    if (rule.containsNameSymbols())
       return true;
 
     return false;
@@ -613,7 +613,7 @@ GenericSignatureErrors RewriteSystem::getErrors() const {
 
     if (!rule.isRedundant() &&
         !rule.isProtocolTypeAliasRule() &&
-        rule.containsUnresolvedSymbols())
+        rule.containsNameSymbols())
       result |= GenericSignatureErrorFlags::HasInvalidRequirements;
 
     if (rule.isRecursive())
@@ -626,7 +626,7 @@ GenericSignatureErrors RewriteSystem::getErrors() const {
 
         if (property->hasSubstitutions()) {
           for (auto t : property->getSubstitutions()) {
-            if (t.containsUnresolvedSymbols())
+            if (t.containsNameSymbols())
               result |= GenericSignatureErrorFlags::HasInvalidRequirements;
           }
         }
@@ -663,7 +663,7 @@ RewriteSystem::getMinimizedProtocolRules() const {
 
     if (rule.isProtocolTypeAliasRule())
       rules[proto].TypeAliases.push_back(ruleID);
-    else if (!rule.containsUnresolvedSymbols())
+    else if (!rule.containsNameSymbols())
       rules[proto].Requirements.push_back(ruleID);
   }
 
@@ -687,7 +687,7 @@ RewriteSystem::getMinimizedGenericSignatureRules() const {
     if (rule.isPermanent() ||
         rule.isRedundant() ||
         rule.isConflicting() ||
-        rule.containsUnresolvedSymbols()) {
+        rule.containsNameSymbols()) {
       continue;
     }
 
@@ -793,7 +793,7 @@ void RewriteSystem::verifyMinimizedRules(
         rule.isAnyConformanceRule() &&
         !rule.isRHSSimplified() &&
         !rule.isSubstitutionSimplified() &&
-        !rule.containsUnresolvedSymbols() &&
+        !rule.containsNameSymbols() &&
         !redundantConformances.count(ruleID)) {
       llvm::errs() << "Minimal conformance is redundant: " << rule << "\n\n";
       dump(llvm::errs());

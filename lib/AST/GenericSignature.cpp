@@ -327,8 +327,7 @@ GenericSignature::LocalRequirements
 GenericSignatureImpl::getLocalRequirements(Type depType) const {
   assert(depType->isTypeParameter() && "Expected a type parameter here");
 
-  return getRequirementMachine()->getLocalRequirements(
-      depType, getGenericParams());
+  return getRequirementMachine()->getLocalRequirements(depType);
 }
 
 ASTContext &GenericSignatureImpl::getASTContext() const {
@@ -412,13 +411,9 @@ bool GenericSignatureImpl::isRequirementSatisfied(
     auto *genericEnv = getGenericEnvironment();
 
     requirement = requirement.subst(
-        [&](SubstitutableType *type) -> Type {
-          if (auto *paramType = type->getAs<GenericTypeParamType>())
-            return genericEnv->mapTypeIntoContext(paramType);
-
-          return type;
-        },
-        LookUpConformanceInModule());
+        QueryInterfaceTypeSubstitutions{genericEnv},
+        LookUpConformanceInModule(),
+        SubstFlags::PreservePackExpansionLevel);
   }
 
   SmallVector<Requirement, 2> subReqs;
@@ -507,6 +502,11 @@ CanType GenericSignatureImpl::getReducedType(Type type) const {
     return CanType(type);
 
   return getRequirementMachine()->getReducedType(
+      type, { })->getCanonicalType();
+}
+
+CanType GenericSignatureImpl::getReducedTypeParameter(CanType type) const {
+  return getRequirementMachine()->getReducedTypeParameter(
       type, { })->getCanonicalType();
 }
 
@@ -1174,7 +1174,39 @@ void swift::validateGenericSignature(ASTContext &context,
 
     // If the removed requirement is satisfied by the new generic signature,
     // it is redundant. Complain.
-    if (newSig->isRequirementSatisfied(requirements[victimIndex])) {
+    auto satisfied = [&](Requirement victim) {
+      if (!newSig->isValidTypeParameter(victim.getFirstType()))
+        return false;
+
+      switch (victim.getKind()) {
+      case RequirementKind::SameShape:
+        return (newSig->isValidTypeParameter(victim.getSecondType()) &&
+                newSig->haveSameShape(victim.getFirstType(),
+                                      victim.getSecondType()));
+      case RequirementKind::Conformance:
+        return newSig->requiresProtocol(victim.getFirstType(),
+                                        victim.getProtocolDecl());
+      case RequirementKind::Superclass: {
+        auto superclass = newSig->getSuperclassBound(victim.getFirstType());
+        return (superclass && superclass->isEqual(victim.getSecondType()));
+      }
+      case RequirementKind::SameType:
+        if (!victim.getSecondType().findIf([&](Type t) -> bool {
+            return (!t->isTypeParameter() ||
+                    newSig->isValidTypeParameter(t));
+          })) {
+          return false;
+        }
+        return newSig.getReducedType(victim.getFirstType())
+          ->isEqual(newSig.getReducedType(victim.getSecondType()));
+      case RequirementKind::Layout: {
+        auto layout = newSig->getLayoutConstraint(victim.getFirstType());
+        return (layout && layout == victim.getLayoutConstraint());
+      }
+      }
+    };
+
+    if (satisfied(requirements[victimIndex])) {
       SmallString<32> reqString;
       {
         llvm::raw_svector_ostream out(reqString);
@@ -1257,6 +1289,10 @@ void GenericSignatureImpl::getRequirementsWithInverses(
     // Any generic parameter with a superclass bound or concrete type does not
     // have an inverse.
     if (getSuperclassBound(gp) || getConcreteType(gp))
+      continue;
+
+    // Variable generics never have inverses (or the positive thereof).
+    if (gp->isValue())
       continue;
 
     for (auto ip : InvertibleProtocolSet::allKnown()) {

@@ -128,7 +128,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   // FIXME: When we migrate to SwiftParser, use the parsed syntax tree.
   auto &SM = ctx.SourceMgr;
   StringRef sourceFileText =
-      SM.getEntireTextForBuffer(*sourceFile->getBufferID());
+      SM.getEntireTextForBuffer(sourceFile->getBufferID());
   StringRef macroDeclText =
       SM.extractText(Lexer::getCharSourceRangeFromSourceRange(
           SM, macro->getSourceRangeIncludingAttrs()));
@@ -797,8 +797,7 @@ static std::string expandMacroDefinition(
     if (isExpressionReplacement) {
       auto argExpr = args->getArgExprs()[replacement.parameterIndex];
       SmallString<32> argTextBuffer;
-      auto argText =
-          extractInlinableText(ctx.SourceMgr, argExpr, argTextBuffer);
+      auto argText = extractInlinableText(ctx, argExpr, argTextBuffer);
       expandedResult.append(argText);
     } else {
       auto typeArgType = subs.getReplacementTypes()[replacement.parameterIndex];
@@ -1200,7 +1199,7 @@ std::optional<unsigned> swift::expandMacroExpr(MacroExpansionExpr *mee) {
   ASTContext &ctx = dc->getASTContext();
   SourceManager &sourceMgr = ctx.SourceMgr;
 
-  auto macroBufferID = *macroSourceFile->getBufferID();
+  auto macroBufferID = macroSourceFile->getBufferID();
   auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
 
   // Handle builtin macro definitions by producing the expression we
@@ -1303,7 +1302,7 @@ swift::expandFreestandingMacro(MacroExpansionDecl *med) {
     if (auto *decl = item.dyn_cast<Decl *>())
       decl->setDeclContext(dc);
   }
-  return *macroSourceFile->getBufferID();
+  return macroSourceFile->getBufferID();
 }
 
 static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
@@ -1682,8 +1681,7 @@ ArrayRef<unsigned> ExpandPreambleMacroRequest::evaluate(
         if (!macroSourceFile)
           return;
 
-        if (auto bufferID = macroSourceFile->getBufferID())
-          bufferIDs.push_back(*bufferID);
+        bufferIDs.push_back(macroSourceFile->getBufferID());
       });
 
   std::reverse(bufferIDs.begin(), bufferIDs.end());
@@ -2024,8 +2022,10 @@ ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
   } else {
     SourceRange genericArgsRange = macroRef.getGenericArgsRange();
     macroExpansion = MacroExpansionExpr::create(
-      dc, macroRef.getSigilLoc(), macroRef.getMacroName(),
-      macroRef.getMacroNameLoc(), genericArgsRange.Start,
+      dc, macroRef.getSigilLoc(),
+      macroRef.getModuleName(), macroRef.getModuleNameLoc(),
+      macroRef.getMacroName(), macroRef.getMacroNameLoc(),
+      genericArgsRange.Start,
       macroRef.getGenericArgs(), genericArgsRange.End,
       macroRef.getArgs(), roles);
   }

@@ -160,8 +160,8 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         }
       }
 
-      auto *paramType = GenericTypeParamType::get(/*isParameterPack*/ false,
-                                                  opaqueSignatureDepth, i, ctx);
+      auto *paramType = GenericTypeParamType::getType(opaqueSignatureDepth, i,
+                                                      ctx);
       genericParamTypes.push_back(paramType);
     
       TypeRepr *constraint = currentRepr;
@@ -480,9 +480,11 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
   // Check that every generic parameter type from the signature is
   // among referencedGenericParams.
   for (auto *genParam : genericSig.getGenericParams()) {
-    auto *paramDecl = genParam->getDecl();
-    if (paramDecl->getDepth() != fnGenericParamsDepth)
+    if (genParam->getDepth() != fnGenericParamsDepth)
       continue;
+
+    auto *paramDecl = genericParams->getParams()[genParam->getIndex()];
+
     if (!referencedGenericParams.count(genParam->getCanonicalType())) {
       // Lazily search for generic params that are indirectly used in the
       // function signature. Do it only if there is a generic parameter
@@ -496,7 +498,7 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
           continue;
       }
       // Produce an error that this generic parameter cannot be bound.
-      if (paramDecl->isImplicit()) {
+      if (paramDecl->isOpaqueType()) {
         paramDecl->getASTContext().Diags
           .diagnose(paramDecl->getOpaqueTypeRepr()->getLoc(),
                     diag::unreferenced_generic_parameter,
@@ -920,6 +922,13 @@ void TypeChecker::diagnoseRequirementFailure(
   Diag<Type, Type, StringRef> diagnosticNote;
 
   const auto reqKind = req.getKind();
+
+  Type secondTy, substSecondTy;
+  if (reqKind != RequirementKind::Layout) {
+    secondTy = req.getSecondType();
+    substSecondTy = substReq.getSecondType();
+  }
+
   switch (reqKind) {
   case RequirementKind::SameShape:
     diagnostic = diag::types_not_same_shape;
@@ -952,12 +961,6 @@ void TypeChecker::diagnoseRequirementFailure(
     diagnostic = diag::types_not_equal;
     diagnosticNote = diag::types_not_equal_requirement;
     break;
-  }
-
-  Type secondTy, substSecondTy;
-  if (req.getKind() != RequirementKind::Layout) {
-    secondTy = req.getSecondType();
-    substSecondTy = substReq.getSecondType();
   }
 
   ASTContext &ctx = module->getASTContext();

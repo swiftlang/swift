@@ -66,5 +66,5 @@ func testCF(_ fridge: CCRefrigerator) {
   CCRefrigeratorOpenMaybeDoSomething(fridge) // okay
   CCRefrigeratorOpenMaybeDoSomething(nil) // okay
 
-  CCRefrigeratorOpenMaybeDoSomething(5) // expected-error{{cannot convert value of type 'Int' to expected argument type 'CCRefrigerator?'}}
+  CCRefrigeratorOpenMaybeDoSomething(5) // expected-error{{cannot convert value of type 'Int' to expected argument type 'CCRefrigerator'}}
 }

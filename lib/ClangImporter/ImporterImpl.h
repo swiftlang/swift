@@ -1062,7 +1062,7 @@ public:
 
   /// Retrieve the placeholder source file for use in parsing Swift attributes
   /// in the given module.
-  SourceFile &getClangSwiftAttrSourceFile(ModuleDecl &module);
+  SourceFile &getClangSwiftAttrSourceFile(ModuleDecl &module, unsigned bufferID);
 
   /// Utility function to import Clang attributes from a source Swift decl to
   /// synthesized Swift decl.
@@ -2029,9 +2029,13 @@ inline std::string getPrivateOperatorName(const std::string &OperatorToken) {
 
 bool hasUnsafeAPIAttr(const clang::Decl *decl);
 
+bool hasNonEscapableAttr(const clang::RecordDecl *decl);
+
+bool hasEscapableAttr(const clang::RecordDecl *decl);
+
 bool isViewType(const clang::CXXRecordDecl *decl);
 
-}
-}
+} // end namespace importer
+} // end namespace swift
 
 #endif

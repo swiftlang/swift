@@ -397,13 +397,13 @@ We can now describe the main loop of the Knuth-Bendix completion procedure, whic
 \end{enumerate}
 \end{algorithm}
 
-\paragraph{Termination.} \index{limitation!completion termination check}The termination check is controlled by a handful of command-line flags:
+\paragraph{Termination.} \index{limitation!completion termination check}The termination check is controlled by a handful of \index{frontend flag}frontend flags:
 \begin{itemize}
-\item \IndexFlag{requirement-machine-max-rule-count} \texttt{-requirement-machine-max-rule-count} controls the maximum number of local rules. Imported rules do not count toward this total, so this is hard to hit with realistic code. The default is a maximum of 4000 local rules.
+\item \IndexFlag{requirement-machine-max-rule-count} \texttt{-requirement-machine-max-rule-count=<value>} sets the maximum number of local rules to \texttt{value}. Imported rules do not count toward this total, so this is hard to hit with realistic code. The default is a maximum of 4000 local rules.
 
-\item \IndexFlag{requirement-machine-max-rule-length} \texttt{-requirement-machine-max-rule-count} controls the maximum length of a rule's left-hand side. To compute the actual quantity, we add the length of the longest \emph{user-written} rule; so the restriction in on the relative ``growth'' and not on the length of a type parameter written by the user. The default value is 12.
+\item \IndexFlag{requirement-machine-max-rule-length} \texttt{-requirement-machine-max-rule-length=<value>} sets the maximum length of the terms in a rule to \texttt{value}. To compute the actual quantity, we add the length of the longest \emph{user-written} rule; so the restriction in on the relative ``growth'' and not on the length of a type parameter written by the user. The default value is 12.
 
-\item \IndexFlag{requirement-machine-max-concrete-nesting} \texttt{-requirement-machine-max-concrete-nesting} controls the maximum nesting of concrete types, to prevent \index{substitution simplification}substitution simplification from constructing an infinite type like \texttt{G<G<G<...>>>}. As with the limit on rule length, we add the maximum nesting depth of user-written rules to get the actual limit. The default value is 30.
+\item \IndexFlag{requirement-machine-max-concrete-nesting} \texttt{-requirement-machine-max-concrete-nesting=<value>} sets the upper bound on nested concrete types to \texttt{value}, to prevent \index{substitution simplification}substitution simplification from constructing an infinite type like \texttt{G<G<G<...>>>}. As with the limit on rule length, we add the maximum nesting depth of user-written rules to get the actual limit. The default value is 30.
 \end{itemize}
 
 While the first of the three is sufficient to detect non-termination, it takes a second or two for completion to record that many rules. The other two limits improve user experience in this case by rejecting clearly invalid programs sooner. The rule length limit being relative instead of just a total ban on terms of length 12 allows various pathological cases to succeed which would otherwise be needlessly rejected.
@@ -539,7 +539,7 @@ What we call reduced rewrite systems are sometimes ``normalized'', ``canonical''
 
 \section{Associated Types}\label{critical pairs}
 
-A conformance rule $t\cdot\pP\Rightarrow t$ always overlaps with an associated type introduction rule $\pP\cdot\nA\Rightarrow\aPA$, and resolving this critical pair defines a rule $t\cdot\nA\Rightarrow t\cdot\aPA$ (unless the right-hand side reduces further). These rewrite rules reduce those terms representing \index{unbound type parameter}unbound type parameters to \index{bound type parameter}bound type parameters. Thus, we will see how the bound and unbound type parameters from \SecRef{type params} manifest in our rewriting system.
+A conformance rule $t\cdot\pP\Rightarrow t$ always overlaps with an associated type rule $\pP\cdot\nA\Rightarrow\aPA$, and resolving this critical pair defines a rule $t\cdot\nA\Rightarrow t\cdot\aPA$ (unless the right-hand side reduces further). These rewrite rules reduce those terms representing \index{unbound type parameter}unbound type parameters to \index{bound type parameter}bound type parameters. Thus, we will see how the bound and unbound type parameters from \SecRef{type params} manifest in our rewriting system.
 
 \begin{example}\label{assoc type completion example}
 We're going to look at this pair of protocol declarations, and the \index{protocol generic signature}protocol generic signature $\GP$:
@@ -568,7 +568,7 @@ Protocol \tP\ has an \index{associated conformance requirement}associated confor
 \end{flalign*}
 We can categorize these rewrite rules as follows:
 \begin{itemize}
-\item Associated type introduction rules: (1) and (2).
+\item Associated type rules: (1) and (2).
 \item Conformance requirements: (3) and (5).
 \item Rules added by completion are indicated with an asterisk: (*4) and (*6).
 \end{itemize}
@@ -698,7 +698,7 @@ An equivalence relation on paths is called a \emph{homotopy relation}.
 \end{example}
 
 \begin{example}\label{overlap of first kind example}
-Let's build on our previous example and look at how unbound type parameters reduce when they appear in requirements. We add a new protocol \texttt{R}, and declare a \index{constrained extension}constrained \index{protocol extension}protocol extension of \tP\ where \texttt{Self.A.B} conforms to \texttt{R}:
+Let's build on our previous example and look at how unbound type parameters reduce when they appear in requirements. We add a new protocol \tR, and declare a \index{constrained extension}constrained \index{protocol extension}protocol extension of \tP\ where \texttt{Self.A.B} conforms to \tR:
 \begin{Verbatim}
 protocol R {}
 
@@ -764,7 +764,7 @@ The rewrite system after step (1) is equivalent to that after step (4). That is,
 \end{example}
 
 \begin{example}
-Now we're going to change \tQ\ to add an associated requirement stating that \nB\ conform to \texttt{R}. The conformance requirement $\ConfReq{\rT.A.B}{R}$ in \texttt{where} clause of our protocol extension becomes redundant as a result, because every \nB\ (of a type conforming to \tQ) now conforms to \texttt{R}:
+Now we're going to change \tQ\ to add an associated requirement stating that \nB\ conform to \tR. The conformance requirement $\ConfReq{\rT.A.B}{R}$ in \texttt{where} clause of our protocol extension becomes redundant as a result, because every \nB\ (of a type conforming to \tQ) now conforms to \tR:
 \begin{Verbatim}
 protocol R {}
 
@@ -916,8 +916,8 @@ We're going to examine the rewrite system for the generic signature $G_\texttt{B
 \end{flalign*}
 We're going to focus on a handful of interesting rules:
 \begin{itemize}
-\item While \texttt{Bot} does not declare any associated types, it inherits \nA\ from \texttt{Mid}; rule (3) is the \index{inherited associated type rule}inherited associated type introduction rule for \nA.
-\item Rules (*5) and (*11) are added by completion as are a consequence of the inherited associated type introduction rule.
+\item While \texttt{Bot} does not declare any associated types, it inherits \nA\ from \texttt{Mid}; rule (3) is the \index{inherited associated type rule}inherited associated type rule for \nA.
+\item Rules (*5) and (*11) are added by completion as are a consequence of the inherited associated type rule.
 \item Rules (*6), (*8) and (*9) are also from completion. They express the ``transitive'' conformance requirements $\ConfReq{Self}{Top}_\texttt{Bottom}$, $\ConfReq{\rT}{Top}$ and $\ConfReq{\rT}{Mid}$.
 \end{itemize}
 
@@ -1019,7 +1019,7 @@ protocol Bot: Mid {
   associatedtype A
 }
 \end{Verbatim}
-The rewrite system is identical; we now call rule (3) an associated type introduction rule instead of an \emph{inherited} associated type introduction rule, but the rule remains the same. Our equivalence class has three type parameters and three terms, because now every associated type symbol corresponds to a declaration:
+The rewrite system is identical; we now call rule (3) an associated type rule instead of an \emph{inherited} associated type rule, but the rule remains the same. Our equivalence class has three type parameters and three terms, because now every associated type symbol corresponds to a declaration:
 \begin{center}
 \begin{tabular}{ll}
 \textbf{Type}&\textbf{Term}\\
@@ -1123,7 +1123,7 @@ struct Y: S {
 \end{minipage}
 
 
-Now, let's look at our fundamental source of truth, the rewrite system. We start with an \index{identity conformance rule}identity conformance rule, three associated type introduction rules, and finally, three rules corresponding to user-written requirements:
+Now, let's look at our fundamental source of truth, the rewrite system. We start with an \index{identity conformance rule}identity conformance rule, three associated type rules, and finally, three rules corresponding to user-written requirements:
 \begin{flalign*}
 \toprule
 &\ProtoInherit{S}{S}\tag{1}&\\
@@ -1148,7 +1148,7 @@ The critical pair is always \index{trivial critical pair}trivial:
 \arrow[u, Rightarrow, "\protosym{S}\cdot(\ProtoInheritInv{S}{S})"', bend right]
 \end{tikzcd}
 \end{center}
-Identity conformance rules also overlap with associated type introduction rules. For example, rule (1) overlaps with (2) on the term $\protosym{S}\cdot\protosym{S}\cdot\nA$:
+Identity conformance rules also overlap with associated type rules. For example, rule~(1) overlaps with (2) on the term $\protosym{S}\cdot\protosym{S}\cdot\nA$:
 \begin{align*}
 \protosym{S}\cdot{}&\protosym{S}\\
 &\protosym{S}\cdot\nA
@@ -1173,7 +1173,7 @@ In the same way we get such a rule for every associated type:
 &\protosym{S}\cdot\assocsym{S}{C}\Rightarrow\assocsym{S}{C}\tag{*10}&\\
 \bottomrule
 \end{flalign*}
-While we could have also written down similar rules in previous examples, they would not have illustrated anything of consequence. They will shortly; but first, we have a few overlaps between conformance rules and associated type introduction rules. As in previous examples, we get the usual rules (*11), (*12), and (*13) for reducing unbound type parameters; we also left-simplify (5), (6) and (7), replacing them with rules (*14), (*15), and (*16):
+While we could have also written down similar rules in previous examples, they would not have illustrated anything of consequence. They will shortly; but first, we have a few overlaps between conformance rules and associated type rules. As in previous examples, we get the usual rules (*11), (*12), and (*13) for reducing unbound type parameters; we also left-simplify (5), (6) and (7), replacing them with rules (*14), (*15), and (*16):
 \begin{flalign*}
 \toprule
 &\assocsym{S}{C}\cdot\nA\Rightarrow\assocsym{S}{C}\cdot\assocsym{S}{A}\tag{*11}&\\
@@ -1276,9 +1276,9 @@ Some finer points:
 \item Some definitions of (4) drop the condition that the removed symbol $a$ not appear in any other rewrite rule $(u,v)\in R$. Our restriction does not cost us any generality, because if $a$ occurs in any other rewrite rule, we can always first perform a series of Tietze transformations to eliminate such occurrences: for each such $(u,v)$, we replace occurrences of $a$ with $t$ in $u$ and $v$, add the new rewrite rule, and finally remove the old rule $(u,v)$. However, we must still require that $a$ not occur in $t$; otherwise, replacing $a$~with~$t$ does not eliminate all occurrences of~$a$.
 \end{itemize}
 
-\paragraph{Associated type symbols.} Tietze transformations give us a new way to understand associated type symbols. The ultimate equivalence between rewrite systems built from user-written requirements and \index{requirement minimization}minimal requirements, shown in \SecRef{critical pairs}, means we could have defined Algorithms \ref{build term generic}~and~\ref{build term protocol} to only ever build terms from \index{protocol symbol}protocol and \index{name symbol}name symbols. After completion, we end up with the same rewrite system, it just takes a little bit more work to get there. In this setup, among the initial rewrite rules, the only occurrences of \index{associated type symbol}associated type symbols are on the right-hand sides of \index{associated type introduction rule}associated type introduction rules:
+\paragraph{Associated type symbols.} Tietze transformations give us a new way to understand associated type symbols. The ultimate equivalence between rewrite systems built from user-written requirements and \index{requirement minimization}minimal requirements, shown in \SecRef{critical pairs}, means we could have defined Algorithms \ref{build term generic}~and~\ref{build term protocol} to only ever build terms from \index{protocol symbol}protocol and \index{name symbol}name symbols. After completion, we end up with the same rewrite system, it just takes a little bit more work to get there. In this setup, among the initial rewrite rules, the only occurrences of \index{associated type symbol}associated type symbols are on the right-hand sides of \index{associated type rule}associated type rules:
 \[\pP\cdot\nA\Rightarrow\aPA\]
-Thus, we can understand the associated type introduction rules as having been added by a sequence of Tietze transformations of the third kind, applied to some monoid presentation. This ``primordial'' monoid presentation involves only protocol and name symbols, and it encodes the same monoid that ours does, up to isomorphism. So why do we bother with associated type symbols at all? In the next section, we will see the answer has to do with the interaction between recursive conformance requirements and completion.
+Thus, we can understand the associated type rules as having been added by a sequence of Tietze transformations of the third kind, applied to some monoid presentation. This ``primordial'' monoid presentation involves only protocol and name symbols, and it encodes the same monoid that ours does, up to isomorphism. So why do we bother with associated type symbols at all? In the next section, we will see the answer has to do with the interaction between recursive conformance requirements and completion.
 
 \paragraph{Further discussion.}
 The elementary Tietze transformations are ``higher dimensional'' rewrite steps, in that they define an edge relation on a graph whose vertices are \emph{monoid presentations}. A path in this graph witnesses the fact that the source and destination define an isomorphic pair of monoids. The problem of deciding if two presentations are joined by a path is the \index{monoid isomorphism problem}\emph{monoid isomorphism problem}. Like the \index{word problem}word problem, this is of course \index{undecidable problem}undecidable in general.
@@ -1287,9 +1287,9 @@ Tietze transformations are fundamental to the study of \emph{combinatorial group
 
 \section{Recursive Conformances}\label{recursive conformances redux}
 
-From previous examples, it may look like completion essentially enumerates \emph{all} derived requirements, but this cannot be true in general. We know from \SecRef{recursive conformances} that \index{recursive conformance requirement}recursive conformance requirements give us generic signatures with an infinite set of \index{derived requirement}derived requirements. If the compiler is to allow such generic signatures, this infinite set of derived requirements must be encoded by a finite number of rewrite rules.
+From previous examples, it may look like completion essentially enumerates \emph{all} derived requirements, but this cannot be true in general. We know from \SecRef{recursive conformances} that \index{recursive conformance requirement}recursive conformance requirements allow us to define generic signatures with an infinite set of \index{derived requirement}derived requirements. If the compiler is to allow such generic signatures, this infinite set of derived requirements must be encoded by a finite number of rewrite rules.
 
-We will see that with recursive conformance requirements, successful termination of the Knuth-Bendix algorithm depends both on the existence of associated type symbols (and introduction rules), and our choice of reduction order. This furnishes the concrete example for a scenario mentioned in \SecRef{word problem}.
+We will see that with recursive conformance requirements, successful termination of the Knuth-Bendix algorithm depends both on the existence of associated type symbols (and rules), and our choice of reduction order. This furnishes the concrete example for a scenario mentioned in \SecRef{word problem}.
 
 \begin{example}
 Our first example is the protocol \texttt{N} that we encountered several times already, most recently in \SecRef{monoidsasprotocols}:
@@ -1426,7 +1426,7 @@ Thus, our eight rules encode two infinite families of derived requirements.
 
 \smallskip
 
-Now, we will show that the associated type introduction rule $\AssocIntro{N}{A}$ was essential. Let's start over with our the initial rules, but delete the symbol $\aNA$ and rule~(2) before attempting completion. Only two rules remain:
+Now, we will show that the associated type rule $\AssocIntro{N}{A}$ was essential. Let's start over with our the initial rules, but delete the symbol $\aNA$ and rule~(2) before attempting completion. Only two rules remain:
 \begin{flalign*}
 \toprule
 &\ProtoInherit{N}{N}&\tag{1}\\
@@ -1498,7 +1498,7 @@ Let's say we inherit from \texttt{N}, and impose our own recursive conformance r
 \begin{Verbatim}
 protocol Q: N where A: Q {}
 \end{Verbatim}
-Even though protocol \tQ\ does not declare an associated type named \nA, we define an associated type symbol $\assocsym{Q}{A}$ and corresponding introduction rule $\AssocIntro{Q}{A}$. We will see that convergence is contingent on this rule.
+Even though protocol \tQ\ does not declare an associated type named \nA, we define an associated type symbol $\assocsym{Q}{A}$ and corresponding rule $\AssocIntro{Q}{A}$. We will see that convergence is contingent on this rule.
 
 The generic signature $G_\tQ$ has all the derived requirements of $G_\texttt{N}$, and adds two more infinite families of conformances to \tQ:
 
@@ -1552,7 +1552,7 @@ The generic signature $G_\tQ$ has all the derived requirements of $G_\texttt{N}$
 \end{flalign*}
 \end{listing}
 
-Here's a question. What if we only had associated type symbols that directly correspond to associated type declarations? That is, what if we got rid of the symbol $\assocsym{Q}{A}$, together with rule (7), the inherited associated type introduction rule $\AssocIntro{Q}{A}$? The resulting monoid would again be equivalent, because this is a \index{Tietze transformation}Tietze transformation. However, we will see that completion fails.
+Here's a question. What if we only had associated type symbols that directly correspond to associated type declarations? That is, what if we got rid of the symbol $\assocsym{Q}{A}$, together with rule (7), the inherited associated type rule $\AssocIntro{Q}{A}$? The resulting monoid would again be equivalent, because this is a \index{Tietze transformation}Tietze transformation. However, we will see that completion fails.
 
 \pagebreak
 
@@ -1714,7 +1714,7 @@ The second defines $\rT\cdot{\assocsym{P1}{A}}^n\cdot\assocsym{P2}{A}\Rightarrow
 {}
 \]
 
-With protocol \texttt{N}, associated type introduction rules allowed us to use a finite set of rewrite rules to describe an infinite set of derived requirements. In the next example of protocol \tQ\ inheriting from \texttt{N}, inherited associated type rules saved the day. This time though, we don't have any tricks left.
+In protocol \texttt{N}, associated type rules allowed us an infinite set of derived requirements with a finite set of rewrite rules. In the next example of protocol \tQ\ inheriting from \texttt{N}, inherited associated type rules saved the day. This time though, we don't have any tricks left.
 
 \smallskip
 
@@ -1731,7 +1731,7 @@ M_2^\prime := \Pres{a,b,c,p,q,t}{\hbox{}&pp\sim p,\,pa\sim b,\,bp\sim b,\,ba\sim
 &qq\sim q,\,qa\sim c,\,cq\sim c,\,ca\sim cc,\\
 &ta\sim tb,\, tb^iq\sim tb^i,\,tb^ic\sim tb^{i+1}}
 \end{align*}
-In fact, the associated type introduction rules don't simplify our understanding of this monoid at all. We can also write down an infinite convergent presentation for the completion of $M_1$:
+In fact, the associated type rules don't simplify our understanding of this monoid at all. We can also write down an infinite convergent presentation for the completion of $M_1$:
 \[M_1^\prime := \Pres{a,p,q,t}{pa^ip\sim pa^i,\, qa^iq\sim qa^i,\, ta^ip\sim ta^i,\, ta^iq\sim ta^i}\]
 This infinite presentation is simple enough that one can implement a one-off algorithm for solving the word problem in $M_1^\prime$. We can simplify the original monoid presentation further by removing $pp\sim p$ and $qq\sim q$; the result is \emph{not} Tietze-equivalent, but it runs into the same problems with completion.
 

@@ -29,9 +29,6 @@ def AutolinkExtractOption : OptionFlag;
 // The option should be accepted by swift -modulewrap
 def ModuleWrapOption : OptionFlag;
 
-// The option should be accepted by swift-indent
-def SwiftIndentOption : OptionFlag;
-
 // The option should not be accepted by the driver.
 def NoDriverOption : OptionFlag;
 
@@ -218,7 +215,6 @@ def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
 
 def help : Flag<["-", "--"], "help">,
   Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
-         SwiftIndentOption,
          SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"Display available options">;
 def h : Flag<["-"], "h">, Alias<help>;
@@ -268,8 +264,8 @@ def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
 
 def o : JoinedOrSeparate<["-"], "o">,
   Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
-         NoInteractiveOption, SwiftIndentOption, ArgumentIsPath,
-         SwiftAPIDigesterOption, CacheInvariant]>,
+         NoInteractiveOption, ArgumentIsPath, SwiftAPIDigesterOption,
+         CacheInvariant]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
 def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
@@ -285,6 +281,13 @@ def swift_version : Separate<["-"], "swift-version">,
          SwiftAPIDigesterOption]>,
   HelpText<"Interpret input according to a specific Swift language version number">,
   MetaVarName<"<vers>">;
+
+def language_mode : Separate<["-"], "language-mode">,
+  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSymbolGraphExtractOption,
+         SwiftAPIDigesterOption]>,
+  HelpText<"Interpret input according to a specific Swift language mode">,
+  MetaVarName<"<mode>">,
+  Alias<swift_version>;
 
 def package_description_version: Separate<["-"], "package-description-version">,
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
@@ -462,6 +465,9 @@ def no_color_diagnostics : Flag<["-"], "no-color-diagnostics">,
 def debug_diagnostic_names : Flag<["-"], "debug-diagnostic-names">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>,
   HelpText<"Include diagnostic names when printing">;
+def print_diagnostic_groups : Flag<["-"], "print-diagnostic-groups">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>,
+  HelpText<"Include diagnostic groups in printed diagnostic output, if available">;
 def print_educational_notes : Flag<["-"], "print-educational-notes">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Include educational notes in printed diagnostic output, if available">;
@@ -579,6 +585,9 @@ def package_name : Separate<["-"], "package-name">,
 def export_as : Separate<["-"], "export-as">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Module name to use when referenced in clients module interfaces">;
+def public_module_name : Separate<["-"], "public-module-name">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+  HelpText<"Public facing module name to use in diagnostics and documentation">;
 
 def emit_module : Flag<["-"], "emit-module">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
@@ -728,7 +737,11 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
 def disable_print_package_name_for_non_package_interface :
   Flag<["-"], "disable-print-package-name-for-non-package-interface">,
   Flags<[FrontendOption, NoDriverOption, HelpHidden]>,
-  HelpText<"Disable adding package name to public or private interface">;
+  HelpText<"No op; package name is only printed in package interface by default">;
+def print_package_name_in_non_package_interface :
+  Flag<["-"], "print-package-name-in-non-package-interface">,
+  Flags<[FrontendOption, NoDriverOption, HelpHidden]>,
+  HelpText<"Print package name in public or private interface">;
 
 def lto : Joined<["-"], "lto=">,
   Flags<[FrontendOption, NoInteractiveOption]>,
@@ -779,11 +792,6 @@ def experimental_c_foreign_reference_types :
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
   HelpText<"Enable experimental C foreign references types (with reference counting).">;
 
-def experimental_cxx_stdlib :
-  Separate<["-"], "experimental-cxx-stdlib">,
-  Flags<[HelpHidden]>,
-  HelpText<"C++ standard library to use; forwarded to Clang's -stdlib flag">;
-
 def experimental_hermetic_seal_at_link:
   Flag<["-"], "experimental-hermetic-seal-at-link">,
   Flags<[FrontendOption, HelpHidden]>,
@@ -799,14 +807,30 @@ def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,
   HelpText<"Suppress all warnings">;
 
+def warning_treating_Group : OptionGroup<"<options to control warning treating>">;
+
 def warnings_as_errors : Flag<["-"], "warnings-as-errors">,
+  Group<warning_treating_Group>,
   Flags<[FrontendOption]>,
   HelpText<"Treat warnings as errors">;
 
+def Werror : Separate<["-"], "Werror">,
+  Group<warning_treating_Group>,
+  Flags<[FrontendOption, HelpHidden]>,
+  MetaVarName<"<diagnostic_group>">,
+  HelpText<"Treat this warning group as error">;
+
 def no_warnings_as_errors : Flag<["-"], "no-warnings-as-errors">,
+  Group<warning_treating_Group>,
   Flags<[FrontendOption]>,
-  HelpText<"Don't treat warnings as errors">;
-  
+  HelpText<"Treat warnings as warnings">;
+
+def Wwarning : Separate<["-"], "Wwarning">,
+  Group<warning_treating_Group>,
+  Flags<[FrontendOption, HelpHidden]>,
+  MetaVarName<"<diagnostic_group>">,
+  HelpText<"Treat this warning group as warning">;
+
 def suppress_remarks : Flag<["-"], "suppress-remarks">,
   Flags<[FrontendOption]>,
   HelpText<"Suppress all remarks">;
@@ -1118,28 +1142,28 @@ def AssertConfig : Separate<["-"], "assert-config">,
 def code_formatting_Group : OptionGroup<"<code formatting options>">;
 
 def use_tabs : Flag<["-"], "use-tabs">, Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption, SwiftIndentOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption]>,
   HelpText<"Use tabs for indentation.">;
 
 def indent_switch_case : Flag<["-"], "indent-switch-case">,
   Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption, SwiftIndentOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption]>,
   HelpText<"Indent cases in switch statements.">;
 
 def in_place : Flag<["-"], "in-place">, Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption, SwiftIndentOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption]>,
   HelpText<"Overwrite input file with formatted file.">;
 
 def tab_width : Separate<["-"], "tab-width">, Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption, SwiftIndentOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption]>,
   HelpText<"Width of tab character.">, MetaVarName<"<n>">;
 
 def indent_width : Separate<["-"], "indent-width">, Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption, SwiftIndentOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption]>,
   HelpText<"Number of characters to indent.">, MetaVarName<"<n>">;
 
 def line_range : Separate<["-"], "line-range">, Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption, SwiftIndentOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption]>,
   HelpText<"<start line>:<end line>. Formats a range of lines (1-based). "
            "Can only be used with one input file.">, MetaVarName<"<n:n>">;
 

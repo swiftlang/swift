@@ -19,6 +19,7 @@
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckInvertible.h"
 #include "TypeChecker.h"
+#include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -57,32 +58,6 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
                                                E->getSemanticsProvidingExpr()))
       return IIOE->getSubExpr();
   return nullptr;
-}
-
-ASTWalker::PreWalkAction BaseDiagnosticWalker::walkToDeclPre(Decl *D) {
-  return Action::VisitNodeIf(isa<ClosureExpr>(D->getDeclContext()) &&
-                             shouldWalkIntoDeclInClosureContext(D));
-}
-
-bool BaseDiagnosticWalker::shouldWalkIntoDeclInClosureContext(Decl *D) {
-  auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext());
-  assert(closure);
-
-  if (closure->isSeparatelyTypeChecked())
-    return false;
-
-  // Let's not walk into declarations contained in a multi-statement
-  // closure because they'd be handled via `typeCheckDecl` that runs
-  // syntactic diagnostics.
-  if (!closure->hasSingleExpressionBody()) {
-    // Since pattern bindings get their types through solution application,
-    // `typeCheckDecl` doesn't touch initializers (because they are already
-    // fully type-checked), so pattern bindings have to be allowed to be
-    // walked to diagnose syntactic issues.
-    return isa<PatternBindingDecl>(D);
-  }
-
-  return true;
 }
 
 /// Diagnose syntactic restrictions of expressions.
@@ -127,15 +102,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       return MacroWalking::Expansion;
     }
 
-    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
-      return Action::SkipNode(P);
-    }
-
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
       return Action::Continue();
     }
-
-    bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // See through implicit conversions of the expression.  We want to be able
@@ -166,7 +135,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         if (isa<TypeDecl>(MRE->getMember().getDecl()))
           checkUseOfMetaTypeName(Base);
       }
-      if (isa<TypeExpr>(Base))
+
+      // Don't diagnose a missing '.self' for type value expressions.
+      if (isa<TypeExpr>(Base) && !isa<TypeValueExpr>(E))
         checkUseOfMetaTypeName(Base);
 
       if (auto *KPE = dyn_cast<KeyPathExpr>(E))
@@ -1609,12 +1580,6 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
              cast<VarDecl>(DRE->getDecl())->isSelfParameter();
     }
 
-    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-      return false;
-    }
-
-    bool shouldWalkCaptureInitializerExpressions() override { return true; }
-
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
     }
@@ -2260,8 +2225,6 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       return parentContext->getInnermostClosureForSelfCapture();
     }
 
-    bool shouldWalkCaptureInitializerExpressions() override { return true; }
-
     bool shouldRecordClosure(const AbstractClosureExpr *E) {
       // Record all closures in Swift 6 mode.
       if (Ctx.isSwiftVersionAtLeast(6))
@@ -2561,7 +2524,14 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
   AbstractClosureExpr *ACE = nullptr;
   if (DC->isLocalContext()) {
     while (DC->getParent()->isLocalContext() && !ACE) {
-      // FIXME: This is happening too early, because closure->getType() isn't set.
+      // FIXME: The closure's type may not be set here yet since we have a
+      // couple of calls to typeCheckExpression remaining in CSApply that can
+      // result in running this logic before the solution has been applied to
+      // the parent expression. Additionally, lazy locals can have their
+      // initializers type-checked from CSGen due to the fact that that name
+      // lookup can kick LazyStoragePropertyRequest, which currently eagerly
+      // computes the interface type. The interface type computation there ought
+      // to be made lazy.
       if (auto *closure = dyn_cast<AbstractClosureExpr>(DC))
         if (closure->getType())
           if (DiagnoseWalker::isClosureRequiringSelfQualification(closure))
@@ -2576,14 +2546,13 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 bool TypeChecker::getDefaultGenericArgumentsString(
     SmallVectorImpl<char> &buf,
     const swift::GenericTypeDecl *typeDecl,
-    llvm::function_ref<Type(const GenericTypeParamDecl *)> getPreferredType) {
+    llvm::function_ref<Type(const GenericTypeParamType *)> getPreferredType) {
   llvm::raw_svector_ostream genericParamText{buf};
   genericParamText << "<";
 
   auto printGenericParamSummary =
       [&](GenericTypeParamType *genericParamTy) {
-    const GenericTypeParamDecl *genericParam = genericParamTy->getDecl();
-    if (Type result = getPreferredType(genericParam)) {
+    if (Type result = getPreferredType(genericParamTy)) {
       result.print(genericParamText);
       return;
     }
@@ -2606,7 +2575,7 @@ bool TypeChecker::getDefaultGenericArgumentsString(
       return;
     }
 
-    genericParamText << "<#" << genericParam->getName() << ": ";
+    genericParamText << "<#" << genericParamTy->getName() << ": ";
     genericParamText << upperBound << "#>";
   };
 
@@ -3160,6 +3129,9 @@ class VarDeclUsageChecker : public ASTWalker {
   DeclContext *DC;
 
   DiagnosticEngine &Diags;
+
+  SourceRange FullRange;
+
   // Keep track of some information about a variable.
   enum {
     RK_Defined     = 1,      ///< Whether it was ever defined in this scope.
@@ -3195,8 +3167,9 @@ class VarDeclUsageChecker : public ASTWalker {
   void operator=(const VarDeclUsageChecker &) = delete;
 
 public:
-  VarDeclUsageChecker(DeclContext *DC,
-                      DiagnosticEngine &Diags) : DC(DC), Diags(Diags) {}
+  VarDeclUsageChecker(DeclContext *DC, DiagnosticEngine &Diags,
+                      SourceRange range)
+      : DC(DC), Diags(Diags), FullRange(range) {}
 
   // After we have scanned the entire region, diagnose variables that could be
   // declared with a narrower usage kind.
@@ -3266,11 +3239,6 @@ public:
     if (isa<TypeDecl>(D))
       return Action::SkipNode();
 
-    // The body of #if clauses are not walked into, we need custom processing
-    // for them.
-    if (auto *ICD = dyn_cast<IfConfigDecl>(D))
-      handleIfConfig(ICD);
-      
     // If this is a VarDecl, then add it to our list of things to track.
     if (auto *vd = dyn_cast<VarDecl>(D)) {
       if (shouldTrackVarDecl(vd)) {
@@ -3353,9 +3321,6 @@ public:
 
   /// The heavy lifting happens when visiting expressions.
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override;
-
-  /// handle #if directives.
-  void handleIfConfig(IfConfigDecl *ICD);
 
   /// Custom handling for statements.
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
@@ -3864,6 +3829,16 @@ SourceLoc swift::getFixItLocForVarToLet(VarDecl *var) {
   return SourceLoc();
 }
 
+extern "C" bool swift_ASTGen_inactiveCodeContainsReference(
+    BridgedASTContext ctx,
+    BridgedStringRef sourceFileBuffer,
+    BridgedStringRef searchRange,
+    BridgedStringRef name,
+    void **cache
+);
+
+extern "C" void swift_ASTGen_freeInactiveCodeContainsReferenceCache(void *cache);
+
 // After we have scanned the entire region, diagnose variables that could be
 // declared with a narrower usage kind.
 VarDeclUsageChecker::~VarDeclUsageChecker() {
@@ -3872,6 +3847,35 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
   // lets let the bigger issues get resolved first.
   if (sawError)
     return;
+
+  /// Check whether the given variable might have been referenced from an
+  /// inactive region of the source code.
+  void *usedInInactiveCache = nullptr;
+  auto isUsedInInactive = [&](VarDecl *var) -> bool {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+    // Extract the full buffer containing the source range.
+    ASTContext &ctx = DC->getASTContext();
+    SourceManager &sourceMgr = ctx.SourceMgr;
+    auto bufferID = sourceMgr.findBufferContainingLoc(FullRange.Start);
+    StringRef sourceFileText = sourceMgr.getEntireTextForBuffer(bufferID);
+
+    // Extract the search text from that buffer.
+    auto searchTextCharRange = Lexer::getCharSourceRangeFromSourceRange(
+        sourceMgr, FullRange);
+    StringRef searchText = sourceMgr.extractText(searchTextCharRange, bufferID);
+
+    return swift_ASTGen_inactiveCodeContainsReference(
+        ctx, sourceFileText, searchText, var->getName().str(),
+        &usedInInactiveCache);
+#else
+    return false;
+#endif
+  };
+  SWIFT_DEFER {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+    swift_ASTGen_freeInactiveCodeContainsReferenceCache(usedInInactiveCache);
+#endif
+  };
 
   for (auto p : VarDecls) {
     VarDecl *var;
@@ -3907,7 +3911,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         auto VD = dyn_cast<VarDecl>(FD->getStorage());
         if ((access & RK_Read) == 0) {
           auto found = AssociatedGetterRefExpr.find(VD);
-          if (found != AssociatedGetterRefExpr.end()) {
+          if (found != AssociatedGetterRefExpr.end() && !isUsedInInactive(VD)) {
             auto *DRE = found->second;
             Diags.diagnose(DRE->getLoc(), diag::unused_setter_parameter,
                            var->getName());
@@ -3941,6 +3945,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       // produce a fixit hint with a parent map, but this is a lot of effort for
       // a narrow case.
       if (access & RK_CaptureList) {
+        if (isUsedInInactive(var))
+          continue;
+
         Diags.diagnose(var->getLoc(), diag::capture_never_used,
                        var->getName());
         continue;
@@ -3954,6 +3961,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       if (auto *pbd = var->getParentPatternBinding()) {
         if (pbd->getSingleVar() == var && pbd->getInit(0) != nullptr &&
             !isa<TypedPattern>(pbd->getPattern(0))) {
+          if (isUsedInInactive(var))
+            continue;
+
           unsigned varKind = var->isLet();
           SourceRange replaceRange(
               pbd->getStartLoc(),
@@ -3984,6 +3994,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
               if (isa<NamedPattern>(LP->getSubPattern())) {
                 auto initExpr = SC->getCond()[0].getInitializer();
                 if (initExpr->getStartLoc().isValid()) {
+                  if (isUsedInInactive(var))
+                    continue;
+
                   unsigned noParens = initExpr->canAppendPostfixExpression();
 
                   // If the subexpr is an "as?" cast, we can rewrite it to
@@ -4051,6 +4064,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         });
 
         if (foundVP) {
+          if (isUsedInInactive(var))
+            continue;
+
           unsigned varKind = var->isLet();
           Diags
               .diagnose(var->getLoc(), diag::variable_never_used,
@@ -4062,6 +4078,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       
       // Otherwise, this is something more complex, perhaps
       //    let (a,b) = foo()
+      if (isUsedInInactive(var))
+        continue;
+
       if (isWrittenLet) {
         Diags.diagnose(var->getLoc(),
                        diag::immutable_value_never_used_but_assigned,
@@ -4084,6 +4103,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         // never mutated, but 'x' was.
         !isVarDeclPartOfPBDThatHadSomeMutation(var)) {
       SourceLoc FixItLoc = getFixItLocForVarToLet(var);
+
+      if (isUsedInInactive(var))
+        continue;
 
       // If this is a parameter explicitly marked 'var', remove it.
       if (FixItLoc.isInvalid()) {
@@ -4113,6 +4135,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     
     // If this is a variable that was only written to, emit a warning.
     if ((access & RK_Read) == 0) {
+      if (isUsedInInactive(var))
+        continue;
+
       Diags.diagnose(var->getLoc(), diag::variable_never_read, var->getName());
       continue;
     }
@@ -4334,256 +4359,12 @@ ASTWalker::PreWalkResult<Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   return Action::Continue(E);
 }
 
-/// handle #if directives.  All of the active clauses are already walked by the
-/// AST walker, but we also want to handle the inactive ones to avoid false
-/// positives.
-void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
-  struct ConservativeDeclMarker : public ASTWalker {
-    VarDeclUsageChecker &VDUC;
-    SourceFile *SF;
-
-    ConservativeDeclMarker(VarDeclUsageChecker &VDUC)
-      : VDUC(VDUC), SF(VDUC.DC->getParentSourceFile()) {}
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Arguments;
-    }
-
-    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
-      // If we see a bound reference to a decl in an inactive #if block, then
-      // conservatively mark it read and written.  This will silence "variable
-      // unused" and "could be marked let" warnings for it.
-      if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-        VDUC.addMark(DRE->getDecl(), RK_Read | RK_Written);
-      else if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(E)) {
-        auto name = declRef->getName();
-        auto loc = declRef->getLoc();
-        if (name.isSimpleName() && loc.isValid()) {
-          auto *varDecl = dyn_cast_or_null<VarDecl>(
-            ASTScope::lookupSingleLocalDecl(SF, name.getFullName(), loc));
-          if (varDecl)
-            VDUC.addMark(varDecl, RK_Read|RK_Written);
-        }
-      }
-      return Action::Continue(E);
-    }
-  };
-
-  for (auto &clause : ICD->getClauses()) {
-    // Active clauses are handled by the normal AST walk.
-    if (clause.isActive) continue;
-
-    for (auto elt : clause.Elements)
-      elt.walk(ConservativeDeclMarker(*this));
-  }
-}
-
-namespace {
-class SingleValueStmtUsageChecker final : public ASTWalker {
-  ASTContext &Ctx;
-  DiagnosticEngine &Diags;
-  llvm::DenseSet<SingleValueStmtExpr *> ValidSingleValueStmtExprs;
-
-public:
-  SingleValueStmtUsageChecker(
-      ASTContext &ctx, ASTNode root,
-      std::optional<ContextualTypePurpose> contextualPurpose)
-      : Ctx(ctx), Diags(ctx.Diags) {
-    assert(!root.is<Expr *>() || contextualPurpose &&
-           "Must provide contextual purpose for expr");
-
-    // If we have a contextual purpose, this is for an expression. Check if it's
-    // an expression in a valid position.
-    if (contextualPurpose) {
-      markAnyValidTopLevelSingleValueStmt(root.get<Expr *>(),
-                                          *contextualPurpose);
-    }
-  }
-
-private:
-  /// Mark a given expression as a valid position for a SingleValueStmtExpr.
-  void markValidSingleValueStmt(Expr *E) {
-    if (!E)
-      return;
-
-    if (auto *SVE = SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(E))
-      ValidSingleValueStmtExprs.insert(SVE);
-  }
-
-  /// Mark a valid top-level expression with a given contextual purpose.
-  void markAnyValidTopLevelSingleValueStmt(Expr *E, ContextualTypePurpose ctp) {
-    // Allowed in returns, throws, and bindings.
-    switch (ctp) {
-    case CTP_ReturnStmt:
-    case CTP_ThrowStmt:
-    case CTP_Initialization:
-      markValidSingleValueStmt(E);
-      break;
-    default:
-      break;
-    }
-  }
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::ArgumentsAndExpansion;
-  }
-
-  AssignExpr *findAssignment(Expr *E) const {
-    // Don't consider assignments if we have a parent expression (as otherwise
-    // this would be effectively allowing it in an arbitrary expression
-    // position).
-    if (Parent.getAsExpr())
-      return nullptr;
-
-    // Look through optional exprs, which are present for e.g x?.y = z, as
-    // we wrap the entire assign in the optional evaluation of the destination.
-    if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(E)) {
-      E = OEE->getSubExpr();
-      while (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(E))
-        E = IIO->getSubExpr();
-    }
-    return dyn_cast<AssignExpr>(E);
-  }
-
-  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E)) {
-      // Diagnose a SingleValueStmtExpr in a context that we do not currently
-      // support. If we start allowing these in arbitrary places, we'll need
-      // to ensure that autoclosures correctly contextualize them.
-      if (!ValidSingleValueStmtExprs.contains(SVE)) {
-        Diags.diagnose(SVE->getLoc(), diag::single_value_stmt_out_of_place,
-                       SVE->getStmt()->getKind());
-      }
-
-      // Diagnose invalid SingleValueStmtExprs. This should only happen for
-      // expressions in positions that we didn't support before
-      // (e.g assignment or *explicit* return).
-      auto *S = SVE->getStmt();
-      auto mayProduceSingleValue = S->mayProduceSingleValue(Ctx);
-      switch (mayProduceSingleValue.getKind()) {
-      case IsSingleValueStmtResult::Kind::Valid:
-        break;
-      case IsSingleValueStmtResult::Kind::UnterminatedBranches: {
-        for (auto *branch : mayProduceSingleValue.getUnterminatedBranches()) {
-          if (auto *BS = dyn_cast<BraceStmt>(branch)) {
-            if (BS->empty()) {
-              Diags.diagnose(branch->getStartLoc(),
-                             diag::single_value_stmt_branch_empty,
-                             S->getKind());
-              continue;
-            }
-          }
-          // TODO: The wording of this diagnostic will need tweaking if either
-          // implicit last expressions or 'then' statements are enabled by
-          // default.
-          Diags.diagnose(branch->getEndLoc(),
-                         diag::single_value_stmt_branch_must_end_in_result,
-                         S->getKind(), isa<SwitchStmt>(S));
-        }
-        break;
-      }
-      case IsSingleValueStmtResult::Kind::NonExhaustiveIf: {
-        Diags.diagnose(S->getStartLoc(),
-                       diag::if_expr_must_be_syntactically_exhaustive);
-        break;
-      }
-      case IsSingleValueStmtResult::Kind::NonExhaustiveDoCatch: {
-        Diags.diagnose(S->getStartLoc(),
-                       diag::do_catch_expr_must_be_syntactically_exhaustive);
-        break;
-      }
-      case IsSingleValueStmtResult::Kind::HasLabel: {
-        // FIXME: We should offer a fix-it to remove (currently we don't track
-        // the colon SourceLoc).
-        auto label = cast<LabeledStmt>(S)->getLabelInfo();
-        Diags.diagnose(label.Loc,
-                       diag::single_value_stmt_must_be_unlabeled, S->getKind())
-          .highlight(label.Loc);
-        break;
-      }
-      case IsSingleValueStmtResult::Kind::InvalidJumps: {
-        // Diagnose each invalid jump.
-        for (auto *jump : mayProduceSingleValue.getInvalidJumps()) {
-          Diags.diagnose(jump->getStartLoc(),
-                         diag::cannot_jump_in_single_value_stmt,
-                         jump->getKind(), S->getKind())
-            .highlight(jump->getSourceRange());
-        }
-        break;
-      }
-      case IsSingleValueStmtResult::Kind::NoResult:
-        // This is fine, we will have typed the expression as Void (we verify
-        // as such in the ASTVerifier).
-        break;
-      case IsSingleValueStmtResult::Kind::CircularReference:
-        // Already diagnosed.
-        break;
-      case IsSingleValueStmtResult::Kind::UnhandledStmt:
-        break;
-      }
-      return Action::Continue(E);
-    }
-
-    // Valid as the source of an assignment.
-    if (auto *AE = findAssignment(E))
-      markValidSingleValueStmt(AE->getSrc());
-
-    // Valid as a single expression body of a closure. This is needed in
-    // addition to ReturnStmt checking, as we will remove the return if the
-    // expression is inferred to be Never.
-    if (auto *ACE = dyn_cast<ClosureExpr>(E)) {
-      if (ACE->hasSingleExpressionBody())
-        markValidSingleValueStmt(ACE->getSingleExpressionBody());
-    }
-    return Action::Continue(E);
-  }
-
-  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-    // Valid in a return/throw/then.
-    if (auto *RS = dyn_cast<ReturnStmt>(S)) {
-      if (RS->hasResult())
-        markValidSingleValueStmt(RS->getResult());
-    }
-    if (auto *TS = dyn_cast<ThrowStmt>(S))
-      markValidSingleValueStmt(TS->getSubExpr());
-
-    if (auto *TS = dyn_cast<ThenStmt>(S))
-      markValidSingleValueStmt(TS->getResult());
-
-    return Action::Continue(S);
-  }
-
-  PreWalkAction walkToDeclPre(Decl *D) override {
-    // Valid as an initializer of a pattern binding.
-    if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
-      for (auto idx : range(PBD->getNumPatternEntries()))
-        markValidSingleValueStmt(PBD->getInit(idx));
-
-      return Action::Continue();
-    }
-    // We don't want to walk into any other decl, we will visit them as part of
-    // typeCheckDecl.
-    return Action::SkipNode();
-  }
-};
-} // end anonymous namespace
-
-void swift::diagnoseOutOfPlaceExprs(
-    ASTContext &ctx, ASTNode root,
-    std::optional<ContextualTypePurpose> contextualPurpose) {
-  // TODO: We ought to consider moving this into pre-checking such that we can
-  // still diagnose on invalid code, and don't have to traverse over implicit
-  // exprs. We need to first separate out SequenceExpr folding though.
-  SingleValueStmtUsageChecker sveChecker(ctx, root, contextualPurpose);
-  root.walk(sveChecker);
-}
-
 /// Apply the warnings managed by VarDeclUsageChecker to the top level
 /// code declarations that haven't been checked yet.
 void swift::
 performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD) {
   auto &ctx = TLCD->getDeclContext()->getASTContext();
-  VarDeclUsageChecker checker(TLCD, ctx.Diags);
+  VarDeclUsageChecker checker(TLCD, ctx.Diags, TLCD->getSourceRange());
   TLCD->walk(checker);
 }
 
@@ -4598,7 +4379,7 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
     // declared as constants. Skip local functions though, since they will
     // be checked as part of their parent function or TopLevelCodeDecl.
     auto &ctx = AFD->getDeclContext()->getASTContext();
-    VarDeclUsageChecker checker(AFD, ctx.Diags);
+    VarDeclUsageChecker checker(AFD, ctx.Diags, AFD->getBody()->getSourceRange());
     AFD->walk(checker);
   }
 
@@ -4794,12 +4575,6 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
   public:
     DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) { }
 
-    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-      return false;
-    }
-
-    bool shouldWalkCaptureInitializerExpressions() override { return true; }
-
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
     }
@@ -4922,12 +4697,6 @@ class ObjCSelectorWalker : public ASTWalker {
 public:
   ObjCSelectorWalker(const DeclContext *dc, Type selectorTy)
     : Ctx(dc->getASTContext()), DC(dc), SelectorTy(selectorTy) { }
-
-  bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-    return false;
-  }
-
-  bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::Expansion;
@@ -5789,12 +5558,6 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       }
     }
 
-    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-      return false;
-    }
-
-    bool shouldWalkCaptureInitializerExpressions() override { return true; }
-
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
     }
@@ -5867,12 +5630,6 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
         }
       }
     }
-
-    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-      return false;
-    }
-
-    bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
@@ -6174,10 +5931,6 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
   public:
     DiagnoseWalker(const DeclContext *DC) : Ctx(DC->getASTContext()), DC(DC) {}
 
-    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-      return false;
-    }
-
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
     }
@@ -6333,10 +6086,6 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
   public:
     DiagnoseWalker(const DeclContext *DC) : Ctx(DC->getASTContext()) {}
 
-    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-      return false;
-    }
-
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
     }
@@ -6421,15 +6170,48 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
   const_cast<Expr *>(E)->walk(Walker);
 }
 
+// Verifies that references to members are valid under the restrictions of the
+// MemberImportVisibility feature.
+static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
+    const DeclContext *dc;
+
+  public:
+    DiagnoseWalker(const DeclContext *dc) : dc(dc) {}
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (auto declRef = E->getReferencedDecl())
+        checkDecl(declRef.getDecl(), E->getLoc());
+
+      return Action::Continue(E);
+    }
+
+    void checkDecl(const ValueDecl *decl, SourceLoc loc) {
+      // Only diagnose uses of members.
+      if (!decl->getDeclContext()->isTypeContext())
+        return;
+
+      if (!dc->isDeclImported(decl))
+        maybeDiagnoseMissingImportForMember(decl, dc, loc);
+    }
+  };
+
+  auto &ctx = DC->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility))
+    return;
+
+  DiagnoseWalker walker(DC);
+  const_cast<Expr *>(E)->walk(walker);
+}
+
 //===----------------------------------------------------------------------===//
 // High-level entry points.
 //===----------------------------------------------------------------------===//
 
 /// Emit diagnostics for syntactic restrictions on a given expression.
-void swift::performSyntacticExprDiagnostics(
-    const Expr *E, const DeclContext *DC,
-    std::optional<ContextualTypePurpose> contextualPurpose, bool isExprStmt,
-    bool disableOutOfPlaceExprChecking) {
+void swift::performSyntacticExprDiagnostics(const Expr *E,
+                                            const DeclContext *DC,
+                                            bool isExprStmt) {
   auto &ctx = DC->getASTContext();
   TypeChecker::diagnoseSelfAssignment(E);
   diagSyntacticUseRestrictions(E, DC, isExprStmt);
@@ -6448,8 +6230,7 @@ void swift::performSyntacticExprDiagnostics(
   diagnoseConstantArgumentRequirement(E, DC);
   diagUnqualifiedAccessToMethodNamedSelf(E, DC);
   diagnoseDictionaryLiteralDuplicateKeyEntries(E, DC);
-  if (!disableOutOfPlaceExprChecking)
-    diagnoseOutOfPlaceExprs(ctx, const_cast<Expr *>(E), contextualPurpose);
+  diagnoseMissingMemberImports(E, DC);
 }
 
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
@@ -6627,8 +6408,8 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
 
   // Generic type parameters.
   if (auto genericParamTy = type->getAs<GenericTypeParamType>()) {
-    if (auto genericParam = genericParamTy->getDecl())
-      return genericParam->getName().str();
+    if (!genericParamTy->isCanonical())
+      return genericParamTy->getName().str();
 
     return "";
   }

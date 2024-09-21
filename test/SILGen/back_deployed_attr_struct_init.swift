@@ -30,7 +30,7 @@ public struct TopLevelStruct<T> {
   // CHECK:   return [[RESULT]] : $()
 
   // -- Back deployment thunk for TopLevelStruct.init(_:)
-  // CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy14TopLevelStructVyACyxGxcfCTwb : $@convention(method) <T> (@in T, @thin TopLevelStruct<T>.Type) -> @out TopLevelStruct<T>
+  // CHECK-LABEL: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy14TopLevelStructVyACyxGxcfCTwb : $@convention(method) <T> (@in T, @thin TopLevelStruct<T>.Type) -> @out TopLevelStruct<T>
   // CHECK: bb0([[SELF_OUT:%.*]] : $*TopLevelStruct<T>, [[T_ARG:%.*]] : $*T, [[METATYPE_ARG:%.*]] : $@thin TopLevelStruct<T>.Type):
   // CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 52
   // CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 1

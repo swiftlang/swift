@@ -25,6 +25,10 @@ function(includeSwiftSyntax)
   file(TO_CMAKE_PATH "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}" swift_syntax_path)
   FetchContent_Declare(CompilerSwiftSyntax SOURCE_DIR "${swift_syntax_path}")
   FetchContent_MakeAvailable(CompilerSwiftSyntax)
+
+  # FIXME: Use FetchContent_Declare's EXCLUDE_FROM_ALL after CMake 3.28
+  FetchContent_GetProperties(CompilerSwiftSyntax BINARY_DIR binary_dir)
+  set_property(DIRECTORY "${binary_dir}" PROPERTY EXCLUDE_FROM_ALL TRUE)
 endfunction()
 includeSwiftSyntax()
 
@@ -48,6 +52,7 @@ foreach(lib ${compiler_swiftsyntax_libs})
 endforeach()
 
 swift_install_in_component(TARGETS ${compiler_swiftsyntax_libs}
-  ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler
-  LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler
-  RUNTIME DESTINATION "bin" COMPONENT compiler)
+  ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler-swift-syntax-lib
+  LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler-swift-syntax-lib
+  RUNTIME DESTINATION "bin" COMPONENT compiler-swift-syntax-lib)
+add_dependencies(compiler-swift-syntax-lib ${compiler_swiftsyntax_libs})

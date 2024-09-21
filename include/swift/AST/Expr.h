@@ -266,7 +266,7 @@ protected:
     Kind : 2
   );
 
-  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1,
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     HasAnonymousClosureVars : 1,
@@ -288,7 +288,13 @@ protected:
 
     /// True if we're in the common case where the GlobalActorAttributeRequest
     /// request returned a pair of null pointers.
-    NoGlobalActorAttribute : 1
+    NoGlobalActorAttribute : 1,
+
+    /// Indicates whether this closure literal would require dynamic actor 
+    /// isolation checks when it either specifies or inherits isolation
+    /// and was passed as an argument to a function that is not fully 
+    /// concurrency checked.
+    RequiresDynamicIsolationChecking : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BindOptionalExpr, Expr, 16,
@@ -1379,8 +1385,47 @@ public:
     return E->getKind() == ExprKind::Type;
   }
 };
-  
-  
+
+class TypeValueExpr : public Expr {
+  TypeLoc paramTypeLoc;
+
+public:
+  /// Create a \c TypeValueExpr from an underlying parameter \c TypeRepr.
+  TypeValueExpr(TypeRepr *paramRepr) :
+      Expr(ExprKind::TypeValue, /*implicit*/ false), paramTypeLoc(paramRepr) {}
+
+  /// Create a \c TypeValueExpr for a given \c TypeDecl at the specified
+  /// location.
+  ///
+  /// The given location must be valid. If it is not, you must use
+  /// \c TypeExpr::createImplicitForDecl instead.
+  static TypeValueExpr *createForDecl(DeclNameLoc Loc, TypeDecl *D,
+                                      DeclContext *DC);
+
+  TypeRepr *getParamTypeRepr() const {
+    return paramTypeLoc.getTypeRepr();
+  }
+
+  /// Retrieves the corresponding parameter type of the value referenced by this
+  /// expression.
+  ArchetypeType *getParamType() const {
+    return paramTypeLoc.getType()->castTo<ArchetypeType>();
+  }
+
+  /// Sets the corresponding parameter type of the value referenced by this
+  /// expression.
+  void setParamType(Type paramType) {
+    paramTypeLoc.setType(paramType);
+  }
+
+  SourceRange getSourceRange() const {
+    return paramTypeLoc.getSourceRange();
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::TypeValue;
+  }
+};
 
 /// A reference to another initializer from within a constructor body,
 /// either to a delegating initializer or to a super.init invocation.
@@ -4074,20 +4119,11 @@ class ClosureExpr : public AbstractClosureExpr {
 
 public:
   enum class BodyState {
-    /// The body was parsed, but not ready for type checking because
-    /// the closure parameters haven't been type checked.
+    /// The body was parsed.
     Parsed,
 
-    /// The type of the closure itself was type checked. But the body has not
-    /// been type checked yet.
-    ReadyForTypeChecking,
-
-    /// The body was typechecked with the enclosing closure.
-    /// i.e. single expression closure or result builder closure.
-    TypeCheckedWithSignature,
-
-    /// The body was type checked separately from the enclosing closure.
-    SeparatelyTypeChecked,
+    /// The body was type-checked.
+    TypeChecked,
   };
 
 private:
@@ -4158,6 +4194,7 @@ public:
     Bits.ClosureExpr.InheritActorContext = false;
     Bits.ClosureExpr.IsPassedToSendingParameter = false;
     Bits.ClosureExpr.NoGlobalActorAttribute = false;
+    Bits.ClosureExpr.RequiresDynamicIsolationChecking = false;
   }
 
   SourceRange getSourceRange() const;
@@ -4221,6 +4258,16 @@ public:
 
   void setIsPassedToSendingParameter(bool value = true) {
     Bits.ClosureExpr.IsPassedToSendingParameter = value;
+  }
+
+  /// True if this is an isolated closure literal that is passed 
+  /// to a callee that has not been concurrency checked.
+  bool requiresDynamicIsolationChecking() const {
+    return Bits.ClosureExpr.RequiresDynamicIsolationChecking;
+  }
+
+  void setRequiresDynamicIsolationChecking(bool value = true) {
+    Bits.ClosureExpr.RequiresDynamicIsolationChecking = value;
   }
 
   /// Determine whether this closure expression has an
@@ -4312,13 +4359,6 @@ public:
   }
   void setBodyState(BodyState v) {
     ExplicitResultTypeAndBodyState.setInt(v);
-  }
-
-  /// Whether this closure's body is/was type checked separately from its
-  /// enclosing expression.
-  bool isSeparatelyTypeChecked() const {
-    return getBodyState() == BodyState::SeparatelyTypeChecked ||
-           getBodyState() == BodyState::ReadyForTypeChecking;
   }
 
   static bool classof(const Expr *E) {
@@ -6441,8 +6481,10 @@ public:
   }
 
   static MacroExpansionExpr *
-  create(DeclContext *dc, SourceLoc sigilLoc, DeclNameRef macroName,
-         DeclNameLoc macroNameLoc, SourceLoc leftAngleLoc,
+  create(DeclContext *dc, SourceLoc sigilLoc,
+         DeclNameRef moduleName, DeclNameLoc moduleNameLoc,
+         DeclNameRef macroName, DeclNameLoc macroNameLoc,
+         SourceLoc leftAngleLoc,
          ArrayRef<TypeRepr *> genericArgs, SourceLoc rightAngleLoc,
          ArgumentList *argList, MacroRoles roles, bool isImplicit = false,
          Type ty = Type());

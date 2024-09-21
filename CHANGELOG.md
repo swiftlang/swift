@@ -5,6 +5,22 @@
 
 ## Swift (next)
 
+* Syntactic SourceKit queries no longer attempt to provide information
+  within the inactive `#if` regions. For example, given:
+
+  ```swift
+  #if DEBUG
+  extension MyType: CustomDebugStringConvertible {
+    var debugDescription: String { ... }
+  }
+  #endif
+  ```
+
+  If `DEBUG` is not set, SourceKit results will not involve the
+  inactive code. Clients should use either SourceKit-LSP or
+  swift-syntax for syntactic queries that are independent of the
+  specific build configuration.
+
 * [SE-0442][]:
   TaskGroups can now be created without explicitly specifying their child task's result types:
 

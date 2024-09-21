@@ -225,6 +225,54 @@ bool swift::rewriting::diagnoseRequirementErrors(
       diagnosedError = true;
       break;
     }
+
+    case RequirementError::Kind::InvalidValueGenericType: {
+      auto req = error.getRequirement();
+
+      if (req.hasError())
+        break;
+
+      ctx.Diags.diagnose(loc, diag::invalid_value_type_value_generic,
+                         req.getSecondType(), req.getFirstType());
+      diagnosedError = true;
+      break;
+    }
+
+    case RequirementError::Kind::InvalidValueGenericConformance: {
+      auto req = error.getRequirement();
+
+      if (req.hasError())
+        break;
+
+      ctx.Diags.diagnose(loc, diag::invalid_value_generic_conformance,
+                         req.getFirstType(), req.getSecondType());
+      diagnosedError = true;
+      break;
+    }
+
+    case RequirementError::Kind::InvalidValueGenericSameType: {
+      auto req = error.getRequirement();
+
+      if (req.hasError())
+        break;
+
+      ctx.Diags.diagnose(loc, diag::invalid_value_generic_same_type,
+                         req.getFirstType(), req.getSecondType());
+      diagnosedError = true;
+      break;
+    }
+
+    case RequirementError::Kind::InvalidValueForTypeSameType: {
+      auto req = error.getRequirement();
+
+      if (req.hasError())
+        break;
+
+      ctx.Diags.diagnose(loc, diag::invalid_value_for_type_same_type,
+                         req.getFirstType(), req.getSecondType());
+      diagnosedError = true;
+      break;
+    }
     }
   }
 

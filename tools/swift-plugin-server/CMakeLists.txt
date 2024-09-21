@@ -19,6 +19,7 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
       SwiftCompilerPluginMessageHandling
       SwiftLibraryPluginProvider
       WasmKitWASI
+    PACKAGE_NAME Toolchain
   )
 
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
@@ -28,6 +29,7 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     SWIFT_DEPENDENCIES
       SwiftCompilerPluginMessageHandling
       SwiftLibraryPluginProvider
+    PACKAGE_NAME Toolchain
   )
 
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
@@ -39,14 +41,6 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
       APPEND PROPERTY INSTALL_RPATH
         "$ORIGIN")
     _set_pure_swift_link_flags(SwiftInProcPluginServer "../../")
-  endif()
-
-  # FXIME: Importing package-cmo enabled '.swiftmodule' causes compiler crash :(
-  if(Swift_COMPILER_PACKAGE_CMO_SUPPORT)
-    target_compile_options(swift-plugin-server PRIVATE
-      "SHELL:-Xfrontend -module-load-mode -Xfrontend prefer-interface")
-    target_compile_options(SwiftInProcPluginServer PRIVATE
-      "SHELL:-Xfrontend -module-load-mode -Xfrontend prefer-interface")
   endif()
 
   set_property(TARGET ${name}

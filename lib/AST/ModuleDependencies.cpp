@@ -120,6 +120,18 @@ void ModuleDependencyInfo::addMacroDependency(StringRef macroModuleName,
     llvm_unreachable("Unexpected dependency kind");
 }
 
+bool ModuleDependencyInfo::hasMacroDependencies() const {
+  if (auto sourceModule =
+          dyn_cast<SwiftSourceModuleDependenciesStorage>(storage.get()))
+    return !sourceModule->textualModuleDetails.macroDependencies.empty();
+
+  if (auto interfaceModule =
+          dyn_cast<SwiftInterfaceModuleDependenciesStorage>(storage.get()))
+    return !interfaceModule->textualModuleDetails.macroDependencies.empty();
+
+  llvm_unreachable("Unexpected dependency kind");
+}
+
 bool ModuleDependencyInfo::isTestableImport(StringRef moduleName) const {
   if (auto swiftSourceDepStorage = getAsSwiftSourceModule())
     return swiftSourceDepStorage->testableImports.contains(moduleName);
@@ -612,10 +624,11 @@ swift::dependencies::registerBackDeployLibraries(
 }
 
 void SwiftDependencyTracker::addCommonSearchPathDeps(
-    const SearchPathOptions &Opts) {
+    const CompilerInvocation &CI) {
+  auto &SearchPathOpts = CI.getSearchPathOptions();
   // Add SDKSetting file.
   SmallString<256> SDKSettingPath;
-  llvm::sys::path::append(SDKSettingPath, Opts.getSDKPath(),
+  llvm::sys::path::append(SDKSettingPath, SearchPathOpts.getSDKPath(),
                           "SDKSettings.json");
   FS->status(SDKSettingPath);
 
@@ -624,7 +637,7 @@ void SwiftDependencyTracker::addCommonSearchPathDeps(
       "arm64", "arm64e", "x86_64", "i386",
       "armv7", "armv7s", "armv7k", "arm64_32"};
 
-  for (auto RuntimeLibPath : Opts.RuntimeLibraryPaths) {
+  for (auto RuntimeLibPath : SearchPathOpts.RuntimeLibraryPaths) {
     std::error_code EC;
     for (auto &Arch : AllSupportedArches) {
       SmallString<256> LayoutFile(RuntimeLibPath);
@@ -634,8 +647,12 @@ void SwiftDependencyTracker::addCommonSearchPathDeps(
   }
 
   // Add VFSOverlay file.
-  for (auto &Overlay: Opts.VFSOverlayFiles)
+  for (auto &Overlay: SearchPathOpts.VFSOverlayFiles)
     FS->status(Overlay);
+
+  // Add blocklist file.
+  for (auto &File: CI.getFrontendOptions().BlocklistConfigFilePaths)
+    FS->status(File);
 }
 
 void SwiftDependencyTracker::startTracking() {

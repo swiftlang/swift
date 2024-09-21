@@ -2112,6 +2112,8 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
   }
   newMethod->setParams(params);
 
+  clang::Sema::SynthesizedFunctionScope scope(clangSema, newMethod);
+
   // Create a new Clang diagnostic pool to capture any diagnostics
   // emitted during the construction of the method.
   clang::sema::DelayedDiagnosticPool diagPool{
@@ -2136,6 +2138,11 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
     thisExpr = conv.get();
   }
 
+  auto memberExprTy =
+      (method->isStatic() && method->getOverloadedOperator() ==
+                                 clang::OverloadedOperatorKind::OO_Call)
+          ? method->getType()
+          : clangCtx.BoundMemberTy;
   auto memberExpr = clangSema.BuildMemberExpr(
       thisExpr, /*isArrow=*/true, clang::SourceLocation(),
       clang::NestedNameSpecifierLoc(), clang::SourceLocation(),
@@ -2143,7 +2150,7 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
       clang::DeclAccessPair::make(const_cast<clang::CXXMethodDecl *>(method),
                                   clang::AS_public),
       /*HadMultipleCandidates=*/false, method->getNameInfo(),
-      clangCtx.BoundMemberTy, clang::VK_PRValue, clang::OK_Ordinary);
+      memberExprTy, clang::VK_PRValue, clang::OK_Ordinary);
   llvm::SmallVector<clang::Expr *, 4> args;
   for (size_t i = 0; i < newMethod->getNumParams(); ++i) {
     auto *param = newMethod->getParamDecl(i);
@@ -2154,13 +2161,14 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
         clangCtx, param, false, type, clang::ExprValueKind::VK_LValue,
         clang::SourceLocation()));
   }
-  auto memberCall = clangSema.BuildCallToMemberFunction(
+  auto memberCall = clangSema.BuildCallExpr(
       nullptr, memberExpr, clang::SourceLocation(), args,
       clang::SourceLocation());
   if (!memberCall.isUsable())
     return nullptr;
-  auto returnStmt = clang::ReturnStmt::Create(clangCtx, clang::SourceLocation(),
-                                              memberCall.get(), nullptr);
+  auto returnStmt =
+      clangSema.BuildReturnStmt(clang::SourceLocation(), memberCall.get())
+          .get();
 
   // Check if there were any Clang errors during the construction
   // of the method body.

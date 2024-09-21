@@ -204,14 +204,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back("-disable-objc-interop");
   }
 
-  // Add flags for C++ interop.
-  if (const Arg *arg =
-          inputArgs.getLastArg(options::OPT_experimental_cxx_stdlib)) {
-    arguments.push_back("-Xcc");
-    arguments.push_back(
-        inputArgs.MakeArgString(Twine("-stdlib=") + arg->getValue()));
-  }
-
   if (inputArgs.hasArg(options::OPT_experimental_hermetic_seal_at_link)) {
     arguments.push_back("-enable-llvm-vfe");
     arguments.push_back("-enable-llvm-wme");
@@ -311,8 +303,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_use);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
-  inputArgs.AddAllArgs(arguments, options::OPT_warnings_as_errors,
-                       options::OPT_no_warnings_as_errors);
+  inputArgs.AddAllArgs(arguments, options::OPT_warning_treating_Group);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_recover_EQ);
   inputArgs.AddLastArg(arguments,

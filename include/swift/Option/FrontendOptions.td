@@ -265,6 +265,8 @@ def dependency_scan_cache_remarks : Flag<["-"], "Rdependency-scan-cache">,
 
 def parallel_scan : Flag<["-"], "parallel-scan">,
    HelpText<"Perform dependency scanning in-parallel.">;
+def no_parallel_scan : Flag<["-"], "-no-parallel-scan">,
+   HelpText<"Perform dependency scanning in a single-threaded fashion.">;
 
 def enable_copy_propagation : Flag<["-"], "enable-copy-propagation">,
   HelpText<"Run SIL copy propagation with lexical lifetimes to shorten object "
@@ -544,6 +546,11 @@ def enable_throws_prediction : Flag<["-"], "enable-throws-prediction">,
   HelpText<"Enables optimization assumption that functions rarely throw errors.">;
 def disable_throws_prediction : Flag<["-"], "disable-throws-prediction">,
   HelpText<"Disables optimization assumption that functions rarely throw errors.">;
+
+def enable_noreturn_prediction : Flag<["-"], "enable-noreturn-prediction">,
+  HelpText<"Enables optimization assumption that calls to no-return functions are cold.">;
+def disable_noreturn_prediction : Flag<["-"], "disable-noreturn-prediction">,
+  HelpText<"Disables optimization assumption that calls to no-return functions are cold.">;
 
 def disable_access_control : Flag<["-"], "disable-access-control">,
   HelpText<"Don't respect access control restrictions">;
@@ -1310,6 +1317,20 @@ def disable_fragile_resilient_protocol_witnesses :
   Flag<["-"], "disable-fragile-relative-protocol-tables">,
   HelpText<"Disable relative protocol witness tables">;
 
+def enable_async_frame_push_pop_metadata :
+  Flag<["-"], "enable-async-frame-push-pop-metadata">,
+  HelpText<"Enable async frame push pop metadata">;
+def disable_async_frame_push_pop_metadata :
+  Flag<["-"], "disable-async-frame-push-pop-metadata">,
+  HelpText<"Disable async frame push pop metadata">;
+
+def enable_async_frame_pointer_all :
+  Flag<["-"], "enable-async-frame-pointer-all">,
+  HelpText<"Always emit async frame stack frames (frame-pointer=all)">;
+def disable_async_frame_pointer_all:
+  Flag<["-"], "disable-async-frame-pointer-all">,
+  HelpText<"Disable always emit async frame stack frames">;
+
 def enable_split_cold_code :
   Flag<["-"], "enable-split-cold-code">,
   HelpText<"Enable splitting of cold code when optimizing">;
@@ -1389,9 +1410,6 @@ def platform_c_calling_convention_EQ :
     Joined<["-"], "experimental-platform-c-calling-convention=">,
     Alias<platform_c_calling_convention>;
 
-def disable_experimental_parser_round_trip : Flag<["-"],
-  "disable-experimental-parser-round-trip">,
-  HelpText<"Disable round trip through the new swift parser">;
 
 def disable_sending_args_and_results_with_region_isolation : Flag<["-"],
   "disable-sending-args-and-results-with-region-based-isolation">,
@@ -1411,3 +1429,8 @@ def platform_availability_inheritance_map_path
     HelpText<"Path of the platform inheritance platform map">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
+
+def disable_experimental_parser_round_trip : Flag<["-"],
+  "disable-experimental-parser-round-trip">,
+  HelpText<"Disable round trip through the new swift parser">,
+  Flags<[FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable]>;

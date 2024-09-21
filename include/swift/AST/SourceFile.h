@@ -156,9 +156,7 @@ private:
   std::optional<StableHasher> InterfaceHasher;
 
   /// The ID for the memory buffer containing this file's source.
-  ///
-  /// May be -1, to indicate no association with a buffer.
-  int BufferID;
+  unsigned BufferID;
 
   /// The parsing options for the file.
   ParsingOptions ParsingOpts;
@@ -370,7 +368,7 @@ public:
   /// \c #sourceLocation(file:) declarations.
   llvm::StringMap<SourceFilePathInfo> getInfoForUsedFilePaths() const;
 
-  SourceFile(ModuleDecl &M, SourceFileKind K, std::optional<unsigned> bufferID,
+  SourceFile(ModuleDecl &M, SourceFileKind K, unsigned bufferID,
              ParsingOptions parsingOpts = {}, bool isPrimary = false);
 
   ~SourceFile();
@@ -507,11 +505,6 @@ public:
     MissingImportForMemberDiagnostics[decl].push_back(loc);
   }
 
-  /// Returns true if there is a pending missing import diagnostic for \p decl.
-  bool hasDelayedMissingImportForMemberDiagnostic(const ValueDecl *decl) const {
-    return MissingImportForMemberDiagnostics.contains(decl);
-  }
-
   DelayedMissingImportForMemberDiags
   takeDelayedMissingImportForMemberDiagnostics() {
     DelayedMissingImportForMemberDiags diags;
@@ -595,9 +588,7 @@ public:
 
   /// The buffer ID for the file that was imported, or None if there
   /// is no associated buffer.
-  std::optional<unsigned> getBufferID() const {
-    if (BufferID == -1)
-      return std::nullopt;
+  unsigned getBufferID() const {
     return BufferID;
   }
 

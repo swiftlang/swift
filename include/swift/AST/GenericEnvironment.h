@@ -157,16 +157,14 @@ private:
   friend ArchetypeType;
   friend QueryInterfaceTypeSubstitutions;
 
-  Type getOrCreateArchetypeFromInterfaceType(Type depType);
+  /// Add a mapping of a type parameter to a contextual type, usually
+  /// an archetype.
+  void addMapping(CanType depType, Type contextType);
 
-  /// Add a mapping of a generic parameter to a specific type (which may be
-  /// an archetype)
-  void addMapping(GenericParamKey key, Type contextType);
-
-  /// Retrieve the mapping for the given generic parameter, if present.
+  /// Retrieve the mapping for the given type parameter, if present.
   ///
   /// This is only useful when lazily populating a generic environment.
-  std::optional<Type> getMappingIfPresent(GenericParamKey key) const;
+  Type getMappingIfPresent(CanType depType) const;
 
 public:
   GenericSignature getGenericSignature() const {
@@ -232,11 +230,21 @@ public:
   /// Create a new generic environment for an opened existential.
   ///
   /// \param existential The subject existential type
+  /// \param uuid The unique identifier for this opened existential
+  static GenericEnvironment *
+  forOpenedExistential(Type existential, UUID uuid);
+
+  /// Create a new generic environment for an opened existential.
+  ///
+  /// \param signature The opened existential signature
+  /// \param existential The generalized existential type
   /// \param outerSubs The substitution map containing archetypes from the
   /// outer generic context
   /// \param uuid The unique identifier for this opened existential
   static GenericEnvironment *
-  forOpenedExistential(Type existential, SubstitutionMap outerSubs, UUID uuid);
+  forOpenedExistential(GenericSignature signature,
+                       Type existential, SubstitutionMap outerSubs,
+                       UUID uuid);
 
   /// Create a new generic environment for an opened element.
   ///
@@ -273,12 +281,11 @@ public:
   /// Map an interface type to a contextual type.
   Type mapTypeIntoContext(Type type) const;
 
-  /// Map an interface type to a contextual type.
-  Type mapTypeIntoContext(Type type,
-                          LookupConformanceFn lookupConformance) const;
-
   /// Map a generic parameter type to a contextual type.
   Type mapTypeIntoContext(GenericTypeParamType *type) const;
+
+  /// Map a type parameter type to a contextual type.
+  Type getOrCreateArchetypeFromInterfaceType(Type depType);
 
   /// Map an interface type containing parameter packs to a contextual
   /// type in the opened element generic context.

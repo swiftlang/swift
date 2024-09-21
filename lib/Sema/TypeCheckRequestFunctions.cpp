@@ -379,7 +379,7 @@ Type ResultBuilderTypeRequest::evaluate(Evaluator &evaluator,
 
   // Resolve a type for the attribute.
   auto mutableAttr = const_cast<CustomAttr*>(attr);
-  auto dc = decl->getDeclContext();
+  auto *dc = decl->getInnermostDeclContext();
   auto &ctx = dc->getASTContext();
   Type type = evaluateOrDefault(
       evaluator,
@@ -420,6 +420,30 @@ Type ResultBuilderTypeRequest::evaluate(Evaluator &evaluator,
   }
 
   return type->mapTypeOutOfContext();
+}
+
+Type GenericTypeParamDeclGetValueTypeRequest::evaluate(Evaluator &evaluator,
+                                             GenericTypeParamDecl *decl) const {
+  if (!decl->isValue())
+    return Type();
+
+  if (decl->getInherited().size() == 0) {
+    decl->diagnose(diag::missing_value_generic_type, decl->getName());
+    return Type();
+  }
+
+  // This should always be true due to how generic parameter parsing works:
+  //
+  // <let N: Int, Bool>
+  //
+  // We should have 1 inherited type for 'N', 'Int', and have a 2nd generic
+  // parameter called 'Bool'.
+  ASSERT(decl->getInherited().size() == 1);
+
+  // The value type of a generic parameter should never rely on the generic
+  // signature of the generic parameter itself or any of the outside context.
+  return decl->getInherited().getResolvedType(0,
+                                              TypeResolutionStage::Structural);
 }
 
 // Define request evaluation functions for each of the type checker requests.

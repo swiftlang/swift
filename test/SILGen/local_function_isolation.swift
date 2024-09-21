@@ -59,11 +59,43 @@ func test() async {}
 // local/nested function.
 actor GenericActor<K> {
   var i: Int = 0
-  private func outerFunc() {
-    func accessSelf() -> Int {
-      // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation12GenericActorC9outerFunc33_7B9E2B75110B8600A136A469D51CAF2BLLyyF10accessSelfL_SiylF : $@convention(thin) <K> (@sil_isolated @guaranteed GenericActor<K>) -> Int {
+  func outerFunc() async {
+    func accessSelf() async -> Int {
+      // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation12GenericActorC9outerFuncyyYaF10accessSelfL_SiyYalF : $@convention(thin) @async <K> (@sil_isolated @guaranteed GenericActor<K>) -> Int {
       return 0
     }
-    print(accessSelf())
+    await print(accessSelf())
   }
+}
+
+// Make sure defer doesn't capture anything.
+actor DeferInsideInitActor {
+  init(foo: ()) async throws {
+    // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation20DeferInsideInitActorC3fooACyt_tYaKcfc6$deferL_yyF : $@convention(thin) () -> () {
+    defer {}
+    try self.init()
+  }
+}
+
+actor NestedAsyncInSyncActor {
+  public func outer() async {
+    // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation22NestedAsyncInSyncActorC5outeryyYaF6middleL_yyF : $@convention(thin) (@sil_isolated @guaranteed NestedAsyncInSyncActor) -> () {
+    func middle() {
+      // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation22NestedAsyncInSyncActorC5outeryyYaF6middleL_yyF5innerL_yyYaF : $@convention(thin) @async (@sil_isolated @guaranteed NestedAsyncInSyncActor) -> () {
+      func inner() async {}
+      _ = inner
+    }
+    _ = middle
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s24local_function_isolation13outerFunctionyyScA_pYaF : $@convention(thin) @async (@guaranteed any Actor) -> () {
+func outerFunction(_ a: any Actor) async {
+  // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation13outerFunctionyyScA_pYaF06middleE0L_yyScA_pYaF : $@convention(thin) @async (@guaranteed any Actor) -> () {
+  func middleFunction(_ isolated: any Actor) async {
+    // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation13outerFunctionyyScA_pYaF06middleE0L_yyScA_pYaF05innerE0L_yyYaF : $@convention(thin) @async () -> () {
+    func innerFunction() async {}
+  }
+
+  await middleFunction(a)
 }

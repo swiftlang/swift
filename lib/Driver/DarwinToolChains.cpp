@@ -999,13 +999,6 @@ toolchains::Darwin::validateArguments(DiagnosticEngine &diags,
 		  options::OPT_no_link_objc_runtime)) {
     diags.diagnose(SourceLoc(), diag::warn_darwin_link_objc_deprecated);
   }
-
-  // If a C++ standard library is specified, it has to be libc++.
-  if (auto arg = args.getLastArg(options::OPT_experimental_cxx_stdlib)) {
-    if (StringRef(arg->getValue()) != "libc++") {
-      diags.diagnose(SourceLoc(), diag::error_darwin_only_supports_libcxx); 
-    }
-  }
 }
 
 void

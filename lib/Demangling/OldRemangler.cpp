@@ -1943,10 +1943,6 @@ ManglingError Remangler::mangleNoDerivative(Node *node, unsigned depth) {
   return mangleSingleChildNode(node, depth + 1); // type
 }
 
-ManglingError Remangler::mangleLifetimeDependence(Node *node, unsigned depth) {
-  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
-}
-
 ManglingError Remangler::mangleTuple(Node *node, unsigned depth) {
   size_t NumElems = node->getNumChildren();
   if (NumElems > 0 &&
@@ -3054,4 +3050,17 @@ Remangler::mangleDependentGenericInverseConformanceRequirement(Node *node,
   DEMANGLER_ASSERT(node->getNumChildren() == 2, node);
   RETURN_IF_ERROR(mangleConstrainedType(node->getChild(0), depth + 1));
   return mangle(node->getChild(1), depth + 1);
+}
+
+ManglingError Remangler::mangleInteger(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError Remangler::mangleNegativeInteger(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError Remangler::mangleDependentGenericParamValueMarker(Node *node,
+                                                                unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }

@@ -257,10 +257,7 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
   // Perform round-trip and/or validation checking.
   if (parsingOpts.contains(ParsingFlags::RoundTrip) &&
       swift_ASTGen_roundTripCheck(exportedSourceFile)) {
-    SourceLoc loc;
-    if (auto bufferID = SF.getBufferID()) {
-      loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
-    }
+    SourceLoc loc = Context.SourceMgr.getLocForBufferStart(SF.getBufferID());
     diagnose(loc, diag::parser_round_trip_error);
     return;
   }
@@ -277,10 +274,7 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
       // which case we still have `hadAnyError() == false`. To avoid
       // emitting the same warnings from SwiftParser, only emit errors from
       // SwiftParser
-      SourceLoc loc;
-      if (auto bufferID = SF.getBufferID()) {
-          loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
-      }
+      SourceLoc loc = Context.SourceMgr.getLocForBufferStart(SF.getBufferID());
       diagnose(loc, diag::parser_new_parser_errors);
     }
   }
@@ -298,10 +292,7 @@ void *ExportedSourceFileRequest::evaluate(Evaluator &evaluator,
   auto &SM = ctx.SourceMgr;
 
   auto bufferID = SF->getBufferID();
-  if (!bufferID)
-    return nullptr;
-
-  StringRef contents = SM.extractText(SM.getRangeForBuffer(*bufferID));
+  StringRef contents = SM.extractText(SM.getRangeForBuffer(bufferID));
 
   // Parse the source file.
   auto exportedSourceFile = swift_ASTGen_parseSourceFile(
@@ -776,7 +767,7 @@ bool Parser::parseSpecializeAttributeArguments(
     std::optional<bool> &Exported,
     std::optional<SpecializeAttr::SpecializationKind> &Kind,
     swift::TrailingWhereClause *&TrailingWhereClause,
-    DeclNameRef &targetFunction, AvailabilityContext *SILAvailability,
+    DeclNameRef &targetFunction, AvailabilityRange *SILAvailability,
     SmallVectorImpl<Identifier> &spiGroups,
     SmallVectorImpl<AvailableAttr *> &availableAttrs,
     size_t &typeErasedParamsCount,
@@ -825,7 +816,7 @@ bool Parser::parseSpecializeAttributeArguments(
                                  diag::sil_availability_expected_version))
           return false;
 
-        *SILAvailability = AvailabilityContext(VersionRange::allGTE(version));
+        *SILAvailability = AvailabilityRange(VersionRange::allGTE(version));
       }
       if (ParamLabel == "availability") {
         SourceRange attrRange;
@@ -1090,7 +1081,7 @@ bool Parser::parseAvailability(
 
 bool Parser::parseSpecializeAttribute(
     swift::tok ClosingBrace, SourceLoc AtLoc, SourceLoc Loc,
-    SpecializeAttr *&Attr, AvailabilityContext *SILAvailability,
+    SpecializeAttr *&Attr, AvailabilityRange *SILAvailability,
     llvm::function_ref<bool(Parser &)> parseSILTargetName,
     llvm::function_ref<bool(Parser &)> parseSILSIPModule) {
   assert(ClosingBrace == tok::r_paren || ClosingBrace == tok::r_square);
@@ -2189,7 +2180,8 @@ void Parser::parseAllAvailabilityMacroArguments() {
 }
 
 ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
-    llvm::SmallVector<PlatformAndVersion, 4> &PlatformAndVersions) {
+    llvm::SmallVector<PlatformAndVersion, 4> &PlatformAndVersions,
+    bool &ParsedUnrecognizedPlatformName) {
   // Check for availability macros first.
   if (peekAvailabilityMacroName()) {
     SmallVector<AvailabilitySpec *, 4> Specs;
@@ -2226,6 +2218,7 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
   // Parse the platform name.
   StringRef platformText = Tok.getText();
   auto MaybePlatform = platformFromString(platformText);
+  ParsedUnrecognizedPlatformName = ParsedUnrecognizedPlatformName || !MaybePlatform.has_value();
   SourceLoc PlatformLoc = Tok.getLoc();
   consumeToken();
 
@@ -2288,6 +2281,7 @@ bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
   SourceLoc RightLoc;
   ParserStatus Status;
   bool SuppressLaterDiags = false;
+  bool ParsedUnrecognizedPlatformName = false;
   llvm::SmallVector<PlatformAndVersion, 4> PlatformAndVersions;
 
   {
@@ -2306,12 +2300,12 @@ bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
     if (!Tok.is(tok::r_paren)) {
       ParseListItemResult Result;
       do {
-        Result = parseListItem(Status, tok::r_paren, LeftLoc, RightLoc,
-                               /*AllowSepAfterLast=*/false,
-                               [&]() -> ParserStatus {
-                                 return parsePlatformVersionInList(
-                                     AtAttrName, PlatformAndVersions);
-                               });
+        Result = parseListItem(
+            Status, tok::r_paren, LeftLoc, RightLoc,
+            /*AllowSepAfterLast=*/false, [&]() -> ParserStatus {
+              return parsePlatformVersionInList(AtAttrName, PlatformAndVersions,
+                                                ParsedUnrecognizedPlatformName);
+            });
       } while (Result == ParseListItemResult::Continue);
     }
   }
@@ -2324,12 +2318,11 @@ bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
     return false;
   }
 
-  if (PlatformAndVersions.empty()) {
+  if (PlatformAndVersions.empty() && !ParsedUnrecognizedPlatformName) {
     diagnose(Loc, diag::attr_availability_need_platform_version, AtAttrName);
     return false;
   }
 
-  assert(!PlatformAndVersions.empty());
   auto AttrRange = SourceRange(Loc, RightLoc);
   for (auto &Item : PlatformAndVersions) {
     Attributes.add(new (Context) BackDeployedAttr(AtLoc, AttrRange, Item.first,
@@ -2797,6 +2790,92 @@ static std::optional<Identifier> parseSingleAttrOptionImpl(
   }
 
   return P.Context.getIdentifier(parsedName);
+}
+
+ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(SourceLoc atLoc,
+                                                          SourceLoc loc) {
+  ParserStatus status;
+  SmallVector<LifetimeEntry> lifetimeEntries;
+
+  if (!Context.LangOpts.hasFeature(Feature::NonescapableTypes)) {
+    diagnose(loc, diag::requires_experimental_feature, "lifetime attribute",
+             false, getFeatureName(Feature::NonescapableTypes));
+    status.setIsParseError();
+    return status;
+  }
+
+  if (!Tok.isFollowingLParen()) {
+    diagnose(loc, diag::expected_lparen_after_lifetime_dependence);
+    status.setIsParseError();
+    return status;
+  }
+  // consume the l_paren
+  auto lParenLoc = consumeToken();
+
+  SourceLoc rParenLoc;
+  bool foundParamId = false;
+  status = parseList(
+      tok::r_paren, lParenLoc, rParenLoc, /*AllowSepAfterLast*/ false,
+      diag::expected_rparen_after_lifetime_dependence, [&]() -> ParserStatus {
+        ParserStatus listStatus;
+        foundParamId = true;
+        switch (Tok.getKind()) {
+        case tok::identifier: {
+          Identifier paramName;
+          auto paramLoc =
+              consumeIdentifier(paramName, /*diagnoseDollarPrefix=*/false);
+          if (paramName.is("immortal")) {
+            lifetimeEntries.push_back(
+                LifetimeEntry::getImmortalLifetimeEntry(paramLoc));
+          } else {
+            lifetimeEntries.push_back(
+                LifetimeEntry::getNamedLifetimeEntry(paramLoc, paramName));
+          }
+          break;
+        }
+        case tok::integer_literal: {
+          SourceLoc paramLoc;
+          unsigned paramNum;
+          if (parseUnsignedInteger(
+                  paramNum, paramLoc,
+                  diag::expected_param_index_lifetime_dependence)) {
+            listStatus.setIsParseError();
+            return listStatus;
+          }
+          lifetimeEntries.push_back(
+              LifetimeEntry::getOrderedLifetimeEntry(paramLoc, paramNum));
+          break;
+        }
+        case tok::kw_self: {
+          auto paramLoc = consumeToken(tok::kw_self);
+          lifetimeEntries.push_back(
+              LifetimeEntry::getSelfLifetimeEntry(paramLoc));
+          break;
+        }
+        default:
+          diagnose(
+              Tok,
+              diag::
+                  expected_identifier_or_index_or_self_after_lifetime_dependence);
+          listStatus.setIsParseError();
+          return listStatus;
+        }
+        return listStatus;
+      });
+
+  if (!foundParamId) {
+    diagnose(
+        Tok,
+        diag::expected_identifier_or_index_or_self_after_lifetime_dependence);
+    status.setIsParseError();
+    return status;
+  }
+
+  assert(!lifetimeEntries.empty());
+  SourceRange range(loc, rParenLoc);
+  return ParserResult<LifetimeAttr>(
+      LifetimeAttr::create(Context, atLoc, SourceRange(loc, rParenLoc),
+                           /* implicit */ false, lifetimeEntries));
 }
 
 /// Parses a (possibly optional) argument for an attribute containing a single, arbitrary identifier.
@@ -3445,6 +3524,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     StringRef AttrName = "@_originallyDefinedIn";
     bool SuppressLaterDiags = false;
+    bool ParsedUnrecognizedPlatformName = false;
     if (parseList(tok::r_paren, LeftLoc, RightLoc, false,
                   diag::originally_defined_in_missing_rparen,
                   [&]() -> ParserStatus {
@@ -3484,8 +3564,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       }
       // Parse 'OSX 13.13'.
       case NextSegmentKind::PlatformVersion: {
-        ParserStatus ListItemStatus =
-            parsePlatformVersionInList(AttrName, PlatformAndVersions);
+        ParserStatus ListItemStatus = parsePlatformVersionInList(
+            AttrName, PlatformAndVersions, ParsedUnrecognizedPlatformName);
         if (ListItemStatus.isErrorOrHasCompletion())
           SuppressLaterDiags = true;
         return ListItemStatus;
@@ -3499,13 +3579,13 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       diagnose(AtLoc, diag::originally_defined_in_need_nonempty_module_name);
       return makeParserSuccess();
     }
-    if (PlatformAndVersions.empty()) {
+
+    if (PlatformAndVersions.empty() && !ParsedUnrecognizedPlatformName) {
       diagnose(AtLoc, diag::attr_availability_need_platform_version, AttrName);
       return makeParserSuccess();
     }
 
     assert(!OriginalModuleName.empty());
-    assert(!PlatformAndVersions.empty());
     assert(NK == NextSegmentKind::PlatformVersion);
     AttrRange = SourceRange(Loc, RightLoc);
     for (auto &Item: PlatformAndVersions) {
@@ -4027,10 +4107,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return makeParserSuccess();
       }
      
-      unsigned count;
-      SourceLoc countLoc;
-      if (parseUnsignedInteger(count, countLoc,
-                               diag::attr_rawlayout_expected_integer_count)) {
+      auto countType = parseType(diag::expected_type);
+      if (countType.isNull()) {
         return makeParserSuccess();
       }
       
@@ -4050,14 +4128,22 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return makeParserSuccess();
       }
       
-      attr = new (Context) RawLayoutAttr(likeType.get(), count, movesAsLike,
-                                         AtLoc, SourceRange(Loc, rParenLoc));
+      attr = new (Context) RawLayoutAttr(likeType.get(), countType.get(),
+                                         movesAsLike, AtLoc,
+                                         SourceRange(Loc, rParenLoc));
     } else {
       diagnose(Loc, diag::attr_rawlayout_expected_label,
                "'size', 'like', or 'likeArrayOf'");
       return makeParserSuccess();
     }
     Attributes.add(attr);
+    break;
+  }
+  case DeclAttrKind::Lifetime: {
+    auto Attr = parseLifetimeAttribute(AtLoc, Loc);
+    Status |= Attr;
+    if (Attr.isNonNull())
+      Attributes.add(Attr.get());
     break;
   }
   }
@@ -5088,8 +5174,8 @@ static ParsedLifetimeDependenceKind getSILLifetimeDependenceKind(const Token &T)
   return ParsedLifetimeDependenceKind::Scope;
 }
 
-ParserStatus Parser::parseLifetimeDependenceSpecifiers(
-    SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList) {
+ParserStatus
+Parser::parseLifetimeEntries(SmallVectorImpl<LifetimeEntry> &specifierList) {
   ParserStatus status;
   // TODO: Add fixits for diagnostics in this function.
   do {
@@ -5139,13 +5225,10 @@ ParserStatus Parser::parseLifetimeDependenceSpecifiers(
                 consumeIdentifier(paramName, /*diagnoseDollarPrefix=*/false);
             if (paramName.is("immortal")) {
               specifierList.push_back(
-                  LifetimeDependenceSpecifier::
-                      getImmortalLifetimeDependenceSpecifier(paramLoc));
+                  LifetimeEntry::getImmortalLifetimeEntry(paramLoc));
             } else {
-              specifierList.push_back(
-                  LifetimeDependenceSpecifier::
-                      getNamedLifetimeDependenceSpecifier(
-                          paramLoc, lifetimeDependenceKind, paramName));
+              specifierList.push_back(LifetimeEntry::getNamedLifetimeEntry(
+                  paramLoc, paramName, lifetimeDependenceKind));
             }
             break;
           }
@@ -5158,17 +5241,14 @@ ParserStatus Parser::parseLifetimeDependenceSpecifiers(
               listStatus.setIsParseError();
               return listStatus;
             }
-            specifierList.push_back(
-                LifetimeDependenceSpecifier::
-                    getOrderedLifetimeDependenceSpecifier(
-                        paramLoc, lifetimeDependenceKind, paramNum));
+            specifierList.push_back(LifetimeEntry::getOrderedLifetimeEntry(
+                paramLoc, paramNum, lifetimeDependenceKind));
             break;
           }
           case tok::kw_self: {
             auto paramLoc = consumeToken(tok::kw_self);
-            specifierList.push_back(
-                LifetimeDependenceSpecifier::getSelfLifetimeDependenceSpecifier(
-                    paramLoc, lifetimeDependenceKind));
+            specifierList.push_back(LifetimeEntry::getSelfLifetimeEntry(
+                paramLoc, lifetimeDependenceKind));
             break;
           }
           default:
@@ -5204,7 +5284,7 @@ ParserStatus Parser::parseDeclAttributeList(
       if (!ifConfigsAreDeclAttrs && !ifConfigContainsOnlyAttributes())
         break;
 
-      Status |= parseIfConfigDeclAttributes(
+      Status |= parseIfConfigAttributes(
           Attributes, ifConfigsAreDeclAttrs, initContext);
     }
   }
@@ -5252,7 +5332,7 @@ ParserStatus Parser::parseClosureDeclAttributeList(DeclAttributes &Attributes) {
       if (!ifConfigsAreDeclAttrs && !ifConfigContainsOnlyAttributes()) {
         break;
       }
-      Status |= parseIfConfigDeclAttributes(Attributes, ifConfigsAreDeclAttrs,
+      Status |= parseIfConfigAttributes(Attributes, ifConfigsAreDeclAttrs,
                                             initContext);
     }
   }
@@ -5497,8 +5577,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
                    "lifetime dependence specifier", false,
                    getFeatureName(Feature::NonescapableTypes));
       }
-      status |=
-          P.parseLifetimeDependenceSpecifiers(lifetimeDependenceSpecifiers);
+      status |= P.parseLifetimeEntries(lifetimeEntries);
       continue;
     }
 
@@ -6168,13 +6247,17 @@ static Parser::ParseDeclOptions getParseDeclOptions(DeclContext *DC) {
 ///
 /// \param fromASTGen If true , this function in called from ASTGen as the
 /// fallback, so do not attempt a callback to ASTGen.
-ParserResult<Decl> Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
-                                     bool IfConfigsAreDeclAttrs,
-                                     llvm::function_ref<void(Decl *)> Handler,
-                                     bool fromASTGen) {
+ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
+                               bool IfConfigsAreDeclAttrs,
+                               llvm::function_ref<void(Decl *)> Handler,
+                               bool fromASTGen) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
-  if (IsForASTGen && !fromASTGen)
-    return parseDeclFromSyntaxTree();
+  if (IsForASTGen && !fromASTGen) {
+    auto result = parseDeclFromSyntaxTree();
+    if (auto resultDecl = result.getPtrOrNull())
+      Handler(resultDecl);
+    return result;
+  }
 #endif
   ParseDeclOptions Flags = getParseDeclOptions(CurDeclContext);
   ParserPosition BeginParserPosition;
@@ -6184,13 +6267,17 @@ ParserResult<Decl> Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
   if (Tok.is(tok::pound_if) && !ifConfigContainsOnlyAttributes()) {
     auto IfConfigResult = parseIfConfig(
         IfConfigContext::DeclItems,
-        [&](SmallVectorImpl<ASTNode> &Decls, bool IsActive) {
+        [&](bool IsActive) {
           ParserStatus Status;
           bool PreviousHadSemi = true;
           while (Tok.isNot(tok::pound_else, tok::pound_endif, tok::pound_elseif,
                            tok::r_brace, tok::eof)) {
             Status |= parseDeclItem(PreviousHadSemi,
-                                    [&](Decl *D) { Decls.emplace_back(D); });
+                                    [&](Decl *D) {
+              if (IsActive) {
+                Handler(D);
+              }
+            });
           }
         });
     if (IfConfigResult.hasCodeCompletion() && isIDEInspectionFirstPass()) {
@@ -6198,19 +6285,7 @@ ParserResult<Decl> Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
       return makeParserError();
     }
 
-    if (auto ICD = IfConfigResult.getPtrOrNull()) {
-      // The IfConfigDecl is ahead of its members in source order.
-      Handler(ICD);
-      // Copy the active members into the entries list.
-      for (auto activeMember : ICD->getActiveClauseElements()) {
-        auto *D = activeMember.get<Decl*>();
-        if (isa<IfConfigDecl>(D))
-          // Don't hoist nested '#if'.
-          continue;
-        Handler(D);
-      }
-    }
-    return IfConfigResult;
+    return makeParserSuccess();
   }
   if (Tok.isAny(tok::pound_warning, tok::pound_error)) {
     auto Result = parseDeclPoundDiagnostic();
@@ -6971,15 +7046,19 @@ ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
     return LineDirectiveStatus;
   }
 
-  ParserResult<Decl> Result =
+  Decl *LastResultDecl = nullptr;
+  ParserStatus Result =
       parseDecl(IsAtStartOfLineOrPreviousHadSemi,
-                /* IfConfigsAreDeclAttrs=*/false, handler);
-  if (Result.isParseErrorOrHasCompletion())
+                /* IfConfigsAreDeclAttrs=*/false, [&](Decl *decl) {
+        handler(decl);
+        LastResultDecl = decl;
+      });
+  if (Result.isErrorOrHasCompletion())
     skipUntilDeclRBrace(tok::semi, tok::pound_endif);
   SourceLoc SemiLoc;
   PreviousHadSemi = consumeIf(tok::semi, SemiLoc);
-  if (PreviousHadSemi && Result.isNonNull())
-    Result.get()->TrailingSemiLoc = SemiLoc;
+  if (PreviousHadSemi && LastResultDecl)
+    LastResultDecl->TrailingSemiLoc = SemiLoc;
   return Result;
 }
 

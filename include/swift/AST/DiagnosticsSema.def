@@ -1605,6 +1605,11 @@ NOTE(candidate_with_extraneous_args,none,
      "candidate %0 has %1 parameter%s1, but context %2 has %3",
      (Type, unsigned, Type, unsigned))
 
+ERROR(result_builder_missing_element,none,
+      "expected expression in result builder %0", (DeclName))
+ERROR(result_builder_missing_element_of_type,none,
+      "expected expression of type %0 in result builder %1", (Type, DeclName))
+
 ERROR(no_accessible_initializers,none,
       "%0 cannot be constructed because it has no accessible initializers",
       (Type))
@@ -2606,8 +2611,9 @@ ERROR(retroactive_not_in_extension_inheritance_clause,none,
       "extensions", ())
 
 ERROR(retroactive_attr_does_not_apply,none,
-      "'retroactive' attribute does not apply; %0 is declared in this module",
-      (Identifier))
+      "'retroactive' attribute does not apply; %0 is declared in "
+      "%select{the same package|this module}1",
+      (const ValueDecl *, bool))
 
 WARNING(extension_retroactive_conformance,none,
        "extension declares a conformance of imported type %0 to imported "
@@ -2666,10 +2672,10 @@ NOTE(add_preconcurrency_to_conformance,none,
      "add '@preconcurrency' to the %0 conformance to defer isolation checking to run time", (DeclName))
 WARNING(remove_public_import,none,
         "public import of %0 was not used in public declarations or inlinable code",
-        (const ModuleDecl *))
+        (Identifier))
 WARNING(remove_package_import,none,
         "package import of %0 was not used in package declarations",
-        (const ModuleDecl *))
+        (Identifier))
 WARNING(public_decl_needs_sendable,none,
         "public %kind0 does not specify whether it is 'Sendable' or not",
         (const ValueDecl *))
@@ -2829,7 +2835,7 @@ ERROR(protocol_has_missing_requirements_versioned,none,
       (Type, Type, llvm::VersionTuple, llvm::VersionTuple))
 ERROR(requirement_restricts_self,none,
       "%kindonly0 requirement %0 cannot add constraint "
-      "'%1%select{:|:| ==|:| has same shape as}2 %3' on 'Self'",
+      "'%1%select{:|:| ==|:| has same shape as|}2 %3' on 'Self'",
       (const ValueDecl *, StringRef, unsigned, StringRef))
 ERROR(witness_argument_name_mismatch,none,
       "%kind0 has different argument labels "
@@ -3322,6 +3328,9 @@ ERROR(override_multiple_decls_base,none,
       (DeclName))
 ERROR(override_sendability_mismatch,none,
       "declaration %0 has a type with different sendability from any potential "
+      "overrides", (DeclName))
+ERROR(override_global_actor_isolation_mismatch,none,
+      "declaration %0 has a type with different global actor isolation from any potential "
       "overrides", (DeclName))
 ERROR(override_multiple_decls_arg_mismatch,none,
       "declaration %0 has different argument labels from any potential "
@@ -4108,6 +4117,8 @@ ERROR(attr_rawlayout_cannot_have_stored_properties,none,
       "type with @_rawLayout cannot have stored properties", ())
 ERROR(attr_rawlayout_cannot_have_alignment_attr,none,
       "type with @_rawLayout cannot also have an @_alignment attribute", ())
+ERROR(attr_rawlayout_invalid_count_type,none,
+      "@_rawLayout count must either be integer literal or a generic argument", ())
       
 // lazy
 ERROR(lazy_not_on_let,none,
@@ -4606,8 +4617,8 @@ NOTE(duplicated_key_declared_here, none,
      "duplicate key declared here", ())
 
 // Generic specializations
-ERROR(cannot_explicitly_specialize_generic_function,none,
-      "cannot explicitly specialize a generic function", ())
+ERROR(cannot_explicitly_specialize_function,none,
+      "cannot explicitly specialize %kind0", (ValueDecl *))
 ERROR(not_a_generic_type,none,
       "cannot specialize non-generic type %0", (Type))
 ERROR(not_a_generic_macro,none,
@@ -5802,6 +5813,9 @@ ERROR(nonisolated_actor_sync_init,none,
 ERROR(nonisolated_wrapped_property,none,
       "'nonisolated' is not supported on properties with property wrappers",
       ())
+ERROR(nonisolated_lazy,none,
+      "'nonisolated' is not supported on lazy properties",
+      ())
 
 ERROR(non_sendable_from_deinit,none,
         "cannot access %1 %2 with a non-sendable type %0 from nonisolated deinit",
@@ -6644,19 +6658,20 @@ NOTE(availability_obsoleted, none,
      "%0 was obsoleted in %1 %2",
      (const ValueDecl *, StringRef, llvm::VersionTuple))
 
-WARNING(availability_deprecated, Deprecation,
-        "%0 %select{is|%select{is|was}3}1 "
-        "deprecated%select{| in %2%select{| %4}3}1%select{|: %5}5",
-        (const ValueDecl *, bool, StringRef, bool, llvm::VersionTuple,
-         StringRef))
+GROUPED_WARNING(availability_deprecated, availability_deprecated, Deprecation,
+                "%0 %select{is|%select{is|was}3}1 "
+                "deprecated%select{| in %2%select{| %4}3}1%select{|: %5}5",
+                (const ValueDecl *, bool, StringRef, bool, llvm::VersionTuple,
+                 StringRef))
 
-WARNING(availability_deprecated_rename, Deprecation,
-        "%0 %select{is|%select{is|was}3}1 "
-        "deprecated%select{| in %2%select{| %4}3}1: "
-        "%select{renamed to|replaced by}5%" REPLACEMENT_DECL_KIND_SELECT "6 "
-        "'%7'",
-        (const ValueDecl *, bool, StringRef, bool, llvm::VersionTuple, bool,
-         unsigned, StringRef))
+GROUPED_WARNING(
+      availability_deprecated_rename, availability_deprecated, Deprecation,
+      "%0 %select{is|%select{is|was}3}1 "
+      "deprecated%select{| in %2%select{| %4}3}1: "
+      "%select{renamed to|replaced by}5%" REPLACEMENT_DECL_KIND_SELECT "6 "
+      "'%7'",
+      (const ValueDecl *, bool, StringRef, bool, llvm::VersionTuple, bool,
+       unsigned, StringRef))
 #undef REPLACEMENT_DECL_KIND_SELECT
 
 NOTE(note_deprecated_rename, none,
@@ -6748,12 +6763,13 @@ WARNING(availability_query_useless_enclosing_scope, none,
 NOTE(availability_query_useless_enclosing_scope_here, none,
      "enclosing scope here", ())
 
-ERROR(availability_deinit_no_potential, none,
-      "deinitializer cannot be marked potentially unavailable with "
-      "'@available'", ())
+ERROR(availability_decl_no_potential, none,
+      "%kindonly0 cannot be marked potentially unavailable with '@available'",
+      (const Decl *))
 
-ERROR(availability_deinit_no_unavailable, none,
-      "deinitializer cannot be marked unavailable with '@available'", ())
+ERROR(availability_decl_no_unavailable, none,
+      "%kindonly0 cannot be marked unavailable with '@available'",
+      (const Decl *))
 
 ERROR(availability_global_script_no_potential,
       none, "global variable cannot be marked potentially "
@@ -7253,7 +7269,7 @@ NOTE(note_result_builder_control_flow, none,
       "builder %0", (DeclName))
 ERROR(result_builder_attribute_not_allowed_here, none,
       "result builder attribute %0 can only be applied to a parameter, "
-      "function, or computed property", (Identifier))
+      "function, subscript, or computed property", (Identifier))
 ERROR(result_builder_attribute_on_storage_without_getter, none,
       "result builder attribute %0 can only be applied to a "
       "%select{subscript|property|constant|variable}1 if it defines a getter",
@@ -7696,7 +7712,7 @@ ERROR(copyable_illegal_deinit, none,
       (const ValueDecl *))
 ERROR(inverse_cannot_be_conditional_on_requirement, none,
       "conditional conformance to suppressible %kind0 cannot depend on "
-      "'%noformat1%select{:|:| ==|:| has same shape as}2 %noformat3'",
+      "'%noformat1%select{:|:| ==|:| has same shape as|}2 %noformat3'",
       (const ProtocolDecl *, Type, unsigned, Type))
 ERROR(inverse_type_member_in_conforming_type,none,
       "%select{stored property %2|associated value %2}1 of "
@@ -7943,12 +7959,13 @@ ERROR(lifetime_dependence_function_type, none,
       "lifetime dependencies on function types are not supported",
       ())
 
+ERROR(lifetime_dependence_immortal_alone, none,
+      "cannot specify any other dependence source along with immortal", ())
+
 //===----------------------------------------------------------------------===//
 //                             MARK: Sending
 //===----------------------------------------------------------------------===//
 
-ERROR(sending_unsupported_param_specifier, none,
-      "'%0' cannot be applied to a 'sending' parameter", (StringRef))
 ERROR(sending_only_on_parameters_and_results, none,
       "'sending' may only be used on parameters and results", ())
 ERROR(sending_cannot_be_applied_to_tuple_elt, none,
@@ -7994,6 +8011,34 @@ WARNING(reference_to_unsafe_typed_decl,none,
       (bool, const ValueDecl *, Type))
 NOTE(unsafe_decl_here,none,
      "unsafe %kindbase0 declared here", (const ValueDecl *))
+
+//===----------------------------------------------------------------------===//
+// MARK: Value Generics
+//===----------------------------------------------------------------------===//
+
+ERROR(cannot_pass_type_for_value_generic,none,
+      "cannot pass type %0 as a value for generic value %1", (Type, Type))
+ERROR(value_type_used_in_type_parameter,none,
+      "cannot use value type %0 for generic argument %1", (Type, Type))
+ERROR(invalid_value_type_value_generic,none,
+      "%0 is not a supported value type for %1", (Type, Type))
+ERROR(invalid_value_generic_conformance,none,
+      "value generic type %0 cannot conform to protocol %1", (Type, Type))
+ERROR(invalid_value_generic_same_type,none,
+      "cannot constrain value parameter %0 to be type %1", (Type, Type))
+ERROR(integer_type_not_accepted,none,
+      "integer unexpectedly used in a type position", ())
+ERROR(value_generic_unexpected,none,
+      "using value generic %0 here is not allowed", (Type))
+ERROR(missing_value_generic_type,none,
+      "value generic %0 must have an explicit value type declared", (Identifier))
+ERROR(value_generics_missing_feature,none,
+      "value generics require '-enable-experimental-feature ValueGenerics'", ())
+ERROR(availability_value_generic_type_only_version_newer, none,
+      "values in generic types are only available in %0 %1 or newer",
+      (StringRef, llvm::VersionTuple))
+ERROR(invalid_value_for_type_same_type,none,
+      "cannot constrain type parameter %0 to be integer %1", (Type, Type))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

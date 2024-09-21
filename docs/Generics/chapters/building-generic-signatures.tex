@@ -402,7 +402,7 @@ We now present requirement decomposition in the form of an algorithm. Mostly thi
 Output the same-type requirement $\SameReq{$\texttt{T.[P]A}_i$}{$\texttt{G}_i$}$.
 \end{enumerate}
 \item (Error) If \texttt{X} is anything else, we have an invalid requirement, for example $\ConfReq{T}{Int}$. \index{diagnostic!invalid requirement}Diagnose an error.
-\item (Next) Go back to Step~4.
+\item (Next) Go back to Step~3.
 \end{enumerate}
 \end{algorithm}
 Usually \tT\ will be a type parameter in Step~7, and the substituted type becomes the dependent member type $\texttt{T.[P]A}_i$. Our algorithm relies on type substitution to also cope with \tT\ being a concrete type. When \tT\ is a concrete type, the subject type of each introduced same-type requirement has to be the \index{type witness}type witness for $\nA_i$ in the concrete conformance $\TP$. For example, given $\ConfReq{Array<\rT>}{Sequence<Int>}$, we output $\ConfReq{Array<\rT>}{Sequence}$ and $\SameReq{\rT}{Int}$. Admittedly, this is a rather a silly edge case. One might think that requirement inference would exercise this scenario:
@@ -435,7 +435,7 @@ The second case merits further explanation. A generic declaration whose requirem
 
 Next, we consider a conformance requirement with a left-hand side that contains type parameters, like $\ConfReq{Array<\rT>}{Sequence}$ or $\ConfReq{Array<\rT>}{Hashable}$. With \index{global conformance lookup}global conformance lookup, we can find the concrete conformance of the subject type to this protocol. If the conformance is \index{invalid conformance}invalid, we have a trivial conflict; if unconditional, the requirement is trivially satisfied.
 
-A \index{conditional conformance}conditional conformance here finally gives us an interesting behavior. Our invariant \textsl{leaves us with no choice}: we must replace the original requirement with the \index{conditional requirement}conditional requirements of this conformance (an unconditional conformance has an empty set of conditional requirements, so there's really just one rule here). For example, for any substitution map $\Sigma$, it is true that $\texttt{Array<\rT>}\otimes\Sigma$ conforms to \texttt{Hashable} if and only if $\rT\otimes\Sigma$ conforms to \texttt{Hashable}. By this logic, $\ConfReq{Array<\rT>}{Hashable}$ must desugar to $\ConfReq{\rT}{Hashable}$, which now fully explains how we infer $\ConfReq{\rT}{Hashable}$ from the parameter type \texttt{Set<Array<\rT>>} below, as we saw previously:
+If we get a \index{conditional conformance}conditional conformance here, our invariant \textsl{leaves us no choice} but to replace the original requirement with the \index{conditional requirement}conditional requirements of this conformance (an unconditional conformance has an empty set of conditional requirements, so there's really just one rule here). For example, because of the conditional conformance of \texttt{Array} to \texttt{Hashable}, we know that $\texttt{Array<\rT>}\otimes\Sigma$ conforms to \texttt{Hashable} if and only if $\rT\otimes\Sigma$ conforms to \texttt{Hashable}, for any substitution map $\Sigma$. Therefore, $\ConfReq{Array<\rT>}{Hashable}$ must desugar to $\ConfReq{\rT}{Hashable}$, which explains how we infer $\ConfReq{\rT}{Hashable}$ from \texttt{Set<Array<\rT>>}, an example we saw earlier:
 \begin{Verbatim}
 func f<T>(_: Set<Array<T>>) /* where T: Hashable */ {}
 \end{Verbatim}
@@ -485,7 +485,7 @@ Takes an arbitrary requirement as input. Outputs a list of desugared requirement
 \item (Next) Take the next requirement from the worklist. If the requirement's subject type is a type parameter, add it to the output list and go to Step~5.
 \item (Desugar) Otherwise, the subject type is a concrete type. Handle each \index{requirement kind}requirement kind as follows:
 \begin{enumerate}
-\item For a \index{conformance requirement}\textbf{conformance requirement} $\TP$, perform the \index{global conformance lookup}global conformance lookup $\protosym{P}\otimes\tT$:
+\item For a \index{conformance requirement}\textbf{conformance requirement} $\TP$, perform the \index{global conformance lookup}global conformance lookup $\pP\otimes\tT$:
 \begin{enumerate}
 \item If we get a \index{concrete conformance}concrete conformance, add the \index{conditional requirement}conditional requirements, if any, to the worklist.
 \item If we get an invalid conformance, add $\TP$ to the conflict list.
@@ -1226,9 +1226,8 @@ We will explain how the implementation deals with superclass, layout and concret
 
 \smallskip
 
-\begin{wrapfigure}[8]{r}{4.2cm}
-\begin{center}
-\begin{tikzpicture}[node distance=0.5cm]
+\begin{wrapfigure}[8]{r}{4cm}
+\quad\begin{tikzpicture}[node distance=0.5cm]
 \node (Shape) [class] {\texttt{\vphantom{Sp}Shape}};
 \node (Polygon) [class, below=of Shape] {\texttt{Polygon}};
 \node (Star) [class, right=of Polygon] {\texttt{\vphantom{Sp}Star}};
@@ -1238,7 +1237,6 @@ We will explain how the implementation deals with superclass, layout and concret
 \draw [arrow] (Shape) -- (Star);
 \draw [arrow] (Polygon) -- (Pentagon);
 \end{tikzpicture}
-\end{center}
 \end{wrapfigure}
 
 Our next example involves superclass requirements. While a description of generic classes awaits us in \ChapRef{classinheritance}, we only need non-generic classes to demonstrate the key ideas in requirement minimization. Since it is such a clich\'e at this point, we're going to follow the trend and go with the classic object oriented ``shape hierarchy'', shown on the right. We also introduce a \texttt{Canvas} protocol, which subjects it associated type to an \index{associated superclass requirement}associated superclass requirement $\AssocConfReq{Self.Boundary}{Polygon}{Canvas}$:

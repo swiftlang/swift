@@ -162,11 +162,11 @@ toolchain as a one-off, there are a couple of differences:
 ### Linux
 
 1. The latest Linux dependencies are listed in the respective Dockerfiles:
-   * [Ubuntu 18.04](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/master/ubuntu/18.04/Dockerfile)
-   * [Ubuntu 20.04](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/master/ubuntu/20.04/Dockerfile)
-   * [Ubuntu 22.04](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/master/ubuntu/22.04/Dockerfile)
-   * [CentOS 7](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/master/centos/7/Dockerfile)
-   * [Amazon Linux 2](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/master/amazon-linux/2/Dockerfile)
+   * [Ubuntu 18.04](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/main/ubuntu/18.04/Dockerfile)
+   * [Ubuntu 20.04](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/main/ubuntu/20.04/Dockerfile)
+   * [Ubuntu 22.04](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/main/ubuntu/22.04/Dockerfile)
+   * [CentOS 7](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/main/centos/7/Dockerfile)
+   * [Amazon Linux 2](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/main/amazon-linux/2/Dockerfile)
 
    Note that [a prebuilt Swift release toolchain](https://www.swift.org/download/)
    is installed and added to the `PATH` in all these Docker containers: it is
@@ -643,14 +643,14 @@ llvm::report_fatal_error(os.str());
 
 ### Debugging using LLDB
 
-When the compiler crashes, the commandline arguments passed to it will be
+When the compiler crashes, the command line arguments passed to it will be
 printed to stderr. It will likely look something like:
 
 ```
 /path/to/swift-frontend <args>
 ```
 
-- Using LLDB on the commandline: Copy the entire invocation and pass it to LLDB.
+- Using LLDB on the command line: Copy the entire invocation and pass it to LLDB.
   ```sh
   lldb -- /path/to/swift-frontend <args>
   ```

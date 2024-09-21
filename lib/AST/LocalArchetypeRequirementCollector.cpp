@@ -29,6 +29,9 @@ LocalArchetypeRequirementCollector::LocalArchetypeRequirementCollector(
     : Context(ctx), OuterSig(sig), Depth(sig.getNextDepth()) {}
 
 void LocalArchetypeRequirementCollector::addOpenedExistential(Type constraint) {
+  if (auto existential = constraint->getAs<ExistentialType>())
+    constraint = existential->getConstraintType();
+
   assert(constraint->isConstraintType() ||
          constraint->getClassOrBoundGenericClass());
   assert(OuterSig || !constraint->hasTypeParameter() &&
@@ -114,8 +117,7 @@ GenericTypeParamType *LocalArchetypeRequirementCollector::addParameter() {
     index = Params.back()->getIndex() + 1;
   }
 
-  auto *param = GenericTypeParamType::get(/*pack*/ false, Depth,
-                                          index, Context);
+  auto *param = GenericTypeParamType::getType(Depth, index, Context);
   Params.push_back(param);
   return param;
 }
@@ -134,10 +136,10 @@ GenericSignature swift::buildGenericSignatureWithCapturedEnvironments(
       break;
 
     case GenericEnvironment::Kind::OpenedExistential: {
-      auto constraint = genericEnv->getOpenedExistentialType();
-      if (auto existential = constraint->getAs<ExistentialType>())
-        constraint = existential->getConstraintType()->mapTypeOutOfContext();
-      collector.addOpenedExistential(constraint);
+      auto existentialTy = genericEnv->maybeApplyOuterContextSubstitutions(
+          genericEnv->getOpenedExistentialType())
+              ->mapTypeOutOfContext();
+      collector.addOpenedExistential(existentialTy);
       continue;
     }
     case GenericEnvironment::Kind::OpenedElement: {
@@ -174,9 +176,8 @@ Type MapLocalArchetypesOutOfContext::getInterfaceType(
   unsigned depth = baseGenericSig.getNextDepth();
   for (auto *capturedEnv : capturedEnvs) {
     if (capturedEnv == genericEnv) {
-      return GenericTypeParamType::get(/*isParameterPack=*/false,
-                                       depth, rootParam->getIndex(),
-                                       rootParam->getASTContext());
+      return GenericTypeParamType::getType(depth, rootParam->getIndex(),
+                                           rootParam->getASTContext());
     }
 
     ++depth;
@@ -201,6 +202,17 @@ Type MapLocalArchetypesOutOfContext::operator()(SubstitutableType *type) const {
   // Root local archetypes change depth.
   auto *genericEnv = archetypeTy->getGenericEnvironment();
   return getInterfaceType(archetypeTy->getInterfaceType(), genericEnv);
+}
+
+Type swift::mapLocalArchetypesOutOfContext(
+    Type type,
+    GenericSignature baseGenericSig,
+    ArrayRef<GenericEnvironment *> capturedEnvs) {
+  return type.subst(MapLocalArchetypesOutOfContext(baseGenericSig, capturedEnvs),
+                    MakeAbstractConformanceForGenericType(),
+                    SubstFlags::PreservePackExpansionLevel |
+                    SubstFlags::SubstitutePrimaryArchetypes |
+                    SubstFlags::SubstituteLocalArchetypes);
 }
 
 static Type mapIntoLocalContext(GenericTypeParamType *param, unsigned baseDepth,

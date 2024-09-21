@@ -140,13 +140,13 @@ public struct TheGenericContainerInitNonTriv {
 // CHECK-NEXT: alignas(alignof(LargeStructNonTrivial)) char copyBuffer_consumedParamCopy_2[sizeof(LargeStructNonTrivial)];
 // CHECK-NEXT: auto &consumedParamCopy_2 = *(new(copyBuffer_consumedParamCopy_2) LargeStructNonTrivial(_2));
 // CHECK-NEXT: swift::_impl::ConsumedValueStorageDestroyer<LargeStructNonTrivial> storageGuard_consumedParamCopy_2(consumedParamCopy_2);
-// CHECK-NON_EVO-NEXT: _impl::$s4Init0A9FromSmallV04takeC5LargeyyAA0C16StructNonTrivialVn_AA0efgH0VntF(_impl::swift_interop_passDirect_Init_{{.*}}(_impl::_impl_SmallStructNonTrivial::getOpaquePointer(consumedParamCopy_1)), _impl::_impl_LargeStructNonTrivial::getOpaquePointer(consumedParamCopy_2), _impl::swift_interop_passDirect_Init_{{.*}}(_getOpaquePointer()));
+// CHECK-NON_EVO-NEXT: Init::_impl::$s4Init0A9FromSmallV04takeC5LargeyyAA0C16StructNonTrivialVn_AA0efgH0VntF(Init::_impl::swift_interop_passDirect_Init_{{.*}}(Init::_impl::_impl_SmallStructNonTrivial::getOpaquePointer(consumedParamCopy_1)), Init::_impl::_impl_LargeStructNonTrivial::getOpaquePointer(consumedParamCopy_2), Init::_impl::swift_interop_passDirect_Init_{{.*}}(_getOpaquePointer()));
 
 // CHECK: SWIFT_INLINE_THUNK void LargeStructNonTrivial::takeMe() const {
 // CHECK-NEXT: alignas(alignof(LargeStructNonTrivial)) char copyBuffer_consumedParamCopy_this[sizeof(LargeStructNonTrivial)];
 // CHECK-NEXT: auto &consumedParamCopy_this = *(new(copyBuffer_consumedParamCopy_this) LargeStructNonTrivial(*this));
 // CHECK-NEXT: swift::_impl::ConsumedValueStorageDestroyer<LargeStructNonTrivial> storageGuard_consumedParamCopy_this(consumedParamCopy_this);
-// CHECK-NEXT: _impl::$s4Init21LargeStructNonTrivialV6takeMeyyF(_impl::_impl_LargeStructNonTrivial::getOpaquePointer(consumedParamCopy_this));
+// CHECK-NEXT: Init::_impl::$s4Init21LargeStructNonTrivialV6takeMeyyF(Init::_impl::_impl_LargeStructNonTrivial::getOpaquePointer(consumedParamCopy_this));
 // CHECK-NEXT: }
 
 // CHECK: SWIFT_INLINE_THUNK TheGenericContainer<T_0_0> TheGenericContainer<T_0_0>::init(const T_0_0& x) {
@@ -166,7 +166,7 @@ public struct TheGenericContainerInitNonTriv {
 // CHECK-NEXT: alignas(alignof(TheGenericContainer<T_0_0>)) char copyBuffer_consumedParamCopy_this[sizeof(TheGenericContainer<T_0_0>)];
 // CHECK-NEXT: auto &consumedParamCopy_this = *(new(copyBuffer_consumedParamCopy_this) TheGenericContainer<T_0_0>(*this));
 // CHECK-NEXT: swift::_impl::ConsumedValueStorageDestroyer<TheGenericContainer<T_0_0>> storageGuard_consumedParamCopy_this(consumedParamCopy_this);
-// CHECK-NEXT: _impl::$s4Init19TheGenericContainerV04takecD0yyF(swift::TypeMetadataTrait<TheGenericContainer<T_0_0>>::getTypeMetadata(), _impl::_impl_TheGenericContainer<T_0_0>::getOpaquePointer(consumedParamCopy_this));
+// CHECK-NEXT: _impl::$s4Init19TheGenericContainerV04takecD0yyF(swift::TypeMetadataTrait<TheGenericContainer<T_0_0>>::getTypeMetadata(), Init::_impl::_impl_TheGenericContainer<T_0_0>::getOpaquePointer(consumedParamCopy_this));
 // CHECK-NEXT: }
 
 // CHECK: SWIFT_INLINE_THUNK TheGenericContainerInitNonTriv TheGenericContainerInitNonTriv::init(const TheGenericContainer<AKlass>& x) {

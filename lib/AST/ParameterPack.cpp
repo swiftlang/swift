@@ -17,6 +17,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
@@ -161,21 +162,18 @@ void TypeBase::getTypeParameterPacks(
       if (paramTy->isParameterPack())
         rootParameterPacks.push_back(paramTy);
     } else if (auto *archetypeTy = t->getAs<PackArchetypeType>()) {
-      rootParameterPacks.push_back(archetypeTy->getRoot());
+      if (archetypeTy->isRoot()) {
+        rootParameterPacks.push_back(archetypeTy);
+      } else {
+        auto *genericEnv = archetypeTy->getGenericEnvironment();
+        auto paramTy = archetypeTy->getInterfaceType()->getRootGenericParam();
+        rootParameterPacks.push_back(
+            genericEnv->mapTypeIntoContext(paramTy));
+      }
     }
 
     return false;
   });
-}
-
-bool GenericTypeParamType::isParameterPack() const {
-  if (auto param = getDecl()) {
-    return param->isParameterPack();
-  }
-
-  auto fixedNum = ParamOrDepthIndex.get<DepthIndexTy>();
-  return (fixedNum & GenericTypeParamType::TYPE_SEQUENCE_BIT) ==
-         GenericTypeParamType::TYPE_SEQUENCE_BIT;
 }
 
 bool TypeBase::isParameterPack() {

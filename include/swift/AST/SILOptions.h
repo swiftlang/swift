@@ -122,6 +122,9 @@ public:
   /// within the optimizer. This influences static branch prediction.
   bool EnableThrowsPrediction = false;
 
+  /// Controls whether to say that blocks ending in an 'unreachable' are cold.
+  bool EnableNoReturnCold = false;
+
   /// Should we run any SIL performance optimizations
   ///
   /// Useful when you want to enable -O LLVM opts but not -O SIL opts.
@@ -188,10 +191,10 @@ public:
   /// If set to true, compile with the SIL Opaque Values enabled.
   bool EnableSILOpaqueValues = false;
 
-  /// Require linear OSSA lifetimes after SILGen
-  bool OSSACompleteLifetimes = false;
+  /// Introduce linear OSSA lifetimes after SILGen
+  bool OSSACompleteLifetimes = true;
 
-  /// Verify linear OSSA lifetimes after SILGen
+  /// Verify linear OSSA lifetimes throughout OSSA pipeline.
   bool OSSAVerifyComplete = false;
 
   /// Enable pack metadata stack "promotion".

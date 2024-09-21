@@ -590,7 +590,7 @@ public:
   IndexSwiftASTWalker(IndexDataConsumer &IdxConsumer, ASTContext &Ctx,
                       SourceFile *SF = nullptr)
       : IdxConsumer(IdxConsumer), SrcMgr(Ctx.SourceMgr),
-        BufferID(SF ? SF->getBufferID().value_or(-1) : -1),
+        BufferID(SF ? SF->getBufferID() : -1),
         enableWarnings(IdxConsumer.enableWarnings()) {}
 
   ~IndexSwiftASTWalker() override {
@@ -1094,7 +1094,7 @@ private:
       return isa<ParamDecl>(D) && !IsRef &&
         D->getDeclContext()->getContextKind() != DeclContextKind::AbstractClosureExpr;
 
-    if (D->isPrivateStdlibDecl())
+    if (D->isPrivateSystemDecl())
       return false;
 
     return true;
@@ -1164,7 +1164,7 @@ void IndexSwiftASTWalker::visitModule(ModuleDecl &Mod) {
   for (auto File : Mod.getFiles()) {
     if (auto SF = dyn_cast<SourceFile>(File)) {
       auto BufID = SF->getBufferID();
-      if (BufID.has_value() && *BufID == BufferID) {
+      if (BufID == BufferID) {
         SrcFile = SF;
         break;
       }

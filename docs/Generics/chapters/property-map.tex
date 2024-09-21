@@ -7,9 +7,9 @@
 \ifWIP
 Until now, you've seen how to solve the \texttt{requiresProtocol()} generic signature
 query. If $T$ is a type term, then the type parameter represented by $T$ conforms to a protocol
-$\proto{P}$ if $T$ and $T.\protosym{P}$ both reduce to the same canonical form ${T}{\downarrow}$. The next
+$\proto{P}$ if $T$ and $T.\pP$ both reduce to the same canonical form ${T}{\downarrow}$. The next
 step is to solve more general queries, such as \texttt{getRequiredProtocols()}. Here, you want to find
-\emph{all} protocol symbols $\protosym{P}$ such that $T.\protosym{P}$ and $T$ reduce to some
+\emph{all} protocol symbols $\pP$ such that $T.\pP$ and $T$ reduce to some
 ${T}{\downarrow}$.
 
 \index{layout requirement}
@@ -181,23 +181,23 @@ The second example explores layout, superclass and concrete type requirements. C
 \[\gensig{\genericsym{0}{0}}{\genericsym{0}{0}\colon\proto{P}, \genericsym{0}{0}.\namesym{B}\colon\proto{Q}}\]
 The three protocols $\proto{R}$, $\proto{Q}$ and $\proto{P}$ together with the generic signature generate the following initial rewrite rules:
 \begin{align*}
-\protosym{Q}.\protosym{R}&\Rightarrow\protosym{Q}\tag{1}\\
-\protosym{P}.\namesym{A}&\Rightarrow\assocsym{P}{A}\tag{2}\\
-\protosym{P}.\namesym{B}&\Rightarrow\assocsym{P}{B}\tag{3}\\
-\protosym{P}.\namesym{C}&\Rightarrow\assocsym{P}{C}\tag{4}\\
+\pQ.\pR&\Rightarrow\pQ\tag{1}\\
+\pP.\namesym{A}&\Rightarrow\assocsym{P}{A}\tag{2}\\
+\pP.\namesym{B}&\Rightarrow\assocsym{P}{B}\tag{3}\\
+\pP.\namesym{C}&\Rightarrow\assocsym{P}{C}\tag{4}\\
 \assocsym{P}{A}.\layoutsym{AnyObject}&\Rightarrow\assocsym{P}{A}\tag{5}\\
 \assocsym{P}{B}.\supersym{\namesym{Cache}\langle\sigma_0\rangle;\,\sigma_0:=\assocsym{P}{A}}&\Rightarrow\assocsym{P}{B}\tag{6}\\
 \assocsym{P}{B}.\layoutsym{\_NativeClass}&\Rightarrow\assocsym{P}{B}\tag{7}\\
 \assocsym{P}{C}.\concretesym{\namesym{Array}\langle\sigma_0\rangle;\,\sigma_0:=\assocsym{P}{A}}&\Rightarrow\assocsym{P}{C}\tag{8}\\
-\genericsym{0}{0}.\protosym{P}&\Rightarrow\genericsym{0}{0}\tag{9}\\
-\genericsym{0}{0}.\assocsym{P}{B}.\protosym{Q}&\Rightarrow\genericsym{0}{0}.\assocsym{P}{B}\tag{10}
+\genericsym{0}{0}.\pP&\Rightarrow\genericsym{0}{0}\tag{9}\\
+\genericsym{0}{0}.\assocsym{P}{B}.\pQ&\Rightarrow\genericsym{0}{0}.\assocsym{P}{B}\tag{10}
 \end{align*}
 The Knuth-Bendix algorithm adds the following rules to make the rewrite system confluent:
 \begin{align*}
 \genericsym{0}{0}.\namesym{A}&\Rightarrow\genericsym{0}{0}.\assocsym{P}{A}\tag{11}\\
 \genericsym{0}{0}.\namesym{B}&\Rightarrow\genericsym{0}{0}.\assocsym{P}{B}\tag{12}\\
 \genericsym{0}{0}.\namesym{C}&\Rightarrow\genericsym{0}{0}.\assocsym{P}{C}\tag{13}\\
-\genericsym{0}{0}.\assocsym{P}{B}.\protosym{R}&\Rightarrow\genericsym{0}{0}.\assocsym{P}{B}\tag{14}
+\genericsym{0}{0}.\assocsym{P}{B}.\pR&\Rightarrow\genericsym{0}{0}.\assocsym{P}{B}\tag{14}
 \end{align*}
 \begin{listing}\captionabove{Protocol with concrete type requirements}\label{propmaplisting}
 \begin{Verbatim}
@@ -224,7 +224,7 @@ The following rewrite rules take the form $V.\Pi\Rightarrow V$, where $\Pi$ is a
 \item Rule~10, which states that the type parameter $\genericsym{0}{0}.\namesym{B}$ conforms to $\proto{Q}$.
 \item Rule~14, which states that the type parameter $\genericsym{0}{0}.\namesym{B}$ conforms to $\proto{R}$.
 
-This final rule was added by the completion procedure to resolve the overlap of Rule~10 and Rule~1 on the term $\genericsym{0}{0}.\assocsym{P}{B}.\protosym{Q}.\protosym{R}$.
+This final rule was added by the completion procedure to resolve the overlap of Rule~10 and Rule~1 on the term $\genericsym{0}{0}.\assocsym{P}{B}.\pQ.\pR$.
 \end{enumerate}
 When constructing the property map, sorting the rules by the length of their left hand sides guarantees that Rule~6 and Rule~7 are processed before Rule~10 and Rule~14. This is important because the subject type of Rule~6 and Rule~7 ($\assocsym{P}{B}$), is a suffix of the subject type of Rule~10 and Rule~14 ($\genericsym{0}{0}.\assocsym{P}{B}$), which means that the property map entries for both Rule~10 and Rule~14 inherit the superclass and layout requirements from Rule~6 and Rule~7. Furthermore, the substitution $\sigma_0:=\assocsym{P}{A}$ in the superclass requirement is adjusted by prepending the prefix $\genericsym{0}{0}$.
 
@@ -237,12 +237,12 @@ In the next section, you will see how this example property map can solve generi
 Key&Values\\
 \hline
 \hline
-$\protosym{Q}$&$\protosym{R}$\\
+$\pQ$&$\pR$\\
 $\assocsym{P}{A}$&$\layoutsym{AnyObject}$\\
 $\assocsym{P}{B}$&$\supersym{\namesym{Cache}\langle\sigma_0\rangle;\,\sigma_0:=\assocsym{P}{A}}$, $\layoutsym{\_NativeClass}$\\
 $\assocsym{P}{C}$&$\concretesym{\namesym{Array}\langle\sigma_0\rangle;\,\sigma_0:=\assocsym{P}{A}}$\\
-$\genericsym{0}{0}$&$\protosym{P}$\\
-$\genericsym{0}{0}.\assocsym{P}{B}$&$\protosym{Q}$, $\protosym{R}$, $\supersym{\namesym{Cache}\langle\sigma_0\rangle;\,\sigma_0:=\genericsym{0}{0}.\assocsym{P}{A}}$, $\layoutsym{\_NativeClass}$\\
+$\genericsym{0}{0}$&$\pP$\\
+$\genericsym{0}{0}.\assocsym{P}{B}$&$\pQ$, $\pR$, $\supersym{\namesym{Cache}\langle\sigma_0\rangle;\,\sigma_0:=\genericsym{0}{0}.\assocsym{P}{A}}$, $\layoutsym{\_NativeClass}$\\
 \hline
 \end{tabular}
 \end{center}
@@ -278,7 +278,7 @@ Generic signature queries are always posed relative to a generic signature, and 
 
 The first step is to look up the set of properties satisfied by $T$ using \AlgRef{propmaplookupalgo}. Then, each predicate can be tested as follows:
 \begin{description}
-\item[\texttt{requiresProtocol()}] A type parameter $T$ conforms to a protocol $\proto{P}$ if the property map entry for some suffix of $T$ stores $\protosym{P}$ for some suffix of $T$.
+\item[\texttt{requiresProtocol()}] A type parameter $T$ conforms to a protocol $\proto{P}$ if the property map entry for some suffix of $T$ stores $\pP$ for some suffix of $T$.
 \index{layout constraints}
 \index{join of layout constraints}
 \item[\texttt{requiresClass()}] A type parameter $T$ is represented as a retainable pointer if the property map entry for some suffix of $T$ stores a layout symbol $L$ such that $L\leq\layoutsym{AnyObject}$.
@@ -291,13 +291,13 @@ Given two layout symbols $A$ and $B$, $A\wedge B$ is the most general symbol tha
 
 Layout symbols store a layout constraint as an instance of the \texttt{LayoutConstraint} class. The join operation used in the implementation of the \texttt{requiresClass()} query is defined in the \texttt{merge()} method on \texttt{LayoutConstraint}.
 
-You've already seen the \texttt{requiresProtocol()} query in \ChapRef{symbols terms rules}, where it was shown that it can be implemented by checking if $\Lambda(T).\protosym{P}\downarrow\Lambda(T)$. The property map implementation is perhaps slightly more efficient, since it only simplifies a single term and not two. The $\texttt{requiresClass()}$ and $\texttt{isConcreteType()}$ queries are new on the other hand, and demonstrate the power of the property map. With the rewrite system alone, they cannot be implemented except by exhaustive enumeration over all known layout and concrete type symbols.
+You've already seen the \texttt{requiresProtocol()} query in \ChapRef{symbols terms rules}, where it was shown that it can be implemented by checking if $\Lambda(T).\pP\downarrow\Lambda(T)$. The property map implementation is perhaps slightly more efficient, since it only simplifies a single term and not two. The $\texttt{requiresClass()}$ and $\texttt{isConcreteType()}$ queries are new on the other hand, and demonstrate the power of the property map. With the rewrite system alone, they cannot be implemented except by exhaustive enumeration over all known layout and concrete type symbols.
 
 All of the subsequent examples reference the protocol definitions from \ExRef{propmapexample3}, and the resulting property map shown in Table~\ref{propmapexample2table}.
-\begin{example} Consider the canonical type term $\genericsym{0}{0}.\assocsym{P}{B}$. This type parameter conforms to $\proto{Q}$ via a requirement stated in the generic signature, and also to $\proto{R}$, because $\proto{Q}$ inherits from $\proto{R}$. The $\texttt{requiresProtocol()}$ query will confirm these facts, because the property map entry for $\genericsym{0}{0}.\assocsym{P}{B}$ contains the protocol symbols $\protosym{Q}$ and $\protosym{R}$:
+\begin{example} Consider the canonical type term $\genericsym{0}{0}.\assocsym{P}{B}$. This type parameter conforms to $\proto{Q}$ via a requirement stated in the generic signature, and also to $\proto{R}$, because $\proto{Q}$ inherits from $\proto{R}$. The $\texttt{requiresProtocol()}$ query will confirm these facts, because the property map entry for $\genericsym{0}{0}.\assocsym{P}{B}$ contains the protocol symbols $\pQ$ and $\pR$:
 \begin{enumerate}
-\item The conformance to $\proto{Q}$ is witnessed by the rewrite rule $\genericsym{0}{0}.\assocsym{P}{B}.\protosym{Q}\Rightarrow \genericsym{0}{0}.\assocsym{P}{B}$, which is Rule~10 in \ExRef{propmapexample2}. This is the initial rule generated by the conformance requirement.
-\item The conformance to $\proto{R}$ is witnessed by the rewrite rule $\genericsym{0}{0}.\assocsym{P}{B}.\protosym{R}\Rightarrow \genericsym{0}{0}.\assocsym{P}{B}$, which is Rule~14 in \ExRef{propmapexample2}. This rule was added by the completion procedure to resolve the overlap between Rule~10 above, which states that $\genericsym{0}{0}.\assocsym{P}{B}$ conforms to $\proto{Q}$, and Rule~1, which states that anything conforming to $\proto{Q}$ also conforms to $\proto{R}$.
+\item The conformance to $\proto{Q}$ is witnessed by the rewrite rule $\genericsym{0}{0}.\assocsym{P}{B}.\pQ\Rightarrow \genericsym{0}{0}.\assocsym{P}{B}$, which is Rule~10 in \ExRef{propmapexample2}. This is the initial rule generated by the conformance requirement.
+\item The conformance to $\proto{R}$ is witnessed by the rewrite rule $\genericsym{0}{0}.\assocsym{P}{B}.\pR\Rightarrow \genericsym{0}{0}.\assocsym{P}{B}$, which is Rule~14 in \ExRef{propmapexample2}. This rule was added by the completion procedure to resolve the overlap between Rule~10 above, which states that $\genericsym{0}{0}.\assocsym{P}{B}$ conforms to $\proto{Q}$, and Rule~1, which states that anything conforming to $\proto{Q}$ also conforms to $\proto{R}$.
 \end{enumerate}
 \end{example}
 \begin{example} This example shows the \texttt{requiresClass()} query on two different type terms.
@@ -397,7 +397,7 @@ Note how the \texttt{getLayoutConstraint()} query deals with a multiplicity of l
 
 Now, let's look at some examples of the four property queries. Once again, these examples use the property map shown in Table~\ref{propmapexample2table}.
 \begin{example}
-Consider the computation of the \texttt{getRequiredProtocols()} query on the canonical type term $\genericsym{0}{0}.\assocsym{P}{B}$. The property map stores the protocol symbols $\{\protosym{Q},\protosym{R}\}$, but $\proto{Q}$ inherits from $\proto{R}$, so the minimal canonical list of protocols is just $\{\protosym{Q}\}$.
+Consider the computation of the \texttt{getRequiredProtocols()} query on the canonical type term $\genericsym{0}{0}.\assocsym{P}{B}$. The property map stores the protocol symbols $\{\pQ,\pR\}$, but $\proto{Q}$ inherits from $\proto{R}$, so the minimal canonical list of protocols is just $\{\pQ\}$.
 \end{example}
 \begin{example}
 Consider the computation of the \texttt{getSuperclassBound()} query on the canonical type term $\genericsym{0}{0}.\assocsym{P}{B}$.
@@ -472,21 +472,21 @@ protocol P : Q {}
 \end{Verbatim}
 The rewrite system has two associated type introduction rules, one for the declaration of $\namesym{A}$ in $\proto{Q}$, and another for the inherited type $\namesym{A}$ in $\proto{P}$:
 \begin{align}
-\protosym{Q}.\namesym{A}&\Rightarrow\assocsym{Q}{A}\tag{1}\\
-\protosym{P}.\assocsym{Q}{A}&\Rightarrow \assocsym{P}{A}\tag{2}
+\pQ.\namesym{A}&\Rightarrow\assocsym{Q}{A}\tag{1}\\
+\pP.\assocsym{Q}{A}&\Rightarrow \assocsym{P}{A}\tag{2}
 \end{align}
 The protocol inheritance relationship also introduces a rewrite rule:
 \begin{align}
-\protosym{P}.\protosym{Q}&\Rightarrow\protosym{P}\tag{3}
+\pP.\pQ&\Rightarrow\pP\tag{3}
 \end{align}
 Finally, the conformance requirement in the generic signature adds the rewrite rule:
 \begin{align}
-\genericsym{0}{0}.\protosym{P}&\Rightarrow\genericsym{0}{0}\tag{4}
+\genericsym{0}{0}.\pP&\Rightarrow\genericsym{0}{0}\tag{4}
 \end{align}
 Resolving critical pairs adds a few additional rules:
 \begin{align}
-\protosym{P}.\namesym{A}&\Rightarrow\assocsym{P}{A}\tag{5}\\
-\genericsym{0}{0}.\protosym{Q}&\Rightarrow\genericsym{0}{0}\tag{6}\\
+\pP.\namesym{A}&\Rightarrow\assocsym{P}{A}\tag{5}\\
+\genericsym{0}{0}.\pQ&\Rightarrow\genericsym{0}{0}\tag{6}\\
 \genericsym{0}{0}.\assocsym{Q}{A}&\Rightarrow\genericsym{0}{0}.\assocsym{P}{A}\tag{7}\\
 \genericsym{0}{0}.\namesym{A}&\Rightarrow\genericsym{0}{0}.\assocsym{P}{A}\tag{8}
 \end{align}
@@ -517,7 +517,7 @@ Keys&Values\\
 \hline
 \hline
 $\assocsym{P}{A}$&$\concretesym{\namesym{Array}\langle\sigma_0\rangle;\,\sigma_0:=\assocsym{P}{B}}$\\
-$\genericsym{0}{0}$&$\protosym{P}$\\
+$\genericsym{0}{0}$&$\pP$\\
 $\genericsym{0}{0}.\assocsym{P}{B}$&$\concretesym{\namesym{Int}}$\\
 \hline
 \end{tabular}
@@ -591,12 +591,12 @@ class C<X>
 \end{align*}
 The relevant subset of this generic signature's rewrite rules:
 \begin{align}
-%&\protosym{P}.\namesym{T}&\Rightarrow\;&\assocsym{P}{T}\tag{Rule 1}\\
-%&\protosym{P}.\namesym{U}&\Rightarrow\;&\assocsym{P}{U}\tag{Rule 2}\\
-%&\protosym{P}.\namesym{V}&\Rightarrow\;&\assocsym{P}{V}\tag{Rule 3}\\
+%&\pP.\namesym{T}&\Rightarrow\;&\assocsym{P}{T}\tag{Rule 1}\\
+%&\pP.\namesym{U}&\Rightarrow\;&\assocsym{P}{U}\tag{Rule 2}\\
+%&\pP.\namesym{V}&\Rightarrow\;&\assocsym{P}{V}\tag{Rule 3}\\
 &\assocsym{P}{U}.\concretesym{\namesym{G}\langle\sigma_0\rangle;\;\sigma_0:=\assocsym{P}{V}}&\Rightarrow\;&\assocsym{P}{U}\tag{Rule 1}\\
 &\genericsym{0}{0}.\protosym{S}&\Rightarrow\;&\genericsym{0}{0}\tag{Rule 2}\\
-&\genericsym{0}{0}.\assocsym{S}{E}.\protosym{P}&\Rightarrow\;&\genericsym{0}{0}.\assocsym{S}{E}\tag{Rule 3}\\
+&\genericsym{0}{0}.\assocsym{S}{E}.\pP&\Rightarrow\;&\genericsym{0}{0}.\assocsym{S}{E}\tag{Rule 3}\\
 &\genericsym{0}{0}.\assocsym{S}{E}.\assocsym{P}{U}&\Rightarrow\;&\genericsym{0}{0}.\assocsym{S}{E}.\assocsym{P}{T}\tag{Rule 4}
 \end{align}
 Observe that Rule 4 overlaps with Rule 1. The prefix $\genericsym{0}{0}.\assocsym{S}{E}$ must be prepended to the substitution $\sigma_0$ in the concrete type symbol when computing the critical pair:

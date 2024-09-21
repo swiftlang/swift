@@ -91,3 +91,11 @@ struct SelfT: Unavail { // expected-error {{type 'SelfT' does not conform to pro
   // expected-error@-1 {{unavailable instance method 'req()' was used to satisfy a requirement of protocol 'Unavail': write it yourself}}
   typealias T = SelfT
 }
+
+protocol UnavailableAssoc {
+  @available(*, unavailable) // expected-error {{associated type cannot be marked unavailable with '@available'}}
+  associatedtype A1
+
+  @available(swift, introduced: 99) // expected-error {{associated type cannot be marked unavailable with '@available'}}
+  associatedtype A2
+}

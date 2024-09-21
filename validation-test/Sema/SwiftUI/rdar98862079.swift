@@ -22,7 +22,7 @@ struct MyView : View {
 
   var body: some View {
     test(value: true ? $newBounds.maxBinding : $newBounds.minBinding, in: bounds)
-    // expected-error@-1 2 {{result values in '? :' expression have mismatching types 'Binding<Binding<Double>?>' and 'Binding<Double>'}}
-    // expected-note@-2 2 {{arguments to generic parameter 'Value' ('Binding<Double>?' and 'Double') are expected to be equal}}
+    // expected-error@-1 {{cannot convert value of type 'Binding<Binding<Double>?>' to expected argument type 'Binding<Double>'}}
+    // expected-note@-2 {{arguments to generic parameter 'Value' ('Binding<Double>?' and 'Double') are expected to be equal}}
   }
 }

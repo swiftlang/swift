@@ -111,10 +111,24 @@ protected:
   FulfillmentMap Fulfillments;
 
   GenericSignature::RequiredProtocols getRequiredProtocols(Type t) {
+    // FIXME: We need to rework this to use archetypes instead of interface
+    // types, or fix the bad interaction between interface type substitution
+    // and concretized conformance requirements. Then we can remove the hack
+    // from getReducedType() to handle this case, and also stop calling
+    // getReducedType() here.
+    t = Generics.getReducedType(t);
+    if (!t->isTypeParameter())
+      return {};
+
     return Generics->getRequiredProtocols(t);
   }
 
   CanType getSuperclassBound(Type t) {
+    // See above.
+    t = Generics.getReducedType(t);
+    if (!t->isTypeParameter())
+      return CanType();
+
     if (auto superclassTy = Generics->getSuperclassBound(t))
       return superclassTy->getCanonicalType();
     return CanType();
@@ -143,8 +157,6 @@ public:
   }
 
 private:
-  void initGenerics();
-
   template <typename ...Args>
   void considerNewTypeSource(IsExact_t isExact, MetadataSource::Kind kind,
                              CanType type, Args... args);
@@ -199,9 +211,8 @@ private:
 PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
                                              CanSILFunctionType fnType,
                                              bool considerParameterSources = true)
-  : IGM(IGM), M(*IGM.getSwiftModule()), FnType(fnType){
-  initGenerics();
-
+  : IGM(IGM), M(*IGM.getSwiftModule()), FnType(fnType),
+    Generics(fnType->getInvocationGenericSignature()) {
   auto rep = fnType->getRepresentation();
 
   if (fnType->isPseudogeneric()) {
@@ -249,11 +260,8 @@ PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
 
 void PolymorphicConvention::addPseudogenericFulfillments() {
   enumerateRequirements([&](GenericRequirement reqt) {
-    auto archetype = Generics.getGenericEnvironment()
-                        ->mapTypeIntoContext(reqt.getTypeParameter())
-                        ->getAs<ArchetypeType>();
-    assert(archetype && "did not get an archetype by mapping param?");
-    auto erasedTypeParam = archetype->getExistentialType()->getCanonicalType();
+    auto erasedTypeParam = Generics->getExistentialType(reqt.getTypeParameter())
+                              ->getCanonicalType();
     Sources.emplace_back(MetadataSource::Kind::ErasedTypeMetadata,
                          reqt.getTypeParameter(), erasedTypeParam);
 
@@ -274,6 +282,11 @@ irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
 
   // Get all of the type metadata.
   signature->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
+    if (gp->isValue() && canonical) {
+      callback(GenericRequirement::forValue(CanType(gp)));
+      return;
+    }
+
     if (canonical)
       callback(GenericRequirement::forMetadata(CanType(gp)));
   });
@@ -312,10 +325,6 @@ enumerateUnfulfilledRequirements(const RequirementCallback &callback) {
     if (!Fulfillments.getFulfillment(requirement))
       callback(requirement);
   });
-}
-
-void PolymorphicConvention::initGenerics() {
-  Generics = FnType->getInvocationGenericSignature();
 }
 
 template <typename ...Args>
@@ -1032,7 +1041,10 @@ static bool isSynthesizedNonUnique(const RootProtocolConformance *conformance) {
 }
 
 /// Determine whether a protocol can ever have a dependent conformance.
-static bool protocolCanHaveDependentConformance(ProtocolDecl *proto) {
+static bool protocolCanHaveDependentConformance(
+    ProtocolDecl *proto,
+    bool isResilient
+) {
   // Objective-C protocols have never been able to have a dependent conformance.
   if (proto->isObjC())
     return false;
@@ -1042,13 +1054,14 @@ static bool protocolCanHaveDependentConformance(ProtocolDecl *proto) {
   // is a marker protocol (since they don't have requirements), but we must
   // retain backward compatibility with binaries built for earlier deployment
   // targets that concluded that these protocols might involve dependent
-  // conformances.
-  ASTContext &ctx = proto->getASTContext();
-  if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget(
-          ctx.LangOpts.Target)) {
-    if (runtimeCompatVersion < llvm::VersionTuple(6, 0) &&
-        proto->isSpecificProtocol(KnownProtocolKind::Sendable))
-      return true;
+  // conformances. Only do this for resilient protocols.
+  if (isResilient && proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+    ASTContext &ctx = proto->getASTContext();
+    if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget(
+            ctx.LangOpts.Target)) {
+      if (runtimeCompatVersion < llvm::VersionTuple(6, 0))
+        return true;
+    }
   }
 
   return Lowering::TypeConverter::protocolRequiresWitnessTable(proto);
@@ -1057,6 +1070,7 @@ static bool protocolCanHaveDependentConformance(ProtocolDecl *proto) {
 static bool isDependentConformance(
               IRGenModule &IGM,
               const RootProtocolConformance *rootConformance,
+              bool isResilient,
               llvm::SmallPtrSet<const NormalProtocolConformance *, 4> &visited){
   // Self-conformances are never dependent.
   auto conformance = dyn_cast<NormalProtocolConformance>(rootConformance);
@@ -1086,7 +1100,8 @@ static bool isDependentConformance(
       continue;
 
     auto assocProtocol = req.getProtocolDecl();
-    if (!protocolCanHaveDependentConformance(assocProtocol))
+    if (!protocolCanHaveDependentConformance(
+            assocProtocol, isResilient))
       continue;
 
     auto assocConformance =
@@ -1100,6 +1115,7 @@ static bool isDependentConformance(
         isDependentConformance(IGM,
                                assocConformance.getConcrete()
                                  ->getRootConformance(),
+                               isResilient,
                                visited))
       return true;
   }
@@ -1168,7 +1184,8 @@ static bool hasConditionalConformances(IRGenModule &IGM,
 bool IRGenModule::isDependentConformance(
     const RootProtocolConformance *conformance) {
   llvm::SmallPtrSet<const NormalProtocolConformance *, 4> visited;
-  return ::isDependentConformance(*this, conformance, visited);
+  return ::isDependentConformance(
+      *this, conformance, conformance->getProtocol()->isResilient(), visited);
 }
 
 static llvm::Value *
@@ -1499,6 +1516,13 @@ public:
     /// Add reference to the protocol conformance descriptor that generated
     /// this table.
     void addProtocolConformanceDescriptor() {
+      // In Embedded Swift, there are no protocol conformance descriptors. Emit
+      // a null pointer instead to keep the same layout as regular Swift.
+      if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+        Table.addNullPointer(IGM.Int8PtrTy);
+        return;
+      }
+      
       auto descriptor =
         IGM.getAddrOfProtocolConformanceDescriptor(&Conformance);
       if (isRelative)
@@ -2547,7 +2571,9 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
 
 void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   if (Context.LangOpts.hasFeature(Feature::Embedded)) {
-    return;
+    // In Embedded Swift, only class-bound wtables are allowed.
+    if (!wt->getConformance()->getProtocol()->requiresClass())
+      return;
   }
 
   // Don't emit a witness table if it is a declaration.
@@ -3004,7 +3030,8 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
   switch (component.getKind()) {
   case Component::Kind::NominalTypeArgument:
   case Component::Kind::NominalTypeArgumentConformance:
-  case Component::Kind::NominalTypeArgumentShape: {
+  case Component::Kind::NominalTypeArgumentShape:
+  case Component::Kind::NominalValueArgument: {
     assert(sourceKey.Kind == LocalTypeDataKind::forFormalTypeMetadata());
     auto type = sourceKey.Type;
     if (auto archetypeTy = dyn_cast<ArchetypeType>(type))
@@ -3081,6 +3108,20 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
       setProtocolWitnessTableName(IGF.IGM, wtable, sourceKey.Type, protocol);
 
       return MetadataResponse::forComplete(wtable);
+    } else if (component.getKind() == Component::Kind::NominalValueArgument) {
+      assert(requirement.isValue() && "index mismatch!");
+
+      sourceKey.Kind = LocalTypeDataKind::forValue();
+
+      if (!source) return MetadataResponse();
+
+      auto sourceMetadata = source.getMetadata();
+      auto value = emitValueGenericRef(IGF, nominal, requirements, reqtIndex,
+                                       sourceMetadata);
+
+      setTypeMetadataName(IGF.IGM, value, sourceKey.Type);
+
+      return MetadataResponse::forComplete(value);
     }
 
     llvm_unreachable("Bad component kind");
@@ -3426,6 +3467,10 @@ void MetadataPath::print(llvm::raw_ostream &out) const {
       out << "nominal_type_argument_shape["
           << component.getPrimaryIndex() << "]";
       break;
+    case Component::Kind::NominalValueArgument:
+      out << "nominal_value_argument["
+          << component.getPrimaryIndex() << "]";
+      break;
     case Component::Kind::PackExpansionCount:
       out << "pack_expansion_count[" << component.getPrimaryIndex() << "]";
       break;
@@ -3528,9 +3573,13 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
                                         CanType srcType,
                                         llvm::Value **srcMetadataCache,
                                         ProtocolConformanceRef conformance) {
-  assert(!srcType->getASTContext().LangOpts.hasFeature(Feature::Embedded));
-
   auto proto = conformance.getRequirement();
+
+  // In Embedded Swift, only class-bound wtables are allowed.
+  if (srcType->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    assert(proto->requiresClass());
+  }
+
   assert(Lowering::TypeConverter::protocolRequiresWitnessTable(proto)
          && "protocol does not have witness tables?!");
 
@@ -3897,6 +3946,9 @@ irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
 
     return wtable;
   }
+
+  case GenericRequirement::Kind::Value:
+    return IGF.emitValueGenericRef(argType);
   }
 }
 
@@ -3939,6 +3991,7 @@ llvm::Type *GenericRequirement::typeForKind(IRGenModule &IGM,
                                             GenericRequirement::Kind kind) {
   switch (kind) {
   case GenericRequirement::Kind::Shape:
+  case GenericRequirement::Kind::Value:
     return IGM.SizeTy;
   case GenericRequirement::Kind::Metadata:
     return IGM.TypeMetadataPtrTy;
@@ -4012,6 +4065,13 @@ void irgen::bindGenericRequirement(IRGenFunction &IGF,
     }
     break;
   }
+
+  case GenericRequirement::Kind::Value: {
+    setTypeMetadataName(IGF.IGM, value, type);
+    auto kind = LocalTypeDataKind::forValue();
+    IGF.setUnscopedLocalTypeData(type, kind, value);
+    break;
+  }
   }
 }
 
@@ -4021,6 +4081,7 @@ namespace {
     unsigned numShapes = 0;
     unsigned numTypeMetadataPtrs = 0;
     unsigned numWitnessTablePtrs = 0;
+    unsigned numValues = 0;
 
   public:
     ExpandPolymorphicSignature(IRGenModule &IGM, CanSILFunctionType fn)
@@ -4050,11 +4111,14 @@ namespace {
         case GenericRequirement::Kind::WitnessTablePack:
           ++numWitnessTablePtrs;
           break;
+        case GenericRequirement::Kind::Value:
+          ++numValues;
+          break;
         }
       });
       assert((!reqs || reqs->size() == (out.size() - outStartSize)) &&
              "missing type source for type");
-      return {numShapes, numTypeMetadataPtrs, numWitnessTablePtrs};
+      return {numShapes, numTypeMetadataPtrs, numWitnessTablePtrs, numValues};
     }
 
   private:

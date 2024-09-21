@@ -1590,7 +1590,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       auto paramTy = cast<GenericTypeParamType>(tybase);
       // If this assertion fires, it probably means the type being mangled here
       // didn't go through getTypeForDWARFMangling().
-      assert(paramTy->getDecl() == nullptr &&
+      assert(paramTy->isCanonical() &&
              "cannot mangle non-canonical generic parameter");
       // A special mangling for the very first generic parameter. This shows up
       // frequently because it corresponds to 'Self' in protocol requirement
@@ -1664,6 +1664,20 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
       return;
     }
+
+    case TypeKind::Integer: {
+      auto integer = cast<IntegerType>(tybase);
+
+      appendOperator("$");
+
+      if (integer->isNegative()) {
+        appendOperator("n");
+      }
+
+      appendOperator(integer->getDigitsText());
+      return;
+    }
+
     case TypeKind::SILMoveOnlyWrapped:
       // If we hit this, we just mangle the underlying name and move on.
       llvm_unreachable("should never be mangled?");
@@ -3250,10 +3264,6 @@ void ASTMangler::appendFunctionResultType(
   } else {
     appendType(resultType, sig, forDecl);
   }
-
-  if (AllowLifetimeDependencies && lifetimeDependence.has_value()) {
-    appendLifetimeDependence(*lifetimeDependence);
-  }
 }
 
 void ASTMangler::appendTypeList(Type listTy, GenericSignature sig,
@@ -3306,29 +3316,10 @@ void ASTMangler::appendParameterTypeListElement(
   if (flags.isCompileTimeConst())
     appendOperator("Yt");
 
-  if (AllowLifetimeDependencies && lifetimeDependence) {
-    appendLifetimeDependence(*lifetimeDependence);
-  }
-
   if (!name.empty())
     appendIdentifier(name.str());
   if (flags.isVariadic())
     appendOperator("d");
-}
-
-void ASTMangler::appendLifetimeDependence(LifetimeDependenceInfo info) {
-  if (auto *inheritIndices = info.getInheritIndices()) {
-    assert(!inheritIndices->isEmpty());
-    appendOperator("Yli");
-    appendIndexSubset(inheritIndices);
-    appendOperator("_");
-  }
-  if (auto *scopeIndices = info.getScopeIndices()) {
-    assert(!scopeIndices->isEmpty());
-    appendOperator("Yls");
-    appendIndexSubset(scopeIndices);
-    appendOperator("_");
-  }
 }
 
 void ASTMangler::appendTupleTypeListElement(Identifier name, Type elementType,
@@ -3796,12 +3787,8 @@ void ASTMangler::appendClosureComponents(CanType Ty, unsigned discriminator,
   appendContext(parentContext, base, StringRef());
 
   auto Sig = parentContext->getGenericSignatureOfContext();
-
-  Ty = Ty.subst(MapLocalArchetypesOutOfContext(Sig, capturedEnvs),
-                MakeAbstractConformanceForGenericType(),
-                SubstFlags::PreservePackExpansionLevel |
-                SubstFlags::SubstitutePrimaryArchetypes |
-                SubstFlags::SubstituteLocalArchetypes)->getCanonicalType();
+  Ty = mapLocalArchetypesOutOfContext(Ty, Sig, capturedEnvs)
+      ->getCanonicalType();
 
   appendType(Ty, Sig);
   appendOperator(isImplicit ? "fu" : "fU", Index(discriminator));
@@ -4205,12 +4192,26 @@ void ASTMangler::appendAnyProtocolConformance(
       conformance.getRequirement()->isMarkerProtocol())
     return;
 
+  // While all invertible protocols are marker protocols, do not mangle them
+  // as a dependent conformance. See `conformanceRequirementIndex` which skips
+  // these, too. In theory, invertible conformances should never be mangled,
+  // but we *might* have let that slip by for the other cases below, so the
+  // early-exits are highly conservative.
+  const bool forInvertible =
+      conformance.getRequirement()->getInvertibleProtocolKind().has_value();
+
   if (conformingType->isTypeParameter()) {
     assert(genericSig && "Need a generic signature to resolve conformance");
+    if (forInvertible)
+      return;
+
     auto path = genericSig->getConformancePath(conformingType,
                                                conformance.getAbstract());
     appendDependentProtocolConformance(path, genericSig);
   } else if (auto opaqueType = conformingType->getAs<OpaqueTypeArchetypeType>()) {
+    if (forInvertible)
+      return;
+
     GenericSignature opaqueSignature =
         opaqueType->getDecl()->getOpaqueInterfaceGenericSignature();
     ConformancePath conformancePath =
@@ -4726,8 +4727,7 @@ static void extractExistentialInverseRequirements(
 
   // Form a parameter referring to the existential's Self.
   auto existentialSelf =
-      GenericTypeParamType::get(/*isParameterPack=*/false,
-                                /*depth=*/0, /*index=*/0, ctx);
+      GenericTypeParamType::getType(/*depth=*/0, /*index=*/0, ctx);
 
   for (auto ip : PCT->getInverses()) {
     auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
@@ -4871,7 +4871,6 @@ ASTMangler::BaseEntitySignature::BaseEntitySignature(const Decl *decl)
     case DeclKind::Extension:
     case DeclKind::TopLevelCode:
     case DeclKind::Import:
-    case DeclKind::IfConfig:
     case DeclKind::PoundDiagnostic:
     case DeclKind::PrecedenceGroup:
     case DeclKind::Missing:

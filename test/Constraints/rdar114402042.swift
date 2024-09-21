@@ -23,10 +23,10 @@ func baz() -> String? {
 var x: Int? = {
   print( // expected-error {{cannot convert value of type '()' to closure result type 'Int?'}}
     // expected-note@-1 {{to match this opening '('}}
-    switch baz() {
+    switch baz() { // expected-error {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
     case ""?:
-        return nil
+        return nil // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
     default:
-        return nil
+        return nil // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
     }
 }() // expected-error {{expected ')' in expression list}}

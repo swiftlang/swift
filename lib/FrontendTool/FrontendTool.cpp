@@ -238,11 +238,8 @@ static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
   SF->getPrecedenceGroups(groups);
   C.NumPrecedenceGroups += groups.size();
 
-  auto bufID = SF->getBufferID();
-  if (bufID.has_value()) {
-    C.NumSourceLines +=
-      SM.getEntireTextForBuffer(bufID.value()).count('\n');
-  }
+  C.NumSourceLines +=
+    SM.getEntireTextForBuffer(SF->getBufferID()).count('\n');
 }
 
 static void countASTStats(UnifiedStatsReporter &Stats,
@@ -916,7 +913,7 @@ static void dumpAPIIfNeeded(const CompilerInstance &Instance) {
     PO.PrintOriginalSourceText = true;
     PO.Indent = 2;
     PO.PrintAccess = false;
-    PO.SkipUnderscoredStdlibProtocols = true;
+    PO.SkipUnderscoredSystemProtocols = true;
     SF->print(TempOS, PO);
     if (TempOS.str().trim().empty())
       return false; // nothing to show.
@@ -1081,7 +1078,6 @@ static void printSingleFrontendOpt(llvm::opt::OptTable &table, options::ID id,
   if (table.getOption(id).hasFlag(options::FrontendOption) ||
       table.getOption(id).hasFlag(options::AutolinkExtractOption) ||
       table.getOption(id).hasFlag(options::ModuleWrapOption) ||
-      table.getOption(id).hasFlag(options::SwiftIndentOption) ||
       table.getOption(id).hasFlag(options::SwiftSymbolGraphExtractOption) ||
       table.getOption(id).hasFlag(options::SwiftAPIDigesterOption)) {
     auto name = StringRef(table.getOptionName(id));
@@ -1986,12 +1982,18 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   auto configurationFileStackTraces =
       std::make_unique<std::optional<PrettyStackTraceFileContents>[]>(
           configurationFileBuffers.size());
-  for_each(configurationFileBuffers.begin(), configurationFileBuffers.end(),
-           &configurationFileStackTraces[0],
-           [](const std::unique_ptr<llvm::MemoryBuffer> &buffer,
-              std::optional<PrettyStackTraceFileContents> &trace) {
-             trace.emplace(*buffer);
-           });
+
+  // If the compile is a whole module job, then the contents of the filelist
+  // is every file in the module, which is not very interesting and could be
+  // hundreds or thousands of lines. Skip dumping this output in that case.
+  if (!Invocation.getFrontendOptions().InputsAndOutputs.isWholeModule()) {
+    for_each(configurationFileBuffers.begin(), configurationFileBuffers.end(),
+             &configurationFileStackTraces[0],
+             [](const std::unique_ptr<llvm::MemoryBuffer> &buffer,
+                std::optional<PrettyStackTraceFileContents> &trace) {
+               trace.emplace(*buffer);
+             });
+  }
 
   // The compiler invocation is now fully configured; notify our observer.
   if (observer) {

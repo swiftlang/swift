@@ -1921,11 +1921,15 @@ static Type getWithoutProtocolTypeAliases(Type type) {
 /// Also see simplifyCurrentTypeWitnesses().
 static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
                                       ValueDecl *witness) {
-  if (witness->isRecursiveValidation())
+  if (witness->isRecursiveValidation()) {
+    LLVM_DEBUG(llvm::dbgs() << "Recursive validation\n";);
     return Type();
+  }
 
-  if (witness->isInvalid())
+  if (witness->isInvalid()) {
+    LLVM_DEBUG(llvm::dbgs() << "Invalid witness\n";);
     return Type();
+  }
 
   if (!witness->getDeclContext()->isTypeContext()) {
     // FIXME: Could we infer from 'Self' to make these work?
@@ -2448,38 +2452,38 @@ AssociatedTypeInference::computeFailureTypeWitness(
   // Look for AsyncIteratorProtocol.next() and infer the Failure type from
   // it.
   for (const auto &witness : valueWitnesses) {
-    if (isAsyncIteratorProtocolNext(witness.first)) {
-      // We use a dyn_cast_or_null since we can get a nullptr here if we fail to
-      // match a witness. In such a case, we should just fail here.
-      if (auto witnessFunc = dyn_cast_or_null<AbstractFunctionDecl>(witness.second)) {
-        auto thrownError = witnessFunc->getEffectiveThrownErrorType();
+    if (!isAsyncIteratorProtocolNext(witness.first))
+      continue;
 
-        // If it doesn't throw, Failure == Never.
-        if (!thrownError)
-          return AbstractTypeWitness(assocType, ctx.getNeverType());
+    if (!witness.second || witness.second->getDeclContext() != dc)
+      continue;
 
-        // If it isn't 'rethrows', use the thrown error type;.
-        if (!witnessFunc->getAttrs().hasAttribute<RethrowsAttr>()) {
-          return AbstractTypeWitness(assocType,
-                                     dc->mapTypeIntoContext(*thrownError));
-        }
+    if (auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness.second)) {
+      auto thrownError = witnessFunc->getEffectiveThrownErrorType();
 
-        for (auto req : witnessFunc->getGenericSignature().getRequirements()) {
-          if (req.getKind() == RequirementKind::Conformance) {
-            auto proto = req.getProtocolDecl();
-            if (proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol) ||
-                proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence)) {
-              auto failureAssocType = proto->getAssociatedType(ctx.Id_Failure);
-              auto failureType = DependentMemberType::get(req.getFirstType(), failureAssocType);
-              return AbstractTypeWitness(assocType, dc->mapTypeIntoContext(failureType));
-            }
-          }
-        }
+      // If it doesn't throw, Failure == Never.
+      if (!thrownError)
+        return AbstractTypeWitness(assocType, ctx.getNeverType());
 
-        return AbstractTypeWitness(assocType, ctx.getErrorExistentialType());
+      // If it isn't 'rethrows', use the thrown error type;.
+      if (!witnessFunc->getAttrs().hasAttribute<RethrowsAttr>()) {
+        return AbstractTypeWitness(assocType,
+                                   dc->mapTypeIntoContext(*thrownError));
       }
 
-      break;
+      for (auto req : witnessFunc->getGenericSignature().getRequirements()) {
+        if (req.getKind() == RequirementKind::Conformance) {
+          auto proto = req.getProtocolDecl();
+          if (proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol) ||
+              proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence)) {
+            auto failureAssocType = proto->getAssociatedType(ctx.Id_Failure);
+            auto failureType = DependentMemberType::get(req.getFirstType(), failureAssocType);
+            return AbstractTypeWitness(assocType, dc->mapTypeIntoContext(failureType));
+          }
+        }
+      }
+
+      return AbstractTypeWitness(assocType, ctx.getErrorExistentialType());
     }
   }
 
@@ -2685,10 +2689,8 @@ bool AssociatedTypeInference::simplifyCurrentTypeWitnesses() {
       abort();
     }
 
-    TypeSubstitutionMap substitutions;
-    auto selfTy = cast<SubstitutableType>(
-        proto->getSelfInterfaceType()->getCanonicalType());
-    substitutions[selfTy] = dc->mapTypeIntoContext(conformance->getType());
+    auto selfTy = proto->getSelfInterfaceType()->getCanonicalType();
+    auto substSelfTy = dc->mapTypeIntoContext(conformance->getType());
 
     for (auto assocType : proto->getAssociatedTypeMembers()) {
       if (conformance->hasTypeWitness(assocType))
@@ -2716,13 +2718,14 @@ bool AssociatedTypeInference::simplifyCurrentTypeWitnesses() {
           if (!type->isTypeParameter())
             return std::nullopt;
 
-          auto *rootParam = type->getRootGenericParam();
-          assert(rootParam->isEqual(selfTy));
-
           // Replace Self with the concrete conforming type.
-          auto substType = Type(type).subst(QueryTypeSubstitutionMap{substitutions},
-                                            LookUpConformanceInModule(),
-                                            options);
+          auto substType = Type(type).subst(
+              [&](SubstitutableType *type) -> Type {
+                ASSERT(type->isEqual(selfTy));
+                return substSelfTy;
+              },
+              LookUpConformanceInModule(),
+              options);
 
           // If we don't have enough type witnesses to substitute fully,
           // leave the original type parameter in place.
@@ -2914,12 +2917,12 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
 
 bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
   auto typeInContext = dc->mapTypeIntoContext(adoptee);
-  auto subs = typeInContext->getContextSubstitutions(ext);
+  auto subs = typeInContext->getContextSubstitutionMap(ext->getExtendedNominal());
 
   SubstOptions options = getSubstOptionsWithCurrentTypeWitnesses();
   switch (checkRequirements(
       ext->getGenericSignature().getRequirements(),
-      QueryTypeSubstitutionMap{subs}, options)) {
+      QuerySubstitutionMap{subs}, options)) {
   case CheckRequirementsResult::Success:
   case CheckRequirementsResult::SubstitutionFailure:
     return false;
@@ -3407,9 +3410,8 @@ static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
   if (!sig1 || !sig2)
     return TypeChecker::compareDeclarations(DC, decl1, decl2);
 
-  auto selfParam = GenericTypeParamType::get(/*isParameterPack*/ false,
-                                             /*depth*/ 0, /*index*/ 0,
-                                             decl1->getASTContext());
+  auto selfParam = GenericTypeParamType::getType(/*depth*/ 0, /*index*/ 0,
+                                                 decl1->getASTContext());
 
   // Collect the protocols required by extension 1.
   Type class1;

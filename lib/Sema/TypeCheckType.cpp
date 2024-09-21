@@ -41,6 +41,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/Assertions.h"
@@ -174,6 +175,8 @@ static unsigned getGenericRequirementKind(TypeResolutionOptions options) {
   case TypeResolverContext::AbstractFunctionDecl:
   case TypeResolverContext::CustomAttr:
   case TypeResolverContext::Inverted:
+  case TypeResolverContext::ValueGenericArgument:
+  case TypeResolverContext::RawLayoutAttr:
     break;
   }
 
@@ -640,9 +643,9 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
       noteLoc = loc;
   }
 
-  const auto subMap = parentTy->getContextSubstitutions(dc);
+  const auto subMap = parentTy->getContextSubstitutionMap(dc);
   const auto substitutions = [&](SubstitutableType *type) -> Type {
-    auto result = QueryTypeSubstitutionMap{subMap}(type);
+    auto result = QuerySubstitutionMap{subMap}(type);
     if (result->hasTypeParameter()) {
       if (contextSig) {
         // Avoid building this generic environment unless we need it.
@@ -716,6 +719,57 @@ void swift::diagnoseInvalidGenericArguments(SourceLoc loc,
 
   decl->diagnose(diag::kind_declname_declared_here,
                  DescriptiveDeclKind::GenericType, decl->getName());
+}
+
+namespace {
+  /// Visits a generic parameter and the type attempting to substitute for it
+  /// to see if it's a valid parameter for integer arguments or other value
+  /// generic parameters.
+  class ValueMatchVisitor : public TypeMatcher<ValueMatchVisitor> {
+  public:
+    ValueMatchVisitor() {}
+
+    bool mismatch(TypeBase *firstType, TypeBase *secondType,
+                  Type sugaredFirstType) {
+      return true;
+    }
+
+    bool mismatch(GenericTypeParamType *paramType, TypeBase *secondType,
+                  Type sugaredFirstType) {
+      if (paramType->isValue()) {
+        if (secondType->is<IntegerType>())
+          return true;
+
+        return false;
+      }
+
+      return true;
+    }
+
+    bool mismatch(GenericTypeParamType *paramType,
+                  GenericTypeParamType *secondType, Type sugaredFirstType) {
+      // If either of these is a value parameter and the other is not, bail.
+      if (paramType->isValue() != secondType->isValue())
+        return false;
+
+      // If both of these aren't values then we're good.
+      if (!paramType->isValue())
+        return true;
+
+      // Both of these generic type parameters are values, but they may not have
+      // underlying value types associated with them. This can occur when a
+      // parameter doesn't declare a value type and we're going to diagnose it
+      // later.
+      if (!paramType->getValueType() || !secondType->getValueType())
+        return true;
+
+      // Otherwise, these are both value parameters and check that both their
+      // value types are the same.
+      return paramType->getValueType()->isEqual(secondType->getValueType());
+    }
+
+    bool alwaysMismatchTypeParameters() const { return true; }
+  };
 }
 
 /// Apply generic arguments to the given type.
@@ -878,10 +932,12 @@ static Type applyGenericArguments(Type type,
   auto *decl = unboundType->getDecl();
 
   auto genericParams = decl->getGenericParams();
-  auto hasParameterPack = llvm::any_of(
-      *genericParams, [](auto *paramDecl) {
-          return paramDecl->isParameterPack();
-      });
+  auto hasParameterPack = llvm::any_of(*genericParams, [](auto *paramDecl) {
+    return paramDecl->isParameterPack();
+  });
+  auto hasValueParam = llvm::any_of(*genericParams, [](auto *paramDecl) {
+    return paramDecl->isValue();
+  });
 
   // If the type declares at least one parameter pack, allow pack expansions
   // anywhere in the argument list. We'll use the PackMatcher to ensure that
@@ -891,6 +947,8 @@ static Type applyGenericArguments(Type type,
       hasParameterPack
       ? TypeResolverContext::VariadicGenericArgument
       : TypeResolverContext::ScalarGenericArgument);
+  if (hasValueParam)
+    argOptions = argOptions.withContext(TypeResolverContext::ValueGenericArgument);
   auto genericResolution = resolution.withOptions(argOptions);
 
   // In SIL mode, Optional<T> interprets T as a SIL type.
@@ -911,6 +969,11 @@ static Type applyGenericArguments(Type type,
       return ErrorType::get(ctx);
 
     args.push_back(substTy);
+
+    // The type we're binding to may not have value parameters, but one of the
+    // arguments may be a value parameter so diagnose this situation as well.
+    if (substTy->isValueParameter())
+      hasValueParam = true;
   }
 
   // Make sure we have the right number of generic arguments.
@@ -977,6 +1040,31 @@ static Type applyGenericArguments(Type type,
       }
 
       args.push_back(arg);
+    }
+  }
+
+  if (hasValueParam) {
+    ValueMatchVisitor matcher;
+
+    for (auto i : indices(genericParams->getParams())) {
+      auto param = genericParams->getParams()[i]->getDeclaredInterfaceType();
+      auto arg = args[i];
+
+      if (!matcher.match(param, arg)) {
+        // If the parameter is a value, then we're trying to substitute a
+        // non-value type like 'Int' or 'T' to our value.
+        if (param->isValueParameter()) {
+          diags.diagnose(loc, diag::cannot_pass_type_for_value_generic, arg, param);
+          return ErrorType::get(ctx);
+
+        // Otherwise, we're trying to use a value type (either an integer
+        // directly or another generic value parameter) for a non-value
+        // parameter.
+        } else {
+          diags.diagnose(loc, diag::value_type_used_in_type_parameter, arg, param);
+          return ErrorType::get(ctx);
+        }
+      }
     }
   }
 
@@ -1132,7 +1220,15 @@ Type TypeResolution::applyUnboundGenericArguments(
       if (result->hasTypeParameter()) {
         if (const auto contextSig = getGenericSignature()) {
           auto *genericEnv = contextSig.getGenericEnvironment();
-          return genericEnv->mapTypeIntoContext(result);
+          // FIXME: This should just use mapTypeIntoContext(), but we can't yet
+          // because we sometimes have type parameters here that are invalid for
+          // our generic signature. This can happen if the type parameter was
+          // found via unqualified lookup, but the current context's
+          // generic signature failed to build because of circularity or
+          // completion failure.
+          return result.subst(QueryInterfaceTypeSubstitutions{genericEnv},
+                              LookUpConformanceInModule(),
+                              SubstFlags::PreservePackExpansionLevel);
         }
       }
       return result;
@@ -2183,6 +2279,8 @@ namespace {
     NeverNullType
     resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
                                      TypeResolutionOptions options);
+    NeverNullType resolveIntegerTypeRepr(IntegerTypeRepr *repr,
+                                         TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveDictionaryType(DictionaryTypeRepr *repr,
@@ -2790,6 +2888,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::LifetimeDependent:
     return resolveLifetimeDependentTypeRepr(
         cast<LifetimeDependentTypeRepr>(repr), options);
+
+  case TypeReprKind::Integer:
+    return resolveIntegerTypeRepr(cast<IntegerTypeRepr>(repr), options);
   }
   llvm_unreachable("all cases should be handled");
 }
@@ -2854,18 +2955,21 @@ TypeResolver::resolveOpenedExistentialArchetype(
 
     archetypeType = ErrorType::get(interfaceType->getASTContext());
   } {
-    // The constraint type is written with respect to the surrounding
-    // generic environment.
-    constraintType = GenericEnvironment::mapTypeIntoContext(
-        resolution.getGenericSignature().getGenericEnvironment(),
-        constraintType);
-
     // The opened existential type is formed by mapping the interface type
     // into a new opened generic environment.
     auto *env = GenericEnvironment::forOpenedExistential(
-        constraintType->getCanonicalType(), SubstitutionMap(),
+        constraintType->getCanonicalType(),
         openedAttr->getUUID());
-    return env->mapTypeIntoContext(interfaceType);
+
+    // Rewrite the interface type into one with the correct depth.
+    interfaceType = Type(interfaceType).subst(
+        [&](SubstitutableType *type) -> Type {
+          return env->getGenericSignature().getGenericParams().back();
+        },
+        MakeAbstractConformanceForGenericType());
+
+    archetypeType = env->mapTypeIntoContext(interfaceType);
+    ASSERT(archetypeType->is<OpenedArchetypeType>());
   }
 
   return archetypeType;
@@ -4853,6 +4957,21 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
   if (result->is<FunctionType>())
     result = applyNonEscapingIfNecessary(result, options);
 
+  // Referencing a value generic by name, e.g. 'let N' and referencing 'N', is
+  // only valid as a generic argument, in generic requirements, when being
+  // used as an expression, inside of the @_rawLayout attribute, and in SIL mode.
+  if (result->isValueParameter() &&
+      !(options.isGenericArgument() ||
+        options.isGenericRequirement() ||
+        options.isAnyExpr() ||
+        options.is(TypeResolverContext::RawLayoutAttr) ||
+        options.contains(TypeResolutionFlags::SILMode))) {
+    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+      diagnose(repr->getNameLoc(), diag::value_generic_unexpected, result);
+    }
+    return ErrorType::get(getASTContext());
+  }
+
   return result;
 }
 
@@ -5042,6 +5161,22 @@ TypeResolver::resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
 }
 
 NeverNullType
+TypeResolver::resolveIntegerTypeRepr(IntegerTypeRepr *repr,
+                                     TypeResolutionOptions options) {
+  if (!options.is(TypeResolverContext::ValueGenericArgument) &&
+      !options.is(TypeResolverContext::SameTypeRequirement) &&
+      !options.is(TypeResolverContext::RawLayoutAttr) &&
+      !options.contains(TypeResolutionFlags::SILMode)) {
+    diagnoseInvalid(repr, repr->getLoc(),
+                    diag::integer_type_not_accepted);
+    return ErrorType::get(getASTContext());
+  }
+
+  return IntegerType::get(repr->getValue(), (bool)repr->getMinusLoc(),
+                          getASTContext());
+}
+
+NeverNullType
 TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
                                     TypeResolutionOptions options) {
   auto argOptions = options.withoutContext().withContext(
@@ -5152,6 +5287,8 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::AssociatedTypeInherited:
   case TypeResolverContext::CustomAttr:
   case TypeResolverContext::Inverted:
+  case TypeResolverContext::ValueGenericArgument:
+  case TypeResolverContext::RawLayoutAttr:
     doDiag = true;
     break;
   }
@@ -6019,6 +6156,7 @@ private:
     case TypeReprKind::PackExpansion:
     case TypeReprKind::PackElement:
     case TypeReprKind::LifetimeDependent:
+    case TypeReprKind::Integer:
       return false;
     }
   }

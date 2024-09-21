@@ -3919,6 +3919,8 @@ protected:
 
   void visitYieldInst(YieldInst *yield) { userInstructionFallback(yield); }
 
+  void visitThrowInst(ThrowInst *t) { userInstructionFallback(t); }
+
   void visitFixLifetimeInst(FixLifetimeInst *f) {
     auto addr = assignment.getAddressForValue(f->getOperand());
     auto builder = assignment.getBuilder(f->getIterator());

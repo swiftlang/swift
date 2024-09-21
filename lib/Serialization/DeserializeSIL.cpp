@@ -719,9 +719,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     llvm::VersionTuple available;
     DECODE_VER_TUPLE(available);
     fn->setAvailabilityForLinkage(
-      available.empty()
-      ? AvailabilityContext::alwaysAvailable()
-      : AvailabilityContext(VersionRange::allGTE(available)));
+        available.empty() ? AvailabilityRange::alwaysAvailable()
+                          : AvailabilityRange(VersionRange::allGTE(available)));
 
     fn->setIsDynamic(IsDynamicallyReplaceable_t(isDynamic));
     fn->setIsExactSelfClass(IsExactSelfClass_t(isExactSelfClass));
@@ -838,9 +837,9 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     llvm::VersionTuple available;
     DECODE_VER_TUPLE(available);
-    auto availability = available.empty()
-      ? AvailabilityContext::alwaysAvailable()
-      : AvailabilityContext(VersionRange::allGTE(available));
+    auto availability =
+        available.empty() ? AvailabilityRange::alwaysAvailable()
+                          : AvailabilityRange(VersionRange::allGTE(available));
 
     llvm::SmallVector<Type, 4> typeErasedParams;
     for (auto id : typeErasedParamsIDs) {
@@ -1364,6 +1363,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                         TyID2, TyCategory2, ValID2,
                                         ValID3);
     RawOpCode = (unsigned)SILInstructionKind::PackElementSetInst;
+    break;
+  case SIL_TYPE_VALUE:
+    SILTypeValueLayout::readRecord(scratch, TyID, TyCategory, TyID2);
+    RawOpCode = (unsigned)SILInstructionKind::TypeValueInst;
     break;
   }
 
@@ -3443,6 +3446,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     for (auto fnID : ListOfValues) {
       (void)getFuncForReference(MF->getIdentifierText(fnID));
     }
+    break;
+  }
+  case SILInstructionKind::TypeValueInst: {
+    auto valueType = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory,
+                                Fn);
+    auto paramType = MF->getType(TyID2)->getCanonicalType();
+    ResultInst = Builder.createTypeValue(Loc, valueType, paramType);
     break;
   }
   }

@@ -822,9 +822,11 @@ bool Parser::parseEndIfDirective(SourceLoc &Loc) {
     Loc = PreviousLoc;
     skipUntilConditionalBlockClose();
     return true;
-  } else if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof))
+  } else if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof)) {
     diagnose(Tok.getLoc(),
              diag::extra_tokens_conditional_compilation_directive);
+    skipUntilTokenOrEndOfLine(tok::NUM_TOKENS);
+  }
   return false;
 }
 
@@ -1144,7 +1146,6 @@ struct ParserUnit::Implementation {
 
     auto *M = ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx);
     SF = new (Ctx) SourceFile(*M, SFKind, BufferID, parsingOpts);
-    M->addAuxiliaryFile(*SF);
   }
 
   ~Implementation() {

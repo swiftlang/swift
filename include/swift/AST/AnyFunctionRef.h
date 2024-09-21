@@ -130,7 +130,7 @@ public:
     auto *ACE = TheFunction.get<AbstractClosureExpr *>();
     if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
       CE->setBody(stmt);
-      CE->setBodyState(ClosureExpr::BodyState::ReadyForTypeChecking);
+      CE->setBodyState(ClosureExpr::BodyState::Parsed);
       return;
     }
 
@@ -146,7 +146,7 @@ public:
     auto *ACE = TheFunction.get<AbstractClosureExpr *>();
     if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
       CE->setBody(stmt);
-      CE->setBodyState(ClosureExpr::BodyState::TypeCheckedWithSignature);
+      CE->setBodyState(ClosureExpr::BodyState::TypeChecked);
       return;
     }
 

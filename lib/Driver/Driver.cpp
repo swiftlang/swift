@@ -108,7 +108,6 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
           .Case("swift-dependency-tool", DriverKind::SwiftDependencyTool)
           .Case("swift-llvm-opt", DriverKind::SwiftLLVMOpt)
           .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
-          .Case("swift-indent", DriverKind::SwiftIndent)
           .Case("swift-symbolgraph-extract", DriverKind::SymbolGraph)
           .Case("swift-api-digester", DriverKind::APIDigester)
           .Case("swift-cache-tool", DriverKind::CacheTool)
@@ -158,11 +157,20 @@ static void validateBridgingHeaderArgs(DiagnosticEngine &diags,
 
 static void validateWarningControlArgs(DiagnosticEngine &diags,
                                        const ArgList &args) {
-  if (args.hasArg(options::OPT_suppress_warnings) &&
-      args.hasFlag(options::OPT_warnings_as_errors,
-                   options::OPT_no_warnings_as_errors, false)) {
-    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
-                   "-warnings-as-errors", "-suppress-warnings");
+  if (args.hasArg(options::OPT_suppress_warnings)) {
+    if (args.hasFlag(options::OPT_warnings_as_errors,
+                     options::OPT_no_warnings_as_errors, false)) {
+      diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                     "-warnings-as-errors", "-suppress-warnings");
+    }
+    if (args.hasArg(options::OPT_Wwarning)) {
+      diags.diagnose(SourceLoc(), diag::error_conflicting_options, "-Wwarning",
+                     "-suppress-warnings");
+    }
+    if (args.hasArg(options::OPT_Werror)) {
+      diags.diagnose(SourceLoc(), diag::error_conflicting_options, "-Werror",
+                     "-suppress-warnings");
+    }
   }
 }
 
@@ -3099,7 +3107,6 @@ void Driver::printHelp(bool ShowHidden) const {
   case DriverKind::SwiftDependencyTool:
   case DriverKind::SwiftLLVMOpt:
   case DriverKind::AutolinkExtract:
-  case DriverKind::SwiftIndent:
   case DriverKind::SymbolGraph:
   case DriverKind::APIDigester:
   case DriverKind::CacheTool:

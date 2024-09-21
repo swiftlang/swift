@@ -174,30 +174,9 @@ bool BindingSet::involvesTypeVariables() const {
 }
 
 bool BindingSet::isPotentiallyIncomplete() const {
-  // Always marking generic parameter type variables as incomplete
-  // is too aggressive. That was the way to make sure that they
-  // are never attempted to eagerly, but really there are only a
-  // couple of situations where that can cause issues:
-  //
-  // 1. Int <: $T_param
-  //    $T1 <: $T_param
-  //
-  // 2. $T2 conv Generic<$T_param>
-  //    $T2 conv Generic<Int?>
-  //    Int <: $T_param
-  //
-  // Attempting $T_param before $T1 in 1. could result in a missed
-  // optional type binding for example.
-  //
-  // Attempting $T_param too early in this case (before $T2) could
-  // miss some transitive bindings inferred through conversion
-  // of `Generic` type.
-  //
-  // If a type variable that represents a generic parameter is no longer
-  // associated with any type variables (directly or indirectly) it's safe
-  // to assume that its binding set is complete.
+  // Generic parameters are always potentially incomplete.
   if (Info.isGenericParameter())
-    return involvesTypeVariables();
+    return true;
 
   // Key path literal type is incomplete until there is a
   // contextual type or key path is resolved enough to infer
@@ -1226,6 +1205,16 @@ bool BindingSet::isViable(PotentialBinding &binding, bool isTransitive) {
     if (!existingNTD || NTD != existingNTD)
       continue;
 
+    // What is going on here needs to be thoroughly re-evaluated,
+    // but at least for now, let's not filter bindings of different
+    // kinds so if we have a situation like: `Array<$T0> conv $T1`
+    // and `$T1 conv Array<(String, Int)>` we can't lose `Array<$T0>`
+    // as a binding because `$T0` could be inferred to
+    // `(key: String, value: Int)` and binding `$T1` to `Array<(String, Int)>`
+    // eagerly would be incorrect.
+    if (existing->Kind != binding.Kind)
+      continue;
+
     // If new type has a type variable it shouldn't
     // be considered  viable.
     if (type->hasTypeVariable())
@@ -1253,6 +1242,36 @@ bool BindingSet::isViable(PotentialBinding &binding, bool isTransitive) {
   return true;
 }
 
+static bool hasConversions(Type type) {
+  if (type->isAnyHashable() || type->isDouble() || type->isCGFloat())
+    return true;
+
+  if (type->getAnyPointerElementType())
+    return true;
+
+  if (auto *structTy = type->getAs<BoundGenericStructType>()) {
+    if (auto eltTy = structTy->isArrayType()) {
+      return hasConversions(eltTy);
+    } else if (auto pair = ConstraintSystem::isDictionaryType(structTy)) {
+      return hasConversions(pair->second);
+    } else if (auto eltTy = ConstraintSystem::isSetType(structTy)) {
+      return hasConversions(*eltTy);
+    }
+
+    return false;
+  }
+
+  if (auto *enumTy = type->getAs<BoundGenericEnumType>()) {
+    if (enumTy->getOptionalObjectType())
+      return true;
+
+    return false;
+  }
+
+  return !(type->is<StructType>() || type->is<EnumType>() ||
+           type->is<BuiltinType>() || type->is<ArchetypeType>());
+}
+
 bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
   if (isHole())
     return false;
@@ -1261,30 +1280,10 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
         if (binding.Kind == AllowedBindingKind::Supertypes)
           return false;
 
-        auto type = binding.BindingType;
-
         if (CS.shouldAttemptFixes())
           return false;
 
-        if (type->isAnyHashable() || type->isDouble() || type->isCGFloat())
-          return false;
-
-        {
-          PointerTypeKind pointerKind;
-          if (type->getAnyPointerElementType(pointerKind)) {
-            switch (pointerKind) {
-            case PTK_UnsafeRawPointer:
-            case PTK_UnsafeMutableRawPointer:
-              return false;
-
-            default:
-              break;
-            }
-          }
-        }
-
-        return type->is<StructType>() || type->is<EnumType>() ||
-               type->is<BuiltinType>();
+        return !hasConversions(binding.BindingType);
       })) {
     // Result type of subscript could be l-value so we can't bind it early.
     if (!TypeVar->getImpl().isSubscriptResultType() &&
@@ -1505,6 +1504,23 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
         AdjacentVars.insert({typeVar, constraint});
     }
 
+    // Infer a binding from `inout $T <convertible to> Unsafe*Pointer<...>?`.
+    if (first->is<InOutType>() &&
+        first->getInOutObjectType()->isEqual(TypeVar)) {
+      if (auto pointeeTy = second->lookThroughAllOptionalTypes()
+                               ->getAnyPointerElementType()) {
+        if (!pointeeTy->isTypeVariableOrMember()) {
+          // The binding is as a fallback in this case because $T could
+          // also be Array<X> or C-style pointer.
+          if (constraint->getKind() >= ConstraintKind::ArgumentConversion)
+            DelayedBy.push_back(constraint);
+
+          return PotentialBinding(pointeeTy, AllowedBindingKind::Exact,
+                                  constraint);
+        }
+      }
+    }
+
     return std::nullopt;
   }
 
@@ -1554,6 +1570,18 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     }
   }
 
+  // Situations like `v.<member> = { ... }` where member is overloaded.
+  // We need to wait until member is resolved otherwise there is a risk
+  // of losing some of the contextual attributes important for the closure
+  // such as @Sendable and global actor.
+  if (TypeVar->getImpl().isClosureType() &&
+      kind == AllowedBindingKind::Subtypes) {
+    if (type->isTypeVariableOrMember() &&
+        constraint->getLocator()->directlyAt<AssignExpr>()) {
+      DelayedBy.push_back(constraint);
+    }
+  }
+
   if (auto *locator = TypeVar->getImpl().getLocator()) {
     // Don't allow a protocol type to get propagated from the base to the result
     // type of a chain, Result should always be a concrete type which conforms
@@ -1561,6 +1589,24 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     if (constraint->getKind() == ConstraintKind::UnresolvedMemberChainBase &&
         kind == AllowedBindingKind::Subtypes && type->is<ProtocolType>())
       return std::nullopt;
+  }
+
+  if (constraint->getKind() == ConstraintKind::LValueObject) {
+    // Allow l-value type inference from its object type, but
+    // not the other way around, that would be handled by constraint
+    // simplification.
+    if (kind == AllowedBindingKind::Subtypes) {
+      if (type->isTypeVariableOrMember())
+        return std::nullopt;
+
+      type = LValueType::get(type);
+    } else {
+      // Right-hand side of the l-value object constraint can only
+      // be bound via constraint simplification when l-value type
+      // is inferred or contextually from other constraints.
+      DelayedBy.push_back(constraint);
+      return std::nullopt;
+    }
   }
 
   // If the source of the binding is 'OptionalObject' constraint
@@ -1734,7 +1780,8 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::OptionalObject:
-  case ConstraintKind::UnresolvedMemberChainBase: {
+  case ConstraintKind::UnresolvedMemberChainBase:
+  case ConstraintKind::LValueObject: {
     auto binding = inferFromRelational(constraint);
     if (!binding)
       break;
@@ -1808,10 +1855,6 @@ void PotentialBindings::infer(Constraint *constraint) {
     break;
 
   case ConstraintKind::Disjunction:
-    // If there is additional context available via disjunction
-    // associated with closure literal (e.g. coercion to some other
-    // type) let's delay resolving the closure until the disjunction
-    // is attempted.
     DelayedBy.push_back(constraint);
     break;
 

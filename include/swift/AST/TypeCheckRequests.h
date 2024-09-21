@@ -3671,9 +3671,9 @@ public:
   void cacheResult(Type value) const;
 };
 
-class ResolveRawLayoutLikeTypeRequest
-    : public SimpleRequest<ResolveRawLayoutLikeTypeRequest,
-                           Type (StructDecl*, RawLayoutAttr *),
+class ResolveRawLayoutTypeRequest
+    : public SimpleRequest<ResolveRawLayoutTypeRequest,
+                           Type (StructDecl*, RawLayoutAttr *, bool),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3684,7 +3684,8 @@ private:
   // Evaluation.
   Type evaluate(Evaluator &evaluator,
                 StructDecl *sd,
-                RawLayoutAttr *attr) const;
+                RawLayoutAttr *attr,
+                bool isLikeType) const;
 
 public:
   // Separate caching.
@@ -4773,8 +4774,9 @@ void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
 
 /// Computes whether a module is part of the stdlib or contained within the
-/// SDK. If no SDK was specified, falls back to whether the module was
-/// specified as a system module (ie. it's on the system search path).
+/// SDK or the platform directory. If no SDK was specified, falls back to
+/// whether the module was specified as a system module (ie. it's on the system
+/// search path).
 class IsNonUserModuleRequest
     : public SimpleRequest<IsNonUserModuleRequest,
                            bool(ModuleDecl *),
@@ -5081,6 +5083,22 @@ public:
   bool isCached() const { return true; }
   std::optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
+};
+
+class GenericTypeParamDeclGetValueTypeRequest
+    : public SimpleRequest<GenericTypeParamDeclGetValueTypeRequest,
+                           Type(GenericTypeParamDecl *decl),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  Type evaluate(Evaluator &evaluator, GenericTypeParamDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
 };
 
 #define SWIFT_TYPEID_ZONE TypeChecker

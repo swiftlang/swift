@@ -101,12 +101,10 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
   assert(SF);
 
   auto bufferID = SF->getBufferID();
-  assert(bufferID);
-
   auto silMod = SILModule::createEmptyModule(desc.context, desc.conv,
                                              desc.opts);
   SILParserState parserState(*silMod.get());
-  Parser parser(*bufferID, *SF, &parserState);
+  Parser parser(bufferID, *SF, &parserState);
   PrettyStackTraceParser StackTrace(parser);
 
   if (ParseSerializedSIL) {
@@ -680,7 +678,7 @@ static bool parseDeclSILOptional(
     OptimizationMode *optimizationMode, PerformanceConstraints *perfConstraints,
     bool *isPerformanceConstraint, bool *markedAsUsed, StringRef *section,
     bool *isLet, bool *isWeakImported, bool *needStackProtection,
-    AvailabilityContext *availability, bool *isWithoutActuallyEscapingThunk,
+    AvailabilityRange *availability, bool *isWithoutActuallyEscapingThunk,
     SmallVectorImpl<std::string> *Semantics,
     SmallVectorImpl<ParsedSpecAttr> *SpecAttrs, ValueDecl **ClangDecl,
     EffectsKind *MRK, SILParser &SP, SILModule &M) {
@@ -729,6 +727,8 @@ static bool parseDeclSILOptional(
       *isThunk = IsSignatureOptimizedThunk;
     else if (isThunk && SP.P.Tok.getText() == "reabstraction_thunk")
       *isThunk = IsReabstractionThunk;
+    else if (isThunk && SP.P.Tok.getText() == "back_deployed_thunk")
+      *isThunk = IsBackDeployedThunk;
     else if (isWithoutActuallyEscapingThunk
              && SP.P.Tok.getText() == "without_actually_escaping")
       *isWithoutActuallyEscapingThunk = true;
@@ -754,7 +754,7 @@ static bool parseDeclSILOptional(
                                  diag::sil_availability_expected_version))
         return true;
 
-      *availability = AvailabilityContext(VersionRange::allGTE(version));
+      *availability = AvailabilityRange(VersionRange::allGTE(version));
 
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
@@ -888,7 +888,7 @@ static bool parseDeclSILOptional(
       SpecializeAttr *Attr;
       StringRef targetFunctionName;
       ModuleDecl *module = nullptr;
-      AvailabilityContext availability = AvailabilityContext::alwaysAvailable();
+      AvailabilityRange availability = AvailabilityRange::alwaysAvailable();
       if (!SP.P.parseSpecializeAttribute(
               tok::r_square, AtLoc, Loc, Attr, &availability,
               [&targetFunctionName](Parser &P) -> bool {
@@ -3089,6 +3089,16 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     ResultVal =
         B.createOpenExistentialValue(InstLoc, Val, Ty, forwardingOwnership);
+    break;
+  }
+  case SILInstructionKind::TypeValueInst: {
+    CanType paramType;
+    if (parseSILType(Ty) ||
+        parseVerbatim("for") ||
+        parseASTType(paramType))
+      return true;
+
+    ResultVal = B.createTypeValue(InstLoc, Ty, paramType);
     break;
   }
   case SILInstructionKind::PackLengthInst: {
@@ -7144,7 +7154,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   SILFunction::Purpose specialPurpose = SILFunction::Purpose::None;
   bool isWeakImported = false;
   bool needStackProtection = false;
-  AvailabilityContext availability = AvailabilityContext::alwaysAvailable();
+  AvailabilityRange availability = AvailabilityRange::alwaysAvailable();
   bool isWithoutActuallyEscapingThunk = false;
   Inline_t inlineStrategy = InlineDefault;
   OptimizationMode optimizationMode = OptimizationMode::NotSet;

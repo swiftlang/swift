@@ -1268,6 +1268,24 @@ getActualLayoutConstraintKind(uint64_t rawKind) {
   return std::nullopt;
 }
 
+/// Translate from the param kind to the Serialization enum values, which are
+/// guaranteed to be stable.
+static std::optional<GenericTypeParamKind>
+getActualParamKind(uint64_t rawKind) {
+#define CASE(KIND)                   \
+  case serialization::GenericParamKind::KIND: \
+    return GenericTypeParamKind::KIND;
+
+  switch ((serialization::GenericParamKind)rawKind) {
+  CASE(Type)
+  CASE(Pack)
+  CASE(Value)
+  }
+#undef CASE
+
+  return std::nullopt;
+}
+
 void ModuleFile::deserializeGenericRequirements(
                    ArrayRef<uint64_t> scratch,
                    unsigned &nextIndex,
@@ -1577,12 +1595,11 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
       auto paramTy = getType(rawParamIDs[i+1])->castTo<GenericTypeParamType>();
 
       if (!name.empty()) {
-        auto *paramDecl = GenericTypeParamDecl::createDeserialized(
-            getAssociatedModule(), name, paramTy->getDepth(),
-            paramTy->getIndex(), paramTy->isParameterPack(),
-            /*isOpaqueType*/ false);
-        paramTy = paramDecl->getDeclaredInterfaceType()
-                   ->castTo<GenericTypeParamType>();
+        paramTy = GenericTypeParamType::get(name, paramTy->getParamKind(),
+                                            paramTy->getDepth(),
+                                            paramTy->getIndex(),
+                                            paramTy->getValueType(),
+                                            getContext());
       }
 
       paramTypes.push_back(paramTy);
@@ -1660,7 +1677,10 @@ Expected<GenericEnvironment *> ModuleFile::getGenericEnvironmentChecked(
   switch (GenericEnvironmentKind(kind)) {
   case GenericEnvironmentKind::OpenedExistential:
     genericEnv = GenericEnvironment::forOpenedExistential(
-        existentialOrShapeTypeOrError.get(), contextSubsOrError.get(), UUID::fromTime());
+        genericSigOrError.get(),
+        existentialOrShapeTypeOrError.get(),
+        contextSubsOrError.get(),
+        UUID::fromTime());
     break;
 
   case GenericEnvironmentKind::OpenedElement:
@@ -3446,25 +3466,37 @@ public:
                                   StringRef blobData) {
     IdentifierID nameID;
     bool isImplicit;
-    bool isParameterPack;
-    unsigned depth;
-    unsigned index;
     bool isOpaqueType;
+    TypeID interfaceTypeID;
 
     decls_block::GenericTypeParamDeclLayout::readRecord(
-        scratch, nameID, isImplicit, isParameterPack, depth, index,
-        isOpaqueType);
+        scratch, nameID, isImplicit, isOpaqueType, interfaceTypeID);
+
+    auto interfaceTy = MF.getTypeChecked(interfaceTypeID);
+    if (!interfaceTy)
+      return interfaceTy.takeError();
+
+    auto paramTy = interfaceTy.get()->castTo<GenericTypeParamType>();
 
     // Always create GenericTypeParamDecls in the associated file; the real
     // context will reparent them.
     auto *DC = MF.getFile();
     auto *genericParam = GenericTypeParamDecl::createDeserialized(
-        DC, MF.getIdentifier(nameID), depth, index, isParameterPack,
-        isOpaqueType);
+        DC, MF.getIdentifier(nameID), paramTy->getDepth(), paramTy->getIndex(),
+        paramTy->getParamKind(), isOpaqueType);
     declOrOffset = genericParam;
 
     if (isImplicit)
       genericParam->setImplicit();
+
+    // If we're dealing with a value generic, the parameter type already
+    // serializes the value type. Inform the request evaluator that we don't
+    // need to recompute this value for the param decl.
+    if (paramTy->isValue()) {
+      ctx.evaluator.cacheOutput(
+        GenericTypeParamDeclGetValueTypeRequest{genericParam},
+        paramTy->getValueType());
+    }
 
     return genericParam;
   }
@@ -6347,11 +6379,13 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       case decls_block::RawLayout_DECL_ATTR: {
         bool isImplicit;
         TypeID typeID;
+        TypeID countID;
         uint32_t rawSize;
         uint8_t rawAlign;
         bool movesAsLike;
         serialization::decls_block::RawLayoutDeclAttrLayout::
-          readRecord(scratch, isImplicit, typeID, rawSize, rawAlign, movesAsLike);
+          readRecord(scratch, isImplicit, typeID, countID, rawSize, rawAlign,
+                     movesAsLike);
         
         if (typeID) {
           auto type = MF.getTypeChecked(typeID);
@@ -6359,14 +6393,20 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
             return type.takeError();
           }
           auto typeRepr = new (ctx) FixedTypeRepr(type.get(), SourceLoc());
-          if (rawAlign == 0) {
+          if (!countID) {
             Attr = new (ctx) RawLayoutAttr(typeRepr,
                                            movesAsLike,
                                            SourceLoc(),
                                            SourceRange());
             break;
           } else {
-            Attr = new (ctx) RawLayoutAttr(typeRepr, rawSize, movesAsLike,
+            auto count = MF.getTypeChecked(countID);
+            if (!count) {
+              return count.takeError();
+            }
+            auto countRepr = new (ctx) FixedTypeRepr(count.get(), SourceLoc());
+
+            Attr = new (ctx) RawLayoutAttr(typeRepr, countRepr, movesAsLike,
                                            SourceLoc(),
                                            SourceRange());
             break;
@@ -7297,15 +7337,23 @@ Expected<Type> DESERIALIZE_TYPE(ELEMENT_ARCHETYPE_TYPE)(
 Expected<Type>
 DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
-  bool parameterPack;
-  DeclID declIDOrDepth;
-  unsigned indexPlusOne;
+  unsigned rawParamKind;
+  bool hasDecl;
+  unsigned depth;
+  unsigned index;
+  DeclID declOrIdentifier;
+  TypeID valueTypeID;
 
   decls_block::GenericTypeParamTypeLayout::readRecord(
-      scratch, parameterPack, declIDOrDepth, indexPlusOne);
+      scratch, rawParamKind, hasDecl, depth, index, declOrIdentifier,
+      valueTypeID);
 
-  if (indexPlusOne == 0) {
-    auto genericParamOrError = MF.getDeclChecked(declIDOrDepth);
+  auto paramKind = getActualParamKind(rawParamKind);
+  if (!paramKind)
+    return MF.diagnoseFatal();
+
+  if (hasDecl) {
+    auto genericParamOrError = MF.getDeclChecked(declOrIdentifier);
     if (!genericParamOrError)
       return genericParamOrError.takeError();
 
@@ -7314,11 +7362,25 @@ DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
     if (!genericParam)
       return MF.diagnoseFatal();
 
+    ASSERT(*paramKind == genericParam->getParamKind());
+    ASSERT(depth == genericParam->getDepth());
+    ASSERT(index == genericParam->getIndex());
+
     return genericParam->getDeclaredInterfaceType();
   }
 
-  return GenericTypeParamType::get(parameterPack, declIDOrDepth,
-                                   indexPlusOne - 1, MF.getContext());
+  auto valueType = MF.getTypeChecked(valueTypeID);
+  if (!valueType)
+    return valueType.takeError();
+
+  if (declOrIdentifier == 0) {
+    return GenericTypeParamType::get(*paramKind, depth, index, *valueType,
+                                     MF.getContext());
+  }
+
+  auto name = MF.getDeclBaseName(declOrIdentifier).getIdentifier();
+  return GenericTypeParamType::get(name, *paramKind, depth, index, *valueType,
+                                   MF.getContext());
 }
 
 Expected<Type> DESERIALIZE_TYPE(PROTOCOL_COMPOSITION_TYPE)(
@@ -7883,6 +7945,17 @@ Expected<Type> DESERIALIZE_TYPE(ERROR_TYPE)(ModuleFile &MF,
   if (!origTy)
     return ErrorType::get(ctx);
   return ErrorType::get(origTy);
+}
+
+Expected<Type> DESERIALIZE_TYPE(INTEGER_TYPE)(ModuleFile &MF,
+                                              SmallVectorImpl<uint64_t> &scratch,
+                                              StringRef blobData) {
+  auto &ctx = MF.getContext();
+  bool isNegative;
+  
+  decls_block::IntegerTypeLayout::readRecord(scratch, isNegative);
+
+  return IntegerType::get(blobData, isNegative, ctx);
 }
 } // namespace decls_block
 } // namespace serialization

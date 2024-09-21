@@ -149,6 +149,7 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
   StringRef sdkPath = Ctx.SearchPathOpts.getSDKPath();
   llvm::SmallString<32> modulePath = realModuleName.str();
   llvm::sys::path::replace_extension(modulePath, newExt);
+  auto ScannerPackageName = Ctx.LangOpts.PackageName;
   std::optional<ModuleDependencyInfo> Result;
   std::error_code code = astDelegate.runInSubContext(
       realModuleName.str(), moduleInterfacePath.str(), sdkPath,
@@ -225,7 +226,6 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
         SourceFile::ParsingOptions parsingOpts;
         auto sourceFile = new (Ctx) SourceFile(
             *moduleDecl, SourceFileKind::Interface, bufferID, parsingOpts);
-        moduleDecl->addAuxiliaryFile(*sourceFile);
         std::vector<StringRef> ArgsRefs(Args.begin(), Args.end());
         std::vector<StringRef> compiledCandidatesRefs(compiledCandidates.begin(),
                                                       compiledCandidates.end());
@@ -271,6 +271,34 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
           Result->addModuleImport(import.module.getModulePath(),
                                   &alreadyAddedModules, &Ctx.SourceMgr);
         }
+
+        // If this is a dependency that belongs to the same package, and we have not yet enabled Package Textual interfaces,
+        // scan the adjacent binary module for package dependencies.
+        if (!ScannerPackageName.empty() &&
+            !Ctx.LangOpts.EnablePackageInterfaceLoad) {
+           auto adjacentBinaryModule = std::find_if(
+               compiledCandidates.begin(), compiledCandidates.end(),
+               [moduleInterfacePath](const std::string &candidate) {
+                 return llvm::sys::path::parent_path(candidate) ==
+                        llvm::sys::path::parent_path(moduleInterfacePath.str());
+               });
+
+           if (adjacentBinaryModule != compiledCandidates.end()) {
+             auto adjacentBinaryModulePackageOnlyImports = getMatchingPackageOnlyImportsOfModule(
+                  *adjacentBinaryModule, isFramework,
+                  isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
+                  ScannerPackageName, Ctx.SourceMgr.getFileSystem().get(),
+                  Ctx.SearchPathOpts.DeserializedPathRecoverer);
+
+             if (!adjacentBinaryModulePackageOnlyImports)
+               return adjacentBinaryModulePackageOnlyImports.getError();
+
+             for (const auto &requiredImport : *adjacentBinaryModulePackageOnlyImports)
+               if (!alreadyAddedModules.contains(requiredImport.getKey()))
+                 Result->addModuleImport(requiredImport.getKey(),
+                                         &alreadyAddedModules);
+           }
+         }
 
         return std::error_code();
       });

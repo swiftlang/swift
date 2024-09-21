@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -enable-experimental-feature ValueGenerics)
 // REQUIRES: executable_test
 
 // UNSUPPORTED: CPU=arm64e
@@ -12,6 +12,8 @@ let testSuite = TestSuite("CheckedCreateType")
 struct Variadic<each T> {
   struct Nested<U, each V: Equatable> {}
 }
+
+struct Value<let N: Int, let M: Int> {}
 
 @_silgen_name("swift_allocateMetadataPack")
 func allocateMetadataPack(
@@ -30,7 +32,7 @@ func metaPointer(_ x: Any.Type) -> UnsafeRawPointer {
   unsafeBitCast(x, to: UnsafeRawPointer.self)
 }
 
-testSuite.test("_swift_checkedCreateType non-variadic") {
+testSuite.test("_swift_instantiateCheckedGenericMetadata non-variadic") {
   let dictMeta = unsafeBitCast(
     [Int: Int].self as Any.Type,
     to: UnsafeRawPointer.self
@@ -53,7 +55,7 @@ testSuite.test("_swift_checkedCreateType non-variadic") {
   }
 }
 
-testSuite.test("_swift_checkedCreateType variadic") {
+testSuite.test("_swift_instantiateCheckedGenericMetadata variadic") {
   let variMeta = unsafeBitCast(
     Variadic< >.self as Any.Type,
     to: UnsafeRawPointer.self
@@ -84,7 +86,7 @@ testSuite.test("_swift_checkedCreateType variadic") {
   }
 }
 
-testSuite.test("_swift_checkedCreateType variadic nested with requirements") {
+testSuite.test("_swift_instantiateCheckedGenericMetadata variadic nested with requirements") {
   let nestedMeta = unsafeBitCast(
     Variadic< >.Nested<()>.self as Any.Type,
     to: UnsafeRawPointer.self
@@ -268,6 +270,30 @@ testSuite.test("_swift_instantiateCheckedGenericMetadata concrete generic types 
 
       expectTrue(nested == Generic5<Int, Int, [Int], String, Double>.Nested.self)
     }
+  }
+}
+
+extension Value where N == M {
+  struct NestedNEqualsM {}
+}
+
+testSuite.test("_swift_instantiateCheckedGenericMetadata value generics") {
+  let nestedMeta1 = metaPointer(Value<0, 0>.NestedNEqualsM.self)
+  let nestedDesc1 = nestedMeta1.load(
+    fromByteOffset: MemoryLayout<Int>.size,
+    as: UnsafeRawPointer.self
+  )
+
+  let genericArgs1: [Int] = [123]
+
+  genericArgs1.withUnsafeBufferPointer {
+    let nested = _instantiateCheckedGenericMetadata(
+      nestedDesc1,
+      UnsafeRawPointer($0.baseAddress!),
+      UInt($0.count)
+    )
+
+    expectTrue(nested == Value<123, 123>.NestedNEqualsM.self)
   }
 }
 

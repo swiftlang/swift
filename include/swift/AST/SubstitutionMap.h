@@ -41,11 +41,6 @@ typedef CanTypeWrapper<GenericTypeParamType> CanGenericTypeParamType;
 template<class Type> class CanTypeWrapper;
 typedef CanTypeWrapper<SubstitutableType> CanSubstitutableType;
 
-enum class CombineSubstitutionMaps {
-  AtDepth,
-  AtIndex
-};
-
 /// SubstitutionMap is a data structure type that describes the mapping of
 /// abstract types to replacement types, together with associated conformances
 /// to use for deriving nested types and conformances.
@@ -108,6 +103,15 @@ public:
   static SubstitutionMap get(GenericSignature genericSig,
                              ArrayRef<Type> replacementTypes,
                              LookupConformanceFn lookupConformance);
+
+  /// Build a substitution map from the substitutions represented by
+  /// the given in-flight substitution.
+  ///
+  /// This function should generally only be used by the substitution
+  /// subsystem.
+  static SubstitutionMap get(GenericSignature genericSig,
+                             ArrayRef<Type> replacementTypes,
+                             InFlightSubstitution &IFS);
 
   /// Build a substitution map from the substitutions represented by
   /// the given in-flight substitution.
@@ -204,26 +208,6 @@ public:
                            const NominalTypeDecl *derivedNominal,
                            GenericSignature baseSig,
                            const GenericParamList *derivedParams);
-
-  /// Combine two substitution maps as follows.
-  ///
-  /// The result is written in terms of the generic parameters of 'genericSig'.
-  ///
-  /// Generic parameters with a depth or index less than 'firstDepthOrIndex'
-  /// come from 'firstSubMap'.
-  ///
-  /// Generic parameters with a depth greater than 'firstDepthOrIndex' come
-  /// from 'secondSubMap', but are looked up starting with a depth or index of
-  /// 'secondDepthOrIndex'.
-  ///
-  /// The 'how' parameter determines if we're looking at the depth or index.
-  static SubstitutionMap
-  combineSubstitutionMaps(SubstitutionMap firstSubMap,
-                          SubstitutionMap secondSubMap,
-                          CombineSubstitutionMaps how,
-                          unsigned baseDepthOrIndex,
-                          unsigned origDepthOrIndex,
-                          GenericSignature genericSig);
 
   /// Swap archetypes in the substitution map's replacement types with their
   /// interface types.
@@ -347,6 +331,19 @@ struct LookUpConformanceInOverrideSubs {
   ProtocolConformanceRef operator()(CanType type,
                                     Type substType,
                                     ProtocolDecl *proto) const;
+};
+
+// Substitute the outer generic parameters from a substitution map, ignoring
+/// inner generic parameters with a given depth.
+struct OuterSubstitutions {
+  SubstitutionMap subs;
+  unsigned depth;
+
+  bool isUnsubstitutedTypeParameter(Type type) const;
+  Type operator()(SubstitutableType *type) const;
+  ProtocolConformanceRef operator()(CanType dependentType,
+                                    Type conformingReplacementType,
+                                    ProtocolDecl *conformedProtocol) const;
 };
 
 } // end namespace swift

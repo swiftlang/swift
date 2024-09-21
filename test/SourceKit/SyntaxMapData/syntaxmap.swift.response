@@ -64,7 +64,7 @@
       key.length: 3
     },
     {
-      key.kind: source.lang.swift.syntaxtype.buildconfig.id,
+      key.kind: source.lang.swift.syntaxtype.identifier,
       key.offset: 140,
       key.length: 4
     },
@@ -79,7 +79,7 @@
       key.length: 1
     },
     {
-      key.kind: source.lang.swift.syntaxtype.typeidentifier,
+      key.kind: source.lang.swift.syntaxtype.identifier,
       key.offset: 153,
       key.length: 3
     },
@@ -99,7 +99,7 @@
       key.length: 1
     },
     {
-      key.kind: source.lang.swift.syntaxtype.typeidentifier,
+      key.kind: source.lang.swift.syntaxtype.identifier,
       key.offset: 171,
       key.length: 5
     },

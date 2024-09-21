@@ -356,7 +356,7 @@ var afterMessageCount : Int?
 func uintFunc() -> UInt {}
 func takeVoidVoidFn(_ a : () -> ()) {}
 takeVoidVoidFn { () -> Void in
-  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int?'}} {{23-23=Int(}} {{33-33=)}}
+  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int'}} {{23-23=Int(}} {{33-33=)}}
 }
 
 // <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
@@ -1158,6 +1158,8 @@ func rdar77022842(argA: Bool? = nil, argB: Bool? = nil) {
     // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'Bool'}}
     // expected-error@-2 {{closure passed to parameter of type 'Bool?' that does not accept a closure}}
     // expected-error@-3 {{cannot convert value of type 'Void' to expected condition type 'Bool'}}
+    // expected-error@-4 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+    // expected-error@-5 {{'if' must have an unconditional 'else' to be used as expression}}
   } // expected-error {{expected '{' after 'if' condition}}
 }
 

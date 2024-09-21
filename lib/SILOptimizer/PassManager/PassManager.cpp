@@ -2115,6 +2115,10 @@ void BridgedCloner::clone(BridgedInstruction inst) {
   cloner->cloneInst(inst.unbridged());
 }
 
+void BridgedCloner::recordFoldedValue(BridgedValue origValue, BridgedValue mappedValue) {
+  cloner->recordFoldedValue(origValue.getSILValue(), mappedValue.getSILValue());
+}
+
 static BridgedUtilities::VerifyFunctionFn verifyFunctionFunction;
 
 void BridgedUtilities::registerVerifier(VerifyFunctionFn verifyFunctionFn) {

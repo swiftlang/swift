@@ -231,6 +231,10 @@ public:
 
   Type createParenType(Type base);
 
+  Type createIntegerType(intptr_t value);
+
+  Type createNegativeIntegerType(intptr_t value);
+
   BuiltGenericSignature
   createGenericSignature(ArrayRef<BuiltType> params,
                          ArrayRef<BuiltRequirement> requirements);
@@ -254,7 +258,13 @@ private:
       NominalTypeDecl *nominalDecl,
       NodePointer node);
   DeclContext *findDeclContext(NodePointer node);
-  ModuleDecl *findModule(NodePointer node);
+
+  /// Find all the ModuleDecls that correspond to a module node's identifier.
+  /// The module name encoded in the node is either the module's real or ABI
+  /// name. Multiple modules can share the same name. This function returns
+  /// all modules that contain that name.
+  llvm::ArrayRef<ModuleDecl *> findPotentialModules(NodePointer node);
+
   Demangle::NodePointer findModuleNode(NodePointer node);
 
   enum class ForeignModuleKind {

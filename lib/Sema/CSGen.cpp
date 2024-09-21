@@ -889,7 +889,7 @@ TypeVarRefCollector::walkToExprPre(Expr *expr) {
     inferTypeVars(DRE->getDecl());
 
   // FIXME: We can see UnresolvedDeclRefExprs here because we don't walk into
-  // patterns when running preCheckExpression, since we don't resolve patterns
+  // patterns when running preCheckTarget, since we don't resolve patterns
   // until CSGen. We ought to consider moving pattern resolution into
   // pre-checking, which would allow us to pre-check patterns normally.
   if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
@@ -1702,6 +1702,21 @@ namespace {
       if (!type || type->hasError()) return Type();
 
       return MetatypeType::get(type);
+    }
+
+    Type visitTypeValueExpr(TypeValueExpr *E) {
+      auto locator = CS.getConstraintLocator(E);
+      auto type = resolveTypeReferenceInExpression(E->getParamTypeRepr(),
+                                              TypeResolverContext::InExpression,
+                                                  locator);
+
+      if (!type || type->hasError()) {
+        return Type();
+      }
+
+      auto archetype = type->castTo<ArchetypeType>();
+      E->setParamType(archetype);
+      return archetype->getValueType();
     }
 
     Type visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
@@ -2540,10 +2555,7 @@ namespace {
         // If this is a multi-statement closure, let's mark result
         // as potential hole right away.
         return Type(CS.createTypeVariable(
-            resultLocator,
-            (!CS.participatesInInference(closure) || allowResultBindToHole)
-                ? TVO_CanBindToHole
-                : 0));
+            resultLocator, allowResultBindToHole ? TVO_CanBindToHole : 0));
       }();
 
       // Determine the isolation of the closure.
@@ -3510,23 +3522,10 @@ namespace {
       } else {
         auto *locator = CS.getConstraintLocator(expr);
 
-        auto isOrCanBeLValueType = [](Type type) {
-          if (auto *typeVar = type->getAs<TypeVariableType>()) {
-            return typeVar->getImpl().canBindToLValue();
-          }
-          return type->is<LValueType>();
-        };
-
         auto exprType = CS.getType(expr);
-        if (!isOrCanBeLValueType(exprType)) {
-          // Pretend that destination is an l-value type.
-          exprType = LValueType::get(exprType);
-          (void)CS.recordFix(TreatRValueAsLValue::create(CS, locator));
-        }
-
         auto *destTy = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
-        CS.addConstraint(ConstraintKind::Bind, LValueType::get(destTy),
-                         exprType, locator);
+        CS.addConstraint(ConstraintKind::LValueObject, exprType, destTy,
+                         locator);
         return destTy;
       }
     }
@@ -4607,13 +4606,14 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
         new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(stmt->getForLoc()),
                               /*Implicit=*/true),
         nextId, labels);
-    nextRef->setFunctionRefKind(FunctionRefKind::Compound);
+    nextRef->setFunctionRefKind(FunctionRefKind::SingleApply);
 
     ArgumentList *nextArgs;
     if (nextFn && nextFn->getParameters()->size() == 1) {
       auto isolationArg =
         new (ctx) CurrentContextIsolationExpr(stmt->getForLoc(), Type());
-      nextArgs = ArgumentList::forImplicitUnlabeled(ctx, { isolationArg });
+      nextArgs = ArgumentList::createImplicit(
+          ctx, {Argument(SourceLoc(), ctx.Id_isolation, isolationArg)});
     } else {
       nextArgs = ArgumentList::createImplicit(ctx, {});
     }

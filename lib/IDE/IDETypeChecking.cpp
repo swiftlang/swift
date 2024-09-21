@@ -501,7 +501,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         // Members from underscored system protocols should still appear as
         // members of the target type, even if the protocols themselves are not
         // printed.
-        AdjustedOpts.SkipUnderscoredStdlibProtocols = false;
+        AdjustedOpts.SkipUnderscoredSystemProtocols = false;
       }
       if (AdjustedOpts.shouldPrint(E)) {
         auto Pair = isApplicable(E, Synthesized, EnablingE, Conf);
@@ -729,7 +729,7 @@ public:
       std::vector<ExpressionTypeInfo> &Results, bool FullyQualified,
       bool CanonicalType, llvm::raw_ostream &OS)
       : SM(SF.getASTContext().SourceMgr),
-        BufferId(*SF.getBufferID()), Results(Results), OS(OS),
+        BufferId(SF.getBufferID()), Results(Results), OS(OS),
         InterestedProtocols(InterestedProtocols),
         FullyQualified(FullyQualified), CanonicalType(CanonicalType) {}
   bool walkToExprPre(Expr *E) override {
@@ -843,7 +843,7 @@ public:
                         bool FullyQualified,
                         std::vector<VariableTypeInfo> &Results,
                         llvm::raw_ostream &OS)
-      : SM(SF.getASTContext().SourceMgr), BufferId(*SF.getBufferID()),
+      : SM(SF.getASTContext().SourceMgr), BufferId(SF.getBufferID()),
         TotalRange(Range), FullyQualified(FullyQualified), Results(Results),
         OS(OS) {}
 

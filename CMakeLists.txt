@@ -155,6 +155,8 @@ else()
     set(SWIFT_HOST_VARIANT_SDK_default "ANDROID")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     set(SWIFT_HOST_VARIANT_SDK_default "OSX")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "WASI")
+    set(SWIFT_HOST_VARIANT_SDK_default "WASI")
   else()
     message(FATAL_ERROR "Unable to detect SDK for host system: ${CMAKE_SYSTEM_NAME}")
   endif()
@@ -244,9 +246,16 @@ option(SWIFT_BUILD_CLANG_OVERLAYS
   "Build Swift overlays for the clang builtin modules"
   TRUE)
 
+# The SDK overlay is provided by the SDK itself on Darwin platforms.
+if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+  set(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY_default FALSE)
+else()
+  set(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY_default TRUE)
+endif()
+
 option(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY
     "Build dynamic variants of the Swift SDK overlay"
-    TRUE)
+    "${SWIFT_BUILD_DYNAMIC_SDK_OVERLAY_default}")
 
 option(SWIFT_BUILD_STATIC_SDK_OVERLAY
     "Build static variants of the Swift SDK overlay"
@@ -412,6 +421,17 @@ set(SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY
   ${SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY_default}
   CACHE STRING "MSVC Runtime Library for the standard library")
 
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows" AND BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" AND
+    CMAKE_BUILD_TYPE STREQUAL "Debug")
+  # Building with the host Swift toolchain requires linking just-built binaries
+  # against the host Swift runtime. In debug builds, that means linking a debug
+  # binary against a release binary. The MSVC linker does not normally permit
+  # this, since debug builds enable bounds-checked C++ iterators by default,
+  # which are not ABI-compatible with regular iterators. Let's instruct MSVC to
+  # disable bounds-checked iterators to make it possible to do a debug build of
+  # the Swift compiler with a host toolchain.
+  add_definitions(-D_ITERATOR_DEBUG_LEVEL=0)
+endif()
 
 if(BRIDGING_MODE STREQUAL "DEFAULT" OR NOT BRIDGING_MODE)
   if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS" OR (CMAKE_Swift_COMPILER AND CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.8))
@@ -461,6 +481,10 @@ set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "" CACHE STRING
 
 option(SWIFT_STDLIB_ENABLE_SIB_TARGETS
        "Should we generate sib targets for the stdlib or not?"
+       FALSE)
+
+option(SWIFT_STDLIB_BUILD_SYMBOL_GRAPHS
+       "Whether to build symbol graphs for the stdlib, for use in documentation."
        FALSE)
 
 
@@ -552,16 +576,16 @@ option(SWIFT_ALLOW_LINKING_SWIFT_CONTENT_IN_DARWIN_TOOLCHAIN
    This is needed to support Apple internal configurations."
   FALSE)
 
-set(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX "10.13" CACHE STRING
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX "13.0" CACHE STRING
     "Minimum deployment target version for OS X")
 
-set(SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS "11.0" CACHE STRING
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS "16.0" CACHE STRING
     "Minimum deployment target version for iOS")
 
-set(SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS "11.0" CACHE STRING
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS "16.0" CACHE STRING
     "Minimum deployment target version for tvOS")
 
-set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "4.0" CACHE STRING
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "6.0" CACHE STRING
     "Minimum deployment target version for watchOS")
 
 set(SWIFT_DARWIN_DEPLOYMENT_VERSION_XROS "1.0" CACHE STRING
@@ -690,10 +714,6 @@ option(SWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER
 
 option(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED
   "Enable experimental distributed actors and functions"
-  FALSE)
-
-option(SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES
-  "Enable experimental NonescapableTypes"
   FALSE)
 
 option(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING
@@ -1374,7 +1394,6 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Differentiable Programming Support: ${SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING}")
   message(STATUS "Concurrency Support:                ${SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY}")
   message(STATUS "Distributed Support:                ${SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED}")
-  message(STATUS "NonEscapableTypes Support:          ${SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES}")
   message(STATUS "String Processing Support:          ${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}")
   message(STATUS "Backtracing Support:                ${SWIFT_ENABLE_BACKTRACING}")
   message(STATUS "Unicode Support:                    ${SWIFT_STDLIB_ENABLE_UNICODE_DATA}")

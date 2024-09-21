@@ -89,6 +89,8 @@ ERROR(error_missing_arg_value,none,
       (StringRef, unsigned))
 ERROR(error_unknown_arg,none,
       "unknown argument: '%0'", (StringRef))
+GROUPED_WARNING(unknown_warning_group, unknown_warning_group, none,
+                "unknown warning group: '%0'", (StringRef))
 ERROR(error_invalid_arg_value,none,
       "invalid value '%1' in '%0'", (StringRef, StringRef))
 ERROR(error_invalid_arg_combination,none,
@@ -507,7 +509,6 @@ REMARK(replay_output, none, "replay output file '%0': key '%1'", (StringRef, Str
 REMARK(output_cache_miss, none, "cache miss for input file '%0': key '%1'", (StringRef, StringRef))
 
 // CAS related diagnostics
-ERROR(error_invalid_cas_id, none, "invalid CASID '%0' (%1)", (StringRef, StringRef))
 ERROR(error_cas, none, "CAS error encountered: %0", (StringRef))
 
 ERROR(error_failed_cached_diag, none, "failed to serialize cached diagnostics: %0", (StringRef))
@@ -578,6 +579,9 @@ ERROR(no_allocations_without_embedded,none,
       "-no-allocations is only applicable with embedded Swift.", ())
 ERROR(no_swift_sources_with_embedded,none,
       "embedded swift cannot be enabled in a compiler built without Swift sources", ())
+
+ERROR(package_cmo_requires_library_evolution, none,
+        "Library evolution must be enabled for Package CMO", ())
 
 ERROR(experimental_not_supported_in_production,none,
       "experimental feature '%0' cannot be enabled in production compiler",

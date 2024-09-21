@@ -38,6 +38,11 @@ public struct ExportedSourceFile {
   /// Cached so we don't need to re-build the line table every time we need to convert a position.
   let sourceLocationConverter: SourceLocationConverter
 
+  /// Configured regions for this source file.
+  ///
+  /// This is a cached value; access via configuredRegions(astContext:).
+  var _configuredRegions: ConfiguredRegions? = nil
+
   public func position(of location: BridgedSourceLoc) -> AbsolutePosition? {
     let sourceFileBaseAddress = UnsafeRawPointer(buffer.baseAddress!)
     guard let opaqueValue = location.getOpaquePointerValue() else {
@@ -67,7 +72,6 @@ extension Parser.ExperimentalFeatures {
     mapFeature(.ThenStatements, to: .thenStatements)
     mapFeature(.DoExpressions, to: .doExpressions)
     mapFeature(.NonescapableTypes, to: .nonescapableTypes)
-    mapFeature(.SendingArgsAndResults, to: .sendingArgsAndResults)
     mapFeature(.TrailingComma, to: .trailingComma)
   }
 }
@@ -162,12 +166,7 @@ public func emitParserDiagnostics(
     let diags = ParseDiagnosticsGenerator.diagnostics(for: sourceFileSyntax)
 
     let diagnosticEngine = BridgedDiagnosticEngine(raw: diagEnginePtr)
-    let buildConfiguration = CompilerBuildConfiguration(
-      ctx: ctx,
-      sourceBuffer: sourceFile.pointee.buffer
-    )
-
-    let configuredRegions = sourceFileSyntax.configuredRegions(in: buildConfiguration)
+    let configuredRegions = sourceFile.pointee.configuredRegions(astContext: ctx)
     for diag in diags {
       // If the diagnostic is in an unparsed #if region, don't emit it.
       if configuredRegions.isActive(diag.node) == .unparsed {

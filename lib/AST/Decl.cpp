@@ -157,7 +157,6 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(Extension);
   TRIVIAL_KIND(EnumCase);
   TRIVIAL_KIND(TopLevelCode);
-  TRIVIAL_KIND(IfConfig);
   TRIVIAL_KIND(PoundDiagnostic);
   TRIVIAL_KIND(PatternBinding);
   TRIVIAL_KIND(PrecedenceGroup);
@@ -323,7 +322,6 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(Extension, "extension");
   ENTRY(EnumCase, "case");
   ENTRY(TopLevelCode, "top-level code");
-  ENTRY(IfConfig, "conditional block");
   ENTRY(PoundDiagnostic, "diagnostic");
   ENTRY(PatternBinding, "pattern binding");
   ENTRY(Var, "var");
@@ -1133,25 +1131,24 @@ bool Decl::hasUnderscoredNaming() const {
   return false;
 }
 
-bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
+bool Decl::isPrivateSystemDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   const Decl *D = this;
   if (auto ExtD = dyn_cast<ExtensionDecl>(D)) {
     Type extTy = ExtD->getExtendedType();
-    return extTy.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic);
+    return extTy.isPrivateSystemType(treatNonBuiltinProtocolsAsPublic);
   }
 
   DeclContext *DC = D->getDeclContext()->getModuleScopeContext();
-  if (DC->getParentModule()->isBuiltinModule() ||
-      DC->getParentModule()->isSwiftShimsModule())
+  auto *M = DC->getParentModule();
+  if (M->isBuiltinModule() || M->isSwiftShimsModule())
     return true;
-  if (!DC->getParentModule()->isSystemModule())
+  if (!M->isSystemModule() && !M->isNonUserModule())
     return false;
   auto FU = dyn_cast<FileUnit>(DC);
   if (!FU)
     return false;
-  // Check for Swift module and overlays.
-  if (!DC->getParentModule()->isStdlibModule() &&
-      FU->getKind() != FileUnitKind::SerializedAST)
+  // Check for stdlib and imported Swift modules.
+  if (!M->isStdlibModule() && FU->getKind() != FileUnitKind::SerializedAST)
     return false;
 
   if (isa<ProtocolDecl>(D)) {
@@ -1191,13 +1188,13 @@ LifetimeAnnotation Decl::getLifetimeAnnotation() const {
   return getLifetimeAnnotationFromAttributes();
 }
 
-AvailabilityContext Decl::getAvailabilityForLinkage() const {
+AvailabilityRange Decl::getAvailabilityForLinkage() const {
   ASTContext &ctx = getASTContext();
 
   // When computing availability for linkage, use the "before" version from
   // the @backDeployed attribute, if present.
   if (auto backDeployVersion = getBackDeployedBeforeOSVersion(ctx))
-    return AvailabilityContext{VersionRange::allGTE(*backDeployVersion)};
+    return AvailabilityRange{VersionRange::allGTE(*backDeployVersion)};
 
   auto containingContext =
       AvailabilityInference::annotatedAvailableRange(this, getASTContext());
@@ -1231,7 +1228,7 @@ AvailabilityContext Decl::getAvailabilityForLinkage() const {
   else if (auto *nominal = dyn_cast<NominalTypeDecl>(dc))
     return nominal->getAvailabilityForLinkage();
 
-  return AvailabilityContext::alwaysAvailable();
+  return AvailabilityRange::alwaysAvailable();
 }
 
 bool Decl::isAlwaysWeakImported() const {
@@ -1288,7 +1285,7 @@ bool Decl::isWeakImported(ModuleDecl *fromModule) const {
     return false;
 
   auto &ctx = fromModule->getASTContext();
-  auto deploymentTarget = AvailabilityContext::forDeploymentTarget(ctx);
+  auto deploymentTarget = AvailabilityRange::forDeploymentTarget(ctx);
 
   if (ctx.LangOpts.WeakLinkAtTarget)
     return !availability.isSupersetOf(deploymentTarget);
@@ -1445,7 +1442,6 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
   case DeclKind::EnumCase:
-  case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
   case DeclKind::Missing:
@@ -2225,9 +2221,9 @@ StringRef PatternBindingEntry::getInitStringRepresentation(
   if (InitContextAndFlags.getInt().contains(PatternFlags::IsText) &&
       !InitStringRepresentation.empty())
     return InitStringRepresentation;
-  auto &sourceMgr = getAnchoringVarDecl()->getASTContext().SourceMgr;
+  auto &ctx = getAnchoringVarDecl()->getASTContext();
   auto init = getOriginalInit();
-  return extractInlinableText(sourceMgr, init, scratch);
+  return extractInlinableText(ctx, init, scratch);
 }
 
 SourceRange PatternBindingDecl::getSourceRange() const {
@@ -2531,10 +2527,6 @@ SourceLoc TopLevelCodeDecl::getStartLoc() const {
 
 SourceRange TopLevelCodeDecl::getSourceRange() const {
   return Body? Body->getSourceRange() : SourceRange();
-}
-
-SourceRange IfConfigDecl::getSourceRange() const {
-  return SourceRange(getLoc(), EndLoc);
 }
 
 static bool isPolymorphic(const AbstractStorageDecl *storage) {
@@ -3179,7 +3171,6 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
-  case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
   case DeclKind::Missing:
@@ -3637,7 +3628,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
                                     /*topLevelFunction=*/true, isMethod,
                                     /*isInitializer=*/isa<ConstructorDecl>(afd),
                                     getNumCurryLevels())
-        ->getMinimalCanonicalType(afd);
+        ->getMinimalCanonicalType();
   }
 
   if (isa<AbstractStorageDecl>(this)) {
@@ -3653,7 +3644,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
                                    /*topLevelFunction=*/true,
                                    /*isMethod=*/false,
                                    /*isInitializer=*/false, getNumCurryLevels())
-              ->getMinimalCanonicalType(cast<SubscriptDecl>(this));
+              ->getMinimalCanonicalType();
     }
 
     // We want to curry the default signature type with the 'self' type of the
@@ -3668,7 +3659,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
     auto mappedType = mapSignatureFunctionType(
         getASTContext(), getInterfaceType(), /*topLevelFunction=*/false,
         /*isMethod=*/false, /*isInitializer=*/false, getNumCurryLevels());
-    return mappedType->getMinimalCanonicalType(getDeclContext());
+    return mappedType->getMinimalCanonicalType();
   }
 
   // Note: If you add more cases to this function, you should update the
@@ -4103,7 +4094,6 @@ SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
   switch (getKind()) {
   case DeclKind::Module:
   case DeclKind::TopLevelCode:
-  case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
   case DeclKind::Missing:
   case DeclKind::MissingMember:
@@ -4220,23 +4210,32 @@ bool ValueDecl::isUsableFromInline() const {
 }
 
 bool ValueDecl::isInterfacePackageEffectivelyPublic() const {
-  // If a package decl has a @usableFromInline (or other inlinable)
-  // attribute, and is defined in a module built from interface, it
-  // can be referenced by another module that imports it even though
-  // the defining interface module does not have package-name (such
-  // as public or private interface); in such case, the decl is treated
-  // as public and access checks in sema are skipped.
-  // We might need to add another check here to ensure the interface
-  // was part of the same package before the package-name was removed.
-  return getFormalAccess() == AccessLevel::Package &&
-         isUsableFromInline() &&
-         getModuleContext()->getPackageName().empty() &&
-         getModuleContext()->isBuiltFromInterface();
+  // A package decl with @usableFromInline (or other inlinable
+  // attributes) is essentially public, and can be printed in
+  // public (or private) interface file without package-name;
+  // it can be referenced by another module (without package-name)
+  // importing such interface module.
+  auto isCandidate = getFormalAccess() == AccessLevel::Package &&
+                     isUsableFromInline() &&
+                     getModuleContext()->getPackageName().empty();
+  if (!isCandidate)
+    return false;
+
+  // Treat the decl as public (1) if it's contained in an interface
+  // file, e.g. when running -typecheck-module-from-interface or
+  // -compile-module-from-interface.
+  isCandidate = false;
+  if (auto srcFile = getDeclContext()->getParentSourceFile()) {
+    isCandidate = srcFile->Kind == SourceFileKind::Interface;
+  }
+  // Or (2) if the decl being referenced in a client file is defined
+  // in an interface module.
+  return isCandidate || getModuleContext()->isBuiltFromInterface();
 }
 
 bool ValueDecl::shouldHideFromEditor() const {
   // Hide private stdlib declarations.
-  if (isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic*/ false) ||
+  if (isPrivateSystemDecl(/*treatNonBuiltinProtocolsAsPublic*/ false) ||
       // ShowInInterfaceAttr is for decls to show in interface as exception but
       // they are not intended to be used directly.
       getAttrs().hasAttribute<ShowInInterfaceAttr>())
@@ -4513,9 +4512,9 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
     if (!pkg) {
       if (VD->isInterfacePackageEffectivelyPublic())
         return AccessScope::getPublic();
-      // Instead of reporting and failing early, return the scope of resultDC to
-      // allow continuation (should still non-zero exit later if in script mode)
-      return AccessScope(resultDC);
+
+      // If reached here, should be treated as internal.
+      return AccessScope(resultDC->getParentModule());
     } else {
       return AccessScope(pkg);
     }
@@ -4810,339 +4809,6 @@ void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
     auto *clonedAttr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
     getAttrs().add(clonedAttr);
   }
-}
-
-GenericParameterReferenceInfo &
-GenericParameterReferenceInfo::operator|=(const GenericParameterReferenceInfo &other) {
-  hasCovariantSelfResult |= other.hasCovariantSelfResult;
-  if (other.selfRef > selfRef) {
-    selfRef = other.selfRef;
-  }
-  if (other.assocTypeRef > assocTypeRef) {
-    assocTypeRef = other.assocTypeRef;
-  }
-  return *this;
-}
-
-/// Forward declaration.
-static GenericParameterReferenceInfo
-findGenericParameterReferences(CanGenericSignature, GenericTypeParamType *,
-                               Type, TypePosition, bool, bool);
-
-/// Determine whether a function type with the given result type may have
-/// a covariant generic parameter type result. This is true if the result type
-/// is either a function type, or a generic parameter, possibly wrapped in some
-/// level of optionality.
-static bool canResultTypeHaveCovariantGenericParameterResult(Type resultTy) {
-  if (resultTy->is<AnyFunctionType>())
-    return true;
-
-  resultTy = resultTy->lookThroughAllOptionalTypes();
-  return resultTy->is<GenericTypeParamType>();
-}
-
-/// Report references to the given generic parameter within the given function
-/// type using the given generic signature.
-///
-/// \param position The current position in terms of variance.
-/// \param skipParamIndex The index of the parameter that shall be skipped.
-static GenericParameterReferenceInfo findGenericParameterReferencesInFunction(
-    CanGenericSignature genericSig, GenericTypeParamType *genericParam,
-    const AnyFunctionType *fnType, TypePosition position,
-    bool treatNonResultCovarianceAsInvariant, bool canBeCovariantResult,
-    std::optional<unsigned> skipParamIndex) {
-  // If there are no type parameters, we're done.
-  if (!isa<GenericFunctionType>(fnType) && !fnType->hasTypeParameter())
-    return GenericParameterReferenceInfo();
-
-  auto inputInfo = GenericParameterReferenceInfo();
-  const auto params = fnType->getParams();
-  for (const auto paramIdx : indices(params)) {
-    // If this is the parameter we were supposed to skip, do so.
-    if (skipParamIndex && paramIdx == *skipParamIndex)
-      continue;
-
-    const auto &param = params[paramIdx];
-    // inout types are invariant.
-    if (param.isInOut()) {
-      inputInfo |= ::findGenericParameterReferences(
-          genericSig, genericParam, param.getPlainType(),
-          TypePosition::Invariant, treatNonResultCovarianceAsInvariant,
-          /*canBeCovariantResult=*/false);
-      continue;
-    }
-
-    // Parameters are contravariant, but if we're prior to the skipped
-    // parameter treat them as invariant because we're not allowed to
-    // reference the parameter at all.
-    TypePosition paramPos = position.flipped();
-    if (skipParamIndex && paramIdx < *skipParamIndex)
-      paramPos = TypePosition::Invariant;
-
-    inputInfo |= ::findGenericParameterReferences(
-        genericSig, genericParam, param.getParameterType(), paramPos,
-        treatNonResultCovarianceAsInvariant, /*canBeCovariantResult=*/false);
-  }
-
-  canBeCovariantResult =
-      // &= does not short-circuit.
-      canBeCovariantResult &&
-      canResultTypeHaveCovariantGenericParameterResult(fnType->getResult());
-
-  const auto resultInfo = ::findGenericParameterReferences(
-      genericSig, genericParam, fnType->getResult(), position,
-      treatNonResultCovarianceAsInvariant, canBeCovariantResult);
-
-  return inputInfo |= resultInfo;
-}
-
-/// Report references to the given generic parameter within the given type
-/// using the given generic signature.
-///
-/// \param position The current position in terms of variance.
-static GenericParameterReferenceInfo
-findGenericParameterReferences(CanGenericSignature genericSig,
-                               GenericTypeParamType *genericParam,
-                               Type type,
-                               TypePosition position,
-                               bool treatNonResultCovarianceAsInvariant,
-                               bool canBeCovariantResult) {
-  // If there are no type parameters, we're done.
-  if (!type->hasTypeParameter())
-    return GenericParameterReferenceInfo();
-
-  // Tuples preserve variance.
-  if (auto tuple = type->getAs<TupleType>()) {
-    auto info = GenericParameterReferenceInfo();
-    for (auto &elt : tuple->getElements()) {
-      info |= findGenericParameterReferences(
-          genericSig, genericParam, elt.getType(), position,
-          treatNonResultCovarianceAsInvariant,
-          /*canBeCovariantResult=*/false);
-    }
-
-    return info;
-  }
-
-  // Function types preserve variance in the result type, and flip variance in
-  // the parameter type.
-  if (auto funcTy = type->getAs<AnyFunctionType>()) {
-    return findGenericParameterReferencesInFunction(
-        genericSig, genericParam, funcTy, position,
-        treatNonResultCovarianceAsInvariant, canBeCovariantResult,
-        /*skipParamIndex=*/std::nullopt);
-  }
-
-  // Metatypes preserve variance.
-  if (auto metaTy = type->getAs<MetatypeType>()) {
-    return findGenericParameterReferences(genericSig, genericParam,
-                                          metaTy->getInstanceType(), position,
-                                          treatNonResultCovarianceAsInvariant,
-                                          canBeCovariantResult);
-  }
-
-  // Optionals preserve variance.
-  if (auto optType = type->getOptionalObjectType()) {
-    return findGenericParameterReferences(
-        genericSig, genericParam, optType, position,
-        treatNonResultCovarianceAsInvariant, canBeCovariantResult);
-  }
-
-  // DynamicSelfType preserves variance.
-  if (auto selfType = type->getAs<DynamicSelfType>()) {
-    return findGenericParameterReferences(genericSig, genericParam,
-                                          selfType->getSelfType(), position,
-                                          treatNonResultCovarianceAsInvariant,
-                                          /*canBeCovariantResult=*/false);
-  }
-
-  if (auto *const nominal = type->getAs<NominalOrBoundGenericNominalType>()) {
-    auto info = GenericParameterReferenceInfo();
-
-    // Don't forget to look in the parent.
-    if (const auto parent = nominal->getParent()) {
-      info |= findGenericParameterReferences(
-          genericSig, genericParam, parent, position,
-          treatNonResultCovarianceAsInvariant,
-          /*canBeCovariantResult=*/false);
-    }
-
-    // Most bound generic types are invariant.
-    if (auto *const bgt = type->getAs<BoundGenericType>()) {
-      if (bgt->isArray()) {
-        // Swift.Array preserves variance in its 'Value' type.
-        info |= findGenericParameterReferences(
-            genericSig, genericParam, bgt->getGenericArgs().front(),
-            position, treatNonResultCovarianceAsInvariant,
-            /*canBeCovariantResult=*/false);
-      } else if (bgt->isDictionary()) {
-        // Swift.Dictionary preserves variance in its 'Element' type.
-        info |= findGenericParameterReferences(
-            genericSig, genericParam, bgt->getGenericArgs().front(),
-            TypePosition::Invariant, treatNonResultCovarianceAsInvariant,
-            /*canBeCovariantResult=*/false);
-        info |= findGenericParameterReferences(
-            genericSig, genericParam, bgt->getGenericArgs().back(),
-            position, treatNonResultCovarianceAsInvariant,
-            /*canBeCovariantResult=*/false);
-      } else {
-        for (const auto &paramType : bgt->getGenericArgs()) {
-          info |= findGenericParameterReferences(
-              genericSig, genericParam, paramType, TypePosition::Invariant,
-              treatNonResultCovarianceAsInvariant,
-              /*canBeCovariantResult=*/false);
-        }
-      }
-    }
-
-    return info;
-  }
-
-  // If the signature of an opaque result type has a same-type constraint
-  // that references Self, it's invariant.
-  if (auto opaque = type->getAs<OpaqueTypeArchetypeType>()) {
-    auto info = GenericParameterReferenceInfo();
-    auto opaqueSig = opaque->getDecl()->getOpaqueInterfaceGenericSignature();
-    for (const auto &req : opaqueSig.getRequirements()) {
-      switch (req.getKind()) {
-      case RequirementKind::SameShape:
-        llvm_unreachable("Same-shape requirement not supported here");
-
-      case RequirementKind::Conformance:
-      case RequirementKind::Layout:
-        continue;
-
-      case RequirementKind::SameType:
-        info |= findGenericParameterReferences(
-            genericSig, genericParam, req.getFirstType(),
-            TypePosition::Invariant, treatNonResultCovarianceAsInvariant,
-            /*canBeCovariantResult=*/false);
-
-        LLVM_FALLTHROUGH;
-
-      case RequirementKind::Superclass:
-        info |= findGenericParameterReferences(
-            genericSig, genericParam, req.getSecondType(),
-            TypePosition::Invariant, treatNonResultCovarianceAsInvariant,
-            /*canBeCovariantResult=*/false);
-        break;
-      }
-    }
-
-    return info;
-  }
-
-  // Protocol compositions preserve variance.
-  if (auto *existential = type->getAs<ExistentialType>())
-    type = existential->getConstraintType();
-  if (auto *comp = type->getAs<ProtocolCompositionType>()) {
-    // 'Self' may be referenced only in an explicit superclass component.
-    for (const auto member : comp->getMembers()) {
-      if (member->getClassOrBoundGenericClass()) {
-        return findGenericParameterReferences(
-            genericSig, genericParam, member, position,
-            treatNonResultCovarianceAsInvariant,
-            /*canBeCovariantResult=*/false);
-      }
-    }
-
-    return GenericParameterReferenceInfo();
-  }
-
-  if (!type->isTypeParameter()) {
-    return GenericParameterReferenceInfo();
-  }
-
-  Type selfTy(genericParam);
-  if (!type->getRootGenericParam()->isEqual(selfTy)) {
-    return GenericParameterReferenceInfo();
-  }
-
-  // A direct reference to 'Self'.
-  if (selfTy->isEqual(type)) {
-    if (position == TypePosition::Covariant) {
-      if (canBeCovariantResult) {
-        return GenericParameterReferenceInfo::forCovariantResult();
-      } else if (treatNonResultCovarianceAsInvariant) {
-        position = TypePosition::Invariant;
-      }
-    }
-
-    return GenericParameterReferenceInfo::forSelfRef(position);
-  }
-
-  // If the type parameter is beyond the domain of the existential generic
-  // signature, ignore it.
-  if (!genericSig->isValidTypeParameter(type)) {
-    return GenericParameterReferenceInfo();
-  }
-
-  if (const auto concreteTy = genericSig->getConcreteType(type)) {
-    return findGenericParameterReferences(
-        genericSig, genericParam, concreteTy, position,
-        treatNonResultCovarianceAsInvariant, canBeCovariantResult);
-  }
-
-  // A reference to an associated type rooted on 'Self'.
-  return GenericParameterReferenceInfo::forAssocTypeRef(position);
-}
-
-GenericParameterReferenceInfo
-swift::findGenericParameterReferences(const ValueDecl *value,
-                                      CanGenericSignature sig,
-                                      GenericTypeParamType *genericParam,
-                                      bool treatNonResultCovarianceAsInvariant,
-                                      std::optional<unsigned> skipParamIndex) {
-  assert(isa<TypeDecl>(value) == false);
-  assert(sig->getGenericParamOrdinal(genericParam) <
-         sig.getGenericParams().size());
-
-  auto type = value->getInterfaceType();
-
-  // Skip invalid declarations.
-  if (type->hasError())
-    return GenericParameterReferenceInfo();
-
-  if (isa<AbstractFunctionDecl>(value) || isa<SubscriptDecl>(value)) {
-    // For a method, skip the 'self' parameter.
-    if (value->hasCurriedSelf())
-      type = type->castTo<AnyFunctionType>()->getResult();
-
-    return ::findGenericParameterReferencesInFunction(
-        sig, genericParam, type->castTo<AnyFunctionType>(),
-        TypePosition::Covariant, treatNonResultCovarianceAsInvariant,
-        /*canBeCovariantResult=*/true, skipParamIndex);
-  }
-
-  return ::findGenericParameterReferences(sig, genericParam, type,
-                                          TypePosition::Covariant,
-                                          treatNonResultCovarianceAsInvariant,
-                                          /*canBeCovariantResult=*/true);
-}
-
-GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
-    Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const {
-  assert(baseTy->isExistentialType());
-  assert(!baseTy->hasTypeParameter());
-
-  // Type declarations don't really have type signatures.
-  if (isa<TypeDecl>(this))
-    return GenericParameterReferenceInfo();
-
-  // Skip invalid declarations.
-  if (getInterfaceType()->hasError())
-    return GenericParameterReferenceInfo();
-
-  // Note: a non-null GenericSignature would violate the invariant that
-  // the protocol 'Self' type referenced from the requirement's interface
-  // type is the same as the existential 'Self' type.
-  auto sig = getASTContext().getOpenedExistentialSignature(baseTy,
-      GenericSignature());
-
-  auto genericParam = sig.getGenericParams().front();
-  return findGenericParameterReferences(this, sig, genericParam,
-                                        treatNonResultCovariantSelfAsInvariant,
-                                        std::nullopt);
 }
 
 TypeDecl::CanBeInvertible::Result
@@ -5628,85 +5294,106 @@ Type TypeAliasDecl::getStructuralType() const {
 }
 
 GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
-                                           SourceLoc nameLoc, SourceLoc eachLoc,
+                                           SourceLoc nameLoc,
+                                           SourceLoc specifierLoc,
                                            unsigned depth, unsigned index,
-                                           bool isParameterPack,
+                                           GenericTypeParamKind paramKind,
                                            bool isOpaqueType,
                                            TypeRepr *opaqueTypeRepr)
     : TypeDecl(DeclKind::GenericTypeParam, dc, name, nameLoc, {}) {
-  assert(!(eachLoc && !isParameterPack) &&
-         "'each' keyword always means type parameter pack");
+  ASSERT(!(specifierLoc &&
+         !(paramKind == GenericTypeParamKind::Pack || paramKind == GenericTypeParamKind::Value)) &&
+    "'each' or 'let' keyword imply a parameter pack or value generic parameter");
+  ASSERT(isOpaqueType || !opaqueTypeRepr);
 
   Bits.GenericTypeParamDecl.Depth = depth;
   assert(Bits.GenericTypeParamDecl.Depth == depth && "Truncation");
   Bits.GenericTypeParamDecl.Index = index;
   assert(Bits.GenericTypeParamDecl.Index == index && "Truncation");
-  Bits.GenericTypeParamDecl.ParameterPack = isParameterPack;
+  Bits.GenericTypeParamDecl.ParamKind = (uint8_t) paramKind;
   Bits.GenericTypeParamDecl.IsOpaqueType = isOpaqueType;
-  assert(isOpaqueType || !opaqueTypeRepr);
-  if (isOpaqueType)
-    *getTrailingObjects<TypeRepr *>() = opaqueTypeRepr;
-  if (isParameterPack)
-    *getTrailingObjects<SourceLoc>() = eachLoc;
 
-  auto &ctx = dc->getASTContext();
-  RecursiveTypeProperties props = RecursiveTypeProperties::HasTypeParameter;
+  if (this->isOpaqueType())
+    *getTrailingObjects<TypeRepr *>() = opaqueTypeRepr;
+
   if (this->isParameterPack())
-    props |= RecursiveTypeProperties::HasParameterPack;
-  auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this, props);
-  setInterfaceType(MetatypeType::get(type, ctx));
+    *getTrailingObjects<SourceLoc>() = specifierLoc;
+
+  if (this->isValue())
+    *getTrailingObjects<SourceLoc>() = specifierLoc;
 }
 
 GenericTypeParamDecl *GenericTypeParamDecl::create(
-    DeclContext *dc, Identifier name, SourceLoc nameLoc, SourceLoc eachLoc,
-    unsigned depth, unsigned index, bool isParameterPack, bool isOpaqueType,
-    TypeRepr *opaqueTypeRepr) {
+    DeclContext *dc, Identifier name, SourceLoc nameLoc, SourceLoc specifierLoc,
+    unsigned depth, unsigned index, GenericTypeParamKind paramKind,
+    bool isOpaqueType, TypeRepr *opaqueTypeRepr) {
   auto &ctx = dc->getASTContext();
-  auto allocSize = totalSizeToAlloc<TypeRepr *, SourceLoc>(
-      isOpaqueType ? 1 : 0, isParameterPack ? 1 : 0);
+
+  auto numTypeReprs = 0;
+
+  if (isOpaqueType)
+    numTypeReprs = 1;
+
+  auto numSourceLocs = 0;
+
+  if (paramKind == GenericTypeParamKind::Pack ||
+      paramKind == GenericTypeParamKind::Value)
+    numSourceLocs = 1;
+
+  auto allocSize = totalSizeToAlloc<TypeRepr *, SourceLoc>(numTypeReprs,
+                                                           numSourceLocs);
   auto mem = ctx.Allocate(allocSize, alignof(GenericTypeParamDecl));
   return new (mem)
-      GenericTypeParamDecl(dc, name, nameLoc, eachLoc, depth, index,
-                           isParameterPack, isOpaqueType, opaqueTypeRepr);
+      GenericTypeParamDecl(dc, name, nameLoc, specifierLoc, depth, index,
+                           paramKind, isOpaqueType, opaqueTypeRepr);
 }
 
 GenericTypeParamDecl *GenericTypeParamDecl::createDeserialized(
     DeclContext *dc, Identifier name, unsigned depth, unsigned index,
-    bool isParameterPack, bool isOpaqueType) {
-  return GenericTypeParamDecl::create(dc, name, SourceLoc(), SourceLoc(), depth,
-                                      index, isParameterPack, isOpaqueType,
+    GenericTypeParamKind paramKind, bool isOpaqueType) {
+  return GenericTypeParamDecl::create(dc, name, SourceLoc(), SourceLoc(),
+                                      depth, index, paramKind,
+                                      isOpaqueType,
                                       /*opaqueRepr*/ nullptr);
 }
 
 GenericTypeParamDecl *
 GenericTypeParamDecl::createParsed(DeclContext *dc, Identifier name,
-                                   SourceLoc nameLoc, SourceLoc eachLoc,
-                                   unsigned index, bool isParameterPack) {
+                                   SourceLoc nameLoc, SourceLoc specifierLoc,
+                                   unsigned index,
+                                   GenericTypeParamKind paramKind) {
   // We always create generic type parameters with an invalid depth.
   // Semantic analysis fills in the depth when it processes the generic
   // parameter list.
   return GenericTypeParamDecl::create(
-      dc, name, nameLoc, eachLoc, GenericTypeParamDecl::InvalidDepth, index,
-      isParameterPack, /*isOpaqueType*/ false, /*opaqueTypeRepr*/ nullptr);
+      dc, name, nameLoc, specifierLoc, GenericTypeParamDecl::InvalidDepth,
+      index, paramKind, /*isOpaqueType*/ false, /*opaqueTypeRepr*/ nullptr);
 }
 
 GenericTypeParamDecl *GenericTypeParamDecl::createImplicit(
     DeclContext *dc, Identifier name, unsigned depth, unsigned index,
-    bool isParameterPack, bool isOpaqueType, TypeRepr *opaqueTypeRepr,
-    SourceLoc nameLoc, SourceLoc eachLoc) {
-  auto *param = GenericTypeParamDecl::create(dc, name, nameLoc, eachLoc, depth,
-                                             index, isParameterPack,
-                                             isOpaqueType, opaqueTypeRepr);
+    GenericTypeParamKind paramKind, TypeRepr *opaqueTypeRepr, SourceLoc nameLoc,
+    SourceLoc specifierLoc) {
+  auto *param = GenericTypeParamDecl::create(dc, name, nameLoc, specifierLoc,
+                                             depth, index, paramKind,
+                                             (bool)opaqueTypeRepr,
+                                             opaqueTypeRepr);
   param->setImplicit();
   return param;
+}
+
+Type GenericTypeParamDecl::getValueType() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+    GenericTypeParamDeclGetValueTypeRequest{const_cast<GenericTypeParamDecl *>(this)},
+    Type());
 }
 
 SourceRange GenericTypeParamDecl::getSourceRange() const {
   auto startLoc = getNameLoc();
   auto endLoc = getNameLoc();
 
-  if (const auto eachLoc = getEachLoc())
-    startLoc = eachLoc;
+  if (const auto specifierLoc = getSpecifierLoc())
+    startLoc = specifierLoc;
 
   if (!getInherited().empty())
     endLoc = getInherited().getEndLoc();
@@ -7570,8 +7257,14 @@ VarDecl::mutability(const DeclContext *UseDC,
   // declaration.  To handle top-level code properly, we look through
   // the TopLevelCode decl on the use (if present) since the vardecl may be
   // one level up.
-  if (getDeclContext() == UseDC)
+  if (getDeclContext() == UseDC) {
+    // Treat values of tuple type as mutable in these contexts, because
+    // SILGen wants to see them as lvalues.
+    if (getInterfaceType()->is<TupleType>())
+      return StorageMutability::Mutable;
+
     return StorageMutability::Initializable;
+  }
 
   if (isa<TopLevelCodeDecl>(UseDC) &&
       getDeclContext() == UseDC->getParent())
@@ -9022,7 +8715,7 @@ ParamDecl::getDefaultValueStringRepresentation(
 
     assert(hasDefaultExpr()
            && "Normal default argument with no default expression?!");
-    return extractInlinableText(getASTContext().SourceMgr,
+    return extractInlinableText(getASTContext(),
                                 getStructuralDefaultExpr(), scratch);
   }
   case DefaultArgumentKind::StoredProperty: {
@@ -9066,8 +8759,7 @@ ParamDecl::getDefaultValueStringRepresentation(
           return ".init()";
         }
 
-        auto &sourceMgr = getASTContext().SourceMgr;
-        return extractInlinableText(sourceMgr, wrappedValue, scratch);
+        return extractInlinableText(getASTContext(), wrappedValue, scratch);
       }
     }
 
@@ -9087,9 +8779,7 @@ ParamDecl::getDefaultValueStringRepresentation(
       return "<<empty>>";
     }
 
-    return extractInlinableText(getASTContext().SourceMgr,
-                                init,
-                                scratch);
+    return extractInlinableText(getASTContext(), init, scratch);
   }
   case DefaultArgumentKind::Inherited: return "super";
 #define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
@@ -10275,7 +9965,7 @@ StringRef AbstractFunctionDecl::getInlinableBodyText(
     return BodyStringRepresentation;
 
   auto body = getBody();
-  return extractInlinableText(getASTContext().SourceMgr, body, scratch);
+  return extractInlinableText(getASTContext(), body, scratch);
 }
 
 /// A uniqued list of derivative function configurations.

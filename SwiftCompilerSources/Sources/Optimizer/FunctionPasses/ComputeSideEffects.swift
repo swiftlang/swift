@@ -57,6 +57,7 @@ let computeSideEffects = FunctionPass(name: "compute-side-effects") {
   // instruction the argument might have escaped.
   for argument in function.arguments {
     collectedEffects.addEffectsForEscapingArgument(argument: argument)
+    collectedEffects.addEffectsForConsumingArgument(argument: argument)
   }
 
   // Don't modify the effects if they didn't change. This avoids sending a change notification
@@ -236,7 +237,17 @@ private struct CollectedEffects {
       addEffects(.destroy, to: argument)
     }
   }
-  
+
+  mutating func addEffectsForConsumingArgument(argument: FunctionArgument) {
+    if argument.convention == .indirectIn {
+      // Usually there _must_ be a read from a consuming in-argument, because the function has to consume the argument.
+      // But in the special case if all control paths end up in an `unreachable`, the consuming read might have been
+      // dead-code eliminated. Therefore make sure to add the read-effect in any case. Otherwise it can result
+      // in memory lifetime failures at a call site.
+      addEffects(.read, to: argument)
+    }
+  }
+
   private mutating func handleApply(_ apply: ApplySite) {
     let callees = calleeAnalysis.getCallees(callee: apply.callee)
     let args = apply.argumentOperands.lazy.map {

@@ -710,6 +710,10 @@ Types
   type ::= type 'Xm' METATYPE-REPR           // existential metatype with representation
   type ::= 'Xe'                              // error or unresolved type
 
+#if SWIFT_RUNTIME_VERSION >= 6.TBD
+  type ::= '$' 'n'? NATURAL_ZERO             // integer type
+#endif
+
   bound-generic-type ::= type 'y' (type* '_')* type* retroactive-conformance* 'G'   // one type-list per nesting level of type
   bound-generic-type ::= substitution
 
@@ -748,10 +752,6 @@ Types
   differentiable ::= 'Yjr'                   // @differentiable(reverse) on function type
   differentiable ::= 'Yjd'                   // @differentiable on function type
   differentiable ::= 'Yjl'                   // @differentiable(_linear) on function type
- #if SWIFT_RUNTIME_VERSION >= 5.TBD
-  lifetime-dependence ::= 'Yli' INDEX-SUBSET '_'         // inherit lifetime dependence
-  lifetime-dependence ::= 'Yls' INDEX-SUBSET '_'         // scoped lifetime dependence
-#endif
   type-list ::= list-type '_' list-type*     // list of types
   type-list ::= empty-list
 
@@ -1008,10 +1008,17 @@ now codified into the ABI; the index 0 is therefore reserved.
 
 ::
 
-  generic-signature ::= requirement* generic-param-pack-marker* 'l'     // one generic parameter
-  generic-signature ::= requirement* generic-param-pack-marker* 'r' GENERIC-PARAM-COUNT* 'l'
+  generic-signature ::= requirement* generic-param-marker 'l'     // one generic parameter
+  generic-signature ::= requirement* generic-param-marker* 'r' GENERIC-PARAM-COUNT* 'l'
+
+  generic-param-marker ::= generic-param-pack-marker
+  generic-param-marker ::= generic-param-value-marker
 
   generic-param-pack-marker ::= 'Rv' GENERIC_PARAM-INDEX   // generic parameter pack marker
+
+#if SWIFT_RUNTIME_VERSION >= 6.TBD
+  generic-param-value-marker ::= type 'RV' GENERIC-PARAM-INDEX // generic parameter value marker
+#endif
 
   GENERIC-PARAM-COUNT ::= 'z'                // zero parameters
   GENERIC-PARAM-COUNT ::= INDEX              // N+1 parameters

@@ -100,7 +100,7 @@ struct Symbol::Storage final
     DEBUG_ASSERT(kind == Symbol::Kind::Superclass ||
                  kind == Symbol::Kind::ConcreteType);
     ASSERT(!type->hasUnboundGenericType());
-    DEBUG_ASSERT(!type->hasTypeVariable());
+    ASSERT(!type->hasTypeVariable());
     ASSERT(type->hasTypeParameter() != substitutions.empty());
 
     Kind = kind;
@@ -113,7 +113,7 @@ struct Symbol::Storage final
   }
 
   Storage(CanType type, ArrayRef<Term> substitutions, const ProtocolDecl *proto) {
-    DEBUG_ASSERT(!type->hasTypeVariable());
+    ASSERT(!type->hasTypeVariable());
     ASSERT(type->hasTypeParameter() != substitutions.empty());
 
     Kind = Symbol::Kind::ConcreteConformance;
@@ -699,8 +699,7 @@ void Symbol::dump(llvm::raw_ostream &out) const {
       llvm::raw_string_ostream os(s);
       os << substitution;
 
-      auto key = CanType(GenericTypeParamType::get(
-          /*isParameterPack=*/false, 0, index, ctx));
+      auto key = CanType(GenericTypeParamType::getType(0, index, ctx));
       substitutionNames[key] = ctx.getIdentifier(s);
     }
   }

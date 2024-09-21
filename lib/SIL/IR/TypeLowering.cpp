@@ -353,6 +353,7 @@ namespace {
     IMPL(SILToken, Trivial)
     IMPL(AnyMetatype, Trivial)
     IMPL(Module, Trivial)
+    IMPL(Integer, Trivial)
 
 #undef IMPL
 
@@ -3116,6 +3117,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     // (3) being a special type that's not worth forming a conformance for
     //     - ModuleType
     //     - SILTokenType
+    //     - IntegerType
     // (4) being an unowned(unsafe) reference to a class/class-bound existential
     //     NOTE: ReferenceStorageType(C) does not conform HOWEVER the presence
     //           of an unowned(unsafe) field within an aggregate DOES NOT allow
@@ -3200,7 +3202,9 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
 
           // ModuleTypes are trivial but don't warrant being given a
           // conformance to BitwiseCopyable (case (3)).
-          if (isa<ModuleType>(ty) || isa<SILTokenType>(ty)) {
+          if (isa<ModuleType>(ty) ||
+              isa<SILTokenType>(ty) ||
+              isa<IntegerType>(ty)) {
             // These types should never appear within aggregates.
             assert(isTopLevel && "aggregate containing marker type!?");
             // If they did, though, they would not justify the aggregate's
@@ -3905,12 +3909,8 @@ getAnyFunctionRefInterfaceType(TypeConverter &TC,
 
   if (funcType->hasArchetype()) {
     assert(isa<FunctionType>(funcType));
-    auto substType = Type(funcType).subst(
-        MapLocalArchetypesOutOfContext(sig.baseGenericSig, sig.capturedEnvs),
-        MakeAbstractConformanceForGenericType(),
-        SubstFlags::PreservePackExpansionLevel |
-        SubstFlags::SubstitutePrimaryArchetypes |
-        SubstFlags::SubstituteLocalArchetypes);
+    auto substType = mapLocalArchetypesOutOfContext(
+        funcType, sig.baseGenericSig, sig.capturedEnvs);
     funcType = cast<FunctionType>(substType->getCanonicalType());
   }
 
@@ -4485,26 +4485,6 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     PrettyStackTraceAnyFunctionRef("lowering local captures", curFn);
     collectCaptures(curFn.getCaptureInfo());
 
-    if (auto *afd = curFn.getAbstractFunctionDecl()) {
-      // If a local function inherits isolation from the enclosing context,
-      // make sure we capture the isolated parameter, if we haven't already.
-      if (afd->isLocalCapture()) {
-        auto actorIsolation = getActorIsolation(afd);
-        if (actorIsolation.getKind() == ActorIsolation::ActorInstance) {
-          if (auto *var = actorIsolation.getActorInstance()) {
-            assert(isa<ParamDecl>(var));
-            recordCapture(CapturedValue(var, 0, afd->getLoc()));
-	    if (var->getInterfaceType()->hasTypeParameter()) {
-	      // If the isolated parameter is of a generic (actor)
-	      // type, we need to treat as if the local function is
-	      // generic.
-	      capturesGenericParams = true;
-	    }
-          }
-        }
-      }
-    }
-
     // A function's captures also include its default arguments, because
     // when we reference a function we don't track which default arguments
     // are referenced too.
@@ -4960,8 +4940,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
 
         // Remap the depth. This is necessary because the 'var' box might
         // capture a subset of the captured environments of the closure.
-        return GenericTypeParamType::get(
-            /*isParameterPack=*/false,
+        return GenericTypeParamType::getType(
             genericSig.getNextDepth() - capturedEnvs.size() + capturedEnvIndex,
             paramTy->getIndex(),
             C);
@@ -4984,15 +4963,10 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
   SmallSetVector<GenericEnvironment *, 2> boxCapturedEnvs;
   findCapturedEnvironments(loweredContextType, boxCapturedEnvs);
 
-  MapLocalArchetypesOutOfContext mapOutOfContext(baseGenericSig,
-                                                 boxCapturedEnvs.getArrayRef());
-
-  auto loweredInterfaceType = loweredContextType.subst(
-      mapOutOfContext,
-      MakeAbstractConformanceForGenericType(),
-      SubstFlags::PreservePackExpansionLevel |
-      SubstFlags::SubstitutePrimaryArchetypes |
-      SubstFlags::SubstituteLocalArchetypes)->getCanonicalType();
+  auto loweredInterfaceType =
+      mapLocalArchetypesOutOfContext(loweredContextType, baseGenericSig,
+                                     boxCapturedEnvs.getArrayRef())
+      ->getCanonicalType();
 
   // If the type is not dependent at all, we can form a concrete box layout.
   // We don't need to capture the generic environment.

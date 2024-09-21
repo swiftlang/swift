@@ -1,10 +1,11 @@
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name basic2
-// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name basic2
-// RUN: %target-sil-opt %t/tmp.2.sib -module-name basic2 -emit-sorted-sil | %FileCheck %s
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name basic2 -enable-experimental-feature ValueGenerics
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name basic2 -enable-experimental-feature ValueGenerics
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name basic2 -emit-sorted-sil -enable-experimental-feature ValueGenerics | %FileCheck %s
 
 import Builtin
+import Swift
 
 class C {}
 sil @getC : $@convention(thin) () -> (@owned C)
@@ -226,6 +227,16 @@ bb0:
   dealloc_box %1 : ${ var Builtin.NativeObject }
   %9999 = tuple ()
   return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_type_value : $@convention(thin) <let N : Int> () -> Int {
+// CHECK:         [[VAL:%.*]] = type_value $Int for N
+// CHECK:         return [[VAL]] : $Int
+// CHECK-LABEL: } // end sil function 'test_type_value'
+sil [ossa] @test_type_value : $@convention(thin) <let N : Int> () -> Int {
+entry:
+  %val = type_value $Int for N
+  return %val : $Int
 }
 
 // CHECK-LABEL: sil [ossa] @tuple_addr_constructor_assign : $@convention(thin) (@in Builtin.NativeObject, @in (Builtin.NativeObject, Builtin.NativeObject)) -> () {

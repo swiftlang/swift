@@ -177,6 +177,21 @@ FailureDiagnostic::getArgumentListFor(ConstraintLocator *locator) const {
   return S.getArgumentList(locator);
 }
 
+StringRef FailureDiagnostic::getEditorPlaceholder(
+    StringRef description, Type ty,
+    llvm::SmallVectorImpl<char> &scratch) const {
+  llvm::raw_svector_ostream OS(scratch);
+  OS << "<#";
+  if (!ty || ty->is<UnresolvedType>()) {
+    OS << description;
+  } else {
+    OS << "T##";
+    ty.print(OS);
+  }
+  OS << "#>";
+  return StringRef(scratch.data(), scratch.size());
+}
+
 Expr *FailureDiagnostic::getBaseExprFor(const Expr *anchor) const {
   if (!anchor)
     return nullptr;
@@ -227,8 +242,17 @@ Type RequirementFailure::getOwnerType() const {
   // to convert source to destination, which means that
   // owner type is actually not an assignment expression
   // itself but its source.
-  if (auto *assignment = getAsExpr<AssignExpr>(anchor))
+  if (auto *assignment = getAsExpr<AssignExpr>(anchor)) {
     anchor = assignment->getSrc();
+    // If locator points to a tuple element, let's dig that up.
+    // Situations like `<<dest>> = (v, 2)` where `v` has a requirement failure.
+    if (auto tupleEltIdx =
+            getLocator()->findFirst<LocatorPathElt::AnyTupleElement>()) {
+      if (auto *tuple = getAsExpr<TupleExpr>(anchor)) {
+        return getType(tuple->getElement(tupleEltIdx->getIndex()));
+      }
+    }
+  }
 
   return getType(anchor)->getInOutObjectType()->getMetatypeInstanceType();
 }
@@ -550,9 +574,8 @@ void RequirementFailure::maybeEmitRequirementNote(const Decl *anchor, Type lhs,
 
     // Handle 'some X' where the '& InvertibleProtocol' is implicit
     if (auto substTy = req.getFirstType()->getAs<GenericTypeParamType>())
-      if (auto gtpd = substTy->getDecl())
-        if (gtpd->isOpaqueType())
-          diag = diag::noncopyable_generics_implicit_composition;
+      if (substTy->getOpaqueDecl() != nullptr)
+        diag = diag::noncopyable_generics_implicit_composition;
 
     emitDiagnosticAt(anchor, diag, req.getFirstType(), req.getSecondType());
     return;
@@ -1649,7 +1672,7 @@ class VarDeclMultipleReferencesChecker : public ASTWalker {
     }
 
     // FIXME: We can see UnresolvedDeclRefExprs here because we have
-    // not yet run preCheckExpression() on the entire function body
+    // not yet run preCheckTarget() on the entire function body
     // yet.
     //
     // We could consider pre-checking more eagerly.
@@ -5178,6 +5201,9 @@ bool MissingArgumentsFailure::diagnoseAsError() {
     return true;
   }
 
+  if (diagnoseMissingResultBuilderElement())
+    return true;
+
   if (diagnoseInvalidTupleDestructuring())
     return true;
 
@@ -5512,6 +5538,55 @@ bool MissingArgumentsFailure::diagnoseClosure(const ClosureExpr *closure) {
     diag.fixItInsertAfter(params->getEndLoc(), OS.str());
   }
 
+  return true;
+}
+
+bool MissingArgumentsFailure::diagnoseMissingResultBuilderElement() const {
+  auto &ctx = getASTContext();
+
+  // Only handle a single missing argument in an empty builder for now. This
+  // should be the most common case though since most builders support N >= 1
+  // elements.
+  if (SynthesizedArgs.size() != 1)
+    return false;
+
+  auto *call = getAsExpr<CallExpr>(getRawAnchor());
+  if (!call || !call->isImplicit() || !call->getArgs()->empty())
+    return false;
+
+  auto *UDE = dyn_cast<UnresolvedDotExpr>(call->getFn());
+  if (!UDE || !isResultBuilderMethodReference(ctx, UDE))
+    return false;
+
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  if (!overload)
+    return false;
+
+  auto *decl = overload->choice.getDeclOrNull();
+  if (!decl || decl->getBaseName() != ctx.Id_buildBlock)
+    return false;
+
+  auto resultBuilder =
+      getType(UDE->getBase())->getMetatypeInstanceType()->getAnyNominal();
+  if (!resultBuilder)
+    return false;
+
+  auto paramType = resolveType(SynthesizedArgs.front().param.getPlainType());
+
+  SmallString<64> scratch;
+  auto fixIt = getEditorPlaceholder("result", paramType, scratch);
+  auto fixItLoc = call->getStartLoc();
+
+  if (paramType->is<UnresolvedType>()) {
+    emitDiagnostic(diag::result_builder_missing_element,
+                   resultBuilder->getName())
+        .fixItInsertAfter(fixItLoc, fixIt);
+  } else {
+    emitDiagnostic(diag::result_builder_missing_element_of_type, paramType,
+                   resultBuilder->getName())
+        .fixItInsertAfter(fixItLoc, fixIt);
+  }
+  emitDiagnosticAt(decl, diag::decl_declared_here, decl);
   return true;
 }
 
@@ -6184,11 +6259,6 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
   }
 
   auto loc = nameLoc.isValid() ? nameLoc.getStartLoc() : ::getLoc(anchor);
-  if (IsMissingImport) {
-    maybeDiagnoseMissingImportForMember(Member, getDC(), loc);
-    return true;
-  }
-
   auto accessLevel = Member->getFormalAccessScope().accessLevelForDiagnostics();
   if (auto *CD = dyn_cast<ConstructorDecl>(Member)) {
     emitDiagnosticAt(loc, diag::init_candidate_inaccessible,
@@ -6668,7 +6738,7 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
                : nullptr;
   };
 
-  llvm::SmallDenseMap<GenericTypeParamDecl *, Type> params;
+  llvm::SmallDenseMap<GenericTypeParamType *, Type> params;
   for (auto &entry : solution.typeBindings) {
     auto *typeVar = entry.first;
 
@@ -6687,10 +6757,10 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
                      }))
       continue;
 
-    params[GP->getDecl()] = type;
+    params[GP] = type;
   }
 
-  auto getPreferredType = [&](const GenericTypeParamDecl *GP) -> Type {
+  auto getPreferredType = [&](const GenericTypeParamType *GP) -> Type {
     auto type = params.find(GP);
     return (type == params.end()) ? Type() : type->second;
   };
@@ -9365,8 +9435,8 @@ bool ConcreteTypeSpecialization::diagnoseAsError() {
   return true;
 }
 
-bool GenericFunctionSpecialization::diagnoseAsError() {
-  emitDiagnostic(diag::cannot_explicitly_specialize_generic_function);
+bool InvalidFunctionSpecialization::diagnoseAsError() {
+  emitDiagnostic(diag::cannot_explicitly_specialize_function, Decl);
   emitDiagnosticAt(Decl, diag::decl_declared_here, Decl);
   return true;
 }

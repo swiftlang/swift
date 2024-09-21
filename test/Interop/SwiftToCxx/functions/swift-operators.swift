@@ -25,6 +25,19 @@ public struct IntBox {
   } 
 }
 
+public struct CustomArray<Element> where Element : ~Copyable {
+  private var buffer: UnsafeMutableBufferPointer<Element>
+
+  public subscript(index: Int) -> Element {
+    _read {
+        yield buffer[index]
+    }
+    nonmutating _modify {
+        yield &buffer[index]
+    }
+  }
+}
+
 // CHECK: #if __cplusplus >= 202302L
 // CHECK-NEXT: SWIFT_INLINE_THUNK int operator [](int x, int _2) const SWIFT_SYMBOL("s:9Operators6IntBoxVys5Int32VAE_AEtcig");
 // CHECK-NEXT: #endif // #if __cplusplus >= 202302L
@@ -34,7 +47,7 @@ public func -(lhs: IntBox, rhs: IntBox) -> CInt {
 }
 
 // CHECK: SWIFT_INLINE_THUNK int operator-(const IntBox& lhs, const IntBox& rhs) noexcept SWIFT_SYMBOL("s:9Operators1soiys5Int32VAA6IntBoxV_AFtF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Operators1soiys5Int32VAA6IntBoxV_AFtF(_impl::swift_interop_passDirect_Operators_uint32_t_0_4(_impl::_impl_IntBox::getOpaquePointer(lhs)), _impl::swift_interop_passDirect_Operators_uint32_t_0_4(_impl::_impl_IntBox::getOpaquePointer(rhs)));
+// CHECK-NEXT:   return Operators::_impl::$s9Operators1soiys5Int32VAA6IntBoxV_AFtF(Operators::_impl::swift_interop_passDirect_Operators_uint32_t_0_4(Operators::_impl::_impl_IntBox::getOpaquePointer(lhs)), Operators::_impl::swift_interop_passDirect_Operators_uint32_t_0_4(Operators::_impl::_impl_IntBox::getOpaquePointer(rhs)));
 // CHECK-NEXT: }
 
 public func ==(lhs: IntBox, rhs: IntBox) -> Bool {
@@ -42,5 +55,6 @@ public func ==(lhs: IntBox, rhs: IntBox) -> Bool {
 }
 
 // CHECK: SWIFT_INLINE_THUNK bool operator==(const IntBox& lhs, const IntBox& rhs) noexcept SWIFT_SYMBOL("s:9Operators2eeoiySbAA6IntBoxV_ADtF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Operators2eeoiySbAA6IntBoxV_ADtF(_impl::swift_interop_passDirect_Operators_uint32_t_0_4(_impl::_impl_IntBox::getOpaquePointer(lhs)), _impl::swift_interop_passDirect_Operators_uint32_t_0_4(_impl::_impl_IntBox::getOpaquePointer(rhs)));
+// CHECK-NEXT:   return Operators::_impl::$s9Operators2eeoiySbAA6IntBoxV_ADtF(Operators::_impl::swift_interop_passDirect_Operators_uint32_t_0_4(Operators::_impl::_impl_IntBox::getOpaquePointer(lhs)), Operators::_impl::swift_interop_passDirect_Operators_uint32_t_0_4(Operators::_impl::_impl_IntBox::getOpaquePointer(rhs)));
 // CHECK-NEXT: }
+

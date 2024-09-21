@@ -3693,68 +3693,6 @@ public:
                         [&]{ S->dump(Out); });
     }
 
-    void checkSourceRanges(IfConfigDecl *ICD) {
-      checkSourceRangesBase(ICD);
-
-      SourceLoc Location = ICD->getStartLoc();
-      for (auto &Clause : ICD->getClauses()) {
-        // Clause start, note that the first clause start location is the
-        // same as that of the whole statement
-        if (Location == ICD->getStartLoc()) {
-          if (Location != Clause.Loc) {
-            Out << "bad start location of IfConfigDecl first clause\n";
-            ICD->print(Out);
-            abort();
-          }
-        } else {
-          if (!Ctx.SourceMgr.isBeforeInBuffer(Location, Clause.Loc)) {
-            Out << "bad start location of IfConfigDecl clause\n";
-            ICD->print(Out);
-            abort();
-          }
-        }
-        Location = Clause.Loc;
-
-        // Condition if present
-        Expr *Cond = Clause.Cond;
-        if (Cond) {
-          if (!Ctx.SourceMgr.isBeforeInBuffer(Location, Cond->getStartLoc())) {
-            Out << "invalid IfConfigDecl clause condition start location\n";
-            ICD->print(Out);
-            abort();
-          }
-          Location = Cond->getEndLoc();
-        }
-        
-        // Body elements
-        auto StoredLoc = Location;
-        for (auto &Element : Clause.Elements) {
-          auto StartLocation = Element.getStartLoc();
-          if (StartLocation.isInvalid()) {
-            continue;
-          }
-          
-          if (!Ctx.SourceMgr.isBeforeInBuffer(StoredLoc, StartLocation)) {
-            Out << "invalid IfConfigDecl clause element start location\n";
-            ICD->print(Out);
-            abort();
-          }
-          
-          auto EndLocation = Element.getEndLoc();
-          if (EndLocation.isValid() &&
-              Ctx.SourceMgr.isBeforeInBuffer(Location, EndLocation)) {
-            Location = EndLocation;
-          }
-        }
-      }
-
-      if (Ctx.SourceMgr.isBeforeInBuffer(ICD->getEndLoc(), Location)) {
-        Out << "invalid IfConfigDecl end location\n";
-        ICD->print(Out);
-        abort();
-      }
-    }
-    
     void checkSourceRanges(Pattern *P) {
       PrettyStackTracePattern debugStack(Ctx, "verifying ranges", P);
 

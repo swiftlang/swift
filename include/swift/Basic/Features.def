@@ -232,6 +232,7 @@ EXPERIMENTAL_FEATURE(PreambleMacros, false)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
 EXPERIMENTAL_FEATURE(FullTypedThrows, false)
 EXPERIMENTAL_FEATURE(SameElementRequirements, false)
+EXPERIMENTAL_FEATURE(GlobalActorInferenceCutoff, false)
 
 // Whether to enable @_used and @_section attributes
 EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
@@ -358,7 +359,7 @@ EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 
 /// Enable non-escapable type attributes and function attributes that support
 /// lifetime-dependent results.
-EXPERIMENTAL_FEATURE(NonescapableTypes, true)
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NonescapableTypes, true)
 
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
@@ -407,6 +408,15 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AllowUnsafeAttribute, true)
 
 /// Warn on use of unsafe constructs.
 EXPERIMENTAL_FEATURE(WarnUnsafe, true)
+
+/// Import unsafe C and C++ constructs as @unsafe.
+EXPERIMENTAL_FEATURE(SafeInterop, true)
+
+// Enable values in generic signatures, e.g. <let N: Int>
+EXPERIMENTAL_FEATURE(ValueGenerics, true)
+
+// When a parameter has unspecified isolation, infer it as main actor isolated.
+EXPERIMENTAL_FEATURE(UnspecifiedMeansMainActorIsolated, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

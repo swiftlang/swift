@@ -1,20 +1,20 @@
 //
 // Build objc_implementation.framework
 //
-// RUN: %empty-directory(%t-frameworks)
-// RUN: %empty-directory(%t-frameworks/objc_implementation.framework/Modules/objc_implementation.swiftmodule)
-// RUN: %empty-directory(%t-frameworks/objc_implementation.framework/Headers)
-// RUN: cp %S/Inputs/objc_implementation.modulemap %t-frameworks/objc_implementation.framework/Modules/module.modulemap
-// RUN: cp %S/Inputs/objc_implementation.h %t-frameworks/objc_implementation.framework/Headers
-// RUN: %target-build-swift-dylib(%t-frameworks/objc_implementation.framework/objc_implementation) -emit-module-path %t-frameworks/objc_implementation.framework/Modules/objc_implementation.swiftmodule/%module-target-triple.swiftmodule -module-name objc_implementation -F %t-frameworks -import-underlying-module -Xlinker -install_name -Xlinker %t-frameworks/objc_implementation.framework/objc_implementation %S/objc_implementation.swift -enable-experimental-feature CImplementation -target %target-stable-abi-triple
+// RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t/objc_implementation.framework/Modules/objc_implementation.swiftmodule)
+// RUN: %empty-directory(%t/objc_implementation.framework/Headers)
+// RUN: cp %S/Inputs/objc_implementation.modulemap %t/objc_implementation.framework/Modules/module.modulemap
+// RUN: cp %S/Inputs/objc_implementation.h %t/objc_implementation.framework/Headers
+// RUN: %target-build-swift-dylib(%t/objc_implementation.framework/objc_implementation) -emit-module-path %t/objc_implementation.framework/Modules/objc_implementation.swiftmodule/%module-target-triple.swiftmodule -module-name objc_implementation -F %t -import-underlying-module -Xlinker -install_name -Xlinker @executable_path/objc_implementation.framework/objc_implementation %S/objc_implementation.swift -enable-experimental-feature CImplementation -target %target-stable-abi-triple
 
 //
 // Execute this file
 //
-// RUN: %empty-directory(%t)
-// RUN: %target-clang %s -isysroot %sdk -F %t-frameworks -lobjc -fmodules -fobjc-arc -o %t/objc_implementation_objc_client
+// RUN: %target-clang %s -isysroot %sdk -F %t -lobjc -fmodules -fobjc-arc -o %t/objc_implementation_objc_client
 // RUN: %target-codesign %t/objc_implementation_objc_client
-// RUN: %target-run %t/objc_implementation_objc_client 2>&1 | %FileCheck %s
+// Note: we pass the .framework as an argument so that remote-run will copy it across when running tests remotely.
+// RUN: %target-run %t/objc_implementation_objc_client %t/objc_implementation.framework 2>&1 | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop

@@ -12,7 +12,7 @@
 // CHECK:   return [[RESULT]] : $()
 
 // -- Back deployment thunk for genericFunc(_:)
-// CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy11genericFuncyxxlFTwb : $@convention(thin) <T> (@in_guaranteed T) -> @out T
+// CHECK-LABEL: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy11genericFuncyxxlFTwb : $@convention(thin) <T> (@in_guaranteed T) -> @out T
 // CHECK: bb0([[OUT_ARG:%.*]] : $*T, [[IN_ARG:%.*]] : $*T):
 // CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 52
 // CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 1
@@ -50,7 +50,7 @@ public func genericFunc<T>(_ t: T) -> T {
 // CHECK:   return [[RESULT]] : $()
 
 // -- Back deployment thunk for genericFuncWithOwnedParam(_:)
-// CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy25genericFuncWithOwnedParamyyxnlFTwb : $@convention(thin) <T> (@in T) -> ()
+// CHECK-LABEL: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy25genericFuncWithOwnedParamyyxnlFTwb : $@convention(thin) <T> (@in T) -> ()
 // CHECK: bb0([[IN_ARG:%.*]] : $*T):
 // CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 52
 // CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 1

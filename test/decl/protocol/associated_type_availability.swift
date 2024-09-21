@@ -84,3 +84,11 @@ extension ModelP2 {
   // expected-error@-1{{'B' is only available in macOS 14 or newer}}
   // expected-note@-2{{add @available attribute to enclosing instance method}}
 }
+
+protocol P3 {
+  @available(macOS, obsoleted: 12) // expected-error{{associated type cannot be marked unavailable with '@available'}}
+  associatedtype A1
+
+  @available(macOS, obsoleted: 99) // FIXME: this should probably be diagnosed
+  associatedtype A2
+}

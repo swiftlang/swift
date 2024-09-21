@@ -60,11 +60,11 @@ func takeClosure(_: () -> ()) {}
 
 // No mark_dependence is needed for a inherited scope.
 //
-// CHECK-LABEL: sil hidden @$s4test14bv_borrow_copyyAA2BVVYlsS_ADF : $@convention(thin) (@guaranteed BV) -> _scope(0)  @owned BV {
+// CHECK-LABEL: sil hidden @$s4test14bv_borrow_copyyAA2BVVADF : $@convention(thin) (@guaranteed BV) -> _scope(0)  @owned BV {
 // CHECK:      bb0(%0 : @noImplicitCopy $BV):
 // CHECK:        apply %{{.*}}(%0) : $@convention(thin) (@guaranteed BV) -> _inherit(0) @owned BV
 // CHECK-NEXT:   return %3 : $BV
-// CHECK-LABEL: } // end sil function '$s4test14bv_borrow_copyyAA2BVVYlsS_ADF'
+// CHECK-LABEL: } // end sil function '$s4test14bv_borrow_copyyAA2BVVADF'
 func bv_borrow_copy(_ bv: borrowing BV) -> dependsOn(scoped bv) BV {
   bv_copy(bv) 
 }
@@ -72,12 +72,12 @@ func bv_borrow_copy(_ bv: borrowing BV) -> dependsOn(scoped bv) BV {
 // The mark_dependence for the borrow scope should be marked
 // [nonescaping] after diagnostics.
 //
-// CHECK-LABEL: sil hidden @$s4test010bv_borrow_C00B0AA2BVVYlsS_AE_tF : $@convention(thin) (@guaranteed BV) -> _scope(0)  @owned BV {
+// CHECK-LABEL: sil hidden @$s4test010bv_borrow_C00B0AA2BVVAE_tF : $@convention(thin) (@guaranteed BV) -> _scope(0)  @owned BV {
 // CHECK:       bb0(%0 : @noImplicitCopy $BV):
 // CHECK:         [[R:%.*]] = apply %{{.*}}(%0) : $@convention(thin) (@guaranteed BV) -> _scope(0) @owned BV
 // CHECK:         %{{.*}} = mark_dependence [nonescaping] [[R]] : $BV on %0 : $BV
 // CHECK-NEXT:    return %{{.*}} : $BV
-// CHECK-LABEL: } // end sil function '$s4test010bv_borrow_C00B0AA2BVVYlsS_AE_tF'
+// CHECK-LABEL: } // end sil function '$s4test010bv_borrow_C00B0AA2BVVAE_tF'
 func bv_borrow_borrow(bv: borrowing BV) -> dependsOn(scoped bv) BV {
   bv_borrow_copy(bv)
 }
@@ -93,14 +93,14 @@ func neint_throws(ncInt: borrowing NCInt) throws -> NEInt {
   return NEInt(owner: ncInt)
 }
 
-// CHECK-LABEL: sil hidden @$s4test9neint_try5ncIntAA5NEIntVYlsS_AA5NCIntV_tKF : $@convention(thin) (@guaranteed NCInt) -> _scope(0)  (@owned NEInt, @error any Error) {
+// CHECK-LABEL: sil hidden @$s4test9neint_try5ncIntAA5NEIntVAA5NCIntV_tKF : $@convention(thin) (@guaranteed NCInt) -> _scope(0)  (@owned NEInt, @error any Error) {
 // CHECK:   try_apply %{{.*}}(%0) : $@convention(thin) (@guaranteed NCInt) -> _scope(0)  (@owned NEInt, @error any Error), normal bb1, error bb2
 // CHECK: bb1([[R:%.*]] : $NEInt):
 // CHECK:   [[MD:%.*]] = mark_dependence [nonescaping] %5 : $NEInt on %0 : $NCInt
 // CHECK:   return [[MD]] : $NEInt
 // CHECK: bb2([[E:%.*]] : $any Error):
 // CHECK:   throw [[E]] : $any Error
-// CHECK-LABEL: } // end sil function '$s4test9neint_try5ncIntAA5NEIntVYlsS_AA5NCIntV_tKF'
+// CHECK-LABEL: } // end sil function '$s4test9neint_try5ncIntAA5NEIntVAA5NCIntV_tKF'
 func neint_try(ncInt: borrowing NCInt) throws -> NEInt {
   try neint_throws(ncInt: ncInt)
 }

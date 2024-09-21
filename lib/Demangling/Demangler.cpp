@@ -80,6 +80,7 @@ static bool isEntity(Node::Kind kind) {
 static bool isRequirement(Node::Kind kind) {
   switch (kind) {
     case Node::Kind::DependentGenericParamPackMarker:
+    case Node::Kind::DependentGenericParamValueMarker:
     case Node::Kind::DependentGenericSameTypeRequirement:
     case Node::Kind::DependentGenericSameShapeRequirement:
     case Node::Kind::DependentGenericLayoutRequirement:
@@ -989,11 +990,6 @@ NodePointer Demangler::demangleTypeAnnotation() {
   case 'u':
     return createType(
         createWithChild(Node::Kind::Sending, popTypeAndGetChild()));
-  case 'l': {
-    auto *node = demangleLifetimeDependence();
-    addChild(node, popTypeAndGetChild());
-    return createType(node);
-  }
   default:
     return nullptr;
   }
@@ -1100,6 +1096,7 @@ recur:
       // outlined copy functions. We treat such a suffix as "unmangled suffix".
       pushBack();
       return createNode(Node::Kind::Suffix, consumeAll());
+    case '$': return demangleIntegerType();
     default:
       pushBack();
       return demangleIdentifier();
@@ -1535,34 +1532,53 @@ NodePointer Demangler::demangleExtensionContext() {
 
 /// Associate any \c OpaqueReturnType nodes with the declaration whose opaque
 /// return type they refer back to.
-static Node *setParentForOpaqueReturnTypeNodes(Demangler &D,
-                                              Node *parent,
-                                              Node *visitedNode) {
-  if (!parent || !visitedNode)
-    return nullptr;
-  if (visitedNode->getKind() == Node::Kind::OpaqueReturnType) {
+/// Implementation for \c setParentForOpaqueReturnTypeNodes. Don't invoke
+/// directly.
+static void setParentForOpaqueReturnTypeNodesImpl(
+    Demangler &D, Node &visitedNode,
+    llvm::function_ref<StringRef()> getParentID) {
+  if (visitedNode.getKind() == Node::Kind::OpaqueReturnType) {
     // If this node is not already parented, parent it.
-    if (visitedNode->hasChildren()
-        && visitedNode->getLastChild()->getKind() == Node::Kind::OpaqueReturnTypeParent) {
-      return parent;
+    if (visitedNode.hasChildren() && visitedNode.getLastChild()->getKind() ==
+                                         Node::Kind::OpaqueReturnTypeParent) {
+      return;
     }
-    visitedNode->addChild(D.createNode(Node::Kind::OpaqueReturnTypeParent,
-                                       (Node::IndexType)parent), D);
-    return parent;
+    visitedNode.addChild(D.createNode(Node::Kind::OpaqueReturnTypeParent,
+                                      StringRef(getParentID())),
+                         D);
+    return;
   }
-  
+
   // If this node is one that may in turn define its own opaque return type,
   // stop recursion, since any opaque return type nodes underneath would refer
   // to the nested declaration rather than the one we're looking at.
-  if (visitedNode->getKind() == Node::Kind::Function
-      || visitedNode->getKind() == Node::Kind::Variable
-      || visitedNode->getKind() == Node::Kind::Subscript) {
-    return parent;
+  if (visitedNode.getKind() == Node::Kind::Function ||
+      visitedNode.getKind() == Node::Kind::Variable ||
+      visitedNode.getKind() == Node::Kind::Subscript) {
+    return;
   }
-  
-  for (size_t i = 0, e = visitedNode->getNumChildren(); i < e; ++i) {
-    setParentForOpaqueReturnTypeNodes(D, parent, visitedNode->getChild(i));
+
+  for (Node *child : visitedNode) {
+    assert(child);
+    setParentForOpaqueReturnTypeNodesImpl(D, *child, getParentID);
   }
+}
+
+/// Associate any \c OpaqueReturnType nodes with the declaration whose opaque
+/// return type they refer back to.
+static Node *setParentForOpaqueReturnTypeNodes(Demangler &D, Node *parent,
+                                               Node *visitedNode) {
+  if (!parent || !visitedNode)
+    return nullptr;
+  std::string parentID;
+  setParentForOpaqueReturnTypeNodesImpl(D, *visitedNode, [&] {
+    if (!parentID.empty())
+      return StringRef(parentID);
+    const auto mangleResult = mangleNode(parent);
+    assert(mangleResult.isSuccess());
+    parentID = mangleResult.result();
+    return StringRef(parentID);
+  });
   return parent;
 }
 
@@ -3156,31 +3172,6 @@ NodePointer Demangler::demangleDifferentiableFunctionType() {
       Node::Kind::DifferentiableFunctionType, (Node::IndexType)kind);
 }
 
-static std::optional<MangledLifetimeDependenceKind>
-getMangledLifetimeDependenceKind(char nextChar) {
-  switch (nextChar) {
-  case 's':
-    return MangledLifetimeDependenceKind::Scope;
-  case 'i':
-    return MangledLifetimeDependenceKind::Inherit;
-  }
-  return std::nullopt;
-}
-
-NodePointer Demangler::demangleLifetimeDependence() {
-  auto kind = getMangledLifetimeDependenceKind(nextChar());
-  if (!kind.has_value()) {
-    return nullptr;
-  }
-  auto result = createNode(Node::Kind::LifetimeDependence);
-  result =
-      addChild(result, createNode(Node::Kind::Index, (Node::IndexType)*kind));
-  result = addChild(result, demangleIndexSubset());
-  if (!nextIf('_'))
-    return nullptr;
-  return result;
-}
-
 std::string Demangler::demangleBridgedMethodParams() {
   if (nextIf('_'))
     return std::string();
@@ -4153,10 +4144,21 @@ NodePointer Demangler::demangleGenericSignature(bool hasParamCounts) {
 NodePointer Demangler::demangleGenericRequirement() {
 
   enum { Generic, Assoc, CompoundAssoc, Substitution } TypeKind;
-  enum { Protocol, BaseClass, SameType, SameShape, Layout, PackMarker, Inverse } ConstraintKind;
+
+  enum {
+    Protocol,
+    BaseClass,
+    SameType,
+    SameShape,
+    Layout,
+    PackMarker,
+    Inverse,
+    ValueMarker
+  } ConstraintKind;
 
   NodePointer inverseKind = nullptr;
   switch (nextChar()) {
+    case 'V': ConstraintKind = ValueMarker; TypeKind = Generic; break;
     case 'v': ConstraintKind = PackMarker; TypeKind = Generic; break;
     case 'c': ConstraintKind = BaseClass; TypeKind = Assoc; break;
     case 'C': ConstraintKind = BaseClass; TypeKind = CompoundAssoc; break;
@@ -4211,6 +4213,10 @@ NodePointer Demangler::demangleGenericRequirement() {
   }
 
   switch (ConstraintKind) {
+  case ValueMarker:
+    return createWithChildren(
+        Node::Kind::DependentGenericParamValueMarker, ConstrTy,
+        popNode(Node::Kind::Type));
   case PackMarker:
     return createWithChild(
         Node::Kind::DependentGenericParamPackMarker, ConstrTy);
@@ -4399,4 +4405,21 @@ NodePointer Demangler::demangleMacroExpansion() {
   if (privateDiscriminator)
     result->addChild(privateDiscriminator, *this);
   return result;
+}
+
+NodePointer Demangler::demangleIntegerType() {
+  NodePointer integer = nullptr;
+
+  switch (peekChar()) {
+  case 'n':
+    nextChar();
+    integer = createNode(Node::Kind::NegativeInteger, -demangleNatural());
+    break;
+
+  default:
+    integer = createNode(Node::Kind::Integer, demangleNatural());
+    break;
+  }
+
+  return createType(integer);
 }

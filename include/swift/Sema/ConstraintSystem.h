@@ -960,6 +960,8 @@ enum ScoreKind: unsigned int {
   SK_Hole,
   /// A reference to an @unavailable declaration.
   SK_Unavailable,
+  /// A reference to a declaration from a module that has not been imported.
+  SK_MissingImport,
   /// A reference to an async function in a synchronous context.
   ///
   /// \note Any score kind after this is considered a conversion that doesn't
@@ -1123,6 +1125,9 @@ struct Score {
 
     case SK_Unavailable:
       return "use of an unavailable declaration";
+
+    case SK_MissingImport:
+      return "use of a declaration that has not been imported";
 
     case SK_AsyncInSyncMismatch:
       return "async-in-synchronous mismatch";
@@ -1975,10 +1980,6 @@ struct MemberLookupResult {
     /// The member is inaccessible (e.g. a private member in another file).
     UR_Inaccessible,
 
-    /// The member is not visible because it comes from a module that was not
-    /// imported.
-    UR_MissingImport,
-
     /// This is a `WritableKeyPath` being used to look up read-only member,
     /// used in situations involving dynamic member lookup via keypath,
     /// because it's not known upfront what access capability would the
@@ -2058,28 +2059,25 @@ struct DynamicCallableMethods {
   }
 };
 
-/// A function that rewrites a syntactic element target in the context
-/// of solution application.
-using RewriteTargetFn = std::function<std::optional<SyntacticElementTarget>(
-    SyntacticElementTarget)>;
+/// Abstract base class for applying a solution to a SyntacticElementTarget.
+class SyntacticElementTargetRewriter {
+public:
+  virtual Solution &getSolution() const = 0;
+  virtual DeclContext *&getCurrentDC() const = 0;
+
+  virtual void addLocalDeclToTypeCheck(Decl *D) = 0;
+
+  virtual std::optional<SyntacticElementTarget>
+  rewriteTarget(SyntacticElementTarget target) = 0;
+
+  virtual ~SyntacticElementTargetRewriter() = default;
+};
 
 enum class ConstraintSystemPhase {
   ConstraintGeneration,
   Solving,
   Diagnostics,
   Finalization
-};
-
-/// Describes the result of applying a solution to a given function.
-enum class SolutionApplicationToFunctionResult {
-  /// Application of the solution succeeded.
-  Success,
-  /// Application of the solution failed.
-  /// TODO: This should probably go away entirely.
-  Failure,
-  /// The solution could not be applied immediately, and type checking for
-  /// this function should be delayed until later.
-  Delay,
 };
 
 /// Retrieve the closure type from the constraint system.
@@ -5239,6 +5237,12 @@ private:
                                              TypeMatchOptions flags,
                                              ConstraintLocatorBuilder locator);
 
+  /// Extract the object type of the l-value type (type1) and bind it to
+  /// to type2.
+  SolutionKind simplifyLValueObjectConstraint(Type type1, Type type2,
+                                              TypeMatchOptions flags,
+                                              ConstraintLocatorBuilder locator);
+
 public: // FIXME: Public for use by static functions.
   /// Simplify a conversion constraint with a fix applied to it.
   SolutionKind simplifyFixConstraint(ConstraintFix *fix, Type type1, Type type2,
@@ -5404,10 +5408,6 @@ public:
   /// and folding sequence expressions.
   static bool preCheckTarget(SyntacticElementTarget &target);
 
-  /// Pre-check the expression, validating any types that occur in the
-  /// expression and folding sequence expressions.
-  static bool preCheckExpression(Expr *&expr, DeclContext *dc);
-
   /// Solve the system of constraints generated from provided target.
   ///
   /// \param target The target that we'll generate constraints from, which
@@ -5531,67 +5531,38 @@ public:
   /// Apply the given solution to the given function's body and, for
   /// closure expressions, the expression itself.
   ///
-  /// \param solution The solution to apply.
   /// \param fn The function to which the solution is being applied.
-  /// \param currentDC The declaration context in which transformations
-  /// will be applied.
-  /// \param rewriteTarget Function that performs a rewrite of any targets
-  /// within the context.
+  /// \param rewriter The rewriter to apply the solution with.
   ///
-  SolutionApplicationToFunctionResult
-  applySolution(Solution &solution, AnyFunctionRef fn, DeclContext *&currentDC,
-                std::function<std::optional<SyntacticElementTarget>(
-                    SyntacticElementTarget)>
-                    rewriteTarget);
+  bool applySolution(AnyFunctionRef fn,
+                     SyntacticElementTargetRewriter &rewriter);
 
   /// Apply the given solution to the given closure body.
   ///
-  ///
-  /// \param solution The solution to apply.
   /// \param fn The function or closure to which the solution is being applied.
-  /// \param currentDC The declaration context in which transformations
-  /// will be applied.
-  /// \param rewriteTarget Function that performs a rewrite of any targets
-  /// within the context.
+  /// \param rewriter The rewriter to apply the solution with.
   ///
   /// \returns true if solution cannot be applied.
-  bool applySolutionToBody(Solution &solution, AnyFunctionRef fn,
-                           DeclContext *&currentDC,
-                           std::function<std::optional<SyntacticElementTarget>(
-                               SyntacticElementTarget)>
-                               rewriteTarget);
+  bool applySolutionToBody(AnyFunctionRef fn,
+                           SyntacticElementTargetRewriter &rewriter);
 
   /// Apply the given solution to the given SingleValueStmtExpr.
   ///
-  /// \param solution The solution to apply.
   /// \param SVE The SingleValueStmtExpr to rewrite.
-  /// \param DC The declaration context in which transformations will be
-  /// applied.
-  /// \param rewriteTarget Function that performs a rewrite of any targets
-  /// within the context.
+  /// \param rewriter The rewriter to apply the solution with.
   ///
   /// \returns true if solution cannot be applied.
-  bool applySolutionToSingleValueStmt(
-      Solution &solution, SingleValueStmtExpr *SVE, DeclContext *DC,
-      std::function<
-          std::optional<SyntacticElementTarget>(SyntacticElementTarget)>
-          rewriteTarget);
+  bool applySolutionToSingleValueStmt(SingleValueStmtExpr *SVE,
+                                      SyntacticElementTargetRewriter &rewriter);
 
   /// Apply the given solution to the given tap expression.
   ///
-  /// \param solution The solution to apply.
   /// \param tapExpr The tap expression to which the solution is being applied.
-  /// \param currentDC The declaration context in which transformations
-  /// will be applied.
-  /// \param rewriteTarget Function that performs a rewrite of any
-  /// solution application target within the context.
+  /// \param rewriter The rewriter to apply the solution with.
   ///
   /// \returns true if solution cannot be applied.
-  bool applySolutionToBody(Solution &solution, TapExpr *tapExpr,
-                           DeclContext *&currentDC,
-                           std::function<std::optional<SyntacticElementTarget>(
-                               SyntacticElementTarget)>
-                               rewriteTarget);
+  bool applySolutionToBody(TapExpr *tapExpr,
+                           SyntacticElementTargetRewriter &rewriter);
 
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully
@@ -5608,8 +5579,6 @@ public:
     auto range = isAlreadyTooComplex.second;
     return range.isValid() ? range : std::optional<SourceRange>();
   }
-
-  bool isPartialApplication(ConstraintLocator *locator);
 
   bool isTooComplex(size_t solutionMemory) {
     if (isAlreadyTooComplex.first)
@@ -5687,22 +5656,10 @@ public:
   /// imported from C/ObjectiveC.
   bool isArgumentOfImportedDecl(ConstraintLocatorBuilder locator);
 
-  /// Check whether given closure should participate in inference e.g.
-  /// if it's a single-expression closure - it always does, but
-  /// multi-statement closures require special flags.
-  bool participatesInInference(ClosureExpr *closure) const;
-
   /// Visit each subexpression that will be part of the constraint system
   /// of the given expression, including those in closure bodies that will be
   /// part of the constraint system.
   void forEachExpr(Expr *expr, llvm::function_ref<Expr *(Expr *)> callback);
-
-  /// Determine whether referencing the given member on the
-  /// given existential base type is supported. This is the case only if the
-  /// type of the member, spelled in the context of \p baseTy, does not contain
-  /// 'Self' or 'Self'-rooted dependent member types in non-covariant position.
-  bool isMemberAvailableOnExistential(Type baseTy,
-                                      const ValueDecl *member) const;
 
   /// Attempts to infer a capability of a key path (i.e. whether it
   /// is read-only, writable, etc.) based on the referenced members.
@@ -5960,20 +5917,6 @@ std::optional<MatchCallArgumentResult> matchCallArguments(
 /// Given an expression that is the target of argument labels (for a call,
 /// subscript, etc.), find the underlying target expression.
 Expr *getArgumentLabelTargetExpr(Expr *fn);
-
-/// Given a type that includes an existential type that has been opened to
-/// the given type variable, replace the opened type variable and its member
-/// types with their upper bounds.
-Type typeEraseOpenedExistentialReference(Type type, Type existentialBaseType,
-                                         TypeVariableType *openedTypeVar,
-                                         TypePosition outermostPosition);
-
-
-/// Given a type that includes opened existential archetypes derived from
-/// the given generic environment, replace the archetypes with their upper
-/// bounds.
-Type typeEraseOpenedArchetypesFromEnvironment(Type type,
-                                              GenericEnvironment *env);
 
 /// Returns true if a reference to a member on a given base type will apply
 /// its curried self parameter, assuming it has one.
@@ -6558,6 +6501,11 @@ Type getPatternTypeOfSingleUnlabeledPackExpansionTuple(Type type);
 /// Check whether this is a reference to one of the special result builder
 /// methods prefixed with `build*` i.e. `buildBlock`, `buildExpression` etc.
 bool isResultBuilderMethodReference(ASTContext &, UnresolvedDotExpr *);
+
+/// Determine the number of applications applied to the given overload.
+unsigned getNumApplications(ValueDecl *decl, bool hasAppliedSelf,
+                            FunctionRefKind functionRefKind);
+
 } // end namespace constraints
 
 template<typename ...Args>

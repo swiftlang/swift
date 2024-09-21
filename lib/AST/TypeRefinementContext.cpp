@@ -27,13 +27,12 @@
 
 using namespace swift;
 
-TypeRefinementContext::TypeRefinementContext(ASTContext &Ctx, IntroNode Node,
-                                             TypeRefinementContext *Parent,
-                                             SourceRange SrcRange,
-                                             const AvailabilityContext &Info,
-                                             const AvailabilityContext &ExplicitInfo)
-    : Node(Node), SrcRange(SrcRange),
-      AvailabilityInfo(Info), ExplicitAvailabilityInfo(ExplicitInfo) {
+TypeRefinementContext::TypeRefinementContext(
+    ASTContext &Ctx, IntroNode Node, TypeRefinementContext *Parent,
+    SourceRange SrcRange, const AvailabilityRange &Info,
+    const AvailabilityRange &ExplicitInfo)
+    : Node(Node), SrcRange(SrcRange), AvailabilityInfo(Info),
+      ExplicitAvailabilityInfo(ExplicitInfo) {
   if (Parent) {
     assert(SrcRange.isValid());
     Parent->addChild(this);
@@ -44,14 +43,14 @@ TypeRefinementContext::TypeRefinementContext(ASTContext &Ctx, IntroNode Node,
 
 TypeRefinementContext *
 TypeRefinementContext::createForSourceFile(SourceFile *SF,
-                                           const AvailabilityContext &Info) {
+                                           const AvailabilityRange &Info) {
   assert(SF);
 
   ASTContext &Ctx = SF->getASTContext();
 
   SourceRange range;
   TypeRefinementContext *parentContext = nullptr;
-  AvailabilityContext availabilityContext = Info;
+  AvailabilityRange availabilityRange = Info;
   switch (SF->Kind) {
   case SourceFileKind::MacroExpansion:
   case SourceFileKind::DefaultArgument: {
@@ -59,13 +58,13 @@ TypeRefinementContext::createForSourceFile(SourceFile *SF,
     // root context should be nested under.
     if (auto parentTRC =
             SF->getEnclosingSourceFile()->getTypeRefinementContext()) {
-      auto charRange = Ctx.SourceMgr.getRangeForBuffer(*SF->getBufferID());
+      auto charRange = Ctx.SourceMgr.getRangeForBuffer(SF->getBufferID());
       range = SourceRange(charRange.getStart(), charRange.getEnd());
       auto originalNode = SF->getNodeInEnclosingSourceFile();
       parentContext =
           parentTRC->findMostRefinedSubContext(originalNode.getStartLoc(), Ctx);
       if (parentContext)
-        availabilityContext = parentContext->getAvailabilityInfo();
+        availabilityRange = parentContext->getAvailabilityInfo();
     }
     break;
   }
@@ -78,17 +77,14 @@ TypeRefinementContext::createForSourceFile(SourceFile *SF,
   }
 
   return new (Ctx)
-      TypeRefinementContext(Ctx, SF, parentContext, range,
-                            availabilityContext,
-                            AvailabilityContext::alwaysAvailable());
+      TypeRefinementContext(Ctx, SF, parentContext, range, availabilityRange,
+                            AvailabilityRange::alwaysAvailable());
 }
 
-TypeRefinementContext *
-TypeRefinementContext::createForDecl(ASTContext &Ctx, Decl *D,
-                                     TypeRefinementContext *Parent,
-                                     const AvailabilityContext &Info,
-                                     const AvailabilityContext &ExplicitInfo,
-                                     SourceRange SrcRange) {
+TypeRefinementContext *TypeRefinementContext::createForDecl(
+    ASTContext &Ctx, Decl *D, TypeRefinementContext *Parent,
+    const AvailabilityRange &Info, const AvailabilityRange &ExplicitInfo,
+    SourceRange SrcRange) {
   assert(D);
   assert(Parent);
   return new (Ctx)
@@ -97,18 +93,18 @@ TypeRefinementContext::createForDecl(ASTContext &Ctx, Decl *D,
 
 TypeRefinementContext *TypeRefinementContext::createForDeclImplicit(
     ASTContext &Ctx, Decl *D, TypeRefinementContext *Parent,
-    const AvailabilityContext &Info, SourceRange SrcRange) {
+    const AvailabilityRange &Info, SourceRange SrcRange) {
   assert(D);
   assert(Parent);
   return new (Ctx) TypeRefinementContext(
       Ctx, IntroNode(D, Reason::DeclImplicit), Parent, SrcRange, Info,
-      AvailabilityContext::alwaysAvailable());
+      AvailabilityRange::alwaysAvailable());
 }
 
 TypeRefinementContext *
 TypeRefinementContext::createForIfStmtThen(ASTContext &Ctx, IfStmt *S,
                                            TypeRefinementContext *Parent,
-                                           const AvailabilityContext &Info) {
+                                           const AvailabilityRange &Info) {
   assert(S);
   assert(Parent);
   return new (Ctx)
@@ -120,7 +116,7 @@ TypeRefinementContext::createForIfStmtThen(ASTContext &Ctx, IfStmt *S,
 TypeRefinementContext *
 TypeRefinementContext::createForIfStmtElse(ASTContext &Ctx, IfStmt *S,
                                            TypeRefinementContext *Parent,
-                                           const AvailabilityContext &Info) {
+                                           const AvailabilityRange &Info) {
   assert(S);
   assert(Parent);
   return new (Ctx)
@@ -129,12 +125,10 @@ TypeRefinementContext::createForIfStmtElse(ASTContext &Ctx, IfStmt *S,
                             Info, /* ExplicitInfo */Info);
 }
 
-TypeRefinementContext *
-TypeRefinementContext::createForConditionFollowingQuery(ASTContext &Ctx,
-                                 PoundAvailableInfo *PAI,
-                                 const StmtConditionElement &LastElement,
-                                 TypeRefinementContext *Parent,
-                                 const AvailabilityContext &Info) {
+TypeRefinementContext *TypeRefinementContext::createForConditionFollowingQuery(
+    ASTContext &Ctx, PoundAvailableInfo *PAI,
+    const StmtConditionElement &LastElement, TypeRefinementContext *Parent,
+    const AvailabilityRange &Info) {
   assert(PAI);
   assert(Parent);
   SourceRange Range(PAI->getEndLoc(), LastElement.getEndLoc());
@@ -142,12 +136,9 @@ TypeRefinementContext::createForConditionFollowingQuery(ASTContext &Ctx,
                                          Info, /* ExplicitInfo */Info);
 }
 
-TypeRefinementContext *
-TypeRefinementContext::createForGuardStmtFallthrough(ASTContext &Ctx,
-                                  GuardStmt *RS,
-                                  BraceStmt *ContainingBraceStmt,
-                                  TypeRefinementContext *Parent,
-                                  const AvailabilityContext &Info) {
+TypeRefinementContext *TypeRefinementContext::createForGuardStmtFallthrough(
+    ASTContext &Ctx, GuardStmt *RS, BraceStmt *ContainingBraceStmt,
+    TypeRefinementContext *Parent, const AvailabilityRange &Info) {
   assert(RS);
   assert(ContainingBraceStmt);
   assert(Parent);
@@ -160,7 +151,7 @@ TypeRefinementContext::createForGuardStmtFallthrough(ASTContext &Ctx,
 TypeRefinementContext *
 TypeRefinementContext::createForGuardStmtElse(ASTContext &Ctx, GuardStmt *RS,
                                               TypeRefinementContext *Parent,
-                                              const AvailabilityContext &Info) {
+                                              const AvailabilityRange &Info) {
   assert(RS);
   assert(Parent);
   return new (Ctx)
@@ -171,7 +162,7 @@ TypeRefinementContext::createForGuardStmtElse(ASTContext &Ctx, GuardStmt *RS,
 TypeRefinementContext *
 TypeRefinementContext::createForWhileStmtBody(ASTContext &Ctx, WhileStmt *S,
                                               TypeRefinementContext *Parent,
-                                              const AvailabilityContext &Info) {
+                                              const AvailabilityRange &Info) {
   assert(S);
   assert(Parent);
   return new (Ctx) TypeRefinementContext(
@@ -360,12 +351,22 @@ TypeRefinementContext::getAvailabilityConditionVersionSourceRange(
   llvm_unreachable("Unhandled Reason in switch.");
 }
 
+static std::string
+stringForAvailability(const AvailabilityRange &availability) {
+  if (availability.isAlwaysAvailable())
+    return "all";
+  if (availability.isKnownUnreachable())
+    return "none";
+
+  return availability.getVersionString();
+}
+
 void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
                                   unsigned Indent) const {
   OS.indent(Indent);
   OS << "(" << getReasonName(getReason());
 
-  OS << " versions=" << AvailabilityInfo.getOSVersion().getAsString();
+  OS << " version=" << stringForAvailability(AvailabilityInfo);
 
   if (getReason() == Reason::Decl || getReason() == Reason::DeclImplicit) {
     Decl *D = Node.getAsDecl();
@@ -390,8 +391,8 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
   }
 
   if (!ExplicitAvailabilityInfo.isAlwaysAvailable())
-    OS << " explicit_versions="
-       << ExplicitAvailabilityInfo.getOSVersion().getAsString();
+    OS << " explicit_version="
+       << stringForAvailability(ExplicitAvailabilityInfo);
 
   for (TypeRefinementContext *Child : Children) {
     OS << '\n';

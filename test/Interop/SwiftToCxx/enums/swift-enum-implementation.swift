@@ -33,6 +33,11 @@ public enum E2 {
     case baz
 }
 
+public enum Expr {
+    case Const(Int)
+    indirect case Neg(Expr)
+}
+
 public struct S {
     public var x: Int64
     
@@ -285,13 +290,13 @@ public struct S {
 // CHECK-NEXT:     return *this == E::foobar;
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK E E::init() {
-// CHECK-NEXT:     return _impl::_impl_E::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT:       _impl::swift_interop_returnDirect_Enums[[ENUMENCODING:[a-z0-9_]+]](result, _impl::$s5Enums1EOACycfC());
+// CHECK-NEXT:     return Enums::_impl::_impl_E::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT:       Enums::_impl::swift_interop_returnDirect_Enums[[ENUMENCODING:[a-z0-9_]+]](result, Enums::_impl::$s5Enums1EOACycfC());
 // CHECK-NEXT:     });
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK swift::Int E::getTen() const {
-// CHECK-NEXT:     return _impl::$s5Enums1EO3tenSivg(_impl::swift_interop_passDirect_Enums[[ENUMENCODING]](_getOpaquePointer()));
+// CHECK-NEXT:     return Enums::_impl::$s5Enums1EO3tenSivg(Enums::_impl::swift_interop_passDirect_Enums[[ENUMENCODING]](_getOpaquePointer()));
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void E::printSelf() const {
-// CHECK-NEXT:     _impl::$s5Enums1EO9printSelfyyF(_impl::swift_interop_passDirect_Enums[[ENUMENCODING]](_getOpaquePointer()));
+// CHECK-NEXT:     Enums::_impl::$s5Enums1EO9printSelfyyF(Enums::_impl::swift_interop_passDirect_Enums[[ENUMENCODING]](_getOpaquePointer()));
 // CHECK-NEXT:   }

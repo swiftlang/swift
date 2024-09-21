@@ -170,6 +170,11 @@ public:
   /// Map contextual types to interface types in the conformance.
   ProtocolConformanceRef mapConformanceOutOfContext() const;
 
+  /// Look up the type witness for an associated type declaration in this
+  /// conformance.
+  Type getTypeWitness(Type origType, AssociatedTypeDecl *assocType,
+                      SubstOptions options = std::nullopt) const;
+
   /// Given a dependent type (expressed in terms of this conformance's
   /// protocol), follow it from the conforming type.
   Type getAssociatedType(Type origType, Type dependentType) const;

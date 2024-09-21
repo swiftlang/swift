@@ -239,6 +239,20 @@ public func _withUnprotectedUnsafePointer<
 #endif
 }
 
+/// Invokes the given closure with a pointer to the given argument.
+///
+/// This function is similar to `withUnsafePointer`, except that it
+/// doesn't trigger stack protection for the pointer.
+@_alwaysEmitIntoClient
+public func _withUnprotectedUnsafePointer<
+  T: ~Copyable, E: Error, Result: ~Copyable
+>(
+  to value: borrowing T,
+  _ body: (UnsafePointer<T>) throws(E) -> Result
+) throws(E) -> Result {
+  return try body(UnsafePointer<T>(Builtin.unprotectedAddressOfBorrow(value)))
+}
+
 extension String {
   /// Calls the given closure with a pointer to the contents of the string,
   /// represented as a null-terminated sequence of UTF-8 code units.

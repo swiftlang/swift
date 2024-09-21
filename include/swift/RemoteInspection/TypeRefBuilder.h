@@ -917,6 +917,16 @@ public:
     return nullptr;
   }
 
+  const TypeRef *createIntegerType(intptr_t value) {
+    // FIXME: implement
+    return nullptr;
+  }
+
+  const TypeRef *createNegativeIntegerType(intptr_t value) {
+    // FIXME: implement
+    return nullptr;
+  }
+
   // Construct a bound generic type ref along with the parent type info
   // The parent list contains every parent type with at least 1 generic
   // type parameter.

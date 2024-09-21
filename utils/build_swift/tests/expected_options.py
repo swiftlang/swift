@@ -8,6 +8,7 @@
 
 
 import multiprocessing
+import platform
 
 from build_swift import argparse
 from build_swift import defaults
@@ -79,7 +80,7 @@ EXPECTED_DEFAULTS = {
     'build_runtime_with_host_compiler': False,
     'build_stdlib_deployment_targets': ['all'],
     'build_subdir': None,
-    'build_swift_dynamic_sdk_overlay': True,
+    'build_swift_dynamic_sdk_overlay': platform.system() != "Darwin",
     'build_swift_dynamic_stdlib': True,
     'build_swift_inspect': False,
     'build_swift_private_stdlib': True,
@@ -274,6 +275,8 @@ EXPECTED_DEFAULTS = {
     'swift_tools_max_parallel_lto_link_jobs':
         defaults.SWIFT_MAX_PARALLEL_LTO_LINK_JOBS,
     'swift_user_visible_version': defaults.SWIFT_USER_VISIBLE_VERSION,
+    'build_stdlib_docs': False,
+    'preview_stdlib_docs': False,
     'symbols_package': None,
     'clean_libdispatch': True,
     'clean_foundation': True,
@@ -578,6 +581,8 @@ EXPECTED_OPTIONS = [
     SetTrueOption('--build-minimal-stdlib', dest='build_minimalstdlib'),
     SetTrueOption('--build-wasm-stdlib', dest='build_wasmstdlib'),
     SetTrueOption('--wasmkit', dest='build_wasmkit'),
+    SetTrueOption('--build-stdlib-docs'),
+    SetTrueOption('--preview-stdlib-docs'),
     SetTrueOption('-B', dest='benchmark'),
     SetTrueOption('-S', dest='skip_build'),
     SetTrueOption('-b', dest='build_llbuild'),

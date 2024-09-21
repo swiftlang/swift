@@ -101,6 +101,14 @@ extension A {
 
 #if TEST_DIAGNOSTICS
 @available(SwiftStdlib 5.1, *)
+actor ConcreteActor {}
+
+@available(SwiftStdlib 5.1, *)
+func concreteActorIsolation(
+  actor: isolated ConcreteActor = #isolation
+) async {}
+
+@available(SwiftStdlib 5.1, *)
 @MainActor
 func testContextualType() {
   let _: any Actor = #isolation
@@ -111,5 +119,10 @@ func testContextualType() {
   // CHECK-DIAGS: note: in expansion of macro 'isolation' here
   // CHECK-DIAGS: let _: Int = #isolation
   let _: Int = #isolation
+
+  // CHECK-DIAGS: error: cannot convert value of type 'MainActor' to expected argument type 'ConcreteActor'
+  // CHECK-DIAGS: note: in expansion of macro 'isolation' here
+  // CHECK-DIAGS: await concreteActorIsolation()
+  await concreteActorIsolation()
 }
 #endif

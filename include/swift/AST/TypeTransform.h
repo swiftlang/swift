@@ -18,6 +18,7 @@
 #ifndef SWIFT_AST_TYPETRANSFORM_H
 #define SWIFT_AST_TYPETRANSFORM_H
 
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/SILLayout.h"
 
 namespace swift {
@@ -111,6 +112,7 @@ case TypeKind::Id:
     case TypeKind::SILToken:
     case TypeKind::Module:
     case TypeKind::BuiltinTuple:
+    case TypeKind::Integer:
       return t;
 
     case TypeKind::PrimaryArchetype:
@@ -136,7 +138,29 @@ case TypeKind::Id:
                                           newSubMap);
     }
 
-    case TypeKind::OpenedArchetype:
+    case TypeKind::OpenedArchetype: {
+      auto *local = cast<LocalArchetypeType>(base);
+      if (auto result = asDerived().transformLocalArchetypeType(local, pos))
+        return *result;
+
+      auto *env = local->getGenericEnvironment();
+
+      auto genericSig = env->getGenericSignature();
+      auto existentialTy = env->getOpenedExistentialType();
+      auto subMap = env->getOuterSubstitutions();
+      auto uuid = env->getOpenedExistentialUUID();
+
+      auto newSubMap = asDerived().transformSubMap(subMap);
+      if (newSubMap == subMap)
+        return t;
+      if (!newSubMap)
+        return Type();
+
+      auto *newEnv = GenericEnvironment::forOpenedExistential(
+          genericSig, existentialTy, newSubMap, uuid);
+      return newEnv->mapTypeIntoContext(local->getInterfaceType());
+    }
+
     case TypeKind::ElementArchetype: {
       auto *local = cast<LocalArchetypeType>(base);
       if (auto result = asDerived().transformLocalArchetypeType(local, pos))
@@ -975,9 +999,7 @@ case TypeKind::Id:
       return subs;
 
     auto sig = subs.getGenericSignature();
-    return SubstitutionMap::get(sig,
-        QueryReplacementTypeArray{sig, newSubs},
-        LookUpConformanceInModule());
+    return SubstitutionMap::get(sig, newSubs, LookUpConformanceInModule());
   }
 
   CanType transformSILField(CanType fieldTy, TypePosition pos) {

@@ -1772,7 +1772,7 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
     if (D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
       return true;
   } else {
-    if (D->isPrivateStdlibDecl(false))
+    if (D->isPrivateSystemDecl(false))
       return true;
   }
   if (AvailableAttr::isUnavailable(D))
@@ -1943,8 +1943,6 @@ SwiftDeclCollector::addMembersToRoot(SDKNode *Root, IterableDeclContext *Context
       // All containing variables should have been handled.
     } else if (isa<EnumCaseDecl>(Member)) {
       // All containing variables should have been handled.
-    } else if (isa<IfConfigDecl>(Member)) {
-      // All containing members should have been handled.
     } else if (isa<PoundDiagnosticDecl>(Member)) {
       // All containing members should have been handled.
     } else if (isa<DestructorDecl>(Member)) {

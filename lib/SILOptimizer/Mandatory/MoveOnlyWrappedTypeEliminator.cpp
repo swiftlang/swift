@@ -208,6 +208,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(FixLifetime)
   NO_UPDATE_NEEDED(AddressToPointer)
   NO_UPDATE_NEEDED(ExistentialMetatype)
+  NO_UPDATE_NEEDED(Builtin)
 #undef NO_UPDATE_NEEDED
 
   bool eliminateIdentityCast(SingleValueInstruction *svi) {

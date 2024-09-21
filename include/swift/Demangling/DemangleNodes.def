@@ -389,7 +389,6 @@ NODE(AsyncRemoved)
 
 // Added in Swift 5.TBD
 NODE(ObjectiveCProtocolSymbolicReference)
-NODE(LifetimeDependence)
 
 NODE(OutlinedInitializeWithCopyNoValueWitness)
 NODE(OutlinedAssignWithTakeNoValueWitness)
@@ -397,6 +396,11 @@ NODE(OutlinedAssignWithCopyNoValueWitness)
 NODE(OutlinedDestroyNoValueWitness)
 
 NODE(DependentGenericInverseConformanceRequirement)
+
+// Added in Swift 6.TBD
+NODE(Integer)
+NODE(NegativeInteger)
+NODE(DependentGenericParamValueMarker)
 
 #undef CONTEXT_NODE
 #undef NODE

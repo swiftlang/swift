@@ -194,32 +194,9 @@ private:
   }
 };
 
-/// Records the reason a declaration is potentially unavailable.
-class UnavailabilityReason {
-private:
-  VersionRange RequiredDeploymentRange;
-
-  explicit UnavailabilityReason(const VersionRange RequiredDeploymentRange)
-      : RequiredDeploymentRange(RequiredDeploymentRange) {}
-
-public:
-  static UnavailabilityReason requiresVersionRange(const VersionRange Range) {
-    return UnavailabilityReason(Range);
-  }
-
-  const VersionRange &getRequiredOSVersionRange() const {
-    return RequiredDeploymentRange;
-  }
-
-  /// Returns true if the required OS version range's lower endpoint is at or
-  /// below the deployment target of the given ASTContext.
-  bool requiresDeploymentTargetOrEarlier(ASTContext &Ctx) const;
-};
-
-/// Represents everything that a particular chunk of code may assume about its
-/// runtime environment.
+/// Represents a version range in which something is available.
 ///
-/// The AvailabilityContext structure forms a [lattice][], which allows it to
+/// The AvailabilityRange structure forms a [lattice][], which allows it to
 /// have meaningful union and intersection operations ("join" and "meet"),
 /// which use conservative approximations to prevent availability violations.
 /// See #unionWith, #intersectWith, and #constrainWith.
@@ -227,58 +204,67 @@ public:
 /// [lattice]: http://mathworld.wolfram.com/Lattice.html
 ///
 /// NOTE: Generally you should use the utilities on \c AvailabilityInference
-/// to create an \c AvailabilityContext, rather than creating one directly.
-class AvailabilityContext {
-  VersionRange OSVersion;
-  std::optional<bool> SPI;
+/// to create an \c AvailabilityRange, rather than creating one directly.
+class AvailabilityRange {
+  VersionRange Range;
 
 public:
-  /// Creates a context that requires certain versions of the target OS.
-  explicit AvailabilityContext(VersionRange OSVersion,
-                               std::optional<bool> SPI = std::nullopt)
-      : OSVersion(OSVersion), SPI(SPI) {}
+  explicit AvailabilityRange(VersionRange Range) : Range(Range) {}
 
   /// Creates a context that imposes the constraints of the ASTContext's
   /// deployment target.
-  static AvailabilityContext forDeploymentTarget(const ASTContext &Ctx);
+  static AvailabilityRange forDeploymentTarget(const ASTContext &Ctx);
 
   /// Creates a context that imposes the constraints of the ASTContext's
   /// inlining target (i.e. minimum inlining version).
-  static AvailabilityContext forInliningTarget(const ASTContext &Ctx);
+  static AvailabilityRange forInliningTarget(const ASTContext &Ctx);
 
   /// Creates a context that imposes the constraints of the ASTContext's
   /// minimum runtime version.
-  static AvailabilityContext forRuntimeTarget(const ASTContext &Ctx);
+  static AvailabilityRange forRuntimeTarget(const ASTContext &Ctx);
 
   /// Creates a context that imposes no constraints.
   ///
   /// \see isAlwaysAvailable
-  static AvailabilityContext alwaysAvailable() {
-    return AvailabilityContext(VersionRange::all());
+  static AvailabilityRange alwaysAvailable() {
+    return AvailabilityRange(VersionRange::all());
   }
 
   /// Creates a context that can never actually occur.
   ///
   /// \see isKnownUnreachable
-  static AvailabilityContext neverAvailable() {
-    return AvailabilityContext(VersionRange::empty());
+  static AvailabilityRange neverAvailable() {
+    return AvailabilityRange(VersionRange::empty());
   }
 
-  /// Returns the range of possible OS versions required by this context.
-  VersionRange getOSVersion() const { return OSVersion; }
+  /// Returns the range of possible versions required by this context.
+  VersionRange getRawVersionRange() const { return Range; }
+
+  /// Returns true if there is a version tuple for this context.
+  bool hasMinimumVersion() const { return Range.hasLowerEndpoint(); }
+
+  /// Returns the minimum version required by this context. This convenience
+  /// is meant for debugging, diagnostics, serialization, etc. Use of the set
+  /// algebra operations on `AvailabilityRange` should be preferred over
+  /// direct comparison of raw versions.
+  ///
+  /// Only call when `hasMinimumVersion()` returns true.
+  llvm::VersionTuple getRawMinimumVersion() const {
+    return Range.getLowerEndpoint();
+  }
 
   /// Returns true if \p other makes stronger guarantees than this context.
   ///
   /// That is, `a.isContainedIn(b)` implies `a.union(b) == b`.
-  bool isContainedIn(const AvailabilityContext &other) const {
-    return OSVersion.isContainedIn(other.OSVersion);
+  bool isContainedIn(const AvailabilityRange &other) const {
+    return Range.isContainedIn(other.Range);
   }
 
   /// Returns true if \p other is a strict subset of this context.
   ///
   /// That is, `a.isSupersetOf(b)` implies `a != b` and `a.union(b) == a`.
-  bool isSupersetOf(const AvailabilityContext &other) const {
-    return OSVersion.isSupersetOf(other.OSVersion);
+  bool isSupersetOf(const AvailabilityRange &other) const {
+    return Range.isSupersetOf(other.Range);
   }
 
   /// Returns true if this context has constraints that make it impossible to
@@ -287,13 +273,13 @@ public:
   /// For example, the else branch of a `#available` check for iOS 8.0 when the
   /// containing function already requires iOS 9.
   bool isKnownUnreachable() const {
-    return OSVersion.isEmpty();
+    return Range.isEmpty();
   }
 
   /// Returns true if there are no constraints on this context; that is,
   /// nothing can be assumed.
   bool isAlwaysAvailable() const {
-    return OSVersion.isAll();
+    return Range.isAll();
   }
 
   /// Produces an under-approximation of the intersection of the two
@@ -305,8 +291,8 @@ public:
   ///
   /// As an example, this is used when figuring out the required availability
   /// for a type that references multiple nominal decls.
-  void intersectWith(const AvailabilityContext &other) {
-    OSVersion.intersectWith(other.getOSVersion());
+  void intersectWith(const AvailabilityRange &other) {
+    Range.intersectWith(other.Range);
   }
 
   /// Produces an over-approximation of the intersection of the two
@@ -316,8 +302,8 @@ public:
   /// treating some invalid deployment environments as available.
   ///
   /// As an example, this is used for the true branch of `#available`.
-  void constrainWith(const AvailabilityContext &other) {
-    OSVersion.constrainWith(other.getOSVersion());
+  void constrainWith(const AvailabilityRange &other) {
+    Range.constrainWith(other.Range);
   }
 
   /// Produces an over-approximation of the union of two availability contexts.
@@ -328,16 +314,20 @@ public:
   ///
   /// As an example, this is used for the else branch of a conditional with
   /// multiple `#available` checks.
-  void unionWith(const AvailabilityContext &other) {
-    OSVersion.unionWith(other.getOSVersion());
+  void unionWith(const AvailabilityRange &other) {
+    Range.unionWith(other.Range);
   }
-
-  bool isAvailableAsSPI() const { return SPI && *SPI; }
 
   /// Returns a representation of this range as a string for debugging purposes.
   std::string getAsString() const {
-    return "AvailabilityContext(" + OSVersion.getAsString() +
-           (isAvailableAsSPI() ? ", spi" : "") + ")";
+    return "AvailabilityRange(" + getVersionString() + ")";
+  }
+
+  /// Returns a representation of the raw version range as a string for
+  /// debugging purposes.
+  std::string getVersionString() const {
+    assert(Range.hasLowerEndpoint());
+    return Range.getLowerEndpoint().getAsString();
   }
 };
 
@@ -355,18 +345,21 @@ public:
                               ArrayRef<const Decl *> InferredFromDecls,
                               ASTContext &Context);
 
-  static AvailabilityContext inferForType(Type t);
+  static AvailabilityRange inferForType(Type t);
 
   /// Returns the context where a declaration is available
-  ///  We assume a declaration without an annotation is always available.
-  static AvailabilityContext availableRange(const Decl *D, ASTContext &C);
+  /// We assume a declaration without an annotation is always available.
+  static AvailabilityRange availableRange(const Decl *D, ASTContext &C);
+
+  /// Returns true is the declaration is `@_spi_available`.
+  static bool isAvailableAsSPI(const Decl *D, ASTContext &C);
 
   /// Returns the availability context for a declaration with the given
   /// @available attribute.
   ///
   /// NOTE: The attribute must be active on the current platform.
-  static AvailabilityContext availableRange(const AvailableAttr *attr,
-                                            ASTContext &C);
+  static AvailabilityRange availableRange(const AvailableAttr *attr,
+                                          ASTContext &C);
 
   /// Returns the attribute that should be used to determine the availability
   /// range of the given declaration, or nullptr if there is none.
@@ -376,10 +369,10 @@ public:
   /// Returns the context for which the declaration
   /// is annotated as available, or None if the declaration
   /// has no availability annotation.
-  static std::optional<AvailabilityContext>
+  static std::optional<AvailabilityRange>
   annotatedAvailableRange(const Decl *D, ASTContext &C);
 
-  static AvailabilityContext
+  static AvailabilityRange
   annotatedAvailableRangeForAttr(const SpecializeAttr *attr, ASTContext &ctx);
 
   /// For the attribute's introduction version, update the platform and version

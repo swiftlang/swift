@@ -1670,6 +1670,19 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     GenericArgs.push_back(triple);
   }
 
+  // Inherit the target SDK name and version
+  if (!LangOpts.SDKName.empty()) {
+    genericSubInvocation.getLangOptions().SDKName = LangOpts.SDKName;
+    GenericArgs.push_back("-target-sdk-name");
+    GenericArgs.push_back(ArgSaver.save(LangOpts.SDKName));
+  }
+  if (LangOpts.SDKVersion.has_value()) {
+    genericSubInvocation.getLangOptions().SDKVersion = LangOpts.SDKVersion;
+    GenericArgs.push_back("-target-sdk-version");
+    GenericArgs.push_back(ArgSaver.save(LangOpts.SDKVersion.value()
+                                                .getAsString()));
+  }
+
   // Inherit the Swift language version
   genericSubInvocation.getLangOptions().EffectiveLanguageVersion =
     LangOpts.EffectiveLanguageVersion;
@@ -1962,9 +1975,13 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     genericSubInvocation.getFrontendOptions()
         .DependencyScanningSubInvocation = true;
   } else if (LoaderOpts.strictImplicitModuleContext ||
-             // Explicit module Interface verification jobs still spawn a sub-instance
-             // and we must ensure this sub-instance gets all of the Xcc flags.
-             LoaderOpts.disableImplicitSwiftModule) {
+             // Explicit module Interface verification jobs still spawn a
+             // sub-instance and we must ensure this sub-instance gets all of
+             // the Xcc flags.
+             LoaderOpts.disableImplicitSwiftModule ||
+             // If using direct cc1 argument mode for lldb or typecheck
+             // interface, inherit all clang arguments.
+             clangImporterOpts.DirectClangCC1ModuleBuild) {
     // If the compiler has been asked to be strict with ensuring downstream
     // dependencies get the parent invocation's context, inherit the extra Clang
     // arguments also. Inherit any clang-specific state of the compilation
@@ -2080,8 +2097,24 @@ StringRef InterfaceSubContextDelegateImpl::computeCachedOutputPath(
 std::string
 InterfaceSubContextDelegateImpl::getCacheHash(StringRef useInterfacePath,
                                               StringRef sdkPath) {
-  auto normalizedTargetTriple =
-      getTargetSpecificModuleTriple(genericSubInvocation.getLangOptions().Target);
+  // When doing dependency scanning for explicit module, use strict context hash
+  // to ensure sound module hash.
+  bool useStrictCacheHash =
+      genericSubInvocation.getFrontendOptions().RequestedAction ==
+      FrontendOptions::ActionType::ScanDependencies;
+
+  // Include the normalized target triple when not using strict hash.
+  // Otherwise, use the full target to ensure soundness of the hash. In
+  // practice, .swiftinterface files will be in target-specific subdirectories
+  // and would have target-specific pieces #if'd out. However, it doesn't hurt
+  // to include it, and it guards against mistakenly reusing cached modules
+  // across targets. Note that this normalization explicitly doesn't include the
+  // minimum deployment target (e.g. the '12.0' in 'ios12.0').
+  auto targetToHash = useStrictCacheHash
+                          ? genericSubInvocation.getLangOptions().Target
+                          : getTargetSpecificModuleTriple(
+                                genericSubInvocation.getLangOptions().Target);
+
   std::string sdkBuildVersion = getSDKBuildVersion(sdkPath);
   const auto ExtraArgs = genericSubInvocation.getClangImporterOptions()
                              .getReducedExtraArgsForSwiftModuleDependency();
@@ -2098,13 +2131,8 @@ InterfaceSubContextDelegateImpl::getCacheHash(StringRef useInterfacePath,
       // anyways.
       useInterfacePath,
 
-      // Include the normalized target triple. In practice, .swiftinterface
-      // files will be in target-specific subdirectories and would have
-      // target-specific pieces #if'd out. However, it doesn't hurt to include
-      // it, and it guards against mistakenly reusing cached modules across
-      // targets. Note that this normalization explicitly doesn't include the
-      // minimum deployment target (e.g. the '12.0' in 'ios12.0').
-      normalizedTargetTriple.str(),
+      // The target triple to hash.
+      targetToHash.str(),
 
       // The SDK path is going to affect how this module is imported, so
       // include it.
@@ -2129,6 +2157,10 @@ InterfaceSubContextDelegateImpl::getCacheHash(StringRef useInterfacePath,
       // Clang ExtraArgs that affects how clang types are imported into swift
       // module.
       llvm::hash_combine_range(ExtraArgs.begin(), ExtraArgs.end()),
+
+      /// Application extension.
+      unsigned(
+          genericSubInvocation.getLangOptions().EnableAppExtensionRestrictions),
 
       // Whether or not OSSA modules are enabled.
       //

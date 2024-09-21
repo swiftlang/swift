@@ -270,12 +270,14 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
           if (Level != OptimizationLevel::O0)
             FPM.addPass(SwiftARCOptPass());
         });
-    PB.registerOptimizerLastEPCallback([](ModulePassManager &MPM,
+    PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM,
                                           OptimizationLevel Level) {
       if (Level != OptimizationLevel::O0)
         MPM.addPass(createModuleToFunctionPassAdaptor(SwiftARCContractPass()));
       if (Level == OptimizationLevel::O0)
         MPM.addPass(AlwaysInlinerPass());
+      if (Opts.EmitAsyncFramePushPopMetadata)
+        MPM.addPass(AsyncEntryReturnMetadataPass());
     });
   }
 

@@ -393,3 +393,35 @@ struct TestMultipleOverloadedInits {
     let _ = [Float(x), Float(x), Float(x), Float(x)]
   }
 }
+
+do {
+  struct Section {
+    var rows: [Row<Any>]?
+  }
+
+  struct Row<T> {
+      init(value: T?) {}
+  }
+
+  struct Asset {
+    var orientation: Int32
+  }
+
+  func test(asset: Asset) -> [Section] {
+    return [
+      Section(rows: [
+        Row(value: String(describing: asset.orientation)) // Ok
+      ])
+    ]
+  }
+}
+
+
+do {
+  func f<R>(fn: () -> [R]) -> [R] { [] }
+
+  // Requires collection upcast from Array<(key: String, value: String)> to `Array<(String, String)>`
+  func g(v: [String: String]) {
+    let _: [(String, String)] = f { return Array(v) } + v // Ok
+  }
+}

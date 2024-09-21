@@ -13,6 +13,7 @@
 import ASTBridging
 import BasicBridging
 import ParseBridging
+import SwiftIfConfig
 // Needed to use BumpPtrAllocator
 @_spi(BumpPtrAllocator) @_spi(RawSyntax) import SwiftSyntax
 
@@ -76,7 +77,7 @@ struct ASTGenVisitor {
 
   let ctx: BridgedASTContext
 
-  let buildConfiguration: CompilerBuildConfiguration
+  let configuredRegions: ConfiguredRegions
 
   fileprivate let allocator: SwiftSyntax.BumpPtrAllocator = .init(initialSlabSize: 256)
 
@@ -89,17 +90,15 @@ struct ASTGenVisitor {
     sourceBuffer: UnsafeBufferPointer<UInt8>,
     declContext: BridgedDeclContext,
     astContext: BridgedASTContext,
+    configuredRegions: ConfiguredRegions,
     legacyParser: BridgedLegacyParser
   ) {
     self.diagnosticEngine = diagnosticEngine
     self.base = sourceBuffer
     self.declContext = declContext
     self.ctx = astContext
+    self.configuredRegions = configuredRegions
     self.legacyParse = legacyParser
-    self.buildConfiguration = CompilerBuildConfiguration(
-      ctx: ctx,
-      sourceBuffer: sourceBuffer
-    )
   }
 
   func generate(sourceFile node: SourceFileSyntax) -> [BridgedDecl] {
@@ -423,7 +422,7 @@ extension TokenSyntax {
 @_cdecl("swift_ASTGen_buildTopLevelASTNodes")
 public func buildTopLevelASTNodes(
   diagEngine: BridgedDiagnosticEngine,
-  sourceFilePtr: UnsafeRawPointer,
+  sourceFilePtr: UnsafeMutableRawPointer,
   dc: BridgedDeclContext,
   ctx: BridgedASTContext,
   legacyParser: BridgedLegacyParser,
@@ -431,15 +430,20 @@ public func buildTopLevelASTNodes(
   callback: @convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void
 ) {
   let sourceFile = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
-  ASTGenVisitor(
+  let visitor = ASTGenVisitor(
     diagnosticEngine: diagEngine,
     sourceBuffer: sourceFile.pointee.buffer,
     declContext: dc,
     astContext: ctx,
+    configuredRegions: sourceFile.pointee.configuredRegions(astContext: ctx),
     legacyParser: legacyParser
   )
-  .generate(sourceFile: sourceFile.pointee.syntax)
-  .forEach { callback($0.raw, outputContext) }
+
+  visitor.generate(sourceFile: sourceFile.pointee.syntax)
+    .forEach { callback($0.raw, outputContext) }
+
+  // Diagnose any errors from evaluating #ifs.
+  visitor.diagnoseAll(visitor.configuredRegions.diagnostics)
 }
 
 /// Generate an AST node at the given source location. Returns the generated
@@ -447,7 +451,7 @@ public func buildTopLevelASTNodes(
 private func _build<Node: SyntaxProtocol, Result>(
   generator: (ASTGenVisitor) -> (Node) -> Result,
   diagEngine: BridgedDiagnosticEngine,
-  sourceFilePtr: UnsafeRawPointer,
+  sourceFilePtr: UnsafeMutableRawPointer,
   sourceLoc: BridgedSourceLoc,
   declContext: BridgedDeclContext,
   astContext: BridgedASTContext,
@@ -480,6 +484,7 @@ private func _build<Node: SyntaxProtocol, Result>(
       sourceBuffer: sourceFile.pointee.buffer,
       declContext: declContext,
       astContext: astContext,
+      configuredRegions: sourceFile.pointee.configuredRegions(astContext: astContext),
       legacyParser: legacyParser
     )
   )(node)
@@ -489,7 +494,7 @@ private func _build<Node: SyntaxProtocol, Result>(
 @usableFromInline
 func buildTypeRepr(
   diagEngine: BridgedDiagnosticEngine,
-  sourceFilePtr: UnsafeRawPointer,
+  sourceFilePtr: UnsafeMutableRawPointer,
   sourceLoc: BridgedSourceLoc,
   declContext: BridgedDeclContext,
   astContext: BridgedASTContext,
@@ -512,7 +517,7 @@ func buildTypeRepr(
 @usableFromInline
 func buildDecl(
   diagEngine: BridgedDiagnosticEngine,
-  sourceFilePtr: UnsafeRawPointer,
+  sourceFilePtr: UnsafeMutableRawPointer,
   sourceLoc: BridgedSourceLoc,
   declContext: BridgedDeclContext,
   astContext: BridgedASTContext,
@@ -535,7 +540,7 @@ func buildDecl(
 @usableFromInline
 func buildExpr(
   diagEngine: BridgedDiagnosticEngine,
-  sourceFilePtr: UnsafeRawPointer,
+  sourceFilePtr: UnsafeMutableRawPointer,
   sourceLoc: BridgedSourceLoc,
   declContext: BridgedDeclContext,
   astContext: BridgedASTContext,
@@ -558,7 +563,7 @@ func buildExpr(
 @usableFromInline
 func buildStmt(
   diagEngine: BridgedDiagnosticEngine,
-  sourceFilePtr: UnsafeRawPointer,
+  sourceFilePtr: UnsafeMutableRawPointer,
   sourceLoc: BridgedSourceLoc,
   declContext: BridgedDeclContext,
   astContext: BridgedASTContext,

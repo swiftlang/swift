@@ -12,7 +12,7 @@ struct Maker {} // expected-error {{result builder must provide at least one sta
 @resultBuilder
 class Inventor {} // expected-error {{result builder must provide at least one static 'buildBlock' method}}
 
-@Maker // expected-error {{result builder attribute 'Maker' can only be applied to a parameter, function, or computed property}}
+@Maker // expected-error {{result builder attribute 'Maker' can only be applied to a parameter, function, subscript, or computed property}}
 typealias typename = Inventor
 
 @Maker // expected-error {{result builder attribute 'Maker' can only be applied to a variable if it defines a getter}}

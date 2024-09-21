@@ -361,6 +361,13 @@ void InverseRequirement::expandDefaults(
     ArrayRef<Type> gps,
     SmallVectorImpl<StructuralRequirement> &result) {
   for (auto gp : gps) {
+    // Value generics never have inverses (or the positive thereof).
+    if (auto gpTy = gp->getAs<GenericTypeParamType>()) {
+      if (gpTy->isValue()) {
+        continue;
+      }
+    }
+
     for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
       result.push_back({{RequirementKind::Conformance, gp,

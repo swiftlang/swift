@@ -60,9 +60,8 @@ struct SubstitutionMapWithLocalArchetypes {
 
         // Map the local archetype to an interface type in the new generic
         // signature.
-        MapLocalArchetypesOutOfContext mapOutOfContext(BaseGenericSig,
-                                                       CapturedEnvs);
-        auto interfaceTy = mapOutOfContext(local);
+        auto interfaceTy = mapLocalArchetypesOutOfContext(
+            local, BaseGenericSig, CapturedEnvs);
 
         // Map this interface type into the new generic environment to get
         // a primary archetype.
@@ -86,6 +85,11 @@ struct SubstitutionMapWithLocalArchetypes {
                                     ProtocolDecl *proto) {
     if (isa<LocalArchetypeType>(origType))
       return swift::lookupConformance(substType, proto);
+
+    if (isa<PrimaryArchetypeType>(origType) ||
+        isa<PackArchetypeType>(origType))
+      origType = origType->mapTypeOutOfContext()->getCanonicalType();
+
     if (SubsMap)
       return SubsMap->lookupConformance(origType, proto);
 
@@ -246,8 +250,8 @@ public:
   /// Register a re-mapping for local archetypes such as opened existentials.
   void registerLocalArchetypeRemapping(GenericEnvironment *From,
                                        GenericEnvironment *To) {
-    ASSERT(From->getGenericSignature()->getMaxDepth()
-           == To->getGenericSignature()->getMaxDepth());
+    ASSERT(From->getGenericSignature().getPointer()
+           == To->getGenericSignature().getPointer());
 
     auto result = Functor.LocalArchetypeSubs.insert(std::make_pair(From, To));
     assert(result.second);
@@ -381,14 +385,14 @@ public:
 
   void remapRootOpenedType(CanOpenedArchetypeType archetypeTy) {
     auto *origEnv = archetypeTy->getGenericEnvironment();
-    auto subMap = origEnv->getOuterSubstitutions();
-    ASSERT(!subMap && "Transform the substitution map!");
-    auto origExistentialTy = origEnv->getOpenedExistentialType()
-        ->getCanonicalType();
 
-    auto substExistentialTy = getOpASTType(origExistentialTy);
+    auto genericSig = origEnv->getGenericSignature();
+    auto existentialTy = origEnv->getOpenedExistentialType();
+    auto subMap = origEnv->getOuterSubstitutions();
+
     auto *newEnv = GenericEnvironment::forOpenedExistential(
-        substExistentialTy, subMap, UUID::fromTime());
+        genericSig, existentialTy, getOpSubstitutionMap(subMap),
+        UUID::fromTime());
 
     registerLocalArchetypeRemapping(origEnv, newEnv);
   }
@@ -2676,7 +2680,7 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitOpenExistentialAddrInst(OpenExistentialAddrInst *Inst) {
   // Create a new archetype for this opened existential type.
-  remapRootOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
+  remapRootOpenedType(Inst->getDefinedOpenedArchetype());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
@@ -2689,7 +2693,7 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitOpenExistentialValueInst(
     OpenExistentialValueInst *Inst) {
   // Create a new archetype for this opened existential type.
-  remapRootOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
+  remapRootOpenedType(Inst->getDefinedOpenedArchetype());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
@@ -2705,14 +2709,7 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::
 visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *Inst) {
-  // Create a new archetype for this opened existential type.
-  auto openedType = Inst->getType().getASTType();
-  auto exType = Inst->getOperand()->getType().getASTType();
-  while (auto exMetatype = dyn_cast<ExistentialMetatypeType>(exType)) {
-    exType = exMetatype->getExistentialInstanceType()->getCanonicalType();
-    openedType = cast<MetatypeType>(openedType).getInstanceType();
-  }
-  remapRootOpenedType(cast<OpenedArchetypeType>(openedType));
+  remapRootOpenedType(Inst->getDefinedOpenedArchetype());
 
   if (!Inst->getOperand()->getType().canUseExistentialRepresentation(
           ExistentialRepresentation::Class)) {
@@ -2736,7 +2733,7 @@ void
 SILCloner<ImplClass>::
 visitOpenExistentialRefInst(OpenExistentialRefInst *Inst) {
   // Create a new archetype for this opened existential type.
-  remapRootOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
+  remapRootOpenedType(Inst->getDefinedOpenedArchetype());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
@@ -2753,7 +2750,7 @@ void
 SILCloner<ImplClass>::
 visitOpenExistentialBoxInst(OpenExistentialBoxInst *Inst) {
   // Create a new archetype for this opened existential type.
-  remapRootOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
+  remapRootOpenedType(Inst->getDefinedOpenedArchetype());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createOpenExistentialBox(
@@ -2767,7 +2764,7 @@ void
 SILCloner<ImplClass>::
 visitOpenExistentialBoxValueInst(OpenExistentialBoxValueInst *Inst) {
   // Create a new archetype for this opened existential type.
-  remapRootOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
+  remapRootOpenedType(Inst->getDefinedOpenedArchetype());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
@@ -2858,6 +2855,16 @@ void SILCloner<ImplClass>::visitDeinitExistentialValueInst(
   recordClonedInstruction(
       Inst, getBuilder().createDeinitExistentialValue(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitTypeValueInst(TypeValueInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+
+  recordClonedInstruction(
+      Inst, getBuilder().createTypeValue(getOpLocation(Inst->getLoc()),
+                                         getOpType(Inst->getType()),
+                                         getOpASTType(Inst->getParamType())));
 }
 
 template <typename ImplClass>

@@ -533,8 +533,8 @@ struct G<T> {}
 
 extension G: Sequence where T: Sequence, T.Element: Hashable {...}
 \end{Verbatim}
-\paragraph{Specialized conditional conformances.} Building upon \SecRef{conformance lookup}, we now describe how substitution relates to conditional conformances. If $\texttt{T}_d$ is the declared interface type of some nominal type declaration~$d$ that \emph{unconditionally} conforms to \texttt{P}, and $\texttt{T}=\texttt{T}_d\otimes\Sigma$ is a \index{specialized type}specialized type of~$d$ for some substitution map $\Sigma$, then looking up the conformance of \texttt{T} to $\protosym{P}$ returns a \index{specialized conformance}specialized conformance with \index{conformance substitution map}conformance substitution map~$\Sigma$:
-\[\protosym{P}\otimes\texttt{T}=\ConfReq{$\texttt{T}_d$}{P}\otimes\Sigma\]
+\paragraph{Specialized conditional conformances.} Building upon \SecRef{conformance lookup}, we now describe how substitution relates to conditional conformances. If $\texttt{T}_d$ is the declared interface type of some nominal type declaration~$d$ that \emph{unconditionally} conforms to \texttt{P}, and $\texttt{T}=\texttt{T}_d\otimes\Sigma$ is a \index{specialized type}specialized type of~$d$ for some substitution map $\Sigma$, then looking up the conformance of \texttt{T} to $\pP$ returns a \index{specialized conformance}specialized conformance with \index{conformance substitution map}conformance substitution map~$\Sigma$:
+\[\pP\otimes\texttt{T}=\ConfReq{$\texttt{T}_d$}{P}\otimes\Sigma\]
 If $\ConfReq{$\texttt{T}_d$}{P}$ is conditional though, we cannot take~$\Sigma$ to be the \index{context substitution map!for a declaration context}context substitution map of~\texttt{T}. The \index{type witness}type witnesses of $\ConfReq{$\texttt{T}_d$}{P}$ might contain type parameters of the constrained extension, and not just the conforming type; however the context substitution map of \texttt{T} has the generic signature of the conforming type. We must set $\Sigma$ to be the context substitution map of \texttt{T} for the generic signature of the constrained extension, as in \SecRef{member type repr}. Indeed, this is the same problem as member type resolution when the referenced type declaration is declared in a constrained extension; we must perform some additional \index{global conformance lookup}global conformance lookups to populate the substitution map completely.
 
 The conditional requirements of the specialized conformance $\TP$ are the \index{substituted requirement}substituted requirements obtained by applying $\Sigma$ to each conditional requirement of \ConfReq{$\texttt{T}_d$}{P}. This makes the following \index{commutative diagram}diagram commute for each conditional requirement~$R$:
@@ -890,12 +890,8 @@ Key source files:
 \item \SourceFile{lib/Sema/TypeCheckProtocol.cpp}
 \end{itemize}
 
-\apiref{ModuleDecl}{class}
-
-See also \SecRef{compilation model source reference} and \SecRef{conformancesourceref}.
-\begin{itemize}
-\item \texttt{checkConformance()} is a utility that first calls \texttt{lookupConformance()}, and then checks any conditional requirements using \texttt{checkRequirements()}, described in \SecRef{type resolution source ref}.
-\end{itemize}
+\apiref{checkConformance}{function}
+A utility function that first calls \texttt{lookupConformance()} (\SecRef{conformancesourceref}), and then checks any conditional requirements using \texttt{checkRequirements()}, described in \SecRef{type resolution source ref}.
 
 The \verb|NormalProtocolConformance| and \verb|SpecializedProtocolConformance| classes were previously introduced in \SecRef{conformancesourceref}.
 \apiref{NormalProtocolConformance}{class}

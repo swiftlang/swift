@@ -1386,9 +1386,9 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
       // based on the requirements harvested from instance storage.
 
       // Form the where clause containing all of the requirements.
-      std::string whereClause;
+      SmallString<64> whereClause;
       {
-        llvm::raw_string_ostream out(whereClause);
+        llvm::raw_svector_ostream out(whereClause);
         llvm::interleaveComma(
             requirements, out,
             [&](const Requirement &req) {
@@ -1504,10 +1504,11 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
     canRemoveOldDecls = true;
   } else {
     // Check if the availability of nominal is high enough to be using the ExecutorJob version
-    AvailabilityContext requirementInfo
-        = AvailabilityInference::availableRange(moveOnlyEnqueueRequirement, C);
-    AvailabilityContext declInfo =
-        TypeChecker::overApproximateAvailabilityAtLocation(nominal->getLoc(), dyn_cast<DeclContext>(nominal));
+    AvailabilityRange requirementInfo =
+        AvailabilityInference::availableRange(moveOnlyEnqueueRequirement, C);
+    AvailabilityRange declInfo =
+        TypeChecker::overApproximateAvailabilityAtLocation(
+            nominal->getLoc(), dyn_cast<DeclContext>(nominal));
     canRemoveOldDecls = declInfo.isContainedIn(requirementInfo);
   }
 
@@ -1780,7 +1781,8 @@ maybeNoteMutatingMethodSuggestion(ASTContext &C,
 
   if (useKind != VarRefUseEnv::Mutating) {
       // This note is tailored for the 'mutating' access, i.e. when
-      // attempting to mutate a property, they should instead make an actor method to perform the mutation. Reading properties does not have the same restriction.
+      // attempting to mutate a property, they should instead make an actor method
+      // to perform the mutation. Reading properties does not have the same restriction.
       return;
   }
 
@@ -1791,21 +1793,10 @@ maybeNoteMutatingMethodSuggestion(ASTContext &C,
   }
 
   if (auto actor = isolation.getActor()) {
-      NominalTypeDecl *actorTy =
-        actor;
-//          (isolation.getKind() == swift::ActorIsolation::ActorInstance ?
-//)
-
       C.Diags.diagnose(
           memberLoc,
           diag::note_consider_method_for_isolated_property_mutation,
           actor);
-//      } else if (isolation.getKind() == swift::ActorIsolation::GlobalActor) {
-//        C.Diags.diagnose(
-//            memberLoc,
-//            diag::note_consider_method_for_global_actor_isolated_property_mutation,
-//            isolation.getGlobalActor());
-//      }
   }
 }
 
@@ -1823,7 +1814,8 @@ static void noteIsolatedActorMember(ValueDecl const *decl,
   if (isDistributedActor) {
     if (auto varDecl = dyn_cast<VarDecl>(decl)) {
       if (varDecl->isDistributed()) {
-        // This is an attempt to access a `distributed var` synchronously, so offer a more detailed error
+        // This is an attempt to access a `distributed var` synchronously, so
+        // offer a more detailed error
         decl->diagnose(diag::distributed_actor_synchronous_access_distributed_computed_property,
                        decl,
                        nominal->getName());
@@ -2896,25 +2888,28 @@ namespace {
       assert(applyStack.size() > 0 && "not contained within an Apply?");
 
       const auto End = applyStack.rend();
-      for (auto I = applyStack.rbegin(); I != End; ++I)
-        if (auto call = dyn_cast<CallExpr>(I->dyn_cast<ApplyExpr *>())) {
-          if (setAsync) {
-            call->setImplicitlyAsync(*setAsync);
-          }
-          if (setThrows) {
-            call->setImplicitlyThrows(true);
-          }else {
-            call->setImplicitlyThrows(false);
-          }
-          if (setDistributedThunk) {
-            call->setShouldApplyDistributedThunk(true);
-          }
-          return;
+      for (auto I = applyStack.rbegin(); I != End; ++I) {
+        auto *apply = I->dyn_cast<ApplyExpr *>();
+        if (!apply || isa<SelfApplyExpr>(apply)) {
+          continue;
         }
-      llvm_unreachable("expected a CallExpr in applyStack!");
-    }
 
-    bool shouldWalkCaptureInitializerExpressions() override { return true; }
+        if (setAsync) {
+          apply->setImplicitlyAsync(*setAsync);
+        }
+        if (setThrows) {
+          apply->setImplicitlyThrows(true);
+        } else {
+          apply->setImplicitlyThrows(false);
+        }
+        if (setDistributedThunk) {
+          apply->setShouldApplyDistributedThunk(true);
+        }
+        return;
+      }
+
+      llvm_unreachable("expected an ApplyExpr in applyStack!");
+    }
 
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
@@ -3995,7 +3990,7 @@ namespace {
       // do not cause implicit 'self' capture diagnostics, etc.
 
       Expr *actorExpr = nullptr;
-      Type optionalAnyActorType = isolationExpr->getType();
+      Type isolationType = isolationExpr->getType();
       switch (isolation) {
       case ActorIsolation::ActorInstance: {
         if (auto *instance = isolation.getActorInstanceExpr()) {
@@ -4049,10 +4044,16 @@ namespace {
 
 
       // Convert the actor argument to the appropriate type.
-      (void)TypeChecker::typeCheckExpression(
+      auto result = TypeChecker::typeCheckExpression(
           actorExpr, dc,
           constraints::ContextualTypeInfo(
-            optionalAnyActorType, CTP_CallArgument));
+            isolationType, CTP_CallArgument));
+
+      // Don't set the actor if there's a type mismatch. The isolation
+      // checker will treat calls using this #isolation value for an
+      // isolated argument as crossing an isolation boundary.
+      if (!result)
+        return;
 
       isolationExpr->setActor(actorExpr);
     }
@@ -5081,7 +5082,6 @@ getMemberIsolationPropagation(const ValueDecl *value) {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
-  case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
   case DeclKind::Missing:
@@ -5494,6 +5494,12 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
   ActorIsolation defaultIsolation = ActorIsolation::forUnspecified();
   IsolationSource defaultIsolationSource;
 
+  // If we are supposed to infer main actor isolation by default, make our
+  // default isolation main actor.
+  if (ctx.LangOpts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated)) {
+    defaultIsolation = ActorIsolation::forMainActor(ctx);
+  }
+
   if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
     // A @Sendable function is assumed to be actor-independent.
     if (func->isSendable()) {
@@ -5518,6 +5524,9 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
         IsolationSource(overriddenValue, IsolationSource::Override);
     overriddenIso = defaultIsolation;
   }
+
+  // NOTE: After this point, the default has been set. Only touch the default
+  // isolation above this point since code below assumes it is now constant.
 
   // Function used when returning an inferred isolation.
   auto inferredIsolation = [&](ActorIsolation inferred,
@@ -5628,6 +5637,32 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
           inferredIsolation(enclosingIsolation),
           IsolationSource(inferenceSource, IsolationSource::LexicalContext)
         };
+      }
+    }
+  }
+
+  // If this is an actor, use the actor isolation of the actor.
+  if (ctx.LangOpts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated)) {
+    // non-async inits and deinits need to be always nonisolated since we can
+    // run the deinit anywhere.
+    //
+    // TODO: We should add a check for if they are marked with global actor
+    // isolation.
+    if (auto *func = dyn_cast<AbstractFunctionDecl>(value)) {
+      if (isa<DestructorDecl>(func) && !func->isAsyncContext())
+        return {ActorIsolation::forNonisolated(false /*unsafe*/),
+                IsolationSource(func, IsolationSource::LexicalContext)};
+
+      if (isa<ConstructorDecl>(func) && !func->isAsyncContext())
+        return {ActorIsolation::forNonisolated(false /*unsafe*/),
+                IsolationSource(func, IsolationSource::LexicalContext)};
+    }
+
+    if (auto nominal = dyn_cast<NominalTypeDecl>(value)) {
+      if (nominal->isActor() && !nominal->isGlobalActor()) {
+        auto isolation = ActorIsolation::forActorInstanceSelf(value);
+        return {inferredIsolation(isolation),
+                IsolationSource(nominal, IsolationSource::LexicalContext)};
       }
     }
   }
@@ -7122,7 +7157,6 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::Struct:
   case DeclKind::TypeAlias:
   case DeclKind::EnumCase:
-  case DeclKind::IfConfig:
   case DeclKind::Import:
   case DeclKind::InfixOperator:
   case DeclKind::Missing:

@@ -46,7 +46,6 @@
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Parse/Parser.h"
@@ -60,7 +59,6 @@
 #include "clang/Basic/LangStandard.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/TargetInfo.h"
-#include "clang/Basic/Version.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/CAS/IncludeTree.h"
 #include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
@@ -74,7 +72,6 @@
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Parse/Parser.h"
-#include "clang/Rewrite/Frontend/FrontendActions.h"
 #include "clang/Rewrite/Frontend/Rewriters.h"
 #include "clang/Sema/DelayedDiagnostic.h"
 #include "clang/Sema/Lookup.h"
@@ -88,6 +85,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/ObjectStore.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/CrashRecoveryContext.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -97,7 +95,6 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/VirtualFileSystem.h"
-#include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/TextAPI/InterfaceFile.h"
 #include "llvm/TextAPI/TextAPIReader.h"
 #include <algorithm>
@@ -752,10 +749,24 @@ void importer::getNormalInvocationArguments(
   invocationArgStrs.push_back("-fapinotes-modules");
   invocationArgStrs.push_back("-fapinotes-swift-version=" +
                               languageVersion.asAPINotesVersionString());
-  invocationArgStrs.push_back("-iapinotes-modules");
-  invocationArgStrs.push_back((llvm::Twine(searchPathOpts.RuntimeResourcePath) +
-                               llvm::sys::path::get_separator() +
-                               "apinotes").str());
+
+  // Prefer `-sdk` paths.
+  if (!searchPathOpts.getSDKPath().empty()) {
+    llvm::SmallString<261> path{searchPathOpts.getSDKPath()};
+    llvm::sys::path::append(path, "usr", "lib", "swift", "apinotes");
+
+    invocationArgStrs.push_back("-iapinotes-modules");
+    invocationArgStrs.push_back(path.str().str());
+  }
+
+  // Fallback to "legacy" `-resource-dir` paths.
+  {
+    llvm::SmallString<261> path{searchPathOpts.RuntimeResourcePath};
+    llvm::sys::path::append(path, "apinotes");
+
+    invocationArgStrs.push_back("-iapinotes-modules");
+    invocationArgStrs.push_back(path.str().str());
+  }
 }
 
 static void
@@ -2770,6 +2781,9 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   wrapper->setIsSystemModule(underlying->IsSystem);
   wrapper->setIsNonSwiftModule();
   wrapper->setHasResolvedImports();
+  if (!underlying->ExportAsModule.empty())
+    wrapper->setExportAsName(
+        SwiftContext.getIdentifier(underlying->ExportAsModule));
 
   auto file = new (SwiftContext) ClangModuleUnit(*wrapper, *this,
                                                  underlying);
@@ -5779,8 +5793,7 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
     // TODO: we also currently don't support static functions. That shouldn't be
     // too hard.
     if (fn->isStatic() ||
-        (fn->getClangDecl() &&
-         isa<clang::FunctionTemplateDecl>(fn->getClangDecl())))
+        isa_and_nonnull<clang::FunctionTemplateDecl>(fn->getClangDecl()))
       return nullptr;
     if (auto cxxMethod =
             dyn_cast_or_null<clang::CXXMethodDecl>(fn->getClangDecl())) {
@@ -7266,7 +7279,7 @@ void ClangImporter::diagnoseMemberValue(const DeclName &name,
                                                     nominalTypesToLookInto);
   for (auto containerDecl : nominalTypesToLookInto) {
     const clang::Decl *clangContainerDecl = containerDecl->getClangDecl();
-    if (clangContainerDecl && isa<clang::DeclContext>(clangContainerDecl)) {
+    if (isa_and_nonnull<clang::DeclContext>(clangContainerDecl)) {
       Impl.diagnoseMemberValue(name,
                                cast<clang::DeclContext>(clangContainerDecl));
     }
@@ -7372,6 +7385,14 @@ static bool hasIteratorAPIAttr(const clang::Decl *decl) {
 
 static bool hasNonCopyableAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, "~Copyable");
+}
+
+bool importer::hasNonEscapableAttr(const clang::RecordDecl *decl) {
+  return hasSwiftAttribute(decl, "~Escapable");
+}
+
+bool importer::hasEscapableAttr(const clang::RecordDecl *decl) {
+  return hasSwiftAttribute(decl, "Escapable");
 }
 
 /// Recursively checks that there are no pointers in any fields or base classes.
@@ -7799,17 +7820,22 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
   if (!decl->hasAttrs())
     return {CustomRefCountingOperationResult::noAttribute, nullptr, ""};
 
-  auto retainFnAttr =
-      llvm::find_if(decl->getAttrs(), [&operationStr](auto *attr) {
-        if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-          return swiftAttr->getAttribute().starts_with(operationStr);
-        return false;
-      });
-  if (retainFnAttr == decl->getAttrs().end()) {
-    return {CustomRefCountingOperationResult::noAttribute, nullptr, ""};
+  llvm::SmallVector<const clang::SwiftAttrAttr *, 1> retainReleaseAttrs;
+  for (auto *attr : decl->getAttrs()) {
+    if (auto swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
+      if (swiftAttr->getAttribute().starts_with(operationStr)) {
+        retainReleaseAttrs.push_back(swiftAttr);
+      }
+    }
   }
 
-  auto name = cast<clang::SwiftAttrAttr>(*retainFnAttr)
+  if (retainReleaseAttrs.empty()) {
+    return {CustomRefCountingOperationResult::noAttribute, nullptr, ""};
+  } else if (retainReleaseAttrs.size() > 1) {
+    return {CustomRefCountingOperationResult::tooManyAttributes, nullptr, ""};
+  }
+
+  auto name = retainReleaseAttrs.front()
                   ->getAttribute()
                   .drop_front(StringRef(operationStr).size())
                   .str();

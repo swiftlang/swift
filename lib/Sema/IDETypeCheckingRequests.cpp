@@ -203,7 +203,8 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
   // The context substitution map for the base type fixes the declaration's
   // outer generic parameters.
   auto substMap = BaseTy->getContextSubstitutionMap(
-      VD->getDeclContext(), genericDecl->getGenericEnvironment());
+      VD->getDeclContext(),
+      VD->getDeclContext()->getGenericEnvironmentOfContext());
 
   // The innermost generic parameters are mapped to error types.
   unsigned innerDepth = genericSig->getMaxDepth();

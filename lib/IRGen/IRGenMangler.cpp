@@ -163,7 +163,6 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
       AllowConcurrencyStandardSubstitutions);
   llvm::SaveAndRestore<bool> savedIsolatedAny(AllowIsolatedAny);
   llvm::SaveAndRestore<bool> savedTypedThrows(AllowTypedThrows);
-  llvm::SaveAndRestore<bool> savedLifetimeDependencies(AllowLifetimeDependencies);
   if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget(
           ctx.LangOpts.Target)) {
 
@@ -179,7 +178,6 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
     if (*runtimeCompatVersion < llvm::VersionTuple(6, 0)) {
       AllowIsolatedAny = false;
       AllowTypedThrows = false;
-      AllowLifetimeDependencies = false;
     }
   }
 

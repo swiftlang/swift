@@ -16,6 +16,7 @@
 
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/Basic/Assertions.h"
 
 using namespace swift;
@@ -37,6 +38,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
   bool visitUnresolvedType(UnresolvedType *ty) { return false; }
   bool visitPlaceholderType(PlaceholderType *ty) { return false; }
   bool visitBuiltinType(BuiltinType *ty) { return false; }
+  bool visitIntegerType(IntegerType *ty) { return false; }
   bool visitTypeAliasType(TypeAliasType *ty) {
     if (auto parent = ty->getParent())
       if (doIt(parent)) return true;
@@ -235,17 +237,39 @@ class Traversal : public TypeVisitor<Traversal, bool>
 
     return false;
   }
-  
-  bool visitArchetypeType(ArchetypeType *ty) {
-    // If the root is an opaque archetype, visit its substitution replacement
-    // types.
-    if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(ty)) {
-      for (auto arg : opaque->getSubstitutions().getReplacementTypes()) {
-        if (doIt(arg)) {
-          return true;
-        }
+
+  bool visitPrimaryArchetypeType(PrimaryArchetypeType *ty) {
+    return false;
+  }
+
+  bool visitPackArchetypeType(PackArchetypeType *ty) {
+    return false;
+  }
+
+  bool visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *opaque) {
+    auto *env = opaque->getGenericEnvironment();
+    for (auto arg : env->getOuterSubstitutions().getReplacementTypes()) {
+      if (doIt(arg)) {
+        return true;
       }
     }
+
+    return false;
+  }
+
+  bool visitOpenedArchetypeType(OpenedArchetypeType *opened) {
+    auto *env = opened->getGenericEnvironment();
+    for (auto arg : env->getOuterSubstitutions().getReplacementTypes()) {
+      if (doIt(arg)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  bool visitElementArchetypeType(ElementArchetypeType *element) {
+    // FIXME: Visit element type substitutions here
     return false;
   }
 

@@ -1030,9 +1030,21 @@ class MandatoryInlining : public SILModuleTransform {
 
     SILOptFunctionBuilder FuncBuilder(*this);
     for (auto &F : *M) {
-      // Don't inline into thunks, even transparent callees.
-      if (F.isThunk())
+      switch (F.isThunk()) {
+      case IsThunk_t::IsThunk:
+      case IsThunk_t::IsReabstractionThunk:
+      case IsThunk_t::IsSignatureOptimizedThunk:
+        // Don't inline into most thunks, even transparent callees.
         continue;
+
+      case IsThunk_t::IsNotThunk:
+      case IsThunk_t::IsBackDeployedThunk:
+        // For correctness, inlining _stdlib_isOSVersionAtLeast() when it is
+        // declared transparent is mandatory in the thunks of @backDeployed
+        // functions. These thunks will not contain calls to other transparent
+        // functions.
+        break;
+      }
 
       // Skip deserialized functions.
       if (F.wasDeserializedCanonical())

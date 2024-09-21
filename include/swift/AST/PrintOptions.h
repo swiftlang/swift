@@ -272,12 +272,12 @@ struct PrintOptions {
 
   bool SkipSwiftPrivateClangDecls = false;
 
-  /// Whether to skip internal stdlib declarations.
-  bool SkipPrivateStdlibDecls = false;
+  /// Whether to skip underscored declarations from system modules.
+  bool SkipPrivateSystemDecls = false;
 
-  /// Whether to skip underscored stdlib protocols.
+  /// Whether to skip underscored protocols from system modules.
   /// Protocols marked with @_show_in_interface are still printed.
-  bool SkipUnderscoredStdlibProtocols = false;
+  bool SkipUnderscoredSystemProtocols = false;
 
   /// Whether to skip unsafe C++ class methods that were renamed
   /// (e.g. __fooUnsafe). See IsSafeUseOfCxxDecl.
@@ -387,6 +387,9 @@ struct PrintOptions {
   /// Replace BitwiseCopyable with _BitwiseCopyable.
   bool SuppressBitwiseCopyable = false;
 
+  /// Suppress ~Escapable types and lifetime dependence annotations
+  bool SuppressNonEscapableTypes = false;
+
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {
       DeclAttrKind::Transparent, DeclAttrKind::Effects,
@@ -438,9 +441,6 @@ struct PrintOptions {
 
   /// Print all decls that have at least this level of access.
   AccessLevel AccessFilter = AccessLevel::Private;
-
-  /// Print IfConfigDecls.
-  bool PrintIfConfig = true;
 
   /// Whether we are printing for sil.
   bool PrintForSIL = false;
@@ -661,7 +661,6 @@ struct PrintOptions {
     result.ExcludeAttrList.push_back(DeclAttrKind::Rethrows);
     result.PrintOverrideKeyword = false;
     result.AccessFilter = accessFilter;
-    result.PrintIfConfig = false;
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::TypesOnly;
     result.PrintDocumentationComments = false;
@@ -679,8 +678,8 @@ struct PrintOptions {
     result.SkipUnavailable = true;
     result.SkipImplicit = true;
     result.SkipSwiftPrivateClangDecls = true;
-    result.SkipPrivateStdlibDecls = true;
-    result.SkipUnderscoredStdlibProtocols = true;
+    result.SkipPrivateSystemDecls = true;
+    result.SkipUnderscoredSystemProtocols = true;
     result.SkipUnsafeCXXMethods = true;
     result.SkipDeinit = true;
     result.EmptyLineBetweenDecls = true;
@@ -788,7 +787,7 @@ struct PrintOptions {
       PrintOptions::FunctionRepresentationMode::None;
     PO.PrintDocumentationComments = false;
     PO.ExcludeAttrList.push_back(DeclAttrKind::Available);
-    PO.SkipPrivateStdlibDecls = true;
+    PO.SkipPrivateSystemDecls = true;
     PO.SkipUnsafeCXXMethods = true;
     PO.ExplodeEnumCaseDecls = true;
     PO.ShouldQualifyNestedDeclarations = QualifyNestedDeclarations::TypesOnly;

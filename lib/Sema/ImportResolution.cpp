@@ -790,13 +790,29 @@ void UnboundImport::validateInterfaceWithPackageName(ModuleDecl *topLevelModule,
   }
 }
 
+/// Returns true if the importer and importee tuple are on an allow list for
+/// use of `@_implementationOnly import`, which is deprecated. Some existing
+/// uses of `@_implementationOnly import` cannot be safely replaced by
+/// `internal import` because the existence of the imported module must always
+/// be hidden from clients.
+static bool shouldSuppressNonResilientImplementationOnlyImportDiagnostic(
+    StringRef targetName, StringRef importerName) {
+  if (targetName == "SwiftConcurrencyInternalShims")
+    return importerName == "_Concurrency";
+
+  if (targetName == "CCryptoBoringSSL" || targetName == "CCryptoBoringSSLShims")
+    return importerName == "Crypto" || importerName == "_CryptoExtras" ||
+           importerName == "CryptoBoringWrapper";
+
+  if (targetName == "CNIOBoringSSL" || targetName == "CNIOBoringSSLShims")
+    return importerName != "NIOSSL";
+
+  return false;
+}
+
 void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
                                        SourceFile &SF) {
-  ASTContext &ctx = SF.getASTContext();
-
-  // Per getTopLevelModule(), we'll only get nullptr here for non-Swift modules,
-  // so these two really mean the same thing.
-  if (!topLevelModule || topLevelModule.get()->isNonSwiftModule())
+  if (!topLevelModule)
     return;
 
   // If the module we're validating is the builtin one, then just return because
@@ -804,6 +820,7 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
   // itself with resiliency. This can occur when one has passed
   // '-enable-builtin-module' and is explicitly importing the Builtin module in
   // their sources.
+  ASTContext &ctx = SF.getASTContext();
   if (topLevelModule.get() == ctx.TheBuiltinModule)
     return;
 
@@ -821,19 +838,15 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
       import.implementationOnlyRange.isValid()) {
     if (SF.getParentModule()->isResilient()) {
       // Encourage replacing `@_implementationOnly` with `internal import`.
-      auto inFlight =
-        ctx.Diags.diagnose(import.importLoc,
-                           diag::implementation_only_deprecated);
-      inFlight.fixItReplace(import.implementationOnlyRange, "internal");
-    } else if ( // Non-resilient
-      !(((targetName.str() == "CCryptoBoringSSL" ||
-          targetName.str() == "CCryptoBoringSSLShims") &&
-         (importerName.str() == "Crypto" ||
-          importerName.str() == "_CryptoExtras" ||
-          importerName.str() == "CryptoBoringWrapper")) ||
-        ((targetName.str() == "CNIOBoringSSL" ||
-          targetName.str() == "CNIOBoringSSLShims") &&
-         importerName.str() == "NIOSSL"))) {
+      if (!topLevelModule.get()->isNonSwiftModule()) {
+        auto inFlight =
+          ctx.Diags.diagnose(import.importLoc,
+                             diag::implementation_only_deprecated);
+        inFlight.fixItReplace(import.implementationOnlyRange, "internal");
+      }
+    } else if ( // Non-resilient client
+        !shouldSuppressNonResilientImplementationOnlyImportDiagnostic(
+            targetName.str(), importerName.str())) {
       ctx.Diags.diagnose(import.importLoc,
                          diag::implementation_only_requires_library_evolution,
                          importerName);
@@ -841,7 +854,8 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
   }
 
   // Report public imports of non-resilient modules from a resilient module.
-  if (import.options.contains(ImportFlags::ImplementationOnly) ||
+  if (topLevelModule.get()->isNonSwiftModule() ||
+      import.options.contains(ImportFlags::ImplementationOnly) ||
       import.accessLevel < AccessLevel::Public)
     return;
 

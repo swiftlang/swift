@@ -208,16 +208,6 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToDeclPreProper(Decl *D) {
     Loc = PrecD->getLoc();
     if (Loc.isValid())
       NameLen = PrecD->getName().getLength();
-
-  } else if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
-    if (SEWalker.shouldWalkInactiveConfigRegion()) {
-      for (auto Clause : ICD->getClauses()) {
-        for (auto Member : Clause.Elements) {
-          Member.walk(*this);
-        }
-      }
-      return Action::SkipNode();
-    }
   } else if (auto *MD = dyn_cast<MacroExpansionDecl>(D)) {
     if (auto *macro =
             dyn_cast_or_null<MacroDecl>(MD->getMacroRef().getDecl())) {

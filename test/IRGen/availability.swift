@@ -1,7 +1,8 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s
 // RUN: %target-swift-frontend -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT
 
-// REQUIRES: objc_interop
+// On iOS stdlib_isOSVersionAtLeast() is @_transparent, which affects optimization.
+// REQUIRES: OS=macosx || OS=tvos || OS=watchos || OS=xros
 
 import Foundation
 

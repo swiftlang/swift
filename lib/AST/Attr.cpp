@@ -1778,7 +1778,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     } else if (auto array = attr->getArrayLikeTypeAndCount()) {
       Printer << "likeArrayOf: ";
       array->first->print(Printer, Options);
-      Printer << ", count: " << array->second;
+      Printer << ", count: ";
+      array->second->print(Printer, Options);
     } else {
       llvm_unreachable("unhandled @_rawLayout form");
     }
@@ -1807,6 +1808,20 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     if (!accesses.empty()) {
       Printer << "accesses: ";
       interleave(accesses, Printer, ", ");
+    }
+    Printer << ")";
+    break;
+  }
+
+  case DeclAttrKind::Lifetime: {
+    auto *attr = cast<LifetimeAttr>(this);
+    bool firstElem = true;
+    Printer << "@lifetime(";
+    for (auto entry : attr->getLifetimeEntries()) {
+      if (!firstElem) {
+        Printer << ", ";
+      }
+      Printer << entry.getParamString();
     }
     Printer << ")";
     break;
@@ -2010,6 +2025,8 @@ StringRef DeclAttribute::getAttrName() const {
     } else {
       return "_allowFeatureSuppression";
     }
+  case DeclAttrKind::Lifetime:
+    return "lifetime";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -2220,8 +2237,18 @@ Type TypeEraserAttr::getResolvedType(const ProtocolDecl *PD) const {
 Type RawLayoutAttr::getResolvedLikeType(StructDecl *sd) const {
   auto &ctx = sd->getASTContext();
   return evaluateOrDefault(ctx.evaluator,
-                           ResolveRawLayoutLikeTypeRequest{sd,
-                               const_cast<RawLayoutAttr *>(this)},
+                           ResolveRawLayoutTypeRequest{sd,
+                              const_cast<RawLayoutAttr *>(this),
+                              /*isLikeType*/ true},
+                           ErrorType::get(ctx));
+}
+
+Type RawLayoutAttr::getResolvedCountType(StructDecl *sd) const {
+  auto &ctx = sd->getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           ResolveRawLayoutTypeRequest{sd,
+                              const_cast<RawLayoutAttr *>(this),
+                              /*isLikeType*/ false},
                            ErrorType::get(ctx));
 }
 
@@ -3027,6 +3054,22 @@ AllowFeatureSuppressionAttr *AllowFeatureSuppressionAttr::create(
   auto *mem = ctx.Allocate(size, alignof(AllowFeatureSuppressionAttr));
   return new (mem)
       AllowFeatureSuppressionAttr(atLoc, range, implicit, inverted, features);
+}
+
+LifetimeAttr::LifetimeAttr(SourceLoc atLoc, SourceRange baseRange,
+                           bool implicit, ArrayRef<LifetimeEntry> entries)
+    : DeclAttribute(DeclAttrKind::Lifetime, atLoc, baseRange, implicit),
+      NumEntries(entries.size()) {
+  std::copy(entries.begin(), entries.end(),
+            getTrailingObjects<LifetimeEntry>());
+}
+
+LifetimeAttr *LifetimeAttr::create(ASTContext &context, SourceLoc atLoc,
+                                   SourceRange baseRange, bool implicit,
+                                   ArrayRef<LifetimeEntry> entries) {
+  unsigned size = totalSizeToAlloc<LifetimeEntry>(entries.size());
+  void *mem = context.Allocate(size, alignof(LifetimeEntry));
+  return new (mem) LifetimeAttr(atLoc, baseRange, implicit, entries);
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {

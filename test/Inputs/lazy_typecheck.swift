@@ -24,6 +24,13 @@ public func publicFuncWithDefaultArg(_ x: Int = 1) -> Int {
   return NoTypecheck.int
 }
 
+@inlinable public func publicInlinableFunc() -> Int {
+  lazy var x = inlinableFunc()
+  func nestedFunc() {}
+  defer { nestedFunc() }
+  return x
+}
+
 package func packageFunc() -> Int {
   return NoTypecheck.int
 }

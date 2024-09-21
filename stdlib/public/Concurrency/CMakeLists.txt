@@ -15,7 +15,10 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR}/Internal
 
 set(swift_concurrency_private_link_libraries)
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-  list(APPEND swift_concurrency_private_link_libraries Synchronization)
+  list(APPEND swift_concurrency_private_link_libraries
+    Synchronization
+    mincore.lib # For QueryInterruptTime()
+  )
 endif()
 
 set(swift_concurrency_incorporate_object_libraries_so swiftThreading)
@@ -159,6 +162,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
 
   SWIFT_MODULE_DEPENDS_ANDROID Android
   SWIFT_MODULE_DEPENDS_LINUX Glibc
+  SWIFT_MODULE_DEPENDS_LINUX_STATIC Musl
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
   SWIFT_MODULE_DEPENDS_OPENBSD Glibc
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc

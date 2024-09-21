@@ -977,10 +977,10 @@ public:
 
   void consumeDecl(ParserPosition BeginParserPosition, bool IsTopLevel);
 
-  ParserResult<Decl> parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
-                               bool IfConfigsAreDeclAttrs,
-                               llvm::function_ref<void(Decl *)> Handler,
-                               bool fromASTGen = false);
+  ParserStatus parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
+                         bool IfConfigsAreDeclAttrs,
+                         llvm::function_ref<void(Decl *)> Handler,
+                         bool fromASTGen = false);
 
   std::pair<std::vector<Decl *>, std::optional<Fingerprint>>
   parseDeclListDelayed(IterableDeclContext *IDC);
@@ -1018,12 +1018,12 @@ public:
 
   /// Parse a #if ... #endif directive.
   /// Delegate callback function to parse elements in the blocks.
-  ParserResult<IfConfigDecl> parseIfConfig(
+  ParserStatus parseIfConfig(
       IfConfigContext ifConfigContext,
-      llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements);
+      llvm::function_ref<void(bool)> parseElements);
 
   /// Parse an #if ... #endif containing only attributes.
-  ParserStatus parseIfConfigDeclAttributes(
+  ParserStatus parseIfConfigAttributes(
     DeclAttributes &attributes, bool ifConfigsAreDeclAttrs,
     PatternBindingInitializer *initContext);
 
@@ -1094,7 +1094,7 @@ public:
   /// \p Attr is where to store the parsed attribute
   bool parseSpecializeAttribute(
       swift::tok ClosingBrace, SourceLoc AtLoc, SourceLoc Loc,
-      SpecializeAttr *&Attr, AvailabilityContext *SILAvailability,
+      SpecializeAttr *&Attr, AvailabilityRange *SILAvailability,
       llvm::function_ref<bool(Parser &)> parseSILTargetName =
           [](Parser &) { return false; },
       llvm::function_ref<bool(Parser &)> parseSILSIPModule =
@@ -1106,7 +1106,7 @@ public:
       std::optional<bool> &Exported,
       std::optional<SpecializeAttr::SpecializationKind> &Kind,
       TrailingWhereClause *&TrailingWhereClause, DeclNameRef &targetFunction,
-      AvailabilityContext *SILAvailability,
+      AvailabilityRange *SILAvailability,
       SmallVectorImpl<Identifier> &spiGroups,
       SmallVectorImpl<AvailableAttr *> &availableAttrs,
       size_t &typeErasedParamsCount,
@@ -1177,6 +1177,10 @@ public:
   ParserResult<MacroRoleAttr> parseMacroRoleAttribute(
       MacroSyntax syntax, SourceLoc AtLoc, SourceLoc Loc
   );
+
+  /// Parse the @lifetime attribute.
+  ParserResult<LifetimeAttr> parseLifetimeAttribute(SourceLoc AtLoc,
+                                                    SourceLoc Loc);
 
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
@@ -1266,8 +1270,8 @@ public:
                                         ConventionTypeAttr *&result,
                                         bool justChecking);
 
-  ParserStatus parseLifetimeDependenceSpecifiers(
-      SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList);
+  ParserStatus
+  parseLifetimeEntries(SmallVectorImpl<LifetimeEntry> &specifierList);
 
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
@@ -1470,7 +1474,7 @@ public:
     SourceLoc ConstLoc;
     SourceLoc SendingLoc;
     SmallVector<TypeOrCustomAttr> Attributes;
-    SmallVector<LifetimeDependenceSpecifier> lifetimeDependenceSpecifiers;
+    SmallVector<LifetimeEntry> lifetimeEntries;
 
     ParsedTypeAttributeList(ParseTypeReason reason) : ParseReason(reason) {}
 
@@ -2104,12 +2108,15 @@ public:
 
   using PlatformAndVersion = std::pair<PlatformKind, llvm::VersionTuple>;
 
-  /// Parse a platform and version tuple (e.g. "macOS 12.0") and append it to the
-  /// given vector. Wildcards ('*') parse successfully but are ignored. Assumes
-  /// that the tuples are part of a comma separated list ending with a trailing
-  /// ')'.
-  ParserStatus parsePlatformVersionInList(StringRef AttrName,
-      llvm::SmallVector<PlatformAndVersion, 4> &PlatformAndVersions);
+  /// Parse a platform and version tuple (e.g. "macOS 12.0") and append it to
+  /// the given vector. Wildcards ('*') parse successfully but are ignored.
+  /// Unrecognized platform names also parse successfully but are ignored.
+  /// Assumes that the tuples are part of a comma separated list ending with a
+  /// trailing ')'.
+  ParserStatus parsePlatformVersionInList(
+      StringRef AttrName,
+      llvm::SmallVector<PlatformAndVersion, 4> & PlatformAndVersions,
+      bool &ParsedUnrecognizedPlatformName);
 
   //===--------------------------------------------------------------------===//
   // Code completion second pass.

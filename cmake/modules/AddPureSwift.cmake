@@ -120,6 +120,31 @@ function(_set_pure_swift_profile_flags target_name)
   endif()
 endfunction()
 
+function(_set_pure_swift_package_options target_name package_name)
+  if(NOT package_name OR NOT Swift_COMPILER_PACKAGE_CMO_SUPPORT)
+    return()
+  endif()
+
+  # Enable package CMO if possible.
+  # NOTE: '-enable-library-evolution' is required for package CMO even when we
+  # don't need '.swiftinterface'. E.g. executables.
+  if(Swift_COMPILER_PACKAGE_CMO_SUPPORT STREQUAL "IMPLEMENTED")
+    target_compile_options("${target_name}" PRIVATE
+      "-enable-library-evolution"
+      "SHELL:-package-name ${package_name}"
+      "SHELL:-Xfrontend -package-cmo"
+      "SHELL:-Xfrontend -allow-non-resilient-access"
+    )
+  elseif(Swift_COMPILER_PACKAGE_CMO_SUPPORT STREQUAL "EXPERIMENTAL")
+    target_compile_options("${target_name}" PRIVATE
+      "-enable-library-evolution"
+      "SHELL:-package-name ${package_name}"
+      "SHELL:-Xfrontend -experimental-package-cmo"
+      "SHELL:-Xfrontend -experimental-allow-non-resilient-access"
+      "SHELL:-Xfrontend -experimental-package-bypass-resilience"
+    )
+  endif()
+endfunction()
 
 # Add a new "pure" Swift host library.
 #
@@ -149,6 +174,9 @@ endfunction()
 # EMIT_MODULE
 #   Emit '.swiftmodule' to
 #
+# PACKAGE_NAME
+#   Name of the Swift package this library belongs to.
+#
 # DEPENDENCIES
 #   Target names to pass target_link_library
 #
@@ -169,7 +197,8 @@ function(add_pure_swift_host_library name)
         SHARED
         STATIC
         EMIT_MODULE)
-  set(single_parameter_options)
+  set(single_parameter_options
+        PACKAGE_NAME)
   set(multiple_parameter_options
         DEPENDENCIES
         SWIFT_DEPENDENCIES)
@@ -193,6 +222,7 @@ function(add_pure_swift_host_library name)
   # Create the library.
   add_library(${name} ${libkind} ${APSHL_SOURCES})
   _add_host_swift_compile_options(${name})
+  _set_pure_swift_package_options(${name} "${APSHL_PACKAGE_NAME}")
 
   set_property(TARGET ${name}
     PROPERTY BUILD_WITH_INSTALL_RPATH YES)
@@ -315,6 +345,9 @@ endfunction()
 # name
 #   Name of the tool (e.g., swift-frontend).
 #
+# PACKAGE_NAME
+#   Name of the Swift package this executable belongs to.
+#
 # DEPENDENCIES
 #   Target names to pass target_link_library
 #
@@ -333,7 +366,8 @@ function(add_pure_swift_host_tool name)
   # Option handling
   set(options)
   set(single_parameter_options
-    SWIFT_COMPONENT)
+    SWIFT_COMPONENT
+    PACKAGE_NAME)
   set(multiple_parameter_options
         DEPENDENCIES
         SWIFT_DEPENDENCIES)
@@ -349,6 +383,7 @@ function(add_pure_swift_host_tool name)
   add_executable(${name} ${APSHT_SOURCES})
   _add_host_swift_compile_options(${name})
   _set_pure_swift_link_flags(${name} "../lib/")
+  _set_pure_swift_package_options(${name} "${APSHT_PACKAGE_NAME}")
 
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
     set_property(TARGET ${name}

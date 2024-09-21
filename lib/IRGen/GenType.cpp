@@ -1547,7 +1547,7 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   // metadata update callback when realizing a Swift class referenced from
   // Objective-C.
   auto deploymentAvailability =
-    AvailabilityContext::forDeploymentTarget(IGM.Context);
+      AvailabilityRange::forDeploymentTarget(IGM.Context);
   bool supportsObjCMetadataUpdateCallback =
     deploymentAvailability.isContainedIn(
         IGM.Context.getObjCMetadataUpdateCallbackAvailability());
@@ -2368,6 +2368,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
                      " arbitrary type positions");
   case TypeKind::SILToken:
     llvm_unreachable("should not be asking for representation of a SILToken");
+  case TypeKind::Integer:
+    llvm_unreachable("implement me");
   }
   }
   llvm_unreachable("bad type kind");
@@ -2445,12 +2447,15 @@ namespace {
 
       auto rawLayout = decl->getAttrs().getAttribute<RawLayoutAttr>();
 
-      // If our struct has a raw layout, it may be dependent on the like type.
+      // If our struct has a raw layout, it may be dependent on the like type or
+      // count type.
       if (rawLayout) {
         if (auto likeType = rawLayout->getResolvedScalarLikeType(decl)) {
           return visit((*likeType)->getCanonicalType());
         } else if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(decl)) {
-          return visit(likeArray->first->getCanonicalType());
+          auto isLikeDependent = visit(likeArray->first->getCanonicalType());
+          auto isCountDependent = visit(likeArray->second->getCanonicalType());
+          return isLikeDependent || isCountDependent;
         }
       }
 

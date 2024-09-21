@@ -83,11 +83,22 @@ public struct Phi {
   // is only included here for compatibility with .sil tests that have
   // not been migrated.
   public init?(_ value: Value) {
-    guard let argument = value as? Argument else { return nil }
+    guard let argument = value as? Argument else {
+      return nil
+    }
     var preds = argument.parentBlock.predecessors
-    guard let pred = preds.next() else { return nil }
-    let term = pred.terminator
-    guard term is BranchInst || term is CondBranchInst else { return nil }
+    if let pred = preds.next() {
+      let term = pred.terminator
+      guard term is BranchInst || term is CondBranchInst else {
+        return nil
+      }
+    } else {
+      // No predecessors indicates an unreachable block (except for function arguments).
+      // Treat this like a degenerate phi so we don't consider it a terminator result.
+      if argument is FunctionArgument {
+        return nil
+      }
+    }
     self.value = argument
   }
 

@@ -9,8 +9,8 @@
 // rdar://100558042
 // UNSUPPORTED: CPU=arm64e
 
-// RUN: %target-build-swift -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -o %t/%target-library-name(TypesToReflect)
-// RUN: %target-build-swift -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift %S/Inputs/main.swift -emit-module -emit-executable -module-name TypeLowering -o %t/TypesToReflect
+// RUN: %target-build-swift -target %target-swift-abi-5.2-triple -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -o %t/%target-library-name(TypesToReflect)
+// RUN: %target-build-swift -target %target-swift-abi-5.2-triple -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift %S/Inputs/main.swift -emit-module -emit-executable -module-name TypeLowering -o %t/TypesToReflect
 
 // RUN: %target-swift-reflection-dump %t/%target-library-name(TypesToReflect) %platform-module-dir/%target-library-name(swiftCore) -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
 // RUN: %target-swift-reflection-dump %t/TypesToReflect %platform-module-dir/%target-library-name(swiftCore) -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize

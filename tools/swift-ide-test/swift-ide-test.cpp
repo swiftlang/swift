@@ -684,17 +684,15 @@ SynthesizeExtension("synthesize-extension",
                     llvm::cl::cat(Category),
                     llvm::cl::init(false));
 
-static llvm::cl::opt<bool>
-SkipPrivateStdlibDecls("skip-private-stdlib-decls",
+static llvm::cl::opt<bool> SkipPrivateSystemDecls(
+    "skip-private-system-decls",
     llvm::cl::desc("Don't print declarations that start with '_'"),
-    llvm::cl::cat(Category),
-    llvm::cl::init(false));
+    llvm::cl::cat(Category), llvm::cl::init(false));
 
-static llvm::cl::opt<bool>
-SkipUnderscoredStdlibProtocols("skip-underscored-stdlib-protocols",
+static llvm::cl::opt<bool> SkipUnderscoredSystemProtocols(
+    "skip-underscored-system-protocols",
     llvm::cl::desc("Don't print protocols that start with '_'"),
-    llvm::cl::cat(Category),
-    llvm::cl::init(false));
+    llvm::cl::cat(Category), llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 SkipUnsafeCXXMethods("skip-unsafe-cxx-methods",
@@ -1236,9 +1234,9 @@ static int printConformingMethodList(
           llvm::outs() << " []";
         llvm::outs() << "\n";
         for (auto VD : Result->Members) {
-          auto funcTy = cast<FuncDecl>(VD)->getMethodInterfaceType();
-          funcTy = Result->ExprType->getTypeOfMember(VD, funcTy);
-          auto resultTy = funcTy->castTo<FunctionType>()->getResult();
+          auto resultTy = cast<FuncDecl>(VD)->getResultInterfaceType();
+          resultTy = resultTy.subst(
+                Result->ExprType->getMemberSubstitutionMap(VD));
 
           llvm::outs() << "   - Name: ";
           VD->getName().print(llvm::outs());
@@ -1768,8 +1766,9 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
   importInfo.StdlibKind = ImplicitStdlibKind::Stdlib;
   auto *M = ModuleDecl::create(ctx.getIdentifier(Invocation.getModuleName()),
                                ctx, importInfo);
+  auto bufferID = ctx.SourceMgr.addMemBufferCopy("// nothing\n");
   auto *SF =
-      new (ctx) SourceFile(*M, SourceFileKind::Main, /*BufferID*/ std::nullopt);
+      new (ctx) SourceFile(*M, SourceFileKind::Main, bufferID);
   M->addFile(*SF);
   performImportResolution(*SF);
 
@@ -2625,7 +2624,7 @@ static int doPrintExpressionTypes(const CompilerInvocation &InitInvok,
   llvm::SmallString<256> TypeBuffer;
   llvm::raw_svector_ostream OS(TypeBuffer);
   SourceFile &SF = *CI.getPrimarySourceFile();
-  auto Source = SF.getASTContext().SourceMgr.getRangeForBuffer(*SF.getBufferID()).str();
+  auto Source = SF.getASTContext().SourceMgr.getRangeForBuffer(SF.getBufferID()).str();
   std::vector<std::pair<unsigned, std::string>> SortedTags;
 
   std::vector<const char*> Usrs;
@@ -2882,7 +2881,7 @@ struct GroupNamesPrinter {
 
   void addDecl(const Decl *D) {
     if (auto VD = dyn_cast<ValueDecl>(D)) {
-      if (!VD->isImplicit() && !VD->isPrivateStdlibDecl()) {
+      if (!VD->isImplicit() && !VD->isPrivateSystemDecl()) {
         StringRef Name = VD->getGroupName().has_value() ?
           VD->getGroupName().value() : "";
         Groups.insert(Name.empty() ? "<NULL>" : Name);
@@ -3104,10 +3103,12 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
 }
 
 static int doPrintHeaders(const CompilerInvocation &InitInvok,
+                          StringRef SourceFilename,
                           const std::vector<std::string> HeadersToPrint,
-                          const PrintOptions &Options,
-                          bool AnnotatePrint) {
+                          const PrintOptions &Options, bool AnnotatePrint) {
   CompilerInvocation Invocation(InitInvok);
+  Invocation.getFrontendOptions().InputsAndOutputs.addPrimaryInputFile(
+      SourceFilename);
 
   CompilerInstance CI;
   // Display diagnostics to stderr.
@@ -4008,9 +4009,8 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
       break;
   }
   assert(SF && "no source file?");
-  assert(SF->getBufferID().has_value() && "no buffer id?");
   SourceManager &SM = SF->getASTContext().SourceMgr;
-  unsigned bufferID = SF->getBufferID().value();
+  unsigned bufferID = SF->getBufferID();
   SourceLoc StartLoc = SM.getLocForLineCol(bufferID, StartLineCol.first,
                                            StartLineCol.second);
   SourceLoc EndLoc = SM.getLocForLineCol(bufferID, EndLineCol.first,
@@ -4114,7 +4114,6 @@ static int doPrintIndexedSymbols(const CompilerInvocation &InitInvok,
       break;
   }
   assert(SF && "no source file?");
-  assert(SF->getBufferID().has_value() && "no buffer id?");
 
   llvm::outs() << llvm::sys::path::filename(SF->getFilename()) << '\n';
   llvm::outs() << "------------\n";
@@ -4636,7 +4635,7 @@ int main(int argc, char *argv[]) {
     PrintOpts.PrintAccess = options::PrintAccess;
     PrintOpts.AccessFilter = options::AccessFilter;
     PrintOpts.PrintDocumentationComments = !options::SkipDocumentationComments;
-    PrintOpts.SkipPrivateStdlibDecls = options::SkipPrivateStdlibDecls;
+    PrintOpts.SkipPrivateSystemDecls = options::SkipPrivateSystemDecls;
     PrintOpts.SkipUnsafeCXXMethods = options::SkipUnsafeCXXMethods;
     PrintOpts.SkipUnavailable = options::SkipUnavailable;
     PrintOpts.SkipDeinit = options::SkipDeinit;
@@ -4650,8 +4649,8 @@ int main(int argc, char *argv[]) {
         = PrintOptions::ArgAndParamPrintingMode::BothAlways;
     }
   }
-  if (options::SkipUnderscoredStdlibProtocols)
-    PrintOpts.SkipUnderscoredStdlibProtocols = true;
+  if (options::SkipUnderscoredSystemProtocols)
+    PrintOpts.SkipUnderscoredSystemProtocols = true;
   if (options::PrintOriginalSourceText)
     PrintOpts.PrintOriginalSourceText = true;
 
@@ -4803,9 +4802,9 @@ int main(int argc, char *argv[]) {
     break;
   }
   case ActionType::PrintHeader: {
-    ExitCode = doPrintHeaders(
-        InitInvok, options::HeaderToPrint, PrintOpts,
-        options::AnnotatePrint);
+    ExitCode = doPrintHeaders(InitInvok, options::SourceFilename,
+                              options::HeaderToPrint, PrintOpts,
+                              options::AnnotatePrint);
     break;
   }
 

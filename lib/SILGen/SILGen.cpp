@@ -754,10 +754,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
 
   // If we have global actor isolation for our constant, put the isolation onto
   // the function.
-  if (auto isolation =
-          getActorIsolationOfContext(constant.getInnermostDeclContext())) {
-    F->setActorIsolation(isolation);
-  }
+  F->setActorIsolation(getActorIsolationOfContext(constant.getInnermostDeclContext()));
 
   assert(F && "SILFunction should have been defined");
 
@@ -806,6 +803,11 @@ bool SILGenModule::shouldSkipDecl(Decl *D) {
 
   if (!getASTContext().SILOpts.SkipNonExportableDecls)
     return false;
+
+  // Declarations nested in functions should be emitted whenever the function
+  // containing them should also be emitted.
+  if (auto funcContext = D->getDeclContext()->getOutermostFunctionContext())
+    return shouldSkipDecl(funcContext->getAsDecl());
 
   if (D->isExposedToClients())
     return false;
@@ -901,7 +903,7 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     preEmitFunction(constant, f, loc);
     PrettyStackTraceSILFunction X("silgen emitBackDeploymentThunk", f);
     f->setBare(IsBare);
-    f->setThunk(IsThunk);
+    f->setThunk(IsBackDeployedThunk);
 
     SILGenFunction(*this, *f, dc).emitBackDeploymentThunk(constant);
 
@@ -1243,12 +1245,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant, SILFunction *F,
     F->setGenericEnvironment(genericEnv, capturedEnvs, forwardingSubs);
   }
 
-  // If we have global actor isolation for our constant, put the isolation onto
-  // the function.
-  if (auto isolation =
-          getActorIsolationOfContext(constant.getInnermostDeclContext())) {
-    F->setActorIsolation(isolation);
-  }
+  F->setActorIsolation(getActorIsolationOfContext(constant.getInnermostDeclContext()));
 
   // Create a debug scope for the function using astNode as source location.
   F->setDebugScope(new (M) SILDebugScope(Loc, F));
@@ -2013,11 +2010,6 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
                                                /*property descriptor*/ true);
   
   (void)SILProperty::create(M, /*serializedKind*/ 0, decl, component);
-}
-
-void SILGenModule::visitIfConfigDecl(IfConfigDecl *ICD) {
-  // Nothing to do for these kinds of decls - anything active has been added
-  // to the enclosing declaration.
 }
 
 void SILGenModule::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {

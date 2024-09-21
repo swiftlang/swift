@@ -1,7 +1,9 @@
 // RUN: %target-run-simple-swiftgyb(-Xfrontend -enable-experimental-forward-mode-differentiation)
 // REQUIRES: executable_test
 
-#if canImport(Darwin)
+#if canImport(tgmath_h)
+  import tgmath_h
+#elseif canImport(Darwin)
   import Darwin.C.tgmath
 #elseif canImport(Glibc)
   import Glibc

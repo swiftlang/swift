@@ -722,8 +722,8 @@ public:
   /// Run the given function for each local archetype this instruction
   /// defines, passing the value that should be used to record the
   /// dependency.
-  void forEachDefinedLocalArchetype(
-      llvm::function_ref<void(CanLocalArchetypeType archetype,
+  void forEachDefinedLocalEnvironment(
+      llvm::function_ref<void(GenericEnvironment *genericEnv,
                               SILValue typeDependency)> function) const;
   bool definesLocalArchetypes() const;
 
@@ -8194,8 +8194,8 @@ class OpenPackElementInst final
 public:
   /// Call the given function for each element archetype that this
   /// instruction opens.
-  void forEachDefinedLocalArchetype(
-      llvm::function_ref<void(CanLocalArchetypeType, SILValue)> fn) const;
+  void forEachDefinedLocalEnvironment(
+      llvm::function_ref<void(GenericEnvironment *, SILValue)> fn) const;
 
   GenericEnvironment *getOpenedGenericEnvironment() const {
     return Env;
@@ -11537,6 +11537,40 @@ public:
          ValueOwnershipKind forwardingOwnershipKind);
   static bool classof(SILNodePointer node) {
     return node->getKind() == SILNodeKind::DestructureTupleInst;
+  }
+};
+
+/// Instruction that takes a value generic parameter type and produces a value
+/// of the underlying parameter type.
+///
+/// E.g. type_value $Int for let N produces an Int value from the let N type.
+class TypeValueInst final
+    : public NullaryInstructionWithTypeDependentOperandsBase<
+                                              SILInstructionKind::TypeValueInst,
+                                              TypeValueInst,
+                                              SingleValueInstruction> {
+  friend TrailingObjects;
+  friend SILBuilder;
+
+  CanType ParamType;
+
+  TypeValueInst(SILDebugLocation loc,
+                ArrayRef<SILValue> typeDependentOperands,
+                SILType valueType,
+                CanType paramType)
+    : NullaryInstructionWithTypeDependentOperandsBase(loc,
+                                                      typeDependentOperands,
+                                                      valueType),
+      ParamType(paramType) {}
+
+  static TypeValueInst *create(SILFunction &parent,
+                               SILDebugLocation loc,
+                               SILType valueType,
+                               CanType paramType);
+public:
+  /// Return the parameter type that defined this value.
+  CanType getParamType() const {
+    return ParamType;
   }
 };
 
