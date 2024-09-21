@@ -2864,7 +2864,7 @@ public:
   /// Convenience function for calling TypeLowering.emitDestroy on the type
   /// lowering for the non-address value.
   void emitDestroyValueOperation(SILLocation Loc, SILValue v) {
-    ASSERT(!v->getType().isAddress());
+    assert(!v->getType().isAddress());
     if (F->hasOwnership() && v->getOwnershipKind() == OwnershipKind::None)
       return;
     auto &lowering = getTypeLowering(v->getType());
