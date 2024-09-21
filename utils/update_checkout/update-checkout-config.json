@@ -165,7 +165,7 @@
                 "swift-experimental-string-processing": "swift/main",
                 "swift-sdk-generator": "main",
                 "wasi-libc": "wasi-sdk-22",
-                "wasmkit": "main",
+                "wasmkit": "0.0.8",
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1"
