@@ -150,11 +150,6 @@ swift_create_post_build_symlink(swift-frontend
 
 swift_create_post_build_symlink(swift-frontend
   SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
-  DESTINATION "swift-indent${CMAKE_EXECUTABLE_SUFFIX}"
-  WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
-
-swift_create_post_build_symlink(swift-frontend
-  SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
   DESTINATION "swift-symbolgraph-extract${CMAKE_EXECUTABLE_SUFFIX}"
   WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 
@@ -198,10 +193,7 @@ add_dependencies(autolink-driver swift-frontend)
 swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-autolink-extract${CMAKE_EXECUTABLE_SUFFIX}"
                            DESTINATION "bin"
                            COMPONENT autolink-driver)
-add_dependencies(editor-integration swift-frontend)
-swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-indent${CMAKE_EXECUTABLE_SUFFIX}"
-                           DESTINATION "bin"
-                           COMPONENT editor-integration)
+
 if(EXISTS "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-driver${CMAKE_EXECUTABLE_SUFFIX}" AND EXISTS "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-help${CMAKE_EXECUTABLE_SUFFIX}")
   swift_install_in_component(PROGRAMS "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-driver${CMAKE_EXECUTABLE_SUFFIX}"
                              DESTINATION "bin"
