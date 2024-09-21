@@ -2760,32 +2760,20 @@ for host in "${ALL_HOSTS[@]}"; do
                 echo "--- Running LLDB unit tests ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
-                echo "--- Running LLDB tests (Swift Config: Precise/ClangImporter) ---"
+                echo "--- Running LLDB tests (Swift Config: ClangImporter) ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
                 with_pushd ${results_dir} \
                     call "${llvm_build_dir}/bin/llvm-lit" \
                          "${lldb_build_dir}/test" \
                          ${LLVM_LIT_ARGS} ${LLVM_LIT_FILTER_ARG} \
-                         --param dotest-args="--setting symbols.use-swift-clangimporter=true --setting symbols.swift-precise-compiler-invocation=true"
-                echo "--- Rerun LLDB Swift API tests (Swift Config: Precise/DWARFImporter) ---"
+                         --param dotest-args="--setting symbols.use-swift-clangimporter=true"
+                echo "--- Rerun LLDB Swift API tests (Swift Config: DWARFImporter) ---"
                 with_pushd ${results_dir} \
                     call "${llvm_build_dir}/bin/llvm-lit" \
                          "${lldb_build_dir}/test" \
                          ${LLVM_LIT_ARGS} ${FILTER_SWIFT_API_OPTION} \
-                         --param dotest-args="--setting symbols.use-swift-clangimporter=false --setting symbols.swift-precise-compiler-invocation=true"
-                echo "--- Rerun LLDB Swift API tests (Swift Config: Classic/ClangImporter) ---"
-                with_pushd ${results_dir} \
-                    call "${llvm_build_dir}/bin/llvm-lit" \
-                         "${lldb_build_dir}/test" \
-                         ${LLVM_LIT_ARGS} ${FILTER_SWIFT_API_OPTION} \
-                         --param dotest-args="--setting symbols.use-swift-clangimporter=true --setting symbols.swift-precise-compiler-invocation=false"
-                echo "--- Rerun LLDB Swift API tests (Swift Config: Classic/DWARFImporter) ---"
-                with_pushd ${results_dir} \
-                    call "${llvm_build_dir}/bin/llvm-lit" \
-                         "${lldb_build_dir}/test" \
-                         ${LLVM_LIT_ARGS} ${FILTER_SWIFT_API_OPTION} \
-                         --param dotest-args="--setting symbols.use-swift-clangimporter=false --setting symbols.swift-precise-compiler-invocation=false"
+                         --param dotest-args="--setting symbols.use-swift-clangimporter=false"
 
                 if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
                     echo "Running LLDB swift compatibility tests against" \
