@@ -88,20 +88,6 @@ public struct Impl: P {
         }
         return (1, 2, 3, 4, 5)
     }
-
-    public func nonMatching_f0(_ b: Bool) throws(OneWord) -> (Float, Float) {
-        guard b else {
-            throw OneWord()
-        }
-        return (1.0, 2.0)
-    }
-
-    public func nonMatching_f1(_ b: Bool) throws(OneWord) -> (Float, Bool, Float) {
-        guard b else {
-            throw OneWord()
-        }
-        return (1.0, true, 2.0)
-    }
 }
 
 @available(SwiftStdlib 6.0, *)
@@ -189,20 +175,6 @@ public struct ImplAsync: PAsync {
         }
         return (1, 2, 3, 4, 5)
     }
-
-    public func nonMatching_f0(_ b: Bool) async throws(OneWord) -> (Float, Float) {
-        guard b else {
-            throw OneWord()
-        }
-        return (1.0, 2.0)
-    }
-
-    public func nonMatching_f1(_ b: Bool) async throws(OneWord) -> (Float, Bool, Float) {
-        guard b else {
-            throw OneWord()
-        }
-        return (1.0, true, 2.0)
-    }
 }
 
 public protocol P {
@@ -219,9 +191,6 @@ public protocol P {
     func g3(_ b: Bool) throws(OneWord) -> (Int, Int, Int)
     func g4(_ b: Bool) throws(OneWord) -> (Int, Int, Int, Int)
     func g5(_ b: Bool) throws(OneWord) -> (Int, Int, Int, Int, Int)
-
-    func nonMatching_f0(_ b: Bool) throws(OneWord) -> (Float, Float)
-    func nonMatching_f1(_ b: Bool) throws(OneWord) -> (Float, Bool, Float)
 }
 
 @available(SwiftStdlib 6.0, *)
@@ -239,7 +208,4 @@ public protocol PAsync {
     func g3(_ b: Bool) async throws(OneWord) -> (Int, Int, Int)
     func g4(_ b: Bool) async throws(OneWord) -> (Int, Int, Int, Int)
     func g5(_ b: Bool) async throws(OneWord) -> (Int, Int, Int, Int, Int)
-
-    func nonMatching_f0(_ b: Bool) async throws(OneWord) -> (Float, Float)
-    func nonMatching_f1(_ b: Bool) async throws(OneWord) -> (Float, Bool, Float)
 }
