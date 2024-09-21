@@ -1178,6 +1178,264 @@ func callImplAsync_f5(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int
     }
 }
 
+
+// CHECK: define hidden swifttailcc void @"$s16typed_throws_abi16callImplAsync_g0ySiAA0eF0V_SbtYaF"(ptr swiftasync %0, i1 %1)
+// CHECK:   %swifterror = alloca swifterror ptr, align 8
+// CHECK:   [[CALL:%.*]] = call token @llvm.coro.id.async(i32 16, i32 16, i32 0, ptr @"$s16typed_throws_abi16callImplAsync_g0ySiAA0eF0V_SbtYaFTu")
+// CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token [[CALL]], ptr null)
+// CHECK:   store ptr null, ptr %swifterror, align 8
+// CHECK:   [[CORO_RESUME:%.*]] = call ptr @llvm.coro.async.resume()
+// CHECK:   [[CALL_RES:%.*]] = call { ptr, i64, ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0i64p0s(i32 {{[0-9]+}}, ptr [[CORO_RESUME]], ptr @__swift_async_resume_project_context, ptr @"{{.*}}", ptr @"{{.*}}", ptr {{%.*}}, i1 %1)
+// CHECK:   [[CALL_RES0:%.*]] = extractvalue { ptr, i64, ptr } [[CALL_RES]], 1
+// CHECK:   [[ERROR_FLAG:%.*]] = extractvalue { ptr, i64, ptr } [[CALL_RES]], 2
+// CHECK:   store ptr [[ERROR_FLAG]], ptr %swifterror, align 8
+// CHECK:   [[ERROR:%.*]] = load ptr, ptr %swifterror, align 8
+// CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
+// CHECK:   br i1 [[ISERROR]], label %typed.error.load, label %[[SUCCESS:.*]]
+// CHECK: typed.error.load:
+// CHECK:   br label %[[SET_ERROR:.*]]
+// CHECK: [[SUCCESS]]:
+// CHECK:   br label %[[COMMON_RET:.*]]
+// CHECK: [[COMMON_RET]]:
+// CHECK:   [[RETVAL:%.*]] = phi i64 [ [[ERROR_RES:%.*]], %[[SET_ERROR]] ], [ 1, %[[SUCCESS]] ]
+// CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 [[RETVAL]])
+// CHECK:   unreachable
+// CHECK: [[SET_ERROR]]:
+// CHECK:   [[ERROR_RES]] = phi i64 [ [[CALL_RES0]], %typed.error.load ]
+// CHECK:   store ptr null, ptr %swifterror, align 8
+// CHECK:   br label %[[COMMON_RET]]
+// CHECK: }
+@available(SwiftStdlib 6.0, *)
+func callImplAsync_g0(_ impl: ImplAsync, _ b: Bool) async -> Int {
+    do {
+        try await impl.g0(b)
+        return 1
+    } catch {
+        return error.x
+    }
+}
+
+// CHECK: define hidden swifttailcc void @"$s16typed_throws_abi16callImplAsync_g1ySiAA0eF0V_SbtYaF"(ptr swiftasync %0, i1 %1)
+// CHECK:   %swifterror = alloca swifterror ptr, align 8
+// CHECK:   [[CALL:%.*]] = call token @llvm.coro.id.async(i32 16, i32 16, i32 0, ptr @"$s16typed_throws_abi16callImplAsync_g1ySiAA0eF0V_SbtYaFTu")
+// CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token [[CALL]], ptr null)
+// CHECK:   store ptr null, ptr %swifterror, align 8
+// CHECK:   [[CORO_RESUME:%.*]] = call ptr @llvm.coro.async.resume()
+// CHECK:   [[CALL_RES:%.*]] = call { ptr, i64, ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0i64p0s(i32 {{[0-9]+}}, ptr [[CORO_RESUME]], ptr @__swift_async_resume_project_context, ptr @"{{.*}}", ptr @"{{.*}}", ptr {{%.*}}, i1 %1)
+// CHECK:   [[CALL_RES0:%.*]] = extractvalue { ptr, i64, ptr } [[CALL_RES]], 1
+// CHECK:   [[ERROR_FLAG:%.*]] = extractvalue { ptr, i64, ptr } [[CALL_RES]], 2
+// CHECK:   store ptr [[ERROR_FLAG]], ptr %swifterror, align 8
+// CHECK:   [[ERROR:%.*]] = load ptr, ptr %swifterror, align 8
+// CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
+// CHECK:   br i1 [[ISERROR]], label %typed.error.load, label %[[SUCCESS:.*]]
+// CHECK: typed.error.load:
+// CHECK:   br label %[[SET_ERROR:.*]]
+// CHECK: [[SUCCESS]]:
+// CHECK:   [[SUCCESS_RES0:%.*]] = phi i64 [ [[CALL_RES0]], %entry ]
+// CHECK:   br label %[[COMMON_RET:.*]]
+// CHECK: [[COMMON_RET]]:
+// CHECK:   [[RETVAL:%.*]] = phi i64 [ [[ERROR_RES:%.*]], %[[SET_ERROR]] ], [ [[SUCCESS_RES0]], %[[SUCCESS]] ]
+// CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 [[RETVAL]])
+// CHECK:   unreachable
+// CHECK: [[SET_ERROR]]:
+// CHECK:   [[ERROR_RES]] = phi i64 [ [[CALL_RES0]], %typed.error.load ]
+// CHECK:   store ptr null, ptr %swifterror, align 8
+// CHECK:   br label %[[COMMON_RET]]
+// CHECK: }
+@available(SwiftStdlib 6.0, *)
+func callImplAsync_g1(_ impl: ImplAsync, _ b: Bool) async -> Int {
+    do {
+        return try await impl.g1(b)
+    } catch {
+        return error.x
+    }
+}
+
+// CHECK: define hidden swifttailcc void @"$s16typed_throws_abi16callImplAsync_g2ySi_SitAA0eF0V_SbtYaF"(ptr swiftasync %0, i1 %1)
+// CHECK:   %swifterror = alloca swifterror ptr, align 8
+// CHECK:   [[CALL:%.*]] = call token @llvm.coro.id.async(i32 16, i32 16, i32 0, ptr @"$s16typed_throws_abi16callImplAsync_g2ySi_SitAA0eF0V_SbtYaFTu")
+// CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token [[CALL]], ptr null)
+// CHECK:   store ptr null, ptr %swifterror, align 8
+// CHECK:   [[CORO_RESUME:%.*]] = call ptr @llvm.coro.async.resume()
+// CHECK:   [[CALL_RES:%.*]] = call { ptr, i64, i64, ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0i64i64p0s(i32 {{[0-9]+}}, ptr [[CORO_RESUME]], ptr @__swift_async_resume_project_context, ptr @"{{.*}}", ptr @"{{.*}}", ptr {{%.*}}, i1 %1)
+// CHECK:   [[CALL_RES0:%.*]] = extractvalue { i64, i64 } {{%.*}}, 0
+// CHECK:   [[CALL_RES1:%.*]] = extractvalue { i64, i64 } {{%.*}}, 1
+// CHECK:   [[ERROR_FLAG:%.*]] = extractvalue { ptr, i64, i64, ptr } [[CALL_RES]], 3
+// CHECK:   store ptr [[ERROR_FLAG]], ptr %swifterror, align 8
+// CHECK:   [[ERROR:%.*]] = load ptr, ptr %swifterror, align 8
+// CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
+// CHECK:   br i1 [[ISERROR]], label %typed.error.load, label %[[SUCCESS:.*]]
+// CHECK: typed.error.load:
+// CHECK:   br label %[[SET_ERROR:.*]]
+// CHECK: [[SUCCESS]]:
+// CHECK:   [[SUCCESS_RES0:%.*]] = phi i64 [ [[CALL_RES0]], %entry ]
+// CHECK:   [[SUCCESS_RES1:%.*]] = phi i64 [ [[CALL_RES1]], %entry ]
+// CHECK:   br label %[[COMMON_RET:.*]]
+// CHECK: [[COMMON_RET]]:
+// CHECK:   [[RETVAL0:%.*]] = phi i64 [ [[ERROR_RES:%.*]], %[[SET_ERROR]] ], [ [[SUCCESS_RES0]], %[[SUCCESS]] ]
+// CHECK:   [[RETVAL1:%.*]] = phi i64 [ 0, %[[SET_ERROR]] ], [ [[SUCCESS_RES1]], %[[SUCCESS]] ]
+// CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 [[RETVAL0]], i64 [[RETVAL1]])
+// CHECK:   unreachable
+// CHECK: [[SET_ERROR]]:
+// CHECK:   [[ERROR_RES]] = phi i64 [ [[CALL_RES0]], %typed.error.load ]
+// CHECK:   store ptr null, ptr %swifterror, align 8
+// CHECK:   br label %[[COMMON_RET]]
+// CHECK: }
+@available(SwiftStdlib 6.0, *)
+func callImplAsync_g2(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int) {
+    do {
+        return try await impl.g2(b)
+    } catch {
+        return (error.x, 0)
+    }
+}
+
+// CHECK: define hidden swifttailcc void @"$s16typed_throws_abi16callImplAsync_g3ySi_S2itAA0eF0V_SbtYaF"(ptr swiftasync %0, i1 %1)
+// CHECK:   %swifterror = alloca swifterror ptr, align 8
+// CHECK:   [[CALL:%.*]] = call token @llvm.coro.id.async(i32 16, i32 16, i32 0, ptr @"$s16typed_throws_abi16callImplAsync_g3ySi_S2itAA0eF0V_SbtYaFTu")
+// CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token [[CALL]], ptr null)
+// CHECK:   store ptr null, ptr %swifterror, align 8
+// CHECK:   [[CORO_RESUME:%.*]] = call ptr @llvm.coro.async.resume()
+// CHECK:   [[CALL_RES:%.*]] = call { ptr, i64, i64, i64, ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0i64i64i64p0s(i32 {{[0-9]+}}, ptr [[CORO_RESUME]], ptr @__swift_async_resume_project_context, ptr @"{{.*}}", ptr @"{{.*}}", ptr {{%.*}}, i1 %1)
+// CHECK:   [[CALL_RES0:%.*]] = extractvalue { i64, i64, i64 } {{%.*}}, 0
+// CHECK:   [[CALL_RES1:%.*]] = extractvalue { i64, i64, i64 } {{%.*}}, 1
+// CHECK:   [[CALL_RES2:%.*]] = extractvalue { i64, i64, i64 } {{%.*}}, 2
+// CHECK:   [[ERROR_FLAG:%.*]] = extractvalue { ptr, i64, i64, i64, ptr } [[CALL_RES]], 4
+// CHECK:   store ptr [[ERROR_FLAG]], ptr %swifterror, align 8
+// CHECK:   [[ERROR:%.*]] = load ptr, ptr %swifterror, align 8
+// CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
+// CHECK:   br i1 [[ISERROR]], label %typed.error.load, label %[[SUCCESS:.*]]
+// CHECK: typed.error.load:
+// CHECK:   br label %[[SET_ERROR:.*]]
+// CHECK: [[SUCCESS]]:
+// CHECK:   [[SUCCESS_RES0:%.*]] = phi i64 [ [[CALL_RES0]], %entry ]
+// CHECK:   [[SUCCESS_RES1:%.*]] = phi i64 [ [[CALL_RES1]], %entry ]
+// CHECK:   [[SUCCESS_RES2:%.*]] = phi i64 [ [[CALL_RES2]], %entry ]
+// CHECK:   br label %[[COMMON_RET:.*]]
+// CHECK: [[COMMON_RET]]:
+// CHECK:   [[RETVAL0:%.*]] = phi i64 [ [[ERROR_RES:%.*]], %[[SET_ERROR]] ], [ [[SUCCESS_RES0]], %[[SUCCESS]] ]
+// CHECK:   [[RETVAL1:%.*]] = phi i64 [ 0, %[[SET_ERROR]] ], [ [[SUCCESS_RES1]], %[[SUCCESS]] ]
+// CHECK:   [[RETVAL2:%.*]] = phi i64 [ 0, %[[SET_ERROR]] ], [ [[SUCCESS_RES2]], %[[SUCCESS]] ]
+// CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 [[RETVAL0]], i64 [[RETVAL1]], i64 [[RETVAL2]])
+// CHECK:   unreachable
+// CHECK: [[SET_ERROR]]:
+// CHECK:   [[ERROR_RES]] = phi i64 [ [[CALL_RES0]], %typed.error.load ]
+// CHECK:   store ptr null, ptr %swifterror, align 8
+// CHECK:   br label %[[COMMON_RET]]
+// CHECK: }
+@available(SwiftStdlib 6.0, *)
+func callImplAsync_g3(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int) {
+    do {
+        return try await impl.g3(b)
+    } catch {
+        return (error.x, 0, 0)
+    }
+}
+
+// CHECK: define hidden swifttailcc void @"$s16typed_throws_abi16callImplAsync_g4ySi_S3itAA0eF0V_SbtYaF"(ptr swiftasync %0, i1 %1)
+// CHECK:   %swifterror = alloca swifterror ptr, align 8
+// CHECK:   [[CALL:%.*]] = call token @llvm.coro.id.async(i32 16, i32 16, i32 0, ptr @"$s16typed_throws_abi16callImplAsync_g4ySi_S3itAA0eF0V_SbtYaFTu")
+// CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token [[CALL]], ptr null)
+// CHECK:   store ptr null, ptr %swifterror, align 8
+// CHECK:   [[CORO_RESUME:%.*]] = call ptr @llvm.coro.async.resume()
+// CHECK:   [[CALL_RES:%.*]] = call { ptr, i64, i64, i64, i64, ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0i64i64i64i64p0s(i32 {{[0-9]+}}, ptr [[CORO_RESUME]], ptr @__swift_async_resume_project_context, ptr @"{{.*}}", ptr @"{{.*}}", ptr {{%.*}}, i1 %1)
+// CHECK:   [[CALL_RES0:%.*]] = extractvalue { i64, i64, i64, i64 } {{%.*}}, 0
+// CHECK:   [[CALL_RES1:%.*]] = extractvalue { i64, i64, i64, i64 } {{%.*}}, 1
+// CHECK:   [[CALL_RES2:%.*]] = extractvalue { i64, i64, i64, i64 } {{%.*}}, 2
+// CHECK:   [[CALL_RES3:%.*]] = extractvalue { i64, i64, i64, i64 } {{%.*}}, 3
+// CHECK:   [[ERROR_FLAG:%.*]] = extractvalue { ptr, i64, i64, i64, i64, ptr } [[CALL_RES]], 5
+// CHECK:   store ptr [[ERROR_FLAG]], ptr %swifterror, align 8
+// CHECK:   [[ERROR:%.*]] = load ptr, ptr %swifterror, align 8
+// CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
+// CHECK:   br i1 [[ISERROR]], label %typed.error.load, label %[[SUCCESS:.*]]
+// CHECK: typed.error.load:
+// CHECK:   br label %[[SET_ERROR:.*]]
+// CHECK: [[SUCCESS]]:
+// CHECK:   [[SUCCESS_RES0:%.*]] = phi i64 [ [[CALL_RES0]], %entry ]
+// CHECK:   [[SUCCESS_RES1:%.*]] = phi i64 [ [[CALL_RES1]], %entry ]
+// CHECK:   [[SUCCESS_RES2:%.*]] = phi i64 [ [[CALL_RES2]], %entry ]
+// CHECK:   [[SUCCESS_RES3:%.*]] = phi i64 [ [[CALL_RES3]], %entry ]
+// CHECK:   br label %[[COMMON_RET:.*]]
+// CHECK: [[COMMON_RET]]:
+// CHECK:   [[RETVAL0:%.*]] = phi i64 [ [[ERROR_RES:%.*]], %[[SET_ERROR]] ], [ [[SUCCESS_RES0]], %[[SUCCESS]] ]
+// CHECK:   [[RETVAL1:%.*]] = phi i64 [ 0, %[[SET_ERROR]] ], [ [[SUCCESS_RES1]], %[[SUCCESS]] ]
+// CHECK:   [[RETVAL2:%.*]] = phi i64 [ 0, %[[SET_ERROR]] ], [ [[SUCCESS_RES2]], %[[SUCCESS]] ]
+// CHECK:   [[RETVAL3:%.*]] = phi i64 [ 0, %[[SET_ERROR]] ], [ [[SUCCESS_RES3]], %[[SUCCESS]] ]
+// CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 [[RETVAL0]], i64 [[RETVAL1]], i64 [[RETVAL2]], i64 [[RETVAL3]])
+// CHECK:   unreachable
+// CHECK: [[SET_ERROR]]:
+// CHECK:   [[ERROR_RES]] = phi i64 [ [[CALL_RES0]], %typed.error.load ]
+// CHECK:   store ptr null, ptr %swifterror, align 8
+// CHECK:   br label %[[COMMON_RET]]
+// CHECK: }
+@available(SwiftStdlib 6.0, *)
+func callImplAsync_g4(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int) {
+    do {
+        return try await impl.g4(b)
+    } catch {
+        return (error.x, 0, 0, 0)
+    }
+}
+
+
+// CHECK: define hidden swifttailcc void @"$s16typed_throws_abi16callImplAsync_g5ySi_S4itAA0eF0V_SbtYaF"(ptr noalias nocapture %0, ptr swiftasync %1, i1 %2)
+// CHECK:   %swifterror = alloca %T16typed_throws_abi7OneWordV, align 8
+// CHECK:   %call.aggresult = alloca <{ %TSi, %TSi, %TSi, %TSi, %TSi }>, align 8
+// CHECK:   %swifterror1 = alloca swifterror ptr, align 8
+// CHECK:   [[CALL:%.*]] = call token @llvm.coro.id.async(i32 16, i32 16, i32 1, ptr @"$s16typed_throws_abi16callImplAsync_g5ySi_S4itAA0eF0V_SbtYaFTu")
+// CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token [[CALL]], ptr null)
+// CHECK:   store ptr null, ptr %swifterror1, align 8
+// CHECK:   [[CORO_RESUME:%.*]] = call ptr @llvm.coro.async.resume()
+// CHECK:   [[CALL_RES:%.*]] = call { ptr, ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0p0s(i32 {{[0-9]+}}, ptr [[CORO_RESUME]], ptr @__swift_async_resume_project_context, ptr @"{{.*}}", ptr %call.aggresult, ptr {{%.*}}, i1 %2, ptr %swifterror)
+// CHECK:   [[ERROR_FLAG:%.*]] = extractvalue { ptr, ptr } [[CALL_RES]], 1
+// CHECK:   store ptr [[ERROR_FLAG]], ptr %swifterror1, align 8
+// CHECK:   [[CALL_RES0:%.*]] = load i64, ptr %call.aggresult.elt{{.*}}, align 8
+// CHECK:   [[CALL_RES1:%.*]] = load i64, ptr %call.aggresult.elt{{.*}}, align 8
+// CHECK:   [[CALL_RES2:%.*]] = load i64, ptr %call.aggresult.elt{{.*}}, align 8
+// CHECK:   [[CALL_RES3:%.*]] = load i64, ptr %call.aggresult.elt{{.*}}, align 8
+// CHECK:   [[CALL_RES4:%.*]] = load i64, ptr %call.aggresult.elt{{.*}}, align 8
+// CHECK:   [[ERROR:%.*]] = load ptr, ptr %swifterror1, align 8
+// CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
+// CHECK:   br i1 [[ISERROR]], label %typed.error.load, label %[[SUCCESS:.*]]
+// CHECK: typed.error.load:
+// CHECK:   %swifterror.x = getelementptr inbounds %T16typed_throws_abi7OneWordV, ptr %swifterror, i32 0, i32 0
+// CHECK:   %swifterror.x._value = getelementptr inbounds %TSi, ptr %swifterror.x, i32 0, i32 0
+// CHECK:   [[ERROR_X:%.*]] = load i64, ptr %swifterror.x._value, align 8
+// CHECK:   br label %[[SET_ERROR:.*]]
+// CHECK: [[SUCCESS]]:
+// CHECK:   [[SUCCESS_RES0:%.*]] = phi i64 [ [[CALL_RES0]], %entry ]
+// CHECK:   [[SUCCESS_RES1:%.*]] = phi i64 [ [[CALL_RES1]], %entry ]
+// CHECK:   [[SUCCESS_RES2:%.*]] = phi i64 [ [[CALL_RES2]], %entry ]
+// CHECK:   [[SUCCESS_RES3:%.*]] = phi i64 [ [[CALL_RES3]], %entry ]
+// CHECK:   [[SUCCESS_RES4:%.*]] = phi i64 [ [[CALL_RES4]], %entry ]
+// CHECK:   br label %[[COMMON_RET:.*]]
+// CHECK: [[COMMON_RET]]:
+// CHECK:   [[RETVAL0:%.*]] = phi i64 [ [[ERROR_RES0:%.*]], %[[SET_ERROR]] ], [ [[SUCCESS_RES0]], %[[SUCCESS]] ]
+// CHECK:   [[RETVAL1:%.*]] = phi i64 [ 0, %[[SET_ERROR]] ], [ [[SUCCESS_RES1]], %[[SUCCESS]] ]
+// CHECK:   [[RETVAL2:%.*]] = phi i64 [ 0, %[[SET_ERROR]] ], [ [[SUCCESS_RES2]], %[[SUCCESS]] ]
+// CHECK:   [[RETVAL3:%.*]] = phi i64 [ 0, %[[SET_ERROR]] ], [ [[SUCCESS_RES3]], %[[SUCCESS]] ]
+// CHECK:   [[RETVAL4:%.*]] = phi i64 [ 0, %[[SET_ERROR]] ], [ [[SUCCESS_RES4]], %[[SUCCESS]] ]
+// CHECK:   store i64 [[RETVAL0]], ptr %.elt{{.*}}, align 8
+// CHECK:   store i64 [[RETVAL1]], ptr %.elt{{.*}}, align 8
+// CHECK:   store i64 [[RETVAL2]], ptr %.elt{{.*}}, align 8
+// CHECK:   store i64 [[RETVAL3]], ptr %.elt{{.*}}, align 8
+// CHECK:   store i64 [[RETVAL4]], ptr %.elt{{.*}}, align 8
+// CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}})
+// CHECK:   unreachable
+// CHECK: [[SET_ERROR]]:
+// CHECK    [[ERROR_RES0]] = phi i64 [ [[ERROR_X]], %typed.error.load ]
+// CHECK:   store ptr null, ptr %swifterror1, align 8
+// CHECK:   br label %[[COMMON_RET]]
+// CHECK: }
+@available(SwiftStdlib 6.0, *)
+func callImplAsync_g5(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int, Int) {
+    do {
+        return try await impl.g5(b)
+    } catch {
+        return (error.x, 0, 0, 0, 0)
+    }
+}
+
 protocol P {
     // CHECK: define hidden swiftcc void @"$s16typed_throws_abi1PP2f0yySbAA5EmptyVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias nocapture swifterror dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
