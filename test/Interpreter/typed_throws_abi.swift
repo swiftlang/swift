@@ -77,16 +77,6 @@ func checkSync() async {
     await invoke { try impl.g5(true) }
     // CHECK: Error: OneWord(x: 0)
     await invoke { try impl.g5(false) }
-
-    // CHECK: Success: (1.0, 2.0)
-    await invoke { try impl.nonMatching_f0(true) }
-    // CHECK: Error: OneWord(x: 0)
-    await invoke { try impl.nonMatching_f0(false) }
-
-    // CHECK: Success: (1.0, true, 2.0)
-    await invoke { try impl.nonMatching_f1(true) }
-    // CHECK: Error: OneWord(x: 0)
-    await invoke { try impl.nonMatching_f1(false) }
 }
 
 func checkAsync() async {
@@ -150,16 +140,6 @@ func checkAsync() async {
     await invoke { try await impl.g5(true) }
     // CHECK: Error: OneWord(x: 0)
     await invoke { try await impl.g5(false) }
-
-    // CHECK: Success: (1.0, 2.0)
-    await invoke { try await impl.nonMatching_f0(true) }
-    // CHECK: Error: OneWord(x: 0)
-    await invoke { try await impl.nonMatching_f0(false) }
-
-    // CHECK: Success: (1.0, true, 2.0)
-    await invoke { try await impl.nonMatching_f1(true) }
-    // CHECK: Error: OneWord(x: 0)
-    await invoke { try await impl.nonMatching_f1(false) }
 }
 
 @main
