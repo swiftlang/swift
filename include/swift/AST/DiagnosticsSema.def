@@ -7958,9 +7958,15 @@ ERROR(lifetime_dependence_immortal_conflict_name, none,
 ERROR(lifetime_dependence_function_type, none,
       "lifetime dependencies on function types are not supported",
       ())
-
 ERROR(lifetime_dependence_immortal_alone, none,
       "cannot specify any other dependence source along with immortal", ())
+ERROR(lifetime_dependence_invalid_inherit_escapable_type, none,
+      "invalid lifetime dependence on a source of Escapable type, use borrow "
+      "dependence instead",
+      ())
+ERROR(lifetime_dependence_cannot_use_parsed_borrow_consuming, none,
+      "invalid use of borrow dependence with consuming ownership",
+      ())
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Sending
