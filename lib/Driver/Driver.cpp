@@ -108,7 +108,6 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
           .Case("swift-dependency-tool", DriverKind::SwiftDependencyTool)
           .Case("swift-llvm-opt", DriverKind::SwiftLLVMOpt)
           .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
-          .Case("swift-indent", DriverKind::SwiftIndent)
           .Case("swift-symbolgraph-extract", DriverKind::SymbolGraph)
           .Case("swift-api-digester", DriverKind::APIDigester)
           .Case("swift-cache-tool", DriverKind::CacheTool)
@@ -3108,7 +3107,6 @@ void Driver::printHelp(bool ShowHidden) const {
   case DriverKind::SwiftDependencyTool:
   case DriverKind::SwiftLLVMOpt:
   case DriverKind::AutolinkExtract:
-  case DriverKind::SwiftIndent:
   case DriverKind::SymbolGraph:
   case DriverKind::APIDigester:
   case DriverKind::CacheTool:
