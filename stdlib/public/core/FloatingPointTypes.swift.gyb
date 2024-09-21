@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -134,10 +134,14 @@ ${Availability(bits)}
 @_unavailableInEmbedded
 extension ${Self}: TextOutputStreamable {
   public func write<Target>(to target: inout Target) where Target: TextOutputStream {
-    var (buffer, length) = _float${bits}ToString(self, debug: true)
-    buffer.withBytes { (bufferPtr) in
-      let bufPtr = UnsafeBufferPointer(start: bufferPtr, count: length)
-      target._writeASCII(bufPtr)
+    if isNaN {
+      target.write("nan")
+    } else {
+      var (buffer, length) = _float${bits}ToString(self, debug: false)
+      buffer.withBytes { (bufferPtr) in
+        let bufPtr = UnsafeBufferPointer(start: bufferPtr, count: length)
+        target._writeASCII(bufPtr)
+      }
     }
   }
 }

@@ -434,9 +434,27 @@ fileprivate func expectNaN<T>(_ expected: String, _ object: T,
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
-) where T: FloatingPoint & CustomDebugStringConvertible & CustomStringConvertible {
+) where T: FloatingPoint & CustomDebugStringConvertible &
+  LosslessStringConvertible & TextOutputStreamable
+{
   // Regular description always returns "nan"
   expectEqual("nan", object.description,
+    message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  expectEqual("nan", String(object),
+    message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+
+  // TextOutputStreamable always writes "nan"
+  var textOutputStream = ""
+  print(object, terminator: "", to: &textOutputStream)
+  expectEqual("nan", textOutputStream,
+    message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  expectEqual("nan", "\(object)",
+    message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  expectEqual("nan", String(describing: object),
     message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 
