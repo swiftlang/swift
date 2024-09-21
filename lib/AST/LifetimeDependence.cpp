@@ -230,6 +230,7 @@ getLifetimeDependenceKind(LifetimeEntry specifier, AbstractFunctionDecl *afd,
           loc, diag::lifetime_dependence_cannot_use_inferred_scoped_consuming);
       return std::nullopt;
     }
+    return lifetimeKind;
   }
 
   // For dependsOn type modifier, we check if we had a "scoped" modifier, if not
