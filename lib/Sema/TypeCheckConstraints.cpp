@@ -204,6 +204,10 @@ bool TypeVariableType::Implementation::isCollectionLiteralType() const {
                      locator->directlyAt<DictionaryExpr>());
 }
 
+bool TypeVariableType::Implementation::isNumberLiteralType() const {
+  return locator && locator->directlyAt<NumberLiteralExpr>();
+}
+
 bool TypeVariableType::Implementation::isFunctionResult() const {
   return locator && locator->isLastElement<LocatorPathElt::FunctionResult>();
 }
