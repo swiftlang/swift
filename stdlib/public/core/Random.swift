@@ -51,7 +51,7 @@ import SwiftShims
 ///
 /// Types that conform to `RandomNumberGenerator` should specifically document
 /// the thread safety and quality of the generator.
-public protocol RandomNumberGenerator {
+public protocol RandomNumberGenerator: ~Copyable {
   /// Returns a value from a uniform, independent distribution of binary data.
   ///
   /// Use this method when you need random binary data to generate another
@@ -63,7 +63,7 @@ public protocol RandomNumberGenerator {
   mutating func next() -> UInt64
 }
 
-extension RandomNumberGenerator {
+extension RandomNumberGenerator where Self: ~Copyable {
   
   // An unavailable default implementation of next() prevents types that do
   // not implement the RandomNumberGenerator interface from conforming to the
@@ -83,7 +83,7 @@ extension RandomNumberGenerator {
   ///
   /// - Returns: A random value of `T`. Bits are randomly distributed so that
   ///   every value of `T` is equally likely to be returned.
-  @inlinable
+  @_alwaysEmitIntoClient
   public mutating func next<T: FixedWidthInteger & UnsignedInteger>() -> T {
     return T._random(using: &self)
   }
@@ -99,7 +99,7 @@ extension RandomNumberGenerator {
   ///   Must be non-zero.
   /// - Returns: A random value of `T` in the range `0..<upperBound`. Every
   ///   value in the range `0..<upperBound` is equally likely to be returned.
-  @inlinable
+  @_alwaysEmitIntoClient
   public mutating func next<T: FixedWidthInteger & UnsignedInteger>(
     upperBound: T
   ) -> T {
@@ -117,6 +117,24 @@ extension RandomNumberGenerator {
       }
     }
     return m.high
+  }
+}
+
+extension RandomNumberGenerator {
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$sSGsE4nextqd__ys17FixedWidthIntegerRd__SURd__lF")
+  @usableFromInline
+  internal mutating func __abi_next<T: FixedWidthInteger & UnsignedInteger>() -> T {
+    return T._random(using: &self)
+  }
+  
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$sSGsE4next10upperBoundqd__qd___ts17FixedWidthIntegerRd__SURd__lF")
+  @usableFromInline
+  internal mutating func __abi_next<T: FixedWidthInteger & UnsignedInteger>(
+    upperBound: T
+  ) -> T {
+    next()
   }
 }
 

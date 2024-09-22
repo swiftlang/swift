@@ -44,8 +44,8 @@ extension BinaryFloatingPoint where Self.RawSignificand: FixedWidthInteger {
   ///   - generator: The random number generator to use when creating the
   ///     new random value.
   /// - Returns: A random value within the bounds of `range`.
-  @inlinable
-  public static func random<T: RandomNumberGenerator>(
+  @_alwaysEmitIntoClient
+  public static func random<T: RandomNumberGenerator & ~Copyable>(
     in range: Range<Self>,
     using generator: inout T
   ) -> Self {
@@ -80,6 +80,16 @@ extension BinaryFloatingPoint where Self.RawSignificand: FixedWidthInteger {
       return Self.random(in: range, using: &generator)
     }
     return randFloat
+  }
+  
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$sSBss17FixedWidthInteger14RawSignificandRpzrlE6random2in5usingxSnyxG_qd__ztSGRd__lFZ")
+  @usableFromInline
+  internal static func __abi_random<T: RandomNumberGenerator>(
+    in range: Range<Self>,
+    using generator: inout T
+  ) -> Self {
+    random(in: range, using: &generator)
   }
 
   /// Returns a random value within the specified range.
@@ -144,8 +154,8 @@ extension BinaryFloatingPoint where Self.RawSignificand: FixedWidthInteger {
   ///   - generator: The random number generator to use when creating the
   ///     new random value.
   /// - Returns: A random value within the bounds of `range`.
-  @inlinable
-  public static func random<T: RandomNumberGenerator>(
+  @_alwaysEmitIntoClient
+  public static func random<T: RandomNumberGenerator & ~Copyable>(
     in range: ClosedRange<Self>,
     using generator: inout T
   ) -> Self {
@@ -181,6 +191,16 @@ extension BinaryFloatingPoint where Self.RawSignificand: FixedWidthInteger {
     let unitRandom = Self.init(rand) * (Self.ulpOfOne / 2)
     let randFloat = delta * unitRandom + range.lowerBound
     return randFloat
+  }
+  
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$sSBss17FixedWidthInteger14RawSignificandRpzrlE6random2in5usingxSNyxG_qd__ztSGRd__lFZ")
+  @usableFromInline
+  internal static func __abi_random<T: RandomNumberGenerator>(
+    in range: ClosedRange<Self>,
+    using generator: inout T
+  ) -> Self {
+    random(in: range, using: &generator)
   }
   
   /// Returns a random value within the specified range.

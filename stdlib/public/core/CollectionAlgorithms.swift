@@ -546,13 +546,22 @@ extension Sequence {
   ///   same shuffled order each time you run your program, that sequence may
   ///   change when your program is compiled using a different version of
   ///   Swift.
-  @inlinable
-  public func shuffled<T: RandomNumberGenerator>(
+  @_alwaysEmitIntoClient
+  public func shuffled<T: RandomNumberGenerator & ~Copyable>(
     using generator: inout T
   ) -> [Element] {
     var result = ContiguousArray(self)
     result.shuffle(using: &generator)
     return Array(result)
+  }
+  
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$sSTsE8shuffled5usingSay7ElementQzGqd__z_tSGRd__lF")
+  @usableFromInline
+  internal func __abi_shuffled<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) -> [Element] {
+    shuffled(using: &generator)
   }
   
   /// Returns the elements of the sequence, shuffled.
@@ -598,8 +607,8 @@ extension MutableCollection where Self: RandomAccessCollection {
   ///   same shuffled order each time you run your program, that sequence may
   ///   change when your program is compiled using a different version of
   ///   Swift.
-  @inlinable
-  public mutating func shuffle<T: RandomNumberGenerator>(
+  @_alwaysEmitIntoClient
+  public mutating func shuffle<T: RandomNumberGenerator & ~Copyable>(
     using generator: inout T
   ) {
     guard count > 1 else { return }
@@ -614,6 +623,15 @@ extension MutableCollection where Self: RandomAccessCollection {
       )
       formIndex(after: &currentIndex)
     }
+  }
+  
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$sSMsSkRzrlE7shuffle5usingyqd__z_tSGRd__lF")
+  @usableFromInline
+  internal mutating func __abi_shuffle<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) {
+    shuffle(using: &generator)
   }
   
   /// Shuffles the collection in place.

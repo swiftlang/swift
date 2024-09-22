@@ -565,8 +565,8 @@ extension SIMD where Scalar: FixedWidthInteger {
   
   /// Returns a vector with random values from within the specified range in
   /// all lanes, using the given generator as a source for randomness.
-  @inlinable
-  public static func random<T: RandomNumberGenerator>(
+  @_alwaysEmitIntoClient
+  public static func random<T: RandomNumberGenerator & ~Copyable>(
     in range: Range<Scalar>,
     using generator: inout T
   ) -> Self {
@@ -575,6 +575,16 @@ extension SIMD where Scalar: FixedWidthInteger {
       result[i] = Scalar.random(in: range, using: &generator)
     }
     return result
+  }
+  
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss4SIMDPss17FixedWidthInteger6ScalarRpzrlE6random2in5usingxSnyAEG_qd__ztSGRd__lFZ")
+  @usableFromInline
+  internal static func __abi_random<T: RandomNumberGenerator>(
+    in range: Range<Scalar>,
+    using generator: inout T
+  ) -> Self {
+    random(in: range, using: &generator)
   }
   
   /// Returns a vector with random values from within the specified range in
@@ -587,8 +597,8 @@ extension SIMD where Scalar: FixedWidthInteger {
 
   /// Returns a vector with random values from within the specified range in
   /// all lanes, using the given generator as a source for randomness.
-  @inlinable
-  public static func random<T: RandomNumberGenerator>(
+  @_alwaysEmitIntoClient
+  public static func random<T: RandomNumberGenerator & ~Copyable>(
     in range: ClosedRange<Scalar>,
     using generator: inout T
   ) -> Self {
@@ -597,6 +607,16 @@ extension SIMD where Scalar: FixedWidthInteger {
       result[i] = Scalar.random(in: range, using: &generator)
     }
     return result
+  }
+  
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss4SIMDPss17FixedWidthInteger6ScalarRpzrlE6random2in5usingxSNyAEG_qd__ztSGRd__lFZ")
+  @usableFromInline
+  internal static func __abi_random<T: RandomNumberGenerator>(
+    in range: ClosedRange<Scalar>,
+    using generator: inout T
+  ) -> Self {
+    random(in: range, using: &generator)
   }
   
   /// Returns a vector with random values from within the specified range in
@@ -637,8 +657,8 @@ extension SIMD
 where Scalar: BinaryFloatingPoint, Scalar.RawSignificand: FixedWidthInteger {
   /// Returns a vector with random values from within the specified range in
   /// all lanes, using the given generator as a source for randomness.
-  @inlinable
-  public static func random<T: RandomNumberGenerator>(
+  @_alwaysEmitIntoClient
+  public static func random<T: RandomNumberGenerator & ~Copyable>(
     in range: Range<Scalar>,
     using generator: inout T
   ) -> Self {
@@ -647,6 +667,16 @@ where Scalar: BinaryFloatingPoint, Scalar.RawSignificand: FixedWidthInteger {
       result[i] = Scalar.random(in: range, using: &generator)
     }
     return result
+  }
+  
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss4SIMDPsSB6ScalarRpzs17FixedWidthIntegerAC_14RawSignificandSBRPzrlE6random2in5usingxSnyADG_qd__ztSGRd__lFZ")
+  @usableFromInline
+  internal static func __abi_random<T: RandomNumberGenerator>(
+    in range: Range<Scalar>,
+    using generator: inout T
+  ) -> Self {
+    random(in: range, using: &generator)
   }
   
   /// Returns a vector with random values from within the specified range in
@@ -659,8 +689,8 @@ where Scalar: BinaryFloatingPoint, Scalar.RawSignificand: FixedWidthInteger {
   
   /// Returns a vector with random values from within the specified range in
   /// all lanes, using the given generator as a source for randomness.
-  @inlinable
-  public static func random<T: RandomNumberGenerator>(
+  @_alwaysEmitIntoClient
+  public static func random<T: RandomNumberGenerator & ~Copyable>(
     in range: ClosedRange<Scalar>,
     using generator: inout T
   ) -> Self {
@@ -669,6 +699,16 @@ where Scalar: BinaryFloatingPoint, Scalar.RawSignificand: FixedWidthInteger {
       result[i] = Scalar.random(in: range, using: &generator)
     }
     return result
+  }
+  
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss4SIMDPsSB6ScalarRpzs17FixedWidthIntegerAC_14RawSignificandSBRPzrlE6random2in5usingxSNyADG_qd__ztSGRd__lFZ")
+  @usableFromInline
+  internal static func __abi_random<T: RandomNumberGenerator>(
+    in range: ClosedRange<Scalar>,
+    using generator: inout T
+  ) -> Self {
+    random(in: range, using: &generator)
   }
   
   /// Returns a vector with random values from within the specified range in
@@ -725,12 +765,24 @@ extension SIMDMask: Sendable where Storage: Sendable {}
 extension SIMDMask {
   /// Returns a vector mask with `true` or `false` randomly assigned in each
   /// lane, using the given generator as a source for randomness.
-  @inlinable
-  public static func random<T: RandomNumberGenerator>(using generator: inout T) -> SIMDMask {
+  @_alwaysEmitIntoClient
+  public static func random<T: RandomNumberGenerator & ~Copyable>(
+    using generator: inout T
+  ) -> SIMDMask {
     var result = SIMDMask()
     for i in result.indices { result[i] = Bool.random(using: &generator) }
     return result
   }
+  
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss8SIMDMaskV6random5usingAByxGqd__z_tSGRd__lFZ")
+  @usableFromInline
+  internal static func __abi_random<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) -> SIMDMask {
+    random(using: &generator)
+  }
+  
   
   /// Returns a vector mask with `true` or `false` randomly assigned in each
   /// lane.

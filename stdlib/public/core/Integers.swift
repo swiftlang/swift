@@ -2461,8 +2461,8 @@ extension FixedWidthInteger {
   ///   - generator: The random number generator to use when creating the
   ///     new random value.
   /// - Returns: A random value within the bounds of `range`.
-  @inlinable
-  public static func random<T: RandomNumberGenerator>(
+  @_alwaysEmitIntoClient
+  public static func random<T: RandomNumberGenerator & ~Copyable>(
     in range: Range<Self>,
     using generator: inout T
   ) -> Self {
@@ -2485,6 +2485,16 @@ extension FixedWidthInteger {
       Magnitude(truncatingIfNeeded: range.lowerBound) &+
       generator.next(upperBound: delta)
     )
+  }
+  
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss17FixedWidthIntegerPsE6random2in5usingxSnyxG_qd__ztSGRd__lFZ")
+  @usableFromInline
+  internal static func __abi_random<T: RandomNumberGenerator>(
+    in range: Range<Self>,
+    using generator: inout T
+  ) -> Self {
+    random(in: range, using: &generator)
   }
   
   /// Returns a random value within the specified range.
@@ -2530,8 +2540,8 @@ extension FixedWidthInteger {
   ///   - generator: The random number generator to use when creating the
   ///     new random value.
   /// - Returns: A random value within the bounds of `range`.
-  @inlinable
-  public static func random<T: RandomNumberGenerator>(
+  @_alwaysEmitIntoClient
+  public static func random<T: RandomNumberGenerator & ~Copyable>(
     in range: ClosedRange<Self>,
     using generator: inout T
   ) -> Self {
@@ -2559,6 +2569,17 @@ extension FixedWidthInteger {
       generator.next(upperBound: delta)
     )
   }
+  
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss17FixedWidthIntegerPsE6random2in5usingxSNyxG_qd__ztSGRd__lFZ")
+  @usableFromInline
+  internal static func __abi_random<T: RandomNumberGenerator>(
+    in range: ClosedRange<Self>,
+    using generator: inout T
+  ) -> Self {
+    random(in: range, using: &generator)
+  }
+    
   
   /// Returns a random value within the specified range.
   ///
@@ -2955,8 +2976,8 @@ extension FixedWidthInteger {
 }
 
 extension FixedWidthInteger {
-  @inlinable
-  public static func _random<R: RandomNumberGenerator>(
+  @_alwaysEmitIntoClient
+  public static func _random<R: RandomNumberGenerator & ~Copyable>(
     using generator: inout R
   ) -> Self {
     if bitWidth <= UInt64.bitWidth {
@@ -2972,6 +2993,15 @@ extension FixedWidthInteger {
       tmp += Self(truncatingIfNeeded: next) &<< (UInt64.bitWidth * i)
     }
     return tmp
+  }
+  
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss17FixedWidthIntegerPsE7_random5usingxqd__z_tSGRd__lFZ")
+  @usableFromInline
+  internal static func __abi_random<R: RandomNumberGenerator>(
+    using generator: inout R
+  ) -> Self {
+    _random(using: &generator)
   }
 }
 
