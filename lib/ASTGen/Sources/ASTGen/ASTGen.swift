@@ -315,13 +315,13 @@ extension ASTGenVisitor {
   }
 
   @inline(__always)
-  func generate(inheritedTypeList node: InheritedTypeListSyntax?) -> BridgedErasedArrayRef {
-    node.map(generate(inheritedTypeList:)) ?? .init()
+  func generate(inheritedTypeList node: InheritedTypeListSyntax?) -> (some Collection<BridgedTypeRepr>)? {
+    node.map(generate(inheritedTypeList:))
   }
 
   @inline(__always)
-  func generate(precedenceGroupNameList node: PrecedenceGroupNameListSyntax?) -> BridgedErasedArrayRef {
-    node.map(generate(precedenceGroupNameList:)) ?? .init()
+  func generate(precedenceGroupNameList node: PrecedenceGroupNameListSyntax?) -> (some Collection<BridgedLocatedIdentifier>)? {
+    node.map(generate(precedenceGroupNameList:))
   }
 }
 
@@ -397,6 +397,22 @@ extension Optional where Wrapped: LazyCollectionProtocol {
     }
 
     return self.bridgedArray(in: astgen)
+  }
+}
+
+extension BridgedArrayRefProtocol {
+  init<C: Collection>(
+    _ collection: C?, in astgen: ASTGenVisitor
+  ) where C.Element == Element {
+    guard let collection = collection, !collection.isEmpty else {
+      self.init(data: nil, count: 0)
+      return
+    }
+
+    let buffer = astgen.allocator.allocate(Element.self, count: collection.count)
+    _ = buffer.initialize(from: collection)
+
+    self.init(data: buffer.baseAddress, count: collection.count)
   }
 }
 

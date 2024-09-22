@@ -70,10 +70,10 @@ BridgedDeclBaseName_createIdentifier(BridgedIdentifier identifier) {
 BridgedDeclNameRef
 BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
                                 BridgedDeclBaseName cBaseName,
-                                BridgedErasedArrayRef cLabels) {
+                                BridgedArrayRef<BridgedIdentifier> cLabels) {
   ASTContext &context = cContext.unbridged();
   SmallVector<Identifier, 4> labels;
-  for (auto &cLabel : cLabels.unbridged<BridgedIdentifier>()) {
+  for (auto &cLabel : cLabels) {
     labels.push_back(cLabel.unbridged());
   }
   return DeclNameRef(DeclName(context, cBaseName.unbridged(), labels));
@@ -86,12 +86,12 @@ BridgedDeclNameRef_createParsed(BridgedDeclBaseName cBaseName) {
 
 BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cBaseNameLoc,
-    BridgedSourceLoc cLParenLoc, BridgedErasedArrayRef cLabelLocs,
+    BridgedSourceLoc cLParenLoc, BridgedArrayRef<BridgedSourceLoc> cLabelLocs,
     BridgedSourceLoc cRParenLoc) {
 
   ASTContext &context = cContext.unbridged();
   SmallVector<SourceLoc, 4> labelLocs;
-  for (auto &cLabelLoc : cLabelLocs.unbridged<BridgedSourceLoc>())
+  for (auto &cLabelLoc : cLabelLocs)
     labelLocs.push_back(cLabelLoc.unbridged());
 
   return DeclNameLoc(context, cBaseNameLoc.unbridged(), cLParenLoc.unbridged(),
@@ -339,12 +339,13 @@ BridgedDiagnosticFixIt::BridgedDiagnosticFixIt(BridgedSourceLoc start,
           CharSourceRange(start.unbridged(), length), text.unbridged(),
           llvm::ArrayRef<DiagnosticArgument>())) {}
 
-void BridgedDiagnosticEngine_diagnose(
-    BridgedDiagnosticEngine bridgedEngine, BridgedSourceLoc loc,
-    BridgedDiagID bridgedDiagID,
-    BridgedErasedArrayRef /*BridgedDiagnosticArgument*/ bridgedArguments,
-    BridgedSourceLoc highlightStart, uint32_t hightlightLength,
-    BridgedErasedArrayRef /*BridgedDiagnosticFixIt*/ bridgedFixIts) {
+void BridgedDiagnosticEngine_diagnose(BridgedDiagnosticEngine bridgedEngine,
+                                      BridgedSourceLoc loc,
+                                      BridgedDiagID bridgedDiagID,
+                                      BridgedErasedArrayRef bridgedArguments,
+                                      BridgedSourceLoc highlightStart,
+                                      uint32_t hightlightLength,
+                                      BridgedErasedArrayRef bridgedFixIts) {
   auto *D = bridgedEngine.unbridged();
 
   auto diagID = static_cast<DiagID>(bridgedDiagID);
@@ -565,9 +566,10 @@ BridgedAlignmentAttr_createParsed(BridgedASTContext cContext,
 BridgedAllowFeatureSuppressionAttr
 BridgedAllowFeatureSuppressionAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, bool inverted, BridgedErasedArrayRef cFeatures) {
+    BridgedSourceRange cRange, bool inverted,
+    BridgedArrayRef<BridgedIdentifier> cFeatures) {
   SmallVector<Identifier> features;
-  for (auto elem : cFeatures.unbridged<BridgedIdentifier>())
+  for (auto elem : cFeatures)
     features.push_back(elem.unbridged());
   return AllowFeatureSuppressionAttr::create(
       cContext.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
@@ -777,13 +779,13 @@ BridgedObjCAttr BridgedObjCAttr_createParsedNullary(
 BridgedObjCAttr BridgedObjCAttr_createParsedSelector(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceLoc cAttrNameLoc, BridgedSourceLoc cLParenLoc,
-    BridgedErasedArrayRef cNameLocs, BridgedErasedArrayRef cNames,
-    BridgedSourceLoc cRParenLoc) {
+    BridgedArrayRef<BridgedSourceLoc> cNameLocs,
+    BridgedArrayRef<BridgedIdentifier> cNames, BridgedSourceLoc cRParenLoc) {
   SmallVector<SourceLoc> nameLocs;
-  for (auto elem : cNameLocs.unbridged<BridgedSourceLoc>())
+  for (auto elem : cNameLocs)
     nameLocs.push_back(elem.unbridged());
   SmallVector<Identifier> names;
-  for (auto elem : cNames.unbridged<BridgedIdentifier>())
+  for (auto elem : cNames)
     names.push_back(elem.unbridged());
 
   return ObjCAttr::createSelector(
@@ -936,15 +938,16 @@ BridgedAccessorDecl BridgedAccessorDecl_createParsed(
 
 BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cBindingKeywordLoc, BridgedErasedArrayRef cBindingEntries,
-    bool isStatic, bool isLet) {
+    BridgedSourceLoc cBindingKeywordLoc,
+    BridgedArrayRef<BridgedPatternBindingEntry> cBindingEntries, bool isStatic,
+    bool isLet) {
   ASTContext &context = cContext.unbridged();
   DeclContext *declContext = cDeclContext.unbridged();
 
   auto introducer = isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var;
 
   SmallVector<PatternBindingEntry, 4> entries;
-  for (auto &entry : cBindingEntries.unbridged<BridgedPatternBindingEntry>()) {
+  for (auto &entry : cBindingEntries) {
     auto *pattern = entry.pattern.unbridged();
 
     // Configure all vars.
@@ -1125,11 +1128,12 @@ BridgedTypeAliasDecl BridgedTypeAliasDecl_createParsed(
 }
 
 static void setParsedMembers(IterableDeclContext *IDC,
-                             BridgedErasedArrayRef bridgedMembers) {
+                             BridgedArrayRef<BridgedDecl> bridgedMembers) {
   auto &ctx = IDC->getDecl()->getASTContext();
 
   SmallVector<Decl *> members;
-  for (auto *decl : bridgedMembers.unbridged<Decl *>()) {
+  for (auto cDecl : bridgedMembers) {
+    auto *decl = cDecl.unbridged();
     members.push_back(decl);
 
     // Add any variables bound to the list of decls.
@@ -1155,20 +1159,22 @@ static void setParsedMembers(IterableDeclContext *IDC,
 }
 
 void BridgedNominalTypeDecl_setParsedMembers(
-    BridgedNominalTypeDecl bridgedDecl, BridgedErasedArrayRef bridgedMembers) {
+    BridgedNominalTypeDecl bridgedDecl,
+    BridgedArrayRef<BridgedDecl> bridgedMembers) {
   setParsedMembers(bridgedDecl.unbridged(), bridgedMembers);
 }
 
 void BridgedExtensionDecl_setParsedMembers(
-    BridgedExtensionDecl bridgedDecl, BridgedErasedArrayRef bridgedMembers) {
+    BridgedExtensionDecl bridgedDecl,
+    BridgedArrayRef<BridgedDecl> bridgedMembers) {
   setParsedMembers(bridgedDecl.unbridged(), bridgedMembers);
 }
 
 static ArrayRef<InheritedEntry>
 convertToInheritedEntries(ASTContext &ctx,
-                          BridgedErasedArrayRef cInheritedTypes) {
+                          BridgedArrayRef<BridgedTypeRepr> cInheritedTypes) {
   return ctx.AllocateTransform<InheritedEntry>(
-      cInheritedTypes.unbridged<BridgedTypeRepr>(),
+      cInheritedTypes.unbridged(),
       [](auto &e) { return InheritedEntry(e.unbridged()); });
 }
 
@@ -1176,7 +1182,7 @@ BridgedNominalTypeDecl BridgedEnumDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cEnumKeywordLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList genericParamList,
-    BridgedErasedArrayRef cInheritedTypes,
+    BridgedArrayRef<BridgedTypeRepr> cInheritedTypes,
     BridgedNullableTrailingWhereClause genericWhereClause,
     BridgedSourceRange cBraceRange) {
   ASTContext &context = cContext.unbridged();
@@ -1191,12 +1197,14 @@ BridgedNominalTypeDecl BridgedEnumDecl_createParsed(
   return decl;
 }
 
-BridgedEnumCaseDecl
-BridgedEnumCaseDecl_createParsed(BridgedDeclContext cDeclContext,
-                                 BridgedSourceLoc cCaseKeywordLoc,
-                                 BridgedErasedArrayRef cElements) {
-  return EnumCaseDecl::create(cCaseKeywordLoc.unbridged(),
-                              cElements.unbridged<EnumElementDecl *>(),
+BridgedEnumCaseDecl BridgedEnumCaseDecl_createParsed(
+    BridgedDeclContext cDeclContext, BridgedSourceLoc cCaseKeywordLoc,
+    BridgedArrayRef<BridgedEnumElementDecl> cElements) {
+  SmallVector<EnumElementDecl *> elements;
+  for (auto elt : cElements)
+    elements.push_back(elt.unbridged());
+
+  return EnumCaseDecl::create(cCaseKeywordLoc.unbridged(), elements,
                               cDeclContext.unbridged());
 }
 
@@ -1228,7 +1236,7 @@ BridgedNominalTypeDecl BridgedStructDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cStructKeywordLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList genericParamList,
-    BridgedErasedArrayRef cInheritedTypes,
+    BridgedArrayRef<BridgedTypeRepr> cInheritedTypes,
     BridgedNullableTrailingWhereClause genericWhereClause,
     BridgedSourceRange cBraceRange) {
   ASTContext &context = cContext.unbridged();
@@ -1247,7 +1255,7 @@ BridgedNominalTypeDecl BridgedClassDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cClassKeywordLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList genericParamList,
-    BridgedErasedArrayRef cInheritedTypes,
+    BridgedArrayRef<BridgedTypeRepr> cInheritedTypes,
     BridgedNullableTrailingWhereClause genericWhereClause,
     BridgedSourceRange cBraceRange, bool isActor) {
   ASTContext &context = cContext.unbridged();
@@ -1266,15 +1274,15 @@ BridgedNominalTypeDecl BridgedProtocolDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cProtocolKeywordLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc,
-    BridgedErasedArrayRef cPrimaryAssociatedTypeNames,
-    BridgedErasedArrayRef cInheritedTypes,
+    BridgedArrayRef<BridgedLocatedIdentifier> cPrimaryAssociatedTypeNames,
+    BridgedArrayRef<BridgedTypeRepr> cInheritedTypes,
     BridgedNullableTrailingWhereClause genericWhereClause,
     BridgedSourceRange cBraceRange) {
   ASTContext &context = cContext.unbridged();
 
   auto primaryAssociatedTypeNames =
       context.AllocateTransform<PrimaryAssociatedTypeName>(
-          cPrimaryAssociatedTypeNames.unbridged<BridgedLocatedIdentifier>(),
+          cPrimaryAssociatedTypeNames.unbridged(),
           [](auto &e) -> PrimaryAssociatedTypeName {
             return {e.Name.unbridged(), e.NameLoc.unbridged()};
           });
@@ -1292,7 +1300,7 @@ BridgedNominalTypeDecl BridgedProtocolDecl_createParsed(
 BridgedAssociatedTypeDecl BridgedAssociatedTypeDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cAssociatedtypeKeywordLoc, BridgedIdentifier cName,
-    BridgedSourceLoc cNameLoc, BridgedErasedArrayRef cInheritedTypes,
+    BridgedSourceLoc cNameLoc, BridgedArrayRef<BridgedTypeRepr> cInheritedTypes,
     BridgedNullableTypeRepr defaultType,
     BridgedNullableTrailingWhereClause genericWhereClause) {
   ASTContext &context = cContext.unbridged();
@@ -1309,7 +1317,7 @@ BridgedAssociatedTypeDecl BridgedAssociatedTypeDecl_createParsed(
 BridgedExtensionDecl BridgedExtensionDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cExtensionKeywordLoc, BridgedTypeRepr extendedType,
-    BridgedErasedArrayRef cInheritedTypes,
+    BridgedArrayRef<BridgedTypeRepr> cInheritedTypes,
     BridgedNullableTrailingWhereClause genericWhereClause,
     BridgedSourceRange cBraceRange) {
   ASTContext &context = cContext.unbridged();
@@ -1369,18 +1377,19 @@ BridgedPrecedenceGroupDecl BridgedPrecedenceGroupDecl_createParsed(
     BridgedAssociativity cAssociativity, BridgedSourceLoc cAssignmentKeywordLoc,
     BridgedSourceLoc cAssignmentValueLoc, bool isAssignment,
     BridgedSourceLoc cHigherThanKeywordLoc,
-    BridgedErasedArrayRef cHigherThanNames,
+    BridgedArrayRef<BridgedLocatedIdentifier> cHigherThanNames,
     BridgedSourceLoc cLowerThanKeywordLoc,
-    BridgedErasedArrayRef cLowerThanNames, BridgedSourceLoc cRightBraceLoc) {
+    BridgedArrayRef<BridgedLocatedIdentifier> cLowerThanNames,
+    BridgedSourceLoc cRightBraceLoc) {
 
   SmallVector<PrecedenceGroupDecl::Relation, 2> higherThanNames;
-  for (auto &pair : cHigherThanNames.unbridged<BridgedLocatedIdentifier>()) {
+  for (auto &pair : cHigherThanNames) {
     higherThanNames.push_back(
         {pair.NameLoc.unbridged(), pair.Name.unbridged(), nullptr});
   }
 
   SmallVector<PrecedenceGroupDecl::Relation, 2> lowerThanNames;
-  for (auto &pair : cLowerThanNames.unbridged<BridgedLocatedIdentifier>()) {
+  for (auto &pair : cLowerThanNames) {
     lowerThanNames.push_back(
         {pair.NameLoc.unbridged(), pair.Name.unbridged(), nullptr});
   }
@@ -1400,10 +1409,9 @@ BridgedImportDecl BridgedImportDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cImportKeywordLoc, BridgedImportKind cImportKind,
     BridgedSourceLoc cImportKindLoc,
-    BridgedErasedArrayRef cImportPathElements) {
+    BridgedArrayRef<BridgedLocatedIdentifier> cImportPathElements) {
   ImportPath::Builder builder;
-  for (auto &element :
-       cImportPathElements.unbridged<BridgedLocatedIdentifier>()) {
+  for (auto &element : cImportPathElements) {
     builder.push_back(element.Name.unbridged(), element.NameLoc.unbridged());
   }
 
@@ -1468,10 +1476,12 @@ BridgedVarDecl BridgedVarDec_createImplicitStringInterpolationVar(
 
 void BridgedAbstractStorageDecl_setAccessors(
     BridgedAbstractStorageDecl cStorage, BridgedAccessorRecord accessors) {
-  cStorage.unbridged()->setAccessors(
-      accessors.lBraceLoc.unbridged(),
-      accessors.accessors.unbridged<AccessorDecl *>(),
-      accessors.rBraceLoc.unbridged());
+  SmallVector<AccessorDecl *> decls;
+  for (auto cDecl : accessors.accessors)
+    decls.push_back(cDecl.unbridged());
+
+  cStorage.unbridged()->setAccessors(accessors.lBraceLoc.unbridged(), decls,
+                                     accessors.rBraceLoc.unbridged());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1500,20 +1510,21 @@ bool BridgedNominalTypeDecl_isStructWithUnreferenceableStorage(
 // MARK: Exprs
 //===----------------------------------------------------------------------===//
 
-BridgedArgumentList
-BridgedArgumentList_createImplicitUnlabeled(BridgedASTContext cContext,
-                                            BridgedErasedArrayRef cExprs) {
-  return ArgumentList::forImplicitUnlabeled(cContext.unbridged(),
-                                            cExprs.unbridged<Expr *>());
+BridgedArgumentList BridgedArgumentList_createImplicitUnlabeled(
+    BridgedASTContext cContext, BridgedArrayRef<BridgedExpr> cExprs) {
+  SmallVector<Expr *> exprs;
+  for (auto cExpr : cExprs)
+    exprs.push_back(cExpr.unbridged());
+  return ArgumentList::forImplicitUnlabeled(cContext.unbridged(), exprs);
 }
 
 BridgedArgumentList BridgedArgumentList_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLParenLoc,
-    BridgedErasedArrayRef cArgs, BridgedSourceLoc cRParenLoc,
+    BridgedArrayRef<BridgedCallArgument> cArgs, BridgedSourceLoc cRParenLoc,
     size_t cFirstTrailingClosureIndex) {
   SmallVector<Argument> arguments;
-  arguments.reserve(cArgs.unbridged<BridgedCallArgument>().size());
-  for (auto &arg : cArgs.unbridged<BridgedCallArgument>()) {
+  arguments.reserve(cArgs.unbridged().size());
+  for (auto &arg : cArgs) {
     arguments.push_back(arg.unbridged());
   }
 

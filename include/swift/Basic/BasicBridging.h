@@ -147,6 +147,59 @@ const void *_Nullable BridgedErasedArrayRef_data(BridgedErasedArrayRef arr);
 SWIFT_NAME("getter:BridgedErasedArrayRef.count(self:)")
 BRIDGED_INLINE SwiftInt BridgedErasedArrayRef_count(BridgedErasedArrayRef arr);
 
+
+/// Bridgable wrapper for 'llvm::ArrayRef<Element>'.
+template <typename _Element>
+class BridgedArrayRef {
+public:
+  // Seemingly needed for Swift-side conformance.
+  using Element = _Element;
+
+  SWIFT_UNAVAILABLE("Use '.data' instead")
+  const void *_Nullable Data;
+
+  SWIFT_UNAVAILABLE("Use '.count' instead")
+  size_t Length;
+
+  SWIFT_NAME("init(data:count:)")
+  BridgedArrayRef(const Element *_Nullable data, SwiftInt length)
+      : Data(data), Length(length) {}
+
+#ifdef USED_IN_CPP_SOURCE
+  using ArrRefTy = llvm::ArrayRef<Element>;
+
+  BridgedArrayRef(ArrRefTy arrRef)
+    : Data(arrRef.data()), Length(arrRef.size()) {}
+
+  using iterator = typename ArrRefTy::iterator;
+  iterator begin() const { return unbridged().begin(); }
+  iterator end() const { return unbridged().end(); }
+
+  ArrRefTy unbridged() const {
+    return ArrRefTy(static_cast<const Element *>(Data), Length);
+  }
+#endif
+
+  bool empty() const { return Length == 0; }
+
+}
+#ifdef IMPORTING_INTO_ASTGEN
+__attribute__((swift_attr("conforms_to:swiftASTGen.BridgedArrayRefProtocol")))
+#endif
+;
+
+template<typename T>
+SWIFT_NAME("getter:BridgedArrayRef.data(self:)")
+inline const void *_Nullable BridgedArrayRef_data(BridgedArrayRef<T> arr) {
+  return arr.Data;
+}
+
+template<typename T>
+SWIFT_NAME("getter:BridgedArrayRef.count(self:)")
+inline SwiftInt BridgedArrayRef_count(BridgedArrayRef<T> arr) {
+  return arr.Length;
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: Data
 //===----------------------------------------------------------------------===//

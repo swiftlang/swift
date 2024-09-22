@@ -76,7 +76,7 @@ extension ASTGenVisitor {
     let appendLiteral = BridgedDeclNameRef.createParsed(
       self.ctx,
       baseName: .createIdentifier(self.ctx.getIdentifier("appendLiteral")),
-      argumentLabels: CollectionOfOne(BridgedIdentifier()).bridgedArray(in: self)
+      argumentLabels: .init(CollectionOfOne(BridgedIdentifier()), in: self)
     )
     // Name reference to `appendInterpolation`. Arguments labels are not determined yet.
     let appendInterpolation = BridgedDeclNameRef.createParsed(
@@ -123,7 +123,7 @@ extension ASTGenVisitor {
       appendLiteralRef.asExpr.setImplicit()
       let argList = BridgedArgumentList.createImplicitUnlabeled(
         self.ctx,
-        exprs: CollectionOfOne(literalExpr).bridgedArray(in: self)
+        exprs: .init(CollectionOfOne(literalExpr.asExpr), in: self)
       )
       let callExpr = BridgedCallExpr.createParsed(
         self.ctx,

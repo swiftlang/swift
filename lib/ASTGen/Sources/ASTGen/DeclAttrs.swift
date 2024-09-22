@@ -359,7 +359,7 @@ extension ASTGenVisitor {
       return nil
     }
 
-    let features = args.compactMap(in: self) { arg -> BridgedIdentifier? in
+    let features = args.compactMap { arg -> BridgedIdentifier? in
       guard arg.label == nil,
             let declNameExpr = arg.expression.as(DeclReferenceExprSyntax.self),
             declNameExpr.argumentNames == nil
@@ -376,7 +376,7 @@ extension ASTGenVisitor {
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateSourceRange(node),
       inverted: inverted,
-      features: features)
+      features: .init(features, in: self))
   }
 
   func generateCDeclAttr(attribute node: AttributeSyntax) -> BridgedCDeclAttr? {
@@ -728,8 +728,8 @@ extension ASTGenVisitor {
         atLoc: self.generateSourceLoc(node.atSign),
         attrNameLoc: self.generateSourceLoc(node.attributeName),
         lParenLoc: self.generateSourceLoc(node.leftParen),
-        nameLocs: selectorPieces.lazy.map({ self.generateSourceLoc($0.name) }).bridgedArray(in: self),
-        names: selectorPieces.lazy.map({ self.generateIdentifier($0.name) }).bridgedArray(in: self),
+        nameLocs: .init(selectorPieces.lazy.map({ self.generateSourceLoc($0.name) }), in: self),
+        names: .init(selectorPieces.lazy.map({ self.generateIdentifier($0.name) }), in: self),
         rParenLoc: self.generateSourceLoc(node.rightParen)
       )
     }

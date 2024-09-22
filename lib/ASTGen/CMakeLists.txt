@@ -86,7 +86,7 @@ endforeach()
 
 set(compile_options
   ${c_include_paths_args}
-  "SHELL: -Xcc -std=c++17 -Xcc -DCOMPILED_WITH_SWIFT"
+  "SHELL: -Xcc -std=c++17 -Xcc -DCOMPILED_WITH_SWIFT -Xcc -DIMPORTING_INTO_ASTGEN"
 
   # FIXME: Needed to work around an availability issue with CxxStdlib
   "SHELL: -Xfrontend -disable-target-os-checking"

@@ -111,7 +111,7 @@ extension ASTGenVisitor {
       name: name,
       nameLoc: nameLoc,
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
-      inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
+      inheritedTypes: .init(self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes), in: self),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
       braceRange: self.generateSourceRange(
         start: node.memberBlock.leftBrace,
@@ -121,7 +121,7 @@ extension ASTGenVisitor {
     decl.asDecl.setAttrs(attrs.attributes)
 
     self.withDeclContext(decl.asDeclContext) {
-      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members))
+      decl.setParsedMembers(.init(self.generate(memberBlockItemList: node.memberBlock.members), in: self))
     }
 
     return decl
@@ -138,7 +138,7 @@ extension ASTGenVisitor {
       name: name,
       nameLoc: nameLoc,
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
-      inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
+      inheritedTypes: .init(self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes), in: self),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
       braceRange: self.generateSourceRange(
         start: node.memberBlock.leftBrace,
@@ -148,7 +148,7 @@ extension ASTGenVisitor {
     decl.asDecl.setAttrs(attrs.attributes)
 
     self.withDeclContext(decl.asDeclContext) {
-      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members))
+      decl.setParsedMembers(.init(self.generate(memberBlockItemList: node.memberBlock.members), in: self))
     }
 
     return decl
@@ -165,7 +165,7 @@ extension ASTGenVisitor {
       name: name,
       nameLoc: nameLoc,
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
-      inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
+      inheritedTypes: .init(self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes), in: self),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
       braceRange: self.generateSourceRange(
         start: node.memberBlock.leftBrace,
@@ -176,7 +176,7 @@ extension ASTGenVisitor {
     decl.asDecl.setAttrs(attrs.attributes)
 
     self.withDeclContext(decl.asDeclContext) {
-      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members))
+      decl.setParsedMembers(.init(self.generate(memberBlockItemList: node.memberBlock.members), in: self))
     }
 
     return decl
@@ -193,7 +193,7 @@ extension ASTGenVisitor {
       name: name,
       nameLoc: nameLoc,
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
-      inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
+      inheritedTypes: .init(self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes), in: self),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
       braceRange: self.generateSourceRange(
         start: node.memberBlock.leftBrace,
@@ -204,7 +204,7 @@ extension ASTGenVisitor {
     decl.asDecl.setAttrs(attrs.attributes)
 
     self.withDeclContext(decl.asDeclContext) {
-      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members))
+      decl.setParsedMembers(.init(self.generate(memberBlockItemList: node.memberBlock.members), in: self))
     }
 
     return decl
@@ -223,8 +223,8 @@ extension ASTGenVisitor {
       protocolKeywordLoc: self.generateSourceLoc(node.protocolKeyword),
       name: name,
       nameLoc: nameLoc,
-      primaryAssociatedTypeNames: primaryAssociatedTypeNames.bridgedArray(in: self),
-      inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
+      primaryAssociatedTypeNames: .init(primaryAssociatedTypeNames, in: self),
+      inheritedTypes: .init(self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes), in: self),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
       braceRange: self.generateSourceRange(
         start: node.memberBlock.leftBrace,
@@ -234,7 +234,7 @@ extension ASTGenVisitor {
     decl.asDecl.setAttrs(attrs.attributes)
 
     self.withDeclContext(decl.asDeclContext) {
-      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members))
+      decl.setParsedMembers(.init(self.generate(memberBlockItemList: node.memberBlock.members), in: self))
     }
 
     return decl
@@ -250,7 +250,7 @@ extension ASTGenVisitor {
       associatedtypeKeywordLoc: self.generateSourceLoc(node.associatedtypeKeyword),
       name: name,
       nameLoc: nameLoc,
-      inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
+      inheritedTypes: .init(self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes), in: self),
       defaultType: self.generate(type: node.initializer?.value),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
@@ -269,7 +269,7 @@ extension ASTGenVisitor {
       declContext: self.declContext,
       extensionKeywordLoc: self.generateSourceLoc(node.extensionKeyword),
       extendedType: self.generate(type: node.extendedType),
-      inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
+      inheritedTypes: .init(self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes), in: self),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
       braceRange: self.generateSourceRange(
         start: node.memberBlock.leftBrace,
@@ -279,7 +279,7 @@ extension ASTGenVisitor {
     decl.asDecl.setAttrs(attrs.attributes)
 
     self.withDeclContext(decl.asDeclContext) {
-      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members))
+      decl.setParsedMembers(.init(self.generate(memberBlockItemList: node.memberBlock.members), in: self))
     }
 
     return decl
@@ -315,7 +315,7 @@ extension ASTGenVisitor {
     return .createParsed(
       declContext: self.declContext,
       caseKeywordLoc: self.generateSourceLoc(node.caseKeyword),
-      elements: elements.bridgedArray(in: self)
+      elements: .init(elements, in: self)
     )
   }
 }
@@ -393,9 +393,9 @@ extension ASTGenVisitor {
     case .accessors(let accessors):
       return BridgedAccessorRecord(
         lBraceLoc: leftBrace,
-        accessors: accessors.lazy.compactMap {
+        accessors: .init(accessors.lazy.compactMap {
           self.generate(accessorDecl: $0, for: storage)
-        }.bridgedArray(in: self),
+        }, in: self),
         rBraceLoc: rightBrace
       )
     case .getter(let codeBlock):
@@ -422,7 +422,7 @@ extension ASTGenVisitor {
       }
       return BridgedAccessorRecord(
         lBraceLoc: leftBrace,
-        accessors: CollectionOfOne(accessor).bridgedArray(in: self),
+        accessors: .init(CollectionOfOne(accessor), in: self),
         rBraceLoc: rightBrace
       )
 #if RESILIENT_SWIFT_SYNTAX
@@ -467,7 +467,7 @@ extension ASTGenVisitor {
     )
   }
 
-  private func generateBindingEntries(for node: VariableDeclSyntax) -> BridgedErasedArrayRef {
+  private func generateBindingEntries(for node: VariableDeclSyntax) -> some Collection<BridgedPatternBindingEntry> {
     var propagatedType: BridgedTypeRepr?
     var entries: [BridgedPatternBindingEntry] = []
 
@@ -504,7 +504,7 @@ extension ASTGenVisitor {
       }
       entries.append(entry)
     }
-    return entries.reversed().bridgedArray(in: self)
+    return entries.reversed()
   }
 
   func generate(variableDecl node: VariableDeclSyntax) -> BridgedPatternBindingDecl {
@@ -516,7 +516,7 @@ extension ASTGenVisitor {
       self.ctx,
       declContext: self.declContext,
       bindingKeywordLoc: self.generateSourceLoc(node.bindingSpecifier),
-      entries: self.generateBindingEntries(for: node),
+      entries: .init(self.generateBindingEntries(for: node), in: self),
       isStatic: isStatic,
       isLet: isLet
     )
@@ -778,9 +778,9 @@ extension ASTGenVisitor {
       assignmentValueLoc: self.generateSourceLoc((body.assignment?.value)),
       isAssignment: assignmentValue,
       higherThanKeywordLoc: self.generateSourceLoc((body.higherThanRelation?.higherThanOrLowerThanLabel)),
-      higherThanNames: self.generate(precedenceGroupNameList: body.higherThanRelation?.precedenceGroups),
+      higherThanNames: .init(self.generate(precedenceGroupNameList: body.higherThanRelation?.precedenceGroups), in: self),
       lowerThanKeywordLoc: self.generateSourceLoc(body.lowerThanRelation?.higherThanOrLowerThanLabel),
-      lowerThanNames: self.generate(precedenceGroupNameList: body.lowerThanRelation?.precedenceGroups),
+      lowerThanNames: .init(self.generate(precedenceGroupNameList: body.lowerThanRelation?.precedenceGroups), in: self),
       rightBraceLoc: self.generateSourceLoc(node.rightBrace)
     )
     decl.asDecl.setAttrs(attrs.attributes)
@@ -826,9 +826,9 @@ extension ASTGenVisitor {
       importKeywordLoc: self.generateSourceLoc(node.importKeyword),
       importKind: importKind,
       importKindLoc: self.generateSourceLoc(node.importKindSpecifier),
-      path: node.path.lazy.map {
-        self.generateLocatedIdentifier($0.name)
-      }.bridgedArray(in: self)
+      path: .init(
+        node.path.lazy.map { self.generateLocatedIdentifier($0.name) }, in: self
+      )
     )
     decl.asDecl.setAttrs(attrs.attributes)
     return decl
@@ -837,7 +837,7 @@ extension ASTGenVisitor {
 
 extension ASTGenVisitor {
   @inline(__always)
-  func generate(memberBlockItemList node: MemberBlockItemListSyntax) -> BridgedErasedArrayRef {
+  func generate(memberBlockItemList node: MemberBlockItemListSyntax) -> some Collection<BridgedDecl> {
     var allBridged: [BridgedDecl] = []
     visitIfConfigElements(node, of: MemberBlockItemSyntax.self) { element in
       if let ifConfigDecl = element.decl.as(IfConfigDeclSyntax.self) {
@@ -850,18 +850,18 @@ extension ASTGenVisitor {
       allBridged.append(self.generate(decl: member.decl))
     }
 
-    return allBridged.lazy.bridgedArray(in: self)
+    return allBridged.lazy
   }
 
   @inline(__always)
-  func generate(inheritedTypeList node: InheritedTypeListSyntax) -> BridgedErasedArrayRef {
-    node.lazy.map { self.generate(type: $0.type) }.bridgedArray(in: self)
+  func generate(inheritedTypeList node: InheritedTypeListSyntax) -> some Collection<BridgedTypeRepr> {
+    node.lazy.map { self.generate(type: $0.type) }
   }
 
   @inline(__always)
-  func generate(precedenceGroupNameList node: PrecedenceGroupNameListSyntax) -> BridgedErasedArrayRef {
+  func generate(precedenceGroupNameList node: PrecedenceGroupNameListSyntax) -> some Collection<BridgedLocatedIdentifier> {
     node.lazy.map {
       self.generateLocatedIdentifier($0.name)
-    }.bridgedArray(in: self)
+    }
   }
 }
