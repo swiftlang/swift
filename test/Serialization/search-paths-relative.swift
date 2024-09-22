@@ -4,7 +4,8 @@
 // RUN: %empty-directory(%t/Frameworks/has_alias.framework/Modules/has_alias.swiftmodule)
 // RUN: %target-swift-frontend -emit-module -o %t/Frameworks/has_alias.framework/Modules/has_alias.swiftmodule/%target-swiftmodule-name %S/Inputs/alias.swift -module-name has_alias
 
-// RUN: cd %t/secret && %target-swiftc_driver -emit-module -o %t/has_xref.swiftmodule -I . -F ../Frameworks -parse-as-library %S/Inputs/has_xref.swift %S/../Inputs/empty.swift -Xfrontend -serialize-debugging-options -Xcc -ivfsoverlay -Xcc %S/../Inputs/unextended-module-overlay.yaml -Xcc -DDUMMY
+// Output paths differ in the new driver, so force SWIFT_USE_OLD_DRIVER for now.
+// RUN: cd %t/secret && env SWIFT_USE_OLD_DRIVER=1 %target-swiftc_driver -emit-module -o %t/has_xref.swiftmodule -I . -F ../Frameworks -parse-as-library %S/Inputs/has_xref.swift %S/../Inputs/empty.swift -Xfrontend -serialize-debugging-options -Xcc -ivfsoverlay -Xcc %S/../Inputs/unextended-module-overlay.yaml -Xcc -DDUMMY
 // RUN: %target-swift-frontend %s -typecheck -I %t
 
 // Ensure that in Swift 6 mode we do not read out search paths, thus are no longer able to
