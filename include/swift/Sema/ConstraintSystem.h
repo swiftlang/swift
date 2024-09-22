@@ -491,6 +491,10 @@ public:
   /// literal (represented by `ArrayExpr` and `DictionaryExpr` in AST).
   bool isCollectionLiteralType() const;
 
+  /// Determine whether this type variable represents a literal such
+  /// as an integer value, a floating-point value with and without a sign.
+  bool isNumberLiteralType() const;
+
   /// Determine whether this type variable represents a result type of a
   /// function call.
   bool isFunctionResult() const;

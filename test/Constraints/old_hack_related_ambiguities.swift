@@ -189,6 +189,16 @@ do {
   }
 }
 
+// `tryOptimizeGenericDisjunction` is too aggressive sometimes, make sure that `<T: FloatingPoint>`
+// overload is _not_ selected in this case.
+do {
+  func test<T: FloatingPoint>(_ expression1: @autoclosure () throws -> T, accuracy: T) -> T {}
+  func test<T: Numeric>(_ expression1: @autoclosure () throws -> T, accuracy: T) -> T {}
+
+  let result = test(10, accuracy: 1)
+  let _: Int = result
+}
+
 // swift-distributed-tracing snippet that relies on old hack behavior.
 protocol TracerInstant {
 }
