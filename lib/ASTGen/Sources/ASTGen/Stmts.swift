@@ -76,7 +76,7 @@ extension ASTGenVisitor {
   }
 
   @inline(__always)
-  func generate(codeBlockItemList node: CodeBlockItemListSyntax) -> BridgedArrayRef {
+  func generate(codeBlockItemList node: CodeBlockItemListSyntax) -> BridgedErasedArrayRef {
     var allItems: [BridgedASTNode] = []
     visitIfConfigElements(
       node,
@@ -180,7 +180,7 @@ extension ASTGenVisitor {
     }
   }
 
-  func generate(conditionElementList node: ConditionElementListSyntax) -> BridgedArrayRef {
+  func generate(conditionElementList node: ConditionElementListSyntax) -> BridgedErasedArrayRef {
     node.lazy.map(generate(conditionElement:)).bridgedArray(in: self)
   }
 
@@ -243,7 +243,7 @@ extension ASTGenVisitor {
     )
   }
 
-  func generate(catchItemList node: CatchItemListSyntax) -> BridgedArrayRef {
+  func generate(catchItemList node: CatchItemListSyntax) -> BridgedErasedArrayRef {
     if node.isEmpty {
       let item = BridgedCaseLabelItemInfo(
         isDefault: false,
@@ -269,7 +269,7 @@ extension ASTGenVisitor {
     )
   }
 
-  func generate(catchClauseList node: CatchClauseListSyntax) -> BridgedArrayRef {
+  func generate(catchClauseList node: CatchClauseListSyntax) -> BridgedErasedArrayRef {
     node.lazy.map(self.generate(catchClause:)).bridgedArray(in: self)
   }
 
@@ -435,7 +435,7 @@ extension ASTGenVisitor {
     )
   }
 
-  func generate(switchCaseItemList node: SwitchCaseItemListSyntax) -> BridgedArrayRef {
+  func generate(switchCaseItemList node: SwitchCaseItemListSyntax) -> BridgedErasedArrayRef {
     return node.lazy.map(self.generate(switchCaseItem:)).bridgedArray(in: self)
   }
 
@@ -443,7 +443,7 @@ extension ASTGenVisitor {
     let unknownAttrLoc = self.generateSourceLoc(node.attribute?.atSign)
     let introducerLoc: BridgedSourceLoc
     let terminatorLoc: BridgedSourceLoc
-    let items: BridgedArrayRef
+    let items: BridgedErasedArrayRef
     switch node.label {
     case .case(let node):
       introducerLoc = self.generateSourceLoc(node.caseKeyword)
@@ -481,7 +481,7 @@ extension ASTGenVisitor {
     )
   }
 
-  func generate(switchCaseList node: SwitchCaseListSyntax) -> BridgedArrayRef {
+  func generate(switchCaseList node: SwitchCaseListSyntax) -> BridgedErasedArrayRef {
     var allBridgedCases: [BridgedASTNode] = []
     visitIfConfigElements(node, of: SwitchCaseSyntax.self) { element in
       switch element {
@@ -536,7 +536,7 @@ extension ASTGenVisitor {
     // ASTGen needs to convert the call to an expression (in generate(codeBlockItem:)?)
     let lParenLoc: BridgedSourceLoc
     let rParenLoc: BridgedSourceLoc
-    let yields: BridgedArrayRef
+    let yields: BridgedErasedArrayRef
     switch node.yieldedExpressions {
     case .multiple(let node):
       lParenLoc = self.generateSourceLoc(node.leftParen)

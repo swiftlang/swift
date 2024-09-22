@@ -114,7 +114,7 @@ void assertFail(const char * _Nonnull msg, const char * _Nonnull file,
 // MARK: ArrayRef
 //===----------------------------------------------------------------------===//
 
-class BridgedArrayRef {
+class BridgedErasedArrayRef {
 public:
   SWIFT_UNAVAILABLE("Use '.data' instead")
   const void *_Nullable Data;
@@ -122,15 +122,15 @@ public:
   SWIFT_UNAVAILABLE("Use '.count' instead")
   size_t Length;
 
-  BridgedArrayRef() : Data(nullptr), Length(0) {}
+  BridgedErasedArrayRef() : Data(nullptr), Length(0) {}
 
   SWIFT_NAME("init(data:count:)")
-  BridgedArrayRef(const void *_Nullable data, size_t length)
+  BridgedErasedArrayRef(const void *_Nullable data, size_t length)
       : Data(data), Length(length) {}
 
 #ifdef USED_IN_CPP_SOURCE
   template <typename T>
-  BridgedArrayRef(llvm::ArrayRef<T> arr)
+  BridgedErasedArrayRef(llvm::ArrayRef<T> arr)
       : Data(arr.data()), Length(arr.size()) {}
 
   template <typename T>
@@ -140,12 +140,12 @@ public:
 #endif
 };
 
-SWIFT_NAME("getter:BridgedArrayRef.data(self:)")
+SWIFT_NAME("getter:BridgedErasedArrayRef.data(self:)")
 BRIDGED_INLINE
-const void *_Nullable BridgedArrayRef_data(BridgedArrayRef arr);
+const void *_Nullable BridgedErasedArrayRef_data(BridgedErasedArrayRef arr);
 
-SWIFT_NAME("getter:BridgedArrayRef.count(self:)")
-BRIDGED_INLINE SwiftInt BridgedArrayRef_count(BridgedArrayRef arr);
+SWIFT_NAME("getter:BridgedErasedArrayRef.count(self:)")
+BRIDGED_INLINE SwiftInt BridgedErasedArrayRef_count(BridgedErasedArrayRef arr);
 
 //===----------------------------------------------------------------------===//
 // MARK: Data

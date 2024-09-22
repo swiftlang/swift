@@ -140,7 +140,8 @@ struct BridgedPostDomTree {
 struct BridgedUtilities {
   typedef void (* _Nonnull VerifyFunctionFn)(BridgedPassContext, BridgedFunction);
   typedef void (* _Nonnull UpdateBorrowedFromFn)(BridgedPassContext, BridgedFunction);
-  typedef void (* _Nonnull UpdateBorrowedFromPhisFn)(BridgedPassContext, BridgedArrayRef);
+  typedef void (*_Nonnull UpdateBorrowedFromPhisFn)(BridgedPassContext,
+                                                    BridgedErasedArrayRef);
 
   static void registerVerifier(VerifyFunctionFn verifyFunctionFn);
   static void registerBorrowedFromUpdater(UpdateBorrowedFromFn updateBorrowedFromFn,
@@ -257,9 +258,10 @@ struct BridgedPassContext {
   BridgedOwnedString mangleWithDeadArgs(const SwiftInt * _Nullable deadArgs,
                                                             SwiftInt numDeadArgs,
                                                             BridgedFunction function) const;
-  BridgedOwnedString mangleWithClosureArgs(BridgedValueArray closureArgs,
-                                                               BridgedArrayRef closureArgIndices,
-                                                               BridgedFunction applySiteCallee) const;
+  BridgedOwnedString
+  mangleWithClosureArgs(BridgedValueArray closureArgs,
+                        BridgedErasedArrayRef closureArgIndices,
+                        BridgedFunction applySiteCallee) const;
 
   SWIFT_IMPORT_UNSAFE BridgedGlobalVar createGlobalVariable(BridgedStringRef name, BridgedType type,
                                                             bool isPrivate) const;

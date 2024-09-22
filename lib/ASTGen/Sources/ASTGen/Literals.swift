@@ -267,13 +267,13 @@ extension ASTGenVisitor {
   public func generate(dictionaryExpr node: DictionaryExprSyntax) -> BridgedDictionaryExpr {
     let lBracketLoc = self.generateSourceLoc(node.leftSquare)
     let rBracketLoc = self.generateSourceLoc(node.rightSquare)
-    let elements: BridgedArrayRef
-    let colonLocs: BridgedArrayRef
+    let elements: BridgedErasedArrayRef
+    let colonLocs: BridgedErasedArrayRef
 
     switch node.content {
     case .colon(_):
-      elements = BridgedArrayRef()
-      colonLocs = BridgedArrayRef()
+      elements = BridgedErasedArrayRef()
+      colonLocs = BridgedErasedArrayRef()
     case .elements(let elementNodes):
       elements = elementNodes.lazy
         .map({ self.generate(dictionaryElement: $0).asExpr })

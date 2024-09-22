@@ -105,7 +105,7 @@ func registerBorrowedFromUpdater() {
       let function = bridgedFunction.function;
       updateBorrowedFrom(in: function, context)
     },
-    { (bridgedCtxt: BridgedPassContext, bridgedPhiArray: BridgedArrayRef) in
+    { (bridgedCtxt: BridgedPassContext, bridgedPhiArray: BridgedErasedArrayRef) in
       let context = FunctionPassContext(_bridged: bridgedCtxt)
       var guaranteedPhis = Stack<Phi>(context)
       defer { guaranteedPhis.deinitialize() }

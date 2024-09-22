@@ -16,14 +16,14 @@
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 //===----------------------------------------------------------------------===//
-// MARK: BridgedArrayRef
+// MARK: BridgedErasedArrayRef
 //===----------------------------------------------------------------------===//
 
-const void *_Nullable BridgedArrayRef_data(BridgedArrayRef arr) {
+const void *_Nullable BridgedErasedArrayRef_data(BridgedErasedArrayRef arr) {
   return arr.Data;
 }
 
-SwiftInt BridgedArrayRef_count(BridgedArrayRef arr) {
+SwiftInt BridgedErasedArrayRef_count(BridgedErasedArrayRef arr) {
   return static_cast<SwiftInt>(arr.Length);
 }
 

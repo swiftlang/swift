@@ -169,7 +169,7 @@ extension ASTGenVisitor {
 
 extension ASTGenVisitor {
   @inline(__always)
-  func generate(functionParameterList node: FunctionParameterListSyntax, forSubscript: Bool) -> BridgedArrayRef {
+  func generate(functionParameterList node: FunctionParameterListSyntax, forSubscript: Bool) -> BridgedErasedArrayRef {
     node.lazy.map({ self.generate(functionParameter: $0, forSubscript: forSubscript) }).bridgedArray(in: self)
   }
 }

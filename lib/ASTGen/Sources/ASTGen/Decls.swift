@@ -467,7 +467,7 @@ extension ASTGenVisitor {
     )
   }
 
-  private func generateBindingEntries(for node: VariableDeclSyntax) -> BridgedArrayRef {
+  private func generateBindingEntries(for node: VariableDeclSyntax) -> BridgedErasedArrayRef {
     var propagatedType: BridgedTypeRepr?
     var entries: [BridgedPatternBindingEntry] = []
 
@@ -837,7 +837,7 @@ extension ASTGenVisitor {
 
 extension ASTGenVisitor {
   @inline(__always)
-  func generate(memberBlockItemList node: MemberBlockItemListSyntax) -> BridgedArrayRef {
+  func generate(memberBlockItemList node: MemberBlockItemListSyntax) -> BridgedErasedArrayRef {
     var allBridged: [BridgedDecl] = []
     visitIfConfigElements(node, of: MemberBlockItemSyntax.self) { element in
       if let ifConfigDecl = element.decl.as(IfConfigDeclSyntax.self) {
@@ -854,12 +854,12 @@ extension ASTGenVisitor {
   }
 
   @inline(__always)
-  func generate(inheritedTypeList node: InheritedTypeListSyntax) -> BridgedArrayRef {
+  func generate(inheritedTypeList node: InheritedTypeListSyntax) -> BridgedErasedArrayRef {
     node.lazy.map { self.generate(type: $0.type) }.bridgedArray(in: self)
   }
 
   @inline(__always)
-  func generate(precedenceGroupNameList node: PrecedenceGroupNameListSyntax) -> BridgedArrayRef {
+  func generate(precedenceGroupNameList node: PrecedenceGroupNameListSyntax) -> BridgedErasedArrayRef {
     node.lazy.map {
       self.generateLocatedIdentifier($0.name)
     }.bridgedArray(in: self)

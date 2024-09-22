@@ -306,7 +306,7 @@ extension ASTGenVisitor {
     additionalTrailingClosures: MultipleTrailingClosureElementListSyntax?
   ) -> BridgedArgumentList {
 
-    let bridgedArgs: BridgedArrayRef = {
+    let bridgedArgs: BridgedErasedArrayRef = {
       // Arguments before ')'
       let normalArgs = labeledExprList.lazy.map({ elem in
         let labelInfo = elem.label.map(self.generateIdentifierAndSourceLoc(_:))
