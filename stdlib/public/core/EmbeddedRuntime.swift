@@ -206,6 +206,15 @@ public func swift_dynamicCastClass(object: UnsafeMutableRawPointer, targetMetada
   return object
 }
 
+@_cdecl("swift_dynamicCastClassUnconditional")
+public func swift_dynamicCastClassUnconditional(object: UnsafeMutableRawPointer, targetMetadata: UnsafeRawPointer,
+    file: UnsafePointer<CChar>, line: CUnsignedInt, column: CUnsignedInt) -> UnsafeMutableRawPointer {
+  guard let result = swift_dynamicCastClass(object: object, targetMetadata: targetMetadata) else {
+    Builtin.int_trap()
+  }
+  return result
+}
+
 @_cdecl("swift_isUniquelyReferenced_native")
 public func swift_isUniquelyReferenced_native(object: Builtin.RawPointer) -> Bool {
   if !isValidPointerForNativeRetain(object: object) { return false }

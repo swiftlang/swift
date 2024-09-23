@@ -804,8 +804,18 @@ struct BridgedSILTypeArray {
   BridgedSILTypeArray(llvm::ArrayRef<swift::SILType> silTypes)
       : typeArray(silTypes) {}
 
+  BridgedSILTypeArray(BridgedArrayRef typeArray)
+      : typeArray(typeArray) {}
+
   llvm::ArrayRef<swift::SILType> unbridged() const {
     return typeArray.unbridged<swift::SILType>();
+  }
+
+  llvm::ArrayRef<swift::SILType> getValues(llvm::SmallVectorImpl<swift::SILType> &storage) {
+    for (unsigned idx = 0; idx < getCount(); ++idx) {
+      storage.push_back(unbridged()[idx]);
+    }
+    return storage;
   }
 #endif
 
@@ -1254,6 +1264,11 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createCondFail(BridgedValue condition,
                                                                        BridgedStringRef message) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createIntegerLiteral(BridgedType type, SwiftInt value) const;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createAllocRef(BridgedType type,
+    bool objc, bool canAllocOnStack, bool isBare,
+    BridgedSILTypeArray elementTypes, BridgedValueArray elementCountOperands) const;
+
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction
   createAllocStack(BridgedType type, bool hasDynamicLifetime, bool isLexical,
                    bool isFromVarDecl, bool wasMoved) const;

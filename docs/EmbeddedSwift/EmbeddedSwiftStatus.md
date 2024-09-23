@@ -43,6 +43,7 @@ This status table describes which of the following standard library features can
 | Integer parsing                                            | No     |
 | KeyPaths                                                   | Partial (only compile-time constant key paths to stored properties supported, only usable in MemoryLayout and UnsafePointer APIs)     |
 | Lazy collections                                           | No     |
+| ManagedBuffer                                              | Yes    |
 | Mirror (runtime reflection)                                | No, intentionally unsupported long-term |
 | Objective-C bridging                                       | No, intentionally unsupported long-term |
 | Optional                                                   | Yes    |

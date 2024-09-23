@@ -77,6 +77,9 @@ extension ManagedBuffer where Element: ~Copyable {
   /// an initial `Header`.
   @_preInverseGenerics
   @inlinable
+  #if $Embedded
+  @_transparent
+  #endif
   public final class func create(
     minimumCapacity: Int,
     makingHeaderWith factory: (ManagedBuffer<Header, Element>) throws -> Header
@@ -290,7 +293,9 @@ public struct ManagedBufferPointer<
   @_preInverseGenerics
   @inlinable
   public init(unsafeBufferObject buffer: AnyObject) {
+    #if !$Embedded
     ManagedBufferPointer._checkValidBufferClass(type(of: buffer))
+    #endif
 
     self._nativeBuffer = Builtin.unsafeCastToNativeObject(buffer)
   }
@@ -308,7 +313,10 @@ public struct ManagedBufferPointer<
   @_preInverseGenerics
   @inlinable
   internal init(_uncheckedUnsafeBufferObject buffer: AnyObject) {
+    #if !$Embedded
     ManagedBufferPointer._internalInvariantValidBufferClass(type(of: buffer))
+    #endif
+
     self._nativeBuffer = Builtin.unsafeCastToNativeObject(buffer)
   }
 
