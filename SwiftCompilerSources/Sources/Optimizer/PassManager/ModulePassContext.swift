@@ -129,6 +129,44 @@ struct ModulePassContext : Context, CustomStringConvertible {
     return function.isDefinition
   }
 
+  func specialize(function: Function, for substitutions: SubstitutionMap) -> Function? {
+    return _bridged.specializeFunction(function.bridged, substitutions.bridged).function
+  }
+
+  enum DeserializationMode {
+    case allFunctions
+    case onlySharedFunctions
+  }
+
+  func deserializeAllCallees(of function: Function, mode: DeserializationMode) {
+    _bridged.deserializeAllCallees(function.bridged, mode == .allFunctions ? true : false)
+  }
+
+  @discardableResult
+  func createWitnessTable(entries: [WitnessTable.Entry],
+                          conformance: ProtocolConformance,
+                          linkage: Linkage,
+                          serialized: Bool) -> WitnessTable
+  {
+    let bridgedEntries = entries.map { $0.bridged }
+    let bridgedWitnessTable = bridgedEntries.withBridgedArrayRef {
+      _bridged.createWitnessTable(linkage.bridged, serialized, conformance.bridged, $0)
+    }
+    return WitnessTable(bridged: bridgedWitnessTable)
+  }
+
+  @discardableResult
+  func createSpecializedVTable(entries: [VTable.Entry],
+                               for classType: Type,
+                               isSerialized: Bool) -> VTable
+  {
+    let bridgedEntries = entries.map { $0.bridged }
+    let bridgedVTable = bridgedEntries.withBridgedArrayRef {
+      _bridged.createSpecializedVTable(isSerialized, classType.bridged, $0)
+    }
+    return VTable(bridged: bridgedVTable)
+  }
+
   func createEmptyFunction(
     name: String,
     parameters: [ParameterInfo],
@@ -173,5 +211,9 @@ extension GlobalVariable {
 extension Function {
   func set(linkage: Linkage, _ context: ModulePassContext) {
     bridged.setLinkage(linkage.bridged)
+  }
+
+  func set(isSerialized: Bool, _ context: ModulePassContext) {
+    bridged.setIsSerialized(isSerialized)
   }
 }

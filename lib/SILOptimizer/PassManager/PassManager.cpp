@@ -34,6 +34,7 @@
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
+#include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OptimizerStatsUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
@@ -1738,6 +1739,38 @@ swift::SILVTable * BridgedPassContext::specializeVTableForType(BridgedType type,
   return ::specializeVTableForType(type.unbridged(),
                                    function.getFunction()->getModule(),
                                    invocation->getTransform());
+}
+
+OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction function,
+                                                               BridgedSubstitutionMap substitutions) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  SILFunction *origFunc = function.getFunction();
+  SubstitutionMap subs = substitutions.unbridged();
+  ReabstractionInfo ReInfo(mod->getSwiftModule(), mod->isWholeModule(),
+                           ApplySite(), origFunc, subs, IsNotSerialized,
+                           /*ConvertIndirectToDirect=*/true,
+                           /*dropMetatypeArgs=*/false);
+
+  if (!ReInfo.canBeSpecialized()) {
+    return {nullptr};
+  }
+
+  SILOptFunctionBuilder FunctionBuilder(*invocation->getTransform());
+
+  GenericFuncSpecializer FuncSpecializer(FunctionBuilder, origFunc, subs,
+                                         ReInfo, /*isMandatory=*/true);
+  SILFunction *SpecializedF = FuncSpecializer.lookupSpecialization();
+  if (!SpecializedF) SpecializedF = FuncSpecializer.tryCreateSpecialization();
+  if (!SpecializedF || SpecializedF->getLoweredFunctionType()->hasError()) {
+    return {nullptr};
+  }
+  return {SpecializedF};
+}
+
+void BridgedPassContext::deserializeAllCallees(BridgedFunction function, bool deserializeAll) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  mod->linkFunction(function.getFunction(), deserializeAll ? SILModule::LinkingMode::LinkAll :
+                                                             SILModule::LinkingMode::LinkNormal);
 }
 
 bool BridgedPassContext::specializeClassMethodInst(BridgedInstruction cm) const {

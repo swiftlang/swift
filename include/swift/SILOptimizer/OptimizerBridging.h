@@ -254,6 +254,9 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;
   SWIFT_IMPORT_UNSAFE swift::SILVTable * _Nullable specializeVTableForType(BridgedType type,
                                                                            BridgedFunction function) const;
+  SWIFT_IMPORT_UNSAFE OptionalBridgedFunction specializeFunction(BridgedFunction function,
+                                                                 BridgedSubstitutionMap substitutions) const;
+  void deserializeAllCallees(BridgedFunction function, bool deserializeAll) const;
   bool specializeClassMethodInst(BridgedInstruction cm) const;
   bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
   BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
@@ -332,6 +335,13 @@ struct BridgedPassContext {
   OptionalBridgedVTable lookupSpecializedVTable(BridgedType classType) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   OptionalBridgedWitnessTable lookupWitnessTable(BridgedProtocolConformance conformance) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedWitnessTable createWitnessTable(BridgedLinkage linkage,
+                                                                            bool serialized,
+                                                                            BridgedProtocolConformance conformance,
+                                                                            BridgedArrayRef bridgedEntries) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedVTable createSpecializedVTable(bool serialized,
+                                                                           BridgedType classType,
+                                                                           BridgedArrayRef bridgedEntries) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE void loadFunction(BridgedFunction function, bool loadCalleesRecursively) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookupStdlibFunction(BridgedStringRef name) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookUpNominalDeinitFunction(BridgedNominalTypeDecl nominal) const;

@@ -927,6 +927,10 @@ void BridgedFunction::setLinkage(BridgedLinkage linkage) const {
   getFunction()->setLinkage((swift::SILLinkage)linkage);
 }
 
+void BridgedFunction::setIsSerialized(bool isSerialized) const {
+  getFunction()->setSerializedKind(isSerialized ? swift::IsSerialized : swift::IsNotSerialized);
+}
+
 bool BridgedFunction::isResilientNominalDecl(BridgedNominalTypeDecl decl) const {
   return decl.unbridged()->isResilient(getFunction()->getModule().getSwiftModule(),
                                        getFunction()->getResilienceExpansion());

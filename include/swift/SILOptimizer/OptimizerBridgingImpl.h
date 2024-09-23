@@ -426,6 +426,36 @@ OptionalBridgedWitnessTable BridgedPassContext::lookupWitnessTable(BridgedProtoc
   return {mod->lookUpWitnessTable(ref.getConcrete())};
 }
 
+BridgedWitnessTable BridgedPassContext::createWitnessTable(BridgedLinkage linkage,
+                                                           bool serialized,
+                                                           BridgedProtocolConformance conformance,
+                                                           BridgedArrayRef bridgedEntries) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  llvm::SmallVector<swift::SILWitnessTable::Entry, 8> entries;
+  for (const BridgedWitnessTableEntry &e : bridgedEntries.unbridged<BridgedWitnessTableEntry>()) {
+    entries.push_back(e.unbridged());
+  }
+  return {swift::SILWitnessTable::create(*mod, (swift::SILLinkage)linkage,
+                                         serialized ? swift::IsSerialized : swift::IsNotSerialized,
+                                         conformance.unbridged().getConcrete(),
+                                         entries, {})};
+}
+
+BridgedVTable BridgedPassContext::createSpecializedVTable(bool serialized,
+                                                          BridgedType classType,
+                                                          BridgedArrayRef bridgedEntries) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  llvm::SmallVector<swift::SILVTableEntry, 8> entries;
+  for (const BridgedVTableEntry &e : bridgedEntries.unbridged<BridgedVTableEntry>()) {
+    entries.push_back(e.unbridged());
+  }
+  swift::SILType classTy = classType.unbridged();
+  return {swift::SILVTable::create(*mod,
+                                   classTy.getClassOrBoundGenericClass(), classTy,
+                                   serialized ? swift::IsSerialized : swift::IsNotSerialized,
+                                   entries)};
+}
+
 void BridgedPassContext::loadFunction(BridgedFunction function, bool loadCalleesRecursively) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   mod->loadFunction(function.getFunction(),
