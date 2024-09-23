@@ -1549,6 +1549,128 @@ func callNonMatching_f1(_ b: Bool) -> (Int, Float, Bool, Float) {
     }
 }
 
+// CHECK: define hidden swifttailcc void @"$s16typed_throws_abi20nonMatching_f0_asyncySf_SftSbYaAA7OneWordVYKF"(ptr swiftasync %0, i1 %1)
+// CHECK:   br i1 %1, label %[[SUCCESS:.*]], label %[[ERROR:.*]]
+// CHECK: [[SUCCESS]]:
+// CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%.*}}, i1 false, ptr @"$s16typed_throws_abi20nonMatching_f0_asyncySf_SftSbYaAA7OneWordVYKF.0.49", ptr {{%.*}}, ptr {{%.*}}, float 1.000000e+00, float 2.000000e+00, i64 undef, ptr null)
+// CHECK:   unreachable
+// CHECK: 18:
+// CHECK:   [[ERROR_X:%.*]] = load i64, ptr %.x1._value, align 8
+// CHECK:   [[ERROR_RET:%.*]] = insertvalue { float, float, i64 } undef, i64 [[ERROR_X]], 2
+// CHECK:   [[ERROR_RET0:%.*]] = extractvalue { float, float, i64 } [[ERROR_RET]], 0
+// CHECK:   [[ERROR_RET1:%.*]] = extractvalue { float, float, i64 } [[ERROR_RET]], 1
+// CHECK:   [[ERROR_RET2:%.*]] = extractvalue { float, float, i64 } [[ERROR_RET]], 2
+// CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%.*}}, i1 false, ptr @"$s16typed_throws_abi20nonMatching_f0_asyncySf_SftSbYaAA7OneWordVYKF.0", ptr {{%.*}}, ptr {{%.*}}, float [[ERROR_RET0]], float [[ERROR_RET1]], i64 [[ERROR_RET2]], ptr inttoptr (i64 1 to ptr))
+// CHECK:   unreachable
+// CHECK: }
+@available(SwiftStdlib 6.0, *)
+func nonMatching_f0_async(_ b: Bool) async throws(OneWord) -> (Float, Float) {
+    guard b else {
+        throw OneWord()
+    }
+    return (1.0, 2.0)
+}
+
+
+// CHECK: define hidden swifttailcc void @"$s16typed_throws_abi24callNonMatching_f0_asyncySi_S2ftSbYaF"(ptr swiftasync %0, i1 %1)
+// CHECK:   call { ptr, float, float, i64, ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0f32f32i64p0s(i32 1024, ptr {{%.*}}, ptr @__swift_async_resume_project_context, ptr @"$s16typed_throws_abi24callNonMatching_f0_asyncySi_S2ftSbYaF.0", ptr @"$s16typed_throws_abi20nonMatching_f0_asyncySf_SftSbYaAA7OneWordVYKF", ptr {{%.*}}, i1 %1)
+// CHECK:   [[CALL_RES0:%.*]] = extractvalue { float, float, i64 } {{%.*}}, 0
+// CHECK:   [[CALL_RES1:%.*]] = extractvalue { float, float, i64 } {{%.*}}, 1
+// CHECK:   [[CALL_RES2:%.*]] = extractvalue { float, float, i64 } {{%.*}}, 2
+// CHECK:   [[ERROR:%.*]] = extractvalue { ptr, float, float, i64, ptr } {{%.*}}, 4
+// CHECK:   store ptr [[ERROR]], ptr %swifterror, align 8
+// CHECK:   [[ERROR0:%.*]] = load ptr, ptr %swifterror, align 8
+// CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR0]], null
+// CHECK:   br i1 [[ISERROR]], label %typed.error.load, label %[[SUCCESS:.*]]
+// CHECK: typed.error.load:
+// CHECK:   br label %[[SET_ERROR:.*]]
+// CHECK: [[SUCCESS]]:
+// CHECK:   [[SUCCESS_RES0:%.*]] = phi float [ [[CALL_RES0]], %entry ]
+// CHECK:   [[SUCCESS_RES1:%.*]] = phi float [ [[CALL_RES1]], %entry ]
+// CHECK:   br label %[[COMMON_RET:.*]]
+// CHECK: [[COMMON_RET]]:
+// CHECK:   [[RETVAL0:%.*]] = phi i64 [ [[ERROR_RES0:%.*]], %[[SET_ERROR]] ], [ 1, %[[SUCCESS]] ]
+// CHECK:   [[RETVAL1:%.*]] = phi float [ 0.000000e+00, %[[SET_ERROR]] ], [ [[SUCCESS_RES0]], %[[SUCCESS]] ]
+// CHECK:   [[RETVAL2:%.*]] = phi float [ 0.000000e+00, %[[SET_ERROR]] ], [ [[SUCCESS_RES1]], %[[SUCCESS]] ]
+// CHECK:   %39 = call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%.*}}, i1 false, ptr @"$s16typed_throws_abi24callNonMatching_f0_asyncySi_S2ftSbYaF.0.50", ptr {{%.*}}, ptr {{%.*}}, i64 [[RETVAL0]], float [[RETVAL1]], float [[RETVAL2]])
+// CHECK:   unreachable
+// CHECK: [[SET_ERROR]]:
+// CHECK:   [[ERROR_RES0]] = phi i64 [ [[CALL_RES2]], %typed.error.load ]
+// CHECK:   store ptr null, ptr %swifterror, align 8
+// CHECK:   br label %[[COMMON_RET]]
+// CHECK: }
+@available(SwiftStdlib 6.0, *)
+func callNonMatching_f0_async(_ b: Bool) async -> (Int, Float, Float) {
+    do {
+        let res = try await nonMatching_f0_async(b)
+        return (1, res.0, res.1)
+    } catch {
+        return (error.x, 0.0, 0.0)
+    }
+}
+
+// CHECK: define hidden swifttailcc void @"$s16typed_throws_abi20nonMatching_f1_asyncySf_SbSftSbYaAA7OneWordVYKF"(ptr swiftasync %0, i1 %1)
+// CHECK:   br i1 %1, label %[[SUCCESS:.*]], label %[[ERROR:.*]]
+// CHECK: [[SUCCESS]]:
+// CHECK:   %17 = call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%.*}}, i1 false, ptr @"$s16typed_throws_abi20nonMatching_f1_asyncySf_SbSftSbYaAA7OneWordVYKF.0.51", ptr {{%.*}}, ptr {{%.*}}, float 1.000000e+00, i64 1, float 2.000000e+00, ptr null)
+// CHECK:   unreachable
+// CHECK: [[ERROR]]:
+// CHECK:   [[ERROR_X:%.*]] = load i64, ptr %.x1._value, align 8
+// CHECK:   [[ERROR_RET:%.*]] = insertvalue { float, i64, float } undef, i64 [[ERROR_X]], 1
+// CHECK:   [[ERROR_RET0:%.*]] = extractvalue { float, i64, float } [[ERROR_RET]], 0
+// CHECK:   [[ERROR_RET1:%.*]] = extractvalue { float, i64, float } [[ERROR_RET]], 1
+// CHECK:   [[ERROR_RET2:%.*]] = extractvalue { float, i64, float } [[ERROR_RET]], 2
+// CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%.*}}, i1 false, ptr @"$s16typed_throws_abi20nonMatching_f1_asyncySf_SbSftSbYaAA7OneWordVYKF.0", ptr {{%.*}}, ptr {{%.*}}, float [[ERROR_RET0]], i64 [[ERROR_RET1]], float [[ERROR_RET2]], ptr inttoptr (i64 1 to ptr))
+// CHECK:   unreachable
+// CHECK: }
+@available(SwiftStdlib 6.0, *)
+func nonMatching_f1_async(_ b: Bool) async throws(OneWord) -> (Float, Bool, Float) {
+    guard b else {
+        throw OneWord()
+    }
+    return (1.0, true, 2.0)
+}
+
+// CHECK: define hidden swifttailcc void @"$s16typed_throws_abi24callNonMatching_f1_asyncySi_SfSbSftSbYaF"(ptr swiftasync %0, i1 %1)
+// CHECK:   call { ptr, float, i64, float, ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0f32i64f32p0s(i32 1024, ptr {{%.*}}, ptr @__swift_async_resume_project_context, ptr @"$s16typed_throws_abi24callNonMatching_f1_asyncySi_SfSbSftSbYaF.0", ptr @"$s16typed_throws_abi20nonMatching_f1_asyncySf_SbSftSbYaAA7OneWordVYKF", ptr {{%.*}}, i1 %1)
+// CHECK:   [[CALL_RES0:%.*]] = extractvalue { float, i64, float } {{%.*}}, 0
+// CHECK:   [[CALL_RES1:%.*]] = extractvalue { float, i64, float } {{%.*}}, 1
+// CHECK:   [[CALL_RES2:%.*]] = extractvalue { float, i64, float } {{%.*}}, 2
+// CHECK:   [[CALL_RES1_TRUNC:%.*]] = trunc i64 [[CALL_RES1]] to i1
+// CHECK:   [[ERROR:%.*]] = extractvalue { ptr, float, i64, float, ptr } {{%.*}}, 4
+// CHECK:   store ptr [[ERROR]], ptr %swifterror, align 8
+// CHECK:   [[ERROR0:%.*]] = load ptr, ptr %swifterror, align 8
+// CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR0]], null
+// CHECK:   br i1 [[ISERROR]], label %typed.error.load, label %[[SUCCESS:.*]]
+// CHECK: typed.error.load:
+// CHECK:   br label %[[SET_ERROR:.*]]
+// CHECK: [[SUCCESS]]:
+// CHECK:   [[SUCCESS_RES0:%.*]] = phi float [ [[CALL_RES0]], %entry ]
+// CHECK:   [[SUCCESS_RES1:%.*]] = phi i1 [ [[CALL_RES1_TRUNC]], %entry ]
+// CHECK:   [[SUCCESS_RES2:%.*]] = phi float [ [[CALL_RES2]], %entry ]
+// CHECK:   br label %[[COMMON_RET:.*]]
+// CHECK: [[COMMON_RET]]:
+// CHECK:   [[RETVAL0:%.*]] = phi i64 [ [[ERROR_RES0:%.*]], %[[SET_ERROR]] ], [ 1, %[[SUCCESS]] ]
+// CHECK:   [[RETVAL1:%.*]] = phi float [ 0.000000e+00, %[[SET_ERROR]] ], [ [[SUCCESS_RES0]], %[[SUCCESS]] ]
+// CHECK:   [[RETVAL2:%.*]] = phi i1 [ false, %[[SET_ERROR]] ], [ [[SUCCESS_RES1]], %[[SUCCESS]] ]
+// CHECK:   [[RETVAL3:%.*]] = phi float [ 0.000000e+00, %[[SET_ERROR]] ], [ [[SUCCESS_RES2]], %[[SUCCESS]] ]
+// CHECK:   %43 = call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%.*}}, i1 false, ptr @"$s16typed_throws_abi24callNonMatching_f1_asyncySi_SfSbSftSbYaF.0.52", ptr {{%.*}}, ptr {{%.*}}, i64 [[RETVAL0]], float [[RETVAL1]], i1 [[RETVAL2]], float [[RETVAL3]])
+// CHECK:   unreachable
+// CHECK: [[SET_ERROR]]:
+// CHECK:   [[ERROR_RES0]] = phi i64 [ [[CALL_RES1]], %typed.error.load ]
+// CHECK:   store ptr null, ptr %swifterror, align 8
+// CHECK:   br label %[[COMMON_RET]]
+// CHECK: }
+@available(SwiftStdlib 6.0, *)
+func callNonMatching_f1_async(_ b: Bool) async -> (Int, Float, Bool, Float) {
+    do {
+        let res = try await nonMatching_f1_async(b)
+        return (1, res.0, res.1, res.2)
+    } catch {
+        return (error.x, 0.0, false, 0.0)
+    }
+}
+
 protocol P {
     // CHECK: define hidden swiftcc void @"$s16typed_throws_abi1PP2f0yySbAA5EmptyVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias nocapture swifterror dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
