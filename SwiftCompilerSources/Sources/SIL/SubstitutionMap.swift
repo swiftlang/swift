@@ -27,8 +27,32 @@ public struct SubstitutionMap {
 
   public var hasAnySubstitutableParams: Bool { bridged.hasAnySubstitutableParams() }
 
+  public var conformances: ConformanceArray { ConformanceArray(substitutionMap: self) }
+
   public var replacementTypes: OptionalTypeArray {
     let types = BridgedTypeArray.fromReplacementTypes(bridged)
     return OptionalTypeArray(bridged: types)
+  }
+
+  public func getMethodSubstitutions(for method: Function) -> SubstitutionMap {
+    return SubstitutionMap(bridged: bridged.getMethodSubstitutions(method.bridged))
+  }
+
+  public struct ConformanceArray : BridgedRandomAccessCollection {
+    fileprivate let bridgedSubs: BridgedSubstitutionMap
+    public let count: Int
+
+    init(substitutionMap: SubstitutionMap) {
+      self.bridgedSubs = substitutionMap.bridged
+      self.count = substitutionMap.bridged.getNumConformances()
+    }
+
+    public var startIndex: Int { return 0 }
+    public var endIndex: Int { return count }
+
+    public subscript(_ index: Int) -> ProtocolConformance {
+      assert(index >= startIndex && index < endIndex)
+      return ProtocolConformance(bridged: bridgedSubs.getConformance(index))
+    }
   }
 }

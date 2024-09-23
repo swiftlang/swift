@@ -381,6 +381,17 @@ BridgedOwnedString BridgedDefaultWitnessTable::getDebugDescription() const {
 static_assert(sizeof(BridgedSubstitutionMap) >= sizeof(swift::SubstitutionMap),
               "BridgedSubstitutionMap has wrong size");
 
+BridgedSubstitutionMap BridgedSubstitutionMap::getMethodSubstitutions(BridgedFunction method) const {
+  swift::SILFunction *f = method.getFunction();
+  swift::GenericSignature genericSig = f->getLoweredFunctionType()->getInvocationGenericSignature();
+
+  if (!genericSig || genericSig->areAllParamsConcrete())
+    return swift::SubstitutionMap();
+
+  return swift::SubstitutionMap::get(genericSig,
+                                     swift::QuerySubstitutionMap{unbridged()},
+                                     swift::LookUpConformanceInModule());
+}
 
 //===----------------------------------------------------------------------===//
 //                               SILDebugLocation

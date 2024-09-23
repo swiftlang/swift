@@ -710,6 +710,14 @@ bool BridgedSubstitutionMap::hasAnySubstitutableParams() const {
   return unbridged().hasAnySubstitutableParams();
 }
 
+SwiftInt BridgedSubstitutionMap::getNumConformances() const {
+  return (SwiftInt)unbridged().getConformances().size();
+}
+
+BridgedProtocolConformance BridgedSubstitutionMap::getConformance(SwiftInt index) const {
+  return unbridged().getConformances()[index];
+}
+
 //===----------------------------------------------------------------------===//
 //                                BridgedLocation
 //===----------------------------------------------------------------------===//

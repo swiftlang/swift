@@ -652,6 +652,9 @@ struct BridgedSubstitutionMap {
   BRIDGED_INLINE BridgedSubstitutionMap();
   BRIDGED_INLINE bool isEmpty() const;
   BRIDGED_INLINE bool hasAnySubstitutableParams() const;
+  SWIFT_IMPORT_UNSAFE BridgedSubstitutionMap getMethodSubstitutions(BridgedFunction method) const;
+  BRIDGED_INLINE SwiftInt getNumConformances() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedProtocolConformance getConformance(SwiftInt index) const;
 };
 
 struct BridgedTypeArray {
