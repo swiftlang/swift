@@ -323,6 +323,10 @@ BridgedASTType BridgedType::getASTType() const {
   return {unbridged().getASTType().getPointer()};
 }
 
+BridgedDiagnosticArgument BridgedType::asDiagnosticArgument() const {
+  return swift::DiagnosticArgument(unbridged().getASTType());
+}
+
 bool BridgedType::isTrivial(BridgedFunction f) const {
   return unbridged().isTrivial(f.getFunction());
 }
@@ -353,6 +357,16 @@ bool BridgedType::hasArchetype() const {
 
 bool BridgedType::isNominalOrBoundGenericNominal() const {
   return unbridged().getNominalOrBoundGenericNominal() != nullptr;
+}
+
+BridgedSubstitutionMap BridgedType::getContextSubstitutionMap() const {
+  swift::CanType astType = unbridged().getASTType();
+  return astType->getContextSubstitutionMap();
+}
+
+bool BridgedType::isGenericAtAnyLevel() const {
+  swift::CanType astType = unbridged().getASTType();
+  return astType->isSpecialized();
 }
 
 BridgedNominalTypeDecl BridgedType::getNominalOrBoundGenericNominal() const {
@@ -529,6 +543,10 @@ BridgedType BridgedType::getFunctionTypeWithNoEscape(bool withNoEscape) const {
 BridgedArgumentConvention BridgedType::getCalleeConvention() const {
   auto fnType = unbridged().getAs<swift::SILFunctionType>();
   return getArgumentConvention(fnType->getCalleeConvention());
+}
+
+BridgedType BridgedType::getSuperClassType() const {
+  return unbridged().getSuperclass();
 }
 
 BridgedType BridgedType::getSuperClassTypeOfClassDecl(BridgedNominalTypeDecl decl) {

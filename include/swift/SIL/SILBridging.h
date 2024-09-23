@@ -42,6 +42,8 @@ struct BridgedFunction;
 struct BridgedBasicBlock;
 struct BridgedSuccessorArray;
 struct OptionalBridgedBasicBlock;
+struct BridgedSubstitutionMap;
+struct BridgedProtocolConformance;
 
 namespace swift {
 class ValueBase;
@@ -286,6 +288,7 @@ struct BridgedType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getAddressType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getObjectType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getASTType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDiagnosticArgument asDiagnosticArgument() const;
   BRIDGED_INLINE bool isTrivial(BridgedFunction f) const;
   BRIDGED_INLINE bool isNonTrivialOrContainsRawPointer(BridgedFunction f) const;
   BRIDGED_INLINE bool isValueTypeWithDeinit() const;
@@ -295,6 +298,8 @@ struct BridgedType {
   BRIDGED_INLINE bool hasArchetype() const;
   BRIDGED_INLINE bool isNominalOrBoundGenericNominal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNominalTypeDecl getNominalOrBoundGenericNominal() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap() const;
+  BRIDGED_INLINE bool isGenericAtAnyLevel() const;
   BRIDGED_INLINE bool isClassOrBoundGenericClass() const;
   BRIDGED_INLINE bool isStructOrBoundGenericStruct() const;
   BRIDGED_INLINE bool isTuple() const;
@@ -336,6 +341,7 @@ struct BridgedType {
   getTupleElementType(SwiftInt idx) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getFunctionTypeWithNoEscape(bool withNoEscape) const;
   BRIDGED_INLINE BridgedArgumentConvention getCalleeConvention() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getSuperClassType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   static BridgedType getSuperClassTypeOfClassDecl(BridgedNominalTypeDecl decl);
 };

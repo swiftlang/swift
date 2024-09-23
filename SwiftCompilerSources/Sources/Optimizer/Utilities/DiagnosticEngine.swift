@@ -30,6 +30,11 @@ extension Int: DiagnosticArgument {
     fn(BridgedDiagnosticArgument(self))
   }
 }
+extension Type: DiagnosticArgument {
+  public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
+    fn(bridged.asDiagnosticArgument())
+  }
+}
 extension DeclRef: DiagnosticArgument {
   public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
     fn(bridged.asDiagnosticArgument())

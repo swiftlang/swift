@@ -80,6 +80,17 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     NominalTypeDecl(_bridged: bridged.getNominalOrBoundGenericNominal())
   }
 
+  public var superClassType: Type? {
+    precondition(isClass)
+    return bridged.getSuperClassType().typeOrNil
+  }
+
+  public var contextSubstitutionMap: SubstitutionMap {
+    SubstitutionMap(bridged: bridged.getContextSubstitutionMap())
+  }
+
+  public var isGenericAtAnyLevel: Bool { bridged.isGenericAtAnyLevel() }
+
   public var isOrContainsObjectiveCClass: Bool { bridged.isOrContainsObjectiveCClass() }
 
   public var isBuiltinInteger: Bool { bridged.isBuiltinInteger() }
