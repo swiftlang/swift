@@ -1097,11 +1097,32 @@ struct BridgedDeclRef {
 };
 
 struct BridgedVTableEntry {
-  const swift::SILVTableEntry * _Nonnull entry;
+  uint64_t storage[5];
+
+  enum class Kind {
+    Normal,
+    Inherited,
+    Override
+  };
+
+#ifdef USED_IN_CPP_SOURCE
+  BridgedVTableEntry(const swift::SILVTableEntry &entry) {
+    *reinterpret_cast<swift::SILVTableEntry *>(&storage) = entry;
+  }
+
+  const swift::SILVTableEntry &unbridged() const {
+    return *reinterpret_cast<const swift::SILVTableEntry *>(&storage);
+  }
+#endif
 
   BridgedOwnedString getDebugDescription() const;
+  BRIDGED_INLINE Kind getKind() const;
+  BRIDGED_INLINE bool isNonOverridden() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclRef getMethodDecl() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getImplementation() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedVTableEntry advanceBy(SwiftInt index) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  static BridgedVTableEntry create(Kind kind, bool nonOverridden,
+                                   BridgedDeclRef methodDecl, BridgedFunction implementation);
 };
 
 struct BridgedVTableEntryArray {
@@ -1113,42 +1134,52 @@ struct BridgedVTable {
   const swift::SILVTable * _Nonnull vTable;
 
   BridgedOwnedString getDebugDescription() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedVTableEntryArray getEntries() const;
+  BRIDGED_INLINE SwiftInt getNumEntries() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedVTableEntry getEntry(SwiftInt index) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNominalTypeDecl getClass() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getSpecializedClassType() const;
+};
+
+struct OptionalBridgedVTable {
+  const swift::SILVTable * _Nullable table;
 };
 
 struct BridgedWitnessTableEntry {
-  const void * _Nonnull entry;
+  uint64_t storage[5];
 
   enum class Kind {
-    Invalid,
-    Method,
-    AssociatedType,
-    AssociatedTypeProtocol,
-    BaseProtocol
+    invalid,
+    method,
+    associatedType,
+    associatedTypeProtocol,
+    baseProtocol
   };
 
 #ifdef USED_IN_CPP_SOURCE
-  const swift::SILWitnessTable::Entry * _Nonnull getEntry() const {
-    return (const swift::SILWitnessTable::Entry * _Nonnull)entry;
+  BridgedWitnessTableEntry(const swift::SILWitnessTable::Entry &entry) {
+    *reinterpret_cast<swift::SILWitnessTable::Entry *>(&storage) = entry;
+  }
+
+  const swift::SILWitnessTable::Entry &unbridged() const {
+    return *reinterpret_cast<const swift::SILWitnessTable::Entry *>(&storage);
   }
 #endif
 
   BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE Kind getKind() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclRef getMethodRequirement() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction getMethodFunction() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedWitnessTableEntry advanceBy(SwiftInt index) const;
-};
-
-struct BridgedWitnessTableEntryArray {
-  BridgedWitnessTableEntry base;
-  SwiftInt count;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  static BridgedWitnessTableEntry createMethod(BridgedDeclRef requirement, BridgedFunction function);
 };
 
 struct BridgedWitnessTable {
   const swift::SILWitnessTable * _Nonnull table;
 
   BridgedOwnedString getDebugDescription() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedWitnessTableEntryArray getEntries() const;
+  BRIDGED_INLINE SwiftInt getNumEntries() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedWitnessTableEntry getEntry(SwiftInt index) const;
+  BRIDGED_INLINE bool isDeclaration() const;
 };
 
 struct OptionalBridgedWitnessTable {
@@ -1159,7 +1190,8 @@ struct BridgedDefaultWitnessTable {
   const swift::SILDefaultWitnessTable * _Nonnull table;
 
   BridgedOwnedString getDebugDescription() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedWitnessTableEntryArray getEntries() const;
+  BRIDGED_INLINE SwiftInt getNumEntries() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedWitnessTableEntry getEntry(SwiftInt index) const;
 };
 
 struct OptionalBridgedDefaultWitnessTable {

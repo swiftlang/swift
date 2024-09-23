@@ -156,7 +156,7 @@ private func specializeVTableAndAddEntriesToWorklist(for type: Type, in function
   let vTables = moduleContext.vTables
   for i in vTablesCountBefore ..< vTables.count {
     for entry in vTables[i].entries {
-      worklist.pushIfNotVisited(entry.function)
+      worklist.pushIfNotVisited(entry.implementation)
     }
   }
 }

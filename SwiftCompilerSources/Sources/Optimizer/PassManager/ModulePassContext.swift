@@ -54,14 +54,14 @@ struct ModulePassContext : Context, CustomStringConvertible {
   }
 
   struct VTableArray : BridgedRandomAccessCollection {
-    fileprivate let bridged: BridgedPassContext.VTableArray
+    fileprivate let bridgedCtxt: BridgedPassContext
 
     var startIndex: Int { return 0 }
-    var endIndex: Int { return bridged.count }
+    var endIndex: Int { return bridgedCtxt.getNumVTables() }
 
     subscript(_ index: Int) -> VTable {
       assert(index >= startIndex && index < endIndex)
-      return VTable(bridged: BridgedVTable(vTable: bridged.base![index]))
+      return VTable(bridged: bridgedCtxt.getVTable(index))
     }
   }
 
@@ -101,9 +101,7 @@ struct ModulePassContext : Context, CustomStringConvertible {
     GlobalVariableList(first: _bridged.getFirstGlobalInModule().globalVar)
   }
 
-  var vTables: VTableArray {
-    VTableArray(bridged: _bridged.getVTables())
-  }
+  var vTables: VTableArray { VTableArray(bridgedCtxt: _bridged) }
   
   var witnessTables: WitnessTableList {
     WitnessTableList(first: _bridged.getFirstWitnessTableInModule().witnessTable)

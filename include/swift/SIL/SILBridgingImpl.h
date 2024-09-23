@@ -1759,17 +1759,42 @@ BridgedDiagnosticArgument BridgedDeclRef::asDiagnosticArgument() const {
 //                                BridgedVTable
 //===----------------------------------------------------------------------===//
 
+BridgedVTableEntry::Kind BridgedVTableEntry::getKind() const {
+  return (Kind)unbridged().getKind();
+}
+
+BRIDGED_INLINE bool BridgedVTableEntry::isNonOverridden() const {
+  return unbridged().isNonOverridden();
+}
+
+BridgedDeclRef BridgedVTableEntry::getMethodDecl() const {
+  return unbridged().getMethod();
+}
+
 BridgedFunction BridgedVTableEntry::getImplementation() const {
-  return {entry->getImplementation()};
+  return {unbridged().getImplementation()};
 }
 
-BridgedVTableEntry BridgedVTableEntry::advanceBy(SwiftInt index) const {
-  return {entry + index};
+BridgedVTableEntry BridgedVTableEntry::create(Kind kind, bool nonOverridden,
+                                              BridgedDeclRef methodDecl, BridgedFunction implementation) {
+  return swift::SILVTableEntry(methodDecl.unbridged(), implementation.getFunction(),
+                               (swift::SILVTableEntry::Kind)kind, nonOverridden);
 }
 
-BridgedVTableEntryArray BridgedVTable::getEntries() const {
-  auto entries = vTable->getEntries();
-  return {{entries.data()}, (SwiftInt)entries.size()};
+SwiftInt BridgedVTable::getNumEntries() const {
+  return SwiftInt(vTable->getEntries().size());
+}
+
+BridgedVTableEntry BridgedVTable::getEntry(SwiftInt index) const {
+  return BridgedVTableEntry(vTable->getEntries()[index]);
+}
+
+BridgedNominalTypeDecl BridgedVTable::getClass() const {
+  return {vTable->getClass()};
+}
+
+BridgedType BridgedVTable::getSpecializedClassType() const {
+  return {vTable->getClassType()};
 }
 
 //===----------------------------------------------------------------------===//
@@ -1777,25 +1802,41 @@ BridgedVTableEntryArray BridgedVTable::getEntries() const {
 //===----------------------------------------------------------------------===//
 
 BridgedWitnessTableEntry::Kind BridgedWitnessTableEntry::getKind() const {
-  return (Kind)getEntry()->getKind();
+  return (Kind)unbridged().getKind();
+}
+
+BridgedDeclRef BridgedWitnessTableEntry::getMethodRequirement() const {
+  return unbridged().getMethodWitness().Requirement;
 }
 
 OptionalBridgedFunction BridgedWitnessTableEntry::getMethodFunction() const {
-  return {getEntry()->getMethodWitness().Witness};
+  return {unbridged().getMethodWitness().Witness};
 }
 
-BridgedWitnessTableEntry BridgedWitnessTableEntry::advanceBy(SwiftInt index) const {
-  return {getEntry() + index};
+BridgedWitnessTableEntry BridgedWitnessTableEntry::createMethod(BridgedDeclRef requirement,
+                                                                BridgedFunction function) {
+  return swift::SILWitnessTable::Entry(swift::SILWitnessTable::MethodWitness{requirement.unbridged(),
+                                                                             function.getFunction()});
 }
 
-BridgedWitnessTableEntryArray BridgedWitnessTable::getEntries() const {
-  auto entries = table->getEntries();
-  return {{entries.data()}, (SwiftInt)entries.size()};
+SwiftInt BridgedWitnessTable::getNumEntries() const {
+  return SwiftInt(table->getEntries().size());
 }
 
-BridgedWitnessTableEntryArray BridgedDefaultWitnessTable::getEntries() const {
-  auto entries = table->getEntries();
-  return {{entries.data()}, (SwiftInt)entries.size()};
+BridgedWitnessTableEntry BridgedWitnessTable::getEntry(SwiftInt index) const {
+  return BridgedWitnessTableEntry(table->getEntries()[index]);
+}
+
+bool BridgedWitnessTable::isDeclaration() const {
+  return table->isDeclaration();
+}
+
+SwiftInt BridgedDefaultWitnessTable::getNumEntries() const {
+  return SwiftInt(table->getEntries().size());
+}
+
+BridgedWitnessTableEntry BridgedDefaultWitnessTable::getEntry(SwiftInt index) const {
+  return BridgedWitnessTableEntry(table->getEntries()[index]);
 }
 
 //===----------------------------------------------------------------------===//
