@@ -357,6 +357,51 @@ namespace {
 
 #undef IMPL
 
+    RetTy visitBuiltinUnboundGenericType(CanBuiltinUnboundGenericType type,
+                                         AbstractionPattern origType,
+                                         IsTypeExpansionSensitive_t isSensitive){
+      llvm_unreachable("not a real type");
+    }
+    
+    RecursiveProperties getBuiltinFixedArrayProperties(
+                                      CanBuiltinFixedArrayType type,
+                                      AbstractionPattern origType,
+                                      IsTypeExpansionSensitive_t isSensitive) {
+      RecursiveProperties props;
+      
+      // We get most of the type properties from the element type.
+      AbstractionPattern origElementType = AbstractionPattern::getOpaque();
+      if (auto bfaOrigTy = origType.getAs<BuiltinFixedArrayType>()) {
+        origElementType = AbstractionPattern(
+          origType.getGenericSignatureOrNull(),
+          bfaOrigTy->getElementType());
+      }
+      
+      props.addSubobject(classifyType(origElementType, type->getElementType(),
+                                      TC, Expansion));
+      
+      props = mergeIsTypeExpansionSensitive(isSensitive, props);
+      
+      // If the size isn't a known literal, then the layout is also dependent,
+      // so make it address-only. If the size is massive, also treat it as
+      // address-only since there's little practical benefit to passing around
+      // huge amounts of data "directly".
+      auto fixedSize = type->getFixedInhabitedSize();
+      if (!type->isFixedNegativeSize()
+          && (!fixedSize.has_value()
+              || *fixedSize > BuiltinFixedArrayType::MaximumLoadableSize)) {
+        props.setAddressOnly();
+      }
+      return props;
+    }
+    
+    RetTy visitBuiltinFixedArrayType(CanBuiltinFixedArrayType type,
+                                     AbstractionPattern origType,
+                                     IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().handleAggregateByProperties(type,
+                  getBuiltinFixedArrayProperties(type, origType, isSensitive));
+    }
+
     RetTy visitPackType(CanPackType type,
                         AbstractionPattern origType,
                         IsTypeExpansionSensitive_t isSensitive) {
@@ -1359,7 +1404,7 @@ namespace {
       forEachNonTrivialChild(B, loc, aggValue, Fn);
     }
   };
-
+  
   /// A lowering for loadable but non-trivial tuple types.
   class LoadableTupleTypeLowering final
       : public LoadableAggTypeLowering<LoadableTupleTypeLowering, unsigned> {
@@ -1762,6 +1807,44 @@ namespace {
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
                                  TypeExpansionKind style) const override {
       emitDestroyValue(B, loc, value);
+    }
+  };
+
+  /// A class for nonspecific loadable nontrivial types.
+  class MiscNontrivialTypeLowering : public LeafLoadableTypeLowering {
+  public:
+    MiscNontrivialTypeLowering(SILType type, RecursiveProperties properties,
+                          TypeExpansionContext forExpansion)
+        : LeafLoadableTypeLowering(type, properties, IsNotReferenceCounted,
+                                   forExpansion) {}
+
+    MiscNontrivialTypeLowering(CanType type, RecursiveProperties properties,
+                            TypeExpansionContext forExpansion)
+      : MiscNontrivialTypeLowering(SILType::getPrimitiveObjectType(type),
+                                   properties, forExpansion)
+    {}
+
+
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      if (isa<FunctionRefInst>(value) || isa<DynamicFunctionRefInst>(value) ||
+          isa<PreviousDynamicFunctionRefInst>(value))
+        return value;
+
+      if (B.getFunction().hasOwnership())
+        return B.createCopyValue(loc, value);
+
+      B.createRetainValue(loc, value, B.getDefaultAtomicity());
+      return value;
+    }
+
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+                          SILValue value) const override {
+      if (B.getFunction().hasOwnership()) {
+        B.createDestroyValue(loc, value);
+        return;
+      }
+      B.createReleaseValue(loc, value, B.getDefaultAtomicity());
     }
   };
 
@@ -2341,6 +2424,14 @@ namespace {
 
       return handleAggregateByProperties<LoadableTupleTypeLowering>(tupleType,
                                                                     properties);
+    }
+    
+    TypeLowering *visitBuiltinFixedArrayType(CanBuiltinFixedArrayType faType,
+                                       AbstractionPattern origType,
+                                       IsTypeExpansionSensitive_t isSensitive) {
+      
+      return handleAggregateByProperties<MiscNontrivialTypeLowering>(faType,
+                 getBuiltinFixedArrayProperties(faType, origType, isSensitive));
     }
 
     bool handleResilience(CanType type, NominalTypeDecl *D,

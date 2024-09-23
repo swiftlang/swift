@@ -1811,6 +1811,10 @@ checkInvertibleRequirementsStructural(const Metadata *type,
     // The existential representation has no room for specifying any
     // suppressed requirements, so it always succeeds.
     return std::nullopt;
+    
+  case MetadataKind::FixedArray:
+    // Builtin.FixedArray has no conformances of its own.
+    return std::nullopt;
 
   case MetadataKind::LastEnumerated:
     break;
