@@ -102,6 +102,11 @@ in batch file format instead of executing them.
 .PARAMETER HostArchName
 The architecture where the toolchain will execute.
 
+.PARAMETER Allocator
+The memory allocator used in the toolchain binaries, if it's
+`mimalloc`, it uses mimalloc. Otherwise, it uses the default
+allocator.
+
 .EXAMPLE
 PS> .\Build.ps1
 
@@ -138,6 +143,7 @@ param(
   [switch] $DebugInfo,
   [switch] $EnableCaching,
   [string] $Cache = "",
+  [string] $Allocator = "",
   [switch] $Summary,
   [switch] $ToBatch
 )
@@ -1465,6 +1471,59 @@ function Build-Compilers() {
   }
 }
 
+# Reference: https://github.com/microsoft/mimalloc/tree/dev/bin#minject
+# TODO: Add ARM64
+function Build-Mimalloc() {
+  [CmdletBinding(PositionalBinding = $false)]
+  param
+  (
+    [Parameter(Position = 0, Mandatory = $true)]
+    [hashtable]$Arch
+  )
+
+  if ($Arch -eq $ArchX64) {
+    $Args = @()
+    Isolate-EnvVars {
+      Invoke-VsDevShell $Arch
+      # Avoid hard-coding the VC tools version number
+      $VCRedistDir = (Get-ChildItem "${env:VCToolsRedistDir}\$($HostArch.ShortName)" -Filter "Microsoft.VC*.CRT").FullName
+      if ($VCRedistDir) {
+        $Args += "-p:VCRedistDir=$VCRedistDir\"
+      }
+    }
+    $Args += "$SourceCache\mimalloc\ide\vs2022\mimalloc.sln"
+    $Args += "-p:Configuration=Release"
+    $Args += "-p:ProductArchitecture=$($Arch.VSName)"
+    Invoke-Program $msbuild @Args
+    $Dest = "$($Arch.ToolchainInstallRoot)\usr\bin"
+    Copy-Item -Path "$SourceCache\mimalloc\out\msvc-$($Arch.ShortName)\Release\mimalloc-override.dll" `
+      -Destination "$Dest"
+    Copy-Item -Path "$SourceCache\mimalloc\out\msvc-$($Arch.ShortName)\Release\mimalloc-redirect.dll" `
+      -Destination "$Dest"
+    $MimallocExecutables = @("swift.exe","swiftc.exe","swift-driver.exe","swift-frontend.exe")
+    $MimallocExecutables += @("clang.exe","clang++.exe","clang-cl.exe")
+    $MimallocExecutables += @("lld.exe","lld-link.exe","ld.lld.exe","ld64.lld.exe")
+    foreach ($Exe in $MimallocExecutables) {
+      $ExePath = [IO.Path]::Combine($Dest, $Exe)
+      # Binary-patch in place
+      $Args = @()
+      $Args += "-f"
+      $Args += "-i"
+      $Args += "-v"
+      $Args += $ExePath
+      Invoke-Program "$SourceCache\mimalloc\bin\minject" @Args
+      # Log the import table
+      $Args = @()
+      $Args += "-l"
+      $Args += $ExePath
+      Invoke-Program "$SourceCache\mimalloc\bin\minject" @Args
+      dir "$ExePath"
+    }
+  } else {
+    throw "mimalloc is currently supported for X64 only"
+  }
+}
+
 function Build-LLVM([Platform]$Platform, $Arch) {
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\llvm `
@@ -2461,6 +2520,7 @@ function Build-Installer($Arch) {
   # when cross-compiling https://github.com/apple/swift/issues/71655
   $INCLUDE_SWIFT_INSPECT = if ($IsCrossCompiling) { "false" } else { "true" }
   $INCLUDE_SWIFT_DOCC = if ($IsCrossCompiling) { "false" } else { "true" }
+  $ENABLE_MIMALLOC = if ($Allocator -eq "mimalloc" -and $Arch -eq $ArchX64) { "true" } else { "false" }
 
   $Properties = @{
     BundleFlavor = "offline";
@@ -2469,6 +2529,7 @@ function Build-Installer($Arch) {
     INCLUDE_SWIFT_INSPECT = $INCLUDE_SWIFT_INSPECT;
     SWIFT_INSPECT_BUILD = "$($Arch.BinaryCache)\swift-inspect\release";
     INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
+    ENABLE_MIMALLOC = $ENABLE_MIMALLOC;
     SWIFT_DOCC_BUILD = "$($Arch.BinaryCache)\swift-docc\release";
     SWIFT_DOCC_RENDER_ARTIFACT_ROOT = "${SourceCache}\swift-docc-render-artifact";
   }
@@ -2619,6 +2680,10 @@ if (-not $SkipBuild) {
 }
 
 Install-HostToolchain
+
+if (-not $SkipBuild -and $Allocator -eq "mimalloc") {
+  Invoke-BuildStep Build-Mimalloc $HostArch
+}
 
 if (-not $SkipBuild -and -not $IsCrossCompiling) {
   Invoke-BuildStep Build-Inspect $HostArch
