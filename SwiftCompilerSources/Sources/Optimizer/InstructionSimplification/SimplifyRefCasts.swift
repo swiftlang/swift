@@ -116,7 +116,10 @@ private func insertCompensatingInstructions(for inst: Instruction, in failureBlo
   let newInst: SingleValueInstruction
   switch inst {
   case let ier as InitExistentialRefInst:
-    newInst = builder.createInitExistentialRef(instance: newArg, existentialType: ier.type, useConformancesOf: ier)
+    newInst = builder.createInitExistentialRef(instance: newArg,
+                                               existentialType: ier.type,
+                                               formalConcreteType: ier.formalConcreteType,
+                                               conformances: ier.conformances)
   case let uc as UpcastInst:
     newInst = builder.createUpcast(from: newArg, to: uc.type)
   default:

@@ -669,6 +669,14 @@ class TailAddrInst : SingleValueInstruction {
 final public
 class InitExistentialRefInst : SingleValueInstruction, UnaryInstruction {
   public var instance: Value { operand.value }
+
+  public var conformances: ProtocolConformanceArray {
+    ProtocolConformanceArray(bridged: bridged.InitExistentialRefInst_getConformances())
+  }
+
+  public var formalConcreteType: BridgedASTType {
+    bridged.InitExistentialRefInst_getFormalConcreteType()
+  }
 }
 
 final public

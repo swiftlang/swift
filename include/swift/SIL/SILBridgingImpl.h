@@ -22,6 +22,8 @@
 #include "SILBridging.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/BasicBridging.h"
@@ -979,6 +981,42 @@ BridgedType BridgedSILTypeArray::getAt(SwiftInt index) const {
 }
 
 //===----------------------------------------------------------------------===//
+//                            BridgedProtocolConformance
+//===----------------------------------------------------------------------===//
+
+static_assert(sizeof(BridgedProtocolConformance) == sizeof(swift::ProtocolConformanceRef));
+
+bool BridgedProtocolConformance::isConcrete() const {
+  return unbridged().isConcrete();
+}
+
+bool BridgedProtocolConformance::isValid() const {
+  return !unbridged().isInvalid();
+}
+
+bool BridgedProtocolConformance::isSpecializedConformance() const {
+  return swift::isa<swift::SpecializedProtocolConformance>(unbridged().getConcrete());
+}
+
+BridgedProtocolConformance BridgedProtocolConformance::getGenericConformance() const {
+  auto *specPC = swift::cast<swift::SpecializedProtocolConformance>(unbridged().getConcrete());
+  return {swift::ProtocolConformanceRef(specPC->getGenericConformance())};
+}
+
+BridgedSubstitutionMap BridgedProtocolConformance::getSpecializedSubstitutions() const {
+  auto *specPC = swift::cast<swift::SpecializedProtocolConformance>(unbridged().getConcrete());
+  return {specPC->getSubstitutionMap()};
+}
+
+//===----------------------------------------------------------------------===//
+//                           BridgedProtocolConformanceArray
+//===----------------------------------------------------------------------===//
+
+BridgedProtocolConformance BridgedProtocolConformanceArray::getAt(SwiftInt index) const {
+  return unbridged()[index];
+}
+
+//===----------------------------------------------------------------------===//
 //                                BridgedInstruction
 //===----------------------------------------------------------------------===//
 
@@ -1129,6 +1167,14 @@ bool BridgedInstruction::AddressToPointerInst_needsStackProtection() const {
 
 bool BridgedInstruction::IndexAddrInst_needsStackProtection() const {
   return getAs<swift::IndexAddrInst>()->needsStackProtection();
+}
+
+BridgedProtocolConformanceArray BridgedInstruction::InitExistentialRefInst_getConformances() const {
+  return getAs<swift::InitExistentialRefInst>()->getConformances();
+}
+
+BridgedASTType BridgedInstruction::InitExistentialRefInst_getFormalConcreteType() const {
+  return {getAs<swift::InitExistentialRefInst>()->getFormalConcreteType().getPointer()};
 }
 
 BridgedGlobalVar BridgedInstruction::GlobalAccessInst_getGlobal() const {
@@ -2036,20 +2082,19 @@ BridgedInstruction BridgedBuilder::createStore(BridgedValue src, BridgedValue ds
 
 BridgedInstruction BridgedBuilder::createInitExistentialRef(BridgedValue instance,
                                             BridgedType type,
-                                            BridgedInstruction useConformancesOf) const {
-  auto *src = useConformancesOf.getAs<swift::InitExistentialRefInst>();
+                                            BridgedASTType formalConcreteType,
+                                            BridgedProtocolConformanceArray conformances) const {
   return {unbridged().createInitExistentialRef(
-      regularLoc(), type.unbridged(), src->getFormalConcreteType(),
-      instance.getSILValue(), src->getConformances())};
+      regularLoc(), type.unbridged(), swift::CanType(formalConcreteType.unbridged()),
+      instance.getSILValue(), conformances.unbridged())};
 }
 
 BridgedInstruction BridgedBuilder::createInitExistentialMetatype(BridgedValue metatype,
                                             BridgedType existentialType,
-                                            BridgedInstruction useConformancesOf) const {
-  auto *src = useConformancesOf.getAs<swift::InitExistentialMetatypeInst>();
+                                            BridgedProtocolConformanceArray conformances) const {
   return {unbridged().createInitExistentialMetatype(
       regularLoc(), metatype.getSILValue(), existentialType.unbridged(),
-      src->getConformances())};
+      conformances.unbridged())};
 }
 
 BridgedInstruction BridgedBuilder::createMetatype(BridgedType type,
