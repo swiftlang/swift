@@ -2185,8 +2185,7 @@ bool MemoryToRegisters::promoteAllocation(AllocStackInst *alloc,
   ++NumAllocStackFound;
 
   // In OSSA, don't do Mem2Reg on non-trivial alloc_stack with dynamic_lifetime.
-  if (alloc->hasDynamicLifetime() && f.hasOwnership() &&
-      !alloc->getType().isTrivial(f)) {
+  if (alloc->hasDynamicLifetime() && !alloc->getType().isTrivial(f)) {
     return false;
   }
 
