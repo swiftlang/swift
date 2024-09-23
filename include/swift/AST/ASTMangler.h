@@ -239,7 +239,7 @@ public:
                                            const ConstructorDecl *Derived,
                                            bool isAllocating);
 
-  std::string mangleWitnessTable(const RootProtocolConformance *C);
+  std::string mangleWitnessTable(const ProtocolConformance *C);
 
   std::string mangleWitnessThunk(const ProtocolConformance *Conformance,
                                  const ValueDecl *Requirement);

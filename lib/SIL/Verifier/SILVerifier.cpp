@@ -7677,7 +7677,7 @@ void SILModule::verify(CalleeCache *calleeCache,
 
   // Check all witness tables.
   LLVM_DEBUG(llvm::dbgs() <<"*** Checking witness tables for duplicates ***\n");
-  llvm::DenseSet<RootProtocolConformance*> wtableConformances;
+  llvm::DenseSet<ProtocolConformance*> wtableConformances;
   for (const SILWitnessTable &wt : getWitnessTables()) {
     LLVM_DEBUG(llvm::dbgs() << "Witness Table:\n"; wt.dump());
     auto conformance = wt.getConformance();

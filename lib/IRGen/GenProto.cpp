@@ -1413,8 +1413,8 @@ public:
 
     WitnessTableBuilderBase(IRGenModule &IGM, SILWitnessTable *SILWT)
         : IGM(IGM), SILWT(SILWT),
-          Conformance(*SILWT->getConformance()),
-          ConformanceInContext(*mapConformanceIntoContext(SILWT->getConformance())),
+          Conformance(*SILWT->getConformance()->getRootConformance()),
+          ConformanceInContext(*mapConformanceIntoContext(SILWT->getConformance()->getRootConformance())),
           ConcreteType(Conformance.getDeclContext()
                          ->mapTypeIntoContext(Conformance.getType())
                          ->getCanonicalType()) {}
@@ -2352,7 +2352,7 @@ void IRGenerator::ensureRelativeSymbolCollocation(SILWitnessTable &wt) {
 
   // Only resilient conformances use relative pointers for witness methods.
   if (wt.isDeclaration() || isAvailableExternally(wt.getLinkage()) ||
-      !CurrentIGM->isResilientConformance(wt.getConformance()))
+      !CurrentIGM->isResilientConformance(wt.getConformance()->getRootConformance()))
     return;
 
   for (auto &entry : wt.getEntries()) {
@@ -2592,14 +2592,15 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   IRGen.ensureRelativeSymbolCollocation(*wt);
 
   auto conf = wt->getConformance();
+  RootProtocolConformance *rootConf = conf->getRootConformance();
   PrettyStackTraceConformance _st("emitting witness table for", conf);
 
   unsigned tableSize = 0;
   llvm::GlobalVariable *global = nullptr;
   llvm::Function *instantiationFunction = nullptr;
-  bool isDependent = isDependentConformance(conf);
+  bool isDependent = isDependentConformance(rootConf);
   SmallVector<llvm::Constant *, 4> resilientWitnesses;
-  bool isResilient = isResilientConformance(conf);
+  bool isResilient = isResilientConformance(rootConf);
   bool useRelativeProtocolWitnessTable =
     IRGen.Opts.UseRelativeProtocolWitnessTables;
   if (useRelativeProtocolWitnessTable &&
@@ -2659,7 +2660,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Collect the information that will go into the protocol conformance
   // descriptor.
   unsigned tablePrivateSize = wt->getConditionalConformances().size();
-  ConformanceDescription description(conf, wt, global, tableSize,
+  ConformanceDescription description(rootConf, wt, global, tableSize,
                                      tablePrivateSize, isDependent);
 
   // Build the instantiation function, we if need one.

@@ -6108,7 +6108,7 @@ IRGenModule::getAddrOfWitnessTableLazyCacheVariable(
 ///
 /// This can only be used with non-dependent conformances.
 llvm::Constant*
-IRGenModule::getAddrOfWitnessTable(const RootProtocolConformance *conf,
+IRGenModule::getAddrOfWitnessTable(const ProtocolConformance *conf,
                                    ConstantInit definition) {
   IRGen.addLazyWitnessTable(conf);
 

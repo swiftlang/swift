@@ -206,7 +206,7 @@ void CalleeCache::computeWitnessMethodCalleesForWitnessTable(
     // If we can't resolve the witness, conservatively assume it can call
     // anything.
     if (!Requirement.getDecl()->isProtocolRequirement() ||
-        !WT.getConformance()->hasWitness(Requirement.getDecl())) {
+        !WT.getConformance()->getRootConformance()->hasWitness(Requirement.getDecl())) {
       TheCallees.setInt(true);
       continue;
     }
@@ -229,7 +229,7 @@ void CalleeCache::computeWitnessMethodCalleesForWitnessTable(
         LLVM_FALLTHROUGH;
       case AccessLevel::FilePrivate:
       case AccessLevel::Private: {
-        auto Witness = Conf->getWitness(Requirement.getDecl());
+        auto Witness = Conf->getRootConformance()->getWitness(Requirement.getDecl());
         auto DeclRef = SILDeclRef(Witness.getDecl());
         canCallUnknown = !calleesAreStaticallyKnowable(M, DeclRef);
       }
