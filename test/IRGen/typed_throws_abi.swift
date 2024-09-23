@@ -1436,6 +1436,119 @@ func callImplAsync_g5(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int
     }
 }
 
+// CHECK: define hidden swiftcc { float, float, i64 } @"$s16typed_throws_abi14nonMatching_f0ySf_SftSbAA7OneWordVYKF"(i1 %0, ptr swiftself %1, ptr noalias nocapture swifterror dereferenceable(8) %2)
+// CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
+// CHECK: [[SUCCESS]]:
+// CHECK:   ret { float, float, i64 } { float 1.000000e+00, float 2.000000e+00, i64 undef }
+// CHECK: [[FAIL]]:
+// CHECK:   [[ERROR_RES0:%.*]] = load i64, ptr %.x1._value, align 8
+// CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
+// CHECK:   [[ERROR_RES:%.*]] = insertvalue { float, float, i64 } undef, i64 [[ERROR_RES0]], 2
+// CHECK:   ret { float, float, i64 } [[ERROR_RES]]
+// CHECK: }
+func nonMatching_f0(_ b: Bool) throws(OneWord) -> (Float, Float) {
+    guard b else {
+        throw OneWord()
+    }
+    return (1.0, 2.0)
+}
+
+// CHECK: define hidden swiftcc { i64, float, float } @"$s16typed_throws_abi18callNonMatching_f0ySi_S2ftSbF"(i1 %0)
+// CHECK:   %swifterror = alloca swifterror ptr, align 8
+// CHECK:   store ptr null, ptr %swifterror, align 8
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc { float, float, i64 } @"$s16typed_throws_abi14nonMatching_f0ySf_SftSbAA7OneWordVYKF"(i1 %0, ptr swiftself undef, ptr noalias nocapture swifterror dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES0:%.*]] = extractvalue { float, float, i64 } [[CALL_RES]], 0
+// CHECK:   [[CALL_RES1:%.*]] = extractvalue { float, float, i64 } [[CALL_RES]], 1
+// CHECK:   [[CALL_RES2:%.*]] = extractvalue { float, float, i64 } [[CALL_RES]], 2
+// CHECK:   [[ERROR:%.*]] = load ptr, ptr %swifterror, align 8
+// CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
+// CHECK:   br i1 [[ISERROR]], label %typed.error.load, label %[[SUCCESS:.*]]
+// CHECK: typed.error.load:
+// CHECK:   br label %[[SET_ERROR:.*]]
+// CHECK: [[SUCCESS]]:
+// CHECK:   [[SUCCESS_RES0:%.*]] = phi float [ [[CALL_RES0]], %entry ]
+// CHECK:   [[SUCCESS_RES1:%.*]] = phi float [ [[CALL_RES1]], %entry ]
+// CHECK:   br label %[[COMMON_RET:.*]]
+// CHECK: [[COMMON_RET]]:
+// CHECK:   [[RETVAL0:%.*]] = phi i64 [ [[ERROR_RES0:%.*]], %[[SET_ERROR]] ], [ 1, %[[SUCCESS]] ]
+// CHECK:   [[RETVAL1:%.*]] = phi float [ 0.000000e+00, %[[SET_ERROR]] ], [ [[SUCCESS_RES0]], %[[SUCCESS]] ]
+// CHECK:   [[RETVAL2:%.*]] = phi float [ 0.000000e+00, %[[SET_ERROR]] ], [ [[SUCCESS_RES1]], %[[SUCCESS]] ]
+// CHECK:   [[RETVAL3:%.*]] = insertvalue { i64, float, float } undef, i64 [[RETVAL0]], 0
+// CHECK:   [[RETVAL4:%.*]] = insertvalue { i64, float, float } [[RETVAL3]], float [[RETVAL1]], 1
+// CHECK:   [[RETVAL:%.*]] = insertvalue { i64, float, float } [[RETVAL4]], float [[RETVAL2]], 2
+// CHECK:   ret { i64, float, float } [[RETVAL]]
+// CHECK: [[SET_ERROR]]:
+// CHECK:   [[ERROR_RES0]] = phi i64 [ [[CALL_RES2]], %typed.error.load ]
+// CHECK:   store ptr null, ptr %swifterror, align 8
+// CHECK:   br label %[[COMMON_RET]]
+// CHECK: }
+func callNonMatching_f0(_ b: Bool) -> (Int, Float, Float) {
+    do {
+        let res = try nonMatching_f0(b)
+        return (1, res.0, res.1)
+    } catch {
+        return (error.x, 0.0, 0.0)
+    }
+}
+
+// define hidden swiftcc { float, i64, float } @"$s16typed_throws_abi14nonMatching_f1ySf_SbSftSbAA7OneWordVYKF"(i1 %0, ptr swiftself %1, ptr noalias nocapture swifterror dereferenceable(8) %2)
+// CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
+// CHECK: [[SUCCESS]]:
+// CHECK:   ret { float, i64, float } { float 1.000000e+00, i64 1, float 2.000000e+00 }
+// CHECK: [[FAIL]]:
+// CHECK:   [[ERROR_RES0:%.*]] = load i64, ptr %.x1._value, align 8
+// CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
+// CHECK:   [[ERROR_RES:%.*]] = insertvalue { float, i64, float } undef, i64 [[ERROR_RES0]], 1
+// CHECK:   ret { float, i64, float } [[ERROR_RES]]
+// }
+func nonMatching_f1(_ b: Bool) throws(OneWord) -> (Float, Bool, Float) {
+    guard b else {
+        throw OneWord()
+    }
+    return (1.0, true, 2.0)
+}
+
+// CHECK: define hidden swiftcc { i64, float, i1, float } @"$s16typed_throws_abi18callNonMatching_f1ySi_SfSbSftSbF"(i1 %0)
+// CHECK:   %swifterror = alloca swifterror ptr, align 8
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc { float, i64, float } @"$s16typed_throws_abi14nonMatching_f1ySf_SbSftSbAA7OneWordVYKF"(i1 %0, ptr swiftself undef, ptr noalias nocapture swifterror dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES0:%.*]] = extractvalue { float, i64, float } [[CALL_RES]], 0
+// CHECK:   [[CALL_RES1:%.*]] = extractvalue { float, i64, float } [[CALL_RES]], 1
+// CHECK:   [[CALL_RES2:%.*]] = extractvalue { float, i64, float } [[CALL_RES]], 2
+// CHECK:   [[CALL_RES1_TRUNC:%.*]] = trunc i64 [[CALL_RES1]] to i1
+// CHECK:   [[ERROR:%.*]] = load ptr, ptr %swifterror, align 8
+// CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
+// CHECK:   br i1 [[ISERROR]], label %typed.error.load, label %[[SUCCESS:.*]]
+// CHECK: typed.error.load:
+// CHECK:   br label %[[SET_ERROR:.*]]
+// CHECK: [[SUCCESS]]:
+// CHECK:   [[SUCCESS_RES0:%.*]] = phi float [ [[CALL_RES0]], %entry ]
+// CHECK:   [[SUCCESS_RES1:%.*]] = phi i1 [ [[CALL_RES1_TRUNC]], %entry ]
+// CHECK:   [[SUCCESS_RES2:%.*]] = phi float [ [[CALL_RES2]], %entry ]
+// CHECK:   br label %[[COMMON_RET:.*]]
+// CHECK: [[COMMON_RET]]:
+// CHECK:   [[RETVAL0:%.*]] = phi i64 [ [[ERROR_RES0:%.*]], %[[SET_ERROR]] ], [ 1, %[[SUCCESS]] ]
+// CHECK:   [[RETVAL1:%.*]] = phi float [ 0.000000e+00, %[[SET_ERROR]] ], [ [[SUCCESS_RES0]], %[[SUCCESS]] ]
+// CHECK:   [[RETVAL2:%.*]] = phi i1 [ false, %[[SET_ERROR]] ], [ [[SUCCESS_RES1]], %[[SUCCESS]] ]
+// CHECK:   [[RETVAL3:%.*]] = phi float [ 0.000000e+00, %[[SET_ERROR]] ], [ [[SUCCESS_RES2]], %[[SUCCESS]] ]
+// CHECK:   [[RETVAL4:%.*]] = insertvalue { i64, float, i1, float } undef, i64 [[RETVAL0]], 0
+// CHECK:   [[RETVAL5:%.*]] = insertvalue { i64, float, i1, float } [[RETVAL4]], float [[RETVAL1]], 1
+// CHECK:   [[RETVAL6:%.*]] = insertvalue { i64, float, i1, float } [[RETVAL5]], i1 [[RETVAL2]], 2
+// CHECK:   [[RETVAL:%.*]] = insertvalue { i64, float, i1, float } [[RETVAL6]], float [[RETVAL3]], 3
+// CHECK:   ret { i64, float, i1, float } [[RETVAL]]
+// CHECK: [[SET_ERROR]]:
+// CHECK:   [[ERROR_RES0]] = phi i64 [ [[CALL_RES1]], %typed.error.load ]
+// CHECK:   store ptr null, ptr %swifterror, align 8
+// CHECK:   br label %[[COMMON_RET]]
+// CHECK: }
+func callNonMatching_f1(_ b: Bool) -> (Int, Float, Bool, Float) {
+    do {
+        let res = try nonMatching_f1(b)
+        return (1, res.0, res.1, res.2)
+    } catch {
+        return (error.x, 0.0, false, 0.0)
+    }
+}
+
 protocol P {
     // CHECK: define hidden swiftcc void @"$s16typed_throws_abi1PP2f0yySbAA5EmptyVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias nocapture swifterror dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
