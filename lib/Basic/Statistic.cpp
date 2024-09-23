@@ -456,20 +456,22 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
   const char *delim = "";
   if (FrontendCounters) {
     auto &C = getFrontendCounters();
-#define FRONTEND_STATISTIC(TY, NAME)                        \
-    do {                                                    \
-      OS << delim << "\t\"" #TY "." #NAME "\": " << C.NAME; \
-      delim = ",\n";                                        \
+#define FRONTEND_STATISTIC(TY, NAME)                          \
+    do {                                                      \
+      if (C.NAME)                                             \
+        OS << delim << "\t\"" #TY "." #NAME "\": " << C.NAME; \
+      delim = ",\n";                                          \
     } while (0);
 #include "swift/Basic/Statistics.def"
 #undef FRONTEND_STATISTIC
   }
   if (DriverCounters) {
     auto &C = getDriverCounters();
-#define DRIVER_STATISTIC(NAME)                              \
-    do {                                                    \
-      OS << delim << "\t\"Driver." #NAME "\": " << C.NAME;  \
-      delim = ",\n";                                        \
+#define DRIVER_STATISTIC(NAME)                                \
+    do {                                                      \
+      if (C.NAME)                                             \
+        OS << delim << "\t\"Driver." #NAME "\": " << C.NAME;  \
+      delim = ",\n";                                          \
     } while (0);
 #include "swift/Basic/Statistics.def"
 #undef DRIVER_STATISTIC
