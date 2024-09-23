@@ -221,7 +221,7 @@ extension MutatingContext {
   }
 
   func getContextSubstitutionMap(for type: Type) -> SubstitutionMap {
-    SubstitutionMap(_bridged.getContextSubstitutionMap(type.bridged))
+    SubstitutionMap(bridged: _bridged.getContextSubstitutionMap(type.bridged))
   }
 
   func notifyInstructionsChanged() {

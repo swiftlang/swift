@@ -592,7 +592,7 @@ final public class BuiltinInst : SingleValueInstruction {
   }
 
   public var substitutionMap: SubstitutionMap {
-    SubstitutionMap(bridged.BuiltinInst_getSubstitutionMap())
+    SubstitutionMap(bridged: bridged.BuiltinInst_getSubstitutionMap())
   }
 }
 
