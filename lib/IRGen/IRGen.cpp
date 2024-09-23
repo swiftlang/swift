@@ -1450,123 +1450,127 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
       IGM->addLinkLibraries();
     IGMcreated = true;
   }
-  
+
   if (!IGMcreated) {
     // TODO: Check this already at argument parsing.
     Ctx.Diags.diagnose(SourceLoc(), diag::no_input_files_for_mt);
     return;
   }
 
-  // Emit the module contents.
-  irgen.emitGlobalTopLevel(desc.getLinkerDirectives());
+  {
+    FrontendStatsTracer tracer(Ctx.Stats, "IRGen");
 
-  for (auto *File : M->getFiles()) {
-    if (auto *SF = dyn_cast<SourceFile>(File)) {
-      {
-        CurrentIGMPtr IGM = irgen.getGenModule(SF);
-        IGM->emitSourceFile(*SF);
-      }
-      
-      if (auto *synthSFU = File->getSynthesizedFile()) {
-        CurrentIGMPtr IGM = irgen.getGenModule(synthSFU);
-        IGM->emitSynthesizedFileUnit(*synthSFU);
+    // Emit the module contents.
+    irgen.emitGlobalTopLevel(desc.getLinkerDirectives());
+
+    for (auto *File : M->getFiles()) {
+      if (auto *SF = dyn_cast<SourceFile>(File)) {
+        {
+          CurrentIGMPtr IGM = irgen.getGenModule(SF);
+          IGM->emitSourceFile(*SF);
+        }
+
+        if (auto *synthSFU = File->getSynthesizedFile()) {
+          CurrentIGMPtr IGM = irgen.getGenModule(synthSFU);
+          IGM->emitSynthesizedFileUnit(*synthSFU);
+        }
       }
     }
-  }
-  
-  // Okay, emit any definitions that we suddenly need.
-  irgen.emitLazyDefinitions();
 
-  irgen.emitSwiftProtocols();
+    // Okay, emit any definitions that we suddenly need.
+    irgen.emitLazyDefinitions();
 
-  irgen.emitDynamicReplacements();
+    irgen.emitSwiftProtocols();
 
-  irgen.emitProtocolConformances();
+    irgen.emitDynamicReplacements();
 
-  irgen.emitTypeMetadataRecords();
+    irgen.emitProtocolConformances();
 
-  irgen.emitAccessibleFunctions();
+    irgen.emitTypeMetadataRecords();
 
-  irgen.emitReflectionMetadataVersion();
+    irgen.emitAccessibleFunctions();
 
-  irgen.emitEagerClassInitialization();
-  irgen.emitObjCActorsNeedingSuperclassSwizzle();
+    irgen.emitReflectionMetadataVersion();
 
-  // Emit reflection metadata for builtin and imported types.
-  irgen.emitBuiltinReflectionMetadata();
+    irgen.emitEagerClassInitialization();
+    irgen.emitObjCActorsNeedingSuperclassSwizzle();
 
-  // Emit coverage mapping info. This needs to happen after we've emitted
-  // any lazy definitions, as we need to know whether or not we emitted a
-  // profiler increment for a given coverage map.
-  irgen.emitCoverageMapping();
+    // Emit reflection metadata for builtin and imported types.
+    irgen.emitBuiltinReflectionMetadata();
 
-  IRGenModule *PrimaryGM = irgen.getPrimaryIGM();
+    // Emit coverage mapping info. This needs to happen after we've emitted
+    // any lazy definitions, as we need to know whether or not we emitted a
+    // profiler increment for a given coverage map.
+    irgen.emitCoverageMapping();
 
-  // Emit symbols for eliminated dead methods.
-  PrimaryGM->emitVTableStubs();
+    IRGenModule *PrimaryGM = irgen.getPrimaryIGM();
+
+    // Emit symbols for eliminated dead methods.
+    PrimaryGM->emitVTableStubs();
+
+    // Verify type layout if we were asked to.
+    if (!Opts.VerifyTypeLayoutNames.empty())
+      PrimaryGM->emitTypeVerifier();
     
-  // Verify type layout if we were asked to.
-  if (!Opts.VerifyTypeLayoutNames.empty())
-    PrimaryGM->emitTypeVerifier();
-  
-  std::for_each(Opts.LinkLibraries.begin(), Opts.LinkLibraries.end(),
-                [&](LinkLibrary linkLib) {
-                  PrimaryGM->addLinkLibrary(linkLib);
-                });
-  
-  llvm::DenseSet<StringRef> referencedGlobals;
+    std::for_each(Opts.LinkLibraries.begin(), Opts.LinkLibraries.end(),
+                  [&](LinkLibrary linkLib) {
+                    PrimaryGM->addLinkLibrary(linkLib);
+                  });
 
-  for (auto it = irgen.begin(); it != irgen.end(); ++it) {
-    IRGenModule *IGM = it->second;
-    llvm::Module *M = IGM->getModule();
-    auto collectReference = [&](llvm::GlobalValue &G) {
-      if (G.isDeclaration()
-          && (G.getLinkage() == GlobalValue::LinkOnceODRLinkage ||
-              G.getLinkage() == GlobalValue::ExternalLinkage)) {
-        referencedGlobals.insert(G.getName());
-        G.setLinkage(GlobalValue::ExternalLinkage);
+    llvm::DenseSet<StringRef> referencedGlobals;
+
+    for (auto it = irgen.begin(); it != irgen.end(); ++it) {
+      IRGenModule *IGM = it->second;
+      llvm::Module *M = IGM->getModule();
+      auto collectReference = [&](llvm::GlobalValue &G) {
+        if (G.isDeclaration()
+            && (G.getLinkage() == GlobalValue::LinkOnceODRLinkage ||
+                G.getLinkage() == GlobalValue::ExternalLinkage)) {
+          referencedGlobals.insert(G.getName());
+          G.setLinkage(GlobalValue::ExternalLinkage);
+        }
+      };
+      for (llvm::GlobalVariable &G : M->globals()) {
+        collectReference(G);
       }
-    };
-    for (llvm::GlobalVariable &G : M->globals()) {
-      collectReference(G);
-    }
-    for (llvm::Function &F : M->getFunctionList()) {
-      collectReference(F);
-    }
-    for (llvm::GlobalAlias &A : M->aliases()) {
-      collectReference(A);
-    }
-  }
-
-  for (auto it = irgen.begin(); it != irgen.end(); ++it) {
-    IRGenModule *IGM = it->second;
-    llvm::Module *M = IGM->getModule();
-    
-    // Update the linkage of shared functions/globals.
-    // If a shared function/global is referenced from another file it must have
-    // weak instead of linkonce linkage. Otherwise LLVM would remove the
-    // definition (if it's not referenced in the same file).
-    auto updateLinkage = [&](llvm::GlobalValue &G) {
-      if (!G.isDeclaration()
-          && G.getLinkage() == GlobalValue::LinkOnceODRLinkage
-          && referencedGlobals.count(G.getName()) != 0) {
-        G.setLinkage(GlobalValue::WeakODRLinkage);
+      for (llvm::Function &F : M->getFunctionList()) {
+        collectReference(F);
       }
-    };
-    for (llvm::GlobalVariable &G : M->globals()) {
-      updateLinkage(G);
-    }
-    for (llvm::Function &F : M->getFunctionList()) {
-      updateLinkage(F);
-    }
-    for (llvm::GlobalAlias &A : M->aliases()) {
-      updateLinkage(A);
+      for (llvm::GlobalAlias &A : M->aliases()) {
+        collectReference(A);
+      }
     }
 
-    if (!IGM->finalize())
-      return;
+    for (auto it = irgen.begin(); it != irgen.end(); ++it) {
+      IRGenModule *IGM = it->second;
+      llvm::Module *M = IGM->getModule();
 
-    setModuleFlags(*IGM);
+      // Update the linkage of shared functions/globals.
+      // If a shared function/global is referenced from another file it must have
+      // weak instead of linkonce linkage. Otherwise LLVM would remove the
+      // definition (if it's not referenced in the same file).
+      auto updateLinkage = [&](llvm::GlobalValue &G) {
+        if (!G.isDeclaration()
+            && G.getLinkage() == GlobalValue::LinkOnceODRLinkage
+            && referencedGlobals.count(G.getName()) != 0) {
+          G.setLinkage(GlobalValue::WeakODRLinkage);
+        }
+      };
+      for (llvm::GlobalVariable &G : M->globals()) {
+        updateLinkage(G);
+      }
+      for (llvm::Function &F : M->getFunctionList()) {
+        updateLinkage(F);
+      }
+      for (llvm::GlobalAlias &A : M->aliases()) {
+        updateLinkage(A);
+      }
+
+      if (!IGM->finalize())
+        return;
+
+      setModuleFlags(*IGM);
+    }
   }
 
   // Bail out if there are any errors.
