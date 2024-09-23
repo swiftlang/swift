@@ -94,6 +94,10 @@ struct BridgedCalleeAnalysis {
   struct CalleeList {
     uint64_t storage[3];
 
+    // Ensure that this struct value type will be indirectly returned on
+    // Windows ARM64
+    CalleeList() {}
+
 #ifdef USED_IN_CPP_SOURCE
     CalleeList(swift::CalleeList list) {
       *reinterpret_cast<swift::CalleeList *>(&storage) = list;
