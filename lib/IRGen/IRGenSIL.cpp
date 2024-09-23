@@ -2478,10 +2478,6 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
   if (f->isExternalDeclaration())
     return;
 
-  if (Context.LangOpts.hasFeature(Feature::Embedded) &&
-      f->getLoweredFunctionType()->isPolymorphic())
-    return;
-
   // Do not emit bodies of public_external or package_external functions.
   if (hasPublicOrPackageVisibility(f->getLinkage(),
                                    f->getASTContext().SILOpts.EnableSerializePackage) &&
@@ -2528,6 +2524,11 @@ void IRGenSILFunction::emitSILFunction() {
       CurFn->addFnAttr("async_entry");
       CurFn->addFnAttr(llvm::Attribute::NoInline);
     }
+
+    // For debugging purposes we always want a frame that stores the async
+    // context.
+    if (IGM.getOptions().AsyncFramePointerAll)
+      CurFn->addFnAttr("frame-pointer", "all");
   }
   if (isAsyncFn) {
     IGM.noteSwiftAsyncFunctionDef();
