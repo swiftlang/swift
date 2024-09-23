@@ -26,9 +26,9 @@ extension AllocRefDynamicInst : OnoneSimplifyable {
     ///   %8 = (... some use of ...) %7 : $BaseClass
 
     let type: Type
-    if let metatypeInst = operands[1].value as? MetatypeInst {
+    if let metatypeInst = metatypeOperand.value as? MetatypeInst {
       type = metatypeInst.type.loweredInstanceTypeOfMetatype(in: parentFunction)
-    } else if let upcastInst = operands[1].value as? UpcastInst,
+    } else if let upcastInst = metatypeOperand.value as? UpcastInst,
         let metatypeInst = upcastInst.operands[0].value as? MetatypeInst {
       type = metatypeInst.type.loweredInstanceTypeOfMetatype(in: parentFunction)
     } else {

@@ -1196,6 +1196,11 @@ final public class AllocRefDynamicInst : AllocRefInstBase {
   public var isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType: Bool {
     bridged.AllocRefDynamicInst_isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType()
   }
+
+  public var metatypeOperand: Operand {
+    let numTailTypes = bridged.AllocRefInstBase_getNumTailTypes()
+    return operands[numTailTypes]
+  }
 }
 
 final public class AllocBoxInst : SingleValueInstruction, Allocation, DebugVariableInstruction {
