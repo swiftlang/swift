@@ -35,7 +35,7 @@ namespace irgen {
   void emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &builtin,
                        BuiltinInst *Inst, ArrayRef<SILType> argTypes,
                        Explosion &args, Explosion &result);
-
+                       
 } // end namespace irgen
 } // end namespace swift
 
