@@ -380,11 +380,15 @@ static Constraint *determineBestChoicesInContext(
         scoreCandidateMatch = [&](GenericSignature genericSig,
                                   Type candidateType, Type paramType,
                                   MatchOptions options) -> double {
+      auto areEqual = [](Type a, Type b) {
+        return a->getDesugaredType()->isEqual(b->getDesugaredType());
+      };
+
       if (options.contains(MatchFlag::ExactOnly))
-        return candidateType->isEqual(paramType) ? 1 : 0;
+        return areEqual(candidateType, paramType) ? 1 : 0;
 
       // Exact match between candidate and parameter types.
-      if (candidateType->isEqual(paramType))
+      if (areEqual(candidateType, paramType))
         return options.contains(MatchFlag::Literal) ? 0.3 : 1;
 
       if (options.contains(MatchFlag::Literal))
