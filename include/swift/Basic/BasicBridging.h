@@ -23,6 +23,15 @@
 // Pure bridging mode does not permit including any C++/llvm/swift headers.
 // See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
 //
+//
+// Note: On Windows ARM64, how a C++ struct/class value type is
+// returned is sensitive to conditions including whether a
+// user-defined constructor exists, etc. See
+// https://learn.microsoft.com/en-us/cpp/build/arm64-windows-abi-conventions?view=msvc-170#return-values
+// So, if a C++ struct/class type is returned as a value between Swift
+// and C++, we need to be careful to match the return convention
+// matches between the non-USED_IN_CPP_SOURCE (Swift) side and the
+// USE_IN_CPP_SOURCE (C++) side.
 #include "swift/Basic/BridgedSwiftObject.h"
 #include "swift/Basic/Compiler.h"
 
@@ -227,6 +236,10 @@ class BridgedOwnedString {
   size_t Length;
 
 public:
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedOwnedString() {}
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedOwnedString(const std::string &stringToCopy);
 
