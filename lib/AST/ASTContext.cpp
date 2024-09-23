@@ -928,12 +928,16 @@ swift::detail::ImportPathBuilder_getIdentifierImpl(ASTContext &ctx,
 
 /// Set a new stats reporter.
 void ASTContext::setStatsReporter(UnifiedStatsReporter *stats) {
-  if (stats) {
-    stats->getFrontendCounters().NumASTBytesAllocated =
-        getAllocator().getBytesAllocated();
-  }
-  evaluator.setStatsReporter(stats);
+  if (!stats)
+    return;
+
   Stats = stats;
+
+  stats->getFrontendCounters().NumASTBytesAllocated =
+      getAllocator().getBytesAllocated();
+
+  if (stats->fineGrainedTimers())
+    evaluator.setStatsReporter(stats);
 }
 
 /// getIdentifier - Return the uniqued and AST-Context-owned version of the

@@ -319,6 +319,7 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            StringRef Directory,
                                            SourceManager *SM,
                                            clang::SourceManager *CSM,
+                                           bool FineGrainedTimers,
                                            bool TraceEvents,
                                            bool ProfileEvents,
                                            bool ProfileEntities)
@@ -329,7 +330,7 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                  OutputType,
                                  OptType),
                          Directory,
-                         SM, CSM,
+                         SM, CSM, FineGrainedTimers,
                          TraceEvents, ProfileEvents, ProfileEntities)
 {
 }
@@ -339,6 +340,7 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            StringRef Directory,
                                            SourceManager *SM,
                                            clang::SourceManager *CSM,
+                                           bool FineGrainedTimers,
                                            bool TraceEvents,
                                            bool ProfileEvents,
                                            bool ProfileEntities)
@@ -355,7 +357,8 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
     SourceMgr(SM),
     ClangSourceMgr(CSM),
     RecursiveTimers(std::make_unique<RecursionSafeTimers>()),
-    IsFlushingTracesAndProfiles(false)
+    IsFlushingTracesAndProfiles(false),
+    FineGrainedTimers(FineGrainedTimers)
 {
   path::append(StatsFilename, makeStatsFileName(ProgramName, AuxName));
   path::append(TraceFilename, makeTraceFileName(ProgramName, AuxName));
