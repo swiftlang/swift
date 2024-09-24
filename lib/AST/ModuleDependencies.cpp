@@ -691,27 +691,6 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   CASOpts = Instance.getInvocation().getCASOptions().CASOpts;
   CAS = Instance.getSharedCASInstance();
 
-  // Add SDKSetting file.
-  SmallString<256> SDKSettingPath;
-  llvm::sys::path::append(
-      SDKSettingPath,
-      Instance.getInvocation().getSearchPathOptions().getSDKPath(),
-      "SDKSettings.json");
-  CommonDependencyFiles.emplace_back(SDKSettingPath.data(),
-                                     SDKSettingPath.size());
-
-  // Add Legacy layout file (maybe just hard code instead of searching).
-  for (auto RuntimeLibPath :
-       Instance.getInvocation().getSearchPathOptions().RuntimeLibraryPaths) {
-    auto &FS = Instance.getFileSystem();
-    std::error_code EC;
-    for (auto F = FS.dir_begin(RuntimeLibPath, EC);
-         !EC && F != llvm::vfs::directory_iterator(); F.increment(EC)) {
-      if (F->path().ends_with(".yaml"))
-        CommonDependencyFiles.emplace_back(F->path().str());
-    }
-  }
-
   auto CachingFS =
       llvm::cas::createCachingOnDiskFileSystem(Instance.getObjectStore());
   if (!CachingFS) {
