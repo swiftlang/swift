@@ -78,6 +78,8 @@ extension ManagedBuffer where Element: ~Copyable {
   @_preInverseGenerics
   @inlinable
   #if $Embedded
+  // Transparent in Embedded Swift to avoid needing "self" as a metatype. By
+  // inlining into the caller, we'll know the concrete type instead.
   @_transparent
   #endif
   public final class func create(

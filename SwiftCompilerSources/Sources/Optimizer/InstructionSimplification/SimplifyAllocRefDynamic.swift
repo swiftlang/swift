@@ -26,11 +26,14 @@ extension AllocRefDynamicInst : OnoneSimplifyable {
     ///   %8 = (... some use of ...) %7 : $BaseClass
 
     let type: Type
+    let emitUpcast: Bool
     if let metatypeInst = metatypeOperand.value as? MetatypeInst {
       type = metatypeInst.type.loweredInstanceTypeOfMetatype(in: parentFunction)
+      emitUpcast = false
     } else if let upcastInst = metatypeOperand.value as? UpcastInst,
         let metatypeInst = upcastInst.operands[0].value as? MetatypeInst {
       type = metatypeInst.type.loweredInstanceTypeOfMetatype(in: parentFunction)
+      emitUpcast = true
     } else {
       return
     }
@@ -38,8 +41,14 @@ extension AllocRefDynamicInst : OnoneSimplifyable {
     let builder = Builder(before: self, context)
     let newAlloc = builder.createAllocRef(type, isObjC: self.isObjC, canAllocOnStack: self.canAllocOnStack, isBare: false,
       tailAllocatedTypes: self.tailAllocatedTypes, tailAllocatedCounts: Array(self.tailAllocatedCounts.values))
-    let newCast = builder.createUpcast(from: newAlloc, to: self.type)
-    uses.replaceAll(with: newCast, context)
+    
+    let result: Value
+    if emitUpcast {
+      result = builder.createUpcast(from: newAlloc, to: self.type)
+    } else {
+      result = newAlloc
+    }
+    uses.replaceAll(with: result, context)
     context.erase(instruction: self)
   }
 }
