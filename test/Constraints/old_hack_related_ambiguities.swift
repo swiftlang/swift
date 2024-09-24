@@ -187,3 +187,53 @@ do {
   let result = test(10, accuracy: 1)
   let _: Int = result
 }
+
+// swift-distributed-tracing snippet that relies on old hack behavior.
+protocol TracerInstant {
+}
+
+extension Int: TracerInstant {}
+
+do {
+  enum SpanKind {
+    case `internal`
+  }
+
+  func withSpan<Instant: TracerInstant>(
+    _ operationName: String,
+    at instant: @autoclosure () -> Instant,
+    context: @autoclosure () -> Int = 0,
+    ofKind kind: SpanKind = .internal
+  ) {}
+
+  func withSpan(
+     _ operationName: String,
+     context: @autoclosure () -> Int = 0,
+     ofKind kind: SpanKind = .internal,
+     at instant: @autoclosure () -> some TracerInstant = 42
+  ) {}
+
+  withSpan("", at: 0) // Ok
+}
+
+protocol ForAssert {
+  var isEmpty: Bool { get }
+}
+
+extension ForAssert {
+  var isEmpty: Bool { false }
+}
+
+do {
+  func assert(_ condition: @autoclosure () -> Bool, _ message: @autoclosure () -> String = String(), file: StaticString = #file, line: UInt = #line) {}
+  func assert(_ condition: Bool, _ message: @autoclosure () -> String, file: StaticString = #file, line: UInt = #line) {}
+  func assert(_ condition: Bool, file: StaticString = #fileID, line: UInt = #line) {}
+
+  struct S : ForAssert {
+    var isEmpty: Bool { false }
+  }
+
+  func test(s: S) {
+    assert(s.isEmpty, "") // Ok
+  }
+}
