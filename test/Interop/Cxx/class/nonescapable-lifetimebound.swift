@@ -18,6 +18,15 @@ struct SWIFT_NONESCAPABLE View {
     View(const View&) = default;
 private:
     const int *member;
+    friend struct OtherView;
+};
+
+struct SWIFT_NONESCAPABLE OtherView {
+    OtherView() : member(nullptr) {}
+    OtherView(View v [[clang::lifetimebound]]) : member(v.member) {}
+    OtherView(const OtherView&) = default;
+private:
+    const int *member;
 };
 
 struct Owner {
@@ -64,13 +73,14 @@ private:
     const int *member;
 };
 
-// CHECK: sil [clang makeOwner] {{.*}}: $@convention(c) () -> Owner
+// CHECK: sil [clang makeOwner] {{.*}} : $@convention(c) () -> Owner
 // CHECK: sil [clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> _scope(0) @autoreleased View
 // CHECK: sil [clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> _scope(0) @autoreleased View
 // CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> _scope(0, 1) @autoreleased View
 // CHECK: sil [clang Owner.handOutView] {{.*}} : $@convention(cxx_method) (@in_guaranteed Owner) -> _scope(0) @autoreleased View
 // CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@guaranteed View, @guaranteed View) -> _inherit(0, 1) @autoreleased View
 // CHECK: sil [clang View.init] {{.*}} : $@convention(c) () -> @out View
+// CHECK: sil [clang OtherView.init] {{.*}} : $@convention(c) (@guaranteed View) -> _inherit(0) @out OtherView
 
 //--- test.swift
 
@@ -85,4 +95,5 @@ public func test() {
     let _ = o.handOutView()
     let _ = getViewFromEither(v1, v2)
     let defaultView = View()
+    let _ = OtherView(defaultView)
 }
