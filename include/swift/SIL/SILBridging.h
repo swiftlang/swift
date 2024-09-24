@@ -804,18 +804,8 @@ struct BridgedSILTypeArray {
   BridgedSILTypeArray(llvm::ArrayRef<swift::SILType> silTypes)
       : typeArray(silTypes) {}
 
-  BridgedSILTypeArray(BridgedArrayRef typeArray)
-      : typeArray(typeArray) {}
-
   llvm::ArrayRef<swift::SILType> unbridged() const {
     return typeArray.unbridged<swift::SILType>();
-  }
-
-  llvm::ArrayRef<swift::SILType> getValues(llvm::SmallVectorImpl<swift::SILType> &storage) {
-    for (unsigned idx = 0; idx < getCount(); ++idx) {
-      storage.push_back(unbridged()[idx]);
-    }
-    return storage;
   }
 #endif
 

@@ -1631,11 +1631,10 @@ BridgedInstruction BridgedBuilder::createIntegerLiteral(BridgedType type, SwiftI
 BridgedInstruction BridgedBuilder::createAllocRef(BridgedType type,
     bool objc, bool canAllocOnStack, bool isBare,
     BridgedSILTypeArray elementTypes, BridgedValueArray elementCountOperands) const {
-  llvm::SmallVector<swift::SILType, 16> elementTypesValues;
   llvm::SmallVector<swift::SILValue, 16> elementCountOperandsValues;
   return {unbridged().createAllocRef(
       regularLoc(), type.unbridged(), objc, canAllocOnStack, isBare,
-      elementTypes.getValues(elementTypesValues),
+      elementTypes.unbridged(),
       elementCountOperands.getValues(elementCountOperandsValues)
       )};
 }
