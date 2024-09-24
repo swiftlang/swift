@@ -19,6 +19,12 @@
 #define SWIFT_STORAGEIMPL_H
 
 #include "swift/Basic/Range.h"
+#include "llvm/ADT/StringRef.h"
+
+namespace llvm {
+class StringRef;
+class raw_ostream;
+} // namespace llvm
 
 namespace swift {
 
@@ -108,7 +114,7 @@ static inline IntRange<AccessorKind> allAccessorKinds() {
 }
 
 /// \returns a user-readable string name for the accessor kind
-static inline StringRef accessorKindName(AccessorKind ak) {
+static inline llvm::StringRef accessorKindName(AccessorKind ak) {
   switch(ak) {
 
 #define ACCESSOR(ID) ID
@@ -400,10 +406,7 @@ public:
   }
 
   /// Describe the implementation of a mutable property implemented opaquely.
-  static StorageImplInfo getMutableOpaque(OpaqueReadOwnership ownership) {
-    return { getOpaqueReadImpl(ownership), WriteImplKind::Set,
-             ReadWriteImplKind::Modify };
-  }
+  static StorageImplInfo getMutableOpaque(OpaqueReadOwnership ownership);
 
   static StorageImplInfo getComputed(StorageIsMutable_t isMutable) {
     return (isMutable ? getMutableComputed()
@@ -451,19 +454,10 @@ public:
   }
 
 private:
-  static ReadImplKind getOpaqueReadImpl(OpaqueReadOwnership ownership) {
-    switch (ownership) {
-    case OpaqueReadOwnership::Owned:
-      return ReadImplKind::Get;
-    case OpaqueReadOwnership::OwnedOrBorrowed:
-    case OpaqueReadOwnership::Borrowed:
-      return ReadImplKind::Read;
-    }
-    llvm_unreachable("bad read-ownership kind");
-  }
+  static ReadImplKind getOpaqueReadImpl(OpaqueReadOwnership ownership);
 };
 
-StringRef getAccessorLabel(AccessorKind kind);
+llvm::StringRef getAccessorLabel(AccessorKind kind);
 void simple_display(llvm::raw_ostream &out, AccessorKind kind);
 
 } // end namespace swift
