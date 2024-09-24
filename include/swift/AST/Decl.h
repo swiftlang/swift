@@ -7996,6 +7996,8 @@ public:
   /// attribute.
   bool isTransparent() const;
 
+  bool isCoroutine() const;
+
   // Expose our import as member status
   ImportAsMemberStatus getImportAsMemberStatus() const {
     return ImportAsMemberStatus(Bits.AbstractFunctionDecl.IAMStatus);
@@ -8512,11 +8514,13 @@ class FuncDecl : public AbstractFunctionDecl {
   friend class SelfAccessKindRequest;
   friend class IsStaticRequest;
   friend class ResultTypeRequest;
+  friend class YieldsTypeRequest;
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
 
   TypeLoc FnRetType;
+  TypeLoc FnYieldType;
 
 protected:
   FuncDecl(DeclKind Kind,
@@ -8549,6 +8553,7 @@ protected:
   }
 
   void setResultInterfaceType(Type type);
+  void setYieldInterfaceType(Type type);
 
 private:
   static FuncDecl *createImpl(ASTContext &Context, SourceLoc StaticLoc,
@@ -8589,8 +8594,8 @@ public:
                           StaticSpellingKind StaticSpelling, SourceLoc FuncLoc,
                           DeclName Name, SourceLoc NameLoc, bool Async,
                           SourceLoc AsyncLoc, bool Throws, SourceLoc ThrowsLoc,
-                          TypeRepr *ThrownTyR,
-                          GenericParamList *GenericParams,
+                          TypeRepr *ThrownTyR, SourceLoc YieldsLoc,
+                          TypeRepr *YieldTyR, GenericParamList *GenericParams,
                           ParameterList *BodyParams, TypeRepr *ResultTyR,
                           DeclContext *Parent);
 
@@ -8647,17 +8652,23 @@ public:
   SourceRange getSourceRange() const;
 
   TypeRepr *getResultTypeRepr() const { return FnRetType.getTypeRepr(); }
+  TypeRepr *getYieldTypeRepr() const { return FnYieldType.getTypeRepr(); }
 
   SourceRange getResultTypeSourceRange() const {
     return FnRetType.getSourceRange();
   }
 
-  /// Retrieve the result interface type of this function.
+  /// Retrieve the result interface type of this function
   Type getResultInterfaceType() const;
+
+  /// Same as above, but only yields
+  Type getYieldsInterfaceType() const;
 
   /// Returns the result interface type of this function if it has already been
   /// computed, otherwise `nullopt`. This should only be used for dumping.
   std::optional<Type> getCachedResultInterfaceType() const;
+
+  std::optional<Type> getCachedYieldsInterfaceType() const;
 
   /// isUnaryOperator - Determine whether this is a unary operator
   /// implementation.  This check is a syntactic rather than type-based check,

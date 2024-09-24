@@ -512,6 +512,34 @@ void synthesizeParameterTypes(SynthesisContext &SC,
   list.params.visit(CollectParamTypes{SC, types});
 }
 
+/// Synthesize a yield list.
+// TBD: Add helpers for inout yields, etc.
+template <class... Yields>
+struct YieldListSynthesizer {
+  VariadicSynthesizerStorage<Yields...> params;
+};
+template <class... Yields>
+constexpr YieldListSynthesizer<Yields...> _yields(Yields... ys) {
+  return {{ys...}};
+}
+
+struct CollectYieldTypes {
+  SynthesisContext &SC;
+  SmallVectorImpl<FunctionType::Yield> &Results;
+
+  template <class S>
+  void operator()(const S &s) const {
+    // Found by argument-dependent lookup.
+    Results.push_back(synthesizeYieldType(SC, s));
+  }
+};
+template <class... Yields>
+void synthesizeYieldTypes(SynthesisContext &SC,
+                          const YieldListSynthesizer<Yields...> &list,
+                          SmallVectorImpl<FunctionType::Yield> &types) {
+  list.params.visit(CollectYieldTypes{SC, types});
+}
+
 /// Synthesize function ExtInfo.
 template <class S> struct ThrowsSynthesizer { S sub; };
 template <class S> struct AsyncSynthesizer { S sub; };
@@ -557,25 +585,29 @@ ASTExtInfo synthesizeExtInfo(SynthesisContext &SC,
 }
 
 /// Synthesize a function type.
-template <class ExtInfoS, class ResultS, class ParamsS>
+template <class ExtInfoS, class ResultS, class ParamsS, class YieldsS>
 struct FunctionTypeSynthesizer {
   ExtInfoS extInfo;
   ResultS result;
   ParamsS parameters;
+  YieldsS yields;
 };
-template <class ExtInfoS, class ResultS, class ParamsS>
-FunctionTypeSynthesizer<ExtInfoS, ResultS, ParamsS>
-_function(ExtInfoS extInfo, ResultS result, ParamsS params) {
-  return {extInfo, result, params};
+template <class ExtInfoS, class ResultS, class ParamsS, class YieldsS>
+FunctionTypeSynthesizer<ExtInfoS, ResultS, ParamsS, YieldsS>
+_function(ExtInfoS extInfo, ResultS result, ParamsS params, YieldsS yields) {
+  return {extInfo, result, params, yields};
 }
-template <class ExtInfoS, class ResultS, class ParamsS>
-Type synthesizeType(SynthesisContext &SC,
-             const FunctionTypeSynthesizer<ExtInfoS, ResultS, ParamsS> &fn) {
+template <class ExtInfoS, class ResultS, class ParamsS, class YieldsS>
+Type synthesizeType(
+    SynthesisContext &SC,
+    const FunctionTypeSynthesizer<ExtInfoS, ResultS, ParamsS, YieldsS> &fn) {
   SmallVector<FunctionType::Param, 4> paramTypes;
   synthesizeParameterTypes(SC, fn.parameters, paramTypes);
+  SmallVector<FunctionType::Yield, 1> yieldTypes;
+  synthesizeYieldTypes(SC, fn.yields, yieldTypes);
   auto extInfo = synthesizeExtInfo(SC, fn.extInfo);
   auto resultType = synthesizeType(SC, fn.result);
-  return FunctionType::get(paramTypes, resultType, extInfo);
+  return FunctionType::get(paramTypes, yieldTypes, resultType, extInfo);
 }
 
 /// Synthesize optionals.

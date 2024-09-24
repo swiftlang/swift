@@ -3940,6 +3940,8 @@ NodePointer Demangler::demangleSpecialType() {
       return popFunctionType(Node::Kind::ObjCBlock);
     case 'C':
       return popFunctionType(Node::Kind::CFunctionPointer);
+    case 'y':
+      return popFunctionType(Node::Kind::Coroutine);
     case 'g':
     case 'G':
       return demangleExtendedExistentialShape(specialChar);

@@ -943,9 +943,9 @@ bool swift::isRepresentableInLanguage(
     }
 
     Type completionHandlerType = FunctionType::get(
-        completionHandlerParams, TupleType::getEmpty(ctx),
+        completionHandlerParams, {}, TupleType::getEmpty(ctx),
         ASTExtInfoBuilder(FunctionTypeRepresentation::Block, false, Type())
-          .build());
+            .build());
 
     // @objcImpl member implementations need to allow a nil completion handler.
     if (AFD->isObjCMemberImplementation())

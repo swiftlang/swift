@@ -3344,6 +3344,8 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, GenericSignature sig,
     } else if (fn->isNoEscape()) {
       return appendOperator("XE");
     }
+    if (fn->isCoroutine())
+      return appendOperator("Xy");
     return appendOperator("c");
 
   case AnyFunctionType::Representation::CFunctionPointer:
@@ -3381,6 +3383,7 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
                            forDecl ? fn->getLifetimeDependenceForResult(forDecl)
                                    : std::nullopt,
                            forDecl);
+  // TODO: Handle yields
   appendFunctionInputType(fn, fn->getParams(), sig, forDecl, isRecursedInto);
   if (fn->isAsync())
     appendOperator("Ya");
@@ -4223,7 +4226,7 @@ CanType ASTMangler::getDeclTypeForMangling(
         isa<SubscriptDecl>(decl)) {
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       CanFunctionType::ExtInfo info;
-      return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
+      return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)}, {},
                                   C.TheErrorType, info);
     }
     return C.TheErrorType;
@@ -4248,8 +4251,8 @@ CanType ASTMangler::getDeclTypeForMangling(
   if (auto gft = dyn_cast<GenericFunctionType>(canTy)) {
     genericSig = gft.getGenericSignature();
 
-    canTy = CanFunctionType::get(gft.getParams(), gft.getResult(),
-                                 gft->getExtInfo());
+    canTy = CanFunctionType::get(gft.getParams(), gft.getYields(),
+                                 gft.getResult(), gft->getExtInfo());
   }
 
   if (!canTy->hasError()) {
