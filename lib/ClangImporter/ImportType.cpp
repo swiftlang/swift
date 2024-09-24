@@ -2157,6 +2157,7 @@ private:
   VISIT(ExistentialType, recurse)
   NEVER_VISIT(LValueType)
   VISIT(InOutType, recurse)
+  NEVER_VISIT(YieldResultType)
 
   NEVER_VISIT(PackType)
   NEVER_VISIT(PackExpansionType)

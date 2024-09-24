@@ -7943,6 +7943,8 @@ public:
   /// attribute.
   bool isTransparent() const;
 
+  bool isCoroutine() const;
+
   // Expose our import as member status
   ImportAsMemberStatus getImportAsMemberStatus() const {
     return ImportAsMemberStatus(Bits.AbstractFunctionDecl.IAMStatus);

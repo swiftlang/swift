@@ -323,7 +323,7 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   CFunctionPointer = uint8_t(FunctionTypeRepresentation::CFunctionPointer),
 
   /// The value of the greatest AST function representation.
-  LastAST = CFunctionPointer,
+  LastAST = uint8_t(FunctionTypeRepresentation::Last),
 
   /// The value of the least SIL-only function representation.
   FirstSIL = 8,
@@ -523,8 +523,8 @@ class ASTExtInfoBuilder {
   // If bits are added or removed, then TypeBase::NumAFTExtInfoBits
   // and NumMaskBits must be updated, and they must match.
   //
-  //   |representation|noEscape|concurrent|async|throws|isolation|differentiability| SendingResult |
-  //   |    0 .. 3    |    4   |    5     |  6  |   7  | 8 .. 10 |     11 .. 13    |         14    |
+  //   |representation|noEscape|concurrent|async|throws|isolation|differentiability| SendingResult | InOutResult | coroutine |
+  //   |    0 .. 3    |    4   |    5     |  6  |   7  | 8 .. 10 |     11 .. 13    |         14    |     15      |    16     |
   //
   enum : unsigned {
     RepresentationMask = 0xF << 0,
@@ -538,7 +538,8 @@ class ASTExtInfoBuilder {
     DifferentiabilityMask = 0x7 << DifferentiabilityMaskOffset,
     SendingResultMask = 1 << 14,
     InOutResultMask = 1 << 15,
-    NumMaskBits = 16
+    CoroutineMask = 1 << 16,
+    NumMaskBits = 17
   };
 
   static_assert(FunctionTypeIsolation::Mask == 0x7, "update mask manually");
@@ -623,6 +624,8 @@ public:
   constexpr bool isThrowing() const { return bits & ThrowsMask; }
 
   constexpr bool hasSendingResult() const { return bits & SendingResultMask; }
+
+  constexpr bool isCoroutine() const { return bits & CoroutineMask; }
 
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
     return DifferentiabilityKind((bits & DifferentiabilityMask) >>
@@ -758,6 +761,13 @@ public:
   }
 
   [[nodiscard]]
+  ASTExtInfoBuilder withCoroutine(bool coroutine = true) const {
+    return ASTExtInfoBuilder(
+        coroutine ? (bits | CoroutineMask) : (bits & ~CoroutineMask),
+        clangTypeInfo, globalActor, thrownError, lifetimeDependencies);
+  }
+
+  [[nodiscard]]
   ASTExtInfoBuilder
   withDifferentiabilityKind(DifferentiabilityKind differentiability) const {
     return ASTExtInfoBuilder(
@@ -888,6 +898,8 @@ public:
 
   constexpr bool isThrowing() const { return builder.isThrowing(); }
 
+  constexpr bool isCoroutine() const { return builder.isCoroutine(); }
+
   constexpr bool hasSendingResult() const { return builder.hasSendingResult(); }
 
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
@@ -958,6 +970,14 @@ public:
   [[nodiscard]]
   ASTExtInfo withThrows() const {
     return builder.withThrows(true, Type()).build();
+  }
+
+  /// Helper method for changing only the coroutine field.
+  ///
+  /// Prefer using \c ASTExtInfoBuilder::withCoroutine for chaining.
+  [[nodiscard]]
+  ASTExtInfo withCoroutine(bool coroutine = true) const {
+    return builder.withCoroutine(coroutine).build();
   }
 
   /// Helper method for changing only the async field.

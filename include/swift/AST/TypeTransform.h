@@ -1055,6 +1055,16 @@ case TypeKind::Id:
         t : InOutType::get(objectTy);
     }
 
+    case TypeKind::YieldResult: {
+      auto yield = cast<YieldResultType>(base);
+      auto objectTy = doIt(yield->getResultType(), TypePosition::Invariant);
+      if (!objectTy || objectTy->hasError())
+        return objectTy;
+
+      return objectTy.getPointer() == yield->getResultType().getPointer() ?
+        t : YieldResultType::get(objectTy, yield->isInOut());
+    }
+
     case TypeKind::Existential: {
       auto *existential = cast<ExistentialType>(base);
       auto constraint = doIt(existential->getConstraintType(), pos);

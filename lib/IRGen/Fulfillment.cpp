@@ -57,6 +57,7 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::PackExpansion:
   case TypeKind::PackElement:
   case TypeKind::BuiltinTuple:
+  case TypeKind::YieldResult:
     llvm_unreachable("these types do not have metadata");
 
   // All the builtin types are leaves.

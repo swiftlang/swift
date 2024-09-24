@@ -2340,6 +2340,10 @@ namespace {
                                     DynamicMetadataRequest request) {
       llvm_unreachable("error type should not appear in IRGen");
     }
+    MetadataResponse visitYieldResultType(CanYieldResultType type,
+                                          DynamicMetadataRequest request) {
+      llvm_unreachable("yields should have been lowered by SILGen");
+    }
 
     MetadataResponse visitIntegerType(CanIntegerType type,
                                       DynamicMetadataRequest request) {

@@ -6531,6 +6531,13 @@ public:
       Printer << "_";
     }
   }
+      
+  void visitYieldResultType(YieldResultType *T, NonRecursivePrintOptions nrOption) {
+    if (T->isInOut())
+      Printer << "inout ";
+    Printer << "@yields ";
+    visit(T->getResultType());
+  }
 
   void visitErrorUnionType(ErrorUnionType *T,
                            NonRecursivePrintOptions nrOptions) {
@@ -6985,6 +6992,10 @@ public:
           Printer.printSwiftLifetimeDependence(lifetimeDependence, params);
         }
       }
+    }
+    
+    if (!Options.excludeAttrKind(TypeAttrKind::YieldOnce) && info.isCoroutine()) {
+      Printer.printSimpleAttr("@yield_once") << " ";
     }
 
     SmallString<64> buf;

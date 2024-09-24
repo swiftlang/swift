@@ -578,6 +578,8 @@ struct ASTContext::Implementation {
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
     llvm::DenseMap<Type, LValueType*> LValueTypes;
     llvm::DenseMap<Type, InOutType*> InOutTypes;
+    llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 1, bool>,
+                   YieldResultType*> YieldResultTypes;
     llvm::DenseMap<std::pair<Type, void*>, DependentMemberType *>
       DependentMemberTypes;
     llvm::FoldingSet<ErrorUnionType> ErrorUnionTypes;
@@ -3396,6 +3398,7 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     llvm::capacity_in_bytes(ReferenceStorageTypes) +
     llvm::capacity_in_bytes(LValueTypes) +
     llvm::capacity_in_bytes(InOutTypes) +
+    llvm::capacity_in_bytes(YieldResultTypes) +
     llvm::capacity_in_bytes(DependentMemberTypes) +
     llvm::capacity_in_bytes(EnumTypes) +
     llvm::capacity_in_bytes(StructTypes) +
@@ -3434,6 +3437,7 @@ void ASTContext::Implementation::Arena::dump(llvm::raw_ostream &os) const {
     SIZE_AND_BYTES(ReferenceStorageTypes);
     SIZE_AND_BYTES(LValueTypes);
     SIZE_AND_BYTES(InOutTypes);
+    SIZE_AND_BYTES(YieldResultTypes);
     SIZE_AND_BYTES(DependentMemberTypes);
     SIZE(ErrorUnionTypes);
     SIZE_AND_BYTES(PlaceholderTypes);
@@ -5771,6 +5775,28 @@ InOutType *InOutType::get(Type objectTy) {
   const ASTContext *canonicalContext = objectTy->isCanonical() ? &C : nullptr;
   return entry = new (C, arena) InOutType(objectTy, canonicalContext,
                                           properties);
+}
+
+YieldResultType *YieldResultType::get(Type objectTy, bool InOut) {
+  auto properties = objectTy->getRecursiveProperties();
+  if (InOut) {
+    assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
+           "cannot have 'inout' or @lvalue wrapped inside an 'inout yield'");
+    properties &= ~RecursiveTypeProperties::IsLValue;
+  }
+
+  auto arena = getArena(properties);
+
+  auto &C = objectTy->getASTContext();
+  auto pair = llvm::PointerIntPair<TypeBase*, 1, bool>(objectTy.getPointer(),
+                                                       InOut);
+  auto &entry = C.getImpl().getArena(arena).YieldResultTypes[pair];
+  if (entry)
+    return entry;
+
+  const ASTContext *canonicalContext = objectTy->isCanonical() ? &C : nullptr;
+  return entry = new (C, arena) YieldResultType(objectTy, InOut, canonicalContext,
+                                                properties);
 }
 
 DependentMemberType *DependentMemberType::get(Type base, Identifier name) {

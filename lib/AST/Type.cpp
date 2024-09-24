@@ -278,6 +278,10 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
 #include "swift/AST/ReferenceStorage.def"
     return false;
 
+  case TypeKind::YieldResult:
+    return isReferenceTypeImpl(cast<YieldResultType>(type).getResultType(),
+                               sig, functionsCount);
+
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
     assert(sig && "dependent types can't answer reference semantics query");
@@ -1875,6 +1879,13 @@ CanType TypeBase::computeCanonicalType() {
     auto *element = cast<PackElementType>(this);
     auto packType = element->getPackType()->getCanonicalType();
     Result = PackElementType::get(packType, element->getLevel());
+    break;
+  }
+
+  case TypeKind::YieldResult: {
+    auto *ty = cast<YieldResultType>(this);
+    auto wrappedType = ty->getResultType()->getCanonicalType();
+    Result = YieldResultType::get(wrappedType, ty->isInOut());
     break;
   }
 
@@ -4630,6 +4641,9 @@ ReferenceCounting TypeBase::getReferenceCounting() {
     return cast<SILMoveOnlyWrappedType>(type)
         ->getInnerType()
         ->getReferenceCounting();
+
+  case TypeKind::YieldResult:
+    return cast<YieldResultType>(type)->getResultType()->getReferenceCounting();
 
   case TypeKind::PrimaryArchetype:
   case TypeKind::ExistentialArchetype:
