@@ -18,7 +18,6 @@
 #ifndef SWIFT_BASIC_LANGOPTIONS_H
 #define SWIFT_BASIC_LANGOPTIONS_H
 
-#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/FixedBitSet.h"
@@ -46,6 +45,7 @@
 namespace swift {
 
   struct DiagnosticBehavior;
+  class DiagnosticEngine;
 
   /// Kind of implicit platform conditions.
   enum class PlatformConditionKind {
@@ -217,8 +217,14 @@ namespace swift {
 
     /// Diagnostic level to report when a public declarations doesn't declare
     /// an introduction OS version.
-    std::optional<DiagnosticBehavior> RequireExplicitAvailability =
-        std::nullopt;
+    enum class RequireExplicitAvailabilityDiagnosticBehavior : uint8_t {
+      Ignore,
+      Warning,
+      Error,
+    };
+    RequireExplicitAvailabilityDiagnosticBehavior
+        RequireExplicitAvailabilityBehavior =
+            RequireExplicitAvailabilityDiagnosticBehavior::Ignore;
 
     /// Introduction platform and version to suggest as fix-it
     /// when using RequireExplicitAvailability.

@@ -1167,11 +1167,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_EQ)) {
     StringRef diagLevel = A->getValue();
     if (diagLevel == "warn") {
-      Opts.RequireExplicitAvailability = DiagnosticBehavior::Warning;
+      Opts.RequireExplicitAvailabilityBehavior =
+          LangOptions::RequireExplicitAvailabilityDiagnosticBehavior::Warning;
     } else if (diagLevel == "error") {
-      Opts.RequireExplicitAvailability = DiagnosticBehavior::Error;
+      Opts.RequireExplicitAvailabilityBehavior =
+          LangOptions::RequireExplicitAvailabilityDiagnosticBehavior::Error;
     } else if (diagLevel == "ignore") {
-      Opts.RequireExplicitAvailability = std::nullopt;
+      Opts.RequireExplicitAvailabilityBehavior =
+          LangOptions::RequireExplicitAvailabilityDiagnosticBehavior::Ignore;
     } else {
       Diags.diagnose(SourceLoc(),
                      diag::error_unknown_require_explicit_availability,
@@ -1180,7 +1183,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   } else if (Args.getLastArg(OPT_require_explicit_availability,
                              OPT_require_explicit_availability_target) ||
              Opts.LibraryLevel == LibraryLevel::API) {
-    Opts.RequireExplicitAvailability = DiagnosticBehavior::Warning;
+    Opts.RequireExplicitAvailabilityBehavior =
+        LangOptions::RequireExplicitAvailabilityDiagnosticBehavior::Warning;
   }
 
   if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_target)) {
