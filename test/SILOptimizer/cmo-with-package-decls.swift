@@ -3,7 +3,7 @@
 // RUN: %target-build-swift -O -wmo -Xfrontend -enable-default-cmo -parse-as-library -emit-module -emit-module-path=%t/Module.swiftmodule -module-name=Module -package-name Pkg -I%t -I%S/Inputs/cross-module %S/Inputs/cross-module/default-module.swift -c -o %t/module.o
 // RUN: %target-build-swift -O -wmo -Xfrontend -enable-default-cmo -parse-as-library -emit-tbd -emit-tbd-path %t/ModuleTBD.tbd -emit-module -emit-module-path=%t/ModuleTBD.swiftmodule -module-name=ModuleTBD -package-name Pkg -I%t -I%S/Inputs/cross-module %S/Inputs/cross-module/default-module.swift -c -o %t/moduletbd.o -Xfrontend -tbd-install_name -Xfrontend module
 
-// RUN: %target-build-swift -O -wmo -module-name=Main -package-name Pkg -I%t -I%S/Inputs/cross-module %s -emit-sil -o %t/Main.sil
+// RUN: %target-build-swift -Xfrontend -enable-default-cmo -O -wmo -module-name=Main -package-name Pkg -I%t -I%S/Inputs/cross-module %s -emit-sil -o %t/Main.sil
 // RUN: %FileCheck %s < %t/Main.sil
 
 // REQUIRES: swift_in_compiler
@@ -12,7 +12,7 @@ import Module
 import ModuleTBD
 
 // static ModuleStruct.privateFunctionPointer
-// CHECK-LABEL: sil_global public_external @$s6Module0A6StructV22privateFunctionPointeryS2icvpZ : $@callee_guaranteed (Int) -> Int{{$}}
+// CHECK-LABEL: sil_global public_external [serialized] @$s6Module0A6StructV22privateFunctionPointeryS2icvpZ : $@callee_guaranteed (Int) -> Int{{$}}
 
 // static ModuleStruct.publicFunctionPointer
 // CHECK-LABEL: sil_global public_external [serialized] @$s6Module0A6StructV21publicFunctionPointeryS2icvpZ : $@callee_guaranteed (Int) -> Int
