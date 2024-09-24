@@ -168,17 +168,18 @@ public:
   // flags for the struct. (The "non-inline" and "has-extra-inhabitants" bits
   // still require additional fixup.)
   enum : uint32_t {
-    AlignmentMask =       0x000000FF,
-    // unused             0x0000FF00,
-    IsNonPOD =            0x00010000,
-    IsNonInline =         0x00020000,
-    // unused             0x00040000,
-    HasSpareBits =        0x00080000,
-    IsNonBitwiseTakable = 0x00100000,
-    HasEnumWitnesses =    0x00200000,
-    Incomplete =          0x00400000,
-    IsNonCopyable =       0x00800000,
-    // unused             0xFF000000,
+    AlignmentMask =          0x000000FF,
+    // unused                0x0000FF00,
+    IsNonPOD =               0x00010000,
+    IsNonInline =            0x00020000,
+    // unused                0x00040000,
+    HasSpareBits =           0x00080000,
+    IsNonBitwiseTakable =    0x00100000,
+    HasEnumWitnesses =       0x00200000,
+    Incomplete =             0x00400000,
+    IsNonCopyable =          0x00800000,
+    IsNonBitwiseBorrowable = 0x01000000,
+    // unused                0xFE000000,
   };
 
   static constexpr const uint32_t MaxNumExtraInhabitants = 0x7FFFFFFF;
@@ -241,6 +242,27 @@ public:
   constexpr TargetValueWitnessFlags withBitwiseTakable(bool isBT) const {
     return TargetValueWitnessFlags((Data & ~IsNonBitwiseTakable) |
                                    (isBT ? 0 : IsNonBitwiseTakable));
+  }
+  
+  /// True if values of this type can be passed by value when borrowed.
+  /// If this bit is true, then borrows of the value are independent of the
+  /// value's address, so a value can be passed in registers or memcpy'd
+  /// while borrowed. This is in contrast to Rust, for instance, where a
+  /// `&T` type is always represented as a pointer, and borrowing a
+  /// value always moves the borrowed value into memory.
+  bool isBitwiseBorrowable() const {
+    /// This bit was introduced with Swift 6; prior to the introduction of
+    /// `Atomic` and `Mutex`, a type was always bitwise-borrowable if it
+    /// was bitwise-takable. Compilers and runtimes before Swift 6 would
+    /// never set the `IsNonBitwiseBorrowable` bit in the value witness
+    /// table, but any type that sets `IsNonBitwiseTakable` is definitely
+    /// not bitwise borrowable.
+    return isBitwiseTakable()
+      && !(Data & IsNonBitwiseBorrowable);
+  }
+  constexpr TargetValueWitnessFlags withBitwiseBorrowable(bool isBB) const {
+    return TargetValueWitnessFlags((Data & ~IsNonBitwiseBorrowable) |
+                                   (isBB ? 0 : IsNonBitwiseBorrowable));
   }
   
   /// True if values of this type can be copied.
