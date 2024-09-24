@@ -474,7 +474,7 @@ package func runPkg(_ arg: [any PkgProto]) {
 // CHECK-LABEL: sil_vtable [serialized_for_package] ParentPubKlass {
 // CHECK-NEXT:  #ParentPubKlass.parentPubVar!getter: (ParentPubKlass) -> () -> Int : @$s3Lib14ParentPubKlassC06parentC3VarSivg  // ParentPubKlass.parentPubVar.getter
 // CHECK-NEXT:  #ParentPubKlass.parentPubVar!setter: (ParentPubKlass) -> (Int) -> () : @$s3Lib14ParentPubKlassC06parentC3VarSivs  // ParentPubKlass.parentPubVar.setter
-// CHECK-NEXT:  #ParentPubKlass.parentPubVar!modify: (ParentPubKlass) -> () -> () : @$s3Lib14ParentPubKlassC06parentC3VarSivM // ParentPubKlass.parentPubVar.modify
+// CHECK-NEXT:  #ParentPubKlass.parentPubVar!modify: (ParentPubKlass) -> @yield_once () -> inout @yields Int : @$s3Lib14ParentPubKlassC06parentC3VarSivM // ParentPubKlass.parentPubVar.modify
 // CHECK-NEXT:  #ParentPubKlass.init!allocator: (ParentPubKlass.Type) -> (Int) -> ParentPubKlass : @$s3Lib14ParentPubKlassCyACSicfC // ParentPubKlass.__allocating_init(_:)
 // CHECK-NEXT:  #ParentPubKlass.parentPubFunc: (ParentPubKlass) -> () -> () : @$s3Lib14ParentPubKlassC06parentC4FuncyyF // ParentPubKlass.parentPubFunc()
 // CHECK-NEXT:  #ParentPubKlass.deinit!deallocator: @$s3Lib14ParentPubKlassCfD  // ParentPubKlass.__deallocating_deinit
@@ -482,12 +482,12 @@ package func runPkg(_ arg: [any PkgProto]) {
 // CHECK-LABEL: sil_vtable [serialized_for_package] PubKlass {
 // CHECK-NEXT:  #ParentPubKlass.parentPubVar!getter: (ParentPubKlass) -> () -> Int : @$s3Lib14ParentPubKlassC06parentC3VarSivg [inherited]  // ParentPubKlass.parentPubVar.getter
 // CHECK-NEXT:  #ParentPubKlass.parentPubVar!setter: (ParentPubKlass) -> (Int) -> () : @$s3Lib14ParentPubKlassC06parentC3VarSivs [inherited]  // ParentPubKlass.parentPubVar.setter
-// CHECK-NEXT:  #ParentPubKlass.parentPubVar!modify: (ParentPubKlass) -> () -> () : @$s3Lib14ParentPubKlassC06parentC3VarSivM [inherited]  // ParentPubKlass.parentPubVar.modify
+// CHECK-NEXT:  #ParentPubKlass.parentPubVar!modify: (ParentPubKlass) -> @yield_once () -> inout @yields Int : @$s3Lib14ParentPubKlassC06parentC3VarSivM [inherited]  // ParentPubKlass.parentPubVar.modify
 // CHECK-NEXT:  #ParentPubKlass.init!allocator: (ParentPubKlass.Type) -> (Int) -> ParentPubKlass : @$s3Lib8PubKlassCyACSicfC [override]  // PubKlass.__allocating_init(_:)
 // CHECK-NEXT:  #ParentPubKlass.parentPubFunc: (ParentPubKlass) -> () -> () : @$s3Lib8PubKlassC06parentB4FuncyyF [override]  // PubKlass.parentPubFunc()
 // CHECK-NEXT:  #PubKlass.pubVar!getter: (PubKlass) -> () -> String : @$s3Lib8PubKlassC6pubVarSSvg  // PubKlass.pubVar.getter
 // CHECK-NEXT:  #PubKlass.pubVar!setter: (PubKlass) -> (String) -> () : @$s3Lib8PubKlassC6pubVarSSvs  // PubKlass.pubVar.setter
-// CHECK-NEXT:  #PubKlass.pubVar!modify: (PubKlass) -> () -> () : @$s3Lib8PubKlassC6pubVarSSvM  // PubKlass.pubVar.modify
+// CHECK-NEXT:  #PubKlass.pubVar!modify: (PubKlass) -> @yield_once () -> inout @yields String : @$s3Lib8PubKlassC6pubVarSSvM  // PubKlass.pubVar.modify
 // CHECK-NEXT:  #PubKlass.init!allocator: (PubKlass.Type) -> (String) -> PubKlass : @$s3Lib8PubKlassCyACSScfC  // PubKlass.__allocating_init(_:)
 // CHECK-NEXT:  #PubKlass.pubFunc: (PubKlass) -> () -> () : @$s3Lib8PubKlassC7pubFuncyyF  // PubKlass.pubFunc()
 // CHECK-NEXT:  #PubKlass.deinit!deallocator: @$s3Lib8PubKlassCfD  // PubKlass.__deallocating_deinit
@@ -496,7 +496,7 @@ package func runPkg(_ arg: [any PkgProto]) {
 // CHECK-LABEL: sil_vtable [serialized_for_package] ParentPkgKlass {
 // CHECK-NEXT:  #ParentPkgKlass.parentPkgVar!getter: (ParentPkgKlass) -> () -> Int : @$s3Lib14ParentPkgKlassC06parentC3VarSivg  // ParentPkgKlass.parentPkgVar.getter
 // CHECK-NEXT:  #ParentPkgKlass.parentPkgVar!setter: (ParentPkgKlass) -> (Int) -> () : @$s3Lib14ParentPkgKlassC06parentC3VarSivs  // ParentPkgKlass.parentPkgVar.setter
-// CHECK-NEXT:  #ParentPkgKlass.parentPkgVar!modify: (ParentPkgKlass) -> () -> () : @$s3Lib14ParentPkgKlassC06parentC3VarSivM // ParentPkgKlass.parentPkgVar.modify
+// CHECK-NEXT:  #ParentPkgKlass.parentPkgVar!modify: (ParentPkgKlass) -> @yield_once () -> inout @yields Int : @$s3Lib14ParentPkgKlassC06parentC3VarSivM // ParentPkgKlass.parentPkgVar.modify
 // CHECK-NEXT:  #ParentPkgKlass.init!allocator: (ParentPkgKlass.Type) -> (Int) -> ParentPkgKlass : @$s3Lib14ParentPkgKlassCyACSicfC // ParentPkgKlass.__allocating_init(_:)
 // CHECK-NEXT:  #ParentPkgKlass.parentPkgFunc: (ParentPkgKlass) -> () -> Int : @$s3Lib14ParentPkgKlassC06parentC4FuncSiyF // ParentPkgKlass.parentPkgFunc()
 // CHECK-NEXT:  #ParentPkgKlass.deinit!deallocator: @$s3Lib14ParentPkgKlassCfD  // ParentPkgKlass.__deallocating_deinit
@@ -504,12 +504,12 @@ package func runPkg(_ arg: [any PkgProto]) {
 // CHECK-LABEL: sil_vtable [serialized_for_package] PkgKlass {
 // CHECK-NEXT:  #ParentPkgKlass.parentPkgVar!getter: (ParentPkgKlass) -> () -> Int : @$s3Lib14ParentPkgKlassC06parentC3VarSivg [inherited]  // ParentPkgKlass.parentPkgVar.getter
 // CHECK-NEXT:  #ParentPkgKlass.parentPkgVar!setter: (ParentPkgKlass) -> (Int) -> () : @$s3Lib14ParentPkgKlassC06parentC3VarSivs [inherited]  // ParentPkgKlass.parentPkgVar.setter
-// CHECK-NEXT:  #ParentPkgKlass.parentPkgVar!modify: (ParentPkgKlass) -> () -> () : @$s3Lib14ParentPkgKlassC06parentC3VarSivM [inherited]  // ParentPkgKlass.parentPkgVar.modify
+// CHECK-NEXT:  #ParentPkgKlass.parentPkgVar!modify: (ParentPkgKlass) -> @yield_once () -> inout @yields Int : @$s3Lib14ParentPkgKlassC06parentC3VarSivM [inherited]  // ParentPkgKlass.parentPkgVar.modify
 // CHECK-NEXT:  #ParentPkgKlass.init!allocator: (ParentPkgKlass.Type) -> (Int) -> ParentPkgKlass : @$s3Lib8PkgKlassCyACSicfC [override]  // PkgKlass.__allocating_init(_:)
 // CHECK-NEXT:  #ParentPkgKlass.parentPkgFunc: (ParentPkgKlass) -> () -> Int : @$s3Lib8PkgKlassC06parentB4FuncSiyF [override]  // PkgKlass.parentPkgFunc()
 // CHECK-NEXT:  #PkgKlass.pkgVar!getter: (PkgKlass) -> () -> String : @$s3Lib8PkgKlassC6pkgVarSSvg  // PkgKlass.pkgVar.getter
 // CHECK-NEXT:  #PkgKlass.pkgVar!setter: (PkgKlass) -> (String) -> () : @$s3Lib8PkgKlassC6pkgVarSSvs  // PkgKlass.pkgVar.setter
-// CHECK-NEXT:  #PkgKlass.pkgVar!modify: (PkgKlass) -> () -> () : @$s3Lib8PkgKlassC6pkgVarSSvM  // PkgKlass.pkgVar.modify
+// CHECK-NEXT:  #PkgKlass.pkgVar!modify: (PkgKlass) -> @yield_once () -> inout @yields String : @$s3Lib8PkgKlassC6pkgVarSSvM  // PkgKlass.pkgVar.modify
 // CHECK-NEXT:  #PkgKlass.init!allocator: (PkgKlass.Type) -> (String) -> PkgKlass : @$s3Lib8PkgKlassCyACSScfC  // PkgKlass.__allocating_init(_:)
 // CHECK-NEXT:  #PkgKlass.pkgFunc: (PkgKlass) -> () -> () : @$s3Lib8PkgKlassC7pkgFuncyyF  // PkgKlass.pkgFunc()
 // CHECK-NEXT:  #PkgKlass.deinit!deallocator: @$s3Lib8PkgKlassCfD  // PkgKlass.__deallocating_deinit
@@ -518,7 +518,7 @@ package func runPkg(_ arg: [any PkgProto]) {
 // CHECK-LABEL: sil_vtable [serialized_for_package] PubKlassZ {
 // CHECK-NEXT:  #PubKlassZ.env!getter: (PubKlassZ) -> () -> UInt16 : @$s3Lib9PubKlassZC3envs6UInt16Vvg  // PubKlassZ.env.getter
 // CHECK-NEXT:  #PubKlassZ.env!setter: (PubKlassZ) -> (UInt16) -> () : @$s3Lib9PubKlassZC3envs6UInt16Vvs  // PubKlassZ.env.setter
-// CHECK-NEXT:  #PubKlassZ.env!modify: (PubKlassZ) -> () -> () : @$s3Lib9PubKlassZC3envs6UInt16VvM  // PubKlassZ.env.modify
+// CHECK-NEXT:  #PubKlassZ.env!modify: (PubKlassZ) -> @yield_once () -> inout @yields UInt16 : @$s3Lib9PubKlassZC3envs6UInt16VvM  // PubKlassZ.env.modify
 // CHECK-NEXT:  #PubKlassZ.init!allocator: (PubKlassZ.Type) -> (UInt16) -> PubKlassZ : @$s3Lib9PubKlassZC8rawValueACs6UInt16V_tcfC  // PubKlassZ.__allocating_init(rawValue:)
 // CHECK-NEXT:  #PubKlassZ.pubFunc: (PubKlassZ) -> () -> () : @$s3Lib9PubKlassZC7pubFuncyyF // PubKlassZ.pubFunc()
 // CHECK-NEXT:  #PubKlassZ.deinit!deallocator: @$s3Lib9PubKlassZCfD // PubKlassZ.__deallocating_deinit
@@ -527,7 +527,7 @@ package func runPkg(_ arg: [any PkgProto]) {
 // CHECK-LABEL: sil_vtable [serialized_for_package] PkgKlassZ {
 // CHECK-NEXT:  #PkgKlassZ.env!getter: (PkgKlassZ) -> () -> UInt16 : @$s3Lib9PkgKlassZC3envs6UInt16Vvg  // PkgKlassZ.env.getter
 // CHECK-NEXT:  #PkgKlassZ.env!setter: (PkgKlassZ) -> (UInt16) -> () : @$s3Lib9PkgKlassZC3envs6UInt16Vvs  // PkgKlassZ.env.setter
-// CHECK-NEXT:  #PkgKlassZ.env!modify: (PkgKlassZ) -> () -> () : @$s3Lib9PkgKlassZC3envs6UInt16VvM  // PkgKlassZ.env.modify
+// CHECK-NEXT:  #PkgKlassZ.env!modify: (PkgKlassZ) -> @yield_once () -> inout @yields UInt16 : @$s3Lib9PkgKlassZC3envs6UInt16VvM  // PkgKlassZ.env.modify
 // CHECK-NEXT:  #PkgKlassZ.init!allocator: (PkgKlassZ.Type) -> (UInt16) -> PkgKlassZ : @$s3Lib9PkgKlassZC8rawValueACs6UInt16V_tcfC  // PkgKlassZ.__allocating_init(rawValue:)
 // CHECK-NEXT:  #PkgKlassZ.pkgFunc: (PkgKlassZ) -> () -> () : @$s3Lib9PkgKlassZC7pkgFuncyyF // PkgKlassZ.pkgFunc()
 // CHECK-NEXT:  #PkgKlassZ.deinit!deallocator: @$s3Lib9PkgKlassZCfD // PkgKlassZ.__deallocating_deinit
@@ -538,7 +538,7 @@ package func runPkg(_ arg: [any PkgProto]) {
 //CHECK-NEXT:   method #PubProto.root!getter: <Self where Self : PubProto> (Self.Type) -> () -> UInt16 : @$s3Lib9PubKlassZCAA0B5ProtoA2aDP4roots6UInt16VvgZTW
 //CHECK-NEXT:   method #PubProto.env!getter: <Self where Self : PubProto> (Self) -> () -> UInt16 : @$s3Lib9PubKlassZCAA0B5ProtoA2aDP3envs6UInt16VvgTW
 //CHECK-NEXT:   method #PubProto.env!setter: <Self where Self : PubProto> (inout Self) -> (UInt16) -> () : @$s3Lib9PubKlassZCAA0B5ProtoA2aDP3envs6UInt16VvsTW
-//CHECK-NEXT:   method #PubProto.env!modify: <Self where Self : PubProto> (inout Self) -> () -> () : @$s3Lib9PubKlassZCAA0B5ProtoA2aDP3envs6UInt16VvMTW
+//CHECK-NEXT:   method #PubProto.env!modify: <Self where Self : PubProto> (inout Self) -> @yield_once () -> inout @yields UInt16 : @$s3Lib9PubKlassZCAA0B5ProtoA2aDP3envs6UInt16VvMTW
 //CHECK-NEXT:   method #PubProto.init!allocator: <Self where Self : PubProto> (Self.Type) -> (UInt16) -> Self : @$s3Lib9PubKlassZCAA0B5ProtoA2aDP8rawValuexs6UInt16V_tcfCTW
 //CHECK-NEXT:   method #PubProto.pubFunc: <Self where Self : PubProto> (Self) -> () -> () : @$s3Lib9PubKlassZCAA0B5ProtoA2aDP7pubFuncyyFTW
 
@@ -547,14 +547,14 @@ package func runPkg(_ arg: [any PkgProto]) {
 //CHECK-NEXT:   method #PubProto.root!getter: <Self where Self : PubProto> (Self.Type) -> () -> UInt16 : @$s3Lib9PubStructVAA0B5ProtoA2aDP4roots6UInt16VvgZTW
 //CHECK-NEXT:   method #PubProto.env!getter: <Self where Self : PubProto> (Self) -> () -> UInt16 : @$s3Lib9PubStructVAA0B5ProtoA2aDP3envs6UInt16VvgTW
 //CHECK-NEXT:   method #PubProto.env!setter: <Self where Self : PubProto> (inout Self) -> (UInt16) -> () : @$s3Lib9PubStructVAA0B5ProtoA2aDP3envs6UInt16VvsTW
-//CHECK-NEXT:   method #PubProto.env!modify: <Self where Self : PubProto> (inout Self) -> () -> () : @$s3Lib9PubStructVAA0B5ProtoA2aDP3envs6UInt16VvMTW
+//CHECK-NEXT:   method #PubProto.env!modify: <Self where Self : PubProto> (inout Self) -> @yield_once () -> inout @yields UInt16 : @$s3Lib9PubStructVAA0B5ProtoA2aDP3envs6UInt16VvMTW
 //CHECK-NEXT:   method #PubProto.init!allocator: <Self where Self : PubProto> (Self.Type) -> (UInt16) -> Self : @$s3Lib9PubStructVAA0B5ProtoA2aDP8rawValuexs6UInt16V_tcfCTW
 //CHECK-NEXT:   method #PubProto.pubFunc: <Self where Self : PubProto> (Self) -> () -> () : @$s3Lib9PubStructVAA0B5ProtoA2aDP7pubFuncyyFTW
 
 //CHECK-LABEL:  sil_witness_table [serialized_for_package] PubStructX: PubSimpleProto module Lib {
 //CHECK-NEXT:   method #PubSimpleProto.pubVar!getter: <Self where Self : PubSimpleProto> (Self) -> () -> Int : @$s3Lib10PubStructXVAA0B11SimpleProtoA2aDP6pubVarSivgTW
 //CHECK-NEXT:   method #PubSimpleProto.pubVar!setter: <Self where Self : PubSimpleProto> (inout Self) -> (Int) -> () : @$s3Lib10PubStructXVAA0B11SimpleProtoA2aDP6pubVarSivsTW
-//CHECK-NEXT:   method #PubSimpleProto.pubVar!modify: <Self where Self : PubSimpleProto> (inout Self) -> () -> () : @$s3Lib10PubStructXVAA0B11SimpleProtoA2aDP6pubVarSivMTW
+//CHECK-NEXT:   method #PubSimpleProto.pubVar!modify: <Self where Self : PubSimpleProto> (inout Self) -> @yield_once () -> inout @yields Int : @$s3Lib10PubStructXVAA0B11SimpleProtoA2aDP6pubVarSivMTW
 //CHECK-NEXT:   method #PubSimpleProto.pubFunc: <Self where Self : PubSimpleProto> (Self) -> () -> Int : @$s3Lib10PubStructXVAA0B11SimpleProtoA2aDP7pubFuncSiyFTW
 
 //CHECK-LABEL:  sil_witness_table package [serialized_for_package] PkgKlassZ: PkgProto module Lib {
@@ -562,7 +562,7 @@ package func runPkg(_ arg: [any PkgProto]) {
 //CHECK-NEXT:   method #PkgProto.root!getter: <Self where Self : PkgProto> (Self.Type) -> () -> UInt16 : @$s3Lib9PkgKlassZCAA0B5ProtoA2aDP4roots6UInt16VvgZTW
 //CHECK-NEXT:   method #PkgProto.env!getter: <Self where Self : PkgProto> (Self) -> () -> UInt16 : @$s3Lib9PkgKlassZCAA0B5ProtoA2aDP3envs6UInt16VvgTW
 //CHECK-NEXT:   method #PkgProto.env!setter: <Self where Self : PkgProto> (inout Self) -> (UInt16) -> () : @$s3Lib9PkgKlassZCAA0B5ProtoA2aDP3envs6UInt16VvsTW
-//CHECK-NEXT:   method #PkgProto.env!modify: <Self where Self : PkgProto> (inout Self) -> () -> () : @$s3Lib9PkgKlassZCAA0B5ProtoA2aDP3envs6UInt16VvMTW
+//CHECK-NEXT:   method #PkgProto.env!modify: <Self where Self : PkgProto> (inout Self) -> @yield_once () -> inout @yields UInt16 : @$s3Lib9PkgKlassZCAA0B5ProtoA2aDP3envs6UInt16VvMTW
 //CHECK-NEXT:   method #PkgProto.init!allocator: <Self where Self : PkgProto> (Self.Type) -> (UInt16) -> Self : @$s3Lib9PkgKlassZCAA0B5ProtoA2aDP8rawValuexs6UInt16V_tcfCTW
 //CHECK-NEXT:   method #PkgProto.pkgFunc: <Self where Self : PkgProto> (Self) -> () -> () : @$s3Lib9PkgKlassZCAA0B5ProtoA2aDP7pkgFuncyyFTW
 
@@ -571,12 +571,12 @@ package func runPkg(_ arg: [any PkgProto]) {
 //CHECK-NEXT:  method #PkgProto.root!getter: <Self where Self : PkgProto> (Self.Type) -> () -> UInt16 : @$s3Lib9PkgStructVAA0B5ProtoA2aDP4roots6UInt16VvgZTW
 //CHECK-NEXT:   method #PkgProto.env!getter: <Self where Self : PkgProto> (Self) -> () -> UInt16 : @$s3Lib9PkgStructVAA0B5ProtoA2aDP3envs6UInt16VvgTW
 //CHECK-NEXT:   method #PkgProto.env!setter: <Self where Self : PkgProto> (inout Self) -> (UInt16) -> () : @$s3Lib9PkgStructVAA0B5ProtoA2aDP3envs6UInt16VvsTW
-//CHECK-NEXT:   method #PkgProto.env!modify: <Self where Self : PkgProto> (inout Self) -> () -> () : @$s3Lib9PkgStructVAA0B5ProtoA2aDP3envs6UInt16VvMTW
+//CHECK-NEXT:   method #PkgProto.env!modify: <Self where Self : PkgProto> (inout Self) -> @yield_once () -> inout @yields UInt16 : @$s3Lib9PkgStructVAA0B5ProtoA2aDP3envs6UInt16VvMTW
 //CHECK-NEXT:   method #PkgProto.init!allocator: <Self where Self : PkgProto> (Self.Type) -> (UInt16) -> Self : @$s3Lib9PkgStructVAA0B5ProtoA2aDP8rawValuexs6UInt16V_tcfCTW
 //CHECK-NEXT:   method #PkgProto.pkgFunc: <Self where Self : PkgProto> (Self) -> () -> () : @$s3Lib9PkgStructVAA0B5ProtoA2aDP7pkgFuncyyFTW
 
 //CHECK-LABEL:  sil_witness_table package [serialized_for_package] PkgStructX: PkgSimpleProto module Lib {
 //CHECK-NEXT:   method #PkgSimpleProto.pkgVar!getter: <Self where Self : PkgSimpleProto> (Self) -> () -> Int : @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP6pkgVarSivgTW 
 //CHECK-NEXT:   method #PkgSimpleProto.pkgVar!setter: <Self where Self : PkgSimpleProto> (inout Self) -> (Int) -> () : @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP6pkgVarSivsTW
-//CHECK-NEXT:   method #PkgSimpleProto.pkgVar!modify: <Self where Self : PkgSimpleProto> (inout Self) -> () -> () : @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP6pkgVarSivMTW
+//CHECK-NEXT:   method #PkgSimpleProto.pkgVar!modify: <Self where Self : PkgSimpleProto> (inout Self) -> @yield_once () -> inout @yields Int : @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP6pkgVarSivMTW
 //CHECK-NEXT:   method #PkgSimpleProto.pkgFunc: <Self where Self : PkgSimpleProto> (Self) -> () -> Int : @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP7pkgFuncSiyFTW

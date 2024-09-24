@@ -581,9 +581,8 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
   GenericSignature sig = dc->getGenericSignatureOfContext();
   if (auto *genericFn = type->getAs<GenericFunctionType>()) {
     sig = genericFn->getGenericSignature();
-    type = FunctionType::get(genericFn->getParams(),
-                             genericFn->getResult(),
-                             genericFn->getExtInfo());
+    type = FunctionType::get(genericFn->getParams(), genericFn->getYields(),
+                             genericFn->getResult(), genericFn->getExtInfo());
   }
 
   auto selfTy = dc->getSelfInterfaceType();
@@ -591,10 +590,10 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   if (sig) {
     GenericFunctionType::ExtInfo info;
-    return GenericFunctionType::get(sig, {selfParam}, type, info);
+    return GenericFunctionType::get(sig, {selfParam}, {}, type, info);
   }
   FunctionType::ExtInfo info;
-  return FunctionType::get({selfParam}, type, info);
+  return FunctionType::get({selfParam}, {}, type, info);
 }
 
 void TypeBase::getTypeVariables(
@@ -1021,9 +1020,11 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor,
     }
 
     ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
+    ArrayRef<AnyFunctionType::Yield> yields = fnType->getYields();
     Type resultType = fnType->getResult();
 
     SmallVector<AnyFunctionType::Param, 4> newParams;
+    SmallVector<AnyFunctionType::Yield, 1> newYields;
     if (recurse) {
       for (unsigned paramIdx : indices(params)) {
         const auto &param = params[paramIdx];
@@ -1044,6 +1045,13 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor,
 
       if (!newParams.empty())
         params = newParams;
+
+      for (auto yield : fnType->getYields()) {
+        newYields.emplace_back(
+            yield.getType()->stripConcurrency(recurse, dropGlobalActor),
+            yield.getFlags());
+      }
+      yields = newYields;
 
       resultType =
           resultType->stripConcurrency(recurse, dropGlobalActor, dropIsolation);
@@ -1075,10 +1083,10 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor,
 
     Type newFnType;
     if (genericSig) {
-      newFnType = GenericFunctionType::get(
-          genericSig, params, resultType, extInfo);
+      newFnType = GenericFunctionType::get(genericSig, params, yields,
+                                           resultType, extInfo);
     } else {
-      newFnType = FunctionType::get(params, resultType, extInfo);
+      newFnType = FunctionType::get(params, yields, resultType, extInfo);
     }
     if (newFnType->isEqual(this))
       return Type(this);
@@ -1403,11 +1411,12 @@ Type TypeBase::removeArgumentLabels(unsigned numArgumentLabels) {
 
   if (auto *genericFnType = dyn_cast<GenericFunctionType>(fnType)) {
     return GenericFunctionType::get(genericFnType->getGenericSignature(),
-                                    unlabeledParams, result,
-                                    fnType->getExtInfo());
+                                    unlabeledParams, fnType->getYields(),
+                                    result, fnType->getExtInfo());
   }
 
-  return FunctionType::get(unlabeledParams, result, fnType->getExtInfo());
+  return FunctionType::get(unlabeledParams, fnType->getYields(), result,
+                           fnType->getExtInfo());
 }
 
 Type TypeBase::eraseDynamicSelfType() {
@@ -1462,18 +1471,19 @@ Type TypeBase::withCovariantResultType() {
   if (wasOptional)
     resultType = OptionalType::get(resultType);
 
-  resultFnType = FunctionType::get(resultFnType->getParams(), resultType,
-                                   resultFnType->getExtInfo());
+  resultFnType =
+      FunctionType::get(resultFnType->getParams(), resultFnType->getYields(),
+                        resultType, resultFnType->getExtInfo());
 
   // Rebuild the outer function type.
   if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
     return GenericFunctionType::get(genericFn->getGenericSignature(),
-                                    fnType->getParams(), resultFnType,
-                                    fnType->getExtInfo());
+                                    fnType->getParams(), fnType->getYields(),
+                                    resultFnType, fnType->getExtInfo());
   }
-  
-  return FunctionType::get(fnType->getParams(), resultFnType,
-                           fnType->getExtInfo());
+
+  return FunctionType::get(fnType->getParams(), fnType->getYields(),
+                           resultFnType, fnType->getExtInfo());
 }
 
 Type TypeBase::replaceTypeVariablesAndPlaceholdersWithErrors() {
@@ -1698,13 +1708,11 @@ Type TypeBase::replaceSelfParameterType(Type newSelf) {
 
   if (auto genericFnTy = getAs<GenericFunctionType>()) {
     return GenericFunctionType::get(genericFnTy->getGenericSignature(),
-                                    {selfParam},
-                                    fnTy->getResult(),
-                                    fnTy->getExtInfo());
+                                    {selfParam}, fnTy->getYields(),
+                                    fnTy->getResult(), fnTy->getExtInfo());
   }
 
-  return FunctionType::get({selfParam},
-                           fnTy->getResult(),
+  return FunctionType::get({selfParam}, fnTy->getYields(), fnTy->getResult(),
                            fnTy->getExtInfo());
 }
 
@@ -1830,6 +1838,15 @@ getCanonicalParams(AnyFunctionType *funcType,
   auto origParams = funcType->getParams();
   for (auto param : origParams) {
     canParams.emplace_back(param.getCanonical(genericSig));
+  }
+}
+
+static void
+getCanonicalYields(AnyFunctionType *funcType,
+                   SmallVectorImpl<AnyFunctionType::Yield> &canYields) {
+  auto origYields = funcType->getYields();
+  for (auto yield : origYields) {
+    canYields.emplace_back(yield.getCanonical());
   }
 }
 
@@ -1991,19 +2008,21 @@ CanType TypeBase::computeCanonicalType() {
     if (auto *genericFnTy = dyn_cast<GenericFunctionType>(this))
       genericSig = genericFnTy->getGenericSignature().getCanonicalSignature();
 
-    // Transform the parameter and result types.
+    // Transform the parameter, yield and result types.
     SmallVector<AnyFunctionType::Param, 8> canParams;
     getCanonicalParams(funcTy, genericSig, canParams);
+    SmallVector<AnyFunctionType::Yield, 8> canYields;
+    getCanonicalYields(funcTy, canYields);
     auto resultTy = funcTy->getResult()->getReducedType(genericSig);
 
     std::optional<ASTExtInfo> extInfo = std::nullopt;
     if (funcTy->hasExtInfo())
       extInfo = funcTy->getCanonicalExtInfo(useClangTypes(resultTy));
     if (genericSig) {
-      Result = GenericFunctionType::get(genericSig, canParams, resultTy,
-                                        extInfo);
+      Result = GenericFunctionType::get(genericSig, canParams, canYields,
+                                        resultTy, extInfo);
     } else {
-      Result = FunctionType::get(canParams, resultTy, extInfo);
+      Result = FunctionType::get(canParams, canYields, resultTy, extInfo);
     }
     assert(Result->isCanonical());
     break;
@@ -2788,15 +2807,30 @@ public:
         newParams.push_back(substParam.withType(newParamTy));
         didChange = didChange | (newParamTy != substParam.getPlainType());
       }
-      
+
+      SmallVector<AnyFunctionType::Yield, 1> newYields;
+      for (auto [index, yield] : llvm::enumerate(func->getYields())) {
+        auto substYield = substFunc.getYields()[index];
+        if (yield.getFlags() != substYield.getFlags())
+          return CanType();
+
+        auto newYieldTy = visit(yield.getType(), substYield.getType());
+        if (!newYieldTy)
+          return CanType();
+
+        newYields.emplace_back(newYieldTy, substYield.getFlags());
+        didChange = didChange | (newYieldTy != substYield.getType());
+      }
+
       auto newReturn = visit(func->getResult()->getCanonicalType(),
                              substFunc->getResult()->getCanonicalType());
       if (!newReturn)
         return CanType();
       if (!didChange && newReturn == substFunc.getResult())
         return subst;
-      return FunctionType::get(newParams, newReturn, func->getExtInfo())
-        ->getCanonicalType();
+      return FunctionType::get(newParams, newYields, newReturn,
+                               func->getExtInfo())
+          ->getCanonicalType();
     }
     return CanType();
   }
@@ -4809,10 +4843,11 @@ AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
           .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable)
           .build();
   if (isa<FunctionType>(this))
-    return FunctionType::get(newParams, getResult(), nonDiffExtInfo);
+    return FunctionType::get(newParams, getYields(), getResult(),
+                             nonDiffExtInfo);
   assert(isa<GenericFunctionType>(this));
   return GenericFunctionType::get(getOptGenericSignature(), newParams,
-                                  getResult(), nonDiffExtInfo);
+                                  getYields(), getResult(), nonDiffExtInfo);
 }
 
 AnyFunctionType *AnyFunctionType::getWithoutThrowing() const {
@@ -4829,6 +4864,18 @@ AnyFunctionType::withIsolation(FunctionTypeIsolation isolation) const {
 AnyFunctionType *AnyFunctionType::withSendable(bool newValue) const {
   auto info = getExtInfo().intoBuilder().withSendable(newValue).build();
   return withExtInfo(info);
+}
+
+AnyFunctionType *AnyFunctionType::getWithoutYields() const {
+  auto resultType = getResult();
+  auto noCoroExtInfo = getExtInfo().intoBuilder()
+                           .withCoroutine(false)
+                           .build();
+  if (isa<FunctionType>(this))
+    return FunctionType::get(getParams(), {}, resultType, noCoroExtInfo);
+  assert(isa<GenericFunctionType>(this));
+  return GenericFunctionType::get(getOptGenericSignature(), getParams(), {},
+                                  resultType, noCoroExtInfo);
 }
 
 std::optional<Type> AnyFunctionType::getEffectiveThrownErrorType() const {
@@ -4994,13 +5041,14 @@ bool CanType::isForeignReferenceType() {
 // Creates an `AnyFunctionType` from the given parameters, result type,
 // generic signature, and `ExtInfo`.
 static AnyFunctionType *
-makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
+makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters,
+                 ArrayRef<AnyFunctionType::Yield> yields, Type resultType,
                  GenericSignature genericSignature,
                  AnyFunctionType::ExtInfo extInfo) {
   if (genericSignature)
-    return GenericFunctionType::get(genericSignature, parameters, resultType,
-                                    extInfo);
-  return FunctionType::get(parameters, resultType, extInfo);
+    return GenericFunctionType::get(genericSignature, parameters, yields,
+                                    resultType, extInfo);
+  return FunctionType::get(parameters, yields, resultType, extInfo);
 }
 
 AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
@@ -5042,10 +5090,10 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
   retElts.push_back(originalResult);
   retElts.push_back(linearMapType);
   auto retTy = TupleType::get(retElts, ctx);
-  auto *derivativeFunctionType =
-      makeFunctionType(curryLevels.back()->getParams(), retTy,
-                       curryLevels.size() == 1 ? derivativeGenSig : nullptr,
-                       curryLevels.back()->getExtInfo());
+  auto *derivativeFunctionType = makeFunctionType(
+      curryLevels.back()->getParams(), curryLevels.back()->getYields(), retTy,
+      curryLevels.size() == 1 ? derivativeGenSig : nullptr,
+      curryLevels.back()->getExtInfo());
 
   // Wrap the derivative function type in additional curry levels.
   auto curryLevelsWithoutLast =
@@ -5054,7 +5102,8 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
     unsigned i = pair.index();
     auto *curryLevel = pair.value();
     derivativeFunctionType = makeFunctionType(
-        curryLevel->getParams(), derivativeFunctionType,
+        curryLevel->getParams(), curryLevel->getYields(),
+        derivativeFunctionType,
         i == curryLevelsWithoutLast.size() - 1 ? derivativeGenSig : nullptr,
         curryLevel->getExtInfo());
   }
@@ -5156,7 +5205,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
     linearMapType =
-        FunctionType::get(differentialParams, differentialResult, info);
+        FunctionType::get(differentialParams, {}, differentialResult, info);
     break;
   }
   case AutoDiffLinearMapKind::Pullback: {
@@ -5219,7 +5268,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     }
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
-    linearMapType = FunctionType::get(pullbackParams, pullbackResult, info);
+    linearMapType = FunctionType::get(pullbackParams, {}, pullbackResult, info);
     break;
   }
   }

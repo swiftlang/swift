@@ -2875,10 +2875,9 @@ static Type getTypeForDisplay(ValueDecl *decl) {
     if (auto genericFn = type->getAs<GenericFunctionType>()) {
       auto sig = genericFn->getGenericSignature();
       auto resultFn = genericFn->getResult()->castTo<FunctionType>();
-      return GenericFunctionType::get(sig,
-                                      resultFn->getParams(),
-                                      resultFn->getResult(),
-                                      resultFn->getExtInfo());
+      return GenericFunctionType::get(
+          sig, resultFn->getParams(), resultFn->getYields(),
+          resultFn->getResult(), resultFn->getExtInfo());
     }
 
     return type->castTo<FunctionType>()->getResult();
@@ -2917,6 +2916,14 @@ static Type getRequirementTypeForDisplay(NormalProtocolConformance *conformance,
         /*result*/false)));
     }
 
+    SmallVector<AnyFunctionType::Yield, 1> yields;
+    for (auto yield : fnTy->getYields()) {
+      // TBD: Verify substType() parameters below
+      yields.emplace_back(substType(yield.getType(),
+                                    /*result*/ false),
+                          yield.getFlags());
+    }
+
     auto result = substType(fnTy->getResult(), /*result*/true);
 
     auto genericSig = fnTy->getOptGenericSignature();
@@ -2931,10 +2938,10 @@ static Type getRequirementTypeForDisplay(NormalProtocolConformance *conformance,
     }
 
     if (genericSig) {
-      return GenericFunctionType::get(genericSig, params, result,
+      return GenericFunctionType::get(genericSig, params, yields, result,
                                       fnTy->getExtInfo());
     }
-    return FunctionType::get(params, result, fnTy->getExtInfo());
+    return FunctionType::get(params, yields, result, fnTy->getExtInfo());
   }
 
   return substType(type, /*result*/ true);
@@ -5711,8 +5718,8 @@ hasInvalidTypeInConformanceContext(const ValueDecl *requirement,
   // For subscripts, build a regular function type to skip walking generic
   // requirements.
   if (auto *gft = interfaceTy->getAs<GenericFunctionType>()) {
-    interfaceTy = FunctionType::get(gft->getParams(), gft->getResult(),
-                                    gft->getExtInfo());
+    interfaceTy = FunctionType::get(gft->getParams(), gft->getYields(),
+                                    gft->getResult(), gft->getExtInfo());
   }
 
   if (!interfaceTy->hasTypeParameter())
