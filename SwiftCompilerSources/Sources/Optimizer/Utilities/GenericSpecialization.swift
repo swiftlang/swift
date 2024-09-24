@@ -75,3 +75,38 @@ func specializeVTablesOfSuperclasses(_ moduleContext: ModulePassContext) {
     }
   }
 }
+
+func specializeWitnessTable(forConformance conformance: ProtocolConformance,
+                            errorLocation: Location,
+                            _ context: ModulePassContext) -> WitnessTable
+{
+  let genericConformance = conformance.genericConformance
+  guard let witnessTable = context.lookupWitnessTable(for: genericConformance) else {
+    fatalError("no witness table found")
+  }
+  assert(witnessTable.isDefinition, "No witness table available")
+
+  let newEntries = witnessTable.entries.map { origEntry in
+    switch origEntry.kind {
+    case .method:
+      guard let origMethod = origEntry.methodFunction else {
+        return origEntry
+      }
+      let methodDecl = origEntry.methodRequirement
+      let methodSubs = conformance.specializedSubstitutions.getMethodSubstitutions(for: origMethod)
+
+      guard !methodSubs.conformances.contains(where: {!$0.isValid}),
+            let specializedMethod = context.specialize(function: origMethod, for: methodSubs) else
+      {
+        context.diagnosticEngine.diagnose(errorLocation.sourceLoc, .cannot_specialize_witness_method, methodDecl)
+        return origEntry
+      }
+      return WitnessTable.Entry(methodRequirement: methodDecl, methodFunction: specializedMethod)
+    default:
+      // TODO: handle other witness table entry kinds
+      fatalError("unsupported witness table etnry")
+    }
+    return origEntry
+  }
+  return context.createWitnessTable(entries: newEntries, conformance: conformance, linkage: .shared, serialized: false)
+}

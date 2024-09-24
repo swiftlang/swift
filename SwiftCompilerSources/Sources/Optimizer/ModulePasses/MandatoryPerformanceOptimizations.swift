@@ -117,6 +117,11 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
           _ = context.specializeClassMethodInst(classMethod)
         }
 
+      case let initExRef as InitExistentialRefInst:
+        if context.options.enableEmbeddedSwift {
+          specializeWitnessTables(for: initExRef, moduleContext, &worklist)
+        }
+
       // We need to de-virtualize deinits of non-copyable types to be able to specialize the deinitializers.
       case let destroyValue as DestroyValueInst:
         if !devirtualizeDeinits(of: destroyValue, simplifyCtxt) {
@@ -257,6 +262,37 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
   }
 
   return false
+}
+
+private func specializeWitnessTables(for initExRef: InitExistentialRefInst, _ context: ModulePassContext,
+                                     _ worklist: inout FunctionWorklist)
+{
+  for conformance in initExRef.conformances where conformance.isConcrete {
+    let origWitnessTable = context.lookupWitnessTable(for: conformance)
+    if conformance.isSpecialized {
+      if origWitnessTable == nil {
+        let wt = specializeWitnessTable(forConformance: conformance, errorLocation: initExRef.location, context)
+        worklist.addWitnessMethods(of: wt)
+      }
+    } else if let origWitnessTable {
+      checkForGenericMethods(in: origWitnessTable, errorLocation: initExRef.location, context)
+    }
+  }
+}
+
+private func checkForGenericMethods(in witnessTable: WitnessTable,
+                                    errorLocation: Location,
+                                    _ context: ModulePassContext)
+{
+  for entry in witnessTable.entries where entry.kind == .method {
+    if let method = entry.methodFunction,
+       method.isGeneric
+    {
+      context.diagnosticEngine.diagnose(errorLocation.sourceLoc, .cannot_specialize_witness_method,
+                                        entry.methodRequirement)
+      return
+    }
+  }
 }
 
 private func checkVTablesForGenericFunctions(_ context: ModulePassContext) {
@@ -468,6 +504,18 @@ fileprivate struct FunctionWorklist {
         }
       default:
         break
+      }
+    }
+  }
+
+  mutating func addWitnessMethods(of witnessTable: WitnessTable) {
+    for entry in witnessTable.entries where entry.kind == .method {
+      if let method = entry.methodFunction,
+         // A new witness table can still contain a generic function if the method couldn't be specialized for
+         // some reason and an error has been printed. Exclude generic functions to not run into an assert later.
+         !method.isGeneric
+      {
+        pushIfNotVisited(method)
       }
     }
   }
