@@ -381,6 +381,10 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
       if (auto VD = PBD->getAnchoringVarDecl(0)) {
         OS << VD->getName();
       }
+    } else if (auto ECD = dyn_cast<EnumCaseDecl>(D)) {
+      if (auto EED = ECD->getFirstElement()) {
+        OS << EED->getName();
+      }
     }
   }
 
