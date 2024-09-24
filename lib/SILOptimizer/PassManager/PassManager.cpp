@@ -1735,12 +1735,6 @@ bool BridgedPassContext::canMakeStaticObjectReadOnly(BridgedType type) const {
   return false;
 }
 
-swift::SILVTable * BridgedPassContext::specializeVTableForType(BridgedType type, BridgedFunction function) const {
-  return ::specializeVTableForType(type.unbridged(),
-                                   function.getFunction()->getModule(),
-                                   invocation->getTransform());
-}
-
 OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction function,
                                                                BridgedSubstitutionMap substitutions) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();

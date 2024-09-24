@@ -33,6 +33,11 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
   // For embedded Swift, optimize all the functions (there cannot be any
   // generics, type metadata, etc.)
   if moduleContext.options.enableEmbeddedSwift {
+    // We need to specialize all vtables which are referenced from non-generic contexts. Beside
+    // `alloc_ref`s of generic classes in non-generic functions, we also need to specialize generic
+    // superclasses of non-generic classes. E.g. `class Derived : Base<Int> {}`
+    specializeVTablesOfSuperclasses(moduleContext)
+
     worklist.addAllNonGenericFunctions(of: moduleContext)
   } else {
     worklist.addAllPerformanceAnnotatedFunctions(of: moduleContext)
@@ -40,6 +45,11 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
   }
 
   optimizeFunctionsTopDown(using: &worklist, moduleContext)
+
+  if moduleContext.options.enableEmbeddedSwift {
+    // Print errors for generic functions in vtables, which is not allowed in embedded Swift.
+    checkVTablesForGenericFunctions(moduleContext)
+  }
 }
 
 private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
@@ -92,11 +102,15 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
       // Embedded Swift specific transformations
       case let alloc as AllocRefInst:
         if context.options.enableEmbeddedSwift {
-          specializeVTableAndAddEntriesToWorklist(for: alloc.type, in: function, context, moduleContext, &worklist)
+          specializeVTableAndAddEntriesToWorklist(for: alloc.type, in: function,
+                                                  errorLocation: alloc.location,
+                                                  moduleContext, &worklist)
         }
       case let metatype as MetatypeInst:
         if context.options.enableEmbeddedSwift {
-          specializeVTableAndAddEntriesToWorklist(for: metatype.type, in: function, context, moduleContext, &worklist)
+          specializeVTableAndAddEntriesToWorklist(for: metatype.type, in: function,
+                                                  errorLocation: metatype.location,
+                                                  moduleContext, &worklist)
         }
       case let classMethod as ClassMethodInst:
         if context.options.enableEmbeddedSwift {
@@ -144,18 +158,23 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
 }
 
 private func specializeVTableAndAddEntriesToWorklist(for type: Type, in function: Function,
-                                                     _ context: FunctionPassContext, _ moduleContext: ModulePassContext,
+                                                     errorLocation: Location,
+                                                     _ moduleContext: ModulePassContext,
                                                      _ worklist: inout FunctionWorklist) {
   let vTablesCountBefore = moduleContext.vTables.count
 
-  guard context.specializeVTable(for: type, in: function) != nil else {
+  guard specializeVTable(forClassType: type, errorLocation: errorLocation, moduleContext) != nil else {
     return
   }
 
   // More than one new vtable might have been created (superclasses), process them all
   let vTables = moduleContext.vTables
   for i in vTablesCountBefore ..< vTables.count {
-    for entry in vTables[i].entries {
+    for entry in vTables[i].entries
+      // A new vtable can still contain a generic function if the method couldn't be specialized for some reason
+      // and an error has been printed. Exclude generic functions to not run into an assert later.
+      where !entry.implementation.isGeneric
+    {
       worklist.pushIfNotVisited(entry.implementation)
     }
   }
@@ -238,6 +257,14 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
   }
 
   return false
+}
+
+private func checkVTablesForGenericFunctions(_ context: ModulePassContext) {
+  for vTable in context.vTables where !vTable.class.isGenericAtAnyLevel {
+    for entry in vTable.entries where entry.implementation.isGeneric {
+      context.diagnosticEngine.diagnose(entry.methodDecl.location.sourceLoc, .non_final_generic_class_function)
+    }
+  }
 }
 
 private extension FullApplySite {
