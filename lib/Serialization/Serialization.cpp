@@ -6223,7 +6223,8 @@ public:
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         isolation,
         fnTy->hasSendingResult(),
-        fnTy->isCalledOnce());
+        fnTy->isCalledOnce(),
+        fnTy->isCoroutine());
 
     serializeFunctionTypeParams(fnTy);
 
@@ -6246,6 +6247,7 @@ public:
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         isolation, fnTy->hasSendingResult(), fnTy->isCalledOnce(),
+        fnTy->isCoroutine(),                                          
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
