@@ -5,6 +5,9 @@
 
 // REQUIRES: objc_interop
 
+// rdar://136620623
+// REQUIRES: rdar136620623
+
 //--- Inputs/module.modulemap
 module Test {
     header "nonescapable.h"
