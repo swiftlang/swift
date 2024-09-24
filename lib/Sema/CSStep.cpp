@@ -925,6 +925,10 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
   // Rewind back the constraint system information.
   ActiveChoice.reset();
 
+  // Reset the best score which was updated by `ConstraintSystem::finalize`
+  // while forming solution(s) for the current element.
+  CS.solverState->BestScore.reset();
+
   if (CS.isDebugMode())
     getDebugLogger() << ")\n";
 
