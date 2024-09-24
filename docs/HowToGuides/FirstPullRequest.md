@@ -116,7 +116,7 @@ Alright! You've implemented a change and would like to submit it.
      any associated test changes.
      This practice is key to efficient and rigorous code review processes,
      as well as a neat, transparent, and actionable commit history.
-   * [Top off your commit messages](https://swift.org/contributing/#commit-messages).
+   * [Top off your commit messages](/CONTRIBUTING.md#commit-messages).
 1. Tidy up and [format your code changes](FAQ.md#how-do-i-format-my-changes).
 
 ### Pushing and creating a pull request
