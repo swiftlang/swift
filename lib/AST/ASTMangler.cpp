@@ -1894,6 +1894,11 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return;
     }
 
+    case TypeKind::YieldResult:
+      appendType(cast<YieldResultType>(tybase)->getResultType(), sig, forDecl);
+      appendOperator("Yy");
+      return;
+
     case TypeKind::SILMoveOnlyWrapped:
       // If we hit this, we just mangle the underlying name and move on.
       llvm_unreachable("should never be mangled?");
@@ -3340,6 +3345,8 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, GenericSignature sig,
     } else if (fn->isNoEscape()) {
       return appendOperator("XE");
     }
+    if (fn->isCoroutine())
+      return appendOperator("Xy");
     return appendOperator("c");
 
   case AnyFunctionType::Representation::CFunctionPointer:
@@ -3595,7 +3602,10 @@ void ASTMangler::appendParameterTypeListElement(
     GenericSignature sig, const ValueDecl *forDecl) {
   if (auto *fnType = elementType->getAs<FunctionType>())
     appendFunctionType(fnType, sig, flags.isAutoClosure(), forDecl);
-  else
+  else if (auto *yieldType = elementType->getAs<YieldResultType>()) {
+    appendType(yieldType->getResultType(), sig, forDecl);
+    appendOperator("Yy");
+  } else
     appendType(elementType, sig, forDecl);
 
   if (flags.isNoDerivative()) {

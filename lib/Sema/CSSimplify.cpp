@@ -7468,6 +7468,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 #include "swift/AST/TypeNodes.def"
 
     case TypeKind::Error:
+    case TypeKind::YieldResult:
       return getTypeMatchFailure(locator);
 
     // BuiltinGenericType subclasses
@@ -8503,6 +8504,7 @@ ConstraintSystem::simplifyConstructionConstraint(
     
   case TypeKind::Error:
   case TypeKind::Placeholder:
+  case TypeKind::YieldResult:
     return SolutionKind::Error;
 
   case TypeKind::GenericFunction:
