@@ -7683,15 +7683,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           // scalar or array.
           if (auto inoutType1 = dyn_cast<InOutType>(desugar1)) {
             if (!isAutoClosureArgument) {
-              auto inoutBaseType = inoutType1->getInOutObjectType();
+              auto inoutBaseType = getFixedTypeRecursive(
+                  inoutType1->getInOutObjectType(), /*wantRValue=*/true);
 
-              auto baseIsArray =
-                  getFixedTypeRecursive(inoutBaseType, /*wantRValue=*/true)
-                      ->isArrayType();
+              // Wait until the base type of `inout` is sufficiently resolved
+              // before making any assessments regarding conversions.
+              if (inoutBaseType->isTypeVariableOrMember())
+                return formUnsolvedResult();
 
-              // FIXME: If the base is still a type variable, we can't tell
-              // what to do here. Might have to try \c ArrayToPointer and make
-              // it more robust.
+              auto baseIsArray = inoutBaseType->isArrayType();
+
               if (baseIsArray)
                 conversionsOrFixes.push_back(
                     ConversionRestrictionKind::ArrayToPointer);
@@ -14082,6 +14083,12 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     // This induces conversions to occur within closures instead of
     // outside of them wherever possible.
     if (locator.isFunctionConversion()) {
+      // This conversion exists only to check adjustments in the member
+      // type, so the fact that adjustments also cause a function conversion
+      // is unrelated.
+      if (locator.isForExistentialMemberAccessConversion())
+        return;
+
       increaseScore(SK_FunctionConversion, locator);
     }
   };

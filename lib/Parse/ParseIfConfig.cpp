@@ -972,34 +972,25 @@ Result Parser::parseIfConfigRaw(
   return finish(EndLoc, HadMissingEnd);
 }
 
-/// Parse and populate a #if ... #endif directive.
+// Parse and populate a #if ... #endif directive.
 /// Delegate callback function to parse elements in the blocks.
-ParserResult<IfConfigDecl> Parser::parseIfConfig(
+ParserStatus Parser::parseIfConfig(
     IfConfigContext ifConfigContext,
-    llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements) {
-  SmallVector<IfConfigClause, 4> clauses;
-  return parseIfConfigRaw<ParserResult<IfConfigDecl>>(
+    llvm::function_ref<void(bool)> parseElements) {
+  ParserStatus status = makeParserSuccess();
+  return parseIfConfigRaw<ParserStatus>(
       ifConfigContext,
       [&](SourceLoc clauseLoc, Expr *condition, bool isActive,
           IfConfigElementsRole role) {
-        SmallVector<ASTNode, 16> elements;
         if (role != IfConfigElementsRole::Skipped)
-          parseElements(elements, isActive);
-        if (role == IfConfigElementsRole::SyntaxOnly)
-          elements.clear();
-
-        clauses.emplace_back(
-            clauseLoc, condition, Context.AllocateCopy(elements), isActive);
+          parseElements(isActive);
       },
       [&](SourceLoc endLoc, bool hadMissingEnd) {
-        auto *ICD = new (Context) IfConfigDecl(CurDeclContext,
-                                               Context.AllocateCopy(clauses),
-                                               endLoc, hadMissingEnd);
-        return makeParserResult(ICD);
-      });
+      return status;
+    });
 }
 
-ParserStatus Parser::parseIfConfigDeclAttributes(
+ParserStatus Parser::parseIfConfigAttributes(
     DeclAttributes &attributes, bool ifConfigsAreDeclAttrs,
     PatternBindingInitializer *initContext) {
   ParserStatus status = makeParserSuccess();

@@ -1281,6 +1281,21 @@ public:
     return false;
   }
 
+  bool isForExistentialMemberAccessConversion() const {
+    for (auto prev = this; prev;
+         prev = prev->previous.dyn_cast<ConstraintLocatorBuilder *>()) {
+      if (auto elt = prev->element) {
+        if (elt->is<LocatorPathElt::ExistentialMemberAccessConversion>())
+          return true;
+      }
+
+      if (auto locator = prev->previous.dyn_cast<ConstraintLocator *>())
+        return bool(locator->findLast<
+                    LocatorPathElt::ExistentialMemberAccessConversion>());
+    }
+    return false;
+  }
+
   std::optional<std::pair</*witness=*/ValueDecl *, GenericTypeParamType *>>
   isForWitnessGenericParameterRequirement() const {
     SmallVector<LocatorPathElt, 2> path;

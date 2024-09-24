@@ -564,7 +564,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
   setupStatsReporter();
 
   if (setupDiagnosticVerifierIfNeeded()) {
-    Error = "Setting up diagnostics verified failed";
+    Error = "Setting up diagnostics verifier failed";
     return true;
   }
 
@@ -729,9 +729,8 @@ void CompilerInstance::setUpDiagnosticOptions() {
   }
   Diagnostics.setWarningsAsErrorsRules(
       Invocation.getDiagnosticOptions().WarningsAsErrorsRules);
-  if (Invocation.getDiagnosticOptions().PrintDiagnosticNames) {
-    Diagnostics.setPrintDiagnosticNames(true);
-  }
+  Diagnostics.setPrintDiagnosticNamesMode(
+      Invocation.getDiagnosticOptions().PrintDiagnosticNames);
   Diagnostics.setDiagnosticDocumentationPath(
       Invocation.getDiagnosticOptions().DiagnosticDocumentationPath);
   Diagnostics.setLanguageVersion(
@@ -1744,9 +1743,9 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
 }
 
 SourceFile *CompilerInstance::createSourceFileForMainModule(
-    ModuleDecl *mod, SourceFileKind fileKind, std::optional<unsigned> bufferID,
+    ModuleDecl *mod, SourceFileKind fileKind, unsigned bufferID,
     bool isMainBuffer) const {
-  auto isPrimary = bufferID && isPrimaryInput(*bufferID);
+  auto isPrimary = isPrimaryInput(bufferID);
   auto opts = getSourceFileParsingOptions(isPrimary);
 
   auto *inputFile = new (*Context)

@@ -1978,6 +1978,11 @@ void PrintAST::printSingleDepthOfGenericSignature(
       if (dependsOnOpaque(inverse.subject))
         continue;
 
+      if (inverse.getKind() == InvertibleProtocolKind::Escapable &&
+          Options.SuppressNonEscapableTypes) {
+        continue;
+      }
+
       if (isFirstReq) {
         if (printRequirements)
           Printer << " " << tok::kw_where << " ";
@@ -2276,10 +2281,6 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
       if (ShouldPrint)
         return true;
     }
-    return false;
-  }
-
-  if (isa<IfConfigDecl>(D)) {
     return false;
   }
 
@@ -3060,14 +3061,6 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
   }
 }
 
-static void suppressingFeatureSpecializeAttributeWithAvailability(
-                                        PrintOptions &options,
-                                        llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<bool> scope(
-    options.PrintSpecializeAttributeWithAvailability, false);
-  action();
-}
-
 static void suppressingFeatureIsolatedAny(PrintOptions &options,
                                           llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<bool> scope(options.SuppressIsolatedAny, true);
@@ -3095,6 +3088,16 @@ suppressingFeatureAllowUnsafeAttribute(PrintOptions &options,
                                        llvm::function_ref<void()> action) {
   unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
   options.ExcludeAttrList.push_back(DeclAttrKind::Unsafe);
+  action();
+  options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
+static void
+suppressingFeatureNonescapableTypes(PrintOptions &options,
+                                    llvm::function_ref<void()> action) {
+  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
+  options.ExcludeAttrList.push_back(DeclAttrKind::Lifetime);
+  llvm::SaveAndRestore<bool> scope(options.SuppressNonEscapableTypes, true);
   action();
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
@@ -3356,10 +3359,6 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
 
 void PrintAST::visitTopLevelCodeDecl(TopLevelCodeDecl *decl) {
   printASTNodes(decl->getBody()->getElements(), /*NeedIndent=*/false);
-}
-
-void PrintAST::visitIfConfigDecl(IfConfigDecl *ICD) {
-  // Never printed
 }
 
 void PrintAST::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
@@ -4107,10 +4106,12 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       Printer.printDeclResultTypePre(decl, ResultTyLoc);
       Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
       {
-        if (auto *typeRepr = dyn_cast_or_null<LifetimeDependentTypeRepr>(
-                decl->getResultTypeRepr())) {
-          for (auto &dep : typeRepr->getLifetimeDependencies()) {
-            Printer << " " << dep.getDependsOnString() << " ";
+        if (!Options.SuppressNonEscapableTypes) {
+          if (auto *typeRepr = dyn_cast_or_null<LifetimeDependentTypeRepr>(
+                  decl->getResultTypeRepr())) {
+            for (auto &dep : typeRepr->getLifetimeDependencies()) {
+              Printer << " " << dep.getDependsOnString() << " ";
+            }
           }
         }
       }
@@ -4127,8 +4128,35 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       }
 
       PrintWithOpaqueResultTypeKeywordRAII x(Options);
-      printTypeLocForImplicitlyUnwrappedOptional(
-          ResultTyLoc, decl->isImplicitlyUnwrappedOptional());
+
+      // Check if we would go down the type repr path... in such a case, see if
+      // we can find a type repr and if that type has a sending type repr. In
+      // such a case, look through the sending type repr since we handle it here
+      // ourselves.
+      bool usedTypeReprPrinting = false;
+      {
+        llvm::SaveAndRestore<PrintOptions> printOptions(Options);
+        Options.PrintOptionalAsImplicitlyUnwrapped =
+            decl->isImplicitlyUnwrappedOptional();
+        if (willUseTypeReprPrinting(ResultTyLoc, CurrentType, Options)) {
+          if (auto repr = ResultTyLoc.getTypeRepr()) {
+            // If we are printing a sending result... and we found that we have
+            // to use type repr printing, look through sending type repr.
+            // Sending was already applied in our caller.
+            if (auto *sendingRepr = dyn_cast<SendingTypeRepr>(repr)) {
+              repr = sendingRepr->getBase();
+            }
+            repr->print(Printer, Options);
+            usedTypeReprPrinting = true;
+          }
+        }
+      }
+
+      // If we printed using type repr printing, do not print again.
+      if (!usedTypeReprPrinting) {
+        printTypeLocForImplicitlyUnwrappedOptional(
+            ResultTyLoc, decl->isImplicitlyUnwrappedOptional());
+      }
       Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
     }
     printDeclGenericRequirements(decl);
@@ -4330,15 +4358,17 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 
       printGenericDeclGenericParams(decl);
       printFunctionParameters(decl);
-      if (decl->hasLifetimeDependentReturn()) {
-        Printer << " -> ";
-        auto *typeRepr =
-            cast<LifetimeDependentTypeRepr>(decl->getResultTypeRepr());
-        for (auto &dep : typeRepr->getLifetimeDependencies()) {
-          Printer << dep.getDependsOnString() << " ";
+      if (!Options.SuppressNonEscapableTypes) {
+        if (decl->hasLifetimeDependentReturn()) {
+          Printer << " -> ";
+          auto *typeRepr =
+              cast<LifetimeDependentTypeRepr>(decl->getResultTypeRepr());
+          for (auto &dep : typeRepr->getLifetimeDependencies()) {
+            Printer << dep.getDependsOnString() << " ";
+          }
+          // TODO: Handle failable initializers with lifetime dependent returns
+          Printer << "Self";
         }
-        // TODO: Handle failable initializers with lifetime dependent returns
-        Printer << "Self";
       }
     });
 
@@ -5487,8 +5517,6 @@ void PrintAST::visitSwitchStmt(SwitchStmt *stmt) {
   for (auto N : stmt->getRawCases()) {
     if (N.is<Stmt*>())
       visit(cast<CaseStmt>(N.get<Stmt*>()));
-    else
-      visit(cast<IfConfigDecl>(N.get<Decl*>()));
     Printer.printNewline();
   }
   indent();
@@ -5585,10 +5613,6 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
         }
       }
     }
-  }
-
-  if (isa<IfConfigDecl>(this)) {
-    return false;
   }
 
   // Print everything else.
@@ -7796,7 +7820,28 @@ swift::getInheritedForPrinting(
         }
         continue;
       }
+
+      // Suppress Escapable and ~Escapable.
+      if (options.SuppressNonEscapableTypes) {
+        if (auto pct = ty->getAs<ProtocolCompositionType>()) {
+          auto inverses = pct->getInverses();
+          if (inverses.contains(InvertibleProtocolKind::Escapable)) {
+            inverses.remove(InvertibleProtocolKind::Escapable);
+            ty = ProtocolCompositionType::get(decl->getASTContext(),
+                                              pct->getMembers(), inverses,
+                                              pct->hasExplicitAnyObject());
+            if (ty->isAny())
+              continue;
+          }
+        }
+
+        if (auto protoTy = ty->getAs<ProtocolType>())
+          if (protoTy->getDecl()->isSpecificProtocol(
+                  KnownProtocolKind::Escapable))
+            continue;
+      }
     }
+
     if (options.SuppressConformanceSuppression &&
         inherited.getEntry(i).isSuppressed()) {
       continue;

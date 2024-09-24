@@ -19,7 +19,6 @@
 
 #include "Address.h"
 #include "Callee.h"
-#include "Explosion.h"
 #include "Temporary.h"
 
 namespace llvm {
@@ -89,7 +88,6 @@ protected:
 
   unsigned IndirectTypedErrorArgIdx = 0;
 
-  std::optional<Explosion> typedErrorExplosion;
 
   virtual void setFromCallee();
   void emitToUnmappedMemory(Address addr);
@@ -110,11 +108,6 @@ protected:
                                    TemporarySet &temporaries,
                                    bool isOutlined);
 
-  bool mayReturnTypedErrorDirectly() const;
-  void emitToUnmappedExplosionWithDirectTypedError(SILType resultType,
-                                                   llvm::Value *result,
-                                                   Explosion &out);
-
   CallEmission(IRGenFunction &IGF, llvm::Value *selfValue, Callee &&callee)
       : IGF(IGF), selfValue(selfValue), CurCallee(std::move(callee)) {}
 
@@ -128,10 +121,6 @@ public:
 
   SubstitutionMap getSubstitutions() const {
     return CurCallee.getSubstitutions();
-  }
-
-  std::optional<Explosion> &getTypedErrorExplosion() {
-    return typedErrorExplosion;
   }
 
   virtual void begin();

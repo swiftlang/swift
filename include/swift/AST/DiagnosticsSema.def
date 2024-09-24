@@ -3329,6 +3329,9 @@ ERROR(override_multiple_decls_base,none,
 ERROR(override_sendability_mismatch,none,
       "declaration %0 has a type with different sendability from any potential "
       "overrides", (DeclName))
+ERROR(override_global_actor_isolation_mismatch,none,
+      "declaration %0 has a type with different global actor isolation from any potential "
+      "overrides", (DeclName))
 ERROR(override_multiple_decls_arg_mismatch,none,
       "declaration %0 has different argument labels from any potential "
       "overrides", (DeclName))
@@ -5810,6 +5813,9 @@ ERROR(nonisolated_actor_sync_init,none,
 ERROR(nonisolated_wrapped_property,none,
       "'nonisolated' is not supported on properties with property wrappers",
       ())
+ERROR(nonisolated_lazy,none,
+      "'nonisolated' is not supported on lazy properties",
+      ())
 
 ERROR(non_sendable_from_deinit,none,
         "cannot access %1 %2 with a non-sendable type %0 from nonisolated deinit",
@@ -6757,12 +6763,13 @@ WARNING(availability_query_useless_enclosing_scope, none,
 NOTE(availability_query_useless_enclosing_scope_here, none,
      "enclosing scope here", ())
 
-ERROR(availability_deinit_no_potential, none,
-      "deinitializer cannot be marked potentially unavailable with "
-      "'@available'", ())
+ERROR(availability_decl_no_potential, none,
+      "%kindonly0 cannot be marked potentially unavailable with '@available'",
+      (const Decl *))
 
-ERROR(availability_deinit_no_unavailable, none,
-      "deinitializer cannot be marked unavailable with '@available'", ())
+ERROR(availability_decl_no_unavailable, none,
+      "%kindonly0 cannot be marked unavailable with '@available'",
+      (const Decl *))
 
 ERROR(availability_global_script_no_potential,
       none, "global variable cannot be marked potentially "
@@ -7262,7 +7269,7 @@ NOTE(note_result_builder_control_flow, none,
       "builder %0", (DeclName))
 ERROR(result_builder_attribute_not_allowed_here, none,
       "result builder attribute %0 can only be applied to a parameter, "
-      "function, or computed property", (Identifier))
+      "function, subscript, or computed property", (Identifier))
 ERROR(result_builder_attribute_on_storage_without_getter, none,
       "result builder attribute %0 can only be applied to a "
       "%select{subscript|property|constant|variable}1 if it defines a getter",
@@ -7959,8 +7966,6 @@ ERROR(lifetime_dependence_immortal_alone, none,
 //                             MARK: Sending
 //===----------------------------------------------------------------------===//
 
-ERROR(sending_unsupported_param_specifier, none,
-      "'%0' cannot be applied to a 'sending' parameter", (StringRef))
 ERROR(sending_only_on_parameters_and_results, none,
       "'sending' may only be used on parameters and results", ())
 ERROR(sending_cannot_be_applied_to_tuple_elt, none,
@@ -8011,12 +8016,6 @@ NOTE(unsafe_decl_here,none,
 // MARK: Value Generics
 //===----------------------------------------------------------------------===//
 
-ERROR(invalid_value_value_generic,none,
-      "%0 requires that %1 must be a valid value for %2",
-      (Type, Type, Type))
-NOTE(invalid_value_value_generic_requirement,none,
-     "requirement specified as %0 == %1%2",
-     (Type, Type, StringRef))
 ERROR(cannot_pass_type_for_value_generic,none,
       "cannot pass type %0 as a value for generic value %1", (Type, Type))
 ERROR(value_type_used_in_type_parameter,none,
@@ -8038,6 +8037,8 @@ ERROR(value_generics_missing_feature,none,
 ERROR(availability_value_generic_type_only_version_newer, none,
       "values in generic types are only available in %0 %1 or newer",
       (StringRef, llvm::VersionTuple))
+ERROR(invalid_value_for_type_same_type,none,
+      "cannot constrain type parameter %0 to be integer %1", (Type, Type))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

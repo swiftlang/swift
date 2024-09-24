@@ -478,6 +478,12 @@ public:
   // Whether to run the HotColdSplitting pass when optimizing.
   unsigned EnableHotColdSplit : 1;
 
+  unsigned EmitAsyncFramePushPopMetadata : 1;
+
+  // Whether to force emission of a frame for all async functions
+  // (LLVM's 'frame-pointer=all').
+  unsigned AsyncFramePointerAll : 1;
+
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
 
@@ -567,7 +573,8 @@ public:
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false),
-        EnableHotColdSplit(false),
+        EnableHotColdSplit(false), EmitAsyncFramePushPopMetadata(false),
+        AsyncFramePointerAll(false),
         CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),

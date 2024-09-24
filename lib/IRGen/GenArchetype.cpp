@@ -521,8 +521,8 @@ getAddressOfOpaqueTypeDescriptor(IRGenFunction &IGF,
 MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
                                           CanOpaqueTypeArchetypeType archetype,
                                           DynamicMetadataRequest request) {
-  bool signedDescriptor = IGF.IGM.getAvailabilityContext().isContainedIn(
-    IGF.IGM.Context.getSignedDescriptorAvailability());
+  bool signedDescriptor = IGF.IGM.getAvailabilityRange().isContainedIn(
+      IGF.IGM.Context.getSignedDescriptorAvailability());
 
   auto accessorFn = signedDescriptor ?
     IGF.IGM.getGetOpaqueTypeMetadata2FunctionPointer() :
@@ -564,8 +564,8 @@ MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
 llvm::Value *irgen::emitOpaqueTypeWitnessTableRef(IRGenFunction &IGF,
                                           CanOpaqueTypeArchetypeType archetype,
                                           ProtocolDecl *protocol) {
-  bool signedDescriptor = IGF.IGM.getAvailabilityContext().isContainedIn(
-    IGF.IGM.Context.getSignedDescriptorAvailability());
+  bool signedDescriptor = IGF.IGM.getAvailabilityRange().isContainedIn(
+      IGF.IGM.Context.getSignedDescriptorAvailability());
 
   auto accessorFn = signedDescriptor ?
     IGF.IGM.getGetOpaqueTypeConformance2FunctionPointer() :

@@ -52,6 +52,7 @@ foreach(lib ${compiler_swiftsyntax_libs})
 endforeach()
 
 swift_install_in_component(TARGETS ${compiler_swiftsyntax_libs}
-  ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler
-  LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler
-  RUNTIME DESTINATION "bin" COMPONENT compiler)
+  ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler-swift-syntax-lib
+  LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler-swift-syntax-lib
+  RUNTIME DESTINATION "bin" COMPONENT compiler-swift-syntax-lib)
+add_dependencies(compiler-swift-syntax-lib ${compiler_swiftsyntax_libs})

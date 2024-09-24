@@ -999,13 +999,13 @@ bool diagnoseConformanceExportability(SourceLoc loc,
 bool isAvailabilitySafeForConformance(
     const ProtocolDecl *proto, const ValueDecl *requirement,
     const ValueDecl *witness, const DeclContext *dc,
-    AvailabilityContext &requiredAvailability);
+    AvailabilityRange &requiredAvailability);
 
 /// Returns an over-approximation of the range of operating system versions
 /// that could the passed-in location could be executing upon for
 /// the target platform. If MostRefined != nullptr, set to the most-refined
 /// TRC found while approximating.
-AvailabilityContext overApproximateAvailabilityAtLocation(
+AvailabilityRange overApproximateAvailabilityAtLocation(
     SourceLoc loc, const DeclContext *DC,
     const TypeRefinementContext **MostRefined = nullptr);
 
@@ -1020,30 +1020,30 @@ TypeRefinementContext *getOrBuildTypeRefinementContext(SourceFile *SF);
 /// Returns a diagnostic indicating why the declaration cannot be annotated
 /// with an @available() attribute indicating it is potentially unavailable
 /// or None if this is allowed.
-std::optional<Diag<>>
+std::optional<Diagnostic>
 diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 
 /// Returns a diagnostic indicating why the declaration cannot be annotated
 /// with an @available() attribute indicating it is unavailable or None if this
 /// is allowed.
-std::optional<Diag<>> diagnosticIfDeclCannotBeUnavailable(const Decl *D);
+std::optional<Diagnostic> diagnosticIfDeclCannotBeUnavailable(const Decl *D);
 
 /// Same as \c checkDeclarationAvailability but doesn't give a reason for
 /// unavailability.
 bool isDeclarationUnavailable(
     const Decl *D, const DeclContext *referenceDC,
-    llvm::function_ref<AvailabilityContext()> getAvailabilityContext);
+    llvm::function_ref<AvailabilityRange()> getAvailabilityRange);
 
 /// Checks whether a declaration should be considered unavailable when
 /// referred to at the given location and, if so, returns the unmet required
 /// version range. Returns None is the declaration is definitely available.
-std::optional<AvailabilityContext>
+std::optional<AvailabilityRange>
 checkDeclarationAvailability(const Decl *D, const ExportContext &Where);
 
 /// Checks whether a conformance should be considered unavailable when
 /// referred to at the given location and, if so, returns the unmet required
 /// version range. Returns None is the declaration is definitely available.
-std::optional<AvailabilityContext>
+std::optional<AvailabilityRange>
 checkConformanceAvailability(const RootProtocolConformance *Conf,
                              const ExtensionDecl *Ext,
                              const ExportContext &Where);
@@ -1060,7 +1060,7 @@ void checkIgnoredExpr(Expr *E);
 bool diagnosePotentialUnavailability(const ValueDecl *D,
                                      SourceRange ReferenceRange,
                                      const DeclContext *ReferenceDC,
-                                     const AvailabilityContext &Availability,
+                                     const AvailabilityRange &Availability,
                                      bool WarnBeforeDeploymentTarget);
 
 // Emits a diagnostic for a protocol conformance that is potentially
@@ -1069,13 +1069,12 @@ void diagnosePotentialUnavailability(const RootProtocolConformance *rootConf,
                                      const ExtensionDecl *ext,
                                      SourceLoc loc,
                                      const DeclContext *dc,
-                                     const AvailabilityContext &availability);
+                                     const AvailabilityRange &availability);
 
-void
-diagnosePotentialUnavailability(SourceRange ReferenceRange,
-                                Diag<StringRef, llvm::VersionTuple> Diag,
-                                const DeclContext *ReferenceDC,
-                                const AvailabilityContext &Availability);
+void diagnosePotentialUnavailability(SourceRange ReferenceRange,
+                                     Diag<StringRef, llvm::VersionTuple> Diag,
+                                     const DeclContext *ReferenceDC,
+                                     const AvailabilityRange &Availability);
 
 /// Type check a 'distributed actor' declaration.
 void checkDistributedActor(SourceFile *SF, NominalTypeDecl *decl);
@@ -1086,7 +1085,7 @@ void checkDistributedActor(SourceFile *SF, NominalTypeDecl *decl);
 bool checkDistributedFunc(FuncDecl *func);
 
 bool checkAvailability(SourceRange ReferenceRange,
-                       AvailabilityContext RequiredAvailability,
+                       AvailabilityRange RequiredAvailability,
                        Diag<StringRef, llvm::VersionTuple> Diag,
                        const DeclContext *ReferenceDC);
 
@@ -1097,7 +1096,7 @@ void checkConcurrencyAvailability(SourceRange ReferenceRange,
 /// potentially unavailable.
 void diagnosePotentialAccessorUnavailability(
     const AccessorDecl *Accessor, SourceRange ReferenceRange,
-    const DeclContext *ReferenceDC, const AvailabilityContext &Availability,
+    const DeclContext *ReferenceDC, const AvailabilityRange &Availability,
     bool ForInout);
 
 /// Returns the availability attribute indicating deprecation if the

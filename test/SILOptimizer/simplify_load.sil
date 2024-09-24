@@ -60,6 +60,9 @@ bb0:
   return %1 : $Builtin.RawPointer
 }
 
+sil_global private @global_char : $Int8
+sil_global private [let] @global_pointer : $UnsafeRawPointer
+
 // CHECK-LABEL: sil @load_global_simple
 // CHECK-DAG:     [[L27:%.*]] = integer_literal $Builtin.Int64, 27
 // CHECK-DAG:     [[I27:%.*]] = struct $Int64 ([[L27]] : $Builtin.Int64)
@@ -182,6 +185,35 @@ bb0(%0 : $Builtin.RawPointer):
   %3 = global_addr @gb2 : $*(B, Int64) depends_on %2
   %4 = load %3 : $*(B, Int64)
   return %4 : $(B, Int64)
+}
+
+sil private [global_init_once_fn] @init_global_pointer : $@convention(c) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  alloc_global @global_pointer
+  %2 = global_addr @global_pointer : $*UnsafeRawPointer
+  %3 = global_addr @global_char : $*Int8
+  %4 = begin_access [modify] [dynamic] %3 : $*Int8
+  %5 = address_to_pointer %4 : $*Int8 to $Builtin.RawPointer
+  %6 = struct $UnsafeRawPointer (%5 : $Builtin.RawPointer)
+  end_access %4 : $*Int8
+  store %6 to %2 : $*UnsafeRawPointer
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil @load_global_pointer :
+// CHECK:         %1 = global_addr @global_char
+// CHECK-NEXT:    %2 = address_to_pointer %1 : $*Int8 to $Builtin.RawPointer
+// CHECK-NEXT:    %3 = struct $UnsafeRawPointer (%2 : $Builtin.RawPointer)
+// CHECK-NEXT:    return %3
+// CHECK:       } // end sil function 'load_global_pointer'
+sil @load_global_pointer : $@convention(thin) (Builtin.RawPointer) -> UnsafeRawPointer {
+bb0(%0 : $Builtin.RawPointer):
+  %2 = function_ref @init_global_pointer : $@convention(c) (Builtin.RawPointer) -> ()
+  %3 = builtin "once"(%0 : $Builtin.RawPointer, %2 : $@convention(c) (Builtin.RawPointer) -> ()) : $Builtin.SILToken
+  %4 = global_addr @global_pointer : $*UnsafeRawPointer depends_on %3
+  %5 = load %4 : $*UnsafeRawPointer
+  return %5 : $UnsafeRawPointer
 }
 
 // CHECK-LABEL: sil @load_first_char_from_string_literal

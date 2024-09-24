@@ -305,29 +305,29 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
   if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl))
     return BoundGenericType::get(nominalDecl, parent, args);
 
+  auto *aliasDecl = cast<TypeAliasDecl>(decl);
+  auto *dc = aliasDecl->getDeclContext();
+
+  SmallVector<Type, 2> subs;
+
   // Combine the substitutions from our parent type with our generic
   // arguments.
-  TypeSubstitutionMap subs;
-  if (parent)
-    subs = parent->getContextSubstitutions(decl->getDeclContext());
-
-  auto *aliasDecl = cast<TypeAliasDecl>(decl);
-
-  auto genericSig = aliasDecl->getGenericSignature();
-  for (unsigned i = 0, e = args.size(); i < e; ++i) {
-    auto origTy = genericSig.getInnermostGenericParams()[i];
-    auto substTy = args[i];
-
-    subs[origTy->getCanonicalType()->castTo<GenericTypeParamType>()] =
-      substTy;
+  if (dc->isLocalContext()) {
+    for (auto *param : dc->getGenericSignatureOfContext().getGenericParams()) {
+      subs.push_back(param);
+    }
+  } else if (parent) {
+    auto parentSubs = parent->getContextSubstitutionMap(
+        dc).getReplacementTypes();
+    subs.append(parentSubs.begin(), parentSubs.end());
   }
 
-  auto subMap = SubstitutionMap::get(genericSig,
-                                     QueryTypeSubstitutionMap{subs},
-                                     LookUpConformanceInModule());
-  if (!subMap)
-    return Type();
+  auto genericSig = aliasDecl->getGenericSignature();
+  ASSERT(genericSig.getInnermostGenericParams().size() == args.size());
+  subs.append(args.begin(), args.end());
 
+  auto subMap = SubstitutionMap::get(genericSig, subs,
+                                     LookUpConformanceInModule());
   return aliasDecl->getDeclaredInterfaceType().subst(subMap);
 }
 

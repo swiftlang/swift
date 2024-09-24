@@ -888,7 +888,8 @@ void IRGenFunction::emitResumeAsyncContinuationThrowing(
 void IRGenFunction::emitClearSensitive(Address address, llvm::Value *size) {
   // If our deployment target doesn't contain the new swift_clearSensitive,
   // fall back to memset_s
-  auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(IGM.Context);
+  auto deploymentAvailability =
+      AvailabilityRange::forDeploymentTarget(IGM.Context);
   auto clearSensitiveAvail = IGM.Context.getClearSensitiveAvailability();
   if (!deploymentAvailability.isContainedIn(clearSensitiveAvail)) {
     Builder.CreateCall(IGM.getMemsetSFunctionPointer(),

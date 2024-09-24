@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-sil \
-// RUN:   -enable-experimental-feature NonescapableTypes
+// RUN:   -enable-experimental-feature NonescapableTypes | %FileCheck %s
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
@@ -57,8 +57,7 @@ public struct BufferView<Element> : ~Escapable {
   let start: BufferViewIndex<Element>
   public let count: Int
   private var baseAddress: UnsafeRawPointer { start._rawValue }
-// TODO: Enable diagnostics once this initializer's store to temporary is handled  
-// CHECK: sil @$s31lifetime_dependence_scope_fixup10BufferViewV11baseAddress5count9dependsOnACyxGSVYls_Siqd__htclufC : $@convention(method) <Element><Owner> (UnsafeRawPointer, Int, @in_guaranteed Owner, @thin BufferView<Element>.Type) -> _scope(1) @owned BufferView<Element> {
+// CHECK: sil @$s36lifetime_dependence_buffer_view_test10BufferViewV11baseAddress5count9dependsOnACyxGSV_Siqd__htcRi_d__Ri0_d__lufC : $@convention(method) <Element><Owner where Owner : ~Copyable, Owner : ~Escapable> (UnsafeRawPointer, Int, @in_guaranteed Owner, @thin BufferView<Element>.Type) -> _inherit(2) @owned BufferView<Element> {
   public init<Owner: ~Copyable & ~Escapable>(
       baseAddress: UnsafeRawPointer,
       count: Int,
@@ -68,7 +67,7 @@ public struct BufferView<Element> : ~Escapable {
         start: .init(rawValue: baseAddress), count: count, dependsOn: owner
       )
   }
-// CHECK: sil hidden @$s31lifetime_dependence_scope_fixup10BufferViewV5start5count9dependsOnACyxGAA0eF5IndexVyxGYls_Siqd__htclufC : $@convention(method) <Element><Owner> (BufferViewIndex<Element>, Int, @in_guaranteed Owner, @thin BufferView<Element>.Type) -> _scope(1) @owned BufferView<Element> {
+// CHECK: sil hidden @$s36lifetime_dependence_buffer_view_test10BufferViewV5start5count9dependsOnACyxGAA0fG5IndexVyxG_Siqd__htcRi_d__Ri0_d__lufC : $@convention(method) <Element><Owner where Owner : ~Copyable, Owner : ~Escapable> (BufferViewIndex<Element>, Int, @in_guaranteed Owner, @thin BufferView<Element>.Type) -> _inherit(2) @owned BufferView<Element> {
   init<Owner: ~Copyable & ~Escapable>(
     start index: BufferViewIndex<Element>,
     count: Int,
@@ -122,7 +121,7 @@ extension BufferView {
     }
   }
  
-// CHECK: sil @$s31lifetime_dependence_scope_fixup10BufferViewVyACyxGAA9FakeRangeVyAA0eF5IndexVyxGGcig : $@convention(method) <Element> (FakeRange<BufferViewIndex<Element>>, @guaranteed BufferView<Element>) -> _scope(0) @owned BufferView<Element> {
+ // CHECK: sil @$s36lifetime_dependence_buffer_view_test10BufferViewVyACyxGAA9FakeRangeVyAA0fG5IndexVyxGGcig : $@convention(method) <Element> (FakeRange<BufferViewIndex<Element>>, @guaranteed BufferView<Element>) -> _inherit(1) @owned BufferView<Element> {
   public subscript(bounds: FakeRange<BufferViewIndex<Element>>) -> Self {
     get {
       BufferView(

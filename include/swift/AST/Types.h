@@ -362,6 +362,8 @@ enum class TypeMatchFlags {
   IgnoreFunctionSendability = 1 << 6,
   /// Ignore `any Sendable` and compositions with Sendable protocol.
   IgnoreSendability = 1 << 7,
+  /// Ignore global actor isolation attributes on functions when matching types.
+  IgnoreFunctionGlobalActorIsolation = 1 << 8,
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
@@ -6588,11 +6590,7 @@ public:
   bool requiresClass() const;
 
   /// Retrieve the superclass of this type, if such a requirement exists.
-  Type getSuperclass() const {
-    if (!Bits.ArchetypeType.HasSuperclass) return Type();
-
-    return *getSubclassTrailingObjects<Type>();
-  }
+  Type getSuperclass() const;
 
   /// Retrieve the layout constraint of this type, if such a requirement exists.
   LayoutConstraint getLayoutConstraint() const {
@@ -7160,22 +7158,6 @@ public:
   AssociatedTypeDecl *getAssocType() const {
     return NameOrAssocType.dyn_cast<AssociatedTypeDecl *>();
   }
-  
-  /// Substitute the base type, looking up our associated type in it if it is
-  /// non-dependent. Returns null if the member could not be found in the new
-  /// base.
-  Type substBaseType(Type base);
-
-  /// Substitute the base type, looking up our associated type in it if it is
-  /// non-dependent. Returns null if the member could not be found in the new
-  /// base.
-  Type substBaseType(Type base, LookupConformanceFn lookupConformance,
-                     SubstOptions options);
-
-  /// Substitute the root generic type, looking up the chain of associated types.
-  /// Returns null if the member could not be found in the new root.
-  Type substRootParam(Type newRoot, LookupConformanceFn lookupConformance,
-                      SubstOptions options);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

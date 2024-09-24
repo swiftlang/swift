@@ -14,3 +14,8 @@ module UnsafeProjections {
   
   export *
 }
+
+module SRetWinARM64 {
+  header "sret-win-arm64.h"
+  requires cplusplus
+}

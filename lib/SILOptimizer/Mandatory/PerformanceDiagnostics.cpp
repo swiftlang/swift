@@ -203,7 +203,7 @@ bool PerformanceDiagnostics::visitFunctionEmbeddedSwift(
     SILFunction *function, LocWithParent *parentLoc) {
   // Don't check generic functions in embedded Swift, they're about to be
   // removed anyway.
-  if (function->getLoweredFunctionType()->getSubstGenericSignature())
+  if (function->isGeneric())
     return false;
 
   if (!function->isDefinition())
@@ -534,7 +534,8 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   LocWithParent loc(inst->getLoc().getSourceLoc(), parentLoc);
 
   if (perfConstr == PerformanceConstraints::NoExistentials &&
-      (impact & RuntimeEffect::Existential)) {
+      ((impact & RuntimeEffect::Existential) ||
+       (impact & RuntimeEffect::ExistentialClassBound))) {
     PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
     if (impactType) {
       diagnose(loc, diag::perf_diag_existential_type, impactType.getASTType());
@@ -556,6 +557,8 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   }
 
   if (module.getOptions().EmbeddedSwift) {
+    // Explicitly don't detect RuntimeEffect::ExistentialClassBound - those are
+    // allowed in Embedded Swift.
     if (impact & RuntimeEffect::Existential) {
       PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
       if (impactType) {

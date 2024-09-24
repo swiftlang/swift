@@ -44,6 +44,7 @@ typedef void (^CompletionHandler)(void (^ SWIFT_SENDABLE)(void)) SWIFT_SENDABLE;
 -(void) withSendableCustom: (void (^)(MyValue *_Nullable SWIFT_SENDABLE)) handler;
 -(void) withNonSendable:(NSString *)operation completionHandler:(void (^ _Nullable NONSENDABLE)(NSString *_Nullable, NSError * _Nullable)) handler;
 -(void) withAliasCompletionHandler:(CompletionHandler)handler;
+-(void) withMainActorId: (void (MAIN_ACTOR ^)(id)) handler;
 @end
 
 // Placement of SWIFT_SENDABLE matters here
@@ -66,6 +67,17 @@ void doSomethingConcurrently(__attribute__((noescape)) void SWIFT_SENDABLE (^blo
 #pragma clang assume_nonnull end
 
 //--- main.swift
+
+do {
+  class SubTestNoActor : Test {
+    @objc override func withMainActorId(_: @escaping (Any) -> Void) {}
+    // expected-error@-1 {{declaration 'withMainActorId' has a type with different global actor isolation from any potential overrides}}
+  }
+
+  class SubTestWithActor : Test {
+    @objc override func withMainActorId(_: @MainActor @escaping (Any) -> Void) {} // Ok
+  }
+}
 
 func test_sendable_attr_in_type_context(test: Test) {
   let fn: (String?, (any Error)?) -> Void = { _,_ in }

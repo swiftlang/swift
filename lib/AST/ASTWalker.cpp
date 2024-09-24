@@ -240,12 +240,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return true;
   }
 
-  bool visitIfConfigDecl(IfConfigDecl *ICD) {
-    // By default, just visit the elements that are actually
-    // injected into the enclosing context.
-    return false;
-  }
-
   bool visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
     // By default, ignore #error/#warning.
     return false;
@@ -2081,8 +2075,7 @@ Stmt *Traversal::visitSwitchStmt(SwitchStmt *S) {
       } else
         return nullptr;
     } else {
-      assert(isa<IfConfigDecl>(N.get<Decl*>()) || 
-             isa<PoundDiagnosticDecl>(N.get<Decl*>()));
+      assert(isa<PoundDiagnosticDecl>(N.get<Decl*>()));
       if (doIt(N.get<Decl*>()))
         return nullptr;
     }

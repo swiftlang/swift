@@ -1383,7 +1383,7 @@ getPropertyWrapperInformationFromOverload(
       VarDecl *memberDecl;
       std::tie(memberDecl, type) = *declInformation;
       if (Type baseType = resolvedOverload.choice.getBaseType()) {
-        type = baseType->getTypeOfMember(memberDecl, type);
+        type = baseType->getRValueType()->getTypeOfMember(memberDecl, type);
       }
       return std::make_pair(decl, type);
     }
@@ -2051,7 +2051,7 @@ static void bindArchetypesFromContext(
   // Find the innermost non-type context.
   for (const auto *parentDC = outerDC;
        !parentDC->isModuleScopeContext();
-       parentDC = parentDC->getParent()) {
+       parentDC = parentDC->getParentForLookup()) {
     if (parentDC->isTypeContext()) {
       if (parentDC != outerDC && parentDC->getSelfProtocolDecl()) {
         auto selfTy = parentDC->getSelfInterfaceType();
@@ -4165,8 +4165,7 @@ struct TypeSimplifier {
           return memberTy;
         }
 
-        auto result = conformance.getAssociatedType(
-            lookupBaseType, assocType->getDeclaredInterfaceType());
+        auto result = conformance.getTypeWitness(lookupBaseType, assocType);
         if (result && !result->hasError())
           return result;
       }

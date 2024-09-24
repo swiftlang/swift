@@ -83,6 +83,10 @@ struct BridgedResultInfo {
   swift::TypeBase * _Nonnull type;
   BridgedResultConvention convention;
 
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedResultInfo() {}
+
 #ifdef USED_IN_CPP_SOURCE
   inline static BridgedResultConvention
   castToResultConvention(swift::ResultConvention convention) {
@@ -100,6 +104,10 @@ struct OptionalBridgedResultInfo {
   swift::TypeBase * _Nullable type = nullptr;
   BridgedResultConvention convention = BridgedResultConvention::Indirect;
 
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  OptionalBridgedResultInfo() {}
+
 #ifdef USED_IN_CPP_SOURCE
   OptionalBridgedResultInfo(std::optional<swift::SILResultInfo> resultInfo) {
     if (resultInfo) {
@@ -113,6 +121,10 @@ struct OptionalBridgedResultInfo {
 
 struct BridgedResultInfoArray {
   BridgedArrayRef resultInfoArray;
+
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedResultInfoArray() {}
 
 #ifdef USED_IN_CPP_SOURCE
   BridgedResultInfoArray(llvm::ArrayRef<swift::SILResultInfo> results)
@@ -217,6 +229,10 @@ struct BridgedParameterInfo {
 struct BridgedParameterInfoArray {
   BridgedArrayRef parameterInfoArray;
 
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedParameterInfoArray() {}
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedParameterInfoArray(llvm::ArrayRef<swift::SILParameterInfo> parameters)
     : parameterInfoArray(parameters) {}
@@ -234,6 +250,10 @@ struct BridgedParameterInfoArray {
 
 struct BridgedYieldInfoArray {
   BridgedArrayRef yieldInfoArray;
+
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedYieldInfoArray() {}
 
 #ifdef USED_IN_CPP_SOURCE
   BridgedYieldInfoArray(llvm::ArrayRef<swift::SILYieldInfo> yields)
@@ -255,6 +275,10 @@ struct BridgedLifetimeDependenceInfo {
   SwiftUInt targetIndex;
   bool immortal;
 
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedLifetimeDependenceInfo() {}
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedLifetimeDependenceInfo(swift::LifetimeDependenceInfo info)
       : inheritLifetimeParamIndices(info.getInheritIndices()),
@@ -267,11 +291,15 @@ struct BridgedLifetimeDependenceInfo {
   BRIDGED_INLINE bool checkScope(SwiftInt index) const;
   BRIDGED_INLINE SwiftInt getTargetIndex() const;
 
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
+  BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
 };
 
 struct BridgedLifetimeDependenceInfoArray {
   BridgedArrayRef lifetimeDependenceInfoArray;
+
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedLifetimeDependenceInfoArray() {}
 
 #ifdef USED_IN_CPP_SOURCE
   BridgedLifetimeDependenceInfoArray(
@@ -313,7 +341,7 @@ struct BridgedASTType {
   }
 #endif
 
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
+  BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
 
   BRIDGED_INLINE bool hasTypeParameter() const;
 
@@ -373,6 +401,10 @@ struct BridgedType {
   struct EnumElementIterator {
     uint64_t storage[4];
 
+    // Ensure that this struct value type will be indirectly returned on
+    // Windows ARM64
+    EnumElementIterator() {}
+
 #ifdef USED_IN_CPP_SOURCE
     EnumElementIterator(swift::EnumDecl::ElementRange::iterator i) {
       static_assert(sizeof(EnumElementIterator) >= sizeof(swift::EnumDecl::ElementRange::iterator));
@@ -386,6 +418,10 @@ struct BridgedType {
     SWIFT_IMPORT_UNSAFE BRIDGED_INLINE EnumElementIterator getNext() const;
   };
 
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedType() {}
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedType(swift::SILType t) : opaqueValue(t.getOpaqueValue()) {}
 
@@ -394,7 +430,7 @@ struct BridgedType {
   }
 #endif
 
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
+  BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE bool isNull() const;
   BRIDGED_INLINE bool isAddress() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getAddressType() const;
@@ -486,7 +522,7 @@ struct BridgedValue {
 
   Kind getKind() const;
   BRIDGED_INLINE swift::ValueBase * _Nonnull getSILValue() const;
-  SWIFT_IMPORT_UNSAFE BridgedOwnedString getDebugDescription() const;
+  BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedOperand getFirstUse() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getType() const;
   BRIDGED_INLINE Ownership getOwnership() const;
@@ -573,6 +609,10 @@ enum class BridgedMemoryBehavior {
 struct BridgedLocation {
   uint64_t storage[3];
 
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedLocation() {}
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedLocation(const swift::SILDebugLocation &loc) {
     *reinterpret_cast<swift::SILDebugLocation *>(&storage) = loc;
@@ -582,7 +622,7 @@ struct BridgedLocation {
   }
 #endif
 
-  SWIFT_IMPORT_UNSAFE BridgedOwnedString getDebugDescription() const;
+  BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLocation getAutogeneratedLocation() const;
   BRIDGED_INLINE bool hasValidLineNumber() const;
   BRIDGED_INLINE bool isAutoGenerated() const;
@@ -634,11 +674,11 @@ struct BridgedFunction {
   };
 
   SWIFT_NAME("init(obj:)")
-  SWIFT_IMPORT_UNSAFE BridgedFunction(SwiftObject obj) : obj(obj) {}
-  SWIFT_IMPORT_UNSAFE BridgedFunction() {}
+  BridgedFunction(SwiftObject obj) : obj(obj) {}
+  BridgedFunction() {}
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::SILFunction * _Nonnull getFunction() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getName() const;
-  SWIFT_IMPORT_UNSAFE BridgedOwnedString getDebugDescription() const;
+  BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLocation getLocation() const;
   BRIDGED_INLINE bool hasOwnership() const;
   BRIDGED_INLINE bool hasLoweredAddresses() const;
@@ -732,7 +772,7 @@ struct BridgedGlobalVar {
   BridgedGlobalVar(SwiftObject obj) : obj(obj) {}
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::SILGlobalVariable * _Nonnull getGlobal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableVarDecl getDecl() const;
-  SWIFT_IMPORT_UNSAFE BridgedOwnedString getDebugDescription() const;
+  BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getName() const;
   BRIDGED_INLINE bool isLet() const;
   BRIDGED_INLINE void setLet(bool value) const;
@@ -780,6 +820,10 @@ struct BridgedSubstitutionMap {
 struct BridgedTypeArray {
   BridgedArrayRef typeArray;
 
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64,
+  BridgedTypeArray() : typeArray() {}
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedTypeArray(llvm::ArrayRef<swift::Type> types) : typeArray(types) {}
 
@@ -799,6 +843,10 @@ struct BridgedTypeArray {
 
 struct BridgedSILTypeArray {
   BridgedArrayRef typeArray;
+
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedSILTypeArray() {}
 
 #ifdef USED_IN_CPP_SOURCE
   BridgedSILTypeArray(llvm::ArrayRef<swift::SILType> silTypes)
@@ -821,6 +869,10 @@ struct BridgedGenericSpecializationInformation {
 
 struct OptionalBridgedSILDebugVariable {
   uint64_t storage[16];
+
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  OptionalBridgedSILDebugVariable() {}
 
 #ifdef USED_IN_CPP_SOURCE
   using OptionalSILDebugVariable = std::optional<swift::SILDebugVariable>;
@@ -849,7 +901,7 @@ struct BridgedInstruction {
 #endif
 
   BridgedInstruction(SwiftObject obj) : obj(obj) {}
-  SWIFT_IMPORT_UNSAFE BridgedOwnedString getDebugDescription() const;
+  BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedInstruction getNext() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedInstruction getPrevious() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock getParent() const;
@@ -936,7 +988,7 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGlobalVar GlobalAccessInst_getGlobal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGlobalVar AllocGlobalInst_getGlobal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction FunctionRefBaseInst_getReferencedFunction() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalInt IntegerLiteralInst_getValue() const;
+  BRIDGED_INLINE OptionalInt IntegerLiteralInst_getValue() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef StringLiteralInst_getValue() const;
   BRIDGED_INLINE int StringLiteralInst_getEncoding() const;
   BRIDGED_INLINE SwiftInt TupleExtractInst_fieldIndex() const;
@@ -1111,7 +1163,7 @@ struct BridgedBasicBlock {
   }
 #endif
 
-  SWIFT_IMPORT_UNSAFE BridgedOwnedString getDebugDescription() const;
+  BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock getNext() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock getPrevious() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getFunction() const;
@@ -1151,7 +1203,7 @@ struct BridgedSuccessorArray {
 struct BridgedVTableEntry {
   const swift::SILVTableEntry * _Nonnull entry;
 
-  SWIFT_IMPORT_UNSAFE BridgedOwnedString getDebugDescription() const;
+  BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getImplementation() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedVTableEntry advanceBy(SwiftInt index) const;
 };
@@ -1164,7 +1216,7 @@ struct BridgedVTableEntryArray {
 struct BridgedVTable {
   const swift::SILVTable * _Nonnull vTable;
 
-  SWIFT_IMPORT_UNSAFE BridgedOwnedString getDebugDescription() const;
+  BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedVTableEntryArray getEntries() const;
 };
 
@@ -1185,7 +1237,7 @@ struct BridgedWitnessTableEntry {
   }
 #endif
 
-  SWIFT_IMPORT_UNSAFE BridgedOwnedString getDebugDescription() const;
+  BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE Kind getKind() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction getMethodFunction() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedWitnessTableEntry advanceBy(SwiftInt index) const;
@@ -1199,7 +1251,7 @@ struct BridgedWitnessTableEntryArray {
 struct BridgedWitnessTable {
   const swift::SILWitnessTable * _Nonnull table;
 
-  SWIFT_IMPORT_UNSAFE BridgedOwnedString getDebugDescription() const;
+  BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedWitnessTableEntryArray getEntries() const;
 };
 
@@ -1210,7 +1262,7 @@ struct OptionalBridgedWitnessTable {
 struct BridgedDefaultWitnessTable {
   const swift::SILDefaultWitnessTable * _Nonnull table;
 
-  SWIFT_IMPORT_UNSAFE BridgedOwnedString getDebugDescription() const;
+  BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedWitnessTableEntryArray getEntries() const;
 };
 

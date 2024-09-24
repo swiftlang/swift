@@ -94,6 +94,10 @@ struct BridgedCalleeAnalysis {
   struct CalleeList {
     uint64_t storage[3];
 
+    // Ensure that this struct value type will be indirectly returned on
+    // Windows ARM64
+    CalleeList() {}
+
 #ifdef USED_IN_CPP_SOURCE
     CalleeList(swift::CalleeList list) {
       *reinterpret_cast<swift::CalleeList *>(&storage) = list;
@@ -186,6 +190,7 @@ struct BridgedCloner {
   SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
   bool isValueCloned(BridgedValue v) const;
   void clone(BridgedInstruction inst);
+  void recordFoldedValue(BridgedValue origValue, BridgedValue mappedValue);
 };
 
 struct BridgedSpecializationCloner {
@@ -206,7 +211,7 @@ struct BridgedPassContext {
     Lowered
   };
 
-  SWIFT_IMPORT_UNSAFE BridgedOwnedString getModuleDescription() const;
+  BridgedOwnedString getModuleDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedChangeNotificationHandler asNotificationHandler() const;
   BRIDGED_INLINE void notifyDependencyOnBodyOf(BridgedFunction otherFunction) const;
   BRIDGED_INLINE SILStage getSILStage() const;
@@ -251,12 +256,12 @@ struct BridgedPassContext {
                                                                            BridgedFunction function) const;
   bool specializeClassMethodInst(BridgedInstruction cm) const;
   bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
-  SWIFT_IMPORT_UNSAFE BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
-  SWIFT_IMPORT_UNSAFE BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;
-  SWIFT_IMPORT_UNSAFE BridgedOwnedString mangleWithDeadArgs(const SwiftInt * _Nullable deadArgs,
+  BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
+  BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;
+  BridgedOwnedString mangleWithDeadArgs(const SwiftInt * _Nullable deadArgs,
                                                             SwiftInt numDeadArgs,
                                                             BridgedFunction function) const;
-  SWIFT_IMPORT_UNSAFE BridgedOwnedString mangleWithClosureArgs(BridgedValueArray closureArgs,
+  BridgedOwnedString mangleWithClosureArgs(BridgedValueArray closureArgs,
                                                                BridgedArrayRef closureArgIndices,
                                                                BridgedFunction applySiteCallee) const;
 

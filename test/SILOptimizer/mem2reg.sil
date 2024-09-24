@@ -578,3 +578,21 @@ bb0:
   dealloc_stack %11 : $*Pair<T, ()>
   return undef : $()
 }
+
+// CHECK-LABEL: sil @dont_promote_dynamic_lifetime : {{.*}} {
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'dont_promote_dynamic_lifetime'
+sil @dont_promote_dynamic_lifetime : $@convention(thin) () -> () {
+  %stack = alloc_stack [dynamic_lifetime] $Klass
+  cond_br undef, left, right
+left:
+  %kin = apply undef() : $@convention(thin) () -> (@owned Klass)
+  %k = load %stack : $*Klass
+  strong_release %k : $Klass
+  br exit
+right:
+  br exit
+exit:
+  dealloc_stack %stack : $*Klass
+  return undef : $()
+}

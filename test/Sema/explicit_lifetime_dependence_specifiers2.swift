@@ -1,6 +1,5 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes
 // REQUIRES: asserts
-// REQUIRES: nonescapable_types
 
 struct AnotherBufferView : ~Escapable, BitwiseCopyable {
   let ptr: UnsafeRawBufferPointer

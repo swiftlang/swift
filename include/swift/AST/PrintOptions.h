@@ -387,6 +387,9 @@ struct PrintOptions {
   /// Replace BitwiseCopyable with _BitwiseCopyable.
   bool SuppressBitwiseCopyable = false;
 
+  /// Suppress ~Escapable types and lifetime dependence annotations
+  bool SuppressNonEscapableTypes = false;
+
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {
       DeclAttrKind::Transparent, DeclAttrKind::Effects,
@@ -571,10 +574,6 @@ struct PrintOptions {
   /// Whether to print feature checks for compatibility with older Swift
   /// compilers that might parse the result.
   bool PrintCompatibilityFeatureChecks = false;
-
-  /// Whether to print @_specialize attributes that have an availability
-  /// parameter.
-  bool PrintSpecializeAttributeWithAvailability = true;
 
   /// Whether to always desugar array types from `[base_type]` to `Array<base_type>`
   bool AlwaysDesugarArraySliceTypes = false;

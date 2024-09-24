@@ -257,10 +257,7 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
   // Perform round-trip and/or validation checking.
   if (parsingOpts.contains(ParsingFlags::RoundTrip) &&
       swift_ASTGen_roundTripCheck(exportedSourceFile)) {
-    SourceLoc loc;
-    if (auto bufferID = SF.getBufferID()) {
-      loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
-    }
+    SourceLoc loc = Context.SourceMgr.getLocForBufferStart(SF.getBufferID());
     diagnose(loc, diag::parser_round_trip_error);
     return;
   }
@@ -277,10 +274,7 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
       // which case we still have `hadAnyError() == false`. To avoid
       // emitting the same warnings from SwiftParser, only emit errors from
       // SwiftParser
-      SourceLoc loc;
-      if (auto bufferID = SF.getBufferID()) {
-          loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
-      }
+      SourceLoc loc = Context.SourceMgr.getLocForBufferStart(SF.getBufferID());
       diagnose(loc, diag::parser_new_parser_errors);
     }
   }
@@ -298,10 +292,7 @@ void *ExportedSourceFileRequest::evaluate(Evaluator &evaluator,
   auto &SM = ctx.SourceMgr;
 
   auto bufferID = SF->getBufferID();
-  if (!bufferID)
-    return nullptr;
-
-  StringRef contents = SM.extractText(SM.getRangeForBuffer(*bufferID));
+  StringRef contents = SM.extractText(SM.getRangeForBuffer(bufferID));
 
   // Parse the source file.
   auto exportedSourceFile = swift_ASTGen_parseSourceFile(
@@ -776,7 +767,7 @@ bool Parser::parseSpecializeAttributeArguments(
     std::optional<bool> &Exported,
     std::optional<SpecializeAttr::SpecializationKind> &Kind,
     swift::TrailingWhereClause *&TrailingWhereClause,
-    DeclNameRef &targetFunction, AvailabilityContext *SILAvailability,
+    DeclNameRef &targetFunction, AvailabilityRange *SILAvailability,
     SmallVectorImpl<Identifier> &spiGroups,
     SmallVectorImpl<AvailableAttr *> &availableAttrs,
     size_t &typeErasedParamsCount,
@@ -825,7 +816,7 @@ bool Parser::parseSpecializeAttributeArguments(
                                  diag::sil_availability_expected_version))
           return false;
 
-        *SILAvailability = AvailabilityContext(VersionRange::allGTE(version));
+        *SILAvailability = AvailabilityRange(VersionRange::allGTE(version));
       }
       if (ParamLabel == "availability") {
         SourceRange attrRange;
@@ -1090,7 +1081,7 @@ bool Parser::parseAvailability(
 
 bool Parser::parseSpecializeAttribute(
     swift::tok ClosingBrace, SourceLoc AtLoc, SourceLoc Loc,
-    SpecializeAttr *&Attr, AvailabilityContext *SILAvailability,
+    SpecializeAttr *&Attr, AvailabilityRange *SILAvailability,
     llvm::function_ref<bool(Parser &)> parseSILTargetName,
     llvm::function_ref<bool(Parser &)> parseSILSIPModule) {
   assert(ClosingBrace == tok::r_paren || ClosingBrace == tok::r_square);
@@ -5293,7 +5284,7 @@ ParserStatus Parser::parseDeclAttributeList(
       if (!ifConfigsAreDeclAttrs && !ifConfigContainsOnlyAttributes())
         break;
 
-      Status |= parseIfConfigDeclAttributes(
+      Status |= parseIfConfigAttributes(
           Attributes, ifConfigsAreDeclAttrs, initContext);
     }
   }
@@ -5341,7 +5332,7 @@ ParserStatus Parser::parseClosureDeclAttributeList(DeclAttributes &Attributes) {
       if (!ifConfigsAreDeclAttrs && !ifConfigContainsOnlyAttributes()) {
         break;
       }
-      Status |= parseIfConfigDeclAttributes(Attributes, ifConfigsAreDeclAttrs,
+      Status |= parseIfConfigAttributes(Attributes, ifConfigsAreDeclAttrs,
                                             initContext);
     }
   }
@@ -6256,13 +6247,17 @@ static Parser::ParseDeclOptions getParseDeclOptions(DeclContext *DC) {
 ///
 /// \param fromASTGen If true , this function in called from ASTGen as the
 /// fallback, so do not attempt a callback to ASTGen.
-ParserResult<Decl> Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
-                                     bool IfConfigsAreDeclAttrs,
-                                     llvm::function_ref<void(Decl *)> Handler,
-                                     bool fromASTGen) {
+ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
+                               bool IfConfigsAreDeclAttrs,
+                               llvm::function_ref<void(Decl *)> Handler,
+                               bool fromASTGen) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
-  if (IsForASTGen && !fromASTGen)
-    return parseDeclFromSyntaxTree();
+  if (IsForASTGen && !fromASTGen) {
+    auto result = parseDeclFromSyntaxTree();
+    if (auto resultDecl = result.getPtrOrNull())
+      Handler(resultDecl);
+    return result;
+  }
 #endif
   ParseDeclOptions Flags = getParseDeclOptions(CurDeclContext);
   ParserPosition BeginParserPosition;
@@ -6272,13 +6267,17 @@ ParserResult<Decl> Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
   if (Tok.is(tok::pound_if) && !ifConfigContainsOnlyAttributes()) {
     auto IfConfigResult = parseIfConfig(
         IfConfigContext::DeclItems,
-        [&](SmallVectorImpl<ASTNode> &Decls, bool IsActive) {
+        [&](bool IsActive) {
           ParserStatus Status;
           bool PreviousHadSemi = true;
           while (Tok.isNot(tok::pound_else, tok::pound_endif, tok::pound_elseif,
                            tok::r_brace, tok::eof)) {
             Status |= parseDeclItem(PreviousHadSemi,
-                                    [&](Decl *D) { Decls.emplace_back(D); });
+                                    [&](Decl *D) {
+              if (IsActive) {
+                Handler(D);
+              }
+            });
           }
         });
     if (IfConfigResult.hasCodeCompletion() && isIDEInspectionFirstPass()) {
@@ -6286,19 +6285,7 @@ ParserResult<Decl> Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
       return makeParserError();
     }
 
-    if (auto ICD = IfConfigResult.getPtrOrNull()) {
-      // The IfConfigDecl is ahead of its members in source order.
-      Handler(ICD);
-      // Copy the active members into the entries list.
-      for (auto activeMember : ICD->getActiveClauseElements()) {
-        auto *D = activeMember.get<Decl*>();
-        if (isa<IfConfigDecl>(D))
-          // Don't hoist nested '#if'.
-          continue;
-        Handler(D);
-      }
-    }
-    return IfConfigResult;
+    return makeParserSuccess();
   }
   if (Tok.isAny(tok::pound_warning, tok::pound_error)) {
     auto Result = parseDeclPoundDiagnostic();
@@ -7059,15 +7046,19 @@ ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
     return LineDirectiveStatus;
   }
 
-  ParserResult<Decl> Result =
+  Decl *LastResultDecl = nullptr;
+  ParserStatus Result =
       parseDecl(IsAtStartOfLineOrPreviousHadSemi,
-                /* IfConfigsAreDeclAttrs=*/false, handler);
-  if (Result.isParseErrorOrHasCompletion())
+                /* IfConfigsAreDeclAttrs=*/false, [&](Decl *decl) {
+        handler(decl);
+        LastResultDecl = decl;
+      });
+  if (Result.isErrorOrHasCompletion())
     skipUntilDeclRBrace(tok::semi, tok::pound_endif);
   SourceLoc SemiLoc;
   PreviousHadSemi = consumeIf(tok::semi, SemiLoc);
-  if (PreviousHadSemi && Result.isNonNull())
-    Result.get()->TrailingSemiLoc = SemiLoc;
+  if (PreviousHadSemi && LastResultDecl)
+    LastResultDecl->TrailingSemiLoc = SemiLoc;
   return Result;
 }
 

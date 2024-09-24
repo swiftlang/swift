@@ -103,7 +103,8 @@
 #define SWIFT_UNSAFE_REFERENCE                                                  \
   __attribute__((swift_attr("import_reference")))                         \
   __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(retain:immortal))))    \
-  __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(release:immortal))))
+  __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(release:immortal))))   \
+  __attribute__((swift_attr("unsafe")))
 
 /// Specifies a name that will be used in Swift for this declaration instead of its original name.
 #define SWIFT_NAME(_name) __attribute__((swift_name(#_name)))
@@ -164,6 +165,13 @@
 #define SWIFT_NONESCAPABLE \
   __attribute__((swift_attr("~Escapable")))
 
+/// Specifies that a specific c++ type such class or struct should be imported
+/// as a escapable Swift value. While this matches the default behavior,
+/// in safe mode interop mode it ensures that the type is not marked as
+/// unsafe.
+#define SWIFT_ESCAPABLE \
+  __attribute__((swift_attr("Escapable")))
+
 /// Specifies that the return value is passed as owned for C++ functions and
 /// methods returning types annotated as `SWIFT_SHARED_REFERENCE`
 #define SWIFT_RETURNS_RETAINED __attribute__((swift_attr("returns_retained")))
@@ -187,6 +195,7 @@
 #define SWIFT_UNCHECKED_SENDABLE
 #define SWIFT_NONCOPYABLE
 #define SWIFT_NONESCAPABLE
+#define SWIFT_ESCAPABLE
 #define SWIFT_RETURNS_RETAINED
 #define SWIFT_RETURNS_UNRETAINED
 

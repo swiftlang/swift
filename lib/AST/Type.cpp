@@ -3186,6 +3186,13 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
     ext2 = ext2.withSendable(false);
   }
 
+  if (matchMode.contains(TypeMatchFlags::IgnoreFunctionGlobalActorIsolation)) {
+    if (ext1.getGlobalActor())
+      ext1 = ext1.withoutIsolation();
+    if (ext2.getGlobalActor())
+      ext2 = ext2.withoutIsolation();
+  }
+
   // If specified, allow an escaping function parameter to override a
   // non-escaping function parameter when the parameter is optional.
   // Note that this is checking 'ext2' rather than 'ext1' because parameters
@@ -3450,6 +3457,14 @@ bool ArchetypeType::requiresClass() const {
   return false;
 }
 
+Type ArchetypeType::getSuperclass() const {
+  if (!Bits.ArchetypeType.HasSuperclass) return Type();
+
+  auto *genericEnv = getGenericEnvironment();
+  return genericEnv->mapTypeIntoContext(
+      *getSubclassTrailingObjects<Type>());
+}
+
 Type ArchetypeType::getValueType() const {
   if (auto gp = getInterfaceType()->getAs<GenericTypeParamType>())
     return gp->getValueType();
@@ -3509,7 +3524,12 @@ RecursiveTypeProperties ArchetypeType::archetypeProperties(
     }
   }
 
-  if (superclass) properties |= superclass->getRecursiveProperties();
+  if (superclass) {
+    auto superclassProps = superclass->getRecursiveProperties();
+    superclassProps.removeHasTypeParameter();
+    superclassProps.removeHasDependentMember();
+    properties |= superclassProps;
+  }
 
   return properties;
 }
@@ -3726,12 +3746,17 @@ void ParameterizedProtocolType::getRequirements(
   auto argTypes = getArgs();
   assert(argTypes.size() <= assocTypes.size());
 
+  auto conformance = lookupConformance(baseType, protoDecl);
+  auto subMap = SubstitutionMap::getProtocolSubstitutions(
+      protoDecl, baseType, conformance);
+
   for (unsigned i : indices(argTypes)) {
     auto argType = argTypes[i];
     auto *assocType = assocTypes[i];
-    auto subjectType = assocType->getDeclaredInterfaceType()
-        ->castTo<DependentMemberType>()
-        ->substBaseType(baseType);
+    // Do a general type substitution here because the associated type might be
+    // from an inherited protocol, in which case we will evaluate a non-trivial
+    // conformance path.
+    auto subjectType = assocType->getDeclaredInterfaceType().subst(subMap);
     reqs.emplace_back(RequirementKind::SameType, subjectType, argType);
   }
 }
@@ -4437,14 +4462,12 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
   auto associatedTypeLookup =
       differentiableProtocol->lookupDirect(ctx.Id_TangentVector);
   assert(associatedTypeLookup.size() == 1);
-  auto *dependentType = DependentMemberType::get(
-      differentiableProtocol->getDeclaredInterfaceType(),
-      cast<AssociatedTypeDecl>(associatedTypeLookup[0]));
+  auto *assocDecl = cast<AssociatedTypeDecl>(associatedTypeLookup[0]);
 
   // Try to get the `TangentVector` associated type of `base`.
   // Return the associated type if it is valid.
-  auto assocTy =
-      dependentType->substBaseType(this, lookupConformance, std::nullopt);
+  auto conformance = swift::lookupConformance(this, differentiableProtocol);
+  auto assocTy = conformance.getTypeWitness(this, assocDecl);
   if (!assocTy->hasError())
     return cache(TangentSpace::getTangentVector(assocTy));
 

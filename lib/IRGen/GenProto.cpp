@@ -111,10 +111,24 @@ protected:
   FulfillmentMap Fulfillments;
 
   GenericSignature::RequiredProtocols getRequiredProtocols(Type t) {
+    // FIXME: We need to rework this to use archetypes instead of interface
+    // types, or fix the bad interaction between interface type substitution
+    // and concretized conformance requirements. Then we can remove the hack
+    // from getReducedType() to handle this case, and also stop calling
+    // getReducedType() here.
+    t = Generics.getReducedType(t);
+    if (!t->isTypeParameter())
+      return {};
+
     return Generics->getRequiredProtocols(t);
   }
 
   CanType getSuperclassBound(Type t) {
+    // See above.
+    t = Generics.getReducedType(t);
+    if (!t->isTypeParameter())
+      return CanType();
+
     if (auto superclassTy = Generics->getSuperclassBound(t))
       return superclassTy->getCanonicalType();
     return CanType();
@@ -143,8 +157,6 @@ public:
   }
 
 private:
-  void initGenerics();
-
   template <typename ...Args>
   void considerNewTypeSource(IsExact_t isExact, MetadataSource::Kind kind,
                              CanType type, Args... args);
@@ -199,9 +211,8 @@ private:
 PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
                                              CanSILFunctionType fnType,
                                              bool considerParameterSources = true)
-  : IGM(IGM), M(*IGM.getSwiftModule()), FnType(fnType){
-  initGenerics();
-
+  : IGM(IGM), M(*IGM.getSwiftModule()), FnType(fnType),
+    Generics(fnType->getInvocationGenericSignature()) {
   auto rep = fnType->getRepresentation();
 
   if (fnType->isPseudogeneric()) {
@@ -249,11 +260,8 @@ PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
 
 void PolymorphicConvention::addPseudogenericFulfillments() {
   enumerateRequirements([&](GenericRequirement reqt) {
-    auto archetype = Generics.getGenericEnvironment()
-                        ->mapTypeIntoContext(reqt.getTypeParameter())
-                        ->getAs<ArchetypeType>();
-    assert(archetype && "did not get an archetype by mapping param?");
-    auto erasedTypeParam = archetype->getExistentialType()->getCanonicalType();
+    auto erasedTypeParam = Generics->getExistentialType(reqt.getTypeParameter())
+                              ->getCanonicalType();
     Sources.emplace_back(MetadataSource::Kind::ErasedTypeMetadata,
                          reqt.getTypeParameter(), erasedTypeParam);
 
@@ -317,10 +325,6 @@ enumerateUnfulfilledRequirements(const RequirementCallback &callback) {
     if (!Fulfillments.getFulfillment(requirement))
       callback(requirement);
   });
-}
-
-void PolymorphicConvention::initGenerics() {
-  Generics = FnType->getInvocationGenericSignature();
 }
 
 template <typename ...Args>
@@ -1512,6 +1516,13 @@ public:
     /// Add reference to the protocol conformance descriptor that generated
     /// this table.
     void addProtocolConformanceDescriptor() {
+      // In Embedded Swift, there are no protocol conformance descriptors. Emit
+      // a null pointer instead to keep the same layout as regular Swift.
+      if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+        Table.addNullPointer(IGM.Int8PtrTy);
+        return;
+      }
+      
       auto descriptor =
         IGM.getAddrOfProtocolConformanceDescriptor(&Conformance);
       if (isRelative)
@@ -2560,7 +2571,9 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
 
 void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   if (Context.LangOpts.hasFeature(Feature::Embedded)) {
-    return;
+    // In Embedded Swift, only class-bound wtables are allowed.
+    if (!wt->getConformance()->getProtocol()->requiresClass())
+      return;
   }
 
   // Don't emit a witness table if it is a declaration.
@@ -3560,9 +3573,13 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
                                         CanType srcType,
                                         llvm::Value **srcMetadataCache,
                                         ProtocolConformanceRef conformance) {
-  assert(!srcType->getASTContext().LangOpts.hasFeature(Feature::Embedded));
-
   auto proto = conformance.getRequirement();
+
+  // In Embedded Swift, only class-bound wtables are allowed.
+  if (srcType->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    assert(proto->requiresClass());
+  }
+
   assert(Lowering::TypeConverter::protocolRequiresWitnessTable(proto)
          && "protocol does not have witness tables?!");
 

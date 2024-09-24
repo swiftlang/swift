@@ -33,7 +33,7 @@ class Triple;
 }
 
 namespace swift {
-class AvailabilityContext;
+class AvailabilityRange;
 
 namespace irgen {
 class IRGenModule;
@@ -89,9 +89,23 @@ inline bool isEmbedded(CanType t) {
   return t->getASTContext().LangOpts.hasFeature(Feature::Embedded);
 }
 
+// Metadata is not generated and not allowed to be referenced in Embedded Swift,
+// expect for classes (both generic and non-generic), dynamic self, and
+// class-bound existentials.
 inline bool isMetadataAllowedInEmbedded(CanType t) {
-  return isa<ClassType>(t) || isa<BoundGenericClassType>(t) ||
-         isa<DynamicSelfType>(t);
+  if (isa<ClassType>(t) || isa<BoundGenericClassType>(t) ||
+      isa<DynamicSelfType>(t)) {
+    return true;
+  }
+  if (auto existentialTy = dyn_cast<ExistentialType>(t)) {
+    if (existentialTy->requiresClass())
+      return true;
+  }
+  if (auto archeTy = dyn_cast<ArchetypeType>(t)) {
+    if (archeTy->requiresClass())
+      return true;
+  }
+  return false;
 }
 
 inline bool isEmbedded(Decl *d) {
@@ -1062,7 +1076,10 @@ public:
   }
 
   static LinkEntity forProtocolWitnessTable(const RootProtocolConformance *C) {
-    assert(!isEmbedded(C));
+    if (isEmbedded(C)) {
+      assert(C->getProtocol()->requiresClass());
+    }
+
     LinkEntity entity;
     entity.setForProtocolConformance(Kind::ProtocolWitnessTable, C);
     return entity;

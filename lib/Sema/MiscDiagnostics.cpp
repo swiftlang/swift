@@ -2524,7 +2524,14 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
   AbstractClosureExpr *ACE = nullptr;
   if (DC->isLocalContext()) {
     while (DC->getParent()->isLocalContext() && !ACE) {
-      // FIXME: This is happening too early, because closure->getType() isn't set.
+      // FIXME: The closure's type may not be set here yet since we have a
+      // couple of calls to typeCheckExpression remaining in CSApply that can
+      // result in running this logic before the solution has been applied to
+      // the parent expression. Additionally, lazy locals can have their
+      // initializers type-checked from CSGen due to the fact that that name
+      // lookup can kick LazyStoragePropertyRequest, which currently eagerly
+      // computes the interface type. The interface type computation there ought
+      // to be made lazy.
       if (auto *closure = dyn_cast<AbstractClosureExpr>(DC))
         if (closure->getType())
           if (DiagnoseWalker::isClosureRequiringSelfQualification(closure))

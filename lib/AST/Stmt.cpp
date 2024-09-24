@@ -302,24 +302,7 @@ ASTNode BraceStmt::findAsyncNode() {
 }
 
 static bool hasSingleActiveElement(ArrayRef<ASTNode> elts) {
-  while (true) {
-    // Single element brace.
-    if (elts.size() == 1)
-      return true;
-
-    // See if we have a #if as the first element of a 2 element brace, if so we
-    // can recuse into its active clause. If so, the second element will be the
-    // active element.
-    if (elts.size() == 2) {
-      if (auto *D = elts.front().dyn_cast<Decl *>()) {
-        if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
-          elts = ICD->getActiveClauseElements();
-          continue;
-        }
-      }
-    }
-    return false;
-  }
+  return elts.size() == 1;
 }
 
 ASTNode BraceStmt::getSingleActiveElement() const {
@@ -960,8 +943,7 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
 #ifndef NDEBUG
   for (auto N : Cases)
     assert((N.is<Stmt*>() && isa<CaseStmt>(N.get<Stmt*>())) ||
-           (N.is<Decl*>() && (isa<IfConfigDecl>(N.get<Decl*>()) ||
-                              isa<PoundDiagnosticDecl>(N.get<Decl*>()))));
+           (N.is<Decl*>() && (isa<PoundDiagnosticDecl>(N.get<Decl*>()))));
 #endif
 
   void *p = C.Allocate(totalSizeToAlloc<ASTNode>(Cases.size()),
