@@ -548,10 +548,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
 
     if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
-      if (!isa<AccessorDecl>(FD))
+      if (!isa<AccessorDecl>(FD)) {
+        if (auto *const TyY = FD->getYieldTypeRepr())
+          if (doIt(TyY))
+            return true;
+
         if (auto *const TyR = FD->getResultTypeRepr())
           if (doIt(TyR))
             return true;
+      }
     }
 
     // Visit trailing requirements

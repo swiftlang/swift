@@ -939,7 +939,12 @@ DECL_ATTR(called, Called,
   177)
 DECL_ATTR_FEATURE_REQUIREMENT(Called, CalledAttribute)
 
-LAST_DECL_ATTR(Called)
+SIMPLE_DECL_ATTR(yield_once, Coroutine,
+  OnFunc,
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | EquivalentInABIAttr,
+  178)
+
+LAST_DECL_ATTR(Coroutine)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

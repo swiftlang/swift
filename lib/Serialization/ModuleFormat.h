@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1017; // Multi-operand debug_value serialization
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1018; // coro AST
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1412,7 +1412,8 @@ namespace decls_block {
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
     BCFixed<1>,                      // has sending result
-    BCFixed<1>                       // called once
+    BCFixed<1>,                      // called once
+    BCFixed<1>                       // coroutine?
     // trailed by parameters
     // Optionally lifetime dependence info
   );
@@ -1515,6 +1516,7 @@ namespace decls_block {
     FunctionTypeIsolationField,      // isolation
     BCFixed<1>,                      // has sending result,
     BCFixed<1>,                      // called once
+    BCFixed<1>,                      // coroutine?
     GenericSignatureIDField          // generic signature
 
     // trailed by parameters

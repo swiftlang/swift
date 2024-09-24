@@ -428,6 +428,7 @@ NODE(ConstValue)
 CONTEXT_NODE(BorrowAccessor)
 CONTEXT_NODE(MutateAccessor)
 NODE(CalledOnceFunctionType)
+NODE(Coroutine)
 
 #undef CONTEXT_NODE
 #undef NODE
