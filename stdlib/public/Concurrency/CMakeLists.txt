@@ -74,9 +74,10 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   AsyncLet.cpp
   Clock.cpp
   GlobalExecutor.cpp
-  Hooks.cpp
+  ConcurrencyHooks.cpp
   EmbeddedSupport.cpp
   Error.cpp
+  ExecutorChecks.cpp
   Setup.cpp
   Task.cpp
   TaskAlloc.cpp

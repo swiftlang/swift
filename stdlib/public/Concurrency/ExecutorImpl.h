@@ -93,6 +93,7 @@ static inline int swift_priority_getBucketIndex(SwiftJobPriority priority) {
 /// field may be freely used by the executor implementation.
 typedef struct {
   SwiftHeapMetadata const *__ptrauth_objc_isa_pointer metadata;
+  uintptr_t refCounts;
   void *schedulerPrivate[2];
   SwiftJobFlags flags;
 } __attribute__((aligned(2 * sizeof(void *)))) SwiftJob;
