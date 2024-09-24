@@ -475,6 +475,7 @@ public:
   void visitAddressableSelfAttr(AddressableSelfAttr *attr);
   void visitAddressableForDependenciesAttr(AddressableForDependenciesAttr *attr);
   void visitUnsafeAttr(UnsafeAttr *attr);
+  void visitCoroutineAttr(CoroutineAttr *attr);
 };
 
 } // end anonymous namespace
@@ -2657,6 +2658,10 @@ void AttributeChecker::visitSILGenNameAttr(SILGenNameAttr *A) {
   if (D->getAttrs().hasAttribute<ABIAttr>()) {
     diagnoseAndRemoveAttr(A, diag::attr_abi_incompatible_with_silgen_name, D);
   }
+}
+
+void AttributeChecker::visitCoroutineAttr(CoroutineAttr *attr) {
+  // FIXME: allow only on @differentiable for modify accessorts
 }
 
 void AttributeChecker::visitUsedAttr(UsedAttr *attr) {

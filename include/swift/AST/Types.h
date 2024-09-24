@@ -407,7 +407,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 15 };
+  enum { NumAFTExtInfoBits = 16 };
   enum { NumSILExtInfoBits = 14 };
 
   // clang-format off
@@ -437,7 +437,7 @@ protected:
     HasCachedType : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+16,
+  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+14,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
     ExtInfoBits : NumAFTExtInfoBits,
@@ -445,7 +445,7 @@ protected:
     HasClangTypeInfo : 1,
     HasThrownError : 1,
     HasLifetimeDependencies : 1,
-    NumParams : 15
+    NumParams : 14
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+16,
@@ -1702,6 +1702,33 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnresolvedType, Type)
 
+class YieldResultType : public TypeBase {
+  Type ResultType;
+  bool InOut = false;
+
+  YieldResultType(Type objectTy, bool InOut, const ASTContext *canonicalContext,
+                  RecursiveTypeProperties properties)
+  : TypeBase(TypeKind::YieldResult, canonicalContext, properties),
+    ResultType(objectTy), InOut(InOut) {}
+
+public:
+  static YieldResultType *get(Type originalType, bool InOut);
+
+  Type getResultType() const { return ResultType; }
+  bool isInOut() const { return InOut; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::YieldResult;
+  }
+};
+
+BEGIN_CAN_TYPE_WRAPPER(YieldResultType, Type)
+PROXY_CAN_TYPE_SIMPLE_GETTER(getResultType)
+static CanYieldResultType get(CanType type, bool InOut) {
+  return CanYieldResultType(YieldResultType::get(type, InOut));
+}
+END_CAN_TYPE_WRAPPER(YieldResultType, Type)
   
 /// BuiltinType - An abstract class for all the builtin types.
 class BuiltinType : public TypeBase {
@@ -3885,6 +3912,8 @@ public:
   bool isAsync() const { return getExtInfo().isAsync(); }
 
   bool isThrowing() const { return getExtInfo().isThrowing(); }
+
+  bool isCoroutine() const { return getExtInfo().isCoroutine(); }
 
   bool hasSendingResult() const { return getExtInfo().hasSendingResult(); }
 

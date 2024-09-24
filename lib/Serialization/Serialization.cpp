@@ -5663,6 +5663,10 @@ public:
     visitBuiltinTypeImpl(ty);
   }
 
+  void visitYieldResultType(const YieldResultType *) {
+    llvm_unreachable("implemented me");
+  }
+
   void visitTypeAliasType(const TypeAliasType *alias) {
     using namespace decls_block;
 

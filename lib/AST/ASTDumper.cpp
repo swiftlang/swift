@@ -4967,6 +4967,7 @@ public:
   TRIVIAL_ATTR_PRINTER(CompilerInitialized, compiler_initialized)
   TRIVIAL_ATTR_PRINTER(Consuming, consuming)
   TRIVIAL_ATTR_PRINTER(Convenience, convenience)
+  TRIVIAL_ATTR_PRINTER(Coroutine, coroutine)
   TRIVIAL_ATTR_PRINTER(DiscardableResult, discardable_result)
   TRIVIAL_ATTR_PRINTER(DisfavoredOverload, disfavored_overload)
   TRIVIAL_ATTR_PRINTER(DistributedActor, distributed_actor)
@@ -6065,6 +6066,13 @@ namespace {
       printFoot();
     }
 
+    void visitYieldResultType(YieldResultType *T, Label label) {
+      printCommon("yield", label);
+      printFlag(T->isInOut(), "inout");
+      printRec(T->getResultType(), Label::always("type"));
+      printFoot();
+    }
+
     TRIVIAL_TYPE_PRINTER(Unresolved, unresolved)
 
     void visitPlaceholderType(PlaceholderType *T, Label label) {
@@ -6485,6 +6493,7 @@ namespace {
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
         printFlag(T->hasSendingResult(), "sending_result");
+        printFlag(T->isCoroutine(), "@yield_once");
         if (T->isDifferentiable()) {
           switch (T->getDifferentiabilityKind()) {
           default:
