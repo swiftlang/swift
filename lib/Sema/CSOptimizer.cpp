@@ -479,8 +479,13 @@ static Constraint *determineBestChoicesInContext(
 
         if (!candidateOptionals.empty() || !paramOptionals.empty()) {
           if (paramOptionals.size() >= candidateOptionals.size()) {
-            return scoreCandidateMatch(genericSig, candidateType, paramType,
-                                       options);
+            auto score = scoreCandidateMatch(genericSig, candidateType,
+                                             paramType, options);
+            // Injection lowers the score slightly to comply with
+            // old behavior where exact matches on operator parameter
+            // types were always preferred.
+            return score == 1 && isOperatorDisjunction(disjunction) ? 0.9
+                                                                    : score;
           }
 
           // Optionality mismatch.
@@ -512,26 +517,60 @@ static Constraint *determineBestChoicesInContext(
 
       // Check protocol requirement(s) if this parameter is a
       // generic parameter type.
-      if (genericSig && paramType->isTypeParameter()) {
-        auto protocolRequirements = genericSig->getRequiredProtocols(paramType);
-        // It's a generic parameter or dependent member which might
-        // be connected via ame-type constraints to other generic
-        // parameters or dependent member but we cannot check that here,
-        // so let's add a tiny score just to acknowledge that it could
-        // possibly match.
-        if (protocolRequirements.empty())
-          return 0.01;
-
-        if (llvm::all_of(protocolRequirements, [&](ProtocolDecl *protocol) {
-              return bool(cs.lookupConformance(candidateType, protocol));
-            })) {
-          if (auto *GP = paramType->getAs<GenericTypeParamType>()) {
-            auto *paramDecl = GP->getDecl();
-            if (paramDecl && paramDecl->isOpaqueType())
-              return 1.0;
+      if (genericSig && paramType->is<GenericTypeParamType>()) {
+        // If candidate is not fully resolved, check conformances only
+        // and lower the score.
+        if (candidateType->hasTypeVariable()) {
+          auto protocolRequirements =
+              genericSig->getRequiredProtocols(paramType);
+          if (llvm::all_of(protocolRequirements, [&](ProtocolDecl *protocol) {
+                return bool(cs.lookupConformance(candidateType, protocol));
+              })) {
+            if (auto *GP = paramType->getAs<GenericTypeParamType>()) {
+              auto *paramDecl = GP->getDecl();
+              if (paramDecl && paramDecl->isOpaqueType())
+                return 1.0;
+            }
+            return 0.7;
           }
-          return 0.7;
+
+          return 0;
         }
+
+        // If the candidate type is fully resolved, let's check all of
+        // the requirements that are associated with the corresponding
+        // parameter, if all of them are satisfied this candidate is
+        // an exact match.
+
+        auto isParameterType = [&paramType](Type type) {
+          return type->isEqual(paramType);
+        };
+
+        SmallVector<Requirement, 4> requirements;
+        for (const auto &requirement : genericSig.getRequirements()) {
+          if (requirement.getFirstType().findIf(isParameterType) ||
+              (requirement.getKind() != RequirementKind::Layout &&
+               requirement.getSecondType().findIf(isParameterType)))
+            requirements.push_back(requirement);
+        }
+
+        auto result = checkRequirements(
+            requirements,
+            [&paramType, &candidateType](SubstitutableType *type) -> Type {
+              if (type->isEqual(paramType))
+                return candidateType;
+              return ErrorType::get(type);
+            },
+            SubstOptions(std::nullopt));
+
+        // Concrete operator overloads are always more preferable to
+        // generic ones if there are exact or subtype matches, for
+        // everything else the solver should try both concrete and
+        // generic and disambiguate during ranking.
+        if (result == CheckRequirementsResult::Success)
+          return isOperatorDisjunction(disjunction) ? 0.9 : 1.0;
+
+        return 0;
       }
 
       // Parameter is generic, let's check whether top-level
