@@ -28,12 +28,18 @@ struct SWIFT_ESCAPABLE Owner {};
 
 struct Unannotated {};
 
+struct SWIFT_UNSAFE_REFERENCE UnsafeReference {};
+
 //--- test.swift
 
 import Test
 import CoreFoundation
 
 func useUnsafeParam(x: Unannotated) { // expected-warning{{reference to unsafe struct 'Unannotated'}}
+}
+
+@available(macOS 13.4, *)
+func useUnsafeParam2(x: UnsafeReference) { // expected-warning{{reference to unsafe class 'UnsafeReference'}}
 }
 
 func useSafeParams(x: Owner, y: View) {

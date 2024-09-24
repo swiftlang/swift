@@ -103,7 +103,8 @@
 #define SWIFT_UNSAFE_REFERENCE                                                  \
   __attribute__((swift_attr("import_reference")))                         \
   __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(retain:immortal))))    \
-  __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(release:immortal))))
+  __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(release:immortal))))   \
+  __attribute__((swift_attr("unsafe")))
 
 /// Specifies a name that will be used in Swift for this declaration instead of its original name.
 #define SWIFT_NAME(_name) __attribute__((swift_name(#_name)))
