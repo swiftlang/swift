@@ -1008,6 +1008,13 @@ void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
     return;
   }
 
+  if (operand->getType().isUnownedStorageType()) {
+    auto release = builder.createUnownedRelease(loc, operand,
+                                                builder.getDefaultAtomicity());
+    callbacks.createdNewInst(release);
+    return;
+  }
+
   if (operand->getType().isReferenceCounted(builder.getModule())) {
     auto u = builder.emitStrongRelease(loc, operand);
     if (u.isNull())
