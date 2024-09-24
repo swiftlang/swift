@@ -3595,7 +3595,7 @@ public:
       //
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       CanFunctionType::ExtInfo info;
-      return CanFunctionType::get({}, C.TheEmptyTupleType, info);
+      return CanFunctionType::get({}, {}, C.TheEmptyTupleType, info);
     }
     case SILFunctionType::Representation::Block:
       // All block types look like AnyObject.
@@ -3780,7 +3780,7 @@ namespace {
         // FIXME: Verify ExtInfo state is correct, not working by accident.
         CanFunctionType::ExtInfo info;
         return emitFromValueWitnessTable(
-            CanFunctionType::get({}, C.TheEmptyTupleType, info));
+            CanFunctionType::get({}, {}, C.TheEmptyTupleType, info));
       }
       case SILFunctionType::Representation::Block:
         // All block types look like AnyObject.

@@ -951,7 +951,12 @@ DECL_ATTR(_target, Target,
   179)
 DECL_ATTR_FEATURE_REQUIREMENT(Target, TargetAttribute)
 
-LAST_DECL_ATTR(Target)
+SIMPLE_DECL_ATTR(yield_once, Coroutine,
+  OnFunc,
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | EquivalentInABIAttr,
+  180)
+
+LAST_DECL_ATTR(Coroutine)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

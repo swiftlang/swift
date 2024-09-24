@@ -793,22 +793,17 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 
 /// Parse a function definition signature.
 ///   func-signature:
-///     func-arguments ('async'|'reasync')? func-throws? func-signature-result?
+///     func-arguments ('async'|'reasync')? func-throws? func-yields?
+///     func-signature-result?
 ///   func-signature-result:
 ///     '->' type
 ///
 /// Note that this leaves retType as null if unspecified.
-ParserStatus
-Parser::parseFunctionSignature(DeclBaseName SimpleName,
-                               DeclName &FullName,
-                               ParameterList *&bodyParams,
-                               DefaultArgumentInfo &defaultArgs,
-                               SourceLoc &asyncLoc,
-                               bool &reasync,
-                               SourceLoc &throwsLoc,
-                               bool &rethrows,
-                               TypeRepr *&thrownType,
-                               TypeRepr *&retType) {
+ParserStatus Parser::parseFunctionSignature(
+    DeclBaseName SimpleName, DeclName &FullName, ParameterList *&bodyParams,
+    DefaultArgumentInfo &defaultArgs, SourceLoc &asyncLoc, bool &reasync,
+    SourceLoc &throwsLoc, bool &rethrows, TypeRepr *&thrownType,
+    SourceLoc &yieldsLoc, TypeRepr *&yieldType, TypeRepr *&retType) {
   SmallVector<Identifier, 4> NamePieces;
   ParserStatus Status;
 
@@ -828,6 +823,9 @@ Parser::parseFunctionSignature(DeclBaseName SimpleName,
   Status |= parseEffectsSpecifiers(SourceLoc(),
                                    asyncLoc, &reasync,
                                    throwsLoc, &rethrows, thrownType);
+
+  // Check for `yields`
+  Status |= parseYield(yieldsLoc, yieldType);
 
   // If there's a trailing arrow, parse the rest as the result type.
   SourceLoc arrowLoc;

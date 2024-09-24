@@ -59,17 +59,19 @@ static Type dropResultOptionality(Type type, unsigned uncurryLevel) {
   // Determine the input and result types of this function.
   auto fnType = type->castTo<AnyFunctionType>();
   auto parameters = fnType->getParams();
+  auto yields = fnType->getYields();
   Type resultType =
       dropResultOptionality(fnType->getResult(), uncurryLevel - 1);
 
   // Produce the resulting function type.
   if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
     return GenericFunctionType::get(genericFn->getGenericSignature(),
-                                    parameters, resultType,
+                                    parameters, yields, resultType,
                                     fnType->getExtInfo());
   }
 
-  return FunctionType::get(parameters, resultType, fnType->getExtInfo());
+  return FunctionType::get(parameters, yields, resultType,
+                           fnType->getExtInfo());
 }
 
 Type swift::getMemberTypeForComparison(const ValueDecl *member,
@@ -104,8 +106,8 @@ Type swift::getMemberTypeForComparison(const ValueDecl *member,
     auto funcTy = memberType->castTo<AnyFunctionType>();
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
-    memberType =
-        FunctionType::get(funcTy->getParams(), funcTy->getResult(), info);
+    memberType = FunctionType::get(funcTy->getParams(), funcTy->getYields(),
+                                   funcTy->getResult(), info);
   } else {
     // For properties, strip off ownership.
     memberType = memberType->getReferenceStorageReferent();
@@ -1605,6 +1607,7 @@ namespace  {
     UNINTERESTING_ATTR(Called)
     UNINTERESTING_ATTR(Concurrent)
     UNINTERESTING_ATTR(Consuming)
+    UNINTERESTING_ATTR(Coroutine)
     UNINTERESTING_ATTR(CxxDecl)
     UNINTERESTING_ATTR(Documentation)
     UNINTERESTING_ATTR(Dynamic)

@@ -41,8 +41,9 @@ TEST_F(SemaTest, TestKeypathFunctionConversionPrefersNarrowConversion) {
 
   // func f<T, U>(_: (T) -> U))
   auto innerGenericFnParam = AnyFunctionType::Param(genericType1);
-  auto genericFnParamTy = FunctionType::get({innerGenericFnParam}, genericType2)
-                              ->withExtInfo(AnyFunctionType::ExtInfo());
+  auto genericFnParamTy =
+      FunctionType::get({innerGenericFnParam}, {}, genericType2)
+          ->withExtInfo(AnyFunctionType::ExtInfo());
   auto *genericFnParamDecl = ParamDecl::createImplicit(
       Context, Identifier(), Identifier(), genericFnParamTy, DC);
   genericFnParamDecl->setSpecifier(ParamSpecifier::Default);
@@ -55,13 +56,14 @@ TEST_F(SemaTest, TestKeypathFunctionConversionPrefersNarrowConversion) {
   auto genericFnDecl = FuncDecl::create(
       Context, SourceLoc(), StaticSpellingKind::None, SourceLoc(), declName,
       SourceLoc(), /*async=*/false, SourceLoc(), /*throws=*/false, SourceLoc(),
-      nullptr, genericParamList, genericFnParamList, nullptr, DC);
+      nullptr, /*YieldsLoc=*/SourceLoc(), /*YieldTyR*/ nullptr,
+      genericParamList, genericFnParamList, nullptr, DC);
   auto genericFnParam = AnyFunctionType::Param(genericFnParamTy);
   llvm::SmallVector<GenericTypeParamType *, 2> genericTypeParams = {
       genericType1, genericType2};
   auto genericSig = GenericSignature::get(genericTypeParams, {});
   genericFnDecl->setGenericSignature(genericSig);
-  auto genericFnTy = GenericFunctionType::get(genericSig, {genericFnParam},
+  auto genericFnTy = GenericFunctionType::get(genericSig, {genericFnParam}, {},
                                               Context.TheEmptyTupleType)
                          ->withExtInfo(AnyFunctionType::ExtInfo());
   genericFnDecl->setInterfaceType(genericFnTy);
@@ -69,20 +71,22 @@ TEST_F(SemaTest, TestKeypathFunctionConversionPrefersNarrowConversion) {
   // func f(_: (String) -> Bool?)
   auto innerConcreteFnParam = AnyFunctionType::Param(stringType);
   auto concreteFnParamTy =
-      FunctionType::get({innerConcreteFnParam}, boolOptType)
+      FunctionType::get({innerConcreteFnParam}, {}, boolOptType)
           ->withExtInfo(AnyFunctionType::ExtInfo());
   auto *concreteFnParamDecl = ParamDecl::createImplicit(
       Context, Identifier(), Identifier(), concreteFnParamTy, DC);
   concreteFnParamDecl->setSpecifier(ParamSpecifier::Default);
   auto *concreteFnParamList =
       ParameterList::createWithoutLoc(concreteFnParamDecl);
-  auto concreteFnDecl = FuncDecl::create(
-      Context, SourceLoc(), StaticSpellingKind::None, SourceLoc(), declName,
-      SourceLoc(), /*async=*/false, SourceLoc(), /*throws=*/false, SourceLoc(),
-      nullptr, nullptr, concreteFnParamList, nullptr, DC);
+  auto concreteFnDecl =
+      FuncDecl::create(Context, SourceLoc(), StaticSpellingKind::None,
+                       SourceLoc(), declName, SourceLoc(), /*async=*/false,
+                       SourceLoc(), /*throws=*/false, SourceLoc(), nullptr,
+                       /*YieldsLoc=*/SourceLoc(), /*YieldTyR*/ nullptr, nullptr,
+                       concreteFnParamList, nullptr, DC);
   auto concreteFnParam = AnyFunctionType::Param(concreteFnParamTy);
   auto concreteFnTy =
-      FunctionType::get({concreteFnParam}, Context.TheEmptyTupleType)
+      FunctionType::get({concreteFnParam}, {}, Context.TheEmptyTupleType)
           ->withExtInfo(AnyFunctionType::ExtInfo());
   concreteFnDecl->setInterfaceType(concreteFnTy);
 

@@ -1253,33 +1253,25 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
     return AbstractionPattern(getGenericSubstitutions(),
                               getGenericSignatureForFunctionComponent(),
                               getResultType(getType()),
-                              clangFunctionType->getReturnType().getTypePtr());    
+                              clangFunctionType->getReturnType().getTypePtr());
   }
   case Kind::CXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-    return AbstractionPattern(getGenericSubstitutions(),
-                              getGenericSignatureForFunctionComponent(),
-                              getResultType(getType()),
-                              getCXXMethod()->getReturnType().getTypePtr());
+    return AbstractionPattern(
+        getGenericSubstitutions(), getGenericSignatureForFunctionComponent(),
+        getResultType(getType()), getCXXMethod()->getReturnType().getTypePtr());
   case Kind::CurriedObjCMethodType:
     return getPartialCurriedObjCMethod(
-                              getGenericSubstitutions(),
-                              getGenericSignatureForFunctionComponent(),
-                              getResultType(getType()),
-                              getObjCMethod(),
-                              getEncodedForeignInfo());
+        getGenericSubstitutions(), getGenericSignatureForFunctionComponent(),
+        getResultType(getType()), getObjCMethod(), getEncodedForeignInfo());
   case Kind::CurriedCFunctionAsMethodType:
     return getPartialCurriedCFunctionAsMethod(
-                                      getGenericSubstitutions(),
-                                      getGenericSignatureForFunctionComponent(),
-                                      getResultType(getType()),
-                                      getClangType(),
-                                      getImportAsMemberStatus());
+        getGenericSubstitutions(), getGenericSignatureForFunctionComponent(),
+        getResultType(getType()), getClangType(), getImportAsMemberStatus());
   case Kind::CurriedCXXMethodType:
-    return getPartialCurriedCXXMethod(getGenericSubstitutions(),
-                                      getGenericSignatureForFunctionComponent(),
-                                      getResultType(getType()), getCXXMethod(),
-                                      getImportAsMemberStatus());
+    return getPartialCurriedCXXMethod(
+        getGenericSubstitutions(), getGenericSignatureForFunctionComponent(),
+        getResultType(getType()), getCXXMethod(), getImportAsMemberStatus());
   case Kind::PartialCurriedObjCMethodType:
   case Kind::ObjCMethodType: {
     // If this is a foreign async function, the result type comes from the
@@ -1332,7 +1324,7 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
         auto clangResultType = callbackParamTy
           ->getParamType(callbackResultIndex)
           .getTypePtr();
-        
+
         return AbstractionPattern(getGenericSubstitutions(),
                                   getGenericSignatureForFunctionComponent(),
                                   getResultType(getType()), clangResultType);
@@ -1343,13 +1335,12 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
         // form to represent the mapping from block parameters to tuple elements
         // in the return type.
         return AbstractionPattern::getObjCCompletionHandlerArgumentsType(
-                      getGenericSubstitutions(),
-                      getGenericSignatureForFunctionComponent(),
-                      getResultType(getType()), callbackParamTy,
-                      getEncodedForeignInfo());
+            getGenericSubstitutions(),
+            getGenericSignatureForFunctionComponent(), getResultType(getType()),
+            callbackParamTy, getEncodedForeignInfo());
       }
     }
-    
+
     return AbstractionPattern(getGenericSubstitutions(),
                               getGenericSignatureForFunctionComponent(),
                               getResultType(getType()),
@@ -3006,7 +2997,7 @@ public:
         addParam(param.getOrigFlags(), expansionType);
       }
     });
-    
+
     if (yieldType) {
       substYieldType = visit(yieldType, yieldPattern);
     }
@@ -3032,7 +3023,11 @@ public:
       extInfo = extInfo->withThrows(true, newErrorType);
     }
 
-    return CanFunctionType::get(FunctionType::CanParamArrayRef(newParams),
+    // Yields were substituted separately
+    if (extInfo)
+      extInfo = extInfo->withCoroutine(false);
+
+    return CanFunctionType::get(FunctionType::CanParamArrayRef(newParams), {},
                                 newResultTy, extInfo);
   }
   
