@@ -6145,7 +6145,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::SequenceElementType:
     case ConstraintLocator::ConstructorMemberType:
     case ConstraintLocator::ExistentialConstraintType:
-    case ConstraintLocator::ProtocolCompositionSuperclassType:
+    case ConstraintLocator::ProtocolCompositionMemberType:
       break;
 
     case ConstraintLocator::GenericArgument:
