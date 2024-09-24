@@ -1279,6 +1279,10 @@ public:
   std::optional<unsigned>
   computeUnalignedFieldStartOffset(const TypeRef *TR,
                                    remote::TypeInfoProvider *ExternalTypeInfo) {
+    if (auto *objcTR = dyn_cast<ObjCClassTypeRef>(TR))
+      if (auto objcTI = ExternalTypeInfo->getTypeInfo(objcTR->getName()))
+        return objcTI->getSize();
+
     size_t isaAndRetainCountSize = sizeof(StoredSize) + sizeof(long long);
 
     const TypeRef *superclass = getBuilder().lookupSuperclass(TR);
