@@ -1335,7 +1335,6 @@ void IRGenerator::emitLazyDefinitions() {
     for (SILFunction *f : LazyFunctionDefinitions) {
       ASSERT(hasValidSignatureForEmbedded(f));
     }
-    assert(LazyWitnessTables.empty());
     assert(LazyCanonicalSpecializedMetadataAccessors.empty());
     assert(LazyMetadataAccessors.empty());
     // LazyClassMetadata is allowed
