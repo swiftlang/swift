@@ -198,4 +198,4 @@ Once you've made multiple substantial contributions, you can
 trigger the CI bot and merge changes upon approval.
 
 [good-first-issues]: https://github.com/swiftlang/swift/contribute
-[write-access]: https://swift.org/contributing/#commit-access
+[write-access]: /CONTRIBUTING.md#commit-access
