@@ -16,13 +16,13 @@
 #ifndef SWIFT_CLANG_IMPORTER_REQUESTS_H
 #define SWIFT_CLANG_IMPORTER_REQUESTS_H
 
-#include "swift/AST/SimpleRequest.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/EvaluatorDependencies.h"
-#include "swift/AST/FileUnit.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Statistic.h"
+#include "clang/AST/Type.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
@@ -499,6 +499,45 @@ private:
   evaluate(Evaluator &evaluator,
            CustomRefCountingOperationDescriptor desc) const;
 };
+
+enum class CxxEscapability { Escapable, NonEscapable, Unknown };
+
+struct EscapabilityLookupDescriptor final {
+  const clang::Type *type;
+
+  friend llvm::hash_code hash_value(const EscapabilityLookupDescriptor &desc) {
+    return llvm::hash_combine(desc.type);
+  }
+
+  friend bool operator==(const EscapabilityLookupDescriptor &lhs,
+                         const EscapabilityLookupDescriptor &rhs) {
+    return lhs.type == rhs.type;
+  }
+
+  friend bool operator!=(const EscapabilityLookupDescriptor &lhs,
+                         const EscapabilityLookupDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+class ClangTypeEscapability
+    : public SimpleRequest<ClangTypeEscapability,
+                           CxxEscapability(EscapabilityLookupDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  bool isCached() const { return true; }
+
+private:
+  friend SimpleRequest;
+
+  CxxEscapability evaluate(Evaluator &evaluator,
+                           EscapabilityLookupDescriptor desc) const;
+};
+
+void simple_display(llvm::raw_ostream &out, EscapabilityLookupDescriptor desc);
+SourceLoc extractNearestSourceLoc(EscapabilityLookupDescriptor desc);
 
 #define SWIFT_TYPEID_ZONE ClangImporter
 #define SWIFT_TYPEID_HEADER "swift/ClangImporter/ClangImporterTypeIDZone.def"
