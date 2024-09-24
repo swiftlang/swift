@@ -441,8 +441,8 @@ BridgedWitnessTable BridgedPassContext::createWitnessTable(BridgedLinkage linkag
                                          entries, {})};
 }
 
-BridgedVTable BridgedPassContext::createSpecializedVTable(bool serialized,
-                                                          BridgedType classType,
+BridgedVTable BridgedPassContext::createSpecializedVTable(BridgedType classType,
+                                                          bool serialized,
                                                           BridgedArrayRef bridgedEntries) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   llvm::SmallVector<swift::SILVTableEntry, 8> entries;

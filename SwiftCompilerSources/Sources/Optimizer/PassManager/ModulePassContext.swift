@@ -162,7 +162,7 @@ struct ModulePassContext : Context, CustomStringConvertible {
   {
     let bridgedEntries = entries.map { $0.bridged }
     let bridgedVTable = bridgedEntries.withBridgedArrayRef {
-      _bridged.createSpecializedVTable(isSerialized, classType.bridged, $0)
+      _bridged.createSpecializedVTable(classType.bridged, isSerialized, $0)
     }
     return VTable(bridged: bridgedVTable)
   }

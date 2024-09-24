@@ -337,8 +337,8 @@ struct BridgedPassContext {
                                                                             bool serialized,
                                                                             BridgedProtocolConformance conformance,
                                                                             BridgedArrayRef bridgedEntries) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedVTable createSpecializedVTable(bool serialized,
-                                                                           BridgedType classType,
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedVTable createSpecializedVTable(BridgedType classType,
+                                                                           bool serialized,
                                                                            BridgedArrayRef bridgedEntries) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE void loadFunction(BridgedFunction function, bool loadCalleesRecursively) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookupStdlibFunction(BridgedStringRef name) const;
