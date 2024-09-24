@@ -85,6 +85,12 @@ private:
     return type;
   }
 
+  // FIXME: Decide if we can generalize yield results at all
+  Type visitYieldResultType(CanYieldResultType origType) {
+    return YieldResultType::get(generalizeStructure(origType.getResultType()),
+                                origType->isInOut());
+  }
+
   Type visitParameterizedProtocolType(CanParameterizedProtocolType origType) {
     // Generalize the argument types of parameterized protocols,
     // but don't generalize the base type.
