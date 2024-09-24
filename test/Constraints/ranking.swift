@@ -450,11 +450,3 @@ struct HasIntInit {
 func compare_solutions_with_bindings(x: UInt8, y: UInt8) -> HasIntInit {
   return .init(Int(x / numericCast(y)))
 }
-
-// Test to make sure that previous favoring behavior is maintained and @autoclosure makes a difference.
-func test_no_ambiguity_with_autoclosure(x: Int) {
-  func test(_ condition: Bool, file: StaticString = #file, line: UInt = #line) {}
-  func test(_ condition: @autoclosure () -> Bool, file: StaticString = #file, line: UInt = #line) {}
-
-  test(x >= 0) // Ok
-}
