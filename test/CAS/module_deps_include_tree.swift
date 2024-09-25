@@ -97,16 +97,45 @@ import SubE
 // CHECK-DAG:     "swift": "A"
 // CHECK-DAG:     "swift": "F"
 
-/// --------Swift module A
-// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}A-{{.*}}.swiftmodule",
+/// --------Clang module C
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}C-{{.*}}.pcm",
+
+// CHECK: "sourceFiles": [
+// CHECK-DAG: module.modulemap
+// CHECK-DAG: C.h
 
 // CHECK: directDependencies
 // CHECK-NEXT: {
-// CHECK-DAG:   "clang": "A"
-// CHECK-DAG:   "swift": "Swift"
-// CHECK-NEXT: },
-// CHECK: "details":
-// CHECK: "moduleCacheKey":
+// CHECK-NEXT: "clang": "B"
+
+// CHECK: "moduleMapPath"
+// CHECK-SAME: module.modulemap
+
+// CHECK: "contextHash"
+// CHECK-SAME: "{{.*}}"
+
+// CHECK: "commandLine": [
+// CHECK:   "-fmodule-format=obj"
+// CHECK:   "-dwarf-ext-refs"
+
+/// --------Clang module B
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}B-{{.*}}.pcm",
+// CHECK: "contextHash": "[[B_CONTEXT:.*]]",
+// CHECK: "commandLine": [
+// CHECK:      "-o"
+// CHECK-NEXT: B-{{.*}}[[B_CONTEXT]].pcm
+// CHECK:      "-fmodule-format=obj"
+// CHECK:      "-dwarf-ext-refs"
+
+// Check make-style dependencies
+// CHECK-MAKE-DEPS: module_deps_include_tree.swift
+// CHECK-MAKE-DEPS-SAME: A.swiftinterface
+// CHECK-MAKE-DEPS-SAME: G.swiftinterface
+// CHECK-MAKE-DEPS-SAME: B.h
+// CHECK-MAKE-DEPS-SAME: F.h
+// CHECK-MAKE-DEPS-SAME: Bridging.h
+// CHECK-MAKE-DEPS-SAME: BridgingOther.h
+// CHECK-MAKE-DEPS-SAME: module.modulemap
 
 /// --------Swift module F
 // CHECK:      "modulePath": "{{.*}}{{/|\\}}F-{{.*}}.swiftmodule",
@@ -119,6 +148,17 @@ import SubE
 // CHECK-DAG:     "swift": "SwiftOnoneSupport"
 // CHECK-NEXT:   }
 // CHECK-NEXT: ],
+// CHECK: "details":
+// CHECK: "moduleCacheKey":
+
+/// --------Swift module A
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}A-{{.*}}.swiftmodule",
+
+// CHECK: directDependencies
+// CHECK-NEXT: {
+// CHECK-DAG:   "clang": "A"
+// CHECK-DAG:   "swift": "Swift"
+// CHECK-NEXT: }
 // CHECK: "details":
 // CHECK: "moduleCacheKey":
 
@@ -161,46 +201,6 @@ import SubE
 
 // CHECK: "moduleInterfacePath"
 // CHECK-SAME: E.swiftinterface
-
-/// --------Clang module C
-// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}C-{{.*}}.pcm",
-
-// CHECK: "sourceFiles": [
-// CHECK-DAG: module.modulemap
-// CHECK-DAG: C.h
-
-// CHECK: directDependencies
-// CHECK-NEXT: {
-// CHECK-NEXT: "clang": "B"
-
-// CHECK: "moduleMapPath"
-// CHECK-SAME: module.modulemap
-
-// CHECK: "contextHash"
-// CHECK-SAME: "{{.*}}"
-
-// CHECK: "commandLine": [
-// CHECK:   "-fmodule-format=obj"
-// CHECK:   "-dwarf-ext-refs"
-
-/// --------Clang module B
-// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}B-{{.*}}.pcm",
-// CHECK: "contextHash": "[[B_CONTEXT:.*]]",
-// CHECK: "commandLine": [
-// CHECK:      "-o"
-// CHECK-NEXT: B-{{.*}}[[B_CONTEXT]].pcm
-// CHECK:      "-fmodule-format=obj"
-// CHECK:      "-dwarf-ext-refs"
-
-// Check make-style dependencies
-// CHECK-MAKE-DEPS: module_deps_include_tree.swift
-// CHECK-MAKE-DEPS-SAME: A.swiftinterface
-// CHECK-MAKE-DEPS-SAME: G.swiftinterface
-// CHECK-MAKE-DEPS-SAME: B.h
-// CHECK-MAKE-DEPS-SAME: F.h
-// CHECK-MAKE-DEPS-SAME: Bridging.h
-// CHECK-MAKE-DEPS-SAME: BridgingOther.h
-// CHECK-MAKE-DEPS-SAME: module.modulemap
 
 /// --------Swift module Swift
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}Swift-{{.*}}.swiftmodule",

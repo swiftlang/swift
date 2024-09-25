@@ -304,14 +304,14 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
         clangModuleDep.ID.ContextHash, swiftArgs, fileDeps, capturedPCMArgs,
         LinkLibraries, RootID, IncludeTree, /*module-cache-key*/ "",
         clangModuleDep.IsSystem);
+
+    std::vector<ModuleDependencyID> directDependencyIDs;
     for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {
       dependencies.addModuleImport(moduleName.ModuleName, &alreadyAddedModules);
       // It is safe to assume that all dependencies of a Clang module are Clang modules.
-      // Doing this allows us to skip "resolving" Clang modules down the line.
-      dependencies.addModuleDependency({moduleName.ModuleName, ModuleDependencyKind::Clang});
+      directDependencyIDs.push_back({moduleName.ModuleName, ModuleDependencyKind::Clang});
     }
-    dependencies.setIsResolved(true);
-
+    dependencies.setImportedClangDependencies(directDependencyIDs);
     result.push_back(std::make_pair(ModuleDependencyID{clangModuleDep.ID.ModuleName,
                                                        ModuleDependencyKind::Clang},
                                     dependencies));
@@ -322,9 +322,16 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
 void ClangImporter::recordBridgingHeaderOptions(
     ModuleDependencyInfo &MDI,
     const clang::tooling::dependencies::TranslationUnitDeps &deps) {
+  std::vector<std::string> swiftArgs;
+  getBridgingHeaderOptions(deps, swiftArgs);
+  MDI.updateBridgingHeaderCommandLine(swiftArgs);
+}
+
+void ClangImporter::getBridgingHeaderOptions(
+    const clang::tooling::dependencies::TranslationUnitDeps &deps,
+    std::vector<std::string> &swiftArgs) {
   auto &ctx = Impl.SwiftContext;
 
-  std::vector<std::string> swiftArgs;
   auto addClangArg = [&](Twine arg) {
     swiftArgs.push_back("-Xcc");
     swiftArgs.push_back(arg.str());
@@ -388,8 +395,6 @@ void ClangImporter::recordBridgingHeaderOptions(
     swiftArgs.push_back("-cas-fs");
     swiftArgs.push_back(*CASFS);
   }
-
-  MDI.updateBridgingHeaderCommandLine(swiftArgs);
 }
 
 // The Swift compiler does not have a concept of a working directory.
@@ -469,20 +474,21 @@ ClangImporter::getModuleDependencies(Identifier moduleName,
                                        });
 }
 
-bool ClangImporter::addHeaderDependencies(
+bool ClangImporter::getHeaderDependencies(
     ModuleDependencyID moduleID,
     clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
-    ModuleDependenciesCache &cache) {
-  auto optionalTargetModule = cache.findDependency(moduleID);
-  assert(optionalTargetModule.has_value());
-  auto targetModule = *(optionalTargetModule.value());
+    ModuleDependenciesCache &cache,
+    ModuleDependencyIDSetVector &headerClangModuleDependencies,
+    std::vector<std::string> &headerFileInputs,
+    std::vector<std::string> &bridgingHeaderCommandLine,
+    std::optional<std::string> &includeTreeID) {
+  auto targetModuleInfo = cache.findKnownDependency(moduleID);
   // If we've already recorded bridging header dependencies, we're done.
-  if (!targetModule.getHeaderDependencies().empty() ||
-      !targetModule.getHeaderInputSourceFiles().empty())
+  if (!targetModuleInfo.getHeaderClangDependencies().empty() ||
+      !targetModuleInfo.getHeaderInputSourceFiles().empty())
     return false;
 
-  // Scan the specified textual header file and record its dependencies
-  // into the cache
+  // Scan the specified textual header file and collect its dependencies
   auto scanHeaderDependencies =
       [&](StringRef headerPath) -> llvm::Expected<TranslationUnitDeps> {
     auto &ctx = Impl.SwiftContext;
@@ -518,25 +524,22 @@ bool ClangImporter::addHeaderDependencies(
         });
     cache.recordDependencies(bridgedDeps);
 
-    // Record dependencies for the source files the bridging header includes.
-    for (const auto &fileDep : dependencies->FileDeps)
-      targetModule.addHeaderSourceFile(fileDep);
-
-    // ... and all module dependencies.
-    llvm::StringSet<> alreadyAddedModules;
-    for (const auto &moduleDep : dependencies->ClangModuleDeps)
-      targetModule.addHeaderInputModuleDependency(moduleDep.ModuleName,
-                                                  alreadyAddedModules);
-
+    llvm::copy(dependencies->FileDeps, std::back_inserter(headerFileInputs));
+    auto bridgedDependencyIDs =
+        llvm::map_range(dependencies->ClangModuleDeps, [](auto &input) {
+          return ModuleDependencyID{input.ModuleName, ModuleDependencyKind::Clang};
+        });
+    headerClangModuleDependencies.insert(bridgedDependencyIDs.begin(),
+                                         bridgedDependencyIDs.end());
     return dependencies;
   };
 
   // - Textual module dependencies require us to process their bridging header.
   // - Binary module dependnecies may have arbitrary header inputs.
-  if (targetModule.isTextualSwiftModule() &&
-      !targetModule.getBridgingHeader()->empty()) {
+  if (targetModuleInfo.isTextualSwiftModule() &&
+      !targetModuleInfo.getBridgingHeader()->empty()) {
     auto clangModuleDependencies =
-        scanHeaderDependencies(*targetModule.getBridgingHeader());
+        scanHeaderDependencies(*targetModuleInfo.getBridgingHeader());
     if (!clangModuleDependencies) {
       // FIXME: Route this to a normal diagnostic.
       llvm::logAllUnhandledErrors(clangModuleDependencies.takeError(),
@@ -547,19 +550,22 @@ bool ClangImporter::addHeaderDependencies(
       return true;
     }
     if (auto TreeID = clangModuleDependencies->IncludeTreeID)
-      targetModule.addBridgingHeaderIncludeTree(*TreeID);
-    recordBridgingHeaderOptions(targetModule, *clangModuleDependencies);
-    // Update the cache with the new information for the module.
-    cache.updateDependency(moduleID, targetModule);
-  } else if (targetModule.isSwiftBinaryModule()) {
-    auto swiftBinaryDeps = targetModule.getAsSwiftBinaryModule();
+      includeTreeID = TreeID;
+
+    getBridgingHeaderOptions(*clangModuleDependencies, bridgingHeaderCommandLine);
+  } else if (targetModuleInfo.isSwiftBinaryModule()) {
+    auto swiftBinaryDeps = targetModuleInfo.getAsSwiftBinaryModule();
     if (!swiftBinaryDeps->headerImport.empty()) {
       auto clangModuleDependencies = scanHeaderDependencies(swiftBinaryDeps->headerImport);
-      if (!clangModuleDependencies)
+      if (!clangModuleDependencies) {
+        // FIXME: Route this to a normal diagnostic.
+        llvm::logAllUnhandledErrors(clangModuleDependencies.takeError(),
+                                    llvm::errs());
+        Impl.SwiftContext.Diags.diagnose(
+            SourceLoc(), diag::clang_dependency_scan_error,
+            "failed to scan header dependencies");
         return true;
-      // TODO: CAS will require a header include tree for this.
-      // Update the cache with the new information for the module.
-      cache.updateDependency(moduleID, targetModule);
+      }
     }
   }
 
