@@ -5,9 +5,6 @@
 
 // REQUIRES: objc_interop
 
-// rdar://136620623
-// REQUIRES: rdar136620623
-
 //--- Inputs/module.modulemap
 module Test {
     header "nonescapable.h"
@@ -41,7 +38,7 @@ import CoreFoundation
 func useUnsafeParam(x: Unannotated) { // expected-warning{{reference to unsafe struct 'Unannotated'}}
 }
 
-@available(macOS 13.4, *)
+@available(SwiftStdlib 5.8, *)
 func useUnsafeParam2(x: UnsafeReference) { // expected-warning{{reference to unsafe class 'UnsafeReference'}}
 }
 
