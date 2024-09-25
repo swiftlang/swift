@@ -581,6 +581,8 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
     }
   }
 
+  ASSERT(ctx.LangOpts.hasFeature(Feature::NonescapableTypes));
+
   if (!cd && afd->hasImplicitSelfDecl()) {
     Type selfTypeInContext = dc->getSelfTypeInContext();
     if (selfTypeInContext->isEscapable()) {
