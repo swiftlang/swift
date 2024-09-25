@@ -1000,6 +1000,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setHasCxxInteroperability();
       M.setCXXStdlibKind(loadedModuleFile->getCXXStdlibKind());
     }
+    if (loadedModuleFile->hasSealedCxxInteroperability())
+      M.setHasSealedCxxInteroperability();
     if (!loadedModuleFile->getModulePackageName().empty()) {
       M.setPackageName(Ctx.getIdentifier(loadedModuleFile->getModulePackageName()));
     }
@@ -1105,7 +1107,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
   // since we skipped loading the overlay for the module.
   if (M.hasCxxInteroperability() && Ctx.LangOpts.EnableCXXInterop &&
       M.getCXXStdlibKind() != Ctx.LangOpts.CXXStdlib &&
-      M.getName() != Ctx.Id_Cxx && M.getName() != Ctx.Id_CxxStdlib) {
+      M.getName() != Ctx.Id_Cxx && M.getName() != Ctx.Id_CxxStdlib &&
+      !M.hasSealedCxxInteroperability()) {
     auto loc = diagLoc.value_or(SourceLoc());
     Ctx.Diags.diagnose(loc, diag::cxx_stdlib_kind_mismatch, M.getName(),
                        to_string(M.getCXXStdlibKind()),

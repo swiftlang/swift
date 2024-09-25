@@ -988,6 +988,11 @@ def cxx_interop_use_opaque_pointer_for_moveonly :
   HelpText<"Testing flag that will be eliminated soon. Do not use.">,
   Flags<[FrontendOption, HelpHidden]>;
 
+def cxx_interop_seal_requirement :
+  Flag<["-"], "seal-cxx-interop-requirement">,
+  HelpText<"Seal the usage of C++ APIs for the current module">,
+  Flags<[FrontendOption, HelpHidden]>;
+
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;

@@ -146,6 +146,7 @@ class ExtendedValidationInfo {
     unsigned HasCxxInteroperability : 1;
     unsigned AllowNonResilientAccess: 1;
     unsigned SerializePackageEnabled: 1;
+    unsigned HasSealedCxxInteroperability : 1;
   } Bits;
 public:
   ExtendedValidationInfo() : Bits() {}
@@ -250,6 +251,13 @@ public:
 
   CXXStdlibKind getCXXStdlibKind() const { return CXXStdlib; }
   void setCXXStdlibKind(CXXStdlibKind kind) { CXXStdlib = kind; }
+
+  bool hasSealedCxxInteroperability() const {
+    return Bits.HasSealedCxxInteroperability;
+  }
+  void setHasSealedCxxInteroperability(bool val) {
+    Bits.HasSealedCxxInteroperability = val;
+  }
 };
 
 struct SearchPath {

@@ -354,6 +354,10 @@ namespace swift {
     // Workaround for bug when building SwiftCompilerSources (rdar://128013193)
     bool CxxInteropUseOpaquePointerForMoveOnly = false;
 
+    /// Should the compiler attempt to seal usage of C++ interoperability
+    /// when building a module.
+    bool SealCxxInteropRequirement = false;
+
     /// On Darwin platforms, use the pre-stable ABI's mark bit for Swift
     /// classes instead of the stable ABI's bit. This is needed when
     /// targeting OSes prior to macOS 10.14.4 and iOS 12.2, where

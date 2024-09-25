@@ -1995,7 +1995,8 @@ swift::getDisallowedOriginKind(const Decl *decl,
   // C++ APIs do not support library evolution.
   if (SF->getASTContext().LangOpts.EnableCXXInterop && where.getDeclContext() &&
       where.getDeclContext()->getAsDecl() &&
-      where.getDeclContext()->getAsDecl()->getModuleContext()->isResilient() &&
+      (where.getDeclContext()->getAsDecl()->getModuleContext()->isResilient() ||
+       SF->getASTContext().LangOpts.SealCxxInteropRequirement) &&
       decl->hasClangNode() && !decl->getModuleContext()->isSwiftShimsModule() &&
       isFragileClangNode(decl->getClangNode()))
     return DisallowedOriginKind::FragileCxxAPI;

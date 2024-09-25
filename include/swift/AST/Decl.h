@@ -721,7 +721,7 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8+1,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -787,7 +787,12 @@ protected:
     AllowNonResilientAccess : 1,
 
     /// Whether this module has been built with -package-cmo.
-    SerializePackageEnabled : 1
+    SerializePackageEnabled : 1,
+
+    /// Whether this module has been built using a sealed C++ interoperability configuration
+    /// that's broadly incompatible with default C++ interoperability support. For example, this is
+    /// set for modules that use a custom libc++ with C++ interoperability.
+    HasSealedCxxInteroperability : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,

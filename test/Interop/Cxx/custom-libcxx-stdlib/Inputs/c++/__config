@@ -1,0 +1,9 @@
+#ifndef CUSTOM_LIBCPP_CONFIG
+#define CUSTOM_LIBCPP_CONFIG
+
+#define CUSTOM_LIBCPP_VERSION 10
+
+#define CUSTOM_LIBCPP_BEGIN_NAMESPACE_STD namespace std { inline namespace v42 {
+#define CUSTOM_LIBCPP_END_NAMESPACE_STD }}
+
+#endif // CUSTOM_LIBCPP_CONFIG

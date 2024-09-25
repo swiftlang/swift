@@ -404,8 +404,11 @@ private:
     /// Whether this module is built with -package-cmo.
     unsigned SerializePackageEnabled : 1;
 
+    /// Whether this module is built with sealed C++ interoperability enabled.
+    unsigned HasSealedCxxInteroperability : 1;
+
     // Explicitly pad out to the next word boundary.
-    unsigned : 3;
+    unsigned : 2;
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
