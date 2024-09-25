@@ -40,6 +40,8 @@ using namespace ast_scope;
 
 void ASTScopeImpl::dump() const { print(llvm::errs(), 0, false); }
 
+void ASTScopeImpl::dumpParents() const { printParents(llvm::errs()); }
+
 void ASTScopeImpl::dumpOneScopeMapLocation(
     std::pair<unsigned, unsigned> lineColumn) {
   auto bufferID = getSourceFile()->getBufferID();
@@ -122,6 +124,21 @@ static void printSourceRange(llvm::raw_ostream &out, const SourceRange range,
 void ASTScopeImpl::printRange(llvm::raw_ostream &out) const {
   SourceRange range = getSourceRangeOfThisASTNode(/*omitAssertions=*/true);
   printSourceRange(out, range, getSourceManager());
+}
+
+void ASTScopeImpl::printParents(llvm::raw_ostream &out) const {
+  SmallVector<const ASTScopeImpl *, 8> nodes;
+  const ASTScopeImpl *cursor = this;
+  do {
+    nodes.push_back(cursor);
+    cursor = cursor->getParent().getPtrOrNull();
+  } while (cursor);
+
+  std::reverse(nodes.begin(), nodes.end());
+
+  for (auto i : indices(nodes)) {
+    nodes[i]->print(out, i, /*lastChild=*/true, /*printChildren=*/false);
+  }
 }
 
 #pragma mark printSpecifics
