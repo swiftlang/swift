@@ -4651,9 +4651,20 @@ void swift::checkExplicitAvailability(Decl *decl) {
   // Skip if the command line option was not set and
   // accessors as we check the pattern binding decl instead.
   auto &ctx = decl->getASTContext();
-  auto DiagLevel = ctx.LangOpts.RequireExplicitAvailability;
-  if (!DiagLevel || isa<AccessorDecl>(decl))
+  if (isa<AccessorDecl>(decl))
     return;
+
+  DiagnosticBehavior DiagLevel;
+  switch (ctx.LangOpts.RequireExplicitAvailabilityBehavior) {
+  case LangOptions::RequireExplicitAvailabilityDiagnosticBehavior::Ignore:
+    return;
+  case LangOptions::RequireExplicitAvailabilityDiagnosticBehavior::Warning:
+    DiagLevel = DiagnosticBehavior::Warning;
+    break;
+  case LangOptions::RequireExplicitAvailabilityDiagnosticBehavior::Error:
+    DiagLevel = DiagnosticBehavior::Error;
+    break;
+  }
 
   // Only look at decls at module level or in extensions.
   // This could be changed to force having attributes on all decls.
@@ -4695,7 +4706,7 @@ void swift::checkExplicitAvailability(Decl *decl) {
 
   if (declNeedsExplicitAvailability(decl)) {
     auto diag = decl->diagnose(diag::public_decl_needs_availability);
-    diag.limitBehavior(*DiagLevel);
+    diag.limitBehavior(DiagLevel);
 
     auto suggestPlatform = ctx.LangOpts.RequireExplicitAvailabilityTarget;
     if (!suggestPlatform.empty()) {
