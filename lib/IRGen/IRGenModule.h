@@ -1119,8 +1119,10 @@ public:
 
   TypeExpansionContext getMaximalTypeExpansionContext() const;
 
-  bool isResilientConformance(const NormalProtocolConformance *conformance);
-  bool isResilientConformance(const RootProtocolConformance *root);
+  bool isResilientConformance(const NormalProtocolConformance *conformance,
+                              bool disableOptimizations = false);
+  bool isResilientConformance(const RootProtocolConformance *root,
+                              bool disableOptimizations = false);
   bool isDependentConformance(const RootProtocolConformance *conformance);
 
   Alignment getCappedAlignment(Alignment alignment);
