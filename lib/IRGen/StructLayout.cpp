@@ -80,7 +80,8 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
   if (rawLayout && type) {
     auto sd = cast<StructDecl>(decl);
     IsKnownTriviallyDestroyable = deinit;
-    IsKnownBitwiseTakable = IsBitwiseTakable;
+    // Raw layout types are never bitwise-borrowable.
+    IsKnownBitwiseTakable = IsBitwiseTakableOnly;
     SpareBits.clear();
     assert(!copyable);
     IsKnownCopyable = copyable;
@@ -125,7 +126,9 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
         // as the like its like.
         if (rawLayout->shouldMoveAsLikeType()) {
           IsKnownTriviallyDestroyable = likeFixedType->isTriviallyDestroyable(ResilienceExpansion::Maximal);
-          IsKnownBitwiseTakable = likeFixedType->isBitwiseTakable(ResilienceExpansion::Maximal);
+          // Raw layout types are still never bitwise-borrowable.
+          IsKnownBitwiseTakable = likeFixedType->getBitwiseTakable(ResilienceExpansion::Maximal)
+            & IsBitwiseTakableOnly;
         }
       } else {
         MinimumSize = Size(0);
@@ -397,7 +400,7 @@ bool StructLayoutBuilder::addField(ElementLayout &elt,
                                   LayoutStrategy strategy) {
   auto &eltTI = elt.getType();
   IsKnownTriviallyDestroyable &= eltTI.isTriviallyDestroyable(ResilienceExpansion::Maximal);
-  IsKnownBitwiseTakable &= eltTI.isBitwiseTakable(ResilienceExpansion::Maximal);
+  IsKnownBitwiseTakable &= eltTI.getBitwiseTakable(ResilienceExpansion::Maximal);
   IsKnownAlwaysFixedSize &= eltTI.isFixedSize(ResilienceExpansion::Minimal);
   IsLoadable &= eltTI.isLoadable();
   IsKnownCopyable &= eltTI.isCopyable(ResilienceExpansion::Maximal);
