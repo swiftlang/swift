@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/stats-events)
 // RUN: %empty-directory(%t/stats-entities)
-// RUN: %target-swiftc_driver -o %t/main -module-name main -stats-output-dir %t/stats-events %s -profile-stats-events
-// RUN: %target-swiftc_driver -o %t/main -module-name main -stats-output-dir %t/stats-entities %s -profile-stats-entities
+// RUN: %target-swiftc_driver -o %t/main -module-name main -stats-output-dir %t/stats-events %s -profile-stats-events -Xfrontend -fine-grained-timers
+// RUN: %target-swiftc_driver -o %t/main -module-name main -stats-output-dir %t/stats-entities %s -profile-stats-entities -Xfrontend -fine-grained-timers
 
 // Need to use %long-tmp because in Windows the * may expand to a path longer
 // than 260 characters.
