@@ -92,14 +92,6 @@ enum class ConstraintKind : char {
   LiteralConformsTo,
   /// A checked cast from the first type to the second.
   CheckedCast,
-  /// The first type can act as the Self type of the second type (which
-  /// is a protocol).
-  ///
-  /// This constraint is slightly looser than a conforms-to constraint, because
-  /// an existential can be used as the Self of any protocol within the
-  /// existential, even if it doesn't conform to that protocol (e.g., due to
-  /// the use of associated types).
-  SelfObjectOfProtocol,
   /// Both types are function types. The first function type's
   /// input is the value being passed to the function and its output
   /// is a type variable that describes the output. The second
@@ -690,7 +682,6 @@ public:
     case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::TransitivelyConformsTo:
     case ConstraintKind::CheckedCast:
-    case ConstraintKind::SelfObjectOfProtocol:
     case ConstraintKind::ApplicableFunction:
     case ConstraintKind::DynamicCallableApplicableFunction:
     case ConstraintKind::BindOverload:

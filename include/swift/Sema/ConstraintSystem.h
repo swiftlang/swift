@@ -4720,10 +4720,10 @@ public:
   /// Subroutine of \c matchTypes(), which matches up a value to an
   /// existential type.
   ///
-  /// \param kind Either ConstraintKind::SelfObjectOfProtocol or
-  /// ConstraintKind::ConformsTo. Usually this uses SelfObjectOfProtocol,
-  /// but when matching the instance type of a metatype with the instance type
-  /// of an existential metatype, since we want an actual conformance check.
+  /// \param kind Either ConstraintKind::Subtype or ConstraintKind::ConformsTo.
+  /// Usually this uses Subtype, but when matching the instance type of a
+  /// metatype with the instance type of an existential metatype, since we
+  /// want an actual conformance check.
   TypeMatchResult matchExistentialTypes(Type type1, Type type2,
                                         ConstraintKind kind,
                                         TypeMatchOptions flags,
@@ -4930,7 +4930,7 @@ private:
   ///
   /// \param type The type being tested.
   /// \param protocol The protocol to which the type should conform.
-  /// \param kind Either ConstraintKind::SelfObjectOfProtocol or
+  /// \param kind Either ConstraintKind::Subtype or
   /// ConstraintKind::ConformsTo.
   /// \param locator Locator describing where this constraint occurred.
   SolutionKind simplifyConformsToConstraint(Type type, ProtocolDecl *protocol,

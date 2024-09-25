@@ -70,7 +70,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::CheckedCast:
-  case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
@@ -151,7 +150,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::CheckedCast:
-  case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
@@ -294,7 +292,6 @@ Constraint::Constraint(ASTNode node, ContextualTypeInfo context,
 ProtocolDecl *Constraint::getProtocol() const {
   assert((Kind == ConstraintKind::ConformsTo ||
           Kind == ConstraintKind::LiteralConformsTo ||
-          Kind == ConstraintKind::SelfObjectOfProtocol ||
           Kind == ConstraintKind::TransitivelyConformsTo)
           && "Not a conformance constraint");
   return Types.Second->castTo<ProtocolType>()->getDecl();
@@ -394,7 +391,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
   case ConstraintKind::LiteralConformsTo: Out << " literal conforms to "; break;
   case ConstraintKind::TransitivelyConformsTo: Out << " transitive conformance to "; break;
   case ConstraintKind::CheckedCast: Out << " checked cast to "; break;
-  case ConstraintKind::SelfObjectOfProtocol: Out << " Self type of "; break;
   case ConstraintKind::ApplicableFunction: Out << " applicable fn "; break;
   case ConstraintKind::DynamicCallableApplicableFunction:
       Out << " dynamic callable applicable fn "; break;
@@ -682,7 +678,6 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::TransitivelyConformsTo:
-  case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::FallbackType:
@@ -751,8 +746,7 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
 
   // Conformance constraints expect an existential on the right-hand side.
   assert((kind != ConstraintKind::ConformsTo &&
-          kind != ConstraintKind::TransitivelyConformsTo &&
-          kind != ConstraintKind::SelfObjectOfProtocol) ||
+          kind != ConstraintKind::TransitivelyConformsTo) ||
          second->isExistentialType());
 
   // Literal protocol conformances expect a protocol.

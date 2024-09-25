@@ -2147,7 +2147,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
-  case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
   case ConstraintKind::ValueWitness:
@@ -2509,7 +2508,6 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
-  case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
   case ConstraintKind::ValueWitness:
@@ -3154,7 +3152,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
-  case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
   case ConstraintKind::ValueWitness:
@@ -3981,8 +3978,8 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   }
 
   if (layout.explicitSuperclass) {
-    auto subKind = std::min(ConstraintKind::Subtype, kind);
-    auto result = matchTypes(type1, layout.explicitSuperclass, subKind,
+    auto result = matchTypes(type1, layout.explicitSuperclass,
+                             ConstraintKind::Subtype,
                              subflags, locator);
     if (result.isFailure())
       return result;
@@ -6957,7 +6954,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::KeyPathApplication:
     case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::OptionalObject:
-    case ConstraintKind::SelfObjectOfProtocol:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueMember:
     case ConstraintKind::ValueWitness:
@@ -8468,7 +8464,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // conform -- they only need to contain the protocol, so check that
   // separately.
   switch (kind) {
-  case ConstraintKind::SelfObjectOfProtocol: {
+  case ConstraintKind::Subtype: {
     auto conformance = TypeChecker::containsProtocol(
         type, protocol, /*allowMissing=*/true);
     if (conformance) {
@@ -14268,7 +14264,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   case ConversionRestrictionKind::Existential:
     addContextualScore();
     return matchExistentialTypes(type1, type2,
-                                 ConstraintKind::SelfObjectOfProtocol,
+                                 ConstraintKind::Subtype,
                                  subflags, locator);
 
   // for $< in { <, <c, <oc }:
@@ -15535,7 +15531,6 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
 
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
-  case ConstraintKind::SelfObjectOfProtocol:
     return simplifyConformsToConstraint(first, second, kind, locator,
                                         subflags);
 
@@ -16066,7 +16061,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
-  case ConstraintKind::SelfObjectOfProtocol:
     return simplifyConformsToConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
         constraint.getKind(), constraint.getLocator(), std::nullopt);
