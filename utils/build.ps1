@@ -984,6 +984,13 @@ function Build-CMakeProject {
         # Add additional linker flags for generating the debug info.
         Append-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS "/debug"
         Append-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS "/debug"
+      } elseif ($Platform -eq "Android") {
+        # Use a built lld linker as the Android's NDK linker might be too
+        # old and not support all required relocations needed by the Swift
+        # runtime.
+        $ldPath = ([IO.Path]::Combine($CompilersBinaryCache, "bin", "ld.lld"))
+        Append-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS "--ld-path=$ldPath"
+        Append-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS "--ld-path=$ldPath"
       }
     }
 
