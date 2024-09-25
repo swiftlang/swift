@@ -683,6 +683,37 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
   llvm_unreachable("bad impl kind");
 }
 
+/// As a special extra check, if the user also gave us a modify coroutine,
+/// check that it has the same mutatingness as the setter.
+/// TODO: arguably this should require the spelling to match even when it's
+/// the implied value.
+static void diagnoseReadWriteMutatingnessMismatch(
+    AbstractStorageDecl *storage, bool isWriterMutating, WriteImplKind write,
+    AccessorKind writeAccesor, ReadWriteImplKind readWrite,
+    AccessorKind readWriteAccessor) {
+  if (storage->getImplInfo().getReadWriteImpl() != readWrite)
+    return;
+  auto modifyAccessor = storage->getParsedAccessor(readWriteAccessor);
+  if (!modifyAccessor)
+    return;
+
+  auto isModifierMutating = modifyAccessor->isMutating();
+  auto isReaderOrWriterMutating =
+      isWriterMutating || storage->isGetterMutating();
+  if (isReaderOrWriterMutating == isModifierMutating)
+    return;
+
+  modifyAccessor->diagnose(diag::modify_mutatingness_differs_from_setter,
+                           isModifierMutating ? SelfAccessKind::Mutating
+                                              : SelfAccessKind::NonMutating,
+                           isModifierMutating ? SelfAccessKind::NonMutating
+                                              : SelfAccessKind::Mutating);
+  auto *setter = storage->getParsedAccessor(writeAccesor);
+  if (setter)
+    setter->diagnose(diag::previous_accessor, "setter", 0);
+  modifyAccessor->setInvalid();
+}
+
 bool
 IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
                                   AbstractStorageDecl *storage) const {
@@ -727,28 +758,9 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
     if (setter)
       result = setter->isMutating();
 
-
-    // As a special extra check, if the user also gave us a modify
-    // coroutine, check that it has the same mutatingness as the setter.
-    // TODO: arguably this should require the spelling to match even when
-    // it's the implied value.
-    auto modifyAccessor = storage->getParsedAccessor(AccessorKind::Modify);
-
-    if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify &&
-        modifyAccessor != nullptr) {
-      auto modifyResult = modifyAccessor->isMutating();
-      if ((result || storage->isGetterMutating()) != modifyResult) {
-        modifyAccessor->diagnose(
-            diag::modify_mutatingness_differs_from_setter,
-            modifyResult ? SelfAccessKind::Mutating
-                         : SelfAccessKind::NonMutating,
-            modifyResult ? SelfAccessKind::NonMutating
-                         : SelfAccessKind::Mutating);
-        if (setter)
-          setter->diagnose(diag::previous_accessor, "setter", 0);
-        modifyAccessor->setInvalid();
-      }
-    }
+    diagnoseReadWriteMutatingnessMismatch(
+        storage, result, WriteImplKind::Set, AccessorKind::Set,
+        ReadWriteImplKind::Modify, AccessorKind::Modify);
 
     return result;
   }
