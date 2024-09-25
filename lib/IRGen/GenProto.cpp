@@ -959,8 +959,13 @@ namespace {
 
 /// Return true if the witness table requires runtime instantiation to
 /// handle resiliently-added requirements with default implementations.
+///
+/// If ignoreGenericity is true, skip the optimization for non-generic
+/// conformances are considered non-resilient.
 bool IRGenModule::isResilientConformance(
-    const NormalProtocolConformance *conformance) {
+    const NormalProtocolConformance *conformance,
+    bool ignoreGenericity
+) {
   // If the protocol is not resilient, the conformance is not resilient
   // either.
   bool shouldTreatProtocolNonResilient =
@@ -992,16 +997,18 @@ bool IRGenModule::isResilientConformance(
   // This is an optimization -- a conformance of a non-generic type cannot
   // resiliently become dependent.
   if (!conformance->getDeclContext()->isGenericContext() &&
-      conformanceModule == conformance->getProtocol()->getParentModule())
+      conformanceModule == conformance->getProtocol()->getParentModule() &&
+      !ignoreGenericity)
     return false;
 
   // We have a resilient conformance.
   return true;
 }
 
-bool IRGenModule::isResilientConformance(const RootProtocolConformance *root) {
+bool IRGenModule::isResilientConformance(const RootProtocolConformance *root,
+                                         bool ignoreGenericity) {
   if (auto normal = dyn_cast<NormalProtocolConformance>(root))
-    return isResilientConformance(normal);
+    return isResilientConformance(normal, ignoreGenericity);
   // Self-conformances never require this.
   return false;
 }
@@ -1185,7 +1192,9 @@ bool IRGenModule::isDependentConformance(
     const RootProtocolConformance *conformance) {
   llvm::SmallPtrSet<const NormalProtocolConformance *, 4> visited;
   return ::isDependentConformance(
-      *this, conformance, conformance->getProtocol()->isResilient(), visited);
+      *this, conformance,
+      isResilientConformance(conformance, /*ignoreGenericity=*/true),
+      visited);
 }
 
 static llvm::Value *
