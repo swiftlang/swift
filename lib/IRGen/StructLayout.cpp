@@ -72,7 +72,7 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto copyable = (decl && !decl->canBeCopyable())
     ? IsNotCopyable : IsCopyable;
-  IsBitwiseTakable_t bitwiseTakable = IsBitwiseTakable;
+  IsBitwiseTakable_t bitwiseTakable = IsBitwiseTakableAndBorrowable;
 
   if (decl && decl->getAttrs().hasAttribute<SensitiveAttr>()) {
     triviallyDestroyable = IsNotTriviallyDestroyable;
@@ -86,7 +86,8 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
   }
   if (rawLayout && type) {
     IsKnownTriviallyDestroyable = triviallyDestroyable;
-    IsKnownBitwiseTakable = bitwiseTakable;
+    // Raw layout types are never bitwise-borrowable.
+    IsKnownBitwiseTakable = bitwiseTakable & IsBitwiseTakableOnly;
     SpareBits.clear();
     assert(!copyable);
     IsKnownCopyable = copyable;
@@ -155,7 +156,9 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
         // type its like.
         if (rawLayout->shouldMoveAsLikeType()) {
           IsKnownTriviallyDestroyable = likeFixedType->isTriviallyDestroyable(ResilienceExpansion::Maximal);
-          IsKnownBitwiseTakable = likeFixedType->isBitwiseTakable(ResilienceExpansion::Maximal);
+          // Raw layout types are still never bitwise-borrowable.
+          IsKnownBitwiseTakable = likeFixedType->getBitwiseTakable(ResilienceExpansion::Maximal)
+            & IsBitwiseTakableOnly;
         }
       } else {
         MinimumSize = Size(0);
@@ -404,7 +407,7 @@ bool StructLayoutBuilder::addField(ElementLayout &elt,
                                   LayoutStrategy strategy) {
   auto &eltTI = elt.getType();
   IsKnownTriviallyDestroyable &= eltTI.isTriviallyDestroyable(ResilienceExpansion::Maximal);
-  IsKnownBitwiseTakable &= eltTI.isBitwiseTakable(ResilienceExpansion::Maximal);
+  IsKnownBitwiseTakable &= eltTI.getBitwiseTakable(ResilienceExpansion::Maximal);
   IsKnownAlwaysFixedSize &= eltTI.isFixedSize(ResilienceExpansion::Minimal);
   IsLoadable &= eltTI.isLoadable();
   IsKnownCopyable &= eltTI.isCopyable(ResilienceExpansion::Maximal);
