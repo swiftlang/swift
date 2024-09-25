@@ -535,6 +535,11 @@ public:
 
     createTupleAddrConstructor(loc, destAddr, values, isInitOfDest);
   }
+
+  using SILBuilder::createHopToMainActorIfNeededThunk;
+  ManagedValue
+  createHopToMainActorIfNeededThunk(SILLocation loc, ManagedValue op,
+                                    SubstitutionMap substitutionMap = {});
 };
 
 } // namespace Lowering

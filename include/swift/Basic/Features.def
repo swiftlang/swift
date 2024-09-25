@@ -433,6 +433,9 @@ EXPERIMENTAL_FEATURE(CoroutineAccessorsUnwindOnCallerError, false)
 /// modify/read coroutines use the callee-allocated ABI
 EXPERIMENTAL_FEATURE(CoroutineAccessorsAllocateInCallee, false)
 
+// When a parameter has unspecified isolation, infer it as main actor isolated.
+EXPERIMENTAL_FEATURE(GenerateForceToMainActorThunks, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

@@ -139,6 +139,7 @@ enum class MangledDifferentiabilityKind : char {
 enum class MangledSILThunkKind : char {
   Invalid = 0,
   Identity = 'I',
+  HopToMainActorIfNeeded = 'H',
 };
 
 /// The pass that caused the specialization to occur. We use this to make sure

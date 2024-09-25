@@ -3382,6 +3382,14 @@ ManglingError Remangler::mangleSILThunkIdentity(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleSILThunkHopToMainActorIfNeeded(Node *node,
+                                                              unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1)); // type
+  Buffer << "TT"
+         << "H";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleDispatchThunk(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Tj";

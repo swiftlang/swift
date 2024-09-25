@@ -34,7 +34,12 @@ struct SILThunkKind {
     /// purposes of the underlying thunking machinery.
     Identity = 1,
 
-    MaxValue = Identity,
+    /// A thunk that checks if a value is on the main actor and if it isn't
+    /// jumps to the main actor. It expects that the passed in function does not
+    /// have any arguments, results, is synchronous, and does not throw.
+    HopToMainActorIfNeeded = 2,
+
+    MaxValue = HopToMainActorIfNeeded,
   };
 
   InnerTy innerTy;
@@ -68,6 +73,8 @@ struct SILThunkKind {
       return Demangle::MangledSILThunkKind::Invalid;
     case Identity:
       return Demangle::MangledSILThunkKind::Identity;
+    case HopToMainActorIfNeeded:
+      return Demangle::MangledSILThunkKind::HopToMainActorIfNeeded;
     }
   }
 };
