@@ -49,7 +49,8 @@ private:
   /// Retrieve the module dependencies for the Swift module with the given name.
   ModuleDependencyVector
   scanFilesystemForSwiftModuleDependency(Identifier moduleName,
-                                         const ModuleDependenciesCache &cache);
+                                         const ModuleDependenciesCache &cache,
+                                         bool isTestableImport = false);
 
   // Worker-specific instance of CompilerInvocation
   std::unique_ptr<CompilerInvocation> workerCompilerInvocation;
@@ -82,14 +83,15 @@ public:
   /// Resolve module dependencies of the given module, computing a full
   /// transitive closure dependency graph.
   std::vector<ModuleDependencyID>
-  getModuleDependencies(ModuleDependencyID moduleID,
+  performDependencyScan(ModuleDependencyID rootModuleID,
                         ModuleDependenciesCache &cache);
 
   /// Query the module dependency info for the Clang module with the given name.
   /// Explicit by-name lookups are useful for batch mode scanning.
   std::optional<const ModuleDependencyInfo *>
   getNamedClangModuleDependencyInfo(StringRef moduleName,
-                                    ModuleDependenciesCache &cache);
+                                    ModuleDependenciesCache &cache,
+                                    ModuleDependencyIDSetVector &discoveredClangModules);
 
   /// Query the module dependency info for the Swift module with the given name.
   /// Explicit by-name lookups are useful for batch mode scanning.
@@ -98,34 +100,50 @@ public:
                                     ModuleDependenciesCache &cache);
 
 private:
-  /// Resolve the direct dependencies of the given module.
-  std::vector<ModuleDependencyID>
-  resolveDirectModuleDependencies(ModuleDependencyID moduleID,
-                                  ModuleDependenciesCache &cache);
-
-  /// Resolve imported module names of a given module to concrete
-  /// modules. If `ParallelScan` is enabled, this operation is multithreaded.
+  /// Main routine that computes imported module dependency transitive
+  /// closure for the given module.
+  /// 1. Swift modules imported directly or via another Swift dependency
+  /// 2. Clang modules imported directly or via a Swift dependency
+  /// 3. Clang modules imported via textual header inputs to Swift modules (bridging headers)
+  /// 4. Swift overlay modules of all of the transitively imported Clang modules that have one
+  ModuleDependencyIDSetVector
+  resolveImportedModuleDependencies(const ModuleDependencyID &rootModuleID,
+                                    ModuleDependenciesCache &cache);
   void
-  resolveImportDependencies(const ModuleDependencyID &moduleID,
+  resolveSwiftModuleDependencies(const ModuleDependencyID &rootModuleID,
+                                 ModuleDependenciesCache &cache,
+                                 ModuleDependencyIDSetVector &discoveredSwiftModules);
+  void
+  resolveAllClangModuleDependencies(ArrayRef<ModuleDependencyID> swiftModules,
+                                    ModuleDependenciesCache &cache,
+                                    ModuleDependencyIDSetVector &discoveredClangModules);
+  void
+  resolveHeaderDependencies(ArrayRef<ModuleDependencyID> swiftModules,
                             ModuleDependenciesCache &cache,
-                            ModuleDependencyIDSetVector &directDependencies);
+                            ModuleDependencyIDSetVector &discoveredHeaderDependencyClangModules);
+  void
+  resolveSwiftOverlayDependencies(ArrayRef<ModuleDependencyID> swiftModules,
+                                  ModuleDependenciesCache &cache,
+                                  ModuleDependencyIDSetVector &discoveredDependencies);
+
+  /// Resolve all of a given module's imports to a Swift module, if one exists.
+  void
+  resolveSwiftImportsForModule(const ModuleDependencyID &moduleID,
+                               ModuleDependenciesCache &cache,
+                               ModuleDependencyIDSetVector &importedSwiftDependencies);
 
   /// If a module has a bridging header or other header inputs, execute a dependency scan
   /// on it and record the dependencies.
-  void resolveHeaderDependencies(
+  void resolveHeaderDependenciesForModule(
       const ModuleDependencyID &moduleID, ModuleDependenciesCache &cache,
-      std::vector<std::string> &allClangModules,
-      llvm::StringSet<> &alreadyKnownModules,
-      ModuleDependencyIDSetVector &directDependencies);
+      ModuleDependencyIDSetVector &headerClangModuleDependencies);
 
   /// Resolve all module dependencies comprised of Swift overlays
   /// of this module's Clang module dependencies.
-  void resolveSwiftOverlayDependencies(
+  void resolveSwiftOverlayDependenciesForModule(
       const ModuleDependencyID &moduleID,
-      const std::vector<std::string> &clangDependencies,
       ModuleDependenciesCache &cache,
-      ModuleDependencyIDSetVector &swiftOverlayDependencies,
-      ModuleDependencyIDSetVector &directDependencies);
+      ModuleDependencyIDSetVector &swiftOverlayDependencies);
 
   /// Identify all cross-import overlay modules of the specified
   /// dependency set and apply an action for each.
