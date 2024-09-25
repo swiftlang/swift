@@ -13,6 +13,7 @@
 import ASTBridging
 
 import Basic
+import SIL
 
 public typealias DiagID = BridgedDiagID
 
@@ -27,6 +28,11 @@ extension String: DiagnosticArgument {
 extension Int: DiagnosticArgument {
   public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
     fn(BridgedDiagnosticArgument(self))
+  }
+}
+extension DeclRef: DiagnosticArgument {
+  public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
+    fn(bridged.asDiagnosticArgument())
   }
 }
 

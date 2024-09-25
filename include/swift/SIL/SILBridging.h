@@ -336,6 +336,8 @@ struct BridgedType {
   getTupleElementType(SwiftInt idx) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getFunctionTypeWithNoEscape(bool withNoEscape) const;
   BRIDGED_INLINE BridgedArgumentConvention getCalleeConvention() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  static BridgedType getSuperClassTypeOfClassDecl(BridgedNominalTypeDecl decl);
 };
 
 // SIL Bridging
@@ -470,6 +472,7 @@ struct BridgedLocation {
   BRIDGED_INLINE bool isEqualTo(BridgedLocation rhs) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSourceLoc getSourceLocation() const;
   BRIDGED_INLINE bool hasSameSourceLocation(BridgedLocation rhs) const;
+  static BRIDGED_INLINE BridgedLocation fromNominalTypeDecl(BridgedNominalTypeDecl decl);
   static BRIDGED_INLINE BridgedLocation getArtificialUnreachableLocation();
 };
 
@@ -1065,6 +1068,23 @@ struct OptionalBridgedSuccessor {
 struct BridgedSuccessorArray {
   OptionalBridgedSuccessor base;
   SwiftInt count;
+};
+
+struct BridgedDeclRef {
+  uint64_t storage[3];
+
+#ifdef USED_IN_CPP_SOURCE
+  BridgedDeclRef(swift::SILDeclRef declRef) {
+    *reinterpret_cast<swift::SILDeclRef *>(&storage) = declRef;
+  }
+
+  swift::SILDeclRef unbridged() const {
+    return *reinterpret_cast<const swift::SILDeclRef *>(&storage);
+  }
+#endif
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLocation getLocation() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDiagnosticArgument asDiagnosticArgument() const;
 };
 
 struct BridgedVTableEntry {

@@ -14,6 +14,7 @@ add_swift_compiler_module(SIL
     Argument.swift
     BasicBlock.swift
     Builder.swift
+    Declarations.swift
     Effects.swift
     ForwardingInstruction.swift
     Function.swift

@@ -531,6 +531,14 @@ BridgedArgumentConvention BridgedType::getCalleeConvention() const {
   return getArgumentConvention(fnType->getCalleeConvention());
 }
 
+BridgedType BridgedType::getSuperClassTypeOfClassDecl(BridgedNominalTypeDecl decl) {
+  swift::Type superTy = swift::cast<swift::ClassDecl>(decl.unbridged())->getSuperclass();
+  if (!superTy) {
+    return BridgedType(swift::SILType());
+  }
+  return swift::SILType::getPrimitiveObjectType(superTy->getCanonicalType());
+}
+
 //===----------------------------------------------------------------------===//
 //                                BridgedValue
 //===----------------------------------------------------------------------===//
@@ -717,6 +725,9 @@ BridgedSourceLoc BridgedLocation::getSourceLocation() const {
 }
 bool BridgedLocation::hasSameSourceLocation(BridgedLocation rhs) const {
   return getLoc().hasSameSourceLocation(rhs.getLoc());
+}
+BridgedLocation BridgedLocation::fromNominalTypeDecl(BridgedNominalTypeDecl decl) {
+  return swift::SILDebugLocation(decl.unbridged(), nullptr);
 }
 BridgedLocation BridgedLocation::getArtificialUnreachableLocation() {
   return swift::SILDebugLocation::getArtificialUnreachableLocation();
@@ -1701,6 +1712,21 @@ BridgedInstruction BridgedSuccessor::getContainingInst() const {
 
 BridgedSuccessor OptionalBridgedSuccessor::advancedBy(SwiftInt index) const {
   return {succ + index};
+}
+
+//===----------------------------------------------------------------------===//
+//                                BridgedDeclRef
+//===----------------------------------------------------------------------===//
+
+static_assert(sizeof(BridgedDeclRef) >= sizeof(swift::SILDeclRef),
+              "BridgedDeclRef has wrong size");
+
+BridgedLocation BridgedDeclRef::getLocation() const {
+  return swift::SILDebugLocation(unbridged().getDecl(), nullptr);
+}
+
+BridgedDiagnosticArgument BridgedDeclRef::asDiagnosticArgument() const {
+  return swift::DiagnosticArgument(unbridged().getDecl()->getName());
 }
 
 //===----------------------------------------------------------------------===//

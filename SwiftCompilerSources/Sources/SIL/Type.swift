@@ -314,38 +314,3 @@ extension BridgedType {
   public var type: Type { Type(bridged: self) }
   var typeOrNil: Type? { isNull() ? nil : type }
 }
-
-// TODO: use an AST type for this once we have it
-public struct NominalTypeDecl : Equatable, Hashable {
-  public let bridged: BridgedNominalTypeDecl
-
-  public init(_bridged: BridgedNominalTypeDecl) {
-    self.bridged = _bridged
-  }
-
-  public var name: StringRef { StringRef(bridged: bridged.getName()) }
-
-  public static func ==(lhs: NominalTypeDecl, rhs: NominalTypeDecl) -> Bool {
-    lhs.bridged.raw == rhs.bridged.raw
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(bridged.raw)
-  }
-
-  public func isResilient(in function: Function) -> Bool {
-    function.bridged.isResilientNominalDecl(bridged)
-  }
-
-  public var isStructWithUnreferenceableStorage: Bool {
-    bridged.isStructWithUnreferenceableStorage()
-  }
-
-  public var isGlobalActor: Bool {
-    return bridged.isGlobalActor()
-  }
-
-  public var hasValueDeinit: Bool {
-    return bridged.hasValueDeinit()
-  }
-}
