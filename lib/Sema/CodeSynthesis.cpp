@@ -1693,11 +1693,6 @@ SynthesizeDefaultInitRequest::evaluate(Evaluator &evaluator,
                                        NominalTypeDecl *decl) const {
   auto &ctx = decl->getASTContext();
 
-  FrontendStatsTracer StatsTracer(ctx.Stats,
-                                  "define-default-ctor", decl);
-  PrettyStackTraceDecl stackTrace("defining default constructor for",
-                                  decl);
-
   // Create the default constructor.
   auto ctorKind = decl->isDistributedActor() ?
       ImplicitConstructorKind::DefaultDistributedActor :

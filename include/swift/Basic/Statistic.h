@@ -167,6 +167,10 @@ private:
   std::unique_ptr<StatsProfilers> EventProfilers;
   std::unique_ptr<StatsProfilers> EntityProfilers;
 
+  /// Whether fine-grained timers are enabled. In practice, this means request
+  /// evaluator requests. This will have a runtime performance impact.
+  bool FineGrainedTimers;
+
   /// Whether we are currently flushing statistics and should not therefore
   /// record any additional stats until we've finished.
   bool IsFlushingTracesAndProfiles;
@@ -179,6 +183,7 @@ private:
                        StringRef Directory,
                        SourceManager *SM,
                        clang::SourceManager *CSM,
+                       bool FineGrainedTimers,
                        bool TraceEvents,
                        bool ProfileEvents,
                        bool ProfileEntities);
@@ -190,12 +195,15 @@ public:
                        StringRef OutputType,
                        StringRef OptType,
                        StringRef Directory,
-                       SourceManager *SM=nullptr,
-                       clang::SourceManager *CSM=nullptr,
-                       bool TraceEvents=false,
-                       bool ProfileEvents=false,
-                       bool ProfileEntities=false);
+                       SourceManager *SM,
+                       clang::SourceManager *CSM,
+                       bool FineGrainedTimers,
+                       bool TraceEvents,
+                       bool ProfileEvents,
+                       bool ProfileEntities);
   ~UnifiedStatsReporter();
+
+  bool fineGrainedTimers() const { return FineGrainedTimers; }
 
   AlwaysOnDriverCounters &getDriverCounters();
   AlwaysOnFrontendCounters &getFrontendCounters();
