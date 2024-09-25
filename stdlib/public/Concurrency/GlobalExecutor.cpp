@@ -122,14 +122,12 @@ uint64_t swift::swift_task_getJobTaskId(Job *job) {
   }
 }
 
-SWIFT_EXPORT_FROM(swift_Concurrency)
-void *swift_job_alloc(SwiftJob *job, size_t size) {
+extern "C" void *swift_job_alloc(SwiftJob *job, size_t size) {
   auto task = cast<AsyncTask>(reinterpret_cast<Job *>(job));
   return _swift_task_alloc_specific(task, size);
 }
 
-SWIFT_EXPORT_FROM(swift_Concurrency)
-void swift_job_dealloc(SwiftJob *job, void *ptr) {
+extern "C" void swift_job_dealloc(SwiftJob *job, void *ptr) {
   auto task = cast<AsyncTask>(reinterpret_cast<Job *>(job));
   return _swift_task_dealloc_specific(task, ptr);
 }
@@ -142,8 +140,7 @@ bool SerialExecutorRef::isMainExecutor() const {
   return swift_task_isMainExecutor(*this);
 }
 
-SWIFT_EXPORT_FROM(swift_Concurrency)
-bool _swift_task_isMainExecutor_c(SwiftExecutorRef executor) {
+extern "C" bool _swift_task_isMainExecutor_c(SwiftExecutorRef executor) {
   SerialExecutorRef ref = *reinterpret_cast<SerialExecutorRef *>(&executor);
   return swift_task_isMainExecutor(ref);
 }

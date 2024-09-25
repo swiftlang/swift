@@ -344,11 +344,8 @@ Added: _swift_task_invokeSwiftCheckIsolated
 Added: _swift_task_isMainExecutor
 Added: _swift_task_isMainExecutor_hook
 
-Added: __swift_task_isMainExecutor_c
 Added: _swift_task_donateThreadToGlobalExecutorUntil
 Added: _swift_task_donateThreadToGlobalExecutorUntil_hook
-Added: _swift_job_alloc
-Added: _swift_job_dealloc
 
 // Add property descriptors for static properties
 Added: _$sScM21sharedUnownedExecutorScevpZMV

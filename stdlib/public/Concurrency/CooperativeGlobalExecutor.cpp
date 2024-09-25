@@ -34,6 +34,8 @@
 #ifndef SWIFT_THREADING_NONE
 # include <thread>
 #endif
+#include <new>
+
 #include <errno.h>
 #include "swift/Basic/PriorityQueue.h"
 
