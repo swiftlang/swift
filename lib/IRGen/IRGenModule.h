@@ -1368,7 +1368,7 @@ private:
     unsigned numExtraInhabitants;
     unsigned align: 16;
     unsigned pod: 1;
-    unsigned bitwiseTakable: 1;
+    unsigned bitwiseTakable: 2;
   };
   friend struct ::llvm::DenseMapInfo<swift::irgen::IRGenModule::FixedLayoutKey>;
   llvm::DenseMap<FixedLayoutKey, llvm::Constant *> PrivateFixedLayouts;

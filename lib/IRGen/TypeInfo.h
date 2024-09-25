@@ -101,7 +101,7 @@ protected:
     uint64_t OpaqueBits;
 
     SWIFT_INLINE_BITFIELD_BASE(TypeInfo,
-                             bitmax(NumSpecialTypeInfoKindBits,8)+6+1+1+1+3+1+1,
+                             bitmax(NumSpecialTypeInfoKindBits,8)+6+1+1+1+1+3+1+1,
       /// The kind of supplemental API this type has, if any.
       Kind : bitmax(NumSpecialTypeInfoKindBits,8),
 
@@ -113,6 +113,9 @@ protected:
       
       /// Whether this type is known to be bitwise-takable.
       BitwiseTakable : 1,
+
+      /// Whether this type is known to be bitwise-borrowable.
+      BitwiseBorrowable : 1,
 
       /// Whether this type is known to be copyable.
       Copyable : 1,
@@ -160,7 +163,9 @@ protected:
     Bits.TypeInfo.Kind = unsigned(stik);
     Bits.TypeInfo.AlignmentShift = llvm::Log2_32(A.getValue());
     Bits.TypeInfo.TriviallyDestroyable = pod;
-    Bits.TypeInfo.BitwiseTakable = bitwiseTakable;
+    Bits.TypeInfo.BitwiseTakable = bitwiseTakable >= IsBitwiseTakableOnly;
+    Bits.TypeInfo.BitwiseBorrowable =
+      bitwiseTakable == IsBitwiseTakableAndBorrowable;
     Bits.TypeInfo.Copyable = copyable;
     Bits.TypeInfo.SubclassKind = InvalidSubclassKind;
     Bits.TypeInfo.AlwaysFixedSize = alwaysFixedSize;
@@ -231,11 +236,25 @@ public:
   }
   
   /// Whether this type is known to be bitwise-takable, i.e. "initializeWithTake"
-  /// is equivalent to a memcpy.
-  IsBitwiseTakable_t isBitwiseTakable(ResilienceExpansion expansion) const {
-    return IsBitwiseTakable_t(Bits.TypeInfo.BitwiseTakable);
+  /// is equivalent to a memcpy, and possibly bitwise-borrowable, i.e.,
+  /// a borrowed argument can be passed by value rather than by reference.
+  IsBitwiseTakable_t getBitwiseTakable(ResilienceExpansion expansion) const {
+    return IsBitwiseTakable_t(
+      Bits.TypeInfo.BitwiseTakable | (Bits.TypeInfo.BitwiseBorrowable << 1));
   }
   
+  /// Whether this type is known to be bitwise-takable, i.e. "initializeWithTake"
+  /// is equivalent to a memcpy
+  bool isBitwiseTakable(ResilienceExpansion expansion) const {
+    return Bits.TypeInfo.BitwiseTakable;
+  }
+  
+  /// Whether this type is known to be bitwise-borrowable, i.e.,
+  /// a borrowed argument can be passed by value rather than by reference.
+  bool isBitwiseBorrowable(ResilienceExpansion expansion) const {
+    return Bits.TypeInfo.BitwiseBorrowable;
+  }
+
   /// Returns the type of special interface followed by this TypeInfo.
   /// It is important for our design that this depends only on
   /// immediate type structure and not on, say, properties that can
