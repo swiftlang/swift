@@ -1280,28 +1280,6 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
   F->verifyIncompleteOSSA();
 
   emitDifferentiabilityWitnessesForFunction(constant, F);
-
-  // To support using metatypes as type hints in Embedded Swift. A default
-  // argument generator might be returning a metatype, which we normally don't
-  // support in Embedded Swift, but to still allow metatypes as type hints, we
-  // make the generator always inline to the callee by marking it transparent.
-  if (M.getOptions().EmbeddedSwift) {
-    if (constant.isDefaultArgGenerator()) {
-      bool isReturningMetatype = false;
-      if (F->getLoweredFunctionType()->getNumResults() == 1) {
-        if (F->getLoweredFunctionType()
-                ->getSingleResult()
-                .getSILStorageInterfaceType()
-                .isMetatype()) {
-          isReturningMetatype = true;
-        }
-      }
-
-      if (isReturningMetatype) {
-        F->setTransparent(IsTransparent);
-      }
-    }
-  }
 }
 
 void SILGenModule::emitDifferentiabilityWitnessesForFunction(
