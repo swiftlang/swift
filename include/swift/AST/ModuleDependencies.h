@@ -992,9 +992,6 @@ class SwiftDependencyScanningService {
   /// CAS ObjectStore Instance.
   std::shared_ptr<llvm::cas::ObjectStore> CAS;
 
-  /// The common dependencies that is needed for every swift compiler instance.
-  std::vector<std::string> CommonDependencyFiles;
-
   /// File prefix mapper.
   std::unique_ptr<llvm::TreePathPrefixMapper> Mapper;
 

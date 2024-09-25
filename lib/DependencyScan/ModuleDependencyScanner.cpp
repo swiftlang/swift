@@ -218,7 +218,6 @@ ModuleDependencyScanningWorker::scanFilesystemForModuleDependency(
   ModuleDependencyVector moduleDependencies =
       swiftScannerModuleLoader->getModuleDependencies(
           moduleName, cache.getModuleOutputPath(),
-          cache.getScanService().getCachingFS(),
           cache.getAlreadySeenClangModules(), clangScanningTool,
           *scanningASTDelegate, cache.getScanService().getPrefixMapper(),
           isTestableImport);
@@ -226,7 +225,6 @@ ModuleDependencyScanningWorker::scanFilesystemForModuleDependency(
   if (moduleDependencies.empty())
     moduleDependencies = clangScannerModuleLoader->getModuleDependencies(
         moduleName, cache.getModuleOutputPath(),
-        cache.getScanService().getCachingFS(),
         cache.getAlreadySeenClangModules(), clangScanningTool,
         *scanningASTDelegate, cache.getScanService().getPrefixMapper(),
         isTestableImport);
@@ -239,9 +237,8 @@ ModuleDependencyScanningWorker::scanFilesystemForSwiftModuleDependency(
     Identifier moduleName, const ModuleDependenciesCache &cache) {
   return swiftScannerModuleLoader->getModuleDependencies(
       moduleName, cache.getModuleOutputPath(),
-      cache.getScanService().getCachingFS(), cache.getAlreadySeenClangModules(),
-      clangScanningTool, *scanningASTDelegate,
-      cache.getScanService().getPrefixMapper(), false);
+      cache.getAlreadySeenClangModules(), clangScanningTool,
+      *scanningASTDelegate, cache.getScanService().getPrefixMapper(), false);
 }
 
 ModuleDependencyVector
@@ -249,9 +246,8 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
     Identifier moduleName, const ModuleDependenciesCache &cache) {
   return clangScannerModuleLoader->getModuleDependencies(
       moduleName, cache.getModuleOutputPath(),
-      cache.getScanService().getCachingFS(), cache.getAlreadySeenClangModules(),
-      clangScanningTool, *scanningASTDelegate,
-      cache.getScanService().getPrefixMapper(), false);
+      cache.getAlreadySeenClangModules(), clangScanningTool,
+      *scanningASTDelegate, cache.getScanService().getPrefixMapper(), false);
 }
 
 template <typename Function, typename... Args>
