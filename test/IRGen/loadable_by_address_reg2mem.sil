@@ -364,3 +364,36 @@ bb0(%0 : $*X):
   dealloc_stack %1 : $*X
   throw %3 : $X
 }
+
+// CHECK: sil @test15
+// CHECK:  cond_br %1, bb1, bb2
+
+// CHECK: bb1:
+// CHECK:   copy_addr [take] {{.*}} to [init] [[PHI:%[0-9]+]] : $*X
+// CHECK:   br bb3
+
+// CHECK: bb2:
+// CHECK:   [[UNDEF:%.*]] = alloc_stack $X
+// CHECK:   copy_addr [take] [[UNDEF]] to [init] [[PHI]] : $*X
+// CHECK:   dealloc_stack [[UNDEF]] : $*X
+// CHECK:   br bb3
+// CHECK:} // end sil function 'test15'
+
+sil @test15 : $@convention(thin) (X, Builtin.Int1) -> () {
+bb0(%0: $X, %1: $Builtin.Int1):
+  %2 = alloc_stack $X
+cond_br %1, bb1, bb2
+
+bb1:
+ br bb3(%0 : $X)
+
+bb2:
+ br bb3(undef : $X)
+
+bb3(%4 : $X):
+  store %4 to %2: $*X
+
+  dealloc_stack %2 : $*X
+  %t = tuple ()
+  return %t : $()
+}
