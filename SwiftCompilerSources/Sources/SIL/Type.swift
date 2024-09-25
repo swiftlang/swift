@@ -207,7 +207,7 @@ extension Type: Equatable {
 }
 
 public struct TypeArray : RandomAccessCollection, CustomReflectable {
-  private let bridged: BridgedSILTypeArray
+  public let bridged: BridgedSILTypeArray
 
   public var startIndex: Int { return 0 }
   public var endIndex: Int { return bridged.getCount() }
