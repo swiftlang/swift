@@ -3,13 +3,13 @@
 // REQUIRES: swift_in_compiler
 
 public class MyClass {
-  func foo<T>(t: T) { } // expected-error {{classes cannot have non-final generic fuctions in embedded Swift}}
+  func foo<T>(t: T) { } // expected-error {{classes cannot have non-final generic functions in embedded Swift}}
   func bar() { }
 }
 
 final class C2<Element> {
   // TODO: this shouldn't be a problem because the class is final
-  init<T>(x: T) { } // expected-error {{classes cannot have non-final generic fuctions in embedded Swift}}
+  init<T>(x: T) { } // expected-error {{classes cannot have non-final generic functions in embedded Swift}}
 }
 
 struct S {}
@@ -19,7 +19,7 @@ func testit2() -> C2<S> {
 }
 
 open class C3<X> {
-  public func foo<T>(t: T) {} // expected-error {{classes cannot have non-final generic fuctions in embedded Swift}}
+  public func foo<T>(t: T) {} // expected-error {{classes cannot have non-final generic functions in embedded Swift}}
 }
 
 func testit3() -> C3<S> {
