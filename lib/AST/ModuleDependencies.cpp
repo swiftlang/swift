@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/MacroDefinition.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/PluginLoader.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Frontend/Frontend.h"
@@ -103,33 +104,6 @@ ModuleDependencyInfo::getAsPlaceholderDependencyModule() const {
 void ModuleDependencyInfo::addTestableImport(ImportPath::Module module) {
   assert(getAsSwiftSourceModule() && "Expected source module for addTestableImport.");
   dyn_cast<SwiftSourceModuleDependenciesStorage>(storage.get())->addTestableImport(module);
-}
-
-void ModuleDependencyInfo::addMacroDependency(StringRef macroModuleName,
-                                              StringRef libraryPath,
-                                              StringRef executablePath) {
-  if (auto swiftSourceStorage =
-          dyn_cast<SwiftSourceModuleDependenciesStorage>(storage.get()))
-    swiftSourceStorage->addMacroDependency(macroModuleName, libraryPath,
-                                           executablePath);
-  else if (auto swiftInterfaceStorage =
-               dyn_cast<SwiftInterfaceModuleDependenciesStorage>(storage.get()))
-    swiftInterfaceStorage->addMacroDependency(macroModuleName, libraryPath,
-                                              executablePath);
-  else
-    llvm_unreachable("Unexpected dependency kind");
-}
-
-bool ModuleDependencyInfo::hasMacroDependencies() const {
-  if (auto sourceModule =
-          dyn_cast<SwiftSourceModuleDependenciesStorage>(storage.get()))
-    return !sourceModule->textualModuleDetails.macroDependencies.empty();
-
-  if (auto interfaceModule =
-          dyn_cast<SwiftInterfaceModuleDependenciesStorage>(storage.get()))
-    return !interfaceModule->textualModuleDetails.macroDependencies.empty();
-
-  llvm_unreachable("Unexpected dependency kind");
 }
 
 bool ModuleDependencyInfo::isTestableImport(StringRef moduleName) const {

@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
@@ -180,6 +181,10 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
                       workerCompilerInvocation->getSymbolGraphOptions(),
                       workerCompilerInvocation->getCASOptions(),
                       ScanASTContext.SourceMgr, Diagnostics));
+  auto loader = std::make_unique<PluginLoader>(
+      *workerASTContext, /*DepTracker=*/nullptr,
+      workerCompilerInvocation->getFrontendOptions().DisableSandbox);
+  workerASTContext->setPluginLoader(std::move(loader));
 
   // Configure the interface scanning AST delegate.
   auto ClangModuleCachePath = getModuleCachePathFromClang(

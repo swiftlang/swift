@@ -265,6 +265,19 @@ static llvm::Error resolveExplicitModuleInputs(
 
   std::vector<std::string> commandLine = resolvingDepInfo.getCommandline();
   auto dependencyInfoCopy = resolvingDepInfo;
+  auto &directDeps = resolvingDepInfo.getDirectModuleDependencies();
+
+  // Helper to the macro dependencies from direct module dependencies.
+  auto addMacroDependencies = [&](ModuleDependencyID moduleID,
+                                  const ModuleDependencyInfo &dep) {
+    if (llvm::find(directDeps, moduleID) == directDeps.end())
+      return;
+
+    for (auto &entry: dep.getMacroDependencies())
+      dependencyInfoCopy.addMacroDependency(
+          entry.first, entry.second.LibraryPath, entry.second.ExecutablePath);
+  };
+
   for (const auto &depModuleID : dependencies) {
     const auto &depInfo = cache.findKnownDependency(depModuleID);
     switch (depModuleID.Kind) {
@@ -276,6 +289,7 @@ static llvm::Error resolveExplicitModuleInputs(
                        : interfaceDepDetails->moduleCacheKey;
       commandLine.push_back("-swift-module-file=" + depModuleID.ModuleName + "=" +
                             path);
+      addMacroDependencies(depModuleID, depInfo);
     } break;
     case swift::ModuleDependencyKind::SwiftBinary: {
       auto binaryDepDetails = depInfo.getAsSwiftBinaryModule();
@@ -299,6 +313,7 @@ static llvm::Error resolveExplicitModuleInputs(
             "-fmodule-map-file=" +
             remapPath(bridgingHeaderDepModuleDetails->moduleMapFile));
       }
+      addMacroDependencies(depModuleID, depInfo);
     } break;
     case swift::ModuleDependencyKind::SwiftPlaceholder: {
       auto placeholderDetails = depInfo.getAsPlaceholderDependencyModule();
@@ -364,7 +379,7 @@ static llvm::Error resolveExplicitModuleInputs(
       llvm::for_each(
           sourceDep->auxiliaryFiles,
           [&tracker](const std::string &file) { tracker->trackFile(file); });
-      llvm::for_each(sourceDep->textualModuleDetails.macroDependencies,
+      llvm::for_each(sourceDep->macroDependencies,
                      [&tracker](const auto &entry) {
                        tracker->trackFile(entry.second.LibraryPath);
                      });
@@ -382,7 +397,7 @@ static llvm::Error resolveExplicitModuleInputs(
       llvm::for_each(
           textualDep->auxiliaryFiles,
           [&tracker](const std::string &file) { tracker->trackFile(file); });
-      llvm::for_each(textualDep->textualModuleDetails.macroDependencies,
+      llvm::for_each(textualDep->macroDependencies,
                      [&tracker](const auto &entry) {
                        tracker->trackFile(entry.second.LibraryPath);
                      });
@@ -402,7 +417,7 @@ static llvm::Error resolveExplicitModuleInputs(
 
       // If there are no external macro dependencies, drop all plugin search
       // paths.
-      if (!resolvingDepInfo.hasMacroDependencies())
+      if (dependencyInfoCopy.getMacroDependencies().empty())
         removeMacroSearchPaths(newCommandLine);
 
       // Update with casfs option.
@@ -629,6 +644,7 @@ static swiftscan_macro_dependency_set_t *createMacroDependencySet(
         create_clone(entry.second.LibraryPath.c_str());
     set->macro_dependencies[SI]->executablePath =
         create_clone(entry.second.ExecutablePath.c_str());
+    ++ SI;
   }
   return set;
 }
@@ -725,7 +741,7 @@ generateFullDependencyGraph(const CompilerInstance &instance,
                              .CASBridgingHeaderIncludeTreeRootID.c_str()),
             create_clone(swiftTextualDeps->moduleCacheKey.c_str()),
             createMacroDependencySet(
-                swiftTextualDeps->textualModuleDetails.macroDependencies),
+                swiftTextualDeps->macroDependencies),
             create_clone(swiftTextualDeps->userModuleVersion.c_str())};
       } else if (swiftSourceDeps) {
         swiftscan_string_ref_t moduleInterfacePath = create_null();
@@ -763,7 +779,7 @@ generateFullDependencyGraph(const CompilerInstance &instance,
                              .CASBridgingHeaderIncludeTreeRootID.c_str()),
             /*CacheKey*/ create_clone(""),
             createMacroDependencySet(
-                swiftSourceDeps->textualModuleDetails.macroDependencies),
+                swiftSourceDeps->macroDependencies),
             /*userModuleVersion*/ create_clone("")};
       } else if (swiftPlaceholderDeps) {
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER;
@@ -787,6 +803,7 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             create_set(swiftBinaryDeps->headerSourceFiles),
             swiftBinaryDeps->isFramework,
             swiftBinaryDeps->isStatic,
+            createMacroDependencySet(swiftBinaryDeps->macroDependencies),
             create_clone(swiftBinaryDeps->moduleCacheKey.c_str()),
             create_clone(swiftBinaryDeps->userModuleVersion.c_str())};
       } else {

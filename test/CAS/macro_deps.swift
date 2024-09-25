@@ -20,9 +20,12 @@
 // FOO-DEPS: MacroOne
 // FOO-DEPS-NOT: MacroTwo
 
+// RR: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json Baz macroDependencies | %FileCheck %s --check-prefix=BAZ-DEPS
+// BAZ-DEPS: MacroOne
+
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json MyApp macroDependencies | %FileCheck %s --check-prefix=APP-DEPS
+// APP-DEPS: MacroOne
 // APP-DEPS: MacroTwo
-// APP-DEPS-NOT: MacroOne
 
 /// Build all dependencies.
 // RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/SwiftShims.cmd
@@ -31,6 +34,8 @@
 // RUN: %swift_frontend_plain @%t/Foo.cmd
 // RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json Bar > %t/Bar.cmd
 // RUN: %swift_frontend_plain @%t/Bar.cmd
+// RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json Baz > %t/Baz.cmd
+// RUN: %swift_frontend_plain @%t/Baz.cmd
 
 // RUN: %FileCheck %s --check-prefix=PLUGIN_SEARCH --input-file=%t/Bar.cmd
 // PLUGIN_SEARCH-NOT: -external-plugin-path
@@ -97,19 +102,28 @@ public func assertFalse() {
 // swift-module-flags: -enable-library-evolution -swift-version 5 -O -module-name Bar -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib
 public func bar()
 
+//--- include/Baz.swiftinterface
+// swift-interface-format-version: 1.0
+// swift-module-flags: -enable-library-evolution -swift-version 5 -O -module-name Baz -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib
+import Foo
+// have access to #assert here
+
 //--- test.swift
 import Foo
 @inlinable
 public func test() {
     #assert(true)
 }
+@freestanding(expression) public macro assertTest(_: Bool) = #externalMacro(module: "MacroOne", type: "AssertMacro")
 
 //--- main.swift
 import Test
 import Bar
+import Baz
 @freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroTwo", type: "StringifyMacro")
 
 func appTest() {
     let str = #stringify("test")
     test()
+    #assertTest(true)
 }
