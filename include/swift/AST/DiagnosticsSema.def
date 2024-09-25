@@ -6584,8 +6584,8 @@ ERROR(dynamic_with_transparent,none,
 ERROR(dynamic_replacement_accessor_not_dynamic, none,
       "replaced accessor for %0 is not marked dynamic", (DeclName))
 ERROR(dynamic_replacement_accessor_not_explicit, none,
-      "replaced accessor %select{get|set|_read|_modify|willSet|didSet|unsafeAddress|addressWithOwner|addressWithNativeOwner|unsafeMutableAddress|mutableAddressWithOwner|}0 for %1 is not explicitly defined",
-      (unsigned, DeclName))
+      "replaced %0 for %1 is not explicitly defined",
+      (StringRef, DeclName))
 ERROR(dynamic_replacement_function_not_dynamic, none,
       "replaced function %0 is not marked dynamic", (DeclName))
 ERROR(dynamic_replacement_function_not_found, none,
