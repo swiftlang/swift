@@ -4079,65 +4079,74 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     }
   }
 
-  auto constraintType1 = type1;
-  if (auto existential = constraintType1->getAs<ExistentialType>())
-    constraintType1 = existential->getConstraintType();
+  // Finally, check parameterized protocol requirements.
+  if (!layout.getParameterizedProtocols().empty()) {
+    SmallVector<std::pair<AssociatedTypeDecl *, Type>, 4> fromReqs;
 
-  auto constraintType2 = type2;
-  if (auto existential = constraintType2->getAs<ExistentialType>())
-    constraintType2 = existential->getConstraintType();
+    if (type1->isExistentialType()) {
+      auto fromLayout = type1->getExistentialLayout();
+      for (auto *parameterizedType : fromLayout.getParameterizedProtocols()) {
+        auto *protoDecl = parameterizedType->getProtocol();
+        auto assocTypes = protoDecl->getPrimaryAssociatedTypes();
+        auto argTypes = parameterizedType->getArgs();
 
-  auto ppt1 = constraintType1->getAs<ParameterizedProtocolType>();
-  auto ppt2 = constraintType2->getAs<ParameterizedProtocolType>();
-
-  // With two parameterized protocols, we've already made sure conformance
-  // constraints are satisfied. Try to match the arguments!
-  if (ppt1 && ppt2) {
-    ArrayRef<Type> longerArgs = ppt1->getArgs();
-    ArrayRef<Type> shorterArgs = ppt2->getArgs();
-    // The more constrained of the two types had better be the first type -
-    // otherwise we're forgetting requirements.
-    if (longerArgs.size() < shorterArgs.size()) {
-      return getTypeMatchFailure(locator);
+        for (unsigned i : indices(argTypes)) {
+          auto argType = argTypes[i];
+          auto *assocType = assocTypes[i]->getAssociatedTypeAnchor();
+          fromReqs.push_back(std::make_pair(assocType, argType));
+        }
+      }
     }
 
-    // Line up the arguments of the parameterized protocol.
-    // FIXME: Extend the locator path to point to the argument
-    // inducing the requirement.
-    for (const auto &pair : llvm::zip_first(shorterArgs, longerArgs)) {
-      auto result = matchTypes(std::get<0>(pair), std::get<1>(pair),
-                               ConstraintKind::Bind,
-                               subflags, locator);
-      if (result.isFailure())
-        return result;
-    }
-  } else if (ppt1 && type2->isExistentialType()) {
-    // P<T, U, V, ...> converts to (P & Q & ...) trivially...
-    return getTypeMatchSuccess();
-  } else if (ppt2 && type1->isExistentialType()) {
-    // But (P & Q & ...) does not convert to P<T, U, V, ...>
-    return getTypeMatchFailure(locator);
-  } else if (ppt1 || ppt2) {
-    auto parameterized = constraintType1;
-    auto base = constraintType2;
-    if (ppt2)
-      std::swap(parameterized, base);
+    for (auto *parameterizedType : layout.getParameterizedProtocols()) {
+      // With two parameterized protocols, we've already made sure conformance
+      // constraints are satisfied. Try to match the arguments!
+      if (type1->isExistentialType()) {
+        auto *protoDecl = parameterizedType->getProtocol();
+        auto assocTypes = protoDecl->getPrimaryAssociatedTypes();
+        auto argTypes = parameterizedType->getArgs();
 
-    // One of the two is parameterized, and the other is a concrete type.
-    // Substitute the base into the requirements of the parameterized type and
-    // discharge the requirements of the parameterized protocol.
-    // FIXME: Extend the locator path to point to the argument
-    // inducing the requirement.
-    SmallVector<Requirement, 2> reqs;
-    parameterized->castTo<ParameterizedProtocolType>()
-                 ->getRequirements(base, reqs);
-    for (const auto &req : reqs) {
-      assert(req.getKind() == RequirementKind::SameType);
-      auto result = matchTypes(req.getFirstType(), req.getSecondType(),
-                               ConstraintKind::Bind,
-                               subflags, locator);
-      if (result.isFailure())
-        return result;
+        for (unsigned i : indices(argTypes)) {
+          auto argType = argTypes[i];
+          auto *assocType = assocTypes[i]->getAssociatedTypeAnchor();
+          bool found = false;
+          for (auto fromReq : fromReqs) {
+            if (fromReq.first == assocType) {
+              // FIXME: Extend the locator path to point to the argument
+              // inducing the requirement.
+              auto result = matchTypes(fromReq.second, argType,
+                                       ConstraintKind::Bind,
+                                       subflags, locator);
+              if (result.isFailure())
+                return result;
+
+              found = true;
+              break;
+            }
+          }
+
+          if (!found)
+            return getTypeMatchFailure(locator);
+        }
+      } else {
+        // The source type is a concrete type.
+        //
+        // Substitute the source into the requirements of the parameterized type
+        // and discharge the requirements of the parameterized protocol.
+        //
+        // FIXME: Extend the locator path to point to the argument
+        // inducing the requirement.
+        SmallVector<Requirement, 2> reqs;
+        parameterizedType->getRequirements(type1, reqs);
+        for (const auto &req : reqs) {
+          assert(req.getKind() == RequirementKind::SameType);
+          auto result = matchTypes(req.getFirstType(), req.getSecondType(),
+                                   ConstraintKind::Bind,
+                                   subflags, locator);
+          if (result.isFailure())
+            return result;
+        }
+      }
     }
   }
 
