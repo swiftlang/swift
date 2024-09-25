@@ -250,12 +250,15 @@ public:
 
   void printRange(llvm::raw_ostream &out) const;
 
+  void printParents(llvm::raw_ostream &out) const;
+
 protected:
   virtual void printSpecifics(llvm::raw_ostream &out) const {}
   virtual NullablePtr<const void> addressForPrinting() const;
 
 public:
   SWIFT_DEBUG_DUMP;
+  SWIFT_DEBUG_DUMPER(dumpParents());
 
   void dumpOneScopeMapLocation(std::pair<unsigned, unsigned> lineColumn);
 
