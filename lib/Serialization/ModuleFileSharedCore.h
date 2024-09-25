@@ -184,6 +184,9 @@ private:
   /// modules.
   std::vector<serialization::SearchPath> SearchPaths;
 
+  /// The external macro plugins from the macro definition inside the module.
+  SmallVector<ExternalMacroPlugin, 4> MacroModuleNames;
+
   /// Info for the (lone) imported header for this module.
   struct {
     off_t fileSize;
@@ -632,6 +635,11 @@ public:
 
   llvm::VersionTuple getUserModuleVersion() const {
     return UserModuleVersion;
+  }
+
+  /// Get external macro names.
+  ArrayRef<ExternalMacroPlugin> getExternalMacros() const {
+    return MacroModuleNames;
   }
 
   /// If the module-defining `.swiftinterface` file is an SDK-relative path,
