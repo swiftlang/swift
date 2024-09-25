@@ -46,12 +46,21 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 //                             BridgedResultInfo
 //===----------------------------------------------------------------------===//
 
+BridgedResultConvention BridgedResultInfo::castToResultConvention(swift::ResultConvention convention) {
+  return static_cast<BridgedResultConvention>(convention);
+}
+
+BridgedResultInfo::BridgedResultInfo(swift::SILResultInfo resultInfo):
+  type(resultInfo.getInterfaceType().getPointer()),
+  convention(castToResultConvention(resultInfo.getConvention()))
+{}
+
 SwiftInt BridgedResultInfoArray::count() const {
-  return unbridged().size();
+  return resultInfoArray.unbridged<swift::SILResultInfo>().size();
 }
 
 BridgedResultInfo BridgedResultInfoArray::at(SwiftInt resultIndex) const {
-  return BridgedResultInfo(unbridged()[resultIndex]);
+  return BridgedResultInfo(resultInfoArray.unbridged<swift::SILResultInfo>()[resultIndex]);
 }
 
 //===----------------------------------------------------------------------===//
@@ -59,36 +68,92 @@ BridgedResultInfo BridgedResultInfoArray::at(SwiftInt resultIndex) const {
 //===----------------------------------------------------------------------===//
 
 SwiftInt BridgedYieldInfoArray::count() const {
-  return unbridged().size();
+  return yieldInfoArray.unbridged<swift::SILYieldInfo>().size();
 }
 
 BridgedParameterInfo BridgedYieldInfoArray::at(SwiftInt resultIndex) const {
-  return BridgedParameterInfo(unbridged()[resultIndex]);
+  return BridgedParameterInfo(yieldInfoArray.unbridged<swift::SILYieldInfo>()[resultIndex]);
 }
 
 //===----------------------------------------------------------------------===//
 //                            BridgedParameterInfo
 //===----------------------------------------------------------------------===//
 
+inline swift::ParameterConvention getParameterConvention(BridgedArgumentConvention convention) {
+  switch (convention) {
+    case BridgedArgumentConvention::Indirect_In:             return swift::ParameterConvention::Indirect_In;
+    case BridgedArgumentConvention::Indirect_In_Guaranteed:  return swift::ParameterConvention::Indirect_In_Guaranteed;
+    case BridgedArgumentConvention::Indirect_Inout:          return swift::ParameterConvention::Indirect_Inout;
+    case BridgedArgumentConvention::Indirect_InoutAliasable: return swift::ParameterConvention::Indirect_InoutAliasable;
+    case BridgedArgumentConvention::Indirect_In_CXX:         return swift::ParameterConvention::Indirect_In_CXX;
+    case BridgedArgumentConvention::Indirect_Out:            break;
+    case BridgedArgumentConvention::Direct_Owned:            return swift::ParameterConvention::Direct_Owned;
+    case BridgedArgumentConvention::Direct_Unowned:          return swift::ParameterConvention::Direct_Unowned;
+    case BridgedArgumentConvention::Direct_Guaranteed:       return swift::ParameterConvention::Direct_Guaranteed;
+    case BridgedArgumentConvention::Pack_Owned:              return swift::ParameterConvention::Pack_Owned;
+    case BridgedArgumentConvention::Pack_Inout:              return swift::ParameterConvention::Pack_Inout;
+    case BridgedArgumentConvention::Pack_Guaranteed:         return swift::ParameterConvention::Pack_Guaranteed;
+    case BridgedArgumentConvention::Pack_Out:                break;
+  }
+  llvm_unreachable("invalid parameter convention");
+}
+
+inline BridgedArgumentConvention getArgumentConvention(swift::ParameterConvention convention) {
+  switch (convention) {
+    case swift::ParameterConvention::Indirect_In:              return BridgedArgumentConvention::Indirect_In;
+    case swift::ParameterConvention::Indirect_In_Guaranteed:   return BridgedArgumentConvention::Indirect_In_Guaranteed;
+    case swift::ParameterConvention::Indirect_Inout:           return BridgedArgumentConvention::Indirect_Inout;
+    case swift::ParameterConvention::Indirect_InoutAliasable:  return BridgedArgumentConvention::Indirect_InoutAliasable;
+    case swift::ParameterConvention::Indirect_In_CXX:          return BridgedArgumentConvention::Indirect_In_CXX;
+    case swift::ParameterConvention::Direct_Owned:             return BridgedArgumentConvention::Direct_Owned;
+    case swift::ParameterConvention::Direct_Unowned:           return BridgedArgumentConvention::Direct_Unowned;
+    case swift::ParameterConvention::Direct_Guaranteed:        return BridgedArgumentConvention::Direct_Guaranteed;
+    case swift::ParameterConvention::Pack_Owned:               return BridgedArgumentConvention::Pack_Owned;
+    case swift::ParameterConvention::Pack_Inout:               return BridgedArgumentConvention::Pack_Inout;
+    case swift::ParameterConvention::Pack_Guaranteed:          return BridgedArgumentConvention::Pack_Guaranteed;
+  }
+  llvm_unreachable("invalid parameter convention");
+}
+
+inline BridgedArgumentConvention castToArgumentConvention(swift::SILArgumentConvention convention) {
+  return static_cast<BridgedArgumentConvention>(convention.Value);
+}
+
+BridgedParameterInfo::BridgedParameterInfo(swift::SILParameterInfo parameterInfo):
+  type(parameterInfo.getInterfaceType().getPointer()),
+  convention(getArgumentConvention(parameterInfo.getConvention())),
+  options(parameterInfo.getOptions().toRaw())
+{}
+
+swift::SILParameterInfo BridgedParameterInfo::unbridged() const {
+  return swift::SILParameterInfo(swift::CanType(type), getParameterConvention(convention),
+                                 swift::SILParameterInfo::Options(options));
+}
+
 SwiftInt BridgedParameterInfoArray::count() const {
-  return unbridged().size();
+  return parameterInfoArray.unbridged<swift::SILParameterInfo>().size();
 }
 
 BridgedParameterInfo BridgedParameterInfoArray::at(SwiftInt parameterIndex) const {
-  return BridgedParameterInfo(unbridged()[parameterIndex]);
+  return BridgedParameterInfo(parameterInfoArray.unbridged<swift::SILParameterInfo>()[parameterIndex]);
 }
 
 //===----------------------------------------------------------------------===//
 //                       BridgedLifetimeDependenceInfo
 //===----------------------------------------------------------------------===//
 
+BridgedLifetimeDependenceInfo::BridgedLifetimeDependenceInfo(swift::LifetimeDependenceInfo info)
+    : inheritLifetimeParamIndices(info.getInheritIndices()),
+      scopeLifetimeParamIndices(info.getScopeIndices()),
+      targetIndex(info.getTargetIndex()), immortal(info.isImmortal()) {}
+
 SwiftInt BridgedLifetimeDependenceInfoArray::count() const {
-  return unbridged().size();
+  return lifetimeDependenceInfoArray.unbridged<swift::LifetimeDependenceInfo>().size();
 }
 
 BridgedLifetimeDependenceInfo
 BridgedLifetimeDependenceInfoArray::at(SwiftInt index) const {
-  return BridgedLifetimeDependenceInfo(unbridged()[index]);
+  return BridgedLifetimeDependenceInfo(lifetimeDependenceInfoArray.unbridged<swift::LifetimeDependenceInfo>()[index]);
 }
 
 bool BridgedLifetimeDependenceInfo::empty() const {
@@ -141,6 +206,10 @@ BridgedOwnedString BridgedLifetimeDependenceInfo::getDebugDescription() const {
 //                               BridgedASTType
 //===----------------------------------------------------------------------===//
 
+swift::Type BridgedASTType::unbridged() const {
+  return type;
+}
+
 BridgedOwnedString BridgedASTType::getDebugDescription() const {
   return BridgedOwnedString(unbridged().getString());
 }
@@ -167,7 +236,7 @@ bool BridgedASTType::isInteger() const {
 
 BridgedResultInfoArray
 BridgedASTType::SILFunctionType_getResultsWithError() const {
-  return unbridged()->castTo<swift::SILFunctionType>()->getResultsWithError();
+  return {unbridged()->castTo<swift::SILFunctionType>()->getResultsWithError()};
 }
 
 SwiftInt BridgedASTType::SILFunctionType_getNumIndirectFormalResultsWithError() const {
@@ -183,11 +252,17 @@ SwiftInt BridgedASTType::SILFunctionType_getNumPackResults() const {
 
 OptionalBridgedResultInfo BridgedASTType::SILFunctionType_getErrorResult() const {
   auto fnTy = unbridged()->castTo<swift::SILFunctionType>();
-  return OptionalBridgedResultInfo(fnTy->getOptionalErrorResult());
+  auto resultInfo = fnTy->getOptionalErrorResult();
+  if (resultInfo) {
+    return {resultInfo->getInterfaceType().getPointer(),
+            BridgedResultInfo::castToResultConvention(resultInfo->getConvention())};
+  }
+  return {nullptr, BridgedResultConvention::Indirect};
+
 }
 
 BridgedParameterInfoArray BridgedASTType::SILFunctionType_getParameters() const {
-  return unbridged()->castTo<swift::SILFunctionType>()->getParameters();
+  return {unbridged()->castTo<swift::SILFunctionType>()->getParameters()};
 }
 
 bool BridgedASTType::SILFunctionType_hasSelfParam() const {
@@ -199,18 +274,24 @@ bool BridgedASTType::SILFunctionType_isTrivialNoescape() const {
 }
 
 BridgedYieldInfoArray BridgedASTType::SILFunctionType_getYields() const {
-  return unbridged()->castTo<swift::SILFunctionType>()->getYields();
+  return {unbridged()->castTo<swift::SILFunctionType>()->getYields()};
 }
 
 BridgedLifetimeDependenceInfoArray
 BridgedASTType::SILFunctionType_getLifetimeDependencies() const {
   auto fnTy = unbridged()->castTo<swift::SILFunctionType>();
-  return fnTy->getLifetimeDependencies();
+  return {fnTy->getLifetimeDependencies()};
 }
 
 //===----------------------------------------------------------------------===//
 //                                BridgedType
 //===----------------------------------------------------------------------===//
+
+BridgedType::BridgedType(swift::SILType t) : opaqueValue(t.getOpaqueValue()) {}
+
+swift::SILType BridgedType::unbridged() const {
+  return swift::SILType::getFromOpaqueValue(opaqueValue);
+}
 
 BridgedType::EnumElementIterator BridgedType::EnumElementIterator::getNext() const {
   return EnumElementIterator(std::next(unbridged()));
@@ -557,10 +638,6 @@ SwiftInt OptionalBridgedOperand::distanceTo(BridgedOperand element) const { retu
 //                                BridgedArgument
 //===----------------------------------------------------------------------===//
 
-inline BridgedArgumentConvention castToArgumentConvention(swift::SILArgumentConvention convention) {
-  return static_cast<BridgedArgumentConvention>(convention.Value);
-}
-
 swift::SILArgument * _Nonnull BridgedArgument::getArgument() const {
   return static_cast<swift::SILArgument *>(obj);
 }
@@ -586,6 +663,14 @@ void BridgedArgument::copyFlags(BridgedArgument fromArgument) const {
 //                            BridgedSubstitutionMap
 //===----------------------------------------------------------------------===//
 
+BridgedSubstitutionMap::BridgedSubstitutionMap(swift::SubstitutionMap map) {
+  *reinterpret_cast<swift::SubstitutionMap *>(&storage) = map;
+}
+
+swift::SubstitutionMap BridgedSubstitutionMap::unbridged() const {
+  return *reinterpret_cast<const swift::SubstitutionMap *>(&storage);
+}
+
 BridgedSubstitutionMap::BridgedSubstitutionMap() : BridgedSubstitutionMap(swift::SubstitutionMap()) {
 }
 
@@ -601,6 +686,12 @@ bool BridgedSubstitutionMap::hasAnySubstitutableParams() const {
 //                                BridgedLocation
 //===----------------------------------------------------------------------===//
 
+BridgedLocation::BridgedLocation(const swift::SILDebugLocation &loc) {
+  *reinterpret_cast<swift::SILDebugLocation *>(&storage) = loc;
+}
+const swift::SILDebugLocation &BridgedLocation::getLoc() const {
+  return *reinterpret_cast<const swift::SILDebugLocation *>(&storage);
+}
 BridgedLocation BridgedLocation::getAutogeneratedLocation() const {
   return getLoc().getAutogeneratedLocation();
 }
@@ -849,6 +940,10 @@ OptionalBridgedInstruction BridgedGlobalVar::getFirstStaticInitInst() const {
 //===----------------------------------------------------------------------===//
 //                                BridgedMultiValueResult
 //===----------------------------------------------------------------------===//
+
+swift::MultipleValueInstructionResult * _Nonnull BridgedMultiValueResult::unbridged() const {
+  return static_cast<swift::MultipleValueInstructionResult *>(obj);
+}
 
 BridgedInstruction BridgedMultiValueResult::getParent() const {
   return {unbridged()->getParent()};
