@@ -599,7 +599,7 @@ IntegerLiteralInst *optimizeBuiltinCanBeObjCClass(BuiltinInst *bi,
 /// Performs "predictable" memory access optimizations.
 ///
 /// See the PredictableMemoryAccessOptimizations pass.
-bool optimizeMemoryAccesses(SILFunction *fn, DominanceInfo *domInfo);
+bool optimizeMemoryAccesses(SILFunction *fn);
 
 /// Performs "predictable" dead allocation optimizations.
 ///

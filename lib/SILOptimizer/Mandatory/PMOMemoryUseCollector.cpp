@@ -136,7 +136,7 @@ class ElementUseCollector {
   SILModule &Module;
   const PMOMemoryObjectInfo &TheMemory;
   SmallVectorImpl<PMOMemoryUse> &Uses;
-  SmallVectorImpl<SILInstruction *> &Releases;
+  SmallVectorImpl<SILInstruction *> *Releases = nullptr;
 
   /// When walking the use list, if we index into a struct element, keep track
   /// of this, so that any indexes into tuple subelements don't affect the
@@ -146,7 +146,7 @@ class ElementUseCollector {
 public:
   ElementUseCollector(const PMOMemoryObjectInfo &TheMemory,
                       SmallVectorImpl<PMOMemoryUse> &Uses,
-                      SmallVectorImpl<SILInstruction *> &Releases)
+                      SmallVectorImpl<SILInstruction *> *Releases)
       : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory),
         Uses(Uses), Releases(Releases) {}
 
@@ -212,7 +212,9 @@ bool ElementUseCollector::collectContainerUses(SILValue boxValue) {
     // eliminated. That should be implemented and fixed.
     if (isa<StrongReleaseInst>(user) || isa<ReleaseValueInst>(user) ||
         isa<DestroyValueInst>(user)) {
-      Releases.push_back(user);
+      if (Releases) {
+        Releases->push_back(user);
+      }
       continue;
     }
 
@@ -436,7 +438,9 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
 
     // We model destroy_addr as a release of the entire value.
     if (isa<DestroyAddrInst>(User)) {
-      Releases.push_back(User);
+      if (Releases) {
+        Releases->push_back(User);
+      }
       continue;
     }
 
@@ -539,9 +543,16 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
 
 /// collectPMOElementUsesFrom - Analyze all uses of the specified allocation
 /// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
-/// and storing the information found into the Uses and Releases lists.
+/// and storing the information found into the Uses lists.
 bool swift::collectPMOElementUsesFrom(
+    const PMOMemoryObjectInfo &MemoryInfo, SmallVectorImpl<PMOMemoryUse> &Uses)
+{
+  return
+    ElementUseCollector(MemoryInfo, Uses, /*Releases*/nullptr).collectFrom();
+}
+
+bool swift::collectPMOElementUsesAndDestroysFrom(
     const PMOMemoryObjectInfo &MemoryInfo, SmallVectorImpl<PMOMemoryUse> &Uses,
     SmallVectorImpl<SILInstruction *> &Releases) {
-  return ElementUseCollector(MemoryInfo, Uses, Releases).collectFrom();
+  return ElementUseCollector(MemoryInfo, Uses, &Releases).collectFrom();
 }
