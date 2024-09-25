@@ -1279,10 +1279,6 @@ public:
   std::optional<unsigned>
   computeUnalignedFieldStartOffset(const TypeRef *TR,
                                    remote::TypeInfoProvider *ExternalTypeInfo) {
-    if (auto *objcTR = dyn_cast<ObjCClassTypeRef>(TR))
-      if (auto objcTI = ExternalTypeInfo->getTypeInfo(objcTR->getName()))
-        return objcTI->getSize();
-
     size_t isaAndRetainCountSize = sizeof(StoredSize) + sizeof(long long);
 
     const TypeRef *superclass = getBuilder().lookupSuperclass(TR);
@@ -1290,6 +1286,12 @@ public:
       // If there is no superclass the stat of the instance's field is right
       // after the isa and retain fields.
       return isaAndRetainCountSize;
+
+    // `ObjCClassTypeRef` instances represent classes in the ObjC module ("__C").
+    // These will never have Swift type metadata.
+    if (auto *objcSuper = dyn_cast<ObjCClassTypeRef>(superclass))
+      if (auto *superTI = ExternalTypeInfo->getTypeInfo(objcSuper->getName()))
+        return superTI->getSize();
 
     auto superclassStart =
         computeUnalignedFieldStartOffset(superclass, ExternalTypeInfo);
