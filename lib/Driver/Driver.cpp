@@ -516,7 +516,13 @@ createStatsReporter(const llvm::opt::InputArgList *ArgList,
                                                  DefaultTargetTriple,
                                                  OutputType,
                                                  OptType,
-                                                 A->getValue());
+                                                 A->getValue(),
+                                                 nullptr,
+                                                 nullptr,
+                                                 false,
+                                                 false,
+                                                 false,
+                                                 false);
 }
 
 static bool

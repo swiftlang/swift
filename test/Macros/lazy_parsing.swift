@@ -10,8 +10,8 @@
 
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -parse-as-library -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
-// RUN: %target-swift-frontend -typecheck -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -stats-output-dir %t/stats-no-lookup -primary-file %t/b.swift %t/a.swift
-// RUN: %target-swift-frontend -typecheck -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -stats-output-dir %t/stats-lookup -primary-file %t/c.swift %t/a.swift
+// RUN: %target-swift-frontend -typecheck -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -stats-output-dir %t/stats-no-lookup -fine-grained-timers -primary-file %t/b.swift %t/a.swift
+// RUN: %target-swift-frontend -typecheck -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -stats-output-dir %t/stats-lookup -fine-grained-timers -primary-file %t/c.swift %t/a.swift
 
 // We use '<=' here instead of '==' to take account of the fact that in debug
 // builds we'll be doing round-trip checking, which will parse the syntax tree

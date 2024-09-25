@@ -228,6 +228,10 @@ public:
   /// The path to which we should output statistics files.
   std::string StatsOutputDir;
 
+  /// Whether to enable timers tracking individual requests. This adds some
+  /// runtime overhead.
+  bool FineGrainedTimers = false;
+
   /// Trace changes to stats to files in StatsOutputDir.
   bool TraceStats = false;
 

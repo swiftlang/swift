@@ -76,7 +76,7 @@ CUSTOM_LOCATOR_PATH_ELT(ContextualType)
 SIMPLE_LOCATOR_PATH_ELT(DynamicLookupResult)
 
 /// The superclass of a protocol composition type.
-SIMPLE_LOCATOR_PATH_ELT(ProtocolCompositionSuperclassType)
+CUSTOM_LOCATOR_PATH_ELT(ProtocolCompositionMemberType)
 
 /// The constraint of an existential type.
 SIMPLE_LOCATOR_PATH_ELT(ExistentialConstraintType)

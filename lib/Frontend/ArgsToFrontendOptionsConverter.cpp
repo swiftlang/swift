@@ -416,6 +416,9 @@ void ArgsToFrontendOptionsConverter::computeDebugTimeOptions() {
   using namespace options;
   if (const Arg *A = Args.getLastArg(OPT_stats_output_dir)) {
     Opts.StatsOutputDir = A->getValue();
+    if (Args.getLastArg(OPT_fine_grained_timers)) {
+      Opts.FineGrainedTimers = true;
+    }
     if (Args.getLastArg(OPT_trace_stats_events)) {
       Opts.TraceStats = true;
     }

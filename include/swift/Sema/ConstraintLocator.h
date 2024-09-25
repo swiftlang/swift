@@ -751,6 +751,18 @@ public:
   }
 };
 
+class LocatorPathElt::ProtocolCompositionMemberType final : public StoredIntegerElement<1> {
+public:
+  ProtocolCompositionMemberType(unsigned index)
+      : StoredIntegerElement(ConstraintLocator::GenericArgument, index) {}
+
+  unsigned getIndex() const { return getValue(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ProtocolCompositionMemberType;
+  }
+};
+
 class LocatorPathElt::GenericArgument final : public StoredIntegerElement<1> {
 public:
   GenericArgument(unsigned index)
