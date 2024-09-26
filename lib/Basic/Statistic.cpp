@@ -357,8 +357,8 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
     SourceMgr(SM),
     ClangSourceMgr(CSM),
     RecursiveTimers(std::make_unique<RecursionSafeTimers>()),
-    IsFlushingTracesAndProfiles(false),
-    FineGrainedTimers(FineGrainedTimers)
+    FineGrainedTimers(FineGrainedTimers),
+    IsFlushingTracesAndProfiles(false)
 {
   path::append(StatsFilename, makeStatsFileName(ProgramName, AuxName));
   path::append(TraceFilename, makeTraceFileName(ProgramName, AuxName));
@@ -458,9 +458,10 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
     auto &C = getFrontendCounters();
 #define FRONTEND_STATISTIC(TY, NAME)                          \
     do {                                                      \
-      if (C.NAME)                                             \
+      if (C.NAME) {                                           \
         OS << delim << "\t\"" #TY "." #NAME "\": " << C.NAME; \
-      delim = ",\n";                                          \
+        delim = ",\n";                                        \
+      }                                                       \
     } while (0);
 #include "swift/Basic/Statistics.def"
 #undef FRONTEND_STATISTIC
@@ -469,9 +470,10 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
     auto &C = getDriverCounters();
 #define DRIVER_STATISTIC(NAME)                                \
     do {                                                      \
-      if (C.NAME)                                             \
+      if (C.NAME) {                                           \
         OS << delim << "\t\"Driver." #NAME "\": " << C.NAME;  \
-      delim = ",\n";                                          \
+        delim = ",\n";                                        \
+      }                                                       \
     } while (0);
 #include "swift/Basic/Statistics.def"
 #undef DRIVER_STATISTIC
