@@ -697,28 +697,70 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
 /// the implied value.
 static void diagnoseReadWriteMutatingnessMismatch(
     AbstractStorageDecl *storage, bool isWriterMutating, WriteImplKind write,
-    AccessorKind writeAccesor, ReadWriteImplKind readWrite,
-    AccessorKind readWriteAccessor) {
+    AccessorKind writerAccesor, ReadWriteImplKind readWrite,
+    AccessorKind readWriterAccessor) {
   if (storage->getImplInfo().getReadWriteImpl() != readWrite)
     return;
-  auto modifyAccessor = storage->getParsedAccessor(readWriteAccessor);
+  auto modifyAccessor = storage->getParsedAccessor(readWriterAccessor);
   if (!modifyAccessor)
     return;
 
   auto isModifierMutating = modifyAccessor->isMutating();
-  auto isReaderOrWriterMutating =
-      isWriterMutating || storage->isGetterMutating();
+  auto isReaderMutating = storage->isGetterMutating();
+  auto isReaderOrWriterMutating = isWriterMutating || isReaderMutating;
   if (isReaderOrWriterMutating == isModifierMutating)
     return;
 
-  modifyAccessor->diagnose(diag::modify_mutatingness_differs_from_setter,
-                           isModifierMutating ? SelfAccessKind::Mutating
-                                              : SelfAccessKind::NonMutating,
-                           isModifierMutating ? SelfAccessKind::NonMutating
-                                              : SelfAccessKind::Mutating);
-  auto *setter = storage->getParsedAccessor(writeAccesor);
-  if (setter)
-    setter->diagnose(diag::previous_accessor, "setter", 0);
+  auto disagreesWithReader = (isReaderMutating != isModifierMutating);
+  auto disagreesWithWriter = (isWriterMutating != isModifierMutating);
+  auto disagreesWithBoth = disagreesWithReader && disagreesWithWriter;
+
+  auto readerAccessor = directAccessorKindForReadImpl(storage->getReadImpl());
+  StringRef readerAccessorName =
+      readerAccessor.has_value()
+          ? getAccessorNameForDiagnostic(*readerAccessor, /*article=*/false)
+          : "the inherited accessor";
+  StringRef writerAccessorName =
+      getAccessorNameForDiagnostic(writerAccesor, /*article=*/false);
+  unsigned diagnosticForm;
+  if (isModifierMutating) {
+    // modifier can't be mutating when both the setter is nonmutating and the
+    // getter isn't mutating
+    assert(disagreesWithBoth);
+    diagnosticForm = 0;
+  } else if (disagreesWithBoth) {
+    // modify can't be nonmutating when either the setter isn't nonmutating or
+    // the getter is mutating
+    diagnosticForm = 1;
+  } else if (disagreesWithWriter) {
+    // modify can't be nonmutating when the setter isn't nonmutating
+    diagnosticForm = 2;
+  } else {
+    // modify can't be nonmutating when the getter is mutating
+    assert(disagreesWithReader);
+    diagnosticForm = 3;
+  }
+
+  modifyAccessor->diagnose(
+      diag::readwriter_mutatingness_differs_from_reader_or_writer_mutatingness,
+      getAccessorNameForDiagnostic(readWriterAccessor, /*article=*/false),
+      isModifierMutating ? SelfAccessKind::Mutating
+                         : SelfAccessKind::NonMutating,
+      diagnosticForm, writerAccessorName, SelfAccessKind::NonMutating,
+      readerAccessorName, SelfAccessKind::Mutating);
+  auto *writer = storage->getParsedAccessor(writerAccesor);
+  if (disagreesWithWriter && writer) {
+    writer->diagnose(
+        diag::previous_accessor,
+        getAccessorNameForDiagnostic(writerAccesor, /*article=*/false), 0);
+  }
+  AccessorDecl *reader = nullptr;
+  if (disagreesWithReader && readerAccessor.has_value() &&
+      (reader = storage->getParsedAccessor(*readerAccessor))) {
+    StringRef readerAccessorName =
+        getAccessorNameForDiagnostic(reader, /*article=*/false);
+    reader->diagnose(diag::previous_accessor, readerAccessorName, 0);
+  }
   modifyAccessor->setInvalid();
 }
 

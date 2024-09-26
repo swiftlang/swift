@@ -1710,9 +1710,10 @@ ERROR(functions_mutating_and_not,none,
 ERROR(static_functions_not_mutating,none,
       "static functions must not be declared mutating", ())
 
-ERROR(modify_mutatingness_differs_from_setter,none,
-      "'modify' accessor cannot be %0 when the setter is %1",
-      (SelfAccessKind, SelfAccessKind))
+ERROR(readwriter_mutatingness_differs_from_reader_or_writer_mutatingness,none,
+      "%0 cannot be %1 when "
+      "%select{both the %3 is %4 and the %5 is not %6|either the %3 is not %4 or the %5 is %6|the %3 is not %4|the %5 is %6}2",
+      (StringRef, SelfAccessKind, unsigned, StringRef, SelfAccessKind, StringRef, SelfAccessKind))
 
 ERROR(transparent_in_protocols_not_supported,none,
       "'@_transparent' attribute is not supported on declarations within protocols", ())
