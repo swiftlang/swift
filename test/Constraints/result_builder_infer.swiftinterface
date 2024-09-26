@@ -1,0 +1,48 @@
+// RUN: %target-typecheck-verify-swift
+
+// swift-interface-format-version: 1.0
+// swift-module-flags: -enable-library-evolution
+
+import Swift
+
+public struct Result {}
+
+@resultBuilder public enum Builder<T> {
+  public static func buildBlock(_: T...) -> Result
+}
+
+public protocol P_Builder_Int {
+  @Builder<Int> func function() -> Result
+  @Builder<Int> var property: Result { get }
+  @Builder<Int> subscript(_: Int) -> Result { get }
+}
+public protocol P_Builder_String {
+  @Builder<String> func function() -> Result
+  @Builder<String> var property: Result { get }
+  @Builder<String> subscript(_: Int) -> Result { get }
+}
+
+// Do not call out ambiguous result builder inference if the inferred-for
+// function has no body.
+
+public struct Test : P_Builder_Int, P_Builder_String {
+  dynamic public func function() -> Result
+  dynamic public var property: Result {
+    get
+  }
+  dynamic public subscript(_: Int) -> Result {
+    get
+  }
+}
+extension Test {
+  @_dynamicReplacement(for: function)
+  public func replacement_function() -> Result
+  @_dynamicReplacement(for: property)
+  public var replacement_property: Result {
+    get
+  }
+  @_dynamicReplacement(for: subscript(_:))
+  public subscript(replacement_subscript _: Int) -> Result {
+    get
+  }
+}
