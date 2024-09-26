@@ -2,6 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: volatile
+// REQUIRES: swift_feature_Volatile
 
 import _Volatile
 

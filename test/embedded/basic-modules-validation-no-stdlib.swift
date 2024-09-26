@@ -14,6 +14,7 @@
 // RUN: not %target-swift-frontend -emit-ir -I %t %t/Main.swift -parse-stdlib -wmo 2>&1 | %FileCheck %s --check-prefix CHECK-B
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Embedded
 
 // BEGIN MyModule.swift
 

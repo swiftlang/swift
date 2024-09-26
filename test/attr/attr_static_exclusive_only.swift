@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature StaticExclusiveOnly
 
+// REQUIRES: swift_feature_StaticExclusiveOnly
+
 @_staticExclusiveOnly // expected-error {{@_staticExclusiveOnly can only be applied to noncopyable types}}
 struct A {}
 

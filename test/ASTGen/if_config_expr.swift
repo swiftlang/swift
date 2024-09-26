@@ -1,8 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature ParserASTGen -D CONDITION_1
 
-// -enable-experimental-feature requires an asserts build
-// REQUIRES: asserts
 // REQUIRES: swift_swift_parser
+// REQUIRES: swift_feature_ParserASTGen
 
 postfix operator ++
 postfix func ++ (_: Int) -> Int { 0 }

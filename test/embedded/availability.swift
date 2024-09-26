@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift -parse-stdlib -enable-experimental-feature Embedded
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Embedded
 
 @_unavailableInEmbedded
 public struct UnavailableInEmbedded {}

@@ -35,6 +35,8 @@
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift5.swift -I %t \
 // RUN:   -swift-version 5 -verify
 
+// REQUIRES: swift_feature_InternalImportsByDefault
+
 //--- DepUsedFromInlinableCode.swift
 public struct TypeUsedFromInlinableCode {}
 public func funcUsedFromInlinableCode() {}

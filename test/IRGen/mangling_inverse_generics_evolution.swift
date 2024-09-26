@@ -9,6 +9,9 @@
 
 // RUN: %FileCheck %s < %t/test.irgen
 
+// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
+
 public protocol P: ~Copyable { }
 
 public struct CallMe<U: ~Copyable> {

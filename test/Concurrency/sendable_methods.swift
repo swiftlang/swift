@@ -2,7 +2,7 @@
 // RUN: %target-swift-emit-silgen %s -verify -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking -module-name sendable_methods -strict-concurrency=complete | %FileCheck %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_InferSendableFromCaptures
 
 func outer() {
     @Sendable func sendable() {}

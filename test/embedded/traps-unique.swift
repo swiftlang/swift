@@ -5,6 +5,7 @@
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
 
 public func foobar(i: Int) {
   if i == 1 { _assertionFailure("prefix", "message 1", file: "", line: 0, flags: 0) }

@@ -2,6 +2,8 @@
 
 // REQUIRES: PTRSIZE=64
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_LayoutStringValueWitnesses
+// REQUIRES: swift_feature_LayoutStringValueWitnessesInstantiation
 
 protocol P {}
 

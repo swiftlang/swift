@@ -4,6 +4,9 @@
 // RUN:   -verify -typecheck %s -debug-generic-signatures \
 // RUN:   -debug-inverse-requirements 2>&1 | %FileCheck %s --implicit-check-not "error:"
 
+// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
+
 // CHECK-LABEL: (file).genericFn@
 // CHECK: Generic signature: <T where T : Copyable, T : Escapable>
 func genericFn<T>(_ t: T) {}

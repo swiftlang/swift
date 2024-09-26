@@ -1,6 +1,7 @@
 // RUN: %target-swift-emit-ir -parse-as-library -module-name main -verify %s -enable-experimental-feature Embedded -wmo
 
 // REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
 
 protocol ClassBound: AnyObject {
   func foo()

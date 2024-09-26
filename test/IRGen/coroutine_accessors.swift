@@ -12,7 +12,9 @@
 // RUN:         -enable-experimental-feature CoroutineAccessors \
 // RUN:         -enable-experimental-feature CoroutineAccessorsAllocateInCallee
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_CoroutineAccessors
+// REQUIRES: swift_feature_CoroutineAccessorsAllocateInCallee
+
 
 @frozen
 public struct S {

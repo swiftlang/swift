@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -parse-as-library -target %target-swift-5.1-abi-triple -strict-concurrency=complete -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
 
 ////////////////////////
 // MARK: Declarations //

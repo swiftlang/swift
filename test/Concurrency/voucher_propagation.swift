@@ -13,6 +13,7 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_IsolatedDeinit
 
 import Darwin
 import Dispatch // expected-warning {{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'Dispatch'}}
