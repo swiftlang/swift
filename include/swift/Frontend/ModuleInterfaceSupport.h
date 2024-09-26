@@ -42,6 +42,10 @@ struct ModuleInterfaceOptions {
   /// [TODO: Clang-type-plumbing] This check should go away.
   bool PrintFullConvention = false;
 
+  /// Print some ABI details for public symbols as comments that can be
+  /// parsed by another tool.
+  bool ABIComments = false;
+
   struct InterfaceFlags {
     /// Copy of all the command-line flags passed at .swiftinterface
     /// generation time, re-applied to CompilerInvocation when reading
