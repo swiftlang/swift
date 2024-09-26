@@ -207,8 +207,8 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool useExportedModuleNames,
                                                    bool aliasModuleNames,
                                                    llvm::SmallSet<StringRef, 4>
-                                                     *aliasModuleNamesTargets
-                                                   ) {
+                                                     *aliasModuleNamesTargets,
+                                                   bool abiComments) {
   PrintOptions result;
   result.IsForSwiftInterface = true;
   result.PrintLongAttrsOnSeparateLines = true;
@@ -230,6 +230,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   result.PreferTypeRepr = preferTypeRepr;
   result.AliasModuleNames = aliasModuleNames;
   result.AliasModuleNamesTargets = aliasModuleNamesTargets;
+  result.PrintABIComments = abiComments;
   if (printFullConvention)
     result.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::Full;
@@ -770,19 +771,28 @@ class PrintAST : public ASTVisitor<PrintAST> {
     printRawComment(RC);
   }
 
-  void printDocumentationComment(const Decl *D) {
-    if (!Options.PrintDocumentationComments)
-      return;
+  /// If we should print a mangled name for this declaration, return that
+  /// mangled name.
+  std::optional<std::string> mangledNameToPrint(const Decl *D);
 
-    // Try to print a comment from Clang.
-    auto MaybeClangNode = D->getClangNode();
-    if (MaybeClangNode) {
-      if (auto *CD = MaybeClangNode.getAsDecl())
-        printClangDocumentationComment(CD);
-      return;
+  void printDocumentationComment(const Decl *D) {
+    if (Options.PrintDocumentationComments) {
+      // Try to print a comment from Clang.
+      auto MaybeClangNode = D->getClangNode();
+      if (MaybeClangNode) {
+        if (auto *CD = MaybeClangNode.getAsDecl())
+          printClangDocumentationComment(CD);
+        return;
+      }
+
+      printSwiftDocumentationComment(D);
     }
 
-    printSwiftDocumentationComment(D);
+    if (auto mangledName = mangledNameToPrint(D)) {
+      indent();
+      Printer << "// MANGLED NAME: " << *mangledName;
+      Printer.printNewline();
+    }
   }
 
   void printStaticKeyword(StaticSpellingKind StaticSpelling) {
@@ -3059,6 +3069,60 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
                        Options.BracketOptions.shouldOpenExtension(decl),
                        Options.BracketOptions.shouldCloseExtension(decl));
   }
+}
+
+std::optional<std::string> PrintAST::mangledNameToPrint(const Decl *D) {
+  using ASTMangler = Mangle::ASTMangler;
+
+  if (!Options.PrintABIComments)
+    return std::nullopt;
+
+  auto valueDecl = dyn_cast<ValueDecl>(D);
+  if (!valueDecl)
+    return std::nullopt;
+
+  // Anything with an access level less than "package" isn't meant to be
+  // referenced from source code outside the module.
+  if (valueDecl->getEffectiveAccess() < AccessLevel::Package)
+    return std::nullopt;
+
+  // For functions, mangle the entity directly.
+  if (auto func = dyn_cast<FuncDecl>(D)) {
+    ASTMangler mangler;
+    return mangler.mangleEntity(func);
+  }
+
+  // For initializers, mangle the allocating initializer.
+  if (auto init = dyn_cast<ConstructorDecl>(D)) {
+    ASTMangler mangler;
+    return mangler.mangleConstructorEntity(init, /*isAllocating=*/true);
+  }
+
+  // For global and static variables, mangle the entity directly.
+  if (auto var = dyn_cast<VarDecl>(D)) {
+    if (!var->isInstanceMember()) {
+      ASTMangler mangler;
+      return mangler.mangleEntity(var);
+    }
+  }
+
+  // For subscripts, mangle the entity directly.
+  if (auto subscript = dyn_cast<SubscriptDecl>(D)) {
+    ASTMangler mangler;
+    return mangler.mangleEntity(subscript);
+  }
+
+  // For nominal types, mangle the type metadata accessor.
+  if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
+    if (!isa<ProtocolDecl>(nominal) && !nominal->getGenericSignature()) {
+      ASTMangler mangler;
+      std::string name = mangler.mangleNominalType(nominal);
+      name += "Ma";
+      return name;
+    }
+  }
+
+  return std::nullopt;
 }
 
 static void suppressingFeatureIsolatedAny(PrintOptions &options,

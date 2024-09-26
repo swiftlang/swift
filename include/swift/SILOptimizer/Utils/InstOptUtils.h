@@ -599,14 +599,12 @@ IntegerLiteralInst *optimizeBuiltinCanBeObjCClass(BuiltinInst *bi,
 /// Performs "predictable" memory access optimizations.
 ///
 /// See the PredictableMemoryAccessOptimizations pass.
-bool optimizeMemoryAccesses(SILFunction *fn, DominanceInfo *domInfo);
+bool optimizeMemoryAccesses(SILFunction *fn);
 
 /// Performs "predictable" dead allocation optimizations.
 ///
 /// See the PredictableDeadAllocationElimination pass.
 bool eliminateDeadAllocations(SILFunction *fn, DominanceInfo *domInfo);
-
-SILVTable *specializeVTableForType(SILType type, SILModule &mod, SILTransform *transform);
 
 bool specializeClassMethodInst(ClassMethodInst *cm);
 

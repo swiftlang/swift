@@ -1333,9 +1333,8 @@ void IRGenerator::emitLazyDefinitions() {
     assert(LazyFieldDescriptors.empty());
     // LazyFunctionDefinitions are allowed, but they must not be generic
     for (SILFunction *f : LazyFunctionDefinitions) {
-      assert(hasValidSignatureForEmbedded(f));
+      ASSERT(hasValidSignatureForEmbedded(f));
     }
-    assert(LazyWitnessTables.empty());
     assert(LazyCanonicalSpecializedMetadataAccessors.empty());
     assert(LazyMetadataAccessors.empty());
     // LazyClassMetadata is allowed
@@ -1483,7 +1482,7 @@ void IRGenerator::addLazyFunction(SILFunction *f) {
 
   // Embedded Swift doesn't expect any generic functions to be referenced.
   if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
-    assert(hasValidSignatureForEmbedded(f));
+    ASSERT(hasValidSignatureForEmbedded(f));
   }
 
   assert(!FinishedEmittingLazyDefinitions);
@@ -6108,7 +6107,7 @@ IRGenModule::getAddrOfWitnessTableLazyCacheVariable(
 ///
 /// This can only be used with non-dependent conformances.
 llvm::Constant*
-IRGenModule::getAddrOfWitnessTable(const RootProtocolConformance *conf,
+IRGenModule::getAddrOfWitnessTable(const ProtocolConformance *conf,
                                    ConstantInit definition) {
   IRGen.addLazyWitnessTable(conf);
 

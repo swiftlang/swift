@@ -18,17 +18,30 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
   public init(bridged: BridgedWitnessTable) { self.bridged = bridged }
 
   public struct Entry : CustomStringConvertible, NoReflectionChildren {
-    fileprivate let bridged: BridgedWitnessTableEntry
-    
+    public let bridged: BridgedWitnessTableEntry
+
     public typealias Kind = BridgedWitnessTableEntry.Kind
+
+    fileprivate init(bridged: BridgedWitnessTableEntry) {
+      self.bridged = bridged
+    }
+
+    public init(methodRequirement: DeclRef, methodFunction: Function) {
+      self.bridged = BridgedWitnessTableEntry.createMethod(methodRequirement.bridged, methodFunction.bridged)
+    }
 
     public var kind: Kind {
       return bridged.getKind()
     }
     
     public var methodFunction: Function? {
-      assert(kind == .Method)
+      assert(kind == .method)
       return bridged.getMethodFunction().function
+    }
+
+    public var methodRequirement: DeclRef {
+      assert(kind == .method)
+      return DeclRef(bridged: bridged.getMethodRequirement())
     }
 
     public var description: String {
@@ -37,22 +50,26 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
   }
 
   public struct EntryArray : BridgedRandomAccessCollection {
-    fileprivate let base: BridgedWitnessTableEntry
+    fileprivate let bridgedTable: BridgedWitnessTable
     public let count: Int
     
-    public var startIndex: Int { return 0 }
-    public var endIndex: Int { return count }
-    
+    init(witnessTable: WitnessTable) {
+      self.bridgedTable = witnessTable.bridged
+      self.count = witnessTable.bridged.getNumEntries()
+    }
+
+    public var startIndex: Int { 0 }
+    public var endIndex: Int { count }
+
     public subscript(_ index: Int) -> Entry {
-      assert(index >= startIndex && index < endIndex)
-      return Entry(bridged: base.advanceBy(index))
+      precondition(index >= startIndex && index < endIndex)
+      return Entry(bridged: bridgedTable.getEntry(index))
     }
   }
 
-  public var entries: EntryArray {
-    let entries = bridged.getEntries()
-    return EntryArray(base: entries.base, count: entries.count)
-  }
+  public var entries: EntryArray { EntryArray(witnessTable: self) }
+
+  public var isDefinition: Bool { !bridged.isDeclaration() }
 
   public var description: String {
     return String(taking: bridged.getDebugDescription())
@@ -65,12 +82,26 @@ public struct DefaultWitnessTable : CustomStringConvertible, NoReflectionChildre
   public init(bridged: BridgedDefaultWitnessTable) { self.bridged = bridged }
 
   public typealias Entry = WitnessTable.Entry
-  public typealias EntryArray = WitnessTable.EntryArray
 
-  public var entries: EntryArray {
-    let entries = bridged.getEntries()
-    return EntryArray(base: entries.base, count: entries.count)
+  public struct EntryArray : BridgedRandomAccessCollection {
+    fileprivate let bridgedTable: BridgedDefaultWitnessTable
+    public let count: Int
+
+    init(witnessTable: DefaultWitnessTable) {
+      self.bridgedTable = witnessTable.bridged
+      self.count = witnessTable.bridged.getNumEntries()
+    }
+
+    public var startIndex: Int { 0 }
+    public var endIndex: Int { count }
+
+    public subscript(_ index: Int) -> Entry {
+      precondition(index >= startIndex && index < endIndex)
+      return Entry(bridged: bridgedTable.getEntry(index))
+    }
   }
+
+  public var entries: EntryArray { EntryArray(witnessTable: self) }
 
   public var description: String {
     return String(taking: bridged.getDebugDescription())

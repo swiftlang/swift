@@ -70,7 +70,7 @@
 /include/swift/AST/Evaluator*                      @CodaFi @slavapestov
 /include/swift/Basic/                              @DougGregor
 /include/swift/Basic/Features.def                  @DougGregor @hborla
-/include/swift/ClangImporter                       @zoecarver @hyp @egorzhdan @beccadax @ian-twilightcoder
+/include/swift/ClangImporter                       @zoecarver @hyp @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun
 /include/swift/DependencyScan                      @artemcm
 /include/swift/Driver*/                            @artemcm
 /include/swift/Frontend*/                          @artemcm @tshortli
@@ -81,7 +81,7 @@
 /include/swift/Migrator/                           @nkcsgexi
 /include/swift/Option/*Options*                    @tshortli
 /include/swift/Parse/                              @ahoppen @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
-/include/swift/PrintAsClang                        @zoecarver @hyp @egorzhdan
+/include/swift/PrintAsClang                        @zoecarver @hyp @egorzhdan @Xazax-hun
 /include/swift/Refactoring                         @ahoppen @bnbarham @hamishknight @rintaro
 /include/swift/Runtime/                            @rjmccall
 /include/swift/SIL/                                @jckarter
@@ -116,7 +116,7 @@
 /lib/ASTGen/                                        @ahoppen @bnbarham @CodaFi @hamishknight @rintaro
 /lib/Basic/                                         @DougGregor
 /lib/Basic/Windows                                  @compnerd
-/lib/ClangImporter                                  @zoecarver @hyp @egorzhdan @beccadax @ian-twilightcoder
+/lib/ClangImporter                                  @zoecarver @hyp @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun
 /lib/ClangImporter/DWARFImporter*                   @adrian-prantl
 /lib/DependencyScan                                 @artemcm
 /lib/Driver*/                                       @artemcm
@@ -135,7 +135,7 @@
 /lib/Markup/                                        @nkcsgexi
 /lib/Migrator/                                      @nkcsgexi
 /lib/Parse/                                         @ahoppen @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
-/lib/PrintAsClang                                   @zoecarver @hyp @egorzhdan
+/lib/PrintAsClang                                   @zoecarver @hyp @egorzhdan @Xazax-hun
 /lib/Refactoring/                                   @ahoppen @bnbarham @hamishknight @rintaro
 /lib/SIL/                                           @jckarter
 /lib/SIL/**/*DebugInfo*                             @adrian-prantl
@@ -177,7 +177,7 @@
 /stdlib/public/*Demangl*/                 @rjmccall
 /stdlib/public/Backtracing/               @al45tair
 /stdlib/public/Concurrency/               @ktoso
-/stdlib/public/Cxx/                       @zoecarver @hyp @egorzhdan
+/stdlib/public/Cxx/                       @zoecarver @hyp @egorzhdan @Xazax-hun
 /stdlib/public/Distributed/               @ktoso
 /stdlib/public/Observation/               @phausler
 /stdlib/public/SwiftRemoteMirror/         @slavapestov
@@ -202,7 +202,7 @@
 /test/IDE/                                          @ahoppen @bnbarham @hamishknight @rintaro
 /test/IRGen/                                        @rjmccall
 /test/Index/                                        @ahoppen @bnbarham @hamishknight @rintaro
-/test/Interop/                                      @zoecarver @hyp @egorzhdan
+/test/Interop/                                      @zoecarver @hyp @egorzhdan @Xazax-hun
 /test/Migrator/                                     @nkcsgexi
 /test/Parse/                                        @ahoppen @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
 /test/Profiler                                      @ahoppen @bnbarham @hamishknight @rintaro

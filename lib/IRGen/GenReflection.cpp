@@ -1144,7 +1144,7 @@ public:
 
     auto alignment = ti->getFixedAlignment().getValue();
     unsigned bitwiseTakable =
-      (ti->isBitwiseTakable(ResilienceExpansion::Minimal) == IsBitwiseTakable
+      (ti->getBitwiseTakable(ResilienceExpansion::Minimal) >= IsBitwiseTakableOnly
        ? 1 : 0);
     B.addInt32(alignment | (bitwiseTakable << 16));
 

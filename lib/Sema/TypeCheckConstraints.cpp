@@ -2338,7 +2338,9 @@ ForcedCheckedCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   return nullptr;
 }
 
-bool swift::canAddExplicitConsume(ModuleDecl *module, Expr *expr) {
+bool swift::canAddExplicitConsume(constraints::Solution &sol,
+                                  ModuleDecl *module,
+                                  Expr *expr) {
   expr = expr->getSemanticsProvidingExpr();
 
   // Is it already wrapped in a `consume`?
@@ -2346,7 +2348,8 @@ bool swift::canAddExplicitConsume(ModuleDecl *module, Expr *expr) {
     return false;
 
   // Is this expression valid to wrap inside a `consume`?
-  auto diags = findSyntacticErrorForConsume(module, SourceLoc(), expr);
+  auto diags = findSyntacticErrorForConsume(module, SourceLoc(), expr,
+                            [&](Expr *e) { return sol.getResolvedType(e); });
   return diags.empty();
 }
 

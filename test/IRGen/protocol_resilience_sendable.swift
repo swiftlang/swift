@@ -6,10 +6,36 @@
 // RUN: %target-swift-frontend -I %t -emit-ir %s -target %target-cpu-apple-macos14.0 | %FileCheck %s -DINT=i%target-ptrsize -check-prefix=CHECK-USAGE -check-prefix=CHECK-USAGE-BEFORE
 // RUN: %target-swift-frontend -I %t -emit-ir %s -target %target-cpu-apple-macos15.0 | %FileCheck %s -DINT=i%target-ptrsize -check-prefix=CHECK-USAGE -check-prefix=CHECK-USAGE-AFTER
 
+// RUN: %target-swift-frontend -I %t -emit-ir %s -target %target-cpu-apple-macos14.0 -enable-library-evolution | %FileCheck %s -DINT=i%target-ptrsize -check-prefix=CHECK-USAGE -check-prefix=CHECK-USAGE-BEFORE
+// RUN: %target-swift-frontend -I %t -emit-ir %s -target %target-cpu-apple-macos15.0 -enable-library-evolution | %FileCheck %s -DINT=i%target-ptrsize -check-prefix=CHECK-USAGE -check-prefix=CHECK-USAGE-AFTER
+
 // REQUIRES: OS=macosx
 
 import resilient_protocol
 import non_resilient_protocol
+
+// CHECK-USAGE: @"$s28protocol_resilience_sendable9LocalTypeVAA0D11SubProtocolAAWP" = hidden constant [3 x ptr] [
+// CHECK-USAGE-SAME: ptr @"$s28protocol_resilience_sendable9LocalTypeVAA0D11SubProtocolAAMc",
+// CHECK-USAGE-SAME: ptr @"$s28protocol_resilience_sendable9LocalTypeVAA0D8ProtocolAAWP",
+// CHECK-USAGE-SAME: ptr @"$s28protocol_resilience_sendable9LocalTypeVAA0D11SubProtocolA2aDP9subMethodyyFTW"
+public protocol LocalProtocol: Sendable {
+  func method()
+}
+
+protocol LocalSubProtocol: Sendable, LocalProtocol {
+  func subMethod()
+}
+
+struct LocalType: Sendable, LocalSubProtocol {
+  func method() { }
+  func subMethod() { }
+}
+
+func acceptLocalProtocol<T: LocalProtocol>(_: T.Type) { }
+func testLocalType() {
+  acceptLocalProtocol(LocalType.self)
+}
+
 
 func acceptResilientSendableBase<T: ResilientSendableBase>(_: T.Type) { }
 

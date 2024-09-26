@@ -576,6 +576,9 @@ public:
   getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                      ModuleDecl::ImportFilter filter) const override;
 
+  virtual void getExternalMacros(
+      SmallVectorImpl<ExternalMacroPlugin> &macros) const override;
+
   virtual void
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const override;
 

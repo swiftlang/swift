@@ -16,7 +16,9 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ModuleDependencies.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
@@ -477,6 +479,26 @@ SerializedModuleLoaderBase::getImportsOfModule(
                                                          importedHeader};
 }
 
+std::optional<MacroPluginDependency>
+SerializedModuleLoaderBase::resolveMacroPlugin(const ExternalMacroPlugin &macro,
+                                               StringRef packageName) {
+  if (macro.MacroAccess == ExternalMacroPlugin::Access::Internal)
+    return std::nullopt;
+
+  if (macro.MacroAccess == ExternalMacroPlugin::Access::Package &&
+      packageName != Ctx.LangOpts.PackageName)
+    return std::nullopt;
+
+  auto &loader = Ctx.getPluginLoader();
+  auto &entry =
+      loader.lookupPluginByModuleName(Ctx.getIdentifier(macro.ModuleName));
+  if (entry.libraryPath.empty() && entry.executablePath.empty())
+    return std::nullopt;
+
+  return MacroPluginDependency{entry.libraryPath.str(),
+                               entry.executablePath.str()};
+}
+
 llvm::ErrorOr<ModuleDependencyInfo>
 SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
                                            bool isTestableImport) {
@@ -561,6 +583,15 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
       optionalModuleImports, linkLibraries, importedHeader,
       definingModulePath, isFramework, loadedModuleFile->isStaticLibrary(),
       /*module-cache-key*/ "", userModuleVer);
+
+  for (auto &macro : loadedModuleFile->getExternalMacros()) {
+    auto deps =
+        resolveMacroPlugin(macro, loadedModuleFile->getModulePackageName());
+    if (!deps)
+      continue;
+    dependencies.addMacroDependency(macro.ModuleName, deps->LibraryPath,
+                                    deps->ExecutablePath);
+  }
 
   return std::move(dependencies);
 }
@@ -1727,6 +1758,11 @@ void SerializedASTFile::getImportedModules(
     SmallVectorImpl<ImportedModule> &imports,
     ModuleDecl::ImportFilter filter) const {
   File.getImportedModules(imports, filter);
+}
+
+void SerializedASTFile::getExternalMacros(
+    SmallVectorImpl<ExternalMacroPlugin> &macros) const {
+  File.getExternalMacros(macros);
 }
 
 void SerializedASTFile::collectLinkLibrariesFromImports(

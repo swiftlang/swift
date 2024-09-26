@@ -171,17 +171,6 @@ std::string ASTMangler::mangleAccessorEntity(AccessorKind kind,
   return finalize();
 }
 
-std::string ASTMangler::mangleGlobalGetterEntity(const ValueDecl *decl,
-                                                 SymbolKind SKind) {
-  assert(isa<VarDecl>(decl) && "Only variables can have global getters");
-  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(decl));
-  beginMangling();
-  BaseEntitySignature base(decl);
-  appendEntity(decl, base, "vG", /*isStatic*/false);
-  appendSymbolKind(SKind);
-  return finalize();
-}
-
 std::string ASTMangler::mangleDefaultArgumentEntity(const DeclContext *func,
                                                     unsigned index,
                                                     SymbolKind SKind) {
@@ -249,12 +238,15 @@ std::string ASTMangler::mangleConstructorVTableThunk(
   return finalize();
 }
 
-std::string ASTMangler::mangleWitnessTable(const RootProtocolConformance *C) {
+std::string ASTMangler::mangleWitnessTable(const ProtocolConformance *C) {
   llvm::SaveAndRestore X(AllowInverses,
                          inversesAllowedIn(C->getDeclContext()));
 
   beginMangling();
-  if (isa<NormalProtocolConformance>(C)) {
+  if (auto *sc = dyn_cast<SpecializedProtocolConformance>(C)) {
+    appendProtocolConformance(sc);
+    appendOperator("WP");
+  } else if (isa<NormalProtocolConformance>(C)) {
     appendProtocolConformance(C);
     appendOperator("WP");
   } else if (isa<SelfProtocolConformance>(C)) {

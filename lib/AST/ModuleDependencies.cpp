@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/MacroDefinition.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/PluginLoader.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Frontend/Frontend.h"
@@ -103,33 +104,6 @@ ModuleDependencyInfo::getAsPlaceholderDependencyModule() const {
 void ModuleDependencyInfo::addTestableImport(ImportPath::Module module) {
   assert(getAsSwiftSourceModule() && "Expected source module for addTestableImport.");
   dyn_cast<SwiftSourceModuleDependenciesStorage>(storage.get())->addTestableImport(module);
-}
-
-void ModuleDependencyInfo::addMacroDependency(StringRef macroModuleName,
-                                              StringRef libraryPath,
-                                              StringRef executablePath) {
-  if (auto swiftSourceStorage =
-          dyn_cast<SwiftSourceModuleDependenciesStorage>(storage.get()))
-    swiftSourceStorage->addMacroDependency(macroModuleName, libraryPath,
-                                           executablePath);
-  else if (auto swiftInterfaceStorage =
-               dyn_cast<SwiftInterfaceModuleDependenciesStorage>(storage.get()))
-    swiftInterfaceStorage->addMacroDependency(macroModuleName, libraryPath,
-                                              executablePath);
-  else
-    llvm_unreachable("Unexpected dependency kind");
-}
-
-bool ModuleDependencyInfo::hasMacroDependencies() const {
-  if (auto sourceModule =
-          dyn_cast<SwiftSourceModuleDependenciesStorage>(storage.get()))
-    return !sourceModule->textualModuleDetails.macroDependencies.empty();
-
-  if (auto interfaceModule =
-          dyn_cast<SwiftInterfaceModuleDependenciesStorage>(storage.get()))
-    return !interfaceModule->textualModuleDetails.macroDependencies.empty();
-
-  llvm_unreachable("Unexpected dependency kind");
 }
 
 bool ModuleDependencyInfo::isTestableImport(StringRef moduleName) const {
@@ -690,27 +664,6 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   // Setup CAS.
   CASOpts = Instance.getInvocation().getCASOptions().CASOpts;
   CAS = Instance.getSharedCASInstance();
-
-  // Add SDKSetting file.
-  SmallString<256> SDKSettingPath;
-  llvm::sys::path::append(
-      SDKSettingPath,
-      Instance.getInvocation().getSearchPathOptions().getSDKPath(),
-      "SDKSettings.json");
-  CommonDependencyFiles.emplace_back(SDKSettingPath.data(),
-                                     SDKSettingPath.size());
-
-  // Add Legacy layout file (maybe just hard code instead of searching).
-  for (auto RuntimeLibPath :
-       Instance.getInvocation().getSearchPathOptions().RuntimeLibraryPaths) {
-    auto &FS = Instance.getFileSystem();
-    std::error_code EC;
-    for (auto F = FS.dir_begin(RuntimeLibPath, EC);
-         !EC && F != llvm::vfs::directory_iterator(); F.increment(EC)) {
-      if (F->path().ends_with(".yaml"))
-        CommonDependencyFiles.emplace_back(F->path().str());
-    }
-  }
 
   auto CachingFS =
       llvm::cas::createCachingOnDiskFileSystem(Instance.getObjectStore());
