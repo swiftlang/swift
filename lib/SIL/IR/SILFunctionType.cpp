@@ -2514,7 +2514,7 @@ static CanSILFunctionType getSILFunctionType(
   CanType coroutineSubstYieldType;
   
   bool isInOutYield = false;
-  if (auto fd = getAsCoroutine(constant)) {
+  if (auto fd = getAsCoroutine(constant)) { // Derive yield type for declaration
     auto origFd = cast<FuncDecl>(origConstant->getDecl());
     auto &ctx = origFd->getASTContext();
     if (auto accessor = dyn_cast<AccessorDecl>(origFd)) {
@@ -2546,6 +2546,19 @@ static CanSILFunctionType getSILFunctionType(
       coroutineSubstYieldType = valueType->getReducedType(
           fd->getGenericSignature());
     }
+  } else if (substFnInterfaceType->isCoroutine()) { // Derive yield type for function type
+    coroutineKind = SILCoroutineKind::YieldOnce;
+    auto origYieldType = origType.getFunctionResultType().getType()->castTo<YieldResultType>();
+    auto reducedYieldType = genericSig.getReducedType(origYieldType->getResultType());
+    coroutineOrigYieldType = AbstractionPattern(genericSig, reducedYieldType);
+
+    auto yieldType = substFnInterfaceType->getResult()->castTo<YieldResultType>();
+    auto valueType = yieldType->getResultType();
+    isInOutYield = yieldType->isInOut();
+    if (reqtSubs)
+      valueType = valueType.subst(*reqtSubs);
+
+    coroutineSubstYieldType = valueType->getReducedType(genericSig);
   }
 
   bool shouldBuildSubstFunctionType = [&]{
@@ -2569,8 +2582,7 @@ static CanSILFunctionType getSILFunctionType(
     // for class override thunks.  This is required to make the yields
     // match in abstraction to the base method's yields, which is necessary
     // to make the extracted continuation-function signatures match.
-    if (constant != origConstant &&
-        coroutineKind != SILCoroutineKind::None)
+    if (constant != origConstant && getAsCoroutine(constant))
       return true;
 
     // We don't currently use substituted function types for generic function

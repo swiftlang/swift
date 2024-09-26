@@ -1391,8 +1391,8 @@ AnyFunctionRef::getYieldResultsImpl(SmallVectorImpl<AnyFunctionType::Yield> &buf
                                     bool mapIntoContext) const {
   assert(buffer.empty());
   if (auto *AFD = getAbstractFunctionDecl()) {
+    // FIXME: AccessorDecl case is not necessary
     if (auto *AD = dyn_cast<AccessorDecl>(AFD)) {
-      // FIXME: AccessorDecl case is not necessary
       if (AD->isCoroutine()) {
         auto valueTy = AD->getStorage()->getValueInterfaceType()
                                        ->getReferenceStorageReferent();
@@ -1405,12 +1405,13 @@ AnyFunctionRef::getYieldResultsImpl(SmallVectorImpl<AnyFunctionType::Yield> &buf
         return buffer;
       }
     } else if (AFD->isCoroutine()) {
-      auto resType = AFD->getInterfaceType()->castTo<FunctionType>()->getResult();
-      if (auto *resFnType = resType->getAs<FunctionType>())
-        resType = resFnType->getResult();
-
-      if (resType->hasError())
+      auto fnType = AFD->getInterfaceType();
+      if (fnType->hasError())
         return {};
+
+      auto resType = fnType->castTo<AnyFunctionType>()->getResult();
+      if (auto *resFnType = resType->getAs<AnyFunctionType>())
+        resType = resFnType->getResult();
 
       auto addYieldInfo =
         [&](const YieldResultType *yieldResultTy) {
@@ -1428,8 +1429,8 @@ AnyFunctionRef::getYieldResultsImpl(SmallVectorImpl<AnyFunctionType::Yield> &buf
           if (auto *yieldResTy = eltTy->getAs<YieldResultType>())
             addYieldInfo(yieldResTy);
         }
-      else
-        addYieldInfo(resType->castTo<YieldResultType>());
+      else if (auto *yieldResTy = resType->getAs<YieldResultType>())
+        addYieldInfo(yieldResTy);
 
       return buffer;
     }
@@ -11441,8 +11442,7 @@ Type FuncDecl::getResultInterfaceTypeWithoutYields() const {
           resultType = elements[0].getType();
       else
           resultType = TupleType::get(elements, getASTContext());
-    } else {
-      assert(resultType->is<YieldResultType>());
+    } else if (resultType->is<YieldResultType>()) {
       resultType = TupleType::getEmpty(getASTContext());
     }
   }
@@ -11470,8 +11470,8 @@ Type FuncDecl::getYieldsInterfaceType() const {
       }
 
     llvm_unreachable("coroutine must have a yield result");
-  } else {
-    assert(resultType->is<YieldResultType>());
+  } else if (!resultType->is<YieldResultType>()) {
+    resultType = TupleType::getEmpty(getASTContext());
   }
 
   return resultType;
