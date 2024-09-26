@@ -2802,8 +2802,7 @@ static bool requiresNoDefinition(Decl *decl) {
       return true;
   }
   // FIXME: Should be able to write this more nicely
-  auto abiAttr = decl->getAttrs().getAttribute<ABIAttr>();
-  if (abiAttr && abiAttr->isInverse())
+  if (!ABIRoleInfo(decl).providesAPI())
     // Decls which merely define the ABI of another decl should not have a
     // body.
     return true;

@@ -150,16 +150,16 @@ func noConflictWithMutualChanges2() {}
 @abi(func noConflictWithMutualChanges2())
 func noConflictWithMutualChanges1() {}
 
-@abi(func conflictsWithOtherABI())
+@abi(func conflictsWithOtherABI()) // expected-note {{'conflictsWithOtherABI()' previously declared here}}
 func conflictsWithOtherABI1() {}
 
-@abi(func conflictsWithOtherABI())
+@abi(func conflictsWithOtherABI()) // expected-error {{invalid redeclaration of 'conflictsWithOtherABI()'}}
 func conflictsWithOtherABI2() {}
 
-@abi(func conflictsWithNonABI())
+@abi(func conflictsWithNonABI()) // expected-error {{invalid redeclaration of 'conflictsWithNonABI()'}}
 func conflictsWithNonABI_formal() {}
 
-func conflictsWithNonABI() {}
+func conflictsWithNonABI() {} // expected-note {{'conflictsWithNonABI()' previously declared here}}
 
 @abi(var var_noConflictWithSelf: Int)
 var var_noConflictWithSelf: Int = 0
@@ -170,16 +170,16 @@ var var_noConflictWithMutualChanges2: Int = 0
 @abi(var var_noConflictWithMutualChanges2: Int)
 var var_noConflictWithMutualChanges1: Int = 0
 
-@abi(var var_conflictsWithOtherABI: Int)
+@abi(var var_conflictsWithOtherABI: Int) // expected-note {{'var_conflictsWithOtherABI' previously declared here}}
 var var_conflictsWithOtherABI1: Int = 0
 
-@abi(var var_conflictsWithOtherABI: Int)
+@abi(var var_conflictsWithOtherABI: Int) // expected-error {{invalid redeclaration of 'var_conflictsWithOtherABI'}}
 var var_conflictsWithOtherABI2: Int = 0
 
-@abi(var var_conflictsWithNonABI: Int)
+@abi(var var_conflictsWithNonABI: Int) // expected-error {{invalid redeclaration of 'var_conflictsWithNonABI'}}
 var var_conflictsWithNonABI_formal: Int = 0
 
-var var_conflictsWithNonABI: Int = 0
+var var_conflictsWithNonABI: Int = 0 // expected-note {{'var_conflictsWithNonABI' previously declared here}}
 
 struct Foo {
   @abi(func noConflictWithSelf())
@@ -191,16 +191,16 @@ struct Foo {
   @abi(func noConflictWithMutualChanges2())
   func noConflictWithMutualChanges1() {}
 
-  @abi(func conflictsWithOtherABI())
+  @abi(func conflictsWithOtherABI()) // expected-note {{'conflictsWithOtherABI()' previously declared here}}
   func conflictsWithOtherABI1() {}
 
-  @abi(func conflictsWithOtherABI())
+  @abi(func conflictsWithOtherABI()) // expected-error {{invalid redeclaration of 'conflictsWithOtherABI()'}}
   func conflictsWithOtherABI2() {}
 
-  @abi(func conflictsWithNonABI())
+  @abi(func conflictsWithNonABI()) // expected-error {{invalid redeclaration of 'conflictsWithNonABI()'}}
   func conflictsWithNonABI_formal() {}
 
-  func conflictsWithNonABI() {}
+  func conflictsWithNonABI() {} // expected-note {{'conflictsWithNonABI()' previously declared here}}
 
   @abi(var var_noConflictWithSelf: Int)
   var var_noConflictWithSelf: Int = 0
@@ -211,19 +211,22 @@ struct Foo {
   @abi(var var_noConflictWithMutualChanges2: Int)
   var var_noConflictWithMutualChanges1: Int = 0
 
-  @abi(var var_conflictsWithOtherABI: Int)
+  @abi(var var_conflictsWithOtherABI: Int) // expected-note {{'var_conflictsWithOtherABI' previously declared here}}
   var var_conflictsWithOtherABI1: Int = 0
 
-  @abi(var var_conflictsWithOtherABI: Int)
+  @abi(var var_conflictsWithOtherABI: Int) // expected-error {{invalid redeclaration of 'var_conflictsWithOtherABI'}}
   var var_conflictsWithOtherABI2: Int = 0
 
-  @abi(var var_conflictsWithNonABI: Int)
+  @abi(var var_conflictsWithNonABI: Int) // expected-error {{invalid redeclaration of 'var_conflictsWithNonABI'}}
   var var_conflictsWithNonABI_formal: Int = 0
 
-  var var_conflictsWithNonABI: Int = 0
+  var var_conflictsWithNonABI: Int = 0 // expected-note {{'var_conflictsWithNonABI' previously declared here}}
 }
 
 func fn() {
+  // TODO: Figure out if @abi makes sense in local scope and, if so, when we
+  //       should complain about redecls.
+
   @abi(func noConflictWithSelf())
   func noConflictWithSelf() {}
 
@@ -233,36 +236,40 @@ func fn() {
   @abi(func noConflictWithMutualChanges2())
   func noConflictWithMutualChanges1() {}
 
-  @abi(func conflictsWithOtherABI())
+  @abi(func conflictsWithOtherABI()) // expected-note {{'conflictsWithOtherABI()' previously declared here}}
   func conflictsWithOtherABI1() {}
 
-  @abi(func conflictsWithOtherABI())
+  @abi(func conflictsWithOtherABI()) // expected-error {{invalid redeclaration of 'conflictsWithOtherABI()'}}
   func conflictsWithOtherABI2() {}
 
-  @abi(func conflictsWithNonABI())
+  @abi(func conflictsWithNonABI()) // expected-error {{invalid redeclaration of 'conflictsWithNonABI()'}}
   func conflictsWithNonABI_formal() {}
 
-  func conflictsWithNonABI() {}
+  func conflictsWithNonABI() {} // expected-note {{'conflictsWithNonABI()' previously declared here}}
+
+  var a = 1 // expected-note {{'a' previously declared here}}
+  var a = 1 // expected-error {{invalid redeclaration of 'a'}}
 
   @abi(var var_noConflictWithSelf: Int)
-  var var_noConflictWithSelf: Int = 0 // expected-warning {{was never used; consider replacing with '_' or removing it}}
+  var var_noConflictWithSelf: Int = 0
 
   @abi(var var_noConflictWithMutualChanges1: Int)
-  var var_noConflictWithMutualChanges2: Int = 0 // expected-warning {{was never used; consider replacing with '_' or removing it}}
+  var var_noConflictWithMutualChanges2: Int = 0
 
   @abi(var var_noConflictWithMutualChanges2: Int)
-  var var_noConflictWithMutualChanges1: Int = 0 // expected-warning {{was never used; consider replacing with '_' or removing it}}
+  var var_noConflictWithMutualChanges1: Int = 0
 
-  @abi(var var_conflictsWithOtherABI: Int)
-  var var_conflictsWithOtherABI1: Int = 0 // expected-warning {{was never used; consider replacing with '_' or removing it}}
+  @abi(var var_conflictsWithOtherABI: Int) // expected-note {{'var_conflictsWithOtherABI' previously declared here}}
+  var var_conflictsWithOtherABI1: Int = 0
 
-  @abi(var var_conflictsWithOtherABI: Int)
-  var var_conflictsWithOtherABI2: Int = 0 // expected-warning {{was never used; consider replacing with '_' or removing it}}
+  @abi(var var_conflictsWithOtherABI: Int) // expected-error {{invalid redeclaration of 'var_conflictsWithOtherABI'}}
+  var var_conflictsWithOtherABI2: Int = 0
 
-  @abi(var var_conflictsWithNonABI: Int)
-  var var_conflictsWithNonABI_formal: Int = 0 // expected-warning {{was never used; consider replacing with '_' or removing it}}
+  // Diagnosed in the opposite order from usual due to being in a local scope where visibility may be limited:
+  @abi(var var_conflictsWithNonABI: Int) // expected-note {{'var_conflictsWithNonABI' previously declared here}}
+  var var_conflictsWithNonABI_formal: Int = 0
 
-  var var_conflictsWithNonABI: Int = 0 // expected-warning {{was never used; consider replacing with '_' or removing it}}
+  var var_conflictsWithNonABI: Int = 0 // expected-error {{invalid redeclaration of 'var_conflictsWithNonABI'}}
 }
 
 //
@@ -282,6 +289,9 @@ func func_with_nested_abi() {
   func exit(_ code : UInt32) -> Void {}
   exit(0)
 }
+
+@abi(var x = 1) // expected-error {{initial value is not allowed here}} expected-error {{type annotation missing in pattern}}
+var x = 1
 
 //
 // Examples of expected use cases

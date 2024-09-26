@@ -907,6 +907,7 @@ namespace {
                            TerminalColor Color = DeclColor) {
       printFieldQuotedRaw([&](raw_ostream &OS) { declRef.dump(OS); }, label,
                           Color);
+      printFlag(!ABIRoleInfo(declRef.getDecl()).providesAPI(), "abi_only_decl");
     }
 
     void printThrowDest(ThrownErrorDestination throws, bool wantNothrow) {
@@ -1101,6 +1102,8 @@ namespace {
         else
           printFieldQuoted(implAttr->CategoryName.str(), label);
       }
+
+      printFlag(!ABIRoleInfo(D).providesAPI(), "abi_only");
 
       printSourceRange(D->getSourceRange(), &D->getASTContext());
       printFlag(D->TrailingSemiLoc.isValid(), "trailing_semi",

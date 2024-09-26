@@ -192,6 +192,21 @@ public:
     if (attr->isInverse())
       return;
 
+    Decl *AD = attr->abiDecl;
+    if (isa<VarDecl>(D) && isa<PatternBindingDecl>(AD)) {
+      AD = cast<PatternBindingDecl>(AD)
+               ->getVarAtSimilarStructuralPosition(cast<VarDecl>(D));
+    }
+    // TODO: EnumElementDecl?
+
+    if (!AD)
+      return;
+
+    // Check the ABI decl and bail if there was a problem with it.
+    TypeChecker::typeCheckDecl(AD);
+    if (AD->isInvalid())
+      return;
+
     // TODO: Validate more
   }
 

@@ -353,6 +353,11 @@ SourceRange CustomAttributeScope::getSourceRangeOfThisASTNode(
   return attr->getRange();
 }
 
+SourceRange ABIAttributeScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
+  return attr->getRange();
+}
+
 SourceRange GuardStmtScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
   return SourceRange(getStmt()->getStartLoc(), endLoc);

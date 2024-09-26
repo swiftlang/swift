@@ -612,6 +612,20 @@ static void checkGenericParams(GenericContext *ownerCtx) {
   TypeChecker::checkShadowedGenericParams(ownerCtx);
 }
 
+/// Returns \c true if \p current and \p other are in the same source file
+/// \em and \c current appears before \p other in that file.
+static bool isBeforeInSameFile(Decl *current, Decl *other) {
+  if (current->getDeclContext()->getParentSourceFile() !=
+                  other->getDeclContext()->getParentSourceFile())
+    return false;
+
+  if (!current->getLoc().isValid())
+    return false;
+
+  return current->getASTContext().SourceMgr
+                        .isBeforeInBuffer(current->getLoc(), other->getLoc());
+}
+
 template <typename T>
 static void checkOperatorOrPrecedenceGroupRedeclaration(
     T *decl, Diag<> diagID, Diag<> noteID,
@@ -631,16 +645,8 @@ static void checkOperatorOrPrecedenceGroupRedeclaration(
     if (other == decl || other->isInvalid())
       continue;
 
-    bool shouldDiagnose = false;
-    if (currentFile == other->getDeclContext()->getParentSourceFile()) {
-      // For a same-file redeclaration, make sure we get the diagnostic ordering
-      // to be sensible.
-      if (decl->getLoc().isValid() && other->getLoc().isValid() &&
-          ctx.SourceMgr.isBeforeInBuffer(decl->getLoc(), other->getLoc())) {
-        std::swap(decl, other);
-      }
-      shouldDiagnose = true;
-    } else {
+    bool shouldDiagnose = true;
+    if (currentFile != other->getDeclContext()->getParentSourceFile()) {
       // If the declarations are in different files, only diagnose if we've
       // enabled the new operator lookup behaviour where decls in the current
       // module are now favored over imports.
@@ -648,6 +654,12 @@ static void checkOperatorOrPrecedenceGroupRedeclaration(
     }
 
     if (shouldDiagnose) {
+      // For a same-file redeclaration, make sure we get the diagnostic ordering
+      // to be sensible.
+      if (isBeforeInSameFile(decl, other)) {
+        std::swap(decl, other);
+      }
+
       ctx.Diags.diagnose(decl, diagID);
       ctx.Diags.diagnose(other, noteID);
       decl->setInvalid();
@@ -696,28 +708,49 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
   }
 
   auto &ctx = current->getASTContext();
+  bool currentIsABIOnly = !ABIRoleInfo(current).providesAPI();
+
+  // If true, two conflicting decls may not be in scope at the same time, so
+  // we might only detect a redeclaration from one and not the other.
+  bool partialScopes = currentDC->isLocalContext() && isa<VarDecl>(current);
 
   // Find other potential definitions.
   SmallVector<ValueDecl *, 4> otherDefinitions;
   if (currentDC->isTypeContext()) {
     // Look within a type context.
     if (auto nominal = currentDC->getSelfNominalTypeDecl()) {
-      auto found = nominal->lookupDirect(current->getBaseName());
+      OptionSet<NominalTypeDecl::LookupDirectFlags> flags;
+      if (currentIsABIOnly)
+        flags |= NominalTypeDecl::LookupDirectFlags::ABIProviding;
+      auto found = nominal->lookupDirect(current->getBaseName(), SourceLoc(),
+                                         flags);
       otherDefinitions.append(found.begin(), found.end());
     }
   } else if (currentDC->isLocalContext()) {
     if (!current->isImplicit()) {
+      ABIRole roleFilter;
+      if (partialScopes)
+        // We don't know if conflicts will be detected when the other decl is
+        // `current`, so if this decl has `ABIRole::Both`, we need this lookup
+        // to include both ProvidesABI *and* ProvidesAPI decls.
+        roleFilter = ABIRoleInfo(current).getRole();
+      else
+        roleFilter = currentIsABIOnly ? ABIRole::ProvidesABI
+                                      : ABIRole::ProvidesAPI;
       ASTScope::lookupLocalDecls(currentFile, current->getBaseName(),
                                  current->getLoc(),
                                  /*stopAfterInnermostBraceStmt=*/true,
-                                 otherDefinitions);
+                                 roleFilter, otherDefinitions);
     }
   } else {
     assert(currentDC->isModuleScopeContext());
     // Look within a module context.
+    OptionSet<ModuleLookupFlags> flags;
+    if (currentIsABIOnly)
+      flags |= ModuleLookupFlags::ABIProviding;
     currentFile->getParentModule()->lookupValue(current->getBaseName(),
                                                 NLKind::QualifiedLookup,
-                                                otherDefinitions);
+                                                flags, otherDefinitions);
   }
 
   // Compare this signature against the signature of other
@@ -738,12 +771,17 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
     if (currentModule != otherDC->getParentModule())
       continue;
 
-    // If both declarations are in the same file, only diagnose the second one.
-    if (currentFile == otherDC->getParentSourceFile())
-      if (current->getLoc().isValid() &&
-          ctx.SourceMgr.isBeforeInBuffer(
-            current->getLoc(), other->getLoc()))
+    bool otherIsABIOnly = !ABIRoleInfo(other).providesAPI();
+
+    if (currentIsABIOnly == otherIsABIOnly || partialScopes) {
+      // If both declarations are in the same file, only diagnose the second one
+      if (isBeforeInSameFile(current, other))
         continue;
+    }
+    else if (!currentIsABIOnly && otherIsABIOnly)
+      // Don't diagnose a non-ABI-only decl as conflicting with an ABI-only
+      // decl. (We'll diagnose it in the other direction instead.)
+      continue;
 
     // Don't compare methods vs. non-methods (which only happens with
     // operators).
@@ -2764,7 +2802,8 @@ public:
         if (!var->hasStorage())
           return;
 
-        if (var->getAttrs().hasAttribute<SILGenNameAttr>())
+        if (var->getAttrs().hasAttribute<SILGenNameAttr>()
+              || !ABIRoleInfo(var).providesAPI())
           return;
 
         if (var->isInvalid() || PBD->isInvalid())

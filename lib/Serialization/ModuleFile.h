@@ -759,7 +759,8 @@ public:
   ModuleDecl *getUnderlyingModule() const { return UnderlyingModule; }
 
   /// Searches the module's top-level decls for the given identifier.
-  void lookupValue(DeclName name, SmallVectorImpl<ValueDecl*> &results);
+  void lookupValue(DeclName name, OptionSet<ModuleLookupFlags> flags,
+                   SmallVectorImpl<ValueDecl*> &results);
 
   /// Searches the module's local type decls for the given mangled name.
   TypeDecl *lookupLocalType(StringRef MangledName);
