@@ -1391,20 +1391,7 @@ AnyFunctionRef::getYieldResultsImpl(SmallVectorImpl<AnyFunctionType::Yield> &buf
                                     bool mapIntoContext) const {
   assert(buffer.empty());
   if (auto *AFD = getAbstractFunctionDecl()) {
-    // FIXME: AccessorDecl case is not necessary
-    if (auto *AD = dyn_cast<AccessorDecl>(AFD)) {
-      if (AD->isCoroutine()) {
-        auto valueTy = AD->getStorage()->getValueInterfaceType()
-                                       ->getReferenceStorageReferent();
-        if (mapIntoContext)
-          valueTy = AFD->mapTypeIntoContext(valueTy);
-        YieldTypeFlags flags(isYieldingMutableAccessor(AD->getAccessorKind())
-                             ? ParamSpecifier::InOut
-                             : ParamSpecifier::LegacyShared);
-        buffer.push_back(AnyFunctionType::Yield(valueTy, flags));
-        return buffer;
-      }
-    } else if (AFD->isCoroutine()) {
+    if (AFD->isCoroutine()) {
       auto fnType = AFD->getInterfaceType();
       if (fnType->hasError())
         return {};
