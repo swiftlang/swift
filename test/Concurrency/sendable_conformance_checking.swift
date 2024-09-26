@@ -187,3 +187,20 @@ actor MyActor {
   // expected-warning@+1 {{non-final class 'Nested' cannot conform to 'Sendable'; use '@unchecked Sendable'; this is an error in the Swift 6 language mode}}
   class Nested: Sendable {}
 }
+
+@Sendable func globalFn() {}
+
+protocol NoSendableReqs {
+  var prop: () -> Void { get }
+  static var staticProp: () -> Void { get }
+}
+
+public struct TestSendableWitnesses1 : NoSendableReqs {
+  var prop: @Sendable () -> Void // Ok (no warnings)
+  static let staticProp: @Sendable () -> Void = { } // Ok (no warnings)
+}
+
+public struct TestSendableWitnesses2 : NoSendableReqs {
+  var prop = globalFn // Ok (no warnings)
+  static let staticProp = globalFn // Ok (no warnings)
+}

@@ -708,7 +708,7 @@ public:
   bool isStaticLibrary() const {
     if (auto *detail = getAsSwiftInterfaceModule())
       return detail->isStatic;
-    else if (auto *detail = getAsSwiftBinaryModule())
+    if (auto *detail = getAsSwiftBinaryModule())
       return detail->isStatic;
     return false;
   }
@@ -716,9 +716,9 @@ public:
   const ArrayRef<std::string> getHeaderInputSourceFiles() const {
     if (auto *detail = getAsSwiftInterfaceModule())
       return detail->textualModuleDetails.bridgingSourceFiles;
-    else if (auto *detail = getAsSwiftSourceModule())
+    if (auto *detail = getAsSwiftSourceModule())
       return detail->textualModuleDetails.bridgingSourceFiles;
-    else if (auto *detail = getAsSwiftBinaryModule())
+    if (auto *detail = getAsSwiftBinaryModule())
       return detail->headerSourceFiles;
     return {};
   }
@@ -726,9 +726,9 @@ public:
   const ArrayRef<std::string> getHeaderDependencies() const {
     if (auto *detail = getAsSwiftInterfaceModule())
       return detail->textualModuleDetails.bridgingModuleDependencies;
-    else if (auto *detail = getAsSwiftSourceModule())
+    if (auto *detail = getAsSwiftSourceModule())
       return detail->textualModuleDetails.bridgingModuleDependencies;
-    else if (auto *detail = getAsSwiftBinaryModule())
+    if (auto *detail = getAsSwiftBinaryModule())
       return detail->headerModuleDependencies;
     return {};
   }
@@ -736,9 +736,9 @@ public:
   std::vector<std::string> getCommandline() const {
     if (auto *detail = getAsClangModule())
       return detail->buildCommandLine;
-    else if (auto *detail = getAsSwiftInterfaceModule())
+    if (auto *detail = getAsSwiftInterfaceModule())
       return detail->textualModuleDetails.buildCommandLine;
-    else if (auto *detail = getAsSwiftSourceModule())
+    if (auto *detail = getAsSwiftSourceModule())
       return detail->textualModuleDetails.buildCommandLine;
     return {};
   }
@@ -747,10 +747,10 @@ public:
     if (isSwiftInterfaceModule())
       return cast<SwiftInterfaceModuleDependenciesStorage>(storage.get())
           ->updateCommandLine(newCommandLine);
-    else if (isSwiftSourceModule())
+    if (isSwiftSourceModule())
       return cast<SwiftSourceModuleDependenciesStorage>(storage.get())
           ->updateCommandLine(newCommandLine);
-    else if (isClangModule())
+    if (isClangModule())
       return cast<ClangModuleDependencyStorage>(storage.get())
           ->updateCommandLine(newCommandLine);
     llvm_unreachable("Unexpected type");
