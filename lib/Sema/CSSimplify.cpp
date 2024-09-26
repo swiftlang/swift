@@ -7523,7 +7523,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 #include "swift/AST/TypeNodes.def"
 
     case TypeKind::Error:
-    case TypeKind::YieldResult:
       return getTypeMatchFailure(locator);
 
     // BuiltinGenericType subclasses
@@ -7549,6 +7548,24 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       }
 
       return result;
+    }
+      
+    case TypeKind::YieldResult: {
+      if (kind != ConstraintKind::Bind && kind != ConstraintKind::Subtype)
+        return getTypeMatchFailure(locator);
+
+      auto *yield1 = cast<YieldResultType>(desugar1);
+      auto *yield2 = cast<YieldResultType>(desugar2);
+
+      // TODO: In theory we can convert inout yield to non-inout one,
+      // however, we disallow this for now as overall generic coroutine
+      // semantics is a bit vague.
+      if (yield1->isInOut() != yield2->isInOut())
+        return getTypeMatchFailure(locator);
+
+      return matchTypes(yield1->getResultType(), yield2->getResultType(),
+                        ConstraintKind::Bind, subflags,
+                  locator.withPathElement(ConstraintLocator::LValueConversion));
     }
 
     case TypeKind::Placeholder: {
@@ -8551,7 +8568,6 @@ ConstraintSystem::simplifyConstructionConstraint(
     
   case TypeKind::Error:
   case TypeKind::Placeholder:
-  case TypeKind::YieldResult:
     return SolutionKind::Error;
 
   case TypeKind::GenericFunction:
@@ -8651,6 +8667,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::Function:
   case TypeKind::LValue:
   case TypeKind::InOut:
+  case TypeKind::YieldResult:
   case TypeKind::Module:
   case TypeKind::Pack:
   case TypeKind::PackExpansion:
