@@ -629,6 +629,25 @@ Expr *PatternBindingCheckedAndContextualizedInitRequest::evaluate(
   return binding->getInit(i);
 }
 
+static std::optional<AccessorKind>
+directAccessorKindForReadImpl(ReadImplKind reader) {
+  switch (reader) {
+  case ReadImplKind::Stored:
+  case ReadImplKind::Inherited:
+    return std::nullopt;
+
+  case ReadImplKind::Get:
+    return AccessorKind::Get;
+
+  case ReadImplKind::Address:
+    return AccessorKind::Address;
+
+  case ReadImplKind::Read:
+    return AccessorKind::Read;
+  }
+  llvm_unreachable("bad impl kind");
+}
+
 bool
 IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
                                   AbstractStorageDecl *storage) const {
@@ -665,22 +684,11 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
   if (isa<ProtocolDecl>(storageDC))
     return checkMutability(AccessorKind::Get);
 
-  switch (storage->getReadImpl()) {
-  case ReadImplKind::Stored:
-  case ReadImplKind::Inherited:
+  auto accessor = directAccessorKindForReadImpl(storage->getReadImpl());
+  if (!accessor)
     return false;
 
-  case ReadImplKind::Get:
-    return checkMutability(AccessorKind::Get);
-
-  case ReadImplKind::Address:
-    return checkMutability(AccessorKind::Address);
-
-  case ReadImplKind::Read:
-    return checkMutability(AccessorKind::Read);
-  }
-
-  llvm_unreachable("bad impl kind");
+  return checkMutability(*accessor);
 }
 
 /// As a special extra check, if the user also gave us a modify coroutine,
