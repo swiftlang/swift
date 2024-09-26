@@ -2594,4 +2594,4 @@ swift_dynamicCastImpl(OpaqueValue *destLocation,
 }
 
 #define OVERRIDE_DYNAMICCASTING COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

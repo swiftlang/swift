@@ -120,9 +120,9 @@ namespace swift {
 #define COMPATIBILITY_PAREN_PARAMS(...) (__VA_ARGS__)
 #define COMPATIBILITY_PAREN_COMPATIBILITY_PAREN2 ()
 
-// Include path computation. Code that includes this file can write
-// `#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH` to include the appropriate
-// .def file for the current library.
+// Include path computation. Code that includes this file can write `#include
+// "..CompatibilityOverride/CompatibilityOverrideIncludePath.h"` to include the
+// appropriate .def file for the current library.
 #define COMPATIBILITY_OVERRIDE_INCLUDE_PATH_swiftRuntime                       \
   "../CompatibilityOverride/CompatibilityOverrideRuntime.def"
 #define COMPATIBILITY_OVERRIDE_INCLUDE_PATH_swift_Concurrency                  \
@@ -173,18 +173,18 @@ namespace swift {
 // Create typedefs for function pointers to call the original implementation.
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs)   \
   ccAttrs typedef ret(*Original_##name) COMPATIBILITY_PAREN(typedArgs);
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "CompatibilityOverrideIncludePath.h"
 
 // Create typedefs for override function pointers.
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs)   \
   ccAttrs typedef ret (*Override_##name)(COMPATIBILITY_UNPAREN_WITH_COMMA(     \
       typedArgs) Original_##name originalImpl);
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "CompatibilityOverrideIncludePath.h"
 
 // Create declarations for getOverride functions.
-#define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
-  Override_ ## name getOverride_ ## name();
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs)   \
+  Override_##name getOverride_##name();
+#include "CompatibilityOverrideIncludePath.h"
 
 /// Used to define an override point. The override point #defines the appropriate
 /// OVERRIDE macro from CompatibilityOverride.def to this macro, then includes
