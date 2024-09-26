@@ -1553,7 +1553,10 @@ AvailableValueDataflowContext::AvailableValueDataflowContext(
 
       llvm_unreachable("Unhandled SILInstructionKind for PMOUseKind::Load?!");
     }
-
+    if (Use.Kind == PMOUseKind::DependenceBase) {
+      // An address used as a dependence base does not affect load promotion.
+      continue;
+    }
     // Keep track of all the uses that aren't loads.
     NonLoadUses[Use.Inst] = ui;
     HasLocalDefinition.set(Use.Inst->getParent());
@@ -2421,14 +2424,17 @@ struct Promotions {
   SmallVector<AvailableValue, 32> allAvailableValues;
   PromotableInstructions loadTakes;
   PromotableInstructions destroys;
+  PromotableInstructions markDepBases;
 
   Promotions()
-      : loadTakes(allAvailableValues), destroys(allAvailableValues) {}
+      : loadTakes(allAvailableValues), destroys(allAvailableValues),
+        markDepBases(allAvailableValues) {}
 
 #ifndef NDEBUG
   void verify() {
     loadTakes.verify();
     destroys.verify();
+    markDepBases.verify();
   }
 #endif
 };
@@ -2496,10 +2502,17 @@ public:
 private:
   SILInstruction *collectUsesForPromotion();
 
+  /// Return true if a mark_dependence can be promoted. If so, this initializes
+  /// the available values in promotions.
+  bool canPromoteMarkDepBase(MarkDependenceInst *md);
+
   /// Return true if a load [take] or destroy_addr can be promoted. If so, this
   /// initializes the available values in promotions.
   bool canPromoteTake(SILInstruction *i,
                       PromotableInstructions &promotableInsts);
+
+  SILValue promoteMarkDepBase(MarkDependenceInst *md,
+                              ArrayRef<AvailableValue> availableValues);
 
   /// Promote a load take cleaning up everything except for RAUWing the
   /// instruction with the aggregated result. The routine returns the new
@@ -2552,6 +2565,10 @@ bool OptimizeDeadAlloc::tryToRemoveDeadAllocation() {
 
   SWIFT_DEFER { DataflowContext.fixupOwnership(deleter, deadEndBlocks); };
 
+  for (auto *md : promotions.markDepBases.instructions()) {
+    if (!canPromoteMarkDepBase(cast<MarkDependenceInst>(md)))
+      return false;
+  }
   if (isTrivial()) {
     removeDeadAllocation();
     return true;
@@ -2620,6 +2637,9 @@ SILInstruction *OptimizeDeadAlloc::collectUsesForPromotion() {
         }
       }
       return u.Inst;
+    case PMOUseKind::DependenceBase:
+      promotions.markDepBases.push(u.Inst);
+      continue;
     case PMOUseKind::Initialization:
       if (!isa<ApplyInst>(u.Inst) &&
           // A copy_addr that is not a take affects the retain count
@@ -2650,6 +2670,28 @@ SILInstruction *OptimizeDeadAlloc::collectUsesForPromotion() {
     }
   }
   return nullptr;
+}
+
+bool OptimizeDeadAlloc::canPromoteMarkDepBase(MarkDependenceInst *md) {
+  SILValue srcAddr = md->getBase();
+  SmallVector<AvailableValue, 8> availableValues;
+  auto result =
+      DataflowContext.computeAvailableValues(srcAddr, md, availableValues);
+  if (!result.has_value())
+    return false;
+
+  unsigned index = promotions.markDepBases.initializeAvailableValues(
+      md, std::move(availableValues));
+
+  SILType baseTy = result->first;
+  if (auto *abi = dyn_cast<AllocBoxInst>(TheMemory)) {
+    if (baseTy == abi->getType()) {
+      baseTy = MemoryType.getObjectType();
+    }
+  }
+  unsigned firstElt = result->second;
+  return isFullyAvailable(baseTy, firstElt,
+                          promotions.markDepBases.availableValues(index));
 }
 
 /// Return true if we can promote the given destroy.
@@ -2692,6 +2734,12 @@ bool OptimizeDeadAlloc::canPromoteTake(
 }
 
 void OptimizeDeadAlloc::removeDeadAllocation() {
+  for (auto idxVal : llvm::enumerate(promotions.markDepBases.instructions())) {
+    auto *md = cast<MarkDependenceInst>(idxVal.value());
+    auto vals = promotions.markDepBases.availableValues(idxVal.index());
+    promoteMarkDepBase(md, vals);
+  }
+
   // If our memory is trivially typed, we can just remove it without needing to
   // consider if the stored value needs to be destroyed. So at this point,
   // delete the memory!
@@ -2796,6 +2844,23 @@ void OptimizeDeadAlloc::removeDeadAllocation() {
     LLVM_DEBUG(v->dump());
     completion.completeOSSALifetime(v, boundary);
   }
+}
+
+SILValue OptimizeDeadAlloc::promoteMarkDepBase(
+    MarkDependenceInst *md, ArrayRef<AvailableValue> availableValues) {
+
+  LLVM_DEBUG(llvm::dbgs() << "  *** Promoting mark_dependence base: " << *md);
+  SILBuilderWithScope B(md);
+  SILValue dependentValue = md->getValue();
+  for (auto &availableValue : availableValues) {
+    dependentValue =
+        B.createMarkDependence(md->getLoc(), dependentValue,
+                               availableValue.getValue(), md->dependenceKind());
+  }
+  LLVM_DEBUG(llvm::dbgs() << "      To value: " << dependentValue);
+  md->replaceAllUsesWith(dependentValue);
+  deleter.deleteIfDead(md);
+  return dependentValue;
 }
 
 SILValue
