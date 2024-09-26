@@ -4,11 +4,19 @@
 // RUN: %target-swift-frontend -scan-dependencies -module-name Test -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -blocklist-file %t/blocklist.yml -blocklist-file %t/empty.yml \
-// RUN:   -scanner-prefix-map %t=/^tmp \
+// RUN:   -scanner-prefix-map %t=/^tmp -I %t/include \
 // RUN:   %t/main.swift -o %t/deps.json -cache-compile-job -cas-path %t/cas 
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/shim.cmd
 // RUN: %swift_frontend_plain @%t/shim.cmd
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json A > %t/A.cmd
+// RUN: %swift_frontend_plain @%t/A.cmd
+
+// RUN: %FileCheck %s -check-prefix CMD -input-file=%t/A.cmd
+// CMD: -blocklist-file
+// CMD-NEXT: /^tmp/blocklist.yml
+// CMD-NEXT: -blocklist-file
+// CMD-NEXT: /^tmp/empty.yml
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json Test casFSRootID > %t/fs.casid
 // DISABLE: llvm-cas --cas %t/cas --ls-tree-recursive @%t/fs.casid | %FileCheck %s -check-prefix FS
@@ -36,6 +44,7 @@
 // CHECK-BLOCKED-NOT: type_layout_string
 
 //--- main.swift
+import A
 public struct Bar {
     let x: Int
     let y: AnyObject
@@ -46,6 +55,11 @@ public enum Foo {
     case b(Int, AnyObject)
     case c
 }
+
+//--- include/A.swiftinterface
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name A -O -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -user-module-version 1.0
+public func a() { }
 
 //--- blocklist.yml
 ---
