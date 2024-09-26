@@ -320,6 +320,29 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const AvailableValue &V) {
 //                           Subelement Extraction
 //===----------------------------------------------------------------------===//
 
+static bool isFullyAvailable(SILType loadTy, unsigned firstElt,
+                             ArrayRef<AvailableValue> AvailableValues) {
+  if (firstElt >= AvailableValues.size()) { // #Elements may be zero.
+    return false;
+  }
+
+  auto &firstVal = AvailableValues[firstElt];
+
+  // Make sure that the first element is available and is the correct type.
+  if (!firstVal || firstVal.getType() != loadTy)
+    return false;
+
+  auto *function = firstVal.getValue()->getFunction();
+  return llvm::all_of(
+    range(getNumSubElements(loadTy, function->getModule(),
+                            TypeExpansionContext(*function))),
+    [&](unsigned index) -> bool {
+      auto &val = AvailableValues[firstElt + index];
+      return val.getValue() == firstVal.getValue() &&
+        val.getSubElementNumber() == index;
+    });
+}
+
 /// Given an aggregate value and an access path, non-destructively extract the
 /// value indicated by the path.
 static SILValue nonDestructivelyExtractSubElement(const AvailableValue &Val,
@@ -493,7 +516,6 @@ private:
                                   SILValue address, unsigned firstElt);
   SILValue handlePrimitiveValue(SILType loadTy, SILValue address,
                                 unsigned firstElt);
-  bool isFullyAvailable(SILType loadTy, unsigned firstElt) const;
 
 
   /// If as a result of us copying values, we may have unconsumed destroys, find
@@ -520,27 +542,6 @@ void AvailableValueAggregator::print(llvm::raw_ostream &os) const {
   }
 }
 
-bool AvailableValueAggregator::isFullyAvailable(SILType loadTy,
-                                                unsigned firstElt) const {
-  if (firstElt >= AvailableValueList.size()) { // #Elements may be zero.
-    return false;
-  }
-
-  auto &firstVal = AvailableValueList[firstElt];
-
-  // Make sure that the first element is available and is the correct type.
-  if (!firstVal || firstVal.getType() != loadTy)
-    return false;
-
-  return llvm::all_of(range(getNumSubElements(
-                          loadTy, M, TypeExpansionContext(B.getFunction()))),
-                      [&](unsigned index) -> bool {
-                        auto &val = AvailableValueList[firstElt + index];
-                        return val.getValue() == firstVal.getValue() &&
-                               val.getSubElementNumber() == index;
-                      });
-}
-
 // We can only take if we never have to split a larger value to promote this
 // address.
 bool AvailableValueAggregator::canTake(SILType loadTy,
@@ -552,7 +553,7 @@ bool AvailableValueAggregator::canTake(SILType loadTy,
     return true;
 
   // If we are trivially fully available, just return true.
-  if (isFullyAvailable(loadTy, firstElt))
+  if (isFullyAvailable(loadTy, firstElt, AvailableValueList))
     return true;
 
   // Otherwise see if we are an aggregate with fully available leaf types.
@@ -659,7 +660,7 @@ SILValue
 AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
                                                        unsigned firstElt) {
   // Check if our underlying type is fully available. If it isn't, bail.
-  if (!isFullyAvailable(loadTy, firstElt))
+  if (!isFullyAvailable(loadTy, firstElt, AvailableValueList))
     return SILValue();
 
   // Ok, grab out first value. (note: any actually will do).
