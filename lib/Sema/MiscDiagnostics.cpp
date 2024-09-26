@@ -1478,12 +1478,13 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 }
 
 DeferredDiags swift::findSyntacticErrorForConsume(
-    ModuleDecl *module, SourceLoc loc, Expr *subExpr) {
+    ModuleDecl *module, SourceLoc loc, Expr *subExpr,
+    llvm::function_ref<Type(Expr *)> getType) {
   assert(!isa<ConsumeExpr>(subExpr) && "operates on the sub-expr of a consume");
 
   DeferredDiags result;
   const bool noncopyable =
-      subExpr->getType()->getCanonicalType()->isNoncopyable();
+      getType(subExpr)->isNoncopyable();
 
   bool partial = false;
   Expr *current = subExpr;

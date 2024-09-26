@@ -171,17 +171,6 @@ std::string ASTMangler::mangleAccessorEntity(AccessorKind kind,
   return finalize();
 }
 
-std::string ASTMangler::mangleGlobalGetterEntity(const ValueDecl *decl,
-                                                 SymbolKind SKind) {
-  assert(isa<VarDecl>(decl) && "Only variables can have global getters");
-  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(decl));
-  beginMangling();
-  BaseEntitySignature base(decl);
-  appendEntity(decl, base, "vG", /*isStatic*/false);
-  appendSymbolKind(SKind);
-  return finalize();
-}
-
 std::string ASTMangler::mangleDefaultArgumentEntity(const DeclContext *func,
                                                     unsigned index,
                                                     SymbolKind SKind) {

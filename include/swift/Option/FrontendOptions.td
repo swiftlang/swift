@@ -1049,6 +1049,9 @@ def disable_alias_module_names_in_module_interface :
   Flag<["-"], "disable-alias-module-names-in-module-interface">,
   HelpText<"When emitting a module interface, disable disambiguating modules "
            "using distinct alias names">;
+def abi_comments_in_module_interface :
+  Flag<["-"], "abi-comments-in-module-interface">,
+  HelpText<"When emitting a module interface, emit comments with ABI details">;
 
 def experimental_spi_imports :
   Flag<["-"], "experimental-spi-imports">,
