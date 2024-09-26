@@ -4,7 +4,8 @@
 // RUN: -disable-experimental-parser-round-trip \
 // RUN: | %FileCheck %s
 // FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
-// REQUIRES: asserts
+
+// REQUIRES: swift_feature_NonescapableTypes
 
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
@@ -52,7 +53,7 @@ func testBasic() {
     let view = BufferView($0, a.count)
     let derivedView = derive(view)
     let newView = consumeAndCreate(derivedView)
-    use(newView)    
+    use(newView)
   }
 }
 
@@ -147,7 +148,7 @@ struct GenericBufferView<Element> : ~Escapable {
     precondition(count >= 0, "Count must not be negative")
     self.baseAddress = baseAddress
     self.count = count
-  } 
+  }
   subscript(position: Pointer) -> Element {
     get {
       if _isPOD(Element.self) {

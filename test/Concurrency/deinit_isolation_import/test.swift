@@ -16,6 +16,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_IsolatedDeinit
 
 // Note: intentionally importing Alpha implicitly
 import Beta

@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -parse-as-library -emit-sil %s -o /dev/null -verify
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_SymbolLinkageMarkers
 
 @_used @_section("__TEXT,__mysection") var g0: Int = 1 // ok
 

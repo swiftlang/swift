@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -print-diagnostic-groups -disable-availability-checking -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 func f(_: @escaping @Sendable () -> Void) { }
 open class F {

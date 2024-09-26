@@ -4,8 +4,8 @@
 // RUN: %target-swift-frontend -emit-sil %s  -disable-availability-checking -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation | %FileCheck %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 actor A {
   var x: String = "Hello"

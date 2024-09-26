@@ -4,8 +4,8 @@
 // RUN:   -module-name Swift \
 // RUN:   -enable-experimental-feature NonescapableTypes
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_NonescapableTypes
 
 // Test the SIL representation for lifetime dependence.
 

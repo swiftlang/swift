@@ -1,5 +1,8 @@
 // RUN: %target-swift-emit-sil -O -sil-verify-all -verify -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses %s
 
+// REQUIRES: swift_feature_MoveOnlyClasses
+// REQUIRES: swift_feature_NoImplicitCopy
+
 struct Test: ~Copyable {
   public let baseAddress: UnsafeRawPointer
   public let count: Int

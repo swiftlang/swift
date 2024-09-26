@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -emit-ir -primary-file %s -enable-experimental-feature TupleConformances -parse-as-library | %FileCheck %s
 
-// -enable-experimental-feature requires an asserts build
-// REQUIRES: asserts
+// REQUIRES: swift_feature_TupleConformances
 
 protocol P {
   func defaultRequirement()

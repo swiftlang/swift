@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s -emit-ir  -parse-as-library | %FileCheck %s --check-prefix=IR
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_SymbolLinkageMarkers
 
 @_section("__DATA,__mysection") var g0: Int = 1
 @_section("__DATA,__mysection") var g1: (Int, Int) = (42, 43)

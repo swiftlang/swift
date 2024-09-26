@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend -enable-experimental-feature BuiltinModule -enable-experimental-feature RawLayout -emit-sil %s | %FileCheck %s
 
+// REQUIRES: swift_feature_BuiltinModule
+// REQUIRES: swift_feature_RawLayout
+
 import Builtin
 
 @_silgen_name("init_lock")

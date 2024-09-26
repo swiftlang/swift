@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -disable-availability-checking -swift-version 6 -enable-experimental-feature GlobalActorInferenceCutoff -parse-as-library %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GlobalActorInferenceCutoff
 
 @MainActor
 protocol GloballyIsolated {}

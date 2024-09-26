@@ -2,6 +2,8 @@
 // RUN: %target-swift-frontend -emit-module -enable-experimental-feature RawLayout -module-name raw_layout_fred -o %t %S/Inputs/raw_layout.swift
 // RUN: %target-swift-frontend -I %t -I %S/Inputs -cxx-interoperability-mode=upcoming-swift -emit-ir %s -verify | %FileCheck %s
 
+// REQUIRES: swift_feature_RawLayout
+
 import raw_layout_fred
 import RawLayoutCXX
 

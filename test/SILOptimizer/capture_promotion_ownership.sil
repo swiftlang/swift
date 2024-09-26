@@ -2,6 +2,8 @@
 // RUN: -enable-experimental-feature NonescapableTypes -module-name Swift \
 // RUN: | %FileCheck %s
 
+// REQUIRES: swift_feature_NonescapableTypes
+
 // Check to make sure that the process of promoting closure captures results in
 // a correctly cloned and modified closure function body. This test
 // intentionally only includes one promotable closure so that there is minimal

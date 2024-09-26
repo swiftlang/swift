@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt %s -enable-experimental-feature ValueGenerics | %target-sil-opt -enable-experimental-feature ValueGenerics | %FileCheck %s
 
+// REQUIRES: swift_feature_ValueGenerics
+
 import Builtin
 import Swift
 

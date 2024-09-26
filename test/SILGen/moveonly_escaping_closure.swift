@@ -4,6 +4,8 @@
 // FIXME: we should add -sil-verify-all to the below. rdar://109477976 (moveonly_escaping_closure.swift fails with -sil-verify-all)
 // RUN: %target-swift-emit-sil -O -enable-experimental-feature NoImplicitCopy -module-name moveonly_closure -verify %s
 
+// REQUIRES: swift_feature_NoImplicitCopy
+
 struct Empty: ~Copyable {}
 
 struct SingleElt: ~Copyable {

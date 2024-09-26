@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -enable-infer-public-sendable %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
 // RUN: %target-swift-frontend -enable-infer-public-sendable %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 func acceptCV<T: Sendable>(_: T) { }
 

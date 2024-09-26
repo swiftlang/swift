@@ -20,7 +20,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
-// REQUIRES: asserts
+// REQUIRES: swift_feature_KeyPathWithStaticMembers
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

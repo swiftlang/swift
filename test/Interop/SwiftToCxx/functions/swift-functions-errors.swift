@@ -4,8 +4,7 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR -Wno-unused-function)
 
-// for experimental feature GenerateBindingsForThrowingFunctionsInCXX:
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GenerateBindingsForThrowingFunctionsInCXX
 
 // CHECK-LABEL: namespace Functions SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Functions") {
 

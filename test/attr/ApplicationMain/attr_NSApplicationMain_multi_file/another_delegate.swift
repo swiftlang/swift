@@ -7,6 +7,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name main -parse-as-library -typecheck -enable-upcoming-feature DeprecateApplicationMain %t.swiftmodule -primary-file %S/delegate.swift -verify -verify-ignore-unknown -verify-additional-prefix deprecated-
 
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_DeprecateApplicationMain
 
 import AppKit
 

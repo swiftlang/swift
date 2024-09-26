@@ -4,8 +4,8 @@
 // RUN: %target-swift-emit-silgen -disable-availability-checking -module-name preconcurrency_conformances -enable-upcoming-feature DynamicActorIsolation %t/src/checks.swift -verify | %FileCheck %t/src/checks.swift
 // RUN: %target-swift-emit-silgen -swift-version 6 -disable-availability-checking -module-name preconcurrency_conformances -disable-dynamic-actor-isolation %t/src/checks_disabled.swift -verify | %FileCheck %t/src/checks_disabled.swift
 
-// REQUIRES: asserts
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_DynamicActorIsolation
 
 //--- checks.swift
 protocol P {

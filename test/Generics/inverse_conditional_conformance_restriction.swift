@@ -2,6 +2,9 @@
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -enable-experimental-feature SuppressedAssociatedTypes
 
+// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
+
 protocol P {}
 protocol Q {}
 class DoggoClass {}

@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature NonescapableTypes -disable-availability-checking -module-name main %s | %FileCheck %s
 
+// REQUIRES: swift_feature_NonescapableTypes
+
 protocol NoCopyP: ~Copyable {}
 
 struct NC: ~Copyable {}

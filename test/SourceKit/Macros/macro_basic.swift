@@ -122,6 +122,7 @@ func remoteCall<Result: ConjureRemoteValue>(function: String, arguments: [String
 }
 
 // REQUIRES: swift_swift_parser, executable_test, shell, asserts
+// REQUIRES: swift_feature_PreambleMacros
 
 // RUN: %empty-directory(%t)
 

@@ -10,6 +10,8 @@
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_LayoutStringValueWitnesses
+// REQUIRES: swift_feature_LayoutStringValueWitnessesInstantiation
 
 // Requires runtime functions added in Swift 5.9.
 // UNSUPPORTED: use_os_stdlib

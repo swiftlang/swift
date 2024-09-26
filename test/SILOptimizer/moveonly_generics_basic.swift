@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend %s -sil-verify-all -verify -emit-sil -enable-experimental-feature MoveOnlyPartialReinitialization
 
-// REQUIRES: asserts
-
+// REQUIRES: swift_feature_MoveOnlyPartialReinitialization
 
 /// MARK: types
 

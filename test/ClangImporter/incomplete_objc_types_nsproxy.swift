@@ -9,6 +9,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_ImportObjcForwardDeclarations
 
 // Verify that a forward declared interface for a type inheriting from NSProxy instead
 // of NSObject is still usable from Swift.

@@ -5,6 +5,7 @@
 // RUN: %target-swift-frontend -swift-version 5 -emit-ir     -I %t                      %t/Main.swift     -parse-stdlib -enable-experimental-feature Embedded -wmo | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Embedded
 
 // BEGIN MyModule.swift
 
