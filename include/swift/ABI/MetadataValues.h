@@ -1554,6 +1554,12 @@ enum class RawLayoutFlags : uintptr_t {
 
   /// Whether or not this raw layout type was declared 'movesAsLike'.
   MovesAsLike = 0x2,
+  
+  /// Whether this raw layout type is bitwise borrowable.
+  ///
+  /// No raw layout types are yet, but should we change our mind about that in the future,
+  /// this flag is here.
+  BitwiseBorrowable = 0x4,
 };
 static inline RawLayoutFlags operator|(RawLayoutFlags lhs,
                                        RawLayoutFlags rhs) {
@@ -1568,6 +1574,9 @@ static inline bool isRawLayoutArray(RawLayoutFlags flags) {
 }
 static inline bool shouldRawLayoutMoveAsLike(RawLayoutFlags flags) {
   return uintptr_t(flags) & uintptr_t(RawLayoutFlags::MovesAsLike);
+}
+static inline bool isRawLayoutBitwiseBorrowable(RawLayoutFlags flags) {
+  return uintptr_t(flags) & uintptr_t(RawLayoutFlags::BitwiseBorrowable);
 }
 
 namespace SpecialPointerAuthDiscriminators {
