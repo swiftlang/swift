@@ -2939,7 +2939,7 @@ public:
 
   /// Is this attribute attached to the ABI declaration and pointing back to
   /// the original? Inverse \c ABIAttr s are always implicit and result in an
-  /// \c ABIRole with \c providesAPI() but not \c providesABI() .
+  /// \c ABIRoleInfo with \c providesAPI() but not \c providesABI() .
   bool isInverse() const { return Bits.ABIAttr.isInverse; }
 
   void createInverse(Decl *owner);
