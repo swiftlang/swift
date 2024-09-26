@@ -1839,7 +1839,7 @@ public:
                                                const NormalProtocolConformance *C,
                                                CanType conformingType,
                                                ForDefinition_t forDefinition);
-  llvm::Constant *getAddrOfWitnessTable(const RootProtocolConformance *C,
+  llvm::Constant *getAddrOfWitnessTable(const ProtocolConformance *C,
                                       ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfWitnessTablePattern(
                                       const NormalProtocolConformance *C,

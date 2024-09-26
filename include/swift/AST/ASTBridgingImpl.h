@@ -45,6 +45,14 @@ bool BridgedNominalTypeDecl_hasValueDeinit(BridgedNominalTypeDecl decl) {
   return decl.unbridged()->getValueTypeDestructor() != nullptr;
 }
 
+bool BridgedNominalTypeDecl_isClass(BridgedNominalTypeDecl decl) {
+  return swift::isa<swift::ClassDecl>(decl.unbridged());
+}
+
+bool BridgedNominalTypeDecl_isGenericAtAnyLevel(BridgedNominalTypeDecl decl) {
+  return decl.unbridged()->isGenericContext();
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedSubscriptDecl
 //===----------------------------------------------------------------------===//

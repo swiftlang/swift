@@ -1372,6 +1372,26 @@ public:
   }
 };
 
+/// Conformance info for a witness table that can be directly generated.
+class SpecializedConformanceInfo : public ConformanceInfo {
+  friend ProtocolInfo;
+
+  const SpecializedProtocolConformance *Conformance;
+public:
+  SpecializedConformanceInfo(const SpecializedProtocolConformance *C)
+      : Conformance(C) {}
+
+  llvm::Value *getTable(IRGenFunction &IGF,
+                        llvm::Value **conformingMetadataCache) const override {
+    return IGF.IGM.getAddrOfWitnessTable(Conformance);
+  }
+
+  llvm::Constant *tryGetConstantTable(IRGenModule &IGM,
+                                      CanType conformingType) const override {
+    return IGM.getAddrOfWitnessTable(Conformance);
+  }
+};
+
 /// Conformance info for a witness table that is (or may be) dependent.
 class AccessorConformanceInfo : public ConformanceInfo {
   friend ProtocolInfo;
@@ -1422,8 +1442,8 @@ public:
 
     WitnessTableBuilderBase(IRGenModule &IGM, SILWitnessTable *SILWT)
         : IGM(IGM), SILWT(SILWT),
-          Conformance(*SILWT->getConformance()),
-          ConformanceInContext(*mapConformanceIntoContext(SILWT->getConformance())),
+          Conformance(*SILWT->getConformance()->getRootConformance()),
+          ConformanceInContext(*mapConformanceIntoContext(SILWT->getConformance()->getRootConformance())),
           ConcreteType(Conformance.getDeclContext()
                          ->mapTypeIntoContext(Conformance.getType())
                          ->getCanonicalType()) {}
@@ -2361,7 +2381,7 @@ void IRGenerator::ensureRelativeSymbolCollocation(SILWitnessTable &wt) {
 
   // Only resilient conformances use relative pointers for witness methods.
   if (wt.isDeclaration() || isAvailableExternally(wt.getLinkage()) ||
-      !CurrentIGM->isResilientConformance(wt.getConformance()))
+      !CurrentIGM->isResilientConformance(wt.getConformance()->getRootConformance()))
     return;
 
   for (auto &entry : wt.getEntries()) {
@@ -2463,10 +2483,19 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
   if (auto found = checkCache(conformance))
     return *found;
 
+  const ConformanceInfo *info;
+
+  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+    if (auto *sc = dyn_cast<SpecializedProtocolConformance>(conformance)) {
+      info = new SpecializedConformanceInfo(sc);
+      Conformances.try_emplace(conformance, info);
+      return *info;
+    }
+  }
+
   //  Drill down to the root normal
   auto rootConformance = conformance->getRootConformance();
 
-  const ConformanceInfo *info;
   // If the conformance is dependent in any way, we need to unique it.
   // Under a relative protocol witness table implementation conformances are
   // always direct.
@@ -2601,14 +2630,15 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   IRGen.ensureRelativeSymbolCollocation(*wt);
 
   auto conf = wt->getConformance();
+  RootProtocolConformance *rootConf = conf->getRootConformance();
   PrettyStackTraceConformance _st("emitting witness table for", conf);
 
   unsigned tableSize = 0;
   llvm::GlobalVariable *global = nullptr;
   llvm::Function *instantiationFunction = nullptr;
-  bool isDependent = isDependentConformance(conf);
+  bool isDependent = isDependentConformance(rootConf);
   SmallVector<llvm::Constant *, 4> resilientWitnesses;
-  bool isResilient = isResilientConformance(conf);
+  bool isResilient = isResilientConformance(rootConf);
   bool useRelativeProtocolWitnessTable =
     IRGen.Opts.UseRelativeProtocolWitnessTables;
   if (useRelativeProtocolWitnessTable &&
@@ -2665,22 +2695,24 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     wtableBuilder.collectResilientWitnesses(resilientWitnesses);
   }
 
-  // Collect the information that will go into the protocol conformance
-  // descriptor.
-  unsigned tablePrivateSize = wt->getConditionalConformances().size();
-  ConformanceDescription description(conf, wt, global, tableSize,
-                                     tablePrivateSize, isDependent);
+  if (!Context.LangOpts.hasFeature(Feature::Embedded)) {
+    // Collect the information that will go into the protocol conformance
+    // descriptor.
+    unsigned tablePrivateSize = wt->getConditionalConformances().size();
+    ConformanceDescription description(rootConf, wt, global, tableSize,
+                                       tablePrivateSize, isDependent);
 
-  // Build the instantiation function, we if need one.
-  description.instantiationFn = instantiationFunction;
-  description.resilientWitnesses = std::move(resilientWitnesses);
+    // Build the instantiation function, we if need one.
+    description.instantiationFn = instantiationFunction;
+    description.resilientWitnesses = std::move(resilientWitnesses);
 
-  // Record this conformance descriptor.
-  addProtocolConformance(std::move(description));
+    // Record this conformance descriptor.
+    addProtocolConformance(std::move(description));
 
-  IRGen.noteUseOfTypeContextDescriptor(
-      conf->getDeclContext()->getSelfNominalTypeDecl(),
-      RequireMetadata);
+    IRGen.noteUseOfTypeContextDescriptor(
+        conf->getDeclContext()->getSelfNominalTypeDecl(),
+        RequireMetadata);
+  }
 }
 
 /// True if a function's signature in LLVM carries polymorphic parameters.

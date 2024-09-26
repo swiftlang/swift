@@ -236,9 +236,8 @@ SILWitnessTable *
 SILModule::lookUpWitnessTable(const ProtocolConformance *C) {
   assert(C && "null conformance passed to lookUpWitnessTable");
 
-  auto rootC = C->getRootConformance();
   // Attempt to lookup the witness table from the table.
-  auto found = WitnessTableMap.find(rootC);
+  auto found = WitnessTableMap.find(C);
   if (found == WitnessTableMap.end())
     return nullptr;
 
@@ -540,7 +539,7 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
     SILLinkerVisitor linker(*this, linkingMode);
     linker.processConformance(C);
   }
-  SILWitnessTable *wt = lookUpWitnessTable(C.getConcrete());
+  SILWitnessTable *wt = lookUpWitnessTable(C.getConcrete()->getRootConformance());
 
   if (!wt) {
     LLVM_DEBUG(llvm::dbgs() << "        Failed speculative lookup of "
