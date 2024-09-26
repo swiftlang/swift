@@ -134,16 +134,16 @@ struct FunctionUses {
 
     for witnessTable in context.witnessTables {
       for entry in witnessTable.entries {
-        if entry.kind == .method, let f = entry.methodFunction {
-          markUnknown(f)
+        if case .method(_, let witness) = entry, let witness {
+          markUnknown(witness)
         }
       }
     }
 
     for witnessTable in context.defaultWitnessTables {
       for entry in witnessTable.entries {
-        if entry.kind == .method, let f = entry.methodFunction {
-          markUnknown(f)
+        if case .method(_, let witness) = entry, let witness {
+          markUnknown(witness)
         }
       }
     }
