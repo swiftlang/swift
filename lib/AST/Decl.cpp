@@ -35,6 +35,7 @@
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/Module.h"
@@ -4243,6 +4244,28 @@ void ValueDecl::setRenamedDecl(const AvailableAttr *attr,
   getASTContext().evaluator.cacheNonEmptyOutput(RenamedDeclRequest{this, attr},
                                                 std::move(renameDecl));
 }
+
+abi_role_detail::Storage abi_role_detail::computeStorage(Decl *decl) {
+  ASSERT(decl);
+
+  Decl *counterpartDecl = decl;
+  ABIRole::Value flags = ABIRole::Either;
+
+  if (auto attr = decl->getAttrs().getAttribute<ABIAttr>()) {
+    flags = attr->isInverse() ? ABIRole::ProvidesABI : ABIRole::ProvidesAPI;
+
+    counterpartDecl = attr->abiDecl;
+    if (auto VD = dyn_cast<VarDecl>(decl))
+      if (auto PBD = dyn_cast_or_null<PatternBindingDecl>(counterpartDecl))
+        counterpartDecl = PBD->getVarAtSimilarStructuralPosition(VD);
+  }
+
+  return Storage(counterpartDecl, flags);
+}
+
+ABIRole::ABIRole(NLOptions opts)
+  : value(opts & NL_ABIProviding ? ProvidesABI : ProvidesAPI)
+{ }
 
 VarDecl *PatternBindingDecl::
 getVarAtSimilarStructuralPosition(VarDecl *otherVar) {

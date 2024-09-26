@@ -330,6 +330,7 @@ bool ModuleFile::mayHaveDiagnosticsPointingAtBuffer() const {
 ModuleFile::~ModuleFile() { }
 
 void ModuleFile::lookupValue(DeclName name,
+                             OptionSet<ModuleLookupFlags> flags,
                              SmallVectorImpl<ValueDecl*> &results) {
   PrettyStackTraceModuleFile stackEntry(*this);
 
@@ -350,7 +351,8 @@ void ModuleFile::lookupValue(DeclName name,
         }
         auto VD = cast<ValueDecl>(declOrError.get());
         if (name.isSimpleName() || VD->getName().matchesRef(name))
-          results.push_back(VD);
+          if (ABIRoleInfo(VD).matchesOptions(flags))
+            results.push_back(VD);
       }
     }
   }
@@ -368,7 +370,8 @@ void ModuleFile::lookupValue(DeclName name,
           continue;
         }
         auto VD = cast<ValueDecl>(declOrError.get());
-        results.push_back(VD);
+        if (ABIRoleInfo(VD).matchesOptions(flags))
+          results.push_back(VD);
       }
     }
   }
@@ -453,7 +456,8 @@ TypeDecl *ModuleFile::lookupNestedType(Identifier name,
           diagnoseAndConsumeError(typeOrErr.takeError());
           continue;
         }
-        return cast<TypeDecl>(typeOrErr.get());
+        if (ABIRoleInfo(typeOrErr.get()).providesAPI()) // FIXME: flags?
+          return cast<TypeDecl>(typeOrErr.get());
       }
     }
   }
@@ -622,6 +626,8 @@ void ModuleFile::lookupVisibleDecls(ImportPath::Access accessPath,
       diagnoseAndConsumeError(declOrError.takeError());
       return;
     }
+    if (!ABIRoleInfo(declOrError.get()).providesAPI()) // FIXME: flags?
+      return;
     consumer.foundDecl(cast<ValueDecl>(declOrError.get()),
                        DeclVisibilityKind::VisibleAtTopLevel);
   };
@@ -1005,6 +1011,8 @@ void ModuleFile::getTopLevelDecls(
       consumeError(declOrError.takeError());
       continue;
     }
+    if (!ABIRoleInfo(declOrError.get()).providesAPI()) // FIXME: flags
+      continue;
     results.push_back(declOrError.get());
   }
 }
@@ -1053,6 +1061,8 @@ ModuleFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl *> &results) {
 
   for (auto DeclID : Core->LocalTypeDecls->data()) {
     auto TD = cast<TypeDecl>(getDecl(DeclID));
+    if (!ABIRoleInfo(TD).providesAPI()) // FIXME: flags
+      continue;
     results.push_back(TD);
   }
 }
