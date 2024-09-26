@@ -58,6 +58,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/APIntMap.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/BlockList.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -779,6 +780,7 @@ ASTContext::ASTContext(
       evaluator(Diags, langOpts), TheBuiltinModule(createBuiltinModule(*this)),
       StdlibModuleName(getIdentifier(STDLIB_NAME)),
       SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
+      blockListConfig(SourceMgr),
       TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(
           *this, Type(), RecursiveTypeProperties::HasError)),
       TheUnresolvedType(new(*this, AllocationArena::Permanent)
