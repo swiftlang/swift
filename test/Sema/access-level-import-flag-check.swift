@@ -23,6 +23,8 @@
 /// swiftinterfaces don't need the flag.
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface) -I %t
 
+// REQUIRES: swift_feature_InternalImportsByDefault
+
 //--- PublicLib.swift
 //--- PackageLib.swift
 //--- InternalLib.swift

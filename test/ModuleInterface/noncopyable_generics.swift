@@ -43,6 +43,10 @@
 
 // RUN: %FileCheck %s --check-prefix=CHECK-SILGEN < %t/final.silgen
 
+// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_SE427NoInferenceOnExtension
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
+
 
 
 import NoncopyableGenerics_Misc

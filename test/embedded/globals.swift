@@ -3,6 +3,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: CODEGENERATOR=ARM
+// REQUIRES: swift_feature_Embedded
 
 precedencegroup AssignmentPrecedence { assignment: true }
 public typealias IntegerLiteralType = Int

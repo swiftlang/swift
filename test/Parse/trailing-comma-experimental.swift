@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature TrailingComma
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_TrailingComma
 
 // Condition List
 

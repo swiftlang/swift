@@ -1,8 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-sil \
 // RUN: -enable-experimental-feature NonescapableTypes | %FileCheck %s
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_NonescapableTypes
 
 struct NCContainer : ~Copyable {
   let ptr: UnsafeRawBufferPointer

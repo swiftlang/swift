@@ -3,6 +3,8 @@
 // RUN: -enable-builtin-module \
 // RUN: -enable-experimental-feature NonescapableTypes | %FileCheck %s
 
+// REQUIRES: swift_feature_NonescapableTypes
+
 import Builtin
 
 struct BufferView : ~Escapable {

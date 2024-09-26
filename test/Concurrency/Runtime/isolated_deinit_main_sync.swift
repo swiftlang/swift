@@ -3,6 +3,7 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
+// REQUIRES: swift_feature_IsolatedDeinit
 
 var isDead: Bool = false
 

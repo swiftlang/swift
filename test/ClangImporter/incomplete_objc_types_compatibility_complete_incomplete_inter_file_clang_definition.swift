@@ -9,6 +9,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_ImportObjcForwardDeclarations
 
 //--- full_definition.swift
 

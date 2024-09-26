@@ -8,6 +8,7 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: synchronization
+// REQUIRES: swift_feature_Embedded
 
 import Synchronization
 

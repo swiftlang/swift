@@ -3,6 +3,8 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name Test
 // RUN: %FileCheck %s < %t.swiftinterface
 
+// REQUIRES: swift_feature_NonescapableTypes
+
 // CHECK: #if compiler(>=5.3) && $NonescapableTypes
 // CHECK: public protocol P : ~Escapable {
 // CHECK:   associatedtype A

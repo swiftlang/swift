@@ -5,8 +5,8 @@
 // RUN:   -module-name test \
 // RUN:   -enable-experimental-feature NonescapableTypes
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_NonescapableTypes
 
 struct Span<T>: ~Escapable {
   private var base: UnsafePointer<T>

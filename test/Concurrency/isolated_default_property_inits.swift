@@ -6,7 +6,8 @@
 // RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature IsolatedDefaultValues -enable-upcoming-feature RegionBasedIsolation %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_IsolatedDefaultValues
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 @globalActor
 actor SomeGlobalActor {

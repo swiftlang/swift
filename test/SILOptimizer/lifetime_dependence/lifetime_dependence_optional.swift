@@ -4,8 +4,8 @@
 // RUN:   -module-name test \
 // RUN:   -enable-experimental-feature NonescapableTypes
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_NonescapableTypes
 
 // Simply test that it is possible for a module to define a pseudo-Optional type without triggering any compiler errors.
 

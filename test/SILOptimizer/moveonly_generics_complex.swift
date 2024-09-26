@@ -4,7 +4,7 @@
 // RUN:     -enable-experimental-feature BuiltinModule              \
 // RUN:     -sil-verify-all
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_BuiltinModule
 
 import Builtin
 

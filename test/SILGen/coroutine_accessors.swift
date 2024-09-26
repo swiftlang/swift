@@ -3,14 +3,14 @@
 // RUN:     -enable-experimental-feature CoroutineAccessors \
 // RUN: | %FileCheck %s
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_CoroutineAccessors
 
 public struct S {
 public var o: any AnyObject
 public var _i: Int = 0
 
 public var irm: Int {
-// CHECK-LABEL: sil [ossa] @$s19coroutine_accessors1SV3irmSivy : 
+// CHECK-LABEL: sil [ossa] @$s19coroutine_accessors1SV3irmSivy :
 // CHECK-SAME:      $@yield_once
 // CHECK-SAME:      @convention(method)
 // CHECK-SAME:      (@guaranteed S)
@@ -21,7 +21,7 @@ public var irm: Int {
   read {
     yield _i
   }
-// CHECK-LABEL: sil [ossa] @$s19coroutine_accessors1SV3irmSivx : 
+// CHECK-LABEL: sil [ossa] @$s19coroutine_accessors1SV3irmSivx :
 // CHECK-SAME:      $@yield_once
 // CHECK-SAME:      @convention(method)
 // CHECK-SAME:      (@inout S)

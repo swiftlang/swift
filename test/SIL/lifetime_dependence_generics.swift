@@ -2,8 +2,9 @@
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -enable-experimental-feature SuppressedAssociatedTypes | %FileCheck %s
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
 
 protocol P {
   associatedtype E: ~Escapable

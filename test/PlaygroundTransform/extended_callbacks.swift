@@ -8,6 +8,7 @@
 // RUN: %target-codesign %t/main2
 // RUN: %target-run %t/main2 | %FileCheck %s
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_PlaygroundExtendedCallbacks
 
 import PlaygroundSupport
 

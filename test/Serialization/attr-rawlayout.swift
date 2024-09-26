@@ -3,6 +3,8 @@
 // RUN: llvm-bcanalyzer -dump %t/a.swiftmodule | %FileCheck --check-prefix BC-CHECK --implicit-check-not UnknownCode %s
 // RUN: %target-swift-ide-test -print-module -module-to-print a -source-filename x -I %t | %FileCheck --check-prefix MODULE-CHECK %s
 
+// REQUIRES: swift_feature_RawLayout
+
 // BC-CHECK: <RawLayout_DECL_ATTR 
 
 // MODULE-CHECK: @_rawLayout(size: 5, alignment: 4) struct A_ExplicitSizeAlign

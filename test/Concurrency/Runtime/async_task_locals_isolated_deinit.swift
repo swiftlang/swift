@@ -10,6 +10,7 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // REQUIRES: gh76538
+// REQUIRES: swift_feature_IsolatedDeinit
 
 import Swift
 import _Concurrency

@@ -1,8 +1,7 @@
 // RUN: %target-swift-emit-silgen -enable-experimental-feature ThenStatements %s | %FileCheck %s
 // RUN: %target-swift-emit-ir -enable-experimental-feature ThenStatements %s
 
-// Needed for experimental features
-// REQUIRES: asserts
+// REQUIRES: swift_feature_ThenStatements
 
 func foo() -> Int {
   switch Bool.random() {

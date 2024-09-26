@@ -4,6 +4,7 @@
 // Swift sources are require to remove struct_extract so this check-not line passes:
 // "CHECK-SIL-NOT: struct_extract"
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
 
 func invokedDeinit() {}
 

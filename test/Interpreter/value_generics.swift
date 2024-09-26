@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature ValueGenerics -Xfrontend  -disable-availability-checking -Xfrontend -disable-experimental-parser-round-trip) | %FileCheck %s
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_ValueGenerics
 
 struct A<let N: Int, let M: Int> {}
 

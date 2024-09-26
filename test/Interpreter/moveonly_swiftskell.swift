@@ -23,6 +23,8 @@
 // RUN: %target-run %t/Opt %t/%target-library-name(Swiftskell) | %FileCheck %s --implicit-check-not destroy
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
 
 // Temporarily disable for back-deployment (rdar://128544927)
 // UNSUPPORTED: back_deployment_runtime

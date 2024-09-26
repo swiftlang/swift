@@ -7,6 +7,8 @@
 // RUN: %FileCheck %s < %t/test.silgen
 // RUN: %swift-demangle < %t/test.silgen | %FileCheck %s --check-prefix=DEMANGLED
 
+// REQUIRES: swift_feature_NonescapableTypes
+
 
 protocol NoncopyableProto: ~Copyable {}
 

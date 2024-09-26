@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -typecheck -enable-experimental-feature KeyPathWithStaticMembers -parse-as-library %s -verify
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_KeyPathWithStaticMembers
 
 struct Sub: Hashable {
   static func ==(_: Sub, _: Sub) -> Bool { return true }
@@ -229,8 +229,8 @@ func testKeyPathInGenericContext<H: Hashable, X>(hashable: H, anything: X) {
 }
 
 func testDisembodiedStringInterpolation(x: Int) {
-  \(x) // expected-error{{string interpolation can only appear inside a string literal}} 
-  \(x, radix: 16) // expected-error{{string interpolation can only appear inside a string literal}} 
+  \(x) // expected-error{{string interpolation can only appear inside a string literal}}
+  \(x, radix: 16) // expected-error{{string interpolation can only appear inside a string literal}}
 }
 
 func testNoComponents() {
@@ -556,7 +556,7 @@ func testStaticKeyPathComponent() {
   let _: KeyPath<X, Int?> = \.e?.h
   let _: PartialKeyPath<X> = \.e?.h
   let _: AnyKeyPath = \X.e?.h
-  
+
   let _ : KeyPath<Y, W.Type> = \Y.[40]
   let _ : KeyPath<Y.Type, W.Type> = \Y.Type.[70]
 }
@@ -940,7 +940,7 @@ func testKeyPathHole() {
   _ = \.x // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}} {{8-8=<#Root#>}}
   _ = \.x.y // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}} {{8-8=<#Root#>}}
 
-  let _ : AnyKeyPath = \.x 
+  let _ : AnyKeyPath = \.x
   // expected-error@-1 {{'AnyKeyPath' does not provide enough context for root type to be inferred; consider explicitly specifying a root type}} {{25-25=<#Root#>}}
   let _ : AnyKeyPath = \.x.y
   // expected-error@-1 {{'AnyKeyPath' does not provide enough context for root type to be inferred; consider explicitly specifying a root type}} {{25-25=<#Root#>}}
@@ -956,7 +956,7 @@ func provideValueButNotRoot<T>(_ fn: (T) -> String) {} // expected-note 2 {{in c
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
   provideValueButNotRoot(\String.foo) // expected-error {{value of type 'String' has no member 'foo'}}
 
-  func provideKPValueButNotRoot<T>(_ kp: KeyPath<T, String>) {} 
+  func provideKPValueButNotRoot<T>(_ kp: KeyPath<T, String>) {}
   provideKPValueButNotRoot(\.x) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
   provideKPValueButNotRoot(\.x.y) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
 
@@ -1026,11 +1026,11 @@ func testMemberAccessOnOptionalKeyPathComponent() {
     }
   }
 
-  \String?.count 
+  \String?.count
   // expected-error@-1 {{value of optional type 'String?' must be unwrapped to refer to member 'count' of wrapped base type 'String'}}
   // expected-note@-2 {{use unwrapped type 'String' as key path root}} {{4-11=String}}
-  
-  \Optional<String>.count 
+
+  \Optional<String>.count
   // expected-error@-1 {{value of optional type 'Optional<String>' must be unwrapped to refer to member 'count' of wrapped base type 'String'}}
   // expected-note@-2 {{use unwrapped type 'String' as key path root}} {{4-20=String}}
 
@@ -1053,7 +1053,7 @@ func testMemberAccessOnOptionalKeyPathComponent() {
   kp(\.count) // expected-error {{key path root inferred as optional type 'String?' must be unwrapped to refer to member 'count' of unwrapped type 'String'}}
   let _ : KeyPath<String?, Int> = \.count // expected-error {{key path root inferred as optional type 'String?' must be unwrapped to refer to member 'count' of unwrapped type 'String'}}
 
-  let _ : KeyPath<String?, Int> = \.utf8.count 
+  let _ : KeyPath<String?, Int> = \.utf8.count
   // expected-error@-1 {{key path root inferred as optional type 'String?' must be unwrapped to refer to member 'utf8' of unwrapped type 'String'}}
 }
 

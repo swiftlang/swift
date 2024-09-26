@@ -7,6 +7,7 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // REQUIRES: rdar125805695
+// REQUIRES: swift_feature_NonescapableTypes
 
 protocol P {
   func speak()

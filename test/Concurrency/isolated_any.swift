@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking -strict-concurrency=complete -enable-upcoming-feature InferSendableFromCaptures %s
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_InferSendableFromCaptures
 
 func globalNonisolatedFunction() {}
 @MainActor func globalMainActorFunction() {}

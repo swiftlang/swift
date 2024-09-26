@@ -6,6 +6,8 @@
 // RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 6 -package-name TestPackage -verify-additional-prefix ambiguity-
 // RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 5 -package-name TestPackage -enable-upcoming-feature MemberImportVisibility -verify-additional-prefix member-visibility-
 
+// REQUIRES: swift_feature_MemberImportVisibility
+
 import members_C
 // expected-member-visibility-note 16{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
 

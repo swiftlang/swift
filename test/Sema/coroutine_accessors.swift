@@ -3,7 +3,7 @@
 // RUN:     -enable-experimental-feature CoroutineAccessors \
 // RUN:     -debug-diagnostic-names
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_CoroutineAccessors
 
 struct S {
 var i: Int

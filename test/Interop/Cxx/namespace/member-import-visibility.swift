@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop -enable-upcoming-feature MemberImportVisibility -verify-additional-prefix member-visibility-
 
+// REQUIRES: swift_feature_MemberImportVisibility
+
 import MembersDirect
 
 // expected-member-visibility-note@-1 4 {{add import of module 'MembersTransitive'}}

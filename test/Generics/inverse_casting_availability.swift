@@ -3,6 +3,7 @@
 // RUN:   -enable-experimental-feature NonescapableTypes
 
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchOS || OS=xros
+// REQUIRES: swift_feature_NonescapableTypes
 
 protocol P {}
 struct NCG<T: ~Copyable> {}

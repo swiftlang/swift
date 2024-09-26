@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend -enable-upcoming-feature SendingArgsAndResults -swift-version 5 -enable-library-evolution -module-name test -emit-module -o %t/test.swiftmodule -emit-module-interface-path - -disable-availability-checking -Xllvm -swift-ast-printer-number-suppression-checks %s | %FileCheck %s
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_SendingArgsAndResults
 
 public class NonSendableKlass {}
 

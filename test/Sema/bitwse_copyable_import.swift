@@ -9,6 +9,8 @@
 // RUN:     -debug-diagnostic-names                          \
 // RUN:     -import-objc-header %t/Library.h
 
+// REQUIRES: swift_feature_NonescapableTypes
+
 //--- Library.h
 
 struct Tenple {

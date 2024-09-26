@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -module-name moveonly_addresschecker -sil-move-only-address-checker -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all %s | %FileCheck %s
 
+// REQUIRES: swift_feature_MoveOnlyClasses
+
 sil_stage raw
 
 import Swift

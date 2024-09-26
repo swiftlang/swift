@@ -32,6 +32,9 @@
 // RUN:   -enable-upcoming-feature InternalImportsByDefault \
 // RUN:   -package-name pkg
 
+// REQUIRES: swift_feature_AccessLevelOnImport
+// REQUIRES: swift_feature_InternalImportsByDefault
+
 //--- DefaultLib.swift
 //--- PublicLib.swift
 //--- PackageLib.swift

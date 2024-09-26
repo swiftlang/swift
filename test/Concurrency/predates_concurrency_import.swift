@@ -8,7 +8,7 @@
 // RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -strict-concurrency=complete  -parse-as-library -enable-upcoming-feature GlobalConcurrency
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GlobalConcurrency
 
 @preconcurrency import NonStrictModule
 @_predatesConcurrency import StrictModule // expected-warning{{'@_predatesConcurrency' has been renamed to '@preconcurrency'}}

@@ -2,6 +2,7 @@
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded | %FileCheck %s --check-prefix EMBEDDED
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Embedded
 
 #if $Embedded
 public func embedded() { }

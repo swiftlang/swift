@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-feature -Xfrontend KeyPathWithStaticMembers) | %FileCheck %s
 
-// REQUIRES: asserts
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_KeyPathWithStaticMembers
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
