@@ -80,10 +80,10 @@ SILLinkage swift::getSILLinkage(FormalLinkage linkage,
 }
 
 SILLinkage
-swift::getLinkageForProtocolConformance(const RootProtocolConformance *C,
+swift::getLinkageForProtocolConformance(const ProtocolConformance *C,
                                         ForDefinition_t definition) {
   // If the conformance was synthesized, give it shared linkage.
-  if (C->isSynthesized())
+  if (C->getRootConformance()->isSynthesized())
     return SILLinkage::Shared;
 
   auto typeDecl = C->getDeclContext()->getSelfNominalTypeDecl();

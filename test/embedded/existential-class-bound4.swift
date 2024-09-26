@@ -5,9 +5,6 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu
 
-// Generic classes don't work yet.
-// XFAIL: *
-
 protocol ClassBound: AnyObject {
     func foo()
     func bar()

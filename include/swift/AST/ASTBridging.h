@@ -1112,6 +1112,14 @@ SWIFT_NAME("BridgedNominalTypeDecl.hasValueDeinit(self:)")
 BRIDGED_INLINE
 bool BridgedNominalTypeDecl_hasValueDeinit(BridgedNominalTypeDecl decl);
 
+SWIFT_NAME("BridgedNominalTypeDecl.isClass(self:)")
+BRIDGED_INLINE
+bool BridgedNominalTypeDecl_isClass(BridgedNominalTypeDecl decl);
+
+SWIFT_NAME("BridgedNominalTypeDecl.isGenericAtAnyLevel(self:)")
+BRIDGED_INLINE
+bool BridgedNominalTypeDecl_isGenericAtAnyLevel(BridgedNominalTypeDecl decl);
+
 SWIFT_NAME("BridgedNominalTypeDecl.setParsedMembers(self:_:)")
 void BridgedNominalTypeDecl_setParsedMembers(BridgedNominalTypeDecl decl,
                                              BridgedArrayRef members);

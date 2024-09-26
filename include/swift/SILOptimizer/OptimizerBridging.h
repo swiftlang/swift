@@ -252,8 +252,9 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE DevirtResult tryDevirtualizeApply(BridgedInstruction apply, bool isMandatory) const;
   bool tryOptimizeKeypath(BridgedInstruction apply) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;
-  SWIFT_IMPORT_UNSAFE swift::SILVTable * _Nullable specializeVTableForType(BridgedType type,
-                                                                           BridgedFunction function) const;
+  SWIFT_IMPORT_UNSAFE OptionalBridgedFunction specializeFunction(BridgedFunction function,
+                                                                 BridgedSubstitutionMap substitutions) const;
+  void deserializeAllCallees(BridgedFunction function, bool deserializeAll) const;
   bool specializeClassMethodInst(BridgedInstruction cm) const;
   bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
   BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
@@ -311,16 +312,12 @@ struct BridgedPassContext {
 
   // Access SIL module data structures
 
-  struct VTableArray {
-    swift::SILVTable * const _Nonnull * _Nullable base;
-    SwiftInt count;
-  };
-
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction getFirstFunctionInModule() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE static OptionalBridgedFunction getNextFunctionInModule(BridgedFunction function);
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedGlobalVar getFirstGlobalInModule() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE static OptionalBridgedGlobalVar getNextGlobalInModule(BridgedGlobalVar global);
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE VTableArray getVTables() const;
+  BRIDGED_INLINE SwiftInt getNumVTables() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedVTable getVTable(SwiftInt index) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedWitnessTable getFirstWitnessTableInModule() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE static OptionalBridgedWitnessTable getNextWitnessTableInModule(
                                                                                   BridgedWitnessTable table);
@@ -330,6 +327,19 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction lookupFunction(BridgedStringRef name) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction loadFunction(BridgedStringRef name,
                                                                           bool loadCalleesRecursively) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  OptionalBridgedVTable lookupVTable(BridgedNominalTypeDecl classDecl) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  OptionalBridgedVTable lookupSpecializedVTable(BridgedType classType) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  OptionalBridgedWitnessTable lookupWitnessTable(BridgedProtocolConformance conformance) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedWitnessTable createWitnessTable(BridgedLinkage linkage,
+                                                                            bool serialized,
+                                                                            BridgedProtocolConformance conformance,
+                                                                            BridgedArrayRef bridgedEntries) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedVTable createSpecializedVTable(BridgedType classType,
+                                                                           bool serialized,
+                                                                           BridgedArrayRef bridgedEntries) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE void loadFunction(BridgedFunction function, bool loadCalleesRecursively) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookupStdlibFunction(BridgedStringRef name) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookUpNominalDeinitFunction(BridgedNominalTypeDecl nominal) const;

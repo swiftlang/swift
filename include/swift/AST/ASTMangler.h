@@ -217,9 +217,6 @@ public:
                                    bool isStatic,
                                    SymbolKind SKind);
 
-  std::string mangleGlobalGetterEntity(const ValueDecl *decl,
-                                       SymbolKind SKind = SymbolKind::Default);
-
   std::string mangleDefaultArgumentEntity(const DeclContext *func,
                                           unsigned index,
                                           SymbolKind SKind = SymbolKind::Default);
@@ -239,7 +236,7 @@ public:
                                            const ConstructorDecl *Derived,
                                            bool isAllocating);
 
-  std::string mangleWitnessTable(const RootProtocolConformance *C);
+  std::string mangleWitnessTable(const ProtocolConformance *C);
 
   std::string mangleWitnessThunk(const ProtocolConformance *Conformance,
                                  const ValueDecl *Requirement);

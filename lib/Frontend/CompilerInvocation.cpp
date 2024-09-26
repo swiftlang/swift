@@ -525,6 +525,7 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     Args.hasArg(OPT_debug_emit_invalid_swiftinterface_syntax);
   Opts.PrintMissingImports =
     !Args.hasArg(OPT_disable_print_missing_imports_in_module_interface);
+  Opts.ABIComments = Args.hasArg(OPT_abi_comments_in_module_interface);
 
   if (const Arg *A = Args.getLastArg(OPT_library_level)) {
     StringRef contents = A->getValue();

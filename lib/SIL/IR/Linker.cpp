@@ -260,8 +260,9 @@ void SILLinkerVisitor::visitProtocolConformance(ProtocolConformanceRef ref) {
   if (!VisitedConformances.insert(C).second)
     return;
 
-  auto *WT = Mod.lookUpWitnessTable(C);
-  
+  RootProtocolConformance *rootC = C->getRootConformance();
+  auto *WT = Mod.lookUpWitnessTable(rootC);
+
   if ((!WT || WT->isDeclaration()) &&
       (mustDeserialize || Mode == SILModule::LinkingMode::LinkAll)) {
     if (!WT) {
@@ -269,7 +270,6 @@ void SILLinkerVisitor::visitProtocolConformance(ProtocolConformanceRef ref) {
       if (C->getProtocol()->isMarkerProtocol())
         return;
 
-      RootProtocolConformance *rootC = C->getRootConformance();
       SILLinkage linkage = getLinkageForProtocolConformance(rootC, NotForDefinition);
       WT = SILWitnessTable::create(Mod, linkage,
                                    const_cast<RootProtocolConformance *>(rootC));

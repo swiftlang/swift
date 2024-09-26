@@ -255,9 +255,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // Canonical swift requires all non cond_br critical edges to be split.
   P.addSplitNonCondBrCriticalEdges();
 
-  // For embedded Swift: Specialize generic class vtables.
-  P.addVTableSpecializer();
-
   P.addMandatoryPerformanceOptimizations();
   P.addOnoneSimplification();
   P.addAllocVectorLowering();

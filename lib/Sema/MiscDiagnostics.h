@@ -21,6 +21,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include <optional>
 
 namespace swift {
@@ -162,10 +163,18 @@ namespace swift {
   /// \param loc corresponds to the location of the 'consume' for which
   ///            diagnostics should be collected, if any.
   ///
+  /// \param getType is a function that can correctly determine the type of
+  ///                an expression. This is to support calls from the
+  ///                constraint solver.
+  ///
   /// \returns an empty collection if there are no errors.
-  DeferredDiags findSyntacticErrorForConsume(ModuleDecl *module,
-                                             SourceLoc loc,
-                                             Expr *subExpr);
+  DeferredDiags findSyntacticErrorForConsume(
+                     ModuleDecl *module,
+                     SourceLoc loc,
+                     Expr *subExpr,
+                     llvm::function_ref<Type(Expr *)> getType = [](Expr *E) {
+                       return E->getType();
+                     });
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H

@@ -80,9 +80,15 @@ inline IsLoadable_t &operator&=(IsLoadable_t &l, IsLoadable_t r) {
   return (l = (l & r));
 }
 
-enum IsBitwiseTakable_t : bool { IsNotBitwiseTakable, IsBitwiseTakable };
+enum IsBitwiseTakable_t : uint8_t {
+  IsNotBitwiseTakable = 0,
+  // The type is bitwise-takable, but borrows are pinned to memory.
+  IsBitwiseTakableOnly = 1,
+  // The type is bitwise-takable and -borrowable.
+  IsBitwiseTakableAndBorrowable = 3,
+};
 inline IsBitwiseTakable_t operator&(IsBitwiseTakable_t l, IsBitwiseTakable_t r) {
-  return IsBitwiseTakable_t(unsigned(l) & unsigned(r));
+  return IsBitwiseTakable_t(std::min(unsigned(l), unsigned(r)));
 }
 inline IsBitwiseTakable_t &operator&=(IsBitwiseTakable_t &l, IsBitwiseTakable_t r) {
   return (l = (l & r));

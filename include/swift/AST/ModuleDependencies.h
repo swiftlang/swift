@@ -224,6 +224,9 @@ public:
   /// command-line), no need to be saved to reconstruct from cache.
   std::vector<std::string> auxiliaryFiles;
 
+  /// The macro dependencies.
+  std::map<std::string, MacroPluginDependency> macroDependencies;
+
   /// The direct dependency of the module is resolved by scanner.
   bool resolved;
   /// ModuleDependencyInfo is finalized (with all transitive dependencies
@@ -252,9 +255,6 @@ struct CommonSwiftTextualModuleDependencyDetails {
 
   /// (Clang) modules on which the bridging header depends.
   std::vector<std::string> bridgingModuleDependencies;
-
-  /// The macro dependencies.
-  std::map<std::string, MacroPluginDependency> macroDependencies;
 
   /// The Swift frontend invocation arguments to build the Swift module from the
   /// interface.
@@ -326,12 +326,6 @@ public:
   void updateCommandLine(const std::vector<std::string> &newCommandLine) {
     textualModuleDetails.buildCommandLine = newCommandLine;
   }
-
-  void addMacroDependency(StringRef macroModuleName, StringRef libraryPath,
-                          StringRef executablePath) {
-    textualModuleDetails.macroDependencies.insert(
-        {macroModuleName.str(), {libraryPath.str(), executablePath.str()}});
-  }
 };
 
 /// Describes the dependencies of a Swift module
@@ -381,12 +375,6 @@ public:
 
   void addTestableImport(ImportPath::Module module) {
     testableImports.insert(module.front().Item.str());
-  }
-
-  void addMacroDependency(StringRef macroModuleName, StringRef libraryPath,
-                          StringRef executablePath) {
-    textualModuleDetails.macroDependencies.insert(
-        {macroModuleName.str(), {libraryPath.str(), executablePath.str()}});
   }
 };
 
@@ -720,7 +708,7 @@ public:
   bool isStaticLibrary() const {
     if (auto *detail = getAsSwiftInterfaceModule())
       return detail->isStatic;
-    else if (auto *detail = getAsSwiftBinaryModule())
+    if (auto *detail = getAsSwiftBinaryModule())
       return detail->isStatic;
     return false;
   }
@@ -728,9 +716,9 @@ public:
   const ArrayRef<std::string> getHeaderInputSourceFiles() const {
     if (auto *detail = getAsSwiftInterfaceModule())
       return detail->textualModuleDetails.bridgingSourceFiles;
-    else if (auto *detail = getAsSwiftSourceModule())
+    if (auto *detail = getAsSwiftSourceModule())
       return detail->textualModuleDetails.bridgingSourceFiles;
-    else if (auto *detail = getAsSwiftBinaryModule())
+    if (auto *detail = getAsSwiftBinaryModule())
       return detail->headerSourceFiles;
     return {};
   }
@@ -738,9 +726,9 @@ public:
   const ArrayRef<std::string> getHeaderDependencies() const {
     if (auto *detail = getAsSwiftInterfaceModule())
       return detail->textualModuleDetails.bridgingModuleDependencies;
-    else if (auto *detail = getAsSwiftSourceModule())
+    if (auto *detail = getAsSwiftSourceModule())
       return detail->textualModuleDetails.bridgingModuleDependencies;
-    else if (auto *detail = getAsSwiftBinaryModule())
+    if (auto *detail = getAsSwiftBinaryModule())
       return detail->headerModuleDependencies;
     return {};
   }
@@ -748,9 +736,9 @@ public:
   std::vector<std::string> getCommandline() const {
     if (auto *detail = getAsClangModule())
       return detail->buildCommandLine;
-    else if (auto *detail = getAsSwiftInterfaceModule())
+    if (auto *detail = getAsSwiftInterfaceModule())
       return detail->textualModuleDetails.buildCommandLine;
-    else if (auto *detail = getAsSwiftSourceModule())
+    if (auto *detail = getAsSwiftSourceModule())
       return detail->textualModuleDetails.buildCommandLine;
     return {};
   }
@@ -759,10 +747,10 @@ public:
     if (isSwiftInterfaceModule())
       return cast<SwiftInterfaceModuleDependenciesStorage>(storage.get())
           ->updateCommandLine(newCommandLine);
-    else if (isSwiftSourceModule())
+    if (isSwiftSourceModule())
       return cast<SwiftSourceModuleDependenciesStorage>(storage.get())
           ->updateCommandLine(newCommandLine);
-    else if (isClangModule())
+    if (isClangModule())
       return cast<ClangModuleDependencyStorage>(storage.get())
           ->updateCommandLine(newCommandLine);
     llvm_unreachable("Unexpected type");
@@ -784,6 +772,16 @@ public:
 
   void addAuxiliaryFile(const std::string &file) {
     storage->auxiliaryFiles.emplace_back(file);
+  }
+
+  void addMacroDependency(StringRef macroModuleName, StringRef libraryPath,
+                          StringRef executablePath) {
+    storage->macroDependencies.insert(
+        {macroModuleName.str(), {libraryPath.str(), executablePath.str()}});
+  }
+
+  std::map<std::string, MacroPluginDependency> &getMacroDependencies() const {
+    return storage->macroDependencies;
   }
 
   void updateCASFileSystemRootID(const std::string &rootID) {
@@ -808,13 +806,6 @@ public:
 
   /// For a Source dependency, register a `Testable` import
   void addTestableImport(ImportPath::Module module);
-
-  /// For a Source/Textual dependency, register a macro dependency.
-  void addMacroDependency(StringRef macroModuleName, StringRef libraryPath,
-                          StringRef executablePath);
-
-  /// For a Source/Textual dependency, if it Has macro dependency.
-  bool hasMacroDependencies() const;
 
   /// Whether or not a queried module name is a `@Testable` import dependency
   /// of this module. Can only return `true` for Swift source modules.
@@ -991,9 +982,6 @@ class SwiftDependencyScanningService {
 
   /// CAS ObjectStore Instance.
   std::shared_ptr<llvm::cas::ObjectStore> CAS;
-
-  /// The common dependencies that is needed for every swift compiler instance.
-  std::vector<std::string> CommonDependencyFiles;
 
   /// File prefix mapper.
   std::unique_ptr<llvm::TreePathPrefixMapper> Mapper;
