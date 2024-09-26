@@ -138,6 +138,7 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
          "# if __has_include(<uchar.h>)\n"
          "#  include <uchar.h>\n"
          "# elif !defined(__cplusplus)\n"
+         "typedef unsigned char char8_t;\n"
          "typedef uint_least16_t char16_t;\n"
          "typedef uint_least32_t char32_t;\n"
          "# endif\n"
