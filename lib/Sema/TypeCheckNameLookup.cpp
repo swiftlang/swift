@@ -40,6 +40,7 @@ void swift::simple_display(llvm::raw_ostream &out, NameLookupOptions options) {
       {NameLookupFlags::IncludeUsableFromInline, "IncludeUsableFromInline"},
       {NameLookupFlags::ExcludeMacroExpansions, "ExcludeMacroExpansions"},
       {NameLookupFlags::IgnoreMissingImports, "IgnoreMissingImports"},
+      {NameLookupFlags::ABIProviding, "ABIProviding"},
   };
 
   auto flagsToPrint = llvm::make_filter_range(
@@ -245,6 +246,8 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
     newOptions |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
   if (options.contains(NameLookupFlags::IgnoreMissingImports))
     newOptions |= UnqualifiedLookupFlags::IgnoreMissingImports;
+  if (options.contains(NameLookupFlags::ABIProviding))
+    newOptions |= UnqualifiedLookupFlags::ABIProviding;
 
   return newOptions;
 }
@@ -350,6 +353,8 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
     subOptions |= NL_IgnoreAccessControl;
   if (options.contains(NameLookupFlags::IgnoreMissingImports))
     subOptions |= NL_IgnoreMissingImports;
+  if (options.contains(NameLookupFlags::ABIProviding))
+    subOptions |= NL_ABIProviding;
 
   // We handle our own overriding/shadowing filtering.
   subOptions &= ~NL_RemoveOverridden;
@@ -450,6 +455,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     subOptions |= NL_IgnoreMissingImports;
   if (options.contains(NameLookupFlags::IncludeUsableFromInline))
     subOptions |= NL_IncludeUsableFromInline;
+  if (options.contains(NameLookupFlags::ABIProviding))
+    subOptions |= NL_ABIProviding;
 
   // Make sure we've resolved implicit members, if we need them.
   namelookup::installSemanticMembersIfNeeded(type, name);
