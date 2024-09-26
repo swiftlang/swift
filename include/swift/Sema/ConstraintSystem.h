@@ -32,6 +32,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Sema/CSBindings.h"
 #include "swift/Sema/CSFix.h"
+#include "swift/Sema/CSTrail.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintGraphScope.h"
@@ -63,8 +64,6 @@ enum class TypeCheckExprFlags;
 
 namespace constraints {
 
-class ConstraintGraph;
-class ConstraintGraphNode;
 class ConstraintSystem;
 class SyntacticElementTarget;
 
@@ -2533,6 +2532,10 @@ private:
     /// processing this constraint system.
     SavedTypeVariableBindings savedBindings;
 
+    /// A log of changes to the constraint system, representing the
+    /// current path being explored in the solution space.
+    SolverTrail Trail;
+
      /// The best solution computed so far.
     std::optional<Score> BestScore;
 
@@ -2679,6 +2682,10 @@ private:
 
       constraint->setFavored();
       favoredConstraints.push_back(constraint);
+    }
+
+    void recordChange(SolverTrail::Change change) {
+      Trail.recordChange(change);
     }
 
   private:

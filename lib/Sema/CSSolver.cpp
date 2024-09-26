@@ -568,7 +568,7 @@ void truncate(llvm::SetVector<V> &vector, unsigned newSize) {
 
 ConstraintSystem::SolverState::SolverState(
     ConstraintSystem &cs, FreeTypeVariableBinding allowFreeTypeVariables)
-    : CS(cs), AllowFreeTypeVariables(allowFreeTypeVariables) {
+    : CS(cs), AllowFreeTypeVariables(allowFreeTypeVariables), Trail(cs) {
   assert(!CS.solverState &&
          "Constraint system should not already have solver state!");
   CS.solverState = this;
