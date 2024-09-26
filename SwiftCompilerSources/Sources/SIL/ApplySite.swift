@@ -182,7 +182,7 @@ extension ApplySite {
   }
 
   public var substitutionMap: SubstitutionMap {
-    SubstitutionMap(bridged.ApplySite_getSubstitutionMap())
+    SubstitutionMap(bridged: bridged.ApplySite_getSubstitutionMap())
   }
 
   public var calleeArgumentConventions: ArgumentConventions {

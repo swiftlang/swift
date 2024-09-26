@@ -22,6 +22,8 @@
 #include "SILBridging.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/BasicBridging.h"
@@ -321,6 +323,10 @@ BridgedASTType BridgedType::getASTType() const {
   return {unbridged().getASTType().getPointer()};
 }
 
+BridgedDiagnosticArgument BridgedType::asDiagnosticArgument() const {
+  return swift::DiagnosticArgument(unbridged().getASTType());
+}
+
 bool BridgedType::isTrivial(BridgedFunction f) const {
   return unbridged().isTrivial(f.getFunction());
 }
@@ -351,6 +357,16 @@ bool BridgedType::hasArchetype() const {
 
 bool BridgedType::isNominalOrBoundGenericNominal() const {
   return unbridged().getNominalOrBoundGenericNominal() != nullptr;
+}
+
+BridgedSubstitutionMap BridgedType::getContextSubstitutionMap() const {
+  swift::CanType astType = unbridged().getASTType();
+  return astType->getContextSubstitutionMap();
+}
+
+bool BridgedType::isGenericAtAnyLevel() const {
+  swift::CanType astType = unbridged().getASTType();
+  return astType->isSpecialized();
 }
 
 BridgedNominalTypeDecl BridgedType::getNominalOrBoundGenericNominal() const {
@@ -529,6 +545,18 @@ BridgedArgumentConvention BridgedType::getCalleeConvention() const {
   return getArgumentConvention(fnType->getCalleeConvention());
 }
 
+BridgedType BridgedType::getSuperClassType() const {
+  return unbridged().getSuperclass();
+}
+
+BridgedType BridgedType::getSuperClassTypeOfClassDecl(BridgedNominalTypeDecl decl) {
+  swift::Type superTy = swift::cast<swift::ClassDecl>(decl.unbridged())->getSuperclass();
+  if (!superTy) {
+    return BridgedType(swift::SILType());
+  }
+  return swift::SILType::getPrimitiveObjectType(superTy->getCanonicalType());
+}
+
 //===----------------------------------------------------------------------===//
 //                                BridgedValue
 //===----------------------------------------------------------------------===//
@@ -682,6 +710,14 @@ bool BridgedSubstitutionMap::hasAnySubstitutableParams() const {
   return unbridged().hasAnySubstitutableParams();
 }
 
+SwiftInt BridgedSubstitutionMap::getNumConformances() const {
+  return (SwiftInt)unbridged().getConformances().size();
+}
+
+BridgedProtocolConformance BridgedSubstitutionMap::getConformance(SwiftInt index) const {
+  return unbridged().getConformances()[index];
+}
+
 //===----------------------------------------------------------------------===//
 //                                BridgedLocation
 //===----------------------------------------------------------------------===//
@@ -715,6 +751,9 @@ BridgedSourceLoc BridgedLocation::getSourceLocation() const {
 }
 bool BridgedLocation::hasSameSourceLocation(BridgedLocation rhs) const {
   return getLoc().hasSameSourceLocation(rhs.getLoc());
+}
+BridgedLocation BridgedLocation::fromNominalTypeDecl(BridgedNominalTypeDecl decl) {
+  return swift::SILDebugLocation(decl.unbridged(), nullptr);
 }
 BridgedLocation BridgedLocation::getArtificialUnreachableLocation() {
   return swift::SILDebugLocation::getArtificialUnreachableLocation();
@@ -888,6 +927,10 @@ void BridgedFunction::setLinkage(BridgedLinkage linkage) const {
   getFunction()->setLinkage((swift::SILLinkage)linkage);
 }
 
+void BridgedFunction::setIsSerialized(bool isSerialized) const {
+  getFunction()->setSerializedKind(isSerialized ? swift::IsSerialized : swift::IsNotSerialized);
+}
+
 bool BridgedFunction::isResilientNominalDecl(BridgedNominalTypeDecl decl) const {
   return decl.unbridged()->isResilient(getFunction()->getModule().getSwiftModule(),
                                        getFunction()->getResilienceExpansion());
@@ -975,6 +1018,42 @@ BridgedType BridgedTypeArray::getAt(SwiftInt index) const {
 //===----------------------------------------------------------------------===//
 
 BridgedType BridgedSILTypeArray::getAt(SwiftInt index) const {
+  return unbridged()[index];
+}
+
+//===----------------------------------------------------------------------===//
+//                            BridgedProtocolConformance
+//===----------------------------------------------------------------------===//
+
+static_assert(sizeof(BridgedProtocolConformance) == sizeof(swift::ProtocolConformanceRef));
+
+bool BridgedProtocolConformance::isConcrete() const {
+  return unbridged().isConcrete();
+}
+
+bool BridgedProtocolConformance::isValid() const {
+  return !unbridged().isInvalid();
+}
+
+bool BridgedProtocolConformance::isSpecializedConformance() const {
+  return swift::isa<swift::SpecializedProtocolConformance>(unbridged().getConcrete());
+}
+
+BridgedProtocolConformance BridgedProtocolConformance::getGenericConformance() const {
+  auto *specPC = swift::cast<swift::SpecializedProtocolConformance>(unbridged().getConcrete());
+  return {swift::ProtocolConformanceRef(specPC->getGenericConformance())};
+}
+
+BridgedSubstitutionMap BridgedProtocolConformance::getSpecializedSubstitutions() const {
+  auto *specPC = swift::cast<swift::SpecializedProtocolConformance>(unbridged().getConcrete());
+  return {specPC->getSubstitutionMap()};
+}
+
+//===----------------------------------------------------------------------===//
+//                           BridgedProtocolConformanceArray
+//===----------------------------------------------------------------------===//
+
+BridgedProtocolConformance BridgedProtocolConformanceArray::getAt(SwiftInt index) const {
   return unbridged()[index];
 }
 
@@ -1129,6 +1208,14 @@ bool BridgedInstruction::AddressToPointerInst_needsStackProtection() const {
 
 bool BridgedInstruction::IndexAddrInst_needsStackProtection() const {
   return getAs<swift::IndexAddrInst>()->needsStackProtection();
+}
+
+BridgedProtocolConformanceArray BridgedInstruction::InitExistentialRefInst_getConformances() const {
+  return getAs<swift::InitExistentialRefInst>()->getConformances();
+}
+
+BridgedASTType BridgedInstruction::InitExistentialRefInst_getFormalConcreteType() const {
+  return {getAs<swift::InitExistentialRefInst>()->getFormalConcreteType().getPointer()};
 }
 
 BridgedGlobalVar BridgedInstruction::GlobalAccessInst_getGlobal() const {
@@ -1658,20 +1745,60 @@ BridgedSuccessor OptionalBridgedSuccessor::advancedBy(SwiftInt index) const {
 }
 
 //===----------------------------------------------------------------------===//
+//                                BridgedDeclRef
+//===----------------------------------------------------------------------===//
+
+static_assert(sizeof(BridgedDeclRef) >= sizeof(swift::SILDeclRef),
+              "BridgedDeclRef has wrong size");
+
+BridgedLocation BridgedDeclRef::getLocation() const {
+  return swift::SILDebugLocation(unbridged().getDecl(), nullptr);
+}
+
+BridgedDiagnosticArgument BridgedDeclRef::asDiagnosticArgument() const {
+  return swift::DiagnosticArgument(unbridged().getDecl()->getName());
+}
+
+//===----------------------------------------------------------------------===//
 //                                BridgedVTable
 //===----------------------------------------------------------------------===//
 
+BridgedVTableEntry::Kind BridgedVTableEntry::getKind() const {
+  return (Kind)unbridged().getKind();
+}
+
+BRIDGED_INLINE bool BridgedVTableEntry::isNonOverridden() const {
+  return unbridged().isNonOverridden();
+}
+
+BridgedDeclRef BridgedVTableEntry::getMethodDecl() const {
+  return unbridged().getMethod();
+}
+
 BridgedFunction BridgedVTableEntry::getImplementation() const {
-  return {entry->getImplementation()};
+  return {unbridged().getImplementation()};
 }
 
-BridgedVTableEntry BridgedVTableEntry::advanceBy(SwiftInt index) const {
-  return {entry + index};
+BridgedVTableEntry BridgedVTableEntry::create(Kind kind, bool nonOverridden,
+                                              BridgedDeclRef methodDecl, BridgedFunction implementation) {
+  return swift::SILVTableEntry(methodDecl.unbridged(), implementation.getFunction(),
+                               (swift::SILVTableEntry::Kind)kind, nonOverridden);
 }
 
-BridgedVTableEntryArray BridgedVTable::getEntries() const {
-  auto entries = vTable->getEntries();
-  return {{entries.data()}, (SwiftInt)entries.size()};
+SwiftInt BridgedVTable::getNumEntries() const {
+  return SwiftInt(vTable->getEntries().size());
+}
+
+BridgedVTableEntry BridgedVTable::getEntry(SwiftInt index) const {
+  return BridgedVTableEntry(vTable->getEntries()[index]);
+}
+
+BridgedNominalTypeDecl BridgedVTable::getClass() const {
+  return {vTable->getClass()};
+}
+
+BridgedType BridgedVTable::getSpecializedClassType() const {
+  return {vTable->getClassType()};
 }
 
 //===----------------------------------------------------------------------===//
@@ -1679,25 +1806,41 @@ BridgedVTableEntryArray BridgedVTable::getEntries() const {
 //===----------------------------------------------------------------------===//
 
 BridgedWitnessTableEntry::Kind BridgedWitnessTableEntry::getKind() const {
-  return (Kind)getEntry()->getKind();
+  return (Kind)unbridged().getKind();
+}
+
+BridgedDeclRef BridgedWitnessTableEntry::getMethodRequirement() const {
+  return unbridged().getMethodWitness().Requirement;
 }
 
 OptionalBridgedFunction BridgedWitnessTableEntry::getMethodFunction() const {
-  return {getEntry()->getMethodWitness().Witness};
+  return {unbridged().getMethodWitness().Witness};
 }
 
-BridgedWitnessTableEntry BridgedWitnessTableEntry::advanceBy(SwiftInt index) const {
-  return {getEntry() + index};
+BridgedWitnessTableEntry BridgedWitnessTableEntry::createMethod(BridgedDeclRef requirement,
+                                                                BridgedFunction function) {
+  return swift::SILWitnessTable::Entry(swift::SILWitnessTable::MethodWitness{requirement.unbridged(),
+                                                                             function.getFunction()});
 }
 
-BridgedWitnessTableEntryArray BridgedWitnessTable::getEntries() const {
-  auto entries = table->getEntries();
-  return {{entries.data()}, (SwiftInt)entries.size()};
+SwiftInt BridgedWitnessTable::getNumEntries() const {
+  return SwiftInt(table->getEntries().size());
 }
 
-BridgedWitnessTableEntryArray BridgedDefaultWitnessTable::getEntries() const {
-  auto entries = table->getEntries();
-  return {{entries.data()}, (SwiftInt)entries.size()};
+BridgedWitnessTableEntry BridgedWitnessTable::getEntry(SwiftInt index) const {
+  return BridgedWitnessTableEntry(table->getEntries()[index]);
+}
+
+bool BridgedWitnessTable::isDeclaration() const {
+  return table->isDeclaration();
+}
+
+SwiftInt BridgedDefaultWitnessTable::getNumEntries() const {
+  return SwiftInt(table->getEntries().size());
+}
+
+BridgedWitnessTableEntry BridgedDefaultWitnessTable::getEntry(SwiftInt index) const {
+  return BridgedWitnessTableEntry(table->getEntries()[index]);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2036,20 +2179,19 @@ BridgedInstruction BridgedBuilder::createStore(BridgedValue src, BridgedValue ds
 
 BridgedInstruction BridgedBuilder::createInitExistentialRef(BridgedValue instance,
                                             BridgedType type,
-                                            BridgedInstruction useConformancesOf) const {
-  auto *src = useConformancesOf.getAs<swift::InitExistentialRefInst>();
+                                            BridgedASTType formalConcreteType,
+                                            BridgedProtocolConformanceArray conformances) const {
   return {unbridged().createInitExistentialRef(
-      regularLoc(), type.unbridged(), src->getFormalConcreteType(),
-      instance.getSILValue(), src->getConformances())};
+      regularLoc(), type.unbridged(), swift::CanType(formalConcreteType.unbridged()),
+      instance.getSILValue(), conformances.unbridged())};
 }
 
 BridgedInstruction BridgedBuilder::createInitExistentialMetatype(BridgedValue metatype,
                                             BridgedType existentialType,
-                                            BridgedInstruction useConformancesOf) const {
-  auto *src = useConformancesOf.getAs<swift::InitExistentialMetatypeInst>();
+                                            BridgedProtocolConformanceArray conformances) const {
   return {unbridged().createInitExistentialMetatype(
       regularLoc(), metatype.getSILValue(), existentialType.unbridged(),
-      src->getConformances())};
+      conformances.unbridged())};
 }
 
 BridgedInstruction BridgedBuilder::createMetatype(BridgedType type,

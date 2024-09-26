@@ -914,7 +914,7 @@ private:
       for (SILFunction *function : constructorsAndDestructors) {
         diagnoser.visitFunctionEmbeddedSwift(function);
       }
-    }    
+    }
   }
 };
 

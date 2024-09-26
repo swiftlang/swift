@@ -2320,6 +2320,49 @@ cleanupCallArguments(SILBuilder &builder, SILLocation loc,
   }
 }
 
+bool swift::specializeClassMethodInst(ClassMethodInst *cm) {
+  SILFunction *f = cm->getFunction();
+  SILModule &m = f->getModule();
+
+  SILValue instance = cm->getOperand();
+  SILType classTy = instance->getType();
+  CanType astType = classTy.getASTType();
+  if (!astType->isSpecialized())
+    return false;
+
+  SubstitutionMap subs = astType->getContextSubstitutionMap();
+
+  SILType funcTy = cm->getType();
+  SILType substitutedType =
+      funcTy.substGenericArgs(m, subs, TypeExpansionContext::minimal());
+
+  ReabstractionInfo reInfo(substitutedType.getAs<SILFunctionType>(), cm->getMember(), m);
+  reInfo.createSubstitutedAndSpecializedTypes();
+  CanSILFunctionType finalFuncTy = reInfo.getSpecializedType();
+  SILType finalSILTy = SILType::getPrimitiveObjectType(finalFuncTy);
+
+  SILBuilder builder(cm);
+  auto *newCM = builder.createClassMethod(cm->getLoc(), cm->getOperand(),
+                                          cm->getMember(), finalSILTy);
+
+  while (!cm->use_empty()) {
+    Operand *use = *cm->use_begin();
+    SILInstruction *user = use->getUser();
+    ApplySite AI = ApplySite::isa(user);
+    if (AI && AI.getCalleeOperand() == use) {
+      replaceWithSpecializedCallee(AI, newCM, reInfo);
+      AI.getInstruction()->eraseFromParent();
+      continue;
+    }
+    llvm::errs() << "unsupported use of class method "
+                 << newCM->getMember().getDecl()->getName() << " in function "
+                 << newCM->getFunction()->getName() << '\n';
+    llvm::report_fatal_error("unsupported class method");
+  }
+
+  return true;
+}
+
 /// Create a new apply based on an old one, but with a different
 /// function being applied.
 ApplySite

@@ -355,10 +355,12 @@ OptionalBridgedGlobalVar BridgedPassContext::getNextGlobalInModule(BridgedGlobal
   return {&*nextIter};
 }
 
-BridgedPassContext::VTableArray BridgedPassContext::getVTables() const {
-  swift::SILModule *mod = invocation->getPassManager()->getModule();
-  auto vTables = mod->getVTables();
-  return {vTables.data(), (SwiftInt)vTables.size()};
+SwiftInt BridgedPassContext::getNumVTables() const {
+  return (SwiftInt)(invocation->getPassManager()->getModule()->getVTables().size());
+}
+
+BridgedVTable BridgedPassContext::getVTable(SwiftInt index) const {
+  return {invocation->getPassManager()->getModule()->getVTables()[index]};
 }
 
 OptionalBridgedWitnessTable BridgedPassContext::getFirstWitnessTableInModule() const {
@@ -403,6 +405,55 @@ OptionalBridgedFunction BridgedPassContext::loadFunction(BridgedStringRef name, 
                             loadCalleesRecursively
                                 ? swift::SILModule::LinkingMode::LinkAll
                                 : swift::SILModule::LinkingMode::LinkNormal)};
+}
+
+OptionalBridgedVTable BridgedPassContext::lookupVTable(BridgedNominalTypeDecl classDecl) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return {mod->lookUpVTable(llvm::cast<swift::ClassDecl>(classDecl.unbridged()))};
+}
+
+OptionalBridgedVTable BridgedPassContext::lookupSpecializedVTable(BridgedType classType) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return {mod->lookUpSpecializedVTable(classType.unbridged())};
+}
+
+OptionalBridgedWitnessTable BridgedPassContext::lookupWitnessTable(BridgedProtocolConformance conformance) const {
+  swift::ProtocolConformanceRef ref = conformance.unbridged();
+  if (!ref.isConcrete()) {
+    return {nullptr};
+  }
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return {mod->lookUpWitnessTable(ref.getConcrete())};
+}
+
+BridgedWitnessTable BridgedPassContext::createWitnessTable(BridgedLinkage linkage,
+                                                           bool serialized,
+                                                           BridgedProtocolConformance conformance,
+                                                           BridgedArrayRef bridgedEntries) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  llvm::SmallVector<swift::SILWitnessTable::Entry, 8> entries;
+  for (const BridgedWitnessTableEntry &e : bridgedEntries.unbridged<BridgedWitnessTableEntry>()) {
+    entries.push_back(e.unbridged());
+  }
+  return {swift::SILWitnessTable::create(*mod, (swift::SILLinkage)linkage,
+                                         serialized ? swift::IsSerialized : swift::IsNotSerialized,
+                                         conformance.unbridged().getConcrete(),
+                                         entries, {})};
+}
+
+BridgedVTable BridgedPassContext::createSpecializedVTable(BridgedType classType,
+                                                          bool serialized,
+                                                          BridgedArrayRef bridgedEntries) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  llvm::SmallVector<swift::SILVTableEntry, 8> entries;
+  for (const BridgedVTableEntry &e : bridgedEntries.unbridged<BridgedVTableEntry>()) {
+    entries.push_back(e.unbridged());
+  }
+  swift::SILType classTy = classType.unbridged();
+  return {swift::SILVTable::create(*mod,
+                                   classTy.getClassOrBoundGenericClass(), classTy,
+                                   serialized ? swift::IsSerialized : swift::IsNotSerialized,
+                                   entries)};
 }
 
 void BridgedPassContext::loadFunction(BridgedFunction function, bool loadCalleesRecursively) const {

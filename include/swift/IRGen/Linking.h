@@ -1075,7 +1075,7 @@ public:
     return entity;
   }
 
-  static LinkEntity forProtocolWitnessTable(const RootProtocolConformance *C) {
+  static LinkEntity forProtocolWitnessTable(const ProtocolConformance *C) {
     if (isEmbedded(C)) {
       assert(C->getProtocol()->requiresClass());
     }
@@ -1505,8 +1505,8 @@ public:
   }
 
   const RootProtocolConformance *getRootProtocolConformance() const {
-    assert(isRootProtocolConformanceKind(getKind()));
-    return cast<RootProtocolConformance>(getProtocolConformance());
+    assert(isProtocolConformanceKind(getKind()));
+    return getProtocolConformance()->getRootConformance();
   }
   
   const ProtocolConformance *getProtocolConformance() const {

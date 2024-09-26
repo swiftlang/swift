@@ -434,20 +434,22 @@ public struct Builder {
 
   public func createInitExistentialRef(instance: Value,
                                        existentialType: Type,
-                                       useConformancesOf: InitExistentialRefInst) -> InitExistentialRefInst {
+                                       formalConcreteType: BridgedASTType,
+                                       conformances: ProtocolConformanceArray) -> InitExistentialRefInst {
     let initExistential = bridged.createInitExistentialRef(instance.bridged,
                                                            existentialType.bridged,
-                                                           useConformancesOf.bridged)
+                                                           formalConcreteType,
+                                                           conformances.bridged)
     return notifyNew(initExistential.getAs(InitExistentialRefInst.self))
   }
 
   public func createInitExistentialMetatype(
     metatype: Value,
     existentialType: Type,
-    useConformancesOf: InitExistentialMetatypeInst) -> InitExistentialMetatypeInst {
+    conformances: ProtocolConformanceArray) -> InitExistentialMetatypeInst {
     let initExistential = bridged.createInitExistentialMetatype(metatype.bridged,
                                                                 existentialType.bridged,
-                                                                useConformancesOf.bridged)
+                                                                conformances.bridged)
     return notifyNew(initExistential.getAs(InitExistentialMetatypeInst.self))
   }
 
