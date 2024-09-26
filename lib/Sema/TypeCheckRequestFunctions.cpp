@@ -321,11 +321,25 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
   // The set of matches from which we can infer result builder types.
   SmallVector<Match, 2> matches;
 
+  const auto getInferenceSourceResultBuilderType = [](ValueDecl *source) {
+    // We always infer for either a getter or freestanding function, so if the
+    // inference source is a storage declaration, inference should draw from
+    // the getter.
+    if (auto *storage = dyn_cast<AbstractStorageDecl>(source)) {
+      if (auto *getter = storage->getAccessor(AccessorKind::Get)) {
+        source = getter;
+      }
+    }
+
+    return source->getResultBuilderType();
+  };
+
   // Determine all of the conformances within the same context as
   // this declaration. If this declaration is a witness to any
   // requirement within one of those protocols that has a result builder
   // attached, use that result builder type.
-  auto addConformanceMatches = [&matches](ValueDecl *lookupDecl) {
+  auto addConformanceMatches = [&matches, &getInferenceSourceResultBuilderType](
+                                   ValueDecl *lookupDecl) {
     DeclContext *dc = lookupDecl->getDeclContext();
     auto idc = cast<IterableDeclContext>(dc->getAsDecl());
     auto conformances = idc->getLocalConformances(
@@ -341,22 +355,8 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
         if (!requirement)
           continue;
 
-        Type resultBuilderType;
-        {
-          auto *inferenceSource = requirement;
-
-          // If the given declaration is a witness to a storage declaration
-          // requirement, then we are inferring for a getter and, hence, should
-          // infer from the getter requirement.
-          if (auto *storage = dyn_cast<AbstractStorageDecl>(requirement)) {
-            if (auto *getter = storage->getAccessor(AccessorKind::Get)) {
-              inferenceSource = getter;
-            }
-          }
-
-          resultBuilderType = inferenceSource->getResultBuilderType();
-        }
-
+        const Type resultBuilderType =
+            getInferenceSourceResultBuilderType(requirement);
         if (!resultBuilderType)
           continue;
 
@@ -391,7 +391,8 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
 
   // Look for result builder types inferred through dynamic replacements.
   if (auto replaced = lookupDecl->getDynamicallyReplacedDecl()) {
-    if (auto resultBuilderType = replaced->getResultBuilderType()) {
+    if (auto resultBuilderType =
+            getInferenceSourceResultBuilderType(replaced)) {
       matches.push_back(
         Match::forDynamicReplacement(replaced, resultBuilderType));
     } else {

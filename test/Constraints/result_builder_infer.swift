@@ -113,13 +113,11 @@ extension Test1 {
   var replacement_property1: Result { 1 }
   @_dynamicReplacement(for: property2)
   var replacement_property2: Result { 1 }
-  // FIXME: expected-error@-1 {{cannot convert return expression}}
 
   @_dynamicReplacement(for: subscript(subscript1:))
   subscript(replacement_subscript1 _: Int) -> Result { 1 }
   @_dynamicReplacement(for: subscript(subscript2:))
   subscript(replacement_subscript2 _: Int) -> Result { 1 }
-  // FIXME: expected-error@-1 {{cannot convert return expression}}
 }
 
 // Edge case: context is a protocol extension.
@@ -498,7 +496,6 @@ extension Test9 {
 
   @_dynamicReplacement(for: property1)
   var replacement_property1: Result { 1 }
-  // FIXME: expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'String'}}
   @_dynamicReplacement(for: property2)
   var replacement_property2: Result { 1 }
 
@@ -506,7 +503,6 @@ extension Test9 {
   subscript(replacement_subscript1 _: Int) -> Result { 1 }
   @_dynamicReplacement(for: subscript(subscript2:))
   subscript(replacement_subscript2 _: Int) -> Result { 1 }
-  // FIXME: expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'String'}}
 }
 
 struct Test10: P_Builder_Int1, P_Builder_String {
@@ -648,13 +644,11 @@ extension Test13 {
   var replacement_property1: Result { 1 }
   @_dynamicReplacement(for: property2)
   var replacement_property2: Result { 1 }
-  // FIXME: expected-error@-1 {{cannot convert return expression}}
 
   @_dynamicReplacement(for: subscript(subscript1:))
   subscript(replacement_subscript1 _: Int) -> Result { 1 }
   @_dynamicReplacement(for: subscript(subscript2:))
   subscript(replacement_subscript2 _: Int) -> Result { 1 }
-  // FIXME: expected-error@-1 {{cannot convert return expression}}
 }
 
 struct Test14: P_Builder_Int1 {
