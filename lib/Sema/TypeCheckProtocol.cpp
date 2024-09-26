@@ -885,7 +885,25 @@ RequirementMatch swift::matchWitness(
     if (!req->isObjC() && reqTypeIsIUO != witnessTypeIsIUO)
       return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
-    if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
+    auto reqType = std::get<0>(types);
+    auto witnessType = std::get<1>(types);
+
+    // Allow witnesses with @Sendable types to match non-Sendable requirements.
+    // This is already supported for method and subscript witnesses that get
+    // their types decomposed.
+    if (auto *reqFnType = reqType->getAs<AnyFunctionType>()) {
+      if (auto *witnessFnType = witnessType->getAs<AnyFunctionType>()) {
+        if (reqFnType->hasExtInfo() && witnessFnType->hasExtInfo()) {
+          auto reqExtInfo = reqFnType->getExtInfo();
+          auto witnessExtInfo = witnessFnType->getExtInfo();
+
+          if (!reqExtInfo.isSendable() && witnessExtInfo.isSendable())
+            reqType = reqFnType->withExtInfo(reqExtInfo.withSendable());
+        }
+      }
+    }
+
+    if (auto result = matchTypes(reqType, witnessType)) {
       return std::move(result.value());
     }
   }
