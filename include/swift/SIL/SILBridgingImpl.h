@@ -289,6 +289,8 @@ BridgedASTType::SILFunctionType_getLifetimeDependencies() const {
 //                                BridgedType
 //===----------------------------------------------------------------------===//
 
+BridgedType::BridgedType() : opaqueValue(nullptr) {}
+
 BridgedType::BridgedType(swift::SILType t) : opaqueValue(t.getOpaqueValue()) {}
 
 swift::SILType BridgedType::unbridged() const {
@@ -942,6 +944,10 @@ BridgedType BridgedFunction::getLoweredType(BridgedASTType type) const {
 
 BridgedType BridgedFunction::getLoweredType(BridgedType type) const {
   return BridgedType(getFunction()->getLoweredType(type.unbridged()));
+}
+
+swift::SILFunction * _Nullable OptionalBridgedFunction::getFunction() const {
+  return static_cast<swift::SILFunction *>(obj);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1813,14 +1819,68 @@ BridgedDeclRef BridgedWitnessTableEntry::getMethodRequirement() const {
   return unbridged().getMethodWitness().Requirement;
 }
 
-OptionalBridgedFunction BridgedWitnessTableEntry::getMethodFunction() const {
+OptionalBridgedFunction BridgedWitnessTableEntry::getMethodWitness() const {
   return {unbridged().getMethodWitness().Witness};
 }
 
+BridgedAssociatedTypeDecl BridgedWitnessTableEntry::getAssociatedTypeRequirement() const {
+  return {unbridged().getAssociatedTypeWitness().Requirement};
+}
+
+BridgedType BridgedWitnessTableEntry::getAssociatedTypeWitness() const {
+  return swift::SILType::getPrimitiveObjectType(unbridged().getAssociatedTypeWitness().Witness);
+}
+
+BridgedType BridgedWitnessTableEntry::getAssociatedTypeProtocolRequirement() const {
+  return swift::SILType::getPrimitiveObjectType(unbridged().getAssociatedTypeProtocolWitness().Requirement);
+}
+
+BridgedProtocolDecl BridgedWitnessTableEntry::getAssociatedTypeProtocolDecl() const {
+  return {unbridged().getAssociatedTypeProtocolWitness().Protocol};
+}
+
+BridgedProtocolConformance BridgedWitnessTableEntry::getAssociatedTypeProtocolWitness() const {
+  return {unbridged().getAssociatedTypeProtocolWitness().Witness};
+}
+
+BridgedProtocolDecl BridgedWitnessTableEntry::getBaseProtocolRequirement() const {
+  return {unbridged().getBaseProtocolWitness().Requirement};
+}
+
+BridgedProtocolConformance BridgedWitnessTableEntry::getBaseProtocolWitness() const {
+  return swift::ProtocolConformanceRef(unbridged().getBaseProtocolWitness().Witness);
+}
+
+
+BridgedWitnessTableEntry BridgedWitnessTableEntry::createInvalid() {
+  return swift::SILWitnessTable::Entry();
+}
+
 BridgedWitnessTableEntry BridgedWitnessTableEntry::createMethod(BridgedDeclRef requirement,
-                                                                BridgedFunction function) {
-  return swift::SILWitnessTable::Entry(swift::SILWitnessTable::MethodWitness{requirement.unbridged(),
-                                                                             function.getFunction()});
+                                                                OptionalBridgedFunction witness) {
+  return swift::SILWitnessTable::Entry(
+    swift::SILWitnessTable::MethodWitness{requirement.unbridged(), witness.getFunction()});
+}
+
+BridgedWitnessTableEntry BridgedWitnessTableEntry::createAssociatedType(BridgedAssociatedTypeDecl requirement,
+                                                                        BridgedType witness) {
+  return swift::SILWitnessTable::Entry(
+    swift::SILWitnessTable::AssociatedTypeWitness{requirement.unbridged(), witness.unbridged().getASTType()});
+}
+
+BridgedWitnessTableEntry BridgedWitnessTableEntry::createAssociatedTypeProtocol(BridgedType requirement,
+                                                                                BridgedProtocolDecl protocolDecl,
+                                                                                BridgedProtocolConformance witness) {
+  return swift::SILWitnessTable::Entry(
+    swift::SILWitnessTable::AssociatedTypeProtocolWitness{requirement.unbridged().getASTType(),
+                                                          protocolDecl.unbridged(),
+                                                          witness.unbridged()});
+}
+
+BridgedWitnessTableEntry BridgedWitnessTableEntry::createBaseProtocol(BridgedProtocolDecl requirement,
+                                                                      BridgedProtocolConformance witness) {
+  return swift::SILWitnessTable::Entry(
+    swift::SILWitnessTable::BaseProtocolWitness{requirement.unbridged(), witness.unbridged().getConcrete()});
 }
 
 SwiftInt BridgedWitnessTable::getNumEntries() const {

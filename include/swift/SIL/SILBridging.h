@@ -279,6 +279,7 @@ struct BridgedType {
     SWIFT_IMPORT_UNSAFE BRIDGED_INLINE EnumElementIterator getNext() const;
   };
 
+  BRIDGED_INLINE BridgedType(); // for Optional<Type>.nil
   BRIDGED_INLINE BridgedType(swift::SILType t);
   BRIDGED_INLINE swift::SILType unbridged() const;
 
@@ -614,6 +615,8 @@ struct BridgedFunction {
 
 struct OptionalBridgedFunction {
   OptionalSwiftObject obj;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::SILFunction * _Nullable getFunction() const;
 };
 
 struct BridgedGlobalVar {
@@ -1169,9 +1172,30 @@ struct BridgedWitnessTableEntry {
   BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE Kind getKind() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclRef getMethodRequirement() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction getMethodFunction() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction getMethodWitness() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedAssociatedTypeDecl getAssociatedTypeRequirement() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getAssociatedTypeWitness() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getAssociatedTypeProtocolRequirement() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedProtocolDecl getAssociatedTypeProtocolDecl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedProtocolConformance getAssociatedTypeProtocolWitness() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedProtocolDecl getBaseProtocolRequirement() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedProtocolConformance getBaseProtocolWitness() const;
+
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
-  static BridgedWitnessTableEntry createMethod(BridgedDeclRef requirement, BridgedFunction function);
+  static BridgedWitnessTableEntry createInvalid();
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  static BridgedWitnessTableEntry createMethod(BridgedDeclRef requirement,
+                                               OptionalBridgedFunction witness);
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  static BridgedWitnessTableEntry createAssociatedType(BridgedAssociatedTypeDecl requirement,
+                                                       BridgedType witness);
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  static BridgedWitnessTableEntry createAssociatedTypeProtocol(BridgedType requirement,
+                                                               BridgedProtocolDecl protocolDecl,
+                                                               BridgedProtocolConformance witness);
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  static BridgedWitnessTableEntry createBaseProtocol(BridgedProtocolDecl requirement,
+                                                     BridgedProtocolConformance witness);
 };
 
 struct BridgedWitnessTable {

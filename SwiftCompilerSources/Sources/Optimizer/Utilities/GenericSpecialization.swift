@@ -87,21 +87,20 @@ func specializeWitnessTable(forConformance conformance: ProtocolConformance,
   assert(witnessTable.isDefinition, "No witness table available")
 
   let newEntries = witnessTable.entries.map { origEntry in
-    switch origEntry.kind {
-    case .method:
-      guard let origMethod = origEntry.methodFunction else {
+    switch origEntry {
+    case .method(let requirement, let witness):
+      guard let origMethod = witness else {
         return origEntry
       }
-      let methodDecl = origEntry.methodRequirement
       let methodSubs = conformance.specializedSubstitutions.getMethodSubstitutions(for: origMethod)
 
       guard !methodSubs.conformances.contains(where: {!$0.isValid}),
             let specializedMethod = context.specialize(function: origMethod, for: methodSubs) else
       {
-        context.diagnosticEngine.diagnose(errorLocation.sourceLoc, .cannot_specialize_witness_method, methodDecl)
+        context.diagnosticEngine.diagnose(errorLocation.sourceLoc, .cannot_specialize_witness_method, requirement)
         return origEntry
       }
-      return WitnessTable.Entry(methodRequirement: methodDecl, methodFunction: specializedMethod)
+      return .method(requirement: requirement, witness: specializedMethod)
     default:
       // TODO: handle other witness table entry kinds
       fatalError("unsupported witness table etnry")

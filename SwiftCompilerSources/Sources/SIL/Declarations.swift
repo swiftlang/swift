@@ -59,6 +59,22 @@ public struct NominalTypeDecl : Equatable, Hashable {
   public var isGenericAtAnyLevel: Bool { bridged.isGenericAtAnyLevel() }
 }
 
+public struct ProtocolDecl {
+  let bridged: BridgedProtocolDecl
+
+  public init(_bridged: BridgedProtocolDecl) {
+    self.bridged = _bridged
+  }
+}
+
+public struct AssociatedTypeDecl {
+  let bridged: BridgedAssociatedTypeDecl
+
+  public init(_bridged: BridgedAssociatedTypeDecl) {
+    self.bridged = _bridged
+  }
+}
+
 public struct DeclRef {
   public let bridged: BridgedDeclRef
 

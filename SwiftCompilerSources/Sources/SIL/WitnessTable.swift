@@ -17,35 +17,66 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
 
   public init(bridged: BridgedWitnessTable) { self.bridged = bridged }
 
-  public struct Entry : CustomStringConvertible, NoReflectionChildren {
-    public let bridged: BridgedWitnessTableEntry
+  public enum Entry : CustomStringConvertible, NoReflectionChildren {
 
-    public typealias Kind = BridgedWitnessTableEntry.Kind
+    case invalid
+
+    /// A witness table entry describing the witness for a method.
+    /// The witness can be nil in case dead function elimination has removed the method
+    /// or if the method was not serialized (for de-serialized witness tables).
+    case method(requirement: DeclRef, witness: Function?)
+
+    /// A witness table entry describing the witness for an associated type.
+    case associatedType(requirement: AssociatedTypeDecl, witness: Type)
+
+    /// A witness table entry describing the witness for an associated type's protocol requirement.
+    case associatedTypeProtocol(requirement: Type, protocol: ProtocolDecl, witness: ProtocolConformance)
+
+    /// A witness table entry referencing the protocol conformance for a refined base protocol.
+    case baseProtocol(requirement: ProtocolDecl, witness: ProtocolConformance)
 
     fileprivate init(bridged: BridgedWitnessTableEntry) {
-      self.bridged = bridged
-    }
-
-    public init(methodRequirement: DeclRef, methodFunction: Function) {
-      self.bridged = BridgedWitnessTableEntry.createMethod(methodRequirement.bridged, methodFunction.bridged)
-    }
-
-    public var kind: Kind {
-      return bridged.getKind()
-    }
-    
-    public var methodFunction: Function? {
-      assert(kind == .method)
-      return bridged.getMethodFunction().function
-    }
-
-    public var methodRequirement: DeclRef {
-      assert(kind == .method)
-      return DeclRef(bridged: bridged.getMethodRequirement())
+      switch bridged.getKind() {
+      case .invalid:
+        self = .invalid
+      case .method:
+        self = .method(requirement: DeclRef(bridged: bridged.getMethodRequirement()),
+                       witness: bridged.getMethodWitness().function)
+      case .associatedType:
+        self = .associatedType(requirement: AssociatedTypeDecl(_bridged: bridged.getAssociatedTypeRequirement()),
+                               witness: bridged.getAssociatedTypeWitness().type)
+      case .associatedTypeProtocol:
+        self = .associatedTypeProtocol(requirement: bridged.getAssociatedTypeProtocolRequirement().type,
+                                       protocol: ProtocolDecl(_bridged: bridged.getAssociatedTypeProtocolDecl()),
+                                       witness: ProtocolConformance(bridged: bridged.getAssociatedTypeProtocolWitness()))
+      case .baseProtocol:
+        self = .baseProtocol(requirement: ProtocolDecl(_bridged: bridged.getBaseProtocolRequirement()),
+                             witness: ProtocolConformance(bridged: bridged.getBaseProtocolWitness()))
+      default:
+        fatalError("invalid witness table entry")
+      }
     }
 
     public var description: String {
       return String(taking: bridged.getDebugDescription())
+    }
+
+    public var bridged: BridgedWitnessTableEntry {
+      switch self {
+      case .invalid:
+        return BridgedWitnessTableEntry.createInvalid()
+      case .method(let requirement, let witness):
+        return BridgedWitnessTableEntry.createMethod(requirement.bridged,
+                                                     OptionalBridgedFunction(obj: witness?.bridged.obj))
+      case .associatedType(let requirement, let witness):
+        return BridgedWitnessTableEntry.createAssociatedType(requirement.bridged, witness.bridged)
+      case .associatedTypeProtocol(let requirement, let protocolDecl, let witness):
+        return BridgedWitnessTableEntry.createAssociatedTypeProtocol(requirement.bridged,
+                                                                     protocolDecl.bridged,
+                                                                     witness.bridged)
+      case .baseProtocol(let requirement, let witness):
+        return BridgedWitnessTableEntry.createBaseProtocol(requirement.bridged, witness.bridged)
+      }
     }
   }
 
