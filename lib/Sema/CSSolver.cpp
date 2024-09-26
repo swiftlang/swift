@@ -421,19 +421,6 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   // Register any fixes produced along this path.
   Fixes.insert(solution.Fixes.begin(), solution.Fixes.end());
 }
-
-/// Restore the type variable bindings to what they were before
-/// we attempted to solve this constraint system.
-void ConstraintSystem::restoreTypeVariableBindings(unsigned numBindings) {
-  auto &savedBindings = *getSavedBindings();
-  std::for_each(savedBindings.rbegin(), savedBindings.rbegin() + numBindings,
-                [](SavedTypeVariableBinding &saved) {
-                  saved.restore();
-                });
-  savedBindings.erase(savedBindings.end() - numBindings,
-                      savedBindings.end());
-}
-
 bool ConstraintSystem::simplify() {
   // While we have a constraint in the worklist, process it.
   while (!ActiveConstraints.empty()) {
@@ -664,7 +651,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   : cs(cs), CGScope(cs.CG)
 {
   numTypeVariables = cs.TypeVariables.size();
-  numSavedBindings = cs.solverState->savedBindings.size();
   numConstraintRestrictions = cs.ConstraintRestrictions.size();
   numFixes = cs.Fixes.size();
   numFixedRequirements = cs.FixedRequirements.size();
@@ -715,10 +701,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
   truncate(cs.TypeVariables, numTypeVariables);
 
   truncate(cs.ResolvedOverloads, numResolvedOverloads);
-
-  // Restore bindings.
-  cs.restoreTypeVariableBindings(cs.solverState->savedBindings.size() -
-                                   numSavedBindings);
 
   // Move any remaining active constraints into the inactive list.
   if (!cs.ActiveConstraints.empty()) {

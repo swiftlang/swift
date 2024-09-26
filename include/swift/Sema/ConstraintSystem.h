@@ -200,28 +200,6 @@ enum class TrailingClosureMatching {
   Backward,
 };
 
-/// A handle that holds the saved state of a type variable, which
-/// can be restored.
-class SavedTypeVariableBinding {
-  /// The type variable that we saved the state of.
-  TypeVariableType *TypeVar;
-
-  /// The saved type variable options.
-  unsigned Options;
-
-  /// The parent or fixed type.
-  llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
-
-public:
-  explicit SavedTypeVariableBinding(TypeVariableType *typeVar);
-
-  /// Restore the state of the type variable to the saved state.
-  void restore();
-};
-
-/// A set of saved type variable bindings.
-using SavedTypeVariableBindings = SmallVector<SavedTypeVariableBinding, 16>;
-
 class ConstraintLocator;
 
 /// Describes a conversion restriction or a fix.
@@ -369,7 +347,7 @@ class TypeVariableType::Implementation {
   ///  constraint graph.
   unsigned GraphIndex;
 
-  friend class constraints::SavedTypeVariableBinding;
+  friend class constraints::SolverTrail;
 
 public:
   /// Retrieve the type variable associated with this implementation.
@@ -457,8 +435,9 @@ public:
   }
 
   /// Record the current type-variable binding.
-  void recordBinding(constraints::SavedTypeVariableBindings &record) {
-    record.push_back(constraints::SavedTypeVariableBinding(getTypeVariable()));
+  void recordBinding(constraints::SolverTrail &trail) {
+    trail.recordChange(constraints::SolverTrail::Change::updatedTypeVariable(
+        getTypeVariable(), ParentOrFixed, getRawOptions()));
   }
 
   /// Retrieve the locator describing where this type variable was
@@ -525,11 +504,11 @@ public:
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///
-  /// \param record The record of changes made by retrieving the representative,
+  /// \param trail The record of changes made by retrieving the representative,
   /// which can happen due to path compression. If null, path compression is
   /// not performed.
   TypeVariableType *
-  getRepresentative(constraints::SavedTypeVariableBindings *record) {
+  getRepresentative(constraints::SolverTrail *trail) {
     // Find the representative type variable.
     auto result = getTypeVariable();
     Implementation *impl = this;
@@ -543,7 +522,7 @@ public:
       impl = &nextTV->getImpl();
     }
 
-    if (impl == this || !record)
+    if (impl == this || !trail)
       return result;
 
     // Perform path compression.
@@ -555,7 +534,7 @@ public:
         break;
 
       // Record the state change.
-      impl->recordBinding(*record);
+      impl->recordBinding(*trail);
 
       impl->ParentOrFixed = result;
       impl = &nextTV->getImpl();
@@ -569,36 +548,36 @@ public:
   ///
   /// \param other The type variable to merge with.
   ///
-  /// \param record The record of state changes.
+  /// \param trail The record of state changes.
   void mergeEquivalenceClasses(TypeVariableType *other,
-                               constraints::SavedTypeVariableBindings *record) {
+                               constraints::SolverTrail *trail) {
     // Merge the equivalence classes corresponding to these two type
     // variables. Always merge 'up' the constraint stack, because it is simpler.
     if (getID() > other->getImpl().getID()) {
-      other->getImpl().mergeEquivalenceClasses(getTypeVariable(), record);
+      other->getImpl().mergeEquivalenceClasses(getTypeVariable(), trail);
       return;
     }
 
-    auto otherRep = other->getImpl().getRepresentative(record);
-    if (record)
-      otherRep->getImpl().recordBinding(*record);
+    auto otherRep = other->getImpl().getRepresentative(trail);
+    if (trail)
+      otherRep->getImpl().recordBinding(*trail);
     otherRep->getImpl().ParentOrFixed = getTypeVariable();
 
     if (canBindToLValue() && !otherRep->getImpl().canBindToLValue()) {
-      if (record)
-        recordBinding(*record);
+      if (trail)
+        recordBinding(*trail);
       getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToLValue;
     }
 
     if (canBindToInOut() && !otherRep->getImpl().canBindToInOut()) {
-      if (record)
-        recordBinding(*record);
+      if (trail)
+        recordBinding(*trail);
       getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToInOut;
     }
 
     if (canBindToNoEscape() && !otherRep->getImpl().canBindToNoEscape()) {
-      if (record)
-        recordBinding(*record);
+      if (trail)
+        recordBinding(*trail);
       getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToNoEscape;
     }
   }
@@ -609,12 +588,12 @@ public:
   /// \returns the fixed type associated with this type variable, or a null
   /// type if there is no fixed type.
   ///
-  /// \param record The record of changes made by retrieving the representative,
+  /// \param trail The record of changes made by retrieving the representative,
   /// which can happen due to path compression. If null, path compression is
   /// not performed.
-  Type getFixedType(constraints::SavedTypeVariableBindings *record) {
+  Type getFixedType(constraints::SolverTrail *trail) {
     // Find the representative type variable.
-    auto rep = getRepresentative(record);
+    auto rep = getRepresentative(trail);
     Implementation &repImpl = rep->getImpl();
 
     // Return the bound type if there is one, otherwise, null.
@@ -623,20 +602,21 @@ public:
 
   /// Assign a fixed type to this equivalence class.
   void assignFixedType(Type type,
-                       constraints::SavedTypeVariableBindings *record) {
-    assert((!getFixedType(0) || getFixedType(0)->isEqual(type)) &&
+                       constraints::SolverTrail *trail) {
+    assert((!getFixedType(nullptr) ||
+            getFixedType(nullptr)->isEqual(type)) &&
            "Already has a fixed type!");
-    auto rep = getRepresentative(record);
-    if (record)
-      rep->getImpl().recordBinding(*record);
+    auto rep = getRepresentative(trail);
+    if (trail)
+      rep->getImpl().recordBinding(*trail);
     rep->getImpl().ParentOrFixed = type.getPointer();
   }
 
-  void setCanBindToLValue(constraints::SavedTypeVariableBindings *record,
+  void setCanBindToLValue(constraints::SolverTrail *trail,
                           bool enabled) {
-    auto &impl = getRepresentative(record)->getImpl();
-    if (record)
-      impl.recordBinding(*record);
+    auto &impl = getRepresentative(trail)->getImpl();
+    if (trail)
+      impl.recordBinding(*trail);
 
     if (enabled)
       impl.getTypeVariable()->Bits.TypeVariableType.Options |=
@@ -646,11 +626,11 @@ public:
           ~TVO_CanBindToLValue;
   }
 
-  void setCanBindToNoEscape(constraints::SavedTypeVariableBindings *record,
+  void setCanBindToNoEscape(constraints::SolverTrail *trail,
                             bool enabled) {
-    auto &impl = getRepresentative(record)->getImpl();
-    if (record)
-      impl.recordBinding(*record);
+    auto &impl = getRepresentative(trail)->getImpl();
+    if (trail)
+      impl.recordBinding(*trail);
 
     if (enabled)
       impl.getTypeVariable()->Bits.TypeVariableType.Options |=
@@ -660,10 +640,10 @@ public:
           ~TVO_CanBindToNoEscape;
   }
 
-  void enableCanBindToHole(constraints::SavedTypeVariableBindings *record) {
-    auto &impl = getRepresentative(record)->getImpl();
-    if (record)
-      impl.recordBinding(*record);
+  void enableCanBindToHole(constraints::SolverTrail *trail) {
+    auto &impl = getRepresentative(trail)->getImpl();
+    if (trail)
+      impl.recordBinding(*trail);
 
     impl.getTypeVariable()->Bits.TypeVariableType.Options |= TVO_CanBindToHole;
   }
@@ -2528,10 +2508,6 @@ private:
     /// Whether to record failures or not.
     bool recordFixes = false;
 
-    /// The set of type variable bindings that have changed while
-    /// processing this constraint system.
-    SavedTypeVariableBindings savedBindings;
-
     /// A log of changes to the constraint system, representing the
     /// current path being explored in the solution space.
     SolverTrail Trail;
@@ -3072,18 +3048,11 @@ private:
     }
   }
 
-  /// Restore the type variable bindings to what they were before
-  /// we attempted to solve this constraint system.
-  ///
-  /// \param numBindings The number of bindings to restore, from the end of
-  /// the saved-binding stack.
-  void restoreTypeVariableBindings(unsigned numBindings);
-
   /// Retrieve the set of saved type variable bindings, if available.
   ///
   /// \returns null when we aren't currently solving the system.
-  SavedTypeVariableBindings *getSavedBindings() const {
-    return solverState ? &solverState->savedBindings : nullptr;
+  SolverTrail *getTrail() const {
+    return solverState ? &solverState->Trail : nullptr;
   }
 
   /// Add a new type variable that was already created.
@@ -4090,7 +4059,7 @@ public:
   /// Retrieve the representative of the equivalence class containing
   /// this type variable.
   TypeVariableType *getRepresentative(TypeVariableType *typeVar) const {
-    return typeVar->getImpl().getRepresentative(getSavedBindings());
+    return typeVar->getImpl().getRepresentative(getTrail());
   }
 
   /// Find if the given type variable is representative for a type
@@ -4153,7 +4122,7 @@ public:
   /// Retrieve the fixed type corresponding to the given type variable,
   /// or a null type if there is no fixed type.
   Type getFixedType(TypeVariableType *typeVar) const {
-    return typeVar->getImpl().getFixedType(getSavedBindings());
+    return typeVar->getImpl().getFixedType(getTrail());
   }
 
   /// Retrieve the fixed type corresponding to a given type variable,

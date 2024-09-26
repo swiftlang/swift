@@ -86,6 +86,19 @@ SolverTrail::Change::boundTypeVariable(TypeVariableType *typeVar,
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::updatedTypeVariable(
+    TypeVariableType *typeVar,
+    llvm::PointerUnion<TypeVariableType *, TypeBase *> parentOrFixed,
+	  unsigned options) {
+  Change result;
+  result.Kind = ChangeKind::UpdatedTypeVariable;
+  result.Update.TypeVar = typeVar;
+  result.Update.ParentOrFixed = parentOrFixed;
+  result.Update.Options = options;
+  return result;
+}
+
 void SolverTrail::Change::undo(ConstraintSystem &cs) {
   auto &cg = cs.getConstraintGraph();
 
@@ -116,6 +129,11 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) {
   case ChangeKind::BoundTypeVariable:
     cg.unbindTypeVariable(Binding.TypeVar, Binding.FixedType);
     break;
+
+  case ChangeKind::UpdatedTypeVariable:
+    Update.TypeVar->getImpl().setRawOptions(Update.Options);
+    Update.TypeVar->getImpl().ParentOrFixed = Update.ParentOrFixed;
+    break;
   }
 }
 
@@ -129,13 +147,21 @@ void SolverTrail::undo(unsigned upTo) {
   if (CS.inInvalidState())
     return;
 
-  // Pop changes off the stack until we hit the change could we had prior to
-  // introducing this scope.
   ASSERT(Changes.size() >= upTo && "Trail corrupted");
-  while (Changes.size() > upTo) {
-    Changes.back().undo(CS);
-    Changes.pop_back();
+
+  for (unsigned i = Changes.size(); i > upTo; i--) {
+    auto change = Changes[i - 1];
+    if (change.Kind == ChangeKind::UpdatedTypeVariable)
+      change.undo(CS);
   }
+
+  for (unsigned i = Changes.size(); i > upTo; i--) {
+    auto change = Changes[i - 1];
+    if (change.Kind != ChangeKind::UpdatedTypeVariable)
+      change.undo(CS);
+  }
+
+  Changes.resize(upTo);
 }
 
 void SolverTrail::dumpActiveScopeChanges(llvm::raw_ostream &out,
@@ -168,6 +194,9 @@ void SolverTrail::dumpActiveScopeChanges(llvm::raw_ostream &out,
       break;
     case ChangeKind::RemovedConstraint:
       removedConstraints.insert(change.TheConstraint);
+      break;
+    case ChangeKind::UpdatedTypeVariable:
+      // Don't consider changes that don't affect the graph.
       break;
     }
   }

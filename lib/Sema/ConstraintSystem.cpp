@@ -170,7 +170,7 @@ void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
   assert(typeVar2 == getRepresentative(typeVar2) &&
          "typeVar2 is not the representative");
   assert(typeVar1 != typeVar2 && "cannot merge type with itself");
-  typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, getSavedBindings());
+  typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, getTrail());
 
   // Merge nodes in the constraint graph.
   CG.mergeNodes(typeVar1, typeVar2);
@@ -202,7 +202,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
   assert(!type->hasError() &&
          "Should not be assigning a type involving ErrorType!");
 
-  typeVar->getImpl().assignFixedType(type, getSavedBindings());
+  typeVar->getImpl().assignFixedType(type, getTrail());
 
   if (!updateState)
     return;

@@ -48,6 +48,8 @@ public:
     ExtendedEquivalenceClass,
     /// Added a fixed binding for a type variable in the constraint graph.
     BoundTypeVariable,
+    /// Set the fixed type or parent and flags for a type variable.
+    UpdatedTypeVariable,
   };
 
   /// A change made to the constraint system.
@@ -78,6 +80,17 @@ public:
         /// The fixed type to which the type variable was bound.
         TypeBase *FixedType;
       } Binding;
+
+      struct {
+        /// The type variable being updated.
+        TypeVariableType *TypeVar;
+
+        /// The representative of the equivalence class, or the fixed type.
+        llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
+
+        /// The saved value of TypeVariableType::Implementation::getRawOptions().
+        unsigned Options;
+      } Update;
     };
 
     Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
@@ -97,6 +110,12 @@ public:
 
     /// Create a change that bound a type variable to a fixed type.
     static Change boundTypeVariable(TypeVariableType *typeVar, Type fixed);
+
+    /// Create a change that updated a type variable.
+    static Change updatedTypeVariable(
+               TypeVariableType *typeVar,
+               llvm::PointerUnion<TypeVariableType *, TypeBase *> parentOrFixed,
+               unsigned options);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

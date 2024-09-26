@@ -4429,11 +4429,11 @@ ConstraintSystem::matchTypesBindTypeVar(
     type.visit([&](Type t) {
       if (auto *tvt = dyn_cast<TypeVariableType>(t.getPointer())) {
         if (!typeVar->getImpl().canBindToLValue()) {
-          tvt->getImpl().setCanBindToLValue(getSavedBindings(),
+          tvt->getImpl().setCanBindToLValue(getTrail(),
                                             /*enabled=*/false);
         }
         if (!typeVar->getImpl().canBindToNoEscape()) {
-          tvt->getImpl().setCanBindToNoEscape(getSavedBindings(),
+          tvt->getImpl().setCanBindToNoEscape(getTrail(),
                                               /*enabled=*/false);
         }
       }
@@ -14894,7 +14894,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
 }
 
 void ConstraintSystem::recordPotentialHole(TypeVariableType *typeVar) {
-  typeVar->getImpl().enableCanBindToHole(getSavedBindings());
+  typeVar->getImpl().enableCanBindToHole(getTrail());
 }
 
 void ConstraintSystem::recordAnyTypeVarAsPotentialHole(Type type) {
@@ -14903,7 +14903,7 @@ void ConstraintSystem::recordAnyTypeVarAsPotentialHole(Type type) {
 
   type.visit([&](Type type) {
     if (auto *typeVar = type->getAs<TypeVariableType>()) {
-      typeVar->getImpl().enableCanBindToHole(getSavedBindings());
+      typeVar->getImpl().enableCanBindToHole(getTrail());
     }
   });
 }
