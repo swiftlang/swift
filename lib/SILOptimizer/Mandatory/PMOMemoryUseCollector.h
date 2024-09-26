@@ -145,13 +145,21 @@ struct PMOMemoryUse {
   bool isValid() const { return Inst != nullptr; }
 };
 
-/// collectPMOElementUsesFrom - Analyze all uses of the specified allocation
-/// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
-/// and storing the information found into the Uses and Releases lists.
+/// Analyze all uses of the specified allocation instruction (alloc_box,
+/// alloc_stack or mark_uninitialized), classifying them and storing the
+/// information found into the Uses lists.
 [[nodiscard]] bool
 collectPMOElementUsesFrom(const PMOMemoryObjectInfo &MemoryInfo,
-                          SmallVectorImpl<PMOMemoryUse> &Uses,
-                          SmallVectorImpl<SILInstruction *> &Releases);
+                          SmallVectorImpl<PMOMemoryUse> &Uses);
+
+/// Analyze all uses of the specified allocation instruction (alloc_box,
+/// alloc_stack or mark_uninitialized), classifying them and storing the
+/// information found into the Uses and Releases lists.
+[[nodiscard]] bool
+collectPMOElementUsesAndDestroysFrom(
+  const PMOMemoryObjectInfo &MemoryInfo,
+  SmallVectorImpl<PMOMemoryUse> &Uses,
+  SmallVectorImpl<SILInstruction *> &Releases);
 
 } // end namespace swift
 
