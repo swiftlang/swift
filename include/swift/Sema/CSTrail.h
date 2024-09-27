@@ -159,6 +159,8 @@ private:
   std::vector<Change> Changes;
 
   bool UndoActive = false;
+  unsigned Total = 0;
+  unsigned Max = 0;
 };
 
 } // namespace constraints

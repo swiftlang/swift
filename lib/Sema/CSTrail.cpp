@@ -216,8 +216,14 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
 }
 
 void SolverTrail::recordChange(Change change) {
+  LLVM_DEBUG(llvm::dbgs() << "+ "; change.dump(llvm::dbgs(), CS, 0););
   ASSERT(!UndoActive);
+
   Changes.push_back(change);
+
+  ++Total;
+  if (Changes.size() > Max)
+    Max = Changes.size();
 }
 
 void SolverTrail::undo(unsigned toIndex) {
@@ -226,20 +232,28 @@ void SolverTrail::undo(unsigned toIndex) {
   if (CS.inInvalidState())
     return;
 
+  LLVM_DEBUG(llvm::dbgs() << "decisions " << Changes.size()
+                          << " max " << Max
+                          << " total " << Total << "\n");
   ASSERT(Changes.size() >= toIndex && "Trail corrupted");
   ASSERT(!UndoActive);
   UndoActive = true;
 
+  // FIXME: Undo all changes in the correct order!
   for (unsigned i = Changes.size(); i > toIndex; i--) {
     auto change = Changes[i - 1];
-    if (change.Kind == ChangeKind::UpdatedTypeVariable)
+    if (change.Kind == ChangeKind::UpdatedTypeVariable) {
+      LLVM_DEBUG(llvm::dbgs() << "- "; change.dump(llvm::dbgs(), CS, 0));
       change.undo(CS);
+    }
   }
 
   for (unsigned i = Changes.size(); i > toIndex; i--) {
     auto change = Changes[i - 1];
-    if (change.Kind != ChangeKind::UpdatedTypeVariable)
+    if (change.Kind != ChangeKind::UpdatedTypeVariable) {
+      LLVM_DEBUG(llvm::dbgs() << "- "; change.dump(llvm::dbgs(), CS, 0));
       change.undo(CS);
+    }
   }
 
   Changes.resize(toIndex);
