@@ -10,6 +10,7 @@ module Test {
 
 //--- Inputs/nonescapable.h
 #include "swift/bridging"
+#include <vector>
 
 struct SWIFT_NONESCAPABLE View {
     View() : member(nullptr) {}
@@ -19,11 +20,19 @@ private:
     const int *member;
 };
 
+using VecOfPtr SWIFT_NONESCAPABLE = std::vector<int*>;
+
 //--- test.swift
 
+import CxxStdlib
 import Test
 
 // CHECK: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
 public func noAnnotations() -> View {
     View()
+}
+
+// CHECK: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
+public func noAnnotations2() -> VecOfPtr {
+    VecOfPtr()
 }
