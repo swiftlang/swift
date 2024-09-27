@@ -30,7 +30,11 @@ static std::optional<Path> getActualModuleMapPath(
     StringRef name, SearchPathOptions &Opts, const llvm::Triple &triple,
     bool isArchSpecific,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
-  StringRef platform = swift::getPlatformNameForTriple(triple);
+  StringRef platform;
+  if (swift::tripleIsMacCatalystEnvironment(triple))
+    platform = "macosx";
+  else
+    platform = swift::getPlatformNameForTriple(triple);
   StringRef arch = swift::getMajorArchitectureName(triple);
 
   Path result;
