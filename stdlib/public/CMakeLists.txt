@@ -177,6 +177,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
   if("AArch64" IN_LIST LLVM_TARGETS_TO_BUILD)
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
       "arm64    arm64-apple-none-macho    arm64-apple-none-macho"
+      "arm64e   arm64e-apple-none-macho   arm64e-apple-none-macho"
     )
   endif()
 
