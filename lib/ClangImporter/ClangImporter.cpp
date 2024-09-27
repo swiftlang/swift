@@ -52,7 +52,9 @@
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/Mangle.h"
+#include "clang/AST/Type.h"
 #include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Basic/FileEntry.h"
 #include "clang/Basic/IdentifierTable.h"
@@ -5018,6 +5020,74 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
   }
 
   return result;
+}
+
+CxxEscapability
+ClangTypeEscapability::evaluate(Evaluator &evaluator,
+                                EscapabilityLookupDescriptor desc) const {
+  auto desugared = desc.type->getUnqualifiedDesugaredType();
+  if (const auto *recordType = desugared->getAs<clang::RecordType>()) {
+    if (importer::hasNonEscapableAttr(recordType->getDecl()))
+      return CxxEscapability::NonEscapable;
+    if (importer::hasEscapableAttr(recordType->getDecl()))
+      return CxxEscapability::Escapable;
+    auto recordDecl = recordType->getDecl();
+    auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl);
+    if (!cxxRecordDecl || cxxRecordDecl->isAggregate()) {
+      bool hadUnknown = false;
+      auto evaluateEscapability = [&](const clang::Type *type) {
+        auto escapability = evaluateOrDefault(
+            evaluator, ClangTypeEscapability({type}), CxxEscapability::Unknown);
+        if (escapability == CxxEscapability::Unknown)
+          hadUnknown = true;
+        return escapability;
+      };
+
+      if (cxxRecordDecl) {
+        for (auto base : cxxRecordDecl->bases()) {
+          auto baseEscapability = evaluateEscapability(
+              base.getType()->getUnqualifiedDesugaredType());
+          if (baseEscapability == CxxEscapability::NonEscapable)
+            return CxxEscapability::NonEscapable;
+        }
+      }
+
+      for (auto field : recordDecl->fields()) {
+        auto fieldEscapability = evaluateEscapability(
+            field->getType()->getUnqualifiedDesugaredType());
+        if (fieldEscapability == CxxEscapability::NonEscapable)
+          return CxxEscapability::NonEscapable;
+      }
+
+      return hadUnknown ? CxxEscapability::Unknown : CxxEscapability::Escapable;
+    }
+  }
+  if (desugared->isArrayType()) {
+    auto elemTy = cast<clang::ArrayType>(desugared)
+                      ->getElementType()
+                      ->getUnqualifiedDesugaredType();
+    return evaluateOrDefault(evaluator, ClangTypeEscapability({elemTy}),
+                             CxxEscapability::Unknown);
+  }
+
+  // Base cases
+  if (desugared->isAnyPointerType() || desugared->isBlockPointerType() ||
+      desugared->isMemberPointerType() || desugared->isReferenceType())
+    return CxxEscapability::NonEscapable;
+  if (desugared->isScalarType())
+    return CxxEscapability::Escapable;
+  return CxxEscapability::Unknown;
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           EscapabilityLookupDescriptor desc) {
+  out << "Computing escapability for type '";
+  out << clang::QualType(desc.type, 0).getAsString();
+  out << "'";
+}
+
+SourceLoc swift::extractNearestSourceLoc(EscapabilityLookupDescriptor) {
+  return SourceLoc();
 }
 
 // Just create a specialized function decl for "__swift_interopStaticCast"
