@@ -770,6 +770,42 @@ ModuleDecl *Decl::getModuleContext() const {
   return getDeclContext()->getParentModule();
 }
 
+/// If `decl` is an imported Cxx decl, returns the actual module that the decl
+/// was imported from. This is necessary to compensate for the way that
+/// Cxx `namespace` declarations are imported. Since namespaces can span
+/// multiple Clang modules, the corresponding decls and all of their members get
+/// associated with the Clang imported header module (named `__ObjC`). This
+/// utility reaches through the Clang AST to find the actual module that members
+/// of namespaces originated from.
+static ModuleDecl *getModuleContextForNameLookupForCxxDecl(const Decl *decl) {
+  auto &ctx = decl->getASTContext();
+  if (!ctx.LangOpts.EnableCXXInterop)
+    return nullptr;
+
+  if (!decl->hasClangNode())
+    return nullptr;
+
+  auto parentModule = decl->getModuleContext();
+
+  // We only need to look for the real parent module when the existing parent
+  // is the imported header module.
+  if (!parentModule->isClangHeaderImportModule())
+    return nullptr;
+
+  auto clangModule = decl->getClangDecl()->getOwningModule();
+  if (!clangModule)
+    return nullptr;
+
+  return ctx.getClangModuleLoader()->getWrapperForModule(clangModule);
+}
+
+ModuleDecl *Decl::getModuleContextForNameLookup() const {
+  if (auto parentModule = getModuleContextForNameLookupForCxxDecl(this))
+    return parentModule;
+
+  return getModuleContext();
+}
+
 /// Retrieve the diagnostic engine for diagnostics emission.
 DiagnosticEngine &Decl::getDiags() const {
   return getASTContext().Diags;
@@ -3941,7 +3977,7 @@ ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
 std::optional<AttributedImport<ImportedModule>>
 ValueDecl::findImport(const DeclContext *fromDC) const {
   // If the type is from the current module, there's no import.
-  auto module = getModuleContext();
+  auto module = getModuleContextForNameLookup();
   if (module == fromDC->getParentModule())
     return std::nullopt;
 
