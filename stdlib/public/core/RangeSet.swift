@@ -398,6 +398,7 @@ extension RangeSet {
 }
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension RangeSet: CustomStringConvertible {
   public var description: String {
     return _ranges.description
