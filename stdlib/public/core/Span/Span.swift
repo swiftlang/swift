@@ -678,52 +678,26 @@ extension Span where Element: ~Copyable {
     (self._pointer == other._pointer) && (self._count == other._count)
   }
 
-  /// Returns true if the memory represented by `span` is a subrange of
-  /// the memory represented by `self`
+  /// Returns the indices within `self` where the memory represented by `span`
+  /// is located, or `nil` if `span` is not located within `self`.
   ///
   /// Parameters:
-  /// - span: a span of the same type as `self`
-  /// Returns: whether `span` is a subrange of `self`
+  /// - span: a span that may be a subrange of `self`
+  /// Returns: A range of offsets within `self`, or `nil`
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
-  public func isWithin(_ span: borrowing Self) -> Bool {
-    if _count > span._count { return false }
-    if _count == 0 { return true }
-    if _start < span._start { return false }
-    let stride = MemoryLayout<Element>.stride
-    if _isPOD(Element.self) {
-      let byteOffset = span._start.distance(to: _start)
-      let (lower, r) = byteOffset.quotientAndRemainder(dividingBy: stride)
-      guard r == 0 else { return false }
-      return lower + _count <= span._count
-    } else {
-      // we have an alignment precondition, so we can omit a stride check
-      let selfEnd = self._start.advanced(by: self._count*stride)
-      let spanEnd = span._start.advanced(by: span._count*stride)
-      return selfEnd <= spanEnd
+  public func indices(of span: borrowing Self) -> Range<Int>? {
+    if span._count > _count { return nil }
+    guard let subspanStart = span._pointer, _count > 0 else {
+      return _pointer == span._pointer ? Range(_uncheckedBounds: (0, 0)) : nil
     }
-  }
-
-  /// Returns the offsets where the memory of `span` is located within
-  /// the memory represented by `self`
-  ///
-  /// Note: `span` must be a subrange of `self`
-  ///
-  /// Parameters:
-  /// - span: a subrange of `self`
-  /// Returns: A range of offsets within `self`
-  @_disallowFeatureSuppression(NonescapableTypes)
-  @_alwaysEmitIntoClient
-  public func indicesWithin(_ span: borrowing Self) -> Range<Int>? {
-    if _count > span._count { return nil }
-    if _count == 0 { return Range(_uncheckedBounds: (0, 0)) }
-    if _start < span._start { return nil }
+    if subspanStart < _start { return nil }
+    let byteOffset = _start.distance(to: subspanStart)
     let stride = MemoryLayout<Element>.stride
-    let byteOffset = span._start.distance(to: _start)
     let (lower, r) = byteOffset.quotientAndRemainder(dividingBy: stride)
     guard r == 0 else { return nil }
-    let upper = lower + _count
-    guard upper <= span._count else { return nil }
+    let upper = lower + span._count
+    guard upper <= _count else { return nil }
     return Range(_uncheckedBounds: (lower, upper))
   }
 }
