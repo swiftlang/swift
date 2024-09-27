@@ -2485,8 +2485,11 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
 
   const ConformanceInfo *info;
 
-  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
-    if (auto *sc = dyn_cast<SpecializedProtocolConformance>(conformance)) {
+  // If there is a specialized SILWitnessTable for the specialized conformance,
+  // directly use it.
+  if (auto *sc = dyn_cast<SpecializedProtocolConformance>(conformance)) {
+    SILWitnessTable *wt = getSILModule().lookUpWitnessTable(conformance);
+    if (wt && wt->getConformance() == sc) {
       info = new SpecializedConformanceInfo(sc);
       Conformances.try_emplace(conformance, info);
       return *info;
