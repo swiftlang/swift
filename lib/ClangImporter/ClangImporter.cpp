@@ -7457,11 +7457,11 @@ static bool hasNonCopyableAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, "~Copyable");
 }
 
-bool importer::hasNonEscapableAttr(const clang::RecordDecl *decl) {
+bool importer::hasNonEscapableAttr(const clang::Decl *decl) {
   return hasSwiftAttribute(decl, "~Escapable");
 }
 
-bool importer::hasEscapableAttr(const clang::RecordDecl *decl) {
+bool importer::hasEscapableAttr(const clang::Decl *decl) {
   return hasSwiftAttribute(decl, "Escapable");
 }
 
