@@ -18,7 +18,6 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Sema/ConstraintGraph.h"
-#include "swift/Sema/ConstraintGraphScope.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSTrail.h"
 #include "swift/Basic/Assertions.h"
@@ -69,7 +68,7 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   TypeVariables.push_back(typeVar);
 
   // Record the change, if there are active scopes.
-  if (ActiveScope)
+  if (CS.solverState)
     CS.solverState->recordChange(SolverTrail::Change::addedTypeVariable(typeVar));
 
   // If this type variable is not the representative of its equivalence class,
@@ -405,26 +404,6 @@ void ConstraintGraphNode::resetBindingSet() {
   }
 }
 
-#pragma mark Graph scope management
-ConstraintGraphScope::ConstraintGraphScope(ConstraintGraph &CG)
-  : CG(CG), ParentScope(CG.ActiveScope),
-    NumChanges(CG.getConstraintSystem().solverState->Trail.size())
-{
-  CG.ActiveScope = this;
-}
-
-ConstraintGraphScope::~ConstraintGraphScope() {
-  // Don't attempt to rollback if constraint system ended up
-  // in an invalid state.
-  if (CG.CS.inInvalidState())
-    return;
-
-  CG.CS.solverState->Trail.undo(NumChanges);
-
-  // The active scope is now the parent scope.
-  CG.ActiveScope = ParentScope;
-}
-
 #pragma mark Graph mutation
 
 void ConstraintGraph::removeNode(TypeVariableType *typeVar) {
@@ -459,7 +438,7 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
   }
 
   // Record the change, if there are active scopes.
-  if (ActiveScope)
+  if (CS.solverState)
     CS.solverState->recordChange(SolverTrail::Change::addedConstraint(constraint));
 }
 
@@ -485,7 +464,7 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
   }
 
   // Record the change, if there are active scopes.
-  if (ActiveScope)
+  if (CS.solverState)
     CS.solverState->recordChange(SolverTrail::Change::removedConstraint(constraint));
 }
 
@@ -504,7 +483,7 @@ void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
   auto typeVarNonRep = typeVar1 == typeVarRep? typeVar2 : typeVar1;
 
   // Record the change, if there are active scopes.
-  if (ActiveScope) {
+  if (CS.solverState) {
     CS.solverState->recordChange(
       SolverTrail::Change::extendedEquivalenceClass(
                         typeVarRep,
@@ -521,7 +500,7 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
          "Cannot bind to type variable; merge equivalence classes instead");
 
   // Record the change, if there are active scopes.
-  if (ActiveScope) {
+  if (CS.solverState) {
     CS.solverState->recordChange(
       SolverTrail::Change::boundTypeVariable(typeVar, fixed));
   }

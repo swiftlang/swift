@@ -648,8 +648,9 @@ ConstraintSystem::SolverState::~SolverState() {
 }
 
 ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
-  : cs(cs), CGScope(cs.CG)
-{
+  : cs(cs) {
+  numTrailChanges = cs.solverState->Trail.size();
+
   numTypeVariables = cs.TypeVariables.size();
   numConstraintRestrictions = cs.ConstraintRestrictions.size();
   numFixes = cs.Fixes.size();
@@ -710,6 +711,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
     cs.InactiveConstraints.splice(cs.InactiveConstraints.end(),
                                   cs.ActiveConstraints);
   }
+
+  // Roll back changes to the constraint system.
+  cs.solverState->Trail.undo(numTrailChanges);
 
   // Rollback all of the changes done to constraints by the current scope,
   // e.g. add retired constraints back to the circulation and remove generated

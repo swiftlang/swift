@@ -31,7 +31,6 @@ class TypeVariableType;
 namespace constraints {
 
 class Constraint;
-class ConstraintGraphScope;
 
 class SolverTrail {
 public:
@@ -134,6 +133,7 @@ public:
   void recordChange(Change change);
 
   void dumpActiveScopeChanges(llvm::raw_ostream &out,
+                              unsigned fromIndex,
                               unsigned indent = 0);
 
   unsigned size() const {
@@ -148,7 +148,7 @@ private:
   /// The list of changes made to this constraint system.
   std::vector<Change> Changes;
 
-  friend class ConstraintGraphScope;
+  bool UndoActive = false;
 };
 
 } // namespace constraints

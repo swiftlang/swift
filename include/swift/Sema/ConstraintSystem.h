@@ -35,7 +35,6 @@
 #include "swift/Sema/CSTrail.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintGraph.h"
-#include "swift/Sema/ConstraintGraphScope.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/OverloadChoice.h"
 #include "swift/Sema/SolutionResult.h"
@@ -2852,8 +2851,8 @@ public:
     /// The length of \c TypeVariables.
     unsigned numTypeVariables;
 
-    /// The length of \c SavedBindings.
-    unsigned numSavedBindings;
+    /// The length of \c Trail.
+    unsigned numTrailChanges;
 
     /// The length of \c ConstraintRestrictions.
     unsigned numConstraintRestrictions;
@@ -2957,9 +2956,6 @@ public:
 
     /// The scope number of this scope. Set when the scope is registered.
     unsigned scopeNumber = 0;
-
-    /// Constraint graph scope associated with this solver scope.
-    ConstraintGraphScope CGScope;
 
     SolverScope(const SolverScope &) = delete;
     SolverScope &operator=(const SolverScope &) = delete;

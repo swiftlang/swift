@@ -18,7 +18,6 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Sema/ConstraintGraph.h"
-#include "swift/Sema/ConstraintGraphScope.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSTrail.h"
 #include "swift/Basic/Assertions.h"
@@ -102,11 +101,6 @@ SolverTrail::Change::updatedTypeVariable(
 void SolverTrail::Change::undo(ConstraintSystem &cs) {
   auto &cg = cs.getConstraintGraph();
 
-  /// Temporarily change the active scope to null, so we don't record
-  /// any changes made while performing the undo operation.
-  llvm::SaveAndRestore<ConstraintGraphScope *> prevActiveScope(cg.ActiveScope,
-                                                               nullptr);
-
   switch (Kind) {
   case ChangeKind::AddedTypeVariable:
     cg.removeNode(TypeVar);
@@ -138,33 +132,40 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) {
 }
 
 void SolverTrail::recordChange(Change change) {
+  if (UndoActive)
+    return;
+
   Changes.push_back(change);
 }
 
-void SolverTrail::undo(unsigned upTo) {
+void SolverTrail::undo(unsigned toIndex) {
   // Don't attempt to rollback if constraint system ended up
   // in an invalid state.
   if (CS.inInvalidState())
     return;
 
-  ASSERT(Changes.size() >= upTo && "Trail corrupted");
+  ASSERT(Changes.size() >= toIndex && "Trail corrupted");
+  ASSERT(!UndoActive);
+  UndoActive = true;
 
-  for (unsigned i = Changes.size(); i > upTo; i--) {
+  for (unsigned i = Changes.size(); i > toIndex; i--) {
     auto change = Changes[i - 1];
     if (change.Kind == ChangeKind::UpdatedTypeVariable)
       change.undo(CS);
   }
 
-  for (unsigned i = Changes.size(); i > upTo; i--) {
+  for (unsigned i = Changes.size(); i > toIndex; i--) {
     auto change = Changes[i - 1];
     if (change.Kind != ChangeKind::UpdatedTypeVariable)
       change.undo(CS);
   }
 
-  Changes.resize(upTo);
+  Changes.resize(toIndex);
+  UndoActive = false;
 }
 
 void SolverTrail::dumpActiveScopeChanges(llvm::raw_ostream &out,
+                                         unsigned fromIndex,
                                          unsigned indent) {
   if (Changes.empty())
     return;
@@ -175,8 +176,7 @@ void SolverTrail::dumpActiveScopeChanges(llvm::raw_ostream &out,
   std::vector<TypeVariableType *> equivTypeVars;
   std::set<Constraint *> addedConstraints;
   std::set<Constraint *> removedConstraints;
-  for (unsigned int i = CS.getConstraintGraph().ActiveScope->getStartIdx();
-       i < Changes.size(); i++) {
+  for (unsigned int i = fromIndex; i < Changes.size(); i++) {
     auto change = Changes[i];
     switch (change.Kind) {
     case ChangeKind::BoundTypeVariable:

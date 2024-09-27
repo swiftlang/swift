@@ -42,7 +42,6 @@ namespace constraints {
 
 class Constraint;
 class ConstraintGraph;
-class ConstraintGraphScope;
 class ConstraintSystem;
 class TypeVariableBinding;
 
@@ -440,11 +439,6 @@ private:
   /// to contract constraint graph edges.
   void incrementConstraintsPerContractionCounter();
 
-  /// The currently active scope, or null if we aren't tracking changes made
-  /// to the constraint graph.
-  ConstraintGraphScope *ActiveScope = nullptr;
-
-  friend class ConstraintGraphScope;
   friend class SolverTrail;
 };
 
