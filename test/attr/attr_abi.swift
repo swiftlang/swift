@@ -10,10 +10,10 @@ func funcForFunc() {}
 @abi(var varForVar_abi: Int)
 var varForVar: Int = 0
 
-@abi(func funcForVar_abi())
+@abi(func funcForVar_abi()) // expected-error {{cannot give var 'funcForVar' the ABI of a global function}}
 var funcForVar: Int = 0
 
-@abi(var varForFunc_abi: Int)
+@abi(var varForFunc_abi: Int) // expected-error {{cannot give global function 'varForFunc()' the ABI of a pattern binding}}
 func varForFunc() {}
 
 //
@@ -23,10 +23,10 @@ func varForFunc() {}
 @abi(func param00_generic00() -> Int)
 func param00_generic00() -> Int { fatalError() }
 
-@abi(func param10_generic00(_: Int) -> Int)
+@abi(func param10_generic00(_: Int) -> Int) // expected-error {{cannot give global function 'param10_generic00()' the ABI of a global function with a different number of low-level parameters}}
 func param10_generic00() -> Int { fatalError() }
 
-@abi(func param01_generic00() -> Int)
+@abi(func param01_generic00() -> Int) // expected-error {{cannot give global function 'param01_generic00' the ABI of a global function with a different number of low-level parameters}}
 func param01_generic00(_: Int) -> Int { fatalError() }
 
 @abi(func param11_generic00(_: Int) -> Int)
@@ -34,30 +34,30 @@ func param11_generic00(_: Int) -> Int { fatalError() }
 
 
 
-@abi(func param00_generic10<T>() -> T)
+@abi(func param00_generic10<T>() -> T) // expected-error {{cannot give global function 'param00_generic10()' the ABI of a global function with a different number of low-level parameters}}
 func param00_generic10() -> Int { fatalError() }
 
-@abi(func param10_generic10<T>(_: Int) -> T)
+@abi(func param10_generic10<T>(_: Int) -> T) // expected-error {{cannot give global function 'param10_generic10()' the ABI of a global function with a different number of low-level parameters}}
 func param10_generic10() -> Int { fatalError() }
 
 @abi(func param01_generic10<T>() -> T)
 func param01_generic10(_: Int) -> Int { fatalError() }
 
-@abi(func param11_generic10<T>(_: Int) -> T)
+@abi(func param11_generic10<T>(_: Int) -> T) // expected-error {{cannot give global function 'param11_generic10' the ABI of a global function with a different number of low-level parameters}}
 func param11_generic10(_: Int) -> Int { fatalError() }
 
 
 
-@abi(func param00_generic01() -> Int)
+@abi(func param00_generic01() -> Int) // expected-error {{cannot give global function 'param00_generic01()' the ABI of a global function with a different number of low-level parameters}}
 func param00_generic01<T>() -> T { fatalError() }
 
 @abi(func param10_generic01(_: Int) -> Int)
 func param10_generic01<T>() -> T { fatalError() }
 
-@abi(func param01_generic01() -> Int)
+@abi(func param01_generic01() -> Int) // expected-error {{cannot give global function 'param01_generic01' the ABI of a global function with a different number of low-level parameters}}
 func param01_generic01<T>(_: Int) -> T { fatalError() }
 
-@abi(func param11_generic01(_: Int) -> Int)
+@abi(func param11_generic01(_: Int) -> Int) // expected-error {{cannot give global function 'param11_generic01' the ABI of a global function with a different number of low-level parameters}}
 func param11_generic01<T>(_: Int) -> T { fatalError() }
 
 
@@ -65,10 +65,10 @@ func param11_generic01<T>(_: Int) -> T { fatalError() }
 @abi(func param00_generic11<T>() -> T)
 func param00_generic11<T>() -> T { fatalError() }
 
-@abi(func param10_generic11<T>(_: Int) -> T)
+@abi(func param10_generic11<T>(_: Int) -> T) // expected-error {{cannot give global function 'param10_generic11()' the ABI of a global function with a different number of low-level parameters}}
 func param10_generic11<T>() -> T { fatalError() }
 
-@abi(func param01_generic11<T>() -> T)
+@abi(func param01_generic11<T>() -> T) // expected-error {{cannot give global function 'param01_generic11' the ABI of a global function with a different number of low-level parameters}}
 func param01_generic11<T>(_: Int) -> T { fatalError() }
 
 @abi(func param11_generic11<T>(_: Int) -> T)
@@ -81,13 +81,13 @@ func param11_generic11<T>(_: Int) -> T { fatalError() }
 @abi(func throws00(_: () throws -> Void))
 func throws00(_: () throws -> Void) {}
 
-@abi(func throws10(_: () throws -> Void) throws)
+@abi(func throws10(_: () throws -> Void) throws) // expected-error {{cannot give 'throws10' the ABI of a global function which can throw}}
 func throws10(_: () throws -> Void) {}
 
-@abi(func throws20(_: () throws -> Void) rethrows)
+@abi(func throws20(_: () throws -> Void) rethrows) // expected-error {{cannot give 'throws20' the ABI of a global function which can throw}}
 func throws20(_: () throws -> Void) {}
 
-@abi(func throws01(_: () throws -> Void))
+@abi(func throws01(_: () throws -> Void)) // expected-error {{cannot give 'throws01' the ABI of a global function which cannot throw}}
 func throws01(_: () throws -> Void) throws {}
 
 @abi(func throws11(_: () throws -> Void) throws)
@@ -96,7 +96,7 @@ func throws11(_: () throws -> Void) throws {}
 @abi(func throws21(_: () throws -> Void) rethrows)
 func throws21(_: () throws -> Void) throws {}
 
-@abi(func throws02(_: () throws -> Void))
+@abi(func throws02(_: () throws -> Void)) // expected-error {{cannot give 'throws02' the ABI of a global function which cannot throw}}
 func throws02(_: () throws -> Void) rethrows {}
 
 @abi(func throws12(_: () throws -> Void) throws)
@@ -112,10 +112,10 @@ func throws22(_: () throws -> Void) rethrows {}
 @abi(func async00())
 func async00() {}
 
-@abi(func async10() async)
+@abi(func async10() async) // expected-error {{cannot give 'async10()' the ABI of an async global function}}
 func async10() {}
 
-@abi(func async01())
+@abi(func async01()) // expected-error {{cannot give 'async01()' the ABI of a non-async global function}}
 func async01() async {}
 
 @abi(func async11() async)
@@ -125,17 +125,17 @@ func async11() async {}
 // PBD shape checking
 //
 
-@abi(var x1, y1: Int)
+@abi(var x1, y1: Int) // expected-error {{cannot give pattern binding the ABI of a binding with more patterns}}
 var x1: Int = 0
 
 @abi(var x2: Int)
-var x2 = 0, y2: Int = 0
+var x2 = 0, y2: Int = 0 // expected-error {{cannot give pattern binding the ABI of a binding with fewer patterns}}
 
-@abi(var (x3, y3): (Int, Int), (a3, b3): (Int, Int))
+@abi(var (x3, y3): (Int, Int), (a3, b3): (Int, Int)) // expected-error {{no match for ABI var 'b3'}}
 var (x3, y3): (Int, Int) = (0, 0), a3: Int = 0
 
 @abi(var (x4, y4): (Int, Int), a4: Int)
-var (x4, y4): (Int, Int) = (0, 0), (a4, b4): (Int, Int) = (0, 0)
+var (x4, y4): (Int, Int) = (0, 0), (a4, b4): (Int, Int) = (0, 0) // expected-error {{no match for var 'b4' in the ABI}}
 
 //
 // Conflict diagnostics
