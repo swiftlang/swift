@@ -86,6 +86,11 @@ def primary_file : Separate<["-"], "primary-file">,
   Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
   HelpText<"Produce output for this file, not the whole module">;
 
+def block_list_file
+  : Separate<["-"], "blocklist-file">, MetaVarName<"<path>">,
+    Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
+    HelpText<"The path to a blocklist configuration file">;
+
 let Flags = [FrontendOption, NoDriverOption] in {
 
 def triple : Separate<["-"], "triple">, Alias<target>;
@@ -287,10 +292,6 @@ def Raccess_note : Separate<["-"], "Raccess-note">,
     HelpText<"Control access note remarks (default: all)">;
 def Raccess_note_EQ : Joined<["-"], "Raccess-note=">,
     Alias<Raccess_note>;
-
-def block_list_file
-  : Separate<["-"], "blocklist-file">, MetaVarName<"<path>">,
-    HelpText<"The path to a blocklist configuration file">;
 } // end let Flags = [FrontendOption, NoDriverOption]
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
