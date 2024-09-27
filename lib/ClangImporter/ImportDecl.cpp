@@ -8155,8 +8155,7 @@ bool swift::importer::isMutabilityAttr(const clang::SwiftAttrAttr *swiftAttr) {
          swiftAttr->getAttribute() == "nonmutating";
 }
 
-static bool importAsUnsafe(const ASTContext &context,
-                           const clang::RecordDecl *decl,
+static bool importAsUnsafe(ASTContext &context, const clang::RecordDecl *decl,
                            const Decl *MappedDecl) {
   if (!context.LangOpts.hasFeature(Feature::SafeInterop) ||
       !context.LangOpts.hasFeature(Feature::AllowUnsafeAttribute) || !decl)
@@ -8165,9 +8164,9 @@ static bool importAsUnsafe(const ASTContext &context,
   if (isa<ClassDecl>(MappedDecl))
     return false;
 
-  // TODO: Add logic to cover structural rules.
-  return !importer::hasNonEscapableAttr(decl) &&
-         !importer::hasEscapableAttr(decl);
+  return evaluateOrDefault(
+             context.evaluator, ClangTypeEscapability({decl->getTypeForDecl()}),
+             CxxEscapability::Unknown) == CxxEscapability::Unknown;
 }
 
 void
