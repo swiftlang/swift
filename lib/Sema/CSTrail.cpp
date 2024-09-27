@@ -194,9 +194,7 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
 }
 
 void SolverTrail::recordChange(Change change) {
-  if (UndoActive)
-    return;
-
+  ASSERT(!UndoActive);
   Changes.push_back(change);
 }
 

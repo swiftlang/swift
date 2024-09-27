@@ -79,9 +79,12 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   // Record this type variable.
   TypeVariables.push_back(typeVar);
 
-  // Record the change, if there are active scopes.
+  // Record the change, if there are active scopes. Note that we specifically
+  // check CS.solverState and not CS.isRecordingChanges(), because we want
+  // recordChange() to assert if there's an active undo. It is not valid to
+  // create new nodes during an undo.
   if (CS.solverState)
-    CS.solverState->recordChange(SolverTrail::Change::addedTypeVariable(typeVar));
+    CS.recordChange(SolverTrail::Change::addedTypeVariable(typeVar));
 
   // If this type variable is not the representative of its equivalence class,
   // add it to its representative's set of equivalences.
@@ -475,8 +478,8 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
   }
 
   // Record the change, if there are active scopes.
-  if (CS.solverState)
-    CS.solverState->recordChange(SolverTrail::Change::addedConstraint(constraint));
+  if (CS.isRecordingChanges())
+    CS.recordChange(SolverTrail::Change::addedConstraint(constraint));
 }
 
 void ConstraintGraph::removeConstraint(Constraint *constraint) {
@@ -501,8 +504,8 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
   }
 
   // Record the change, if there are active scopes.
-  if (CS.solverState)
-    CS.solverState->recordChange(SolverTrail::Change::removedConstraint(constraint));
+  if (CS.isRecordingChanges())
+    CS.recordChange(SolverTrail::Change::removedConstraint(constraint));
 }
 
 void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1, 
@@ -520,8 +523,8 @@ void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
   auto typeVarNonRep = typeVar1 == typeVarRep? typeVar2 : typeVar1;
 
   // Record the change, if there are active scopes.
-  if (CS.solverState) {
-    CS.solverState->recordChange(
+  if (CS.isRecordingChanges()) {
+    CS.recordChange(
       SolverTrail::Change::extendedEquivalenceClass(
                         typeVarRep,
                         repNode.getEquivalenceClass().size()));
@@ -535,12 +538,6 @@ void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
 void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
   assert(!fixed->is<TypeVariableType>() &&
          "Cannot bind to type variable; merge equivalence classes instead");
-
-  // Record the change, if there are active scopes.
-  if (CS.solverState) {
-    CS.solverState->recordChange(
-      SolverTrail::Change::boundTypeVariable(typeVar, fixed));
-  }
 
   auto &node = (*this)[typeVar];
 
@@ -556,6 +553,10 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
     otherNode.addReferencedBy(typeVar);
     node.addReferencedVar(otherTypeVar);
   }
+
+  // Record the change, if there are active scopes.
+  if (CS.isRecordingChanges())
+    CS.recordChange(SolverTrail::Change::boundTypeVariable(typeVar, fixed));
 }
 
 void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed) {

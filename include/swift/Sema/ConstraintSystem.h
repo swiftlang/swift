@@ -521,7 +521,7 @@ public:
       impl = &nextTV->getImpl();
     }
 
-    if (impl == this || !trail)
+    if (impl == this || !trail || trail->isUndoActive())
       return result;
 
     // Perform path compression.
@@ -2659,10 +2659,6 @@ private:
       favoredConstraints.push_back(constraint);
     }
 
-    void recordChange(SolverTrail::Change change) {
-      Trail.recordChange(change);
-    }
-
   private:
     /// The list of constraints that have been retired along the
     /// current path, this list is used in LIFO fashion when
@@ -2797,6 +2793,14 @@ public:
   /// system, and carries temporary state related to the current path
   /// we're exploring.
   SolverState *solverState = nullptr;
+
+  bool isRecordingChanges() const {
+    return solverState && !solverState->Trail.isUndoActive();
+  }
+
+  void recordChange(SolverTrail::Change change) {
+    solverState->Trail.recordChange(change);
+  }
 
   /// Form a locator that can be used to retrieve argument information cached in
   /// the constraint system for the callee described by the anchor of the

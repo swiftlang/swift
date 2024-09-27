@@ -133,6 +133,8 @@ public:
   SolverTrail(const SolverTrail &) = delete;
   SolverTrail &operator=(const SolverTrail &) = delete;
 
+  bool isUndoActive() const { return UndoActive; }
+
   void recordChange(Change change);
 
   void dumpActiveScopeChanges(llvm::raw_ostream &out,
