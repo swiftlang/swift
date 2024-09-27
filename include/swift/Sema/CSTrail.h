@@ -120,7 +120,10 @@ public:
     /// had prior to this change.
     ///
     /// Changes must be undone in stack order.
-    void undo(ConstraintSystem &cs);
+    void undo(ConstraintSystem &cs) const;
+
+    void dump(llvm::raw_ostream &out, ConstraintSystem &cs,
+              unsigned indent = 0) const;
   };
 
   SolverTrail(ConstraintSystem &cs) : CS(cs) {}
@@ -134,7 +137,7 @@ public:
 
   void dumpActiveScopeChanges(llvm::raw_ostream &out,
                               unsigned fromIndex,
-                              unsigned indent = 0);
+                              unsigned indent = 0) const;
 
   unsigned size() const {
     return Changes.size();
