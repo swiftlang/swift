@@ -239,12 +239,18 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
     }
   }
 
+  // FIXME: This is totally the wrong place to do it. We should do this in
+  // introduceToInference().
+  if (isRecordingChanges())
+    recordChange(SolverTrail::Change::introducedToInference(typeVar, type));
+
   // Notify the constraint graph.
   CG.bindTypeVariable(typeVar, type);
+
   addTypeVariableConstraintsToWorkList(typeVar);
 
   if (notifyBindingInference)
-    CG[typeVar].introduceToInference(type);
+    CG.introduceToInference(typeVar, type);
 }
 
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(

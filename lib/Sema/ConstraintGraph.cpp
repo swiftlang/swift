@@ -92,6 +92,11 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   if (typeVar != typeVarRep)
     mergeNodes(typeVar, typeVarRep);
   else if (auto fixed = CS.getFixedType(typeVarRep)) {
+    // FIXME: This is totally the wrong place to do it. We should do this in
+    // introduceToInference().
+    if (CS.isRecordingChanges())
+      CS.recordChange(SolverTrail::Change::introducedToInference(typeVar, fixed));
+
     // Bind the type variable.
     bindTypeVariable(typeVar, fixed);
   }
@@ -414,11 +419,13 @@ void ConstraintGraphNode::introduceToInference(Type fixedType) {
   }
 }
 
-void ConstraintGraphNode::retractFromInference(
-    Type fixedType, SmallPtrSetImpl<TypeVariableType *> &referencedVars) {
+void ConstraintGraphNode::retractFromInference(Type fixedType) {
   // Notify referencing variables (just like in bound case) that this
   // type variable has been modified.
   notifyReferencingVars();
+
+  SmallPtrSet<TypeVariableType *, 4> referencedVars;
+  fixedType->getTypeVariables(referencedVars);
 
   // TODO: This might be an overkill but it's (currently)
   // the simplest way to reliably ensure that all of the
@@ -559,6 +566,10 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
     CS.recordChange(SolverTrail::Change::boundTypeVariable(typeVar, fixed));
 }
 
+void ConstraintGraph::introduceToInference(TypeVariableType *typeVar, Type fixed) {
+  (*this)[typeVar].introduceToInference(fixed);
+}
+
 void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed) {
   auto &node = (*this)[typeVar];
 
@@ -571,8 +582,10 @@ void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed) 
     otherNode.removeReferencedBy(typeVar);
     node.removeReference(otherTypeVar);
   }
+}
 
-  node.retractFromInference(fixed, referencedVars);
+void ConstraintGraph::retractFromInference(TypeVariableType *typeVar, Type fixed) {
+  return (*this)[typeVar].retractFromInference(fixed);
 }
 
 #pragma mark Algorithms

@@ -86,6 +86,16 @@ SolverTrail::Change::boundTypeVariable(TypeVariableType *typeVar,
 }
 
 SolverTrail::Change
+SolverTrail::Change::introducedToInference(TypeVariableType *typeVar,
+                                           Type fixed) {
+  Change result;
+  result.Kind = ChangeKind::IntroducedToInference;
+  result.Binding.TypeVar = typeVar;
+  result.Binding.FixedType = fixed.getPointer();
+  return result;
+}
+
+SolverTrail::Change
 SolverTrail::Change::updatedTypeVariable(
     TypeVariableType *typeVar,
     llvm::PointerUnion<TypeVariableType *, TypeBase *> parentOrFixed,
@@ -122,6 +132,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::BoundTypeVariable:
     cg.unbindTypeVariable(Binding.TypeVar, Binding.FixedType);
+    break;
+
+  case ChangeKind::IntroducedToInference:
+    cg.retractFromInference(Binding.TypeVar, Binding.FixedType);
     break;
 
   case ChangeKind::UpdatedTypeVariable:
@@ -171,6 +185,14 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << " to fixed type ";
     Binding.FixedType->print(out, PO);
     out << ")\n";
+    break;
+
+  case ChangeKind::IntroducedToInference:
+    out << "(introduced type variable ";
+    Binding.TypeVar->print(out, PO);
+    out << " with fixed type ";
+    Binding.FixedType->print(out, PO);
+    out << " to inference)\n";
     break;
 
   case ChangeKind::UpdatedTypeVariable:

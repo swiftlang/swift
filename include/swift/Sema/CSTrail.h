@@ -47,6 +47,8 @@ public:
     ExtendedEquivalenceClass,
     /// Added a fixed binding for a type variable in the constraint graph.
     BoundTypeVariable,
+    /// Introduced a type variable's fixed type to inference.
+    IntroducedToInference,
     /// Set the fixed type or parent and flags for a type variable.
     UpdatedTypeVariable,
   };
@@ -109,6 +111,9 @@ public:
 
     /// Create a change that bound a type variable to a fixed type.
     static Change boundTypeVariable(TypeVariableType *typeVar, Type fixed);
+
+    /// Create a change that introduced a type variable to inference.
+    static Change introducedToInference(TypeVariableType *typeVar, Type fixed);
 
     /// Create a change that updated a type variable.
     static Change updatedTypeVariable(

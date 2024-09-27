@@ -154,9 +154,7 @@ private:
   void introduceToInference(Type fixedType);
 
   /// Opposite of \c introduceToInference(Type)
-  void
-  retractFromInference(Type fixedType,
-                       SmallPtrSetImpl<TypeVariableType *> &referencedVars);
+  void retractFromInference(Type fixedType);
 
   /// Drop all previously collected bindings and re-infer based on the
   /// current set constraints associated with this equivalence class.
@@ -272,6 +270,9 @@ public:
 
   /// Bind the given type variable to the given fixed type.
   void bindTypeVariable(TypeVariableType *typeVar, Type fixedType);
+
+  /// Introduce the type variable's fixed type to inference.
+  void introduceToInference(TypeVariableType *typeVar, Type fixedType);
 
   /// Describes which constraints \c gatherConstraints should gather.
   enum class GatheringKind {
@@ -428,6 +429,12 @@ private:
   /// Note that this change is not recorded and cannot be undone. Use with
   /// caution.
   void unbindTypeVariable(TypeVariableType *typeVar, Type fixedType);
+
+  /// Retract the given type variable from inference.
+  ///
+  /// Note that this change is not recorded and cannot be undone. Use with
+  /// caution.
+  void retractFromInference(TypeVariableType *typeVar, Type fixedType);
 
   /// Perform edge contraction on the constraint graph, merging equivalence
   /// classes until a fixed point is reached.
