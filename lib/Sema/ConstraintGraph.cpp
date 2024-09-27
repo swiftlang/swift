@@ -289,26 +289,38 @@ void ConstraintGraphNode::truncateEquivalenceClass(unsigned prevSize) {
 
 void ConstraintGraphNode::addReferencedVar(TypeVariableType *typeVar) {
   bool inserted = References.insert(typeVar);
-  assert(inserted && "Attempt to reference a duplicate type variable");
-  (void)inserted;
+  if (!inserted) {
+    llvm::errs() << "$T" << TypeVar->getImpl().getID() << " already "
+                 << "references $T" << typeVar->getImpl().getID() << "\n";
+    abort();
+  }
 }
 
 void ConstraintGraphNode::addReferencedBy(TypeVariableType *typeVar) {
   bool inserted = ReferencedBy.insert(typeVar);
-  assert(inserted && "Already referenced by the given type variable");
-  (void)inserted;
+  if (!inserted) {
+    llvm::errs() << "$T" << TypeVar->getImpl().getID() << " already "
+                 << "referenced by $T" << typeVar->getImpl().getID() << "\n";
+    abort();
+  }
 }
 
 void ConstraintGraphNode::removeReference(TypeVariableType *typeVar) {
   auto removed = References.remove(typeVar);
-  assert(removed && "Variables are not connected");
-  (void)removed;
+  if (!removed) {
+    llvm::errs() << "$T" << TypeVar->getImpl().getID() << " does not "
+                 << "reference $T" << typeVar->getImpl().getID() << "\n";
+    abort();
+  }
 }
 
 void ConstraintGraphNode::removeReferencedBy(TypeVariableType *typeVar) {
   auto removed = ReferencedBy.remove(typeVar);
-  assert(removed && "Variables are not connected");
-  (void)removed;
+  if (!removed) {
+    llvm::errs() << "$T" << TypeVar->getImpl().getID() << " not "
+                 << "referenced by $T" << typeVar->getImpl().getID() << "\n";
+    abort();
+  }
 }
 
 inference::PotentialBindings &ConstraintGraphNode::getCurrentBindings() {
