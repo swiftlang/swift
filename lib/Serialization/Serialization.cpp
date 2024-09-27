@@ -744,11 +744,7 @@ IdentifierID Serializer::addContainingModuleRef(const DeclContext *DC,
     return CURRENT_MODULE_ID;
   if (M == this->M->getASTContext().TheBuiltinModule)
     return BUILTIN_MODULE_ID;
-
-  auto clangImporter =
-    static_cast<ClangImporter *>(
-      this->M->getASTContext().getClangModuleLoader());
-  if (M == clangImporter->getImportedHeaderModule())
+  if (M->isClangHeaderImportModule())
     return OBJC_HEADER_MODULE_ID;
 
   auto exportedModuleName = file->getExportedModuleName();
