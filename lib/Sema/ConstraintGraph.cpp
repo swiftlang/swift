@@ -43,6 +43,9 @@ ConstraintGraph::~ConstraintGraph() {
     delete impl.getGraphNode();
     impl.setGraphNode(nullptr);
   }
+  for (auto *node : FreeList) {
+    delete node;
+  }
 }
 
 #pragma mark Graph accessors
@@ -55,11 +58,20 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
     assert(impl.getGraphIndex() < TypeVariables.size() && "Out-of-bounds index");
     assert(TypeVariables[impl.getGraphIndex()] == typeVar && 
            "Type variable mismatch");
+    ASSERT(nodePtr->TypeVar == typeVar &&
+           "Use-after-free");
     return { *nodePtr, impl.getGraphIndex() };
   }
 
   // Allocate the new node.
-  auto nodePtr = new ConstraintGraphNode(*this, typeVar);
+  ConstraintGraphNode *nodePtr;
+  if (FreeList.empty())
+    nodePtr = new ConstraintGraphNode(*this, typeVar);
+  else {
+    nodePtr = FreeList.back();
+    FreeList.pop_back();
+    nodePtr->initTypeVariable(typeVar);
+  }
   unsigned index = TypeVariables.size();
   impl.setGraphNode(nodePtr);
   impl.setGraphIndex(index);
@@ -82,6 +94,17 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   }
 
   return { *nodePtr, index };
+}
+
+void ConstraintGraphNode::reset() {
+  ASSERT(TypeVar);
+  TypeVar = nullptr;
+  Bindings.reset();
+  Constraints.clear();
+  ConstraintIndex.clear();
+  ReferencedBy.clear();
+  References.clear();
+  EquivalenceClass.clear();
 }
 
 bool ConstraintGraphNode::forRepresentativeVar() const {
@@ -422,7 +445,9 @@ void ConstraintGraph::removeNode(TypeVariableType *typeVar) {
   // Remove this node.
   auto &impl = typeVar->getImpl();
   unsigned index = impl.getGraphIndex();
-  delete impl.getGraphNode();
+  auto *node = impl.getGraphNode();
+  node->reset();
+  FreeList.push_back(node);
   impl.setGraphNode(nullptr);
 
   // Remove this type variable from the list.

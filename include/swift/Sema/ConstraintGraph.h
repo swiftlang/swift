@@ -57,6 +57,13 @@ public:
   /// Retrieve the type variable this node represents.
   TypeVariableType *getTypeVariable() const { return TypeVar; }
 
+  void reset();
+
+  void initTypeVariable(TypeVariableType *typeVar) {
+    ASSERT(!TypeVar);
+    TypeVar = typeVar;
+  }
+
   /// Retrieve the set of constraints that mention this type variable.
   ///
   /// These are the hyperedges of the graph, connecting this node to
@@ -434,6 +441,9 @@ private:
 
   /// Constraints that are "orphaned" because they contain no type variables.
   SmallVector<Constraint *, 4> OrphanedConstraints;
+
+  /// Unused nodes.
+  SmallVector<ConstraintGraphNode *> FreeList;
 
   /// Increment the number of constraints considered per attempt
   /// to contract constraint graph edges.
