@@ -789,13 +789,16 @@ coroutine, where a normal function return would need to transfer ownership of
 its return value, since a normal function's context ceases to exist and be able
 to maintain ownership of the value after it returns.
 
-To support these concepts, SIL supports two kinds of coroutine:
-``@yield_many`` and ``@yield_once``. Either of these attributes may be
+To support these concepts, SIL supports two flavors: single-yield and
+multi-yield.  These two flavors correspond to three kinds.  A multi-yield
+coroutine is of kind ``@yield_many``. A single-yield coroutine is of kind
+either ``@yield_once`` or ``@yield_once_2``. Any of these attributes may be
 written before a function type to indicate that it is a coroutine type.
-``@yield_many`` and ``@yield_once`` coroutines are allowed to also be
-``@async``. (Note that ``@async`` functions are not themselves modeled
-explicitly as coroutines in SIL, although the implementation may use a coroutine
-lowering strategy.)
+
+Both single-yield and multi-yield coroutines are allowed to also be ``@async``.
+(Note that ``@async`` functions are not themselves modeled explicitly as
+coroutines in SIL, although the implementation may use a coroutine lowering
+strategy.)
 
 A coroutine type may declare any number of *yielded values*, which is to
 say, values which are provided to the caller at a yield point.  Yielded
@@ -816,9 +819,10 @@ calling a yield-many coroutine of any kind.
 Coroutines may contain the special ``yield`` and ``unwind``
 instructions.
 
-A ``@yield_many`` coroutine may yield as many times as it desires.
-A ``@yield_once`` coroutine may yield exactly once before returning,
-although it may also ``throw`` before reaching that point.
+A multi-yield (``@yield_many``) coroutine may yield as many times as it desires.
+A single-yield (``@yield_once`` or ``@yield_once_2``) coroutine may yield
+exactly once before returning, although it may also ``throw`` before reaching
+that point.
 
 Variadic Generics
 `````````````````
@@ -8376,9 +8380,10 @@ the current function was invoked with a ``try_apply`` instruction, control
 resumes at the normal destination, and the value of the basic block argument
 will be the operand of this ``return`` instruction.
 
-If the current function is a ``yield_once`` coroutine, there must not be
-a path from the entry block to a ``return`` which does not pass through
-a ``yield`` instruction. This rule does not apply in the ``raw`` SIL stage.
+If the current function is a single-yield coroutine (``yield_once`` or
+``yield_once_2``), there must not be a path from the entry block to a
+``return`` which does not pass through a ``yield`` instruction. This rule does
+not apply in the ``raw`` SIL stage.
 
 ``return`` does not retain or release its operand or any other values.
 
@@ -8446,9 +8451,10 @@ The ``resume`` and ``unwind`` destination blocks must be uniquely
 referenced by the ``yield`` instruction.  This prevents them from becoming
 critical edges.
 
-In a ``yield_once`` coroutine, there must not be a control flow path leading
-from the ``resume`` edge to another ``yield`` instruction in this function.
-This rule does not apply in the ``raw`` SIL stage.
+In a single-yield coroutine (``yield_once`` or ``yield_once_2``), there must
+not be a control flow path leading from the ``resume`` edge to another
+``yield`` instruction in this function. This rule does not apply in the ``raw``
+SIL stage.
 
 There must not be a control flow path leading from the ``unwind`` edge to
 a ``return`` instruction, to a ``throw`` instruction, or to any block

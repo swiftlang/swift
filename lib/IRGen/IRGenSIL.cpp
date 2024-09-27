@@ -2133,6 +2133,9 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   case SILCoroutineKind::YieldOnce:
     emitYieldOnceCoroutineEntry(IGF, funcTy, *emission);
     break;
+  case SILCoroutineKind::YieldOnce2:
+    emitYieldOnce2CoroutineEntry(IGF, funcTy, *emission);
+    break;
   case SILCoroutineKind::YieldMany:
     emitYieldManyCoroutineEntry(IGF, funcTy, *emission);
     break;
@@ -3785,6 +3788,10 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
 
   case SILCoroutineKind::YieldOnce:
     coroutineBuffer = emitAllocYieldOnceCoroutineBuffer(*this);
+    break;
+
+  case SILCoroutineKind::YieldOnce2:
+    // @yield_once_2 coroutines allocate in the callee
     break;
 
   case SILCoroutineKind::YieldMany:

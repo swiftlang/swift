@@ -4823,11 +4823,17 @@ enum class SILCoroutineKind : uint8_t {
   /// It must not have normal results and may have arbitrary yield results.
   YieldOnce,
 
+  /// This function is a yield-once coroutine (used by read and modify
+  /// accessors).  It has the following differences from YieldOnce:
+  /// - it does not observe errors thrown by its caller
+  /// - it uses the callee-allocated ABI
+  YieldOnce2,
+
   /// This function is a yield-many coroutine (used by e.g. generators).
   /// It must not have normal results and may have arbitrary yield results.
   YieldMany,
 };
-  
+
 class SILFunctionConventions;
 
 
@@ -5038,6 +5044,17 @@ public:
   }
   SILCoroutineKind getCoroutineKind() const {
     return SILCoroutineKind(Bits.SILFunctionType.CoroutineKind);
+  }
+  /// Whether this coroutine's ABI is callee-allocated.
+  bool isCalleeAllocatedCoroutine() const {
+    switch (getCoroutineKind()) {
+    case SILCoroutineKind::None:
+    case SILCoroutineKind::YieldOnce:
+    case SILCoroutineKind::YieldMany:
+      return false;
+    case SILCoroutineKind::YieldOnce2:
+      return true;
+    }
   }
 
   bool isSendable() const { return getExtInfo().isSendable(); }
