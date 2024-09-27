@@ -2104,8 +2104,12 @@ public:
               "begin_apply instruction cannot call function with error result");
     }
 
-    require(calleeConv.funcTy->getCoroutineKind() == SILCoroutineKind::YieldOnce,
-            "must call yield_once coroutine with begin_apply");
+    auto coroKind = calleeConv.funcTy->getCoroutineKind();
+
+    require(coroKind == SILCoroutineKind::YieldOnce ||
+                coroKind == SILCoroutineKind::YieldOnce2,
+            "first operand of begin_apply must be a yield_once or yield_once_2 "
+            "coroutine");
     require(!calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync(),
             "cannot call an async function from a non async function");
   }

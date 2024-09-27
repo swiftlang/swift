@@ -3102,6 +3102,7 @@ TypeAttrKind TypeAttrSet::getRepresentative(TypeAttrKind kind) {
 
   case TypeAttrKind::YieldMany:
   case TypeAttrKind::YieldOnce:
+  case TypeAttrKind::YieldOnce2:
     return TAR_SILCoroutine;
 
   case TypeAttrKind::CalleeOwned:
@@ -3248,6 +3249,7 @@ static bool isFunctionAttribute(TypeAttrKind attrKind) {
       TypeAttrKind::Escaping,
       TypeAttrKind::Sendable,
       TypeAttrKind::YieldOnce,
+      TypeAttrKind::YieldOnce2,
       TypeAttrKind::YieldMany,
       TypeAttrKind::Async,
   };
@@ -4251,10 +4253,21 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   auto coroutineKind = SILCoroutineKind::None;
   if (auto coroAttr = attrs ? attrs->claim(TAR_SILCoroutine) : nullptr) {
     assert(isa<YieldOnceTypeAttr>(coroAttr) ||
+           isa<YieldOnce2TypeAttr>(coroAttr) ||
            isa<YieldManyTypeAttr>(coroAttr));
-    coroutineKind = (isa<YieldOnceTypeAttr>(coroAttr)
-                       ? SILCoroutineKind::YieldOnce
-                       : SILCoroutineKind::YieldMany);
+    switch (coroAttr->getKind()) {
+    case TypeAttrKind::YieldOnce:
+      coroutineKind = SILCoroutineKind::YieldOnce;
+      break;
+    case TypeAttrKind::YieldOnce2:
+      coroutineKind = SILCoroutineKind::YieldOnce2;
+      break;
+    case TypeAttrKind::YieldMany:
+      coroutineKind = SILCoroutineKind::YieldMany;
+      break;
+    default:
+      llvm_unreachable("bad TypeAttrKind for TAR_SILCoroutine");
+    }
   }
 
   ParameterConvention callee = ParameterConvention::Direct_Unowned;

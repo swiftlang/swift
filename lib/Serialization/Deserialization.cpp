@@ -6647,6 +6647,7 @@ getActualSILCoroutineKind(uint8_t rep) {
     return swift::SILCoroutineKind::KIND;
   CASE(None)
   CASE(YieldOnce)
+  CASE(YieldOnce2)
   CASE(YieldMany)
 #undef CASE
   default:

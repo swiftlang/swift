@@ -207,6 +207,10 @@ namespace irgen {
   emitYieldOnceCoroutineEntry(IRGenFunction &IGF,
                               CanSILFunctionType coroutineType,
                               NativeCCEntryPointArgumentEmission &emission);
+  void
+  emitYieldOnce2CoroutineEntry(IRGenFunction &IGF,
+                               CanSILFunctionType coroutineType,
+                               NativeCCEntryPointArgumentEmission &emission);
 
   Address emitAllocYieldManyCoroutineBuffer(IRGenFunction &IGF);
   void emitDeallocYieldManyCoroutineBuffer(IRGenFunction &IGF, Address buffer);
