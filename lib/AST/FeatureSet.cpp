@@ -68,6 +68,7 @@ UNINTERESTING_FEATURE(FullTypedThrows)
 UNINTERESTING_FEATURE(ExistentialAny)
 UNINTERESTING_FEATURE(InferSendableFromCaptures)
 UNINTERESTING_FEATURE(ImplicitOpenExistentials)
+UNINTERESTING_FEATURE(MemberImportVisibility)
 
 // ----------------------------------------------------------------------------
 // MARK: - Experimental Features
@@ -275,7 +276,6 @@ static bool usesFeatureIsolatedAny(Decl *decl) {
   });
 }
 
-UNINTERESTING_FEATURE(MemberImportVisibility)
 UNINTERESTING_FEATURE(IsolatedAny2)
 UNINTERESTING_FEATURE(GlobalActorIsolatedTypesUsability)
 UNINTERESTING_FEATURE(ObjCImplementation)
