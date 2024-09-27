@@ -1684,6 +1684,8 @@ ManglingError Remangler::mangleImplCoroutineKind(Node *node,
   StringRef text = node->getText();
   if (text == "yield_once") {
     Buffer << "A";
+  } else if (text == "yield_once_2") {
+    Buffer << "I";
   } else if (text == "yield_many") {
     Buffer << "G";
   } else {

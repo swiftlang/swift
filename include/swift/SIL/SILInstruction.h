@@ -3251,6 +3251,10 @@ class BeginApplyInst final
 public:
   using MultipleValueInstructionTrailingObjects::totalSizeToAlloc;
 
+  bool isCalleeAllocated() const {
+    return getSubstCalleeType()->isCalleeAllocatedCoroutine();
+  }
+
   MultipleValueInstructionResult *getTokenResult() const {
     return const_cast<MultipleValueInstructionResult *>(
              &getAllResultsBuffer().back());

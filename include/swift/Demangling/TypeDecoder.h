@@ -51,6 +51,7 @@ enum class ImplMetatypeRepresentation {
 enum class ImplCoroutineKind {
   None,
   YieldOnce,
+  YieldOnce2,
   YieldMany,
 };
 
@@ -1097,6 +1098,8 @@ protected:
             return MAKE_NODE_TYPE_ERROR0(child, "expected text");
           if (child->getText() == "yield_once") {
             coroutineKind = ImplCoroutineKind::YieldOnce;
+          } else if (child->getText() == "yield_once_2") {
+            coroutineKind = ImplCoroutineKind::YieldOnce2;
           } else if (child->getText() == "yield_many") {
             coroutineKind = ImplCoroutineKind::YieldMany;
           } else

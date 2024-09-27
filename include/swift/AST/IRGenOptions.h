@@ -165,6 +165,9 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
   /// Resumption functions from yield-once coroutines.
   PointerAuthSchema YieldOnceResumeFunctions;
 
+  /// Resumption functions from yield-once-2 coroutines.
+  PointerAuthSchema YieldOnce2ResumeFunctions;
+
   /// Resumption functions from yield-many coroutines.
   PointerAuthSchema YieldManyResumeFunctions;
 

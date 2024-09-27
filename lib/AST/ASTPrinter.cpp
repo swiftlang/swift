@@ -6770,6 +6770,9 @@ public:
     case SILCoroutineKind::YieldOnce:
       Printer << "@yield_once ";
       return;
+    case SILCoroutineKind::YieldOnce2:
+      Printer << "@yield_once_2 ";
+      return;
     case SILCoroutineKind::YieldMany:
       Printer << "@yield_many ";
       return;

@@ -6821,7 +6821,8 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
     break;
   }
 
-  case SILCoroutineKind::YieldOnce: {
+  case SILCoroutineKind::YieldOnce:
+  case SILCoroutineKind::YieldOnce2: {
     SmallVector<SILValue, 4> derivedYields;
     auto tokenAndCleanup =
         emitBeginApplyWithRethrow(loc, derivedRef,
@@ -7209,7 +7210,8 @@ void SILGenFunction::emitProtocolWitness(
     break;
   }
 
-  case SILCoroutineKind::YieldOnce: {
+  case SILCoroutineKind::YieldOnce:
+  case SILCoroutineKind::YieldOnce2: {
     SmallVector<SILValue, 4> witnessYields;
     auto tokenAndCleanup =
       emitBeginApplyWithRethrow(loc, witnessFnRef, witnessSILTy, witnessSubs,

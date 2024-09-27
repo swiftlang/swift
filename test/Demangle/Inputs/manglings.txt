@@ -476,3 +476,4 @@ $s9MacroUser0023macro_expandswift_elFCffMX436_4_23bitwidthNumberedStructsfMf_ --
 $sxq_IyXd_D ---> @callee_unowned (@in_cxx A) -> (@unowned B)
 $s2hi1SV1iSivx ---> hi.S.i.modify2 : Swift.Int
 $s2hi1SV1iSivy ---> hi.S.i.read2 : Swift.Int
+$s2hi1SVIetMIy_TC  ---> coroutine continuation prototype for @escaping @convention(thin) @convention(method) @yield_once_2 (@unowned hi.S) -> ()

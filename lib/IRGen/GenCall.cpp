@@ -81,6 +81,9 @@ static Size getCoroutineContextSize(IRGenModule &IGM,
     llvm_unreachable("expand a coroutine");
   case SILCoroutineKind::YieldOnce:
     return getYieldOnceCoroutineBufferSize(IGM);
+  case SILCoroutineKind::YieldOnce2:
+    llvm::report_fatal_error(
+        "callee allocated coroutines do not have fixed-size buffers");
   case SILCoroutineKind::YieldMany:
     return getYieldManyCoroutineBufferSize(IGM);
   }
@@ -675,7 +678,8 @@ void SignatureExpansion::expandCoroutineResult(bool forContinuation) {
       llvm_unreachable("should have been filtered out before here");
 
     // Yield-once coroutines may optionaly return a value from the continuation.
-    case SILCoroutineKind::YieldOnce: {
+    case SILCoroutineKind::YieldOnce:
+    case SILCoroutineKind::YieldOnce2: {
       // Ensure that no parameters were added before to correctly record their ABI
       // details.
       assert(ParamIRTypes.empty());
@@ -1807,6 +1811,7 @@ void SignatureExpansion::expandParameters(
   // First, if this is a coroutine, add the coroutine-context parameter.
   switch (FnType->getCoroutineKind()) {
   case SILCoroutineKind::None:
+  case SILCoroutineKind::YieldOnce2:
     break;
 
   case SILCoroutineKind::YieldOnce:
@@ -2522,6 +2527,9 @@ public:
       original.transferInto(adjusted, 1);
       break;
 
+    case SILCoroutineKind::YieldOnce2:
+      llvm::report_fatal_error("unimplemented");
+      break;
     case SILCoroutineKind::None:
       break;
     }
@@ -2861,6 +2869,7 @@ public:
     switch (origCalleeType->getCoroutineKind()) {
     case SILCoroutineKind::YieldMany:
     case SILCoroutineKind::YieldOnce:
+    case SILCoroutineKind::YieldOnce2:
       assert(false && "Should not reach this");
       break;
 
@@ -4440,6 +4449,9 @@ irgen::getCoroutineResumeFunctionPointerAuth(IRGenModule &IGM,
   case SILCoroutineKind::YieldOnce:
     return { IGM.getOptions().PointerAuth.YieldOnceResumeFunctions,
              PointerAuthEntity::forYieldTypes(fnType) };
+  case SILCoroutineKind::YieldOnce2:
+    return {IGM.getOptions().PointerAuth.YieldOnce2ResumeFunctions,
+            PointerAuthEntity::forYieldTypes(fnType)};
   }
   llvm_unreachable("bad coroutine kind");
 }
@@ -4567,6 +4579,12 @@ void irgen::emitYieldManyCoroutineEntry(
                            llvm::Intrinsic::coro_id_retcon,
                            getYieldManyCoroutineBufferSize(IGF.IGM),
                            getYieldManyCoroutineBufferAlignment(IGF.IGM));
+}
+
+void irgen::emitYieldOnce2CoroutineEntry(
+    IRGenFunction &IGF, CanSILFunctionType fnType,
+    NativeCCEntryPointArgumentEmission &emission) {
+  llvm::report_fatal_error("unimplemented");
 }
 
 static Address createOpaqueBufferAlloca(IRGenFunction &IGF,

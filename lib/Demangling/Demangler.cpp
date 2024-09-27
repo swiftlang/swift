@@ -2345,6 +2345,8 @@ NodePointer Demangler::demangleImplFunctionType() {
   const char *CoroAttr = nullptr;
   if (nextIf('A'))
     CoroAttr = "yield_once";
+  else if (nextIf('I'))
+    CoroAttr = "yield_once_2";
   else if (nextIf('G'))
     CoroAttr = "yield_many";
   if (CoroAttr)
