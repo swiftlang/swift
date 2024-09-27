@@ -1476,7 +1476,12 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
 
   case DeclKind::TypeAlias: {
     Type type = cast<TypeAliasDecl>(VD)->getDeclaredInterfaceType();
-    auto *nominal = type->getAnyNominal();
+    // FIXME: It's necessary to check for existentials because `getAnyNominal`
+    // looks through them.
+    auto canonical = type->getCanonicalType();
+    if (isa<ExistentialType>(canonical))
+      return ImportKind::Type;
+    auto *nominal = canonical->getAnyNominal();
     if (!nominal)
       return ImportKind::Type;
     return getBestImportKind(nominal);
