@@ -1,5 +1,6 @@
-// RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-feature -Xfrontend KeyPathWithStaticMembers) | %FileCheck %s
 
+// REQUIRES: asserts
 // REQUIRES: executable_test
 
 // UNSUPPORTED: use_os_stdlib
@@ -7,6 +8,7 @@
 
 class MyLabel {
   var text = "label"
+  static var isVisible = true
 }
 
 class Controller {
@@ -14,6 +16,8 @@ class Controller {
   fileprivate let label = MyLabel()
   fileprivate var secondLabel: MyLabel? = MyLabel()
   public var thirdLabel: MyLabel? = MyLabel()
+  fileprivate var fourthLabel: MyLabel.Type? { return MyLabel.self }
+  public var fifthLabel: MyLabel.Type? { return MyLabel.self }
   
   subscript(string: String) -> String {
     get {
@@ -56,6 +60,7 @@ class Controller {
 
 struct S {
   var a: Int
+  static let b: Double = 100.0
 }
 
 struct Container<V> {
@@ -76,6 +81,22 @@ extension Container where V: Controller {
 
 // CHECK: label
 print(Container(Controller()).test())
+
+struct MetatypeContainer<V> {
+  var v : V.Type
+  init(_ v: V.Type) {
+    self.v = v
+  }
+  func useMetatypeKeyPath() -> Bool {
+    if let labelType = v as? MyLabel.Type {
+      return labelType.isVisible
+    }
+    return false
+  }
+}
+
+// CHECK: true
+print(MetatypeContainer(MyLabel.self).useMetatypeKeyPath())
 
 public class GenericController<U> {
   init(_ u: U) {
@@ -123,6 +144,15 @@ print(\Controller[array: [42]])
 // CHECK: \Controller.
 print(\Controller[array: [42], array2: [42]])
 
+// CHECK: {{\\Controller\.(fourthLabel|<computed .* \(Optional<MyLabel\.Type>\)>)!\.<computed .* \(Bool\)>}}
+print(\Controller.fourthLabel!.isVisible)
+
+// CHECK: \S.Type.<computed {{.*}} (Double)>
+print(\S.Type.b)
+// CHECK: {{\\Controller\.(fifthLabel|<computed .* \(Optional<MyLabel\.Type>\)>)\?\.<computed .* \(Bool\)>?}}
+print(\Controller.fifthLabel?.isVisible)
+
+
 do {
   struct S {
     var i: Int
@@ -161,4 +191,19 @@ do {
   print(S2()[keyPath: kp])
   // CHECK: {{\\S2\.subscript\(_: S1 #[0-9]+\)|\S2\.<computed 0x.* \(String\)>}}
   print(kp)
+}
+
+do {
+  struct Weekday {
+      static let day = "Monday"
+  }
+  
+  @dynamicMemberLookup
+  struct StaticExample<T> {
+      subscript<U>(dynamicMember keyPath: KeyPath<T.Type, U>) -> U {
+          return T.self[keyPath: keyPath]
+      }
+  }
+  // CHECK: true
+  print(StaticExample<MyLabel>().isVisible)
 }
