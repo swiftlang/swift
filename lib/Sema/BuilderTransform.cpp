@@ -1266,8 +1266,8 @@ public:
 };
 } // end anonymous namespace
 
-bool BraceHasReturnRequest::evaluate(Evaluator &evaluator,
-                                     const BraceStmt *BS) const {
+bool BraceHasExplicitReturnStmtRequest::evaluate(Evaluator &evaluator,
+                                                 const BraceStmt *BS) const {
   return !ReturnStmtFinder::find(BS).empty();
 }
 
@@ -1278,7 +1278,8 @@ bool AnyFunctionRef::bodyHasExplicitReturnStmt() const {
   }
 
   auto &ctx = getAsDeclContext()->getASTContext();
-  return evaluateOrDefault(ctx.evaluator, BraceHasReturnRequest{body}, false);
+  return evaluateOrDefault(ctx.evaluator,
+                           BraceHasExplicitReturnStmtRequest{body}, false);
 }
 
 std::vector<ReturnStmt *> TypeChecker::findReturnStatements(AnyFunctionRef fn) {
