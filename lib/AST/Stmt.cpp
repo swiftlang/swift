@@ -318,7 +318,8 @@ Stmt *BraceStmt::getSingleActiveStatement() const {
 }
 
 bool BraceStmt::hasExplicitReturnStmt(ASTContext &ctx) const {
-  return evaluateOrDefault(ctx.evaluator, BraceHasReturnRequest{this}, false);
+  return evaluateOrDefault(ctx.evaluator,
+                           BraceHasExplicitReturnStmtRequest{this}, false);
 }
 
 IsSingleValueStmtResult Stmt::mayProduceSingleValue(ASTContext &ctx) const {

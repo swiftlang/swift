@@ -1258,8 +1258,8 @@ public:
 };
 } // end anonymous namespace
 
-bool BraceHasReturnRequest::evaluate(Evaluator &evaluator,
-                                     const BraceStmt *BS) const {
+bool BraceHasExplicitReturnStmtRequest::evaluate(Evaluator &evaluator,
+                                                 const BraceStmt *BS) const {
   return !ReturnStmtFinder::find(BS).empty();
 }
 
