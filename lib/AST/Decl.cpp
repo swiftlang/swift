@@ -9356,6 +9356,11 @@ bool AbstractFunctionDecl::hasBody() const {
   }
 }
 
+bool AbstractFunctionDecl::bodyHasExplicitReturnStmt() const {
+  return AnyFunctionRef(const_cast<AbstractFunctionDecl *>(this))
+      .bodyHasExplicitReturnStmt();
+}
+
 /// Expand all preamble macros attached to the given function declaration.
 static std::vector<ASTNode> expandPreamble(AbstractFunctionDecl *func) {
   std::vector<ASTNode> preamble;

@@ -1962,6 +1962,11 @@ BraceStmt * AbstractClosureExpr::getBody() const {
   llvm_unreachable("Unknown closure expression");
 }
 
+bool AbstractClosureExpr::bodyHasExplicitReturnStmt() const {
+  return AnyFunctionRef(const_cast<AbstractClosureExpr *>(this))
+      .bodyHasExplicitReturnStmt();
+}
+
 Type AbstractClosureExpr::getResultType(
     llvm::function_ref<Type(Expr *)> getType) const {
   auto *E = const_cast<AbstractClosureExpr *>(this);
