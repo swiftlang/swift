@@ -15,7 +15,7 @@ struct Impl: P {
     // CHECK:   ret void
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
-    // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"() #12
+    // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
     // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret void
@@ -32,7 +32,7 @@ struct Impl: P {
     // CHECK:   ret i64 1
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
-    // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"() #12
+    // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
     // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret i64 undef
@@ -50,7 +50,7 @@ struct Impl: P {
     // CHECK:   ret { i64, i64 } { i64 1, i64 2 }
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
-    // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"() #12
+    // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
     // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret { i64, i64 } undef
@@ -68,7 +68,7 @@ struct Impl: P {
     // CHECK:   ret { i64, i64, i64 } { i64 1, i64 2, i64 3 }
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
-    // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"() #12
+    // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
     // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret { i64, i64, i64 } undef
@@ -86,7 +86,7 @@ struct Impl: P {
     // CHECK:   ret { i64, i64, i64, i64 } { i64 1, i64 2, i64 3, i64 4 }
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
-    // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"() #12
+    // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
     // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
     // CHECK:   ret { i64, i64, i64, i64 } undef
@@ -109,7 +109,7 @@ struct Impl: P {
     // CHECK:   ret void
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
-    // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"() #12
+    // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
     // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
     // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %3, align 8
     // CHECK:   ret void
@@ -215,7 +215,7 @@ struct Impl: P {
         return (1, 2, 3, 4)
     }
 
-    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi4ImplV2g5ySi_S4itSbAA7OneWordVYKF"(ptr noalias nocapture sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) %0, i1 %1, ptr swiftself %2, ptr noalias nocapture swifterror dereferenceable(8) %3, ptr %4) #0 {
+    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi4ImplV2g5ySi_S4itSbAA7OneWordVYKF"(ptr noalias nocapture sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) %0, i1 %1, ptr swiftself %2, ptr noalias nocapture swifterror dereferenceable(8) %3, ptr %4)
     // CHECK: entry:
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi7OneWordV, align 8
     // CHECK:   br i1 %1, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
@@ -677,7 +677,7 @@ func callImpl_g5(_ impl: Impl, _ b: Bool) -> (Int, Int, Int, Int, Int) {
 @available(SwiftStdlib 6.0, *)
 struct ImplAsync: PAsync {
 
-    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi9ImplAsyncV2f0yySbYaAA5EmptyVYKF"(ptr swiftasync %0, i1 %1) #0 {
+    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi9ImplAsyncV2f0yySbYaAA5EmptyVYKF"(ptr swiftasync %0, i1 %1)
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
     // CHECK:   br i1 %1, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
@@ -700,13 +700,13 @@ struct ImplAsync: PAsync {
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
     // CHECK:   br i1 %1, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
-    // CHECK:   %16 = call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 1, ptr null)
+    // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 1, ptr null)
     // CHECK:   unreachable
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
     // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
-    // CHECK:   %23 = call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 undef, ptr inttoptr (i64 1 to ptr))
+    // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 undef, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
     func f1(_ b: Bool) async throws(Empty) -> Int {
@@ -720,13 +720,13 @@ struct ImplAsync: PAsync {
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
     // CHECK:   br i1 %1, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
-    // CHECK:   %16 = call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 1, i64 2, ptr null)
+    // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 1, i64 2, ptr null)
     // CHECK:   unreachable
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
     // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
-    // CHECK:   %23 = call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 undef, i64 undef, ptr inttoptr (i64 1 to ptr))
+    // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 undef, i64 undef, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
     func f2(_ b: Bool) async throws(Empty) -> (Int, Int) {
@@ -740,13 +740,13 @@ struct ImplAsync: PAsync {
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
     // CHECK:   br i1 %1, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
-    // CHECK:   %16 = call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 1, i64 2, i64 3, ptr null)
+    // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 1, i64 2, i64 3, ptr null)
     // CHECK:   unreachable
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
     // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
-    // CHECK:   %23 = call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 undef, i64 undef, i64 undef, ptr inttoptr (i64 1 to ptr))
+    // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 undef, i64 undef, i64 undef, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
     func f3(_ b: Bool) async throws(Empty) -> (Int, Int, Int) {
@@ -760,13 +760,13 @@ struct ImplAsync: PAsync {
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
     // CHECK:   br i1 %1, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
-    // CHECK:   %16 = call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 1, i64 2, i64 3, i64 4, ptr null)
+    // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 1, i64 2, i64 3, i64 4, ptr null)
     // CHECK:   unreachable
     // CHECK: [[FAIL]]:
     // CHECK:   call swiftcc void @"$s16typed_throws_abi5EmptyVACycfC"()
     // CHECK:   [[ERROR_WITNESS:%.*]] = call ptr @"$s16typed_throws_abi5EmptyVACs5ErrorAAWl"()
     // CHECK:   call swiftcc void @swift_willThrowTyped(ptr noalias undef, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s16typed_throws_abi5EmptyVMf", i32 0, i32 2), ptr [[ERROR_WITNESS]])
-    // CHECK:   %23 = call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 undef, i64 undef, i64 undef, i64 undef, ptr inttoptr (i64 1 to ptr))
+    // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, i64 undef, i64 undef, i64 undef, i64 undef, ptr inttoptr (i64 1 to ptr))
     // CHECK:   unreachable
     // CHECK: }
     func f4(_ b: Bool) async throws(Empty) -> (Int, Int, Int, Int) {
@@ -776,7 +776,7 @@ struct ImplAsync: PAsync {
         return (1, 2, 3, 4)
     }
 
-    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi9ImplAsyncV2f5ySi_S4itSbYaAA5EmptyVYKF"(ptr noalias nocapture %0, ptr swiftasync %1, i1 %2, ptr %3) #0 {
+    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi9ImplAsyncV2f5ySi_S4itSbYaAA5EmptyVYKF"(ptr noalias nocapture %0, ptr swiftasync %1, i1 %2, ptr %3)
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
     // CHECK:   br i1 %2, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
@@ -905,7 +905,7 @@ struct ImplAsync: PAsync {
         return (1, 2, 3, 4)
     }
 
-    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi9ImplAsyncV2g5ySi_S4itSbYaAA7OneWordVYKF"(ptr noalias nocapture %0, ptr swiftasync %1, i1 %2, ptr %3) #0 {
+    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi9ImplAsyncV2g5ySi_S4itSbYaAA7OneWordVYKF"(ptr noalias nocapture %0, ptr swiftasync %1, i1 %2, ptr %3)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi7OneWordV, align 8
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
     // CHECK:   br i1 %2, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
@@ -1592,7 +1592,7 @@ func nonMatching_f0_async(_ b: Bool) async throws(OneWord) -> (Float, Float) {
 // CHECK:   [[RETVAL0:%.*]] = phi i64 [ [[ERROR_RES0:%.*]], %[[SET_ERROR]] ], [ 1, %[[SUCCESS]] ]
 // CHECK:   [[RETVAL1:%.*]] = phi float [ 0.000000e+00, %[[SET_ERROR]] ], [ [[SUCCESS_RES0]], %[[SUCCESS]] ]
 // CHECK:   [[RETVAL2:%.*]] = phi float [ 0.000000e+00, %[[SET_ERROR]] ], [ [[SUCCESS_RES1]], %[[SUCCESS]] ]
-// CHECK:   %39 = call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%.*}}, i1 false, ptr @"$s16typed_throws_abi24callNonMatching_f0_asyncySi_S2ftSbYaF.0.50", ptr {{%.*}}, ptr {{%.*}}, i64 [[RETVAL0]], float [[RETVAL1]], float [[RETVAL2]])
+// CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%.*}}, i1 false, ptr @"$s16typed_throws_abi24callNonMatching_f0_asyncySi_S2ftSbYaF.0.50", ptr {{%.*}}, ptr {{%.*}}, i64 [[RETVAL0]], float [[RETVAL1]], float [[RETVAL2]])
 // CHECK:   unreachable
 // CHECK: [[SET_ERROR]]:
 // CHECK:   [[ERROR_RES0]] = phi i64 [ [[CALL_RES2]], %typed.error.load ]
@@ -1612,7 +1612,7 @@ func callNonMatching_f0_async(_ b: Bool) async -> (Int, Float, Float) {
 // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi20nonMatching_f1_asyncySf_SbSftSbYaAA7OneWordVYKF"(ptr swiftasync %0, i1 %1)
 // CHECK:   br i1 %1, label %[[SUCCESS:.*]], label %[[ERROR:.*]]
 // CHECK: [[SUCCESS]]:
-// CHECK:   %17 = call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%.*}}, i1 false, ptr @"$s16typed_throws_abi20nonMatching_f1_asyncySf_SbSftSbYaAA7OneWordVYKF.0.51", ptr {{%.*}}, ptr {{%.*}}, float 1.000000e+00, i64 1, float 2.000000e+00, ptr null)
+// CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%.*}}, i1 false, ptr @"$s16typed_throws_abi20nonMatching_f1_asyncySf_SbSftSbYaAA7OneWordVYKF.0.51", ptr {{%.*}}, ptr {{%.*}}, float 1.000000e+00, i64 1, float 2.000000e+00, ptr null)
 // CHECK:   unreachable
 // CHECK: [[ERROR]]:
 // CHECK:   [[ERROR_X:%.*]] = load i64, ptr %.x1._value, align 8
@@ -1654,7 +1654,7 @@ func nonMatching_f1_async(_ b: Bool) async throws(OneWord) -> (Float, Bool, Floa
 // CHECK:   [[RETVAL1:%.*]] = phi float [ 0.000000e+00, %[[SET_ERROR]] ], [ [[SUCCESS_RES0]], %[[SUCCESS]] ]
 // CHECK:   [[RETVAL2:%.*]] = phi i1 [ false, %[[SET_ERROR]] ], [ [[SUCCESS_RES1]], %[[SUCCESS]] ]
 // CHECK:   [[RETVAL3:%.*]] = phi float [ 0.000000e+00, %[[SET_ERROR]] ], [ [[SUCCESS_RES2]], %[[SUCCESS]] ]
-// CHECK:   %43 = call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%.*}}, i1 false, ptr @"$s16typed_throws_abi24callNonMatching_f1_asyncySi_SfSbSftSbYaF.0.52", ptr {{%.*}}, ptr {{%.*}}, i64 [[RETVAL0]], float [[RETVAL1]], i1 [[RETVAL2]], float [[RETVAL3]])
+// CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%.*}}, i1 false, ptr @"$s16typed_throws_abi24callNonMatching_f1_asyncySi_SfSbSftSbYaF.0.52", ptr {{%.*}}, ptr {{%.*}}, i64 [[RETVAL0]], float [[RETVAL1]], i1 [[RETVAL2]], float [[RETVAL3]])
 // CHECK:   unreachable
 // CHECK: [[SET_ERROR]]:
 // CHECK:   [[ERROR_RES0]] = phi i64 [ [[CALL_RES1]], %typed.error.load ]
