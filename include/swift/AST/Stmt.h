@@ -237,6 +237,13 @@ public:
   /// active \c #if. Otherwise returns \c nullptr.
   Stmt *getSingleActiveStatement() const;
 
+  /// Returns a boolean value indicating whether the brace statement contains
+  /// an explicit `return` statement.
+  ///
+  /// \returns `true` if the brace statement contains an explicit `return`
+  /// statement, `false` otherwise.
+  bool hasExplicitReturnStmt(ASTContext &ctx) const;
+
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Brace; }
 };
 

@@ -918,13 +918,9 @@ std::optional<BraceStmt *>
 TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
   // First look for any return statements, and bail if we have any.
   auto &ctx = func->getASTContext();
-  if (evaluateOrDefault(ctx.evaluator, BraceHasReturnRequest{func->getBody()},
-                        false)) {
+  if (auto returnStmts = findReturnStatements(func); !returnStmts.empty()) {
     // One or more explicit 'return' statements were encountered, which
     // disables the result builder transform. Warn when we do this.
-    auto returnStmts = findReturnStatements(func);
-    assert(!returnStmts.empty());
-
     ctx.Diags.diagnose(
         returnStmts.front()->getReturnLoc(),
         diag::result_builder_disabled_by_return_warn, builderType);
@@ -1126,8 +1122,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
   // not apply the result builder transform if it contained an explicit return.
   // To maintain source compatibility, we still need to check for HasReturnStmt.
   // https://github.com/apple/swift/issues/64332.
-  if (evaluateOrDefault(getASTContext().evaluator,
-                        BraceHasReturnRequest{fn.getBody()}, false)) {
+  if (fn.getBody()->hasExplicitReturnStmt(getASTContext())) {
     // Diagnostic mode means that solver couldn't reach any viable
     // solution, so let's diagnose presence of a `return` statement
     // in the closure body.
@@ -1269,6 +1264,11 @@ bool BraceHasReturnRequest::evaluate(Evaluator &evaluator,
 }
 
 std::vector<ReturnStmt *> TypeChecker::findReturnStatements(AnyFunctionRef fn) {
+  if (!fn.getBody()->hasExplicitReturnStmt(
+          fn.getAsDeclContext()->getASTContext())) {
+    return std::vector<ReturnStmt *>();
+  }
+
   return ReturnStmtFinder::find(fn.getBody());
 }
 

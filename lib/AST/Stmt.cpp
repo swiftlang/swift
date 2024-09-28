@@ -317,6 +317,10 @@ Stmt *BraceStmt::getSingleActiveStatement() const {
   return getSingleActiveElement().dyn_cast<Stmt *>();
 }
 
+bool BraceStmt::hasExplicitReturnStmt(ASTContext &ctx) const {
+  return evaluateOrDefault(ctx.evaluator, BraceHasReturnRequest{this}, false);
+}
+
 IsSingleValueStmtResult Stmt::mayProduceSingleValue(ASTContext &ctx) const {
   return evaluateOrDefault(ctx.evaluator, IsSingleValueStmtRequest{this, &ctx},
                            IsSingleValueStmtResult::circularReference());
