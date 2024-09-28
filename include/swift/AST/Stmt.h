@@ -44,6 +44,7 @@ class FuncDecl;
 class AbstractFunctionDecl;
 class Pattern;
 class PatternBindingDecl;
+class ReturnStmt;
 class VarDecl;
 class CaseStmt;
 class DoCatchStmt;
@@ -243,6 +244,12 @@ public:
   /// \returns `true` if the brace statement contains an explicit `return`
   /// statement, `false` otherwise.
   bool hasExplicitReturnStmt(ASTContext &ctx) const;
+
+  /// Finds occurrences of explicit `return` statements within the brace
+  /// statement.
+  /// \param results An out container to which the results are added.
+  void getExplicitReturnStmts(ASTContext &ctx,
+                              SmallVectorImpl<ReturnStmt *> &results) const;
 
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Brace; }
 };

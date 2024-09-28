@@ -918,7 +918,9 @@ std::optional<BraceStmt *>
 TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
   // First look for any return statements, and bail if we have any.
   auto &ctx = func->getASTContext();
-  if (auto returnStmts = findReturnStatements(func); !returnStmts.empty()) {
+  if (SmallVector<ReturnStmt *> returnStmts;
+      func->getBody()->getExplicitReturnStmts(ctx, returnStmts),
+      !returnStmts.empty()) {
     // One or more explicit 'return' statements were encountered, which
     // disables the result builder transform. Warn when we do this.
     ctx.Diags.diagnose(
@@ -1220,79 +1222,6 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
     return getTypeMatchFailure(locator);
 
   return getTypeMatchSuccess();
-}
-
-/// Walks the given brace statement and calls the given function reference on
-/// every occurrence of an explicit `return` statement.
-///
-/// \param callback A function reference that takes a `return` statement and
-/// returns a boolean value indicating whether to abort the walk.
-///
-/// \returns `true` if the walk was aborted, `false` otherwise.
-static bool walkExplicitReturnStmts(const BraceStmt *BS,
-                                    function_ref<bool(ReturnStmt *)> callback) {
-  class Walker : public ASTWalker {
-    function_ref<bool(ReturnStmt *)> callback;
-
-  public:
-    Walker(decltype(Walker::callback) callback) : callback(callback) {}
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Arguments;
-    }
-
-    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      return Action::SkipNode(E);
-    }
-
-    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      if (S->isImplicit()) {
-        return Action::SkipNode(S);
-      }
-
-      auto *returnStmt = dyn_cast<ReturnStmt>(S);
-      if (!returnStmt) {
-        return Action::Continue(S);
-      }
-
-      if (callback(returnStmt)) {
-        return Action::Stop();
-      }
-
-      // Skip children & post walk and continue.
-      return Action::SkipNode(S);
-    }
-
-    /// Ignore patterns.
-    PreWalkResult<Pattern *> walkToPatternPre(Pattern *pat) override {
-      return Action::SkipNode(pat);
-    }
-  };
-
-  Walker walker(callback);
-
-  return const_cast<BraceStmt *>(BS)->walk(walker) == nullptr;
-}
-
-bool BraceHasExplicitReturnStmtRequest::evaluate(Evaluator &evaluator,
-                                                 const BraceStmt *BS) const {
-  return walkExplicitReturnStmts(BS, [](ReturnStmt *) { return true; });
-}
-
-std::vector<ReturnStmt *> TypeChecker::findReturnStatements(AnyFunctionRef fn) {
-  if (!fn.getBody()->hasExplicitReturnStmt(
-          fn.getAsDeclContext()->getASTContext())) {
-    return std::vector<ReturnStmt *>();
-  }
-
-  std::vector<ReturnStmt *> results;
-
-  walkExplicitReturnStmts(fn.getBody(), [&results](ReturnStmt *RS) {
-    results.push_back(RS);
-    return false;
-  });
-
-  return results;
 }
 
 ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(

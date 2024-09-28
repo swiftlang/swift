@@ -236,7 +236,7 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
   // Check whether there are any return statements in the function's body.
   // If there are, the result builder transform will be disabled,
   // so don't infer a result builder.
-  if (!TypeChecker::findReturnStatements(funcDecl).empty())
+  if (funcDecl->getBody()->hasExplicitReturnStmt(dc->getASTContext()))
     return Type();
 
   // Find all of the potentially inferred result builder types.

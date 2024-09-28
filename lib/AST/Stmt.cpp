@@ -317,9 +317,78 @@ Stmt *BraceStmt::getSingleActiveStatement() const {
   return getSingleActiveElement().dyn_cast<Stmt *>();
 }
 
+/// Walks the given brace statement and calls the given function reference on
+/// every occurrence of an explicit `return` statement.
+///
+/// \param callback A function reference that takes a `return` statement and
+/// returns a boolean value indicating whether to abort the walk.
+///
+/// \returns `true` if the walk was aborted, `false` otherwise.
+static bool walkExplicitReturnStmts(const BraceStmt *BS,
+                                    function_ref<bool(ReturnStmt *)> callback) {
+  class Walker : public ASTWalker {
+    function_ref<bool(ReturnStmt *)> callback;
+
+  public:
+    Walker(decltype(Walker::callback) callback) : callback(callback) {}
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      return Action::SkipNode(E);
+    }
+
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+      if (S->isImplicit()) {
+        return Action::SkipNode(S);
+      }
+
+      auto *returnStmt = dyn_cast<ReturnStmt>(S);
+      if (!returnStmt) {
+        return Action::Continue(S);
+      }
+
+      if (callback(returnStmt)) {
+        return Action::Stop();
+      }
+
+      // Skip children & post walk and continue.
+      return Action::SkipNode(S);
+    }
+
+    /// Ignore patterns.
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *pat) override {
+      return Action::SkipNode(pat);
+    }
+  };
+
+  Walker walker(callback);
+
+  return const_cast<BraceStmt *>(BS)->walk(walker) == nullptr;
+}
+
+bool BraceHasExplicitReturnStmtRequest::evaluate(Evaluator &evaluator,
+                                                 const BraceStmt *BS) const {
+  return walkExplicitReturnStmts(BS, [](ReturnStmt *) { return true; });
+}
+
 bool BraceStmt::hasExplicitReturnStmt(ASTContext &ctx) const {
   return evaluateOrDefault(ctx.evaluator,
                            BraceHasExplicitReturnStmtRequest{this}, false);
+}
+
+void BraceStmt::getExplicitReturnStmts(
+    ASTContext &ctx, SmallVectorImpl<ReturnStmt *> &results) const {
+  if (!hasExplicitReturnStmt(ctx)) {
+    return;
+  }
+
+  walkExplicitReturnStmts(this, [&results](ReturnStmt *RS) {
+    results.push_back(RS);
+    return false;
+  });
 }
 
 IsSingleValueStmtResult Stmt::mayProduceSingleValue(ASTContext &ctx) const {
