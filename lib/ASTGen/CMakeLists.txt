@@ -93,13 +93,19 @@ set(compile_options
 
   # Necessary to avoid treating IBOutlet and IBAction as keywords
   "SHELL:-Xcc -UIBOutlet -Xcc -UIBAction -Xcc -UIBInspectable"
-
-  "SHELL:-Xcc -D_CRT_USE_BUILTIN_OFFSETOF"
 )
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  list(APPEND compile_options
+    # Make 'offsetof()' a const value.
+    "SHELL:-Xcc -D_CRT_USE_BUILTIN_OFFSETOF"
+    # Workaround for https://github.com/swiftlang/llvm-project/issues/7172
+    "SHELL:-Xcc -Xclang -Xcc -fmodule-format=raw")
+endif()
 
 # Prior to 5.9, we have to use the experimental flag for C++ interop.
 if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
-  list(APPEND compile_options "-Xfrontend" "-enable-experimental-cxx-interop")
+  list(APPEND compile_options "SHELL:-Xfrontend -enable-experimental-cxx-interop")
 else()
   list(APPEND compile_options "-cxx-interoperability-mode=default")
 endif()
