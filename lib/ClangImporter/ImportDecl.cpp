@@ -2615,6 +2615,11 @@ namespace {
         Impl.diagnose(loc,
                       diag::foreign_reference_types_cannot_find_retain_release,
                       false, retainOperation.name, decl->getNameAsString());
+        if (!Impl.SwiftContext.LangOpts
+                 .DisableExperimentalClangImporterDiagnostics) {
+          Impl.diagnoseTopLevelValue(
+              DeclName(Impl.SwiftContext.getIdentifier(retainOperation.name)));
+        }
       } else if (retainOperation.kind ==
                  CustomRefCountingOperationResult::tooManyFound) {
         HeaderLoc loc(decl->getLocation());
@@ -2674,7 +2679,12 @@ namespace {
         Impl.diagnose(loc,
                       diag::foreign_reference_types_cannot_find_retain_release,
                       true, releaseOperation.name, decl->getNameAsString());
-      } else if (releaseOperation.kind ==
+        if (!Impl.SwiftContext.LangOpts
+                 .DisableExperimentalClangImporterDiagnostics) {
+          Impl.diagnoseTopLevelValue(
+              DeclName(Impl.SwiftContext.getIdentifier(releaseOperation.name)));
+        }
+      }else if (releaseOperation.kind ==
                  CustomRefCountingOperationResult::tooManyFound) {
         HeaderLoc loc(decl->getLocation());
         Impl.diagnose(loc,
