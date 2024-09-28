@@ -918,7 +918,11 @@ std::optional<BraceStmt *>
 TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
   // First look for any return statements, and bail if we have any.
   auto &ctx = func->getASTContext();
-  if (auto returnStmts = findReturnStatements(func); !returnStmts.empty()) {
+
+  SmallVector<ReturnStmt *> returnStmts;
+  func->getExplicitReturnStmts(returnStmts);
+
+  if (!returnStmts.empty()) {
     // One or more explicit 'return' statements were encountered, which
     // disables the result builder transform. Warn when we do this.
     ctx.Diags.diagnose(
@@ -1298,19 +1302,16 @@ bool AnyFunctionRef::bodyHasExplicitReturnStmt() const {
                            BraceHasExplicitReturnStmtRequest{body}, false);
 }
 
-std::vector<ReturnStmt *> TypeChecker::findReturnStatements(AnyFunctionRef fn) {
-  if (!fn.bodyHasExplicitReturnStmt()) {
-    return std::vector<ReturnStmt *>();
+void AnyFunctionRef::getExplicitReturnStmts(
+    SmallVectorImpl<ReturnStmt *> &results) const {
+  if (!bodyHasExplicitReturnStmt()) {
+    return;
   }
 
-  std::vector<ReturnStmt *> results;
-
-  walkExplicitReturnStmts(fn.getBody(), [&results](ReturnStmt *RS) {
+  walkExplicitReturnStmts(getBody(), [&results](ReturnStmt *RS) {
     results.push_back(RS);
     return false;
   });
-
-  return results;
 }
 
 ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(

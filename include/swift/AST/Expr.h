@@ -71,6 +71,7 @@ namespace swift {
   class KeyPathExpr;
   class CaptureListExpr;
   class ThenStmt;
+  class ReturnStmt;
 
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -4057,6 +4058,11 @@ public:
   /// \returns `true` if the body contains an explicit `return` statement,
   /// `false` otherwise.
   bool bodyHasExplicitReturnStmt() const;
+
+  /// Finds occurrences of explicit `return` statements within the body, if any.
+  ///
+  /// \param results An out container to which the results are added.
+  void getExplicitReturnStmts(SmallVectorImpl<ReturnStmt *> &results) const;
 
   ActorIsolation getActorIsolation() const {
     return actorIsolation;

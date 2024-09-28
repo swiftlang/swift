@@ -1967,6 +1967,12 @@ bool AbstractClosureExpr::bodyHasExplicitReturnStmt() const {
       .bodyHasExplicitReturnStmt();
 }
 
+void AbstractClosureExpr::getExplicitReturnStmts(
+    SmallVectorImpl<ReturnStmt *> &results) const {
+  AnyFunctionRef(const_cast<AbstractClosureExpr *>(this))
+      .getExplicitReturnStmts(results);
+}
+
 Type AbstractClosureExpr::getResultType(
     llvm::function_ref<Type(Expr *)> getType) const {
   auto *E = const_cast<AbstractClosureExpr *>(this);

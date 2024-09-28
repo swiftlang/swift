@@ -109,6 +109,7 @@ namespace swift {
   class ProtocolType;
   struct RawComment;
   enum class ResilienceExpansion : unsigned;
+  class ReturnStmt;
   enum class EffectKind : uint8_t;
   enum class PolymorphicEffectKind : uint8_t;
   class TrailingWhereClause;
@@ -7681,6 +7682,11 @@ public:
   /// \returns `true` if the body contains an explicit `return` statement,
   /// `false` otherwise.
   bool bodyHasExplicitReturnStmt() const;
+
+  /// Finds occurrences of explicit `return` statements within the body, if any.
+  ///
+  /// \param results An out container to which the results are added.
+  void getExplicitReturnStmts(SmallVectorImpl<ReturnStmt *> &results) const;
 
   /// Returns true if the text of this function's body can be retrieved either
   /// by extracting the text from the source buffer or reading the inlinable
