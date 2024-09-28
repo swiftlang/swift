@@ -404,9 +404,7 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
     if (bridgingHeader.empty())
       return import != &M && import->getName() == M.getName();
 
-    auto importer = static_cast<ClangImporter *>(
-        import->getASTContext().getClangModuleLoader());
-    return import == importer->getImportedHeaderModule();
+    return import->isClangHeaderImportModule();
   };
 
   clang::FileSystemOptions fileSystemOptions;

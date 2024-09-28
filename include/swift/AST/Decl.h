@@ -979,6 +979,12 @@ public:
   LLVM_READONLY
   ModuleDecl *getModuleContext() const;
 
+  /// Retrieve the module in which this declaration would be found by name
+  /// lookup queries. The result can differ from that of `getModuleContext()`
+  /// when the decl was imported via Cxx interop.
+  LLVM_READONLY
+  ModuleDecl *getModuleContextForNameLookup() const;
+
   /// getASTContext - Return the ASTContext that this decl lives in.
   LLVM_READONLY
   ASTContext &getASTContext() const {

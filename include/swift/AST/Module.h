@@ -614,6 +614,9 @@ public:
   void findDeclaredCrossImportOverlaysTransitive(
       SmallVectorImpl<ModuleDecl *> &overlays);
 
+  /// Returns true if this module is the Clang header import module.
+  bool isClangHeaderImportModule() const;
+
   /// Convenience accessor for clients that know what kind of file they're
   /// dealing with.
   SourceFile &getMainSourceFile() const;
