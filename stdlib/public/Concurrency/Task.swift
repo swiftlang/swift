@@ -635,25 +635,6 @@ extension Task where Failure == Never {
   ) {
     fatalError("Unavailable in task-to-thread concurrency model.")
   }
-#elseif $Embedded
-  @discardableResult
-  @_alwaysEmitIntoClient
-  public init(
-    priority: TaskPriority? = nil,
-    @_inheritActorContext @_implicitSelfCapture operation: sending @escaping () async -> Success
-  ) {
-    // Set up the job flags for a new task.
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: true,
-      inheritContext: true, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-
-    // Create the asynchronous task.
-    let (task, _) = Builtin.createAsyncTask(flags, operation)
-
-    self._task = task
-  }
 #else
   /// Runs the given nonthrowing operation asynchronously
   /// as part of a new top-level task on behalf of the current actor.
@@ -716,25 +697,6 @@ extension Task where Failure == Error {
     @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async throws -> Success
   ) {
     fatalError("Unavailable in task-to-thread concurrency model")
-  }
-#elseif $Embedded
-  @discardableResult
-  @_alwaysEmitIntoClient
-  public init(
-    priority: TaskPriority? = nil,
-    @_inheritActorContext @_implicitSelfCapture operation: sending @escaping () async throws -> Success
-  ) {
-    // Set up the task flags for a new task.
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: true,
-      inheritContext: true, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-
-    // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTask(flags, operation)
-
-    self._task = task
   }
 #else
   /// Runs the given throwing operation asynchronously
@@ -801,25 +763,6 @@ extension Task where Failure == Never {
   ) -> Task<Success, Failure> {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
-#elseif $Embedded
-  @discardableResult
-  @_alwaysEmitIntoClient
-  public static func detached(
-    priority: TaskPriority? = nil,
-    operation: sending @escaping () async -> Success
-  ) -> Task<Success, Failure> {
-    // Set up the job flags for a new task.
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-
-    // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTask(flags, operation)
-
-    return Task(task)
-  }
 #else
   /// Runs the given nonthrowing operation asynchronously
   /// as part of a new top-level task.
@@ -879,25 +822,6 @@ extension Task where Failure == Error {
     operation: sending @escaping @isolated(any) () async throws -> Success
   ) -> Task<Success, Failure> {
     fatalError("Unavailable in task-to-thread concurrency model")
-  }
-#elseif $Embedded
-  @discardableResult
-  @_alwaysEmitIntoClient
-  public static func detached(
-    priority: TaskPriority? = nil,
-    operation: sending @escaping () async throws -> Success
-  ) -> Task<Success, Failure> {
-    // Set up the job flags for a new task.
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-
-    // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTask(flags, operation)
-
-    return Task(task)
   }
 #else
   /// Runs the given throwing operation asynchronously
