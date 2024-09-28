@@ -160,6 +160,11 @@ public:
   /// `false` otherwise.
   bool bodyHasExplicitReturnStmt() const;
 
+  /// Finds occurrences of explicit `return` statements within the body, if any.
+  ///
+  /// \param results An out container to which the results are added.
+  void getExplicitReturnStmts(SmallVectorImpl<ReturnStmt *> &results) const;
+
   DeclContext *getAsDeclContext() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD;

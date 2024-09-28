@@ -263,7 +263,7 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
   // the result of inferring for 'x' will be considered when inferring for 'y'
   // either way.
   if (!funcDecl->hasBody() || !dc->getParentSourceFile() ||
-      !TypeChecker::findReturnStatements(funcDecl).empty()) {
+      funcDecl->bodyHasExplicitReturnStmt()) {
     return Type();
   }
 
