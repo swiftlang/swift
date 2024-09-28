@@ -2504,7 +2504,7 @@ bool DeclContext::lookupQualified(Type type,
 }
 
 bool DeclContext::isDeclImported(const Decl *decl) const {
-  auto declModule = decl->getDeclContext()->getParentModule();
+  auto declModule = decl->getModuleContextForNameLookup();
   return getASTContext().getImportCache().isImportedBy(declModule, this);
 }
 

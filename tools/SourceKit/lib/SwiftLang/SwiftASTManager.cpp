@@ -1043,8 +1043,6 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
   if (!TopMod)
     return;
 
-  auto ClangModuleLoader = TopMod->getASTContext().getClangModuleLoader();
-
   ModuleDecl::ImportFilter ImportFilter = {
       ModuleDecl::ImportFilterKind::Exported,
       ModuleDecl::ImportFilterKind::Default};
@@ -1061,8 +1059,7 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
     if (Mod->isSystemModule())
       continue;
     // FIXME: Setup dependencies on the included headers.
-    if (ClangModuleLoader &&
-        Mod == ClangModuleLoader->getImportedHeaderModule())
+    if (Mod->isClangHeaderImportModule())
       continue;
     bool NewVisit = Visited.insert(Mod).second;
     if (!NewVisit)
