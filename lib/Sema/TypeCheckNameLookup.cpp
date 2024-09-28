@@ -809,7 +809,7 @@ public:
 static void diagnoseMissingImportForMember(const ValueDecl *decl,
                                            SourceFile *sf, SourceLoc loc) {
   auto &ctx = sf->getASTContext();
-  auto definingModule = decl->getModuleContext();
+  auto definingModule = decl->getModuleContextForNameLookup();
   ctx.Diags.diagnose(loc, diag::candidate_from_missing_import,
                      decl->getDescriptiveKind(), decl->getName(),
                      definingModule);
@@ -823,7 +823,7 @@ diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
   diagnoseMissingImportForMember(decl, sf, loc);
 
   auto &ctx = sf->getASTContext();
-  auto definingModule = decl->getModuleContext();
+  auto definingModule = decl->getModuleContextForNameLookup();
   SourceLoc bestLoc = ctx.Diags.getBestAddImportFixItLoc(decl, sf);
   if (!bestLoc.isValid())
     return;
@@ -874,8 +874,17 @@ diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
 bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
                                                 const DeclContext *dc,
                                                 SourceLoc loc) {
-  if (decl->findImport(dc))
+  if (dc->isDeclImported(decl))
     return false;
+
+  if (dc->getASTContext().LangOpts.EnableCXXInterop) {
+    // With Cxx interop enabled, there are some declarations that always belong
+    // to the Clang header import module which should always be implicitly
+    // visible. However, that module is not implicitly imported in source files
+    // so we need to special case it here and avoid diagnosing.
+    if (decl->getModuleContextForNameLookup()->isClangHeaderImportModule())
+      return false;
+  }
 
   auto sf = dc->getParentSourceFile();
   if (!sf)

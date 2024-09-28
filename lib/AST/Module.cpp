@@ -2471,6 +2471,14 @@ bool ModuleDecl::getRequiredBystandersIfCrossImportOverlay(
   return false;
 }
 
+bool ModuleDecl::isClangHeaderImportModule() const {
+  auto importer = getASTContext().getClangModuleLoader();
+  if (!importer)
+    return false;
+
+  return this == importer->getImportedHeaderModule();
+}
+
 namespace {
 struct OverlayFileContents {
   struct Module {
