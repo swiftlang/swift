@@ -335,15 +335,39 @@ llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
   assert(subs.getReplacementTypes().size() == 1 &&
          "createTaskGroup should have a type substitution");
   auto resultType = subs.getReplacementTypes()[0]->getCanonicalType();
-  auto resultTypeMetadata = IGF.emitAbstractTypeMetadataRef(resultType);
+
+  // In desktop Swift, we pass a Metadata pointer as the last argument. In
+  // Embedded Swift, we pass a TaskOptionRecord list, and mark a bit in
+  // groupFlags.
+  llvm::Value *metadataOrTypeOptionRecord;
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    metadataOrTypeOptionRecord =
+        llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
+    metadataOrTypeOptionRecord = maybeAddEmbeddedSwiftResultTypeInfo(
+        IGF, metadataOrTypeOptionRecord, resultType);
+    llvm::IntegerType *IntPtrTy = IGF.IGM.IntPtrTy;
+    TaskGroupFlags taskgroupFlags(0);
+    taskgroupFlags.setIsMetadataAsOptionRecord(true);
+    auto flagValue = llvm::ConstantInt::get(IGF.IGM.IntPtrTy,
+                                            taskgroupFlags.getOpaqueValue());
+    if (!groupFlags) {
+      groupFlags = flagValue;
+    } else {
+      groupFlags = IGF.Builder.CreateOr(groupFlags, flagValue);
+    }
+  } else {
+    metadataOrTypeOptionRecord = IGF.emitAbstractTypeMetadataRef(resultType);
+  }
 
   llvm::CallInst *call;
   if (groupFlags) {
-    call = IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeWithFlagsFunctionPointer(),
-                                  {groupFlags, group, resultTypeMetadata});
+    call = IGF.Builder.CreateCall(
+        IGF.IGM.getTaskGroupInitializeWithFlagsFunctionPointer(),
+        {groupFlags, group, metadataOrTypeOptionRecord});
   } else {
-    call = IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeFunctionPointer(),
-                                  {group, resultTypeMetadata});
+    call =
+        IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeFunctionPointer(),
+                               {group, metadataOrTypeOptionRecord});
   }
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);

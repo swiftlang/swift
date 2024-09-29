@@ -26,6 +26,7 @@
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskGroup.h"
+#include "swift/ABI/TaskOptions.h"
 #include "swift/Basic/RelativePointer.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Runtime/Concurrency.h"
@@ -964,15 +965,36 @@ static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) 
 SWIFT_CC(swift)
 static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
                                                     TaskGroup *group, const Metadata *T) {
-
-#if !SWIFT_CONCURRENCY_EMBEDDED
-  ResultTypeInfo resultType;
-  resultType.metadata = T;
-
   TaskGroupFlags groupFlags(rawGroupFlags);
   SWIFT_TASK_GROUP_DEBUG_LOG_0(group, "create group, from task:%p; flags: isDiscardingResults=%d",
                                swift_task_getCurrent(),
                                groupFlags.isDiscardResults());
+
+  ResultTypeInfo resultType;
+#if !SWIFT_CONCURRENCY_EMBEDDED
+  resultType.metadata = T;
+  assert(!groupFlags.isMetadataAsOptionRecord());
+#else
+  assert(groupFlags.isMetadataAsOptionRecord());
+  TaskOptionRecord *options = (TaskOptionRecord *)T;
+  for (auto option = options; option; option = option->getParent()) {
+    switch (option->getKind()) {
+    case TaskOptionRecordKind::ResultTypeInfo: {
+      auto *typeInfo = cast<ResultTypeInfoTaskOptionRecord>(option);
+      resultType = {
+          .size = typeInfo->size,
+          .alignMask = typeInfo->alignMask,
+          .initializeWithCopy = typeInfo->initializeWithCopy,
+          .storeEnumTagSinglePayload = typeInfo->storeEnumTagSinglePayload,
+          .destroy = typeInfo->destroy,
+      };
+      break;
+    }
+    default:
+      swift_unreachable("only ResultTypeInfo expected");
+    }
+  }
+#endif
 
   TaskGroupBase *impl;
   if (groupFlags.isDiscardResults()) {
@@ -993,9 +1015,6 @@ static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
     }
     return true;
   });
-#else
-  swift_unreachable("task groups not supported yet in embedded Swift");
-#endif
 }
 
 // =============================================================================
