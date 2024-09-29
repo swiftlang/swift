@@ -2792,6 +2792,10 @@ public:
     /// Request the TaskGroup to immediately release completed tasks,
     /// and not store their results. This also effectively disables `next()`.
     TaskGroup_DiscardResults = 8,
+    /// The `Metadata *T` in swift_taskGroup_initialize and in
+    /// swift_taskGroup_initializeWithFlags pointer is actually a
+    /// TaskOptionRecord pointer. Used only in Embedded Swift.
+    TaskGroup_MetadataAsOptionRecord = 9,
   };
 
   explicit TaskGroupFlags(uint32_t bits) : FlagSet(bits) {}
@@ -2800,6 +2804,10 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(TaskGroup_DiscardResults,
                                 isDiscardResults,
                                 setIsDiscardResults)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(TaskGroup_MetadataAsOptionRecord,
+                                isMetadataAsOptionRecord,
+                                setIsMetadataAsOptionRecord)
 };
 
 /// Flags for cancellation records.

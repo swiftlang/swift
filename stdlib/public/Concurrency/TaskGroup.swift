@@ -63,7 +63,9 @@ import Swift
 /// For tasks that need to handle cancellation by throwing an error,
 /// use the `withThrowingTaskGroup(of:returning:body:)` method instead.
 @available(SwiftStdlib 5.1, *)
+#if !$Embedded
 @backDeployed(before: SwiftStdlib 6.0)
+#endif
 @inlinable
 public func withTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
@@ -198,7 +200,9 @@ public func _unsafeInheritExecutor_withTaskGroup<ChildTaskResult, GroupResult>(
 /// which gives you a chance to handle the individual error
 /// or to let the group rethrow the error.
 @available(SwiftStdlib 5.1, *)
+#if !$Embedded
 @backDeployed(before: SwiftStdlib 6.0)
+#endif
 @inlinable
 public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
@@ -592,7 +596,9 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   ///
   /// - Returns: The value returned by the next child task that completes.
   @available(SwiftStdlib 5.1, *)
+  #if !$Embedded
   @backDeployed(before: SwiftStdlib 6.0)
+  #endif
   public mutating func next(isolation: isolated (any Actor)? = #isolation) async -> ChildTaskResult? {
     // try!-safe because this function only exists for Failure == Never,
     // and as such, it is impossible to spawn a throwing child task.
@@ -610,7 +616,9 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// Await all of the pending tasks added this group.
   @usableFromInline
   @available(SwiftStdlib 5.1, *)
+  #if !$Embedded
   @backDeployed(before: SwiftStdlib 6.0)
+  #endif
   internal mutating func awaitAllRemainingTasks(isolation: isolated (any Actor)? = #isolation) async {
     while let _ = await next(isolation: isolation) {}
   }
@@ -750,7 +758,9 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// Await all the remaining tasks on this group.
   @usableFromInline
   @available(SwiftStdlib 5.1, *)
+  #if !$Embedded
   @backDeployed(before: SwiftStdlib 6.0)
+  #endif
   internal mutating func awaitAllRemainingTasks(isolation: isolated (any Actor)? = #isolation) async {
     while true {
       do {
@@ -1028,7 +1038,9 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///
   /// - SeeAlso: `nextResult()`
   @available(SwiftStdlib 5.1, *)
+  #if !$Embedded
   @backDeployed(before: SwiftStdlib 6.0)
+  #endif
   public mutating func next(isolation: isolated (any Actor)? = #isolation) async throws -> ChildTaskResult? {
     return try await _taskGroupWaitNext(group: _group)
   }
