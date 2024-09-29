@@ -321,7 +321,7 @@ bool StorageVisitor::visit(NominalTypeDecl *nominal, DeclContext *dc) {
 
         // Check that the associated value type is Sendable.
         auto elementType = dc->mapTypeIntoContext(
-            element->getArgumentInterfaceType());
+            element->getPayloadInterfaceType());
         if ((*this)(element, elementType))
           return true;
       }

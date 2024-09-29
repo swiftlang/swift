@@ -942,7 +942,7 @@ private:
       flags.setIsIndirectCase();
 
     Type interfaceType = decl->isAvailableDuringLowering()
-                             ? decl->getArgumentInterfaceType()
+                             ? decl->getPayloadInterfaceType()
                              : nullptr;
 
     addField(flags, interfaceType, decl->getBaseIdentifier().str());
