@@ -2954,9 +2954,6 @@ namespace {
         return false; 
       });
 
-      if (conformsToMatches.empty())
-        return;
-
       for (auto match : conformsToMatches) {
         if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(match))
           addExplicitProtocolConformance(decl, swiftAttr);
