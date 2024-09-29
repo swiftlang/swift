@@ -1665,6 +1665,10 @@ void ProcessOutOfLineJob::process(Job *job) {
 #endif /* !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS */
 
 void DefaultActorImpl::destroy() {
+#if SWIFT_CONCURRENCY_EMBEDDED
+  // Embedded runtime does not track the refcount inside deinit
+  // See swift_release_n_(object:,n:) in EmbeddedRuntime.swift
+#else
   HeapObject *object = asAbstract(this);
   size_t retainCount = swift_retainCount(object);
   if (SWIFT_UNLIKELY(retainCount > 1)) {
@@ -1680,6 +1684,7 @@ void DefaultActorImpl::destroy() {
                       descriptor ? descriptor->Name.get() : "<unknown>",
                       retainCount);
   }
+#endif
 
 #if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
   // TODO (rokhinip): Do something to assert that the lock is unowned
