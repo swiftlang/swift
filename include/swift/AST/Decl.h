@@ -8507,7 +8507,9 @@ public:
     return hasName() ? getBaseIdentifier().str() : "_";
   }
 
-  Type getArgumentInterfaceType() const;
+  /// Retrieve the payload type for the enum element, which is a tuple of the
+  /// associated values, or null if there are no associated values.
+  Type getPayloadInterfaceType() const;
 
   void setParameterList(ParameterList *params);
   ParameterList *getParameterList() const { return Params; }

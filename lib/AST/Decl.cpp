@@ -10601,7 +10601,7 @@ SourceRange EnumElementDecl::getSourceRange() const {
   return {getStartLoc(), getNameLoc()};
 }
 
-Type EnumElementDecl::getArgumentInterfaceType() const {
+Type EnumElementDecl::getPayloadInterfaceType() const {
   if (!hasAssociatedValues())
     return nullptr;
 

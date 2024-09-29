@@ -4337,7 +4337,7 @@ public:
       // reason). However, we need a more robust handling of deserialization
       // dependencies that can handle circularities. rdar://problem/32359173
       collectDependenciesFromType(dependencyTypes,
-                                  nextElt->getArgumentInterfaceType(),
+                                  nextElt->getPayloadInterfaceType(),
                                   /*excluding*/theEnum->getParentModule());
     }
     for (Requirement req : theEnum->getGenericRequirements()) {
