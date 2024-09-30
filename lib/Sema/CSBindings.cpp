@@ -2746,10 +2746,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   // If all of the re-activated constraints where simplified,
   // let's notify binding inference about the fact that type
   // variable has been bound successfully.
-  {
-    auto &CG = cs.getConstraintGraph();
-    CG[TypeVar].introduceToInference(type);
-  }
+  cs.getConstraintGraph().introduceToInference(TypeVar, type);
 
   return true;
 }
