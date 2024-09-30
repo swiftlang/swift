@@ -117,6 +117,7 @@ add_swift_host_library(swiftAST STATIC
   SearchPathOptions.cpp
   SILLayout.cpp
   Stmt.cpp
+  StorageImpl.cpp
   SubstitutionMap.cpp
   SwiftNameTranslation.cpp
   Type.cpp

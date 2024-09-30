@@ -3317,9 +3317,9 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
 
   if (!storage)
     return nullptr;
-  if (!storage->hasStorage()
-      && storage->getReadImpl() != ReadImplKind::Read
-      && storage->getReadImpl() != ReadImplKind::Address) {
+  if (!storage->hasStorage() && storage->getReadImpl() != ReadImplKind::Read &&
+      storage->getReadImpl() != ReadImplKind::Read2 &&
+      storage->getReadImpl() != ReadImplKind::Address) {
     return nullptr;
   }
 

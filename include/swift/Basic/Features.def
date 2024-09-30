@@ -417,6 +417,9 @@ EXPERIMENTAL_FEATURE(ValueGenerics, true)
 // When a parameter has unspecified isolation, infer it as main actor isolated.
 EXPERIMENTAL_FEATURE(UnspecifiedMeansMainActorIsolated, false)
 
+/// modify/read single-yield coroutines
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
