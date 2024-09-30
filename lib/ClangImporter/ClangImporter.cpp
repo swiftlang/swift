@@ -1297,10 +1297,8 @@ ClangImporter::create(ASTContext &ctx,
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
       ctx.SourceMgr.getFileSystem();
 
-  ClangInvocationFileMapping fileMapping;
-
-  if (!ignoreFileMapping)
-    fileMapping = getClangInvocationFileMapping(ctx);
+  ClangInvocationFileMapping fileMapping =
+    getClangInvocationFileMapping(ctx, nullptr, ignoreFileMapping);
 
   // Avoid creating indirect file system when using include tree.
   if (!ctx.ClangImporterOpts.HasClangIncludeTreeRoot) {
