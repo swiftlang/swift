@@ -208,6 +208,10 @@ constexpr bool isGroupInSupergroup() {
       return true;
   return false;
 }
+// Check for isGroupInSupergroup itself
+static_assert(!isGroupInSupergroup<DiagGroupID::no_group,
+                                   DiagGroupID::DeprecatedDeclaration>() &&
+              "Bug in isGroupInSupergroup");
 
 static_assert(!hasCycle(), "Diagnostic groups graph has a cycle!");
 // Sanity check for the "no_group" group
@@ -216,9 +220,15 @@ static_assert(std::get<0>(diagnosticGroupConnections).supergroups.size() == 0,
               "no_group isn't a top-level group");
 static_assert(std::get<0>(diagnosticGroupConnections).subgroups.size() == 0,
               "no_group shouldn't have subgroups");
-// Check groups have expected supergroups
-static_assert(isGroupInSupergroup<DiagGroupID::availability_deprecated,
-                                  DiagGroupID::deprecated>());
+// Check groups have associated diagnostics
+#define CHECK_NOT_EMPTY(Group)                                                 \
+  static_assert(                                                               \
+      std::get<(uint16_t)DiagGroupID::Group>(diagnosticGroupConnections)       \
+              .diagnostics.size() > 0,                                         \
+      "'" #Group "' group shouldn't be empty.");
+CHECK_NOT_EMPTY(DeprecatedDeclaration)
+CHECK_NOT_EMPTY(UnknownWarningGroup)
+#undef CHECK_NOT_EMPTY
 
 } // end namespace validation
 
