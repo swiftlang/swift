@@ -47,8 +47,6 @@ public:
     ExtendedEquivalenceClass,
     /// Added a new edge in the constraint graph.
     RelatedTypeVariables,
-    /// Introduced a type variable's fixed type to inference.
-    IntroducedToInference,
     /// Inferred potential bindings from a constraint.
     InferredBindings,
     /// Retracted potential bindings from a constraint.
@@ -94,14 +92,6 @@ public:
       } Relation;
 
       struct {
-        /// The type variable being bound to a fixed type.
-        TypeVariableType *TypeVar;
-
-        /// The fixed type to which the type variable was bound.
-        TypeBase *FixedType;
-      } Binding;
-
-      struct {
         /// The type variable being updated.
         TypeVariableType *TypeVar;
 
@@ -132,9 +122,6 @@ public:
     /// a type variable pair.
     static Change relatedTypeVariables(TypeVariableType *typeVar,
                                        TypeVariableType *otherTypeVar);
-
-    /// Create a change that introduced a type variable to inference.
-    static Change introducedToInference(TypeVariableType *typeVar, Type fixed);
 
     /// Create a change that inferred bindings from a constraint.
     static Change inferredBindings(TypeVariableType *typeVar,

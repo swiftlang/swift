@@ -153,9 +153,6 @@ private:
   /// type variable has been bound to a valid type and solver can make progress.
   void introduceToInference(Type fixedType);
 
-  /// Opposite of \c introduceToInference(Type)
-  void retractFromInference(Type fixedType);
-
   /// Drop all previously collected bindings and re-infer based on the
   /// current set constraints associated with this equivalence class.
   void resetBindingSet();
@@ -445,11 +442,6 @@ private:
   ///
   /// Note that this it only meant to be called by SolverTrail::Change::undo().
   void retractBindings(TypeVariableType *typeVar, Constraint *constraint);
-
-  /// Retract the given type variable from inference.
-  ///
-  /// Note that this it only meant to be called by SolverTrail::Change::undo().
-  void retractFromInference(TypeVariableType *typeVar, Type fixedType);
 
   /// Perform edge contraction on the constraint graph, merging equivalence
   /// classes until a fixed point is reached.
