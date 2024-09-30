@@ -2377,6 +2377,10 @@ private:
   llvm::SmallMapVector<ConstraintLocator *, ArrayRef<OpenedType>, 4>
       OpenedTypes;
 
+  /// A set of type variables representing opened generic types that have been
+  /// involved in type mismatch fixes.
+  llvm::SmallVector<TypeVariableType *, 4> MismatchedOpenedTypes;
+
   /// A dictionary of all conformances that have been looked up by the solver.
   llvm::DenseMap<std::pair<TypeBase *, ProtocolDecl *>, ProtocolConformanceRef>
       Conformances;
@@ -2892,6 +2896,9 @@ public:
 
     /// The length of \c OpenedTypes.
     unsigned numOpenedTypes;
+
+    /// The length of \c MismatchedOpenedTypes.
+    unsigned numMismatchedOpenedTypes;
 
     /// The length of \c OpenedExistentialTypes.
     unsigned numOpenedExistentialTypes;
@@ -4317,6 +4324,27 @@ public:
                 ConstraintLocatorBuilder locator);
 
 private:
+  /// Record mismatch in opened generic  type parameter.
+  void recordMismatchedOpenedType(TypeVariableType *type) {
+    MismatchedOpenedTypes.push_back(type);
+  }
+
+  /// Check whether type involves  any mismatched opened generic type parameters..
+  bool typeHasMismatchedOpenedType(Type type) {
+    if (MismatchedOpenedTypes.empty())
+      return false;
+    SmallPtrSet<TypeVariableType *, 2> variables;
+    type->getTypeVariables(variables);
+    for (auto tv : variables) {
+      auto rep = tv->getImpl().getRepresentative(nullptr);
+      for (auto mismatch : MismatchedOpenedTypes) {
+        if (mismatch->getImpl().getRepresentative(nullptr) == rep)
+          return true;
+      }
+    }
+    return false;
+  }
+
   /// "Open" an opaque archetype type, similar to \c openType.
   Type openOpaqueType(OpaqueTypeArchetypeType *type,
                       ConstraintLocatorBuilder locator);

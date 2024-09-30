@@ -10258,7 +10258,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     if ((candidates.empty() ||
          allFromConditionalConformances(*this, instanceTy, candidates)) &&
         !isSelfRecursiveKeyPathDynamicMemberLookup(*this, baseTy,
-                                                   memberLocator)) {
+                                                   memberLocator) &&
+        !typeHasMismatchedOpenedType(instanceTy)) {
       auto &ctx = getASTContext();
 
       // Recursively look up `subscript(dynamicMember:)` methods in this type.
@@ -15230,6 +15231,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
 
       if (type2->getAnyNominal() == getASTContext().getOpaquePointerDecl())
         impact += 1;
+    }
+
+    // Record any opened generic types mismatched
+    SmallPtrSet<TypeVariableType *, 2> variables;
+    type2->getTypeVariables(variables);
+    for (auto tv : variables) {
+      if (tv->getImpl().getGenericParameter())
+        recordMismatchedOpenedType(tv);
     }
 
     return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;

@@ -672,6 +672,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numAppliedDisjunctions = cs.AppliedDisjunctions.size();
   numArgumentMatchingChoices = cs.argumentMatchingChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
+  numMismatchedOpenedTypes = cs.MismatchedOpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
   numOpenedPackExpansionTypes = cs.OpenedPackExpansionTypes.size();
   numPackExpansionEnvironments = cs.PackExpansionEnvironments.size();
@@ -751,6 +752,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any opened types.
   truncate(cs.OpenedTypes, numOpenedTypes);
+
+  // Remove any mismatched opened types.
+  truncate(cs.MismatchedOpenedTypes, numMismatchedOpenedTypes);
 
   // Remove any conformances solver had to fix along
   // the current path.
