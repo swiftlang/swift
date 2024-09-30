@@ -1081,7 +1081,7 @@ struct BridgedSuccessorArray {
 };
 
 struct BridgedDeclRef {
-  uint64_t storage[4];
+  uint64_t storage[3];
 
 #ifdef USED_IN_CPP_SOURCE
   BridgedDeclRef(swift::SILDeclRef declRef) {
@@ -1098,7 +1098,7 @@ struct BridgedDeclRef {
 };
 
 struct BridgedVTableEntry {
-  uint64_t storage[6];
+  uint64_t storage[5];
 
   enum class Kind {
     Normal,
@@ -1146,7 +1146,7 @@ struct OptionalBridgedVTable {
 };
 
 struct BridgedWitnessTableEntry {
-  uint64_t storage[6];
+  uint64_t storage[5];
 
   enum class Kind {
     invalid,
