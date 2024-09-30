@@ -1769,6 +1769,9 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 /// representative type variable, along with flags indicating whether
 /// those types should be opened.
 void PotentialBindings::infer(Constraint *constraint) {
+  if (!Constraints.insert(constraint).second)
+    return;
+
   switch (constraint->getKind()) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
@@ -1937,6 +1940,9 @@ void PotentialBindings::infer(Constraint *constraint) {
 }
 
 void PotentialBindings::retract(Constraint *constraint) {
+  if (!Constraints.erase(constraint))
+    return;
+
   Bindings.erase(
       llvm::remove_if(Bindings,
                       [&constraint](const PotentialBinding &binding) {
