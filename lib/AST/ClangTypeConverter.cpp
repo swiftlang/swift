@@ -34,8 +34,12 @@
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/ClangImporter/ClangImporter.h"
 
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
+#include "clang/AST/Type.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Sema/Sema.h"
 
@@ -850,6 +854,16 @@ clang::QualType ClangTypeConverter::convert(Type type) {
                             1);
         return ctx.getObjCObjectPointerType(clangType);
       }
+    } else {
+      auto it = ReversedExportMapBackwards.find(decl);
+      // This can happen, when the String type is exported to C++ (as
+      // swift::String) which is later imported back to Swift as String.
+      if (it != ReversedExportMapBackwards.end()) {
+        const auto *clangDecl = dyn_cast<clang::CXXRecordDecl>(it->getSecond());
+        if (clangDecl && importer::isSwiftType(clangDecl))
+          return clang::QualType(
+              cast<clang::TypeDecl>(clangDecl)->getTypeForDecl(), 0);
+      }
     }
   }
 
@@ -865,6 +879,7 @@ void ClangTypeConverter::registerExportedClangDecl(Decl *swiftDecl,
          "generated Clang declaration for Swift declaration should not "
          "have multiple declarations");
   ReversedExportMap.insert({clangDecl, swiftDecl});
+  ReversedExportMapBackwards.insert({swiftDecl, clangDecl});
 }
 
 Decl *ClangTypeConverter::getSwiftDeclForExportedClangDecl(

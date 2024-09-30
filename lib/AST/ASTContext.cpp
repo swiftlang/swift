@@ -6239,6 +6239,14 @@ ASTContext::getSwiftDeclForExportedClangDecl(const clang::Decl *decl) {
   return impl.Converter->getSwiftDeclForExportedClangDecl(decl);
 }
 
+void ASTContext::registerExportedClangDecl(Decl *decl,
+                                           const clang::Decl *clangDecl) {
+  // Make sure we have a converter.
+  getClangTypeConverter();
+  auto &impl = getImpl();
+  impl.Converter->registerExportedClangDecl(decl, clangDecl);
+}
+
 const clang::Type *
 ASTContext::getClangTypeForIRGen(Type ty) {
   return getClangTypeConverter().convert(ty).getTypePtrOrNull();

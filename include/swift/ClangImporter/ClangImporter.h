@@ -714,6 +714,8 @@ ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
                                      NominalTypeDecl *selfType,
                                      std::optional<Type> parameterType);
 
+bool isSwiftType(const clang::CXXRecordDecl *decl);
+
 } // namespace importer
 
 struct ClangInvocationFileMapping {

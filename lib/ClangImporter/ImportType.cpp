@@ -2279,8 +2279,8 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
       if (auto *vd = evaluateOrDefault(
               SwiftContext.evaluator,
               CxxRecordAsSwiftType({recordType, SwiftContext}), nullptr)) {
-        if (auto *cd = dyn_cast<ClassDecl>(vd)) {
-          Type t = ClassType::get(cd, Type(), SwiftContext);
+        if (auto *ntd = dyn_cast<NominalTypeDecl>(vd)) {
+          Type t = NominalType::get(ntd, Type(), SwiftContext);
           return ImportedType(t, /*implicitlyUnwraps=*/false);
         }
       }
@@ -2527,11 +2527,8 @@ ClangImporter::Implementation::importParameterType(
       if (auto *vd = evaluateOrDefault(
               SwiftContext.evaluator,
               CxxRecordAsSwiftType({recordType, SwiftContext}), nullptr)) {
-
-        if (auto *cd = dyn_cast<ClassDecl>(vd)) {
-
-          swiftParamTy = ClassType::get(cd, Type(), SwiftContext);
-        }
+        if (auto *ntd = dyn_cast<NominalTypeDecl>(vd))
+          swiftParamTy = NominalType::get(ntd, Type(), SwiftContext);
       }
     }
   }

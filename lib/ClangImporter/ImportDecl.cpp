@@ -2746,13 +2746,19 @@ namespace {
         return nullptr;
       }
 
+      auto dc = decl->getDeclContext();
       // Bail if this is `std::chrono::tzdb`. This type causes issues in copy
       // constructor instantiation.
       // FIXME: https://github.com/apple/swift/issues/73037
-      if (decl->getDeclContext()->isNamespace() &&
-          decl->getDeclContext()->getParent()->isStdNamespace() &&
+      if (dc->isNamespace() && dc->getParent()->isStdNamespace() &&
           decl->getIdentifier() &&
           (decl->getName() == "tzdb" || decl->getName() == "time_zone_link"))
+        return nullptr;
+
+      // Use the native representation for Swift types, no import necessary.
+      // See ClangTypeConverter for lowering and CxxRecordAsSwiftType for the
+      // lookup logic.
+      if (importer::isSwiftType(decl))
         return nullptr;
 
       auto &clangSema = Impl.getClangSema();
@@ -3021,15 +3027,14 @@ namespace {
 
     Decl *VisitClassTemplateSpecializationDecl(
                  const clang::ClassTemplateSpecializationDecl *decl) {
+      auto *classTemplate = decl->getSpecializedTemplate();
       // Treat a specific specialization like the unspecialized class template
       // when importing it in symbolic mode.
       if (Impl.importSymbolicCXXDecls)
-        return Impl.importDecl(decl->getSpecializedTemplate(),
-                               Impl.CurrentVersion);
+        return Impl.importDecl(classTemplate,Impl.CurrentVersion);
 
-      bool isPair = decl->getSpecializedTemplate()->isInStdNamespace() &&
-                    decl->getSpecializedTemplate()->getName() == "pair";
-
+      bool isPair = classTemplate->isInStdNamespace() &&
+                    classTemplate->getName() == "pair";
       // Before we go any further, check if we've already got tens of thousands
       // of specializations. If so, it means we're likely instantiating a very
       // deep/complex template, or we've run into an infinite loop. In either

@@ -53,6 +53,7 @@
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/AST/DeclTemplate.h"
 #include "clang/AST/Mangle.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/DiagnosticOptions.h"
@@ -100,6 +101,7 @@
 #include "llvm/TextAPI/InterfaceFile.h"
 #include "llvm/TextAPI/TextAPIReader.h"
 #include <algorithm>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <string>
@@ -7631,11 +7633,15 @@ static bool hasCustomCopyOrMoveConstructor(const clang::CXXRecordDecl *decl) {
          decl->hasUserDeclaredMoveConstructor();
 }
 
+bool importer::isSwiftType(const clang::CXXRecordDecl *decl) {
+  auto essAttr = decl->getAttr<clang::ExternalSourceSymbolAttr>();
+  return essAttr && essAttr->getLanguage() == "Swift" &&
+         !essAttr->getDefinedIn().empty() && !essAttr->getUSR().empty();
+}
+
 static bool isSwiftClassType(const clang::CXXRecordDecl *decl) {
   // Swift type must be annotated with external_source_symbol attribute.
-  auto essAttr = decl->getAttr<clang::ExternalSourceSymbolAttr>();
-  if (!essAttr || essAttr->getLanguage() != "Swift" ||
-      essAttr->getDefinedIn().empty() || essAttr->getUSR().empty())
+  if (!importer::isSwiftType(decl))
     return false;
 
   // Ensure that the baseclass is swift::RefCountedClass.
@@ -7717,14 +7723,36 @@ ValueDecl *
 CxxRecordAsSwiftType::evaluate(Evaluator &evaluator,
                                CxxRecordSemanticsDescriptor desc) const {
   auto cxxDecl = dyn_cast<clang::CXXRecordDecl>(desc.decl);
-  if (!cxxDecl)
+  // TODO: support specializations like swift::Optional<int>
+  if (!cxxDecl || isa<clang::ClassTemplateSpecializationDecl>(cxxDecl))
     return nullptr;
-  if (!isSwiftClassType(cxxDecl))
+  if (!importer::isSwiftType(cxxDecl))
     return nullptr;
 
-  SmallVector<ValueDecl *, 1> results;
+  if (!isSwiftClassType(cxxDecl)) {
+    // TODO: support value types indirected through swift::_impl::OpaqueStorage.
+    bool isOpaqueLayout = false;
+    auto numFields =
+        std::distance(cxxDecl->field_begin(), cxxDecl->field_end());
+    if (numFields == 1) {
+      auto field = *cxxDecl->field_begin();
+      isOpaqueLayout = !(field->getName() == "_storage" &&
+                         field->getType()->isConstantArrayType() &&
+                         cxxDecl->getASTContext()
+                             .getAsConstantArrayType(field->getType())
+                             ->getElementType()
+                             ->isCharType());
+    }
+    if (isOpaqueLayout)
+      return nullptr;
+  }
+
   auto *essaAttr = cxxDecl->getAttr<clang::ExternalSourceSymbolAttr>();
-  auto *mod = desc.ctx.getModuleByName(essaAttr->getDefinedIn());
+  if (!essaAttr)
+    return nullptr;
+  auto *mod = essaAttr->getDefinedIn() == "swift"
+                  ? desc.ctx.getStdlibModule()
+                  : desc.ctx.getModuleByName(essaAttr->getDefinedIn());
   if (!mod) {
     // TODO: warn about missing 'import'.
     return nullptr;
@@ -7732,11 +7760,12 @@ CxxRecordAsSwiftType::evaluate(Evaluator &evaluator,
   // FIXME: Support renamed declarations.
   auto swiftName = cxxDecl->getName();
   // FIXME: handle nested Swift types once they're supported.
+  SmallVector<ValueDecl *, 1> results;
   mod->lookupValue(desc.ctx.getIdentifier(swiftName), NLKind::UnqualifiedLookup,
                    results);
   if (results.size() == 1) {
-    if (dyn_cast<ClassDecl>(results[0]))
-      return results[0];
+    desc.ctx.registerExportedClangDecl(results[0], cxxDecl->getCanonicalDecl());
+    return results[0];
   }
   return nullptr;
 }
