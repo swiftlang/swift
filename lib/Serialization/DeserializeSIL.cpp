@@ -4073,7 +4073,7 @@ void SILDeserializer::readWitnessTableEntries(
       CanType type = MF->getType(assocId)->getCanonicalType();
       ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
       auto conformance = MF->getConformance(conformanceId);
-      witnessEntries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
+      witnessEntries.push_back(SILWitnessTable::AssociatedConformanceWitness{
         type, proto, conformance
       });
     } else if (kind == SIL_WITNESS_ASSOC_ENTRY) {

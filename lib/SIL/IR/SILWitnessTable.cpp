@@ -132,7 +132,7 @@ SILWitnessTable::~SILWitnessTable() {
       }
       break;
     case AssociatedType:
-    case AssociatedTypeProtocol:
+    case AssociatedConformance:
     case BaseProtocol:
     case Invalid:
       break;
@@ -160,7 +160,7 @@ void SILWitnessTable::convertToDefinition(
       }
       break;
     case AssociatedType:
-    case AssociatedTypeProtocol:
+    case AssociatedConformance:
     case BaseProtocol:
     case Invalid:
       break;

@@ -63,7 +63,7 @@ public:
   
   /// A witness table entry describing the witness for an associated type's
   /// protocol requirement.
-  struct AssociatedTypeProtocolWitness {
+  struct AssociatedConformanceWitness {
     /// The associated type required.  A dependent type in the protocol's
     /// context.
     CanType Requirement;
@@ -88,7 +88,7 @@ public:
     Invalid,
     Method,
     AssociatedType,
-    AssociatedTypeProtocol,
+    AssociatedConformance,
     BaseProtocol
   } ENUM_EXTENSIBILITY_ATTR(open);
   
@@ -98,7 +98,7 @@ public:
     union {
       MethodWitness Method;
       AssociatedTypeWitness AssociatedType;
-      AssociatedTypeProtocolWitness AssociatedTypeProtocol;
+      AssociatedConformanceWitness AssociatedConformance;
       BaseProtocolWitness BaseProtocol;
     };
     
@@ -113,9 +113,9 @@ public:
       : Kind(WitnessKind::AssociatedType), AssociatedType(AssociatedType)
     {}
     
-    Entry(const AssociatedTypeProtocolWitness &AssociatedTypeProtocol)
-      : Kind(WitnessKind::AssociatedTypeProtocol),
-        AssociatedTypeProtocol(AssociatedTypeProtocol)
+    Entry(const AssociatedConformanceWitness &AssociatedConformance)
+      : Kind(WitnessKind::AssociatedConformance),
+        AssociatedConformance(AssociatedConformance)
     {}
     
     Entry(const BaseProtocolWitness &BaseProtocol)
@@ -135,10 +135,9 @@ public:
       assert(Kind == WitnessKind::AssociatedType);
       return AssociatedType;
     }
-    const AssociatedTypeProtocolWitness &
-    getAssociatedTypeProtocolWitness() const {
-      assert(Kind == WitnessKind::AssociatedTypeProtocol);
-      return AssociatedTypeProtocol;
+    const AssociatedConformanceWitness &getAssociatedConformanceWitness() const {
+      assert(Kind == WitnessKind::AssociatedConformance);
+      return AssociatedConformance;
     }
     const BaseProtocolWitness &getBaseProtocolWitness() const {
       assert(Kind == WitnessKind::BaseProtocol);

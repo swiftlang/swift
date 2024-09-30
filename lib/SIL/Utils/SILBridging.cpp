@@ -380,7 +380,7 @@ static_assert(sizeof(BridgedWitnessTableEntry) >= sizeof(swift::SILWitnessTable:
 static_assert((int)BridgedWitnessTableEntry::Kind::invalid == (int)swift::SILWitnessTable::WitnessKind::Invalid);
 static_assert((int)BridgedWitnessTableEntry::Kind::method == (int)swift::SILWitnessTable::WitnessKind::Method);
 static_assert((int)BridgedWitnessTableEntry::Kind::associatedType == (int)swift::SILWitnessTable::WitnessKind::AssociatedType);
-static_assert((int)BridgedWitnessTableEntry::Kind::associatedTypeProtocol == (int)swift::SILWitnessTable::WitnessKind::AssociatedTypeProtocol);
+static_assert((int)BridgedWitnessTableEntry::Kind::associatedConformance == (int)swift::SILWitnessTable::WitnessKind::AssociatedConformance);
 static_assert((int)BridgedWitnessTableEntry::Kind::baseProtocol == (int)swift::SILWitnessTable::WitnessKind::BaseProtocol);
 
 BridgedOwnedString BridgedWitnessTableEntry::getDebugDescription() const {

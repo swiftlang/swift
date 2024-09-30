@@ -1080,7 +1080,7 @@ struct BridgedWitnessTableEntry {
     invalid,
     method,
     associatedType,
-    associatedTypeProtocol,
+    associatedConformance,
     baseProtocol
   };
 

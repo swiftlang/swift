@@ -335,8 +335,8 @@ void SILLinkerVisitor::visitProtocolConformance(
       maybeVisitRelatedConformance(ProtocolConformanceRef(baseConformance));
       break;
     }
-    case SILWitnessTable::WitnessKind::AssociatedTypeProtocol: {
-      auto assocConformance = E.getAssociatedTypeProtocolWitness().Witness;
+    case SILWitnessTable::WitnessKind::AssociatedConformance: {
+      auto assocConformance = E.getAssociatedConformanceWitness().Witness;
       maybeVisitRelatedConformance(assocConformance);
       break;
     }

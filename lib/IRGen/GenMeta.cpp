@@ -1159,12 +1159,12 @@ namespace {
 
       for (auto &entry : DefaultWitnesses->getEntries()) {
         if (!entry.isValid() ||
-            entry.getKind() != SILWitnessTable::AssociatedTypeProtocol ||
-            entry.getAssociatedTypeProtocolWitness().Protocol != requirement ||
-            entry.getAssociatedTypeProtocolWitness().Requirement != association)
+            entry.getKind() != SILWitnessTable::AssociatedConformance ||
+            entry.getAssociatedConformanceWitness().Protocol != requirement ||
+            entry.getAssociatedConformanceWitness().Requirement != association)
           continue;
 
-        auto witness = entry.getAssociatedTypeProtocolWitness().Witness;
+        auto witness = entry.getAssociatedConformanceWitness().Witness;
         AssociatedConformance conformance(Proto, association, requirement);
         defineDefaultAssociatedConformanceAccessFunction(conformance, witness);
         return IGM.getMangledAssociatedConformance(nullptr, conformance);

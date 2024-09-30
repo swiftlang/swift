@@ -3057,8 +3057,8 @@ void SILSerializer::writeSILWitnessTableEntry(
     return;
   }
 
-  if (entry.getKind() == SILWitnessTable::AssociatedTypeProtocol) {
-    auto &assoc = entry.getAssociatedTypeProtocolWitness();
+  if (entry.getKind() == SILWitnessTable::AssociatedConformance) {
+    auto &assoc = entry.getAssociatedConformanceWitness();
 
     auto requirementID = S.addTypeRef(assoc.Requirement);
     auto protocolID = S.addDeclRef(assoc.Protocol);
