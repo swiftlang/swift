@@ -10,17 +10,21 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Dependencies.h"
+#include "swift/Frontend/MakeStyleDependencies.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/Basic/SourceLoc.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/InputFile.h"
 #include "swift/FrontendTool/FrontendTool.h"
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/VirtualOutputBackend.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -88,68 +92,138 @@ reversePathSortedFilenames(const Container &elts) {
   return tmp;
 }
 
+static void emitMakeDependenciesFile(std::vector<std::string> &dependencies,
+                                     const FrontendOptions &opts,
+                                     const InputFile &input,
+                                     const std::vector<std::string> &prefixMap,
+                                     llvm::raw_ostream &os) {
+  // Prefix map all the path if needed.
+  if (!prefixMap.empty()) {
+    SmallVector<llvm::MappedPrefix, 4> prefixes;
+    llvm::MappedPrefix::transformJoinedIfValid(prefixMap, prefixes);
+    llvm::PrefixMapper mapper;
+    mapper.addRange(prefixes);
+    mapper.sort();
+    llvm::for_each(dependencies, [&mapper](std::string &dep) {
+      dep = mapper.mapToString(dep);
+    });
+  }
+
+  // Escape all the dependencies.
+  llvm::SmallString<256> buffer;
+  llvm::for_each(dependencies, [&buffer](std::string &dep) {
+    dep = frontend::utils::escapeForMake(dep, buffer).str();
+  });
+
+  // FIXME: Xcode can't currently handle multiple targets in a single
+  // dependency line.
+  opts.forAllOutputPaths(input, [&](const StringRef path) {
+    os << frontend::utils::escapeForMake(path, buffer) << " :";
+    for (auto &dep : dependencies)
+      os << ' ' << dep;
+    os << "\n";
+  });
+}
+
+static llvm::SmallString<256>
+serializeDependencies(const std::vector<std::string> &deps) {
+  // Encode the dependencies as null terminated strings.
+  llvm::SmallString<256> buffer;
+  for (auto &dep : deps) {
+    buffer.append(dep);
+    buffer.push_back('\0');
+  }
+
+  return buffer;
+}
+
+static std::vector<std::string> deserializeDependencies(StringRef buffer) {
+  std::vector<std::string> deps;
+  StringRef dep;
+  while (!buffer.empty()) {
+    std::tie(dep, buffer) = buffer.split('\0');
+    deps.push_back(dep.str());
+  }
+
+  return deps;
+}
+
+bool swift::emitMakeDependenciesFromSerializedBuffer(
+    llvm::StringRef buffer, llvm::raw_ostream &os, const FrontendOptions &opts,
+    const InputFile &input, DiagnosticEngine &diags) {
+  auto dependencies = deserializeDependencies(buffer);
+
+  emitMakeDependenciesFile(dependencies, opts, input, opts.CacheReplayPrefixMap,
+                           os);
+  return false;
+}
+
 /// Emits a Make-style dependencies file.
-bool swift::emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
-                                         DependencyTracker *depTracker,
-                                         const FrontendOptions &opts,
-                                         const InputFile &input,
-                                         llvm::vfs::OutputBackend &backend) {
+bool swift::emitMakeDependenciesIfNeeded(CompilerInstance &instance,
+                                         const InputFile &input) {
+  auto &opts = instance.getInvocation().getFrontendOptions();
+  auto *depTracker = instance.getDependencyTracker();
   auto dependenciesFilePath = input.getDependenciesFilePath();
   if (dependenciesFilePath.empty())
     return false;
 
-  auto out = backend.createFile(dependenciesFilePath);
-  if (!out) {
-    diags.diagnose(SourceLoc(), diag::error_opening_output,
-                   dependenciesFilePath, toString(out.takeError()));
-    return true;
-  }
-
-  llvm::SmallString<256> buffer;
-
   // collect everything in memory to avoid redundant work
   // when there are multiple targets
-  std::string dependencyString;
+  std::vector<std::string> dependencies;
 
   // First include all other files in the module. Make-style dependencies
   // need to be conservative!
   auto inputPaths =
       reversePathSortedFilenames(opts.InputsAndOutputs.getInputFilenames());
   for (auto const &path : inputPaths) {
-    dependencyString.push_back(' ');
-    dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
+    dependencies.push_back(path);
   }
   // Then print dependencies we've picked up during compilation.
   auto dependencyPaths =
       reversePathSortedFilenames(depTracker->getDependencies());
   for (auto const &path : dependencyPaths) {
-    dependencyString.push_back(' ');
-    dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
+    dependencies.push_back(path);
   }
   auto incrementalDependencyPaths =
       reversePathSortedFilenames(depTracker->getIncrementalDependencyPaths());
   for (auto const &path : incrementalDependencyPaths) {
-    dependencyString.push_back(' ');
-    dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
+    dependencies.push_back(path);
   }
   auto macroPluginDependencyPath =
       reversePathSortedFilenames(depTracker->getMacroPluginDependencyPaths());
   for (auto const &path : macroPluginDependencyPath) {
-    dependencyString.push_back(' ');
-    dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
+    dependencies.push_back(path);
   }
 
-  // FIXME: Xcode can't currently handle multiple targets in a single
-  // dependency line.
-  opts.forAllOutputPaths(input, [&](const StringRef targetName) {
-    auto targetNameEscaped = frontend::utils::escapeForMake(targetName, buffer);
-    *out << targetNameEscaped << " :" << dependencyString << '\n';
-  });
+  auto out = instance.getOutputBackend().createFile(dependenciesFilePath);
+  if (!out) {
+    instance.getDiags().diagnose(SourceLoc(), diag::error_opening_output,
+                                 dependenciesFilePath,
+                                 toString(out.takeError()));
+    return true;
+  }
+
+  emitMakeDependenciesFile(dependencies, opts, input, opts.CacheReplayPrefixMap,
+                           *out);
 
   if (auto error = out->keep()) {
-    diags.diagnose(SourceLoc(), diag::error_closing_output,
-                   dependenciesFilePath, toString(std::move(error)));
+    instance.getDiags().diagnose(SourceLoc(), diag::error_closing_output,
+                                 dependenciesFilePath,
+                                 toString(std::move(error)));
     return true;
+  }
+
+  // If store into CAS if needed. This has to happen after emitted the real file
+  // so the CASBackend is not finalized before emitting the real file.
+  if (instance.supportCaching()) {
+    auto &CASBackend = instance.getCASOutputBackend();
+    auto buffer = serializeDependencies(dependencies);
+    if (auto err = CASBackend.storeMakeDependenciesFile(dependenciesFilePath,
+                                                        buffer)) {
+      instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
+                                   toString(std::move(err)));
+      return true;
+    }
   }
 
   return false;

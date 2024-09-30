@@ -40,11 +40,13 @@ createSwiftCachingOutputBackend(
 
 /// Replay the output of the compilation from cache.
 /// Return true if outputs are replayed, false otherwise.
-bool replayCachedCompilerOutputs(
-    llvm::cas::ObjectStore &CAS, llvm::cas::ActionCache &Cache,
-    llvm::cas::ObjectRef BaseKey, DiagnosticEngine &Diag,
-    const FrontendInputsAndOutputs &InputsAndOutputs,
-    CachingDiagnosticsProcessor &CDP, bool CacheRemarks, bool UseCASBackend);
+bool replayCachedCompilerOutputs(llvm::cas::ObjectStore &CAS,
+                                 llvm::cas::ActionCache &Cache,
+                                 llvm::cas::ObjectRef BaseKey,
+                                 DiagnosticEngine &Diag,
+                                 const FrontendOptions &Opts,
+                                 CachingDiagnosticsProcessor &CDP,
+                                 bool CacheRemarks, bool UseCASBackend);
 
 /// Load the cached compile result from cache.
 std::unique_ptr<llvm::MemoryBuffer> loadCachedCompileResultFromCacheKey(
