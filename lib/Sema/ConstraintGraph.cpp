@@ -609,7 +609,17 @@ void ConstraintGraph::unrelateTypeVariables(TypeVariableType *typeVar,
 }
 
 void ConstraintGraph::retractFromInference(TypeVariableType *typeVar, Type fixed) {
-  return (*this)[typeVar].retractFromInference(fixed);
+  (*this)[typeVar].retractFromInference(fixed);
+}
+
+void ConstraintGraph::inferBindings(TypeVariableType *typeVar,
+                                    Constraint *constraint) {
+  (*this)[typeVar].getCurrentBindings().infer(constraint);
+}
+
+void ConstraintGraph::retractBindings(TypeVariableType *typeVar,
+                                      Constraint *constraint) {
+  (*this)[typeVar].getCurrentBindings().retract(constraint);
 }
 
 #pragma mark Algorithms

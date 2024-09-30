@@ -100,6 +100,26 @@ SolverTrail::Change::introducedToInference(TypeVariableType *typeVar,
 }
 
 SolverTrail::Change
+SolverTrail::Change::inferredBindings(TypeVariableType *typeVar,
+                                     Constraint *constraint) {
+  Change result;
+  result.Kind = ChangeKind::InferredBindings;
+  result.TheConstraint.TypeVar = typeVar;
+  result.TheConstraint.Constraint = constraint;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::retractedBindings(TypeVariableType *typeVar,
+                                       Constraint *constraint) {
+  Change result;
+  result.Kind = ChangeKind::RetractedBindings;
+  result.TheConstraint.TypeVar = typeVar;
+  result.TheConstraint.Constraint = constraint;
+  return result;
+}
+
+SolverTrail::Change
 SolverTrail::Change::updatedTypeVariable(
     TypeVariableType *typeVar,
     llvm::PointerUnion<TypeVariableType *, TypeBase *> parentOrFixed,
@@ -140,6 +160,14 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::IntroducedToInference:
     cg.retractFromInference(Binding.TypeVar, Binding.FixedType);
+    break;
+
+  case ChangeKind::InferredBindings:
+    cg.retractBindings(TheConstraint.TypeVar, TheConstraint.Constraint);
+    break;
+
+  case ChangeKind::RetractedBindings:
+    cg.inferBindings(TheConstraint.TypeVar, TheConstraint.Constraint);
     break;
 
   case ChangeKind::UpdatedTypeVariable:
@@ -203,6 +231,24 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << " with fixed type ";
     Binding.FixedType->print(out, PO);
     out << " to inference)\n";
+    break;
+
+  case ChangeKind::InferredBindings:
+    out << "(inferred bindings from ";
+    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
+                         indent + 2);
+    out << " for type variable ";
+    TheConstraint.TypeVar->print(out, PO);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RetractedBindings:
+    out << "(retracted bindings from ";
+    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
+                                    indent + 2);
+    out << " for type variable ";
+    TheConstraint.TypeVar->print(out, PO);
+    out << ")\n";
     break;
 
   case ChangeKind::UpdatedTypeVariable:

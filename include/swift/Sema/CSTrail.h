@@ -49,6 +49,10 @@ public:
     RelatedTypeVariables,
     /// Introduced a type variable's fixed type to inference.
     IntroducedToInference,
+    /// Inferred potential bindings from a constraint.
+    InferredBindings,
+    /// Retracted potential bindings from a constraint.
+    RetractedBindings,
     /// Set the fixed type or parent and flags for a type variable.
     UpdatedTypeVariable,
   };
@@ -131,6 +135,14 @@ public:
 
     /// Create a change that introduced a type variable to inference.
     static Change introducedToInference(TypeVariableType *typeVar, Type fixed);
+
+    /// Create a change that inferred bindings from a constraint.
+    static Change inferredBindings(TypeVariableType *typeVar,
+                                   Constraint *constraint);
+
+    /// Create a change that retracted bindings from a constraint.
+    static Change retractedBindings(TypeVariableType *typeVar,
+                                    Constraint *constraint);
 
     /// Create a change that updated a type variable.
     static Change updatedTypeVariable(

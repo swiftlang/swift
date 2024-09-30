@@ -436,6 +436,16 @@ private:
   void unrelateTypeVariables(TypeVariableType *typeVar,
                              TypeVariableType *otherTypeVar);
 
+  /// Infer bindings from the given constraint.
+  ///
+  /// Note that this it only meant to be called by SolverTrail::Change::undo().
+  void inferBindings(TypeVariableType *typeVar, Constraint *constraint);
+
+  /// Retract bindings from the given constraint.
+  ///
+  /// Note that this it only meant to be called by SolverTrail::Change::undo().
+  void retractBindings(TypeVariableType *typeVar, Constraint *constraint);
+
   /// Retract the given type variable from inference.
   ///
   /// Note that this it only meant to be called by SolverTrail::Change::undo().

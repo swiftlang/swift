@@ -1772,6 +1772,10 @@ void PotentialBindings::infer(Constraint *constraint) {
   if (!Constraints.insert(constraint).second)
     return;
 
+  // Record the change, if there are active scopes.
+  if (CS.isRecordingChanges())
+    CS.recordChange(SolverTrail::Change::inferredBindings(TypeVar, constraint));
+
   switch (constraint->getKind()) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
@@ -1942,6 +1946,10 @@ void PotentialBindings::infer(Constraint *constraint) {
 void PotentialBindings::retract(Constraint *constraint) {
   if (!Constraints.erase(constraint))
     return;
+
+  // Record the change, if there are active scopes.
+  if (CS.isRecordingChanges())
+    CS.recordChange(SolverTrail::Change::retractedBindings(TypeVar, constraint));
 
   Bindings.erase(
       llvm::remove_if(Bindings,
