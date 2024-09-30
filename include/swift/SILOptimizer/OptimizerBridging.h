@@ -332,6 +332,10 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   OptionalBridgedVTable lookupSpecializedVTable(BridgedType classType) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedConformance getSpecializedConformance(BridgedConformance genericConformance,
+                                                       BridgedASTType type,
+                                                       BridgedSubstitutionMap substitutions) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   OptionalBridgedWitnessTable lookupWitnessTable(BridgedConformance conformance) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedWitnessTable createWitnessTable(BridgedLinkage linkage,
                                                                             bool serialized,
