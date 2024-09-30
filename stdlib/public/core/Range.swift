@@ -174,6 +174,7 @@ public struct Range<Bound: Comparable> {
   ///
   /// - Parameter bounds: A tuple of the lower and upper bounds of the range.
   @inlinable
+  @unsafe
   public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     _debugPrecondition(bounds.lower <= bounds.upper,
       "Range requires lowerBound <= upperBound")
