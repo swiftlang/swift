@@ -178,3 +178,21 @@ extension BridgedArrayRef {
     return c(buffer)
   }
 }
+
+//===----------------------------------------------------------------------===//
+//                            Sequence Utilities
+//===----------------------------------------------------------------------===//
+
+/// RandomAccessCollection which bridges to some C++ array.
+///
+/// It fixes the default reflection for bridged random access collections, which usually have a
+/// `bridged` stored property.
+/// Conforming to this protocol displays the "real" children  not just `bridged`.
+public protocol BridgedRandomAccessCollection : RandomAccessCollection, CustomReflectable {
+}
+
+extension BridgedRandomAccessCollection {
+  public var customMirror: Mirror {
+    Mirror(self, children: self.map { (label: nil, value: $0 as Any) })
+  }
+}
