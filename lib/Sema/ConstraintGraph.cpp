@@ -155,16 +155,6 @@ void ConstraintGraphNode::addConstraint(Constraint *constraint) {
   assert(ConstraintIndex.count(constraint) == 0 && "Constraint re-insertion");
   ConstraintIndex[constraint] = Constraints.size();
   Constraints.push_back(constraint);
-
-  {
-    introduceToInference(constraint);
-
-    if (isUsefulForReferencedVars(constraint)) {
-      notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
-        referencedVar.introduceToInference(constraint);
-      });
-    }
-  }
 }
 
 void ConstraintGraphNode::removeConstraint(Constraint *constraint) {
@@ -175,16 +165,6 @@ void ConstraintGraphNode::removeConstraint(Constraint *constraint) {
   auto index = pos->second;
   ConstraintIndex.erase(pos);
   assert(Constraints[index] == constraint && "Mismatched constraint");
-
-  {
-    retractFromInference(constraint);
-
-    if (isUsefulForReferencedVars(constraint)) {
-      notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
-        referencedVar.retractFromInference(constraint);
-      });
-    }
-  }
 
   // If this is the last constraint, just pop it off the list and we're done.
   unsigned lastIndex = Constraints.size()-1;
@@ -471,48 +451,97 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
   // For the nodes corresponding to each type variable...
   auto referencedTypeVars = constraint->getTypeVariables();
   for (auto typeVar : referencedTypeVars) {
-    // Find the node for this type variable.
-    auto &node = (*this)[typeVar];
+    // Record the change, if there are active scopes.
+    if (CS.isRecordingChanges())
+      CS.recordChange(SolverTrail::Change::addedConstraint(typeVar, constraint));
 
-    // Note the constraint within the node for that type variable.
-    node.addConstraint(constraint);
+    addConstraint(typeVar, constraint);
   }
 
   // If the constraint doesn't reference any type variables, it's orphaned;
   // track it as such.
   if (referencedTypeVars.empty()) {
-    OrphanedConstraints.push_back(constraint);
+    // Record the change, if there are active scopes.
+    if (CS.isRecordingChanges())
+      CS.recordChange(SolverTrail::Change::addedConstraint(nullptr, constraint));
+
+    addConstraint(nullptr, constraint);
+  }
+}
+
+void ConstraintGraph::addConstraint(TypeVariableType *typeVar,
+                                    Constraint *constraint) {
+  if (typeVar) {
+    // Find the node for this type variable.
+    auto &node = (*this)[typeVar];
+
+    // Note the constraint within the node for that type variable.
+    node.addConstraint(constraint);
+
+    node.introduceToInference(constraint);
+
+    if (isUsefulForReferencedVars(constraint)) {
+      node.notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
+        referencedVar.introduceToInference(constraint);
+      });
+    }
+
+    return;
   }
 
-  // Record the change, if there are active scopes.
-  if (CS.isRecordingChanges())
-    CS.recordChange(SolverTrail::Change::addedConstraint(constraint));
+  // If the constraint doesn't reference any type variables, it's orphaned;
+  // track it as such.
+  OrphanedConstraints.push_back(constraint);
 }
 
 void ConstraintGraph::removeConstraint(Constraint *constraint) {
   // For the nodes corresponding to each type variable...
   auto referencedTypeVars = constraint->getTypeVariables();
   for (auto typeVar : referencedTypeVars) {
-    // Find the node for this type variable.
-    auto &node = (*this)[typeVar];
+    // Record the change, if there are active scopes.
+    if (CS.isRecordingChanges())
+      CS.recordChange(SolverTrail::Change::removedConstraint(typeVar, constraint));
 
-    // Remove the constraint.
-    node.removeConstraint(constraint);
+    removeConstraint(typeVar, constraint);
   }
 
   // If this is an orphaned constraint, remove it from the list.
   if (referencedTypeVars.empty()) {
-    auto known = std::find(OrphanedConstraints.begin(),
-                           OrphanedConstraints.end(),
-                           constraint);
-    assert(known != OrphanedConstraints.end() && "missing orphaned constraint");
-    *known = OrphanedConstraints.back();
-    OrphanedConstraints.pop_back();
+    // Record the change, if there are active scopes.
+    if (CS.isRecordingChanges())
+      CS.recordChange(SolverTrail::Change::removedConstraint(nullptr, constraint));
+
+    removeConstraint(nullptr, constraint);
+  }
+}
+
+void ConstraintGraph::removeConstraint(TypeVariableType *typeVar,
+                                       Constraint *constraint) {
+  if (typeVar) {
+    // Find the node for this type variable.
+    auto &node = (*this)[typeVar];
+
+    node.retractFromInference(constraint);
+
+    if (isUsefulForReferencedVars(constraint)) {
+      node.notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
+        referencedVar.retractFromInference(constraint);
+      });
+    }
+
+    // Remove the constraint.
+    node.removeConstraint(constraint);
+
+    return;
   }
 
-  // Record the change, if there are active scopes.
-  if (CS.isRecordingChanges())
-    CS.recordChange(SolverTrail::Change::removedConstraint(constraint));
+  // If this is an orphaned constraint, remove it from the list.
+  auto known = std::find(OrphanedConstraints.begin(),
+                         OrphanedConstraints.end(),
+                         constraint);
+  assert(known != OrphanedConstraints.end() && "missing orphaned constraint");
+  *known = OrphanedConstraints.back();
+  OrphanedConstraints.pop_back();
 }
 
 void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1, 

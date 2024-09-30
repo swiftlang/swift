@@ -259,8 +259,14 @@ public:
   /// Add a new constraint to the graph.
   void addConstraint(Constraint *constraint);
 
+  /// Primitive form for SolverTrail::Change::undo().
+  void addConstraint(TypeVariableType *typeVar, Constraint *constraint);
+
   /// Remove a constraint from the graph.
   void removeConstraint(Constraint *constraint);
+
+  /// Primitive form for SolverTrail::Change::undo().
+  void removeConstraint(TypeVariableType *typeVar, Constraint *constraint);
 
   /// Merge the two nodes for the two given type variables.
   ///
@@ -416,25 +422,23 @@ public:
 private:
   /// Remove the node corresponding to the given type variable.
   ///
-  /// This operation assumes that the any constraints that refer to
-  /// this type variable have been or will be removed before other
-  /// graph queries are performed.
+  /// This operation assumes that the any constraints that refer to this type
+  /// variable have been or will be removed before other graph queries are
+  /// performed.
   ///
-  /// Note that this change is not recorded and cannot be undone. Use with
-  /// caution.
+  /// Note that this it only meant to be called by SolverTrail::Change::undo().
   void removeNode(TypeVariableType *typeVar);
 
   /// Remove an edge from the constraint graph.
   ///
-  /// Note that this change is not recorded and cannot be undone. Use with
-  /// caution.
+  ///
+  /// Note that this it only meant to be called by SolverTrail::Change::undo().
   void unrelateTypeVariables(TypeVariableType *typeVar,
                              TypeVariableType *otherTypeVar);
 
   /// Retract the given type variable from inference.
   ///
-  /// Note that this change is not recorded and cannot be undone. Use with
-  /// caution.
+  /// Note that this it only meant to be called by SolverTrail::Change::undo().
   void retractFromInference(TypeVariableType *typeVar, Type fixedType);
 
   /// Perform edge contraction on the constraint graph, merging equivalence

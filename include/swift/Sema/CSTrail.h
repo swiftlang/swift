@@ -64,7 +64,14 @@ public:
 
     union {
       TypeVariableType *TypeVar;
-      Constraint *TheConstraint;
+
+      struct {
+        /// The type variable we're adding or removing a constraint from.
+        TypeVariableType *TypeVar;
+
+        /// The constraint.
+        Constraint *Constraint;
+      } TheConstraint;
 
       struct {
         /// The type variable whose equivalence class was extended.
@@ -108,10 +115,10 @@ public:
     static Change addedTypeVariable(TypeVariableType *typeVar);
 
     /// Create a change that added a constraint.
-    static Change addedConstraint(Constraint *constraint);
+    static Change addedConstraint(TypeVariableType *typeVar, Constraint *constraint);
 
     /// Create a change that removed a constraint.
-    static Change removedConstraint(Constraint *constraint);
+    static Change removedConstraint(TypeVariableType *typeVar, Constraint *constraint);
 
     /// Create a change that extended an equivalence class.
     static Change extendedEquivalenceClass(TypeVariableType *typeVar,

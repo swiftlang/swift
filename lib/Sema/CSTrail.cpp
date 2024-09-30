@@ -50,18 +50,22 @@ SolverTrail::Change::addedTypeVariable(TypeVariableType *typeVar) {
 }
 
 SolverTrail::Change
-SolverTrail::Change::addedConstraint(Constraint *constraint) {
+SolverTrail::Change::addedConstraint(TypeVariableType *typeVar,
+                                     Constraint *constraint) {
   Change result;
   result.Kind = ChangeKind::AddedConstraint;
-  result.TheConstraint = constraint;
+  result.TheConstraint.TypeVar = typeVar;
+  result.TheConstraint.Constraint = constraint;
   return result;
 }
 
 SolverTrail::Change
-SolverTrail::Change::removedConstraint(Constraint *constraint) {
+SolverTrail::Change::removedConstraint(TypeVariableType *typeVar,
+                                       Constraint *constraint) {
   Change result;
   result.Kind = ChangeKind::RemovedConstraint;
-  result.TheConstraint = constraint;
+  result.TheConstraint.TypeVar = typeVar;
+  result.TheConstraint.Constraint = constraint;
   return result;
 }
 
@@ -117,11 +121,11 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     break;
 
   case ChangeKind::AddedConstraint:
-    cg.removeConstraint(TheConstraint);
+    cg.removeConstraint(TheConstraint.TypeVar, TheConstraint.Constraint);
     break;
 
   case ChangeKind::RemovedConstraint:
-    cg.addConstraint(TheConstraint);
+    cg.addConstraint(TheConstraint.TypeVar, TheConstraint.Constraint);
     break;
 
   case ChangeKind::ExtendedEquivalenceClass: {
@@ -162,13 +166,19 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
 
   case ChangeKind::AddedConstraint:
     out << "(added constraint ";
-    TheConstraint->print(out, &cs.getASTContext().SourceMgr, indent + 2);
+    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
+                         indent + 2);
+    out << " to type variable ";
+    TheConstraint.TypeVar->print(out, PO);
     out << ")\n";
     break;
 
   case ChangeKind::RemovedConstraint:
     out << "(removed constraint ";
-    TheConstraint->print(out, &cs.getASTContext().SourceMgr, indent + 2);
+    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
+                                    indent + 2);
+    out << " from type variable ";
+    TheConstraint.TypeVar->print(out, PO);
     out << ")\n";
     break;
 
