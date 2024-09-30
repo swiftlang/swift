@@ -424,11 +424,12 @@ private:
   /// caution.
   void removeNode(TypeVariableType *typeVar);
 
-  /// Unbind the given type variable from the given fixed type.
+  /// Remove an edge from the constraint graph.
   ///
   /// Note that this change is not recorded and cannot be undone. Use with
   /// caution.
-  void unbindTypeVariable(TypeVariableType *typeVar, Type fixedType);
+  void unrelateTypeVariables(TypeVariableType *typeVar,
+                             TypeVariableType *otherTypeVar);
 
   /// Retract the given type variable from inference.
   ///

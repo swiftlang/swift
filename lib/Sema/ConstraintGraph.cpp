@@ -559,29 +559,24 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
 
     otherNode.addReferencedBy(typeVar);
     node.addReferencedVar(otherTypeVar);
-  }
 
-  // Record the change, if there are active scopes.
-  if (CS.isRecordingChanges())
-    CS.recordChange(SolverTrail::Change::boundTypeVariable(typeVar, fixed));
+    // Record the change, if there are active scopes.
+    if (CS.isRecordingChanges())
+      CS.recordChange(SolverTrail::Change::relatedTypeVariables(typeVar, otherTypeVar));
+  }
 }
 
 void ConstraintGraph::introduceToInference(TypeVariableType *typeVar, Type fixed) {
   (*this)[typeVar].introduceToInference(fixed);
 }
 
-void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed) {
+void ConstraintGraph::unrelateTypeVariables(TypeVariableType *typeVar,
+                                            TypeVariableType *otherTypeVar) {
   auto &node = (*this)[typeVar];
+  auto &otherNode = (*this)[otherTypeVar];
 
-  llvm::SmallPtrSet<TypeVariableType *, 4> referencedVars;
-  fixed->getTypeVariables(referencedVars);
-
-  for (auto otherTypeVar : referencedVars) {
-    auto &otherNode = (*this)[otherTypeVar];
-
-    otherNode.removeReferencedBy(typeVar);
-    node.removeReference(otherTypeVar);
-  }
+  otherNode.removeReferencedBy(typeVar);
+  node.removeReference(otherTypeVar);
 }
 
 void ConstraintGraph::retractFromInference(TypeVariableType *typeVar, Type fixed) {

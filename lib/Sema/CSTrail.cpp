@@ -76,12 +76,12 @@ SolverTrail::Change::extendedEquivalenceClass(TypeVariableType *typeVar,
 }
 
 SolverTrail::Change
-SolverTrail::Change::boundTypeVariable(TypeVariableType *typeVar,
-                                       Type fixed) {
+SolverTrail::Change::relatedTypeVariables(TypeVariableType *typeVar,
+                                          TypeVariableType *otherTypeVar) {
   Change result;
-  result.Kind = ChangeKind::BoundTypeVariable;
-  result.Binding.TypeVar = typeVar;
-  result.Binding.FixedType = fixed.getPointer();
+  result.Kind = ChangeKind::RelatedTypeVariables;
+  result.Relation.TypeVar = typeVar;
+  result.Relation.OtherTypeVar = otherTypeVar;
   return result;
 }
 
@@ -130,8 +130,8 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     break;
    }
 
-  case ChangeKind::BoundTypeVariable:
-    cg.unbindTypeVariable(Binding.TypeVar, Binding.FixedType);
+  case ChangeKind::RelatedTypeVariables:
+    cg.unrelateTypeVariables(Relation.TypeVar, Relation.OtherTypeVar);
     break;
 
   case ChangeKind::IntroducedToInference:
@@ -179,11 +179,11 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     break;
    }
 
-  case ChangeKind::BoundTypeVariable:
-    out << "(bound type variable ";
-    Binding.TypeVar->print(out, PO);
-    out << " to fixed type ";
-    Binding.FixedType->print(out, PO);
+  case ChangeKind::RelatedTypeVariables:
+    out << "(related type variable ";
+    Relation.TypeVar->print(out, PO);
+    out << " with ";
+    Relation.OtherTypeVar->print(out, PO);
     out << ")\n";
     break;
 

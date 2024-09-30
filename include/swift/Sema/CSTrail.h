@@ -37,7 +37,7 @@ public:
 
   /// The kind of change made to the graph.
   enum class ChangeKind {
-    /// Added a type variable to the constraint graph.
+    /// Added a new vertex to the constraint graph.
     AddedTypeVariable,
     /// Added a new constraint to the constraint graph.
     AddedConstraint,
@@ -45,8 +45,8 @@ public:
     RemovedConstraint,
     /// Extended the equivalence class of a type variable in the constraint graph.
     ExtendedEquivalenceClass,
-    /// Added a fixed binding for a type variable in the constraint graph.
-    BoundTypeVariable,
+    /// Added a new edge in the constraint graph.
+    RelatedTypeVariables,
     /// Introduced a type variable's fixed type to inference.
     IntroducedToInference,
     /// Set the fixed type or parent and flags for a type variable.
@@ -73,6 +73,14 @@ public:
         /// The previous size of the equivalence class.
         unsigned PrevSize;
       } EquivClass;
+
+      struct {
+        /// The first type variable.
+        TypeVariableType *TypeVar;
+
+        /// The second type variable.
+        TypeVariableType *OtherTypeVar;
+      } Relation;
 
       struct {
         /// The type variable being bound to a fixed type.
@@ -109,8 +117,10 @@ public:
     static Change extendedEquivalenceClass(TypeVariableType *typeVar,
                                            unsigned prevSize);
 
-    /// Create a change that bound a type variable to a fixed type.
-    static Change boundTypeVariable(TypeVariableType *typeVar, Type fixed);
+    /// Create a change that updated the references/referenced by sets of
+    /// a type variable pair.
+    static Change relatedTypeVariables(TypeVariableType *typeVar,
+                                       TypeVariableType *otherTypeVar);
 
     /// Create a change that introduced a type variable to inference.
     static Change introducedToInference(TypeVariableType *typeVar, Type fixed);
