@@ -1419,6 +1419,15 @@ ERROR(optional_chain_isnt_chaining,none,
       ())
 ERROR(pattern_in_expr,none,
       "%0 cannot appear in an expression", (DescriptivePatternKind))
+ERROR(conditional_cast_in_type_casting_pattern,none,
+      "cannot conditionally downcast in a type-casting pattern",
+      ())
+ERROR(force_cast_in_type_casting_pattern,none,
+      "cannot force downcast in a type-casting pattern",
+      ())
+ERROR(cannot_bind_value_with_is,none,
+      "use 'as' keyword to bind a matched value",
+      ())
 NOTE(note_call_to_operator,none,
      "in call to operator %0", (const ValueDecl *))
 NOTE(note_call_to_func,none,
@@ -1814,6 +1823,17 @@ ERROR(attr_implementation_category_goes_on_objc_attr,none,
       "'@implementation'",
       ())
 
+WARNING(objc_implementation_will_become_objc,none,
+        "%kind0 will become implicitly '@objc' after adopting '@objc "
+        "@implementation'; add '%select{@nonobjc|final}1' to keep the current "
+        "behavior",
+        (const ValueDecl *, /*suggestFinal=*/bool))
+WARNING(objc_implementation_will_become_nonobjc,none,
+        "%kind0 will no longer be implicitly '@objc' after adopting '@objc "
+        "@implementation'; add '@objc' to keep the current "
+        "behavior",
+        (const ValueDecl *))
+
 ERROR(member_of_objc_implementation_not_objc_or_final,none,
       "%kind0 does not match any %kindonly0 declared in the headers for %1; "
       "did you use the %kindonly0's Swift name?",
@@ -1822,12 +1842,10 @@ NOTE(fixit_add_private_for_objc_implementation,none,
      "add 'private' or 'fileprivate' to define an Objective-C-compatible %0 "
      "not declared in the header",
      (DescriptiveDeclKind))
-NOTE(fixit_add_final_for_objc_implementation,none,
-     "add 'final' to define a Swift %0 that cannot be overridden",
-     (DescriptiveDeclKind))
-NOTE(fixit_add_nonobjc_for_objc_implementation,none,
-     "add '@nonobjc' to define a Swift-only %0",
-     (DescriptiveDeclKind))
+NOTE(fixit_add_nonobjc_or_final_for_objc_implementation,none,
+     "add '%select{@nonobjc|final}1' to define a Swift-only %0"
+     "%select{| that cannot be overridden}1",
+     (DescriptiveDeclKind, /*suggestFinal=*/bool))
 
 ERROR(objc_implementation_wrong_category,none,
       "%kind0 should be implemented in extension for "

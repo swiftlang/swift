@@ -89,6 +89,14 @@ public struct Builder {
     let literal = bridged.createIntegerLiteral(type.bridged, value)
     return notifyNew(literal.getAs(IntegerLiteralInst.self))
   }
+    
+  public func createAllocRef(_ type: Type, isObjC: Bool = false, canAllocOnStack: Bool = false, isBare: Bool = false,
+                             tailAllocatedTypes: TypeArray, tailAllocatedCounts: [Value]) -> AllocRefInst {
+    return tailAllocatedCounts.withBridgedValues { countsRef in
+      let dr = bridged.createAllocRef(type.bridged, isObjC, canAllocOnStack, isBare, tailAllocatedTypes.bridged, countsRef)
+      return notifyNew(dr.getAs(AllocRefInst.self))
+    }
+  }
 
   public func createAllocStack(_ type: Type, hasDynamicLifetime: Bool = false,
                                isLexical: Bool = false, isFromVarDecl: Bool = false,
@@ -426,20 +434,22 @@ public struct Builder {
 
   public func createInitExistentialRef(instance: Value,
                                        existentialType: Type,
-                                       useConformancesOf: InitExistentialRefInst) -> InitExistentialRefInst {
+                                       formalConcreteType: BridgedASTType,
+                                       conformances: ProtocolConformanceArray) -> InitExistentialRefInst {
     let initExistential = bridged.createInitExistentialRef(instance.bridged,
                                                            existentialType.bridged,
-                                                           useConformancesOf.bridged)
+                                                           formalConcreteType,
+                                                           conformances.bridged)
     return notifyNew(initExistential.getAs(InitExistentialRefInst.self))
   }
 
   public func createInitExistentialMetatype(
     metatype: Value,
     existentialType: Type,
-    useConformancesOf: InitExistentialMetatypeInst) -> InitExistentialMetatypeInst {
+    conformances: ProtocolConformanceArray) -> InitExistentialMetatypeInst {
     let initExistential = bridged.createInitExistentialMetatype(metatype.bridged,
                                                                 existentialType.bridged,
-                                                                useConformancesOf.bridged)
+                                                                conformances.bridged)
     return notifyNew(initExistential.getAs(InitExistentialMetatypeInst.self))
   }
 

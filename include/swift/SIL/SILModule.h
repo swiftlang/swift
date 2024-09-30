@@ -252,7 +252,7 @@ private:
       VTableEntryCache;
 
   /// Lookup table for SIL witness tables from conformances.
-  llvm::DenseMap<const RootProtocolConformance *, SILWitnessTable *>
+  llvm::DenseMap<const ProtocolConformance *, SILWitnessTable *>
   WitnessTableMap;
 
   /// The list of SILWitnessTables in the module.

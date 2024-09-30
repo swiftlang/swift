@@ -119,10 +119,11 @@ public:
   void visitFunctionRefInst(FunctionRefInst *FRI);
   void visitDynamicFunctionRefInst(DynamicFunctionRefInst *FRI);
   void visitPreviousDynamicFunctionRefInst(PreviousDynamicFunctionRefInst *FRI);
-  void visitProtocolConformance(ProtocolConformanceRef C);
+  void visitProtocolConformance(ProtocolConformanceRef C,
+                                bool referencedFromInitExistential);
   void visitApplySubstitutions(SubstitutionMap subs);
   void visitWitnessMethodInst(WitnessMethodInst *WMI) {
-    visitProtocolConformance(WMI->getConformance());
+    visitProtocolConformance(WMI->getConformance(), false);
   }
   void visitInitExistentialAddrInst(InitExistentialAddrInst *IEI);
   void visitInitExistentialRefInst(InitExistentialRefInst *IERI);

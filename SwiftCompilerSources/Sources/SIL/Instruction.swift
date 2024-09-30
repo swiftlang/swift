@@ -592,7 +592,7 @@ final public class BuiltinInst : SingleValueInstruction {
   }
 
   public var substitutionMap: SubstitutionMap {
-    SubstitutionMap(bridged.BuiltinInst_getSubstitutionMap())
+    SubstitutionMap(bridged: bridged.BuiltinInst_getSubstitutionMap())
   }
 }
 
@@ -669,6 +669,14 @@ class TailAddrInst : SingleValueInstruction {
 final public
 class InitExistentialRefInst : SingleValueInstruction, UnaryInstruction {
   public var instance: Value { operand.value }
+
+  public var conformances: ProtocolConformanceArray {
+    ProtocolConformanceArray(bridged: bridged.InitExistentialRefInst_getConformances())
+  }
+
+  public var formalConcreteType: BridgedASTType {
+    bridged.InitExistentialRefInst_getFormalConcreteType()
+  }
 }
 
 final public
@@ -1195,6 +1203,11 @@ final public class AllocRefInst : AllocRefInstBase {
 final public class AllocRefDynamicInst : AllocRefInstBase {
   public var isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType: Bool {
     bridged.AllocRefDynamicInst_isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType()
+  }
+
+  public var metatypeOperand: Operand {
+    let numTailTypes = bridged.AllocRefInstBase_getNumTailTypes()
+    return operands[numTailTypes]
   }
 }
 

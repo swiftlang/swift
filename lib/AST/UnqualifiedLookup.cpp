@@ -240,9 +240,6 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   auto localCounter = lookupCounter;
   (void)localCounter; // for debugging
 #endif
-  FrontendStatsTracer StatsTracer(Ctx.Stats,
-                                  "performUnqualifiedLookup",
-                                  DC->getParentSourceFile());
 
   if (options.contains(UnqualifiedLookupFlags::ModuleLookup)) {
     lookForAModuleWithTheGivenName(DC->getModuleScopeContext());

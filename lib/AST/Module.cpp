@@ -20,6 +20,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessScope.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -30,6 +31,7 @@
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -1614,6 +1616,11 @@ void ModuleDecl::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
   FORWARD(getImportedModules, (modules, filter));
 }
 
+void ModuleDecl::getExternalMacros(
+    SmallVectorImpl<ExternalMacroPlugin> &macros) const {
+  FORWARD(getExternalMacros, (macros));
+}
+
 void ModuleDecl::getImplicitImportsForModuleInterface(
     SmallVectorImpl<ImportedModule> &imports) const {
   FORWARD(getImplicitImportsForModuleInterface, (imports));
@@ -1702,6 +1709,29 @@ SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
 
     if (filter.contains(requiredFilter))
       modules.push_back(desc.module);
+  }
+}
+
+void SourceFile::getExternalMacros(
+    SmallVectorImpl<ExternalMacroPlugin> &macros) const {
+  for (auto *D : getTopLevelDecls()) {
+    auto macroDecl = dyn_cast<MacroDecl>(D);
+    if (!macroDecl)
+      continue;
+
+    auto macroDef = macroDecl->getDefinition();
+    if (macroDef.kind != MacroDefinition::Kind::External)
+      continue;
+
+    auto formalAccess = macroDecl->getFormalAccess();
+    ExternalMacroPlugin::Access access = ExternalMacroPlugin::Access::Internal;
+    if (formalAccess >= AccessLevel::Public)
+      access = ExternalMacroPlugin::Access::Public;
+    else if (formalAccess >= AccessLevel::Package)
+      access = ExternalMacroPlugin::Access::Package;
+
+    auto external = macroDef.getExternalMacro();
+    macros.push_back({external.moduleName.str().str(), access});
   }
 }
 
@@ -2439,6 +2469,14 @@ bool ModuleDecl::getRequiredBystandersIfCrossImportOverlay(
       return true;
   }
   return false;
+}
+
+bool ModuleDecl::isClangHeaderImportModule() const {
+  auto importer = getASTContext().getClangModuleLoader();
+  if (!importer)
+    return false;
+
+  return this == importer->getImportedHeaderModule();
 }
 
 namespace {

@@ -1373,20 +1373,31 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
       }
     }
 
+    // Fetch the task executor from the job for later use. This can be somewhat
+    // expensive, so only do it if we're likely to need it. The conditions here
+    // match the conditions of the if statements below which use `taskExecutor`.
+    TaskExecutorRef taskExecutor;
+    bool needsScheduling = !oldState.isScheduled() && newState.isScheduled();
+    bool needsStealer =
+        oldState.getMaxPriority() != newState.getMaxPriority() &&
+        newState.isRunning();
+    if (needsScheduling || needsStealer)
+      taskExecutor = TaskExecutorRef::fromTaskExecutorPreference(job);
+
     // This needs to be a store release so that we also publish the contents of
     // the new Job we are adding to the atomic job queue. Pairs with consume
     // in drainOne.
     if (_status().compare_exchange_weak(oldState, newState,
                    /* success */ std::memory_order_release,
                    /* failure */ std::memory_order_relaxed)) {
+      // NOTE: `job` is off limits after this point, as another thread might run
+      // and destroy it now that it's enqueued.
+
       traceActorStateTransition(this, oldState, newState, distributedActorIsRemote);
 
       if (!oldState.isScheduled() && newState.isScheduled()) {
         // We took responsibility to schedule the actor for the first time. See
         // also ownership rule (1)
-        TaskExecutorRef taskExecutor =
-            TaskExecutorRef::fromTaskExecutorPreference(job);
-
         return scheduleActorProcessJob(newState.getMaxPriority(), taskExecutor);
       }
 
@@ -1407,8 +1418,6 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
               this, newState.getMaxPriority());
           swift_retain(this);
 
-          TaskExecutorRef taskExecutor =
-              TaskExecutorRef::fromTaskExecutorPreference(job);
           scheduleActorProcessJob(newState.getMaxPriority(), taskExecutor);
         }
       }
@@ -1464,9 +1473,19 @@ void DefaultActorImpl::enqueueStealer(Job *job, JobPriority priority) {
     if (oldState == newState)
       return;
 
+    // Fetch the task executor from the job for later use. This can be somewhat
+    // expensive, so only do it if we're likely to need it. The conditions here
+    // match the conditions of the if statements below which use `taskExecutor`.
+    TaskExecutorRef taskExecutor;
+    if (!newState.isRunning() && newState.isScheduled())
+      taskExecutor = TaskExecutorRef::fromTaskExecutorPreference(job);
+
     if (_status().compare_exchange_weak(oldState, newState,
                    /* success */ std::memory_order_relaxed,
                    /* failure */ std::memory_order_relaxed)) {
+      // NOTE: `job` is off limits after this point, as another thread might run
+      // and destroy it now that it's enqueued.
+
       traceActorStateTransition(this, oldState, newState, distributedActorIsRemote);
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
       if (newState.isRunning()) {
@@ -1484,7 +1503,6 @@ void DefaultActorImpl::enqueueStealer(Job *job, JobPriority priority) {
             "[Override] Scheduling a stealer for actor %p at %#x priority",
             this, newState.getMaxPriority());
         swift_retain(this);
-        auto taskExecutor = TaskExecutorRef::fromTaskExecutorPreference(job);
         scheduleActorProcessJob(newState.getMaxPriority(), taskExecutor);
       }
 #endif

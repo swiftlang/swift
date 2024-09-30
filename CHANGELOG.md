@@ -5,6 +5,22 @@
 
 ## Swift (next)
 
+* [SE-0444][]:
+  When the upcoming feature `MemberImportVisibility` is enabled, Swift will
+  require that a module be directly imported in a source file when resolving
+  member declarations from that module:
+  
+  ```swift
+  let recipe = "2 slices of bread, 1.5 tbs peanut butter".parse()
+  // error: instance method 'parse()' is inaccessible due to missing import of
+  //        defining module 'RecipeKit'
+  // note:  add import of module 'RecipeKit'
+  ```
+  
+  This new behavior prevents ambiguities from arising when a transitively
+  imported module declares a member that conflicts with a member of a directly
+  imported module.
+
 * Syntactic SourceKit queries no longer attempt to provide information
   within the inactive `#if` regions. For example, given:
 
@@ -10629,6 +10645,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0428]: https://github.com/apple/swift-evolution/blob/main/proposals/0428-resolve-distributed-actor-protocols.md
 [SE-0431]: https://github.com/apple/swift-evolution/blob/main/proposals/0431-isolated-any-functions.md
 [SE-0442]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0442-allow-taskgroup-childtaskresult-type-to-be-inferred.md
+[SE-0444]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0444-member-import-visibility.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>

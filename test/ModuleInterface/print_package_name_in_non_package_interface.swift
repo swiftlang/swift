@@ -51,7 +51,10 @@
 // RUN: rm -rf %t/Bar.package.swiftinterface
 
 /// Print -package-name in public or private interface.
-// RUN: %target-build-swift -emit-module %t/Bar.swift -I %t \
+/// Note the order of arguments differs across old/new driver, so force old
+/// driver for now.
+// RUN: env SWIFT_USE_OLD_DRIVER=1 %target-build-swift \
+// RUN:   -emit-module %t/Bar.swift -I %t \
 // RUN:   -module-name Bar -package-name barpkg \
 // RUN:   -enable-library-evolution -swift-version 6 \
 // RUN:   -Xfrontend -print-package-name-in-non-package-interface \

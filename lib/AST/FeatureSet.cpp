@@ -50,16 +50,6 @@ static bool usesTypeMatching(Decl *decl, llvm::function_ref<bool(Type)> fn) {
 #define UNINTERESTING_FEATURE(FeatureName)                                     \
   static bool usesFeature##FeatureName(Decl *decl) { return false; }
 
-static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    for (auto specialize : func->getAttrs().getAttributes<SpecializeAttr>()) {
-      if (!specialize->getAvailableAttrs().empty())
-        return true;
-    }
-  }
-  return false;
-}
-
 // ----------------------------------------------------------------------------
 // MARK: - Upcoming Features
 // ----------------------------------------------------------------------------
@@ -78,6 +68,7 @@ UNINTERESTING_FEATURE(FullTypedThrows)
 UNINTERESTING_FEATURE(ExistentialAny)
 UNINTERESTING_FEATURE(InferSendableFromCaptures)
 UNINTERESTING_FEATURE(ImplicitOpenExistentials)
+UNINTERESTING_FEATURE(MemberImportVisibility)
 
 // ----------------------------------------------------------------------------
 // MARK: - Experimental Features
@@ -206,6 +197,7 @@ UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
 UNINTERESTING_FEATURE(UnspecifiedMeansMainActorIsolated)
 UNINTERESTING_FEATURE(GlobalActorInferenceCutoff)
+UNINTERESTING_FEATURE(KeyPathWithStaticMembers)
 
 static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   auto isFunctionTypeWithSending = [](Type type) {
@@ -285,7 +277,6 @@ static bool usesFeatureIsolatedAny(Decl *decl) {
   });
 }
 
-UNINTERESTING_FEATURE(MemberImportVisibility)
 UNINTERESTING_FEATURE(IsolatedAny2)
 UNINTERESTING_FEATURE(GlobalActorIsolatedTypesUsability)
 UNINTERESTING_FEATURE(ObjCImplementation)

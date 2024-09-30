@@ -601,6 +601,8 @@ void writeJSON(llvm::raw_ostream &out,
                           /*trailingComma=*/true);
       }
 
+      writeMacroDependencies(out, swiftBinaryDeps->macro_dependencies, 5,
+                             /*trailingComma=*/true);
       writeJSONSingleField(out, "isFramework", swiftBinaryDeps->is_framework,
                            5, /*trailingComma=*/false);
     } else {

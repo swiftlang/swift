@@ -1287,6 +1287,12 @@ public:
       // after the isa and retain fields.
       return isaAndRetainCountSize;
 
+    // `ObjCClassTypeRef` instances represent classes in the ObjC module ("__C").
+    // These will never have Swift type metadata.
+    if (auto *objcSuper = dyn_cast<ObjCClassTypeRef>(superclass))
+      if (auto *superTI = ExternalTypeInfo->getTypeInfo(objcSuper->getName()))
+        return superTI->getSize();
+
     auto superclassStart =
         computeUnalignedFieldStartOffset(superclass, ExternalTypeInfo);
     if (!superclassStart)

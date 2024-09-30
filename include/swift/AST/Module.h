@@ -145,6 +145,19 @@ struct SourceFilePathInfo {
   }
 };
 
+/// This is used to idenfity an external macro definition.
+struct ExternalMacroPlugin {
+  std::string ModuleName;
+
+  enum Access {
+    Internal = 0,
+    Package,
+    Public,
+  };
+
+  Access MacroAccess;
+};
+
 /// Discriminator for resilience strategy.
 enum class ResilienceStrategy : unsigned {
   /// Public nominal types: fragile
@@ -601,6 +614,9 @@ public:
   void findDeclaredCrossImportOverlaysTransitive(
       SmallVectorImpl<ModuleDecl *> &overlays);
 
+  /// Returns true if this module is the Clang header import module.
+  bool isClangHeaderImportModule() const;
+
   /// Convenience accessor for clients that know what kind of file they're
   /// dealing with.
   SourceFile &getMainSourceFile() const;
@@ -968,6 +984,9 @@ public:
   /// in this list.
   void getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                           ImportFilter filter = ImportFilterKind::Exported) const;
+
+  /// Looks up which external macros are defined by this file.
+  void getExternalMacros(SmallVectorImpl<ExternalMacroPlugin> &macros) const;
 
   /// Lists modules that are not imported from a file and used in API.
   void getImplicitImportsForModuleInterface(

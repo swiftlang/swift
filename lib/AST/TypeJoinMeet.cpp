@@ -460,8 +460,18 @@ CanType TypeJoin::visitProtocolType(CanType second) {
   auto *secondDecl =
     cast<ProtocolDecl>(second->getNominalOrBoundGenericNominal());
 
-  if (firstDecl->getInheritedProtocols().empty() &&
-      secondDecl->getInheritedProtocols().empty())
+  SmallVector<Type, 4> firstMembers;
+  for (auto *decl : firstDecl->getInheritedProtocols())
+    if (!decl->getInvertibleProtocolKind())
+      firstMembers.push_back(decl->getDeclaredInterfaceType());
+
+  SmallVector<Type, 4> secondMembers;
+  for (auto *decl : secondDecl->getInheritedProtocols())
+    if (!decl->getInvertibleProtocolKind())
+      secondMembers.push_back(decl->getDeclaredInterfaceType());
+
+  if (firstMembers.empty() &&
+      secondMembers.empty())
     return TheAnyType;
 
   if (firstDecl->inheritsFrom(secondDecl))
@@ -473,14 +483,6 @@ CanType TypeJoin::visitProtocolType(CanType second) {
   // One isn't the supertype of the other, so instead, treat each as
   // if it's a protocol composition of its inherited members, and join
   // those.
-  SmallVector<Type, 4> firstMembers;
-  for (auto *decl : firstDecl->getInheritedProtocols())
-    firstMembers.push_back(decl->getDeclaredInterfaceType());
-
-  SmallVector<Type, 4> secondMembers;
-  for (auto *decl : secondDecl->getInheritedProtocols())
-    secondMembers.push_back(decl->getDeclaredInterfaceType());
-
   return computeProtocolCompositionJoin(firstMembers, secondMembers);
 }
 

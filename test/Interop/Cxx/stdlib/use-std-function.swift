@@ -14,6 +14,7 @@
 // XFAIL: LinuxDistribution=rhel-9.3
 // XFAIL: LinuxDistribution=rhel-9.4
 // XFAIL: LinuxDistribution=fedora-39
+// XFAIL: LinuxDistribution=debian-12
 
 import StdlibUnittest
 import StdFunction
@@ -63,12 +64,11 @@ StdFunctionTestSuite.test("FunctionStringToString init from closure and pass as 
   expectEqual(std.string("prefixabcabc"), res)
 }
 
-// FIXME: assertion for address-only closure params (rdar://124501345)
-//StdFunctionTestSuite.test("FunctionStringToStringConstRef init from closure and pass as parameter") {
-//  let res = invokeFunctionTwiceConstRef(.init({ $0 + std.string("abc") }),
-//                                        std.string("prefix"))
-//  expectEqual(std.string("prefixabcabc"), res)
-//}
+StdFunctionTestSuite.test("FunctionStringToStringConstRef init from closure and pass as parameter") {
+  let res = invokeFunctionTwiceConstRef(.init({ $0 + std.string("abc") }),
+                                        std.string("prefix"))
+  expectEqual(std.string("prefixabcabc"), res)
+}
 #endif
 
 runAllTests()

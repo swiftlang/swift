@@ -204,6 +204,14 @@ void retain2(MultipleRetainReleaseAttrFRT *v);
 void release1(MultipleRetainReleaseAttrFRT *v);
 void release2(MultipleRetainReleaseAttrFRT *v);
 
+struct
+    __attribute__((swift_attr("import_reference")))
+    __attribute__((swift_attr("retain:Uretain")))
+    __attribute__((swift_attr("release:Urelease")))
+UnimportedRetainRelease {};
+void Uretain(UnimportedRetainRelease v);
+UnimportedRetainRelease Urelease(UnimportedRetainRelease* v);
+
 //--- test.swift
 
 import Test
@@ -284,3 +292,10 @@ public func testMultipleRetainRelease(x: MultipleRetainReleaseFRT) {}
 // CHECK: error: reference type 'MultipleRetainReleaseAttrFRT' must have only one 'release:' Swift attribute
 @available(macOS 13.3, *)
 public func testMultipleRetainRelease(x: MultipleRetainReleaseAttrFRT) {}
+
+// CHECK: error: cannot find retain function 'Uretain' for reference type 'UnimportedRetainRelease'
+// CHECK: note: function uses foreign reference type 'UnimportedRetainRelease' as a value in a parameter types which breaks 'swift_shared_reference' contract
+// CHECK: error: cannot find release function 'Urelease' for reference type 'UnimportedRetainRelease'
+// CHECK: note: function uses foreign reference type 'UnimportedRetainRelease' as a value in the return types which breaks 'swift_shared_reference' contract
+@available(macOS 13.3, *)
+public func test(x: UnimportedRetainRelease) {}

@@ -12,6 +12,7 @@
 
 import TestsUtils
 import CxxStdlibPerformance
+import CxxStdlib // FIXME(rdar://128520766): this import should be redundant
 
 let iterRepeatFactor = 7
 

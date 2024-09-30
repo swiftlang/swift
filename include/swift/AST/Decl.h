@@ -979,6 +979,12 @@ public:
   LLVM_READONLY
   ModuleDecl *getModuleContext() const;
 
+  /// Retrieve the module in which this declaration would be found by name
+  /// lookup queries. The result can differ from that of `getModuleContext()`
+  /// when the decl was imported via Cxx interop.
+  LLVM_READONLY
+  ModuleDecl *getModuleContextForNameLookup() const;
+
   /// getASTContext - Return the ASTContext that this decl lives in.
   LLVM_READONLY
   ASTContext &getASTContext() const {
@@ -8515,7 +8521,9 @@ public:
     return hasName() ? getBaseIdentifier().str() : "_";
   }
 
-  Type getArgumentInterfaceType() const;
+  /// Retrieve the payload type for the enum element, which is a tuple of the
+  /// associated values, or null if there are no associated values.
+  Type getPayloadInterfaceType() const;
 
   void setParameterList(ParameterList *params);
   ParameterList *getParameterList() const { return Params; }

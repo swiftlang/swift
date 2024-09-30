@@ -80,6 +80,17 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     NominalTypeDecl(_bridged: bridged.getNominalOrBoundGenericNominal())
   }
 
+  public var superClassType: Type? {
+    precondition(isClass)
+    return bridged.getSuperClassType().typeOrNil
+  }
+
+  public var contextSubstitutionMap: SubstitutionMap {
+    SubstitutionMap(bridged: bridged.getContextSubstitutionMap())
+  }
+
+  public var isGenericAtAnyLevel: Bool { bridged.isGenericAtAnyLevel() }
+
   public var isOrContainsObjectiveCClass: Bool { bridged.isOrContainsObjectiveCClass() }
 
   public var isBuiltinInteger: Bool { bridged.isBuiltinInteger() }
@@ -207,7 +218,7 @@ extension Type: Equatable {
 }
 
 public struct TypeArray : RandomAccessCollection, CustomReflectable {
-  private let bridged: BridgedSILTypeArray
+  public let bridged: BridgedSILTypeArray
 
   public var startIndex: Int { return 0 }
   public var endIndex: Int { return bridged.getCount() }
@@ -313,39 +324,4 @@ public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
 extension BridgedType {
   public var type: Type { Type(bridged: self) }
   var typeOrNil: Type? { isNull() ? nil : type }
-}
-
-// TODO: use an AST type for this once we have it
-public struct NominalTypeDecl : Equatable, Hashable {
-  public let bridged: BridgedNominalTypeDecl
-
-  public init(_bridged: BridgedNominalTypeDecl) {
-    self.bridged = _bridged
-  }
-
-  public var name: StringRef { StringRef(bridged: bridged.getName()) }
-
-  public static func ==(lhs: NominalTypeDecl, rhs: NominalTypeDecl) -> Bool {
-    lhs.bridged.raw == rhs.bridged.raw
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(bridged.raw)
-  }
-
-  public func isResilient(in function: Function) -> Bool {
-    function.bridged.isResilientNominalDecl(bridged)
-  }
-
-  public var isStructWithUnreferenceableStorage: Bool {
-    bridged.isStructWithUnreferenceableStorage()
-  }
-
-  public var isGlobalActor: Bool {
-    return bridged.isGlobalActor()
-  }
-
-  public var hasValueDeinit: Bool {
-    return bridged.hasValueDeinit()
-  }
 }

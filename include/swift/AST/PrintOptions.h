@@ -528,6 +528,10 @@ struct PrintOptions {
   /// with types sharing a name with a module.
   bool AliasModuleNames = false;
 
+  /// Print some ABI details for public symbols as comments that can be
+  /// parsed by another tool.
+  bool PrintABIComments = false;
+
   /// Name of the modules that have been aliased in AliasModuleNames mode.
   /// Ideally we would use something other than a string to identify a module,
   /// but since one alias can apply to more than one module, strings happen
@@ -582,10 +586,6 @@ struct PrintOptions {
   /// Whether to print feature checks for compatibility with older Swift
   /// compilers that might parse the result.
   bool PrintCompatibilityFeatureChecks = false;
-
-  /// Whether to print @_specialize attributes that have an availability
-  /// parameter.
-  bool PrintSpecializeAttributeWithAvailability = true;
 
   /// Whether to always desugar array types from `[base_type]` to `Array<base_type>`
   bool AlwaysDesugarArraySliceTypes = false;
@@ -722,7 +722,8 @@ struct PrintOptions {
                                               bool useExportedModuleNames,
                                               bool aliasModuleNames,
                                               llvm::SmallSet<StringRef, 4>
-                                                *aliasModuleNamesTargets
+                                                *aliasModuleNamesTargets,
+                                              bool abiComments
                                               );
 
   /// Retrieve the set of options suitable for "Generated Interfaces", which

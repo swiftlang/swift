@@ -35,5 +35,5 @@ target_sources(swiftSILOptimizer PRIVATE
   SpeculativeDevirtualizer.cpp
   StringOptimization.cpp
   TempLValueOpt.cpp
-  TempRValueElimination.cpp
-  VTableSpecializer.cpp)
+  TempRValueElimination.cpp)
+

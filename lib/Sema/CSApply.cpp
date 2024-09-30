@@ -5384,9 +5384,6 @@ namespace {
         auto varDecl = cast<VarDecl>(property);
         // Key paths don't work with mutating-get properties.
         assert(!varDecl->isGetterMutating());
-        // Key paths don't currently support static members.
-        // There is a fix which diagnoses such situation already.
-        assert(!varDecl->isStatic());
 
         // Compute the concrete reference to the member.
         auto ref = resolveConcreteDeclRef(property, locator);
@@ -5620,18 +5617,18 @@ namespace {
 
       /// Check if it needs an explicit consume, due to this being a cast.
       auto *module = dc->getParentModule();
-      auto origType = cs.getType(injection->getSubExpr());
+      auto origType = solution.getResolvedType(injection->getSubExpr());
       if (willHaveConfusingConsumption(origType, locator, cs) &&
-          canAddExplicitConsume(module, injection->getSubExpr()))
+          canAddExplicitConsume(solution, module, injection->getSubExpr()))
         ConsumingCoercions.push_back(injection);
     }
 
     void diagnoseExistentialErasureOf(Expr *fromExpr, Expr *toExpr,
                                       ConstraintLocatorBuilder locator) {
       auto *module = dc->getParentModule();
-      auto fromType = cs.getType(fromExpr);
+      auto fromType = solution.getResolvedType(fromExpr);
       if (willHaveConfusingConsumption(fromType, locator, cs) &&
-          canAddExplicitConsume(module, fromExpr)) {
+          canAddExplicitConsume(solution, module, fromExpr)) {
         ConsumingCoercions.push_back(toExpr);
       }
     }

@@ -36,16 +36,13 @@ let swiftSetttings: [SwiftSetting] = [
     "-Xcc", "-I\(swiftSourceDirectory)/../build/Default/swift/include",
     "-Xcc", "-I\(swiftSourceDirectory)/../build/Default/llvm/include",
     "-Xcc", "-I\(swiftSourceDirectory)/../build/Default/llvm/tools/clang/include",
-
-    // FIXME: Needed to work around an availability issue with CxxStdlib
-    "-Xfrontend", "-disable-target-os-checking",
   ]),
 ]
 
 let package = Package(
   name: "swiftSwiftCompiler",
   platforms: [
-    .macOS(.v10_15)
+    .macOS(.v13)
   ],
   products: [
     .library(name: "swiftASTGen", targets: ["swiftASTGen"]),
