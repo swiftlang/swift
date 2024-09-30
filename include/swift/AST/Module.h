@@ -983,7 +983,7 @@ public:
   /// \p filter controls whether public, private, or any imports are included
   /// in this list.
   void getImportedModules(SmallVectorImpl<ImportedModule> &imports,
-                          ImportFilter filter = ImportFilterKind::Exported) const;
+                          ImportFilter filter) const;
 
   /// Looks up which external macros are defined by this file.
   void getExternalMacros(SmallVectorImpl<ExternalMacroPlugin> &macros) const;
