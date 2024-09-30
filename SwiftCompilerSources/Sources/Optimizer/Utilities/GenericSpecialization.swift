@@ -78,7 +78,8 @@ func specializeVTablesOfSuperclasses(_ moduleContext: ModulePassContext) {
 
 func specializeWitnessTable(forConformance conformance: Conformance,
                             errorLocation: Location,
-                            _ context: ModulePassContext) -> WitnessTable
+                            _ context: ModulePassContext,
+                            _ notifyNewWitnessTable: (WitnessTable) -> ())
 {
   let genericConformance = conformance.genericConformance
   guard let witnessTable = context.lookupWitnessTable(for: genericConformance) else {
@@ -107,5 +108,7 @@ func specializeWitnessTable(forConformance conformance: Conformance,
     }
     return origEntry
   }
-  return context.createWitnessTable(entries: newEntries, conformance: conformance, linkage: .shared, serialized: false)
+  let newWT = context.createWitnessTable(entries: newEntries,conformance: conformance,
+                                         linkage: .shared, serialized: false)
+  notifyNewWitnessTable(newWT)
 }

@@ -271,8 +271,9 @@ private func specializeWitnessTables(for initExRef: InitExistentialRefInst, _ co
     let origWitnessTable = context.lookupWitnessTable(for: conformance)
     if conformance.isSpecialized {
       if origWitnessTable == nil {
-        let wt = specializeWitnessTable(forConformance: conformance, errorLocation: initExRef.location, context)
-        worklist.addWitnessMethods(of: wt)
+        specializeWitnessTable(forConformance: conformance, errorLocation: initExRef.location, context) {
+          worklist.addWitnessMethods(of: $0)
+        }
       }
     } else if let origWitnessTable {
       checkForGenericMethods(in: origWitnessTable, errorLocation: initExRef.location, context)
