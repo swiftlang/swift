@@ -21,7 +21,7 @@ import OptimizerBridging
 struct ModulePassContext : Context, CustomStringConvertible {
   let _bridged: BridgedPassContext
 
-  public var description: String {
+  var description: String {
     return String(taking: _bridged.getModuleDescription())
   }
 
