@@ -457,10 +457,12 @@ StepResult ComponentStep::take(bool prevFailed) {
   }
 
   auto printConstraints = [&](const ConstraintList &constraints) {
-    for (auto &constraint : constraints)
+    for (auto &constraint : constraints) {
       constraint.print(
           getDebugLogger().indent(CS.solverState->getCurrentIndent()),
           &CS.getASTContext().SourceMgr, CS.solverState->getCurrentIndent());
+      getDebugLogger() << "\n";
+    }
   };
 
   // If we don't have any disjunction or type variable choices left, we're done

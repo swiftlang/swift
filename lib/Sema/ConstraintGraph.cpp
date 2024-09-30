@@ -18,8 +18,8 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Sema/ConstraintGraph.h"
-#include "swift/Sema/ConstraintGraphScope.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/CSTrail.h"
 #include "swift/Basic/Assertions.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
@@ -38,18 +38,13 @@ using namespace constraints;
 ConstraintGraph::ConstraintGraph(ConstraintSystem &cs) : CS(cs) { }
 
 ConstraintGraph::~ConstraintGraph() {
-#ifndef NDEBUG
-  // If constraint system is in an invalid state, it's
-  // possible that constraint graph is corrupted as well
-  // so let's not attempt to check change log.
-  if (!CS.inInvalidState())
-    assert(Changes.empty() && "Scope stack corrupted");
-#endif
-
   for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
     auto &impl = TypeVariables[i]->getImpl();
     delete impl.getGraphNode();
     impl.setGraphNode(nullptr);
+  }
+  for (auto *node : FreeList) {
+    delete node;
   }
 }
 
@@ -63,11 +58,20 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
     assert(impl.getGraphIndex() < TypeVariables.size() && "Out-of-bounds index");
     assert(TypeVariables[impl.getGraphIndex()] == typeVar && 
            "Type variable mismatch");
+    ASSERT(nodePtr->TypeVar == typeVar &&
+           "Use-after-free");
     return { *nodePtr, impl.getGraphIndex() };
   }
 
   // Allocate the new node.
-  auto nodePtr = new ConstraintGraphNode(*this, typeVar);
+  ConstraintGraphNode *nodePtr;
+  if (FreeList.empty())
+    nodePtr = new ConstraintGraphNode(*this, typeVar);
+  else {
+    nodePtr = FreeList.back();
+    FreeList.pop_back();
+    nodePtr->initTypeVariable(typeVar);
+  }
   unsigned index = TypeVariables.size();
   impl.setGraphNode(nodePtr);
   impl.setGraphIndex(index);
@@ -75,9 +79,12 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   // Record this type variable.
   TypeVariables.push_back(typeVar);
 
-  // Record the change, if there are active scopes.
-  if (ActiveScope)
-    Changes.push_back(Change::addedTypeVariable(typeVar));
+  // Record the change, if there are active scopes. Note that we specifically
+  // check CS.solverState and not CS.isRecordingChanges(), because we want
+  // recordChange() to assert if there's an active undo. It is not valid to
+  // create new nodes during an undo.
+  if (CS.solverState)
+    CS.recordChange(SolverTrail::Change::addedTypeVariable(typeVar));
 
   // If this type variable is not the representative of its equivalence class,
   // add it to its representative's set of equivalences.
@@ -85,11 +92,27 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   if (typeVar != typeVarRep)
     mergeNodes(typeVar, typeVarRep);
   else if (auto fixed = CS.getFixedType(typeVarRep)) {
+    // FIXME: This is totally the wrong place to do it. We should do this in
+    // introduceToInference().
+    if (CS.isRecordingChanges())
+      CS.recordChange(SolverTrail::Change::introducedToInference(typeVar, fixed));
+
     // Bind the type variable.
     bindTypeVariable(typeVar, fixed);
   }
 
   return { *nodePtr, index };
+}
+
+void ConstraintGraphNode::reset() {
+  ASSERT(TypeVar);
+  TypeVar = nullptr;
+  Bindings.reset();
+  Constraints.clear();
+  ConstraintIndex.clear();
+  ReferencedBy.clear();
+  References.clear();
+  EquivalenceClass.clear();
 }
 
 bool ConstraintGraphNode::forRepresentativeVar() const {
@@ -297,26 +320,38 @@ void ConstraintGraphNode::truncateEquivalenceClass(unsigned prevSize) {
 
 void ConstraintGraphNode::addReferencedVar(TypeVariableType *typeVar) {
   bool inserted = References.insert(typeVar);
-  assert(inserted && "Attempt to reference a duplicate type variable");
-  (void)inserted;
+  if (!inserted) {
+    llvm::errs() << "$T" << TypeVar->getImpl().getID() << " already "
+                 << "references $T" << typeVar->getImpl().getID() << "\n";
+    abort();
+  }
 }
 
 void ConstraintGraphNode::addReferencedBy(TypeVariableType *typeVar) {
   bool inserted = ReferencedBy.insert(typeVar);
-  assert(inserted && "Already referenced by the given type variable");
-  (void)inserted;
+  if (!inserted) {
+    llvm::errs() << "$T" << TypeVar->getImpl().getID() << " already "
+                 << "referenced by $T" << typeVar->getImpl().getID() << "\n";
+    abort();
+  }
 }
 
 void ConstraintGraphNode::removeReference(TypeVariableType *typeVar) {
   auto removed = References.remove(typeVar);
-  assert(removed && "Variables are not connected");
-  (void)removed;
+  if (!removed) {
+    llvm::errs() << "$T" << TypeVar->getImpl().getID() << " does not "
+                 << "reference $T" << typeVar->getImpl().getID() << "\n";
+    abort();
+  }
 }
 
 void ConstraintGraphNode::removeReferencedBy(TypeVariableType *typeVar) {
   auto removed = ReferencedBy.remove(typeVar);
-  assert(removed && "Variables are not connected");
-  (void)removed;
+  if (!removed) {
+    llvm::errs() << "$T" << TypeVar->getImpl().getID() << " not "
+                 << "referenced by $T" << typeVar->getImpl().getID() << "\n";
+    abort();
+  }
 }
 
 inference::PotentialBindings &ConstraintGraphNode::getCurrentBindings() {
@@ -384,11 +419,13 @@ void ConstraintGraphNode::introduceToInference(Type fixedType) {
   }
 }
 
-void ConstraintGraphNode::retractFromInference(
-    Type fixedType, SmallPtrSetImpl<TypeVariableType *> &referencedVars) {
+void ConstraintGraphNode::retractFromInference(Type fixedType) {
   // Notify referencing variables (just like in bound case) that this
   // type variable has been modified.
   notifyReferencingVars();
+
+  SmallPtrSet<TypeVariableType *, 4> referencedVars;
+  fixedType->getTypeVariables(referencedVars);
 
   // TODO: This might be an overkill but it's (currently)
   // the simplest way to reliably ensure that all of the
@@ -412,113 +449,15 @@ void ConstraintGraphNode::resetBindingSet() {
   }
 }
 
-#pragma mark Graph scope management
-ConstraintGraphScope::ConstraintGraphScope(ConstraintGraph &CG)
-  : CG(CG), ParentScope(CG.ActiveScope), NumChanges(CG.Changes.size())
-{
-  CG.ActiveScope = this;
-}
-
-ConstraintGraphScope::~ConstraintGraphScope() {
-  // Don't attempt to rollback if constraint system ended up
-  // in an invalid state.
-  if (CG.CS.inInvalidState())
-    return;
-
-  // Pop changes off the stack until we hit the change could we had prior to
-  // introducing this scope.
-  assert(CG.Changes.size() >= NumChanges && "Scope stack corrupted");
-  while (CG.Changes.size() > NumChanges) {
-    CG.Changes.back().undo(CG);
-    CG.Changes.pop_back();
-  }
-
-  // The active scope is now the parent scope.
-  CG.ActiveScope = ParentScope;
-}
-
-ConstraintGraph::Change
-ConstraintGraph::Change::addedTypeVariable(TypeVariableType *typeVar) {
-  Change result;
-  result.Kind = ChangeKind::AddedTypeVariable;
-  result.TypeVar = typeVar;
-  return result;
-}
-
-ConstraintGraph::Change
-ConstraintGraph::Change::addedConstraint(Constraint *constraint) {
-  Change result;
-  result.Kind = ChangeKind::AddedConstraint;
-  result.TheConstraint = constraint;
-  return result;
-}
-
-ConstraintGraph::Change
-ConstraintGraph::Change::removedConstraint(Constraint *constraint) {
-  Change result;
-  result.Kind = ChangeKind::RemovedConstraint;
-  result.TheConstraint = constraint;
-  return result;
-}
-
-ConstraintGraph::Change
-ConstraintGraph::Change::extendedEquivalenceClass(TypeVariableType *typeVar,
-                                                  unsigned prevSize) {
-  Change result;
-  result.Kind = ChangeKind::ExtendedEquivalenceClass;
-  result.EquivClass.TypeVar = typeVar;
-  result.EquivClass.PrevSize = prevSize;
-  return result;
-}
-
-ConstraintGraph::Change
-ConstraintGraph::Change::boundTypeVariable(TypeVariableType *typeVar,
-                                           Type fixed) {
-  Change result;
-  result.Kind = ChangeKind::BoundTypeVariable;
-  result.Binding.TypeVar = typeVar;
-  result.Binding.FixedType = fixed.getPointer();
-  return result;
-}
-
-void ConstraintGraph::Change::undo(ConstraintGraph &cg) {
-  /// Temporarily change the active scope to null, so we don't record
-  /// any changes made while performing the undo operation.
-  llvm::SaveAndRestore<ConstraintGraphScope *> prevActiveScope(cg.ActiveScope,
-                                                               nullptr);
-
-  switch (Kind) {
-  case ChangeKind::AddedTypeVariable:
-    cg.removeNode(TypeVar);
-    break;
-
-  case ChangeKind::AddedConstraint:
-    cg.removeConstraint(TheConstraint);
-    break;
-
-  case ChangeKind::RemovedConstraint:
-    cg.addConstraint(TheConstraint);
-    break;
-
-  case ChangeKind::ExtendedEquivalenceClass: {
-    auto &node = cg[EquivClass.TypeVar];
-    node.truncateEquivalenceClass(EquivClass.PrevSize);
-    break;
-   }
-
-  case ChangeKind::BoundTypeVariable:
-    cg.unbindTypeVariable(Binding.TypeVar, Binding.FixedType);
-    break;
-  }
-}
-
 #pragma mark Graph mutation
 
 void ConstraintGraph::removeNode(TypeVariableType *typeVar) {
   // Remove this node.
   auto &impl = typeVar->getImpl();
   unsigned index = impl.getGraphIndex();
-  delete impl.getGraphNode();
+  auto *node = impl.getGraphNode();
+  node->reset();
+  FreeList.push_back(node);
   impl.setGraphNode(nullptr);
 
   // Remove this type variable from the list.
@@ -546,8 +485,8 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
   }
 
   // Record the change, if there are active scopes.
-  if (ActiveScope)
-    Changes.push_back(Change::addedConstraint(constraint));
+  if (CS.isRecordingChanges())
+    CS.recordChange(SolverTrail::Change::addedConstraint(constraint));
 }
 
 void ConstraintGraph::removeConstraint(Constraint *constraint) {
@@ -572,8 +511,8 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
   }
 
   // Record the change, if there are active scopes.
-  if (ActiveScope)
-    Changes.push_back(Change::removedConstraint(constraint));
+  if (CS.isRecordingChanges())
+    CS.recordChange(SolverTrail::Change::removedConstraint(constraint));
 }
 
 void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1, 
@@ -591,10 +530,12 @@ void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
   auto typeVarNonRep = typeVar1 == typeVarRep? typeVar2 : typeVar1;
 
   // Record the change, if there are active scopes.
-  if (ActiveScope)
-    Changes.push_back(Change::extendedEquivalenceClass(
+  if (CS.isRecordingChanges()) {
+    CS.recordChange(
+      SolverTrail::Change::extendedEquivalenceClass(
                         typeVarRep,
                         repNode.getEquivalenceClass().size()));
+  }
 
   // Merge equivalence class from the non-representative type variable.
   auto &nonRepNode = (*this)[typeVarNonRep];
@@ -604,10 +545,6 @@ void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
 void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
   assert(!fixed->is<TypeVariableType>() &&
          "Cannot bind to type variable; merge equivalence classes instead");
-
-  // Record the change, if there are active scopes.
-  if (ActiveScope)
-    Changes.push_back(Change::boundTypeVariable(typeVar, fixed));
 
   auto &node = (*this)[typeVar];
 
@@ -623,6 +560,14 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
     otherNode.addReferencedBy(typeVar);
     node.addReferencedVar(otherTypeVar);
   }
+
+  // Record the change, if there are active scopes.
+  if (CS.isRecordingChanges())
+    CS.recordChange(SolverTrail::Change::boundTypeVariable(typeVar, fixed));
+}
+
+void ConstraintGraph::introduceToInference(TypeVariableType *typeVar, Type fixed) {
+  (*this)[typeVar].introduceToInference(fixed);
 }
 
 void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed) {
@@ -637,8 +582,10 @@ void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed) 
     otherNode.removeReferencedBy(typeVar);
     node.removeReference(otherTypeVar);
   }
+}
 
-  node.retractFromInference(fixed, referencedVars);
+void ConstraintGraph::retractFromInference(TypeVariableType *typeVar, Type fixed) {
+  return (*this)[typeVar].retractFromInference(fixed);
 }
 
 #pragma mark Algorithms
@@ -1558,123 +1505,6 @@ void ConstraintGraph::dump() {
 
 void ConstraintGraph::dump(llvm::raw_ostream &out) {
   print(CS.getTypeVariables(), out);
-}
-
-void ConstraintGraph::dumpActiveScopeChanges(llvm::raw_ostream &out,
-                                             unsigned indent) {
-  if (Changes.empty())
-    return;
-
-  // Collect Changes for printing.
-  std::map<TypeVariableType *, TypeBase *> tvWithboundTypes;
-  std::vector<TypeVariableType *> addedTypeVars;
-  std::vector<TypeVariableType *> equivTypeVars;
-  std::set<Constraint *> addedConstraints;
-  std::set<Constraint *> removedConstraints;
-  for (unsigned int i = ActiveScope->getStartIdx(); i < Changes.size(); i++) {
-    auto change = Changes[i];
-    switch (change.Kind) {
-    case ChangeKind::BoundTypeVariable:
-      tvWithboundTypes.insert(std::pair<TypeVariableType *, TypeBase *>(
-          change.Binding.TypeVar, change.Binding.FixedType));
-      break;
-    case ChangeKind::AddedTypeVariable:
-      addedTypeVars.push_back(change.TypeVar);
-      break;
-    case ChangeKind::ExtendedEquivalenceClass:
-      equivTypeVars.push_back(change.EquivClass.TypeVar);
-      break;
-    case ChangeKind::AddedConstraint:
-      addedConstraints.insert(change.TheConstraint);
-      break;
-    case ChangeKind::RemovedConstraint:
-      removedConstraints.insert(change.TheConstraint);
-      break;
-    }
-  }
-
-  // If there are any constraints that were both added and removed in this set
-  // of Changes, remove them from both.
-  std::set<Constraint *> intersects;
-  set_intersection(addedConstraints.begin(), addedConstraints.end(),
-                   removedConstraints.begin(), removedConstraints.end(),
-                   std::inserter(intersects, intersects.begin()));
-  llvm::set_subtract(addedConstraints, intersects);
-  llvm::set_subtract(removedConstraints, intersects);
-
-  // Print out Changes.
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
-  out.indent(indent);
-  out << "(Changes:\n";
-  if (!tvWithboundTypes.empty()) {
-    out.indent(indent + 2);
-    out << "(Newly Bound: \n";
-    for (const auto &tvWithType : tvWithboundTypes) {
-      out.indent(indent + 4);
-      out << "> $T" << tvWithType.first->getImpl().getID() << " := ";
-      tvWithType.second->print(out, PO);
-      out << '\n';
-    }
-    out.indent(indent + 2);
-    out << ")\n";
-  }
-  if (!addedTypeVars.empty()) {
-    out.indent(indent + 2);
-    auto heading = (addedTypeVars.size() > 1) ? "(New Type Variables: \n"
-                                              : "(New Type Variable: \n";
-    out << heading;
-    for (const auto &typeVar : addedTypeVars) {
-      out.indent(indent + 4);
-      out << "> $T" << typeVar->getImpl().getID();
-      out << '\n';
-    }
-    out.indent(indent + 2);
-    out << ")\n";
-  }
-  if (!equivTypeVars.empty()) {
-    out.indent(indent + 2);
-    auto heading = (equivTypeVars.size() > 1) ? "(New Equivalences: \n"
-                                              : "(New Equivalence: \n";
-    out << heading;
-    for (const auto &typeVar : equivTypeVars) {
-      out.indent(indent + 4);
-      out << "> $T" << typeVar->getImpl().getID();
-      out << '\n';
-    }
-    out.indent(indent + 2);
-    out << ")\n";
-  }
-  if (!addedConstraints.empty()) {
-    out.indent(indent + 2);
-    auto heading = (addedConstraints.size() > 1) ? "(Added Constraints: \n"
-                                                 : "(Added Constraint: \n";
-    out << heading;
-    for (const auto &constraint : addedConstraints) {
-      out.indent(indent + 4);
-      out << "> ";
-      constraint->print(out, &CS.getASTContext().SourceMgr, indent + 6);
-      out << '\n';
-    }
-    out.indent(indent + 2);
-    out << ")\n";
-  }
-  if (!removedConstraints.empty()) {
-    out.indent(indent + 2);
-    auto heading = (removedConstraints.size() > 1) ? "(Removed Constraints: \n"
-                                                   : "(Removed Constraint: \n";
-    out << heading;
-    for (const auto &constraint : removedConstraints) {
-      out.indent(indent + 4);
-      out << "> ";
-      constraint->print(out, &CS.getASTContext().SourceMgr, indent + 6);
-      out << '\n';
-    }
-    out.indent(indent + 2);
-    out << ")\n";
-  }
-  out.indent(indent);
-  out << ")\n";
 }
 
 void ConstraintGraph::printConnectedComponents(
