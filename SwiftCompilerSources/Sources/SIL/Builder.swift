@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import Basic
+import AST
 import SILBridging
 
 /// A utility to create new instructions at a given insertion point.
@@ -434,11 +435,11 @@ public struct Builder {
 
   public func createInitExistentialRef(instance: Value,
                                        existentialType: Type,
-                                       formalConcreteType: BridgedASTType,
-                                       conformances: ProtocolConformanceArray) -> InitExistentialRefInst {
+                                       formalConcreteType: CanonicalType,
+                                       conformances: ConformanceArray) -> InitExistentialRefInst {
     let initExistential = bridged.createInitExistentialRef(instance.bridged,
                                                            existentialType.bridged,
-                                                           formalConcreteType,
+                                                           formalConcreteType.bridged,
                                                            conformances.bridged)
     return notifyNew(initExistential.getAs(InitExistentialRefInst.self))
   }
@@ -446,7 +447,7 @@ public struct Builder {
   public func createInitExistentialMetatype(
     metatype: Value,
     existentialType: Type,
-    conformances: ProtocolConformanceArray) -> InitExistentialMetatypeInst {
+    conformances: ConformanceArray) -> InitExistentialMetatypeInst {
     let initExistential = bridged.createInitExistentialMetatype(metatype.bridged,
                                                                 existentialType.bridged,
                                                                 conformances.bridged)

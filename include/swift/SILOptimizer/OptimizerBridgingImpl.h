@@ -202,7 +202,7 @@ BridgedPostDomTree BridgedPassContext::getPostDomTree() const {
   return {pda->get(invocation->getFunction())};
 }
 
-BridgedNominalTypeDecl BridgedPassContext::getSwiftArrayDecl() const {
+BridgedDeclObj BridgedPassContext::getSwiftArrayDecl() const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return {mod->getASTContext().getArrayDecl()};
 }
@@ -407,9 +407,9 @@ OptionalBridgedFunction BridgedPassContext::loadFunction(BridgedStringRef name, 
                                 : swift::SILModule::LinkingMode::LinkNormal)};
 }
 
-OptionalBridgedVTable BridgedPassContext::lookupVTable(BridgedNominalTypeDecl classDecl) const {
+OptionalBridgedVTable BridgedPassContext::lookupVTable(BridgedDeclObj classDecl) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
-  return {mod->lookUpVTable(llvm::cast<swift::ClassDecl>(classDecl.unbridged()))};
+  return {mod->lookUpVTable(classDecl.getAs<swift::ClassDecl>())};
 }
 
 OptionalBridgedVTable BridgedPassContext::lookupSpecializedVTable(BridgedType classType) const {
@@ -417,7 +417,7 @@ OptionalBridgedVTable BridgedPassContext::lookupSpecializedVTable(BridgedType cl
   return {mod->lookUpSpecializedVTable(classType.unbridged())};
 }
 
-OptionalBridgedWitnessTable BridgedPassContext::lookupWitnessTable(BridgedProtocolConformance conformance) const {
+OptionalBridgedWitnessTable BridgedPassContext::lookupWitnessTable(BridgedConformance conformance) const {
   swift::ProtocolConformanceRef ref = conformance.unbridged();
   if (!ref.isConcrete()) {
     return {nullptr};
@@ -428,7 +428,7 @@ OptionalBridgedWitnessTable BridgedPassContext::lookupWitnessTable(BridgedProtoc
 
 BridgedWitnessTable BridgedPassContext::createWitnessTable(BridgedLinkage linkage,
                                                            bool serialized,
-                                                           BridgedProtocolConformance conformance,
+                                                           BridgedConformance conformance,
                                                            BridgedArrayRef bridgedEntries) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   llvm::SmallVector<swift::SILWitnessTable::Entry, 8> entries;

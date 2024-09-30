@@ -22,8 +22,6 @@
 #include "SILBridging.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/BasicBridging.h"
@@ -122,13 +120,13 @@ inline BridgedArgumentConvention castToArgumentConvention(swift::SILArgumentConv
 }
 
 BridgedParameterInfo::BridgedParameterInfo(swift::SILParameterInfo parameterInfo):
-  type(parameterInfo.getInterfaceType().getPointer()),
+  type(parameterInfo.getInterfaceType()),
   convention(getArgumentConvention(parameterInfo.getConvention())),
   options(parameterInfo.getOptions().toRaw())
 {}
 
 swift::SILParameterInfo BridgedParameterInfo::unbridged() const {
-  return swift::SILParameterInfo(swift::CanType(type), getParameterConvention(convention),
+  return swift::SILParameterInfo(type.unbridged(), getParameterConvention(convention),
                                  swift::SILParameterInfo::Options(options));
 }
 
@@ -205,55 +203,27 @@ BridgedOwnedString BridgedLifetimeDependenceInfo::getDebugDescription() const {
 }
 
 //===----------------------------------------------------------------------===//
-//                               BridgedASTType
+//                               SILFunctionType
 //===----------------------------------------------------------------------===//
 
-swift::Type BridgedASTType::unbridged() const {
-  return type;
-}
-
-BridgedOwnedString BridgedASTType::getDebugDescription() const {
-  return BridgedOwnedString(unbridged().getString());
-}
-
-bool BridgedASTType::hasTypeParameter() const {
-  return unbridged()->hasTypeParameter();
-}
-
-bool BridgedASTType::isOpenedExistentialWithError() const {
-  return unbridged()->isOpenedExistentialWithError();
-}
-
-bool BridgedASTType::isEscapable() const {
-  return unbridged()->isEscapable();
-}
-
-bool BridgedASTType::isNoEscape() const {
-  return unbridged()->isNoEscape();
-}
-
-bool BridgedASTType::isInteger() const {
-  return unbridged()->is<swift::IntegerType>();
-}
-
 BridgedResultInfoArray
-BridgedASTType::SILFunctionType_getResultsWithError() const {
-  return {unbridged()->castTo<swift::SILFunctionType>()->getResultsWithError()};
+SILFunctionType_getResultsWithError(BridgedCanType funcTy) {
+  return {funcTy.unbridged()->castTo<swift::SILFunctionType>()->getResultsWithError()};
 }
 
-SwiftInt BridgedASTType::SILFunctionType_getNumIndirectFormalResultsWithError() const {
-  auto fnTy = unbridged()->castTo<swift::SILFunctionType>();
+SwiftInt SILFunctionType_getNumIndirectFormalResultsWithError(BridgedCanType funcTy) {
+  auto fnTy = funcTy.unbridged()->castTo<swift::SILFunctionType>();
   return fnTy->getNumIndirectFormalResults()
     + (fnTy->hasIndirectErrorResult() ? 1 : 0);
 }
 
-SwiftInt BridgedASTType::SILFunctionType_getNumPackResults() const {
-  return unbridged()->castTo<swift::SILFunctionType>()
+SwiftInt SILFunctionType_getNumPackResults(BridgedCanType funcTy) {
+  return funcTy.unbridged()->castTo<swift::SILFunctionType>()
     ->getNumPackResults();
 }
 
-OptionalBridgedResultInfo BridgedASTType::SILFunctionType_getErrorResult() const {
-  auto fnTy = unbridged()->castTo<swift::SILFunctionType>();
+OptionalBridgedResultInfo SILFunctionType_getErrorResult(BridgedCanType funcTy) {
+  auto fnTy = funcTy.unbridged()->castTo<swift::SILFunctionType>();
   auto resultInfo = fnTy->getOptionalErrorResult();
   if (resultInfo) {
     return {resultInfo->getInterfaceType().getPointer(),
@@ -263,25 +233,25 @@ OptionalBridgedResultInfo BridgedASTType::SILFunctionType_getErrorResult() const
 
 }
 
-BridgedParameterInfoArray BridgedASTType::SILFunctionType_getParameters() const {
-  return {unbridged()->castTo<swift::SILFunctionType>()->getParameters()};
+BridgedParameterInfoArray SILFunctionType_getParameters(BridgedCanType funcTy) {
+  return {funcTy.unbridged()->castTo<swift::SILFunctionType>()->getParameters()};
 }
 
-bool BridgedASTType::SILFunctionType_hasSelfParam() const {
-  return unbridged()->castTo<swift::SILFunctionType>()->hasSelfParam();
+bool SILFunctionType_hasSelfParam(BridgedCanType funcTy) {
+  return funcTy.unbridged()->castTo<swift::SILFunctionType>()->hasSelfParam();
 }
 
-bool BridgedASTType::SILFunctionType_isTrivialNoescape() const {
-  return unbridged()->castTo<swift::SILFunctionType>()->isTrivialNoEscape();
+bool SILFunctionType_isTrivialNoescape(BridgedCanType funcTy) {
+  return funcTy.unbridged()->castTo<swift::SILFunctionType>()->isTrivialNoEscape();
 }
 
-BridgedYieldInfoArray BridgedASTType::SILFunctionType_getYields() const {
-  return {unbridged()->castTo<swift::SILFunctionType>()->getYields()};
+BridgedYieldInfoArray SILFunctionType_getYields(BridgedCanType funcTy) {
+  return {funcTy.unbridged()->castTo<swift::SILFunctionType>()->getYields()};
 }
 
 BridgedLifetimeDependenceInfoArray
-BridgedASTType::SILFunctionType_getLifetimeDependencies() const {
-  auto fnTy = unbridged()->castTo<swift::SILFunctionType>();
+SILFunctionType_getLifetimeDependencies(BridgedCanType funcTy) {
+  auto fnTy = funcTy.unbridged()->castTo<swift::SILFunctionType>();
   return {fnTy->getLifetimeDependencies()};
 }
 
@@ -299,6 +269,14 @@ BridgedType::EnumElementIterator BridgedType::EnumElementIterator::getNext() con
   return EnumElementIterator(std::next(unbridged()));
 }
 
+BridgedType BridgedType::createObjectType(BridgedCanType canTy) {
+  return swift::SILType::getPrimitiveObjectType(canTy.unbridged());
+}
+
+BridgedType BridgedType::createAddressType(BridgedCanType canTy) {
+  return swift::SILType::getPrimitiveAddressType(canTy.unbridged());
+}
+
 BridgedOwnedString BridgedType::getDebugDescription() const {
   return BridgedOwnedString(unbridged().getDebugDescription());
 }
@@ -309,6 +287,10 @@ bool BridgedType::isNull() const {
 
 bool BridgedType::isAddress() const {
   return unbridged().isAddress();
+}
+
+BridgedCanType BridgedType::getCanType() const {
+  return unbridged().getASTType();
 }
 
 BridgedType BridgedType::getAddressType() const {
@@ -369,7 +351,7 @@ bool BridgedType::isGenericAtAnyLevel() const {
   return astType->isSpecialized();
 }
 
-BridgedNominalTypeDecl BridgedType::getNominalOrBoundGenericNominal() const {
+OptionalBridgedDeclObj BridgedType::getNominalOrBoundGenericNominal() const {
   return {unbridged().getNominalOrBoundGenericNominal()};
 }
 
@@ -549,14 +531,6 @@ BridgedType BridgedType::getSuperClassType() const {
   return unbridged().getSuperclass();
 }
 
-BridgedType BridgedType::getSuperClassTypeOfClassDecl(BridgedNominalTypeDecl decl) {
-  swift::Type superTy = swift::cast<swift::ClassDecl>(decl.unbridged())->getSuperclass();
-  if (!superTy) {
-    return BridgedType(swift::SILType());
-  }
-  return swift::SILType::getPrimitiveObjectType(superTy->getCanonicalType());
-}
-
 //===----------------------------------------------------------------------===//
 //                                BridgedValue
 //===----------------------------------------------------------------------===//
@@ -676,46 +650,13 @@ BridgedBasicBlock BridgedArgument::getParent() const {
 
 bool BridgedArgument::isReborrow() const { return getArgument()->isReborrow(); }
 
-BridgedNullableVarDecl BridgedArgument::getVarDecl() const {
-  // TODO: why does AST bridging force a non-const pointer?
-  return {llvm::dyn_cast_or_null<swift::VarDecl>(
-      const_cast<swift::ValueDecl*>(getArgument()->getDecl()))};
+OptionalBridgedDeclObj BridgedArgument::getVarDecl() const {
+  return {llvm::dyn_cast_or_null<swift::VarDecl>(getArgument()->getDecl())};
 }
 
 void BridgedArgument::copyFlags(BridgedArgument fromArgument) const {
   auto *fArg = static_cast<swift::SILFunctionArgument *>(getArgument());
   fArg->copyFlags(static_cast<swift::SILFunctionArgument *>(fromArgument.getArgument()));
-}
-
-//===----------------------------------------------------------------------===//
-//                            BridgedSubstitutionMap
-//===----------------------------------------------------------------------===//
-
-BridgedSubstitutionMap::BridgedSubstitutionMap(swift::SubstitutionMap map) {
-  *reinterpret_cast<swift::SubstitutionMap *>(&storage) = map;
-}
-
-swift::SubstitutionMap BridgedSubstitutionMap::unbridged() const {
-  return *reinterpret_cast<const swift::SubstitutionMap *>(&storage);
-}
-
-BridgedSubstitutionMap::BridgedSubstitutionMap() : BridgedSubstitutionMap(swift::SubstitutionMap()) {
-}
-
-bool BridgedSubstitutionMap::isEmpty() const {
-  return unbridged().empty();
-}
-
-bool BridgedSubstitutionMap::hasAnySubstitutableParams() const {
-  return unbridged().hasAnySubstitutableParams();
-}
-
-SwiftInt BridgedSubstitutionMap::getNumConformances() const {
-  return (SwiftInt)unbridged().getConformances().size();
-}
-
-BridgedProtocolConformance BridgedSubstitutionMap::getConformance(SwiftInt index) const {
-  return unbridged().getConformances()[index];
 }
 
 //===----------------------------------------------------------------------===//
@@ -752,7 +693,7 @@ BridgedSourceLoc BridgedLocation::getSourceLocation() const {
 bool BridgedLocation::hasSameSourceLocation(BridgedLocation rhs) const {
   return getLoc().hasSameSourceLocation(rhs.getLoc());
 }
-BridgedLocation BridgedLocation::fromNominalTypeDecl(BridgedNominalTypeDecl decl) {
+BridgedLocation BridgedLocation::fromNominalTypeDecl(BridgedDeclObj decl) {
   return swift::SILDebugLocation(decl.unbridged(), nullptr);
 }
 BridgedLocation BridgedLocation::getArtificialUnreachableLocation() {
@@ -779,10 +720,9 @@ bool BridgedFunction::hasOwnership() const { return getFunction()->hasOwnership(
 
 bool BridgedFunction::hasLoweredAddresses() const { return getFunction()->getModule().useLoweredAddresses(); }
 
-BridgedASTType BridgedFunction::getLoweredFunctionTypeInContext() const {
+BridgedCanType BridgedFunction::getLoweredFunctionTypeInContext() const {
   auto expansion = getFunction()->getTypeExpansionContext();
-  return
-    {getFunction()->getLoweredFunctionTypeInContext(expansion).getPointer()};
+  return getFunction()->getLoweredFunctionTypeInContext(expansion);
 }
 
 OptionalBridgedBasicBlock BridgedFunction::getFirstBlock() const {
@@ -931,9 +871,9 @@ void BridgedFunction::setIsSerialized(bool isSerialized) const {
   getFunction()->setSerializedKind(isSerialized ? swift::IsSerialized : swift::IsNotSerialized);
 }
 
-bool BridgedFunction::isResilientNominalDecl(BridgedNominalTypeDecl decl) const {
-  return decl.unbridged()->isResilient(getFunction()->getModule().getSwiftModule(),
-                                       getFunction()->getResilienceExpansion());
+bool BridgedFunction::isResilientNominalDecl(BridgedDeclObj decl) const {
+  return decl.getAs<swift::NominalTypeDecl>()->isResilient(getFunction()->getModule().getSwiftModule(),
+                                                           getFunction()->getResilienceExpansion());
 }
 
 BridgedType BridgedFunction::getLoweredType(BridgedASTType type) const {
@@ -952,8 +892,8 @@ swift::SILGlobalVariable * _Nonnull BridgedGlobalVar::getGlobal() const {
   return static_cast<swift::SILGlobalVariable *>(obj);
 }
 
-BridgedNullableVarDecl BridgedGlobalVar::getDecl() const {
-  return getGlobal()->getDecl();
+OptionalBridgedDeclObj BridgedGlobalVar::getDecl() const {
+  return {getGlobal()->getDecl()};
 }
 
 BridgedStringRef BridgedGlobalVar::getName() const {
@@ -1018,42 +958,6 @@ BridgedType BridgedTypeArray::getAt(SwiftInt index) const {
 //===----------------------------------------------------------------------===//
 
 BridgedType BridgedSILTypeArray::getAt(SwiftInt index) const {
-  return unbridged()[index];
-}
-
-//===----------------------------------------------------------------------===//
-//                            BridgedProtocolConformance
-//===----------------------------------------------------------------------===//
-
-static_assert(sizeof(BridgedProtocolConformance) == sizeof(swift::ProtocolConformanceRef));
-
-bool BridgedProtocolConformance::isConcrete() const {
-  return unbridged().isConcrete();
-}
-
-bool BridgedProtocolConformance::isValid() const {
-  return !unbridged().isInvalid();
-}
-
-bool BridgedProtocolConformance::isSpecializedConformance() const {
-  return swift::isa<swift::SpecializedProtocolConformance>(unbridged().getConcrete());
-}
-
-BridgedProtocolConformance BridgedProtocolConformance::getGenericConformance() const {
-  auto *specPC = swift::cast<swift::SpecializedProtocolConformance>(unbridged().getConcrete());
-  return {swift::ProtocolConformanceRef(specPC->getGenericConformance())};
-}
-
-BridgedSubstitutionMap BridgedProtocolConformance::getSpecializedSubstitutions() const {
-  auto *specPC = swift::cast<swift::SpecializedProtocolConformance>(unbridged().getConcrete());
-  return {specPC->getSubstitutionMap()};
-}
-
-//===----------------------------------------------------------------------===//
-//                           BridgedProtocolConformanceArray
-//===----------------------------------------------------------------------===//
-
-BridgedProtocolConformance BridgedProtocolConformanceArray::getAt(SwiftInt index) const {
   return unbridged()[index];
 }
 
@@ -1210,12 +1114,12 @@ bool BridgedInstruction::IndexAddrInst_needsStackProtection() const {
   return getAs<swift::IndexAddrInst>()->needsStackProtection();
 }
 
-BridgedProtocolConformanceArray BridgedInstruction::InitExistentialRefInst_getConformances() const {
+BridgedConformanceArray BridgedInstruction::InitExistentialRefInst_getConformances() const {
   return getAs<swift::InitExistentialRefInst>()->getConformances();
 }
 
-BridgedASTType BridgedInstruction::InitExistentialRefInst_getFormalConcreteType() const {
-  return {getAs<swift::InitExistentialRefInst>()->getFormalConcreteType().getPointer()};
+BridgedCanType BridgedInstruction::InitExistentialRefInst_getFormalConcreteType() const {
+  return getAs<swift::InitExistentialRefInst>()->getFormalConcreteType();
 }
 
 BridgedGlobalVar BridgedInstruction::GlobalAccessInst_getGlobal() const {
@@ -1575,9 +1479,9 @@ BridgedSubstitutionMap BridgedInstruction::ApplySite_getSubstitutionMap() const 
   return as.getSubstitutionMap();
 }
 
-BridgedASTType BridgedInstruction::ApplySite_getSubstitutedCalleeType() const {
+BridgedCanType BridgedInstruction::ApplySite_getSubstitutedCalleeType() const {
   auto as = swift::ApplySite(unbridged());
-  return {as.getSubstCalleeType().getPointer()};
+  return as.getSubstCalleeType();
 }
 
 SwiftInt BridgedInstruction::ApplySite_getNumArguments() const {
@@ -1597,8 +1501,8 @@ bool BridgedInstruction::ConvertFunctionInst_withoutActuallyEscaping() const {
   return getAs<swift::ConvertFunctionInst>()->withoutActuallyEscaping();
 }
 
-BridgedASTType BridgedInstruction::TypeValueInst_getParamType() const {
-  return {getAs<swift::TypeValueInst>()->getParamType().getPointer()};
+BridgedCanType BridgedInstruction::TypeValueInst_getParamType() const {
+  return getAs<swift::TypeValueInst>()->getParamType();
 }
 
 SwiftInt BridgedInstruction::TypeValueInst_getValue() const {
@@ -1618,23 +1522,23 @@ SwiftInt BridgedInstruction::TypeValueInst_getValue() const {
 //                     VarDeclInst and DebugVariableInst
 //===----------------------------------------------------------------------===//
 
-BridgedNullableVarDecl BridgedInstruction::DebugValue_getDecl() const {
+OptionalBridgedDeclObj BridgedInstruction::DebugValue_getDecl() const {
   return {getAs<swift::DebugValueInst>()->getDecl()};
 }
 
-BridgedNullableVarDecl BridgedInstruction::AllocStack_getDecl() const {
+OptionalBridgedDeclObj BridgedInstruction::AllocStack_getDecl() const {
   return {getAs<swift::AllocStackInst>()->getDecl()};
 }
 
-BridgedNullableVarDecl BridgedInstruction::AllocBox_getDecl() const {
+OptionalBridgedDeclObj BridgedInstruction::AllocBox_getDecl() const {
   return {getAs<swift::AllocBoxInst>()->getDecl()};
 }
 
-BridgedNullableVarDecl BridgedInstruction::GlobalAddr_getDecl() const {
+OptionalBridgedDeclObj BridgedInstruction::GlobalAddr_getDecl() const {
   return {getAs<swift::GlobalAddrInst>()->getReferencedGlobal()->getDecl()};
 }
 
-BridgedNullableVarDecl BridgedInstruction::RefElementAddr_getDecl() const {
+OptionalBridgedDeclObj BridgedInstruction::RefElementAddr_getDecl() const {
   return {getAs<swift::RefElementAddrInst>()->getField()};
 }
 
@@ -1793,8 +1697,8 @@ BridgedVTableEntry BridgedVTable::getEntry(SwiftInt index) const {
   return BridgedVTableEntry(vTable->getEntries()[index]);
 }
 
-BridgedNominalTypeDecl BridgedVTable::getClass() const {
-  return {vTable->getClass()};
+BridgedDeclObj BridgedVTable::getClass() const {
+  return vTable->getClass();
 }
 
 BridgedType BridgedVTable::getSpecializedClassType() const {
@@ -2179,16 +2083,16 @@ BridgedInstruction BridgedBuilder::createStore(BridgedValue src, BridgedValue ds
 
 BridgedInstruction BridgedBuilder::createInitExistentialRef(BridgedValue instance,
                                             BridgedType type,
-                                            BridgedASTType formalConcreteType,
-                                            BridgedProtocolConformanceArray conformances) const {
+                                            BridgedCanType formalConcreteType,
+                                            BridgedConformanceArray conformances) const {
   return {unbridged().createInitExistentialRef(
-      regularLoc(), type.unbridged(), swift::CanType(formalConcreteType.unbridged()),
+      regularLoc(), type.unbridged(), formalConcreteType.unbridged(),
       instance.getSILValue(), conformances.unbridged())};
 }
 
 BridgedInstruction BridgedBuilder::createInitExistentialMetatype(BridgedValue metatype,
                                             BridgedType existentialType,
-                                            BridgedProtocolConformanceArray conformances) const {
+                                            BridgedConformanceArray conformances) const {
   return {unbridged().createInitExistentialMetatype(
       regularLoc(), metatype.getSILValue(), existentialType.unbridged(),
       conformances.unbridged())};

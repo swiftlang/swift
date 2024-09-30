@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SILBridging
 
 public struct VTable : CustomStringConvertible, NoReflectionChildren {
@@ -84,7 +85,7 @@ public struct VTable : CustomStringConvertible, NoReflectionChildren {
 
   public var entries: EntryArray { EntryArray(vTable: self) }
 
-  public var `class`: NominalTypeDecl { NominalTypeDecl(_bridged: bridged.getClass()) }
+  public var `class`: ClassDecl { bridged.getClass().getAs(ClassDecl.self) }
 
   public var specializedClassType: Type? { bridged.getSpecializedClassType().typeOrNil }
 

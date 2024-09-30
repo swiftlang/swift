@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SILBridging
 
 public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {

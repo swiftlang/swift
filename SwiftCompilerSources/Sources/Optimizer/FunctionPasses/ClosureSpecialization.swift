@@ -99,7 +99,9 @@
 /// }
 /// ```
 
+import AST
 import SIL
+import SILBridging
 
 private let verbose = false
 
@@ -1085,7 +1087,7 @@ private extension ParameterInfo {
   }
 
   var isTrivialNoescapeClosure: Bool {
-    self.type.SILFunctionType_isTrivialNoescape()
+    SILFunctionType_isTrivialNoescape(type.bridged)
   }
 }
 

@@ -1901,9 +1901,9 @@ OptionalBridgedFunction BridgedPassContext::lookupStdlibFunction(BridgedStringRe
   return {funcBuilder.getOrCreateFunction(SILLocation(decl), declRef, NotForDefinition)};
 }
 
-OptionalBridgedFunction BridgedPassContext::lookUpNominalDeinitFunction(BridgedNominalTypeDecl nominal)  const {
+OptionalBridgedFunction BridgedPassContext::lookUpNominalDeinitFunction(BridgedDeclObj nominal)  const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
-  return {mod->lookUpMoveOnlyDeinitFunction(nominal.unbridged())};
+  return {mod->lookUpMoveOnlyDeinitFunction(nominal.getAs<swift::NominalTypeDecl>())};
 }
 
 bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const {

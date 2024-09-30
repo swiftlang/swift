@@ -10,11 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 import OptimizerBridging
 
 @_cdecl("initializeSwiftModules")
 public func initializeSwiftModules() {
+  registerAST()
   registerSILClasses()
   registerSwiftAnalyses()
   registerUtilities()

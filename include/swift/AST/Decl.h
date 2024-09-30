@@ -50,6 +50,7 @@
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/OptionalEnum.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/SwiftObjectHeader.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -348,7 +349,7 @@ enum class ArtificialMainKind : uint8_t {
 };
 
 /// Decl - Base class for all declarations in Swift.
-class alignas(1 << DeclAlignInBits) Decl : public ASTAllocated<Decl> {
+class alignas(1 << DeclAlignInBits) Decl : public ASTAllocated<Decl>, public SwiftObjectHeader {
 protected:
   // clang-format off
   //
@@ -860,6 +861,8 @@ private:
   void operator=(const Decl&) = delete;
   SourceLoc getLocFromSource() const;
 
+  static SwiftMetatype getDeclMetatype(DeclKind kind);
+
   /// Returns the serialized locations of this declaration from the
   /// corresponding .swiftsourceinfo file. "Empty" (ie. \c BufferID of 0, an
   /// invalid \c Loc, and empty \c DocRanges) if either there is no
@@ -905,7 +908,7 @@ private:
 protected:
 
   Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)
-    : Context(context) {
+    : SwiftObjectHeader(getDeclMetatype(kind)), Context(context) {
     Bits.OpaqueBits = 0;
     Bits.Decl.Kind = unsigned(kind);
     Bits.Decl.Invalid = false;

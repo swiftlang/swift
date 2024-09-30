@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 import OptimizerBridging
 
@@ -144,7 +145,7 @@ struct ModulePassContext : Context, CustomStringConvertible {
 
   @discardableResult
   func createWitnessTable(entries: [WitnessTable.Entry],
-                          conformance: ProtocolConformance,
+                          conformance: Conformance,
                           linkage: Linkage,
                           serialized: Bool) -> WitnessTable
   {

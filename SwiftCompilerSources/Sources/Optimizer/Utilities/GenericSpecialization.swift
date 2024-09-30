@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 
 @discardableResult
@@ -17,13 +18,12 @@ func specializeVTable(forClassType classType: Type,
                       errorLocation: Location,
                       _ context: ModulePassContext) -> VTable?
 {
-  if !classType.isClass {
+  guard let nominal = classType.nominal,
+        let classDecl = nominal as? ClassDecl,
+        classType.isGenericAtAnyLevel else
+  {
     return nil
   }
-  if !classType.isGenericAtAnyLevel {
-    return nil
-  }
-  let classDecl = classType.nominal
 
   if context.lookupSpecializedVTable(for: classType) != nil {
     return nil
@@ -69,14 +69,14 @@ func specializeVTablesOfSuperclasses(_ moduleContext: ModulePassContext) {
     if !vtable.isSpecialized,
        !vtable.class.isGenericAtAnyLevel,
        let superClassTy = vtable.class.superClassType,
-       superClassTy.nominal.isGenericAtAnyLevel
+       superClassTy.isGenericAtAnyLevel
     {
       specializeVTable(forClassType: superClassTy, errorLocation: vtable.class.location, moduleContext)
     }
   }
 }
 
-func specializeWitnessTable(forConformance conformance: ProtocolConformance,
+func specializeWitnessTable(forConformance conformance: Conformance,
                             errorLocation: Location,
                             _ context: ModulePassContext) -> WitnessTable
 {

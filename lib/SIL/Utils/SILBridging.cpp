@@ -210,6 +210,18 @@ BridgedOwnedString BridgedFunction::getDebugDescription() const {
   return str;
 }
 
+BridgedSubstitutionMap BridgedFunction::getMethodSubstitutions(BridgedSubstitutionMap contextSubs) const {
+  swift::SILFunction *f = getFunction();
+  swift::GenericSignature genericSig = f->getLoweredFunctionType()->getInvocationGenericSignature();
+
+  if (!genericSig || genericSig->areAllParamsConcrete())
+    return swift::SubstitutionMap();
+
+  return swift::SubstitutionMap::get(genericSig,
+                                     swift::QuerySubstitutionMap{contextSubs.unbridged()},
+                                     swift::LookUpConformanceInModule());
+}
+
 //===----------------------------------------------------------------------===//
 //                               SILBasicBlock
 //===----------------------------------------------------------------------===//
@@ -321,6 +333,17 @@ bool BridgedGlobalVar::mustBeInitializedStatically() const {
 }
 
 //===----------------------------------------------------------------------===//
+//                            SILDeclRef
+//===----------------------------------------------------------------------===//
+
+BridgedOwnedString BridgedDeclRef::getDebugDescription() const {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  unbridged().print(os);
+  return str;
+}
+
+//===----------------------------------------------------------------------===//
 //                            SILVTable
 //===----------------------------------------------------------------------===//
 
@@ -382,25 +405,6 @@ BridgedOwnedString BridgedDefaultWitnessTable::getDebugDescription() const {
   table->print(os);
   str.pop_back(); // Remove trailing newline.
   return str;
-}
-
-//===----------------------------------------------------------------------===//
-//                               SubstitutionMap
-//===----------------------------------------------------------------------===//
-
-static_assert(sizeof(BridgedSubstitutionMap) >= sizeof(swift::SubstitutionMap),
-              "BridgedSubstitutionMap has wrong size");
-
-BridgedSubstitutionMap BridgedSubstitutionMap::getMethodSubstitutions(BridgedFunction method) const {
-  swift::SILFunction *f = method.getFunction();
-  swift::GenericSignature genericSig = f->getLoweredFunctionType()->getInvocationGenericSignature();
-
-  if (!genericSig || genericSig->areAllParamsConcrete())
-    return swift::SubstitutionMap();
-
-  return swift::SubstitutionMap::get(genericSig,
-                                     swift::QuerySubstitutionMap{unbridged()},
-                                     swift::LookUpConformanceInModule());
 }
 
 //===----------------------------------------------------------------------===//
