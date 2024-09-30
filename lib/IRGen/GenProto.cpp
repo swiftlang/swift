@@ -1563,12 +1563,9 @@ public:
     /// A base protocol is witnessed by a pointer to the conformance
     /// of this type to that protocol.
     void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
-#ifndef NDEBUG
       auto &entry = SILEntries.front();
-#endif
       SILEntries = SILEntries.slice(1);
 
-#ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::BaseProtocol
              && "sil witness table does not match protocol");
       assert(entry.getBaseProtocolWitness().Requirement == baseProto
@@ -1577,13 +1574,18 @@ public:
       assert((size_t)piIndex.getValue() ==
              Table.size() - WitnessTableFirstRequirementOffset &&
              "offset doesn't match ProtocolInfo layout");
-#endif
 
       // TODO: Use the witness entry instead of falling through here.
 
       // Look for conformance info.
-      auto *astConf = ConformanceInContext.getInheritedConformance(baseProto);
-      assert(astConf->getType()->isEqual(ConcreteType));
+      ProtocolConformance *astConf = nullptr;
+      if (isa<SpecializedProtocolConformance>(SILWT->getConformance())) {
+        astConf = entry.getBaseProtocolWitness().Witness;
+        ASSERT(isa<SpecializedProtocolConformance>(astConf));
+      } else {
+        astConf = ConformanceInContext.getInheritedConformance(baseProto);
+        assert(astConf->getType()->isEqual(ConcreteType));
+      }
       const ConformanceInfo &conf = IGM.getConformanceInfo(baseProto, astConf);
 
       // If we can emit the base witness table as a constant, do so.
