@@ -2063,22 +2063,20 @@ void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,
 }
 
 bool Parser::peekAvailabilityMacroName() {
-  parseAllAvailabilityMacroArguments();
-  AvailabilityMacroMap Map = AvailabilityMacros;
+  AvailabilityMacroMap &Map = parseAllAvailabilityMacroArguments();
 
   StringRef MacroName = Tok.getText();
-  return Map.find(MacroName) != Map.end();
+  return Map.Impl.find(MacroName) != Map.Impl.end();
 }
 
 ParserStatus
 Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   // Get the macros from the compiler arguments.
-  parseAllAvailabilityMacroArguments();
-  AvailabilityMacroMap Map = AvailabilityMacros;
+  AvailabilityMacroMap &Map = parseAllAvailabilityMacroArguments();
 
   StringRef MacroName = Tok.getText();
-  auto NameMatch = Map.find(MacroName);
-  if (NameMatch == Map.end())
+  auto NameMatch = Map.Impl.find(MacroName);
+  if (NameMatch == Map.Impl.end())
     return makeParserSuccess(); // No match, it could be a standard platform.
 
   consumeToken();
@@ -2114,11 +2112,10 @@ Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   return makeParserSuccess();
 }
 
-void Parser::parseAllAvailabilityMacroArguments() {
-
-  if (AvailabilityMacrosComputed) return;
-
-  AvailabilityMacroMap Map;
+AvailabilityMacroMap &Parser::parseAllAvailabilityMacroArguments() {
+  AvailabilityMacroMap &Map = Context.getAvailabilityMacroCache();
+  if (Map.WasParsed)
+    return Map;
 
   SourceManager &SM = Context.SourceMgr;
   LangOptions LangOpts = Context.LangOpts;
@@ -2156,9 +2153,9 @@ void Parser::parseAllAvailabilityMacroArguments() {
     ParsedMacro.Specs = SpecsCopy;
 
     // Find the macro info by name.
-    AvailabilityMacroVersionMap MacroDefinition;
-    auto NameMatch = Map.find(ParsedMacro.Name);
-    if (NameMatch != Map.end()) {
+    AvailabilityMacroMap::VersionEntry MacroDefinition;
+    auto NameMatch = Map.Impl.find(ParsedMacro.Name);
+    if (NameMatch != Map.Impl.end()) {
       MacroDefinition = NameMatch->getSecond();
     }
 
@@ -2171,12 +2168,12 @@ void Parser::parseAllAvailabilityMacroArguments() {
     }
 
     // Save back the macro spec.
-    Map.erase(ParsedMacro.Name);
-    Map.insert({ParsedMacro.Name, MacroDefinition});
+    Map.Impl.erase(ParsedMacro.Name);
+    Map.Impl.insert({ParsedMacro.Name, MacroDefinition});
   }
 
-  AvailabilityMacros = Map;
-  AvailabilityMacrosComputed = true;
+  Map.WasParsed = true;
+  return Map;
 }
 
 ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,

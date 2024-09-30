@@ -215,6 +215,19 @@ public:
   }
 };
 
+/// Maps of macro name and version to availability specifications.
+/// Organized as two nested \c DenseMap keyed first on the macro name then
+/// the macro version. This structure allows to peek at macro names before
+/// parsing a version tuple.
+class AvailabilityMacroMap {
+public:
+  typedef llvm::DenseMap<llvm::VersionTuple,
+                         SmallVector<AvailabilitySpec *, 4>> VersionEntry;
+
+  bool WasParsed = false;
+  llvm::DenseMap<StringRef, VersionEntry> Impl;
+};
+
 } // end namespace swift
 
 #endif
