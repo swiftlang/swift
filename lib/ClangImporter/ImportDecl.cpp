@@ -28,6 +28,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -43,6 +44,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/PrettyStackTrace.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Version.h"
@@ -63,12 +65,14 @@
 #include "clang/Sema/Lookup.h"
 
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Path.h"
 
 #include <algorithm>
+#include <string>
 
 #define DEBUG_TYPE "Clang module importer"
 
@@ -2746,14 +2750,24 @@ namespace {
         return nullptr;
       }
 
+      auto dc = decl->getDeclContext();
       // Bail if this is `std::chrono::tzdb`. This type causes issues in copy
       // constructor instantiation.
       // FIXME: https://github.com/apple/swift/issues/73037
-      if (decl->getDeclContext()->isNamespace() &&
-          decl->getDeclContext()->getParent()->isStdNamespace() &&
+      if (dc->isNamespace() && dc->getParent()->isStdNamespace() &&
           decl->getIdentifier() &&
           (decl->getName() == "tzdb" || decl->getName() == "time_zone_link"))
         return nullptr;
+
+      // Import the C++ swift::String as the swift String type.
+      if (dc->isNamespace() &&
+          cast<clang::NamespaceDecl>(dc)->getName() == "swift" &&
+          decl->getIdentifier() && decl->getName() == "String") {
+        auto swiftDecl = Impl.SwiftContext.getStringDecl();
+        Impl.SwiftContext.registerExportedClangDecl(swiftDecl,
+                                                    decl->getCanonicalDecl());
+        return swiftDecl;
+      }
 
       auto &clangSema = Impl.getClangSema();
       // Make Clang define any implicit constructors it may need (copy,
@@ -3019,16 +3033,51 @@ namespace {
       return false;
     }
 
+    static unsigned counter() {
+      static unsigned counter = 0;
+      return counter++;
+    }
+
     Decl *VisitClassTemplateSpecializationDecl(
                  const clang::ClassTemplateSpecializationDecl *decl) {
+      auto *classTemplate = decl->getSpecializedTemplate();
       // Treat a specific specialization like the unspecialized class template
       // when importing it in symbolic mode.
       if (Impl.importSymbolicCXXDecls)
-        return Impl.importDecl(decl->getSpecializedTemplate(),
-                               Impl.CurrentVersion);
+        return Impl.importDecl(classTemplate,Impl.CurrentVersion);
 
-      bool isPair = decl->getSpecializedTemplate()->isInStdNamespace() &&
-                    decl->getSpecializedTemplate()->getName() == "pair";
+      auto templateDC = classTemplate->getDeclContext()->getNonTransparentContext();
+      if (templateDC->isNamespace() && cast<clang::NamespaceDecl>(templateDC)->getName() == "swift") {
+        if (classTemplate->getName() == "Optional") {
+          assert(decl->getTemplateArgs().size() == 1);
+
+          auto clangTemplateArg = decl->getTemplateArgs()[0].getAsType();
+          auto importedType = Impl.importType(
+              clangTemplateArg, ImportTypeKind::Abstract,
+              ImportDiagnosticAdder(Impl, decl, decl->getLocation()), false,
+              Bridgeability::None, ImportTypeAttrs{});
+          if (!importedType)
+            return nullptr;
+          llvm::SmallVector<Type, 1> GenericArg;
+          GenericArg.push_back(importedType.getType());
+          auto type = BoundGenericEnumType::get(
+              Impl.SwiftContext.getOptionalDecl(), Type(), GenericArg);
+
+          Identifier name = Impl.SwiftContext.getIdentifier(
+              "SynthasizedOptional" + std::to_string(counter()));
+          auto importedHeaderModule = Impl.SwiftContext.getClangModuleLoader()
+                                          ->getImportedHeaderModule();
+          auto *aliasDecl = Impl.createDeclWithClangNode<TypeAliasDecl>(
+              decl, AccessLevel::Public, SourceLoc(), SourceLoc(), name,
+              SourceLoc(), nullptr, importedHeaderModule->getDeclContext());
+          aliasDecl->setUnderlyingType(type);
+          Impl.SwiftContext.registerExportedClangDecl(aliasDecl, decl);
+          return aliasDecl;
+        }
+      }
+
+      bool isPair = classTemplate->isInStdNamespace() &&
+                    classTemplate->getName() == "pair";
 
       // Before we go any further, check if we've already got tens of thousands
       // of specializations. If so, it means we're likely instantiating a very

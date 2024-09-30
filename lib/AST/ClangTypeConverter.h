@@ -34,6 +34,7 @@ class ClangTypeConverter :
 
   llvm::DenseMap<Type, clang::QualType> Cache;
   llvm::DenseMap<const clang::Decl *, swift::Decl *> ReversedExportMap;
+  llvm::DenseMap<swift::Decl *, const clang::Decl *> ReversedExportMapBackwards;
 
   bool StdlibTypesAreCached = false;
 

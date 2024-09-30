@@ -843,6 +843,8 @@ public:
   /// if applicable.
   const Decl *getSwiftDeclForExportedClangDecl(const clang::Decl *decl);
 
+  void registerExportedClangDecl(Decl *decl, const clang::Decl *clangDecl);
+
   /// General conversion method from Swift types -> Clang types.
   ///
   /// HACK: This method is only intended to be called from a specific place in
