@@ -74,6 +74,14 @@ extension Context {
     return _bridged.lookupSpecializedVTable(classType.bridged).vTable
   }
 
+  func getSpecializedConformance(of genericConformance: Conformance,
+                                 for type: AST.`Type`,
+                                 substitutions: SubstitutionMap) -> Conformance
+  {
+    let c = _bridged.getSpecializedConformance(genericConformance.bridged, type.bridged, substitutions.bridged)
+    return Conformance(bridged: c)
+  }
+
   func notifyNewFunction(function: Function, derivedFrom: Function) {
     _bridged.addFunctionToPassManagerWorklist(function.bridged, derivedFrom.bridged)
   }
