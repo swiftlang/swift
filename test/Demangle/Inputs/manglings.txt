@@ -473,3 +473,5 @@ $s23variadic_generic_opaque2G2VyAA2S1V_AA2S2VQPGAA1PHPAeA1QHPyHC_AgaJHPyHCHX_HC 
 
 $s9MacroUser0023macro_expandswift_elFCffMX436_4_23bitwidthNumberedStructsfMf_ ---> freestanding macro expansion #1 of bitwidthNumberedStructs in module MacroUser file macro_expand.swift line 437 column 5
 $sxq_IyXd_D ---> @callee_unowned (@in_cxx A) -> (@unowned B)
+$s2hi1SV1iSivx ---> hi.S.i.modify2 : Swift.Int
+$s2hi1SV1iSivy ---> hi.S.i.read2 : Swift.Int

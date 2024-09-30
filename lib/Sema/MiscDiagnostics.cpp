@@ -4919,7 +4919,9 @@ public:
           case AccessorKind::Address:
           case AccessorKind::MutableAddress:
           case AccessorKind::Read:
+          case AccessorKind::Read2:
           case AccessorKind::Modify:
+          case AccessorKind::Modify2:
           case AccessorKind::Init:
             llvm_unreachable("cannot be @objc");
           }

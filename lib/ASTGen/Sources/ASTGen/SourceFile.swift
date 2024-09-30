@@ -69,10 +69,12 @@ extension Parser.ExperimentalFeatures {
       }
     }
 
+    mapFeature(.ReferenceBindings, to: .referenceBindings)
     mapFeature(.ThenStatements, to: .thenStatements)
     mapFeature(.DoExpressions, to: .doExpressions)
     mapFeature(.NonescapableTypes, to: .nonescapableTypes)
     mapFeature(.TrailingComma, to: .trailingComma)
+    mapFeature(.CoroutineAccessors, to: .coroutineAccessors)
   }
 }
 
