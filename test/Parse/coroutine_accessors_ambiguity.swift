@@ -6,6 +6,8 @@
 // RUN:     -verify-additional-prefix disabled- \
 // RUN:     -debug-diagnostic-names
 
+// REQUIRES: asserts
+
 // Properties with implicit getters which call functions named modify.
 
 func modify<T>(_ c : () -> T) -> T { c() }
