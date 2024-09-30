@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature KeyPathWithStaticMembers
 
+// REQUIRES: asserts
+
 var global = 42
 
 @dynamicMemberLookup
