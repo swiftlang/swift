@@ -25,6 +25,11 @@ extension String: DiagnosticArgument {
     _withBridgedStringRef { fn(BridgedDiagnosticArgument($0)) }
   }
 }
+extension StringRef: DiagnosticArgument {
+  func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
+    fn(BridgedDiagnosticArgument(_bridged))
+  }
+}
 extension Int: DiagnosticArgument {
   func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
     fn(BridgedDiagnosticArgument(self))

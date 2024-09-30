@@ -80,7 +80,7 @@ public extension NoReflectionChildren {
 //===----------------------------------------------------------------------===//
 
 public struct StringRef : CustomStringConvertible, NoReflectionChildren {
-  let _bridged: BridgedStringRef
+  public let _bridged: BridgedStringRef
 
   public init(bridged: BridgedStringRef) { self._bridged = bridged }
 
