@@ -469,6 +469,7 @@ private:
     case Node::Kind::MethodDescriptor:
     case Node::Kind::MethodLookupFunction:
     case Node::Kind::ModifyAccessor:
+    case Node::Kind::Modify2Accessor:
     case Node::Kind::NativeOwningAddressor:
     case Node::Kind::NativeOwningMutableAddressor:
     case Node::Kind::NativePinningAddressor:
@@ -519,6 +520,7 @@ private:
     case Node::Kind::ReabstractionThunkHelperWithSelf:
     case Node::Kind::ReabstractionThunkHelperWithGlobalActor:
     case Node::Kind::ReadAccessor:
+    case Node::Kind::Read2Accessor:
     case Node::Kind::RelatedEntityDeclName:
     case Node::Kind::RetroactiveConformance:
     case Node::Kind::Setter:
@@ -2720,9 +2722,15 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::ReadAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
                                 "read");
+  case Node::Kind::Read2Accessor:
+    return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
+                                "read2");
   case Node::Kind::ModifyAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
                                 "modify");
+  case Node::Kind::Modify2Accessor:
+    return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
+                                "modify2");
   case Node::Kind::InitAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
                                 "init");

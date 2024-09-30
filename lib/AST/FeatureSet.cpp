@@ -311,6 +311,25 @@ static bool usesFeatureValueGenerics(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureCoroutineAccessors(Decl *decl) {
+  auto accessorDeclUsesFeatureCoroutineAccessors = [](AccessorDecl *accessor) {
+    return requiresFeatureCoroutineAccessors(accessor->getAccessorKind());
+  };
+  switch (decl->getKind()) {
+  case DeclKind::Var: {
+    auto *var = cast<VarDecl>(decl);
+    return llvm::any_of(var->getAllAccessors(),
+                        accessorDeclUsesFeatureCoroutineAccessors);
+  }
+  case DeclKind::Accessor: {
+    auto *accessor = cast<AccessorDecl>(decl);
+    return accessorDeclUsesFeatureCoroutineAccessors(accessor);
+  }
+  default:
+    return false;
+  }
+}
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------

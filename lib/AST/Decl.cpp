@@ -263,9 +263,11 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
        return DescriptiveDeclKind::MutableAddressor;
 
      case AccessorKind::Read:
+     case AccessorKind::Read2:
        return DescriptiveDeclKind::ReadAccessor;
 
      case AccessorKind::Modify:
+     case AccessorKind::Modify2:
        return DescriptiveDeclKind::ModifyAccessor;
 
      case AccessorKind::Init:
@@ -2728,6 +2730,9 @@ getDirectReadAccessStrategy(const AbstractStorageDecl *storage) {
   case ReadImplKind::Read:
     return AccessStrategy::getAccessor(AccessorKind::Read,
                                        /*dispatch*/ false);
+  case ReadImplKind::Read2:
+    return AccessStrategy::getAccessor(AccessorKind::Read2,
+                                       /*dispatch*/ false);
   }
   llvm_unreachable("bad impl kind");
 }
@@ -2763,6 +2768,9 @@ getDirectWriteAccessStrategy(const AbstractStorageDecl *storage) {
   case WriteImplKind::Modify:
     return AccessStrategy::getAccessor(AccessorKind::Modify,
                                        /*dispatch*/ false);
+  case WriteImplKind::Modify2:
+    return AccessStrategy::getAccessor(AccessorKind::Modify2,
+                                       /*dispatch*/ false);
   }
   llvm_unreachable("bad impl kind");
 }
@@ -2792,6 +2800,9 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
                                        /*dispatch*/ false);
   case ReadWriteImplKind::Modify:
     return AccessStrategy::getAccessor(AccessorKind::Modify,
+                                       /*dispatch*/ false);
+  case ReadWriteImplKind::Modify2:
+    return AccessStrategy::getAccessor(AccessorKind::Modify2,
                                        /*dispatch*/ false);
   case ReadWriteImplKind::StoredWithDidSet:
   case ReadWriteImplKind::InheritedWithDidSet:
@@ -2936,8 +2947,10 @@ bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
   case AccessorKind::Set:
     return requiresOpaqueSetter();
   case AccessorKind::Read:
+  case AccessorKind::Read2:
     return requiresOpaqueReadCoroutine();
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
     return requiresOpaqueModifyCoroutine();
 
   // Other accessors are never part of the opaque-accessors set.
@@ -6798,8 +6811,10 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
   case AccessorKind::MutableAddress:
     return article ? "a mutable addressor" : "mutable addressor";
   case AccessorKind::Read:
+  case AccessorKind::Read2:
     return article ? "a 'read' accessor" : "'read' accessor";
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
     return article ? "a 'modify' accessor" : "'modify' accessor";
   case AccessorKind::WillSet:
     return "'willSet'";
@@ -9039,7 +9054,9 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
     case AccessorKind::Get:
     case AccessorKind::DistributedGet:
     case AccessorKind::Read:
+    case AccessorKind::Read2:
     case AccessorKind::Modify:
+    case AccessorKind::Modify2:
       return subscript ? subscript->getName()
                        : DeclName(ctx, storage->getBaseName(),
                                   ArrayRef<Identifier>());
@@ -10347,7 +10364,9 @@ StringRef AccessorDecl::implicitParameterNameFor(AccessorKind kind) {
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
   case AccessorKind::Read:
+  case AccessorKind::Read2:
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
     return StringRef();
@@ -10360,6 +10379,7 @@ bool AccessorDecl::isAssumedNonMutating() const {
   case AccessorKind::DistributedGet:
   case AccessorKind::Address:
   case AccessorKind::Read:
+  case AccessorKind::Read2:
     return true;
 
   case AccessorKind::Set:
@@ -10367,6 +10387,7 @@ bool AccessorDecl::isAssumedNonMutating() const {
   case AccessorKind::DidSet:
   case AccessorKind::MutableAddress:
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
   case AccessorKind::Init:
     return false;
   }

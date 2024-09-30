@@ -305,6 +305,9 @@ ERROR(observing_accessor_in_subscript,none,
       "%select{'willSet'|'didSet'}0 is not allowed in subscripts", (unsigned))
 ERROR(getset_cannot_be_implied,none,
       "variable with implied type cannot have implied getter/setter", ())
+ERROR(accessor_requires_coroutine_accessors,none,
+      "%0 is only valid when experimental feature coroutine accessors is enabled",
+      (StringRef))
 
 // Import
 ERROR(decl_expected_module_name,none,

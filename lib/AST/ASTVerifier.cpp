@@ -3411,10 +3411,11 @@ public:
           abort();
         }
         if (FD->isDynamic() != storageDecl->isDynamic() &&
-            // We allow a non dynamic setter if there is a dynamic modify,
-            // observer, or mutable addressor.
+            // We allow a non dynamic setter if there is a dynamic
+            // _modify/modify, observer, or mutable addressor.
             !(FD->isSetter() &&
               (storageDecl->getWriteImpl() == WriteImplKind::Modify ||
+               storageDecl->getWriteImpl() == WriteImplKind::Modify2 ||
                storageDecl->getWriteImpl() ==
                    WriteImplKind::StoredWithObservers ||
                storageDecl->getWriteImpl() == WriteImplKind::MutableAddress) &&
@@ -3422,6 +3423,7 @@ public:
             // We allow a non dynamic getter if there is a dynamic read.
             !(FD->isGetter() &&
               (storageDecl->getReadImpl() == ReadImplKind::Read ||
+               storageDecl->getReadImpl() == ReadImplKind::Read2 ||
                storageDecl->getReadImpl() == ReadImplKind::Address) &&
               storageDecl->shouldUseNativeDynamicDispatch())) {
           Out << "Property and accessor do not match for 'dynamic'\n";

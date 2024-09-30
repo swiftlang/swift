@@ -98,7 +98,7 @@ static ValueOwnership getLoweredOwnership(AbstractFunctionDecl *afd) {
   }
   if (auto *ad = dyn_cast<AccessorDecl>(afd)) {
     if (ad->getAccessorKind() == AccessorKind::Set ||
-        ad->getAccessorKind() == AccessorKind::Modify) {
+        isYieldingDefaultMutatingAccessor(ad->getAccessorKind())) {
       return ValueOwnership::InOut;
     }
   }

@@ -2359,6 +2359,12 @@ void PrintAST::printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD) {
   }
 }
 
+static bool
+shouldPrintUnderscoredCoroutineAccessors(const AbstractStorageDecl *ASD) {
+  // TODO: CoroutineAccessors: Print only when necessary.
+  return true;
+}
+
 void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   if (isa<VarDecl>(ASD) && !Options.PrintPropertyAccessors)
     return;
@@ -2501,8 +2507,13 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   // Collect the accessor declarations that we should print.
   SmallVector<AccessorDecl *, 4> accessorsToPrint;
   auto AddAccessorToPrint = [&](AccessorKind kind) {
+    if (Options.SuppressCoroutineAccessors &&
+        requiresFeatureCoroutineAccessors(kind))
+      return;
     auto *Accessor = ASD->getAccessor(kind);
-    if (Accessor && shouldPrint(Accessor))
+    if (!Accessor)
+      return;
+    if (shouldPrint(Accessor))
       accessorsToPrint.push_back(Accessor);
   };
 
@@ -2528,6 +2539,13 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     case ReadImplKind::Read:
       AddAccessorToPrint(AccessorKind::Read);
       break;
+    case ReadImplKind::Read2:
+      if (ASD->getAccessor(AccessorKind::Read) &&
+          shouldPrintUnderscoredCoroutineAccessors(ASD)) {
+        AddAccessorToPrint(AccessorKind::Read);
+      }
+      AddAccessorToPrint(AccessorKind::Read2);
+      break;
     }
     switch (impl.getWriteImpl()) {
     case WriteImplKind::Immutable:
@@ -2542,8 +2560,10 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     }
     case WriteImplKind::Set:
       AddAccessorToPrint(AccessorKind::Set);
-      if (!shouldHideModifyAccessor())
+      if (!shouldHideModifyAccessor()) {
         AddAccessorToPrint(AccessorKind::Modify);
+        AddAccessorToPrint(AccessorKind::Modify2);
+      }
       break;
     case WriteImplKind::MutableAddress:
       AddAccessorToPrint(AccessorKind::MutableAddress);
@@ -2552,6 +2572,13 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       break;
     case WriteImplKind::Modify:
       AddAccessorToPrint(AccessorKind::Modify);
+      break;
+    case WriteImplKind::Modify2:
+      if (ASD->getAccessor(AccessorKind::Modify) &&
+          shouldPrintUnderscoredCoroutineAccessors(ASD)) {
+        AddAccessorToPrint(AccessorKind::Modify);
+      }
+      AddAccessorToPrint(AccessorKind::Modify2);
       break;
     }
   }
@@ -3141,10 +3168,8 @@ suppressingFeatureSendingArgsAndResults(PrintOptions &options,
 static void
 suppressingFeatureBitwiseCopyable2(PrintOptions &options,
                                    llvm::function_ref<void()> action) {
-  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
   llvm::SaveAndRestore<bool> scope(options.SuppressBitwiseCopyable, true);
   action();
-  options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
 static void
@@ -3164,6 +3189,13 @@ suppressingFeatureNonescapableTypes(PrintOptions &options,
   llvm::SaveAndRestore<bool> scope(options.SuppressNonEscapableTypes, true);
   action();
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
+static void
+suppressingFeatureCoroutineAccessors(PrintOptions &options,
+                                     llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressCoroutineAccessors, true);
+  action();
 }
 
 /// Suppress the printing of a particular feature.
@@ -4040,6 +4072,10 @@ bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
 }
 
 void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
+  if (Options.SuppressCoroutineAccessors &&
+      requiresFeatureCoroutineAccessors(decl->getAccessorKind())) {
+    return;
+  }
   printDocumentationComment(decl);
   printAttributes(decl);
   // Explicitly print 'mutating' and 'nonmutating' if needed.
@@ -4050,7 +4086,9 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   case AccessorKind::DistributedGet:
   case AccessorKind::Address:
   case AccessorKind::Read:
+  case AccessorKind::Read2:
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
   case AccessorKind::DidSet:
   case AccessorKind::MutableAddress:
     recordDeclLoc(decl,
