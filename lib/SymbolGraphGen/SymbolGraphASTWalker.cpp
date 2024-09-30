@@ -328,7 +328,7 @@ bool SymbolGraphASTWalker::isConsideredExportedImported(const Decl *D) const {
 }
 
 bool SymbolGraphASTWalker::isFromExportedImportedModule(const Decl* D, bool countUnderlyingClangModule) const {
-  auto *M = D->getModuleContext();
+  auto *M = getRealModuleOf(D);
   return isQualifiedExportedImport(D) || isExportedImportedModule(M, countUnderlyingClangModule);
 }
 

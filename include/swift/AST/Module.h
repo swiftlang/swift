@@ -847,6 +847,12 @@ public:
   /// returns the module \c Foo.
   ModuleDecl *getTopLevelModule(bool overlay = false);
 
+  /// Returns whether or not this module is a submodule of the given module.
+  /// If `this == M`, this returns false. If this is a submodule such as
+  /// `Foo.Bar.Baz`, and the given module is either `Foo` or `Foo.Bar`, this
+  /// returns true.
+  bool isSubmoduleOf(const ModuleDecl *M) const;
+
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;
   }
