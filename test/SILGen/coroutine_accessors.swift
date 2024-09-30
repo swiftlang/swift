@@ -3,6 +3,8 @@
 // RUN:     -enable-experimental-feature CoroutineAccessors \
 // RUN: | %FileCheck %s
 
+// REQUIRES: asserts
+
 public struct S {
 public var o: any AnyObject
 public var _i: Int = 0

@@ -6,6 +6,8 @@
 // RUN:     -verify-additional-prefix disabled- \
 // RUN:     -debug-diagnostic-names
 
+// REQUIRES: asserts
+
 var _i: Int = 0
 
 // Order of accessor kinds:

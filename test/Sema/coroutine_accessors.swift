@@ -3,6 +3,7 @@
 // RUN:     -enable-experimental-feature CoroutineAccessors \
 // RUN:     -debug-diagnostic-names
 
+// REQUIRES: asserts
 
 struct S {
 var i: Int

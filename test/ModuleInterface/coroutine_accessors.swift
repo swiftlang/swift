@@ -6,6 +6,8 @@
 // RUN: %FileCheck %s < %t.swiftinterface
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name Rock
 
+// REQUIRES: asserts
+
 var _i: Int = 0
 
 // CHECK:      #if compiler(>=5.3) && $CoroutineAccessors
