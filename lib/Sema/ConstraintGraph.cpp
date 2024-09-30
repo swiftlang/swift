@@ -438,6 +438,16 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
       CS.recordChange(SolverTrail::Change::addedConstraint(typeVar, constraint));
 
     addConstraint(typeVar, constraint);
+
+    auto &node = (*this)[typeVar];
+
+    node.introduceToInference(constraint);
+
+    if (isUsefulForReferencedVars(constraint)) {
+      node.notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
+        referencedVar.introduceToInference(constraint);
+      });
+    }
   }
 
   // If the constraint doesn't reference any type variables, it's orphaned;
@@ -454,20 +464,7 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
 void ConstraintGraph::addConstraint(TypeVariableType *typeVar,
                                     Constraint *constraint) {
   if (typeVar) {
-    // Find the node for this type variable.
-    auto &node = (*this)[typeVar];
-
-    // Note the constraint within the node for that type variable.
-    node.addConstraint(constraint);
-
-    node.introduceToInference(constraint);
-
-    if (isUsefulForReferencedVars(constraint)) {
-      node.notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
-        referencedVar.introduceToInference(constraint);
-      });
-    }
-
+    (*this)[typeVar].addConstraint(constraint);
     return;
   }
 
@@ -480,6 +477,17 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
   // For the nodes corresponding to each type variable...
   auto referencedTypeVars = constraint->getTypeVariables();
   for (auto typeVar : referencedTypeVars) {
+    // Find the node for this type variable.
+    auto &node = (*this)[typeVar];
+
+    node.retractFromInference(constraint);
+
+    if (isUsefulForReferencedVars(constraint)) {
+      node.notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
+        referencedVar.retractFromInference(constraint);
+      });
+    }
+
     // Record the change, if there are active scopes.
     if (CS.isRecordingChanges())
       CS.recordChange(SolverTrail::Change::removedConstraint(typeVar, constraint));
@@ -500,20 +508,7 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
 void ConstraintGraph::removeConstraint(TypeVariableType *typeVar,
                                        Constraint *constraint) {
   if (typeVar) {
-    // Find the node for this type variable.
-    auto &node = (*this)[typeVar];
-
-    node.retractFromInference(constraint);
-
-    if (isUsefulForReferencedVars(constraint)) {
-      node.notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
-        referencedVar.retractFromInference(constraint);
-      });
-    }
-
-    // Remove the constraint.
-    node.removeConstraint(constraint);
-
+    (*this)[typeVar].removeConstraint(constraint);
     return;
   }
 
