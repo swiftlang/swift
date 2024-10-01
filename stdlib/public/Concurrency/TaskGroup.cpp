@@ -955,6 +955,8 @@ TaskGroup* TaskGroupTaskStatusRecord::getGroup() {
 // =============================================================================
 // ==== initialize -------------------------------------------------------------
 
+static void _swift_taskGroup_initialize(ResultTypeInfo resultType, size_t rawGroupFlags, TaskGroup *group);
+
 // Initializes into the preallocated _group an actual TaskGroupBase.
 SWIFT_CC(swift)
 static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) {
@@ -965,21 +967,27 @@ static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) 
 SWIFT_CC(swift)
 static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
                                                     TaskGroup *group, const Metadata *T) {
-  TaskGroupFlags groupFlags(rawGroupFlags);
-  SWIFT_TASK_GROUP_DEBUG_LOG_0(group, "create group, from task:%p; flags: isDiscardingResults=%d",
-                               swift_task_getCurrent(),
-                               groupFlags.isDiscardResults());
-
   ResultTypeInfo resultType;
 #if !SWIFT_CONCURRENCY_EMBEDDED
   resultType.metadata = T;
-  assert(!groupFlags.isMetadataAsOptionRecord());
 #else
-  assert(groupFlags.isMetadataAsOptionRecord());
-  TaskOptionRecord *options = (TaskOptionRecord *)T;
+  swift_unreachable("swift_taskGroup_initializeWithFlags in embedded");
+#endif
+  _swift_taskGroup_initialize(resultType, rawGroupFlags, group);
+}
+
+// Initializes into the preallocated _group an actual instance.
+SWIFT_CC(swift)
+static void swift_taskGroup_initializeWithOptionsImpl(size_t rawGroupFlags, TaskGroup *group, const Metadata *T, TaskOptionRecord *options) {
+  ResultTypeInfo resultType;
+#if !SWIFT_CONCURRENCY_EMBEDDED
+  resultType.metadata = T;
+#endif
+
   for (auto option = options; option; option = option->getParent()) {
     switch (option->getKind()) {
     case TaskOptionRecordKind::ResultTypeInfo: {
+#if SWIFT_CONCURRENCY_EMBEDDED
       auto *typeInfo = cast<ResultTypeInfoTaskOptionRecord>(option);
       resultType = {
           .size = typeInfo->size,
@@ -988,13 +996,26 @@ static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
           .storeEnumTagSinglePayload = typeInfo->storeEnumTagSinglePayload,
           .destroy = typeInfo->destroy,
       };
+#else
+      swift_unreachable("ResultTypeInfo in non embedded");
+#endif
       break;
     }
     default:
-      swift_unreachable("only ResultTypeInfo expected");
+      break; // ignore unknown records
     }
   }
-#endif
+
+  assert(!resultType.isNull());
+
+  _swift_taskGroup_initialize(resultType, rawGroupFlags, group);
+}
+
+static void _swift_taskGroup_initialize(ResultTypeInfo resultType, size_t rawGroupFlags, TaskGroup *group) {
+  TaskGroupFlags groupFlags(rawGroupFlags);
+  SWIFT_TASK_GROUP_DEBUG_LOG_0(group, "create group, from task:%p; flags: isDiscardingResults=%d",
+                               swift_task_getCurrent(),
+                               groupFlags.isDiscardResults());
 
   TaskGroupBase *impl;
   if (groupFlags.isDiscardResults()) {

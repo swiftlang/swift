@@ -300,6 +300,10 @@ OVERRIDE_TASK_GROUP(taskGroup_initializeWithFlags, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::, (size_t flags, TaskGroup *group, const Metadata *T), (flags, group, T))
 
+OVERRIDE_TASK_GROUP(taskGroup_initializeWithOptions, void,
+                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                    swift::, (size_t flags, TaskGroup *group, const Metadata *T, TaskOptionRecord *options), (flags, group, T, options))
+
 OVERRIDE_TASK_STATUS(taskGroup_attachChild, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::, (TaskGroup *group, AsyncTask *child),

@@ -336,38 +336,30 @@ llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
          "createTaskGroup should have a type substitution");
   auto resultType = subs.getReplacementTypes()[0]->getCanonicalType();
 
-  // In desktop Swift, we pass a Metadata pointer as the last argument. In
-  // Embedded Swift, we pass a TaskOptionRecord list, and mark a bit in
-  // groupFlags.
-  llvm::Value *metadataOrTypeOptionRecord;
   if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
-    metadataOrTypeOptionRecord =
-        llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
-    metadataOrTypeOptionRecord = maybeAddEmbeddedSwiftResultTypeInfo(
-        IGF, metadataOrTypeOptionRecord, resultType);
-    llvm::IntegerType *IntPtrTy = IGF.IGM.IntPtrTy;
-    TaskGroupFlags taskgroupFlags(0);
-    taskgroupFlags.setIsMetadataAsOptionRecord(true);
-    auto flagValue = llvm::ConstantInt::get(IGF.IGM.IntPtrTy,
-                                            taskgroupFlags.getOpaqueValue());
-    if (!groupFlags) {
-      groupFlags = flagValue;
-    } else {
-      groupFlags = IGF.Builder.CreateOr(groupFlags, flagValue);
-    }
-  } else {
-    metadataOrTypeOptionRecord = IGF.emitAbstractTypeMetadataRef(resultType);
+    // In Embedded Swift, call swift_taskGroup_initializeWithOptions instead, to
+    // avoid needing a Metadata argument.
+    llvm::Value *options = llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
+    llvm::Value *resultTypeMetadata = llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
+    options = maybeAddEmbeddedSwiftResultTypeInfo(IGF, options, resultType);
+    if (!groupFlags) groupFlags = llvm::ConstantInt::get(IGF.IGM.SizeTy, 0);
+    llvm::CallInst *call = IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeWithOptionsFunctionPointer(),
+                                  {groupFlags, group, resultTypeMetadata, options});
+    call->setDoesNotThrow();
+    call->setCallingConv(IGF.IGM.SwiftCC);
+    return group;
   }
+
+  auto resultTypeMetadata = IGF.emitAbstractTypeMetadataRef(resultType);
 
   llvm::CallInst *call;
   if (groupFlags) {
-    call = IGF.Builder.CreateCall(
-        IGF.IGM.getTaskGroupInitializeWithFlagsFunctionPointer(),
-        {groupFlags, group, metadataOrTypeOptionRecord});
+    call = IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeWithFlagsFunctionPointer(),
+                                  {groupFlags, group, resultTypeMetadata});
   } else {
     call =
         IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeFunctionPointer(),
-                               {group, metadataOrTypeOptionRecord});
+                               {group, resultTypeMetadata});
   }
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
