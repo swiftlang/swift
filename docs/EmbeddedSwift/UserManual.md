@@ -164,15 +164,15 @@ func sayHello() {
 }
 ```
 
-Additionally, you can also use an attribute (also experimental, and not source stable) to make entire functions, types and other declarations unavailable in Embedded Swift. This can be particularly useful to explicitly mark your own code (and also entire types and conformances) that relies on features unavailable in Embedded Swift, e.g. existentials or strings -- it is explicitly allowed to use those in unavailable contexts:
+Additionally, you can also use an attribute (also experimental, and not source stable) to make entire functions, types and other declarations unavailable in Embedded Swift. This can be particularly useful to explicitly mark your own code (and also entire types and conformances) that relies on features unavailable in Embedded Swift, e.g. the Any type or Codable -- it is explicitly allowed to use those in unavailable contexts:
 
 ```swift
 @_unavailableInEmbedded
-func useAnExistential(_: Any) { ... }
+func useAny(_: Any) { ... }
 
 @_unavailableInEmbedded
-extension MyStruct: CustomStringConvertible {
-  var description: String { return "..." }
+extension MyStruct: Codable {
+  ...
 }
 ```
 
@@ -183,7 +183,7 @@ Embedded Swift is a subset of the Swift language, and some features are not avai
 Features that are not available:
 
 - **Not available**: Runtime reflection (`Mirror` APIs).
-- **Not available**: Values of protocol types ("existentials"), e.g. `let a: Hashable = ...`, are not allowed. `Any` and `AnyObject` are also not allowed.
+- **Not available**: Values of protocol types ("existentials"), unless the protocol is restricted to be class-bound (derived from AnyObject). E.g. `let a: Hashable = ...` is not allowed. `Any` is also not allowed.
 - **Not available**: Metatypes, e.g. `let t = SomeClass.Type` or `type(of: value)` are not allowed.
 - **Not available**: Printing and stringification of arbitrary types (achieved via reflection in desktop Swift).
 - **Not available yet (under development)**: Swift Concurrency.
