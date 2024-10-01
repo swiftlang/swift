@@ -193,7 +193,8 @@ ClangImporter::createClangArgs(const ClangImporterOptions &ClangImporterOpts,
 static SmallVector<std::pair<std::string, std::string>, 2>
 getLibcFileMapping(ASTContext &ctx, StringRef modulemapFileName,
                    std::optional<ArrayRef<StringRef>> maybeHeaderFileNames,
-                   const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
+                   const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs,
+                   bool suppressDiagnostic) {
   const llvm::Triple &triple = ctx.LangOpts.Target;
 
   // Extract the libc path from Clang driver.
@@ -217,7 +218,8 @@ getLibcFileMapping(ASTContext &ctx, StringRef modulemapFileName,
           parsedIncludeArgs, {"inttypes.h", "unistd.h", "stdint.h"}, vfs)) {
     libcDir = dir.value();
   } else {
-    ctx.Diags.diagnose(SourceLoc(), diag::libc_not_found, triple.str());
+    if (!suppressDiagnostic)
+      ctx.Diags.diagnose(SourceLoc(), diag::libc_not_found, triple.str());
     return {};
   }
 
@@ -255,7 +257,8 @@ getLibcFileMapping(ASTContext &ctx, StringRef modulemapFileName,
 
 static void getLibStdCxxFileMapping(
     ClangInvocationFileMapping &fileMapping, ASTContext &ctx,
-    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
+    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs,
+    bool suppressDiagnostic) {
   assert(ctx.LangOpts.EnableCXXInterop &&
          "libstdc++ is only injected if C++ interop is enabled");
 
@@ -290,7 +293,8 @@ static void getLibStdCxxFileMapping(
                                      {"cstdlib", "string", "vector"}, vfs)) {
     cxxStdlibDir = dir.value();
   } else {
-    ctx.Diags.diagnose(SourceLoc(), diag::libstdcxx_not_found, triple.str());
+    if (!suppressDiagnostic)
+      ctx.Diags.diagnose(SourceLoc(), diag::libstdcxx_not_found, triple.str());
     return;
   }
 
@@ -545,7 +549,8 @@ SmallVector<std::pair<std::string, std::string>, 2> GetWindowsFileMappings(
 } // namespace
 
 ClangInvocationFileMapping swift::getClangInvocationFileMapping(
-    ASTContext &ctx, llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs) {
+  ASTContext &ctx, llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs,
+  bool suppressDiagnostic) {
   ClangInvocationFileMapping result;
   if (!vfs)
     vfs = llvm::vfs::getRealFileSystem();
@@ -575,18 +580,21 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
   if (triple.isOSWASI()) {
     // WASI Mappings
     libcFileMapping =
-        getLibcFileMapping(ctx, "wasi-libc.modulemap", std::nullopt, vfs);
+      getLibcFileMapping(ctx, "wasi-libc.modulemap", std::nullopt, vfs,
+                         suppressDiagnostic);
 
     // WASI's module map needs fixing
     result.requiresBuiltinHeadersInSystemModules = true;
   } else if (triple.isMusl()) {
     libcFileMapping =
-        getLibcFileMapping(ctx, "musl.modulemap", StringRef("SwiftMusl.h"), vfs);
+      getLibcFileMapping(ctx, "musl.modulemap", StringRef("SwiftMusl.h"), vfs,
+                         suppressDiagnostic);
   } else if (triple.isAndroid()) {
     // Android uses the android-specific module map that overlays the NDK.
     StringRef headerFiles[] = {"SwiftAndroidNDK.h", "SwiftBionic.h"};
     libcFileMapping =
-        getLibcFileMapping(ctx, "android.modulemap", headerFiles, vfs);
+      getLibcFileMapping(ctx, "android.modulemap", headerFiles, vfs,
+                         suppressDiagnostic);
 
     if (!libcFileMapping.empty()) {
       sysroot = libcFileMapping[0].first;
@@ -596,7 +604,8 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
              triple.isOSFreeBSD()) {
     // BSD/Linux Mappings
     libcFileMapping = getLibcFileMapping(ctx, "glibc.modulemap",
-                                         StringRef("SwiftGlibc.h"), vfs);
+                                         StringRef("SwiftGlibc.h"), vfs,
+                                         suppressDiagnostic);
 
     // glibc.modulemap needs fixing
     result.requiresBuiltinHeadersInSystemModules = true;
@@ -604,7 +613,7 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
   result.redirectedFiles.append(libcFileMapping);
 
   if (ctx.LangOpts.EnableCXXInterop)
-    getLibStdCxxFileMapping(result, ctx, vfs);
+    getLibStdCxxFileMapping(result, ctx, vfs, suppressDiagnostic);
 
   result.redirectedFiles.append(GetWindowsFileMappings(
       ctx, vfs, result.requiresBuiltinHeadersInSystemModules));
