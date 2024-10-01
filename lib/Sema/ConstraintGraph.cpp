@@ -92,11 +92,6 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   if (typeVar != typeVarRep)
     mergeNodes(typeVar, typeVarRep);
   else if (auto fixed = CS.getFixedType(typeVarRep)) {
-    // FIXME: This is totally the wrong place to do it. We should do this in
-    // introduceToInference().
-    if (CS.isRecordingChanges())
-      CS.recordChange(SolverTrail::Change::introducedToInference(typeVar, fixed));
-
     // Bind the type variable.
     bindTypeVariable(typeVar, fixed);
   }
@@ -155,16 +150,6 @@ void ConstraintGraphNode::addConstraint(Constraint *constraint) {
   assert(ConstraintIndex.count(constraint) == 0 && "Constraint re-insertion");
   ConstraintIndex[constraint] = Constraints.size();
   Constraints.push_back(constraint);
-
-  {
-    introduceToInference(constraint);
-
-    if (isUsefulForReferencedVars(constraint)) {
-      notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
-        referencedVar.introduceToInference(constraint);
-      });
-    }
-  }
 }
 
 void ConstraintGraphNode::removeConstraint(Constraint *constraint) {
@@ -175,16 +160,6 @@ void ConstraintGraphNode::removeConstraint(Constraint *constraint) {
   auto index = pos->second;
   ConstraintIndex.erase(pos);
   assert(Constraints[index] == constraint && "Mismatched constraint");
-
-  {
-    retractFromInference(constraint);
-
-    if (isUsefulForReferencedVars(constraint)) {
-      notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
-        referencedVar.retractFromInference(constraint);
-      });
-    }
-  }
 
   // If this is the last constraint, just pop it off the list and we're done.
   unsigned lastIndex = Constraints.size()-1;
@@ -296,26 +271,8 @@ void ConstraintGraphNode::addToEquivalenceClass(
 }
 
 void ConstraintGraphNode::truncateEquivalenceClass(unsigned prevSize) {
-  llvm::SmallSetVector<TypeVariableType *, 4> disconnectedVars;
-  for (auto disconnected = EquivalenceClass.begin() + prevSize;
-       disconnected != EquivalenceClass.end();
-       ++disconnected) {
-    disconnectedVars.insert(*disconnected);
-  }
-
   EquivalenceClass.erase(EquivalenceClass.begin() + prevSize,
                          EquivalenceClass.end());
-
-  // We need to re-introduce each constraint associated with
-  // "disconnected" member itself and to this representative.
-  {
-    // Re-infer bindings for the current representative.
-    resetBindingSet();
-
-    // Re-infer bindings all of the newly made representatives.
-    for (auto *typeVar : disconnectedVars)
-      CG[typeVar].notifyReferencingVars();
-  }
 }
 
 void ConstraintGraphNode::addReferencedVar(TypeVariableType *typeVar) {
@@ -419,36 +376,6 @@ void ConstraintGraphNode::introduceToInference(Type fixedType) {
   }
 }
 
-void ConstraintGraphNode::retractFromInference(Type fixedType) {
-  // Notify referencing variables (just like in bound case) that this
-  // type variable has been modified.
-  notifyReferencingVars();
-
-  SmallPtrSet<TypeVariableType *, 4> referencedVars;
-  fixedType->getTypeVariables(referencedVars);
-
-  // TODO: This might be an overkill but it's (currently)
-  // the simplest way to reliably ensure that all of the
-  // no longer related constraints have been retracted.
-  for (auto *referencedVar : referencedVars) {
-    auto &node = CG[referencedVar];
-    if (node.forRepresentativeVar())
-      node.resetBindingSet();
-  }
-}
-
-void ConstraintGraphNode::resetBindingSet() {
-  assert(forRepresentativeVar());
-
-  Bindings.reset();
-
-  auto &bindings = getCurrentBindings();
-  for (auto *constraint : CG.gatherConstraints(
-           TypeVar, ConstraintGraph::GatheringKind::EquivalenceClass)) {
-    bindings.infer(constraint);
-  }
-}
-
 #pragma mark Graph mutation
 
 void ConstraintGraph::removeNode(TypeVariableType *typeVar) {
@@ -471,22 +398,44 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
   // For the nodes corresponding to each type variable...
   auto referencedTypeVars = constraint->getTypeVariables();
   for (auto typeVar : referencedTypeVars) {
-    // Find the node for this type variable.
+    // Record the change, if there are active scopes.
+    if (CS.isRecordingChanges())
+      CS.recordChange(SolverTrail::Change::addedConstraint(typeVar, constraint));
+
+    addConstraint(typeVar, constraint);
+
     auto &node = (*this)[typeVar];
 
-    // Note the constraint within the node for that type variable.
-    node.addConstraint(constraint);
+    node.introduceToInference(constraint);
+
+    if (isUsefulForReferencedVars(constraint)) {
+      node.notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
+        referencedVar.introduceToInference(constraint);
+      });
+    }
   }
 
   // If the constraint doesn't reference any type variables, it's orphaned;
   // track it as such.
   if (referencedTypeVars.empty()) {
-    OrphanedConstraints.push_back(constraint);
+    // Record the change, if there are active scopes.
+    if (CS.isRecordingChanges())
+      CS.recordChange(SolverTrail::Change::addedConstraint(nullptr, constraint));
+
+    addConstraint(nullptr, constraint);
+  }
+}
+
+void ConstraintGraph::addConstraint(TypeVariableType *typeVar,
+                                    Constraint *constraint) {
+  if (typeVar) {
+    (*this)[typeVar].addConstraint(constraint);
+    return;
   }
 
-  // Record the change, if there are active scopes.
-  if (CS.isRecordingChanges())
-    CS.recordChange(SolverTrail::Change::addedConstraint(constraint));
+  // If the constraint doesn't reference any type variables, it's orphaned;
+  // track it as such.
+  OrphanedConstraints.push_back(constraint);
 }
 
 void ConstraintGraph::removeConstraint(Constraint *constraint) {
@@ -496,23 +445,45 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
     // Find the node for this type variable.
     auto &node = (*this)[typeVar];
 
-    // Remove the constraint.
-    node.removeConstraint(constraint);
+    node.retractFromInference(constraint);
+
+    if (isUsefulForReferencedVars(constraint)) {
+      node.notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
+        referencedVar.retractFromInference(constraint);
+      });
+    }
+
+    // Record the change, if there are active scopes.
+    if (CS.isRecordingChanges())
+      CS.recordChange(SolverTrail::Change::removedConstraint(typeVar, constraint));
+
+    removeConstraint(typeVar, constraint);
   }
 
   // If this is an orphaned constraint, remove it from the list.
   if (referencedTypeVars.empty()) {
-    auto known = std::find(OrphanedConstraints.begin(),
-                           OrphanedConstraints.end(),
-                           constraint);
-    assert(known != OrphanedConstraints.end() && "missing orphaned constraint");
-    *known = OrphanedConstraints.back();
-    OrphanedConstraints.pop_back();
+    // Record the change, if there are active scopes.
+    if (CS.isRecordingChanges())
+      CS.recordChange(SolverTrail::Change::removedConstraint(nullptr, constraint));
+
+    removeConstraint(nullptr, constraint);
+  }
+}
+
+void ConstraintGraph::removeConstraint(TypeVariableType *typeVar,
+                                       Constraint *constraint) {
+  if (typeVar) {
+    (*this)[typeVar].removeConstraint(constraint);
+    return;
   }
 
-  // Record the change, if there are active scopes.
-  if (CS.isRecordingChanges())
-    CS.recordChange(SolverTrail::Change::removedConstraint(constraint));
+  // If this is an orphaned constraint, remove it from the list.
+  auto known = std::find(OrphanedConstraints.begin(),
+                         OrphanedConstraints.end(),
+                         constraint);
+  assert(known != OrphanedConstraints.end() && "missing orphaned constraint");
+  *known = OrphanedConstraints.back();
+  OrphanedConstraints.pop_back();
 }
 
 void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1, 
@@ -559,33 +530,34 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
 
     otherNode.addReferencedBy(typeVar);
     node.addReferencedVar(otherTypeVar);
-  }
 
-  // Record the change, if there are active scopes.
-  if (CS.isRecordingChanges())
-    CS.recordChange(SolverTrail::Change::boundTypeVariable(typeVar, fixed));
+    // Record the change, if there are active scopes.
+    if (CS.isRecordingChanges())
+      CS.recordChange(SolverTrail::Change::relatedTypeVariables(typeVar, otherTypeVar));
+  }
 }
 
 void ConstraintGraph::introduceToInference(TypeVariableType *typeVar, Type fixed) {
   (*this)[typeVar].introduceToInference(fixed);
 }
 
-void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed) {
+void ConstraintGraph::unrelateTypeVariables(TypeVariableType *typeVar,
+                                            TypeVariableType *otherTypeVar) {
   auto &node = (*this)[typeVar];
+  auto &otherNode = (*this)[otherTypeVar];
 
-  llvm::SmallPtrSet<TypeVariableType *, 4> referencedVars;
-  fixed->getTypeVariables(referencedVars);
-
-  for (auto otherTypeVar : referencedVars) {
-    auto &otherNode = (*this)[otherTypeVar];
-
-    otherNode.removeReferencedBy(typeVar);
-    node.removeReference(otherTypeVar);
-  }
+  otherNode.removeReferencedBy(typeVar);
+  node.removeReference(otherTypeVar);
 }
 
-void ConstraintGraph::retractFromInference(TypeVariableType *typeVar, Type fixed) {
-  return (*this)[typeVar].retractFromInference(fixed);
+void ConstraintGraph::inferBindings(TypeVariableType *typeVar,
+                                    Constraint *constraint) {
+  (*this)[typeVar].getCurrentBindings().infer(constraint);
+}
+
+void ConstraintGraph::retractBindings(TypeVariableType *typeVar,
+                                      Constraint *constraint) {
+  (*this)[typeVar].getCurrentBindings().retract(constraint);
 }
 
 #pragma mark Algorithms

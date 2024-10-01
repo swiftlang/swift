@@ -50,18 +50,22 @@ SolverTrail::Change::addedTypeVariable(TypeVariableType *typeVar) {
 }
 
 SolverTrail::Change
-SolverTrail::Change::addedConstraint(Constraint *constraint) {
+SolverTrail::Change::addedConstraint(TypeVariableType *typeVar,
+                                     Constraint *constraint) {
   Change result;
   result.Kind = ChangeKind::AddedConstraint;
-  result.TheConstraint = constraint;
+  result.TheConstraint.TypeVar = typeVar;
+  result.TheConstraint.Constraint = constraint;
   return result;
 }
 
 SolverTrail::Change
-SolverTrail::Change::removedConstraint(Constraint *constraint) {
+SolverTrail::Change::removedConstraint(TypeVariableType *typeVar,
+                                       Constraint *constraint) {
   Change result;
   result.Kind = ChangeKind::RemovedConstraint;
-  result.TheConstraint = constraint;
+  result.TheConstraint.TypeVar = typeVar;
+  result.TheConstraint.Constraint = constraint;
   return result;
 }
 
@@ -76,22 +80,32 @@ SolverTrail::Change::extendedEquivalenceClass(TypeVariableType *typeVar,
 }
 
 SolverTrail::Change
-SolverTrail::Change::boundTypeVariable(TypeVariableType *typeVar,
-                                       Type fixed) {
+SolverTrail::Change::relatedTypeVariables(TypeVariableType *typeVar,
+                                          TypeVariableType *otherTypeVar) {
   Change result;
-  result.Kind = ChangeKind::BoundTypeVariable;
-  result.Binding.TypeVar = typeVar;
-  result.Binding.FixedType = fixed.getPointer();
+  result.Kind = ChangeKind::RelatedTypeVariables;
+  result.Relation.TypeVar = typeVar;
+  result.Relation.OtherTypeVar = otherTypeVar;
   return result;
 }
 
 SolverTrail::Change
-SolverTrail::Change::introducedToInference(TypeVariableType *typeVar,
-                                           Type fixed) {
+SolverTrail::Change::inferredBindings(TypeVariableType *typeVar,
+                                     Constraint *constraint) {
   Change result;
-  result.Kind = ChangeKind::IntroducedToInference;
-  result.Binding.TypeVar = typeVar;
-  result.Binding.FixedType = fixed.getPointer();
+  result.Kind = ChangeKind::InferredBindings;
+  result.TheConstraint.TypeVar = typeVar;
+  result.TheConstraint.Constraint = constraint;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::retractedBindings(TypeVariableType *typeVar,
+                                       Constraint *constraint) {
+  Change result;
+  result.Kind = ChangeKind::RetractedBindings;
+  result.TheConstraint.TypeVar = typeVar;
+  result.TheConstraint.Constraint = constraint;
   return result;
 }
 
@@ -117,11 +131,11 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     break;
 
   case ChangeKind::AddedConstraint:
-    cg.removeConstraint(TheConstraint);
+    cg.removeConstraint(TheConstraint.TypeVar, TheConstraint.Constraint);
     break;
 
   case ChangeKind::RemovedConstraint:
-    cg.addConstraint(TheConstraint);
+    cg.addConstraint(TheConstraint.TypeVar, TheConstraint.Constraint);
     break;
 
   case ChangeKind::ExtendedEquivalenceClass: {
@@ -130,12 +144,16 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     break;
    }
 
-  case ChangeKind::BoundTypeVariable:
-    cg.unbindTypeVariable(Binding.TypeVar, Binding.FixedType);
+  case ChangeKind::RelatedTypeVariables:
+    cg.unrelateTypeVariables(Relation.TypeVar, Relation.OtherTypeVar);
     break;
 
-  case ChangeKind::IntroducedToInference:
-    cg.retractFromInference(Binding.TypeVar, Binding.FixedType);
+  case ChangeKind::InferredBindings:
+    cg.retractBindings(TheConstraint.TypeVar, TheConstraint.Constraint);
+    break;
+
+  case ChangeKind::RetractedBindings:
+    cg.inferBindings(TheConstraint.TypeVar, TheConstraint.Constraint);
     break;
 
   case ChangeKind::UpdatedTypeVariable:
@@ -162,13 +180,19 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
 
   case ChangeKind::AddedConstraint:
     out << "(added constraint ";
-    TheConstraint->print(out, &cs.getASTContext().SourceMgr, indent + 2);
+    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
+                         indent + 2);
+    out << " to type variable ";
+    TheConstraint.TypeVar->print(out, PO);
     out << ")\n";
     break;
 
   case ChangeKind::RemovedConstraint:
     out << "(removed constraint ";
-    TheConstraint->print(out, &cs.getASTContext().SourceMgr, indent + 2);
+    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
+                                    indent + 2);
+    out << " from type variable ";
+    TheConstraint.TypeVar->print(out, PO);
     out << ")\n";
     break;
 
@@ -179,20 +203,30 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     break;
    }
 
-  case ChangeKind::BoundTypeVariable:
-    out << "(bound type variable ";
-    Binding.TypeVar->print(out, PO);
-    out << " to fixed type ";
-    Binding.FixedType->print(out, PO);
+  case ChangeKind::RelatedTypeVariables:
+    out << "(related type variable ";
+    Relation.TypeVar->print(out, PO);
+    out << " with ";
+    Relation.OtherTypeVar->print(out, PO);
     out << ")\n";
     break;
 
-  case ChangeKind::IntroducedToInference:
-    out << "(introduced type variable ";
-    Binding.TypeVar->print(out, PO);
-    out << " with fixed type ";
-    Binding.FixedType->print(out, PO);
-    out << " to inference)\n";
+  case ChangeKind::InferredBindings:
+    out << "(inferred bindings from ";
+    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
+                         indent + 2);
+    out << " for type variable ";
+    TheConstraint.TypeVar->print(out, PO);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RetractedBindings:
+    out << "(retracted bindings from ";
+    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
+                                    indent + 2);
+    out << " for type variable ";
+    TheConstraint.TypeVar->print(out, PO);
+    out << ")\n";
     break;
 
   case ChangeKind::UpdatedTypeVariable:
