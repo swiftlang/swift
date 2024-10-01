@@ -1,12 +1,22 @@
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
 // RUN: %target-build-swift -whole-module-optimization -module-name PlaygroundSupport -emit-module-path %t/PlaygroundSupport.swiftmodule -parse-as-library -c -o %t/PlaygroundSupport.o %S/Inputs/SilentPCMacroRuntime.swift %S/Inputs/PlaygroundsRuntime.swift
+//
+// Default Swift version
 // RUN: %target-build-swift -Xfrontend -playground -o %t/main -I=%t %t/PlaygroundSupport.o %t/main.swift
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 // RUN: %target-build-swift -Xfrontend -pc-macro -Xfrontend -playground -o %t/main2 -I=%t %t/PlaygroundSupport.o %t/main.swift 
 // RUN: %target-codesign %t/main2
 // RUN: %target-run %t/main2 | %FileCheck %s
+//
+// Swift version 6
+// RUN: %target-build-swift -swift-version 6 -Xfrontend -playground -o %t/main3 -I=%t %t/PlaygroundSupport.o %t/main.swift
+// RUN: %target-codesign %t/main3
+// RUN: %target-run %t/main3 | %FileCheck %s
+// RUN: %target-build-swift -swift-version 6 -Xfrontend -pc-macro -Xfrontend -playground -o %t/main4 -I=%t %t/PlaygroundSupport.o %t/main.swift
+// RUN: %target-codesign %t/main4
+// RUN: %target-run %t/main4 | %FileCheck %s
 // REQUIRES: executable_test
 
 import PlaygroundSupport
