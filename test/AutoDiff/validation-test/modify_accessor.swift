@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// This test fails on arm64e with a pointer auth failure.
+// XFAIL: CPU=arm64e
+
 import _Differentiation
 import StdlibUnittest
 
