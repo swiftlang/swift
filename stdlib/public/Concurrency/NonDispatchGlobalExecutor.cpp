@@ -34,6 +34,8 @@
 
 #include "ExecutorImpl.h"
 
+using namespace swift;
+
 SWIFT_CC(swift)
 void swift_task_enqueueGlobalImpl(SwiftJob *job) {
   assert(job && "no job provided");
