@@ -39,6 +39,7 @@
 using namespace swift;
 
 #define DECL_ATTR(_, Id, ...) \
+  static_assert(DeclAttrKind::Id <= DeclAttrKind::Last_DeclAttr); \
   static_assert(IsTriviallyDestructible<Id##Attr>::value, \
                 "Attrs are BumpPtrAllocated; the destructor is never called");
 #include "swift/AST/DeclAttr.def"
@@ -68,6 +69,10 @@ static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::
               DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIStableToRemove),     \
               #Name " needs to specify either APIBreakingToRemove or APIStableToRemove");
 #include "swift/AST/DeclAttr.def"
+
+#define TYPE_ATTR(_, Id)                                                       \
+  static_assert(TypeAttrKind::Id <= TypeAttrKind::Last_TypeAttr);
+#include "swift/AST/TypeAttr.def"
 
 StringRef swift::getAccessLevelSpelling(AccessLevel value) {
   switch (value) {
