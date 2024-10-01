@@ -1487,6 +1487,10 @@ ClangImporter::create(ASTContext &ctx,
   if (importerOpts.Mode == ClangImporterOptions::Modes::PrecompiledModule)
     return importer;
 
+  instance.initializeDelayedInputFileFromCAS();
+  if (instance.getDiagnostics().hasErrorOccurred())
+    return nullptr;
+
   bool canBegin = action->BeginSourceFile(instance,
                                           instance.getFrontendOpts().Inputs[0]);
   if (!canBegin)
