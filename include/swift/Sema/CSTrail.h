@@ -69,6 +69,8 @@ public:
     RecordedOpenedTypes,
     /// Recorded the opening of an existential type at a locator.
     RecordedOpenedExistentialType,
+    /// Recorded the opening of a pack existential type.
+    RecordedOpenedPackExpansionType,
   };
 
   /// A change made to the constraint system.
@@ -134,6 +136,7 @@ public:
       } FixedRequirement;
 
       ConstraintLocator *Locator;
+      PackExpansionType *ExpansionTy;
     };
 
     Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
@@ -196,6 +199,9 @@ public:
 
     /// Create a change that recorded the opening of an existential type.
     static Change recordedOpenedExistentialType(ConstraintLocator *locator);
+
+    /// Create a change that recorded the opening of a pack expansion type.
+    static Change recordedOpenedPackExpansionType(PackExpansionType *expansion);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

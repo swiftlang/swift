@@ -2394,7 +2394,7 @@ private:
   llvm::SmallDenseMap<ConstraintLocator *, OpenedArchetypeType *, 4>
       OpenedExistentialTypes;
 
-  llvm::SmallMapVector<PackExpansionType *, TypeVariableType *, 4>
+  llvm::SmallDenseMap<PackExpansionType *, TypeVariableType *, 4>
       OpenedPackExpansionTypes;
 
   llvm::SmallMapVector<ConstraintLocator *, std::pair<UUID, Type>, 4>
@@ -2882,9 +2882,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    /// The length of \c OpenedPackExpansionsTypes.
-    unsigned numOpenedPackExpansionTypes;
 
     /// The length of \c PackExpansionEnvironments.
     unsigned numPackExpansionEnvironments;
@@ -4334,6 +4331,16 @@ private:
   Type openPackExpansionType(PackExpansionType *expansion,
                              OpenedTypeMap &replacements,
                              ConstraintLocatorBuilder locator);
+
+  /// Update OpenedPackExpansionTypes and record a change in the trail.
+  void recordOpenedPackExpansionType(PackExpansionType *expansion,
+                                     TypeVariableType *expansionVar);
+
+  /// Undo the above change.
+  void removeOpenedPackExpansionType(PackExpansionType *expansion) {
+    bool erased = OpenedPackExpansionTypes.erase(expansion);
+    ASSERT(erased);
+  }
 
 public:
   /// Recurse over the given type and open any opaque archetype types.

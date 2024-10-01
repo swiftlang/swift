@@ -193,6 +193,14 @@ SolverTrail::Change::recordedOpenedExistentialType(ConstraintLocator *locator) {
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::recordedOpenedPackExpansionType(PackExpansionType *expansionTy) {
+  Change result;
+  result.Kind = ChangeKind::RecordedOpenedPackExpansionType;
+  result.ExpansionTy = expansionTy;
+  return result;
+}
+
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
@@ -264,6 +272,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::RecordedOpenedExistentialType:
     cs.removeOpenedExistentialType(Locator);
+    break;
+
+  case ChangeKind::RecordedOpenedPackExpansionType:
+    cs.removeOpenedPackExpansionType(ExpansionTy);
     break;
   }
 }
@@ -404,6 +416,12 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
   case ChangeKind::RecordedOpenedExistentialType:
     out << "(recorded opened existential type at ";
     Locator->dump(&cs.getASTContext().SourceMgr, out);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedOpenedPackExpansionType:
+    out << "(recorded opened pack expansion type for ";
+    ExpansionTy->print(out, PO);
     out << ")\n";
     break;
   }

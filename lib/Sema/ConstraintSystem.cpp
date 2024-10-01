@@ -1263,6 +1263,15 @@ Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
   return expansionVar;
 }
 
+void ConstraintSystem::recordOpenedPackExpansionType(PackExpansionType *expansion,
+                                                     TypeVariableType *expansionVar) {
+  bool inserted = OpenedPackExpansionTypes.insert({expansion, expansionVar}).second;
+  if (inserted) {
+    if (isRecordingChanges())
+      recordChange(SolverTrail::Change::recordedOpenedPackExpansionType(expansion));
+  }
+}
+
 Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
                                       ConstraintLocatorBuilder locator) {
   auto opaqueDecl = opaque->getDecl();
