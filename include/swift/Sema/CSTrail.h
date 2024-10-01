@@ -76,6 +76,8 @@ public:
     /// Recorded the mapping from a pack element expression to its parent
     /// pack expansion expression.
     RecordedPackEnvironment,
+    /// Record a defaulted constraint at a locator.
+    RecordedDefaultedConstraint,
   };
 
   /// A change made to the constraint system.
@@ -215,6 +217,9 @@ public:
     /// Create a change that recorded a mapping from a pack element expression
     /// to its parent expansion expression.
     static Change recordedPackEnvironment(PackElementExpr *packElement);
+
+    /// Create a change that recorded a defaulted constraint at a locator.
+    static Change recordedDefaultedConstraint(ConstraintLocator *locator);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

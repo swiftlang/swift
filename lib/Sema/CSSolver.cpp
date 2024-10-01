@@ -347,8 +347,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   // Register the defaulted type variables.
-  DefaultedConstraints.insert(solution.DefaultedConstraints.begin(),
-                              solution.DefaultedConstraints.end());
+  for (auto *locator : solution.DefaultedConstraints)
+    recordDefaultedConstraint(locator);
 
   // Add the node types back.
   for (auto &nodeType : solution.nodeTypes) {
@@ -663,7 +663,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
-  numDefaultedConstraints = cs.DefaultedConstraints.size();
   numAddedNodeTypes = cs.addedNodeTypes.size();
   numAddedKeyPathComponentTypes = cs.addedKeyPathComponentTypes.size();
   numKeyPaths = cs.KeyPaths.size();
@@ -718,9 +717,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // e.g. add retired constraints back to the circulation and remove generated
   // constraints introduced by the current scope.
   cs.solverState->rollback(this);
-
-  // Remove any defaulted type variables.
-  truncate(cs.DefaultedConstraints, numDefaultedConstraints);
 
   // Remove any node types we registered.
   for (unsigned i :

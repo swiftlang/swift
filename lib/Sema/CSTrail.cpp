@@ -217,6 +217,14 @@ SolverTrail::Change::recordedPackEnvironment(PackElementExpr *packElement) {
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::recordedDefaultedConstraint(ConstraintLocator *locator) {
+  Change result;
+  result.Kind = ChangeKind::RecordedDefaultedConstraint;
+  result.Locator = locator;
+  return result;
+}
+
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
@@ -300,6 +308,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::RecordedPackEnvironment:
     cs.removePackEnvironment(ElementExpr);
+    break;
+
+  case ChangeKind::RecordedDefaultedConstraint:
+    cs.removeDefaultedConstraint(Locator);
     break;
   }
 }
@@ -457,6 +469,12 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
 
   case ChangeKind::RecordedPackEnvironment:
     out << "(recorded pack environment)\n";
+    break;
+
+  case ChangeKind::RecordedDefaultedConstraint:
+    out << "(recorded defaulted constraint at ";
+    Locator->dump(&cs.getASTContext().SourceMgr, out);
+    out << ")\n";
     break;
   }
 }

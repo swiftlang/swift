@@ -2412,10 +2412,25 @@ private:
 
 public:
   /// A map from argument expressions to their applied property wrapper expressions.
-  llvm::SmallMapVector<ASTNode, SmallVector<AppliedPropertyWrapper, 2>, 4> appliedPropertyWrappers;
+  llvm::SmallMapVector<ASTNode, SmallVector<AppliedPropertyWrapper, 2>, 4>
+      appliedPropertyWrappers;
 
   /// The locators of \c Defaultable constraints whose defaults were used.
-  llvm::SetVector<ConstraintLocator *> DefaultedConstraints;
+  llvm::DenseSet<ConstraintLocator *> DefaultedConstraints;
+
+  void recordDefaultedConstraint(ConstraintLocator *locator) {
+    bool inserted = DefaultedConstraints.insert(locator).second;
+    if (inserted) {
+      if (isRecordingChanges()) {
+        recordChange(SolverTrail::Change::recordedDefaultedConstraint(locator));
+      }
+    }
+  }
+
+  void removeDefaultedConstraint(ConstraintLocator *locator) {
+    bool erased = DefaultedConstraints.erase(locator);
+    ASSERT(erased);
+  }
 
   /// A cache that stores the @dynamicCallable required methods implemented by
   /// types.
@@ -2878,9 +2893,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    /// The length of \c DefaultedConstraints.
-    unsigned numDefaultedConstraints;
 
     unsigned numAddedNodeTypes;
 
