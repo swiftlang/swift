@@ -317,7 +317,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Remember all of the argument/parameter matching choices we made.
   for (auto &argumentMatch : solution.argumentMatchingChoices) {
-    argumentMatchingChoices.insert(argumentMatch);
+    recordMatchCallArgumentResult(argumentMatch.first, argumentMatch.second);
   }
 
   // Remember implied results.
@@ -672,7 +672,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
-  numArgumentMatchingChoices = cs.argumentMatchingChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
   numOpenedPackExpansionTypes = cs.OpenedPackExpansionTypes.size();
@@ -734,9 +733,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // e.g. add retired constraints back to the circulation and remove generated
   // constraints introduced by the current scope.
   cs.solverState->rollback(this);
-
-  // Remove any argument matching choices;
-  truncate(cs.argumentMatchingChoices, numArgumentMatchingChoices);
 
   // Remove any opened types.
   truncate(cs.OpenedTypes, numOpenedTypes);

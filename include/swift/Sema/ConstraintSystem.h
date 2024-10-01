@@ -1519,7 +1519,7 @@ public:
 
   /// For locators associated with call expressions, the trailing closure
   /// matching rule and parameter bindings that were applied.
-  llvm::MapVector<ConstraintLocator *, MatchCallArgumentResult>
+  llvm::DenseMap<ConstraintLocator *, MatchCallArgumentResult>
       argumentMatchingChoices;
 
   /// The set of disjunction choices used to arrive at this solution,
@@ -2341,7 +2341,7 @@ private:
 
   /// For locators associated with call expressions, the trailing closure
   /// matching rule and parameter bindings that were applied.
-  llvm::MapVector<ConstraintLocator *, MatchCallArgumentResult>
+  llvm::DenseMap<ConstraintLocator *, MatchCallArgumentResult>
       argumentMatchingChoices;
 
   /// The set of implicit value conversions performed by the solver on
@@ -2882,9 +2882,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    /// The length of \c argumentMatchingChoices.
-    unsigned numArgumentMatchingChoices;
 
     /// The length of \c OpenedTypes.
     unsigned numOpenedTypes;
@@ -3637,8 +3634,15 @@ public:
   /// \param type The type on which to holeify.
   void recordTypeVariablesAsHoles(Type type);
 
+  /// Add a MatchCallArgumentResult and record the change in the trail.
   void recordMatchCallArgumentResult(ConstraintLocator *locator,
                                      MatchCallArgumentResult result);
+
+  /// Undo the above change.
+  void removeMatchCallArgumentResult(ConstraintLocator *locator) {
+    bool erased = argumentMatchingChoices.erase(locator);
+    ASSERT(erased);
+  }
 
   /// Record implicitly generated `callAsFunction` with root at the
   /// given expression, located at \c locator.

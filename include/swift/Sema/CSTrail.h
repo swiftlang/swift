@@ -63,6 +63,8 @@ public:
     RecordedDisjunctionChoice,
     /// Recorded an applied disjunction.
     RecordedAppliedDisjunction,
+    /// Recorded an argument matching choice.
+    RecordedMatchCallArgumentResult,
   };
 
   /// A change made to the constraint system.
@@ -181,6 +183,9 @@ public:
 
     /// Create a change that recorded an applied disjunction.
     static Change recordedAppliedDisjunction(ConstraintLocator *locator);
+
+    /// Create a change that recorded an applied disjunction.
+    static Change recordedMatchCallArgumentResult(ConstraintLocator *locator);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.
