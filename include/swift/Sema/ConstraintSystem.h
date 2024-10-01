@@ -1546,7 +1546,7 @@ public:
       PackExpansionEnvironments;
 
   /// The pack expansion environment that can open a given pack element.
-  llvm::MapVector<PackElementExpr *, PackExpansionExpr *>
+  llvm::DenseMap<PackElementExpr *, PackExpansionExpr *>
       PackEnvironments;
 
   /// The outer pack element generic environment to use when dealing with nested
@@ -2400,7 +2400,7 @@ private:
   llvm::SmallDenseMap<ConstraintLocator *, std::pair<UUID, Type>, 4>
       PackExpansionEnvironments;
 
-  llvm::SmallMapVector<PackElementExpr *, PackExpansionExpr *, 2>
+  llvm::SmallDenseMap<PackElementExpr *, PackExpansionExpr *, 2>
       PackEnvironments;
 
   llvm::SmallVector<GenericEnvironment *, 4> PackElementGenericEnvironments;
@@ -2882,9 +2882,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    /// The length of \c PackEnvironments.
-    unsigned numPackEnvironments;
 
     /// The length of \c PackElementGenericEnvironments.
     unsigned numPackElementGenericEnvironments;
@@ -3474,9 +3471,16 @@ public:
   /// Get the opened element generic environment for the given pack element.
   PackExpansionExpr *getPackEnvironment(PackElementExpr *packElement) const;
 
-  /// Associate an opened element generic environment to a pack element.
+  /// Associate an opened element generic environment to a pack element,
+  /// and record a change in the trail.
   void addPackEnvironment(PackElementExpr *packElement,
                           PackExpansionExpr *packExpansion);
+
+  /// Undo the above change.
+  void removePackEnvironment(PackElementExpr *packElement) {
+    bool erased = PackEnvironments.erase(packElement);
+    ASSERT(erased);
+  }
 
   /// Retrieve the constraint locator for the given anchor and
   /// path, uniqued and automatically infer the summary flags

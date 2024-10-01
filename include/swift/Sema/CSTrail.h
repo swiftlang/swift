@@ -73,6 +73,9 @@ public:
     RecordedOpenedPackExpansionType,
     /// Recorded the creation of a generic environment for a pack expansion expression.
     RecordedPackExpansionEnvironment,
+    /// Recorded the mapping from a pack element expression to its parent
+    /// pack expansion expression.
+    RecordedPackEnvironment,
   };
 
   /// A change made to the constraint system.
@@ -139,6 +142,7 @@ public:
 
       ConstraintLocator *Locator;
       PackExpansionType *ExpansionTy;
+      PackElementExpr *ElementExpr;
     };
 
     Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
@@ -207,6 +211,10 @@ public:
 
     /// Create a change that recorded the opening of a pack expansion type.
     static Change recordedPackExpansionEnvironment(ConstraintLocator *locator);
+
+    /// Create a change that recorded a mapping from a pack element expression
+    /// to its parent expansion expression.
+    static Change recordedPackEnvironment(PackElementExpr *packElement);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

@@ -209,6 +209,14 @@ SolverTrail::Change::recordedPackExpansionEnvironment(ConstraintLocator *locator
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::recordedPackEnvironment(PackElementExpr *packElement) {
+  Change result;
+  result.Kind = ChangeKind::RecordedPackEnvironment;
+  result.ElementExpr = packElement;
+  return result;
+}
+
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
@@ -288,6 +296,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::RecordedPackExpansionEnvironment:
     cs.removePackExpansionEnvironment(Locator);
+    break;
+
+  case ChangeKind::RecordedPackEnvironment:
+    cs.removePackEnvironment(ElementExpr);
     break;
   }
 }
@@ -441,6 +453,10 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << "(recorded pack expansion environment at ";
     Locator->dump(&cs.getASTContext().SourceMgr, out);
     out << ")\n";
+    break;
+
+  case ChangeKind::RecordedPackEnvironment:
+    out << "(recorded pack environment)\n";
     break;
   }
 }

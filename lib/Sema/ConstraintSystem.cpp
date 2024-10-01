@@ -910,11 +910,12 @@ ConstraintSystem::getPackEnvironment(PackElementExpr *packElement) const {
 
 void ConstraintSystem::addPackEnvironment(PackElementExpr *packElement,
                                           PackExpansionExpr *packExpansion) {
-  assert(packElement);
-  assert(packExpansion);
-  [[maybe_unused]] const auto inserted =
+  bool inserted =
       PackEnvironments.insert({packElement, packExpansion}).second;
-  assert(inserted && "Mapping already defined?");
+  if (inserted) {
+    if (isRecordingChanges())
+      recordChange(SolverTrail::Change::recordedPackEnvironment(packElement));
+  }
 }
 
 /// Extend the given depth map by adding depths for all of the subexpressions

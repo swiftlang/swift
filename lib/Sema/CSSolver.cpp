@@ -346,7 +346,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Register the solutions's pack environments.
   for (auto &packEnvironment : solution.PackEnvironments) {
-    PackEnvironments.insert(packEnvironment);
+    addPackEnvironment(packEnvironment.first, packEnvironment.second);
   }
 
   // Register the solutions's pack element generic environments.
@@ -672,7 +672,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
-  numPackEnvironments = cs.PackEnvironments.size();
   numPackElementGenericEnvironments = cs.PackElementGenericEnvironments.size();
   numDefaultedConstraints = cs.DefaultedConstraints.size();
   numAddedNodeTypes = cs.addedNodeTypes.size();
@@ -729,9 +728,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // e.g. add retired constraints back to the circulation and remove generated
   // constraints introduced by the current scope.
   cs.solverState->rollback(this);
-
-  // Remove any pack environments.
-  truncate(cs.PackEnvironments, numPackEnvironments);
 
   // Remove any pack element generic environments.
   truncate(cs.PackElementGenericEnvironments,
