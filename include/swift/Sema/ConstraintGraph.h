@@ -153,10 +153,6 @@ private:
   /// type variable has been bound to a valid type and solver can make progress.
   void introduceToInference(Type fixedType);
 
-  /// Drop all previously collected bindings and re-infer based on the
-  /// current set constraints associated with this equivalence class.
-  void resetBindingSet();
-
   /// Notify all of the type variables that have this one (or any member of
   /// its equivalence class) referenced in their fixed type.
   ///

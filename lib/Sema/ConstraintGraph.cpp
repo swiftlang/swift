@@ -376,18 +376,6 @@ void ConstraintGraphNode::introduceToInference(Type fixedType) {
   }
 }
 
-void ConstraintGraphNode::resetBindingSet() {
-  assert(forRepresentativeVar());
-
-  Bindings.reset();
-
-  auto &bindings = getCurrentBindings();
-  for (auto *constraint : CG.gatherConstraints(
-           TypeVar, ConstraintGraph::GatheringKind::EquivalenceClass)) {
-    bindings.infer(constraint);
-  }
-}
-
 #pragma mark Graph mutation
 
 void ConstraintGraph::removeNode(TypeVariableType *typeVar) {
