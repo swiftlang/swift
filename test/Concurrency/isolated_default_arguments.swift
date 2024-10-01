@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature IsolatedDefaultValues -enable-upcoming-feature RegionBasedIsolation -enable-upcoming-feature InferSendableFromCaptures %s
+// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature InferSendableFromCaptures %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -317,3 +317,10 @@ struct Values {
   @MainActor var value: Int { 0 }
   @SomeGlobalActor var otherValue: Int { 0 }
 }
+
+class PreconcurrencyInit {
+  @preconcurrency @MainActor init() {}
+}
+
+// expected-warning@+1 {{main actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
+func downgrade(_: PreconcurrencyInit = .init()) {}
