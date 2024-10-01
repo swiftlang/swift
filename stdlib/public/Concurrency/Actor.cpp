@@ -20,9 +20,10 @@
 #include <new>
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
+#include "TaskPrivate.h"
+#include "TaskTrackingPrivate.h"
 #include "swift/ABI/Actor.h"
 #include "swift/ABI/Task.h"
-#include "TaskPrivate.h"
 #include "swift/Basic/HeaderFooterLayout.h"
 #include "swift/Basic/PriorityQueue.h"
 #include "swift/Concurrency/Actor.h"
@@ -81,6 +82,7 @@ extern "C" void objc_autoreleasePoolPop(void *);
 #endif
 
 using namespace swift;
+using namespace swift::tasktracking;
 
 /// Should we yield the thread?
 static bool shouldYieldThread() {
@@ -93,104 +95,6 @@ static bool shouldYieldThread() {
 /*****************************************************************************/
 
 namespace {
-
-/// An extremely silly class which exists to make pointer
-/// default-initialization constexpr.
-template <class T> struct Pointer {
-  T *Value;
-  constexpr Pointer() : Value(nullptr) {}
-  constexpr Pointer(T *value) : Value(value) {}
-  operator T *() const { return Value; }
-  T *operator->() const { return Value; }
-};
-
-/// A class which encapsulates the information we track about
-/// the current thread and active executor.
-class ExecutorTrackingInfo {
-  /// A thread-local variable pointing to the active tracking
-  /// information about the current thread, if any.
-  ///
-  /// TODO: this is obviously runtime-internal and therefore not
-  /// reasonable to make ABI. We might want to also provide a way
-  /// for generated code to efficiently query the identity of the
-  /// current executor, in order to do a cheap comparison to avoid
-  /// doing all the work to suspend the task when we're already on
-  /// the right executor. It would make sense for that to be a
-  /// separate thread-local variable (or whatever is most efficient
-  /// on the target platform).
-  static SWIFT_THREAD_LOCAL_TYPE(Pointer<ExecutorTrackingInfo>,
-                                 tls_key::concurrency_executor_tracking_info)
-      ActiveInfoInThread;
-
-  /// The active executor.
-  SerialExecutorRef ActiveExecutor = SerialExecutorRef::generic();
-
-  /// The current task executor, if present, otherwise `undefined`.
-  /// The task executor should be used to execute code when the active executor
-  /// is `generic`.
-  TaskExecutorRef TaskExecutor = TaskExecutorRef::undefined();
-
-  /// Whether this context allows switching.  Some contexts do not;
-  /// for example, we do not allow switching from swift_job_run
-  /// unless the passed-in executor is generic.
-  bool AllowsSwitching = true;
-
-  VoucherManager voucherManager;
-
-  /// The tracking info that was active when this one was entered.
-  ExecutorTrackingInfo *SavedInfo;
-
-public:
-  ExecutorTrackingInfo() = default;
-
-  ExecutorTrackingInfo(const ExecutorTrackingInfo &) = delete;
-  ExecutorTrackingInfo &operator=(const ExecutorTrackingInfo &) = delete;
-
-  /// Unconditionally initialize a fresh tracking state on the
-  /// current state, shadowing any previous tracking state.
-  /// leave() must be called before the object goes out of scope.
-  void enterAndShadow(SerialExecutorRef currentExecutor,
-                      TaskExecutorRef taskExecutor) {
-    ActiveExecutor = currentExecutor;
-    TaskExecutor = taskExecutor;
-    SavedInfo = ActiveInfoInThread.get();
-    ActiveInfoInThread.set(this);
-  }
-
-  void swapToJob(Job *job) { voucherManager.swapToJob(job); }
-
-  void restoreVoucher(AsyncTask *task) { voucherManager.restoreVoucher(task); }
-
-  SerialExecutorRef getActiveExecutor() const { return ActiveExecutor; }
-  void setActiveExecutor(SerialExecutorRef newExecutor) {
-    ActiveExecutor = newExecutor;
-  }
-
-  TaskExecutorRef getTaskExecutor() const { return TaskExecutor; }
-
-  void setTaskExecutor(TaskExecutorRef newExecutor) {
-    TaskExecutor = newExecutor;
-  }
-
-  bool allowsSwitching() const {
-    return AllowsSwitching;
-  }
-
-  /// Disallow switching in this tracking context.  This should only
-  /// be set on a new tracking info, before any jobs are run in it.
-  void disallowSwitching() {
-    AllowsSwitching = false;
-  }
-
-  static ExecutorTrackingInfo *current() {
-    return ActiveInfoInThread.get();
-  }
-
-  void leave() {
-    voucherManager.leave();
-    ActiveInfoInThread.set(SavedInfo);
-  }
-};
 
 class ActiveTask {
   /// A thread-local variable pointing to the active tracking
@@ -210,11 +114,17 @@ public:
 SWIFT_THREAD_LOCAL_TYPE(Pointer<AsyncTask>, tls_key::concurrency_task)
 ActiveTask::Value;
 
+} // end anonymous namespace
+
+namespace swift {
+namespace tasktracking {
+
 SWIFT_THREAD_LOCAL_TYPE(Pointer<ExecutorTrackingInfo>,
                         tls_key::concurrency_executor_tracking_info)
 ExecutorTrackingInfo::ActiveInfoInThread;
 
-} // end anonymous namespace
+} // namespace tasktracking
+} // namespace swift
 
 void swift::runJobInEstablishedExecutorContext(Job *job) {
   _swift_tsan_acquire(job);
