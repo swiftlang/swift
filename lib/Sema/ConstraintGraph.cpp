@@ -276,26 +276,8 @@ void ConstraintGraphNode::addToEquivalenceClass(
 }
 
 void ConstraintGraphNode::truncateEquivalenceClass(unsigned prevSize) {
-  llvm::SmallSetVector<TypeVariableType *, 4> disconnectedVars;
-  for (auto disconnected = EquivalenceClass.begin() + prevSize;
-       disconnected != EquivalenceClass.end();
-       ++disconnected) {
-    disconnectedVars.insert(*disconnected);
-  }
-
   EquivalenceClass.erase(EquivalenceClass.begin() + prevSize,
                          EquivalenceClass.end());
-
-  // We need to re-introduce each constraint associated with
-  // "disconnected" member itself and to this representative.
-  {
-    // Re-infer bindings for the current representative.
-    resetBindingSet();
-
-    // Re-infer bindings all of the newly made representatives.
-    for (auto *typeVar : disconnectedVars)
-      CG[typeVar].notifyReferencingVars();
-  }
 }
 
 void ConstraintGraphNode::addReferencedVar(TypeVariableType *typeVar) {
