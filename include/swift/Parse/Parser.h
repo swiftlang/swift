@@ -1222,11 +1222,8 @@ public:
   }
 
   bool isLifetimeDependenceToken() {
-    if (!isInSILMode()) {
-      return Tok.isContextualKeyword("dependsOn");
-    }
-    return Tok.isContextualKeyword("_inherit") ||
-           Tok.isContextualKeyword("_scope");
+    return isInSILMode() && (Tok.isContextualKeyword("_inherit") ||
+                             Tok.isContextualKeyword("_scope"));
   }
 
   bool canHaveParameterSpecifierContextualKeyword() {

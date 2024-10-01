@@ -4246,16 +4246,6 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 
       Printer.printDeclResultTypePre(decl, ResultTyLoc);
       Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
-      {
-        if (!Options.SuppressNonEscapableTypes) {
-          if (auto *typeRepr = dyn_cast_or_null<LifetimeDependentTypeRepr>(
-                  decl->getResultTypeRepr())) {
-            for (auto &dep : typeRepr->getLifetimeDependencies()) {
-              Printer << " " << dep.getDependsOnString() << " ";
-            }
-          }
-        }
-      }
 
       if (!Options.SuppressSendingArgsAndResults) {
         if (decl->hasSendingResult()) {
@@ -4499,18 +4489,6 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 
       printGenericDeclGenericParams(decl);
       printFunctionParameters(decl);
-      if (!Options.SuppressNonEscapableTypes) {
-        if (decl->hasLifetimeDependentReturn()) {
-          Printer << " -> ";
-          auto *typeRepr =
-              cast<LifetimeDependentTypeRepr>(decl->getResultTypeRepr());
-          for (auto &dep : typeRepr->getLifetimeDependencies()) {
-            Printer << dep.getDependsOnString() << " ";
-          }
-          // TODO: Handle failable initializers with lifetime dependent returns
-          Printer << "Self";
-        }
-      }
     });
 
   printDeclGenericRequirements(decl);

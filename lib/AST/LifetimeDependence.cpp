@@ -414,48 +414,6 @@ LifetimeDependenceInfo::fromLifetimeAttribute(AbstractFunctionDecl *afd) {
 }
 
 std::optional<LifetimeDependenceInfo>
-LifetimeDependenceInfo::fromDependsOn(AbstractFunctionDecl *afd,
-                                      TypeRepr *targetTypeRepr, Type targetType,
-                                      unsigned targetIndex) {
-  auto *dc = afd->getDeclContext();
-  auto &ctx = dc->getASTContext();
-  auto &diags = ctx.Diags;
-
-  auto *lifetimeDependentRepr =
-      dyn_cast_or_null<LifetimeDependentTypeRepr>(targetTypeRepr);
-  if (!lifetimeDependentRepr) {
-    return std::nullopt;
-  }
-
-  if (targetType->isEscapable()) {
-    diags.diagnose(targetTypeRepr->getLoc(),
-                   diag::lifetime_dependence_invalid_type);
-    return std::nullopt;
-  }
-
-  auto capacity = afd->hasImplicitSelfDecl()
-                      ? (afd->getParameters()->size() + 1)
-                      : afd->getParameters()->size();
-
-  SmallBitVector inheritIndices(capacity);
-  SmallBitVector scopeIndices(capacity);
-  bool isImmortal = false;
-  bool hasError = false;
-
-  for (auto entry : lifetimeDependentRepr->getLifetimeDependencies()) {
-    hasError |= populateLifetimeDependence(afd, entry, inheritIndices,
-                                           scopeIndices, isImmortal);
-  }
-
-  if (hasError) {
-    return std::nullopt;
-  }
-  return LifetimeDependenceInfo(
-      inheritIndices.any() ? IndexSubset::get(ctx, inheritIndices) : nullptr,
-      scopeIndices.any() ? IndexSubset::get(ctx, scopeIndices) : nullptr,
-      targetIndex, isImmortal);
-}
-
 // This utility is similar to its overloaded version that builds the
 // LifetimeDependenceInfo from the swift decl. Reason for duplicated code is
 // the apis on type and ownership is different in SIL compared to Sema.
@@ -735,38 +693,12 @@ LifetimeDependenceInfo::get(AbstractFunctionDecl *afd) {
     return LifetimeDependenceInfo::fromLifetimeAttribute(afd);
   }
 
-  SmallVector<LifetimeDependenceInfo> lifetimeDependencies;
-
-  for (unsigned targetIndex : indices(*afd->getParameters())) {
-    auto *param = (*afd->getParameters())[targetIndex];
-    auto paramType =
-        afd->mapTypeIntoContext(param->toFunctionParam().getParameterType());
-    if (auto result = LifetimeDependenceInfo::fromDependsOn(
-            afd, param->getTypeRepr(), paramType, targetIndex)) {
-      lifetimeDependencies.push_back(*result);
-    }
-  }
-
-  std::optional<LifetimeDependenceInfo> resultDependence;
-
-  if (auto *lifetimeTypeRepr = dyn_cast_or_null<LifetimeDependentTypeRepr>(
-          afd->getResultTypeRepr())) {
-    resultDependence = LifetimeDependenceInfo::fromDependsOn(
-        afd, lifetimeTypeRepr, getResultOrYield(afd),
-        afd->hasImplicitSelfDecl() ? afd->getParameters()->size() + 1
-                                   : afd->getParameters()->size());
-  } else {
-    resultDependence = LifetimeDependenceInfo::infer(afd);
-  }
-
-  if (resultDependence.has_value()) {
-    lifetimeDependencies.push_back(*resultDependence);
-  }
-
-  if (lifetimeDependencies.empty()) {
+  SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
+  auto resultDependence = LifetimeDependenceInfo::infer(afd);
+  if (!resultDependence.has_value()) {
     return std::nullopt;
   }
-
+  lifetimeDependencies.push_back(*resultDependence);
   return afd->getASTContext().AllocateCopy(lifetimeDependencies);
 }
 

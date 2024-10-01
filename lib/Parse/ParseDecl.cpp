@@ -10074,26 +10074,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     isAsync = true;
   }
 
-  if (auto *lifetimeTyR =
-          dyn_cast_or_null<LifetimeDependentTypeRepr>(FuncRetTy)) {
-    auto *base = lifetimeTyR->getBase();
-
-    auto isOptionalSimpleUnqualifiedIdentifier = [](TypeRepr *typeRepr,
-                                                    Identifier str) {
-      if (auto *optionalTR = dyn_cast<OptionalTypeRepr>(typeRepr)) {
-        return optionalTR->getBase()->isSimpleUnqualifiedIdentifier(str);
-      }
-      return false;
-    };
-
-    // Diagnose if return type is not Self or Self?
-    if (!base->isSimpleUnqualifiedIdentifier(Context.Id_Self) &&
-        !isOptionalSimpleUnqualifiedIdentifier(base, Context.Id_Self)) {
-      diagnose(FuncRetTy->getStartLoc(),
-               diag::lifetime_dependence_invalid_init_return);
-      return nullptr;
-    }
-  } else if (FuncRetTy) {
+  if (FuncRetTy) {
     diagnose(FuncRetTy->getStartLoc(), diag::initializer_result_type)
       .fixItRemove(FuncRetTy->getSourceRange());
   }
