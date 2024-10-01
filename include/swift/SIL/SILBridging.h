@@ -102,7 +102,7 @@ struct OptionalBridgedResultInfo {
 };
 
 struct BridgedResultInfoArray {
-  BridgedArrayRef resultInfoArray;
+  BridgedErasedArrayRef resultInfoArray;
 
   BRIDGED_INLINE SwiftInt count() const;
 
@@ -142,7 +142,7 @@ struct BridgedParameterInfo {
 };
 
 struct BridgedParameterInfoArray {
-  BridgedArrayRef parameterInfoArray;
+  BridgedErasedArrayRef parameterInfoArray;
 
   BRIDGED_INLINE SwiftInt count() const;
 
@@ -151,7 +151,7 @@ struct BridgedParameterInfoArray {
 };
 
 struct BridgedYieldInfoArray {
-  BridgedArrayRef yieldInfoArray;
+  BridgedErasedArrayRef yieldInfoArray;
 
   BRIDGED_INLINE SwiftInt count() const;
 
@@ -175,7 +175,7 @@ struct BridgedLifetimeDependenceInfo {
 };
 
 struct BridgedLifetimeDependenceInfoArray {
-  BridgedArrayRef lifetimeDependenceInfoArray;
+  BridgedErasedArrayRef lifetimeDependenceInfoArray;
 
   BRIDGED_INLINE SwiftInt count() const;
 
@@ -594,10 +594,9 @@ struct BridgedFunction {
 
   typedef void (* _Nonnull RegisterFn)(BridgedFunction f, void * _Nonnull data, SwiftInt size);
   typedef void (* _Nonnull WriteFn)(BridgedFunction, BridgedOStream, SwiftInt);
-  typedef ParsingError (*_Nonnull ParseFn)(BridgedFunction,
-                                           BridgedStringRef,
+  typedef ParsingError (*_Nonnull ParseFn)(BridgedFunction, BridgedStringRef,
                                            ParseEffectsMode, SwiftInt,
-                                           BridgedArrayRef);
+                                           BridgedErasedArrayRef);
   typedef SwiftInt (* _Nonnull CopyEffectsFn)(BridgedFunction, BridgedFunction);
   typedef EffectInfo (* _Nonnull GetEffectInfoFn)(BridgedFunction, SwiftInt);
   typedef BridgedMemoryBehavior (* _Nonnull GetMemBehaviorFn)(BridgedFunction, bool);
@@ -659,7 +658,7 @@ struct BridgedSubstitutionMap {
 };
 
 struct BridgedTypeArray {
-  BridgedArrayRef typeArray;
+  BridgedErasedArrayRef typeArray;
 
   // Ensure that this struct value type will be indirectly returned on
   // Windows ARM64,
@@ -683,7 +682,7 @@ struct BridgedTypeArray {
 };
 
 struct BridgedSILTypeArray {
-  BridgedArrayRef typeArray;
+  BridgedErasedArrayRef typeArray;
 
   // Ensure that this struct value type will be indirectly returned on
   // Windows ARM64

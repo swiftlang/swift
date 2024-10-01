@@ -315,22 +315,22 @@ extension ASTGenVisitor {
   }
 
   @inline(__always)
-  func generate(inheritedTypeList node: InheritedTypeListSyntax?) -> BridgedArrayRef {
-    node.map(generate(inheritedTypeList:)) ?? .init()
+  func generate(inheritedTypeList node: InheritedTypeListSyntax?) -> (some Collection<BridgedTypeRepr>)? {
+    node.map(generate(inheritedTypeList:))
   }
 
   @inline(__always)
-  func generate(precedenceGroupNameList node: PrecedenceGroupNameListSyntax?) -> BridgedArrayRef {
-    node.map(generate(precedenceGroupNameList:)) ?? .init()
+  func generate(precedenceGroupNameList node: PrecedenceGroupNameListSyntax?) -> (some Collection<BridgedLocatedIdentifier>)? {
+    node.map(generate(precedenceGroupNameList:))
   }
 }
 
 extension Collection {
-  /// Like ``Sequence.compactMap(_:)``, but returns a `BridgedArrayRef` with a lifetime tied to that of `astgen`.
+  /// Like ``Sequence.compactMap(_:)``, but returns a `BridgedErasedArrayRef` with a lifetime tied to that of `astgen`.
   ///
   /// - Note: The purpose of this method is to make up for the performance toll of calling ``Collection.bridgedArray``
   ///   on a ``LazyFilterSequence`` due to the `count` access.
-  func compactMap<T>(in astgen: ASTGenVisitor, _ transform: (Element) -> T?) -> BridgedArrayRef {
+  func compactMap<T>(in astgen: ASTGenVisitor, _ transform: (Element) -> T?) -> BridgedErasedArrayRef {
     if self.isEmpty {
       return .init()
     }
@@ -355,8 +355,8 @@ extension Collection {
 }
 
 extension CollectionOfOne {
-  /// Returns a single element as a `BridgedArrayRef` with a lifetime tied to that of `astgen`.
-  func bridgedArray(in astgen: ASTGenVisitor) -> BridgedArrayRef {
+  /// Returns a single element as a `BridgedErasedArrayRef` with a lifetime tied to that of `astgen`.
+  func bridgedArray(in astgen: ASTGenVisitor) -> BridgedErasedArrayRef {
     let buffer = astgen.allocator.allocate(Element.self, count: 1)
     _ = buffer.initialize(from: self)
     return .init(data: buffer.baseAddress, count: 1)
@@ -364,8 +364,8 @@ extension CollectionOfOne {
 }
 
 extension LazyCollectionProtocol {
-  /// Returns a copy of the collection's elements as a `BridgedArrayRef` with a lifetime tied to that of `astgen`.
-  func bridgedArray(in astgen: ASTGenVisitor) -> BridgedArrayRef {
+  /// Returns a copy of the collection's elements as a `BridgedErasedArrayRef` with a lifetime tied to that of `astgen`.
+  func bridgedArray(in astgen: ASTGenVisitor) -> BridgedErasedArrayRef {
     if self.isEmpty {
       return .init()
     }
@@ -381,22 +381,38 @@ extension LazyCollectionProtocol {
 // conditionally conforms to 'LazySequenceProtocol' in the standard library.
 // FIXME: We could make it conform unconditionally
 extension ReversedCollection {
-  /// Returns a copy of the collection's elements as a `BridgedArrayRef` with a lifetime tied to that of `astgen`.
+  /// Returns a copy of the collection's elements as a `BridgedErasedArrayRef` with a lifetime tied to that of `astgen`.
   @inline(__always)
-  func bridgedArray(in astgen: ASTGenVisitor) -> BridgedArrayRef {
+  func bridgedArray(in astgen: ASTGenVisitor) -> BridgedErasedArrayRef {
     self.lazy.bridgedArray(in: astgen)
   }
 }
 
 extension Optional where Wrapped: LazyCollectionProtocol {
-  /// Returns a copy of the collection's elements as a `BridgedArrayRef` with a lifetime tied to that of `astgen`.
+  /// Returns a copy of the collection's elements as a `BridgedErasedArrayRef` with a lifetime tied to that of `astgen`.
   @inline(__always)
-  func bridgedArray(in astgen: ASTGenVisitor) -> BridgedArrayRef {
+  func bridgedArray(in astgen: ASTGenVisitor) -> BridgedErasedArrayRef {
     guard let self else {
       return .init()
     }
 
     return self.bridgedArray(in: astgen)
+  }
+}
+
+extension BridgedArrayRefProtocol {
+  init<C: Collection>(
+    _ collection: C?, in astgen: ASTGenVisitor
+  ) where C.Element == Element {
+    guard let collection = collection, !collection.isEmpty else {
+      self.init(data: nil, count: 0)
+      return
+    }
+
+    let buffer = astgen.allocator.allocate(Element.self, count: collection.count)
+    _ = buffer.initialize(from: collection)
+
+    self.init(data: buffer.baseAddress, count: collection.count)
   }
 }
 

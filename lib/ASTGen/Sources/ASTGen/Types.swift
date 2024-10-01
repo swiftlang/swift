@@ -140,7 +140,7 @@ extension ASTGenVisitor {
   func generate(memberType node: MemberTypeSyntax) -> BridgedDeclRefTypeRepr {
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
 
-    let genericArguments: BridgedArrayRef
+    let genericArguments: BridgedErasedArrayRef
     let angleRange: BridgedSourceRange
     if let generics = node.genericArgumentClause {
       genericArguments = generics.arguments.lazy.map {
@@ -389,7 +389,7 @@ extension ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
-  func generate(tupleTypeElementList node: TupleTypeElementListSyntax) -> BridgedArrayRef {
+  func generate(tupleTypeElementList node: TupleTypeElementListSyntax) -> BridgedErasedArrayRef {
     node.lazy.map { element in
       let (firstName, firstNameLoc) =
         self.generateIdentifierAndSourceLoc(element.firstName)

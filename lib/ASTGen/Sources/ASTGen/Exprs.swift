@@ -306,9 +306,9 @@ extension ASTGenVisitor {
     additionalTrailingClosures: MultipleTrailingClosureElementListSyntax?
   ) -> BridgedArgumentList {
 
-    let bridgedArgs: BridgedArrayRef = {
+    let bridgedArgs = {
       // Arguments before ')'
-      let normalArgs = labeledExprList.lazy.map({ elem in
+      let normalArgs = labeledExprList.map({ elem in
         let labelInfo = elem.label.map(self.generateIdentifierAndSourceLoc(_:))
         return BridgedCallArgument(
           labelLoc: labelInfo?.sourceLoc ?? BridgedSourceLoc(),
@@ -322,7 +322,7 @@ extension ASTGenVisitor {
           additionalTrailingClosures == nil || additionalTrailingClosures!.isEmpty,
           "multiple trailing closures without the first trailing closure"
         )
-        return normalArgs.bridgedArray(in: self)
+        return normalArgs
       }
 
       // The first trailing closure.
@@ -331,9 +331,9 @@ extension ASTGenVisitor {
         label: nil,
         argExpr: self.generate(closureExpr: trailingClosure).asExpr
       )
-      let normalArgsAndClosure = ConcatCollection(normalArgs, CollectionOfOne(bridgedTrailingClosureArg))
+      let normalArgsAndClosure = normalArgs + [bridgedTrailingClosureArg]
       guard let additionalTrailingClosures else {
-        return normalArgsAndClosure.bridgedArray(in: self)
+        return normalArgsAndClosure
       }
 
       // Remaining trailing closures.
@@ -344,8 +344,7 @@ extension ASTGenVisitor {
           argExpr: self.generate(closureExpr: argNode.closure).asExpr
         )
       }
-      let allArgs = ConcatCollection(normalArgsAndClosure, additions)
-      return allArgs.bridgedArray(in: self)
+      return normalArgsAndClosure + additions
     }()
 
     // This should be "nil" value if there's no trailing closure. Passing the number
@@ -357,7 +356,7 @@ extension ASTGenVisitor {
     return BridgedArgumentList.createParsed(
       self.ctx,
       lParenLoc: self.generateSourceLoc(leftParen),
-      args: bridgedArgs,
+      args: .init(bridgedArgs, in: self),
       rParenLoc: self.generateSourceLoc(rightParen),
       firstTrailingClosureIndex: firstTrailingClosureIndex
     )
@@ -416,13 +415,13 @@ extension ASTGenVisitor {
         name: .createParsed(
           self.ctx,
           baseName: baseName,
-          argumentLabels: labels.bridgedArray(in: self)
+          argumentLabels: .init(labels, in: self)
         ),
         loc: .createParsed(
           self.ctx,
           baseNameLoc: baseNameLoc,
           lParenLoc: self.generateSourceLoc(argumentClause.leftParen),
-          argumentLabelLocs: labelLocs.bridgedArray(in: self),
+          argumentLabelLocs: .init(labelLocs, in: self),
           rParenLoc: self.generateSourceLoc(argumentClause.rightParen)
         )
       )

@@ -418,7 +418,7 @@ extension Function {
         s._withBridgedStringRef { $0.write(os) }
       },
       // parseFn:
-      { (f: BridgedFunction, str: BridgedStringRef, mode: BridgedFunction.ParseEffectsMode, argumentIndex: Int, paramNames: BridgedArrayRef) -> BridgedFunction.ParsingError in
+      { (f: BridgedFunction, str: BridgedStringRef, mode: BridgedFunction.ParseEffectsMode, argumentIndex: Int, paramNames: BridgedErasedArrayRef) -> BridgedFunction.ParsingError in
         do {
           var parser = StringParser(String(str))
           let function = f.function

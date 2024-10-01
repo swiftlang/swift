@@ -1831,10 +1831,9 @@ BridgedOwnedString BridgedPassContext::mangleWithDeadArgs(const SwiftInt * _Null
 }
 
 BridgedOwnedString BridgedPassContext::mangleWithClosureArgs(
-  BridgedValueArray bridgedClosureArgs,
-  BridgedArrayRef bridgedClosureArgIndices,
-  BridgedFunction applySiteCallee
-) const {
+    BridgedValueArray bridgedClosureArgs,
+    BridgedErasedArrayRef bridgedClosureArgIndices,
+    BridgedFunction applySiteCallee) const {
   auto pass = Demangle::SpecializationPass::ClosureSpecializer;
   auto serializedKind = applySiteCallee.getFunction()->getSerializedKind();
   Mangle::FunctionSignatureSpecializationMangler mangler(

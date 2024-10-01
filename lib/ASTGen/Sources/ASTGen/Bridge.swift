@@ -237,6 +237,11 @@ extension BridgedSourceRange {
   }
 }
 
+protocol BridgedArrayRefProtocol {
+  associatedtype Element
+  init(data: UnsafePointer<Element>?, count: Int)
+}
+
 /// Helper collection type that lazily concatenates two collections.
 struct ConcatCollection<C1: Collection, C2: Collection> where C1.Element == C2.Element {
   let c1: C1

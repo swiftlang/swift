@@ -142,9 +142,9 @@ extension String {
 }
 
 extension Array {
-  public func withBridgedArrayRef<T>(_ c: (BridgedArrayRef) -> T) -> T {
+  public func withBridgedArrayRef<T>(_ c: (BridgedErasedArrayRef) -> T) -> T {
     return withUnsafeBytes { buf in
-      return c(BridgedArrayRef(data: buf.baseAddress!, count: count))
+      return c(BridgedErasedArrayRef(data: buf.baseAddress!, count: count))
     }
   }
 }
@@ -171,7 +171,7 @@ extension Optional where Wrapped == UnsafeMutablePointer<BridgedSwiftObject> {
   }
 }
 
-extension BridgedArrayRef {
+extension BridgedErasedArrayRef {
   public func withElements<T, R>(ofType ty: T.Type, _ c: (UnsafeBufferPointer<T>) -> R) -> R {
     let start = data?.bindMemory(to: ty, capacity: count)
     let buffer = UnsafeBufferPointer(start: start, count: count)
