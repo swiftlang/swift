@@ -2120,11 +2120,18 @@ AvailabilityMacroMap &Parser::parseAllAvailabilityMacroArguments() {
   SourceManager &SM = Context.SourceMgr;
   LangOptions LangOpts = Context.LangOpts;
 
+  // Allocate all buffers in one go to avoid repeating the sorting in
+  // findBufferContainingLocInternal.
+  llvm::SmallVector<unsigned, 4> bufferIDs;
   for (StringRef macro: LangOpts.AvailabilityMacros) {
+    unsigned bufferID = SM.addMemBufferCopy(macro,
+                                            "-define-availability argument");
+    bufferIDs.push_back(bufferID);
+  }
 
+  // Parse each macro definition.
+  for (unsigned bufferID: bufferIDs) {
     // Create temporary parser.
-    int bufferID = SM.addMemBufferCopy(macro,
-                                       "-define-availability argument");
     swift::ParserUnit PU(SM, SourceFileKind::Main, bufferID, LangOpts,
                          TypeCheckerOptions(), SILOptions(), "unknown");
 
