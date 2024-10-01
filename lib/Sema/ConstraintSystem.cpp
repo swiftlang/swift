@@ -1654,6 +1654,20 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
   return requestedType;
 }
 
+void ConstraintSystem::recordOpenedType(
+    ConstraintLocator *locator, ArrayRef<OpenedType> openedTypes) {
+  bool inserted = OpenedTypes.insert({locator, openedTypes}).second;
+  if (inserted) {
+    if (isRecordingChanges())
+      recordChange(SolverTrail::Change::recordedOpenedTypes(locator));
+  }
+}
+
+void ConstraintSystem::removeOpenedType(ConstraintLocator *locator) {
+  bool erased = OpenedTypes.erase(locator);
+  ASSERT(erased);
+}
+
 void ConstraintSystem::recordOpenedTypes(
        ConstraintLocatorBuilder locator,
        const OpenedTypeMap &replacements) {
@@ -1673,20 +1687,12 @@ void ConstraintSystem::recordOpenedTypes(
 
   ConstraintLocator *locatorPtr = getConstraintLocator(locator);
   assert(locatorPtr && "No locator for opened types?");
-#if false
-  assert(std::find_if(OpenedTypes.begin(), OpenedTypes.end(),
-                      [&](const std::pair<ConstraintLocator *,
-                          ArrayRef<OpenedType>> &entry) {
-                        return entry.first == locatorPtr;
-                      }) == OpenedTypes.end() &&
-         "already registered opened types for this locator");
-#endif
 
   OpenedType* openedTypes
     = Allocator.Allocate<OpenedType>(replacements.size());
   std::copy(replacements.begin(), replacements.end(), openedTypes);
-  OpenedTypes.insert(
-      {locatorPtr, llvm::ArrayRef(openedTypes, replacements.size())});
+  recordOpenedType(
+      locatorPtr, llvm::ArrayRef(openedTypes, replacements.size()));
 }
 
 /// Determine how many levels of argument labels should be removed from the

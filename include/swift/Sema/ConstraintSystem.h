@@ -2362,7 +2362,7 @@ private:
 
   /// A mapping from constraint locators to the set of opened types associated
   /// with that locator.
-  llvm::SmallMapVector<ConstraintLocator *, ArrayRef<OpenedType>, 4>
+  llvm::SmallDenseMap<ConstraintLocator *, ArrayRef<OpenedType>, 4>
       OpenedTypes;
 
   /// A dictionary of all conformances that have been looked up by the solver.
@@ -2882,9 +2882,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    /// The length of \c OpenedTypes.
-    unsigned numOpenedTypes;
 
     /// The length of \c OpenedExistentialTypes.
     unsigned numOpenedExistentialTypes;
@@ -4392,6 +4389,13 @@ public:
                               bool skipProtocolSelfConstraint,
                               ConstraintLocatorBuilder locator,
                               llvm::function_ref<Type(Type)> subst);
+
+  /// Update OpenedTypes and record a change in the trail.
+  void recordOpenedType(
+      ConstraintLocator *locator, ArrayRef<OpenedType> openedTypes);
+
+  /// Undo the above change.
+  void removeOpenedType(ConstraintLocator *locator);
 
   /// Record the set of opened types for the given locator.
   void recordOpenedTypes(

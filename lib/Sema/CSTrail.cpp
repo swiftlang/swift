@@ -177,6 +177,14 @@ SolverTrail::Change::recordedMatchCallArgumentResult(ConstraintLocator *locator)
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::recordedOpenedTypes(ConstraintLocator *locator) {
+  Change result;
+  result.Kind = ChangeKind::RecordedOpenedTypes;
+  result.Locator = locator;
+  return result;
+}
+
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
@@ -240,6 +248,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::RecordedMatchCallArgumentResult:
     cs.removeMatchCallArgumentResult(Locator);
+    break;
+
+  case ChangeKind::RecordedOpenedTypes:
+    cs.removeOpenedType(Locator);
     break;
   }
 }
@@ -367,6 +379,12 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
 
   case ChangeKind::RecordedMatchCallArgumentResult:
     out << "(recorded argument matching choice at ";
+    Locator->dump(&cs.getASTContext().SourceMgr, out);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedOpenedTypes:
+    out << "(recorded list of opened types at ";
     Locator->dump(&cs.getASTContext().SourceMgr, out);
     out << ")\n";
     break;

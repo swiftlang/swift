@@ -65,6 +65,8 @@ public:
     RecordedAppliedDisjunction,
     /// Recorded an argument matching choice.
     RecordedMatchCallArgumentResult,
+    /// Recorded a list of opened types at a locator.
+    RecordedOpenedTypes,
   };
 
   /// A change made to the constraint system.
@@ -186,6 +188,9 @@ public:
 
     /// Create a change that recorded an applied disjunction.
     static Change recordedMatchCallArgumentResult(ConstraintLocator *locator);
+
+    /// Create a change that recorded a list of opened types.
+    static Change recordedOpenedTypes(ConstraintLocator *locator);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

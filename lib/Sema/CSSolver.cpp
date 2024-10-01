@@ -326,7 +326,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Register the solution's opened types.
   for (const auto &opened : solution.OpenedTypes) {
-    OpenedTypes.insert(opened);
+    recordOpenedType(opened.first, opened.second);
   }
 
   // Register the solution's opened existential types.
@@ -672,7 +672,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
-  numOpenedTypes = cs.OpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
   numOpenedPackExpansionTypes = cs.OpenedPackExpansionTypes.size();
   numPackExpansionEnvironments = cs.PackExpansionEnvironments.size();
@@ -733,9 +732,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // e.g. add retired constraints back to the circulation and remove generated
   // constraints introduced by the current scope.
   cs.solverState->rollback(this);
-
-  // Remove any opened types.
-  truncate(cs.OpenedTypes, numOpenedTypes);
 
   // Remove any opened existential types.
   truncate(cs.OpenedExistentialTypes, numOpenedExistentialTypes);
