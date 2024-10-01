@@ -4473,7 +4473,6 @@ size_t Solution::getTotalMemory() const {
          OpenedPackExpansionTypes.getMemorySize() +
          PackExpansionEnvironments.getMemorySize() +
          size_in_bytes(PackEnvironments) +
-         PackElementGenericEnvironments.size() +
          (DefaultedConstraints.size() * sizeof(void *)) +
          nodeTypes.getMemorySize() +
          keyPathComponentTypes.getMemorySize() +

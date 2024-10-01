@@ -1549,10 +1549,6 @@ public:
   llvm::DenseMap<PackElementExpr *, PackExpansionExpr *>
       PackEnvironments;
 
-  /// The outer pack element generic environment to use when dealing with nested
-  /// pack iteration (see \c getPackElementEnvironment).
-  llvm::SmallVector<GenericEnvironment *> PackElementGenericEnvironments;
-
   /// The locators of \c Defaultable constraints whose defaults were used.
   llvm::DenseSet<ConstraintLocator *> DefaultedConstraints;
 
@@ -2882,9 +2878,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    /// The length of \c PackElementGenericEnvironments.
-    unsigned numPackElementGenericEnvironments;
 
     /// The length of \c DefaultedConstraints.
     unsigned numDefaultedConstraints;

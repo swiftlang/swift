@@ -264,9 +264,6 @@ Solution ConstraintSystem::finalize() {
   for (const auto &packEnv : PackEnvironments)
     solution.PackEnvironments.insert(packEnv);
 
-  for (const auto &packEltGenericEnv : PackElementGenericEnvironments)
-    solution.PackElementGenericEnvironments.push_back(packEltGenericEnv);
-
   for (const auto &synthesized : SynthesizedConformances) {
     solution.SynthesizedConformances.insert(synthesized);
   }
@@ -347,12 +344,6 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   // Register the solutions's pack environments.
   for (auto &packEnvironment : solution.PackEnvironments) {
     addPackEnvironment(packEnvironment.first, packEnvironment.second);
-  }
-
-  // Register the solutions's pack element generic environments.
-  for (auto &packElementGenericEnvironment :
-       solution.PackElementGenericEnvironments) {
-    PackElementGenericEnvironments.push_back(packElementGenericEnvironment);
   }
 
   // Register the defaulted type variables.
@@ -672,7 +663,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
-  numPackElementGenericEnvironments = cs.PackElementGenericEnvironments.size();
   numDefaultedConstraints = cs.DefaultedConstraints.size();
   numAddedNodeTypes = cs.addedNodeTypes.size();
   numAddedKeyPathComponentTypes = cs.addedKeyPathComponentTypes.size();
@@ -728,10 +718,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // e.g. add retired constraints back to the circulation and remove generated
   // constraints introduced by the current scope.
   cs.solverState->rollback(this);
-
-  // Remove any pack element generic environments.
-  truncate(cs.PackElementGenericEnvironments,
-           numPackElementGenericEnvironments);
 
   // Remove any defaulted type variables.
   truncate(cs.DefaultedConstraints, numDefaultedConstraints);
