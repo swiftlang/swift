@@ -188,7 +188,8 @@ public:
   static std::unique_ptr<ClangImporter>
   create(ASTContext &ctx,
          std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
-         DWARFImporterDelegate *dwarfImporterDelegate = nullptr);
+         DWARFImporterDelegate *dwarfImporterDelegate = nullptr,
+         bool ignoreFileMapping = false);
 
   static std::vector<std::string>
   getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget = false);
@@ -725,9 +726,13 @@ struct ClangInvocationFileMapping {
 /// On Linux, some platform libraries (glibc, libstdc++) are not modularized.
 /// We inject modulemaps for those libraries into their include directories
 /// to allow using them from Swift.
+///
+/// `suppressDiagnostic` prevents us from emitting warning messages when we
+/// are unable to find headers.
 ClangInvocationFileMapping getClangInvocationFileMapping(
     ASTContext &ctx,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr);
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr,
+    bool suppressDiagnostic = false);
 
 } // end namespace swift
 
