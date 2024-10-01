@@ -1507,6 +1507,11 @@ public:
   /// to make the solution work.
   std::vector<ConstraintFix *> Fixes;
 
+  /// The list of fixed requirements.
+  using FixedRequirement =
+      std::tuple<GenericTypeParamType *, unsigned, TypeBase *>;
+  std::vector<FixedRequirement> FixedRequirements;
+
   /// Maps expressions for implied results (e.g implicit 'then' statements,
   /// implicit 'return' statements in single expression body closures) to their
   /// result kind.
@@ -2138,6 +2143,7 @@ public:
   friend class RequirementFailure;
   friend class MissingMemberFailure;
   friend struct ClosureIsolatedByPreconcurrency;
+  friend class SolverTrail;
 
   class SolverScope;
 
@@ -2363,11 +2369,21 @@ private:
   /// solver path.
   using FixedRequirement =
       std::tuple<GenericTypeParamType *, unsigned, TypeBase *>;
-  llvm::SmallSetVector<FixedRequirement, 4> FixedRequirements;
+  llvm::DenseSet<FixedRequirement> FixedRequirements;
 
   bool isFixedRequirement(ConstraintLocator *reqLocator, Type requirementTy);
+
+  /// Add a fixed requirement and record a change to the trail.
   void recordFixedRequirement(ConstraintLocator *reqLocator,
                               Type requirementTy);
+
+  /// Primitive form used when applying solution.
+  void recordFixedRequirement(GenericTypeParamType *paramTy,
+                              unsigned reqKind, Type reqTy);
+
+  /// Called to undo the above change.
+  void removeFixedRequirement(GenericTypeParamType *paramTy,
+                              unsigned reqKind, Type reqTy);
 
   /// A mapping from constraint locators to the opened existential archetype
   /// used for the 'self' of an existential type.
@@ -2862,9 +2878,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    /// The length of \c FixedRequirements.
-    unsigned numFixedRequirements;
 
     /// The length of \c DisjunctionChoices.
     unsigned numDisjunctionChoices;

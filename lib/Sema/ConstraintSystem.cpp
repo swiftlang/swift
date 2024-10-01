@@ -4404,6 +4404,7 @@ size_t Solution::getTotalMemory() const {
          overloadChoices.getMemorySize() +
          ConstraintRestrictions.getMemorySize() +
          (Fixes.size() * sizeof(void *)) + DisjunctionChoices.getMemorySize() +
+         AppliedDisjunctions.getMemorySize() +
          OpenedTypes.getMemorySize() + OpenedExistentialTypes.getMemorySize() +
          OpenedPackExpansionTypes.getMemorySize() +
          PackExpansionEnvironments.getMemorySize() +
@@ -7369,9 +7370,29 @@ void ConstraintSystem::recordFixedRequirement(ConstraintLocator *reqLocator,
   if (auto reqInfo = getRequirementInfo(*this, reqLocator)) {
     auto *GP = reqInfo->first;
     auto reqKind = static_cast<unsigned>(reqInfo->second);
-    FixedRequirements.insert(
-        std::make_tuple(GP, reqKind, requirementTy.getPointer()));
+    recordFixedRequirement(GP, reqKind, requirementTy);
   }
+}
+
+void ConstraintSystem::recordFixedRequirement(GenericTypeParamType *GP,
+                                              unsigned reqKind,
+                                              Type requirementTy) {
+  bool inserted = FixedRequirements.insert(
+      std::make_tuple(GP, reqKind, requirementTy.getPointer())).second;
+  if (inserted) {
+    if (isRecordingChanges()) {
+      recordChange(SolverTrail::Change::addedFixedRequirement(
+          GP, reqKind, requirementTy));
+    }
+  }
+}
+
+void ConstraintSystem::removeFixedRequirement(GenericTypeParamType *GP,
+                                              unsigned reqKind,
+                                              Type requirementTy) {
+  auto key = std::make_tuple(GP, reqKind, requirementTy.getPointer());
+  bool erased = FixedRequirements.erase(key);
+  ASSERT(erased);
 }
 
 // Replace any error types encountered with placeholders.

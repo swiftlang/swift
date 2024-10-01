@@ -57,6 +57,8 @@ public:
     AddedConversionRestriction,
     /// Recorded a fix.
     AddedFix,
+    /// Recorded a fixed requirement.
+    AddedFixedRequirement,
   };
 
   /// A change made to the constraint system.
@@ -115,6 +117,11 @@ public:
       } Restriction;
 
       ConstraintFix *Fix;
+
+      struct {
+        GenericTypeParamType *GP;
+        Type ReqTy;
+      } FixedRequirement;
     };
 
     Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
@@ -156,6 +163,11 @@ public:
 
     /// Create a change that recorded a fix.
     static Change addedFix(ConstraintFix *fix);
+
+    /// Create a change that recorded a fixed requirement.
+    static Change addedFixedRequirement(GenericTypeParamType *GP,
+                                        unsigned reqKind,
+                                        Type requirementTy);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

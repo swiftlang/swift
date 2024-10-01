@@ -139,6 +139,18 @@ SolverTrail::Change::addedFix(ConstraintFix *fix) {
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::addedFixedRequirement(GenericTypeParamType *GP,
+                                           unsigned reqKind,
+                                           Type reqTy) {
+  Change result;
+  result.Kind = ChangeKind::AddedFixedRequirement;
+  result.FixedRequirement.GP = GP;
+  result.FixedRequirement.ReqTy = reqTy;
+  result.Options = reqKind;
+  return result;
+}
+
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
@@ -185,6 +197,11 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::AddedFix:
     cs.removeFix(Fix);
+    break;
+
+  case ChangeKind::AddedFixedRequirement:
+    cs.removeFixedRequirement(FixedRequirement.GP, Options,
+                              FixedRequirement.ReqTy);
     break;
   }
 }
@@ -285,6 +302,15 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
   case ChangeKind::AddedFix:
     out << "(added a fix ";
     Fix->print(out);
+    out << ")\n";
+    break;
+
+  case ChangeKind::AddedFixedRequirement:
+    out << "(added a fixed requirement ";
+    FixedRequirement.GP->print(out, PO);
+    out << " kind ";
+    out << Options << " ";
+    FixedRequirement.ReqTy->print(out, PO);
     out << ")\n";
     break;
   }

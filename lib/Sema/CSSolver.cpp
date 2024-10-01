@@ -137,6 +137,10 @@ Solution ConstraintSystem::finalize() {
        llvm::make_range(Fixes.begin() + firstFixIndex, Fixes.end()))
     solution.Fixes.push_back(fix);
 
+  for (const auto &fix : FixedRequirements) {
+    solution.FixedRequirements.push_back(fix);
+  }
+
   // Remember all the disjunction choices we made.
   for (auto &choice : DisjunctionChoices) {
     solution.DisjunctionChoices.insert(choice);
@@ -421,6 +425,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   // Register any fixes produced along this path.
   for (auto *fix : solution.Fixes)
     addFix(fix);
+
+  // Register fixed requirements.
+  for (auto fix : solution.FixedRequirements)
+    recordFixedRequirement(std::get<0>(fix), std::get<1>(fix), std::get<2>(fix));
 }
 bool ConstraintSystem::simplify() {
   // While we have a constraint in the worklist, process it.
@@ -654,7 +662,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
-  numFixedRequirements = cs.FixedRequirements.size();
   numDisjunctionChoices = cs.DisjunctionChoices.size();
   numAppliedDisjunctions = cs.AppliedDisjunctions.size();
   numArgumentMatchingChoices = cs.argumentMatchingChoices.size();
@@ -731,10 +738,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any opened types.
   truncate(cs.OpenedTypes, numOpenedTypes);
-
-  // Remove any conformances solver had to fix along
-  // the current path.
-  truncate(cs.FixedRequirements, numFixedRequirements);
 
   // Remove any opened existential types.
   truncate(cs.OpenedExistentialTypes, numOpenedExistentialTypes);
