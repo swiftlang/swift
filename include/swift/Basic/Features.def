@@ -430,6 +430,9 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
 /// modify/read single-yield coroutines always execute code post-yield code
 EXPERIMENTAL_FEATURE(CoroutineAccessorsUnwindOnCallerError, false)
 
+/// modify/read coroutines use the callee-allocated ABI
+EXPERIMENTAL_FEATURE(CoroutineAccessorsAllocateInCallee, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
