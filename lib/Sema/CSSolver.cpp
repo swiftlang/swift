@@ -290,10 +290,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   // Register constraint restrictions.
   // FIXME: Copy these directly into some kind of partial solution?
   for ( auto &restriction : solution.ConstraintRestrictions) {
-    auto *type1 = restriction.first.first.getPointer();
-    auto *type2 = restriction.first.second.getPointer();
+    auto type1 = restriction.first.first;
+    auto type2 = restriction.first.second;
 
-    ConstraintRestrictions.insert({{type1, type2}, restriction.second});
+    addConversionRestriction(type1, type2, restriction.second);
   }
 
   // Register the solution's disjunction choices.
@@ -652,7 +652,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numTrailChanges = cs.solverState->Trail.size();
 
   numTypeVariables = cs.TypeVariables.size();
-  numConstraintRestrictions = cs.ConstraintRestrictions.size();
   numFixes = cs.Fixes.size();
   numFixedRequirements = cs.FixedRequirements.size();
   numDisjunctionChoices = cs.DisjunctionChoices.size();
@@ -719,9 +718,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // e.g. add retired constraints back to the circulation and remove generated
   // constraints introduced by the current scope.
   cs.solverState->rollback(this);
-
-  // Remove any constraint restrictions.
-  truncate(cs.ConstraintRestrictions, numConstraintRestrictions);
 
   // Remove any fixes.
   truncate(cs.Fixes, numFixes);

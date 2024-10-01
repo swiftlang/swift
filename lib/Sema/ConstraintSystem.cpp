@@ -257,6 +257,28 @@ void ConstraintSystem::addTypeVariableConstraintsToWorkList(
       activateConstraint(constraint);
 }
 
+void ConstraintSystem::addConversionRestriction(
+    Type srcType, Type dstType,
+    ConversionRestrictionKind restriction) {
+  auto key = std::make_pair(srcType.getPointer(), dstType.getPointer());
+  bool inserted = ConstraintRestrictions.insert(
+      std::make_pair(key, restriction)).second;
+  if (!inserted)
+    return;
+
+  if (isRecordingChanges()) {
+    recordChange(SolverTrail::Change::addedConversionRestriction(
+      srcType, dstType));
+  }
+}
+
+void ConstraintSystem::removeConversionRestriction(
+    Type srcType, Type dstType) {
+  auto key = std::make_pair(srcType.getPointer(), dstType.getPointer());
+  bool erased = ConstraintRestrictions.erase(key);
+  ASSERT(erased);
+}
+
 /// Retrieve a dynamic result signature for the given declaration.
 static std::tuple<char, ObjCSelector, CanType>
 getDynamicResultSignature(ValueDecl *decl) {

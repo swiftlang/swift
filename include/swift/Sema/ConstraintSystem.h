@@ -2314,7 +2314,7 @@ private:
   /// there are multiple ways in which one type could convert to another, e.g.,
   /// given class types A and B, the solver might choose either a superclass
   /// conversion or a user-defined conversion.
-  llvm::MapVector<std::pair<TypeBase *, TypeBase *>, ConversionRestrictionKind>
+  llvm::DenseMap<std::pair<TypeBase *, TypeBase *>, ConversionRestrictionKind>
       ConstraintRestrictions;
 
   /// The set of fixes applied to make the solution work.
@@ -2857,9 +2857,6 @@ public:
 
     /// The length of \c Trail.
     unsigned numTrailChanges;
-
-    /// The length of \c ConstraintRestrictions.
-    unsigned numConstraintRestrictions;
 
     /// The length of \c Fixes.
     unsigned numFixes;
@@ -4217,6 +4214,13 @@ public:
   void assignFixedType(TypeVariableType *typeVar, Type type,
                        bool updateState = true,
                        bool notifyBindingInference = true);
+
+  /// Update ConstraintRestrictions and record a change in the trail.
+  void addConversionRestriction(Type srcType, Type dstType,
+                                ConversionRestrictionKind restriction);
+
+  /// Called to undo the above change.
+  void removeConversionRestriction(Type srcType, Type dstType);
 
   /// Determine whether the given type is a dictionary and, if so, provide the
   /// key and value types for the dictionary.

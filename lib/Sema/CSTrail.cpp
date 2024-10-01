@@ -118,7 +118,16 @@ SolverTrail::Change::updatedTypeVariable(
   result.Kind = ChangeKind::UpdatedTypeVariable;
   result.Update.TypeVar = typeVar;
   result.Update.ParentOrFixed = parentOrFixed;
-  result.Update.Options = options;
+  result.Options = options;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::addedConversionRestriction(Type srcType, Type dstType) {
+  Change result;
+  result.Kind = ChangeKind::AddedConversionRestriction;
+  result.Restriction.SrcType = srcType;
+  result.Restriction.DstType = dstType;
   return result;
 }
 
@@ -157,8 +166,13 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     break;
 
   case ChangeKind::UpdatedTypeVariable:
-    Update.TypeVar->getImpl().setRawOptions(Update.Options);
+    Update.TypeVar->getImpl().setRawOptions(Options);
     Update.TypeVar->getImpl().ParentOrFixed = Update.ParentOrFixed;
+    break;
+
+  case ChangeKind::AddedConversionRestriction:
+    cs.removeConversionRestriction(Restriction.SrcType,
+                                   Restriction.DstType);
     break;
   }
 }
@@ -229,7 +243,7 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << ")\n";
     break;
 
-  case ChangeKind::UpdatedTypeVariable:
+  case ChangeKind::UpdatedTypeVariable: {
     out << "(updated type variable ";
     Update.TypeVar->print(out, PO);
 
@@ -243,7 +257,16 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
       parentOrFixed.get<TypeBase *>()->print(out, PO);
     }
     out << " with options 0x";
-    out.write_hex(Update.Options);
+    out.write_hex(Options);
+    out << ")\n";
+    break;
+  }
+
+  case ChangeKind::AddedConversionRestriction:
+    out << "(added restriction with source ";
+    Restriction.SrcType->print(out, PO);
+    out << " and destination ";
+    Restriction.DstType->print(out, PO);
     out << ")\n";
     break;
   }

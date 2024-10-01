@@ -14676,8 +14676,7 @@ ConstraintSystem::simplifyRestrictedConstraint(
       addFixConstraint(fix, matchKind, type1, type2, locator);
     }
 
-    ConstraintRestrictions.insert({
-        std::make_pair(type1.getPointer(), type2.getPointer()), restriction});
+    addConversionRestriction(type1, type2, restriction);
     return SolutionKind::Solved;
   }
   case SolutionKind::Unsolved:

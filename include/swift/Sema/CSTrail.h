@@ -36,7 +36,7 @@ class SolverTrail {
 public:
 
   /// The kind of change made to the graph.
-  enum class ChangeKind {
+  enum class ChangeKind: unsigned {
     /// Added a new vertex to the constraint graph.
     AddedTypeVariable,
     /// Added a new constraint to the constraint graph.
@@ -53,6 +53,8 @@ public:
     RetractedBindings,
     /// Set the fixed type or parent and flags for a type variable.
     UpdatedTypeVariable,
+    /// Recorded a conversion restriction kind.
+    AddedConversionRestriction,
   };
 
   /// A change made to the constraint system.
@@ -63,6 +65,9 @@ public:
   public:
     /// The kind of change.
     ChangeKind Kind;
+
+    /// Extra storage.
+    unsigned Options;
 
     union {
       TypeVariableType *TypeVar;
@@ -97,10 +102,15 @@ public:
 
         /// The representative of the equivalence class, or the fixed type.
         llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
-
-        /// The saved value of TypeVariableType::Implementation::getRawOptions().
-        unsigned Options;
       } Update;
+
+      struct {
+        /// The source type.
+        Type SrcType;
+
+        /// The destination type.
+        Type DstType;
+      } Restriction;
     };
 
     Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
@@ -136,6 +146,9 @@ public:
                TypeVariableType *typeVar,
                llvm::PointerUnion<TypeVariableType *, TypeBase *> parentOrFixed,
                unsigned options);
+
+    /// Create a change that recorded a restriction.
+    static Change addedConversionRestriction(Type srcType, Type dstType);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.
