@@ -14855,7 +14855,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
     return true;
 
   if (isAugmentingFix(fix)) {
-    Fixes.insert(fix);
+    addFix(fix);
     return false;
   }
 
@@ -14887,7 +14887,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   }
 
   if (!found)
-    Fixes.insert(fix);
+    addFix(fix);
 
   return false;
 }

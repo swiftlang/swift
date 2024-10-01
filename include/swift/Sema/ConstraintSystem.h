@@ -2859,6 +2859,8 @@ public:
     unsigned numTrailChanges;
 
     /// The length of \c Fixes.
+    ///
+    /// FIXME: Remove this.
     unsigned numFixes;
 
     /// The length of \c FixedRequirements.
@@ -4221,6 +4223,12 @@ public:
 
   /// Called to undo the above change.
   void removeConversionRestriction(Type srcType, Type dstType);
+
+  /// Update Fixes and record a change in the trail.
+  void addFix(ConstraintFix *fix);
+
+  /// Called to undo the above change.
+  void removeFix(ConstraintFix *fix);
 
   /// Determine whether the given type is a dictionary and, if so, provide the
   /// key and value types for the dictionary.

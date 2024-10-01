@@ -55,6 +55,8 @@ public:
     UpdatedTypeVariable,
     /// Recorded a conversion restriction kind.
     AddedConversionRestriction,
+    /// Recorded a fix.
+    AddedFix,
   };
 
   /// A change made to the constraint system.
@@ -111,6 +113,8 @@ public:
         /// The destination type.
         Type DstType;
       } Restriction;
+
+      ConstraintFix *Fix;
     };
 
     Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
@@ -149,6 +153,9 @@ public:
 
     /// Create a change that recorded a restriction.
     static Change addedConversionRestriction(Type srcType, Type dstType);
+
+    /// Create a change that recorded a fix.
+    static Change addedFix(ConstraintFix *fix);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

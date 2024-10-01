@@ -131,6 +131,14 @@ SolverTrail::Change::addedConversionRestriction(Type srcType, Type dstType) {
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::addedFix(ConstraintFix *fix) {
+  Change result;
+  result.Kind = ChangeKind::AddedFix;
+  result.Fix = fix;
+  return result;
+}
+
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
@@ -173,6 +181,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   case ChangeKind::AddedConversionRestriction:
     cs.removeConversionRestriction(Restriction.SrcType,
                                    Restriction.DstType);
+    break;
+
+  case ChangeKind::AddedFix:
+    cs.removeFix(Fix);
     break;
   }
 }
@@ -267,6 +279,12 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     Restriction.SrcType->print(out, PO);
     out << " and destination ";
     Restriction.DstType->print(out, PO);
+    out << ")\n";
+    break;
+
+  case ChangeKind::AddedFix:
+    out << "(added a fix ";
+    Fix->print(out);
     out << ")\n";
     break;
   }

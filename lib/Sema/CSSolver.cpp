@@ -419,7 +419,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   // Register any fixes produced along this path.
-  Fixes.insert(solution.Fixes.begin(), solution.Fixes.end());
+  for (auto *fix : solution.Fixes)
+    addFix(fix);
 }
 bool ConstraintSystem::simplify() {
   // While we have a constraint in the worklist, process it.
@@ -718,9 +719,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // e.g. add retired constraints back to the circulation and remove generated
   // constraints introduced by the current scope.
   cs.solverState->rollback(this);
-
-  // Remove any fixes.
-  truncate(cs.Fixes, numFixes);
 
   // Remove any disjunction choices.
   truncate(cs.DisjunctionChoices, numDisjunctionChoices);

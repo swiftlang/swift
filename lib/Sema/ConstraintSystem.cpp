@@ -279,6 +279,20 @@ void ConstraintSystem::removeConversionRestriction(
   ASSERT(erased);
 }
 
+void ConstraintSystem::addFix(ConstraintFix *fix) {
+  bool inserted = Fixes.insert(fix);
+  if (!inserted)
+    return;
+
+  if (isRecordingChanges())
+    recordChange(SolverTrail::Change::addedFix(fix));
+}
+
+void ConstraintSystem::removeFix(ConstraintFix *fix) {
+  ASSERT(Fixes.back() == fix);
+  Fixes.pop_back();
+}
+
 /// Retrieve a dynamic result signature for the given declaration.
 static std::tuple<char, ObjCSelector, CanType>
 getDynamicResultSignature(ValueDecl *decl) {
