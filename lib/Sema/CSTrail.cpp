@@ -161,6 +161,14 @@ SolverTrail::Change::recordedDisjunctionChoice(ConstraintLocator *locator,
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::recordedAppliedDisjunction(ConstraintLocator *locator) {
+  Change result;
+  result.Kind = ChangeKind::RecordedAppliedDisjunction;
+  result.Locator = locator;
+  return result;
+}
+
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
@@ -216,6 +224,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::RecordedDisjunctionChoice:
     cs.removeDisjunctionChoice(Locator);
+    break;
+
+  case ChangeKind::RecordedAppliedDisjunction:
+    cs.removeAppliedDisjunction(Locator);
     break;
   }
 }
@@ -333,6 +345,12 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     Locator->dump(&cs.getASTContext().SourceMgr, out);
     out << " index ";
     out << Options << ")\n";
+    break;
+
+  case ChangeKind::RecordedAppliedDisjunction:
+    out << "(recorded applied disjunction at ";
+    Locator->dump(&cs.getASTContext().SourceMgr, out);
+    out << ")\n";
     break;
   }
 }

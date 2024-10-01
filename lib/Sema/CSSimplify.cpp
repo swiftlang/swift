@@ -12823,7 +12823,7 @@ bool ConstraintSystem::simplifyAppliedOverloads(
   auto *applicableFn = result->first;
   auto *fnTypeVar = applicableFn->getSecondType()->castTo<TypeVariableType>();
   auto argFnType = applicableFn->getFirstType()->castTo<FunctionType>();
-  AppliedDisjunctions[disjunction->getLocator()] = argFnType;
+  recordAppliedDisjunction(disjunction->getLocator(), argFnType);
   return simplifyAppliedOverloadsImpl(disjunction, fnTypeVar, argFnType,
                                       /*numOptionalUnwraps*/ result->second,
                                       applicableFn->getLocator());
@@ -12843,7 +12843,7 @@ bool ConstraintSystem::simplifyAppliedOverloads(
   if (!disjunction)
     return false;
 
-  AppliedDisjunctions[disjunction->getLocator()] = argFnType;
+  recordAppliedDisjunction(disjunction->getLocator(), argFnType);
   return simplifyAppliedOverloadsImpl(disjunction, fnTypeVar, argFnType,
                                       numOptionalUnwraps, locator);
 }

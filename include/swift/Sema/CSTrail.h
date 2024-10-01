@@ -61,6 +61,8 @@ public:
     AddedFixedRequirement,
     /// Recorded a disjunction choice.
     RecordedDisjunctionChoice,
+    /// Recorded an applied disjunction.
+    RecordedAppliedDisjunction,
   };
 
   /// A change made to the constraint system.
@@ -176,6 +178,9 @@ public:
     /// Create a change that recorded a disjunction choice.
     static Change recordedDisjunctionChoice(ConstraintLocator *locator,
                                             unsigned index);
+
+    /// Create a change that recorded an applied disjunction.
+    static Change recordedAppliedDisjunction(ConstraintLocator *locator);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

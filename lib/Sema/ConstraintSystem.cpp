@@ -310,6 +310,18 @@ void ConstraintSystem::recordDisjunctionChoice(
   }
 }
 
+void ConstraintSystem::recordAppliedDisjunction(
+    ConstraintLocator *locator, FunctionType *fnType) {
+  // We shouldn't ever register disjunction choices multiple times.
+  auto inserted = AppliedDisjunctions.insert(
+      std::make_pair(locator, fnType));
+  if (inserted.second) {
+    if (isRecordingChanges()) {
+      recordChange(SolverTrail::Change::recordedAppliedDisjunction(locator));
+    }
+  }
+}
+
 /// Retrieve a dynamic result signature for the given declaration.
 static std::tuple<char, ObjCSelector, CanType>
 getDynamicResultSignature(ValueDecl *decl) {

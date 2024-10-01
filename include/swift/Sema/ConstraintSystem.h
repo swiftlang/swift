@@ -1526,6 +1526,10 @@ public:
   /// which informs constraint application.
   llvm::DenseMap<ConstraintLocator *, unsigned> DisjunctionChoices;
 
+  /// A map from applied disjunction constraints to the corresponding
+  /// argument function type.
+  llvm::DenseMap<ConstraintLocator *, FunctionType *> AppliedDisjunctions;
+
   /// The set of opened types for a given locator.
   llvm::DenseMap<ConstraintLocator *, ArrayRef<OpenedType>> OpenedTypes;
 
@@ -2332,7 +2336,7 @@ private:
 
   /// A map from applied disjunction constraints to the corresponding
   /// argument function type.
-  llvm::SmallMapVector<ConstraintLocator *, const FunctionType *, 4>
+  llvm::SmallDenseMap<ConstraintLocator *, FunctionType *, 4>
       AppliedDisjunctions;
 
   /// For locators associated with call expressions, the trailing closure
@@ -2878,9 +2882,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    /// The length of \c AppliedDisjunctions.
-    unsigned numAppliedDisjunctions;
 
     /// The length of \c argumentMatchingChoices.
     unsigned numArgumentMatchingChoices;
@@ -5325,6 +5326,15 @@ private:
     ASSERT(erased);
   }
 
+  /// Record applied disjunction and add a change to the trail.
+  void recordAppliedDisjunction(ConstraintLocator *locator,
+                                FunctionType *type);
+
+  /// Undo the above change.
+  void removeAppliedDisjunction(ConstraintLocator *locator) {
+    bool erased = AppliedDisjunctions.erase(locator);
+    ASSERT(erased);
+  }
 
   /// Filter the set of disjunction terms, keeping only those where the
   /// predicate returns \c true.
@@ -5629,9 +5639,12 @@ public:
 
   // If the given constraint is an applied disjunction, get the argument function
   // that the disjunction is applied to.
-  const FunctionType *getAppliedDisjunctionArgumentFunction(const Constraint *disjunction) {
+  FunctionType *getAppliedDisjunctionArgumentFunction(const Constraint *disjunction) {
     assert(disjunction->getKind() == ConstraintKind::Disjunction);
-    return AppliedDisjunctions[disjunction->getLocator()];
+    auto found = AppliedDisjunctions.find(disjunction->getLocator());
+    if (found == AppliedDisjunctions.end())
+      return nullptr;
+    return found->second;
   }
 
   /// The overload sets that have already been resolved along the current path.
