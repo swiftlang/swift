@@ -519,8 +519,6 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
                  ::getenv("SWIFT_ALIAS_MODULE_NAMES_IN_INTERFACES"));
   Opts.PrintFullConvention |=
     Args.hasArg(OPT_experimental_print_full_convention);
-  Opts.ExperimentalSPIImports |=
-    Args.hasArg(OPT_experimental_spi_imports);
   Opts.DebugPrintInvalidSyntax |=
     Args.hasArg(OPT_debug_emit_invalid_swiftinterface_syntax);
   Opts.PrintMissingImports =
@@ -1193,6 +1191,16 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   Opts.EnableSPIOnlyImports = Args.hasArg(OPT_experimental_spi_only_imports);
+  if (Args.hasArg(OPT_experimental_spi_imports)) {
+    if (Opts.EffectiveLanguageVersion.isVersionAtLeast(6)) {
+      Diags.diagnose(SourceLoc(), diag::flag_unsuppored,
+                     "-experimental-spi-imports");
+      HadError = true;
+    } else {
+      Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
+                     "-experimental-spi-imports");
+    }
+  }
 
   if (Args.hasArg(OPT_warn_swift3_objc_inference_minimal))
     Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
@@ -3733,15 +3741,10 @@ bool CompilerInvocation::parseArgs(
     }
   }
 
-  // With Swift 6, enable @_spiOnly by default and forbid the old version.
-  // This also enables proper error reporting of ioi references from spi decls.
+  // With Swift 6, enable @_spiOnly by default. This also enables proper error
+  // reporting of ioi references from spi decls.
   if (LangOpts.EffectiveLanguageVersion.isVersionAtLeast(6)) {
     LangOpts.EnableSPIOnlyImports = true;
-
-    if (ParsedArgs.hasArg(OPT_experimental_spi_imports)) {
-      Diags.diagnose(SourceLoc(), diag::error_old_spi_only_import_unsupported);
-      return true;
-    }
   }
 
   return false;
