@@ -36,8 +36,8 @@ class ClangTypeConverter :
 
   // Bidirectional mapping between types exported from Swift to their
   // C family counterparts.
-  llvm::DenseMap<const clang::Decl *, swift::Decl *> ReversedExportMap;
-  llvm::DenseMap<swift::Decl *, const clang::Decl *> ReversedExportMapBackwards;
+  llvm::DenseMap<const clang::Decl *, Type> ReversedExportMap;
+  llvm::DenseMap<Type, const clang::Decl *> ReversedExportMapBackwards;
 
   bool StdlibTypesAreCached = false;
 
@@ -84,9 +84,9 @@ public:
                                      SILFunctionType::Representation repr);
 
   /// Check whether the given Clang declaration is an export of a Swift
-  /// declaration introduced by this converter, and if so, return the original
-  /// Swift declaration.
-  Decl *getSwiftDeclForExportedClangDecl(const clang::Decl *decl) const;
+  /// Type introduced by this converter, and if so, return the original
+  /// Swift Type.
+  Type getSwiftTypeForExportedClangDecl(const clang::Decl *decl) const;
 
   /// Translate Swift generic arguments to Clang C++ template arguments.
   ///
@@ -108,7 +108,7 @@ private:
   clang::QualType convertMemberType(NominalTypeDecl *DC,
                                     StringRef memberName);
 
-  void registerExportedClangDecl(Decl *swiftDecl,
+  void registerExportedClangDecl(Type swiftType,
                                  const clang::Decl *clangDecl);
 
   clang::QualType reverseBuiltinTypeMapping(StructType *type);

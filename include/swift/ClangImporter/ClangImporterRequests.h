@@ -22,6 +22,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -345,8 +346,37 @@ struct CxxRecordSemanticsDescriptor final {
   }
 };
 
+struct ClangTypeToSwiftTypeDescriptor final {
+  const clang::RecordDecl *decl;
+  ASTContext &ctx;
+  ClangImporter::Implementation &impl;
+
+  ClangTypeToSwiftTypeDescriptor(const clang::RecordDecl *decl, ASTContext &ctx,
+                                 ClangImporter::Implementation &impl)
+      : decl(decl), ctx(ctx), impl(impl) {}
+
+  friend llvm::hash_code
+  hash_value(const ClangTypeToSwiftTypeDescriptor &desc) {
+    return llvm::hash_combine(desc.decl);
+  }
+
+  friend bool operator==(const ClangTypeToSwiftTypeDescriptor &lhs,
+                         const ClangTypeToSwiftTypeDescriptor &rhs) {
+    return lhs.decl == rhs.decl;
+  }
+
+  friend bool operator!=(const ClangTypeToSwiftTypeDescriptor &lhs,
+                         const ClangTypeToSwiftTypeDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
 void simple_display(llvm::raw_ostream &out, CxxRecordSemanticsDescriptor desc);
 SourceLoc extractNearestSourceLoc(CxxRecordSemanticsDescriptor desc);
+
+void simple_display(llvm::raw_ostream &out,
+                    ClangTypeToSwiftTypeDescriptor desc);
+SourceLoc extractNearestSourceLoc(ClangTypeToSwiftTypeDescriptor desc);
 
 /// What pattern does this C++ API fit? Uses attributes such as
 /// import_owned and import_reference to determine the pattern.
@@ -377,7 +407,7 @@ private:
 /// Does this C++ record represent a Swift type.
 class CxxRecordAsSwiftType
     : public SimpleRequest<CxxRecordAsSwiftType,
-                           ValueDecl *(CxxRecordSemanticsDescriptor),
+                           Type(ClangTypeToSwiftTypeDescriptor),
                            RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -388,7 +418,7 @@ public:
 private:
   friend SimpleRequest;
 
-  ValueDecl *evaluate(Evaluator &evaluator, CxxRecordSemanticsDescriptor) const;
+  Type evaluate(Evaluator &evaluator, ClangTypeToSwiftTypeDescriptor) const;
 };
 
 struct SafeUseOfCxxDeclDescriptor final {

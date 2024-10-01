@@ -6228,23 +6228,22 @@ ASTContext::getClangTemplateArguments(
                                                    templateArgs);
 }
 
-const Decl *
-ASTContext::getSwiftDeclForExportedClangDecl(const clang::Decl *decl) {
+Type ASTContext::getSwiftTypeForExportedClangDecl(const clang::Decl *decl) {
   auto &impl = getImpl();
 
   // If we haven't exported anything yet, this must not be how we found
   // this declaration.
   if (!impl.Converter) return nullptr;
 
-  return impl.Converter->getSwiftDeclForExportedClangDecl(decl);
+  return impl.Converter->getSwiftTypeForExportedClangDecl(decl);
 }
 
-void ASTContext::registerExportedClangDecl(Decl *decl,
+void ASTContext::registerExportedClangDecl(Type type,
                                            const clang::Decl *clangDecl) {
   // Make sure we have a converter.
   getClangTypeConverter();
   auto &impl = getImpl();
-  impl.Converter->registerExportedClangDecl(decl, clangDecl);
+  impl.Converter->registerExportedClangDecl(type, clangDecl);
 }
 
 const clang::Type *

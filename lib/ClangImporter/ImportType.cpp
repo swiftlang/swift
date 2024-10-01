@@ -2276,13 +2276,10 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
   // Import the underlying result type.
   if (clangDecl) {
     if (auto recordType = returnType->getAsCXXRecordDecl()) {
-      if (auto *vd = evaluateOrDefault(
+      if (auto type = evaluateOrDefault(
               SwiftContext.evaluator,
-              CxxRecordAsSwiftType({recordType, SwiftContext}), nullptr)) {
-        if (auto *ntd = dyn_cast<NominalTypeDecl>(vd)) {
-          Type t = NominalType::get(ntd, Type(), SwiftContext);
-          return ImportedType(t, /*implicitlyUnwraps=*/false);
-        }
+              CxxRecordAsSwiftType({recordType, SwiftContext, *this}), nullptr)) {
+        return ImportedType(type, /*implicitlyUnwraps=*/false);
       }
     }
   }
@@ -2524,12 +2521,9 @@ ClangImporter::Implementation::importParameterType(
   if (!swiftParamTy) {
     if (auto recordType = paramTy->getAsCXXRecordDecl()) {
 
-      if (auto *vd = evaluateOrDefault(
+      swiftParamTy = evaluateOrDefault(
               SwiftContext.evaluator,
-              CxxRecordAsSwiftType({recordType, SwiftContext}), nullptr)) {
-        if (auto *ntd = dyn_cast<NominalTypeDecl>(vd))
-          swiftParamTy = NominalType::get(ntd, Type(), SwiftContext);
-      }
+              CxxRecordAsSwiftType({recordType, SwiftContext, *this}), nullptr);
     }
   }
 

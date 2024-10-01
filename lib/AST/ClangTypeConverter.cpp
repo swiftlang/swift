@@ -32,6 +32,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -465,7 +466,7 @@ clang::QualType ClangTypeConverter::visitProtocolType(ProtocolType *type) {
                    PDecl->getASTContext(),
                    proto->getObjCRuntimeName(runtimeNameBuffer)));
 
-  registerExportedClangDecl(proto, PDecl);
+  registerExportedClangDecl(type, PDecl);
 
   auto clangType  = clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy,
                                                &PDecl, 1);
@@ -516,7 +517,7 @@ clang::QualType ClangTypeConverter::visitClassType(ClassType *type) {
                    CDecl->getASTContext(),
                    swiftDecl->getObjCRuntimeName(runtimeNameBuffer)));
 
-  registerExportedClangDecl(swiftDecl, CDecl);
+  registerExportedClangDecl(type, CDecl);
 
   auto clangType  = clangCtx.getObjCInterfaceType(CDecl);
   return clangCtx.getObjCObjectPointerType(clangType);
@@ -838,7 +839,7 @@ clang::QualType ClangTypeConverter::convert(Type type) {
   if (auto existential = type->getAs<ExistentialType>())
     type = existential->getConstraintType();
 
-  if (auto nominal = type->getAs<NominalType>()) {
+  if (auto nominal = type->getAs<NominalOrBoundGenericNominalType>()) {
     auto decl = nominal->getDecl();
     if (auto clangDecl = decl->getClangDecl()) {
       auto &ctx = ClangASTContext;
@@ -855,7 +856,7 @@ clang::QualType ClangTypeConverter::convert(Type type) {
         return ctx.getObjCObjectPointerType(clangType);
       }
     } else {
-      auto it = ReversedExportMapBackwards.find(decl);
+      auto it = ReversedExportMapBackwards.find(type);
       // This can happen, when the String type is exported to C++ (as
       // swift::String) which is later imported back to Swift as String.
       if (it != ReversedExportMapBackwards.end()) {
@@ -873,16 +874,16 @@ clang::QualType ClangTypeConverter::convert(Type type) {
   return result;
 }
 
-void ClangTypeConverter::registerExportedClangDecl(Decl *swiftDecl,
+void ClangTypeConverter::registerExportedClangDecl(Type swiftType,
                                              const clang::Decl *clangDecl) {
   assert(clangDecl->isCanonicalDecl() &&
          "generated Clang declaration for Swift declaration should not "
          "have multiple declarations");
-  ReversedExportMap.insert({clangDecl, swiftDecl});
-  ReversedExportMapBackwards.insert({swiftDecl, clangDecl});
+  ReversedExportMap.insert({clangDecl, swiftType});
+  ReversedExportMapBackwards.insert({swiftType, clangDecl});
 }
 
-Decl *ClangTypeConverter::getSwiftDeclForExportedClangDecl(
+Type ClangTypeConverter::getSwiftTypeForExportedClangDecl(
                                              const clang::Decl *decl) const {
   // We don't need to canonicalize the declaration because these exported
   // declarations are never redeclarations.

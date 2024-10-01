@@ -47,6 +47,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/CXXMethodBridging.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
@@ -3032,6 +3033,12 @@ namespace {
       // when importing it in symbolic mode.
       if (Impl.importSymbolicCXXDecls)
         return Impl.importDecl(classTemplate,Impl.CurrentVersion);
+
+      // Use the native representation for Swift types, no import necessary.
+      // See ClangTypeConverter for lowering and CxxRecordAsSwiftType for the
+      // lookup logic.
+      if (importer::isSwiftType(classTemplate->getTemplatedDecl()))
+        return nullptr;
 
       bool isPair = classTemplate->isInStdNamespace() &&
                     classTemplate->getName() == "pair";

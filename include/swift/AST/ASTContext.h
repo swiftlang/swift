@@ -841,9 +841,9 @@ public:
 
   /// Get the Swift declaration that a Clang declaration was exported from,
   /// if applicable.
-  const Decl *getSwiftDeclForExportedClangDecl(const clang::Decl *decl);
+  Type getSwiftTypeForExportedClangDecl(const clang::Decl *decl);
 
-  void registerExportedClangDecl(Decl *decl, const clang::Decl *clangDecl);
+  void registerExportedClangDecl(Type type, const clang::Decl *clangDecl);
 
   /// General conversion method from Swift types -> Clang types.
   ///

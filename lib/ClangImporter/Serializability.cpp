@@ -22,6 +22,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "ImporterImpl.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/SwiftAbstractBasicWriter.h"
 
@@ -50,9 +52,9 @@ public:
 
     // If the declaration isn't from an AST file, it might be something that
     // we built automatically when exporting a Swift type.
-    if (auto swiftDecl =
-          Impl.SwiftContext.getSwiftDeclForExportedClangDecl(decl))
-      return swiftDecl;
+    if (auto nominalType =
+          Impl.SwiftContext.getSwiftTypeForExportedClangDecl(decl)->getAs<NominalType>())
+      return nominalType->getDecl();
 
     // Allow serialization for non-modular headers as well, with the hope that
     // we find the same header when doing unqualified lookup during

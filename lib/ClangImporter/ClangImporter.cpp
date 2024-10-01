@@ -24,6 +24,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -55,6 +56,7 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/Mangle.h"
+#include "clang/AST/TemplateBase.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Basic/FileEntry.h"
@@ -7718,28 +7720,14 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
   llvm_unreachable("Could not classify C++ type.");
 }
 
-ValueDecl *
-CxxRecordAsSwiftType::evaluate(Evaluator &evaluator,
-                               CxxRecordSemanticsDescriptor desc) const {
+Type CxxRecordAsSwiftType::evaluate(Evaluator &evaluator,
+                                    ClangTypeToSwiftTypeDescriptor desc) const {
   auto cxxDecl = dyn_cast<clang::CXXRecordDecl>(desc.decl);
   // TODO: support specializations like swift::Optional<int>
-  if (!cxxDecl || isa<clang::ClassTemplateSpecializationDecl>(cxxDecl))
+  if (!cxxDecl)
     return nullptr;
   if (!importer::isSwiftType(cxxDecl))
     return nullptr;
-
-  if (!isSwiftClassType(cxxDecl)) {
-    // TODO: support value types indirected through swift::_impl::OpaqueStorage.
-    bool isOpaqueLayout = false;
-    for (const auto *field : cxxDecl->fields()) {
-      if (field->getName() == "_storage") {
-        isOpaqueLayout = !field->getType()->isArrayType();
-        break;
-      }
-    }
-    if (isOpaqueLayout)
-      return nullptr;
-  }
 
   auto *essaAttr = cxxDecl->getAttr<clang::ExternalSourceSymbolAttr>();
   if (!essaAttr)
@@ -7751,6 +7739,7 @@ CxxRecordAsSwiftType::evaluate(Evaluator &evaluator,
     // TODO: warn about missing 'import'.
     return nullptr;
   }
+
   // FIXME: Support renamed declarations.
   auto swiftName = cxxDecl->getName();
   // FIXME: handle nested Swift types once they're supported.
@@ -7758,8 +7747,46 @@ CxxRecordAsSwiftType::evaluate(Evaluator &evaluator,
   mod->lookupValue(desc.ctx.getIdentifier(swiftName), NLKind::UnqualifiedLookup,
                    results);
   if (results.size() == 1) {
-    desc.ctx.registerExportedClangDecl(results[0], cxxDecl->getCanonicalDecl());
-    return results[0];
+    if (auto *specialization =
+            dyn_cast<clang::ClassTemplateSpecializationDecl>(cxxDecl)) {
+      llvm::SmallVector<Type, 8> GenericArgs;
+      for (auto templateArg : specialization->getTemplateArgs().asArray()) {
+        if (templateArg.getKind() != clang::TemplateArgument::Type)
+          return nullptr;
+        auto clangType = templateArg.getAsType();
+
+        if (auto recordType = clangType->getAs<clang::RecordType>()) {
+          auto convertedType =
+              evaluateOrDefault(desc.ctx.evaluator,
+                                CxxRecordAsSwiftType({recordType->getDecl(),
+                                                      desc.ctx, desc.impl}),
+                                nullptr);
+          if (convertedType) {
+            GenericArgs.push_back(convertedType);
+            continue;
+          }
+        }
+
+        auto importedType = desc.impl.importType(
+            clangType, ImportTypeKind::Abstract,
+            ImportDiagnosticAdder(desc.impl, cxxDecl, cxxDecl->getLocation()),
+            false, Bridgeability::None, ImportTypeAttrs{});
+        if (!importedType)
+          return nullptr;
+
+        GenericArgs.push_back(importedType.getType());
+      }
+      auto type = BoundGenericType::get(cast<NominalTypeDecl>(results[0]), Type(),
+                                   GenericArgs);
+      desc.ctx.registerExportedClangDecl(type, cxxDecl->getCanonicalDecl());
+      return type;
+    }
+
+    if (auto *ntd = dyn_cast<NominalTypeDecl>(results[0])) {
+      auto type = NominalType::get(ntd, Type(), desc.ctx);
+      desc.ctx.registerExportedClangDecl(type, cxxDecl->getCanonicalDecl());
+      return type;
+    }
   }
   return nullptr;
 }
@@ -7882,6 +7909,16 @@ void swift::simple_display(llvm::raw_ostream &out,
 }
 
 SourceLoc swift::extractNearestSourceLoc(CxxRecordSemanticsDescriptor desc) {
+  return SourceLoc();
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           ClangTypeToSwiftTypeDescriptor desc) {
+  out << "Converting Clang type to Swift type: '"
+      << desc.decl->getNameAsString() << "'.\n";
+}
+
+SourceLoc swift::extractNearestSourceLoc(ClangTypeToSwiftTypeDescriptor desc) {
   return SourceLoc();
 }
 

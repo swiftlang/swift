@@ -3,7 +3,7 @@
 
 // RUN: %target-swift-frontend -typecheck %t/swiftMod.swift -typecheck -module-name SwiftMod -emit-clang-header-path %t/swiftMod.h -I %t -enable-experimental-cxx-interop -Xcc -DFIRSTPASS
 
-// RUN: %target-interop-build-swift %t/swiftMod.swift -o %t/swift-execution -module-name SwiftMod -I %t -g -DSECOND_PASS -Xcc -DSWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR
+// RUN: %target-interop-build-swift %t/swiftMod.swift -o %t/swift-execution -module-name SwiftMod -I %t -g -DSECOND_PASS -Xcc -DSWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR -O
 
 // RUN: %target-codesign %t/swift-execution
 // RUN: %target-run %t/swift-execution | %FileCheck %s
@@ -17,6 +17,10 @@
 
 inline swift::String createString() {
     return swift::String("Foobar");
+}
+
+inline swift::Optional<swift::String> createOptionalString() {
+    return swift::Optional<swift::String>::some("Bar");
 }
 
 #endif
@@ -36,7 +40,10 @@ public func f() -> String? { "" }
 
 let str = createString()
 print(str)
+let opt = createOptionalString()
+print(opt)
 
 #endif
 
 // CHECK: Foobar
+// CHECK: Optional(42)
