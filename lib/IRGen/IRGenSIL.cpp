@@ -2130,11 +2130,15 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   switch (funcTy->getCoroutineKind()) {
   case SILCoroutineKind::None:
     break;
+  case SILCoroutineKind::YieldOnce2:
+    if (IGF.IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
+      LLVM_FALLTHROUGH;
+    } else {
+      emitYieldOnce2CoroutineEntry(IGF, funcTy, *emission);
+      break;
+    }
   case SILCoroutineKind::YieldOnce:
     emitYieldOnceCoroutineEntry(IGF, funcTy, *emission);
-    break;
-  case SILCoroutineKind::YieldOnce2:
-    emitYieldOnce2CoroutineEntry(IGF, funcTy, *emission);
     break;
   case SILCoroutineKind::YieldMany:
     emitYieldManyCoroutineEntry(IGF, funcTy, *emission);
@@ -3786,12 +3790,16 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   case SILCoroutineKind::None:
     break;
 
+  case SILCoroutineKind::YieldOnce2:
+    if (IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
+      LLVM_FALLTHROUGH;
+    } else {
+      // @yield_once_2 coroutines allocate in the callee
+      break;
+    }
+
   case SILCoroutineKind::YieldOnce:
     coroutineBuffer = emitAllocYieldOnceCoroutineBuffer(*this);
-    break;
-
-  case SILCoroutineKind::YieldOnce2:
-    // @yield_once_2 coroutines allocate in the callee
     break;
 
   case SILCoroutineKind::YieldMany:

@@ -3469,6 +3469,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_fragile_resilient_protocol_witnesses,
                  OPT_disable_fragile_resilient_protocol_witnesses,
                  Opts.UseFragileResilientProtocolWitnesses);
+  Opts.EmitYieldOnce2AsYieldOnce =
+      Args.hasFlag(OPT_disable_callee_allocated_single_yield_coro_abi,
+                   OPT_enable_callee_allocated_single_yield_coro_abi,
+                   Opts.EmitYieldOnce2AsYieldOnce);
   Opts.EnableHotColdSplit =
       Args.hasFlag(OPT_enable_split_cold_code,
                    OPT_disable_split_cold_code,
