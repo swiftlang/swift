@@ -158,6 +158,14 @@ struct
       __attribute__((swift_attr("returns_unretained")));
 };
 
+// C++ APIs returning FRTs but not having annotations
+struct
+    StructWithoutReturnsAnnotations {
+  static FRTStruct *_Nonnull StaticMethodReturningFRT();
+};
+
+FRTStruct *_Nonnull global_function_returning_FRT_WithoutReturnsAnnotations();
+
 struct NonFRTStruct {};
 
 // Global/free C++ functions returning non-FRT
