@@ -157,11 +157,6 @@ class LifetimeDependenceInfo {
   static std::optional<ArrayRef<LifetimeDependenceInfo>>
   fromLifetimeAttribute(AbstractFunctionDecl *afd);
 
-  /// Builds LifetimeDependenceInfo from dependsOn type modifier
-  static std::optional<LifetimeDependenceInfo>
-  fromDependsOn(AbstractFunctionDecl *afd, TypeRepr *targetRepr,
-                Type targetType, unsigned targetIndex);
-
   /// Infer LifetimeDependenceInfo on result
   static std::optional<LifetimeDependenceInfo> infer(AbstractFunctionDecl *afd);
 
