@@ -319,6 +319,9 @@ public:
       }
     }
 
+    // TODO: Diagnose if Protocol::isMarkerProtocol() - contradiction in terms
+    //       (and mangler can't handle invertible protocols with @abi)
+
     // TODO: Validate more
     // FIXME: The list of properties that have to match is practically endless
     // and will grow as new features are added to the compiler. We might want to

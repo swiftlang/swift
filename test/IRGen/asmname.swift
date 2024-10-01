@@ -1,6 +1,8 @@
-// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-feature ABIAttribute %s -emit-ir > %t.ir
+// RUN: %FileCheck --input-file %t.ir %s
+// RUN: %FileCheck --check-prefix NEGATIVE --input-file %t.ir %s
 
-// REQUIRES: CPU=i386 || CPU=x86_64
+// REQUIRES: CPU=i386 || CPU=x86_64 || CPU=arm64
 
 
 // Non-Swift _silgen_name definitions
@@ -35,7 +37,7 @@ private  func PlainPrivate()  { }
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @silgen_name_public
 // CHECK: define hidden swiftcc void @silgen_name_internal
 // CHECK: define internal swiftcc void @silgen_name_private
-// CHECK-NOT: SilgenName
+// NEGATIVE-NOT: define {{.*}}SilgenName
 
 
 // Swift cdecl definitions
@@ -52,6 +54,8 @@ private  func PlainPrivate()  { }
 // CHECK: define hidden swiftcc void @"$s7asmname13CDeclInternal
 // CHECK: define internal void @cdecl_private()
 
+
+
 // silgen_name on enum constructors
 public enum X {
 case left(Int64)
@@ -65,3 +69,43 @@ extension X {
     self = .left(blah)
   }
 }
+
+
+
+// Swift abi definitions
+
+@abi(func abi_ABIAttrPublic())   public   func api_ABIAttrPublic()   { }
+@abi(func abi_ABIAttrInternal()) internal func api_ABIAttrInternal() { }
+@abi(func abi_ABIAttrPrivate())  private  func api_ABIAttrPrivate()  { }
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s7asmname17abi_ABIAttrPublic
+// CHECK: define hidden swiftcc void @"$s7asmname19abi_ABIAttrInternal
+// CHECK: define internal swiftcc void @"$s7asmname18abi_ABIAttrPrivate
+
+@abi(var abi_ABIAttrPublic_var: Int64)   public   var api_ABIAttrPublic_var: Int64   { get { 1 } set {} }
+@abi(var abi_ABIAttrInternal_var: Int64) internal var api_ABIAttrInternal_var: Int64 { get { 1 } set {} }
+@abi(var abi_ABIAttrPrivate_var: Int64)  private  var api_ABIAttrPrivate_var: Int64  { get { 1 } set {} }
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc i64 @"$s7asmname21abi_ABIAttrPublic_vars5Int64Vvg"
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s7asmname21abi_ABIAttrPublic_vars5Int64Vvs"
+// CHECK: define hidden swiftcc i64 @"$s7asmname23abi_ABIAttrInternal_vars5Int64Vvg"
+// CHECK: define hidden swiftcc void @"$s7asmname23abi_ABIAttrInternal_vars5Int64Vvs"
+// CHECK: define internal swiftcc i64 @"$s7asmname22abi_ABIAttrPrivate_vars5Int64Vvg"
+// CHECK: define internal swiftcc void @"$s7asmname22abi_ABIAttrPrivate_vars5Int64Vvs"
+
+@abi(public func abi_ABIAttrGenericNonSendableToSendable<T>(_ value: T) -> T)
+public func api_ABIAttrGenericNonSendableToSendable<T: Sendable>(_ value: T) -> T { return value }
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s7asmname031abi_ABIAttrGenericNonSendableToF0yxxlF"
+// NEGATIVE-NOT: @"$s7asmname031abi_ABIAttrGenericNonSendableToF0yxxs0F0RzlF"
+
+// Similar to hack applied to `AsyncStream.init(unfolding:onCancel:)`
+@abi(public func abi_ABIAttrPreconcurrencyToNotPreconcurrency(_ c1: () -> Void, _ c2: @Sendable () -> Void))
+@preconcurrency public func api_ABIAttrPreconcurrencyToNotPreconcurrency(_ c1: () -> Void, _ c2: @Sendable () -> Void) {}
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s7asmname030abi_ABIAttrPreconcurrencyToNotD0yyyyXE_yyYbXEtF"
+
+extension X {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i8 } @"$s7asmname1XO8abi_blahACs5Int64V_tcfC"
+  @abi(init(abi_blah: Int64))
+  public init(api_blah: Int64) {
+    self = .left(api_blah)
+  }
+}
+// NEGATIVE-NOT: define {{.*}}api_
