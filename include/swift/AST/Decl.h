@@ -1568,6 +1568,8 @@ public:
   /// Retrieve the position of any where clause for this context's
   /// generic parameters.
   SourceRange getGenericTrailingWhereClauseSourceRange() const;
+
+  static bool classof(const Decl *D);
 };
 static_assert(sizeof(_GenericContext) + sizeof(DeclContext) ==
               sizeof(GenericContext), "Please add fields to _GenericContext");
@@ -9584,6 +9586,16 @@ inline bool DeclContext::classof(const Decl *D) {
   default: return false;
 #define DECL(ID, PARENT) // See previous line
 #define CONTEXT_DECL(ID, PARENT) \
+  case DeclKind::ID: return true;
+#include "swift/AST/DeclNodes.def"
+  }
+}
+
+inline bool GenericContext::classof(const Decl *D) {
+  switch (D->getKind()) { //
+  default: return false;
+#define DECL(ID, PARENT) // See previous line
+#define GENERIC_DECL(ID, PARENT) \
   case DeclKind::ID: return true;
 #include "swift/AST/DeclNodes.def"
   }
