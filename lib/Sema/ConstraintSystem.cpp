@@ -293,6 +293,23 @@ void ConstraintSystem::removeFix(ConstraintFix *fix) {
   Fixes.pop_back();
 }
 
+void ConstraintSystem::recordDisjunctionChoice(
+    ConstraintLocator *locator,
+    unsigned index) {
+  // We shouldn't ever register disjunction choices multiple times.
+  auto inserted = DisjunctionChoices.insert(
+      std::make_pair(locator, index));
+  if (!inserted.second) {
+    ASSERT(inserted.first->second == index);
+    return;
+  }
+
+  if (isRecordingChanges()) {
+    recordChange(SolverTrail::Change::recordedDisjunctionChoice(
+      locator, index));
+  }
+}
+
 /// Retrieve a dynamic result signature for the given declaration.
 static std::tuple<char, ObjCSelector, CanType>
 getDynamicResultSignature(ValueDecl *decl) {

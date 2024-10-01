@@ -302,7 +302,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Register the solution's disjunction choices.
   for (auto &choice : solution.DisjunctionChoices) {
-    DisjunctionChoices.insert(choice);
+    recordDisjunctionChoice(choice.first, choice.second);
   }
 
   // Remember all of the argument/parameter matching choices we made.
@@ -662,7 +662,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
-  numDisjunctionChoices = cs.DisjunctionChoices.size();
   numAppliedDisjunctions = cs.AppliedDisjunctions.size();
   numArgumentMatchingChoices = cs.argumentMatchingChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
@@ -726,9 +725,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // e.g. add retired constraints back to the circulation and remove generated
   // constraints introduced by the current scope.
   cs.solverState->rollback(this);
-
-  // Remove any disjunction choices.
-  truncate(cs.DisjunctionChoices, numDisjunctionChoices);
 
   // Remove any applied disjunctions.
   truncate(cs.AppliedDisjunctions, numAppliedDisjunctions);

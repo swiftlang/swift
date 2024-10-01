@@ -59,6 +59,8 @@ public:
     AddedFix,
     /// Recorded a fixed requirement.
     AddedFixedRequirement,
+    /// Recorded a disjunction choice.
+    RecordedDisjunctionChoice,
   };
 
   /// A change made to the constraint system.
@@ -122,6 +124,8 @@ public:
         GenericTypeParamType *GP;
         Type ReqTy;
       } FixedRequirement;
+
+      ConstraintLocator *Locator;
     };
 
     Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
@@ -168,6 +172,10 @@ public:
     static Change addedFixedRequirement(GenericTypeParamType *GP,
                                         unsigned reqKind,
                                         Type requirementTy);
+
+    /// Create a change that recorded a disjunction choice.
+    static Change recordedDisjunctionChoice(ConstraintLocator *locator,
+                                            unsigned index);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

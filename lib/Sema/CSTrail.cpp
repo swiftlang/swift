@@ -151,6 +151,16 @@ SolverTrail::Change::addedFixedRequirement(GenericTypeParamType *GP,
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::recordedDisjunctionChoice(ConstraintLocator *locator,
+                                               unsigned index) {
+  Change result;
+  result.Kind = ChangeKind::RecordedDisjunctionChoice;
+  result.Locator = locator;
+  result.Options = index;
+  return result;
+}
+
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
@@ -202,6 +212,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   case ChangeKind::AddedFixedRequirement:
     cs.removeFixedRequirement(FixedRequirement.GP, Options,
                               FixedRequirement.ReqTy);
+    break;
+
+  case ChangeKind::RecordedDisjunctionChoice:
+    cs.removeDisjunctionChoice(Locator);
     break;
   }
 }
@@ -312,6 +326,13 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << Options << " ";
     FixedRequirement.ReqTy->print(out, PO);
     out << ")\n";
+    break;
+
+  case ChangeKind::RecordedDisjunctionChoice:
+    out << "(recorded disjunction choice at ";
+    Locator->dump(&cs.getASTContext().SourceMgr, out);
+    out << " index ";
+    out << Options << ")\n";
     break;
   }
 }

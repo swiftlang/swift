@@ -2328,7 +2328,7 @@ private:
 
   /// The set of remembered disjunction choices used to reach
   /// the current constraint system.
-  llvm::MapVector<ConstraintLocator *, unsigned> DisjunctionChoices;
+  llvm::SmallDenseMap<ConstraintLocator *, unsigned, 4> DisjunctionChoices;
 
   /// A map from applied disjunction constraints to the corresponding
   /// argument function type.
@@ -2878,9 +2878,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    /// The length of \c DisjunctionChoices.
-    unsigned numDisjunctionChoices;
 
     /// The length of \c AppliedDisjunctions.
     unsigned numAppliedDisjunctions;
@@ -5319,14 +5316,15 @@ private:
   /// Collect the current inactive disjunction constraints.
   void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
 
-  /// Record a particular disjunction choice of
-  void recordDisjunctionChoice(ConstraintLocator *disjunctionLocator,
-                               unsigned index) {
-    // We shouldn't ever register disjunction choices multiple times.
-    assert(!DisjunctionChoices.count(disjunctionLocator) ||
-           DisjunctionChoices[disjunctionLocator] == index);
-    DisjunctionChoices.insert({disjunctionLocator, index});
+  /// Record a particular disjunction choice and add a change to the trail.
+  void recordDisjunctionChoice(ConstraintLocator *locator, unsigned index);
+
+  /// Undo the above change.
+  void removeDisjunctionChoice(ConstraintLocator *locator) {
+    bool erased = DisjunctionChoices.erase(locator);
+    ASSERT(erased);
   }
+
 
   /// Filter the set of disjunction terms, keeping only those where the
   /// predicate returns \c true.
