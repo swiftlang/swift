@@ -153,13 +153,6 @@ private:
   /// type variable has been bound to a valid type and solver can make progress.
   void introduceToInference(Type fixedType);
 
-  /// Opposite of \c introduceToInference(Type)
-  void retractFromInference(Type fixedType);
-
-  /// Drop all previously collected bindings and re-infer based on the
-  /// current set constraints associated with this equivalence class.
-  void resetBindingSet();
-
   /// Notify all of the type variables that have this one (or any member of
   /// its equivalence class) referenced in their fixed type.
   ///
@@ -259,8 +252,14 @@ public:
   /// Add a new constraint to the graph.
   void addConstraint(Constraint *constraint);
 
+  /// Primitive form for SolverTrail::Change::undo().
+  void addConstraint(TypeVariableType *typeVar, Constraint *constraint);
+
   /// Remove a constraint from the graph.
   void removeConstraint(Constraint *constraint);
+
+  /// Primitive form for SolverTrail::Change::undo().
+  void removeConstraint(TypeVariableType *typeVar, Constraint *constraint);
 
   /// Merge the two nodes for the two given type variables.
   ///
@@ -416,25 +415,29 @@ public:
 private:
   /// Remove the node corresponding to the given type variable.
   ///
-  /// This operation assumes that the any constraints that refer to
-  /// this type variable have been or will be removed before other
-  /// graph queries are performed.
+  /// This operation assumes that the any constraints that refer to this type
+  /// variable have been or will be removed before other graph queries are
+  /// performed.
   ///
-  /// Note that this change is not recorded and cannot be undone. Use with
-  /// caution.
+  /// Note that this it only meant to be called by SolverTrail::Change::undo().
   void removeNode(TypeVariableType *typeVar);
 
-  /// Unbind the given type variable from the given fixed type.
+  /// Remove an edge from the constraint graph.
   ///
-  /// Note that this change is not recorded and cannot be undone. Use with
-  /// caution.
-  void unbindTypeVariable(TypeVariableType *typeVar, Type fixedType);
+  ///
+  /// Note that this it only meant to be called by SolverTrail::Change::undo().
+  void unrelateTypeVariables(TypeVariableType *typeVar,
+                             TypeVariableType *otherTypeVar);
 
-  /// Retract the given type variable from inference.
+  /// Infer bindings from the given constraint.
   ///
-  /// Note that this change is not recorded and cannot be undone. Use with
-  /// caution.
-  void retractFromInference(TypeVariableType *typeVar, Type fixedType);
+  /// Note that this it only meant to be called by SolverTrail::Change::undo().
+  void inferBindings(TypeVariableType *typeVar, Constraint *constraint);
+
+  /// Retract bindings from the given constraint.
+  ///
+  /// Note that this it only meant to be called by SolverTrail::Change::undo().
+  void retractBindings(TypeVariableType *typeVar, Constraint *constraint);
 
   /// Perform edge contraction on the constraint graph, merging equivalence
   /// classes until a fixed point is reached.
