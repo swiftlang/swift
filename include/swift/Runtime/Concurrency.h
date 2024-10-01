@@ -958,6 +958,9 @@ JobPriority swift_task_getCurrentThreadPriority(void);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_startOnMainActor(AsyncTask* job);
 
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) bool swift_task_isOnMainActor();
+
 /// Donate this thread to the global executor until either the
 /// given condition returns true or we've run out of cooperative
 /// tasks to run.

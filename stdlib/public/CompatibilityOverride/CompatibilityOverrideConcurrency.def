@@ -413,6 +413,10 @@ OVERRIDE_TASK(task_startOnMainActor, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
               swift::, (AsyncTask *task), (task))
 
+OVERRIDE_TASK(task_isOnMainActor, bool,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+              swift::,,)
+
 #undef OVERRIDE
 #undef OVERRIDE_ACTOR
 #undef OVERRIDE_TASK

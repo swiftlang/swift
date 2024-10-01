@@ -25,6 +25,7 @@
 #include "Error.h"
 #include "TaskGroupPrivate.h"
 #include "TaskPrivate.h"
+#include "TaskTrackingPrivate.h"
 #include "Tracing.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/Task.h"
@@ -1745,6 +1746,21 @@ static void swift_task_startOnMainActorImpl(AsyncTask* task) {
   swift_retain(task);
   swift_job_run(task, mainExecutor);
   _swift_task_setCurrent(originalTask);
+}
+
+SWIFT_CC(swift)
+static bool swift_task_isOnMainActorImpl() {
+  // Grab the executor tracking information.
+  auto current = tasktracking::ExecutorTrackingInfo::current();
+
+  // Then if we don't have a current executor, we must be in a non-Swift
+  // Concurrency context. In that case, just check against the main thread.
+  if (!current) {
+    return Thread::onMainThread();
+  }
+
+  // Otherwise, just check if the active executor is the main executor.
+  return current->getActiveExecutor().isMainExecutor();
 }
 
 #define OVERRIDE_TASK COMPATIBILITY_OVERRIDE
