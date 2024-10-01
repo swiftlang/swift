@@ -2397,7 +2397,7 @@ private:
   llvm::SmallDenseMap<PackExpansionType *, TypeVariableType *, 4>
       OpenedPackExpansionTypes;
 
-  llvm::SmallMapVector<ConstraintLocator *, std::pair<UUID, Type>, 4>
+  llvm::SmallDenseMap<ConstraintLocator *, std::pair<UUID, Type>, 4>
       PackExpansionEnvironments;
 
   llvm::SmallMapVector<PackElementExpr *, PackExpansionExpr *, 2>
@@ -2882,9 +2882,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    /// The length of \c PackExpansionEnvironments.
-    unsigned numPackExpansionEnvironments;
 
     /// The length of \c PackEnvironments.
     unsigned numPackEnvironments;
@@ -3463,6 +3460,16 @@ public:
   /// Get the opened element generic environment for the given locator.
   GenericEnvironment *getPackElementEnvironment(ConstraintLocator *locator,
                                                 CanType shapeClass);
+
+  /// Update PackExpansionEnvironments and record a change in the trail.
+  void recordPackExpansionEnvironment(ConstraintLocator *locator,
+                                      std::pair<UUID, Type> uuidAndShape);
+
+  /// Undo the above change.
+  void removePackExpansionEnvironment(ConstraintLocator *locator) {
+    bool erased = PackExpansionEnvironments.erase(locator);
+    ASSERT(erased);
+  }
 
   /// Get the opened element generic environment for the given pack element.
   PackExpansionExpr *getPackEnvironment(PackElementExpr *packElement) const;

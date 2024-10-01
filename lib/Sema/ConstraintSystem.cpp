@@ -868,7 +868,7 @@ ConstraintSystem::getPackElementEnvironment(ConstraintLocator *locator,
   auto result = PackExpansionEnvironments.find(locator);
   if (result == PackExpansionEnvironments.end()) {
     uuidAndShape = std::make_pair(UUID::fromTime(), shapeClass);
-    PackExpansionEnvironments[locator] = uuidAndShape;
+    recordPackExpansionEnvironment(locator, uuidAndShape);
   } else {
     uuidAndShape = result->second;
   }
@@ -889,6 +889,17 @@ ConstraintSystem::getPackElementEnvironment(ConstraintLocator *locator,
   auto contextSubs = contextEnv->getForwardingSubstitutionMap();
   return GenericEnvironment::forOpenedElement(elementSig, uuidAndShape.first,
                                               shapeParam, contextSubs);
+}
+
+void ConstraintSystem::recordPackExpansionEnvironment(
+    ConstraintLocator *locator, std::pair<UUID, Type> uuidAndShape) {
+  bool inserted = PackExpansionEnvironments.insert({locator, uuidAndShape}).second;
+  if (inserted) {
+    if (isRecordingChanges()) {
+      recordChange(
+        SolverTrail::Change::recordedPackExpansionEnvironment(locator));
+    }
+  }
 }
 
 PackExpansionExpr *

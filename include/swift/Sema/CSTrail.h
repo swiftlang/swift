@@ -71,6 +71,8 @@ public:
     RecordedOpenedExistentialType,
     /// Recorded the opening of a pack existential type.
     RecordedOpenedPackExpansionType,
+    /// Recorded the creation of a generic environment for a pack expansion expression.
+    RecordedPackExpansionEnvironment,
   };
 
   /// A change made to the constraint system.
@@ -202,6 +204,9 @@ public:
 
     /// Create a change that recorded the opening of a pack expansion type.
     static Change recordedOpenedPackExpansionType(PackExpansionType *expansion);
+
+    /// Create a change that recorded the opening of a pack expansion type.
+    static Change recordedPackExpansionEnvironment(ConstraintLocator *locator);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

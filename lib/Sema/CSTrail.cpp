@@ -201,6 +201,14 @@ SolverTrail::Change::recordedOpenedPackExpansionType(PackExpansionType *expansio
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::recordedPackExpansionEnvironment(ConstraintLocator *locator) {
+  Change result;
+  result.Kind = ChangeKind::RecordedPackExpansionEnvironment;
+  result.Locator = locator;
+  return result;
+}
+
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
@@ -276,6 +284,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::RecordedOpenedPackExpansionType:
     cs.removeOpenedPackExpansionType(ExpansionTy);
+    break;
+
+  case ChangeKind::RecordedPackExpansionEnvironment:
+    cs.removePackExpansionEnvironment(Locator);
     break;
   }
 }
@@ -422,6 +434,12 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
   case ChangeKind::RecordedOpenedPackExpansionType:
     out << "(recorded opened pack expansion type for ";
     ExpansionTy->print(out, PO);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedPackExpansionEnvironment:
+    out << "(recorded pack expansion environment at ";
+    Locator->dump(&cs.getASTContext().SourceMgr, out);
     out << ")\n";
     break;
   }
