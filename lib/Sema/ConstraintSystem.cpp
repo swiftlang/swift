@@ -845,9 +845,18 @@ std::pair<Type, OpenedArchetypeType *> ConstraintSystem::openExistentialType(
     t = t->getMetatypeInstanceType();
   auto *opened = t->castTo<OpenedArchetypeType>();
 
-  assert(OpenedExistentialTypes.count(locator) == 0);
-  OpenedExistentialTypes.insert({locator, opened});
+  recordOpenedExistentialType(locator, opened);
+
   return {result, opened};
+}
+
+void ConstraintSystem::recordOpenedExistentialType(
+    ConstraintLocator *locator, OpenedArchetypeType *opened) {
+  bool inserted = OpenedExistentialTypes.insert({locator, opened}).second;
+  if (inserted) {
+    if (isRecordingChanges())
+      recordChange(SolverTrail::Change::recordedOpenedExistentialType(locator));
+  }
 }
 
 GenericEnvironment *
@@ -2740,8 +2749,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   } else if (baseObjTy->isExistentialType()) {
     auto openedArchetype =
         OpenedArchetypeType::get(baseObjTy->getCanonicalType());
-    OpenedExistentialTypes.insert(
-        {getConstraintLocator(locator), openedArchetype});
+    recordOpenedExistentialType(getConstraintLocator(locator), openedArchetype);
     baseOpenedTy = openedArchetype;
   }
 

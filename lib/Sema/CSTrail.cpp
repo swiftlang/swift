@@ -185,6 +185,14 @@ SolverTrail::Change::recordedOpenedTypes(ConstraintLocator *locator) {
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::recordedOpenedExistentialType(ConstraintLocator *locator) {
+  Change result;
+  result.Kind = ChangeKind::RecordedOpenedExistentialType;
+  result.Locator = locator;
+  return result;
+}
+
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
@@ -252,6 +260,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::RecordedOpenedTypes:
     cs.removeOpenedType(Locator);
+    break;
+
+  case ChangeKind::RecordedOpenedExistentialType:
+    cs.removeOpenedExistentialType(Locator);
     break;
   }
 }
@@ -385,6 +397,12 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
 
   case ChangeKind::RecordedOpenedTypes:
     out << "(recorded list of opened types at ";
+    Locator->dump(&cs.getASTContext().SourceMgr, out);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedOpenedExistentialType:
+    out << "(recorded opened existential type at ";
     Locator->dump(&cs.getASTContext().SourceMgr, out);
     out << ")\n";
     break;

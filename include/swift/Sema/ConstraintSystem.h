@@ -2391,7 +2391,7 @@ private:
 
   /// A mapping from constraint locators to the opened existential archetype
   /// used for the 'self' of an existential type.
-  llvm::SmallMapVector<ConstraintLocator *, OpenedArchetypeType *, 4>
+  llvm::SmallDenseMap<ConstraintLocator *, OpenedArchetypeType *, 4>
       OpenedExistentialTypes;
 
   llvm::SmallMapVector<PackExpansionType *, TypeVariableType *, 4>
@@ -2882,9 +2882,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    /// The length of \c OpenedExistentialTypes.
-    unsigned numOpenedExistentialTypes;
 
     /// The length of \c OpenedPackExpansionsTypes.
     unsigned numOpenedPackExpansionTypes;
@@ -3455,6 +3452,16 @@ public:
   /// constraint system and returning both it and the root opened archetype.
   std::pair<Type, OpenedArchetypeType *> openExistentialType(
       Type type, ConstraintLocator *locator);
+
+  /// Update OpenedExistentials and record a change in the trail.
+  void recordOpenedExistentialType(ConstraintLocator *locator,
+                                   OpenedArchetypeType *opened);
+
+  /// Undo the above change.
+  void removeOpenedExistentialType(ConstraintLocator *locator) {
+    bool erased = OpenedExistentialTypes.erase(locator);
+    ASSERT(erased);
+  }
 
   /// Get the opened element generic environment for the given locator.
   GenericEnvironment *getPackElementEnvironment(ConstraintLocator *locator,
