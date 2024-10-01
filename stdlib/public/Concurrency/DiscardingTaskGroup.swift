@@ -67,7 +67,7 @@ import Swift
 ///
 /// - SeeAlso: ``withThrowingDiscardingTaskGroup(returning:body:)``
 @available(SwiftStdlib 5.9, *)
-#if !$Embedded
+#if !hasFeature(Embedded)
 @backDeployed(before: SwiftStdlib 6.0)
 #endif
 @inlinable
@@ -611,7 +611,7 @@ extension DiscardingTaskGroup: Sendable { }
 /// }
 /// ```
 @available(SwiftStdlib 5.9, *)
-#if !$Embedded
+#if !hasFeature(Embedded)
 @backDeployed(before: SwiftStdlib 6.0)
 #endif
 @inlinable
