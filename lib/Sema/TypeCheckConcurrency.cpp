@@ -3758,6 +3758,14 @@ namespace {
       if (!unsatisfiedIsolation)
         return false;
 
+      // Record whether the callee isolation or the context isolation
+      // is preconcurrency, which is used later to downgrade errors to
+      // warnings in minimal checking.
+      bool preconcurrency = getContextIsolation().preconcurrency() ||
+          (calleeDecl && getActorIsolation(calleeDecl).preconcurrency());
+      unsatisfiedIsolation =
+          unsatisfiedIsolation->withPreconcurrency(preconcurrency);
+
       bool onlyArgsCrossIsolation = callOptions.contains(
           ActorReferenceResult::Flags::OnlyArgsCrossIsolation);
       if (!onlyArgsCrossIsolation &&
@@ -3775,63 +3783,41 @@ namespace {
       // If we need to mark the call as implicitly asynchronous, make sure
       // we're in an asynchronous context.
       if (requiresAsync && !getDeclContext()->isAsyncContext()) {
+        auto diagnostic = calleeDecl ?
+          Diagnostic(
+            /*id*/diag::actor_isolated_call_decl,
+            /*args*/*unsatisfiedIsolation, calleeDecl, getContextIsolation()
+          ) :
+          Diagnostic(
+            /*id*/diag::actor_isolated_call,
+            /*args*/*unsatisfiedIsolation, getContextIsolation()
+          );
 
         if (ctx.LangOpts.hasFeature(Feature::GroupActorErrors)) {
-
-          IsolationError mismatch([calleeDecl, apply, unsatisfiedIsolation, getContextIsolation]() {
-            if (calleeDecl) {
-              auto preconcurrency = getContextIsolation().preconcurrency() || 
-                getActorIsolation(calleeDecl).preconcurrency();
-
-              return IsolationError(
-                             apply->getLoc(),
-                             preconcurrency,
-                             Diagnostic(diag::actor_isolated_call_decl,
-                                        *unsatisfiedIsolation,
-                                        calleeDecl,
-                                        getContextIsolation()));
-            } else {
-              return IsolationError(
-                             apply->getLoc(),
-                             getContextIsolation().preconcurrency(),
-                             Diagnostic(diag::actor_isolated_call,
-                                        *unsatisfiedIsolation,
-                                        getContextIsolation()));
-            }
-          }());
-
-          auto iter = applyErrors.find(std::make_pair(*unsatisfiedIsolation, getContextIsolation()));
-          if (iter != applyErrors.end()){
-            iter->second.push_back((mismatch));
-          } else {
-            DiagnosticList list;
-            list.push_back((mismatch));
-            auto keyPair = std::make_pair(*unsatisfiedIsolation, getContextIsolation());
-            applyErrors.insert(std::make_pair(keyPair, list));
+          IsolationError mismatch(apply->getLoc(), preconcurrency, diagnostic);
+          auto key = std::make_pair(
+              unsatisfiedIsolation->withPreconcurrency(false),
+              getContextIsolation());
+          if (applyErrors.find(key) == applyErrors.end()) {
+            applyErrors.insert(std::make_pair(key, DiagnosticList()));
           }
+
+          applyErrors[key].push_back(mismatch);
         } else {
+          ctx.Diags.diagnose(
+            apply->getLoc(),
+            diagnostic.getID(),
+            diagnostic.getArgs())
+              .warnUntilSwiftVersionIf(preconcurrency, 6);
+
           if (calleeDecl) {
             auto calleeIsolation = getInferredActorIsolation(calleeDecl);
-            auto preconcurrency = getContextIsolation().preconcurrency() ||
-                calleeIsolation.preconcurrency();
-
-            ctx.Diags.diagnose(
-              apply->getLoc(), diag::actor_isolated_call_decl,
-              *unsatisfiedIsolation,
-              calleeDecl,
-              getContextIsolation())
-                .warnUntilSwiftVersionIf(preconcurrency, 6);
             calleeDecl->diagnose(diag::actor_isolated_sync_func, calleeDecl);
             if (auto source = calleeIsolation.source.isInferred()) {
               calleeDecl->diagnose(diag::actor_isolation_source,
                                    calleeIsolation.isolation,
                                    calleeIsolation.source);
             }
-          } else {
-            ctx.Diags.diagnose(
-                               apply->getLoc(), diag::actor_isolated_call, *unsatisfiedIsolation,
-                               getContextIsolation())
-            .warnUntilSwiftVersionIf(getContextIsolation().preconcurrency(), 6);
           }
 
           if (unsatisfiedIsolation->isGlobalActor()) {
@@ -5962,10 +5948,12 @@ DefaultInitializerIsolation::evaluate(Evaluator &evaluator,
   auto requiredIsolation = checker.computeRequiredIsolation(initExpr);
   if (requiredIsolation.isActorIsolated()) {
     if (enclosingIsolation != requiredIsolation) {
+      bool preconcurrency =
+          !isa<ParamDecl>(var) || requiredIsolation.preconcurrency();
       var->diagnose(
           diag::isolated_default_argument_context,
           requiredIsolation, enclosingIsolation)
-        .warnUntilSwiftVersionIf(!isa<ParamDecl>(var), 6);
+        .warnUntilSwiftVersionIf(preconcurrency, 6);
       return ActorIsolation::forUnspecified();
     }
   }
