@@ -5138,16 +5138,23 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
   llvm_unreachable("bad attribute kind");
 }
 
-static ParsedLifetimeDependenceKind getSILLifetimeDependenceKind(const Token &T) {
-  if (T.isContextualKeyword("_inherit")) {
-    return ParsedLifetimeDependenceKind::Inherit;
-  }
-  assert(T.isContextualKeyword("_scope"));
-  return ParsedLifetimeDependenceKind::Scope;
-}
-
 ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
   ParserStatus status;
+
+  auto getLifetimeDependenceKind =
+      [&](Token Tok) -> std::optional<ParsedLifetimeDependenceKind> {
+    if (Tok.isContextualKeyword("copy") &&
+        peekToken().isAny(tok::identifier, tok::integer_literal,
+                          tok::kw_self)) {
+      return ParsedLifetimeDependenceKind::Inherit;
+    }
+    if (Tok.isContextualKeyword("borrow") &&
+        peekToken().isAny(tok::identifier, tok::integer_literal,
+                          tok::kw_self)) {
+      return ParsedLifetimeDependenceKind::Scope;
+    }
+    return std::nullopt;
+  };
 
   if (!Tok.isFollowingLParen()) {
     diagnose(loc, diag::expected_lparen_after_lifetime_dependence);
@@ -5176,13 +5183,14 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
       diag::expected_rparen_after_lifetime_dependence, [&]() -> ParserStatus {
         ParserStatus listStatus;
         foundParamId = true;
+
         auto lifetimeDependenceKind = ParsedLifetimeDependenceKind::Default;
-        if (Tok.isContextualKeyword("borrow") &&
-            peekToken().isAny(tok::identifier, tok::integer_literal,
-                              tok::kw_self)) {
-          lifetimeDependenceKind = ParsedLifetimeDependenceKind::Scope;
+        auto result = getLifetimeDependenceKind(Tok);
+        if (result.has_value()) {
+          lifetimeDependenceKind = *result;
           consumeToken();
         }
+
         auto sourceDescriptor =
             parseLifetimeDescriptor(*this, lifetimeDependenceKind);
         if (!sourceDescriptor) {
@@ -5462,7 +5470,6 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
   PatternBindingInitializer *initContext = nullptr;
   auto &Tok = P.Tok;
   while (P.isParameterSpecifier()) {
-
     if (Tok.isContextualKeyword("isolated")) {
       Tok.setKind(tok::contextual_keyword);
       auto kwLoc = P.consumeToken();
@@ -5506,13 +5513,14 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       continue;
     }
 
-    if (P.isLifetimeDependenceToken()) {
+    if (P.isSILLifetimeDependenceToken()) {
       if (!P.Context.LangOpts.hasFeature(Feature::NonescapableTypes)) {
         P.diagnose(Tok, diag::requires_experimental_feature,
                    "lifetime dependence specifier", false,
                    getFeatureName(Feature::NonescapableTypes));
       }
-      auto loc = P.consumeToken();
+      P.consumeToken(); // consume '@'
+      auto loc = P.consumeToken(); // consume 'lifetime'
       auto result = P.parseLifetimeEntry(loc);
       if (result.isNull()) {
         status |= result;

@@ -1201,6 +1201,9 @@ public:
 
   bool isParameterSpecifier() {
     if (Tok.is(tok::kw_inout)) return true;
+    if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
+        isSILLifetimeDependenceToken())
+      return true;
     if (!canHaveParameterSpecifierContextualKeyword()) return false;
     if (Tok.isContextualKeyword("__shared") ||
         Tok.isContextualKeyword("__owned") ||
@@ -1212,9 +1215,6 @@ public:
     if (Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
         Tok.isContextualKeyword("sending"))
       return true;
-    if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
-        isLifetimeDependenceToken())
-      return true;
     return false;
   }
 
@@ -1225,9 +1225,9 @@ public:
     consumeToken();
   }
 
-  bool isLifetimeDependenceToken() {
-    return isInSILMode() && (Tok.isContextualKeyword("_inherit") ||
-                             Tok.isContextualKeyword("_scope"));
+  bool isSILLifetimeDependenceToken() {
+    return isInSILMode() && Tok.is(tok::at_sign) &&
+           (peekToken().isContextualKeyword("lifetime"));
   }
 
   bool canHaveParameterSpecifierContextualKeyword() {
@@ -1248,7 +1248,7 @@ public:
         return true;
     }
 
-    return isLifetimeDependenceToken();
+    return false;
   }
 
   bool parseConventionAttributeInternal(SourceLoc atLoc, SourceLoc attrLoc,
