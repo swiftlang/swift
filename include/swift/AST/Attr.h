@@ -2640,25 +2640,20 @@ public:
   }
 };
 
-class LifetimeAttr final
-    : public DeclAttribute,
-      private llvm::TrailingObjects<LifetimeAttr, LifetimeEntry> {
+class LifetimeAttr final : public DeclAttribute {
+  LifetimeEntry *entry;
 
-  friend TrailingObjects;
-
-  unsigned NumEntries = 0;
-
-  explicit LifetimeAttr(SourceLoc atLoc, SourceRange baseRange, bool implicit,
-                        ArrayRef<LifetimeEntry> entries);
+  LifetimeAttr(SourceLoc atLoc, SourceRange baseRange, bool implicit,
+               LifetimeEntry *entry)
+      : DeclAttribute(DeclAttrKind::Lifetime, atLoc, baseRange, implicit),
+        entry(entry) {}
 
 public:
   static LifetimeAttr *create(ASTContext &context, SourceLoc atLoc,
                               SourceRange baseRange, bool implicit,
-                              ArrayRef<LifetimeEntry> entries);
+                              LifetimeEntry *entry);
 
-  ArrayRef<LifetimeEntry> getLifetimeEntries() const {
-    return {getTrailingObjects<LifetimeEntry>(), NumEntries};
-  }
+  LifetimeEntry *getLifetimeEntry() const { return entry; }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Lifetime;

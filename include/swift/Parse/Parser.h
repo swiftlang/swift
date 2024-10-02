@@ -1166,6 +1166,10 @@ public:
   ParserResult<LifetimeAttr> parseLifetimeAttribute(SourceLoc AtLoc,
                                                     SourceLoc Loc);
 
+  /// Common utility to parse swift @lifetime decl attribute and SIL @lifetime
+  /// type modifier.
+  ParserResult<LifetimeEntry> parseLifetimeEntry(SourceLoc loc);
+
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                   SourceLoc AtEndLoc,
@@ -1250,9 +1254,6 @@ public:
   bool parseConventionAttributeInternal(SourceLoc atLoc, SourceLoc attrLoc,
                                         ConventionTypeAttr *&result,
                                         bool justChecking);
-
-  ParserStatus
-  parseLifetimeEntries(SmallVectorImpl<LifetimeEntry> &specifierList);
 
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
@@ -1455,7 +1456,7 @@ public:
     SourceLoc ConstLoc;
     SourceLoc SendingLoc;
     SmallVector<TypeOrCustomAttr> Attributes;
-    SmallVector<LifetimeEntry> lifetimeEntries;
+    LifetimeEntry *lifetimeEntry = nullptr;
 
     ParsedTypeAttributeList(ParseTypeReason reason) : ParseReason(reason) {}
 

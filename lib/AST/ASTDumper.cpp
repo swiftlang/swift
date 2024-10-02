@@ -3576,13 +3576,12 @@ public:
   void visitLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *T,
                                       StringRef label) {
     printCommon("type_lifetime_dependent_return", label);
-    for (auto &dep : T->getLifetimeDependencies()) {
-      printFieldRaw(
-          [&](raw_ostream &out) {
-            out << " " << dep.getDependsOnString() << " ";
-          },
-          "");
-    }
+
+    printFieldRaw(
+        [&](raw_ostream &out) {
+          out << " " << T->getLifetimeEntry()->getString() << " ";
+        },
+        "");
     printRec(T->getBase());
     printFoot();
   }
