@@ -56,20 +56,20 @@ class SILArgument : public ValueBase {
   friend class SILBasicBlock;
 
   SILBasicBlock *parentBlock;
-  const ValueDecl *decl;
+  ValueDecl *decl;
   USE_SHARED_UINT8;
 
 protected:
   SILArgument(ValueKind subClassKind, SILBasicBlock *inputParentBlock,
               SILType type, ValueOwnershipKind ownershipKind,
-              const ValueDecl *inputDecl = nullptr, bool reborrow = false,
+              ValueDecl *inputDecl = nullptr, bool reborrow = false,
               bool pointerEscape = false);
 
   // A special constructor, only intended for use in
   // SILBasicBlock::replacePHIArg and replaceFunctionArg.
   explicit SILArgument(ValueKind subClassKind, SILType type,
                        ValueOwnershipKind ownershipKind,
-                       const ValueDecl *inputDecl = nullptr,
+                       ValueDecl *inputDecl = nullptr,
                        bool reborrow = false, bool pointerEscape = false)
       : ValueBase(subClassKind, type), parentBlock(nullptr), decl(inputDecl) {
     sharedUInt8().SILArgument.valueOwnershipKind = uint8_t(ownershipKind);
@@ -137,7 +137,7 @@ public:
 
   SILModule &getModule() const;
 
-  const ValueDecl *getDecl() const { return decl; }
+  ValueDecl *getDecl() const { return decl; }
 
   static bool classof(const SILInstruction *) = delete;
   static bool classof(const SILUndef *) = delete;
@@ -246,7 +246,7 @@ class SILPhiArgument : public SILArgument {
 
   SILPhiArgument(SILBasicBlock *parentBlock, SILType type,
                  ValueOwnershipKind ownershipKind,
-                 const ValueDecl *decl = nullptr, bool isReborrow = false,
+                 ValueDecl *decl = nullptr, bool isReborrow = false,
                  bool hasPointerEscape = false)
       : SILArgument(ValueKind::SILPhiArgument, parentBlock, type, ownershipKind,
                     decl, isReborrow, hasPointerEscape) {}
@@ -254,7 +254,7 @@ class SILPhiArgument : public SILArgument {
   // A special constructor, only intended for use in
   // SILBasicBlock::replacePHIArg.
   explicit SILPhiArgument(SILType type, ValueOwnershipKind ownershipKind,
-                          const ValueDecl *decl = nullptr,
+                          ValueDecl *decl = nullptr,
                           bool isReborrow = false,
                           bool hasPointerEscape = false)
       : SILArgument(ValueKind::SILPhiArgument, type, ownershipKind, decl,
@@ -363,7 +363,7 @@ class SILFunctionArgument : public SILArgument {
 
   SILFunctionArgument(
       SILBasicBlock *parentBlock, SILType type,
-      ValueOwnershipKind ownershipKind, const ValueDecl *decl = nullptr,
+      ValueOwnershipKind ownershipKind, ValueDecl *decl = nullptr,
       bool isNoImplicitCopy = false,
       LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None,
       bool isCapture = false, bool isParameterPack = false)
@@ -378,7 +378,7 @@ class SILFunctionArgument : public SILArgument {
   // A special constructor, only intended for use in
   // SILBasicBlock::replaceFunctionArg.
   explicit SILFunctionArgument(SILType type, ValueOwnershipKind ownershipKind,
-                               const ValueDecl *decl = nullptr)
+                               ValueDecl *decl = nullptr)
       : SILArgument(ValueKind::SILFunctionArgument, type, ownershipKind, decl) {
   }
 

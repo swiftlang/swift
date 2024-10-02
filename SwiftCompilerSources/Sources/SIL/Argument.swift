@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import Basic
+import AST
 import SILBridging
 
 /// A basic block argument.
@@ -31,9 +32,9 @@ public class Argument : Value, Hashable {
 
   public var isReborrow: Bool { bridged.isReborrow() }
 
-  public var varDecl: VarDecl? { VarDecl(bridged: bridged.getVarDecl()) }
+  public var varDecl: VarDecl? { bridged.getVarDecl().getAs(VarDecl.self) }
 
-  public var sourceLoc: SourceLoc? { varDecl?.sourceLoc }
+  public var sourceLoc: SourceLoc? { varDecl?.nameLoc }
 
   public static func ==(lhs: Argument, rhs: Argument) -> Bool {
     lhs === rhs
@@ -295,8 +296,7 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
   }
 
   public var description: String {
-    let origTy = convention.bridgedFunctionType
-    var str = String(taking: origTy.getDebugDescription())
+    var str = convention.functionType.description
     for idx in startIndex..<indirectSILResultCount {
       str += "\n[\(idx)]  indirect result: " + self[idx].description
     }
@@ -348,8 +348,7 @@ public struct YieldConventions : Collection, CustomStringConvertible {
   }
 
   public var description: String {
-    var str = String(
-      taking: convention.bridgedFunctionType.getDebugDescription())
+    var str = convention.functionType.description
     yields.forEach {
       str += "\n      yield: " + $0.description
     }

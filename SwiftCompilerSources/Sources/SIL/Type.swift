@@ -11,8 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 import Basic
+import AST
 import SILBridging
 
+/// A Swift type that has been lowered to a SIL representation type.
+/// A `SIL.Type` is basically an `AST.CanonicalType` with the distinction between "object" and "address" type
+/// (`*T` is the type of an address pointing at T).
+/// Note that not all `CanonicalType`s can be represented as a `SIL.Type`.
 public struct Type : CustomStringConvertible, NoReflectionChildren {
   public let bridged: BridgedType
 
@@ -21,6 +26,8 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
 
   public var addressType: Type { bridged.getAddressType().type }
   public var objectType: Type { bridged.getObjectType().type }
+
+  public var canonicalASTType: CanonicalType { CanonicalType(bridged: bridged.getCanType()) }
 
   public func isTrivial(in function: Function) -> Bool {
     return bridged.isTrivial(function.bridged)
@@ -49,7 +56,6 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
 
   public var hasArchetype: Bool { bridged.hasArchetype() }
 
-  public var isNominal: Bool { bridged.isNominalOrBoundGenericNominal() }
   public var isClass: Bool { bridged.isClassOrBoundGenericClass() }
   public var isStruct: Bool { bridged.isStructOrBoundGenericStruct() }
   public var isTuple: Bool { bridged.isTuple() }
@@ -76,8 +82,8 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   }
 
   /// Can only be used if the type is in fact a nominal type (`isNominal` is true).
-  public var nominal: NominalTypeDecl {
-    NominalTypeDecl(_bridged: bridged.getNominalOrBoundGenericNominal())
+  public var nominal: NominalTypeDecl? {
+    bridged.getNominalOrBoundGenericNominal().getAs(NominalTypeDecl.self)
   }
 
   public var superClassType: Type? {
@@ -124,7 +130,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   /// Returns nil if the nominal is a resilient type because in this case the complete list
   /// of fields is not known.
   public func getNominalFields(in function: Function) -> NominalFieldsArray? {
-    if nominal.isResilient(in: function) {
+    if nominal!.isResilient(in: function) {
       return nil
     }
     return NominalFieldsArray(type: self, function: function)
@@ -134,7 +140,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   /// Returns nil if the enum is a resilient type because in this case the complete list
   /// of cases is not known.
   public func getEnumCases(in function: Function) -> EnumCases? {
-    if nominal.isResilient(in: function) {
+    if nominal!.isResilient(in: function) {
       return nil
     }
     return EnumCases(enumType: self, function: function)

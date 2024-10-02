@@ -136,7 +136,7 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
         }
       case let sea as StructElementAddrInst:
         let structType = sea.struct.type
-        if structType.nominal.name == "_SwiftArrayBodyStorage" {
+        if structType.nominal!.name == "_SwiftArrayBodyStorage" {
           guard let fields = structType.getNominalFields(in: parentFunction) else {
             return false
           }
@@ -154,7 +154,7 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
         addr = sea.struct
       case let rea as RefElementAddrInst:
         let classType = rea.instance.type
-        switch classType.nominal.name {
+        switch classType.nominal!.name {
         case "__RawDictionaryStorage",
               "__RawSetStorage":
           // For Dictionary and Set we support "count" and "capacity".

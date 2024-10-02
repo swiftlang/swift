@@ -1719,9 +1719,9 @@ public:
           requirement.getAssociatedRequirement());
 
 #ifndef NDEBUG
-      assert(entry.getKind() == SILWitnessTable::AssociatedTypeProtocol
+      assert(entry.getKind() == SILWitnessTable::AssociatedConformance
              && "sil witness table does not match protocol");
-      auto associatedWitness = entry.getAssociatedTypeProtocolWitness();
+      auto associatedWitness = entry.getAssociatedConformanceWitness();
       assert(associatedWitness.Requirement == requirement.getAssociation()
              && "sil witness table does not match protocol");
       assert(associatedWitness.Protocol ==
@@ -1952,8 +1952,8 @@ void ResilientWitnessTableBuilder::collectResilientWitnesses(
     }
 
     // Associated conformance access function.
-    if (entry.getKind() == SILWitnessTable::AssociatedTypeProtocol) {
-      const auto &witness = entry.getAssociatedTypeProtocolWitness();
+    if (entry.getKind() == SILWitnessTable::AssociatedConformance) {
+      const auto &witness = entry.getAssociatedConformanceWitness();
 
       auto associate =
         ConformanceInContext.getAssociatedType(
@@ -2265,9 +2265,9 @@ namespace {
             IGM.getAddrOfLLVMVariableOrGOTEquivalent(
               LinkEntity::forAssociatedTypeDescriptor(assocType));
           B.addRelativeAddress(assocTypeDescriptor);
-        } else if (entry.getKind() == SILWitnessTable::AssociatedTypeProtocol) {
+        } else if (entry.getKind() == SILWitnessTable::AssociatedConformance) {
           // Associated conformance descriptor.
-          const auto &witness = entry.getAssociatedTypeProtocolWitness();
+          const auto &witness = entry.getAssociatedConformanceWitness();
 
           AssociatedConformance requirement(SILWT->getProtocol(),
                                             witness.Requirement,
@@ -2538,7 +2538,7 @@ static bool isConstantWitnessTable(SILWitnessTable *wt) {
       continue;
 
     case SILWitnessTable::AssociatedType:
-    case SILWitnessTable::AssociatedTypeProtocol:
+    case SILWitnessTable::AssociatedConformance:
       // Associated types and conformances are cached in the witness table.
       // FIXME: If we start emitting constant references to here,
       // we will need to ask the witness table builder for this information.

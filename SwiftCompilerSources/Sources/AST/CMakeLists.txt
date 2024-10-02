@@ -1,14 +1,17 @@
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
-# NOTE: Subdirectories must be added in dependency order.
-
-add_subdirectory(Basic)
-add_subdirectory(AST)
-add_subdirectory(SIL)
-add_subdirectory(Optimizer)
+add_swift_compiler_module(AST
+  DEPENDS
+    Basic
+  SOURCES
+    Declarations.swift
+    Conformance.swift
+    Registration.swift
+    SubstitutionMap.swift
+    Type.swift)

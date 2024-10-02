@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import Basic
+import AST
 import SILBridging
 
 //===----------------------------------------------------------------------===//
@@ -391,22 +392,6 @@ final public class HopToExecutorInst : Instruction, UnaryInstruction {}
 
 final public class FixLifetimeInst : Instruction, UnaryInstruction {}
 
-// VarDecl is a struct wrapper around a C++ VarDecl pointer. This insulates the Swift interface from the C++ interface and avoids the need to fake a Swift class. When the AST exposes VarDecl, then this can be replaced whenever it is convenient.
-public struct VarDecl {
-  var bridged: BridgedVarDecl
-  
-  public init?(bridged: BridgedNullableVarDecl) {
-    guard let decl = bridged.raw else { return nil }
-    self.bridged = BridgedVarDecl(raw: decl)
-  }
-
-  public var sourceLoc: SourceLoc? {
-    return SourceLoc(bridged: bridged.getSourceLocation())
-  }
-
-  public var userFacingName: String { String(bridged.getUserFacingName()) }
-}
-
 // See C++ VarDeclCarryingInst
 public protocol VarDeclInstruction {
   var varDecl: VarDecl? { get }
@@ -429,7 +414,7 @@ public protocol MetaInstruction: Instruction {}
 
 final public class DebugValueInst : Instruction, UnaryInstruction, DebugVariableInstruction, MetaInstruction {
   public var varDecl: VarDecl? {
-    VarDecl(bridged: bridged.DebugValue_getDecl())
+    bridged.DebugValue_getDecl().getAs(VarDecl.self)
   }
 
   public var debugVariable: DebugVariable {
@@ -670,12 +655,12 @@ final public
 class InitExistentialRefInst : SingleValueInstruction, UnaryInstruction {
   public var instance: Value { operand.value }
 
-  public var conformances: ProtocolConformanceArray {
-    ProtocolConformanceArray(bridged: bridged.InitExistentialRefInst_getConformances())
+  public var conformances: ConformanceArray {
+    ConformanceArray(bridged: bridged.InitExistentialRefInst_getConformances())
   }
 
-  public var formalConcreteType: BridgedASTType {
-    bridged.InitExistentialRefInst_getFormalConcreteType()
+  public var formalConcreteType: CanonicalType {
+    CanonicalType(bridged: bridged.InitExistentialRefInst_getFormalConcreteType())
   }
 }
 
@@ -727,8 +712,8 @@ class ExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {}
 final public class ObjCProtocolInst : SingleValueInstruction {}
 
 final public class TypeValueInst: SingleValueInstruction, UnaryInstruction {
-  public var paramType: BridgedASTType {
-    bridged.TypeValueInst_getParamType()
+  public var paramType: CanonicalType {
+    CanonicalType(bridged: bridged.TypeValueInst_getParamType())
   }
 
   public var value: Int {
@@ -763,7 +748,7 @@ final public class PreviousDynamicFunctionRefInst : FunctionRefBaseInst {
 
 final public class GlobalAddrInst : GlobalAccessInstruction, VarDeclInstruction {
   public var varDecl: VarDecl? {
-    VarDecl(bridged: bridged.GlobalAddr_getDecl())
+    bridged.GlobalAddr_getDecl().getAs(VarDecl.self)
   }
 
   public var dependencyToken: Value? {
@@ -890,7 +875,7 @@ final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction
   public var isImmutable: Bool { bridged.RefElementAddrInst_isImmutable() }
   
   public var varDecl: VarDecl? {
-    VarDecl(bridged: bridged.RefElementAddr_getDecl())
+    bridged.RefElementAddr_getDecl().getAs(VarDecl.self)
   }
 }
 
@@ -1167,7 +1152,7 @@ final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVar
   public var hasDynamicLifetime: Bool { bridged.AllocStackInst_hasDynamicLifetime() }
 
   public var varDecl: VarDecl? {
-    VarDecl(bridged: bridged.AllocStack_getDecl())
+    bridged.AllocStack_getDecl().getAs(VarDecl.self)
   }
 
   public var debugVariable: DebugVariable {
@@ -1214,7 +1199,7 @@ final public class AllocRefDynamicInst : AllocRefInstBase {
 final public class AllocBoxInst : SingleValueInstruction, Allocation, DebugVariableInstruction {
 
   public var varDecl: VarDecl? {
-    VarDecl(bridged: bridged.AllocBox_getDecl())
+    bridged.AllocBox_getDecl().getAs(VarDecl.self)
   }
 
   public var debugVariable: DebugVariable {

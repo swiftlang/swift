@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SILBridging
 
 /// Argument conventions indexed on an apply's operand.
@@ -284,9 +285,12 @@ extension ApplySite {
 }
 
 extension ApplySite {
-  private var functionConvention: FunctionConvention {
-    FunctionConvention(for: bridged.ApplySite_getSubstitutedCalleeType(),
-                       in: parentFunction)
+  public var functionConvention: FunctionConvention {
+    FunctionConvention(for: substitutedCalleeType, in: parentFunction)
+  }
+
+  public var substitutedCalleeType: CanonicalType {
+    CanonicalType(bridged: bridged.ApplySite_getSubstitutedCalleeType())
   }
 }
 

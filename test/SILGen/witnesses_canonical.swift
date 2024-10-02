@@ -26,7 +26,7 @@ protocol CT : ST, _CDT {
 }
 
 // CHECK: sil_witness_table hidden <T where T : _CDT> _S<T>: CT module witnesses_canonical {
-// associated_type_protocol (_SS: _CDT): _S<_S<T>>: specialize <T = _S<T>> (<T where T : _CDT> _S<T>: _CDT module witnesses_canonical)
+// associated_conformance (_SS: _CDT): _S<_S<T>>: specialize <T = _S<T>> (<T where T : _CDT> _S<T>: _CDT module witnesses_canonical)
 
 // rdar://problem/21599502 -- make sure we get requirements on
 // associated types from protocols we inherit.
@@ -52,7 +52,7 @@ struct XQ3 : Q3 {
 }
 
 // CHECK: sil_witness_table hidden XQ3: Q3 module witnesses_canonical {
-// CHECK:  associated_type_protocol (Assoc: P1): XP: P1 module witnesses_canonical
-// CHECK:  associated_type_protocol (Assoc: P2): XP: P2 module witnesses_canonical
+// CHECK:  associated_conformance (Assoc: P1): XP: P1 module witnesses_canonical
+// CHECK:  associated_conformance (Assoc: P2): XP: P2 module witnesses_canonical
 // CHECK:  associated_type Assoc: XP
 // CHECK: }

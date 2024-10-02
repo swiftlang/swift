@@ -13,7 +13,7 @@
 import SIL
 import OptimizerBridging
 
-public struct DominatorTree {
+struct DominatorTree {
   let bridged: BridgedDomTree
 }
 
