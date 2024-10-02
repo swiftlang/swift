@@ -76,8 +76,10 @@ public:
     /// Recorded the mapping from a pack element expression to its parent
     /// pack expansion expression.
     RecordedPackEnvironment,
-    /// Record a defaulted constraint at a locator.
+    /// Recorded a defaulted constraint at a locator.
     RecordedDefaultedConstraint,
+    /// Recorded an assignment of a type to an AST node.
+    RecordedNodeType,
   };
 
   /// A change made to the constraint system.
@@ -141,6 +143,11 @@ public:
         GenericTypeParamType *GP;
         Type ReqTy;
       } FixedRequirement;
+
+      struct {
+        ASTNode Node;
+        Type OldType;
+      } Node;
 
       ConstraintLocator *Locator;
       PackExpansionType *ExpansionTy;
@@ -220,6 +227,9 @@ public:
 
     /// Create a change that recorded a defaulted constraint at a locator.
     static Change recordedDefaultedConstraint(ConstraintLocator *locator);
+
+    /// Create a change that recorded an assignment of a type to an AST node.
+    static Change recordedNodeType(ASTNode node, Type oldType);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.
