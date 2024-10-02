@@ -14,11 +14,10 @@ import ASTBridging
 import BasicBridging
 @_spi(PluginMessage) @_spi(ExperimentalLanguageFeature) import SwiftCompilerPluginMessageHandling
 import SwiftDiagnostics
-import SwiftOperators
 import SwiftParser
 import SwiftSyntax
-import SwiftSyntaxBuilder
 @_spi(ExperimentalLanguageFeature) @_spi(Compiler) import SwiftSyntaxMacroExpansion
+import swiftASTGen
 
 struct ExportedExternalMacro {
   var moduleName: String
@@ -209,7 +208,7 @@ func checkMacroDefinition(
   numGenericReplacementsPtr: UnsafeMutablePointer<Int>
 ) -> Int {
   // Assert "out" parameters are initialized.
-  assert(externalMacroOutPtr.pointee.isEmptyInitialized)
+  assert(externalMacroOutPtr.pointee.isEmpty)
   assert(replacementsPtr.pointee == nil && numReplacementsPtr.pointee == 0)
 
   // Parse 'macro' decl.
@@ -433,7 +432,7 @@ func expandFreestandingMacro(
   expandedSourceOutPtr: UnsafeMutablePointer<BridgedStringRef>
 ) -> Int {
   // We didn't expand anything so far.
-  assert(expandedSourceOutPtr.pointee.isEmptyInitialized)
+  assert(expandedSourceOutPtr.pointee.isEmpty)
 
   guard let sourceLocationPtr = sourceLocationPtr else {
     print("NULL source location")
@@ -557,67 +556,6 @@ func expandFreestandingMacroImpl(
   }
 }
 
-/// Retrieve a syntax node in the given source file, with the given type.
-func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
-  sourceFilePtr: UnsafeRawPointer,
-  sourceLocationPtr: UnsafePointer<UInt8>?,
-  type: Node.Type,
-  wantOutermost: Bool = false
-) -> Node? {
-  guard let sourceLocationPtr = sourceLocationPtr else {
-    return nil
-  }
-
-  let sourceFilePtr = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
-
-  // Find the offset.
-  let buffer = sourceFilePtr.pointee.buffer
-  let offset = sourceLocationPtr - buffer.baseAddress!
-  if offset < 0 || offset >= buffer.count {
-    print("source location isn't inside this buffer")
-    return nil
-  }
-
-  // Find the token at that offset.
-  let sf = sourceFilePtr.pointee.syntax
-  guard let token = sf.token(at: AbsolutePosition(utf8Offset: offset)) else {
-    print("couldn't find token at offset \(offset)")
-    return nil
-  }
-
-  var currentSyntax = Syntax(token)
-  var resultSyntax: Node? = nil
-  while let parentSyntax = currentSyntax.parent {
-    currentSyntax = parentSyntax
-    if let typedParent = currentSyntax.as(type) {
-      resultSyntax = typedParent
-      break
-    }
-  }
-
-  // If we didn't find anything, complain and fail.
-  guard var resultSyntax else {
-    print("unable to find node: \(token.debugDescription)")
-    return nil
-  }
-
-  // If we want the outermost node, keep looking.
-  // E.g. for 'foo.bar' we want the member ref expression instead of the
-  // identifier expression.
-  if wantOutermost {
-    while let parentSyntax = currentSyntax.parent,
-      parentSyntax.position == resultSyntax.position
-    {
-      currentSyntax = parentSyntax
-      if let typedParent = currentSyntax.as(type) {
-        resultSyntax = typedParent
-      }
-    }
-  }
-
-  return resultSyntax
-}
-
 @_cdecl("swift_ASTGen_expandAttachedMacro")
 @usableFromInline
 func expandAttachedMacro(
@@ -636,7 +574,7 @@ func expandAttachedMacro(
   expandedSourceOutPtr: UnsafeMutablePointer<BridgedStringRef>
 ) -> Int {
   // We didn't expand anything so far.
-  assert(expandedSourceOutPtr.pointee.isEmptyInitialized)
+  assert(expandedSourceOutPtr.pointee.isEmpty)
 
   // Dig out the custom attribute for the attached macro declarations.
   guard

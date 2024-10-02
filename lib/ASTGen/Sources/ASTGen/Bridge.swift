@@ -14,7 +14,7 @@ import ASTBridging
 import BasicBridging
 @_spi(RawSyntax) import SwiftSyntax
 
-protocol BridgedNullable: ExpressibleByNilLiteral {
+public protocol BridgedNullable: ExpressibleByNilLiteral {
   associatedtype RawPtr
   init(raw: RawPtr?)
 }
@@ -105,7 +105,7 @@ extension String {
     )
   }
 
-  mutating func withBridgedString<R>(_ body: (BridgedStringRef) throws -> R) rethrows -> R {
+  public mutating func withBridgedString<R>(_ body: (BridgedStringRef) throws -> R) rethrows -> R {
     try withUTF8 { buffer in
       try body(BridgedStringRef(data: buffer.baseAddress, count: buffer.count))
     }
@@ -119,7 +119,7 @@ extension SyntaxText {
 }
 
 /// Allocate a copy of the given string as a null-terminated UTF-8 string.
-func allocateBridgedString(
+public func allocateBridgedString(
   _ string: String
 ) -> BridgedStringRef {
   var string = string
@@ -141,12 +141,6 @@ func allocateBridgedString(
 @_cdecl("swift_ASTGen_freeBridgedString")
 public func freeBridgedString(bridged: BridgedStringRef) {
   bridged.data?.deallocate()
-}
-
-extension BridgedStringRef {
-  var isEmptyInitialized: Bool {
-    return self.data == nil && self.count == 0
-  }
 }
 
 extension BridgedStringRef: /*@retroactive*/ Swift.ExpressibleByStringLiteral {

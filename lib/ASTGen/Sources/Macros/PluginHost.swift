@@ -12,6 +12,7 @@
 
 import ASTBridging
 import BasicBridging
+import swiftASTGen
 @_spi(PluginMessage) import SwiftCompilerPluginMessageHandling
 import SwiftSyntax
 

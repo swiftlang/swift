@@ -93,7 +93,8 @@ target_link_libraries(swiftSema PRIVATE
 
 if (SWIFT_BUILD_SWIFT_SYNTAX)
   target_link_libraries(swiftSema PRIVATE
-    swiftASTGen)
+    swiftASTGen
+    swiftMacros)
 endif()
 
 set_swift_llvm_is_available(swiftSema)
