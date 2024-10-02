@@ -754,6 +754,27 @@ public:
 
 void simple_display(llvm::raw_ostream &out, const KnownProtocolKind);
 
+/// Pretty-print the given declaration into a buffer and return a source
+/// location that refers to the declaration in that buffer.
+class PrettyPrintDeclRequest
+   : public SimpleRequest<PrettyPrintDeclRequest,
+                          SourceLoc(const Decl *),
+                          RequestFlags::Cached>
+{
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  SourceLoc evaluate(Evaluator &eval, const Decl *d) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 // Find the type in the cache or look it up
 class DefaultTypeRequest
     : public SimpleRequest<DefaultTypeRequest,

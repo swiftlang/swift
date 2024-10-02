@@ -1052,10 +1052,6 @@ namespace swift {
     /// been emitted due to an open transaction.
     SmallVector<Diagnostic, 4> TentativeDiagnostics;
 
-    /// The set of declarations for which we have pretty-printed
-    /// results that we can point to on the command line.
-    llvm::DenseMap<const Decl *, SourceLoc> PrettyPrintedDeclarations;
-
     llvm::BumpPtrAllocator TransactionAllocator;
     /// A set of all strings involved in current transactional chain.
     /// This is required because diagnostics are not directly emitted
@@ -1108,6 +1104,7 @@ namespace swift {
     friend class CompoundDiagnosticTransaction;
     friend class DiagnosticStateRAII;
     friend class DiagnosticQueue;
+    friend class PrettyPrintDeclRequest;
 
   public:
     explicit DiagnosticEngine(SourceManager &SourceMgr)

@@ -1733,5 +1733,4 @@ HeapObject *_swift_bridgeToObjectiveCUsingProtocolIfPossible(
 #endif
 
 #define OVERRIDE_CASTING COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
-
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"
