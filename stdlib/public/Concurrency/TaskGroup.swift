@@ -327,7 +327,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     self._group = group
   }
 
-#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && !$Embedded
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   /// Adds a child task to the group.
   ///
   /// - Parameters:
@@ -405,63 +405,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
                            initialSerialExecutor: builtinSerialExecutor,
                            taskGroup: _group,
                            operation: operation)
-
-    return true
-  }
-
-#elseif $Embedded
-
-  @_alwaysEmitIntoClient
-  public mutating func addTask(
-    priority: TaskPriority? = nil,
-    operation: sending @escaping () async -> ChildTaskResult
-  ) {
-#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: false,
-      addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: false
-    )
-#else
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: false)
-#endif
-
-    // Create the task in this group.
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-  }
-
-  @_alwaysEmitIntoClient
-  public mutating func addTaskUnlessCancelled(
-    priority: TaskPriority? = nil,
-    operation: sending @escaping () async -> ChildTaskResult
-  ) -> Bool {
-    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
-
-    guard canAdd else {
-      // the group is cancelled and is not accepting any new work
-      return false
-    }
-#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: false,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-#else
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-#endif
-
-    // Create the task in this group.
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
 
     return true
   }
