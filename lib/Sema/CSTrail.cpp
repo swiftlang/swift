@@ -234,6 +234,18 @@ SolverTrail::Change::recordedNodeType(ASTNode node, Type oldType) {
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::recordedKeyPathComponentType(const KeyPathExpr *expr,
+                                                  unsigned component,
+                                                  Type oldType) {
+  Change result;
+  result.Kind = ChangeKind::RecordedKeyPathComponentType;
+  result.Options = component;
+  result.KeyPath.Expr = expr;
+  result.KeyPath.OldType = oldType;
+  return result;
+}
+
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
@@ -325,6 +337,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::RecordedNodeType:
     cs.restoreType(Node.Node, Node.OldType);
+    break;
+
+  case ChangeKind::RecordedKeyPathComponentType:
+    cs.restoreType(KeyPath.Expr, Options, KeyPath.OldType);
     break;
   }
 }
@@ -482,7 +498,9 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
 
   case ChangeKind::RecordedPackEnvironment:
     // FIXME: Print short form of PackExpansionExpr
-    out << "(recorded pack environment)\n";
+    out << "(recorded pack environment";
+    simple_display(out, ElementExpr);
+    out << "\n";
     break;
 
   case ChangeKind::RecordedDefaultedConstraint:
@@ -500,6 +518,17 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     else
       out << "null";
     out << ")\n";
+    break;
+
+  case ChangeKind::RecordedKeyPathComponentType:
+    out << "(recorded key path ";
+    simple_display(out, KeyPath.Expr);
+    out << " with component type ";
+    if (Node.OldType)
+      Node.OldType->print(out, PO);
+    else
+      out << "null";
+    out << " for component " << Options << ")\n";
     break;
   }
 }

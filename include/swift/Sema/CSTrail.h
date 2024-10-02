@@ -80,6 +80,8 @@ public:
     RecordedDefaultedConstraint,
     /// Recorded an assignment of a type to an AST node.
     RecordedNodeType,
+    /// Recorded an assignment of a type to a keypath component.
+    RecordedKeyPathComponentType,
   };
 
   /// A change made to the constraint system.
@@ -148,6 +150,11 @@ public:
         ASTNode Node;
         Type OldType;
       } Node;
+
+      struct {
+        const KeyPathExpr *Expr;
+        Type OldType;
+      } KeyPath;
 
       ConstraintLocator *Locator;
       PackExpansionType *ExpansionTy;
@@ -230,6 +237,11 @@ public:
 
     /// Create a change that recorded an assignment of a type to an AST node.
     static Change recordedNodeType(ASTNode node, Type oldType);
+
+    /// Create a change that recorded an assignment of a type to an AST node.
+    static Change recordedKeyPathComponentType(const KeyPathExpr *expr,
+                                               unsigned component,
+                                               Type oldType);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.
