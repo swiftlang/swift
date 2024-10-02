@@ -246,6 +246,15 @@ struct SILOptOptions {
   DisableObjCInterop = llvm::cl::opt<bool>("disable-objc-interop",
                      llvm::cl::desc("Disable Objective-C interoperability."));
 
+  llvm::cl::opt<bool>
+  DisableImplicitModules = llvm::cl::opt<bool>("disable-implicit-swift-modules",
+                     llvm::cl::desc("Disable implicit swift modules."));
+
+  llvm::cl::opt<std::string>
+  ExplicitSwiftModuleMapPath = llvm::cl::opt<std::string>(
+    "explicit-swift-module-map-file",
+    llvm::cl::desc("Explict swift module map file path"));
+
   llvm::cl::list<std::string>
   ExperimentalFeatures = llvm::cl::list<std::string>("enable-experimental-feature",
                        llvm::cl::desc("Enable the given experimental feature."));
@@ -679,6 +688,12 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     = options.EnableLibraryEvolution;
   Invocation.getFrontendOptions().StrictImplicitModuleContext
     = options.StrictImplicitModuleContext;
+
+  Invocation.getFrontendOptions().DisableImplicitModules =
+    options.DisableImplicitModules;
+  Invocation.getSearchPathOptions().ExplicitSwiftModuleMapPath =
+    options.ExplicitSwiftModuleMapPath;
+
   // Set the module cache path. If not passed in we use the default swift module
   // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = options.ModuleCachePath;
