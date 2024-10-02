@@ -45,8 +45,8 @@ getLifetimeDependenceFor(ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
 }
 
 std::string LifetimeDependenceInfo::getString() const {
-  std::string lifetimeDependenceString;
-  auto getOnIndices = [](IndexSubset *bitvector) {
+  std::string lifetimeDependenceString = "@lifetime(";
+  auto getSourceString = [](IndexSubset *bitvector, StringRef kind) {
     std::string result;
     bool isFirstSetBit = true;
     for (unsigned i = 0; i < bitvector->getCapacity(); i++) {
@@ -54,20 +54,30 @@ std::string LifetimeDependenceInfo::getString() const {
         if (!isFirstSetBit) {
           result += ", ";
         }
+        result += kind;
         result += std::to_string(i);
         isFirstSetBit = false;
       }
     }
     return result;
   };
-  if (inheritLifetimeParamIndices && !inheritLifetimeParamIndices->isEmpty()) {
-    lifetimeDependenceString =
-        "_inherit(" + getOnIndices(inheritLifetimeParamIndices) + ") ";
-  }
-  if (scopeLifetimeParamIndices && !scopeLifetimeParamIndices->isEmpty()) {
+  if (inheritLifetimeParamIndices) {
+    assert(!inheritLifetimeParamIndices->isEmpty());
     lifetimeDependenceString +=
-        "_scope(" + getOnIndices(scopeLifetimeParamIndices) + ") ";
+        getSourceString(inheritLifetimeParamIndices, "copy ");
   }
+  if (scopeLifetimeParamIndices) {
+    assert(!scopeLifetimeParamIndices->isEmpty());
+    if (inheritLifetimeParamIndices) {
+      lifetimeDependenceString += ", ";
+    }
+    lifetimeDependenceString +=
+        getSourceString(scopeLifetimeParamIndices, "borrow ");
+  }
+  if (isImmortal()) {
+    lifetimeDependenceString += "immortal";
+  }
+  lifetimeDependenceString += ") ";
   return lifetimeDependenceString;
 }
 
