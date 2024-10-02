@@ -177,12 +177,17 @@ public:
       result += ": ";
     }
 
+    bool firstElem = true;
     for (auto source : sources) {
+      if (!firstElem) {
+        result += ", ";
+      }
       if (source.getParsedLifetimeDependenceKind() ==
           ParsedLifetimeDependenceKind::Scope) {
         result += "borrow ";
       }
       result += source.getString();
+      firstElem = false;
     }
     result += ")";
     return result;
