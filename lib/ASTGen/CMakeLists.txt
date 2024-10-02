@@ -18,7 +18,7 @@ if(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER)
   list(APPEND ASTGen_Swift_dependencies _CompilerRegexParser)
 endif()
 
-add_pure_swift_host_library(swiftASTGen STATIC
+add_pure_swift_host_library(swiftASTGen STATIC CXX_INTEROP
   Sources/ASTGen/ASTGen.swift
   Sources/ASTGen/ASTGen+CompilerBuildConfiguration.swift
   Sources/ASTGen/Bridge.swift
@@ -52,7 +52,7 @@ add_pure_swift_host_library(swiftASTGen STATIC
     ${ASTGen_Swift_dependencies}
 )
 
-add_pure_swift_host_library(swiftMacros STATIC
+add_pure_swift_host_library(swiftMacros STATIC CXX_INTEROP
   Sources/Macros/Macros.swift
   Sources/Macros/PluginHost.swift
   Sources/Macros/SourceManager.swift
@@ -69,7 +69,7 @@ add_pure_swift_host_library(swiftMacros STATIC
     swiftASTGen
 )
 
-add_pure_swift_host_library(swiftIDEUtilsBridging
+add_pure_swift_host_library(swiftIDEUtilsBridging CXX_INTEROP
   Sources/SwiftIDEUtilsBridging/NameMatcherBridging.swift
   
   DEPENDENCIES
@@ -77,36 +77,6 @@ add_pure_swift_host_library(swiftIDEUtilsBridging
   SWIFT_DEPENDENCIES
     _CompilerSwiftIDEUtils
     _CompilerSwiftSyntax
+    _CompilerSwiftIDEUtils
     swiftASTGen
 )
-
-set(compile_options
-  "SHELL: -Xcc -std=c++17 -Xcc -DCOMPILED_WITH_SWIFT"
-
-  # FIXME: Needed to work around an availability issue with CxxStdlib
-  "SHELL: -Xfrontend -disable-target-os-checking"
-
-  # Necessary to avoid treating IBOutlet and IBAction as keywords
-  "SHELL:-Xcc -UIBOutlet -Xcc -UIBAction -Xcc -UIBInspectable"
-)
-
-if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-  list(APPEND compile_options
-    # Make 'offsetof()' a const value.
-    "SHELL:-Xcc -D_CRT_USE_BUILTIN_OFFSETOF"
-    # Workaround for https://github.com/swiftlang/llvm-project/issues/7172
-    "SHELL:-Xcc -Xclang -Xcc -fmodule-format=raw")
-endif()
-
-# Prior to 5.9, we have to use the experimental flag for C++ interop.
-if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
-  list(APPEND compile_options "SHELL:-Xfrontend -enable-experimental-cxx-interop")
-else()
-  list(APPEND compile_options "-cxx-interoperability-mode=default")
-endif()
-
-if(SWIFT_BUILD_SWIFT_SYNTAX)
-  foreach(target swiftASTGen swiftIDEUtilsBridging swiftMacros)
-    target_compile_options(${target} PRIVATE ${compile_options})
-  endforeach()
-endif()
