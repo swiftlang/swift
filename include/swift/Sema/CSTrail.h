@@ -36,7 +36,7 @@ class SolverTrail {
 public:
 
   /// The kind of change made to the graph.
-  enum class ChangeKind {
+  enum class ChangeKind: unsigned {
     /// Added a new vertex to the constraint graph.
     AddedTypeVariable,
     /// Added a new constraint to the constraint graph.
@@ -53,6 +53,31 @@ public:
     RetractedBindings,
     /// Set the fixed type or parent and flags for a type variable.
     UpdatedTypeVariable,
+    /// Recorded a conversion restriction kind.
+    AddedConversionRestriction,
+    /// Recorded a fix.
+    AddedFix,
+    /// Recorded a fixed requirement.
+    AddedFixedRequirement,
+    /// Recorded a disjunction choice.
+    RecordedDisjunctionChoice,
+    /// Recorded an applied disjunction.
+    RecordedAppliedDisjunction,
+    /// Recorded an argument matching choice.
+    RecordedMatchCallArgumentResult,
+    /// Recorded a list of opened types at a locator.
+    RecordedOpenedTypes,
+    /// Recorded the opening of an existential type at a locator.
+    RecordedOpenedExistentialType,
+    /// Recorded the opening of a pack existential type.
+    RecordedOpenedPackExpansionType,
+    /// Recorded the creation of a generic environment for a pack expansion expression.
+    RecordedPackExpansionEnvironment,
+    /// Recorded the mapping from a pack element expression to its parent
+    /// pack expansion expression.
+    RecordedPackEnvironment,
+    /// Record a defaulted constraint at a locator.
+    RecordedDefaultedConstraint,
   };
 
   /// A change made to the constraint system.
@@ -63,6 +88,9 @@ public:
   public:
     /// The kind of change.
     ChangeKind Kind;
+
+    /// Extra storage.
+    unsigned Options;
 
     union {
       TypeVariableType *TypeVar;
@@ -97,10 +125,26 @@ public:
 
         /// The representative of the equivalence class, or the fixed type.
         llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
-
-        /// The saved value of TypeVariableType::Implementation::getRawOptions().
-        unsigned Options;
       } Update;
+
+      struct {
+        /// The source type.
+        Type SrcType;
+
+        /// The destination type.
+        Type DstType;
+      } Restriction;
+
+      ConstraintFix *Fix;
+
+      struct {
+        GenericTypeParamType *GP;
+        Type ReqTy;
+      } FixedRequirement;
+
+      ConstraintLocator *Locator;
+      PackExpansionType *ExpansionTy;
+      PackElementExpr *ElementExpr;
     };
 
     Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
@@ -136,6 +180,46 @@ public:
                TypeVariableType *typeVar,
                llvm::PointerUnion<TypeVariableType *, TypeBase *> parentOrFixed,
                unsigned options);
+
+    /// Create a change that recorded a restriction.
+    static Change addedConversionRestriction(Type srcType, Type dstType);
+
+    /// Create a change that recorded a fix.
+    static Change addedFix(ConstraintFix *fix);
+
+    /// Create a change that recorded a fixed requirement.
+    static Change addedFixedRequirement(GenericTypeParamType *GP,
+                                        unsigned reqKind,
+                                        Type requirementTy);
+
+    /// Create a change that recorded a disjunction choice.
+    static Change recordedDisjunctionChoice(ConstraintLocator *locator,
+                                            unsigned index);
+
+    /// Create a change that recorded an applied disjunction.
+    static Change recordedAppliedDisjunction(ConstraintLocator *locator);
+
+    /// Create a change that recorded an applied disjunction.
+    static Change recordedMatchCallArgumentResult(ConstraintLocator *locator);
+
+    /// Create a change that recorded a list of opened types.
+    static Change recordedOpenedTypes(ConstraintLocator *locator);
+
+    /// Create a change that recorded the opening of an existential type.
+    static Change recordedOpenedExistentialType(ConstraintLocator *locator);
+
+    /// Create a change that recorded the opening of a pack expansion type.
+    static Change recordedOpenedPackExpansionType(PackExpansionType *expansion);
+
+    /// Create a change that recorded the opening of a pack expansion type.
+    static Change recordedPackExpansionEnvironment(ConstraintLocator *locator);
+
+    /// Create a change that recorded a mapping from a pack element expression
+    /// to its parent expansion expression.
+    static Change recordedPackEnvironment(PackElementExpr *packElement);
+
+    /// Create a change that recorded a defaulted constraint at a locator.
+    static Change recordedDefaultedConstraint(ConstraintLocator *locator);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

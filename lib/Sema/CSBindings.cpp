@@ -2747,7 +2747,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
 
   // If this was from a defaultable binding note that.
   if (Binding.isDefaultableBinding()) {
-    cs.DefaultedConstraints.insert(srcLocator);
+    cs.recordDefaultedConstraint(srcLocator);
 
     // Fail if hole reporting fails.
     if (type->isPlaceholder() && reportHole())
