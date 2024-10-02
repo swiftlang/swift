@@ -80,24 +80,7 @@ add_pure_swift_host_library(swiftIDEUtilsBridging
     swiftASTGen
 )
 
-set(c_include_paths
-  # LLVM modules and headers.
-  "${LLVM_MAIN_INCLUDE_DIR}"
-  # Generated LLVM headers.
-  "${LLVM_INCLUDE_DIR}"
-  # Clang modules and headers.
-  ${CLANG_INCLUDE_DIRS}
-  # Bridging modules and headers.
-  "${SWIFT_MAIN_INCLUDE_DIR}"
-  # Generated C headers.
-  "${CMAKE_CURRENT_BINARY_DIR}/../../include")
-set(c_include_paths_args)
-foreach(c_include_path ${c_include_paths})
-  list(APPEND c_include_paths_args "SHELL: -Xcc -I -Xcc ${c_include_path}")
-endforeach()
-
 set(compile_options
-  ${c_include_paths_args}
   "SHELL: -Xcc -std=c++17 -Xcc -DCOMPILED_WITH_SWIFT"
 
   # FIXME: Needed to work around an availability issue with CxxStdlib
