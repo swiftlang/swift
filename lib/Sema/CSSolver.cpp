@@ -137,9 +137,18 @@ Solution ConstraintSystem::finalize() {
        llvm::make_range(Fixes.begin() + firstFixIndex, Fixes.end()))
     solution.Fixes.push_back(fix);
 
+  for (const auto &fix : FixedRequirements) {
+    solution.FixedRequirements.push_back(fix);
+  }
+
   // Remember all the disjunction choices we made.
   for (auto &choice : DisjunctionChoices) {
     solution.DisjunctionChoices.insert(choice);
+  }
+
+  // Remember all the applied disjunctions.
+  for (auto &choice : AppliedDisjunctions) {
+    solution.AppliedDisjunctions.insert(choice);
   }
 
   // Remember all of the argument/parameter matching choices we made.
@@ -255,9 +264,6 @@ Solution ConstraintSystem::finalize() {
   for (const auto &packEnv : PackEnvironments)
     solution.PackEnvironments.insert(packEnv);
 
-  for (const auto &packEltGenericEnv : PackElementGenericEnvironments)
-    solution.PackElementGenericEnvironments.push_back(packEltGenericEnv);
-
   for (const auto &synthesized : SynthesizedConformances) {
     solution.SynthesizedConformances.insert(synthesized);
   }
@@ -290,20 +296,25 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   // Register constraint restrictions.
   // FIXME: Copy these directly into some kind of partial solution?
   for ( auto &restriction : solution.ConstraintRestrictions) {
-    auto *type1 = restriction.first.first.getPointer();
-    auto *type2 = restriction.first.second.getPointer();
+    auto type1 = restriction.first.first;
+    auto type2 = restriction.first.second;
 
-    ConstraintRestrictions.insert({{type1, type2}, restriction.second});
+    addConversionRestriction(type1, type2, restriction.second);
   }
 
   // Register the solution's disjunction choices.
   for (auto &choice : solution.DisjunctionChoices) {
-    DisjunctionChoices.insert(choice);
+    recordDisjunctionChoice(choice.first, choice.second);
+  }
+
+  // Register the solution's applied disjunctions.
+  for (auto &choice : solution.AppliedDisjunctions) {
+    recordAppliedDisjunction(choice.first, choice.second);
   }
 
   // Remember all of the argument/parameter matching choices we made.
   for (auto &argumentMatch : solution.argumentMatchingChoices) {
-    argumentMatchingChoices.insert(argumentMatch);
+    recordMatchCallArgumentResult(argumentMatch.first, argumentMatch.second);
   }
 
   // Remember implied results.
@@ -312,38 +323,32 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Register the solution's opened types.
   for (const auto &opened : solution.OpenedTypes) {
-    OpenedTypes.insert(opened);
+    recordOpenedType(opened.first, opened.second);
   }
 
   // Register the solution's opened existential types.
   for (const auto &openedExistential : solution.OpenedExistentialTypes) {
-    OpenedExistentialTypes.insert(openedExistential);
+    recordOpenedExistentialType(openedExistential.first, openedExistential.second);
   }
 
   // Register the solution's opened pack expansion types.
   for (const auto &expansion : solution.OpenedPackExpansionTypes) {
-    OpenedPackExpansionTypes.insert(expansion);
+    recordOpenedPackExpansionType(expansion.first, expansion.second);
   }
 
   // Register the solutions's pack expansion environments.
   for (const auto &expansion : solution.PackExpansionEnvironments) {
-    PackExpansionEnvironments.insert(expansion);
+    recordPackExpansionEnvironment(expansion.first, expansion.second);
   }
 
   // Register the solutions's pack environments.
   for (auto &packEnvironment : solution.PackEnvironments) {
-    PackEnvironments.insert(packEnvironment);
-  }
-
-  // Register the solutions's pack element generic environments.
-  for (auto &packElementGenericEnvironment :
-       solution.PackElementGenericEnvironments) {
-    PackElementGenericEnvironments.push_back(packElementGenericEnvironment);
+    addPackEnvironment(packEnvironment.first, packEnvironment.second);
   }
 
   // Register the defaulted type variables.
-  DefaultedConstraints.insert(solution.DefaultedConstraints.begin(),
-                              solution.DefaultedConstraints.end());
+  for (auto *locator : solution.DefaultedConstraints)
+    recordDefaultedConstraint(locator);
 
   // Add the node types back.
   for (auto &nodeType : solution.nodeTypes) {
@@ -419,7 +424,12 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   // Register any fixes produced along this path.
-  Fixes.insert(solution.Fixes.begin(), solution.Fixes.end());
+  for (auto *fix : solution.Fixes)
+    addFix(fix);
+
+  // Register fixed requirements.
+  for (auto fix : solution.FixedRequirements)
+    recordFixedRequirement(std::get<0>(fix), std::get<1>(fix), std::get<2>(fix));
 }
 bool ConstraintSystem::simplify() {
   // While we have a constraint in the worklist, process it.
@@ -652,19 +662,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numTrailChanges = cs.solverState->Trail.size();
 
   numTypeVariables = cs.TypeVariables.size();
-  numConstraintRestrictions = cs.ConstraintRestrictions.size();
   numFixes = cs.Fixes.size();
-  numFixedRequirements = cs.FixedRequirements.size();
-  numDisjunctionChoices = cs.DisjunctionChoices.size();
-  numAppliedDisjunctions = cs.AppliedDisjunctions.size();
-  numArgumentMatchingChoices = cs.argumentMatchingChoices.size();
-  numOpenedTypes = cs.OpenedTypes.size();
-  numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
-  numOpenedPackExpansionTypes = cs.OpenedPackExpansionTypes.size();
-  numPackExpansionEnvironments = cs.PackExpansionEnvironments.size();
-  numPackEnvironments = cs.PackEnvironments.size();
-  numPackElementGenericEnvironments = cs.PackElementGenericEnvironments.size();
-  numDefaultedConstraints = cs.DefaultedConstraints.size();
   numAddedNodeTypes = cs.addedNodeTypes.size();
   numAddedKeyPathComponentTypes = cs.addedKeyPathComponentTypes.size();
   numKeyPaths = cs.KeyPaths.size();
@@ -719,47 +717,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // e.g. add retired constraints back to the circulation and remove generated
   // constraints introduced by the current scope.
   cs.solverState->rollback(this);
-
-  // Remove any constraint restrictions.
-  truncate(cs.ConstraintRestrictions, numConstraintRestrictions);
-
-  // Remove any fixes.
-  truncate(cs.Fixes, numFixes);
-
-  // Remove any disjunction choices.
-  truncate(cs.DisjunctionChoices, numDisjunctionChoices);
-
-  // Remove any applied disjunctions.
-  truncate(cs.AppliedDisjunctions, numAppliedDisjunctions);
-
-  // Remove any argument matching choices;
-  truncate(cs.argumentMatchingChoices, numArgumentMatchingChoices);
-
-  // Remove any opened types.
-  truncate(cs.OpenedTypes, numOpenedTypes);
-
-  // Remove any conformances solver had to fix along
-  // the current path.
-  truncate(cs.FixedRequirements, numFixedRequirements);
-
-  // Remove any opened existential types.
-  truncate(cs.OpenedExistentialTypes, numOpenedExistentialTypes);
-
-  // Remove any opened pack expansion types.
-  truncate(cs.OpenedPackExpansionTypes, numOpenedPackExpansionTypes);
-
-  // Remove any pack expansion environments.
-  truncate(cs.PackExpansionEnvironments, numPackExpansionEnvironments);
-
-  // Remove any pack environments.
-  truncate(cs.PackEnvironments, numPackEnvironments);
-
-  // Remove any pack element generic environments.
-  truncate(cs.PackElementGenericEnvironments,
-           numPackElementGenericEnvironments);
-
-  // Remove any defaulted type variables.
-  truncate(cs.DefaultedConstraints, numDefaultedConstraints);
 
   // Remove any node types we registered.
   for (unsigned i :
