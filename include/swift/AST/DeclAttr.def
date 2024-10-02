@@ -510,7 +510,11 @@ DECL_ATTR(lifetime, Lifetime,
   OnAccessor | OnConstructor | OnFunc | OnSubscript | LongAttribute | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   161)
 
-LAST_DECL_ATTR(Unsafe)
+SIMPLE_DECL_ATTR(_PlaygroundTransformed, PlaygroundTransformed,
+  OnFunc | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  162)
+
+LAST_DECL_ATTR(PlaygroundTransformed)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

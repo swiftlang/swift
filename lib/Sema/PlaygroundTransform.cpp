@@ -41,10 +41,14 @@ namespace {
 struct TransformOptions {
   bool LogScopeEvents;
   bool LogFunctionParameters;
+  bool SelectiveTransform;
 
-  TransformOptions(const PlaygroundOptionSet &opts) :
-    LogScopeEvents(opts.contains(PlaygroundOption::ScopeEvents)),
-    LogFunctionParameters(opts.contains(PlaygroundOption::FunctionParameters)) {}
+  TransformOptions(const PlaygroundOptionSet &opts)
+      : LogScopeEvents(opts.contains(PlaygroundOption::ScopeEvents)),
+        LogFunctionParameters(
+            opts.contains(PlaygroundOption::FunctionParameters)),
+        SelectiveTransform(
+            opts.contains(PlaygroundOption::SelectiveTransform)) {}
 };
 
 class Instrumenter : InstrumenterBase {
@@ -949,6 +953,24 @@ void swift::performPlaygroundTransform(SourceFile &SF, PlaygroundOptionSet Opts)
     }
 
     PreWalkAction walkToDeclPre(Decl *D) override {
+      // If the selective transform option is enabled then skip any
+      // non-annotated nodes.
+      if (Options.SelectiveTransform) {
+        // Only funcs can be annotated with @_PlaygroundTransformed.
+        auto *funcDecl = dyn_cast<FuncDecl>(D);
+        // In addition to file-level funcs, also support annotated funcs in
+        // structs, classes, extensions and macro expansions.
+        bool isAllowedOuterDecl =
+            (dyn_cast<StructDecl>(D) || dyn_cast<ClassDecl>(D) ||
+             dyn_cast<ExtensionDecl>(D) || dyn_cast<MacroExpansionDecl>(D));
+        // Skip transforming any nodes that are not one of the allowed container
+        // decls and are not @_PlaygroundTransformed annotated functions.
+        if (!isAllowedOuterDecl &&
+            !(funcDecl &&
+              funcDecl->getAttrs().hasAttribute<PlaygroundTransformedAttr>()))
+          return Action::SkipNode();
+      }
+
       if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
         // Skip any functions that do not have user-written source code.
         if (!FD->isImplicit() && !FD->isBodySkipped() &&
