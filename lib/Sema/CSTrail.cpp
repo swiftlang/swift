@@ -225,6 +225,15 @@ SolverTrail::Change::recordedDefaultedConstraint(ConstraintLocator *locator) {
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::recordedNodeType(ASTNode node, Type oldType) {
+  Change result;
+  result.Kind = ChangeKind::RecordedNodeType;
+  result.Node.Node = node;
+  result.Node.OldType = oldType;
+  return result;
+}
+
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
@@ -312,6 +321,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::RecordedDefaultedConstraint:
     cs.removeDefaultedConstraint(Locator);
+    break;
+
+  case ChangeKind::RecordedNodeType:
+    cs.restoreType(Node.Node, Node.OldType);
     break;
   }
 }
@@ -468,12 +481,24 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     break;
 
   case ChangeKind::RecordedPackEnvironment:
+    // FIXME: Print short form of PackExpansionExpr
     out << "(recorded pack environment)\n";
     break;
 
   case ChangeKind::RecordedDefaultedConstraint:
     out << "(recorded defaulted constraint at ";
     Locator->dump(&cs.getASTContext().SourceMgr, out);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedNodeType:
+    out << "(recorded node type at ";
+    Node.Node.getStartLoc().print(out, cs.getASTContext().SourceMgr);
+    out << " previous ";
+    if (Node.OldType)
+      Node.OldType->print(out, PO);
+    else
+      out << "null";
     out << ")\n";
     break;
   }

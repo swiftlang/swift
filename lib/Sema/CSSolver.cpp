@@ -663,7 +663,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
-  numAddedNodeTypes = cs.addedNodeTypes.size();
   numAddedKeyPathComponentTypes = cs.addedKeyPathComponentTypes.size();
   numKeyPaths = cs.KeyPaths.size();
   numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
@@ -717,17 +716,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // e.g. add retired constraints back to the circulation and remove generated
   // constraints introduced by the current scope.
   cs.solverState->rollback(this);
-
-  // Remove any node types we registered.
-  for (unsigned i :
-           reverse(range(numAddedNodeTypes, cs.addedNodeTypes.size()))) {
-    auto node = cs.addedNodeTypes[i].first;
-    if (Type oldType = cs.addedNodeTypes[i].second)
-      cs.NodeTypes[node] = oldType;
-    else
-      cs.NodeTypes.erase(node);
-  }
-  truncate(cs.addedNodeTypes, numAddedNodeTypes);
 
   // Remove any node types we registered.
   for (unsigned i : reverse(range(numAddedKeyPathComponentTypes,

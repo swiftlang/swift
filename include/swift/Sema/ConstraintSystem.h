@@ -2256,11 +2256,7 @@ private:
   /// nodes themselves. This allows us to typecheck and
   /// run through various diagnostics passes without actually mutating
   /// the types on the nodes.
-  llvm::MapVector<ASTNode, Type> NodeTypes;
-
-  /// The nodes for which we have produced types, along with the prior type
-  /// each node had before introducing this type.
-  llvm::SmallVector<std::pair<ASTNode, Type>, 8> addedNodeTypes;
+  llvm::DenseMap<ASTNode, Type> NodeTypes;
 
   /// Maps components in a key path expression to their type. Needed because
   /// KeyPathExpr + Index isn't an \c ASTNode and thus can't be stored in \c
@@ -2894,8 +2890,6 @@ public:
     /// FIXME: Remove this.
     unsigned numFixes;
 
-    unsigned numAddedNodeTypes;
-
     unsigned numAddedKeyPathComponentTypes;
 
     unsigned numDisabledConstraints;
@@ -3205,21 +3199,39 @@ public:
     this->FavoredTypes[E] = T;
   }
 
-  /// Set the type in our type map for the given node.
+  /// Set the type in our type map for the given node, and record the change
+  /// in the trail.
   ///
-  /// The side tables are used through the expression type checker to avoid mutating nodes until
-  /// we know we have successfully type-checked them.
+  /// The side tables are used through the expression type checker to avoid
+  /// mutating nodes until we know we have successfully type-checked them.
   void setType(ASTNode node, Type type) {
-    assert(!node.isNull() && "Cannot set type information on null node");
-    assert(type && "Expected non-null type");
+    ASSERT(!node.isNull() && "Cannot set type information on null node");
+    ASSERT(type && "Expected non-null type");
 
     // Record the type.
     Type &entry = NodeTypes[node];
     Type oldType = entry;
     entry = type;
 
-    // Record the fact that we ascribed a type to this node.
-    addedNodeTypes.push_back({node, oldType});
+    if (oldType.getPointer() != type.getPointer()) {
+      // Record the fact that we assigned a type to this node.
+      if (isRecordingChanges())
+        recordChange(SolverTrail::Change::recordedNodeType(node, oldType));
+    }
+  }
+
+  /// Undo the above change.
+  void restoreType(ASTNode node, Type oldType) {
+    ASSERT(!node.isNull() && "Cannot set type information on null node");
+
+    if (oldType) {
+      auto found = NodeTypes.find(node);
+      ASSERT(found != NodeTypes.end());
+      found->second = oldType;
+    } else {
+      bool erased = NodeTypes.erase(node);
+      ASSERT(erased);
+    }
   }
 
   /// Set the type in our type map for a given expression. The side
