@@ -254,6 +254,14 @@ SolverTrail::Change::disabledConstraint(Constraint *constraint) {
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::favoredConstraint(Constraint *constraint) {
+  Change result;
+  result.Kind = ChangeKind::FavoredConstraint;
+  result.TheConstraint.Constraint = constraint;
+  return result;
+}
+
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
@@ -354,6 +362,11 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   case ChangeKind::DisabledConstraint:
     if (TheConstraint.Constraint->isDisabled())
       TheConstraint.Constraint->setEnabled();
+    break;
+
+  case ChangeKind::FavoredConstraint:
+    if (TheConstraint.Constraint->isFavored())
+      TheConstraint.Constraint->setFavored(false);
     break;
   }
 }
@@ -546,6 +559,13 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
 
   case ChangeKind::DisabledConstraint:
     out << "(disabled constraint ";
+    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
+                                    indent + 2);
+    out << ")\n";
+    break;
+
+  case ChangeKind::FavoredConstraint:
+    out << "(favored constraint ";
     TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
                                     indent + 2);
     out << ")\n";
