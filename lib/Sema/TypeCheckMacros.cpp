@@ -1351,44 +1351,17 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
   if (!attrSourceFile)
     return nullptr;
 
-  SourceFile *declSourceFile =
-      moduleDecl->getSourceFileContainingLocation(attachedTo->getStartLoc());
-  if (!declSourceFile && isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
-    // Pretty-print the declaration into a buffer so we can macro-expand
-    // it.
-    // FIXME: Turn this into a request.
-    llvm::SmallString<128> buffer;
-    {
-      llvm::raw_svector_ostream out(buffer);
-      StreamPrinter printer(out);
-      attachedTo->print(
-          printer,
-          PrintOptions::printForDiagnostics(
-              AccessLevel::Public,
-              ctx.TypeCheckerOpts.PrintFullConvention));
-    }
-
-    // Create the buffer.
-    SourceManager &sourceMgr = ctx.SourceMgr;
-    auto bufferID = sourceMgr.addMemBufferCopy(buffer);
-    auto memBufferStartLoc = sourceMgr.getLocForBufferStart(bufferID);
-    sourceMgr.setGeneratedSourceInfo(
-        bufferID,
-        GeneratedSourceInfo{
-          GeneratedSourceInfo::PrettyPrinted,
-          CharSourceRange(),
-          CharSourceRange(memBufferStartLoc, buffer.size()),
-          ASTNode(const_cast<Decl *>(attachedTo)).getOpaqueValue(),
-          nullptr
-        }
-    );
-
-    // Create a source file to go with it.
-    declSourceFile = new (ctx)
-        SourceFile(*moduleDecl, SourceFileKind::Library, bufferID);
-    moduleDecl->addAuxiliaryFile(*declSourceFile);
+  // If the declaration has no source location and comes from a Clang module,
+  // pretty-print the declaration and use that location.
+  SourceLoc attachedToLoc = attachedTo->getLoc();
+  if (attachedToLoc.isInvalid() &&
+      isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
+    attachedToLoc = evaluateOrDefault(
+        ctx.evaluator, PrettyPrintDeclRequest{attachedTo}, SourceLoc());
   }
 
+  SourceFile *declSourceFile =
+      moduleDecl->getSourceFileContainingLocation(attachedToLoc);
   if (!declSourceFile)
     return nullptr;
 
@@ -1529,7 +1502,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
 
     auto startLoc = searchDecl->getStartLoc();
     if (startLoc.isInvalid() && isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
-      startLoc = ctx.SourceMgr.getLocForBufferStart(*declSourceFile->getBufferID());
+      startLoc = attachedToLoc;
     }
 
     BridgedStringRef evaluatedSourceOut{nullptr, 0};
