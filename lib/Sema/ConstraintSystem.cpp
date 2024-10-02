@@ -257,6 +257,71 @@ void ConstraintSystem::addTypeVariableConstraintsToWorkList(
       activateConstraint(constraint);
 }
 
+void ConstraintSystem::addConversionRestriction(
+    Type srcType, Type dstType,
+    ConversionRestrictionKind restriction) {
+  auto key = std::make_pair(srcType.getPointer(), dstType.getPointer());
+  bool inserted = ConstraintRestrictions.insert(
+      std::make_pair(key, restriction)).second;
+  if (!inserted)
+    return;
+
+  if (isRecordingChanges()) {
+    recordChange(SolverTrail::Change::addedConversionRestriction(
+      srcType, dstType));
+  }
+}
+
+void ConstraintSystem::removeConversionRestriction(
+    Type srcType, Type dstType) {
+  auto key = std::make_pair(srcType.getPointer(), dstType.getPointer());
+  bool erased = ConstraintRestrictions.erase(key);
+  ASSERT(erased);
+}
+
+void ConstraintSystem::addFix(ConstraintFix *fix) {
+  bool inserted = Fixes.insert(fix);
+  if (!inserted)
+    return;
+
+  if (isRecordingChanges())
+    recordChange(SolverTrail::Change::addedFix(fix));
+}
+
+void ConstraintSystem::removeFix(ConstraintFix *fix) {
+  ASSERT(Fixes.back() == fix);
+  Fixes.pop_back();
+}
+
+void ConstraintSystem::recordDisjunctionChoice(
+    ConstraintLocator *locator,
+    unsigned index) {
+  // We shouldn't ever register disjunction choices multiple times.
+  auto inserted = DisjunctionChoices.insert(
+      std::make_pair(locator, index));
+  if (!inserted.second) {
+    ASSERT(inserted.first->second == index);
+    return;
+  }
+
+  if (isRecordingChanges()) {
+    recordChange(SolverTrail::Change::recordedDisjunctionChoice(
+      locator, index));
+  }
+}
+
+void ConstraintSystem::recordAppliedDisjunction(
+    ConstraintLocator *locator, FunctionType *fnType) {
+  // We shouldn't ever register disjunction choices multiple times.
+  auto inserted = AppliedDisjunctions.insert(
+      std::make_pair(locator, fnType));
+  if (inserted.second) {
+    if (isRecordingChanges()) {
+      recordChange(SolverTrail::Change::recordedAppliedDisjunction(locator));
+    }
+  }
+}
+
 /// Retrieve a dynamic result signature for the given declaration.
 static std::tuple<char, ObjCSelector, CanType>
 getDynamicResultSignature(ValueDecl *decl) {
@@ -780,9 +845,18 @@ std::pair<Type, OpenedArchetypeType *> ConstraintSystem::openExistentialType(
     t = t->getMetatypeInstanceType();
   auto *opened = t->castTo<OpenedArchetypeType>();
 
-  assert(OpenedExistentialTypes.count(locator) == 0);
-  OpenedExistentialTypes.insert({locator, opened});
+  recordOpenedExistentialType(locator, opened);
+
   return {result, opened};
+}
+
+void ConstraintSystem::recordOpenedExistentialType(
+    ConstraintLocator *locator, OpenedArchetypeType *opened) {
+  bool inserted = OpenedExistentialTypes.insert({locator, opened}).second;
+  if (inserted) {
+    if (isRecordingChanges())
+      recordChange(SolverTrail::Change::recordedOpenedExistentialType(locator));
+  }
 }
 
 GenericEnvironment *
@@ -794,7 +868,7 @@ ConstraintSystem::getPackElementEnvironment(ConstraintLocator *locator,
   auto result = PackExpansionEnvironments.find(locator);
   if (result == PackExpansionEnvironments.end()) {
     uuidAndShape = std::make_pair(UUID::fromTime(), shapeClass);
-    PackExpansionEnvironments[locator] = uuidAndShape;
+    recordPackExpansionEnvironment(locator, uuidAndShape);
   } else {
     uuidAndShape = result->second;
   }
@@ -817,6 +891,17 @@ ConstraintSystem::getPackElementEnvironment(ConstraintLocator *locator,
                                               shapeParam, contextSubs);
 }
 
+void ConstraintSystem::recordPackExpansionEnvironment(
+    ConstraintLocator *locator, std::pair<UUID, Type> uuidAndShape) {
+  bool inserted = PackExpansionEnvironments.insert({locator, uuidAndShape}).second;
+  if (inserted) {
+    if (isRecordingChanges()) {
+      recordChange(
+        SolverTrail::Change::recordedPackExpansionEnvironment(locator));
+    }
+  }
+}
+
 PackExpansionExpr *
 ConstraintSystem::getPackEnvironment(PackElementExpr *packElement) const {
   const auto match = PackEnvironments.find(packElement);
@@ -825,11 +910,12 @@ ConstraintSystem::getPackEnvironment(PackElementExpr *packElement) const {
 
 void ConstraintSystem::addPackEnvironment(PackElementExpr *packElement,
                                           PackExpansionExpr *packExpansion) {
-  assert(packElement);
-  assert(packExpansion);
-  [[maybe_unused]] const auto inserted =
+  bool inserted =
       PackEnvironments.insert({packElement, packExpansion}).second;
-  assert(inserted && "Mapping already defined?");
+  if (inserted) {
+    if (isRecordingChanges())
+      recordChange(SolverTrail::Change::recordedPackEnvironment(packElement));
+  }
 }
 
 /// Extend the given depth map by adding depths for all of the subexpressions
@@ -1187,6 +1273,15 @@ Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
 
   OpenedPackExpansionTypes[openedPackExpansion] = expansionVar;
   return expansionVar;
+}
+
+void ConstraintSystem::recordOpenedPackExpansionType(PackExpansionType *expansion,
+                                                     TypeVariableType *expansionVar) {
+  bool inserted = OpenedPackExpansionTypes.insert({expansion, expansionVar}).second;
+  if (inserted) {
+    if (isRecordingChanges())
+      recordChange(SolverTrail::Change::recordedOpenedPackExpansionType(expansion));
+  }
 }
 
 Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
@@ -1589,6 +1684,20 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
   return requestedType;
 }
 
+void ConstraintSystem::recordOpenedType(
+    ConstraintLocator *locator, ArrayRef<OpenedType> openedTypes) {
+  bool inserted = OpenedTypes.insert({locator, openedTypes}).second;
+  if (inserted) {
+    if (isRecordingChanges())
+      recordChange(SolverTrail::Change::recordedOpenedTypes(locator));
+  }
+}
+
+void ConstraintSystem::removeOpenedType(ConstraintLocator *locator) {
+  bool erased = OpenedTypes.erase(locator);
+  ASSERT(erased);
+}
+
 void ConstraintSystem::recordOpenedTypes(
        ConstraintLocatorBuilder locator,
        const OpenedTypeMap &replacements) {
@@ -1608,20 +1717,12 @@ void ConstraintSystem::recordOpenedTypes(
 
   ConstraintLocator *locatorPtr = getConstraintLocator(locator);
   assert(locatorPtr && "No locator for opened types?");
-#if false
-  assert(std::find_if(OpenedTypes.begin(), OpenedTypes.end(),
-                      [&](const std::pair<ConstraintLocator *,
-                          ArrayRef<OpenedType>> &entry) {
-                        return entry.first == locatorPtr;
-                      }) == OpenedTypes.end() &&
-         "already registered opened types for this locator");
-#endif
 
   OpenedType* openedTypes
     = Allocator.Allocate<OpenedType>(replacements.size());
   std::copy(replacements.begin(), replacements.end(), openedTypes);
-  OpenedTypes.insert(
-      {locatorPtr, llvm::ArrayRef(openedTypes, replacements.size())});
+  recordOpenedType(
+      locatorPtr, llvm::ArrayRef(openedTypes, replacements.size()));
 }
 
 /// Determine how many levels of argument labels should be removed from the
@@ -2669,8 +2770,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   } else if (baseObjTy->isExistentialType()) {
     auto openedArchetype =
         OpenedArchetypeType::get(baseObjTy->getCanonicalType());
-    OpenedExistentialTypes.insert(
-        {getConstraintLocator(locator), openedArchetype});
+    recordOpenedExistentialType(getConstraintLocator(locator), openedArchetype);
     baseOpenedTy = openedArchetype;
   }
 
@@ -4368,11 +4468,11 @@ size_t Solution::getTotalMemory() const {
          overloadChoices.getMemorySize() +
          ConstraintRestrictions.getMemorySize() +
          (Fixes.size() * sizeof(void *)) + DisjunctionChoices.getMemorySize() +
+         AppliedDisjunctions.getMemorySize() +
          OpenedTypes.getMemorySize() + OpenedExistentialTypes.getMemorySize() +
          OpenedPackExpansionTypes.getMemorySize() +
          PackExpansionEnvironments.getMemorySize() +
          size_in_bytes(PackEnvironments) +
-         PackElementGenericEnvironments.size() +
          (DefaultedConstraints.size() * sizeof(void *)) +
          nodeTypes.getMemorySize() +
          keyPathComponentTypes.getMemorySize() +
@@ -7333,9 +7433,29 @@ void ConstraintSystem::recordFixedRequirement(ConstraintLocator *reqLocator,
   if (auto reqInfo = getRequirementInfo(*this, reqLocator)) {
     auto *GP = reqInfo->first;
     auto reqKind = static_cast<unsigned>(reqInfo->second);
-    FixedRequirements.insert(
-        std::make_tuple(GP, reqKind, requirementTy.getPointer()));
+    recordFixedRequirement(GP, reqKind, requirementTy);
   }
+}
+
+void ConstraintSystem::recordFixedRequirement(GenericTypeParamType *GP,
+                                              unsigned reqKind,
+                                              Type requirementTy) {
+  bool inserted = FixedRequirements.insert(
+      std::make_tuple(GP, reqKind, requirementTy.getPointer())).second;
+  if (inserted) {
+    if (isRecordingChanges()) {
+      recordChange(SolverTrail::Change::addedFixedRequirement(
+          GP, reqKind, requirementTy));
+    }
+  }
+}
+
+void ConstraintSystem::removeFixedRequirement(GenericTypeParamType *GP,
+                                              unsigned reqKind,
+                                              Type requirementTy) {
+  auto key = std::make_tuple(GP, reqKind, requirementTy.getPointer());
+  bool erased = FixedRequirements.erase(key);
+  ASSERT(erased);
 }
 
 // Replace any error types encountered with placeholders.

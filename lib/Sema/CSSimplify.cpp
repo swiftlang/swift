@@ -12824,7 +12824,7 @@ bool ConstraintSystem::simplifyAppliedOverloads(
   auto *applicableFn = result->first;
   auto *fnTypeVar = applicableFn->getSecondType()->castTo<TypeVariableType>();
   auto argFnType = applicableFn->getFirstType()->castTo<FunctionType>();
-  AppliedDisjunctions[disjunction->getLocator()] = argFnType;
+  recordAppliedDisjunction(disjunction->getLocator(), argFnType);
   return simplifyAppliedOverloadsImpl(disjunction, fnTypeVar, argFnType,
                                       /*numOptionalUnwraps*/ result->second,
                                       applicableFn->getLocator());
@@ -12844,7 +12844,7 @@ bool ConstraintSystem::simplifyAppliedOverloads(
   if (!disjunction)
     return false;
 
-  AppliedDisjunctions[disjunction->getLocator()] = argFnType;
+  recordAppliedDisjunction(disjunction->getLocator(), argFnType);
   return simplifyAppliedOverloadsImpl(disjunction, fnTypeVar, argFnType,
                                       numOptionalUnwraps, locator);
 }
@@ -14677,8 +14677,7 @@ ConstraintSystem::simplifyRestrictedConstraint(
       addFixConstraint(fix, matchKind, type1, type2, locator);
     }
 
-    ConstraintRestrictions.insert({
-        std::make_pair(type1.getPointer(), type2.getPointer()), restriction});
+    addConversionRestriction(type1, type2, restriction);
     return SolutionKind::Solved;
   }
   case SolutionKind::Unsolved:
@@ -14857,7 +14856,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
     return true;
 
   if (isAugmentingFix(fix)) {
-    Fixes.insert(fix);
+    addFix(fix);
     return false;
   }
 
@@ -14889,7 +14888,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   }
 
   if (!found)
-    Fixes.insert(fix);
+    addFix(fix);
 
   return false;
 }
@@ -14927,7 +14926,11 @@ void ConstraintSystem::recordTypeVariablesAsHoles(Type type) {
 void ConstraintSystem::recordMatchCallArgumentResult(
     ConstraintLocator *locator, MatchCallArgumentResult result) {
   assert(locator->isLastElement<LocatorPathElt::ApplyArgument>());
-  argumentMatchingChoices.insert({locator, result});
+  bool inserted = argumentMatchingChoices.insert({locator, result}).second;
+  if (inserted) {
+    if (isRecordingChanges())
+      recordChange(SolverTrail::Change::recordedMatchCallArgumentResult(locator));
+  }
 }
 
 void ConstraintSystem::recordCallAsFunction(UnresolvedDotExpr *root,

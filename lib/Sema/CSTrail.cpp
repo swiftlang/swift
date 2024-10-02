@@ -118,7 +118,110 @@ SolverTrail::Change::updatedTypeVariable(
   result.Kind = ChangeKind::UpdatedTypeVariable;
   result.Update.TypeVar = typeVar;
   result.Update.ParentOrFixed = parentOrFixed;
-  result.Update.Options = options;
+  result.Options = options;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::addedConversionRestriction(Type srcType, Type dstType) {
+  Change result;
+  result.Kind = ChangeKind::AddedConversionRestriction;
+  result.Restriction.SrcType = srcType;
+  result.Restriction.DstType = dstType;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::addedFix(ConstraintFix *fix) {
+  Change result;
+  result.Kind = ChangeKind::AddedFix;
+  result.Fix = fix;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::addedFixedRequirement(GenericTypeParamType *GP,
+                                           unsigned reqKind,
+                                           Type reqTy) {
+  Change result;
+  result.Kind = ChangeKind::AddedFixedRequirement;
+  result.FixedRequirement.GP = GP;
+  result.FixedRequirement.ReqTy = reqTy;
+  result.Options = reqKind;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::recordedDisjunctionChoice(ConstraintLocator *locator,
+                                               unsigned index) {
+  Change result;
+  result.Kind = ChangeKind::RecordedDisjunctionChoice;
+  result.Locator = locator;
+  result.Options = index;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::recordedAppliedDisjunction(ConstraintLocator *locator) {
+  Change result;
+  result.Kind = ChangeKind::RecordedAppliedDisjunction;
+  result.Locator = locator;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::recordedMatchCallArgumentResult(ConstraintLocator *locator) {
+  Change result;
+  result.Kind = ChangeKind::RecordedMatchCallArgumentResult;
+  result.Locator = locator;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::recordedOpenedTypes(ConstraintLocator *locator) {
+  Change result;
+  result.Kind = ChangeKind::RecordedOpenedTypes;
+  result.Locator = locator;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::recordedOpenedExistentialType(ConstraintLocator *locator) {
+  Change result;
+  result.Kind = ChangeKind::RecordedOpenedExistentialType;
+  result.Locator = locator;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::recordedOpenedPackExpansionType(PackExpansionType *expansionTy) {
+  Change result;
+  result.Kind = ChangeKind::RecordedOpenedPackExpansionType;
+  result.ExpansionTy = expansionTy;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::recordedPackExpansionEnvironment(ConstraintLocator *locator) {
+  Change result;
+  result.Kind = ChangeKind::RecordedPackExpansionEnvironment;
+  result.Locator = locator;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::recordedPackEnvironment(PackElementExpr *packElement) {
+  Change result;
+  result.Kind = ChangeKind::RecordedPackEnvironment;
+  result.ElementExpr = packElement;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::recordedDefaultedConstraint(ConstraintLocator *locator) {
+  Change result;
+  result.Kind = ChangeKind::RecordedDefaultedConstraint;
+  result.Locator = locator;
   return result;
 }
 
@@ -157,8 +260,58 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     break;
 
   case ChangeKind::UpdatedTypeVariable:
-    Update.TypeVar->getImpl().setRawOptions(Update.Options);
+    Update.TypeVar->getImpl().setRawOptions(Options);
     Update.TypeVar->getImpl().ParentOrFixed = Update.ParentOrFixed;
+    break;
+
+  case ChangeKind::AddedConversionRestriction:
+    cs.removeConversionRestriction(Restriction.SrcType,
+                                   Restriction.DstType);
+    break;
+
+  case ChangeKind::AddedFix:
+    cs.removeFix(Fix);
+    break;
+
+  case ChangeKind::AddedFixedRequirement:
+    cs.removeFixedRequirement(FixedRequirement.GP, Options,
+                              FixedRequirement.ReqTy);
+    break;
+
+  case ChangeKind::RecordedDisjunctionChoice:
+    cs.removeDisjunctionChoice(Locator);
+    break;
+
+  case ChangeKind::RecordedAppliedDisjunction:
+    cs.removeAppliedDisjunction(Locator);
+    break;
+
+  case ChangeKind::RecordedMatchCallArgumentResult:
+    cs.removeMatchCallArgumentResult(Locator);
+    break;
+
+  case ChangeKind::RecordedOpenedTypes:
+    cs.removeOpenedType(Locator);
+    break;
+
+  case ChangeKind::RecordedOpenedExistentialType:
+    cs.removeOpenedExistentialType(Locator);
+    break;
+
+  case ChangeKind::RecordedOpenedPackExpansionType:
+    cs.removeOpenedPackExpansionType(ExpansionTy);
+    break;
+
+  case ChangeKind::RecordedPackExpansionEnvironment:
+    cs.removePackExpansionEnvironment(Locator);
+    break;
+
+  case ChangeKind::RecordedPackEnvironment:
+    cs.removePackEnvironment(ElementExpr);
+    break;
+
+  case ChangeKind::RecordedDefaultedConstraint:
+    cs.removeDefaultedConstraint(Locator);
     break;
   }
 }
@@ -229,7 +382,7 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << ")\n";
     break;
 
-  case ChangeKind::UpdatedTypeVariable:
+  case ChangeKind::UpdatedTypeVariable: {
     out << "(updated type variable ";
     Update.TypeVar->print(out, PO);
 
@@ -243,7 +396,84 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
       parentOrFixed.get<TypeBase *>()->print(out, PO);
     }
     out << " with options 0x";
-    out.write_hex(Update.Options);
+    out.write_hex(Options);
+    out << ")\n";
+    break;
+  }
+
+  case ChangeKind::AddedConversionRestriction:
+    out << "(added restriction with source ";
+    Restriction.SrcType->print(out, PO);
+    out << " and destination ";
+    Restriction.DstType->print(out, PO);
+    out << ")\n";
+    break;
+
+  case ChangeKind::AddedFix:
+    out << "(added a fix ";
+    Fix->print(out);
+    out << ")\n";
+    break;
+
+  case ChangeKind::AddedFixedRequirement:
+    out << "(added a fixed requirement ";
+    FixedRequirement.GP->print(out, PO);
+    out << " kind ";
+    out << Options << " ";
+    FixedRequirement.ReqTy->print(out, PO);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedDisjunctionChoice:
+    out << "(recorded disjunction choice at ";
+    Locator->dump(&cs.getASTContext().SourceMgr, out);
+    out << " index ";
+    out << Options << ")\n";
+    break;
+
+  case ChangeKind::RecordedAppliedDisjunction:
+    out << "(recorded applied disjunction at ";
+    Locator->dump(&cs.getASTContext().SourceMgr, out);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedMatchCallArgumentResult:
+    out << "(recorded argument matching choice at ";
+    Locator->dump(&cs.getASTContext().SourceMgr, out);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedOpenedTypes:
+    out << "(recorded list of opened types at ";
+    Locator->dump(&cs.getASTContext().SourceMgr, out);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedOpenedExistentialType:
+    out << "(recorded opened existential type at ";
+    Locator->dump(&cs.getASTContext().SourceMgr, out);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedOpenedPackExpansionType:
+    out << "(recorded opened pack expansion type for ";
+    ExpansionTy->print(out, PO);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedPackExpansionEnvironment:
+    out << "(recorded pack expansion environment at ";
+    Locator->dump(&cs.getASTContext().SourceMgr, out);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedPackEnvironment:
+    out << "(recorded pack environment)\n";
+    break;
+
+  case ChangeKind::RecordedDefaultedConstraint:
+    out << "(recorded defaulted constraint at ";
+    Locator->dump(&cs.getASTContext().SourceMgr, out);
     out << ")\n";
     break;
   }

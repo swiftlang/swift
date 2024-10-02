@@ -4945,6 +4945,7 @@ bool ConstraintSystem::generateConstraints(
     // Cache the outer generic environment, if it exists.
     if (target.getPackElementEnv()) {
       PackElementGenericEnvironments.push_back(target.getPackElementEnv());
+      ASSERT(!isRecordingChanges() && "Need to record a change");
     }
 
     // For a for-each statement, generate constraints for the pattern, where
