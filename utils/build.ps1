@@ -700,20 +700,20 @@ function Fetch-Dependencies {
         $installerWriteTime = (Get-Item $source).LastWriteTime
         $extractedWriteTime = (Get-Item $destination).LastWriteTime
         if ($installerWriteTime -le $extractedWriteTime) {
-            Write-Output "'$ToolchainName' is already extracted and up to date."
+            Write-Output "'$InstallerExeName' is already extracted and up to date."
             return
         }
     }
 
-    Write-Output "Extracting '$ToolchainName' ..."
+    Write-Output "Extracting '$InstallerExeName' ..."
 
     # The new runtime MSI is built to expand files into the immediate directory. So, setup the installation location.
     New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains\$PinnedToolchain\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin | Out-Null
-    Invoke-Program $BinaryCache\WiX-$WiXVersion\tools\net6.0\any\wix.exe -- burn extract $BinaryCache\$ToolchainName.exe -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\
-    Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | % {
+    Invoke-Program $BinaryCache\WiX-$WiXVersion\tools\net6.0\any\wix.exe -- burn extract $BinaryCache\$InstallerExeName -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\
+    Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
       $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
       $TARGETDIR = if ($_.Name -eq "rtl.msi") { "$BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin" } else { "$BinaryCache\toolchains\$ToolchainName" }
-    Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$_ ALLUSERS=0 TARGETDIR=$TARGETDIR
+    Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=$TARGETDIR
     }
   }
 
@@ -2612,9 +2612,9 @@ if (-not $SkipBuild) {
 }
 
 if ($Clean) {
-  10..[HostComponent].getEnumValues()[-1] | % { Remove-Item -Force -Recurse "$BinaryCache\$_" -ErrorAction Ignore }
+  10..[HostComponent].getEnumValues()[-1] | ForEach-Object { Remove-Item -Force -Recurse "$BinaryCache\$_" -ErrorAction Ignore }
   foreach ($Arch in $WindowsSDKArchs) {
-    0..[TargetComponent].getEnumValues()[-1] | % { Remove-Item -Force -Recurse "$BinaryCache\$($Arch.BuildID + $_)" -ErrorAction Ignore }
+    0..[TargetComponent].getEnumValues()[-1] | ForEach-Object { Remove-Item -Force -Recurse "$BinaryCache\$($Arch.BuildID + $_)" -ErrorAction Ignore }
   }
 }
 
@@ -2774,6 +2774,6 @@ if (-not $IsCrossCompiling) {
   exit 1
 } finally {
   if ($Summary) {
-    $TimingData | Select Platform,Arch,Checkout,"Elapsed Time" | Sort -Descending -Property "Elapsed Time" | Format-Table -AutoSize
+    $TimingData | Select-Object Platform,Arch,Checkout,"Elapsed Time" | Sort-Object -Descending -Property "Elapsed Time" | Format-Table -AutoSize
   }
 }
