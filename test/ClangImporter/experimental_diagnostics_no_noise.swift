@@ -60,10 +60,10 @@ s.c = 5
 // CHECK-NEXT: ctypes.h:{{[0-9]+}}:{{[0-9]+}}: note: built-in type 'Complex' not supported
 // CHECK-NEXT:   int _Complex c;
 // CHECK-NEXT:   ^
-// CHECK-NEXT: ctypes.PartialImport:{{[0-9]+}}:{{[0-9]+}}: note: did you mean 'a'?
+// CHECK-NEXT: ctypes.PartialImport.a:{{[0-9]+}}:{{[0-9]+}}: note: did you mean 'a'?
 // CHECK-NEXT:     public var a: Int32
 // CHECK-NEXT:                ^
-// CHECK-NEXT: ctypes.PartialImport:{{[0-9]+}}:{{[0-9]+}}: note: did you mean 'b'?
+// CHECK-NEXT: ctypes.PartialImport.b:{{[0-9]+}}:{{[0-9]+}}: note: did you mean 'b'?
 // CHECK-NEXT:     public var b: Int32
 // CHECK-NEXT:                ^
 
