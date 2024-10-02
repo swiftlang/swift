@@ -25,7 +25,7 @@ enum PluginError: String, Error, CustomStringConvertible {
   var description: String { rawValue }
 }
 
-@_cdecl("swift_ASTGen_initializePlugin")
+@_cdecl("swift_Macros_initializePlugin")
 public func _initializePlugin(
   opaqueHandle: UnsafeMutableRawPointer,
   cxxDiagnosticEngine: UnsafeMutableRawPointer?
@@ -42,7 +42,7 @@ public func _initializePlugin(
   }
 }
 
-@_cdecl("swift_ASTGen_deinitializePlugin")
+@_cdecl("swift_Macros_deinitializePlugin")
 public func _deinitializePlugin(
   opaqueHandle: UnsafeMutableRawPointer
 ) {
@@ -52,8 +52,8 @@ public func _deinitializePlugin(
 
 /// Load the library plugin in the plugin server.
 /// This should be called inside lock.
-@_cdecl("swift_ASTGen_pluginServerLoadLibraryPlugin")
-func swift_ASTGen_pluginServerLoadLibraryPlugin(
+@_cdecl("swift_Macros_pluginServerLoadLibraryPlugin")
+func swift_Macros_pluginServerLoadLibraryPlugin(
   opaqueHandle: UnsafeMutableRawPointer,
   libraryPath: UnsafePointer<CChar>,
   moduleName: UnsafePointer<CChar>,

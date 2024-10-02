@@ -56,7 +56,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/Bridging/ASTGen.h"
+#include "swift/Bridging/Macros.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -1153,7 +1153,7 @@ static bool checkExpressionMacroDefaultValueRestrictions(ParamDecl *param) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
   auto *DC = param->getInnermostDeclContext();
   const SourceFile *SF = DC->getParentSourceFile();
-  return swift_ASTGen_checkDefaultArgumentMacroExpression(
+  return swift_Macros_checkDefaultArgumentMacroExpression(
       &ctx.Diags, SF->getExportedSourceFile(),
       initExpr->getLoc().getOpaquePointerValue());
 #else

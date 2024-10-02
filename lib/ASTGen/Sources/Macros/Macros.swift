@@ -45,7 +45,7 @@ extension MacroRole {
   }
 }
 
-@_cdecl("swift_ASTGen_resolveExternalMacro")
+@_cdecl("swift_Macros_resolveExternalMacro")
 public func resolveExternalMacro(
   moduleName: UnsafePointer<CChar>,
   typeName: UnsafePointer<CChar>,
@@ -65,7 +65,7 @@ public func resolveExternalMacro(
   return UnsafeRawPointer(exportedPtr)
 }
 
-@_cdecl("swift_ASTGen_destroyExternalMacro")
+@_cdecl("swift_Macros_destroyExternalMacro")
 public func destroyExternalMacro(
   macroPtr: UnsafeMutableRawPointer
 ) {
@@ -139,7 +139,7 @@ fileprivate func identifierFromStringLiteral(_ node: ExprSyntax) -> String? {
 ///
 /// - Returns: `true` if all restrictions are satisfied, `false` if diagnostics
 /// are emitted.
-@_cdecl("swift_ASTGen_checkDefaultArgumentMacroExpression")
+@_cdecl("swift_Macros_checkDefaultArgumentMacroExpression")
 func checkDefaultArgumentMacroExpression(
   diagEnginePtr: UnsafeMutableRawPointer,
   sourceFilePtr: UnsafeRawPointer,
@@ -196,7 +196,7 @@ func checkDefaultArgumentMacroExpression(
 /// (start offset, end offset, parameter index): the [start offset, end offset)
 /// range in the macro expansion expression should be replaced with the
 /// argument matching the corresponding parameter.
-@_cdecl("swift_ASTGen_checkMacroDefinition")
+@_cdecl("swift_Macros_checkMacroDefinition")
 func checkMacroDefinition(
   diagEnginePtr: UnsafeMutableRawPointer,
   sourceFileBuffer: BridgedStringRef,
@@ -399,7 +399,7 @@ func checkMacroDefinition(
   }
 }
 
-@_cdecl("swift_ASTGen_freeExpansionReplacements")
+@_cdecl("swift_Macros_freeExpansionReplacements")
 public func freeExpansionReplacements(
   pointer: UnsafeMutablePointer<Int>?,
   numReplacements: Int
@@ -420,7 +420,7 @@ func makeExpansionOutputResult(
   return 0
 }
 
-@_cdecl("swift_ASTGen_expandFreestandingMacro")
+@_cdecl("swift_Macros_expandFreestandingMacro")
 @usableFromInline
 func expandFreestandingMacro(
   diagEnginePtr: UnsafeMutableRawPointer,
@@ -556,7 +556,7 @@ func expandFreestandingMacroImpl(
   }
 }
 
-@_cdecl("swift_ASTGen_expandAttachedMacro")
+@_cdecl("swift_Macros_expandAttachedMacro")
 @usableFromInline
 func expandAttachedMacro(
   diagEnginePtr: UnsafeMutableRawPointer,
