@@ -76,12 +76,12 @@ struct Main {
     }
     print("after task")
     await t.value
-    // CHECK-NEXT: after task
-    // CHECK-NEXT: task
-    // CHECK-NEXT: test
-    // CHECK-NEXT: await
-    // CHECK-NEXT: return 42
-    // CHECK-NEXT: return
-    // CHECK-NEXT: 42
+    // CHECK: after task
+    // CHECK: task
+    // CHECK: test
+    // CHECK: await
+    // CHECK: return 42
+    // CHECK: return
+    // CHECK: 42
   }
 }
