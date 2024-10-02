@@ -536,4 +536,4 @@ void TaskLocal::Storage::copyToOnlyOnlyFromCurrentGroup(AsyncTask *target) {
 }
 
 #define OVERRIDE_TASK_LOCAL COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

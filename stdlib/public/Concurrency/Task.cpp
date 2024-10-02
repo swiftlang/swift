@@ -1832,4 +1832,4 @@ static void swift_task_startOnMainActorImpl(AsyncTask* task) {
   }
 #endif // #else SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
 
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

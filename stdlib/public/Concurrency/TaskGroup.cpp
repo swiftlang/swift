@@ -2084,4 +2084,4 @@ static bool swift_taskGroup_addPendingImpl(TaskGroup *_group, bool unconditional
 }
 
 #define OVERRIDE_TASK_GROUP COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

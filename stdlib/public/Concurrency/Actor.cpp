@@ -2310,8 +2310,7 @@ void swift::swift_executor_escalate(SerialExecutorRef executor, AsyncTask *task,
 }
 
 #define OVERRIDE_ACTOR COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
-
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"
 
 /*****************************************************************************/
 /***************************** DISTRIBUTED ACTOR *****************************/
