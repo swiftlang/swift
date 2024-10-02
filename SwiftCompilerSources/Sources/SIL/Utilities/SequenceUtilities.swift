@@ -104,20 +104,28 @@ public extension CollectionLikeSequence {
 
 // Also make the lazy sequences a CollectionLikeSequence if the underlying sequence is one.
 
-extension LazySequence : CollectionLikeSequence,
-                         FormattedLikeArray, CustomStringConvertible, CustomReflectable
+extension LazySequence : /*@retroactive*/ SIL.CollectionLikeSequence,
+                         /*@retroactive*/ SIL.FormattedLikeArray,
+                         /*@retroactive*/ Swift.CustomStringConvertible,
+                         /*@retroactive*/ Swift.CustomReflectable
                          where Base: CollectionLikeSequence {}
 
-extension FlattenSequence : CollectionLikeSequence,
-                            FormattedLikeArray, CustomStringConvertible, CustomReflectable
+extension FlattenSequence : /*@retroactive*/ SIL.CollectionLikeSequence,
+                            /*@retroactive*/ SIL.FormattedLikeArray,
+                            /*@retroactive*/ Swift.CustomStringConvertible,
+                            /*@retroactive*/ Swift.CustomReflectable
                             where Base: CollectionLikeSequence {}
 
-extension LazyMapSequence : CollectionLikeSequence,
-                            FormattedLikeArray, CustomStringConvertible, CustomReflectable
+extension LazyMapSequence : /*@retroactive*/ SIL.CollectionLikeSequence,
+                            /*@retroactive*/ SIL.FormattedLikeArray,
+                            /*@retroactive*/ Swift.CustomStringConvertible,
+                            /*@retroactive*/ Swift.CustomReflectable
                             where Base: CollectionLikeSequence {}
 
-extension LazyFilterSequence : CollectionLikeSequence,
-                               FormattedLikeArray, CustomStringConvertible, CustomReflectable
+extension LazyFilterSequence : /*@retroactive*/ SIL.CollectionLikeSequence,
+                               /*@retroactive*/ SIL.FormattedLikeArray,
+                               /*@retroactive*/ Swift.CustomStringConvertible,
+                               /*@retroactive*/ Swift.CustomReflectable
                                where Base: CollectionLikeSequence {}
 
 //===----------------------------------------------------------------------===//
