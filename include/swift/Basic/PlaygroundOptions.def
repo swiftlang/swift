@@ -37,4 +37,7 @@ PLAYGROUND_OPTION(ScopeEvents, "Scope entry/exit events",
 PLAYGROUND_OPTION(FunctionParameters, "Values of function parameters",
   /* enabled by default */ true, /* enabled in high-perf mode */ false)
 
+PLAYGROUND_OPTION(SelectiveTransform, "Only transform explicitly annotated code",
+  /* enabled by default */ false, /* enabled in high-perf mode */ false)
+
 #undef PLAYGROUND_OPTION

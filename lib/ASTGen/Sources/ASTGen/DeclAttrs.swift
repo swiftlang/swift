@@ -243,6 +243,7 @@ extension ASTGenVisitor {
         .nsManaged,
         .objCMembers,
         .objCNonLazyRealization,
+        .playgroundTransformed,
         .preconcurrency,
         .preInverseGenerics,
         .propertyWrapper,
