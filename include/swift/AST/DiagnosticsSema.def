@@ -7948,9 +7948,9 @@ ERROR(pack_iteration_where_clause_not_supported, none,
 //------------------------------------------------------------------------------
 
 ERROR(lifetime_dependence_invalid_param_name, none,
-      "invalid parameter name specified %0", (Identifier))
+      "invalid parameter name specified '%0'", (StringRef))
 ERROR(lifetime_dependence_invalid_param_index, none,
-      "invalid parameter index specified %0", (unsigned))
+      "invalid parameter index specified '%0'", (unsigned))
 ERROR(lifetime_dependence_invalid_self_in_static, none,
       "invalid lifetime dependence specifier on non-existent self", ())
 ERROR(lifetime_dependence_invalid_self_in_init, none,
