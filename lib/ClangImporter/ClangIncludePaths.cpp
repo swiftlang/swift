@@ -439,17 +439,16 @@ GetPlatformAuxiliaryFile(StringRef Platform, StringRef File,
   return "";
 }
 
-SmallVector<std::pair<std::string, std::string>, 2> GetWindowsFileMappings(
-    ASTContext &Context,
+void GetWindowsFileMappings(
+    ClangInvocationFileMapping &fileMapping, ASTContext &Context,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &driverVFS,
     bool &requiresBuiltinHeadersInSystemModules) {
   const llvm::Triple &Triple = Context.LangOpts.Target;
   const SearchPathOptions &SearchPathOpts = Context.SearchPathOpts;
-  SmallVector<std::pair<std::string, std::string>, 2> Mappings;
   std::string AuxiliaryFile;
 
   if (!Triple.isWindowsMSVCEnvironment())
-    return Mappings;
+    return;
 
   auto [Driver, clangDiagEngine] = ClangImporter::createClangDriver(
       Context.LangOpts, Context.ClangImporterOpts, driverVFS);
@@ -478,7 +477,8 @@ SmallVector<std::pair<std::string, std::string>, 2> GetWindowsFileMappings(
     AuxiliaryFile =
         GetPlatformAuxiliaryFile("windows", "winsdk.modulemap", SearchPathOpts);
     if (!AuxiliaryFile.empty())
-      Mappings.emplace_back(std::string(WinSDKInjection), AuxiliaryFile);
+      fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
+                                               AuxiliaryFile);
   }
 
   struct {
@@ -506,7 +506,8 @@ SmallVector<std::pair<std::string, std::string>, 2> GetWindowsFileMappings(
       // cycle goes away. Note that -fbuiltin-headers-in-system-modules does
       // nothing to fix the same problem with C++ headers, and is generally
       // fragile.
-      Mappings.emplace_back(std::string(UCRTInjection), AuxiliaryFile);
+      fileMapping.redirectedFiles.emplace_back(std::string(UCRTInjection),
+                                               AuxiliaryFile);
       requiresBuiltinHeadersInSystemModules = true;
     }
   }
@@ -533,7 +534,8 @@ SmallVector<std::pair<std::string, std::string>, 2> GetWindowsFileMappings(
         GetPlatformAuxiliaryFile("windows", "vcruntime.modulemap",
                                  SearchPathOpts);
     if (!AuxiliaryFile.empty())
-      Mappings.emplace_back(std::string(VCToolsInjection), AuxiliaryFile);
+      fileMapping.redirectedFiles.emplace_back(std::string(VCToolsInjection),
+                                               AuxiliaryFile);
 
     llvm::sys::path::remove_filename(VCToolsInjection);
     llvm::sys::path::append(VCToolsInjection, "vcruntime.apinotes");
@@ -541,10 +543,19 @@ SmallVector<std::pair<std::string, std::string>, 2> GetWindowsFileMappings(
         GetPlatformAuxiliaryFile("windows", "vcruntime.apinotes",
                                  SearchPathOpts);
     if (!AuxiliaryFile.empty())
-      Mappings.emplace_back(std::string(VCToolsInjection), AuxiliaryFile);
-  }
+      fileMapping.redirectedFiles.emplace_back(std::string(VCToolsInjection),
+                                               AuxiliaryFile);
 
-  return Mappings;
+    // __msvc_bit_utils.hpp was added in a recent VS 2022 version. It has to be
+    // referenced from the modulemap directly to avoid modularization errors.
+    // Older VS versions might not have it. Let's inject an empty header file if
+    // it isn't available.
+    llvm::sys::path::remove_filename(VCToolsInjection);
+    llvm::sys::path::append(VCToolsInjection, "__msvc_bit_utils.hpp");
+    if (!llvm::sys::fs::exists(VCToolsInjection))
+      fileMapping.overridenFiles.emplace_back(std::string(VCToolsInjection),
+                                              "");
+  }
 }
 } // namespace
 
@@ -615,7 +626,7 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
   if (ctx.LangOpts.EnableCXXInterop)
     getLibStdCxxFileMapping(result, ctx, vfs, suppressDiagnostic);
 
-  result.redirectedFiles.append(GetWindowsFileMappings(
-      ctx, vfs, result.requiresBuiltinHeadersInSystemModules));
+  GetWindowsFileMappings(result, ctx, vfs,
+                         result.requiresBuiltinHeadersInSystemModules);
   return result;
 }
