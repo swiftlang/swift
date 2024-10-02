@@ -2823,6 +2823,15 @@ ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(SourceLoc atLoc,
       diag::expected_rparen_after_lifetime_dependence, [&]() -> ParserStatus {
         ParserStatus listStatus;
         foundParamId = true;
+
+        auto lifetimeDependenceKind = ParsedLifetimeDependenceKind::Default;
+        if (Tok.isContextualKeyword("borrow") &&
+            peekToken().isAny(tok::identifier, tok::integer_literal,
+                              tok::kw_self)) {
+          lifetimeDependenceKind = ParsedLifetimeDependenceKind::Scope;
+          consumeToken();
+        }
+
         switch (Tok.getKind()) {
         case tok::identifier: {
           Identifier paramName;
@@ -2832,8 +2841,8 @@ ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(SourceLoc atLoc,
             lifetimeEntries.push_back(
                 LifetimeEntry::getImmortalLifetimeEntry(paramLoc));
           } else {
-            lifetimeEntries.push_back(
-                LifetimeEntry::getNamedLifetimeEntry(paramLoc, paramName));
+            lifetimeEntries.push_back(LifetimeEntry::getNamedLifetimeEntry(
+                paramLoc, paramName, lifetimeDependenceKind));
           }
           break;
         }
@@ -2846,14 +2855,14 @@ ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(SourceLoc atLoc,
             listStatus.setIsParseError();
             return listStatus;
           }
-          lifetimeEntries.push_back(
-              LifetimeEntry::getOrderedLifetimeEntry(paramLoc, paramNum));
+          lifetimeEntries.push_back(LifetimeEntry::getOrderedLifetimeEntry(
+              paramLoc, paramNum, lifetimeDependenceKind));
           break;
         }
         case tok::kw_self: {
           auto paramLoc = consumeToken(tok::kw_self);
-          lifetimeEntries.push_back(
-              LifetimeEntry::getSelfLifetimeEntry(paramLoc));
+          lifetimeEntries.push_back(LifetimeEntry::getSelfLifetimeEntry(
+              paramLoc, lifetimeDependenceKind));
           break;
         }
         default:

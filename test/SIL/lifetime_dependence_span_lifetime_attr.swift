@@ -160,7 +160,7 @@ extension Span {
 
 extension ContiguousArray {
   public var view: Span<Element> {
-    @lifetime(self)
+    @lifetime(borrow self)
     borrowing _read {
       yield Span(
         baseAddress: _baseAddressIfContiguous!, count: count, dependsOn: self
