@@ -301,7 +301,7 @@ struct LocalVariableAccessMap: Collection, CustomStringConvertible {
 
   subscript(instruction: Instruction) -> LocalVariableAccessInfo? { accessMap[instruction] }
 
-  public var description: String {
+  var description: String {
     "Access map:\n" + map({String(describing: $0)}).joined(separator: "\n")
   }
 }

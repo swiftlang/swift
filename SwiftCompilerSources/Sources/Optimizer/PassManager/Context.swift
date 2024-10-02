@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 import OptimizerBridging
 
@@ -61,7 +62,7 @@ extension Context {
     }
   }
 
-  func lookupWitnessTable(for conformance: ProtocolConformance) -> WitnessTable? {
+  func lookupWitnessTable(for conformance: Conformance) -> WitnessTable? {
     return _bridged.lookupWitnessTable(conformance.bridged).witnessTable
   }
 
@@ -286,7 +287,7 @@ struct FunctionPassContext : MutatingContext {
   }
 
   var swiftArrayDecl: NominalTypeDecl {
-    NominalTypeDecl(_bridged: _bridged.getSwiftArrayDecl())
+    _bridged.getSwiftArrayDecl().getAs(NominalTypeDecl.self)
   }
 
   func loadFunction(name: StaticString, loadCalleesRecursively: Bool) -> Function? {

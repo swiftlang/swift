@@ -191,9 +191,9 @@ class DeadFunctionAndGlobalElimination {
           }
         } break;
 
-        case SILWitnessTable::AssociatedTypeProtocol: {
+        case SILWitnessTable::AssociatedConformance: {
           ProtocolConformanceRef CRef =
-             entry.getAssociatedTypeProtocolWitness().Witness;
+             entry.getAssociatedConformanceWitness().Witness;
           if (CRef.isConcrete())
             ensureAliveConformance(CRef.getConcrete());
           break;

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,8 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SILBridging
+import Basic
+import ASTBridging
 
+/// SubstitutionMap describes the mapping of abstract types to replacement types,
+/// together with associated conformances to use for deriving nested types and conformances.
+///
+/// Substitution maps are primarily used when performing substitutions into any entity that
+/// can reference type parameters and conformances.
 public struct SubstitutionMap {
   public let bridged: BridgedSubstitutionMap
 
@@ -29,15 +35,6 @@ public struct SubstitutionMap {
 
   public var conformances: ConformanceArray { ConformanceArray(substitutionMap: self) }
 
-  public var replacementTypes: OptionalTypeArray {
-    let types = BridgedTypeArray.fromReplacementTypes(bridged)
-    return OptionalTypeArray(bridged: types)
-  }
-
-  public func getMethodSubstitutions(for method: Function) -> SubstitutionMap {
-    return SubstitutionMap(bridged: bridged.getMethodSubstitutions(method.bridged))
-  }
-
   public struct ConformanceArray : BridgedRandomAccessCollection {
     fileprivate let bridgedSubs: BridgedSubstitutionMap
     public let count: Int
@@ -50,9 +47,9 @@ public struct SubstitutionMap {
     public var startIndex: Int { return 0 }
     public var endIndex: Int { return count }
 
-    public subscript(_ index: Int) -> ProtocolConformance {
+    public subscript(_ index: Int) -> Conformance {
       assert(index >= startIndex && index < endIndex)
-      return ProtocolConformance(bridged: bridgedSubs.getConformance(index))
+      return Conformance(bridged: bridgedSubs.getConformance(index))
     }
   }
 }

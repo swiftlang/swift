@@ -10,9 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-import ASTBridging
+import AST
 import SIL
 import OptimizerBridging
+
+// Default to SIL.Type within the Optimizer module.
+typealias Type = SIL.`Type`
 
 extension Value {
   var lookThroughBorrow: Value {
@@ -411,7 +414,7 @@ extension StoreInst {
     let builder = Builder(after: self, context)
     let type = source.type
     if type.isStruct {
-      if type.nominal.isStructWithUnreferenceableStorage {
+      if (type.nominal as! StructDecl).hasUnreferenceableStorage {
         return
       }
       if parentFunction.hasOwnership && source.ownership != .none {
@@ -465,7 +468,7 @@ extension LoadInst {
     var elements = [Value]()
     let builder = Builder(before: self, context)
     if type.isStruct {
-      if type.nominal.isStructWithUnreferenceableStorage {
+      if (type.nominal as! StructDecl).hasUnreferenceableStorage {
         return
       }
       guard let fields = type.getNominalFields(in: parentFunction) else {

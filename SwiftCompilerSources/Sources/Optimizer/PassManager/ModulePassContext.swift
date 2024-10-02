@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 import OptimizerBridging
 
@@ -21,7 +22,7 @@ import OptimizerBridging
 struct ModulePassContext : Context, CustomStringConvertible {
   let _bridged: BridgedPassContext
 
-  public var description: String {
+  var description: String {
     return String(taking: _bridged.getModuleDescription())
   }
 
@@ -144,7 +145,7 @@ struct ModulePassContext : Context, CustomStringConvertible {
 
   @discardableResult
   func createWitnessTable(entries: [WitnessTable.Entry],
-                          conformance: ProtocolConformance,
+                          conformance: Conformance,
                           linkage: Linkage,
                           serialized: Bool) -> WitnessTable
   {

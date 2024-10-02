@@ -4149,10 +4149,10 @@ void SILWitnessTable::Entry::print(llvm::raw_ostream &out, bool verbose,
     assocWitness.Witness->print(out, options);
     break;
   }
-  case WitnessKind::AssociatedTypeProtocol: {
-    // associated_type_protocol (AssociatedTypeName: Protocol): <conformance>
-    auto &assocProtoWitness = getAssociatedTypeProtocolWitness();
-    out << "associated_type_protocol (";
+  case WitnessKind::AssociatedConformance: {
+    // associated_conformance (AssociatedTypeName: Protocol): <conformance>
+    auto &assocProtoWitness = getAssociatedConformanceWitness();
+    out << "associated_conformance (";
     (void) printAssociatedTypePath(out, assocProtoWitness.Requirement);
     out << ": " << assocProtoWitness.Protocol->getName() << "): ";
     if (assocProtoWitness.Witness.isConcrete())

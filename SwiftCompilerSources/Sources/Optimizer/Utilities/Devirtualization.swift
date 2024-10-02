@@ -34,13 +34,13 @@ private func devirtualize(destroy: some DevirtualizableDestroy, _ context: some 
     return true
   }
 
-  if !type.isNominal {
+  guard let nominal = type.nominal else {
     // E.g. a non-copyable generic function parameter
     return true
   }
 
-  if type.nominal.hasValueDeinit && !destroy.shouldDropDeinit {
-    guard let deinitFunc = context.lookupDeinit(ofNominal: type.nominal) else {
+  if nominal.valueTypeDestructor != nil && !destroy.shouldDropDeinit {
+    guard let deinitFunc = context.lookupDeinit(ofNominal: nominal) else {
       return false
     }
     destroy.createDeinitCall(to: deinitFunc, context)

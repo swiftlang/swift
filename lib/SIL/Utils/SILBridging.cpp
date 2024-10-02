@@ -210,6 +210,18 @@ BridgedOwnedString BridgedFunction::getDebugDescription() const {
   return str;
 }
 
+BridgedSubstitutionMap BridgedFunction::getMethodSubstitutions(BridgedSubstitutionMap contextSubs) const {
+  swift::SILFunction *f = getFunction();
+  swift::GenericSignature genericSig = f->getLoweredFunctionType()->getInvocationGenericSignature();
+
+  if (!genericSig || genericSig->areAllParamsConcrete())
+    return swift::SubstitutionMap();
+
+  return swift::SubstitutionMap::get(genericSig,
+                                     swift::QuerySubstitutionMap{contextSubs.unbridged()},
+                                     swift::LookUpConformanceInModule());
+}
+
 //===----------------------------------------------------------------------===//
 //                               SILBasicBlock
 //===----------------------------------------------------------------------===//
@@ -321,6 +333,17 @@ bool BridgedGlobalVar::mustBeInitializedStatically() const {
 }
 
 //===----------------------------------------------------------------------===//
+//                            SILDeclRef
+//===----------------------------------------------------------------------===//
+
+BridgedOwnedString BridgedDeclRef::getDebugDescription() const {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  unbridged().print(os);
+  return str;
+}
+
+//===----------------------------------------------------------------------===//
 //                            SILVTable
 //===----------------------------------------------------------------------===//
 
@@ -357,7 +380,7 @@ static_assert(sizeof(BridgedWitnessTableEntry) >= sizeof(swift::SILWitnessTable:
 static_assert((int)BridgedWitnessTableEntry::Kind::invalid == (int)swift::SILWitnessTable::WitnessKind::Invalid);
 static_assert((int)BridgedWitnessTableEntry::Kind::method == (int)swift::SILWitnessTable::WitnessKind::Method);
 static_assert((int)BridgedWitnessTableEntry::Kind::associatedType == (int)swift::SILWitnessTable::WitnessKind::AssociatedType);
-static_assert((int)BridgedWitnessTableEntry::Kind::associatedTypeProtocol == (int)swift::SILWitnessTable::WitnessKind::AssociatedTypeProtocol);
+static_assert((int)BridgedWitnessTableEntry::Kind::associatedConformance == (int)swift::SILWitnessTable::WitnessKind::AssociatedConformance);
 static_assert((int)BridgedWitnessTableEntry::Kind::baseProtocol == (int)swift::SILWitnessTable::WitnessKind::BaseProtocol);
 
 BridgedOwnedString BridgedWitnessTableEntry::getDebugDescription() const {
@@ -382,25 +405,6 @@ BridgedOwnedString BridgedDefaultWitnessTable::getDebugDescription() const {
   table->print(os);
   str.pop_back(); // Remove trailing newline.
   return str;
-}
-
-//===----------------------------------------------------------------------===//
-//                               SubstitutionMap
-//===----------------------------------------------------------------------===//
-
-static_assert(sizeof(BridgedSubstitutionMap) >= sizeof(swift::SubstitutionMap),
-              "BridgedSubstitutionMap has wrong size");
-
-BridgedSubstitutionMap BridgedSubstitutionMap::getMethodSubstitutions(BridgedFunction method) const {
-  swift::SILFunction *f = method.getFunction();
-  swift::GenericSignature genericSig = f->getLoweredFunctionType()->getInvocationGenericSignature();
-
-  if (!genericSig || genericSig->areAllParamsConcrete())
-    return swift::SubstitutionMap();
-
-  return swift::SubstitutionMap::get(genericSig,
-                                     swift::QuerySubstitutionMap{unbridged()},
-                                     swift::LookUpConformanceInModule());
 }
 
 //===----------------------------------------------------------------------===//

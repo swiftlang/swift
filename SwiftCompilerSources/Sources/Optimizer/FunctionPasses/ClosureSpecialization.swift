@@ -99,7 +99,9 @@
 /// }
 /// ```
 
+import AST
 import SIL
+import SILBridging
 
 private let verbose = false
 
@@ -1085,7 +1087,7 @@ private extension ParameterInfo {
   }
 
   var isTrivialNoescapeClosure: Bool {
-    self.type.SILFunctionType_isTrivialNoescape()
+    SILFunctionType_isTrivialNoescape(type.bridged)
   }
 }
 
@@ -1175,31 +1177,31 @@ private struct OrderedDict<Key: Hashable, Value> {
   private var valueIndexDict: [Key: Int] = [:]
   private var entryList: [(Key, Value)] = []
 
-  public subscript(key: Key) -> Value? {
+  subscript(key: Key) -> Value? {
     if let index = valueIndexDict[key] {
       return entryList[index].1
     }
     return nil
   }
 
-  public mutating func insert(key: Key, value: Value) {
+  mutating func insert(key: Key, value: Value) {
     if valueIndexDict[key] == nil {
       valueIndexDict[key] = entryList.count
       entryList.append((key, value))
     }
   }
 
-  public mutating func update(key: Key, value: Value) {
+  mutating func update(key: Key, value: Value) {
     if let index = valueIndexDict[key] {
       entryList[index].1 = value
     }
   }
 
-  public var keys: LazyMapSequence<Array<(Key, Value)>, Key> {
+  var keys: LazyMapSequence<Array<(Key, Value)>, Key> {
     entryList.lazy.map { $0.0 }
   }
 
-  public var values: LazyMapSequence<Array<(Key, Value)>, Value> {
+  var values: LazyMapSequence<Array<(Key, Value)>, Value> {
     entryList.lazy.map { $0.1 }
   }
 }
@@ -1298,11 +1300,11 @@ private struct CallSite {
   let applySite: ApplySite
   var closureArgDescriptors: [ClosureArgDescriptor] = []
 
-  public init(applySite: ApplySite) {
+  init(applySite: ApplySite) {
     self.applySite = applySite
   }
 
-  public mutating func appendClosureArgDescriptor(_ descriptor: ClosureArgDescriptor) {
+  mutating func appendClosureArgDescriptor(_ descriptor: ClosureArgDescriptor) {
     self.closureArgDescriptors.append(descriptor)
   }
 
