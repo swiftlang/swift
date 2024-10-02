@@ -19,8 +19,8 @@ _ = bar.methodReturningForwardDeclaredInterface()
 let s: PartialImport
 s.c = 5
 // CHECK: experimental_diagnostics_opt_out.swift:{{[0-9]+}}:{{[0-9]+}}: error: value of type 'PartialImport' has no member 'c'
-// CHECK: ctypes.PartialImport:{{[0-9]+}}:{{[0-9]+}}: note: did you mean 'a'?
-// CHECK: ctypes.PartialImport:{{[0-9]+}}:{{[0-9]+}}: note: did you mean 'b'?
+// CHECK: ctypes.PartialImport.a:{{[0-9]+}}:{{[0-9]+}}: note: did you mean 'a'?
+// CHECK: ctypes.PartialImport.b:{{[0-9]+}}:{{[0-9]+}}: note: did you mean 'b'?
 // CHECK-NOT: warning
 // CHECK-NOT: error
 // CHECK-NOT: note

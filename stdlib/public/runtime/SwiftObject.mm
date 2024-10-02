@@ -1774,7 +1774,7 @@ const ClassMetadata *swift::getRootSuperclass() {
 }
 
 #define OVERRIDE_OBJC COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"
 
 #define OVERRIDE_FOREIGN COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"
