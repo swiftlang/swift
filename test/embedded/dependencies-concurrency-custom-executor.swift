@@ -26,6 +26,7 @@
 // DEP: ___stack_chk_guard
 // DEP: ___stderrp
 // DEP: _abort
+// DEP: _clock_gettime
 // DEP: _exit
 // DEP: _fprintf
 // DEP: _free
@@ -38,6 +39,7 @@
 // DEP: _putchar
 // DEP: _strlen
 // DEP: _vfprintf
+// DEP: _vprintf
 // DEP: _vsnprintf
 // DEP: _write
 
