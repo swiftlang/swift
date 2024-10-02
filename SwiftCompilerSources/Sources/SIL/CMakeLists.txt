@@ -9,12 +9,14 @@
 add_swift_compiler_module(SIL
   DEPENDS
     Basic
+    AST
   SOURCES
     ApplySite.swift
     Argument.swift
+    ASTExtensions.swift
     BasicBlock.swift
     Builder.swift
-    Declarations.swift
+    DeclRef.swift
     Effects.swift
     ForwardingInstruction.swift
     Function.swift
@@ -24,10 +26,8 @@ add_swift_compiler_module(SIL
     Linkage.swift
     Location.swift
     Operand.swift
-    ProtocolConformance.swift
     Registration.swift
     SILStage.swift
-    SubstitutionMap.swift
     Type.swift
     Value.swift
     VTable.swift

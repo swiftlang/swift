@@ -284,12 +284,12 @@ private func checkForGenericMethods(in witnessTable: WitnessTable,
                                     errorLocation: Location,
                                     _ context: ModulePassContext)
 {
-  for entry in witnessTable.entries where entry.kind == .method {
-    if let method = entry.methodFunction,
-       method.isGeneric
+  for entry in witnessTable.entries {
+    if case .method(let requirement, let witness) = entry,
+       let witness,
+       witness.isGeneric
     {
-      context.diagnosticEngine.diagnose(errorLocation.sourceLoc, .cannot_specialize_witness_method,
-                                        entry.methodRequirement)
+      context.diagnosticEngine.diagnose(errorLocation.sourceLoc, .cannot_specialize_witness_method, requirement)
       return
     }
   }
@@ -509,8 +509,9 @@ fileprivate struct FunctionWorklist {
   }
 
   mutating func addWitnessMethods(of witnessTable: WitnessTable) {
-    for entry in witnessTable.entries where entry.kind == .method {
-      if let method = entry.methodFunction,
+    for entry in witnessTable.entries {
+      if case .method(_, let witness) = entry,
+         let method = witness,
          // A new witness table can still contain a generic function if the method couldn't be specialized for
          // some reason and an error has been printed. Exclude generic functions to not run into an assert later.
          !method.isGeneric

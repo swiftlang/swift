@@ -48,7 +48,7 @@ bb0(%0 : $*Self):
 
 
 // CHECK-LABEL: sil_default_witness_table ResilientProtocol {
-// CHECK: associated_type_protocol (T: Proto): Wrapper<Self>: specialize <Self> (<T> Wrapper<T>: Proto module witness_tables)
+// CHECK: associated_conformance (T: Proto): Wrapper<Self>: specialize <Self> (<T> Wrapper<T>: Proto module witness_tables)
 // CHECK: associated_type T: Wrapper<Self>
 // CHECK: no_default
 // CHECK: no_default
@@ -58,7 +58,7 @@ bb0(%0 : $*Self):
 // CHECK: }
 
 sil_default_witness_table ResilientProtocol {
-  associated_type_protocol (T: Proto): Wrapper<Self>: specialize <Self> (<T> Wrapper<T>: Proto module witness_tables)
+  associated_conformance (T: Proto): Wrapper<Self>: specialize <Self> (<T> Wrapper<T>: Proto module witness_tables)
   associated_type T: Wrapper<Self>
   no_default
   no_default

@@ -1738,7 +1738,7 @@ the underlying normal conformance.
   sil-witness-entry ::= 'base_protocol' identifier ':' protocol-conformance
   sil-witness-entry ::= 'method' sil-decl-ref ':' sil-function-name
   sil-witness-entry ::= 'associated_type' identifier
-  sil-witness-entry ::= 'associated_type_protocol'
+  sil-witness-entry ::= 'associated_conformance'
                         '(' identifier ':' identifier ')' ':' protocol-conformance
 
 Witness tables consist of the following entries:

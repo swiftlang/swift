@@ -11,11 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 import Basic
+import AST
 import SILBridging
 
 final public class GlobalVariable : CustomStringConvertible, HasShortDescription, Hashable {
   public var varDecl: VarDecl? {
-    VarDecl(bridged: bridged.getDecl())
+    bridged.getDecl().getAs(VarDecl.self)
   }
 
   public var name: StringRef {

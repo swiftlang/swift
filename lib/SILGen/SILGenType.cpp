@@ -675,7 +675,7 @@ public:
 
     SGM.useConformance(assocConformance);
 
-    Entries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
+    Entries.push_back(SILWitnessTable::AssociatedConformanceWitness{
         req.getAssociation(), req.getAssociatedRequirement(),
         assocConformance});
   }
@@ -1084,7 +1084,7 @@ public:
     if (witness.isInvalid())
       return addMissingDefault();
 
-    auto entry = SILWitnessTable::AssociatedTypeProtocolWitness{
+    auto entry = SILWitnessTable::AssociatedConformanceWitness{
         req.getAssociation(), req.getAssociatedRequirement(), witness};
     DefaultWitnesses.push_back(entry);
   }

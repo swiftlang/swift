@@ -24,6 +24,7 @@
 #ifdef USED_IN_CPP_SOURCE
 #include "swift/AST/ArgumentList.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/IfConfigClauseRangeInfo.h"
@@ -36,9 +37,16 @@ namespace swift {
 class ASTContext;
 class DiagnosticArgument;
 class DiagnosticEngine;
+class Type;
+class CanType;
+class TypeBase;
+class SubstitutionMap;
 }
 
+struct BridgedASTType;
+class BridgedCanType;
 class BridgedASTContext;
+struct BridgedSubstitutionMap;
 
 //===----------------------------------------------------------------------===//
 // MARK: Identifier
@@ -283,6 +291,37 @@ enum ENUM_EXTENSIBILITY_ATTR(open) ASTNodeKind : size_t {
   ASTNodeKindExpr,
   ASTNodeKindStmt,
   ASTNodeKindDecl
+};
+
+void registerBridgedDecl(BridgedStringRef bridgedClassName, SwiftMetatype metatype);
+
+struct OptionalBridgedDeclObj {
+  OptionalSwiftObject obj;
+};
+
+struct BridgedDeclObj {
+  SwiftObject obj;
+
+#ifdef USED_IN_CPP_SOURCE
+  template <class D> D *_Nonnull getAs() const {
+    return llvm::cast<D>(static_cast<swift::Decl *>(obj));
+  }
+  swift::Decl * _Nonnull unbridged() const {
+    return getAs<swift::Decl>();
+  }
+#endif
+
+  BridgedDeclObj(SwiftObject obj) : obj(obj) {}
+  BridgedOwnedString getDebugDescription() const;
+  BRIDGED_INLINE BridgedSourceLoc getLoc() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef Type_getName() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef Value_getUserFacingName() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSourceLoc Value_getNameLoc() const;
+  BRIDGED_INLINE bool GenericType_isGenericAtAnyLevel() const;
+  BRIDGED_INLINE bool NominalType_isGlobalActor() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj NominalType_getValueTypeDestructor() const;
+  BRIDGED_INLINE bool Struct_hasUnreferenceableStorage() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType Class_getSuperclass() const;
 };
 
 struct BridgedASTNode {
@@ -1124,6 +1163,9 @@ SWIFT_NAME("BridgedNominalTypeDecl.setParsedMembers(self:_:)")
 void BridgedNominalTypeDecl_setParsedMembers(BridgedNominalTypeDecl decl,
                                              BridgedArrayRef members);
 
+SWIFT_NAME("BridgedNominalTypeDecl.getSourceLocation(self:)")
+BRIDGED_INLINE BridgedSourceLoc BridgedNominalTypeDecl_getSourceLocation(BridgedNominalTypeDecl decl);
+
 //===----------------------------------------------------------------------===//
 // MARK: SubscriptDecl
 //===----------------------------------------------------------------------===//
@@ -1140,13 +1182,6 @@ BridgedSubscriptDecl_asAbstractStorageDecl(BridgedSubscriptDecl decl);
 SWIFT_NAME("BridgedVarDecl.createImplicitStringInterpolationVar(_:)")
 BridgedVarDecl BridgedVarDec_createImplicitStringInterpolationVar(
     BridgedDeclContext cDeclContext);
-
-SWIFT_NAME("BridgedVarDecl.getSourceLocation(self:)")
-BRIDGED_INLINE BridgedSourceLoc BridgedVarDecl_getSourceLocation(BridgedVarDecl decl);
-
-SWIFT_NAME("BridgedVarDecl.getUserFacingName(self:)")
-BRIDGED_INLINE
-BridgedStringRef BridgedVarDecl_getUserFacingName(BridgedVarDecl decl);
 
 SWIFT_NAME("getter:BridgedVarDecl.asAbstractStorageDecl(self:)")
 BRIDGED_INLINE
@@ -1957,6 +1992,79 @@ SWIFT_NAME("BridgedParameterList.createParsed(_:leftParenLoc:parameters:"
 BridgedParameterList BridgedParameterList_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLeftParenLoc,
     BridgedArrayRef cParameters, BridgedSourceLoc cRightParenLoc);
+
+struct BridgedASTType {
+  swift::TypeBase * _Nullable type;
+
+  BRIDGED_INLINE swift::Type unbridged() const;
+  BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getCanonicalType() const;
+  BRIDGED_INLINE bool hasTypeParameter() const;
+  BRIDGED_INLINE bool isOpenedExistentialWithError() const;
+  BRIDGED_INLINE bool isEscapable() const;
+  BRIDGED_INLINE bool isNoEscape() const;
+  BRIDGED_INLINE bool isInteger() const;
+};
+
+class BridgedCanType {
+  swift::TypeBase * _Nullable type;
+
+public:
+  BRIDGED_INLINE BridgedCanType(swift::CanType ty);
+  BRIDGED_INLINE swift::CanType unbridged() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getType() const;
+};
+
+struct BridgedConformance {
+  void * _Nullable opaqueValue;
+
+#ifdef USED_IN_CPP_SOURCE
+  BridgedConformance(swift::ProtocolConformanceRef conformance)
+      : opaqueValue(conformance.getOpaqueValue()) {}
+
+  swift::ProtocolConformanceRef unbridged() const {
+    return swift::ProtocolConformanceRef::getFromOpaqueValue(opaqueValue);
+  }
+#endif
+
+  BridgedOwnedString getDebugDescription() const;
+  BRIDGED_INLINE bool isConcrete() const;
+  BRIDGED_INLINE bool isValid() const;
+  BRIDGED_INLINE bool isSpecializedConformance() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance getGenericConformance() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getSpecializedSubstitutions() const;
+};
+
+struct BridgedConformanceArray {
+  BridgedArrayRef pcArray;
+
+#ifdef USED_IN_CPP_SOURCE
+  BridgedConformanceArray(llvm::ArrayRef<swift::ProtocolConformanceRef> conformances)
+      : pcArray(conformances) {}
+
+  llvm::ArrayRef<swift::ProtocolConformanceRef> unbridged() const {
+    return pcArray.unbridged<swift::ProtocolConformanceRef>();
+  }
+#endif
+
+  SwiftInt getCount() const { return SwiftInt(pcArray.Length); }
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedConformance getAt(SwiftInt index) const;
+};
+
+struct BridgedSubstitutionMap {
+  uint64_t storage[1];
+
+  BRIDGED_INLINE BridgedSubstitutionMap(swift::SubstitutionMap map);
+  BRIDGED_INLINE swift::SubstitutionMap unbridged() const;
+  BRIDGED_INLINE BridgedSubstitutionMap();
+  BRIDGED_INLINE bool isEmpty() const;
+  BRIDGED_INLINE bool hasAnySubstitutableParams() const;
+  BRIDGED_INLINE SwiftInt getNumConformances() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance getConformance(SwiftInt index) const;
+};
 
 //===----------------------------------------------------------------------===//
 // MARK: #if handling
