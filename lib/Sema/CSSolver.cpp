@@ -664,7 +664,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
   numKeyPaths = cs.KeyPaths.size();
-  numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
   numFavoredConstraints = cs.solverState->getNumFavoredConstraints();
   numResultBuilderTransformed = cs.resultBuilderTransformed.size();
   numAppliedPropertyWrappers = cs.appliedPropertyWrappers.size();
@@ -1771,10 +1770,12 @@ ConstraintSystem::filterDisjunction(
     if (restoreOnFail)
       constraintsToRestoreOnFail.push_back(constraint);
 
-    if (solverState)
-      solverState->disableConstraint(constraint);
-    else
-      constraint->setDisabled();
+    if (!constraint->isDisabled()) {
+      if (solverState)
+        solverState->disableConstraint(constraint);
+      else
+        constraint->setDisabled();
+    }
   }
 
   switch (numEnabledTerms) {

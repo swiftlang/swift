@@ -2633,15 +2633,6 @@ private:
       generatedConstraints.erase(genStart, genEnd);
 
       for (unsigned constraintIdx :
-             range(scope->numDisabledConstraints, disabledConstraints.size())) {
-        if (disabledConstraints[constraintIdx]->isDisabled())
-          disabledConstraints[constraintIdx]->setEnabled();
-      }
-      disabledConstraints.erase(
-          disabledConstraints.begin() + scope->numDisabledConstraints,
-          disabledConstraints.end());
-
-      for (unsigned constraintIdx :
              range(scope->numFavoredConstraints, favoredConstraints.size())) {
         if (favoredConstraints[constraintIdx]->isFavored())
           favoredConstraints[constraintIdx]->setFavored(false);
@@ -2657,15 +2648,11 @@ private:
       return AllowFreeTypeVariables != FreeTypeVariableBinding::Disallow;
     }
 
-    unsigned getNumDisabledConstraints() const {
-      return disabledConstraints.size();
-    }
-
     /// Disable the given constraint; this change will be rolled back
     /// when we exit the current solver scope.
     void disableConstraint(Constraint *constraint) {
       constraint->setDisabled();
-      disabledConstraints.push_back(constraint);
+      Trail.recordChange(SolverTrail::Change::disabledConstraint(constraint));
     }
 
     unsigned getNumFavoredConstraints() const {
@@ -2702,7 +2689,6 @@ private:
     llvm::SmallVector<
       std::tuple<SolverScope *, ConstraintList::iterator, unsigned>, 4> scopes;
 
-    SmallVector<Constraint *, 4> disabledConstraints;
     SmallVector<Constraint *, 4> favoredConstraints;
     
     /// Depth of the solution stack.
@@ -2884,8 +2870,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    unsigned numDisabledConstraints;
 
     unsigned numFavoredConstraints;
 

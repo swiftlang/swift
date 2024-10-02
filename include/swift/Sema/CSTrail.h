@@ -82,6 +82,8 @@ public:
     RecordedNodeType,
     /// Recorded an assignment of a type to a keypath component.
     RecordedKeyPathComponentType,
+    /// Disabled a constraint.
+    DisabledConstraint,
   };
 
   /// A change made to the constraint system.
@@ -242,6 +244,9 @@ public:
     static Change recordedKeyPathComponentType(const KeyPathExpr *expr,
                                                unsigned component,
                                                Type oldType);
+
+    /// Create a change that disabled a constraint.
+    static Change disabledConstraint(Constraint *constraint);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.
