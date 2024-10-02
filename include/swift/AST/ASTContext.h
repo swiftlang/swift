@@ -69,6 +69,7 @@ namespace swift {
   class AbstractFunctionDecl;
   class ASTContext;
   enum class Associativity : unsigned char;
+  class AvailabilityMacroMap;
   class AvailabilityRange;
   class BoundGenericType;
   class BuiltinTupleDecl;
@@ -986,6 +987,12 @@ public:
     // This didn't fit the pattern, so needed renaming
     return getMultiPayloadEnumTagSinglePayloadAvailability();
   }
+
+  /// Cache of the availability macros parsed from the command line arguments.
+  ///
+  /// This is an implementation detail, access via
+  /// \c Parser::parseAllAvailabilityMacroArguments.
+  AvailabilityMacroMap &getAvailabilityMacroCache() const;
 
   /// Test support utility for loading a platform remap file
   /// in case an SDK is not specified to the compilation.

@@ -346,22 +346,6 @@ public:
   /// This vector is managed by \c StructureMarkerRAII objects.
   llvm::SmallVector<StructureMarker, 16> StructureMarkers;
 
-  /// Maps of macro name and version to availability specifications.
-  typedef llvm::DenseMap<llvm::VersionTuple,
-                         SmallVector<AvailabilitySpec *, 4>>
-                        AvailabilityMacroVersionMap;
-  typedef llvm::DenseMap<StringRef, AvailabilityMacroVersionMap>
-                        AvailabilityMacroMap;
-
-  /// Cache of the availability macros parsed from the command line arguments.
-  /// Organized as two nested \c DenseMap keyed first on the macro name then
-  /// the macro version. This structure allows to peek at macro names before
-  /// parsing a version tuple.
-  AvailabilityMacroMap AvailabilityMacros;
-
-  /// Has \c AvailabilityMacros been computed?
-  bool AvailabilityMacrosComputed = false;
-
 public:
   Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
          SILParserStateBase *SIL, PersistentParserState *PersistentState);
@@ -2080,7 +2064,7 @@ public:
   parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs);
 
   /// Parse the availability macros definitions passed as arguments.
-  void parseAllAvailabilityMacroArguments();
+  AvailabilityMacroMap &parseAllAvailabilityMacroArguments();
 
   /// Result of parsing an availability macro definition.
   struct AvailabilityMacroDefinition {
