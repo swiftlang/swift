@@ -376,7 +376,12 @@ populateLifetimeDependence(AbstractFunctionDecl *afd, LifetimeEntry *entry) {
 
 std::optional<ArrayRef<LifetimeDependenceInfo>>
 LifetimeDependenceInfo::fromLifetimeAttribute(AbstractFunctionDecl *afd) {
+  auto *dc = afd->getDeclContext();
+  auto &ctx = dc->getASTContext();
+  auto &diags = ctx.Diags;
+  
   SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
+  llvm::SmallSet<unsigned, 1> lifetimeDependentTargets;
   auto lifetimeAttrs = afd->getAttrs().getAttributes<LifetimeAttr>();
   for (auto attr : lifetimeAttrs) {
     auto lifetimeDependenceInfo =
@@ -384,6 +389,13 @@ LifetimeDependenceInfo::fromLifetimeAttribute(AbstractFunctionDecl *afd) {
     if (!lifetimeDependenceInfo.has_value()) {
       return std::nullopt;
     }
+    auto targetIndex = lifetimeDependenceInfo->getTargetIndex();
+    if (lifetimeDependentTargets.contains(targetIndex)) {
+      // TODO: Diagnose at the source location of the @lifetime attribute with
+      // duplicate target.
+      diags.diagnose(afd->getLoc(), diag::lifetime_dependence_duplicate_target);
+    }
+    lifetimeDependentTargets.insert(targetIndex);
     lifetimeDependencies.push_back(*lifetimeDependenceInfo);
   }
 

@@ -34,3 +34,8 @@ func invalidDependence(_ x: consuming Klass) -> NE {
   NE()
 }
 
+@lifetime(result: source) 
+@lifetime(result: source) // TODO: display error here
+func invalidTarget(_ result: inout NE, _ source: consuming NE) { // expected-error{{invalid duplicate target lifetime dependencies on function}}
+  result = source
+}
