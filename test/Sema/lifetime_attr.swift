@@ -17,7 +17,7 @@ func invalidAttrOnNonExistingSelf(_ ne: NE) -> NE {
   ne
 }
 
-@lifetime(2) // expected-error{{invalid parameter index specified 2}}
+@lifetime(2) // expected-error{{invalid parameter index specified '2'}}
 func invalidAttrOnNonExistingParamIndex(_ ne: NE) -> NE {
   ne
 }

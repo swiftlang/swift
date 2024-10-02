@@ -17,9 +17,9 @@ struct NCInt: ~Copyable {
 struct NEInt : ~Escapable {
   let value: Int
 
-  init(borrowed: borrowing NCInt) -> dependsOn(borrowed) Self {
+  @lifetime(borrow borrowed)
+  init(borrowed: borrowing NCInt) {
     self.value = borrowed.value
-    return self
   }
 }
 

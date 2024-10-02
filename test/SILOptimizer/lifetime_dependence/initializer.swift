@@ -18,7 +18,8 @@ struct Span<T>: ~Escapable {
     self.count = count
   }
 
-  init<S>(base: UnsafePointer<T>, count: Int, generic: borrowing S) -> dependsOn(generic) Self {
+  @lifetime(borrow generic)
+  init<S>(base: UnsafePointer<T>, count: Int, generic: borrowing S) {
     self.base = base
     self.count = count
   }

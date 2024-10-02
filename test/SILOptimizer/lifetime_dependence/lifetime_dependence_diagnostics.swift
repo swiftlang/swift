@@ -10,13 +10,15 @@
 struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let c: Int
-  init(_ p: UnsafeRawPointer, _ c: Int) -> dependsOn(p) Self {
+  @lifetime(borrow p)
+  init(_ p: UnsafeRawPointer, _ c: Int) {
     self.p = p
     self.c = c
   }
 }
 
-func bv_copy(_ bv: borrowing BV) -> dependsOn(bv) BV {
+@lifetime(bv)
+func bv_copy(_ bv: borrowing BV) -> BV {
   copy bv
 }
 
@@ -41,7 +43,8 @@ public struct NEInt: ~Escapable {
     _modify { yield &i }
   }
 
-  init(owner: borrowing NCInt) -> dependsOn(owner) Self {
+  @lifetime(borrow owner)
+  init(owner: borrowing NCInt) {
     self.i = owner.i
   }
 }
@@ -60,25 +63,27 @@ func takeClosure(_: () -> ()) {}
 
 // No mark_dependence is needed for a inherited scope.
 //
-// CHECK-LABEL: sil hidden @$s4test14bv_borrow_copyyAA2BVVADF : $@convention(thin) (@guaranteed BV) -> _scope(0)  @owned BV {
+// CHECK-LABEL: sil hidden @$s4test14bv_borrow_copyyAA2BVVADF : $@convention(thin) (@guaranteed BV) -> @lifetime(borrow 0)  @owned BV {
 // CHECK:      bb0(%0 : @noImplicitCopy $BV):
-// CHECK:        apply %{{.*}}(%0) : $@convention(thin) (@guaranteed BV) -> _inherit(0) @owned BV
+// CHECK:        apply %{{.*}}(%0) : $@convention(thin) (@guaranteed BV) -> @lifetime(copy 0) @owned BV
 // CHECK-NEXT:   return %3 : $BV
 // CHECK-LABEL: } // end sil function '$s4test14bv_borrow_copyyAA2BVVADF'
-func bv_borrow_copy(_ bv: borrowing BV) -> dependsOn(scoped bv) BV {
+@lifetime(borrow bv)
+func bv_borrow_copy(_ bv: borrowing BV) -> BV {
   bv_copy(bv) 
 }
 
 // The mark_dependence for the borrow scope should be marked
 // [nonescaping] after diagnostics.
 //
-// CHECK-LABEL: sil hidden @$s4test010bv_borrow_C00B0AA2BVVAE_tF : $@convention(thin) (@guaranteed BV) -> _scope(0)  @owned BV {
+// CHECK-LABEL: sil hidden @$s4test010bv_borrow_C00B0AA2BVVAE_tF : $@convention(thin) (@guaranteed BV) -> @lifetime(borrow 0)  @owned BV {
 // CHECK:       bb0(%0 : @noImplicitCopy $BV):
-// CHECK:         [[R:%.*]] = apply %{{.*}}(%0) : $@convention(thin) (@guaranteed BV) -> _scope(0) @owned BV
+// CHECK:         [[R:%.*]] = apply %{{.*}}(%0) : $@convention(thin) (@guaranteed BV) -> @lifetime(borrow 0) @owned BV
 // CHECK:         %{{.*}} = mark_dependence [nonescaping] [[R]] : $BV on %0 : $BV
 // CHECK-NEXT:    return %{{.*}} : $BV
 // CHECK-LABEL: } // end sil function '$s4test010bv_borrow_C00B0AA2BVVAE_tF'
-func bv_borrow_borrow(bv: borrowing BV) -> dependsOn(scoped bv) BV {
+@lifetime(borrow bv)
+func bv_borrow_borrow(bv: borrowing BV) -> BV {
   bv_borrow_copy(bv)
 }
 
@@ -93,8 +98,8 @@ func neint_throws(ncInt: borrowing NCInt) throws -> NEInt {
   return NEInt(owner: ncInt)
 }
 
-// CHECK-LABEL: sil hidden @$s4test9neint_try5ncIntAA5NEIntVAA5NCIntV_tKF : $@convention(thin) (@guaranteed NCInt) -> _scope(0)  (@owned NEInt, @error any Error) {
-// CHECK:   try_apply %{{.*}}(%0) : $@convention(thin) (@guaranteed NCInt) -> _scope(0)  (@owned NEInt, @error any Error), normal bb1, error bb2
+// CHECK-LABEL: sil hidden @$s4test9neint_try5ncIntAA5NEIntVAA5NCIntV_tKF : $@convention(thin) (@guaranteed NCInt) -> @lifetime(borrow 0)  (@owned NEInt, @error any Error) {
+// CHECK:   try_apply %{{.*}}(%0) : $@convention(thin) (@guaranteed NCInt) -> @lifetime(borrow 0)  (@owned NEInt, @error any Error), normal bb1, error bb2
 // CHECK: bb1([[R:%.*]] : $NEInt):
 // CHECK:   [[MD:%.*]] = mark_dependence [nonescaping] %5 : $NEInt on %0 : $NCInt
 // CHECK:   return [[MD]] : $NEInt
