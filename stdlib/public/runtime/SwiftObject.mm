@@ -431,6 +431,9 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
   if (self == other) {
     return YES;
   }
+  if (other == nil) {
+    return NO;
+  }
   if (runtime::bincompat::useLegacySwiftObjCHashing()) {
     // Legacy behavior: Don't proxy to Swift Hashable or Equatable
     return NO; // We know the ids are different
