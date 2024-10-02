@@ -663,7 +663,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
-  numAddedKeyPathComponentTypes = cs.addedKeyPathComponentTypes.size();
   numKeyPaths = cs.KeyPaths.size();
   numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
   numFavoredConstraints = cs.solverState->getNumFavoredConstraints();
@@ -716,19 +715,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // e.g. add retired constraints back to the circulation and remove generated
   // constraints introduced by the current scope.
   cs.solverState->rollback(this);
-
-  // Remove any node types we registered.
-  for (unsigned i : reverse(range(numAddedKeyPathComponentTypes,
-                                  cs.addedKeyPathComponentTypes.size()))) {
-    auto KeyPath = std::get<0>(cs.addedKeyPathComponentTypes[i]);
-    auto KeyPathIndex = std::get<1>(cs.addedKeyPathComponentTypes[i]);
-    if (Type oldType = std::get<2>(cs.addedKeyPathComponentTypes[i])) {
-      cs.KeyPathComponentTypes[{KeyPath, KeyPathIndex}] = oldType;
-    } else {
-      cs.KeyPathComponentTypes.erase({KeyPath, KeyPathIndex});
-    }
-  }
-  truncate(cs.addedKeyPathComponentTypes, numAddedKeyPathComponentTypes);
 
   /// Remove any key path expressions.
   truncate(cs.KeyPaths, numKeyPaths);

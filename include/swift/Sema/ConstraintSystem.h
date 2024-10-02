@@ -2265,11 +2265,6 @@ private:
                  Type>
       KeyPathComponentTypes;
 
-  /// Same as \c addedNodeTypes for \c KeyPathComponentTypes.
-  llvm::SmallVector<
-      std::tuple<const KeyPathExpr *, /*component index=*/unsigned, Type>>
-      addedKeyPathComponentTypes;
-
   /// Maps a key path root, value, and decl context to the key path expression.
   llvm::MapVector<const KeyPathExpr *,
                   std::tuple</*root=*/TypeVariableType *,
@@ -2890,8 +2885,6 @@ public:
     /// FIXME: Remove this.
     unsigned numFixes;
 
-    unsigned numAddedKeyPathComponentTypes;
-
     unsigned numDisabledConstraints;
 
     unsigned numFavoredConstraints;
@@ -3234,25 +3227,44 @@ public:
     }
   }
 
+  /// Check to see if we have a type for a node.
+  bool hasType(ASTNode node) const {
+    assert(!node.isNull() && "Expected non-null node");
+    return NodeTypes.count(node) > 0;
+  }
+
   /// Set the type in our type map for a given expression. The side
   /// map is used throughout the expression type checker in order to
   /// avoid mutating expressions until we know we have successfully
   /// type-checked them.
   void setType(const KeyPathExpr *KP, unsigned I, Type T) {
-    assert(KP && "Expected non-null key path parameter!");
-    assert(T && "Expected non-null type!");
+    ASSERT(KP && "Expected non-null key path parameter!");
+    ASSERT(T && "Expected non-null type!");
 
     Type &entry = KeyPathComponentTypes[{KP, I}];
     Type oldType = entry;
     entry = T;
 
-    addedKeyPathComponentTypes.push_back(std::make_tuple(KP, I, oldType));
+    if (oldType.getPointer() != T.getPointer()) {
+      if (isRecordingChanges()) {
+        recordChange(
+          SolverTrail::Change::recordedKeyPathComponentType(
+            KP, I, oldType));
+      }
+    }
   }
 
-  /// Check to see if we have a type for a node.
-  bool hasType(ASTNode node) const {
-    assert(!node.isNull() && "Expected non-null node");
-    return NodeTypes.count(node) > 0;
+  void restoreType(const KeyPathExpr *KP, unsigned I, Type T) {
+    ASSERT(KP && "Expected non-null key path parameter!");
+
+    if (T) {
+      auto found = KeyPathComponentTypes.find({KP, I});
+      ASSERT(found != KeyPathComponentTypes.end());
+      found->second = T;
+    } else {
+      bool erased = KeyPathComponentTypes.erase({KP, I});
+      ASSERT(erased);
+    }
   }
 
   bool hasType(const KeyPathExpr *KP, unsigned I) const {
