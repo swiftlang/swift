@@ -84,6 +84,8 @@ public:
     RecordedKeyPathComponentType,
     /// Disabled a constraint.
     DisabledConstraint,
+    /// Favored a constraint.
+    FavoredConstraint,
   };
 
   /// A change made to the constraint system.
@@ -247,6 +249,9 @@ public:
 
     /// Create a change that disabled a constraint.
     static Change disabledConstraint(Constraint *constraint);
+
+    /// Create a change that favored a constraint.
+    static Change favoredConstraint(Constraint *constraint);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

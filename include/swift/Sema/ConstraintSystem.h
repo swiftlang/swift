@@ -2631,15 +2631,6 @@ private:
       }
 
       generatedConstraints.erase(genStart, genEnd);
-
-      for (unsigned constraintIdx :
-             range(scope->numFavoredConstraints, favoredConstraints.size())) {
-        if (favoredConstraints[constraintIdx]->isFavored())
-          favoredConstraints[constraintIdx]->setFavored(false);
-      }
-      favoredConstraints.erase(
-          favoredConstraints.begin() + scope->numFavoredConstraints,
-          favoredConstraints.end());
     }
 
     /// Check whether constraint system is allowed to form solutions
@@ -2651,12 +2642,9 @@ private:
     /// Disable the given constraint; this change will be rolled back
     /// when we exit the current solver scope.
     void disableConstraint(Constraint *constraint) {
+      ASSERT(!constraint->isDisabled());
       constraint->setDisabled();
       Trail.recordChange(SolverTrail::Change::disabledConstraint(constraint));
-    }
-
-    unsigned getNumFavoredConstraints() const {
-      return favoredConstraints.size();
     }
 
     /// Favor the given constraint; this change will be rolled back
@@ -2665,7 +2653,7 @@ private:
       assert(!constraint->isFavored());
 
       constraint->setFavored();
-      favoredConstraints.push_back(constraint);
+      Trail.recordChange(SolverTrail::Change::favoredConstraint(constraint));
     }
 
   private:
@@ -2689,8 +2677,7 @@ private:
     llvm::SmallVector<
       std::tuple<SolverScope *, ConstraintList::iterator, unsigned>, 4> scopes;
 
-    SmallVector<Constraint *, 4> favoredConstraints;
-    
+
     /// Depth of the solution stack.
     unsigned depth = 0;
   };
@@ -2870,8 +2857,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    unsigned numFavoredConstraints;
 
     unsigned numResultBuilderTransformed;
 
