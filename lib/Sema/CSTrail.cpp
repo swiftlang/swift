@@ -246,6 +246,14 @@ SolverTrail::Change::recordedKeyPathComponentType(const KeyPathExpr *expr,
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::disabledConstraint(Constraint *constraint) {
+  Change result;
+  result.Kind = ChangeKind::DisabledConstraint;
+  result.TheConstraint.Constraint = constraint;
+  return result;
+}
+
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
@@ -341,6 +349,11 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::RecordedKeyPathComponentType:
     cs.restoreType(KeyPath.Expr, Options, KeyPath.OldType);
+    break;
+
+  case ChangeKind::DisabledConstraint:
+    if (TheConstraint.Constraint->isDisabled())
+      TheConstraint.Constraint->setEnabled();
     break;
   }
 }
@@ -529,6 +542,13 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     else
       out << "null";
     out << " for component " << Options << ")\n";
+    break;
+
+  case ChangeKind::DisabledConstraint:
+    out << "(disabled constraint ";
+    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
+                                    indent + 2);
+    out << ")\n";
     break;
   }
 }
