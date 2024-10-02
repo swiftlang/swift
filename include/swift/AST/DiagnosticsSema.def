@@ -8005,6 +8005,8 @@ ERROR(lifetime_dependence_invalid_inherit_escapable_type, none,
 ERROR(lifetime_dependence_cannot_use_parsed_borrow_consuming, none,
       "invalid use of borrow dependence with consuming ownership",
       ())
+ERROR(lifetime_dependence_duplicate_target, none,
+      "invalid duplicate target lifetime dependencies on function", ())
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Sending
