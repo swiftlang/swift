@@ -338,6 +338,14 @@ Added: _$ss9TaskLocalC9withValue_9operation9isolation4file4lineqd__x_qd__yYaKXES
 
 Added: __swift_concurrency_debug_internal_layout_version
 
+Added: _swift_task_getMainExecutor_hook
+Added: _swift_task_invokeSwiftCheckIsolated
+Added: _swift_task_isMainExecutor
+Added: _swift_task_isMainExecutor_hook
+
+Added: _swift_task_donateThreadToGlobalExecutorUntil
+Added: _swift_task_donateThreadToGlobalExecutorUntil_hook
+
 // Add property descriptors for static properties
 Added: _$sScM21sharedUnownedExecutorScevpZMV
 Added: _$sScM6sharedScMvpZMV
