@@ -11,27 +11,31 @@
 // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence should be expressed by a builtin that is
 // hidden within the function body.
 @_unsafeNonescapableResult
+@lifetime(source)
 func unsafeLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
   dependent: consuming T, dependsOn source: borrowing U)
-  -> dependsOn(source) T {
+  -> T {
   dependent
 }
 
 struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let i: Int
-
-  init(_ p: UnsafeRawPointer, _ i: Int) -> dependsOn(p) Self {
+ 
+  @lifetime(borrow p)
+  init(_ p: UnsafeRawPointer, _ i: Int) {
     self.p = p
     self.i = i
   }
 
-  init(independent p: UnsafeRawPointer, _ i: Int) -> dependsOn(p) Self {
+  @lifetime(borrow p)
+  init(independent p: UnsafeRawPointer, _ i: Int) {
     self.p = p
     self.i = i
   }
 
-  consuming func derive() -> dependsOn(self) BV {
+  @lifetime(self)
+  consuming func derive() -> BV {
     // Technically, this "new" view does not depend on the 'view' argument.
     // This unsafely creates a new view with no dependence.
     let bv = BV(independent: self.p, self.i)
@@ -57,22 +61,26 @@ struct NEBV : ~Escapable {
     }
   }
 
-  func borrowedView() -> dependsOn(scoped self) BV {
+  @lifetime(borrow self)
+  func borrowedView() -> BV {
     bv
   }
 }
 
 // Test lifetime inheritance through chained consumes.
-func bv_derive(bv: consuming BV) -> dependsOn(bv) BV {
+@lifetime(bv)
+func bv_derive(bv: consuming BV) -> BV {
   bv.derive()
 }
 
 // Test lifetime inheritance through stored properties.
-func ne_extract_member(nebv: consuming NEBV) -> dependsOn(nebv) BV {
+@lifetime(nebv)
+func ne_extract_member(nebv: consuming NEBV) -> BV {
   return nebv.bv
 }
 
-func ne_yield_member(nebv: consuming NEBV) -> dependsOn(nebv) BV {
+@lifetime(nebv)
+func ne_yield_member(nebv: consuming NEBV) -> BV {
   return nebv.view
 }
 
