@@ -15,18 +15,30 @@
 /// This file is included into GlobalExecutor.cpp only when Dispatch
 /// integration is enabled.  It is expected to define the following
 /// functions:
+///   swift_task_asyncMainDrainQueueImpl
+///   swift_task_checkIsolatedImpl
+///   swift_task_donateThreadToGlobalExecutorUntilImpl
 ///   swift_task_enqueueGlobalImpl
+///   swift_task_enqueueGlobalWithDeadlineImpl
 ///   swift_task_enqueueGlobalWithDelayImpl
 ///   swift_task_enqueueMainExecutorImpl
-///   swift_task_checkIsolated
+///   swift_task_getMainExecutorImpl
+///   swift_task_isMainExecutorImpl
 /// as well as any Dispatch-specific functions for the runtime.
 ///
 ///===------------------------------------------------------------------===///
+
+#include <cstddef>
+
+#include "swift/Runtime/Concurrency.h"
+#include "swift/Runtime/EnvironmentVariables.h"
 
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include "swift/Runtime/HeapObject.h"
 #include <dispatch/dispatch.h>
 #if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <Windows.h>
 #else
 #include <dlfcn.h>
@@ -37,6 +49,12 @@
 #include <dispatch/private.h>
 #define SWIFT_CONCURRENCY_HAS_DISPATCH_PRIVATE 1
 #endif
+
+#include "Error.h"
+#include "ExecutorImpl.h"
+#include "TaskPrivate.h"
+
+using namespace swift;
 
 // Ensure that Job's layout is compatible with what Dispatch expects.
 // Note: MinimalDispatchObjectHeader just has the fields we care about, it is
@@ -61,7 +79,7 @@ static_assert(offsetof(Job, SchedulerPrivate[Job::DispatchLinkageIndex]) ==
 
 /// The function passed to dispatch_async_f to execute a job.
 static void __swift_run_job(void *_job) {
-  Job *job = (Job*) _job;
+  SwiftJob *job = (SwiftJob*) _job;
   auto metadata =
       reinterpret_cast<const DispatchClassMetadata *>(job->metadata);
   metadata->VTableInvoke(job, nullptr, 0);
@@ -119,9 +137,9 @@ static void initializeDispatchEnqueueFunc(dispatch_queue_t queue, void *obj,
 }
 
 /// Enqueue a Job onto a dispatch queue using dispatchEnqueueFunc.
-static void dispatchEnqueue(dispatch_queue_t queue, Job *job,
+static void dispatchEnqueue(dispatch_queue_t queue, SwiftJob *job,
                             dispatch_qos_class_t qos, void *executorQueue) {
-  job->SchedulerPrivate[Job::DispatchQueueIndex] = executorQueue;
+  job->schedulerPrivate[Job::DispatchQueueIndex] = executorQueue;
   dispatchEnqueueFunc.load(std::memory_order_relaxed)(queue, job, qos);
 }
 
@@ -135,7 +153,7 @@ static constexpr size_t dispatchQueueCooperativeFlag = 4;
 extern "C" void dispatch_queue_set_width(dispatch_queue_t dq, long width);
 #endif
 
-static dispatch_queue_t getGlobalQueue(JobPriority priority) {
+static dispatch_queue_t getGlobalQueue(SwiftJobPriority priority) {
   size_t numericPriority = static_cast<size_t>(priority);
   if (numericPriority >= globalQueueCacheCount)
     swift_Concurrency_fatalError(0, "invalid job priority %#zx", numericPriority);
@@ -193,7 +211,7 @@ static dispatch_queue_t getGlobalQueue(JobPriority priority) {
 // Get a queue suitable for dispatch_after. Use the cooperative queues on OS
 // versions where they work with dispatch_after, and use a standard global
 // queue where cooperative queues don't work.
-static dispatch_queue_t getTimerQueue(JobPriority priority) {
+static dispatch_queue_t getTimerQueue(SwiftJobPriority priority) {
   // On newer OSes, we can use the cooperative queues.
   if (__builtin_available(macOS 12.3, iOS 15.4, tvOS 15.4, watchOS 8.5, *))
     return getGlobalQueue(priority);
@@ -203,7 +221,7 @@ static dispatch_queue_t getTimerQueue(JobPriority priority) {
 }
 
 SWIFT_CC(swift)
-static void swift_task_enqueueGlobalImpl(Job *job) {
+void swift_task_enqueueGlobalImpl(SwiftJob *job) {
   assert(job && "no job provided");
   // We really want four things from the global execution service:
   //  - Enqueuing work should have minimal runtime and memory overhead.
@@ -234,7 +252,7 @@ static void swift_task_enqueueGlobalImpl(Job *job) {
   // the priorities of work added to this queue using Dispatch's public
   // API, but as discussed above, that is less important than avoiding
   // performance problems.
-  JobPriority priority = job->getPriority();
+  SwiftJobPriority priority = swift_job_getPriority(job);
 
   auto queue = getGlobalQueue(priority);
 
@@ -244,18 +262,18 @@ static void swift_task_enqueueGlobalImpl(Job *job) {
 
 
 SWIFT_CC(swift)
-static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
-                                              Job *job) {
+void swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,
+                                           SwiftJob *job) {
   assert(job && "no job provided");
 
   dispatch_function_t dispatchFunction = &__swift_run_job;
   void *dispatchContext = job;
 
-  JobPriority priority = job->getPriority();
+  SwiftJobPriority priority = swift_job_getPriority(job);
 
   auto queue = getTimerQueue(priority);
 
-  job->SchedulerPrivate[Job::DispatchQueueIndex] =
+  job->schedulerPrivate[SwiftJobDispatchQueueIndex] =
       DISPATCH_QUEUE_GLOBAL_EXECUTOR;
 
   dispatch_time_t when = dispatch_time(DISPATCH_TIME_NOW, delay);
@@ -268,16 +286,14 @@ static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
 
 struct __swift_job_source {
   dispatch_source_t source;
-  Job *job;
+  SwiftJob *job;
 };
 
 static void _swift_run_job_leeway(struct __swift_job_source *jobSource) {
   dispatch_source_t source = jobSource->source;
   dispatch_release(source);
-  Job *job = jobSource->job;
-  auto task = dyn_cast<AsyncTask>(job);
-  assert(task && "provided job must be a task");
-  _swift_task_dealloc_specific(task, jobSource);
+  SwiftJob *job = jobSource->job;
+  swift_job_dealloc(job, jobSource);
   __swift_run_job(job);
 }
 
@@ -333,19 +349,18 @@ clock_and_value_to_time(int clock, long long deadline) {
 }
 
 SWIFT_CC(swift)
-static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
-                                                     long long nsec,
-                                                     long long tsec,
-                                                     long long tnsec,
-                                                     int clock, Job *job) {
+void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
+                                              long long nsec,
+                                              long long tsec,
+                                              long long tnsec,
+                                              int clock, SwiftJob *job) {
   assert(job && "no job provided");
-  auto task = cast<AsyncTask>(job);
 
-  JobPriority priority = job->getPriority();
+  SwiftJobPriority priority = swift_job_getPriority(job);
 
   auto queue = getTimerQueue(priority);
 
-  job->SchedulerPrivate[Job::DispatchQueueIndex] =
+  job->schedulerPrivate[SwiftJobDispatchQueueIndex] =
       DISPATCH_QUEUE_GLOBAL_EXECUTOR;
 
   uint64_t deadline = sec * NSEC_PER_SEC + nsec;
@@ -361,8 +376,8 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
     size_t sz = sizeof(struct __swift_job_source);
 
     struct __swift_job_source *jobSource = 
-        (struct __swift_job_source *)_swift_task_alloc_specific(task, sz);
-    
+      (struct __swift_job_source *)swift_job_alloc(job, sz);
+
     jobSource->job = job;
     jobSource->source = source;
 
@@ -378,10 +393,10 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
 }
 
 SWIFT_CC(swift)
-static void swift_task_enqueueMainExecutorImpl(Job *job) {
+void swift_task_enqueueMainExecutorImpl(SwiftJob *job) {
   assert(job && "no job provided");
 
-  JobPriority priority = job->getPriority();
+  SwiftJobPriority priority = swift_job_getPriority(job);
 
   // This is an inline function that compiles down to a pointer to a global.
   auto mainQueue = dispatch_get_main_queue();
@@ -393,24 +408,25 @@ void swift::swift_task_enqueueOnDispatchQueue(Job *job,
                                               HeapObject *_queue) {
   JobPriority priority = job->getPriority();
   auto queue = reinterpret_cast<dispatch_queue_t>(_queue);
-  dispatchEnqueue(queue, job, (dispatch_qos_class_t)priority, queue);
+  dispatchEnqueue(queue, (SwiftJob *)job, (dispatch_qos_class_t)priority, queue);
 }
 
 /// Recognize if the SerialExecutor is specifically a `DispatchSerialQueue`
 /// by comparing witness tables and return it if true.
-static dispatch_queue_s *getAsDispatchSerialQueue(SerialExecutorRef executor) {
-  if (!executor.hasSerialExecutorWitnessTable()) {
+static dispatch_queue_s *getAsDispatchSerialQueue(SwiftExecutorRef executor) {
+  if (!swift_executor_hasWitnessTable(executor)) {
     return nullptr;
   }
 
   auto executorWitnessTable = reinterpret_cast<const WitnessTable *>(
-      executor.getSerialExecutorWitnessTable());
+      swift_executor_getWitnessTable(executor));
   auto serialQueueWitnessTable = reinterpret_cast<const WitnessTable *>(
       _swift_task_getDispatchQueueSerialExecutorWitnessTable());
 
   if (swift_compareWitnessTables(executorWitnessTable,
                                  serialQueueWitnessTable)) {
-    return reinterpret_cast<dispatch_queue_s *>(executor.getIdentity());
+    auto identity = swift_executor_getIdentity(executor);
+    return reinterpret_cast<dispatch_queue_s *>(identity);
   } else {
     return nullptr;
   }
@@ -422,20 +438,16 @@ static dispatch_queue_s *getAsDispatchSerialQueue(SerialExecutorRef executor) {
 /// to perform this assertion on earlier platforms, where the `checkIsolated`
 /// requirement/witness was not shipping yet.
 SWIFT_CC(swift)
-static void swift_task_checkIsolatedImpl(SerialExecutorRef executor) {
+void swift_task_checkIsolatedImpl(SwiftExecutorRef executor) {
   // If it is the main executor, compare with the Main queue
-  if (executor.isMainExecutor()) {
+  if (swift_executor_isMain(executor)) {
     dispatch_assert_queue(dispatch_get_main_queue());
     return;
   }
 
   // if able to, use the checkIsolated implementation in Swift
-  if (executor.hasSerialExecutorWitnessTable()) {
-    _task_serialExecutor_checkIsolated(
-        executor.getIdentity(), swift_getObjectType(executor.getIdentity()),
-        executor.getSerialExecutorWitnessTable());
+  if (swift_executor_invokeSwiftCheckIsolated(executor))
     return;
-  }
 
   if (auto queue = getAsDispatchSerialQueue(executor)) {
     // if the executor was not SerialExecutor for some reason but we're able
@@ -447,4 +459,61 @@ static void swift_task_checkIsolatedImpl(SerialExecutorRef executor) {
   // otherwise, we have no way to check, so report an error
   // TODO: can we swift_getTypeName(swift_getObjectType(executor.getIdentity()), false).data safely in the message here?
   swift_Concurrency_fatalError(0, "Incorrect actor executor assumption");
+}
+
+SWIFT_CC(swift)
+SwiftExecutorRef swift_task_getMainExecutorImpl() {
+  return swift_executor_ordinary(
+           reinterpret_cast<SwiftHeapObject*>(&_dispatch_main_q),
+           reinterpret_cast<SwiftExecutorWitnessTable *>(
+             _swift_task_getDispatchQueueSerialExecutorWitnessTable()));
+}
+
+SWIFT_CC(swift)
+bool swift_task_isMainExecutorImpl(SwiftExecutorRef executor) {
+  return swift_executor_getIdentity(executor)
+    == reinterpret_cast<SwiftHeapObject *>(&_dispatch_main_q);
+}
+
+SWIFT_CC(swift) void
+swift_task_donateThreadToGlobalExecutorUntilImpl(bool (*condition)(void *),
+                                                 void *conditionContext) {
+  swift_Concurrency_fatalError(0, "Not supported for Dispatch executor");
+}
+
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN
+SWIFT_CC(swift)
+void swift_task_asyncMainDrainQueueImpl() {
+#if defined(_WIN32)
+  HMODULE hModule = LoadLibraryW(L"dispatch.dll");
+  if (hModule == NULL) {
+    swift_Concurrency_fatalError(0,
+      "unable to load dispatch.dll: %lu", GetLastError());
+  }
+
+  auto pfndispatch_main = reinterpret_cast<void (FAR *)(void)>(
+    GetProcAddress(hModule, "dispatch_main"));
+  if (pfndispatch_main == NULL) {
+    swift_Concurrency_fatalError(0,
+      "unable to locate dispatch_main in dispatch.dll: %lu", GetLastError());
+  }
+
+  pfndispatch_main();
+  swift_unreachable("Returned from dispatch_main()");
+#else
+  // CFRunLoop is not available on non-Darwin targets.  Foundation has an
+  // implementation, but CoreFoundation is not meant to be exposed.  We can only
+  // assume the existence of `CFRunLoopRun` on Darwin platforms, where the
+  // system provides an implementation of CoreFoundation.
+#if defined(__APPLE__)
+  auto runLoop =
+      reinterpret_cast<void (*)(void)>(dlsym(RTLD_DEFAULT, "CFRunLoopRun"));
+  if (runLoop) {
+    runLoop();
+    exit(0);
+  }
+#endif
+
+    dispatch_main();
+#endif
 }

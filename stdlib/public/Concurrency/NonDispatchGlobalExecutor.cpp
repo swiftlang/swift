@@ -18,14 +18,26 @@
 /// This file is included into GlobalExecutor.cpp only when both
 /// Dispatch integration and the cooperative global executor are disabled.
 /// It is expected to define the following functions:
+///   swift_task_asyncMainDrainQueueImpl
+///   swift_task_checkIsolatedImpl
+///   swift_task_donateThreadToGlobalExecutorUntilImpl
 ///   swift_task_enqueueGlobalImpl
+///   swift_task_enqueueGlobalWithDeadlineImpl
 ///   swift_task_enqueueGlobalWithDelayImpl
 ///   swift_task_enqueueMainExecutorImpl
+///   swift_task_getMainExecutorImpl
+///   swift_task_isMainExecutorImpl
 ///
 ///===------------------------------------------------------------------===///
 
+#include "swift/Runtime/Debug.h"
+
+#include "ExecutorImpl.h"
+
+using namespace swift;
+
 SWIFT_CC(swift)
-static void swift_task_enqueueGlobalImpl(Job *job) {
+void swift_task_enqueueGlobalImpl(SwiftJob *job) {
   assert(job && "no job provided");
 
   swift_reportError(0, "operation unsupported without libdispatch: "
@@ -33,8 +45,8 @@ static void swift_task_enqueueGlobalImpl(Job *job) {
 }
 
 SWIFT_CC(swift)
-static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
-                                                  Job *job) {
+void swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,
+                                           SwiftJob *job) {
   assert(job && "no job provided");
 
   swift_reportError(0, "operation unsupported without libdispatch: "
@@ -42,11 +54,11 @@ static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
 }
 
 SWIFT_CC(swift)
-static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
-                                                     long long nsec,
-                                                     long long tsec,
-                                                     long long tnsec,
-                                                     int clock, Job *job) {
+void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
+                                              long long nsec,
+                                              long long tsec,
+                                              long long tnsec,
+                                              int clock, SwiftJob *job) {
   assert(job && "no job provided");
 
   swift_reportError(0, "operation unsupported without libdispatch: "
@@ -55,7 +67,7 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
 
 /// Enqueues a task on the main executor.
 SWIFT_CC(swift)
-static void swift_task_enqueueMainExecutorImpl(Job *job) {
+void swift_task_enqueueMainExecutorImpl(SwiftJob *job) {
   assert(job && "no job provided");
 
   swift_reportError(0, "operation unsupported without libdispatch: "
@@ -63,8 +75,29 @@ static void swift_task_enqueueMainExecutorImpl(Job *job) {
 }
 
 SWIFT_CC(swift)
-static void swift_task_checkIsolatedImpl(SerialExecutorRef executor) {
-  _task_serialExecutor_checkIsolated(
-      executor.getIdentity(), swift_getObjectType(executor.getIdentity()),
-      executor.getSerialExecutorWitnessTable());
+void swift_task_checkIsolatedImpl(SwiftExecutorRef executor) {
+  swift_executor_invokeSwiftCheckIsolated(executor);
+}
+
+SWIFT_CC(swift)
+SwiftExecutorRef swift_task_getMainExecutorImpl() {
+  return swift_executor_generic();
+}
+
+SWIFT_CC(swift)
+bool swift_task_isMainExecutorImpl(SwiftExecutorRef executor) {
+  return swift_executor_isGeneric(executor);
+}
+
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_CC(swift)
+void swift_task_asyncMainDrainQueueImpll() {
+  swift_reportError(0, "operation unsupported without libdispatch: "
+                       "swift_task_asyncMainDrainQueue");
+}
+
+SWIFT_CC(swift) void
+swift_task_donateThreadToGlobalExecutorUntilImpl(bool (*condition)(void *),
+                                                 void *conditionContext) {
+  swift_reportError(0, "operation unsupported: "
+                    "swift_task_donateThreadToGlobalExecutorUntilImpl");
 }
