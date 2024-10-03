@@ -50,6 +50,14 @@
 // RUN: diff %t5.casid %t6.casid
 // RUN: not diff %t5.casid %t7.casid
 
+/// Check switching CAS plugin path.
+// RUN: %cache-tool -cas-path %t/cas -cas-plugin-path %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext -cache-tool-action print-base-key -- \
+// RUN:   %target-swift-frontend -cache-compile-job %t/a.swift -c @%t/MyApp.cmd -cas-path %t/cas -cas-plugin-path %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext > %t8.casid
+// RUN: ln -s %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext %t/libCASPluginTest%llvm_plugin_ext
+// RUN: %cache-tool -cas-path %t/cas -cas-plugin-path %t/libCASPluginTest%llvm_plugin_ext -cache-tool-action print-base-key -- \
+// RUN:   %target-swift-frontend -cache-compile-job %t/a.swift -c @%t/MyApp.cmd -cas-path %t/cas -cas-plugin-path %t/libCASPluginTest%llvm_plugin_ext > %t9.casid
+// RUN: diff %t8.casid %t9.casid
+
 /// Test output keys.
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
 // RUN:   %target-swift-frontend -cache-compile-job %t/a.swift -emit-module -c -emit-dependencies \
