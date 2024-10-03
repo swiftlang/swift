@@ -376,13 +376,12 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     break;
 
   case ChangeKind::DisabledConstraint:
-    if (TheConstraint.Constraint->isDisabled())
-      TheConstraint.Constraint->setEnabled();
+    TheConstraint.Constraint->setEnabled();
     break;
 
   case ChangeKind::FavoredConstraint:
-    if (TheConstraint.Constraint->isFavored())
-      TheConstraint.Constraint->setFavored(false);
+    ASSERT(TheConstraint.Constraint->isFavored());
+    TheConstraint.Constraint->setFavored(false);
     break;
 
   case ChangeKind::RecordedResultBuilderTransform:
