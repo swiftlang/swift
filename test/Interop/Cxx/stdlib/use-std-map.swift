@@ -71,6 +71,35 @@ StdMapTestSuite.test("MapStrings.init(_: Dictionary<std.string, std.string>)") {
   expectEqual(emptyM.size(), 0)
 }
 
+StdMapTestSuite.test("Map as ExpressibleByDictionaryLiteral") {
+  let m: Map = [-1 : 2, 2 : 3, 33 : 44]
+  expectEqual(m.size(), 3)
+
+  func takesMap(_ m: Map) {
+    expectEqual(m[-1], 2)
+    expectEqual(m[2], 3)
+    expectEqual(m[33], 44)
+  }
+
+  takesMap(m)
+  takesMap([-1 : 2, 2 : 3, 33 : 44])
+}
+
+/// Same as above, but for std::unordered_map.
+StdMapTestSuite.test("UnorderedMap as ExpressibleByDictionaryLiteral") {
+  let m: UnorderedMap = [-1 : 2, 2 : 3, 33 : 44]
+  expectEqual(m.size(), 3)
+
+  func takesUnorderedMap(_ m: UnorderedMap) {
+    expectEqual(m[-1], 2)
+    expectEqual(m[2], 3)
+    expectEqual(m[33], 44)
+  }
+
+  takesUnorderedMap(m)
+  takesUnorderedMap([-1 : 2, 2 : 3, 33 : 44])
+}
+
 StdMapTestSuite.test("Map.subscript") {
   // This relies on the `std::map` conformance to `CxxDictionary` protocol.
   var m = initMap()
