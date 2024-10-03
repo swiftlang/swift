@@ -405,6 +405,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
 #include "swift/AST/ReferenceStorage.def"
     SINGLE_VALUE_INST(ConvertFunctionInst, convert_function,
                       SingleValueInstruction, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ThunkInst, thunk,
+                      SingleValueInstruction, MayHaveSideEffects, MayRelease)
     SINGLE_VALUE_INST(ConvertEscapeToNoEscapeInst, convert_escape_to_noescape,
                       SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(RefToBridgeObjectInst, ref_to_bridge_object,

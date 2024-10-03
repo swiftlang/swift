@@ -940,6 +940,26 @@ void SILModule::performOnceForPrespecializedImportedExtensions(
   prespecializedFunctionDeclsImported = true;
 }
 
+void SILModule::moveBefore(SILModule::iterator moveAfter, SILFunction *fn) {
+  assert(&fn->getModule() == this);
+  assert(&moveAfter->getModule() == this);
+  assert(moveAfter != end() &&
+         "We assume that moveAfter must not be end since nothing is after end");
+
+  getFunctionList().remove(fn->getIterator());
+  getFunctionList().insert(moveAfter, fn);
+}
+
+void SILModule::moveAfter(SILModule::iterator moveAfter, SILFunction *fn) {
+  assert(&fn->getModule() == this);
+  assert(&moveAfter->getModule() == this);
+  assert(moveAfter != end() &&
+         "We assume that moveAfter must not be end since nothing is after end");
+
+  getFunctionList().remove(fn->getIterator());
+  getFunctionList().insertAfter(moveAfter, fn);
+}
+
 SILProperty *
 SILProperty::create(SILModule &M, unsigned Serialized, AbstractStorageDecl *Decl,
                     std::optional<KeyPathPatternComponent> Component) {

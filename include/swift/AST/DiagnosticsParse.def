@@ -2165,5 +2165,11 @@ ERROR(sending_repeated,none,
 ERROR(sending_cannot_be_used_with_borrowing,none,
       "'%0' cannot be used together with 'borrowing'", (StringRef))
 
+ERROR(sil_thunkinst_failed_to_parse_kind,none,
+      "'%0' is not a valid thunk kind supported by ThunkInst", (StringRef))
+
+ERROR(sil_failed_to_parse_sil_optional,none,
+      "Expected SIL optional value of the form '[' NAME ']'", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

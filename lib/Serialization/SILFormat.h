@@ -174,6 +174,7 @@ namespace sil_block {
     SIL_PACK_ELEMENT_GET,
     SIL_PACK_ELEMENT_SET,
     SIL_TYPE_VALUE,
+    SIL_THUNK,
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -595,6 +596,15 @@ namespace sil_block {
     TypeIDField,          // Value type
     SILTypeCategoryField,
     TypeIDField           // Generic type
+  >;
+
+  using SILThunkLayout = BCRecordLayout<
+    SIL_THUNK,
+    BCFixed<4>, // Kind
+    TypeIDField, // Input Function Type
+    SILTypeCategoryField, // Input Function Value Category
+    ValueIDField, // Input Function Value
+    SubstitutionMapIDField  // Substitution map;
   >;
 
 // clang-format on

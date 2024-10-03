@@ -1162,6 +1162,20 @@ SILFunctionType::getWithRepresentation(Representation repr) {
   return getWithExtInfo(getExtInfo().withRepresentation(repr));
 }
 
+CanSILFunctionType SILFunctionType::getWithCalleeConvention(
+    ParameterConvention newCalleeConvention) {
+  // If we already have this callee convention, just return *this.
+  if (getCalleeConvention() == newCalleeConvention)
+    return CanSILFunctionType(this);
+
+  // Otherwise, make a new type.
+  return get(getInvocationGenericSignature(), getExtInfo(), getCoroutineKind(),
+             newCalleeConvention, getParameters(), getYields(), getResults(),
+             getOptionalErrorResult(), getPatternSubstitutions(),
+             getInvocationSubstitutions(), getASTContext(),
+             getWitnessMethodConformanceOrInvalid());
+}
+
 CanSILFunctionType SILFunctionType::getWithExtInfo(ExtInfo newExt) {
   auto oldExt = getExtInfo();
   if (newExt.isEqualTo(oldExt, useClangTypes(this)))

@@ -90,6 +90,7 @@ CONSTANT_OWNERSHIP_INST(Owned, EndInitLetRef)
 CONSTANT_OWNERSHIP_INST(Owned, BeginDeallocRef)
 CONSTANT_OWNERSHIP_INST(Owned, KeyPath)
 CONSTANT_OWNERSHIP_INST(Owned, InitExistentialValue)
+CONSTANT_OWNERSHIP_INST(Owned, Thunk)
 
 // One would think that these /should/ be unowned. In truth they are owned since
 // objc metatypes do not go through the retain/release fast path. In their

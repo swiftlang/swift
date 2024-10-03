@@ -1240,6 +1240,17 @@ public:
         WithoutActuallyEscaping, forwardingOwnershipKind));
   }
 
+  ThunkInst *createThunk(SILLocation Loc, SILValue Op, ThunkInst::Kind kind,
+                         SubstitutionMap substitutionMap = {}) {
+    return insert(ThunkInst::create(getSILDebugLocation(Loc), Op, getModule(),
+                                    F, kind, substitutionMap));
+  }
+
+  ThunkInst *createIdentityThunk(SILLocation Loc, SILValue Op,
+                                 SubstitutionMap substitutionMap = {}) {
+    return createThunk(Loc, Op, ThunkInst::Kind::Identity, substitutionMap);
+  }
+
   ConvertEscapeToNoEscapeInst *
   createConvertEscapeToNoEscape(SILLocation Loc, SILValue Op, SILType Ty,
                                 bool lifetimeGuaranteed) {

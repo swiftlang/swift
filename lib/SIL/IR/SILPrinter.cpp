@@ -2046,6 +2046,23 @@ public:
     *this << CI->getType();
     printForwardingOwnershipKind(CI, CI->getOperand());
   }
+
+  void visitThunkInst(ThunkInst *ti) {
+    switch (ti->getThunkKind()) {
+    case ThunkInst::Kind::Invalid:
+      llvm_unreachable("Cannot print invalid?!");
+      break;
+    case ThunkInst::Kind::Identity:
+      *this << "[identity] ";
+      break;
+    }
+    *this << Ctx.getID(ti->getOperand());
+    printSubstitutions(
+        ti->getSubstitutionMap(),
+        ti->getOrigCalleeType()->getInvocationGenericSignature());
+    *this << "() : " << ti->getOperand()->getType();
+  }
+
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *CI) {
     *this << (CI->isLifetimeGuaranteed() ? "" : "[not_guaranteed] ")
           << getIDAndType(CI->getOperand()) << " to " << CI->getType();
