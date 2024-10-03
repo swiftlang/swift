@@ -16,7 +16,7 @@
 /// `std::multiset` conform to this protocol.
 ///
 /// - SeeAlso: `CxxUniqueSet`
-public protocol CxxSet<Element> {
+public protocol CxxSet<Element>: ExpressibleByArrayLiteral {
   associatedtype Element
   associatedtype Size: BinaryInteger
 
@@ -45,6 +45,11 @@ extension CxxSet {
     for item in sequence {
       self.__insertUnsafe(item)
     }
+  }
+
+  @inlinable
+  public init(arrayLiteral elements: Element...) {
+    self.init(elements)
   }
 
   /// Returns a Boolean value that indicates whether the given element exists
