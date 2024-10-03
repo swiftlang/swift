@@ -266,7 +266,7 @@ void ConstraintSystem::addConversionRestriction(
   if (!inserted)
     return;
 
-  if (isRecordingChanges()) {
+  if (solverState) {
     recordChange(SolverTrail::Change::addedConversionRestriction(
       srcType, dstType));
   }
@@ -284,7 +284,7 @@ void ConstraintSystem::addFix(ConstraintFix *fix) {
   if (!inserted)
     return;
 
-  if (isRecordingChanges())
+  if (solverState)
     recordChange(SolverTrail::Change::addedFix(fix));
 }
 
@@ -304,7 +304,7 @@ void ConstraintSystem::recordDisjunctionChoice(
     return;
   }
 
-  if (isRecordingChanges()) {
+  if (solverState) {
     recordChange(SolverTrail::Change::recordedDisjunctionChoice(
       locator, index));
   }
@@ -316,7 +316,7 @@ void ConstraintSystem::recordAppliedDisjunction(
   auto inserted = AppliedDisjunctions.insert(
       std::make_pair(locator, fnType));
   if (inserted.second) {
-    if (isRecordingChanges()) {
+    if (solverState) {
       recordChange(SolverTrail::Change::recordedAppliedDisjunction(locator));
     }
   }
@@ -854,7 +854,7 @@ void ConstraintSystem::recordOpenedExistentialType(
     ConstraintLocator *locator, OpenedArchetypeType *opened) {
   bool inserted = OpenedExistentialTypes.insert({locator, opened}).second;
   if (inserted) {
-    if (isRecordingChanges())
+    if (solverState)
       recordChange(SolverTrail::Change::recordedOpenedExistentialType(locator));
   }
 }
@@ -895,7 +895,7 @@ void ConstraintSystem::recordPackExpansionEnvironment(
     ConstraintLocator *locator, std::pair<UUID, Type> uuidAndShape) {
   bool inserted = PackExpansionEnvironments.insert({locator, uuidAndShape}).second;
   if (inserted) {
-    if (isRecordingChanges()) {
+    if (solverState) {
       recordChange(
         SolverTrail::Change::recordedPackExpansionEnvironment(locator));
     }
@@ -913,7 +913,7 @@ void ConstraintSystem::addPackEnvironment(PackElementExpr *packElement,
   bool inserted =
       PackEnvironments.insert({packElement, packExpansion}).second;
   if (inserted) {
-    if (isRecordingChanges())
+    if (solverState)
       recordChange(SolverTrail::Change::recordedPackEnvironment(packElement));
   }
 }
@@ -1279,7 +1279,7 @@ void ConstraintSystem::recordOpenedPackExpansionType(PackExpansionType *expansio
                                                      TypeVariableType *expansionVar) {
   bool inserted = OpenedPackExpansionTypes.insert({expansion, expansionVar}).second;
   if (inserted) {
-    if (isRecordingChanges())
+    if (solverState)
       recordChange(SolverTrail::Change::recordedOpenedPackExpansionType(expansion));
   }
 }
@@ -1688,7 +1688,7 @@ void ConstraintSystem::recordOpenedType(
     ConstraintLocator *locator, ArrayRef<OpenedType> openedTypes) {
   bool inserted = OpenedTypes.insert({locator, openedTypes}).second;
   if (inserted) {
-    if (isRecordingChanges())
+    if (solverState)
       recordChange(SolverTrail::Change::recordedOpenedTypes(locator));
   }
 }
@@ -7443,7 +7443,7 @@ void ConstraintSystem::recordFixedRequirement(GenericTypeParamType *GP,
   bool inserted = FixedRequirements.insert(
       std::make_tuple(GP, reqKind, requirementTy.getPointer())).second;
   if (inserted) {
-    if (isRecordingChanges()) {
+    if (solverState) {
       recordChange(SolverTrail::Change::addedFixedRequirement(
           GP, reqKind, requirementTy));
     }

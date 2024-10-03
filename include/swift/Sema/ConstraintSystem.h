@@ -2412,9 +2412,8 @@ public:
   void recordDefaultedConstraint(ConstraintLocator *locator) {
     bool inserted = DefaultedConstraints.insert(locator).second;
     if (inserted) {
-      if (isRecordingChanges()) {
+      if (solverState)
         recordChange(SolverTrail::Change::recordedDefaultedConstraint(locator));
-      }
     }
   }
 
@@ -3177,7 +3176,7 @@ public:
 
     if (oldType.getPointer() != type.getPointer()) {
       // Record the fact that we assigned a type to this node.
-      if (isRecordingChanges())
+      if (solverState)
         recordChange(SolverTrail::Change::recordedNodeType(node, oldType));
     }
   }
@@ -3215,7 +3214,7 @@ public:
     entry = T;
 
     if (oldType.getPointer() != T.getPointer()) {
-      if (isRecordingChanges()) {
+      if (solverState) {
         recordChange(
           SolverTrail::Change::recordedKeyPathComponentType(
             KP, I, oldType));
