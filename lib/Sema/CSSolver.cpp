@@ -415,7 +415,14 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   for (const auto &appliedWrapper : solution.appliedPropertyWrappers) {
-    appliedPropertyWrappers.insert(appliedWrapper);
+    auto found = appliedPropertyWrappers.find(appliedWrapper.first);
+    if (found == appliedPropertyWrappers.end()) {
+      appliedPropertyWrappers.insert(appliedWrapper);
+    } else {
+      auto &existing = found->second;
+      ASSERT(existing.size() <= appliedWrapper.second.size());
+      existing = appliedWrapper.second;
+    }
   }
 
   for (auto &valueConversion : solution.ImplicitValueConversions) {
@@ -681,7 +688,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
   numKeyPaths = cs.KeyPaths.size();
-  numAppliedPropertyWrappers = cs.appliedPropertyWrappers.size();
   numResolvedOverloads = cs.ResolvedOverloads.size();
   numInferredClosureTypes = cs.ClosureTypes.size();
   numImpliedResults = cs.ImpliedResults.size();
@@ -732,9 +738,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   /// Remove any key path expressions.
   truncate(cs.KeyPaths, numKeyPaths);
-
-  // Remove any applied property wrappers.
-  truncate(cs.appliedPropertyWrappers, numAppliedPropertyWrappers);
 
   // Remove any inferred closure types (e.g. used in result builder body).
   truncate(cs.ClosureTypes, numInferredClosureTypes);

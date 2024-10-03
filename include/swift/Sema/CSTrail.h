@@ -91,6 +91,8 @@ public:
     FavoredConstraint,
     /// Recorded a result builder transform.
     RecordedResultBuilderTransform,
+    /// Applied a property wrapper.
+    AppliedPropertyWrapper,
   };
 
   /// A change made to the constraint system.
@@ -168,6 +170,7 @@ public:
       ConstraintLocator *Locator;
       PackExpansionType *ExpansionTy;
       PackElementExpr *ElementExpr;
+      Expr *TheExpr;
       AnyFunctionRef AFR;
     };
 
@@ -261,6 +264,9 @@ public:
 
     /// Create a change that recorded a result builder transform.
     static Change recordedResultBuilderTransform(AnyFunctionRef fn);
+
+    /// Create a change that recorded a result builder transform.
+    static Change appliedPropertyWrapper(Expr *anchor);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.
