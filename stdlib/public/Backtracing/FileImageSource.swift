@@ -16,7 +16,15 @@
 
 import Swift
 
-@_implementationOnly import OS.Libc
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+internal import Darwin
+#elseif os(Windows)
+internal import ucrt
+#elseif canImport(Glibc)
+internal import Glibc
+#elseif canImport(Musl)
+internal import Musl
+#endif
 
 enum FileImageSourceError: Error {
   case posixError(Int32)
@@ -37,18 +45,18 @@ class FileImageSource: ImageSource {
 
   public init(path: String) throws {
     _path = path
-    let fd = _swift_open(path, O_RDONLY, 0)
+    let fd = open(path, O_RDONLY, 0)
     if fd < 0 {
-      throw FileImageSourceError.posixError(_swift_get_errno())
+      throw FileImageSourceError.posixError(errno)
     }
     defer { close(fd) }
     let size = lseek(fd, 0, SEEK_END)
     if size < 0 {
-      throw FileImageSourceError.posixError(_swift_get_errno())
+      throw FileImageSourceError.posixError(errno)
     }
     let base = mmap(nil, Int(size), PROT_READ, MAP_FILE|MAP_PRIVATE, fd, 0)
     if base == nil || base! == UnsafeRawPointer(bitPattern: -1)! {
-      throw FileImageSourceError.posixError(_swift_get_errno())
+      throw FileImageSourceError.posixError(errno)
     }
     _mapping = UnsafeRawBufferPointer(start: base, count: Int(size))
   }

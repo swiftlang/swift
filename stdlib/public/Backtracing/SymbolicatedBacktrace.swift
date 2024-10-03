@@ -18,16 +18,19 @@
 import Swift
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-@_implementationOnly import OS.Darwin
+internal import BacktracingImpl.OS.Darwin
 #endif
 
-@_implementationOnly import OS.Libc
-@_implementationOnly import Runtime
-// Because we've turned off the OS/SDK modules, and we don't have a module for
-// stddef.h, and we sometimes build with -fbuiltin-headers-in-system-modules for
-// vfs reasons, stddef.h can be absorbed into a random module. Sometimes it's
-// SwiftOverlayShims.
-@_implementationOnly import SwiftOverlayShims
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+internal import Darwin
+#elseif os(Windows)
+internal import ucrt
+#elseif canImport(Glibc)
+internal import Glibc
+#elseif canImport(Musl)
+internal import Musl
+#endif
+internal import BacktracingImpl.Runtime
 
 /// A symbolicated backtrace
 public struct SymbolicatedBacktrace: CustomStringConvertible {

@@ -29,9 +29,17 @@
 
 import Swift
 
-@_implementationOnly import OS.Libc
-@_implementationOnly import CompressionLibs
-@_implementationOnly import ImageFormats.Elf
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+internal import Darwin
+#elseif os(Windows)
+internal import ucrt
+#elseif canImport(Glibc)
+internal import Glibc
+#elseif canImport(Musl)
+internal import Musl
+#endif
+internal import BacktracingImpl.CompressionLibs
+internal import BacktracingImpl.ImageFormats.Elf
 
 enum CompressedImageSourceError: Error {
   case unboundedImageSource

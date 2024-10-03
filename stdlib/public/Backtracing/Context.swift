@@ -20,12 +20,13 @@
 import Swift
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-@_implementationOnly import OS.Darwin
+internal import Darwin
+internal import BacktracingImpl.OS.Darwin
 #elseif os(Linux)
-@_implementationOnly import OS.Linux
+internal import BacktracingImpl.OS.Linux
 #endif
 
-@_implementationOnly import FixedLayout
+internal import BacktracingImpl.FixedLayout
 
 @_spi(Contexts) public enum ContextError: Error {
   case unableToFormTLSAddress

@@ -50,10 +50,7 @@ set(BACKTRACING_COMPILE_FLAGS
   "-Xfrontend;-experimental-spi-only-imports"
   "-Xcc;-I${SWIFT_SOURCE_DIR}/include"
   "-Xcc;-I${CMAKE_BINARY_DIR}/include"
-  "-Xcc;-fno-implicit-module-maps"
-  "-Xcc;-fbuiltin-module-map"
-  "-Xcc;-fmodule-map-file=${SWIFT_STDLIB_SOURCE_DIR}/public/SwiftShims/swift/shims/module.modulemap"
-  "-Xcc;-fmodule-map-file=${SWIFT_STDLIB_SOURCE_DIR}/public/Backtracing/modules/module.modulemap")
+  "-Xcc;-I${SWIFT_STDLIB_SOURCE_DIR}/public/Backtracing/modules")
 
 ###TODO: Add these when we add static linking support
 #
@@ -78,6 +75,15 @@ add_swift_target_library(swift_Backtracing ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   ${BACKTRACING_SOURCES}
 
   SWIFT_MODULE_DEPENDS ${concurrency}
+
+  SWIFT_MODULE_DEPENDS_ANDROID Android
+  SWIFT_MODULE_DEPENDS_LINUX Glibc
+  SWIFT_MODULE_DEPENDS_LINUX_STATIC Musl
+  SWIFT_MODULE_DEPENDS_FREEBSD Glibc
+  SWIFT_MODULE_DEPENDS_OPENBSD Glibc
+  SWIFT_MODULE_DEPENDS_CYGWIN Glibc
+  SWIFT_MODULE_DEPENDS_HAIKU Glibc
+  SWIFT_MODULE_DEPENDS_WINDOWS CRT
 
   PRIVATE_LINK_LIBRARIES ${swift_backtracing_link_libraries}
 

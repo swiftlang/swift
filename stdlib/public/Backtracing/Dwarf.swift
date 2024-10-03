@@ -19,8 +19,8 @@
 
 import Swift
 
-@_implementationOnly import ImageFormats.Dwarf
-@_implementationOnly import Runtime
+internal import BacktracingImpl.ImageFormats.Dwarf
+internal import BacktracingImpl.Runtime
 
 // .. Dwarf specific errors ....................................................
 
