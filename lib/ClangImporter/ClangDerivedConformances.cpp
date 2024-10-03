@@ -883,6 +883,8 @@ void swift::conformToCxxSetIfNeeded(ClangImporter::Implementation &impl,
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element,
                                valueType->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.Id_ArrayLiteralElement,
+                               valueType->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
                                sizeType->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("InsertionResult"),
