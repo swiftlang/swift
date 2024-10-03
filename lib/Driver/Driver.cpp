@@ -1167,6 +1167,9 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       break;
 
     case options::OPT_emit_irgen:
+      OI.CompilerOutputType = file_types::TY_RawLLVM_IR;
+      break;
+
     case options::OPT_emit_ir:
       OI.CompilerOutputType = file_types::TY_LLVM_IR;
       break;
@@ -1668,6 +1671,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_dSYM:
       case file_types::TY_Dependencies:
       case file_types::TY_Assembly:
+      case file_types::TY_RawLLVM_IR:
       case file_types::TY_LLVM_IR:
       case file_types::TY_LLVM_BC:
       case file_types::TY_SerializedDiagnostics:
