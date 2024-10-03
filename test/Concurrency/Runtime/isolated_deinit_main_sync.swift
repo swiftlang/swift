@@ -1,5 +1,9 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature IsolatedDeinit -Xfrontend -disable-availability-checking) | %FileCheck %s
 
+// REQUIRES: executable_test
+// REQUIRES: concurrency
+// REQUIRES: concurrency_runtime
+
 var isDead: Bool = false
 
 public class Foo {
