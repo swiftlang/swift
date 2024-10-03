@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift( -enable-experimental-feature IsolatedDeinit -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -11,7 +11,7 @@
 import Distributed
 
 distributed actor SomeSpecificDistributedActor {
-  deinit {
+  nonisolated deinit {
     print("deinit \(self.id)")
   }
 }
@@ -40,7 +40,7 @@ final class FakeActorSystem: DistributedActorSystem {
   typealias SerializationRequirement = Codable
   typealias ResultHandler = FakeResultHandler
 
-  deinit {
+  nonisolated deinit {
     print("deinit \(self)")
   }
 
