@@ -75,6 +75,51 @@ StdSetTestSuite.test("UnorderedSetOfCInt.init()") {
     expectTrue(s.contains(3))
 }
 
+StdSetTestSuite.test("SetOfCInt as ExpressibleByArrayLiteral") {
+    let s: SetOfCInt = [1, 3, 5]
+    expectTrue(s.contains(1))
+    expectFalse(s.contains(2))
+    expectTrue(s.contains(3))
+
+    func takesSetOfCInt(_ s: SetOfCInt) {
+        expectTrue(s.contains(1))
+        expectTrue(s.contains(2))
+        expectFalse(s.contains(3))
+    }
+
+    takesSetOfCInt([1, 2])
+}
+
+StdSetTestSuite.test("UnorderedSetOfCInt as ExpressibleByArrayLiteral") {
+    let s: UnorderedSetOfCInt = [1, 3, 5]
+    expectTrue(s.contains(1))
+    expectFalse(s.contains(2))
+    expectTrue(s.contains(3))
+
+    func takesUnorderedSetOfCInt(_ s: UnorderedSetOfCInt) {
+        expectTrue(s.contains(1))
+        expectTrue(s.contains(2))
+        expectFalse(s.contains(3))
+    }
+
+    takesUnorderedSetOfCInt([1, 2])
+}
+
+StdSetTestSuite.test("MultisetOfCInt as ExpressibleByArrayLiteral") {
+    let s: MultisetOfCInt = [1, 1, 3]
+    expectTrue(s.contains(1))
+    expectFalse(s.contains(2))
+    expectTrue(s.contains(3))
+
+    func takesMultisetOfCInt(_ s: MultisetOfCInt) {
+        expectTrue(s.contains(1))
+        expectTrue(s.contains(2))
+        expectFalse(s.contains(3))
+    }
+
+    takesMultisetOfCInt([1, 1, 2])
+}
+
 StdSetTestSuite.test("SetOfCInt.insert") {
     var s = SetOfCInt()
     expectFalse(s.contains(123))
