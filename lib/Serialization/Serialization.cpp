@@ -1167,7 +1167,7 @@ void Serializer::writeHeader() {
         auto &Opts = Options.ExtraClangOptions;
         for (auto Arg = Opts.begin(), E = Opts.end(); Arg != E; ++Arg) {
           StringRef arg(*Arg);
-          if (arg.starts_with("-ivfsoverlay")) {
+          if (!Options.ExplicitModuleBuild && arg.starts_with("-ivfsoverlay")) {
             // FIXME: This is a hack and calls for a better design.
             //
             // Filter out any -ivfsoverlay options that include an
@@ -1175,6 +1175,11 @@ void Serializer::writeHeader() {
             // buildsystem uses these while *building* mixed Objective-C and
             // Swift frameworks; but they should never be used to *import* the
             // module defined in the framework.
+            //
+            // This is not done for explicit modules builds. In an explicit
+            // build LLDB needs to be able import the unmodified .pcms, so
+            // having the exact same flags matters there, and there is no risk
+            // of a recompilation failure, because nothing is recompiled.
             auto Next = std::next(Arg);
             if (Next != E &&
                 StringRef(*Next).ends_with("unextended-module-overlay.yaml")) {
