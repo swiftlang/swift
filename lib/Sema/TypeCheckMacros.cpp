@@ -40,6 +40,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Bridging/ASTGen.h"
+#include "swift/Bridging/Macros.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Lexer.h"
@@ -121,7 +122,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   ptrdiff_t *genericReplacements = nullptr;
   ptrdiff_t numGenericReplacements = 0;
 
-  // Parse 'macro' decl in swift_ASTGen_checkMacroDefinition.
+  // Parse 'macro' decl in swift_Macros_checkMacroDefinition.
   // NOTE: We don't use source->getExportedSourceFile() because it parses the
   // entire source buffer, which we don't want. Usually 'macro' decl is not in
   // the same file as the expansion, so we only want to parse only the decl.
@@ -133,7 +134,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
       SM.extractText(Lexer::getCharSourceRangeFromSourceRange(
           SM, macro->getSourceRangeIncludingAttrs()));
 
-  auto checkResult = swift_ASTGen_checkMacroDefinition(
+  auto checkResult = swift_Macros_checkMacroDefinition(
       &ctx.Diags, sourceFileText, macroDeclText, &externalMacroName,
       &replacements, &numReplacements, &genericReplacements,
       &numGenericReplacements);
@@ -141,8 +142,8 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   // Clean up after the call.
   SWIFT_DEFER {
     swift_ASTGen_freeBridgedString(externalMacroName);
-    swift_ASTGen_freeExpansionReplacements(replacements, numReplacements);
-    // swift_ASTGen_freeExpansionGenericReplacements(genericReplacements, numGenericReplacements); // FIXME: !!!!!!
+    swift_Macros_freeExpansionReplacements(replacements, numReplacements);
+    // swift_Macros_freeExpansionGenericReplacements(genericReplacements, numGenericReplacements); // FIXME: !!!!!!
   };
 
   if (checkResult < 0 && ctx.CompletionCallback) {
@@ -247,7 +248,7 @@ initializePlugin(ASTContext &ctx, CompilerPlugin *plugin, StringRef libraryPath,
   // But plugin loading is in libAST and it can't link ASTGen symbols.
   if (!plugin->isInitialized()) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
-    if (!swift_ASTGen_initializePlugin(plugin, &ctx.Diags)) {
+    if (!swift_Macros_initializePlugin(plugin, &ctx.Diags)) {
       return llvm::createStringError(llvm::inconvertibleErrorCode(),
                                      "'%s' produced malformed response",
                                      plugin->getPath().data());
@@ -255,12 +256,12 @@ initializePlugin(ASTContext &ctx, CompilerPlugin *plugin, StringRef libraryPath,
 
     // Resend the compiler capability on reconnect.
     auto *callback = new std::function<void(void)>([plugin]() {
-      (void)swift_ASTGen_initializePlugin(plugin, /*diags=*/nullptr);
+      (void)swift_Macros_initializePlugin(plugin, /*diags=*/nullptr);
     });
     plugin->addOnReconnect(callback);
 
     plugin->setCleanup([plugin, callback] {
-      swift_ASTGen_deinitializePlugin(plugin);
+      swift_Macros_deinitializePlugin(plugin);
       delete callback;
     });
 #endif
@@ -281,7 +282,7 @@ initializePlugin(ASTContext &ctx, CompilerPlugin *plugin, StringRef libraryPath,
     std::string moduleNameStr(moduleName.str());
 
     BridgedStringRef bridgedErrorOut{nullptr, 0};
-    bool loaded = swift_ASTGen_pluginServerLoadLibraryPlugin(
+    bool loaded = swift_Macros_pluginServerLoadLibraryPlugin(
         plugin, resolvedLibraryPathStr.c_str(), moduleNameStr.c_str(),
         &bridgedErrorOut);
 
@@ -300,7 +301,7 @@ initializePlugin(ASTContext &ctx, CompilerPlugin *plugin, StringRef libraryPath,
     // Set a callback to load the library again on reconnections.
     auto *callback = new std::function<void(void)>(
         [plugin, resolvedLibraryPathStr, moduleNameStr]() {
-          (void)swift_ASTGen_pluginServerLoadLibraryPlugin(
+          (void)swift_Macros_pluginServerLoadLibraryPlugin(
               plugin, resolvedLibraryPathStr.c_str(), moduleNameStr.c_str(),
               /*errorOut=*/nullptr);
         });
@@ -385,10 +386,10 @@ static ExternalMacroDefinition resolveExternalMacro(ASTContext &ctx,
                                                     Identifier moduleName,
                                                     Identifier typeName) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
-  if (auto *macro = swift_ASTGen_resolveExternalMacro(moduleName.get(),
+  if (auto *macro = swift_Macros_resolveExternalMacro(moduleName.get(),
                                                       typeName.get(), plugin)) {
     // Make sure we clean up after the macro.
-    ctx.addCleanup([macro]() { swift_ASTGen_destroyExternalMacro(macro); });
+    ctx.addCleanup([macro]() { swift_Macros_destroyExternalMacro(macro); });
     return ExternalMacroDefinition::success(macro);
   }
   // NOTE: this is not reachable because executable macro resolution always
@@ -1163,7 +1164,7 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
 
     BridgedStringRef evaluatedSourceOut{nullptr, 0};
     assert(!externalDef.isError());
-    swift_ASTGen_expandFreestandingMacro(
+    swift_Macros_expandFreestandingMacro(
         &ctx.Diags, externalDef.get(), discriminator->c_str(),
         getRawMacroRole(macroRole), astGenSourceFile,
         expansion->getSourceRange().Start.getOpaquePointerValue(),
@@ -1487,7 +1488,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
 
     BridgedStringRef evaluatedSourceOut{nullptr, 0};
     assert(!externalDef.isError());
-    swift_ASTGen_expandAttachedMacro(
+    swift_Macros_expandAttachedMacro(
         &ctx.Diags, externalDef.get(), discriminator->c_str(),
         extendedType.c_str(), conformanceList.c_str(), getRawMacroRole(role),
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
