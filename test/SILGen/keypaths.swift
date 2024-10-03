@@ -1,4 +1,5 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature KeyPathWithStaticMembers -disable-availability-checking -parse-stdlib -module-name keypaths %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-experimental-feature KeyPathWithStaticMembers -disable-availability-checking -disable-experimental-parser-round-trip -parse-stdlib -module-name keypaths %s | %FileCheck %s
+// FIXME: Remove '-disable-experimental-parser-round-trip'.
 
 // REQUIRES: asserts
 

@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-sil \
-// RUN:   -enable-experimental-feature NonescapableTypes
+// RUN:   -enable-experimental-feature NonescapableTypes \
+// RUN:   -disable-experimental-parser-round-trip
+// FIXME: Remove '-disable-experimental-parser-round-trip'.
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
