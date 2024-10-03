@@ -13,8 +13,6 @@ sil_stage raw
 
 class C {}
 
-@_marker public protocol Escapable { }
-
 struct Nonescapable: ~Escapable {}
 
 sil @c_dependence : $@convention(thin) (@guaranteed C) -> _scope(0) @owned Nonescapable
@@ -52,3 +50,7 @@ bb0:
   %t = tuple ()
   return %t : $()
 }
+
+public struct Container<Element> : ~Copyable, ~Escapable where Element : ~Copyable {}
+
+sil [ossa] @parseInoutDep : $@convention(method) <Element where Element : ~Copyable> (_lifetime(_copy 0) @inout Container<Element>) -> ()
