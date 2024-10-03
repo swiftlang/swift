@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes -disable-experimental-parser-round-trip
+// FIXME: Remove '-disable-experimental-parser-round-trip'.
 // REQUIRES: asserts
 
 struct NE : ~Escapable {
