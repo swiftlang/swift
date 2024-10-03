@@ -279,27 +279,6 @@ static void printImports(raw_ostream &out,
     return importSet;
   };
 
-  // With -experimental-spi-imports:
-  // When printing the private or package swiftinterface file, print implementation-only
-  // imports only if they are also SPI. First, list all implementation-only imports and
-  // filter them later.
-  llvm::SmallSet<ImportedModule, 4, ImportedModule::Order> ioiImportSet;
-  if (!Opts.printPublicInterface() && Opts.ExperimentalSPIImports) {
-
-    SmallVector<ImportedModule, 4> ioiImports, allImports;
-    M->getImportedModules(ioiImports,
-                          ModuleDecl::ImportFilterKind::ImplementationOnly);
-
-    // Only consider modules imported consistently as implementation-only.
-    ImportSet allImportSet = getImports(allImportFilter);
-
-    for (auto import: ioiImports)
-      if (allImportSet.count(import) == 0)
-        ioiImportSet.insert(import);
-
-    allImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-  }
-
   /// Collect @_spiOnly imports that are not imported elsewhere publicly.
   ImportSet spiOnlyImportSet;
   if (!Opts.printPublicInterface()) {
@@ -366,13 +345,6 @@ static void printImports(raw_ostream &out,
 
     llvm::SmallSetVector<Identifier, 4> spis;
     M->lookupImportedSPIGroups(importedModule, spis);
-
-    // Only print implementation-only imports which have an SPI import.
-    if (ioiImportSet.count(import)) {
-      if (spis.empty())
-        continue;
-      out << "@_implementationOnly ";
-    }
 
     if (exportedImportSet.count(import))
       out << "@_exported ";
