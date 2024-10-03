@@ -263,39 +263,13 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       IS_STDLIB IS_FRAGILE
 
       ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
+      ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
       CooperativeGlobalExecutor.cpp
-
-      # TODO: Only a subset of Swift Concurrency .swift sources, for now.
-      Actor.swift
-      AsyncLet.swift
-      CheckedContinuation.swift
-      Errors.swift
-      Executor.swift
-      ExecutorAssertions.swift
-      AsyncCompactMapSequence.swift
-      AsyncDropFirstSequence.swift
-      AsyncDropWhileSequence.swift
-      AsyncFilterSequence.swift
-      AsyncFlatMapSequence.swift
-      AsyncIteratorProtocol.swift
-      AsyncMapSequence.swift
-      AsyncPrefixSequence.swift
-      AsyncPrefixWhileSequence.swift
-      AsyncSequence.swift
-      AsyncThrowingCompactMapSequence.swift
-      AsyncThrowingDropWhileSequence.swift
-      AsyncThrowingFilterSequence.swift
-      AsyncThrowingFlatMapSequence.swift
-      AsyncThrowingMapSequence.swift
-      AsyncThrowingPrefixWhileSequence.swift
-      GlobalActor.swift
-      PartialAsyncTask.swift
-      Task.swift
-      TaskCancellation.swift
 
       SWIFT_COMPILE_FLAGS
         ${extra_swift_compile_flags} -enable-experimental-feature Embedded
         -parse-stdlib -DSWIFT_CONCURRENCY_EMBEDDED
+        -Xfrontend -emit-empty-object-file
         ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
       C_COMPILE_FLAGS
         ${extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS} -DSWIFT_CONCURRENCY_EMBEDDED=1

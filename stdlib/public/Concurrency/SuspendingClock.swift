@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 import Swift
 
+#if !$Embedded
+
 /// A clock that measures time that always increments but stops incrementing 
 /// while the system is asleep. 
 ///
@@ -179,3 +181,4 @@ extension SuspendingClock.Instant: InstantProtocol {
   }
 }
 
+#endif
