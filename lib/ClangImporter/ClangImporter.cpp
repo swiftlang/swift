@@ -1501,8 +1501,8 @@ ClangImporter::create(ASTContext &ctx,
     return importer;
 
   instance.initializeDelayedInputFileFromCAS();
-  if (instance.getDiagnostics().hasErrorOccurred())
-    return nullptr;
+  if (instance.getFrontendOpts().Inputs.empty())
+    return nullptr; // no inputs available.
 
   bool canBegin = action->BeginSourceFile(instance,
                                           instance.getFrontendOpts().Inputs[0]);
