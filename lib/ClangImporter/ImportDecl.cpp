@@ -57,6 +57,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjCCommon.h"
+#include "clang/AST/DeclarationName.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Lex/Preprocessor.h"
@@ -1012,6 +1013,7 @@ namespace {
   {
     ClangImporter::Implementation &Impl;
     bool forwardDeclaration = false;
+    bool importAsEscapable = true;
     ImportNameVersion version;
     SwiftDeclSynthesizer synthesizer;
 
@@ -1147,8 +1149,9 @@ namespace {
 
   public:
     explicit SwiftDeclConverter(ClangImporter::Implementation &impl,
-                                ImportNameVersion vers)
-      : Impl(impl), version(vers), synthesizer(Impl) { }
+                                ImportNameVersion vers, bool importAsEscapable)
+        : Impl(impl), importAsEscapable(importAsEscapable), version(vers),
+          synthesizer(Impl) {}
 
     bool hadForwardDeclaration() const {
       return forwardDeclaration;
@@ -1506,14 +1509,16 @@ namespace {
         // bridging, i.e. if the imported typealias should name a bridged type
         // or the original C type.
         clang::QualType ClangType = Decl->getUnderlyingType();
+        const clang::Type *nonEscapableType = nullptr;
         if (importer::hasNonEscapableAttr(Decl))
-          Impl.nonEscapableTypes.insert(
-              ClangType->getCanonicalTypeUnqualified()->getTypePtr());
+          nonEscapableType =
+              ClangType->getCanonicalTypeUnqualified()->getTypePtr();
         SwiftType = Impl.importTypeIgnoreIUO(
             ClangType, ImportTypeKind::Typedef,
             ImportDiagnosticAdder(Impl, Decl, Decl->getLocation()),
             isInSystemModule(DC), getTypedefBridgeability(Decl),
-            getImportTypeAttrs(Decl), OTK_Optional);
+            getImportTypeAttrs(Decl), OTK_Optional,
+            /*resugarNSErrorPointer=*/true, nonEscapableType);
       }
 
       if (!SwiftType)
@@ -1923,7 +1928,8 @@ namespace {
                                        ImportNameVersion nameVersion) -> bool {
             if (!contextIsEnum(newName))
               return true;
-            SwiftDeclConverter converter(Impl, nameVersion);
+            SwiftDeclConverter converter(Impl, nameVersion,
+                                         /*importAsEscapable=*/true);
             Decl *imported =
                 converter.importOptionConstant(constant, decl, result);
             if (!imported)
@@ -1943,7 +1949,8 @@ namespace {
           if (canonicalCaseIter == canonicalEnumConstants.end()) {
             // Unavailable declarations get no special treatment.
             enumeratorDecl =
-                SwiftDeclConverter(Impl, getActiveSwiftVersion())
+                SwiftDeclConverter(Impl, getActiveSwiftVersion(),
+                                   /*importAsEscapable=*/true)
                     .importEnumCase(constant, decl, cast<EnumDecl>(result));
           } else {
             const clang::EnumConstantDecl *unimported =
@@ -1952,8 +1959,10 @@ namespace {
 
             // Import the canonical enumerator for this case first.
             if (unimported) {
-              enumeratorDecl = SwiftDeclConverter(Impl, getActiveSwiftVersion())
-                  .importEnumCase(unimported, decl, cast<EnumDecl>(result));
+              enumeratorDecl =
+                  SwiftDeclConverter(Impl, getActiveSwiftVersion(),
+                                     /*importAsEscapable=*/true)
+                      .importEnumCase(unimported, decl, cast<EnumDecl>(result));
               if (enumeratorDecl) {
                 canonicalCaseIter->getSecond() =
                     cast<EnumElementDecl>(enumeratorDecl);
@@ -1986,7 +1995,8 @@ namespace {
               return true;
             if (!contextIsEnum(newName))
               return true;
-            SwiftDeclConverter converter(Impl, nameVersion);
+            SwiftDeclConverter converter(Impl, nameVersion,
+                                         /*importAsEscapable=*/true);
             Decl *imported =
                 converter.importEnumCase(constant, decl, cast<EnumDecl>(result),
                                          enumeratorDecl);
@@ -2181,8 +2191,8 @@ namespace {
       // struct at which point it attempts to import its decl context which is
       // the "Parent" struct. Without trying to look up already-imported structs
       // this will cause an infinite loop.
-      auto alreadyImportedResult =
-          Impl.ImportedDecls.find({decl->getCanonicalDecl(), getVersion()});
+      auto alreadyImportedResult = Impl.ImportedDecls.find(
+          {decl->getCanonicalDecl(), getVersion(), importAsEscapable});
       if (alreadyImportedResult != Impl.ImportedDecls.end())
         return alreadyImportedResult->second;
 
@@ -2195,7 +2205,8 @@ namespace {
         result = Impl.createDeclWithClangNode<StructDecl>(
             decl, AccessLevel::Public, loc, name, loc, std::nullopt, nullptr,
             dc);
-      Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
+      Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion(),
+                          importAsEscapable}] = result;
 
       if (recordHasMoveOnlySemantics(decl)) {
         if (decl->isInStdNamespace() && decl->getName() == "promise") {
@@ -2207,10 +2218,7 @@ namespace {
       }
 
       if (Impl.SwiftContext.LangOpts.hasFeature(Feature::NonescapableTypes) &&
-          (importer::hasNonEscapableAttr(decl) ||
-           Impl.nonEscapableTypes.contains(decl->getTypeForDecl()
-                                               ->getCanonicalTypeUnqualified()
-                                               ->getTypePtr()))) {
+          (importer::hasNonEscapableAttr(decl) || !importAsEscapable)) {
         result->getAttrs().add(new (Impl.SwiftContext)
                                    NonEscapableAttr(/*Implicit=*/true));
       }
@@ -7452,7 +7460,8 @@ SwiftDeclConverter::importAccessor(const clang::ObjCMethodDecl *clangAccessor,
                                    AbstractStorageDecl *storage,
                                    AccessorKind accessorKind,
                                    DeclContext *dc) {
-  SwiftDeclConverter converter(Impl, getActiveSwiftVersion());
+  SwiftDeclConverter converter(Impl, getActiveSwiftVersion(),
+                               /*importAsEscapable=*/true);
   auto *accessor = cast_or_null<AccessorDecl>(
     converter.importObjCMethodDecl(clangAccessor, dc,
                                    AccessorInfo{storage, accessorKind}));
@@ -7585,7 +7594,8 @@ std::optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
 void ClangImporter::Implementation::importMirroredProtocolMembers(
     const clang::ObjCContainerDecl *decl, DeclContext *dc,
     std::optional<DeclBaseName> name, SmallVectorImpl<Decl *> &members) {
-  SwiftDeclConverter converter(*this, CurrentVersion);
+  SwiftDeclConverter converter(*this, CurrentVersion,
+                               /*importAsEscapable=*/true);
   converter.importMirroredProtocolMembers(decl, dc, name, members);
 }
 
@@ -8023,9 +8033,10 @@ void SwiftDeclConverter::importInheritedConstructors(
 
 std::optional<Decl *> ClangImporter::Implementation::importDeclCached(
     const clang::NamedDecl *ClangDecl, ImportNameVersion version,
-    bool UseCanonical) {
+    bool UseCanonical, bool escapable) {
   auto Known = ImportedDecls.find(
-    { UseCanonical? ClangDecl->getCanonicalDecl(): ClangDecl, version });
+      {UseCanonical ? ClangDecl->getCanonicalDecl() : ClangDecl, version,
+       escapable});
   if (Known == ImportedDecls.end())
     return std::nullopt;
 
@@ -8756,11 +8767,9 @@ void ClangImporter::Implementation::importAttributes(
   }
 }
 
-Decl *
-ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
-                                              ImportNameVersion version,
-                                              bool &TypedefIsSuperfluous,
-                                              bool &HadForwardDeclaration) {
+Decl *ClangImporter::Implementation::importDeclImpl(
+    const clang::NamedDecl *ClangDecl, ImportNameVersion version,
+    bool &TypedefIsSuperfluous, bool &HadForwardDeclaration, bool escapable) {
   assert(ClangDecl);
 
   // If this decl isn't valid, don't import it. Bail now.
@@ -8787,7 +8796,7 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   }
   
   if (!Result) {
-    SwiftDeclConverter converter(*this, version);
+    SwiftDeclConverter converter(*this, version, escapable);
     Result = converter.Visit(ClangDecl);
     HadForwardDeclaration = converter.hadForwardDeclaration();
   }
@@ -9023,7 +9032,8 @@ void ClangImporter::Implementation::finishNormalConformance(
 
 Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
     const clang::NamedDecl *ClangDecl, ImportNameVersion version,
-    bool SuperfluousTypedefsAreTransparent, bool UseCanonicalDecl) {
+    bool SuperfluousTypedefsAreTransparent, bool UseCanonicalDecl,
+    bool escapable) {
   if (!ClangDecl)
     return nullptr;
 
@@ -9034,7 +9044,7 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
 
   auto Canon = cast<clang::NamedDecl>(UseCanonicalDecl? ClangDecl->getCanonicalDecl(): ClangDecl);
 
-  auto Known = importDeclCached(Canon, version, UseCanonicalDecl);
+  auto Known = importDeclCached(Canon, version, UseCanonicalDecl, escapable);
   if (Known.has_value()) {
     if (!SuperfluousTypedefsAreTransparent &&
         SuperfluousTypedefs.count(Canon))
@@ -9047,9 +9057,9 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
 
   startedImportingEntity();
   Decl *Result = importDeclImpl(ClangDecl, version, TypedefIsSuperfluous,
-                                HadForwardDeclaration);
+                                HadForwardDeclaration, escapable);
   if (!Result) {
-    ImportedDecls[{Canon, version}] = nullptr;
+    ImportedDecls[{Canon, version, escapable}] = nullptr;
     return nullptr;
   }
 
@@ -9060,7 +9070,7 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   }
 
   if (!HadForwardDeclaration)
-    ImportedDecls[{Canon, version}] = Result;
+    ImportedDecls[{Canon, version, escapable}] = Result;
 
   if (!SuperfluousTypedefsAreTransparent && TypedefIsSuperfluous)
     return nullptr;
@@ -9086,7 +9096,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
   if (known != ImportedProtocolDecls.end())
     return known->second;
 
-  SwiftDeclConverter converter(*this, version);
+  SwiftDeclConverter converter(*this, version, /*importAsEscapable=*/true);
   Decl *result;
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(decl)) {
     result =
@@ -9755,7 +9765,8 @@ void ClangImporter::Implementation::importInheritedConstructors(
      const clang::ObjCInterfaceDecl *curObjCClass,
      const ClassDecl *classDecl, SmallVectorImpl<Decl *> &newMembers) {
   if (curObjCClass->getName() != "Protocol") {
-    SwiftDeclConverter converter(*this, CurrentVersion);
+    SwiftDeclConverter converter(*this, CurrentVersion,
+                                 /*importAsEscapable=*/true);
     converter.importInheritedConstructors(classDecl, newMembers);
   }
 }

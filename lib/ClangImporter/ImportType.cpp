@@ -51,6 +51,7 @@
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Compiler.h"
+#include <optional>
 
 using namespace swift;
 using namespace importer;
@@ -216,17 +217,20 @@ namespace {
     Bridgeability Bridging;
     const clang::FunctionType *CompletionHandlerType;
     std::optional<unsigned> CompletionHandlerErrorParamIndex;
+    const clang::Type *NonEscapableType;
 
   public:
     SwiftTypeConverter(ClangImporter::Implementation &impl,
                        llvm::function_ref<void(Diagnostic &&)> addDiag,
                        bool allowNSUIntegerAsInt, Bridgeability bridging,
                        const clang::FunctionType *completionHandlerType,
-                       std::optional<unsigned> completionHandlerErrorParamIndex)
+                       std::optional<unsigned> completionHandlerErrorParamIndex,
+                       const clang::Type *nonEscapableType)
         : Impl(impl), addImportDiagnostic(addDiag),
           AllowNSUIntegerAsInt(allowNSUIntegerAsInt), Bridging(bridging),
           CompletionHandlerType(completionHandlerType),
-          CompletionHandlerErrorParamIndex(completionHandlerErrorParamIndex) {}
+          CompletionHandlerErrorParamIndex(completionHandlerErrorParamIndex),
+          NonEscapableType(nonEscapableType) {}
 
     using TypeVisitor::Visit;
     ImportResult Visit(clang::QualType type) {
@@ -983,7 +987,8 @@ namespace {
 
     ImportResult VisitRecordType(const clang::RecordType *type) {
       auto decl = dyn_cast_or_null<TypeDecl>(
-          Impl.importDecl(type->getDecl(), Impl.CurrentVersion));
+          Impl.importDecl(type->getDecl(), Impl.CurrentVersion,
+                          /*UseCanonicalDecl=*/true, type != NonEscapableType));
       if (!decl)
         return nullptr;
 
@@ -1714,7 +1719,8 @@ ImportedType ClangImporter::Implementation::importType(
     llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn,
     bool allowNSUIntegerAsInt, Bridgeability bridging, ImportTypeAttrs attrs,
     OptionalTypeKind optionality, bool resugarNSErrorPointer,
-    std::optional<unsigned> completionHandlerErrorParamIndex) {
+    std::optional<unsigned> completionHandlerErrorParamIndex,
+    const clang::Type *nonEscapableType) {
   if (type.isNull())
     return {Type(), false};
 
@@ -1774,7 +1780,8 @@ ImportedType ClangImporter::Implementation::importType(
   // Perform abstract conversion, ignoring how the type is actually used.
   SwiftTypeConverter converter(
       *this, addImportDiagnosticFn, allowNSUIntegerAsInt, bridging,
-      completionHandlerType, completionHandlerErrorParamIndex);
+      completionHandlerType, completionHandlerErrorParamIndex,
+      nonEscapableType);
   auto importResult = converter.Visit(type);
 
   // Now fix up the type based on how we're concretely using it.
@@ -1789,13 +1796,13 @@ ImportedType ClangImporter::Implementation::importType(
 Type ClangImporter::Implementation::importTypeIgnoreIUO(
     clang::QualType type, ImportTypeKind importKind,
     llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn,
-    bool allowNSUIntegerAsInt, Bridgeability bridging,
-    ImportTypeAttrs attrs, OptionalTypeKind optionality,
-    bool resugarNSErrorPointer) {
+    bool allowNSUIntegerAsInt, Bridgeability bridging, ImportTypeAttrs attrs,
+    OptionalTypeKind optionality, bool resugarNSErrorPointer,
+    const clang::Type *nonEscpableType) {
 
-  auto importedType = importType(type, importKind, addImportDiagnosticFn,
-                                 allowNSUIntegerAsInt, bridging, attrs,
-                                 optionality, resugarNSErrorPointer);
+  auto importedType = importType(
+      type, importKind, addImportDiagnosticFn, allowNSUIntegerAsInt, bridging,
+      attrs, optionality, resugarNSErrorPointer, std::nullopt, nonEscpableType);
 
   return importedType.getType();
 }

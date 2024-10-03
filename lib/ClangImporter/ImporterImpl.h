@@ -34,16 +34,17 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
-#include "clang/Lex/MacroInfo.h"
-#include "clang/Lex/Preprocessor.h"
 #include "clang/AST/DeclVisitor.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/Lex/MacroInfo.h"
+#include "clang/Lex/Preprocessor.h"
 #include "clang/Serialization/ModuleFileExtension.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallBitVector.h"
@@ -53,8 +54,8 @@
 #include "llvm/Support/Path.h"
 #include <functional>
 #include <set>
-#include <unordered_set>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace llvm {
@@ -421,6 +422,12 @@ struct ImportDiagnosticHasher {
   }
 };
 
+struct ImportDeclKey {
+  const clang::Decl *decl;
+  importer::ImportNameVersion version;
+  bool escapable = true;
+};
+
 /// Implementation of the Clang importer.
 class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
   : public LazyMemberLoader,
@@ -550,11 +557,7 @@ public:
   std::unique_ptr<SwiftLookupTable> BridgingHeaderLookupTable;
 
   /// Mapping of already-imported declarations.
-  llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
-
-  // Types that should be imported as non-escapable. This is collected from
-  // the using declarations and used when importing template specializations.
-  llvm::DenseSet<const clang::Type *> nonEscapableTypes;
+  llvm::DenseMap<ImportDeclKey, Decl *> ImportedDecls;
 
   /// The set of "special" typedef-name declarations, which are
   /// mapped to specific Swift types.
@@ -1094,15 +1097,17 @@ public:
   /// Otherwise, return nullptr.
   std::optional<Decl *> importDeclCached(const clang::NamedDecl *ClangDecl,
                                          Version version,
-                                         bool UseCanonicalDecl = true);
+                                         bool UseCanonicalDecl = true,
+                                         bool escapable = true);
 
   Decl *importDeclImpl(const clang::NamedDecl *ClangDecl, Version version,
-                       bool &TypedefIsSuperfluous, bool &HadForwardDeclaration);
+                       bool &TypedefIsSuperfluous, bool &HadForwardDeclaration,
+                       bool escapable);
 
   Decl *importDeclAndCacheImpl(const clang::NamedDecl *ClangDecl,
                                Version version,
                                bool SuperfluousTypedefsAreTransparent,
-                               bool UseCanonicalDecl);
+                               bool UseCanonicalDecl, bool escapable);
 
   /// Same as \c importDeclReal, but for use inside importer
   /// implementation.
@@ -1111,10 +1116,11 @@ public:
   /// looks through superfluous typedefs and returns the imported underlying
   /// decl in that case.
   Decl *importDecl(const clang::NamedDecl *ClangDecl, Version version,
-                   bool UseCanonicalDecl = true) {
+                   bool UseCanonicalDecl = true, bool escapable = true) {
     return importDeclAndCacheImpl(ClangDecl, version,
                                   /*SuperfluousTypedefsAreTransparent=*/true,
-                                  /*UseCanonicalDecl*/ UseCanonicalDecl);
+                                  /*UseCanonicalDecl*/ UseCanonicalDecl,
+                                  escapable);
   }
 
   /// Import the given Clang declaration into Swift.  Use this function
@@ -1127,7 +1133,8 @@ public:
                        bool useCanonicalDecl = true) {
     return importDeclAndCacheImpl(ClangDecl, version,
                                   /*SuperfluousTypedefsAreTransparent=*/false,
-                                  /*UseCanonicalDecl*/ useCanonicalDecl);
+                                  /*UseCanonicalDecl*/ useCanonicalDecl,
+                                  /*escapable=*/true);
   }
 
   /// Import a cloned version of the given declaration, which is part of
@@ -1366,7 +1373,8 @@ public:
       ImportTypeAttrs attrs,
       OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
       bool resugarNSErrorPointer = true,
-      std::optional<unsigned> completionHandlerErrorParamIndex = std::nullopt);
+      std::optional<unsigned> completionHandlerErrorParamIndex = std::nullopt,
+      const clang::Type *nonEscapableType = nullptr);
 
   /// Import the given Clang type into Swift.
   ///
@@ -1383,7 +1391,8 @@ public:
       bool allowNSUIntegerAsInt, Bridgeability topLevelBridgeability,
       ImportTypeAttrs attrs,
       OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
-      bool resugarNSErrorPointer = true);
+      bool resugarNSErrorPointer = true,
+      const clang::Type *nonEscapableType = nullptr);
 
   /// Import the given Clang type into Swift, returning the
   /// Swift parameters and result type and whether we should treat it
@@ -2041,5 +2050,30 @@ bool isViewType(const clang::CXXRecordDecl *decl);
 
 } // end namespace importer
 } // end namespace swift
+
+namespace llvm {
+template <>
+struct DenseMapInfo<swift::ImportDeclKey> {
+  using Version = swift::importer::ImportNameVersion;
+  using DMIVer = DenseMapInfo<Version>;
+  using DMIPtr = DenseMapInfo<void *>;
+  static inline swift::ImportDeclKey getEmptyKey() {
+    return {nullptr, DMIVer::getEmptyKey(), false};
+  }
+  static inline swift::ImportDeclKey getTombstoneKey() {
+    return {nullptr, DMIVer::getTombstoneKey(), true};
+  }
+  static unsigned getHashValue(const swift::ImportDeclKey &Val) {
+    return detail::combineHashValue(DMIPtr::getHashValue(Val.decl),
+                                    DMIVer::getHashValue(Val.version)) +
+           Val.escapable;
+  }
+  static bool isEqual(const swift::ImportDeclKey &LHS,
+                      const swift::ImportDeclKey &RHS) {
+    return LHS.decl == RHS.decl && LHS.version == RHS.version &&
+           LHS.escapable == RHS.escapable;
+  }
+};
+} // end namespace llvm
 
 #endif

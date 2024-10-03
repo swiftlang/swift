@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: not %target-swift-frontend -typecheck -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs  %t/test.swift -enable-experimental-feature NonescapableTypes -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs  %t/test.swift -enable-experimental-feature NonescapableTypes -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 -verify -verify-ignore-unknown
 
 //--- Inputs/module.modulemap
 module Test {
@@ -10,7 +10,6 @@ module Test {
 
 //--- Inputs/nonescapable.h
 #include "swift/bridging"
-#include <vector>
 
 struct SWIFT_NONESCAPABLE View {
     View() : member(nullptr) {}
@@ -20,19 +19,24 @@ private:
     const int *member;
 };
 
-using VecOfPtr SWIFT_NONESCAPABLE = std::vector<int*>;
+template<typename T>
+struct MyVector{};
+
+using VecOfPtr SWIFT_NONESCAPABLE = MyVector<int*>;
+using VecOfEscapablePtr = MyVector<int*>;
 
 //--- test.swift
 
-import CxxStdlib
 import Test
 
-// CHECK: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
-public func noAnnotations() -> View {
+public func noAnnotations() -> View { // expected-error{{cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership}}
     View()
 }
 
-// CHECK: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
-public func noAnnotations2() -> VecOfPtr {
+public func noAnnotations2() -> VecOfPtr { // expected-error{{cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership}}
     VecOfPtr()
+}
+
+public func noAnnotations3() -> VecOfEscapablePtr {
+    VecOfEscapablePtr()
 }
