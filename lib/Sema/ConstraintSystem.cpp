@@ -281,8 +281,7 @@ void ConstraintSystem::removeConversionRestriction(
 
 void ConstraintSystem::addFix(ConstraintFix *fix) {
   bool inserted = Fixes.insert(fix);
-  if (!inserted)
-    return;
+  ASSERT(inserted);
 
   if (solverState)
     recordChange(SolverTrail::Change::addedFix(fix));
@@ -294,32 +293,23 @@ void ConstraintSystem::removeFix(ConstraintFix *fix) {
 }
 
 void ConstraintSystem::recordDisjunctionChoice(
-    ConstraintLocator *locator,
-    unsigned index) {
-  // We shouldn't ever register disjunction choices multiple times.
-  auto inserted = DisjunctionChoices.insert(
-      std::make_pair(locator, index));
-  if (!inserted.second) {
-    ASSERT(inserted.first->second == index);
-    return;
-  }
+    ConstraintLocator *locator, unsigned index) {
+  bool inserted = DisjunctionChoices.insert({locator, index}).second;
+  ASSERT(inserted);
 
-  if (solverState) {
-    recordChange(SolverTrail::Change::recordedDisjunctionChoice(
-      locator, index));
-  }
+  if (solverState)
+    recordChange(SolverTrail::Change::recordedDisjunctionChoice(locator, index));
 }
 
 void ConstraintSystem::recordAppliedDisjunction(
     ConstraintLocator *locator, FunctionType *fnType) {
   // We shouldn't ever register disjunction choices multiple times.
-  auto inserted = AppliedDisjunctions.insert(
-      std::make_pair(locator, fnType));
-  if (inserted.second) {
-    if (solverState) {
-      recordChange(SolverTrail::Change::recordedAppliedDisjunction(locator));
-    }
-  }
+  bool inserted = AppliedDisjunctions.insert(
+      std::make_pair(locator, fnType)).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::recordedAppliedDisjunction(locator));
 }
 
 /// Retrieve a dynamic result signature for the given declaration.
@@ -853,10 +843,10 @@ std::pair<Type, OpenedArchetypeType *> ConstraintSystem::openExistentialType(
 void ConstraintSystem::recordOpenedExistentialType(
     ConstraintLocator *locator, OpenedArchetypeType *opened) {
   bool inserted = OpenedExistentialTypes.insert({locator, opened}).second;
-  if (inserted) {
-    if (solverState)
-      recordChange(SolverTrail::Change::recordedOpenedExistentialType(locator));
-  }
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::recordedOpenedExistentialType(locator));
 }
 
 GenericEnvironment *
@@ -894,12 +884,10 @@ ConstraintSystem::getPackElementEnvironment(ConstraintLocator *locator,
 void ConstraintSystem::recordPackExpansionEnvironment(
     ConstraintLocator *locator, std::pair<UUID, Type> uuidAndShape) {
   bool inserted = PackExpansionEnvironments.insert({locator, uuidAndShape}).second;
-  if (inserted) {
-    if (solverState) {
-      recordChange(
-        SolverTrail::Change::recordedPackExpansionEnvironment(locator));
-    }
-  }
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::recordedPackExpansionEnvironment(locator));
 }
 
 PackExpansionExpr *
@@ -910,12 +898,11 @@ ConstraintSystem::getPackEnvironment(PackElementExpr *packElement) const {
 
 void ConstraintSystem::addPackEnvironment(PackElementExpr *packElement,
                                           PackExpansionExpr *packExpansion) {
-  bool inserted =
-      PackEnvironments.insert({packElement, packExpansion}).second;
-  if (inserted) {
-    if (solverState)
-      recordChange(SolverTrail::Change::recordedPackEnvironment(packElement));
-  }
+  bool inserted = PackEnvironments.insert({packElement, packExpansion}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::recordedPackEnvironment(packElement));
 }
 
 /// Extend the given depth map by adding depths for all of the subexpressions
@@ -1028,7 +1015,8 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
   openGeneric(decl->getDeclContext(), decl->getGenericSignature(), locator,
               replacements);
 
-  recordOpenedTypes(locator, replacements);
+  // FIXME: Get rid of fixmeAllowDuplicates.
+  recordOpenedTypes(locator, replacements, /*fixmeAllowDuplicates=*/true);
 
   if (parentTy) {
     const auto parentTyInContext =
@@ -1278,10 +1266,10 @@ Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
 void ConstraintSystem::recordOpenedPackExpansionType(PackExpansionType *expansion,
                                                      TypeVariableType *expansionVar) {
   bool inserted = OpenedPackExpansionTypes.insert({expansion, expansionVar}).second;
-  if (inserted) {
-    if (solverState)
-      recordChange(SolverTrail::Change::recordedOpenedPackExpansionType(expansion));
-  }
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::recordedOpenedPackExpansionType(expansion));
 }
 
 Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
@@ -1687,10 +1675,10 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
 void ConstraintSystem::recordOpenedType(
     ConstraintLocator *locator, ArrayRef<OpenedType> openedTypes) {
   bool inserted = OpenedTypes.insert({locator, openedTypes}).second;
-  if (inserted) {
-    if (solverState)
-      recordChange(SolverTrail::Change::recordedOpenedTypes(locator));
-  }
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::recordedOpenedTypes(locator));
 }
 
 void ConstraintSystem::removeOpenedType(ConstraintLocator *locator) {
@@ -1700,7 +1688,8 @@ void ConstraintSystem::removeOpenedType(ConstraintLocator *locator) {
 
 void ConstraintSystem::recordOpenedTypes(
        ConstraintLocatorBuilder locator,
-       const OpenedTypeMap &replacements) {
+       const OpenedTypeMap &replacements,
+       bool fixmeAllowDuplicates) {
   if (replacements.empty())
     return;
 
@@ -1721,7 +1710,10 @@ void ConstraintSystem::recordOpenedTypes(
   OpenedType* openedTypes
     = Allocator.Allocate<OpenedType>(replacements.size());
   std::copy(replacements.begin(), replacements.end(), openedTypes);
-  recordOpenedType(
+
+  // FIXME: Get rid of fixmeAllowDuplicates.
+  if (!fixmeAllowDuplicates || OpenedTypes.count(locatorPtr) == 0)
+    recordOpenedType(
       locatorPtr, llvm::ArrayRef(openedTypes, replacements.size()));
 }
 

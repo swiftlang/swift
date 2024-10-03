@@ -14927,10 +14927,10 @@ void ConstraintSystem::recordMatchCallArgumentResult(
     ConstraintLocator *locator, MatchCallArgumentResult result) {
   assert(locator->isLastElement<LocatorPathElt::ApplyArgument>());
   bool inserted = argumentMatchingChoices.insert({locator, result}).second;
-  if (inserted) {
-    if (isRecordingChanges())
-      recordChange(SolverTrail::Change::recordedMatchCallArgumentResult(locator));
-  }
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::recordedMatchCallArgumentResult(locator));
 }
 
 void ConstraintSystem::recordCallAsFunction(UnresolvedDotExpr *root,

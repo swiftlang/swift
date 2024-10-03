@@ -304,17 +304,20 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Register the solution's disjunction choices.
   for (auto &choice : solution.DisjunctionChoices) {
-    recordDisjunctionChoice(choice.first, choice.second);
+    if (DisjunctionChoices.count(choice.first) == 0)
+      recordDisjunctionChoice(choice.first, choice.second);
   }
 
   // Register the solution's applied disjunctions.
   for (auto &choice : solution.AppliedDisjunctions) {
-    recordAppliedDisjunction(choice.first, choice.second);
+    if (AppliedDisjunctions.count(choice.first) == 0)
+      recordAppliedDisjunction(choice.first, choice.second);
   }
 
   // Remember all of the argument/parameter matching choices we made.
   for (auto &argumentMatch : solution.argumentMatchingChoices) {
-    recordMatchCallArgumentResult(argumentMatch.first, argumentMatch.second);
+    if (argumentMatchingChoices.count(argumentMatch.first) == 0)
+      recordMatchCallArgumentResult(argumentMatch.first, argumentMatch.second);
   }
 
   // Remember implied results.
@@ -323,32 +326,40 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Register the solution's opened types.
   for (const auto &opened : solution.OpenedTypes) {
-    recordOpenedType(opened.first, opened.second);
+    if (OpenedTypes.count(opened.first) == 0)
+      recordOpenedType(opened.first, opened.second);
   }
 
   // Register the solution's opened existential types.
   for (const auto &openedExistential : solution.OpenedExistentialTypes) {
-    recordOpenedExistentialType(openedExistential.first, openedExistential.second);
+    if (OpenedExistentialTypes.count(openedExistential.first) == 0) {
+      recordOpenedExistentialType(openedExistential.first,
+                                  openedExistential.second);
+    }
   }
 
   // Register the solution's opened pack expansion types.
   for (const auto &expansion : solution.OpenedPackExpansionTypes) {
-    recordOpenedPackExpansionType(expansion.first, expansion.second);
+    if (OpenedPackExpansionTypes.count(expansion.first) == 0)
+      recordOpenedPackExpansionType(expansion.first, expansion.second);
   }
 
   // Register the solutions's pack expansion environments.
   for (const auto &expansion : solution.PackExpansionEnvironments) {
-    recordPackExpansionEnvironment(expansion.first, expansion.second);
+    if (PackExpansionEnvironments.count(expansion.first) == 0)
+      recordPackExpansionEnvironment(expansion.first, expansion.second);
   }
 
   // Register the solutions's pack environments.
   for (auto &packEnvironment : solution.PackEnvironments) {
-    addPackEnvironment(packEnvironment.first, packEnvironment.second);
+    if (PackEnvironments.count(packEnvironment.first) == 0)
+      addPackEnvironment(packEnvironment.first, packEnvironment.second);
   }
 
   // Register the defaulted type variables.
-  for (auto *locator : solution.DefaultedConstraints)
+  for (auto *locator : solution.DefaultedConstraints) {
     recordDefaultedConstraint(locator);
+  }
 
   // Add the node types back.
   for (auto &nodeType : solution.nodeTypes) {
@@ -424,12 +435,17 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   // Register any fixes produced along this path.
-  for (auto *fix : solution.Fixes)
-    addFix(fix);
+  for (auto *fix : solution.Fixes) {
+    if (Fixes.count(fix) == 0)
+      addFix(fix);
+  }
 
   // Register fixed requirements.
-  for (auto fix : solution.FixedRequirements)
-    recordFixedRequirement(std::get<0>(fix), std::get<1>(fix), std::get<2>(fix));
+  for (auto fix : solution.FixedRequirements) {
+    recordFixedRequirement(std::get<0>(fix),
+                           std::get<1>(fix),
+                           std::get<2>(fix));
+  }
 }
 bool ConstraintSystem::simplify() {
   // While we have a constraint in the worklist, process it.
