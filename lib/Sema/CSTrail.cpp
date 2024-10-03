@@ -270,6 +270,14 @@ SolverTrail::Change::recordedResultBuilderTransform(AnyFunctionRef fn) {
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::appliedPropertyWrapper(Expr *expr) {
+  Change result;
+  result.Kind = ChangeKind::AppliedPropertyWrapper;
+  result.TheExpr = expr;
+  return result;
+}
+
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
@@ -379,6 +387,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::RecordedResultBuilderTransform:
     cs.removeResultBuilderTransform(AFR);
+    break;
+
+  case ChangeKind::AppliedPropertyWrapper:
+    cs.removePropertyWrapper(TheExpr);
     break;
   }
 }
@@ -586,6 +598,12 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
   case ChangeKind::RecordedResultBuilderTransform:
     out << "(recorded result builder transform ";
     simple_display(out, AFR);
+    out << ")\n";
+    break;
+
+  case ChangeKind::AppliedPropertyWrapper:
+    out << "(applied property wrapper to ";
+    simple_display(out, TheExpr);
     out << ")\n";
     break;
   }

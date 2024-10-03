@@ -1604,7 +1604,7 @@ public:
       resultBuilderTransformed;
 
   /// A map from argument expressions to their applied property wrapper expressions.
-  llvm::MapVector<ASTNode, SmallVector<AppliedPropertyWrapper, 2>> appliedPropertyWrappers;
+  llvm::DenseMap<ASTNode, SmallVector<AppliedPropertyWrapper, 2>> appliedPropertyWrappers;
 
   /// A mapping from the constraint locators for references to various
   /// names (e.g., member references, normal name references, possible
@@ -2403,7 +2403,7 @@ private:
 
 public:
   /// A map from argument expressions to their applied property wrapper expressions.
-  llvm::SmallMapVector<ASTNode, SmallVector<AppliedPropertyWrapper, 2>, 4>
+  llvm::SmallDenseMap<ASTNode, SmallVector<AppliedPropertyWrapper, 2>, 4>
       appliedPropertyWrappers;
 
   /// The locators of \c Defaultable constraints whose defaults were used.
@@ -2856,9 +2856,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    /// The length of \c appliedPropertyWrappers
-    unsigned numAppliedPropertyWrappers;
 
     /// The length of \c ResolvedOverloads.
     unsigned numResolvedOverloads;
@@ -5328,6 +5325,13 @@ public:
   TypeMatchResult applyPropertyWrapperToParameter(
       Type wrapperType, Type paramType, ParamDecl *param, Identifier argLabel,
       ConstraintKind matchKind, ConstraintLocatorBuilder locator);
+
+  /// Used by applyPropertyWrapperToParameter() to update appliedPropertyWrappers
+  /// and record a change in the trail.
+  void applyPropertyWrapper(Expr *anchor, AppliedPropertyWrapper applied);
+
+  /// Undo the above change.
+  void removePropertyWrapper(Expr *anchor);
 
   /// Determine whether given type variable with its set of bindings is viable
   /// to be attempted on the next step of the solver.
