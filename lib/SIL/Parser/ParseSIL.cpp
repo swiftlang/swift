@@ -4033,7 +4033,69 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
-    // Conversion instructions.
+  case SILInstructionKind::ThunkInst: {
+    // We have to parse a sil optional.
+    StringRef attrName;
+    if (!parseSILOptional(attrName, *this)) {
+      P.diagnose(OpcodeLoc, diag::sil_failed_to_parse_sil_optional);
+      return true;
+    }
+
+    auto kind = llvm::StringSwitch<ThunkInst::Kind>(attrName)
+                    .Case("identity", ThunkInst::Kind::Identity)
+                    .Default(ThunkInst::Kind::Invalid);
+    if (!kind) {
+      P.diagnose(OpcodeLoc, diag::sil_thunkinst_failed_to_parse_kind, attrName);
+      return true;
+    }
+
+    UnresolvedValueName fnName;
+    if (parseValueName(fnName)) {
+      return true;
+    }
+
+    SmallVector<ParsedSubstitution, 4> parsedSubs;
+    if (parseSubstitutions(parsedSubs))
+      return true;
+
+    // TODO: When we support full parameters, add them here.
+    SILType thunkTy;
+    SourceLoc TypeLoc;
+    GenericSignature genericSig;
+    GenericParamList *genericParams = nullptr;
+    if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "(") ||
+        P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")") ||
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+        parseSILType(thunkTy, TypeLoc, genericSig, genericParams))
+      return true;
+
+    auto FTI = thunkTy.getAs<SILFunctionType>();
+    if (!FTI) {
+      P.diagnose(TypeLoc, diag::expected_sil_type_kind, "be a function");
+      return true;
+    }
+
+    SubstitutionMap subs;
+    if (!parsedSubs.empty()) {
+      if (!genericSig) {
+        P.diagnose(TypeLoc, diag::sil_substitutions_on_non_polymorphic_type);
+        return true;
+      }
+      subs = getApplySubstitutionsFromParsed(*this, genericSig, parsedSubs);
+      if (!subs)
+        return true;
+    }
+
+    if (parseSILDebugLocation(InstLoc, B)) {
+      return true;
+    }
+
+    SILValue fnVal = getLocalValue(fnName, thunkTy, InstLoc, B);
+    ResultVal = B.createThunk(InstLoc, fnVal, kind, subs);
+    break;
+  }
+
+  // Conversion instructions.
   case SILInstructionKind::UncheckedRefCastInst:
   case SILInstructionKind::UncheckedAddrCastInst:
   case SILInstructionKind::UncheckedTrivialBitCastInst:

@@ -14,11 +14,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/AssertImplements.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -2813,6 +2814,79 @@ static SILFunctionType *getNonSendableFuncType(SILType ty) {
 bool ConvertFunctionInst::onlyConvertsSendable() const {
   return getNonSendableFuncType(getOperand()->getType()) ==
          getNonSendableFuncType(getType());
+}
+
+static CanSILFunctionType
+getDerivedFunctionTypeForIdentityThunk(SILFunction *fn,
+                                       CanSILFunctionType inputFunctionType,
+                                       SubstitutionMap subMap) {
+  inputFunctionType = inputFunctionType->substGenericArgs(
+      fn->getModule(), subMap, fn->getTypeExpansionContext());
+  bool needsSubstFunctionType = false;
+  for (auto param : inputFunctionType->getParameters()) {
+    needsSubstFunctionType |= param.getInterfaceType()->hasTypeParameter();
+  }
+  for (auto result : inputFunctionType->getResults()) {
+    needsSubstFunctionType |= result.getInterfaceType()->hasTypeParameter();
+  }
+  for (auto yield : inputFunctionType->getYields()) {
+    needsSubstFunctionType |= yield.getInterfaceType()->hasTypeParameter();
+  }
+  if (inputFunctionType->hasErrorResult()) {
+    needsSubstFunctionType |= inputFunctionType->getErrorResult()
+                                  .getInterfaceType()
+                                  ->hasTypeParameter();
+  }
+
+  SubstitutionMap appliedSubs;
+  if (needsSubstFunctionType) {
+    appliedSubs = inputFunctionType->getCombinedSubstitutions();
+  }
+
+  auto extInfoBuilder =
+      inputFunctionType->getExtInfo()
+          .intoBuilder()
+          .withRepresentation(SILFunctionType::Representation::Thick)
+          .withIsPseudogeneric(false);
+
+  return SILFunctionType::get(
+      nullptr, extInfoBuilder.build(), inputFunctionType->getCoroutineKind(),
+      ParameterConvention::Direct_Guaranteed,
+      inputFunctionType->getParameters(), inputFunctionType->getYields(),
+      inputFunctionType->getResults(),
+      inputFunctionType->getOptionalErrorResult(), appliedSubs,
+      SubstitutionMap(), inputFunctionType->getASTContext());
+}
+
+CanSILFunctionType
+ThunkInst::Kind::getDerivedFunctionType(SILFunction *fn,
+                                        CanSILFunctionType inputFunctionType,
+                                        SubstitutionMap subMap) const {
+  switch (innerTy) {
+  case Invalid:
+    return CanSILFunctionType();
+  case Identity:
+    return getDerivedFunctionTypeForIdentityThunk(fn, inputFunctionType,
+                                                  subMap);
+  }
+
+  llvm_unreachable("Covered switch isn't covered?!");
+}
+
+ThunkInst *ThunkInst::create(SILDebugLocation debugLoc, SILValue operand,
+                             SILModule &mod, SILFunction *f,
+                             ThunkInst::Kind kind, SubstitutionMap subs) {
+  SILType resultType = kind.getDerivedFunctionType(f, operand->getType(), subs);
+  SmallVector<SILValue, 8> typeDependentOperands;
+  if (f) {
+    assert(&f->getModule() == &mod);
+    collectTypeDependentOperands(typeDependentOperands, *f, resultType);
+  }
+  unsigned size =
+      totalSizeToAlloc<swift::Operand>(1 + typeDependentOperands.size());
+  void *Buffer = mod.allocateInst(size, alignof(ThunkInst));
+  return ::new (Buffer) ThunkInst(debugLoc, operand, typeDependentOperands,
+                                  resultType, kind, subs);
 }
 
 ConvertEscapeToNoEscapeInst *ConvertEscapeToNoEscapeInst::create(

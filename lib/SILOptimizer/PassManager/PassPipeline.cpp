@@ -915,6 +915,8 @@ SILPassPipelinePlan
 SILPassPipelinePlan::getLoweringPassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
   P.startPipeline("Lowering");
+  // Lower thunks.
+  P.addThunkLowering();
   P.addLowerHopToActor(); // FIXME: earlier for more opportunities?
   P.addOwnershipModelEliminator();
   P.addAlwaysEmitConformanceMetadataPreservation();

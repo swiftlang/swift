@@ -309,6 +309,7 @@ OPERAND_OWNERSHIP(ForwardingConsume, InitExistentialValue)
 OPERAND_OWNERSHIP(ForwardingConsume, DeinitExistentialValue)
 OPERAND_OWNERSHIP(ForwardingConsume, MarkUninitialized)
 OPERAND_OWNERSHIP(ForwardingConsume, Throw)
+OPERAND_OWNERSHIP(ForwardingConsume, Thunk)
 
 // Instructions that expose a pointer within a borrow scope.
 OPERAND_OWNERSHIP(InteriorPointer, RefElementAddr)
