@@ -14,9 +14,9 @@
 ///
 /// C++ standard library types such as `std::map` and `std::unordered_map`
 /// conform to this protocol.
-public protocol CxxDictionary<Key, Value> {
-  associatedtype Key
-  associatedtype Value
+public protocol CxxDictionary<Key, Value>: ExpressibleByDictionaryLiteral {
+  override associatedtype Key
+  override associatedtype Value
   associatedtype Element: CxxPair<Key, Value>
   associatedtype RawIterator: UnsafeCxxInputIterator
     where RawIterator.Pointee == Element
@@ -61,6 +61,14 @@ extension CxxDictionary {
   public init(_ dictionary: Dictionary<Key, Value>) where Key: Hashable {
     self.init()
     for (key, value) in dictionary {
+      self[key] = value
+    }
+  }
+
+  @inlinable
+  public init(dictionaryLiteral elements: (Key, Value)...) {
+    self.init()
+    for (key, value) in elements {
       self[key] = value
     }
   }
