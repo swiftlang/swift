@@ -531,7 +531,7 @@ extension DistributedActorSystem {
     }
 
     // Decode the return type
-    func allocateReturnTypeBuffer<R>(_: R.Type) -> UnsafeMutableRawPointer? {
+    func doAllocateReturnTypeBuffer<R>(_: R.Type) -> UnsafeMutableRawPointer? {
       return UnsafeMutableRawPointer(UnsafeMutablePointer<R>.allocate(capacity: 1))
     }
 
@@ -549,15 +549,18 @@ extension DistributedActorSystem {
         errorCode: .typeDeserializationFailure)
     }
 
-    guard let resultBuffer = _openExistential(returnTypeFromTypeInfo, do: allocateReturnTypeBuffer) else {
+    guard let resultBuffer = _openExistential(returnTypeFromTypeInfo, do: doAllocateReturnTypeBuffer) else {
       throw ExecuteDistributedTargetError(
         message: "Failed to allocate buffer for distributed target return type",
         errorCode: .typeDeserializationFailure)
     }
 
+    var executeDistributedTargetHasThrown = false
     func doDestroyReturnTypeBuffer<R>(_: R.Type) {
       let buf = resultBuffer.assumingMemoryBound(to: R.self)
-      buf.deinitialize(count: 1)
+      if !executeDistributedTargetHasThrown {
+        buf.deinitialize(count: 1)
+      }
       buf.deallocate()
     }
 
@@ -592,6 +595,7 @@ extension DistributedActorSystem {
         )
       }
     } catch {
+      executeDistributedTargetHasThrown = true
       try await handler.onThrow(error: error)
     }
   }
