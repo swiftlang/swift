@@ -262,6 +262,14 @@ SolverTrail::Change::favoredConstraint(Constraint *constraint) {
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::recordedResultBuilderTransform(AnyFunctionRef fn) {
+  Change result;
+  result.Kind = ChangeKind::RecordedResultBuilderTransform;
+  result.AFR = fn;
+  return result;
+}
+
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
@@ -367,6 +375,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   case ChangeKind::FavoredConstraint:
     if (TheConstraint.Constraint->isFavored())
       TheConstraint.Constraint->setFavored(false);
+    break;
+
+  case ChangeKind::RecordedResultBuilderTransform:
+    cs.removeResultBuilderTransform(AFR);
     break;
   }
 }
@@ -568,6 +580,12 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << "(favored constraint ";
     TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
                                     indent + 2);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedResultBuilderTransform:
+    out << "(recorded result builder transform ";
+    simple_display(out, AFR);
     out << ")\n";
     break;
   }

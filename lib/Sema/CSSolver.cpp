@@ -410,7 +410,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   for (const auto &transformed : solution.resultBuilderTransformed) {
-    resultBuilderTransformed.insert(transformed);
+    if (resultBuilderTransformed.count(transformed.first) == 0)
+      recordResultBuilderTransform(transformed.first, transformed.second);
   }
 
   for (const auto &appliedWrapper : solution.appliedPropertyWrappers) {
@@ -680,7 +681,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
   numKeyPaths = cs.KeyPaths.size();
-  numResultBuilderTransformed = cs.resultBuilderTransformed.size();
   numAppliedPropertyWrappers = cs.appliedPropertyWrappers.size();
   numResolvedOverloads = cs.ResolvedOverloads.size();
   numInferredClosureTypes = cs.ClosureTypes.size();
@@ -732,9 +732,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   /// Remove any key path expressions.
   truncate(cs.KeyPaths, numKeyPaths);
-
-  /// Remove any builder transformed closures.
-  truncate(cs.resultBuilderTransformed, numResultBuilderTransformed);
 
   // Remove any applied property wrappers.
   truncate(cs.appliedPropertyWrappers, numAppliedPropertyWrappers);

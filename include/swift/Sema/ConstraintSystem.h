@@ -2857,8 +2857,6 @@ public:
     /// FIXME: Remove this.
     unsigned numFixes;
 
-    unsigned numResultBuilderTransformed;
-
     /// The length of \c appliedPropertyWrappers
     unsigned numAppliedPropertyWrappers;
 
@@ -5316,6 +5314,14 @@ public:
   matchResultBuilder(AnyFunctionRef fn, Type builderType, Type bodyResultType,
                      ConstraintKind bodyResultConstraintKind,
                      Type contextualType, ConstraintLocatorBuilder locator);
+
+  /// Used by matchResultBuilder() to update resultBuilderTransformed and record
+  /// a change in the trail.
+  void recordResultBuilderTransform(AnyFunctionRef fn,
+                                    AppliedBuilderTransform transformInfo);
+
+  /// Undo the above change.
+  void removeResultBuilderTransform(AnyFunctionRef fn);
 
   /// Matches a wrapped or projected value parameter type to its backing
   /// property wrapper type by applying the property wrapper.
