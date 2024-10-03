@@ -7992,7 +7992,7 @@ ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
        "Escapable",
        ())
 ERROR(lifetime_dependence_immortal_conflict_name, none,
-      "conflict between the parameter name and immortal keyword", ())
+      "conflict between the parameter name and 'immortal' contextual keyword", ())
 ERROR(lifetime_dependence_function_type, none,
       "lifetime dependencies on function types are not supported",
       ())

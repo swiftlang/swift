@@ -39,3 +39,8 @@ func invalidDependence(_ x: consuming Klass) -> NE {
 func invalidTarget(_ result: inout NE, _ source: consuming NE) { // expected-error{{invalid duplicate target lifetime dependencies on function}}
   result = source
 }
+
+@lifetime(immortal)
+func immortalConflict(_ immortal: Int) -> NE { // expected-error{{conflict between the parameter name and 'immortal' contextual keyword}}
+  NE()
+}
