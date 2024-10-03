@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name inlinable_attribute -emit-verbose-sil -warnings-as-errors -disable-availability-checking %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-experimental-feature IsolatedDeinit -module-name inlinable_attribute -emit-verbose-sil -warnings-as-errors -disable-availability-checking %s | %FileCheck %s
 
 // CHECK-LABEL: sil [serialized] [ossa] @$s19inlinable_attribute15fragileFunctionyyF : $@convention(thin) () -> ()
 @inlinable public func fragileFunction() {
@@ -38,6 +38,7 @@ public class MyCls {
 }
 
 public actor MyAct {
+  // CHECK-LABEL-NOT: sil [serialized] [ossa] @$s19inlinable_attribute5MyActCfZ : $@convention(thin) (@owned MyAct) -> ()
   // CHECK-LABEL: sil [serialized] [ossa] @$s19inlinable_attribute5MyActCfD : $@convention(method) (@owned MyAct) -> ()
   @inlinable deinit {}
 
@@ -61,6 +62,12 @@ public actor MyAct {
   @inlinable public init(inlinableConvenienceInit: ()) {
     self.init(designatedInit: ())
   }
+}
+
+public actor MyActIsolatedDeinit {
+  // CHECK-LABEL: sil [serialized] [ossa] @$s19inlinable_attribute19MyActIsolatedDeinitCfZ : $@convention(thin) (@owned MyActIsolatedDeinit) -> ()
+  // CHECK-LABEL: sil [serialized] [ossa] @$s19inlinable_attribute19MyActIsolatedDeinitCfD : $@convention(method) (@owned MyActIsolatedDeinit) -> ()
+  @inlinable isolated deinit {}
 }
 
 // Make sure enum case constructors for public and versioned enums are
