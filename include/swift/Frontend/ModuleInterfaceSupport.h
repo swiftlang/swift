@@ -67,10 +67,6 @@ struct ModuleInterfaceOptions {
   /// Flags which appear only in the .package.swiftinterface.
   InterfaceFlags PackageFlags = {};
 
-  /// Print imports with both @_implementationOnly and @_spi, only applies
-  /// when PrintSPIs is true.
-  bool ExperimentalSPIImports = false;
-
   /// Print imports that are missing from the source and used in API.
   bool PrintMissingImports = true;
 
