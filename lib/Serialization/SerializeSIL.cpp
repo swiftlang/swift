@@ -1973,6 +1973,20 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                        gaca.getFormalResumeType());
     break;
   }
+  case SILInstructionKind::ThunkInst: {
+    auto &ti = cast<ThunkInst>(SI);
+    auto operandType = ti.getOperand()->getType();
+    auto operandTypeRef = S.addTypeRef(operandType.getRawASTType());
+    auto operandRef = addValueRef(ti.getOperand());
+
+    SILThunkLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILThunkLayout::Code],
+        unsigned(ti.getThunkKind()), operandTypeRef,
+        unsigned(operandType.getCategory()), operandRef,
+        S.addSubstitutionMapRef(ti.getSubstitutionMap()));
+    break;
+  }
+
   // Conversion instructions (and others of similar form).
 #define LOADABLE_REF_STORAGE(Name, ...) \
   case SILInstructionKind::RefTo##Name##Inst: \
@@ -3237,6 +3251,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILPackElementGetLayout>();
   registerSILAbbr<SILPackElementSetLayout>();
   registerSILAbbr<SILTypeValueLayout>();
+  registerSILAbbr<SILThunkLayout>();
 
   registerSILAbbr<VTableLayout>();
   registerSILAbbr<VTableEntryLayout>();

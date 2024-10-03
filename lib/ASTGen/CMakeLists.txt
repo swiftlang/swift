@@ -31,13 +31,10 @@ add_pure_swift_host_library(swiftASTGen STATIC
   Sources/ASTGen/Generics.swift
   Sources/ASTGen/LegacyParse.swift
   Sources/ASTGen/Literals.swift
-  Sources/ASTGen/Macros.swift
   Sources/ASTGen/ParameterClause.swift
   Sources/ASTGen/Patterns.swift
-  Sources/ASTGen/PluginHost.swift
   Sources/ASTGen/Regex.swift
   Sources/ASTGen/SourceFile.swift
-  Sources/ASTGen/SourceManager.swift
   Sources/ASTGen/Stmts.swift
   Sources/ASTGen/TypeAttrs.swift
   Sources/ASTGen/Types.swift
@@ -51,11 +48,25 @@ add_pure_swift_host_library(swiftASTGen STATIC
     _CompilerSwiftSyntaxBuilder
     _CompilerSwiftParser
     _CompilerSwiftParserDiagnostics
-    _CompilerSwiftCompilerPluginMessageHandling
-    _CompilerSwiftSyntaxMacroExpansion
     _CompilerSwiftDiagnostics
-    _CompilerSwiftIDEUtils
     ${ASTGen_Swift_dependencies}
+)
+
+add_pure_swift_host_library(swiftMacros STATIC
+  Sources/Macros/Macros.swift
+  Sources/Macros/PluginHost.swift
+  Sources/Macros/SourceManager.swift
+
+  DEPENDENCIES
+    swiftAST
+  SWIFT_DEPENDENCIES
+    _CompilerSwiftCompilerPluginMessageHandling
+    _CompilerSwiftDiagnostics
+    _CompilerSwiftOperators
+    _CompilerSwiftParser
+    _CompilerSwiftSyntax
+    _CompilerSwiftSyntaxMacroExpansion
+    swiftASTGen
 )
 
 add_pure_swift_host_library(swiftIDEUtilsBridging
@@ -64,6 +75,7 @@ add_pure_swift_host_library(swiftIDEUtilsBridging
   DEPENDENCIES
     swiftAST
   SWIFT_DEPENDENCIES
+    _CompilerSwiftIDEUtils
     _CompilerSwiftSyntax
     swiftASTGen
 )
@@ -111,7 +123,7 @@ else()
 endif()
 
 if(SWIFT_BUILD_SWIFT_SYNTAX)
-  foreach(target swiftASTGen swiftIDEUtilsBridging)
+  foreach(target swiftASTGen swiftIDEUtilsBridging swiftMacros)
     target_compile_options(${target} PRIVATE ${compile_options})
   endforeach()
 endif()
