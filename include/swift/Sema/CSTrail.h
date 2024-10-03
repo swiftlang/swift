@@ -17,6 +17,9 @@
 #ifndef SWIFT_SEMA_CSTRAIL_H
 #define SWIFT_SEMA_CSTRAIL_H
 
+#include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include <vector>
 
 namespace llvm {
@@ -86,6 +89,8 @@ public:
     DisabledConstraint,
     /// Favored a constraint.
     FavoredConstraint,
+    /// Recorded a result builder transform.
+    RecordedResultBuilderTransform,
   };
 
   /// A change made to the constraint system.
@@ -163,6 +168,7 @@ public:
       ConstraintLocator *Locator;
       PackExpansionType *ExpansionTy;
       PackElementExpr *ElementExpr;
+      AnyFunctionRef AFR;
     };
 
     Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
@@ -252,6 +258,9 @@ public:
 
     /// Create a change that favored a constraint.
     static Change favoredConstraint(Constraint *constraint);
+
+    /// Create a change that recorded a result builder transform.
+    static Change recordedResultBuilderTransform(AnyFunctionRef fn);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.
