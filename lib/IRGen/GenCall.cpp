@@ -52,6 +52,7 @@
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "IRGenMangler.h"
 #include "LoadableTypeInfo.h"
 #include "NativeConventionSchema.h"
 #include "Signature.h"
@@ -3219,7 +3220,31 @@ llvm::CallBase *CallEmission::emitCallSite() {
     } else
       IGF.setCallsThunksWithForeignExceptionTraps();
   }
-  auto call = createCall(fn, Args);
+
+  auto fnToCall = fn;
+  if (UseProfilingThunk) {
+    assert(fnToCall.isConstant() && "Non constant function in profiling thunk");
+    auto genericFn = cast<llvm::Function>(fnToCall.getRawPointer());
+    auto replacementTypes = CurCallee.getSubstitutions().getReplacementTypes();
+    llvm::SmallString<64> name;
+    {
+      llvm::raw_svector_ostream os(name);
+      os << "__swift_prof_thunk__generic_func__";
+      os << replacementTypes.size();
+      os << "__";
+      for (auto replTy : replacementTypes) {
+        IRGenMangler mangler;
+        os << mangler.mangleTypeMetadataFull(replTy->getCanonicalType());
+        os << "___";
+      }
+      os << "fun__";
+    }
+    auto *thunk = IGF.IGM.getOrCreateProfilingThunk(genericFn, name);
+    fnToCall = fnToCall.withProfilingThunk(thunk);
+
+  }
+
+  auto call = createCall(fnToCall, Args);
   if (invokeNormalDest)
     IGF.Builder.emitBlock(invokeNormalDest);
 

@@ -1477,6 +1477,12 @@ void IRGenModule::setHasNoFramePointer(llvm::Function *F) {
   F->addFnAttrs(b);
 }
 
+void IRGenModule::setMustHaveFramePointer(llvm::Function *F) {
+  llvm::AttrBuilder b(getLLVMContext());
+  b.addAttribute("frame-pointer", "all");
+  F->addFnAttrs(b);
+}
+
 /// Construct initial function attributes from options.
 void IRGenModule::constructInitialFnAttributes(
     llvm::AttrBuilder &Attrs, OptimizationMode FuncOptMode,

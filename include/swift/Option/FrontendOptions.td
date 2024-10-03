@@ -1349,6 +1349,13 @@ def disable_new_llvm_pass_manager :
   Flag<["-"], "disable-new-llvm-pass-manager">,
   HelpText<"Disable the new llvm pass manager">;
 
+def enable_profiling_marker_thunks :
+  Flag<["-"], "enable-profiling-marker-thunks">,
+  HelpText<"Enable profiling marker thunks">;
+def disable_profiling_marker_thunks :
+  Flag<["-"], "disable-profiling-marker-thunks">,
+  HelpText<"Disable profiling marker thunks">;
+
 def enable_objective_c_protocol_symbolic_references :
   Flag<["-"], "enable-objective-c-protocol-symbolic-references">,
   HelpText<"Enable objective-c protocol symbolic references">;
