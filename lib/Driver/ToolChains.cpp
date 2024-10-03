@@ -712,6 +712,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-emit-sibgen";
   case file_types::TY_SIB:
     return "-emit-sib";
+  case file_types::TY_RawLLVM_IR:
+    return "-emit-irgen";
   case file_types::TY_LLVM_IR:
     return "-emit-ir";
   case file_types::TY_LLVM_BC:
@@ -976,6 +978,9 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     switch (context.Output.getPrimaryOutputType()) {
     case file_types::TY_Object:
       FrontendModeOption = "-c";
+      break;
+    case file_types::TY_RawLLVM_IR:
+      FrontendModeOption = "-emit-irgen";
       break;
     case file_types::TY_LLVM_IR:
       FrontendModeOption = "-emit-ir";
