@@ -336,6 +336,8 @@ Added: _$ss9TaskLocalC13withValueImpl_9operation9isolation4file4lineqd__xn_qd__y
 Added: _$ss9TaskLocalC9withValue_9operation9isolation4file4lineqd__x_qd__yYaKXEScA_pSgYiSSSutYaKlF
 Added: _$ss9TaskLocalC9withValue_9operation9isolation4file4lineqd__x_qd__yYaKXEScA_pSgYiSSSutYaKlFTu
 
+// isolated deinit
+Added: _swift_task_deinitOnExecutor
 
 Added: __swift_concurrency_debug_internal_layout_version
 
