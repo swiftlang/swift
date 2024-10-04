@@ -2278,7 +2278,7 @@ class PromotableInstructions {
   SmallVectorImpl<AvailableValue> &allAvailableValues;
 
   SmallVector<SILInstruction *> promotableInsts;
-  SmallVector<unsigned, 8> availableValueStartOffsets;
+  SmallVector<std::pair<unsigned, unsigned>, 8> availableValueOffsets;
 
 public:
   PromotableInstructions(SmallVectorImpl<AvailableValue> &allAvailableValues)
@@ -2296,9 +2296,12 @@ public:
   initializeAvailableValues(SILInstruction *instruction,
                             SmallVectorImpl<AvailableValue> &&availableValues) {
 
-    unsigned nextInstIdx = availableValueStartOffsets.size();
+    unsigned nextInstIdx = availableValueOffsets.size();
     assert(instruction == promotableInsts[nextInstIdx]);
-    availableValueStartOffsets.push_back(allAvailableValues.size());
+
+    unsigned startOffset = allAvailableValues.size();
+    unsigned endOffset = startOffset + availableValues.size();
+    availableValueOffsets.push_back({startOffset, endOffset});
     std::move(availableValues.begin(), availableValues.end(),
               std::back_inserter(allAvailableValues));
     return nextInstIdx;
@@ -2311,11 +2314,8 @@ public:
   }
 
   MutableArrayRef<AvailableValue> mutableAvailableValues(unsigned index) {
-    unsigned startOffset = availableValueStartOffsets[index];
-    unsigned endOffset = allAvailableValues.size();
-    if (index + 1 < size()) {
-      endOffset = availableValueStartOffsets[index + 1];
-    }
+    unsigned startOffset, endOffset;
+    std::tie(startOffset, endOffset) = availableValueOffsets[index];
     return {allAvailableValues.begin() + startOffset,
             allAvailableValues.begin() + endOffset};
   }
