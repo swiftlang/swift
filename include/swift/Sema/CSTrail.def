@@ -62,8 +62,9 @@ CHANGE(FavoredConstraint)
 CHANGE(RecordedResultBuilderTransform)
 CHANGE(RecordedClosureType)
 CHANGE(RecordedContextualInfo)
+CHANGE(RecordedTarget)
 
-LAST_CHANGE(RecordedContextualInfo)
+LAST_CHANGE(RecordedTarget)
 
 #undef LOCATOR_CHANGE
 #undef EXPR_CHANGE

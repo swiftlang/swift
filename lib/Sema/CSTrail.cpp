@@ -53,7 +53,7 @@ SolverTrail::~SolverTrail() {
   SolverTrail::Change::Name(ConstraintLocator *locator) { \
     Change result; \
     result.Kind = ChangeKind::Name; \
-    result.Locator = locator; \
+    result.TheLocator = locator; \
     return result; \
   }
 #define EXPR_CHANGE(Name) \
@@ -160,7 +160,7 @@ SolverTrail::Change
 SolverTrail::Change::AddedFix(ConstraintFix *fix) {
   Change result;
   result.Kind = ChangeKind::AddedFix;
-  result.Fix = fix;
+  result.TheFix = fix;
   return result;
 }
 
@@ -181,7 +181,7 @@ SolverTrail::Change::RecordedDisjunctionChoice(ConstraintLocator *locator,
                                                unsigned index) {
   Change result;
   result.Kind = ChangeKind::RecordedDisjunctionChoice;
-  result.Locator = locator;
+  result.TheLocator = locator;
   result.Options = index;
   return result;
 }
@@ -190,7 +190,7 @@ SolverTrail::Change
 SolverTrail::Change::RecordedOpenedPackExpansionType(PackExpansionType *expansionTy) {
   Change result;
   result.Kind = ChangeKind::RecordedOpenedPackExpansionType;
-  result.ExpansionTy = expansionTy;
+  result.TheExpansion = expansionTy;
   return result;
 }
 
@@ -198,7 +198,7 @@ SolverTrail::Change
 SolverTrail::Change::RecordedPackEnvironment(PackElementExpr *packElement) {
   Change result;
   result.Kind = ChangeKind::RecordedPackEnvironment;
-  result.ElementExpr = packElement;
+  result.TheElement = packElement;
   return result;
 }
 
@@ -243,15 +243,15 @@ SolverTrail::Change
 SolverTrail::Change::RecordedResultBuilderTransform(AnyFunctionRef fn) {
   Change result;
   result.Kind = ChangeKind::RecordedResultBuilderTransform;
-  result.AFR = fn;
+  result.TheRef = fn;
   return result;
 }
 
 SolverTrail::Change
-SolverTrail::Change::RecordedClosureType(const ClosureExpr *closure) {
+SolverTrail::Change::RecordedClosureType(ClosureExpr *closure) {
   Change result;
   result.Kind = ChangeKind::RecordedClosureType;
-  result.Closure = closure;
+  result.TheClosure = closure;
   return result;
 }
 
@@ -261,6 +261,75 @@ SolverTrail::Change::RecordedContextualInfo(ASTNode node) {
   result.Kind = ChangeKind::RecordedContextualInfo;
   result.Node.Node = node;
   return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::RecordedTarget(SyntacticElementTargetKey key) {
+  Change result;
+  result.Kind = ChangeKind::RecordedTarget;
+  result.Options = unsigned(key.kind);
+
+  switch (key.kind) {
+  case SyntacticElementTargetKey::Kind::empty:
+  case SyntacticElementTargetKey::Kind::tombstone:
+    llvm_unreachable("Invalid SyntacticElementTargetKey::Kind");
+  case SyntacticElementTargetKey::Kind::stmtCondElement:
+    result.TheCondElt = key.storage.stmtCondElement;
+    break;
+  case SyntacticElementTargetKey::Kind::expr:
+    result.TheExpr = key.storage.expr;
+    break;
+  case SyntacticElementTargetKey::Kind::closure:
+    result.TheClosure = cast<ClosureExpr>(key.storage.expr);
+    break;
+  case SyntacticElementTargetKey::Kind::stmt:
+    result.TheStmt = key.storage.stmt;
+    break;
+  case SyntacticElementTargetKey::Kind::pattern:
+    result.ThePattern = key.storage.pattern;
+    break;
+  case SyntacticElementTargetKey::Kind::patternBindingEntry:
+    result.ThePatternBinding = key.storage.patternBindingEntry.patternBinding;
+    result.Options |= key.storage.patternBindingEntry.index << 8;
+    break;
+  case SyntacticElementTargetKey::Kind::varDecl:
+    result.TheVar = key.storage.varDecl;
+    break;
+  case SyntacticElementTargetKey::Kind::functionRef:
+    result.TheDeclContext = key.storage.functionRef;
+    break;
+  }
+
+  return result;
+}
+
+SyntacticElementTargetKey
+SolverTrail::Change::getSyntacticElementTargetKey() const {
+  ASSERT(Kind == ChangeKind::RecordedTarget);
+
+  auto kind = SyntacticElementTargetKey::Kind(Options & 0xff);
+
+  switch (kind) {
+  case SyntacticElementTargetKey::Kind::empty:
+  case SyntacticElementTargetKey::Kind::tombstone:
+    llvm_unreachable("Invalid SyntacticElementTargetKey::Kind");
+  case SyntacticElementTargetKey::Kind::stmtCondElement:
+    return SyntacticElementTargetKey(TheCondElt);
+  case SyntacticElementTargetKey::Kind::expr:
+    return SyntacticElementTargetKey(TheExpr);
+  case SyntacticElementTargetKey::Kind::closure:
+    return SyntacticElementTargetKey(TheClosure);
+  case SyntacticElementTargetKey::Kind::stmt:
+    return SyntacticElementTargetKey(TheStmt);
+  case SyntacticElementTargetKey::Kind::pattern:
+    return SyntacticElementTargetKey(ThePattern);
+  case SyntacticElementTargetKey::Kind::patternBindingEntry:
+    return SyntacticElementTargetKey(ThePatternBinding, Options >> 8);
+  case SyntacticElementTargetKey::Kind::varDecl:
+    return SyntacticElementTargetKey(TheVar);
+  case SyntacticElementTargetKey::Kind::functionRef:
+    return SyntacticElementTargetKey(TheDeclContext);
+  }
 }
 
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
@@ -308,7 +377,7 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     break;
 
   case ChangeKind::AddedFix:
-    cs.removeFix(Fix);
+    cs.removeFix(TheFix);
     break;
 
   case ChangeKind::AddedFixedRequirement:
@@ -317,39 +386,39 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     break;
 
   case ChangeKind::RecordedDisjunctionChoice:
-    cs.removeDisjunctionChoice(Locator);
+    cs.removeDisjunctionChoice(TheLocator);
     break;
 
   case ChangeKind::RecordedAppliedDisjunction:
-    cs.removeAppliedDisjunction(Locator);
+    cs.removeAppliedDisjunction(TheLocator);
     break;
 
   case ChangeKind::RecordedMatchCallArgumentResult:
-    cs.removeMatchCallArgumentResult(Locator);
+    cs.removeMatchCallArgumentResult(TheLocator);
     break;
 
   case ChangeKind::RecordedOpenedTypes:
-    cs.removeOpenedType(Locator);
+    cs.removeOpenedType(TheLocator);
     break;
 
   case ChangeKind::RecordedOpenedExistentialType:
-    cs.removeOpenedExistentialType(Locator);
+    cs.removeOpenedExistentialType(TheLocator);
     break;
 
   case ChangeKind::RecordedOpenedPackExpansionType:
-    cs.removeOpenedPackExpansionType(ExpansionTy);
+    cs.removeOpenedPackExpansionType(TheExpansion);
     break;
 
   case ChangeKind::RecordedPackExpansionEnvironment:
-    cs.removePackExpansionEnvironment(Locator);
+    cs.removePackExpansionEnvironment(TheLocator);
     break;
 
   case ChangeKind::RecordedPackEnvironment:
-    cs.removePackEnvironment(ElementExpr);
+    cs.removePackEnvironment(TheElement);
     break;
 
   case ChangeKind::RecordedDefaultedConstraint:
-    cs.removeDefaultedConstraint(Locator);
+    cs.removeDefaultedConstraint(TheLocator);
     break;
 
   case ChangeKind::RecordedNodeType:
@@ -370,7 +439,7 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     break;
 
   case ChangeKind::RecordedResultBuilderTransform:
-    cs.removeResultBuilderTransform(AFR);
+    cs.removeResultBuilderTransform(TheRef);
     break;
 
   case ChangeKind::AppliedPropertyWrapper:
@@ -378,11 +447,11 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     break;
 
   case ChangeKind::ResolvedOverload:
-    cs.removeResolvedOverload(Locator);
+    cs.removeResolvedOverload(TheLocator);
     break;
 
   case ChangeKind::RecordedClosureType:
-    cs.removeClosureType(Closure);
+    cs.removeClosureType(TheClosure);
     break;
 
   case ChangeKind::RecordedImpliedResult:
@@ -391,6 +460,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::RecordedContextualInfo:
     cs.removeContextualInfo(Node.Node);
+    break;
+
+  case ChangeKind::RecordedTarget:
+    cs.removeTargetFor(getSyntacticElementTargetKey());
     break;
   }
 }
@@ -408,7 +481,7 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
 #define LOCATOR_CHANGE(Name) \
   case ChangeKind::Name: \
     out << "(" << #Name << " at "; \
-    Locator->dump(&cs.getASTContext().SourceMgr, out); \
+    TheLocator->dump(&cs.getASTContext().SourceMgr, out); \
     out << ")\n"; \
     break;
 #define EXPR_CHANGE(Name) \
@@ -505,7 +578,7 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
 
   case ChangeKind::AddedFix:
     out << "(AddedFix ";
-    Fix->print(out);
+    TheFix->print(out);
     out << ")\n";
     break;
 
@@ -520,21 +593,21 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
 
   case ChangeKind::RecordedDisjunctionChoice:
     out << "(RecordedDisjunctionChoice at ";
-    Locator->dump(&cs.getASTContext().SourceMgr, out);
+    TheLocator->dump(&cs.getASTContext().SourceMgr, out);
     out << " index ";
     out << Options << ")\n";
     break;
 
   case ChangeKind::RecordedOpenedPackExpansionType:
     out << "(RecordedOpenedPackExpansionType for ";
-    ExpansionTy->print(out, PO);
+    TheExpansion->print(out, PO);
     out << ")\n";
     break;
 
   case ChangeKind::RecordedPackEnvironment:
     // FIXME: Print short form of PackExpansionExpr
     out << "(RecordedPackEnvironment ";
-    simple_display(out, ElementExpr);
+    simple_display(out, TheElement);
     out << "\n";
     break;
 
@@ -576,19 +649,25 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
 
   case ChangeKind::RecordedResultBuilderTransform:
     out << "(RecordedResultBuilderTransform ";
-    simple_display(out, AFR);
+    simple_display(out, TheRef);
     out << ")\n";
     break;
 
   case ChangeKind::RecordedClosureType:
     out << "(RecordedClosureType ";
-    simple_display(out, Closure);
+    simple_display(out, TheClosure);
     out << ")\n";
     break;
 
   case ChangeKind::RecordedContextualInfo:
     // FIXME: Print short form of ASTNode
     out << "(RecordedContextualInfo)\n";
+    break;
+
+  case ChangeKind::RecordedTarget:
+    out << "(RecordedTarget ";
+    getSyntacticElementTargetKey().dump(out);
+    out << ")\n";
     break;
   }
 }

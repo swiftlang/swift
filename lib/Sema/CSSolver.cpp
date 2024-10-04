@@ -218,7 +218,8 @@ Solution ConstraintSystem::finalize() {
     solution.contextualTypes.push_back({entry.first, entry.second.first});
   }
 
-  solution.targets = targets;
+  for (auto &target : targets)
+    solution.targets.insert(target);
 
   for (const auto &item : caseLabelItems)
     solution.caseLabelItems.insert(item);
@@ -692,7 +693,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
   numKeyPaths = cs.KeyPaths.size();
-  numTargets = cs.targets.size();
   numCaseLabelItems = cs.caseLabelItems.size();
   numPotentialThrowSites = cs.potentialThrowSites.size();
   numExprPatterns = cs.exprPatterns.size();
@@ -736,9 +736,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   /// Remove any key path expressions.
   truncate(cs.KeyPaths, numKeyPaths);
-
-  // Remove any targets.
-  truncate(cs.targets, numTargets);
 
   // Remove any case label item infos.
   truncate(cs.caseLabelItems, numCaseLabelItems);

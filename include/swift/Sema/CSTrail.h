@@ -34,6 +34,7 @@ class TypeVariableType;
 namespace constraints {
 
 class Constraint;
+struct SyntacticElementTargetKey;
 
 class SolverTrail {
 public:
@@ -102,7 +103,6 @@ public:
         Type DstType;
       } Restriction;
 
-      ConstraintFix *Fix;
 
       struct {
         GenericTypeParamType *GP;
@@ -119,12 +119,19 @@ public:
         Type OldType;
       } KeyPath;
 
-      ConstraintLocator *Locator;
-      PackExpansionType *ExpansionTy;
-      PackElementExpr *ElementExpr;
+      ConstraintFix *TheFix;
+      ConstraintLocator *TheLocator;
+      PackExpansionType *TheExpansion;
+      PackElementExpr *TheElement;
       Expr *TheExpr;
-      AnyFunctionRef AFR;
-      const ClosureExpr *Closure;
+      Stmt *TheStmt;
+      StmtConditionElement *TheCondElt;
+      Pattern *ThePattern;
+      PatternBindingDecl *ThePatternBinding;
+      VarDecl *TheVar;
+      AnyFunctionRef TheRef;
+      ClosureExpr *TheClosure;
+      DeclContext *TheDeclContext;
     };
 
     Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
@@ -205,10 +212,13 @@ public:
     static Change RecordedResultBuilderTransform(AnyFunctionRef fn);
 
     /// Create a change that recorded a closure type.
-    static Change RecordedClosureType(const ClosureExpr *closure);
+    static Change RecordedClosureType(ClosureExpr *closure);
 
     /// Create a change that recorded the contextual type of an AST node.
     static Change RecordedContextualInfo(ASTNode node);
+
+    /// Create a change that recorded a SyntacticElementTarget.
+    static Change RecordedTarget(SyntacticElementTargetKey key);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.
@@ -218,6 +228,9 @@ public:
 
     void dump(llvm::raw_ostream &out, ConstraintSystem &cs,
               unsigned indent = 0) const;
+
+  private:
+    SyntacticElementTargetKey getSyntacticElementTargetKey() const;
   };
 
   SolverTrail(ConstraintSystem &cs);
