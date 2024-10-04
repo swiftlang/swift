@@ -80,7 +80,6 @@ nonisolated func nonisolatedFunc(expectedQueue queue: DispatchQueue) async {
     }
 
     executor = nil
-    print("In main: executor = nil")
 
     await task.value
     // The executor is ONLY released after the task has completed,
