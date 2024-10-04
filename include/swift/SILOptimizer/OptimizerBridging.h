@@ -256,6 +256,7 @@ struct BridgedPassContext {
                                                                  BridgedSubstitutionMap substitutions) const;
   void deserializeAllCallees(BridgedFunction function, bool deserializeAll) const;
   bool specializeClassMethodInst(BridgedInstruction cm) const;
+  bool specializeWitnessMethodInst(BridgedInstruction wm) const;
   bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
   BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
   BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;

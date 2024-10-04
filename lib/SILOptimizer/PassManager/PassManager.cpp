@@ -1771,6 +1771,10 @@ bool BridgedPassContext::specializeClassMethodInst(BridgedInstruction cm) const 
   return ::specializeClassMethodInst(cm.getAs<ClassMethodInst>());
 }
 
+bool BridgedPassContext::specializeWitnessMethodInst(BridgedInstruction wm) const {
+  return ::specializeWitnessMethodInst(wm.getAs<WitnessMethodInst>());
+}
+
 bool BridgedPassContext::specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const {
   return ::specializeAppliesInFunction(*function.getFunction(), invocation->getTransform(), isMandatory);
 }

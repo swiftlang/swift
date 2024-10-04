@@ -357,6 +357,15 @@ struct FunctionPassContext : MutatingContext {
     return false
   }
 
+  func specializeWitnessMethodInst(_ wm: WitnessMethodInst) -> Bool {
+    if _bridged.specializeWitnessMethodInst(wm.bridged) {
+      notifyInstructionsChanged()
+      notifyCallsChanged()
+      return true
+    }
+    return false
+  }
+
   func specializeApplies(in function: Function, isMandatory: Bool) -> Bool {
     if _bridged.specializeAppliesInFunction(function.bridged, isMandatory) {
       notifyInstructionsChanged()

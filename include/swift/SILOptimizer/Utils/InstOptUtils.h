@@ -607,6 +607,7 @@ bool optimizeMemoryAccesses(SILFunction *fn);
 bool eliminateDeadAllocations(SILFunction *fn, DominanceInfo *domInfo);
 
 bool specializeClassMethodInst(ClassMethodInst *cm);
+bool specializeWitnessMethodInst(WitnessMethodInst *wm);
 
 bool specializeAppliesInFunction(SILFunction &F,
                                  SILTransform *transform,
