@@ -130,6 +130,7 @@ public:
     Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
 
 #define LOCATOR_CHANGE(Name) static Change Name(ConstraintLocator *locator);
+#define EXPR_CHANGE(Name) static Change Name(Expr *expr);
 #include "swift/Sema/CSTrail.def"
 
     /// Create a change that added a type variable.
@@ -202,9 +203,6 @@ public:
 
     /// Create a change that recorded a result builder transform.
     static Change RecordedResultBuilderTransform(AnyFunctionRef fn);
-
-    /// Create a change that recorded a result builder transform.
-    static Change AppliedPropertyWrapper(Expr *anchor);
 
     /// Create a change that recorded a closure type.
     static Change RecordedClosureType(const ClosureExpr *closure);

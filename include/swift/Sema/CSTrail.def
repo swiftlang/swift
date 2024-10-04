@@ -22,6 +22,10 @@
 #define LOCATOR_CHANGE(Name) CHANGE(Name)
 #endif
 
+#ifndef EXPR_CHANGE
+#define EXPR_CHANGE(Name) CHANGE(Name)
+#endif
+
 #ifndef LAST_CHANGE
 #define LAST_CHANGE(Name)
 #endif
@@ -33,6 +37,9 @@ LOCATOR_CHANGE(RecordedOpenedExistentialType)
 LOCATOR_CHANGE(RecordedPackExpansionEnvironment)
 LOCATOR_CHANGE(RecordedDefaultedConstraint)
 LOCATOR_CHANGE(ResolvedOverload)
+
+EXPR_CHANGE(AppliedPropertyWrapper)
+EXPR_CHANGE(RecordedImpliedResult)
 
 CHANGE(AddedTypeVariable)
 CHANGE(AddedConstraint)
@@ -53,11 +60,11 @@ CHANGE(RecordedKeyPathComponentType)
 CHANGE(DisabledConstraint)
 CHANGE(FavoredConstraint)
 CHANGE(RecordedResultBuilderTransform)
-CHANGE(AppliedPropertyWrapper)
 CHANGE(RecordedClosureType)
 
 LAST_CHANGE(RecordedClosureType)
 
 #undef LOCATOR_CHANGE
+#undef EXPR_CHANGE
 #undef LAST_CHANGE
 #undef CHANGE
