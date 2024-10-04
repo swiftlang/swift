@@ -6,6 +6,9 @@
 // RUN: %target-swift-frontend -module-name A -I %t -disable-profiling-marker-thunks -emit-ir %s | %FileCheck %s --check-prefix=NOTHUNK
 // RUN: %target-swift-frontend -module-name A -I %t -emit-ir %s | %FileCheck %s --check-prefix=NOTHUNK
 
+// UNSUPPORTED: OS=windows-msvc
+// UNSUPPORTED: OS=linux-gnu, OS=linux-android, OS=linux-androideabi
+
 // NOTHUNK-NOT: __swift_prof_thunk
 
 import P
