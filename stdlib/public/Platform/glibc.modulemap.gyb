@@ -49,10 +49,8 @@ module SwiftGlibc [system] {
   export *
 }
 
-% if CMAKE_SDK != "WASI":
 module CUUID [system] {
   header "uuid/uuid.h"
   link "uuid"
   export *
 }
-% end
