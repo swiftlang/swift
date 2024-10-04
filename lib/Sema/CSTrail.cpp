@@ -489,6 +489,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   case ChangeKind::RecordedPotentialThrowSite:
     cs.removePotentialThrowSite(TheCatchNode);
     break;
+
+  case ChangeKind::RecordedExprPattern:
+    cs.removeExprPatternFor(TheExpr);
+    break;
   }
 }
 
