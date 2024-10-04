@@ -360,6 +360,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   case ChangeKind::AppliedPropertyWrapper:
     cs.removePropertyWrapper(TheExpr);
     break;
+
+  case ChangeKind::ResolvedOverload:
+    cs.removeResolvedOverload(Locator);
+    break;
   }
 }
 

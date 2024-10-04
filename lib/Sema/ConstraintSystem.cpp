@@ -3735,6 +3735,20 @@ void ConstraintSystem::bindOverloadType(
   llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
 }
 
+void ConstraintSystem::recordResolvedOverload(ConstraintLocator *locator,
+                                              SelectedOverload overload) {
+  bool inserted = ResolvedOverloads.insert({locator, overload}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::ResolvedOverload(locator));
+}
+
+void ConstraintSystem::removeResolvedOverload(ConstraintLocator *locator) {
+  bool erased = ResolvedOverloads.erase(locator);
+  ASSERT(erased);
+}
+
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                        Type boundType,
                                        OverloadChoice choice,
@@ -3990,9 +4004,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   auto overload = SelectedOverload{
       choice, openedType, adjustedOpenedType, refType, adjustedRefType,
       boundType};
-  auto result = ResolvedOverloads.insert({locator, overload});
-  assert(result.second && "Already resolved this overload?");
-  (void)result;
+  recordResolvedOverload(locator, overload);
 
   // Add the constraints necessary to bind the overload type.
   bindOverloadType(overload, boundType, locator, useDC,

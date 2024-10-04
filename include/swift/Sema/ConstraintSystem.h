@@ -2207,7 +2207,7 @@ private:
   llvm::FoldingSetVector<ConstraintLocator> ConstraintLocators;
 
   /// The overload sets that have been resolved along the current path.
-  llvm::MapVector<ConstraintLocator *, SelectedOverload> ResolvedOverloads;
+  llvm::DenseMap<ConstraintLocator *, SelectedOverload> ResolvedOverloads;
 
   /// The current fixed score for this constraint system and the (partial)
   /// solution it represents.
@@ -2856,9 +2856,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    /// The length of \c ResolvedOverloads.
-    unsigned numResolvedOverloads;
 
     /// The length of \c ClosureTypes.
     unsigned numInferredClosureTypes;
@@ -4932,6 +4929,11 @@ public:
     buildDisjunctionForOptionalVsUnderlying(boundTy, type, dynamicLocator);
   }
 
+  void recordResolvedOverload(ConstraintLocator *locator,
+                              SelectedOverload choice);
+
+  void removeResolvedOverload(ConstraintLocator *locator);
+
   /// Resolve the given overload set to the given choice.
   void resolveOverload(ConstraintLocator *locator, Type boundType,
                        OverloadChoice choice, DeclContext *useDC);
@@ -5689,7 +5691,7 @@ public:
   }
 
   /// The overload sets that have already been resolved along the current path.
-  const llvm::MapVector<ConstraintLocator *, SelectedOverload> &
+  const llvm::DenseMap<ConstraintLocator *, SelectedOverload> &
   getResolvedOverloads() const {
     return ResolvedOverloads;
   }

@@ -32,6 +32,7 @@ LOCATOR_CHANGE(RecordedOpenedTypes)
 LOCATOR_CHANGE(RecordedOpenedExistentialType)
 LOCATOR_CHANGE(RecordedPackExpansionEnvironment)
 LOCATOR_CHANGE(RecordedDefaultedConstraint)
+LOCATOR_CHANGE(ResolvedOverload)
 
 CHANGE(AddedTypeVariable)
 CHANGE(AddedConstraint)
