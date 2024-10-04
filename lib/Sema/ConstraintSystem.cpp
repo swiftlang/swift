@@ -3542,12 +3542,13 @@ void ConstraintSystem::bindOverloadType(
 
     // Associate an argument list for the implicit x[dynamicMember:] subscript
     // if we haven't already.
-    auto *&argList = ArgumentLists[getArgumentInfoLocator(callLoc)];
-    if (!argList) {
-      argList = ArgumentList::createImplicit(
+    auto *argLoc = getArgumentInfoLocator(callLoc);
+    if (ArgumentLists.find(argLoc) == ArgumentLists.end()) {
+      auto *argList = ArgumentList::createImplicit(
           ctx, {Argument(SourceLoc(), ctx.Id_dynamicMember, /*expr*/ nullptr)},
           /*firstTrailingClosureIndex=*/std::nullopt,
           AllocationArena::ConstraintSolver);
+      recordArgumentList(argLoc, argList);
     }
 
     auto *callerTy = FunctionType::get(
@@ -6521,13 +6522,20 @@ ArgumentList *ConstraintSystem::getArgumentList(ConstraintLocator *locator) {
   return nullptr;
 }
 
+void ConstraintSystem::recordArgumentList(ConstraintLocator *locator,
+                                          ArgumentList *args) {
+  bool inserted = ArgumentLists.insert({locator, args}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedArgumentList(locator));
+}
+
 void ConstraintSystem::associateArgumentList(ConstraintLocator *locator,
                                              ArgumentList *args) {
-  assert(locator && locator->getAnchor());
-  auto *argInfoLoc = getArgumentInfoLocator(locator);
-  auto inserted = ArgumentLists.insert({argInfoLoc, args}).second;
-  assert(inserted && "Multiple argument lists at locator?");
-  (void)inserted;
+  ASSERT(locator && locator->getAnchor());
+  auto *argLoc = getArgumentInfoLocator(locator);
+  recordArgumentList(argLoc, args);
 }
 
 ArgumentList *Solution::getArgumentList(ConstraintLocator *locator) const {

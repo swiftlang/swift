@@ -1610,7 +1610,7 @@ public:
   /// A mapping from the constraint locators for references to various
   /// names (e.g., member references, normal name references, possible
   /// constructions) to the argument lists for the call to that locator.
-  llvm::MapVector<ConstraintLocator *, ArgumentList *> argumentLists;
+  llvm::DenseMap<ConstraintLocator *, ArgumentList *> argumentLists;
 
   /// The set of implicitly generated `.callAsFunction` root expressions.
   llvm::DenseMap<ConstraintLocator *, UnresolvedDotExpr *>
@@ -2397,7 +2397,7 @@ private:
   /// A mapping from the constraint locators for references to various
   /// names (e.g., member references, normal name references, possible
   /// constructions) to the argument lists for the call to that locator.
-  llvm::MapVector<ConstraintLocator *, ArgumentList *> ArgumentLists;
+  llvm::DenseMap<ConstraintLocator *, ArgumentList *> ArgumentLists;
 
 public:
   /// A map from argument expressions to their applied property wrapper expressions.
@@ -2801,6 +2801,11 @@ public:
   /// Associate an argument list with a call at a given locator.
   void associateArgumentList(ConstraintLocator *locator, ArgumentList *args);
 
+  /// Same as associateArgumentList() except the locator points at the
+  /// argument list itself. Records a change in the trail.
+  void recordArgumentList(ConstraintLocator *locator,
+                          ArgumentList *args);
+
   /// If the given node is a function expression with a parent ApplyExpr,
   /// returns the apply, otherwise returns the node itself.
   ASTNode includingParentApply(ASTNode node);
@@ -2849,9 +2854,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    /// The length of \c ArgumentLists.
-    unsigned numArgumentLists;
 
     /// The length of \c ImplicitCallAsFunctionRoots.
     unsigned numImplicitCallAsFunctionRoots;
