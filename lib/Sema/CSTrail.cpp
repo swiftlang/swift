@@ -317,6 +317,14 @@ SolverTrail::Change::RecordedIsolatedParam(ParamDecl *param) {
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::RecordedKeyPath(KeyPathExpr *expr) {
+  Change result;
+  result.Kind = ChangeKind::RecordedKeyPath;
+  result.KeyPath.Expr = expr;
+  return result;
+}
+
 SyntacticElementTargetKey
 SolverTrail::Change::getSyntacticElementTargetKey() const {
   ASSERT(Kind == ChangeKind::RecordedTarget);
@@ -474,6 +482,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::RecordedPreconcurrencyClosure:
     cs.removePreconcurrencyClosure(TheClosure);
+    break;
+
+  case ChangeKind::RecordedKeyPath:
+    cs.removeKeyPath(KeyPath.Expr);
     break;
   }
 }
@@ -686,6 +698,12 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
   case ChangeKind::RecordedIsolatedParam:
     out << "(RecordedIsolatedParam ";
     TheParam->dumpRef(out);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedKeyPath:
+    out << "(RecordedKeyPath ";
+    simple_display(out, KeyPath.Expr);
     out << ")\n";
     break;
   }

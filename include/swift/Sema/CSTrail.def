@@ -74,8 +74,9 @@ CHANGE(RecordedTarget)
 CHANGE(RecordedCaseLabelItemInfo)
 CHANGE(RecordedPotentialThrowSite)
 CHANGE(RecordedIsolatedParam)
+CHANGE(RecordedKeyPath)
 
-LAST_CHANGE(RecordedIsolatedParam)
+LAST_CHANGE(RecordedKeyPath)
 
 #undef LOCATOR_CHANGE
 #undef EXPR_CHANGE
