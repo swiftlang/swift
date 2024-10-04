@@ -84,7 +84,7 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   // recordChange() to assert if there's an active undo. It is not valid to
   // create new nodes during an undo.
   if (CS.solverState)
-    CS.recordChange(SolverTrail::Change::addedTypeVariable(typeVar));
+    CS.recordChange(SolverTrail::Change::AddedTypeVariable(typeVar));
 
   // If this type variable is not the representative of its equivalence class,
   // add it to its representative's set of equivalences.
@@ -400,7 +400,7 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
   for (auto typeVar : referencedTypeVars) {
     // Record the change, if there are active scopes.
     if (CS.isRecordingChanges())
-      CS.recordChange(SolverTrail::Change::addedConstraint(typeVar, constraint));
+      CS.recordChange(SolverTrail::Change::AddedConstraint(typeVar, constraint));
 
     addConstraint(typeVar, constraint);
 
@@ -420,7 +420,7 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
   if (referencedTypeVars.empty()) {
     // Record the change, if there are active scopes.
     if (CS.isRecordingChanges())
-      CS.recordChange(SolverTrail::Change::addedConstraint(nullptr, constraint));
+      CS.recordChange(SolverTrail::Change::AddedConstraint(nullptr, constraint));
 
     addConstraint(nullptr, constraint);
   }
@@ -455,7 +455,7 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
 
     // Record the change, if there are active scopes.
     if (CS.isRecordingChanges())
-      CS.recordChange(SolverTrail::Change::removedConstraint(typeVar, constraint));
+      CS.recordChange(SolverTrail::Change::RemovedConstraint(typeVar, constraint));
 
     removeConstraint(typeVar, constraint);
   }
@@ -464,7 +464,7 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
   if (referencedTypeVars.empty()) {
     // Record the change, if there are active scopes.
     if (CS.isRecordingChanges())
-      CS.recordChange(SolverTrail::Change::removedConstraint(nullptr, constraint));
+      CS.recordChange(SolverTrail::Change::RemovedConstraint(nullptr, constraint));
 
     removeConstraint(nullptr, constraint);
   }
@@ -503,7 +503,7 @@ void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
   // Record the change, if there are active scopes.
   if (CS.isRecordingChanges()) {
     CS.recordChange(
-      SolverTrail::Change::extendedEquivalenceClass(
+      SolverTrail::Change::ExtendedEquivalenceClass(
                         typeVarRep,
                         repNode.getEquivalenceClass().size()));
   }
@@ -533,7 +533,7 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
 
     // Record the change, if there are active scopes.
     if (CS.isRecordingChanges())
-      CS.recordChange(SolverTrail::Change::relatedTypeVariables(typeVar, otherTypeVar));
+      CS.recordChange(SolverTrail::Change::RelatedTypeVariables(typeVar, otherTypeVar));
   }
 }
 

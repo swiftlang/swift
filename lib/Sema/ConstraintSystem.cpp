@@ -267,7 +267,7 @@ void ConstraintSystem::addConversionRestriction(
     return;
 
   if (solverState) {
-    recordChange(SolverTrail::Change::addedConversionRestriction(
+    recordChange(SolverTrail::Change::AddedConversionRestriction(
       srcType, dstType));
   }
 }
@@ -284,7 +284,7 @@ void ConstraintSystem::addFix(ConstraintFix *fix) {
   ASSERT(inserted);
 
   if (solverState)
-    recordChange(SolverTrail::Change::addedFix(fix));
+    recordChange(SolverTrail::Change::AddedFix(fix));
 }
 
 void ConstraintSystem::removeFix(ConstraintFix *fix) {
@@ -298,7 +298,7 @@ void ConstraintSystem::recordDisjunctionChoice(
   ASSERT(inserted);
 
   if (solverState)
-    recordChange(SolverTrail::Change::recordedDisjunctionChoice(locator, index));
+    recordChange(SolverTrail::Change::RecordedDisjunctionChoice(locator, index));
 }
 
 void ConstraintSystem::recordAppliedDisjunction(
@@ -309,7 +309,7 @@ void ConstraintSystem::recordAppliedDisjunction(
   ASSERT(inserted);
 
   if (solverState)
-    recordChange(SolverTrail::Change::recordedAppliedDisjunction(locator));
+    recordChange(SolverTrail::Change::RecordedAppliedDisjunction(locator));
 }
 
 /// Retrieve a dynamic result signature for the given declaration.
@@ -846,7 +846,7 @@ void ConstraintSystem::recordOpenedExistentialType(
   ASSERT(inserted);
 
   if (solverState)
-    recordChange(SolverTrail::Change::recordedOpenedExistentialType(locator));
+    recordChange(SolverTrail::Change::RecordedOpenedExistentialType(locator));
 }
 
 GenericEnvironment *
@@ -887,7 +887,7 @@ void ConstraintSystem::recordPackExpansionEnvironment(
   ASSERT(inserted);
 
   if (solverState)
-    recordChange(SolverTrail::Change::recordedPackExpansionEnvironment(locator));
+    recordChange(SolverTrail::Change::RecordedPackExpansionEnvironment(locator));
 }
 
 PackExpansionExpr *
@@ -902,7 +902,7 @@ void ConstraintSystem::addPackEnvironment(PackElementExpr *packElement,
   ASSERT(inserted);
 
   if (solverState)
-    recordChange(SolverTrail::Change::recordedPackEnvironment(packElement));
+    recordChange(SolverTrail::Change::RecordedPackEnvironment(packElement));
 }
 
 /// Extend the given depth map by adding depths for all of the subexpressions
@@ -1269,7 +1269,7 @@ void ConstraintSystem::recordOpenedPackExpansionType(PackExpansionType *expansio
   ASSERT(inserted);
 
   if (solverState)
-    recordChange(SolverTrail::Change::recordedOpenedPackExpansionType(expansion));
+    recordChange(SolverTrail::Change::RecordedOpenedPackExpansionType(expansion));
 }
 
 Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
@@ -1678,7 +1678,7 @@ void ConstraintSystem::recordOpenedType(
   ASSERT(inserted);
 
   if (solverState)
-    recordChange(SolverTrail::Change::recordedOpenedTypes(locator));
+    recordChange(SolverTrail::Change::RecordedOpenedTypes(locator));
 }
 
 void ConstraintSystem::removeOpenedType(ConstraintLocator *locator) {
@@ -7436,7 +7436,7 @@ void ConstraintSystem::recordFixedRequirement(GenericTypeParamType *GP,
       std::make_tuple(GP, reqKind, requirementTy.getPointer())).second;
   if (inserted) {
     if (solverState) {
-      recordChange(SolverTrail::Change::addedFixedRequirement(
+      recordChange(SolverTrail::Change::AddedFixedRequirement(
           GP, reqKind, requirementTy));
     }
   }

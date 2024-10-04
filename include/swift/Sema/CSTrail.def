@@ -1,0 +1,61 @@
+//===--- CSTrail.def - Trail Change Kinds ---------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+///
+/// This file enumerates the kinds of SolverTrail::Change.
+///
+//===----------------------------------------------------------------------===//
+
+#ifndef CHANGE
+#define CHANGE(Name)
+#endif
+
+#ifndef LOCATOR_CHANGE
+#define LOCATOR_CHANGE(Name) CHANGE(Name)
+#endif
+
+#ifndef LAST_CHANGE
+#define LAST_CHANGE(Name)
+#endif
+
+LOCATOR_CHANGE(RecordedAppliedDisjunction)
+LOCATOR_CHANGE(RecordedMatchCallArgumentResult)
+LOCATOR_CHANGE(RecordedOpenedTypes)
+LOCATOR_CHANGE(RecordedOpenedExistentialType)
+LOCATOR_CHANGE(RecordedPackExpansionEnvironment)
+LOCATOR_CHANGE(RecordedDefaultedConstraint)
+
+CHANGE(AddedTypeVariable)
+CHANGE(AddedConstraint)
+CHANGE(RemovedConstraint)
+CHANGE(ExtendedEquivalenceClass)
+CHANGE(RelatedTypeVariables)
+CHANGE(InferredBindings)
+CHANGE(RetractedBindings)
+CHANGE(UpdatedTypeVariable)
+CHANGE(AddedConversionRestriction)
+CHANGE(AddedFix)
+CHANGE(AddedFixedRequirement)
+CHANGE(RecordedDisjunctionChoice)
+CHANGE(RecordedOpenedPackExpansionType)
+CHANGE(RecordedPackEnvironment)
+CHANGE(RecordedNodeType)
+CHANGE(RecordedKeyPathComponentType)
+CHANGE(DisabledConstraint)
+CHANGE(FavoredConstraint)
+CHANGE(RecordedResultBuilderTransform)
+CHANGE(AppliedPropertyWrapper)
+
+LAST_CHANGE(AppliedPropertyWrapper)
+
+#undef LOCATOR_CHANGE
+#undef LAST_CHANGE
+#undef CHANGE
