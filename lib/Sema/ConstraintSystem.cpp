@@ -4491,7 +4491,7 @@ size_t Solution::getTotalMemory() const {
          size_in_bytes(resultBuilderTransformed) +
          size_in_bytes(appliedPropertyWrappers) +
          size_in_bytes(argumentLists) +
-         ImplicitCallAsFunctionRoots.getMemorySize() +
+         size_in_bytes(ImplicitCallAsFunctionRoots) +
          size_in_bytes(SynthesizedConformances);
 }
 

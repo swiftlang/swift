@@ -12899,7 +12899,11 @@ createImplicitRootForCallAsFunction(ConstraintSystem &cs, Type refType,
     // Record a type of the new reference in the constraint system.
     cs.setType(implicitRef, refType);
     // Record new `.callAsFunction` in the constraint system.
-    cs.recordCallAsFunction(implicitRef, arguments, calleeLocator);
+    cs.recordImplicitCallAsFunctionRoot(calleeLocator, implicitRef);
+
+    auto *implicitRefLocator = cs.getConstraintLocator(
+        implicitRef, ConstraintLocator::ApplyArgument);
+    cs.associateArgumentList(implicitRefLocator, arguments);
   }
 
   return implicitRef;
@@ -14974,13 +14978,13 @@ void ConstraintSystem::recordMatchCallArgumentResult(
     recordChange(SolverTrail::Change::RecordedMatchCallArgumentResult(locator));
 }
 
-void ConstraintSystem::recordCallAsFunction(UnresolvedDotExpr *root,
-                                            ArgumentList *arguments,
-                                            ConstraintLocator *locator) {
-  ImplicitCallAsFunctionRoots.insert({locator, root});
+void ConstraintSystem::recordImplicitCallAsFunctionRoot(
+    ConstraintLocator *locator, UnresolvedDotExpr *root) {
+  bool inserted = ImplicitCallAsFunctionRoots.insert({locator, root}).second;
+  ASSERT(inserted);
 
-  associateArgumentList(
-      getConstraintLocator(root, ConstraintLocator::ApplyArgument), arguments);
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedImplicitCallAsFunctionRoot(locator));
 }
 
 void ConstraintSystem::recordKeyPath(const KeyPathExpr *keypath,
