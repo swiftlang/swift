@@ -800,18 +800,6 @@ BUILTIN_MISC_OPERATION(ResumeThrowingContinuationReturning,
 BUILTIN_MISC_OPERATION(ResumeThrowingContinuationThrowing,
                        "resumeThrowingContinuationThrowing", "", Special)
 
-/// Create a task group.
-BUILTIN_MISC_OPERATION(CreateTaskGroup,
-                       "createTaskGroup", "", Special)
-
-/// Create a task group, with options.
-BUILTIN_MISC_OPERATION(CreateTaskGroupWithFlags,
-                       "createTaskGroupWithFlags", "", Special)
-
-/// Destroy a task group.
-BUILTIN_MISC_OPERATION(DestroyTaskGroup,
-                       "destroyTaskGroup", "", Special)
-
 /// Unchecked pointer alignment assertion. Allows the compiler to assume
 /// alignment of the pointer to emit more efficient code.
 ///
@@ -1053,6 +1041,15 @@ BUILTIN_SIL_OPERATION(CreateAsyncDiscardingTaskInGroupWithExecutor,
 /// reference.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildOrdinaryTaskExecutorRef,
     "buildOrdinaryTaskExecutorRef", "n", Special)
+
+/// Create a task group.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateTaskGroup, "createTaskGroup", "", Special)
+
+/// Create a task group, with options.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateTaskGroupWithFlags, "createTaskGroupWithFlags", "", Special)
+
+/// Destroy a task group.
+BUILTIN_MISC_OPERATION(DestroyTaskGroup, "destroyTaskGroup", "", Special)
 
 /// globalStringTablePointer has type String -> Builtin.RawPointer.
 /// It returns an immortal, global string table pointer for strings constructed

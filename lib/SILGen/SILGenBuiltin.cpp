@@ -1750,6 +1750,38 @@ static ManagedValue emitBuiltinCreateDiscardingTask(
         CreateTaskOptions::Discarding });
 }
 
+// Emit SIL for the named builtin: createTaskGroup.
+// These formally take a metatype argument that's never actually used, so
+// we ignore it.
+static ManagedValue emitBuiltinCreateTaskGroup(SILGenFunction &SGF,
+                                               SILLocation loc,
+                                               SubstitutionMap subs,
+                                               ArrayRef<ManagedValue> args,
+                                               SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+  auto resultType = SILType::getRawPointerType(ctx);
+  auto value = SGF.B.createBuiltin(
+      loc, ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CreateTaskGroup)),
+      resultType, subs, {});
+  return ManagedValue::forObjectRValueWithoutOwnership(value);
+}
+
+// Emit SIL for the named builtin: createTaskGroupWithFlags.
+// These formally take a metatype argument that's never actually used, so
+// we ignore it.
+static ManagedValue emitBuiltinCreateTaskGroupWithFlags(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+  auto resultType = SILType::getRawPointerType(ctx);
+  auto value = SGF.B.createBuiltin(
+      loc,
+      ctx.getIdentifier(
+          getBuiltinName(BuiltinValueKind::CreateTaskGroupWithFlags)),
+      resultType, subs, {args[0].getValue()});
+  return ManagedValue::forObjectRValueWithoutOwnership(value);
+}
+
 ManagedValue
 SILGenFunction::emitCreateAsyncMainTask(SILLocation loc, SubstitutionMap subs,
                                         ManagedValue flags,
