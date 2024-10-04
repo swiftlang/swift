@@ -460,7 +460,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   for (auto &synthesized : solution.SynthesizedConformances) {
-    SynthesizedConformances.insert(synthesized);
+    if (SynthesizedConformances.count(synthesized.first) == 0)
+      recordSynthesizedConformance(synthesized.first, synthesized.second);
   }
 
   // Register any fixes produced along this path.
@@ -708,7 +709,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
-  numSynthesizedConformances = cs.SynthesizedConformances.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -740,9 +740,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // e.g. add retired constraints back to the circulation and remove generated
   // constraints introduced by the current scope.
   cs.solverState->rollback(this);
-
-  // Remove any implicitly synthesized conformances.
-  truncate(cs.SynthesizedConformances, numSynthesizedConformances);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
