@@ -671,10 +671,6 @@ Added: _$ss20ManagedBufferPointerV13_headerOffsetSivpZMV
 Added: _$ss20ManagedBufferPointerV14_alignmentMaskSivpZMV
 Added: _$ss20ManagedBufferPointerV14_elementOffsetSivpZMV
 Added: _$ss22__RawDictionaryStorageC5emptys07__EmptyB9SingletonCvpZMV
-Added: _$ss24_RuntimeFunctionCountersV03numabC0SivpZMV
-Added: _$ss24_RuntimeFunctionCountersV07runtimeB11NameToIndexSDySSSiGvpZMV
-Added: _$ss24_RuntimeFunctionCountersV07runtimeB5NamesSaySSGvpZMV
-Added: _$ss24_RuntimeFunctionCountersV07runtimebC7OffsetsSPys6UInt16VGvpZMV
 Added: _$ss4Int8V8bitWidthSivpZMV
 Added: _$ss5Int16V8bitWidthSivpZMV
 Added: _$ss5Int32V8bitWidthSivpZMV
