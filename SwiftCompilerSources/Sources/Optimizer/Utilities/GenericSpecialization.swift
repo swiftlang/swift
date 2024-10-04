@@ -89,6 +89,8 @@ func specializeWitnessTable(forConformance conformance: Conformance,
 
   let newEntries = witnessTable.entries.map { origEntry in
     switch origEntry {
+    case .invalid:
+      return WitnessTable.Entry.invalid
     case .method(let requirement, let witness):
       guard let origMethod = witness else {
         return origEntry
@@ -108,9 +110,14 @@ func specializeWitnessTable(forConformance conformance: Conformance,
                                                        substitutions: conformance.specializedSubstitutions)
       specializeWitnessTable(forConformance: baseConf, errorLocation: errorLocation, context, notifyNewWitnessTable)
       return .baseProtocol(requirement: requirement, witness: baseConf)
-    default:
-      // TODO: handle other witness table entry kinds
-      fatalError("unsupported witness table etnry")
+    case .associatedType(let requirement, let witness):
+      let substType = witness.subst(with: conformance.specializedSubstitutions)
+      return .associatedType(requirement: requirement, witness: substType)
+    case .associatedConformance(let requirement, let proto, let witness):
+      if witness.isSpecialized {
+        specializeWitnessTable(forConformance: witness, errorLocation: errorLocation, context, notifyNewWitnessTable)
+      }
+      return .associatedConformance(requirement: requirement, protocol: proto, witness: witness)
     }
   }
   let newWT = context.createWitnessTable(entries: newEntries,conformance: conformance,
