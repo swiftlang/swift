@@ -253,6 +253,8 @@ enum class UnqualifiedLookupFlags {
   /// This lookup should include members that would otherwise be filtered out
   /// because they come from a module that has not been imported.
   IgnoreMissingImports = 1 << 10,
+
+  // Reminder: If you add a flag, make sure you update simple_display() below
 };
 
 using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;
