@@ -1567,9 +1567,9 @@ public:
 
   /// The key path expression and its root type, value type, and decl context
   /// introduced by this solution.
-  llvm::MapVector<const KeyPathExpr *,
-                  std::tuple</*root=*/TypeVariableType *,
-                             /*value=*/TypeVariableType *, DeclContext *>>
+  llvm::DenseMap<const KeyPathExpr *,
+                 std::tuple</*root=*/TypeVariableType *,
+                            /*value=*/TypeVariableType *, DeclContext *>>
       KeyPaths;
 
   /// Contextual types introduced by this solution.
@@ -2265,9 +2265,9 @@ private:
       KeyPathComponentTypes;
 
   /// Maps a key path root, value, and decl context to the key path expression.
-  llvm::MapVector<const KeyPathExpr *,
-                  std::tuple</*root=*/TypeVariableType *,
-                             /*value=*/TypeVariableType *, DeclContext *>>
+  llvm::DenseMap<const KeyPathExpr *,
+                 std::tuple</*root=*/TypeVariableType *,
+                            /*value=*/TypeVariableType *, DeclContext *>>
       KeyPaths;
 
   /// Maps AST entries to their targets.
@@ -2849,9 +2849,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    /// The length of \c KeyPaths.
-    unsigned numKeyPaths;
 
     /// The length of \c ArgumentLists.
     unsigned numArgumentLists;
@@ -3641,9 +3638,12 @@ public:
                             ConstraintLocator *locator);
 
   /// Record root, value, and declContext of keypath expression for use across
-  /// constraint system.
-  void recordKeyPath(KeyPathExpr *keypath, TypeVariableType *root,
+  /// constraint system, and add a change to the trail.
+  void recordKeyPath(const KeyPathExpr *keypath, TypeVariableType *root,
                      TypeVariableType *value, DeclContext *dc);
+
+  /// Undo the above change.
+  void removeKeyPath(const KeyPathExpr *keypath);
 
   /// Walk a closure AST to determine its effects.
   ///

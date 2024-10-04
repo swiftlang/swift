@@ -226,6 +226,9 @@ public:
     /// Create a change that recorded an isolated parameter.
     static Change RecordedIsolatedParam(ParamDecl *param);
 
+    /// Create a change that recorded a key path expression.
+    static Change RecordedKeyPath(KeyPathExpr *expr);
+
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.
     ///

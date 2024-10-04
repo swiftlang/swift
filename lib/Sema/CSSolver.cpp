@@ -378,7 +378,12 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Add key paths.
   for (const auto &keypath : solution.KeyPaths) {
-    KeyPaths.insert(keypath);
+    if (KeyPaths.count(keypath.first) == 0) {
+      recordKeyPath(keypath.first,
+                    std::get<0>(keypath.second),
+                    std::get<1>(keypath.second),
+                    std::get<2>(keypath.second));
+    }
   }
 
   // Add the contextual types.
@@ -701,7 +706,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
-  numKeyPaths = cs.KeyPaths.size();
   numArgumentLists = cs.ArgumentLists.size();
   numImplicitCallAsFunctionRoots = cs.ImplicitCallAsFunctionRoots.size();
   numSynthesizedConformances = cs.SynthesizedConformances.size();
@@ -736,9 +740,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // e.g. add retired constraints back to the circulation and remove generated
   // constraints introduced by the current scope.
   cs.solverState->rollback(this);
-
-  /// Remove any key path expressions.
-  truncate(cs.KeyPaths, numKeyPaths);
 
   // Remove any argument lists no longer in scope.
   truncate(cs.ArgumentLists, numArgumentLists);
