@@ -3190,6 +3190,27 @@ void CallEmission::emitToUnmappedMemory(Address result) {
     }
   }
 }
+static FunctionPointer getProfilingFuncFor(IRGenFunction &IGF,
+                                           FunctionPointer fnToCall,
+                                           Callee &callee) {
+    auto genericFn = cast<llvm::Function>(fnToCall.getRawPointer());
+    auto replacementTypes = callee.getSubstitutions().getReplacementTypes();
+    llvm::SmallString<64> name;
+    {
+      llvm::raw_svector_ostream os(name);
+      os << "__swift_prof_thunk__generic_func__";
+      os << replacementTypes.size();
+      os << "__";
+      for (auto replTy : replacementTypes) {
+        IRGenMangler mangler;
+        os << mangler.mangleTypeMetadataFull(replTy->getCanonicalType());
+        os << "___";
+      }
+      os << "fun__";
+    }
+    auto *thunk = IGF.IGM.getOrCreateProfilingThunk(genericFn, name);
+    return fnToCall.withProfilingThunk(thunk);
+}
 
 /// The private routine to ultimately emit a call or invoke instruction.
 llvm::CallBase *CallEmission::emitCallSite() {
@@ -3224,24 +3245,7 @@ llvm::CallBase *CallEmission::emitCallSite() {
   auto fnToCall = fn;
   if (UseProfilingThunk) {
     assert(fnToCall.isConstant() && "Non constant function in profiling thunk");
-    auto genericFn = cast<llvm::Function>(fnToCall.getRawPointer());
-    auto replacementTypes = CurCallee.getSubstitutions().getReplacementTypes();
-    llvm::SmallString<64> name;
-    {
-      llvm::raw_svector_ostream os(name);
-      os << "__swift_prof_thunk__generic_func__";
-      os << replacementTypes.size();
-      os << "__";
-      for (auto replTy : replacementTypes) {
-        IRGenMangler mangler;
-        os << mangler.mangleTypeMetadataFull(replTy->getCanonicalType());
-        os << "___";
-      }
-      os << "fun__";
-    }
-    auto *thunk = IGF.IGM.getOrCreateProfilingThunk(genericFn, name);
-    fnToCall = fnToCall.withProfilingThunk(thunk);
-
+    fnToCall = getProfilingFuncFor(IGF, fnToCall, CurCallee);
   }
 
   auto call = createCall(fnToCall, Args);
