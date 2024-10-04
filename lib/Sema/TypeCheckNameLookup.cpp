@@ -32,6 +32,26 @@
 
 using namespace swift;
 
+void swift::simple_display(llvm::raw_ostream &out, NameLookupOptions options) {
+  using Flag = std::pair<NameLookupFlags, StringRef>;
+  Flag possibleFlags[] = {
+      {NameLookupFlags::IgnoreAccessControl, "IgnoreAccessControl"},
+      {NameLookupFlags::IncludeOuterResults, "IncludeOuterResults"},
+      {NameLookupFlags::IncludeUsableFromInline, "IncludeUsableFromInline"},
+      {NameLookupFlags::ExcludeMacroExpansions, "ExcludeMacroExpansions"},
+      {NameLookupFlags::IgnoreMissingImports, "IgnoreMissingImports"},
+  };
+
+  auto flagsToPrint = llvm::make_filter_range(
+      possibleFlags, [&](Flag flag) { return options.contains(flag.first); });
+
+  out << "{ ";
+  interleave(
+      flagsToPrint, [&](Flag flag) { out << flag.second; },
+      [&] { out << ", "; });
+  out << " }";
+}
+
 namespace {
   /// Builder that helps construct a lookup result from the raw lookup
   /// data.
