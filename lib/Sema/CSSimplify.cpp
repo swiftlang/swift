@@ -11513,6 +11513,19 @@ static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
   return builderType;
 }
 
+void ConstraintSystem::recordIsolatedParam(ParamDecl *param) {
+  bool inserted = isolatedParams.insert(param).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedIsolatedParam(param));
+}
+
+void ConstraintSystem::removeIsolatedParam(ParamDecl *param) {
+  bool erased = isolatedParams.erase(param);
+  ASSERT(erased);
+}
+
 bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
                                       Type contextualType,
                                       ConstraintLocatorBuilder locator) {
@@ -11658,7 +11671,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
         // Note when a parameter is inferred to be isolated.
         if (contextualParam->isIsolated() && !flags.isIsolated() && paramDecl)
-          isolatedParams.insert(paramDecl);
+          recordIsolatedParam(paramDecl);
 
         // Carry-over the ownership specifier from the contextual parameter.
         auto paramOwnership =

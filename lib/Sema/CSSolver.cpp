@@ -231,7 +231,7 @@ Solution ConstraintSystem::finalize() {
     solution.exprPatterns.insert(pattern);
 
   for (const auto &param : isolatedParams)
-    solution.isolatedParams.push_back(param);
+    solution.isolatedParams.insert(param);
 
   for (const auto &closure : preconcurrencyClosures)
     solution.preconcurrencyClosures.push_back(closure);
@@ -406,7 +406,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   for (auto param : solution.isolatedParams) {
-    isolatedParams.insert(param);
+    if (isolatedParams.count(param) == 0)
+      recordIsolatedParam(param);
   }
 
   for (auto &pair : solution.exprPatterns) {
@@ -697,7 +698,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
   numKeyPaths = cs.KeyPaths.size();
-  numIsolatedParams = cs.isolatedParams.size();
   numPreconcurrencyClosures = cs.preconcurrencyClosures.size();
   numImplicitValueConversions = cs.ImplicitValueConversions.size();
   numArgumentLists = cs.ArgumentLists.size();
@@ -737,9 +737,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   /// Remove any key path expressions.
   truncate(cs.KeyPaths, numKeyPaths);
-
-  // Remove any isolated parameters.
-  truncate(cs.isolatedParams, numIsolatedParams);
 
   // Remove any preconcurrency closures.
   truncate(cs.preconcurrencyClosures, numPreconcurrencyClosures);
