@@ -1203,8 +1203,7 @@ struct CaseLabelItemInfo {
 
 /// Key to the constraint solver's mapping from AST nodes to their corresponding
 /// target.
-class SyntacticElementTargetKey {
-public:
+struct SyntacticElementTargetKey {
   enum class Kind {
     empty,
     tombstone,
@@ -1218,72 +1217,75 @@ public:
     functionRef,
   };
 
-private:
   Kind kind;
 
   union {
-    const StmtConditionElement *stmtCondElement;
+    StmtConditionElement *stmtCondElement;
 
-    const Expr *expr;
+    Expr *expr;
 
-    const Stmt *stmt;
+    Stmt *stmt;
 
-    const Pattern *pattern;
+    Pattern *pattern;
 
     struct PatternBindingEntry {
-      const PatternBindingDecl *patternBinding;
+      PatternBindingDecl *patternBinding;
       unsigned index;
     } patternBindingEntry;
 
-    const VarDecl *varDecl;
+    VarDecl *varDecl;
 
-    const DeclContext *functionRef;
+    DeclContext *functionRef;
   } storage;
 
-public:
   SyntacticElementTargetKey(Kind kind) {
     assert(kind == Kind::empty || kind == Kind::tombstone);
     this->kind = kind;
   }
 
-  SyntacticElementTargetKey(const StmtConditionElement *stmtCondElement) {
+  SyntacticElementTargetKey(StmtConditionElement *stmtCondElement) {
     kind = Kind::stmtCondElement;
     storage.stmtCondElement = stmtCondElement;
   }
 
-  SyntacticElementTargetKey(const Expr *expr) {
+  SyntacticElementTargetKey(Expr *expr) {
     kind = Kind::expr;
     storage.expr = expr;
   }
 
-  SyntacticElementTargetKey(const ClosureExpr *closure) {
+  SyntacticElementTargetKey(ClosureExpr *closure) {
     kind = Kind::closure;
     storage.expr = closure;
   }
 
-  SyntacticElementTargetKey(const Stmt *stmt) {
+  SyntacticElementTargetKey(Stmt *stmt) {
     kind = Kind::stmt;
     storage.stmt = stmt;
   }
 
-  SyntacticElementTargetKey(const Pattern *pattern) {
+  SyntacticElementTargetKey(Pattern *pattern) {
     kind = Kind::pattern;
     storage.pattern = pattern;
   }
 
-  SyntacticElementTargetKey(const PatternBindingDecl *patternBinding,
+  SyntacticElementTargetKey(PatternBindingDecl *patternBinding,
                             unsigned index) {
     kind = Kind::patternBindingEntry;
     storage.patternBindingEntry.patternBinding = patternBinding;
     storage.patternBindingEntry.index = index;
   }
 
-  SyntacticElementTargetKey(const VarDecl *varDecl) {
+  SyntacticElementTargetKey(VarDecl *varDecl) {
     kind = Kind::varDecl;
     storage.varDecl = varDecl;
   }
 
-  SyntacticElementTargetKey(const AnyFunctionRef functionRef) {
+  SyntacticElementTargetKey(DeclContext *dc) {
+    kind = Kind::functionRef;
+    storage.functionRef = dc;
+  }
+
+  SyntacticElementTargetKey(AnyFunctionRef functionRef) {
     kind = Kind::functionRef;
     storage.functionRef = functionRef.getAsDeclContext();
   }
@@ -1574,7 +1576,7 @@ public:
   std::vector<std::pair<ASTNode, ContextualTypeInfo>> contextualTypes;
 
   /// Maps AST nodes to their target.
-  llvm::MapVector<SyntacticElementTargetKey, SyntacticElementTarget> targets;
+  llvm::DenseMap<SyntacticElementTargetKey, SyntacticElementTarget> targets;
 
   /// Maps case label items to information tracked about them as they are
   /// being solved.
@@ -1727,12 +1729,7 @@ public:
   }
 
   std::optional<SyntacticElementTarget>
-  getTargetFor(SyntacticElementTargetKey key) const {
-    auto known = targets.find(key);
-    if (known == targets.end())
-      return std::nullopt;
-    return known->second;
-  }
+  getTargetFor(SyntacticElementTargetKey key) const;
 
   ConstraintLocator *getCalleeLocator(ConstraintLocator *locator,
                                       bool lookThroughApply = true) const;
@@ -2275,7 +2272,7 @@ private:
       KeyPaths;
 
   /// Maps AST entries to their targets.
-  llvm::MapVector<SyntacticElementTargetKey, SyntacticElementTarget> targets;
+  llvm::DenseMap<SyntacticElementTargetKey, SyntacticElementTarget> targets;
 
   /// Contextual type information for expressions that are part of this
   /// constraint system. The second type, if valid, contains the type as it
@@ -2860,9 +2857,6 @@ public:
     /// FIXME: Remove this.
     unsigned numFixes;
 
-    /// The length of \c targets.
-    unsigned numTargets;
-
     /// The length of \c caseLabelItems.
     unsigned numCaseLabelItems;
 
@@ -3090,8 +3084,10 @@ public:
     bool inserted = ClosureTypes.insert({closure, type}).second;
     ASSERT(inserted);
 
-    if (solverState)
-      recordChange(SolverTrail::Change::RecordedClosureType(closure));
+    if (solverState) {
+      recordChange(SolverTrail::Change::RecordedClosureType(
+        const_cast<ClosureExpr *>(closure)));
+    }
   }
 
   void removeClosureType(const ClosureExpr *closure) {
@@ -3359,18 +3355,12 @@ public:
   }
 
   void setTargetFor(SyntacticElementTargetKey key,
-                    SyntacticElementTarget target) {
-    assert(targets.count(key) == 0 && "Already set this target");
-    targets.insert({key, target});
-  }
+                    SyntacticElementTarget target);
+
+  void removeTargetFor(SyntacticElementTargetKey key);
 
   std::optional<SyntacticElementTarget>
-  getTargetFor(SyntacticElementTargetKey key) const {
-    auto known = targets.find(key);
-    if (known == targets.end())
-      return std::nullopt;
-    return known->second;
-  }
+  getTargetFor(SyntacticElementTargetKey key) const;
 
   std::optional<AppliedBuilderTransform>
   getAppliedResultBuilderTransform(AnyFunctionRef fn) const {
