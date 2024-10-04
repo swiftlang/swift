@@ -124,6 +124,7 @@ public:
       PackElementExpr *ElementExpr;
       Expr *TheExpr;
       AnyFunctionRef AFR;
+      const ClosureExpr *Closure;
     };
 
     Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
@@ -204,6 +205,9 @@ public:
 
     /// Create a change that recorded a result builder transform.
     static Change AppliedPropertyWrapper(Expr *anchor);
+
+    /// Create a change that recorded a closure type.
+    static Change RecordedClosureType(const ClosureExpr *closure);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.
