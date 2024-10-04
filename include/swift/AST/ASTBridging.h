@@ -1638,6 +1638,16 @@ void BridgedStmt_dump(BridgedStmt statement);
 // MARK: TypeAttributes
 //===----------------------------------------------------------------------===//
 
+#ifdef USED_IN_CPP_SOURCE
+namespace swift {
+class TypeAttributes {
+public:
+  SmallVector<TypeOrCustomAttr> attrs;
+  TypeAttributes() {}
+};
+} // namespace swift
+#endif
+
 // Bridged type attribute kinds, which mirror TypeAttrKind exactly.
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind {
 #define TYPE_ATTR(_, CLASS) BridgedTypeAttrKind##CLASS,
