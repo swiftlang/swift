@@ -8329,6 +8329,16 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   return matchExistentialTypes(type, protocol, kind, flags, locator);
 }
 
+void ConstraintSystem::recordSynthesizedConformance(
+                                           ConstraintLocator *locator,
+                                           ProtocolConformanceRef conformance) {
+  bool inserted = SynthesizedConformances.insert({locator, conformance}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedSynthesizedConformance(locator));
+}
+
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  Type type,
                                  ProtocolDecl *protocol,
@@ -8487,7 +8497,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           ProtocolConformanceRef synthesized(protocol);
           auto witnessLoc = getConstraintLocator(
               locator.getAnchor(), LocatorPathElt::Witness(witness));
-          SynthesizedConformances.insert({witnessLoc, synthesized});
+          // FIXME: Why are we recording the same locator more than once here?
+          if (SynthesizedConformances.count(witnessLoc) == 0)
+            recordSynthesizedConformance(witnessLoc, synthesized);
           return recordConformance(synthesized);
         };
 
