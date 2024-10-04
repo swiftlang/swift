@@ -437,7 +437,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   for (auto &valueConversion : solution.ImplicitValueConversions) {
-    ImplicitValueConversions.insert(valueConversion);
+    if (ImplicitValueConversions.count(valueConversion.first) == 0) {
+      recordImplicitValueConversion(valueConversion.first,
+                                    valueConversion.second);
+    }
   }
 
   // Register the argument lists.
@@ -699,7 +702,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
   numKeyPaths = cs.KeyPaths.size();
-  numImplicitValueConversions = cs.ImplicitValueConversions.size();
   numArgumentLists = cs.ArgumentLists.size();
   numImplicitCallAsFunctionRoots = cs.ImplicitCallAsFunctionRoots.size();
   numSynthesizedConformances = cs.SynthesizedConformances.size();
@@ -737,9 +739,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   /// Remove any key path expressions.
   truncate(cs.KeyPaths, numKeyPaths);
-
-  // Remove any implicit value conversions.
-  truncate(cs.ImplicitValueConversions, numImplicitValueConversions);
 
   // Remove any argument lists no longer in scope.
   truncate(cs.ArgumentLists, numArgumentLists);

@@ -2331,7 +2331,7 @@ private:
 
   /// The set of implicit value conversions performed by the solver on
   /// a current path to reach a solution.
-  llvm::SmallMapVector<ConstraintLocator *, ConversionRestrictionKind, 2>
+  llvm::SmallDenseMap<ConstraintLocator *, ConversionRestrictionKind, 2>
       ImplicitValueConversions;
 
   /// The worklist of "active" constraints that should be revisited
@@ -2413,11 +2413,6 @@ public:
       if (solverState)
         recordChange(SolverTrail::Change::RecordedDefaultedConstraint(locator));
     }
-  }
-
-  void removeDefaultedConstraint(ConstraintLocator *locator) {
-    bool erased = DefaultedConstraints.erase(locator);
-    ASSERT(erased);
   }
 
   /// A cache that stores the @dynamicCallable required methods implemented by
@@ -2854,9 +2849,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    /// The length of \c ImplicitValueConversions.
-    unsigned numImplicitValueConversions;
 
     /// The length of \c KeyPaths.
     unsigned numKeyPaths;
@@ -3453,12 +3445,6 @@ public:
   void recordOpenedExistentialType(ConstraintLocator *locator,
                                    OpenedArchetypeType *opened);
 
-  /// Undo the above change.
-  void removeOpenedExistentialType(ConstraintLocator *locator) {
-    bool erased = OpenedExistentialTypes.erase(locator);
-    ASSERT(erased);
-  }
-
   /// Get the opened element generic environment for the given locator.
   GenericEnvironment *getPackElementEnvironment(ConstraintLocator *locator,
                                                 CanType shapeClass);
@@ -3466,12 +3452,6 @@ public:
   /// Update PackExpansionEnvironments and record a change in the trail.
   void recordPackExpansionEnvironment(ConstraintLocator *locator,
                                       std::pair<UUID, Type> uuidAndShape);
-
-  /// Undo the above change.
-  void removePackExpansionEnvironment(ConstraintLocator *locator) {
-    bool erased = PackExpansionEnvironments.erase(locator);
-    ASSERT(erased);
-  }
 
   /// Get the opened element generic environment for the given pack element.
   PackExpansionExpr *getPackEnvironment(PackElementExpr *packElement) const;
@@ -3654,12 +3634,6 @@ public:
   /// Add a MatchCallArgumentResult and record the change in the trail.
   void recordMatchCallArgumentResult(ConstraintLocator *locator,
                                      MatchCallArgumentResult result);
-
-  /// Undo the above change.
-  void removeMatchCallArgumentResult(ConstraintLocator *locator) {
-    bool erased = argumentMatchingChoices.erase(locator);
-    ASSERT(erased);
-  }
 
   /// Record implicitly generated `callAsFunction` with root at the
   /// given expression, located at \c locator.
@@ -4438,9 +4412,6 @@ public:
   void recordOpenedType(
       ConstraintLocator *locator, ArrayRef<OpenedType> openedTypes);
 
-  /// Undo the above change.
-  void removeOpenedType(ConstraintLocator *locator);
-
   /// Record the set of opened types for the given locator.
   void recordOpenedTypes(
          ConstraintLocatorBuilder locator,
@@ -4962,8 +4933,6 @@ public:
   void recordResolvedOverload(ConstraintLocator *locator,
                               SelectedOverload choice);
 
-  void removeResolvedOverload(ConstraintLocator *locator);
-
   /// Resolve the given overload set to the given choice.
   void resolveOverload(ConstraintLocator *locator, Type boundType,
                        OverloadChoice choice, DeclContext *useDC);
@@ -5253,6 +5222,10 @@ private:
                  TypeMatchOptions flags,
                  ConstraintLocatorBuilder locator);
 
+  /// Update ImplicitValueConversions and record a change in the trail.
+  void recordImplicitValueConversion(ConstraintLocator *locator,
+                                     ConversionRestrictionKind restriction);
+
   /// Simplify a conversion constraint by applying the given
   /// reduction rule, which is known to apply at the outermost level.
   SolutionKind simplifyRestrictedConstraint(
@@ -5393,21 +5366,9 @@ private:
   /// Record a particular disjunction choice and add a change to the trail.
   void recordDisjunctionChoice(ConstraintLocator *locator, unsigned index);
 
-  /// Undo the above change.
-  void removeDisjunctionChoice(ConstraintLocator *locator) {
-    bool erased = DisjunctionChoices.erase(locator);
-    ASSERT(erased);
-  }
-
   /// Record applied disjunction and add a change to the trail.
   void recordAppliedDisjunction(ConstraintLocator *locator,
                                 FunctionType *type);
-
-  /// Undo the above change.
-  void removeAppliedDisjunction(ConstraintLocator *locator) {
-    bool erased = AppliedDisjunctions.erase(locator);
-    ASSERT(erased);
-  }
 
   /// Filter the set of disjunction terms, keeping only those where the
   /// predicate returns \c true.
