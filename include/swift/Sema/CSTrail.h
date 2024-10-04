@@ -132,6 +132,7 @@ public:
       AnyFunctionRef TheRef;
       ClosureExpr *TheClosure;
       DeclContext *TheDeclContext;
+      CaseLabelItem *TheItem;
     };
 
     Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
@@ -219,6 +220,9 @@ public:
 
     /// Create a change that recorded a SyntacticElementTarget.
     static Change RecordedTarget(SyntacticElementTargetKey key);
+
+    /// Create a change that recorded a SyntacticElementTarget.
+    static Change RecordedCaseLabelItemInfo(CaseLabelItem *item);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.
