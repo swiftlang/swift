@@ -141,6 +141,7 @@ public:
 
 #define LOCATOR_CHANGE(Name) static Change Name(ConstraintLocator *locator);
 #define EXPR_CHANGE(Name) static Change Name(Expr *expr);
+#define CLOSURE_CHANGE(Name) static Change Name(ClosureExpr *closure);
 #include "swift/Sema/CSTrail.def"
 
     /// Create a change that added a type variable.
@@ -213,9 +214,6 @@ public:
 
     /// Create a change that recorded a result builder transform.
     static Change RecordedResultBuilderTransform(AnyFunctionRef fn);
-
-    /// Create a change that recorded a closure type.
-    static Change RecordedClosureType(ClosureExpr *closure);
 
     /// Create a change that recorded the contextual type of an AST node.
     static Change RecordedContextualInfo(ASTNode node);

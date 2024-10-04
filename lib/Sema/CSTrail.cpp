@@ -64,6 +64,14 @@ SolverTrail::~SolverTrail() {
     result.TheExpr = expr; \
     return result; \
   }
+#define CLOSURE_CHANGE(Name) \
+  SolverTrail::Change \
+  SolverTrail::Change::Name(ClosureExpr *closure) { \
+    Change result; \
+    result.Kind = ChangeKind::Name; \
+    result.TheClosure = closure; \
+    return result; \
+  }
 #include "swift/Sema/CSTrail.def"
 
 SolverTrail::Change
@@ -244,14 +252,6 @@ SolverTrail::Change::RecordedResultBuilderTransform(AnyFunctionRef fn) {
   Change result;
   result.Kind = ChangeKind::RecordedResultBuilderTransform;
   result.TheRef = fn;
-  return result;
-}
-
-SolverTrail::Change
-SolverTrail::Change::RecordedClosureType(ClosureExpr *closure) {
-  Change result;
-  result.Kind = ChangeKind::RecordedClosureType;
-  result.TheClosure = closure;
   return result;
 }
 
@@ -505,6 +505,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   case ChangeKind::RecordedIsolatedParam:
     cs.removeIsolatedParam(TheParam);
     break;
+
+  case ChangeKind::RecordedPreconcurrencyClosure:
+    cs.removePreconcurrencyClosure(TheClosure);
+    break;
   }
 }
 
@@ -528,6 +532,12 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
   case ChangeKind::Name: \
     out << "(" << #Name << " "; \
     simple_display(out, TheExpr); \
+    out << ")\n"; \
+    break;
+#define CLOSURE_CHANGE(Name) \
+  case ChangeKind::Name: \
+    out << "(" << #Name << " "; \
+    simple_display(out, TheClosure); \
     out << ")\n"; \
     break;
 #include "swift/Sema/CSTrail.def"
@@ -690,12 +700,6 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
   case ChangeKind::RecordedResultBuilderTransform:
     out << "(RecordedResultBuilderTransform ";
     simple_display(out, TheRef);
-    out << ")\n";
-    break;
-
-  case ChangeKind::RecordedClosureType:
-    out << "(RecordedClosureType ";
-    simple_display(out, TheClosure);
     out << ")\n";
     break;
 

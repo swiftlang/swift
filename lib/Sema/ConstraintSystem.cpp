@@ -4496,7 +4496,7 @@ size_t Solution::getTotalMemory() const {
          size_in_bytes(caseLabelItems) +
          size_in_bytes(exprPatterns) +
          size_in_bytes(isolatedParams) +
-         (preconcurrencyClosures.size() * sizeof(void *)) +
+         size_in_bytes(preconcurrencyClosures) +
          size_in_bytes(resultBuilderTransformed) +
          size_in_bytes(appliedPropertyWrappers) +
          size_in_bytes(argumentLists) +
