@@ -126,6 +126,10 @@ bool BridgedASTType::isInteger() const {
   return unbridged()->is<swift::IntegerType>();
 }
 
+BridgedASTType BridgedASTType::subst(BridgedSubstitutionMap substMap) const {
+  return {unbridged().subst(substMap.unbridged()).getPointer()};
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedCanType
 //===----------------------------------------------------------------------===//

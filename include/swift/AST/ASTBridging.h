@@ -2014,6 +2014,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isEscapable() const;
   BRIDGED_INLINE bool isNoEscape() const;
   BRIDGED_INLINE bool isInteger() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedSubstitutionMap substMap) const;
 };
 
 class BridgedCanType {
