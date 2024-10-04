@@ -58,7 +58,7 @@ public protocol ProtoWithAssocConf: AnyObject {
 }
 
 public class GenClass2<T>: Q {
-  var t: T
+  final var t: T
 
   init(t : T) { self.t = t }
 
@@ -67,10 +67,25 @@ public class GenClass2<T>: Q {
   }
 }
 
+public class DerivedFromGenClass2: GenClass2<Int> {
+  init() { super.init(t: 42) }
+
+  public override func bar() {
+    print("derived-bar")
+  }
+}
+
 final public class GenClass3<V>: ProtoWithAssocConf {
   public func foo() -> GenClass2<Int> {
     print("foo")
     return GenClass2(t: 27)
+  }
+}
+
+final public class OtherClass: ProtoWithAssocConf {
+  public func foo() -> GenClass2<Int> {
+    print("other-foo")
+    return DerivedFromGenClass2()
   }
 }
 
@@ -82,6 +97,63 @@ public func createExWithAssocConf() -> any ProtoWithAssocConf {
 public func callExWithAssocConf(_ p: any ProtoWithAssocConf) {
   let x = p.foo()
   x.bar()
+}
+
+public class Base<T>: ClassBound {
+  public func foo() { print("Base.foo()") }
+  public func bar() { print("Base.bar()") }
+}
+
+public class Derived1: Base<Int> {
+  public override func foo() { print("Derived1.foo()") }
+  public override func bar() { print("Derived1.bar()") }
+}
+
+public class Derived2<T>: Base<T> {
+  public override func foo() { print("Derived2.foo()") }
+  public override func bar() { print("Derived2.bar()") }
+}
+
+public func takes_p1(_ p: P1) {
+  p.normal()
+}
+
+public protocol P1: AnyObject {
+  func normal()
+}
+
+public protocol P2 {
+  func foo()
+}
+
+public class ConditionalConformanceBase<A> {
+  final var a: A
+
+  init(a: A) { self.a = a }
+}
+
+extension ConditionalConformanceBase: P1 where A: P2 {
+  public func normal() {
+    a.foo()
+  }
+}
+
+public class ConditionalConformanceDerived<T>: ConditionalConformanceBase<T> {
+  init(t: T) { super.init(a: t) }
+}
+
+
+public func testConditionalConformance<T: P2>(t: T) {
+  takes_p1(ConditionalConformanceDerived(t: t))
+}
+
+
+struct S: P2 {
+  var i: Int
+
+  func foo() {
+    print(i)
+  }
 }
 
 @main
@@ -98,6 +170,17 @@ struct Main {
         callExWithAssocConf(createExWithAssocConf())
         // CHECK: foo
         // CHECK: bar
+        callExWithAssocConf(OtherClass())
+        // CHECK: other-foo
+        // CHECK: derived-bar
+        test(existential: Derived1())
+        // CHECK: Derived1.foo()
+        // CHECK: Derived1.bar()
+        test(existential: Derived2<Bool>())
+        // CHECK: Derived2.foo()
+        // CHECK: Derived2.bar()
+        testConditionalConformance(t: S(i: 27))
+        // CHECK: 27
     }
 }
 

@@ -2504,10 +2504,14 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
 
   const ConformanceInfo *info;
 
+  auto *specConf = conformance;
+  if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(conformance))
+    specConf = inheritedC->getInheritedConformance();
+
   // If there is a specialized SILWitnessTable for the specialized conformance,
   // directly use it.
-  if (auto *sc = dyn_cast<SpecializedProtocolConformance>(conformance)) {
-    SILWitnessTable *wt = getSILModule().lookUpWitnessTable(conformance);
+  if (auto *sc = dyn_cast<SpecializedProtocolConformance>(specConf)) {
+    SILWitnessTable *wt = getSILModule().lookUpWitnessTable(specConf);
     if (wt && wt->getConformance() == sc) {
       info = new SpecializedConformanceInfo(sc);
       Conformances.try_emplace(conformance, info);

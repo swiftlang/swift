@@ -163,6 +163,10 @@ bool BridgedConformance::isSpecializedConformance() const {
   return swift::isa<swift::SpecializedProtocolConformance>(unbridged().getConcrete());
 }
 
+bool BridgedConformance::isInheritedConformance() const {
+  return swift::isa<swift::InheritedProtocolConformance>(unbridged().getConcrete());
+}
+
 BridgedASTType BridgedConformance::getType() const {
   return {unbridged().getConcrete()->getType().getPointer()};
 }
@@ -170,6 +174,11 @@ BridgedASTType BridgedConformance::getType() const {
 BridgedConformance BridgedConformance::getGenericConformance() const {
   auto *specPC = swift::cast<swift::SpecializedProtocolConformance>(unbridged().getConcrete());
   return {swift::ProtocolConformanceRef(specPC->getGenericConformance())};
+}
+
+BridgedConformance BridgedConformance::getInheritedConformance() const {
+  auto *inheritedConf = swift::cast<swift::InheritedProtocolConformance>(unbridged().getConcrete());
+  return {swift::ProtocolConformanceRef(inheritedConf->getInheritedConformance())};
 }
 
 BridgedSubstitutionMap BridgedConformance::getSpecializedSubstitutions() const {
