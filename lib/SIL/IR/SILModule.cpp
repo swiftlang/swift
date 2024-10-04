@@ -541,6 +541,9 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
     linker.processConformance(C);
   }
   ProtocolConformance *conf = C.getConcrete();
+  if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(conf))
+    conf = inheritedC->getInheritedConformance();
+
   if (!isa<SpecializedProtocolConformance>(conf) || !lookupInSpecializedWitnessTable) {
     conf = conf->getRootConformance();
   }

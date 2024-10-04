@@ -271,7 +271,8 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
 private func specializeWitnessTables(for initExRef: InitExistentialRefInst, _ context: ModulePassContext,
                                      _ worklist: inout FunctionWorklist)
 {
-  for conformance in initExRef.conformances where conformance.isConcrete {
+  for c in initExRef.conformances where c.isConcrete {
+    let conformance = c.isInherited ? c.inheritedConformance : c
     let origWitnessTable = context.lookupWitnessTable(for: conformance)
     if conformance.isSpecialized {
       if origWitnessTable == nil {
