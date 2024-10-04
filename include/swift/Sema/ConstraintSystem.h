@@ -1591,7 +1591,7 @@ public:
 
   /// A map of expressions to the ExprPatterns that they are being solved as
   /// a part of.
-  llvm::MapVector<Expr *, ExprPattern *> exprPatterns;
+  llvm::DenseMap<Expr *, ExprPattern *> exprPatterns;
 
   /// The set of parameters that have been inferred to be 'isolated'.
   std::vector<ParamDecl *> isolatedParams;
@@ -2289,7 +2289,7 @@ private:
 
   /// A map of expressions to the ExprPatterns that they are being solved as
   /// a part of.
-  llvm::SmallMapVector<Expr *, ExprPattern *, 2> exprPatterns;
+  llvm::SmallDenseMap<Expr *, ExprPattern *, 2> exprPatterns;
 
   /// The set of parameters that have been inferred to be 'isolated'.
   llvm::SmallSetVector<ParamDecl *, 2> isolatedParams;
@@ -2855,9 +2855,6 @@ public:
     /// FIXME: Remove this.
     unsigned numFixes;
 
-    /// The length of \c exprPatterns.
-    unsigned numExprPatterns;
-
     /// The length of \c isolatedParams.
     unsigned numIsolatedParams;
 
@@ -3401,11 +3398,19 @@ public:
 
   /// Record a given ExprPattern as the parent of its sub-expression.
   void setExprPatternFor(Expr *E, ExprPattern *EP) {
-    assert(E);
-    assert(EP);
-    auto inserted = exprPatterns.insert({E, EP}).second;
-    assert(inserted && "Mapping already defined?");
-    (void)inserted;
+    ASSERT(E);
+    ASSERT(EP);
+    bool inserted = exprPatterns.insert({E, EP}).second;
+    ASSERT(inserted);
+
+    if (solverState)
+      recordChange(SolverTrail::Change::RecordedExprPattern(E));
+  }
+
+  /// Record a given ExprPattern as the parent of its sub-expression.
+  void removeExprPatternFor(Expr *E) {
+    bool erased = exprPatterns.erase(E);
+    ASSERT(erased);
   }
 
   std::optional<CaseLabelItemInfo>

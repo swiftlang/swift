@@ -40,6 +40,7 @@ LOCATOR_CHANGE(ResolvedOverload)
 
 EXPR_CHANGE(AppliedPropertyWrapper)
 EXPR_CHANGE(RecordedImpliedResult)
+EXPR_CHANGE(RecordedExprPattern)
 
 CHANGE(AddedTypeVariable)
 CHANGE(AddedConstraint)

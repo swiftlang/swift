@@ -409,8 +409,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     isolatedParams.insert(param);
   }
 
-  for (auto &pair : solution.exprPatterns)
-    exprPatterns.insert(pair);
+  for (auto &pair : solution.exprPatterns) {
+    if (exprPatterns.count(pair.first) == 0)
+      setExprPatternFor(pair.first, pair.second);
+  }
 
   for (auto closure : solution.preconcurrencyClosures) {
     preconcurrencyClosures.insert(closure);
@@ -695,7 +697,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
   numKeyPaths = cs.KeyPaths.size();
-  numExprPatterns = cs.exprPatterns.size();
   numIsolatedParams = cs.isolatedParams.size();
   numPreconcurrencyClosures = cs.preconcurrencyClosures.size();
   numImplicitValueConversions = cs.ImplicitValueConversions.size();
@@ -736,9 +737,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   /// Remove any key path expressions.
   truncate(cs.KeyPaths, numKeyPaths);
-
-  // Remove any ExprPattern mappings.
-  truncate(cs.exprPatterns, numExprPatterns);
 
   // Remove any isolated parameters.
   truncate(cs.isolatedParams, numIsolatedParams);
