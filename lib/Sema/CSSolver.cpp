@@ -455,7 +455,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   for (auto &implicitRoot : solution.ImplicitCallAsFunctionRoots) {
-    ImplicitCallAsFunctionRoots.insert(implicitRoot);
+    if (ImplicitCallAsFunctionRoots.count(implicitRoot.first) == 0)
+      recordImplicitCallAsFunctionRoot(implicitRoot.first, implicitRoot.second);
   }
 
   for (auto &synthesized : solution.SynthesizedConformances) {
@@ -707,7 +708,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
-  numImplicitCallAsFunctionRoots = cs.ImplicitCallAsFunctionRoots.size();
   numSynthesizedConformances = cs.SynthesizedConformances.size();
 
   PreviousScore = cs.CurrentScore;
@@ -740,10 +740,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // e.g. add retired constraints back to the circulation and remove generated
   // constraints introduced by the current scope.
   cs.solverState->rollback(this);
-
-  // Remove any implicitly generated root expressions for `.callAsFunction`
-  // which are no longer in scope.
-  truncate(cs.ImplicitCallAsFunctionRoots, numImplicitCallAsFunctionRoots);
 
   // Remove any implicitly synthesized conformances.
   truncate(cs.SynthesizedConformances, numSynthesizedConformances);

@@ -2423,7 +2423,7 @@ public:
   /// A cache of implicitly generated dot-member expressions used as roots
   /// for some `.callAsFunction` calls. The key here is "base" locator for
   /// the `.callAsFunction` member reference.
-  llvm::SmallMapVector<ConstraintLocator *, UnresolvedDotExpr *, 2>
+  llvm::SmallDenseMap<ConstraintLocator *, UnresolvedDotExpr *, 2>
       ImplicitCallAsFunctionRoots;
 
   /// The set of conformances synthesized during solving (i.e. for
@@ -2854,9 +2854,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    /// The length of \c ImplicitCallAsFunctionRoots.
-    unsigned numImplicitCallAsFunctionRoots;
 
     /// The length of \c SynthesizedConformances.
     unsigned numSynthesizedConformances;
@@ -3634,10 +3631,8 @@ public:
   void recordMatchCallArgumentResult(ConstraintLocator *locator,
                                      MatchCallArgumentResult result);
 
-  /// Record implicitly generated `callAsFunction` with root at the
-  /// given expression, located at \c locator.
-  void recordCallAsFunction(UnresolvedDotExpr *root, ArgumentList *arguments,
-                            ConstraintLocator *locator);
+  void recordImplicitCallAsFunctionRoot(
+      ConstraintLocator *locator, UnresolvedDotExpr *root);
 
   /// Record root, value, and declContext of keypath expression for use across
   /// constraint system, and add a change to the trail.
