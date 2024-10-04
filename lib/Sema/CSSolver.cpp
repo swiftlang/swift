@@ -654,10 +654,6 @@ ConstraintSystem::SolverState::~SolverState() {
   if (CS.inInvalidState())
     return;
 
-  // Make sure that all of the retired constraints have been returned
-  // to constraint system.
-  assert(!hasRetiredConstraints());
-
   // Re-activate constraints which were initially marked as "active"
   // to restore original state of the constraint system.
   for (auto *constraint : activeConstraints) {
@@ -715,7 +711,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
 
-  cs.solverState->registerScope(this);
+  cs.solverState->beginScope(this);
   assert(!cs.failedConstraint && "Unexpected failed constraint!");
 }
 
@@ -739,10 +735,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // Roll back changes to the constraint system.
   cs.solverState->Trail.undo(numTrailChanges);
 
-  // Rollback all of the changes done to constraints by the current scope,
-  // e.g. add retired constraints back to the circulation and remove generated
-  // constraints introduced by the current scope.
-  cs.solverState->rollback(this);
+  cs.solverState->endScope(this);
 
   // Clear out other "failed" state.
   cs.failedConstraint = nullptr;

@@ -61,6 +61,7 @@ CLOSURE_CHANGE(RecordedPreconcurrencyClosure)
 CONSTRAINT_CHANGE(DisabledConstraint)
 CONSTRAINT_CHANGE(FavoredConstraint)
 CONSTRAINT_CHANGE(GeneratedConstraint)
+CONSTRAINT_CHANGE(RetiredConstraint)
 
 CHANGE(AddedTypeVariable)
 CHANGE(AddedConstraint)
