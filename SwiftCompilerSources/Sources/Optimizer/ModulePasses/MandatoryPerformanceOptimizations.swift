@@ -116,6 +116,10 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
         if context.options.enableEmbeddedSwift {
           _ = context.specializeClassMethodInst(classMethod)
         }
+      case let witnessMethod as WitnessMethodInst:
+        if context.options.enableEmbeddedSwift {
+          _ = context.specializeWitnessMethodInst(witnessMethod)
+        }
 
       case let initExRef as InitExistentialRefInst:
         if context.options.enableEmbeddedSwift {

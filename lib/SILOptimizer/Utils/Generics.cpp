@@ -725,8 +725,6 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     SubstitutedType = createSubstitutedType(Callee, CallerInterfaceSubs,
                                             HasUnboundGenericParams);
   }
-  assert(!SubstitutedType->hasArchetype() &&
-         "Substituted function type should not contain archetypes");
 
   // Check which parameters and results can be converted from
   // indirect to direct ones.
@@ -2358,6 +2356,58 @@ bool swift::specializeClassMethodInst(ClassMethodInst *cm) {
                  << newCM->getMember().getDecl()->getName() << " in function "
                  << newCM->getFunction()->getName() << '\n';
     llvm::report_fatal_error("unsupported class method");
+  }
+
+  return true;
+}
+
+bool swift::specializeWitnessMethodInst(WitnessMethodInst *wm) {
+  SILFunction *f = wm->getFunction();
+  SILModule &m = f->getModule();
+
+  CanType astType = wm->getLookupType();
+  if (!isa<OpenedArchetypeType>(astType))
+    return false;
+
+  if (wm->isSpecialized())
+    return false;
+
+  // This should not happen. Just to be on the safe side.
+  if (wm->use_empty())
+    return false;
+
+  Operand *firstUse = *wm->use_begin();
+  ApplySite AI = ApplySite::isa(firstUse->getUser());
+  assert(AI && AI.getCalleeOperand() == firstUse && "wrong use of witness_method instruction");
+
+  SubstitutionMap subs = AI.getSubstitutionMap();
+
+  SILType funcTy = wm->getType();
+  SILType substitutedType =
+      funcTy.substGenericArgs(m, subs, TypeExpansionContext::minimal());
+
+  ReabstractionInfo reInfo(substitutedType.getAs<SILFunctionType>(), wm->getMember(), m);
+  reInfo.createSubstitutedAndSpecializedTypes();
+  CanSILFunctionType finalFuncTy = reInfo.getSpecializedType();
+  SILType finalSILTy = SILType::getPrimitiveObjectType(finalFuncTy);
+
+  SILBuilder builder(wm);
+  auto *newWM = builder.createWitnessMethod(wm->getLoc(), wm->getLookupType(),
+                                            wm->getConformance(), wm->getMember(), finalSILTy);
+
+  while (!wm->use_empty()) {
+    Operand *use = *wm->use_begin();
+    SILInstruction *user = use->getUser();
+    ApplySite AI = ApplySite::isa(user);
+    if (AI && AI.getCalleeOperand() == use) {
+      replaceWithSpecializedCallee(AI, newWM, reInfo);
+      AI.getInstruction()->eraseFromParent();
+      continue;
+    }
+    llvm::errs() << "unsupported use of witness method "
+                 << newWM->getMember().getDecl()->getName() << " in function "
+                 << newWM->getFunction()->getName() << '\n';
+    llvm::report_fatal_error("unsupported witness method");
   }
 
   return true;
