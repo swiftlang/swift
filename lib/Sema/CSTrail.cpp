@@ -247,6 +247,14 @@ SolverTrail::Change::AppliedPropertyWrapper(Expr *expr) {
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::RecordedClosureType(const ClosureExpr *closure) {
+  Change result;
+  result.Kind = ChangeKind::RecordedClosureType;
+  result.Closure = closure;
+  return result;
+}
+
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
@@ -363,6 +371,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::ResolvedOverload:
     cs.removeResolvedOverload(Locator);
+    break;
+
+  case ChangeKind::RecordedClosureType:
+    cs.removeClosureType(Closure);
     break;
   }
 }
@@ -549,6 +561,12 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
   case ChangeKind::AppliedPropertyWrapper:
     out << "(AppliedPropertyWrapper ";
     simple_display(out, TheExpr);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedClosureType:
+    out << "(RecordedClosureType ";
+    simple_display(out, Closure);
     out << ")\n";
     break;
   }

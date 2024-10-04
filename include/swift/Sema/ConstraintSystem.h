@@ -2221,6 +2221,9 @@ private:
 
   /// Maps discovered closures to their types inferred
   /// from declared parameters/result and body.
+  ///
+  /// This is a MapVector because contractEdges() iterates over it and
+  /// may depend on order.
   llvm::MapVector<const ClosureExpr *, FunctionType *> ClosureTypes;
 
   /// Maps closures and local functions to the pack expansion expressions they
@@ -2857,9 +2860,6 @@ public:
     /// FIXME: Remove this.
     unsigned numFixes;
 
-    /// The length of \c ClosureTypes.
-    unsigned numInferredClosureTypes;
-
     /// The length of \c ImpliedResults.
     unsigned numImpliedResults;
 
@@ -3083,10 +3083,18 @@ public:
   }
 
   void setClosureType(const ClosureExpr *closure, FunctionType *type) {
-    assert(closure);
-    assert(type && "Expected non-null type");
-    assert(ClosureTypes.count(closure) == 0 && "Cannot reset closure type");
-    ClosureTypes.insert({closure, type});
+    ASSERT(closure);
+    ASSERT(type);
+    bool inserted = ClosureTypes.insert({closure, type}).second;
+    ASSERT(inserted);
+
+    if (solverState)
+      recordChange(SolverTrail::Change::RecordedClosureType(closure));
+  }
+
+  void removeClosureType(const ClosureExpr *closure) {
+    bool erased = ClosureTypes.erase(closure);
+    ASSERT(erased);
   }
 
   FunctionType *getClosureType(const ClosureExpr *closure) const {

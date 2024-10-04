@@ -54,8 +54,9 @@ CHANGE(DisabledConstraint)
 CHANGE(FavoredConstraint)
 CHANGE(RecordedResultBuilderTransform)
 CHANGE(AppliedPropertyWrapper)
+CHANGE(RecordedClosureType)
 
-LAST_CHANGE(AppliedPropertyWrapper)
+LAST_CHANGE(RecordedClosureType)
 
 #undef LOCATOR_CHANGE
 #undef LAST_CHANGE
