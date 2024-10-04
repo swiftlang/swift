@@ -1585,7 +1585,7 @@ public:
   /// Maps catch nodes to the set of potential throw sites that will be caught
   /// at that location.
 
-  /// The set of opened types for a given locator.
+  /// Keep track of all of the potential throw sites.
   std::vector<std::pair<CatchNode, PotentialThrowSite>>
       potentialThrowSites;
 
@@ -2855,9 +2855,6 @@ public:
     /// FIXME: Remove this.
     unsigned numFixes;
 
-    /// The length of \c potentialThrowSites.
-    unsigned numPotentialThrowSites;
-
     /// The length of \c exprPatterns.
     unsigned numExprPatterns;
 
@@ -3424,6 +3421,14 @@ public:
   void recordPotentialThrowSite(
       PotentialThrowSite::Kind kind, Type type,
       ConstraintLocatorBuilder locator);
+
+  /// Used by the above to update potentialThrowSites and record a change
+  /// in the trail.
+  void recordPotentialThrowSite(CatchNode catchNode,
+                                PotentialThrowSite site);
+
+  /// Undo the above change.
+  void removePotentialThrowSite(CatchNode catchNode);
 
   /// Determine the caught error type for the given catch node.
   Type getCaughtErrorType(CatchNode node);

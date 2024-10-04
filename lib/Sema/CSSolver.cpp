@@ -399,9 +399,11 @@ void ConstraintSystem::applySolution(const Solution &solution) {
       setCaseLabelItemInfo(info.first, info.second);
   }
 
-  potentialThrowSites.insert(potentialThrowSites.end(),
-                             solution.potentialThrowSites.begin(),
-                             solution.potentialThrowSites.end());
+  auto sites = ArrayRef(solution.potentialThrowSites);
+  ASSERT(sites.size() >= potentialThrowSites.size());
+  for (const auto &site : sites.slice(potentialThrowSites.size())) {
+    potentialThrowSites.push_back(site);
+  }
 
   for (auto param : solution.isolatedParams) {
     isolatedParams.insert(param);
@@ -693,7 +695,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
   numKeyPaths = cs.KeyPaths.size();
-  numPotentialThrowSites = cs.potentialThrowSites.size();
   numExprPatterns = cs.exprPatterns.size();
   numIsolatedParams = cs.isolatedParams.size();
   numPreconcurrencyClosures = cs.preconcurrencyClosures.size();
@@ -735,9 +736,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   /// Remove any key path expressions.
   truncate(cs.KeyPaths, numKeyPaths);
-
-  // Remove any potential throw sites.
-  truncate(cs.potentialThrowSites, numPotentialThrowSites);
 
   // Remove any ExprPattern mappings.
   truncate(cs.exprPatterns, numExprPatterns);

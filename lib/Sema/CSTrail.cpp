@@ -311,6 +311,14 @@ SolverTrail::Change::RecordedCaseLabelItemInfo(CaseLabelItem *item) {
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::RecordedPotentialThrowSite(CatchNode catchNode) {
+  Change result;
+  result.Kind = ChangeKind::RecordedPotentialThrowSite;
+  result.TheCatchNode = catchNode;
+  return result;
+}
+
 SyntacticElementTargetKey
 SolverTrail::Change::getSyntacticElementTargetKey() const {
   ASSERT(Kind == ChangeKind::RecordedTarget);
@@ -476,6 +484,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::RecordedCaseLabelItemInfo:
     cs.removeCaseLabelItemInfo(TheItem);
+    break;
+
+  case ChangeKind::RecordedPotentialThrowSite:
+    cs.removePotentialThrowSite(TheCatchNode);
     break;
   }
 }
@@ -685,6 +697,11 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
   case ChangeKind::RecordedCaseLabelItemInfo:
     // FIXME: Print something here
     out << "(RecordedCaseLabelItemInfo)\n";
+    break;
+
+  case ChangeKind::RecordedPotentialThrowSite:
+    // FIXME: Print something here
+    out << "(RecordedPotentialThrowSite)\n";
     break;
   }
 }
