@@ -324,8 +324,6 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
         handler: resultHandler
       )
 
-      defer { remoteCallResult = nil }
-      defer { remoteCallError = nil }
       switch (remoteCallResult, remoteCallError) {
       case (.some(let value), nil):
         print("  << remoteCall return: \(value)")
