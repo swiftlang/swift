@@ -2281,7 +2281,7 @@ private:
   /// constraint system. The second type, if valid, contains the type as it
   /// should appear in actual constraint. This will have unbound generic types
   /// opened, placeholder types converted to type variables, etc.
-  llvm::MapVector<ASTNode, std::pair<ContextualTypeInfo, Type>> contextualTypes;
+  llvm::DenseMap<ASTNode, std::pair<ContextualTypeInfo, Type>> contextualTypes;
 
   /// Information about each case label item tracked by the constraint system.
   llvm::SmallMapVector<const CaseLabelItem *, CaseLabelItemInfo, 4>
@@ -2860,9 +2860,6 @@ public:
     /// FIXME: Remove this.
     unsigned numFixes;
 
-    /// The length of \c contextualTypes.
-    unsigned numContextualTypes;
-
     /// The length of \c targets.
     unsigned numTargets;
 
@@ -3294,10 +3291,17 @@ public:
   }
 
   void setContextualInfo(ASTNode node, ContextualTypeInfo info) {
-    assert(bool(node) && "Expected non-null expression!");
-    assert(contextualTypes.count(node) == 0 &&
-           "Already set this contextual type");
-    contextualTypes[node] = {info, Type()};
+    ASSERT(bool(node) && "Expected non-null expression!");
+    bool inserted = contextualTypes.insert({node, {info, Type()}}).second;
+    ASSERT(inserted);
+
+    if (solverState)
+      recordChange(SolverTrail::Change::RecordedContextualInfo(node));
+  }
+
+  void removeContextualInfo(ASTNode node) {
+    bool erased = contextualTypes.erase(node);
+    ASSERT(erased);
   }
 
   std::optional<ContextualTypeInfo> getContextualTypeInfo(ASTNode node) const {

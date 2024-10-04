@@ -207,6 +207,9 @@ public:
     /// Create a change that recorded a closure type.
     static Change RecordedClosureType(const ClosureExpr *closure);
 
+    /// Create a change that recorded the contextual type of an AST node.
+    static Change RecordedContextualInfo(ASTNode node);
+
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.
     ///

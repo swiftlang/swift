@@ -255,6 +255,14 @@ SolverTrail::Change::RecordedClosureType(const ClosureExpr *closure) {
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::RecordedContextualInfo(ASTNode node) {
+  Change result;
+  result.Kind = ChangeKind::RecordedContextualInfo;
+  result.Node.Node = node;
+  return result;
+}
+
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
@@ -379,6 +387,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::RecordedImpliedResult:
     cs.removeImpliedResult(TheExpr);
+    break;
+
+  case ChangeKind::RecordedContextualInfo:
+    cs.removeContextualInfo(Node.Node);
     break;
   }
 }
@@ -572,6 +584,11 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << "(RecordedClosureType ";
     simple_display(out, Closure);
     out << ")\n";
+    break;
+
+  case ChangeKind::RecordedContextualInfo:
+    // FIXME: Print short form of ASTNode
+    out << "(RecordedContextualInfo)\n";
     break;
   }
 }
