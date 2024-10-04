@@ -1594,7 +1594,7 @@ public:
   llvm::DenseMap<Expr *, ExprPattern *> exprPatterns;
 
   /// The set of parameters that have been inferred to be 'isolated'.
-  std::vector<ParamDecl *> isolatedParams;
+  llvm::DenseSet<ParamDecl *> isolatedParams;
 
   /// The set of closures that have been inferred to be "isolated by
   /// preconcurrency".
@@ -2292,7 +2292,7 @@ private:
   llvm::SmallDenseMap<Expr *, ExprPattern *, 2> exprPatterns;
 
   /// The set of parameters that have been inferred to be 'isolated'.
-  llvm::SmallSetVector<ParamDecl *, 2> isolatedParams;
+  llvm::SmallDenseSet<ParamDecl *, 2> isolatedParams;
 
   /// The set of closures that have been inferred to be "isolated by
   /// preconcurrency".
@@ -2854,9 +2854,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    /// The length of \c isolatedParams.
-    unsigned numIsolatedParams;
 
     /// The length of \c PreconcurrencyClosures.
     unsigned numPreconcurrencyClosures;
@@ -4214,6 +4211,13 @@ public:
   /// the body and assign fixed type to the closure, `false` otherwise.
   bool resolveClosure(TypeVariableType *typeVar, Type contextualType,
                       ConstraintLocatorBuilder locator);
+
+  /// Used by the above to update isolatedParams and record a change in
+  /// the trail.
+  void recordIsolatedParam(ParamDecl *param);
+
+  /// Undo the above change.
+  void removeIsolatedParam(ParamDecl *param);
 
   /// Given the fact that contextual type is now available for the type
   /// variable representing a pack expansion type, let's resolve the expansion.

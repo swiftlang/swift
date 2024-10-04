@@ -134,6 +134,7 @@ public:
       DeclContext *TheDeclContext;
       CaseLabelItem *TheItem;
       CatchNode TheCatchNode;
+      ParamDecl *TheParam;
     };
 
     Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
@@ -227,6 +228,9 @@ public:
 
     /// Create a change that recorded a potential throw site.
     static Change RecordedPotentialThrowSite(CatchNode catchNode);
+
+    /// Create a change that recorded an isolated parameter.
+    static Change RecordedIsolatedParam(ParamDecl *param);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

@@ -66,8 +66,9 @@ CHANGE(RecordedContextualInfo)
 CHANGE(RecordedTarget)
 CHANGE(RecordedCaseLabelItemInfo)
 CHANGE(RecordedPotentialThrowSite)
+CHANGE(RecordedIsolatedParam)
 
-LAST_CHANGE(RecordedPotentialThrowSite)
+LAST_CHANGE(RecordedIsolatedParam)
 
 #undef LOCATOR_CHANGE
 #undef EXPR_CHANGE

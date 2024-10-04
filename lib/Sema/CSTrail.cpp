@@ -319,6 +319,14 @@ SolverTrail::Change::RecordedPotentialThrowSite(CatchNode catchNode) {
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::RecordedIsolatedParam(ParamDecl *param) {
+  Change result;
+  result.Kind = ChangeKind::RecordedIsolatedParam;
+  result.TheParam = param;
+  return result;
+}
+
 SyntacticElementTargetKey
 SolverTrail::Change::getSyntacticElementTargetKey() const {
   ASSERT(Kind == ChangeKind::RecordedTarget);
@@ -492,6 +500,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::RecordedExprPattern:
     cs.removeExprPatternFor(TheExpr);
+    break;
+
+  case ChangeKind::RecordedIsolatedParam:
+    cs.removeIsolatedParam(TheParam);
     break;
   }
 }
@@ -706,6 +718,12 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
   case ChangeKind::RecordedPotentialThrowSite:
     // FIXME: Print something here
     out << "(RecordedPotentialThrowSite)\n";
+    break;
+
+  case ChangeKind::RecordedIsolatedParam:
+    out << "(RecordedIsolatedParam ";
+    TheParam->dumpRef(out);
+    out << ")\n";
     break;
   }
 }
