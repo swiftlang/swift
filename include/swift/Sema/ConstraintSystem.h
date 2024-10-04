@@ -1515,7 +1515,7 @@ public:
   /// Maps expressions for implied results (e.g implicit 'then' statements,
   /// implicit 'return' statements in single expression body closures) to their
   /// result kind.
-  llvm::MapVector<const Expr *, ImpliedResultKind> ImpliedResults;
+  llvm::DenseMap<Expr *, ImpliedResultKind> ImpliedResults;
 
   /// For locators associated with call expressions, the trailing closure
   /// matching rule and parameter bindings that were applied.
@@ -2233,7 +2233,7 @@ private:
   /// Maps expressions for implied results (e.g implicit 'then' statements,
   /// implicit 'return' statements in single expression body closures) to their
   /// result kind.
-  llvm::MapVector<const Expr *, ImpliedResultKind> ImpliedResults;
+  llvm::DenseMap<Expr *, ImpliedResultKind> ImpliedResults;
 
   /// This is a *global* list of all result builder bodies that have
   /// been determined to be incorrect by failing constraint generation.
@@ -2860,9 +2860,6 @@ public:
     /// FIXME: Remove this.
     unsigned numFixes;
 
-    /// The length of \c ImpliedResults.
-    unsigned numImpliedResults;
-
     /// The length of \c contextualTypes.
     unsigned numContextualTypes;
 
@@ -3065,16 +3062,24 @@ public:
   }
 
   /// Record an implied result for a ReturnStmt or ThenStmt.
-  void recordImpliedResult(const Expr *E, ImpliedResultKind kind) {
-    assert(E);
+  void recordImpliedResult(Expr *E, ImpliedResultKind kind) {
+    ASSERT(E);
     auto inserted = ImpliedResults.insert({E, kind}).second;
-    assert(inserted && "Duplicate implied result?");
-    (void)inserted;
+    ASSERT(inserted && "Duplicate implied result?");
+
+    if (solverState)
+      recordChange(SolverTrail::Change::RecordedImpliedResult(E));
+  }
+
+  /// Undo the above change.
+  void removeImpliedResult(Expr *E) {
+    bool erased = ImpliedResults.erase(E);
+    ASSERT(erased);
   }
 
   /// Whether the given expression is the implied result for either a ReturnStmt
   /// or ThenStmt, and if so, the kind of implied result.
-  std::optional<ImpliedResultKind> isImpliedResult(const Expr *E) const {
+  std::optional<ImpliedResultKind> isImpliedResult(Expr *E) const {
     auto result = ImpliedResults.find(E);
     if (result == ImpliedResults.end())
       return std::nullopt;

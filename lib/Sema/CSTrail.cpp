@@ -56,6 +56,14 @@ SolverTrail::~SolverTrail() {
     result.Locator = locator; \
     return result; \
   }
+#define EXPR_CHANGE(Name) \
+  SolverTrail::Change \
+  SolverTrail::Change::Name(Expr *expr) { \
+    Change result; \
+    result.Kind = ChangeKind::Name; \
+    result.TheExpr = expr; \
+    return result; \
+  }
 #include "swift/Sema/CSTrail.def"
 
 SolverTrail::Change
@@ -240,14 +248,6 @@ SolverTrail::Change::RecordedResultBuilderTransform(AnyFunctionRef fn) {
 }
 
 SolverTrail::Change
-SolverTrail::Change::AppliedPropertyWrapper(Expr *expr) {
-  Change result;
-  result.Kind = ChangeKind::AppliedPropertyWrapper;
-  result.TheExpr = expr;
-  return result;
-}
-
-SolverTrail::Change
 SolverTrail::Change::RecordedClosureType(const ClosureExpr *closure) {
   Change result;
   result.Kind = ChangeKind::RecordedClosureType;
@@ -376,6 +376,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   case ChangeKind::RecordedClosureType:
     cs.removeClosureType(Closure);
     break;
+
+  case ChangeKind::RecordedImpliedResult:
+    cs.removeImpliedResult(TheExpr);
+    break;
   }
 }
 
@@ -393,6 +397,12 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
   case ChangeKind::Name: \
     out << "(" << #Name << " at "; \
     Locator->dump(&cs.getASTContext().SourceMgr, out); \
+    out << ")\n"; \
+    break;
+#define EXPR_CHANGE(Name) \
+  case ChangeKind::Name: \
+    out << "(" << #Name << " "; \
+    simple_display(out, TheExpr); \
     out << ")\n"; \
     break;
 #include "swift/Sema/CSTrail.def"
@@ -555,12 +565,6 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
   case ChangeKind::RecordedResultBuilderTransform:
     out << "(RecordedResultBuilderTransform ";
     simple_display(out, AFR);
-    out << ")\n";
-    break;
-
-  case ChangeKind::AppliedPropertyWrapper:
-    out << "(AppliedPropertyWrapper ";
-    simple_display(out, TheExpr);
     out << ")\n";
     break;
 
