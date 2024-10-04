@@ -520,6 +520,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     cs.InactiveConstraints.erase(iter);
     break;
   }
+
+  case ChangeKind::RetiredConstraint:
+    cs.InactiveConstraints.push_back(TheConstraint.Constraint);
+    break;
   }
 }
 

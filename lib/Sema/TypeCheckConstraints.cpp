@@ -1508,15 +1508,6 @@ void ConstraintSystem::print(raw_ostream &out) const {
     }
   }
 
-  if (solverState && solverState->hasRetiredConstraints()) {
-    out.indent(indent) << "Retired Constraints:\n";
-    solverState->forEachRetired([&](Constraint &constraint) {
-      out.indent(indent + 2);
-      constraint.print(out, &getASTContext().SourceMgr);
-      out << "\n";
-    });
-  }
-
   if (!ResolvedOverloads.empty()) {
     out.indent(indent) << "Resolved overloads:\n";
 
