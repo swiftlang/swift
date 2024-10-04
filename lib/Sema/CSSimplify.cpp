@@ -14082,6 +14082,17 @@ void ConstraintSystem::addRestrictedConstraint(
                                      TMF_GenerateConstraints, locator);
 }
 
+void ConstraintSystem::recordImplicitValueConversion(
+                             ConstraintLocator *locator,
+                             ConversionRestrictionKind restriction) {
+  bool inserted = ImplicitValueConversions.insert(
+        {getConstraintLocator(locator), restriction}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedImplicitValueConversion(locator));
+}
+
 /// Given that we have a conversion constraint between two types, and
 /// that the given constraint-reduction rule applies between them at
 /// the top level, apply it and generate any necessary recursive

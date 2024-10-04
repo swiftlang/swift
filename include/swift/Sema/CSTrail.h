@@ -139,7 +139,7 @@ public:
 
     Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
 
-#define LOCATOR_CHANGE(Name) static Change Name(ConstraintLocator *locator);
+#define LOCATOR_CHANGE(Name, _) static Change Name(ConstraintLocator *locator);
 #define EXPR_CHANGE(Name) static Change Name(Expr *expr);
 #define CLOSURE_CHANGE(Name) static Change Name(ClosureExpr *closure);
 #include "swift/Sema/CSTrail.def"
@@ -186,10 +186,6 @@ public:
     static Change AddedFixedRequirement(GenericTypeParamType *GP,
                                         unsigned reqKind,
                                         Type requirementTy);
-
-    /// Create a change that recorded a disjunction choice.
-    static Change RecordedDisjunctionChoice(ConstraintLocator *locator,
-                                            unsigned index);
 
     /// Create a change that recorded the opening of a pack expansion type.
     static Change RecordedOpenedPackExpansionType(PackExpansionType *expansion);

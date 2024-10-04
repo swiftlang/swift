@@ -298,7 +298,7 @@ void ConstraintSystem::recordDisjunctionChoice(
   ASSERT(inserted);
 
   if (solverState)
-    recordChange(SolverTrail::Change::RecordedDisjunctionChoice(locator, index));
+    recordChange(SolverTrail::Change::RecordedDisjunctionChoice(locator));
 }
 
 void ConstraintSystem::recordAppliedDisjunction(
@@ -1689,11 +1689,6 @@ void ConstraintSystem::recordOpenedType(
 
   if (solverState)
     recordChange(SolverTrail::Change::RecordedOpenedTypes(locator));
-}
-
-void ConstraintSystem::removeOpenedType(ConstraintLocator *locator) {
-  bool erased = OpenedTypes.erase(locator);
-  ASSERT(erased);
 }
 
 void ConstraintSystem::recordOpenedTypes(
@@ -3752,11 +3747,6 @@ void ConstraintSystem::recordResolvedOverload(ConstraintLocator *locator,
 
   if (solverState)
     recordChange(SolverTrail::Change::ResolvedOverload(locator));
-}
-
-void ConstraintSystem::removeResolvedOverload(ConstraintLocator *locator) {
-  bool erased = ResolvedOverloads.erase(locator);
-  ASSERT(erased);
 }
 
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,

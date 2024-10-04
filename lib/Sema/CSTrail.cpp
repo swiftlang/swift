@@ -48,7 +48,7 @@ SolverTrail::~SolverTrail() {
     ASSERT(Changes.empty() && "Trail corrupted");
 }
 
-#define LOCATOR_CHANGE(Name) \
+#define LOCATOR_CHANGE(Name, _) \
   SolverTrail::Change \
   SolverTrail::Change::Name(ConstraintLocator *locator) { \
     Change result; \
@@ -181,16 +181,6 @@ SolverTrail::Change::AddedFixedRequirement(GenericTypeParamType *GP,
   result.FixedRequirement.GP = GP;
   result.FixedRequirement.ReqTy = reqTy;
   result.Options = reqKind;
-  return result;
-}
-
-SolverTrail::Change
-SolverTrail::Change::RecordedDisjunctionChoice(ConstraintLocator *locator,
-                                               unsigned index) {
-  Change result;
-  result.Kind = ChangeKind::RecordedDisjunctionChoice;
-  result.TheLocator = locator;
-  result.Options = index;
   return result;
 }
 
@@ -360,6 +350,14 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
   switch (Kind) {
+#define LOCATOR_CHANGE(Name, Map) \
+  case ChangeKind::Name: { \
+    bool erased = cs.Map.erase(TheLocator); \
+    ASSERT(erased); \
+    break; \
+  }
+#include "swift/Sema/CSTrail.def"
+
   case ChangeKind::AddedTypeVariable:
     cg.removeNode(TypeVar);
     break;
@@ -409,40 +407,12 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
                               FixedRequirement.ReqTy);
     break;
 
-  case ChangeKind::RecordedDisjunctionChoice:
-    cs.removeDisjunctionChoice(TheLocator);
-    break;
-
-  case ChangeKind::RecordedAppliedDisjunction:
-    cs.removeAppliedDisjunction(TheLocator);
-    break;
-
-  case ChangeKind::RecordedMatchCallArgumentResult:
-    cs.removeMatchCallArgumentResult(TheLocator);
-    break;
-
-  case ChangeKind::RecordedOpenedTypes:
-    cs.removeOpenedType(TheLocator);
-    break;
-
-  case ChangeKind::RecordedOpenedExistentialType:
-    cs.removeOpenedExistentialType(TheLocator);
-    break;
-
   case ChangeKind::RecordedOpenedPackExpansionType:
     cs.removeOpenedPackExpansionType(TheExpansion);
     break;
 
-  case ChangeKind::RecordedPackExpansionEnvironment:
-    cs.removePackExpansionEnvironment(TheLocator);
-    break;
-
   case ChangeKind::RecordedPackEnvironment:
     cs.removePackEnvironment(TheElement);
-    break;
-
-  case ChangeKind::RecordedDefaultedConstraint:
-    cs.removeDefaultedConstraint(TheLocator);
     break;
 
   case ChangeKind::RecordedNodeType:
@@ -468,10 +438,6 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::AppliedPropertyWrapper:
     cs.removePropertyWrapper(TheExpr);
-    break;
-
-  case ChangeKind::ResolvedOverload:
-    cs.removeResolvedOverload(TheLocator);
     break;
 
   case ChangeKind::RecordedClosureType:
@@ -522,7 +488,7 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
 
   switch (Kind) {
 
-#define LOCATOR_CHANGE(Name) \
+#define LOCATOR_CHANGE(Name, _) \
   case ChangeKind::Name: \
     out << "(" << #Name << " at "; \
     TheLocator->dump(&cs.getASTContext().SourceMgr, out); \
@@ -639,13 +605,6 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << Options << " ";
     FixedRequirement.ReqTy->print(out, PO);
     out << ")\n";
-    break;
-
-  case ChangeKind::RecordedDisjunctionChoice:
-    out << "(RecordedDisjunctionChoice at ";
-    TheLocator->dump(&cs.getASTContext().SourceMgr, out);
-    out << " index ";
-    out << Options << ")\n";
     break;
 
   case ChangeKind::RecordedOpenedPackExpansionType:

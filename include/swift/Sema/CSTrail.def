@@ -19,7 +19,7 @@
 #endif
 
 #ifndef LOCATOR_CHANGE
-#define LOCATOR_CHANGE(Name) CHANGE(Name)
+#define LOCATOR_CHANGE(Name, Map) CHANGE(Name)
 #endif
 
 #ifndef EXPR_CHANGE
@@ -34,13 +34,15 @@
 #define LAST_CHANGE(Name)
 #endif
 
-LOCATOR_CHANGE(RecordedAppliedDisjunction)
-LOCATOR_CHANGE(RecordedMatchCallArgumentResult)
-LOCATOR_CHANGE(RecordedOpenedTypes)
-LOCATOR_CHANGE(RecordedOpenedExistentialType)
-LOCATOR_CHANGE(RecordedPackExpansionEnvironment)
-LOCATOR_CHANGE(RecordedDefaultedConstraint)
-LOCATOR_CHANGE(ResolvedOverload)
+LOCATOR_CHANGE(RecordedDisjunctionChoice, DisjunctionChoices)
+LOCATOR_CHANGE(RecordedAppliedDisjunction, AppliedDisjunctions)
+LOCATOR_CHANGE(RecordedMatchCallArgumentResult, argumentMatchingChoices)
+LOCATOR_CHANGE(RecordedOpenedTypes, OpenedTypes)
+LOCATOR_CHANGE(RecordedOpenedExistentialType, OpenedExistentialTypes)
+LOCATOR_CHANGE(RecordedPackExpansionEnvironment, PackExpansionEnvironments)
+LOCATOR_CHANGE(RecordedDefaultedConstraint, DefaultedConstraints)
+LOCATOR_CHANGE(ResolvedOverload, ResolvedOverloads)
+LOCATOR_CHANGE(RecordedImplicitValueConversion, ImplicitValueConversions)
 
 EXPR_CHANGE(AppliedPropertyWrapper)
 EXPR_CHANGE(RecordedImpliedResult)
@@ -60,7 +62,6 @@ CHANGE(UpdatedTypeVariable)
 CHANGE(AddedConversionRestriction)
 CHANGE(AddedFix)
 CHANGE(AddedFixedRequirement)
-CHANGE(RecordedDisjunctionChoice)
 CHANGE(RecordedOpenedPackExpansionType)
 CHANGE(RecordedPackEnvironment)
 CHANGE(RecordedNodeType)
