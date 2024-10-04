@@ -435,7 +435,7 @@ public:
 
   /// Record the current type-variable binding.
   void recordBinding(constraints::SolverTrail &trail) {
-    trail.recordChange(constraints::SolverTrail::Change::updatedTypeVariable(
+    trail.recordChange(constraints::SolverTrail::Change::UpdatedTypeVariable(
         getTypeVariable(), ParentOrFixed, getRawOptions()));
   }
 
@@ -2413,7 +2413,7 @@ public:
     bool inserted = DefaultedConstraints.insert(locator).second;
     if (inserted) {
       if (solverState)
-        recordChange(SolverTrail::Change::recordedDefaultedConstraint(locator));
+        recordChange(SolverTrail::Change::RecordedDefaultedConstraint(locator));
     }
   }
 
@@ -2643,7 +2643,7 @@ private:
     void disableConstraint(Constraint *constraint) {
       ASSERT(!constraint->isDisabled());
       constraint->setDisabled();
-      Trail.recordChange(SolverTrail::Change::disabledConstraint(constraint));
+      Trail.recordChange(SolverTrail::Change::DisabledConstraint(constraint));
     }
 
     /// Favor the given constraint; this change will be rolled back
@@ -2652,7 +2652,7 @@ private:
       assert(!constraint->isFavored());
 
       constraint->setFavored();
-      Trail.recordChange(SolverTrail::Change::favoredConstraint(constraint));
+      Trail.recordChange(SolverTrail::Change::FavoredConstraint(constraint));
     }
 
   private:
@@ -3172,7 +3172,7 @@ public:
     if (oldType.getPointer() != type.getPointer()) {
       // Record the fact that we assigned a type to this node.
       if (solverState)
-        recordChange(SolverTrail::Change::recordedNodeType(node, oldType));
+        recordChange(SolverTrail::Change::RecordedNodeType(node, oldType));
     }
   }
 
@@ -3211,7 +3211,7 @@ public:
     if (oldType.getPointer() != T.getPointer()) {
       if (solverState) {
         recordChange(
-          SolverTrail::Change::recordedKeyPathComponentType(
+          SolverTrail::Change::RecordedKeyPathComponentType(
             KP, I, oldType));
       }
     }

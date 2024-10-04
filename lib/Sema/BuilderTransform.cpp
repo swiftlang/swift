@@ -1226,7 +1226,7 @@ void ConstraintSystem::recordResultBuilderTransform(AnyFunctionRef fn,
   ASSERT(inserted);
 
   if (solverState)
-    recordChange(SolverTrail::Change::recordedResultBuilderTransform(fn));
+    recordChange(SolverTrail::Change::RecordedResultBuilderTransform(fn));
 }
 
 /// Undo the above change.

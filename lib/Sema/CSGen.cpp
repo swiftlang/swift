@@ -5051,7 +5051,7 @@ void ConstraintSystem::applyPropertyWrapper(
   appliedPropertyWrappers[anchor].push_back(applied);
 
   if (solverState)
-    recordChange(SolverTrail::Change::appliedPropertyWrapper(anchor));
+    recordChange(SolverTrail::Change::AppliedPropertyWrapper(anchor));
 }
 
 void ConstraintSystem::removePropertyWrapper(Expr *anchor) {

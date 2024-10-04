@@ -14930,7 +14930,7 @@ void ConstraintSystem::recordMatchCallArgumentResult(
   ASSERT(inserted);
 
   if (solverState)
-    recordChange(SolverTrail::Change::recordedMatchCallArgumentResult(locator));
+    recordChange(SolverTrail::Change::RecordedMatchCallArgumentResult(locator));
 }
 
 void ConstraintSystem::recordCallAsFunction(UnresolvedDotExpr *root,

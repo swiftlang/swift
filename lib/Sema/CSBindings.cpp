@@ -1777,7 +1777,7 @@ void PotentialBindings::infer(Constraint *constraint) {
 
   // Record the change, if there are active scopes.
   if (CS.isRecordingChanges())
-    CS.recordChange(SolverTrail::Change::inferredBindings(TypeVar, constraint));
+    CS.recordChange(SolverTrail::Change::InferredBindings(TypeVar, constraint));
 
   switch (constraint->getKind()) {
   case ConstraintKind::Bind:
@@ -1952,7 +1952,7 @@ void PotentialBindings::retract(Constraint *constraint) {
 
   // Record the change, if there are active scopes.
   if (CS.isRecordingChanges())
-    CS.recordChange(SolverTrail::Change::retractedBindings(TypeVar, constraint));
+    CS.recordChange(SolverTrail::Change::RetractedBindings(TypeVar, constraint));
 
   LLVM_DEBUG(
     llvm::dbgs() << Constraints.size() << " " << Bindings.size() << " "
