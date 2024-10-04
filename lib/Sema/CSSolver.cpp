@@ -290,8 +290,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Register overload choices.
   // FIXME: Copy these directly into some kind of partial solution?
-  for (auto overload : solution.overloadChoices)
-    ResolvedOverloads.insert(overload);
+  for (auto overload : solution.overloadChoices) {
+    if (!ResolvedOverloads.count(overload.first))
+      recordResolvedOverload(overload.first, overload.second);
+  }
 
   // Register constraint restrictions.
   // FIXME: Copy these directly into some kind of partial solution?
@@ -688,7 +690,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
   numKeyPaths = cs.KeyPaths.size();
-  numResolvedOverloads = cs.ResolvedOverloads.size();
   numInferredClosureTypes = cs.ClosureTypes.size();
   numImpliedResults = cs.ImpliedResults.size();
   numContextualTypes = cs.contextualTypes.size();
@@ -716,8 +717,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Erase the end of various lists.
   truncate(cs.TypeVariables, numTypeVariables);
-
-  truncate(cs.ResolvedOverloads, numResolvedOverloads);
 
   // Move any remaining active constraints into the inactive list.
   if (!cs.ActiveConstraints.empty()) {
