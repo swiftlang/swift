@@ -450,7 +450,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Register the argument lists.
   for (auto &argListMapping : solution.argumentLists) {
-    ArgumentLists.insert(argListMapping);
+    if (ArgumentLists.count(argListMapping.first) == 0)
+      recordArgumentList(argListMapping.first, argListMapping.second);
   }
 
   for (auto &implicitRoot : solution.ImplicitCallAsFunctionRoots) {
@@ -706,7 +707,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
-  numArgumentLists = cs.ArgumentLists.size();
   numImplicitCallAsFunctionRoots = cs.ImplicitCallAsFunctionRoots.size();
   numSynthesizedConformances = cs.SynthesizedConformances.size();
 
@@ -740,9 +740,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // e.g. add retired constraints back to the circulation and remove generated
   // constraints introduced by the current scope.
   cs.solverState->rollback(this);
-
-  // Remove any argument lists no longer in scope.
-  truncate(cs.ArgumentLists, numArgumentLists);
 
   // Remove any implicitly generated root expressions for `.callAsFunction`
   // which are no longer in scope.

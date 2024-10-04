@@ -43,6 +43,7 @@ LOCATOR_CHANGE(RecordedPackExpansionEnvironment, PackExpansionEnvironments)
 LOCATOR_CHANGE(RecordedDefaultedConstraint, DefaultedConstraints)
 LOCATOR_CHANGE(ResolvedOverload, ResolvedOverloads)
 LOCATOR_CHANGE(RecordedImplicitValueConversion, ImplicitValueConversions)
+LOCATOR_CHANGE(RecordedArgumentList, ArgumentLists)
 
 EXPR_CHANGE(AppliedPropertyWrapper)
 EXPR_CHANGE(RecordedImpliedResult)

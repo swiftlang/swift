@@ -14665,7 +14665,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
           getASTContext(), {Argument(SourceLoc(), Identifier(), nullptr)},
           /*firstTrailingClosureIndex=*/std::nullopt,
           AllocationArena::ConstraintSolver);
-      ArgumentLists.insert({argumentsLoc, argList});
+      recordArgumentList(argumentsLoc, argList);
     }
 
     auto *memberTypeLoc = getConstraintLocator(
