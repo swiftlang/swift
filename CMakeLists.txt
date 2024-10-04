@@ -695,10 +695,6 @@ option(SWIFT_IMPLICIT_CONCURRENCY_IMPORT
   "Implicitly import the Swift concurrency module"
   TRUE)
 
-option(SWIFT_IMPLICIT_BACKTRACING_IMPORT
-  "Implicitly import the Swift backtracing module"
-  FALSE)
-
 option(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
   "Enable build of the Swift concurrency module"
   FALSE)
@@ -864,11 +860,6 @@ if (CMAKE_Swift_COMPILER)
   swift_supports_implicit_module("string-processing"
     SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
   message(STATUS "  Implicit 'string-processing' import: ${SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT}")
-
-  # Same for _Backtracing.
-  swift_supports_implicit_module("backtracing"
-    SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT)
-  message(STATUS "  Implicit 'backtracing' import: ${SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT}")
 
   swift_get_package_cmo_support(
     Swift_COMPILER_PACKAGE_CMO_SUPPORT)
