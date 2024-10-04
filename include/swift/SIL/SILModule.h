@@ -853,6 +853,7 @@ public:
   std::pair<SILFunction *, SILWitnessTable *>
   lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
                                SILDeclRef Requirement,
+                               bool lookupInSpecializedWitnessTable,
                                SILModule::LinkingMode linkingMode);
 
   /// Look up the SILDefaultWitnessTable representing the default witnesses

@@ -4114,29 +4114,31 @@ public:
               == F.getModule().Types.getProtocolWitnessRepresentation(protocol),
             "result of witness_method must have correct representation for protocol");
 
-    require(methodType->isPolymorphic(),
-            "result of witness_method must be polymorphic");
+    if (methodType->isPolymorphic()) {
+      require(methodType->isPolymorphic(),
+              "result of witness_method must be polymorphic");
 
-    auto genericSig = methodType->getInvocationGenericSignature();
+      auto genericSig = methodType->getInvocationGenericSignature();
 
-    auto selfGenericParam = genericSig.getGenericParams()[0];
-    require(selfGenericParam->getDepth() == 0
-            && selfGenericParam->getIndex() == 0,
-            "method should be polymorphic on Self parameter at depth 0 index 0");
-    std::optional<Requirement> selfRequirement;
-    for (auto req : genericSig.getRequirements()) {
-      if (req.getKind() != RequirementKind::SameType) {
-        selfRequirement = req;
-        break;
+      auto selfGenericParam = genericSig.getGenericParams()[0];
+      require(selfGenericParam->getDepth() == 0
+              && selfGenericParam->getIndex() == 0,
+              "method should be polymorphic on Self parameter at depth 0 index 0");
+      std::optional<Requirement> selfRequirement;
+      for (auto req : genericSig.getRequirements()) {
+        if (req.getKind() != RequirementKind::SameType) {
+          selfRequirement = req;
+          break;
+        }
       }
-    }
 
-    require(selfRequirement &&
-            selfRequirement->getKind() == RequirementKind::Conformance,
-            "first non-same-typerequirement should be conformance requirement");
-    const auto protos = genericSig->getRequiredProtocols(selfGenericParam);
-    require(std::find(protos.begin(), protos.end(), protocol) != protos.end(),
-            "requirement Self parameter must conform to called protocol");
+      require(selfRequirement &&
+              selfRequirement->getKind() == RequirementKind::Conformance,
+              "first non-same-typerequirement should be conformance requirement");
+      const auto protos = genericSig->getRequiredProtocols(selfGenericParam);
+      require(std::find(protos.begin(), protos.end(), protocol) != protos.end(),
+              "requirement Self parameter must conform to called protocol");
+    }
 
     auto lookupType = AMI->getLookupType();
     if (getLocalArchetypeOf(lookupType) || lookupType->hasDynamicSelfType()) {

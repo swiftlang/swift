@@ -12,6 +12,7 @@
 
 #include "swift/SIL/CalleeCache.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
 #include "llvm/Support/Compiler.h"
@@ -256,8 +257,7 @@ CalleeCache::getSingleCalleeForWitnessMethod(WitnessMethodInst *WMI) const {
   SILWitnessTable *WT;
 
   // Attempt to find a specific callee for the given conformance and member.
-  std::tie(CalleeFn, WT) = WMI->getModule().lookUpFunctionInWitnessTable(
-      WMI->getConformance(), WMI->getMember(), SILModule::LinkingMode::LinkNormal);
+  std::tie(CalleeFn, WT) = lookUpFunctionInWitnessTable(WMI, SILModule::LinkingMode::LinkNormal);
 
   return CalleeFn;
 }

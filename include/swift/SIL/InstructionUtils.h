@@ -15,7 +15,7 @@
 
 #include "swift/SIL/InstWrappers.h"
 #include "swift/SIL/RuntimeEffect.h"
-#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILModule.h"
 
 namespace swift {
 
@@ -232,6 +232,9 @@ bool visitExplodedTupleType(SILType type,
 /// visited all of the tuple elements without the visitor returing false.
 bool visitExplodedTupleValue(SILValue value,
                              llvm::function_ref<SILValue(SILValue, std::optional<unsigned>)> callback);
+
+std::pair<SILFunction *, SILWitnessTable *>
+lookUpFunctionInWitnessTable(WitnessMethodInst *wmi, SILModule::LinkingMode linkingMode);
 
 } // end namespace swift
 
