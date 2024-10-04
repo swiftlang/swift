@@ -64,8 +64,9 @@ CHANGE(RecordedClosureType)
 CHANGE(RecordedContextualInfo)
 CHANGE(RecordedTarget)
 CHANGE(RecordedCaseLabelItemInfo)
+CHANGE(RecordedPotentialThrowSite)
 
-LAST_CHANGE(RecordedCaseLabelItemInfo)
+LAST_CHANGE(RecordedPotentialThrowSite)
 
 #undef LOCATOR_CHANGE
 #undef EXPR_CHANGE

@@ -133,6 +133,7 @@ public:
       ClosureExpr *TheClosure;
       DeclContext *TheDeclContext;
       CaseLabelItem *TheItem;
+      CatchNode TheCatchNode;
     };
 
     Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
@@ -223,6 +224,9 @@ public:
 
     /// Create a change that recorded a SyntacticElementTarget.
     static Change RecordedCaseLabelItemInfo(CaseLabelItem *item);
+
+    /// Create a change that recorded a potential throw site.
+    static Change RecordedPotentialThrowSite(CatchNode catchNode);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

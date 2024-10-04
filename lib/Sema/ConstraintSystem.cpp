@@ -436,6 +436,18 @@ bool ConstraintSystem::containsIDEInspectionTarget(
 }
 
 void ConstraintSystem::recordPotentialThrowSite(
+    CatchNode catchNode, PotentialThrowSite site) {
+  potentialThrowSites.push_back({catchNode, site});
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedPotentialThrowSite(catchNode));
+}
+
+void ConstraintSystem::removePotentialThrowSite(CatchNode catchNode) {
+  ASSERT(potentialThrowSites.back().first == catchNode);
+  potentialThrowSites.pop_back();
+}
+
+void ConstraintSystem::recordPotentialThrowSite(
     PotentialThrowSite::Kind kind, Type type,
     ConstraintLocatorBuilder locator) {
   ASTContext &ctx = getASTContext();
@@ -461,9 +473,8 @@ void ConstraintSystem::recordPotentialThrowSite(
   // do..catch statements without an explicit `throws` clause do infer
   // thrown types.
   if (auto doCatch = catchNode.dyn_cast<DoCatchStmt *>()) {
-    potentialThrowSites.push_back(
-        {catchNode,
-         PotentialThrowSite{kind, type, getConstraintLocator(locator)}});
+    PotentialThrowSite site{kind, type, getConstraintLocator(locator)};
+    recordPotentialThrowSite(catchNode, site);
     return;
   }
 
@@ -476,9 +487,8 @@ void ConstraintSystem::recordPotentialThrowSite(
   if (!closureEffects(closure).isThrowing())
     return;
 
-  potentialThrowSites.push_back(
-      {catchNode,
-       PotentialThrowSite{kind, type, getConstraintLocator(locator)}});
+  PotentialThrowSite site{kind, type, getConstraintLocator(locator)};
+  recordPotentialThrowSite(catchNode, site);
 }
 
 Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
