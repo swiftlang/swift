@@ -322,8 +322,12 @@ public:
     fillWithError(future->getError());
   }
   void fillWithError(SwiftError *error) {
+    #if SWIFT_CONCURRENCY_EMBEDDED
+    swift_unreachable("untyped error used in embedded Swift");
+    #else
     errorResult = error;
     swift_errorRetain(error);
+    #endif
   }
 };
 
