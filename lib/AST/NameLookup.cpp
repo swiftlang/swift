@@ -118,6 +118,8 @@ void swift::simple_display(llvm::raw_ostream &out,
       {UnqualifiedLookupFlags::TypeLookup, "TypeLookup"},
       {UnqualifiedLookupFlags::MacroLookup, "MacroLookup"},
       {UnqualifiedLookupFlags::ModuleLookup, "ModuleLookup"},
+      {UnqualifiedLookupFlags::DisregardSelfBounds, "DisregardSelfBounds"},
+      {UnqualifiedLookupFlags::IgnoreMissingImports, "IgnoreMissingImports"},
   };
 
   auto flagsToPrint = llvm::make_filter_range(
