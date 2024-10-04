@@ -11526,6 +11526,23 @@ void ConstraintSystem::removeIsolatedParam(ParamDecl *param) {
   ASSERT(erased);
 }
 
+void ConstraintSystem::recordPreconcurrencyClosure(
+    const ClosureExpr *closure) {
+  bool inserted = preconcurrencyClosures.insert(closure).second;
+  ASSERT(inserted);
+
+  if (solverState) {
+    recordChange(SolverTrail::Change::RecordedPreconcurrencyClosure(
+      const_cast<ClosureExpr *>(closure)));
+  }
+}
+
+void ConstraintSystem::removePreconcurrencyClosure(
+    const ClosureExpr *closure) {
+  bool erased = preconcurrencyClosures.erase(closure);
+  ASSERT(erased);
+}
+
 bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
                                       Type contextualType,
                                       ConstraintLocatorBuilder locator) {
@@ -11535,7 +11552,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
   // Note if this closure is isolated by preconcurrency.
   if (hasPreconcurrencyCallee(locator))
-    preconcurrencyClosures.insert(closure);
+    recordPreconcurrencyClosure(closure);
 
   // Let's look through all optionals associated with contextual
   // type to make it possible to infer parameter/result type of

@@ -1598,7 +1598,7 @@ public:
 
   /// The set of closures that have been inferred to be "isolated by
   /// preconcurrency".
-  std::vector<const ClosureExpr *> preconcurrencyClosures;
+  llvm::DenseSet<const ClosureExpr *> preconcurrencyClosures;
 
   /// The set of functions that have been transformed by a result builder.
   llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
@@ -2296,7 +2296,7 @@ private:
 
   /// The set of closures that have been inferred to be "isolated by
   /// preconcurrency".
-  llvm::SmallSetVector<const ClosureExpr *, 2> preconcurrencyClosures;
+  llvm::SmallDenseSet<const ClosureExpr *, 2> preconcurrencyClosures;
 
   /// Maps closure parameters to type variables.
   llvm::DenseMap<const ParamDecl *, TypeVariableType *>
@@ -2854,9 +2854,6 @@ public:
     ///
     /// FIXME: Remove this.
     unsigned numFixes;
-
-    /// The length of \c PreconcurrencyClosures.
-    unsigned numPreconcurrencyClosures;
 
     /// The length of \c ImplicitValueConversions.
     unsigned numImplicitValueConversions;
@@ -4218,6 +4215,13 @@ public:
 
   /// Undo the above change.
   void removeIsolatedParam(ParamDecl *param);
+
+  /// Used by the above to update preconcurrencyClosures and record a change in
+  /// the trail.
+  void recordPreconcurrencyClosure(const ClosureExpr *closure);
+
+  /// Undo the above change.
+  void removePreconcurrencyClosure(const ClosureExpr *closure);
 
   /// Given the fact that contextual type is now available for the type
   /// variable representing a pack expansion type, let's resolve the expansion.

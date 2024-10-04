@@ -26,6 +26,10 @@
 #define EXPR_CHANGE(Name) CHANGE(Name)
 #endif
 
+#ifndef CLOSURE_CHANGE
+#define CLOSURE_CHANGE(Name) CHANGE(Name)
+#endif
+
 #ifndef LAST_CHANGE
 #define LAST_CHANGE(Name)
 #endif
@@ -41,6 +45,9 @@ LOCATOR_CHANGE(ResolvedOverload)
 EXPR_CHANGE(AppliedPropertyWrapper)
 EXPR_CHANGE(RecordedImpliedResult)
 EXPR_CHANGE(RecordedExprPattern)
+
+CLOSURE_CHANGE(RecordedClosureType)
+CLOSURE_CHANGE(RecordedPreconcurrencyClosure)
 
 CHANGE(AddedTypeVariable)
 CHANGE(AddedConstraint)
@@ -61,7 +68,6 @@ CHANGE(RecordedKeyPathComponentType)
 CHANGE(DisabledConstraint)
 CHANGE(FavoredConstraint)
 CHANGE(RecordedResultBuilderTransform)
-CHANGE(RecordedClosureType)
 CHANGE(RecordedContextualInfo)
 CHANGE(RecordedTarget)
 CHANGE(RecordedCaseLabelItemInfo)
@@ -72,5 +78,6 @@ LAST_CHANGE(RecordedIsolatedParam)
 
 #undef LOCATOR_CHANGE
 #undef EXPR_CHANGE
+#undef CLOSURE_CHANGE
 #undef LAST_CHANGE
 #undef CHANGE

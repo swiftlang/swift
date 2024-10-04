@@ -2581,7 +2581,7 @@ bool ConstraintSystem::applySolution(AnyFunctionRef fn,
         param->setIsolated(true);
     }
 
-    if (llvm::is_contained(solution.preconcurrencyClosures, closure))
+    if (solution.preconcurrencyClosures.count(closure))
       closure->setIsolatedByPreconcurrency();
 
     // Coerce the result type, if it was written explicitly.

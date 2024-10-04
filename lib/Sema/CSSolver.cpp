@@ -233,8 +233,8 @@ Solution ConstraintSystem::finalize() {
   for (const auto &param : isolatedParams)
     solution.isolatedParams.insert(param);
 
-  for (const auto &closure : preconcurrencyClosures)
-    solution.preconcurrencyClosures.push_back(closure);
+  for (auto closure : preconcurrencyClosures)
+    solution.preconcurrencyClosures.insert(closure);
 
   for (const auto &transformed : resultBuilderTransformed) {
     solution.resultBuilderTransformed.insert(transformed);
@@ -416,7 +416,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   for (auto closure : solution.preconcurrencyClosures) {
-    preconcurrencyClosures.insert(closure);
+    if (preconcurrencyClosures.count(closure) == 0)
+      recordPreconcurrencyClosure(closure);
   }
 
   for (const auto &transformed : solution.resultBuilderTransformed) {
@@ -698,7 +699,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
   numKeyPaths = cs.KeyPaths.size();
-  numPreconcurrencyClosures = cs.preconcurrencyClosures.size();
   numImplicitValueConversions = cs.ImplicitValueConversions.size();
   numArgumentLists = cs.ArgumentLists.size();
   numImplicitCallAsFunctionRoots = cs.ImplicitCallAsFunctionRoots.size();
@@ -737,9 +737,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   /// Remove any key path expressions.
   truncate(cs.KeyPaths, numKeyPaths);
-
-  // Remove any preconcurrency closures.
-  truncate(cs.preconcurrencyClosures, numPreconcurrencyClosures);
 
   // Remove any implicit value conversions.
   truncate(cs.ImplicitValueConversions, numImplicitValueConversions);
