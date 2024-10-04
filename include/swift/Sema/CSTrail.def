@@ -63,8 +63,9 @@ CHANGE(RecordedResultBuilderTransform)
 CHANGE(RecordedClosureType)
 CHANGE(RecordedContextualInfo)
 CHANGE(RecordedTarget)
+CHANGE(RecordedCaseLabelItemInfo)
 
-LAST_CHANGE(RecordedTarget)
+LAST_CHANGE(RecordedCaseLabelItemInfo)
 
 #undef LOCATOR_CHANGE
 #undef EXPR_CHANGE

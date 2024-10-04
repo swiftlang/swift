@@ -1580,8 +1580,7 @@ public:
 
   /// Maps case label items to information tracked about them as they are
   /// being solved.
-  llvm::MapVector<const CaseLabelItem *, CaseLabelItemInfo>
-      caseLabelItems;
+  llvm::DenseMap<const CaseLabelItem *, CaseLabelItemInfo> caseLabelItems;
 
   /// Maps catch nodes to the set of potential throw sites that will be caught
   /// at that location.
@@ -2281,8 +2280,7 @@ private:
   llvm::DenseMap<ASTNode, std::pair<ContextualTypeInfo, Type>> contextualTypes;
 
   /// Information about each case label item tracked by the constraint system.
-  llvm::SmallMapVector<const CaseLabelItem *, CaseLabelItemInfo, 4>
-      caseLabelItems;
+  llvm::SmallDenseMap<const CaseLabelItem *, CaseLabelItemInfo, 4> caseLabelItems;
 
   /// Keep track of all of the potential throw sites.
   /// FIXME: This data structure should be replaced with something that
@@ -2857,9 +2855,6 @@ public:
     /// FIXME: Remove this.
     unsigned numFixes;
 
-    /// The length of \c caseLabelItems.
-    unsigned numCaseLabelItems;
-
     /// The length of \c potentialThrowSites.
     unsigned numPotentialThrowSites;
 
@@ -3392,9 +3387,19 @@ public:
   }
 
   void setCaseLabelItemInfo(const CaseLabelItem *item, CaseLabelItemInfo info) {
-    assert(item != nullptr);
-    assert(caseLabelItems.count(item) == 0);
-    caseLabelItems[item] = info;
+    ASSERT(item);
+    bool inserted = caseLabelItems.insert({item, info}).second;
+    ASSERT(inserted);
+
+    if (solverState) {
+      recordChange(SolverTrail::Change::RecordedCaseLabelItemInfo(
+        const_cast<CaseLabelItem *>(item)));
+    }
+  }
+
+  void removeCaseLabelItemInfo(const CaseLabelItem *item) {
+    bool erased = caseLabelItems.erase(item);
+    ASSERT(erased);
   }
 
   /// Record a given ExprPattern as the parent of its sub-expression.

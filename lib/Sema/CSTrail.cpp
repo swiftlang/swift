@@ -303,6 +303,14 @@ SolverTrail::Change::RecordedTarget(SyntacticElementTargetKey key) {
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::RecordedCaseLabelItemInfo(CaseLabelItem *item) {
+  Change result;
+  result.Kind = ChangeKind::RecordedCaseLabelItemInfo;
+  result.TheItem = item;
+  return result;
+}
+
 SyntacticElementTargetKey
 SolverTrail::Change::getSyntacticElementTargetKey() const {
   ASSERT(Kind == ChangeKind::RecordedTarget);
@@ -464,6 +472,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::RecordedTarget:
     cs.removeTargetFor(getSyntacticElementTargetKey());
+    break;
+
+  case ChangeKind::RecordedCaseLabelItemInfo:
+    cs.removeCaseLabelItemInfo(TheItem);
     break;
   }
 }
@@ -668,6 +680,11 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << "(RecordedTarget ";
     getSyntacticElementTargetKey().dump(out);
     out << ")\n";
+    break;
+
+  case ChangeKind::RecordedCaseLabelItemInfo:
+    // FIXME: Print something here
+    out << "(RecordedCaseLabelItemInfo)\n";
     break;
   }
 }
