@@ -38,6 +38,7 @@
 
 #include <errno.h>
 #include "swift/Basic/PriorityQueue.h"
+#include "swift/Runtime/Heap.h"
 
 #if __has_include(<time.h>)
 # include <time.h>
@@ -103,10 +104,10 @@ struct JobDeadlineStorage<false> {
     return *storage(job);
   }
   static void set(SwiftJob *job, JobDeadline deadline) {
-    storage(job) = new JobDeadline(deadline);
+    storage(job) = swift_cxx_newObject<JobDeadline>(deadline);
   }
   static void destroy(SwiftJob *job) {
-    delete storage(job);
+    swift_cxx_deleteObject(storage(job));
   }
 };
 
