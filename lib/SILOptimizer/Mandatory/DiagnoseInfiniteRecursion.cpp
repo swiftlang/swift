@@ -122,8 +122,7 @@ static bool isRecursiveCall(FullApplySite applySite) {
   }
 
   if (auto *WMI = dyn_cast<WitnessMethodInst>(callee)) {
-    auto funcAndTable = parentFunc->getModule().lookUpFunctionInWitnessTable(
-        WMI->getConformance(), WMI->getMember(), SILModule::LinkingMode::LinkNormal);
+    auto funcAndTable = lookUpFunctionInWitnessTable(WMI, SILModule::LinkingMode::LinkNormal);
     return funcAndTable.first == parentFunc;
   }
   return false;

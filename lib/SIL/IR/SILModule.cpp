@@ -531,6 +531,7 @@ SerializedSILLoader *SILModule::getSILLoader() {
 std::pair<SILFunction *, SILWitnessTable *>
 SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
                                         SILDeclRef Requirement,
+                                        bool lookupInSpecializedWitnessTable,
                                         SILModule::LinkingMode linkingMode) {
   if (!C.isConcrete())
     return {nullptr, nullptr};
@@ -539,7 +540,12 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
     SILLinkerVisitor linker(*this, linkingMode);
     linker.processConformance(C);
   }
-  SILWitnessTable *wt = lookUpWitnessTable(C.getConcrete()->getRootConformance());
+  ProtocolConformance *conf = C.getConcrete();
+  if (!isa<SpecializedProtocolConformance>(conf) || !lookupInSpecializedWitnessTable) {
+    conf = conf->getRootConformance();
+  }
+
+  SILWitnessTable *wt = lookUpWitnessTable(conf);
 
   if (!wt) {
     LLVM_DEBUG(llvm::dbgs() << "        Failed speculative lookup of "

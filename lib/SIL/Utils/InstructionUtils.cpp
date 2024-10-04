@@ -1389,3 +1389,11 @@ bool swift::visitExplodedTupleValue(
 
   return true;
 }
+
+std::pair<SILFunction *, SILWitnessTable *>
+swift::lookUpFunctionInWitnessTable(WitnessMethodInst *wmi,
+                                    SILModule::LinkingMode linkingMode) {
+  SILModule &mod = wmi->getModule();
+  return mod.lookUpFunctionInWitnessTable(wmi->getConformance(), wmi->getMember(),
+                                          wmi->isSpecialized(), linkingMode);
+}
