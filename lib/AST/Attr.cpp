@@ -785,7 +785,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   AttributeVector attributes;
   AttributeVector modifiers;
   bool libraryLevelAPI =
-      D->getASTContext().LangOpts.LibraryLevel == LibraryLevel::API;
+      D && D->getASTContext().LangOpts.LibraryLevel == LibraryLevel::API;
 
   for (auto DA : llvm::reverse(FlattenedAttrs)) {
     // Don't skip implicit custom attributes. Custom attributes like global
@@ -1648,8 +1648,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DeclAttrKind::ABI: {
     auto *attr = cast<ABIAttr>(this);
     Printer << "@abi(";
-    if (attr->abiDecl)
-      attr->abiDecl->print(Printer, Options);
+    Decl *abiDecl = attr->abiDecl;
+    if (abiDecl && Options.ExplodePatternBindingDecls
+          && isa<PatternBindingDecl>(abiDecl) && D && isa<VarDecl>(D))
+      abiDecl = cast<PatternBindingDecl>(abiDecl)
+                    ->getVarAtSimilarStructuralPosition(
+                                      const_cast<VarDecl *>(cast<VarDecl>(D)));
+    if (abiDecl)
+      abiDecl->print(Printer, Options);
     Printer << ")";
 
     break;

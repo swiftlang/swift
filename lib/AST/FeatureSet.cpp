@@ -323,9 +323,18 @@ static bool usesFeatureAllowUnsafeAttribute(Decl *decl) {
   return decl->getAttrs().hasAttribute<UnsafeAttr>();
 }
 
+static ABIAttr *getABIAttr(Decl *decl) {
+  if (auto pbd = dyn_cast<PatternBindingDecl>(decl))
+    for (auto i : range(pbd->getNumPatternEntries()))
+      if (auto anchorVar = pbd->getAnchoringVarDecl(i))
+        return getABIAttr(anchorVar);
+  // FIXME: EnumCaseDecl/EnumElementDecl
+
+  return decl->getAttrs().getAttribute<ABIAttr>();
+}
+
 static bool usesFeatureABIAttribute(Decl *decl) {
-  auto abiAttr = decl->getAttrs().getAttribute<ABIAttr>();
-  return abiAttr && !abiAttr->isInverse();
+  return getABIAttr(decl) != nullptr;
 }
 
 UNINTERESTING_FEATURE(WarnUnsafe)
@@ -430,26 +439,38 @@ static bool allowFeatureSuppression(StringRef featureName, Decl *decl) {
 /// Go through all the features used by the given declaration and
 /// either add or remove them to this set.
 void FeatureSet::collectFeaturesUsed(Decl *decl, InsertOrRemove operation) {
+  // Count feature usage in an ABI decl as feature usage by the API, not itself,
+  // since we can't use `#if` inside an @abi attribute.
+  Decl *abiDecl = nullptr;
+  if (auto abiAttr = getABIAttr(decl)) {
+    abiDecl = abiAttr->abiDecl;
+  }
+
+#define CHECK(Function) (Function(decl) || (abiDecl && Function(abiDecl)))
+#define CHECK_ARG(Function, Arg) (Function(Arg, decl) || (abiDecl && Function(Arg, abiDecl)))
+
   // Go through each of the features, checking whether the
   // declaration uses that feature.
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
-  if (usesFeature##FeatureName(decl))                                          \
+  if (CHECK(usesFeature##FeatureName))                                         \
     collectRequiredFeature(Feature::FeatureName, operation);
 #define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
-  if (usesFeature##FeatureName(decl)) {                                        \
-    if (disallowFeatureSuppression(#FeatureName, decl))                        \
+  if (CHECK(usesFeature##FeatureName)) {                                       \
+    if (CHECK_ARG(disallowFeatureSuppression, #FeatureName))                   \
       collectRequiredFeature(Feature::FeatureName, operation);                 \
     else                                                                       \
       collectSuppressibleFeature(Feature::FeatureName, operation);             \
   }
 #define CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
-  if (usesFeature##FeatureName(decl)) {                                        \
-    if (allowFeatureSuppression(#FeatureName, decl))                           \
+  if (CHECK(usesFeature##FeatureName)) {                                       \
+    if (CHECK_ARG(allowFeatureSuppression, #FeatureName))                      \
       collectSuppressibleFeature(Feature::FeatureName, operation);             \
     else                                                                       \
       collectRequiredFeature(Feature::FeatureName, operation);                 \
   }
 #include "swift/Basic/Features.def"
+#undef CHECK
+#undef CHECK_ARG
 }
 
 FeatureSet swift::getUniqueFeaturesUsed(Decl *decl) {
