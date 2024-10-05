@@ -11,15 +11,16 @@
 //===----------------------------------------------------------------------===//
 
 import TestsUtils
-import CxxStdlibPerformance
-import CxxStdlib // FIXME(rdar://128520766): this import should be redundant
-
-let iterRepeatFactor = 7
 
 // FIXME swift-ci linux tests do not support std::span
 #if os(Linux)
 public let benchmarks = [BenchmarkInfo]()
 #else
+
+import CxxStdlibPerformance
+import CxxStdlib // FIXME(rdar://128520766): this import should be redundant
+
+let iterRepeatFactor = 7
 
 public let benchmarks = [
   BenchmarkInfo(
