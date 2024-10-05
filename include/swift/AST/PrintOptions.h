@@ -237,6 +237,10 @@ struct PrintOptions {
   /// Use the original module name to qualify a symbol.
   bool UseOriginallyDefinedInModuleNames = false;
 
+  /// Add a `@_silgen_name` attribute to each function that
+  /// is compatible with one that specifies its mangled name.
+  bool PrintSyntheticSILGenName = false;
+
   /// Print Swift.Array and Swift.Optional with sugared syntax
   /// ([] and ?), even if there are no sugar type nodes.
   bool SynthesizeSugarOnTypes = false;
