@@ -42,7 +42,7 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
     // Known implemented kinds.
     case .arrayExpr, .arrowExpr, .assignmentExpr, .awaitExpr, .binaryOperatorExpr,
       .booleanLiteralExpr, .borrowExpr, .closureExpr, .consumeExpr, .copyExpr,
-      .discardAssignmentExpr, .declReferenceExpr, .dictionaryExpr,
+      .discardAssignmentExpr, .declReferenceExpr, .dictionaryExpr, .floatLiteralExpr,
       .functionCallExpr, .ifExpr, .integerLiteralExpr, .memberAccessExpr,
       .nilLiteralExpr, .packElementExpr, .packExpansionExpr, .patternExpr,
       .postfixOperatorExpr, .prefixOperatorExpr, .regexLiteralExpr, .sequenceExpr,
@@ -53,11 +53,10 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
 
     // Known unimplemented kinds.
     case .asExpr, 
-      .doExpr, .editorPlaceholderExpr, .floatLiteralExpr, .forceUnwrapExpr,
-      .inOutExpr, .infixOperatorExpr, .isExpr, .keyPathExpr,
-      .macroExpansionExpr, .optionalChainingExpr,
-      .postfixIfConfigExpr, .genericSpecializationExpr, .switchExpr,
-      .ternaryExpr:
+      .doExpr, .editorPlaceholderExpr, .forceUnwrapExpr, .inOutExpr,
+      .infixOperatorExpr, .isExpr, .keyPathExpr, .macroExpansionExpr,
+      .optionalChainingExpr, .postfixIfConfigExpr, .genericSpecializationExpr,
+      .switchExpr, .ternaryExpr:
       return false
 
     // Unknown expr kinds.
@@ -113,8 +112,8 @@ extension ASTGenVisitor {
       break
     case .editorPlaceholderExpr:
       break
-    case .floatLiteralExpr:
-      break
+    case .floatLiteralExpr(let node):
+      return self.generate(floatLiteralExpr: node).asExpr
     case .forceUnwrapExpr:
       break
     case .functionCallExpr(let node):
