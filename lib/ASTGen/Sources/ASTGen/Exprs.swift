@@ -45,9 +45,10 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
       .discardAssignmentExpr, .declReferenceExpr, .dictionaryExpr,
       .functionCallExpr, .ifExpr, .integerLiteralExpr, .memberAccessExpr,
       .nilLiteralExpr, .packElementExpr, .packExpansionExpr, .patternExpr,
-      .postfixOperatorExpr, .prefixOperatorExpr, .sequenceExpr,
-      .stringLiteralExpr, .tryExpr, .tupleExpr, .typeExpr, .unresolvedAsExpr,
-      .unresolvedIsExpr, .unresolvedTernaryExpr:
+      .postfixOperatorExpr, .prefixOperatorExpr, .regexLiteralExpr, .sequenceExpr,
+      .simpleStringLiteralExpr, .subscriptCallExpr, .stringLiteralExpr, .superExpr,
+      .tryExpr, .tupleExpr, .typeExpr, .unresolvedAsExpr, .unresolvedIsExpr,
+      .unresolvedTernaryExpr:
       break
 
     // Known unimplemented kinds.
@@ -55,8 +56,7 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
       .doExpr, .editorPlaceholderExpr, .floatLiteralExpr, .forceUnwrapExpr,
       .inOutExpr, .infixOperatorExpr, .isExpr, .keyPathExpr,
       .macroExpansionExpr, .optionalChainingExpr,
-      .postfixIfConfigExpr, .regexLiteralExpr, .genericSpecializationExpr,
-      .simpleStringLiteralExpr, .subscriptCallExpr, .superExpr, .switchExpr,
+      .postfixIfConfigExpr, .genericSpecializationExpr, .switchExpr,
       .ternaryExpr:
       return false
 
@@ -156,22 +156,22 @@ extension ASTGenVisitor {
       return self.generate(postfixOperatorExpr: node).asExpr
     case .prefixOperatorExpr(let node):
       return self.generate(prefixOperatorExpr: node).asExpr
-    case .regexLiteralExpr:
-      break
+    case .regexLiteralExpr(let node):
+      return self.generate(regexLiteralExpr: node)
     case .sequenceExpr(let node):
       return self.generate(sequenceExpr: node)
     case .simpleStringLiteralExpr:
-      break
+      preconditionFailure("SimpleStringLiteral expression only appear in attributes")
     case .stringLiteralExpr(let node):
       return self.generate(stringLiteralExpr: node)
-    case .subscriptCallExpr:
-      break
-    case .superExpr:
-      break
+    case .subscriptCallExpr(let node):
+      return self.generate(subscriptCallExpr: node).asExpr
+    case .superExpr(let node):
+      return self.generate(superExpr: node).asExpr
     case .switchExpr:
       break
-    case .ternaryExpr:
-      break
+    case .ternaryExpr(let node):
+      preconditionFailure("Ternary expression only appear after operator folding")
     case .tryExpr(let node):
       return self.generate(tryExpr: node)
     case .tupleExpr(let node):
@@ -589,6 +589,23 @@ extension ASTGenVisitor {
       self.ctx,
       exprs: elements.lazy.bridgedArray(in: self)
     ).asExpr
+  }
+
+  func generate(subscriptCallExpr node: SubscriptCallExprSyntax) -> BridgedSubscriptExpr {
+    let callee = generate(expr: node.calledExpression)
+    let arguments = generateArgumentList(
+      leftParen: node.leftSquare,
+      labeledExprList: node.arguments,
+      rightParen: node.rightSquare,
+      trailingClosure: node.trailingClosure,
+      additionalTrailingClosures: node.additionalTrailingClosures
+    )
+
+    return .createParsed(self.ctx, baseExpr: callee, args: arguments)
+  }
+
+  func generate(superExpr node: SuperExprSyntax) -> BridgedSuperRefExpr {
+    return .createParsed(self.ctx, superLoc: self.generateSourceLoc(node))
   }
 
   func generate(tryExpr node: TryExprSyntax) -> BridgedExpr {

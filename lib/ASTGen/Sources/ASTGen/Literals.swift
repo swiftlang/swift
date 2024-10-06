@@ -13,6 +13,7 @@
 import ASTBridging
 @_spi(Compiler) import SwiftParser
 import SwiftSyntax
+@_spi(CompilerInterface) import _CompilerRegexParser
 
 extension ASTGenVisitor {
   func generate(stringLiteralExpr node: StringLiteralExprSyntax) -> BridgedExpr {
