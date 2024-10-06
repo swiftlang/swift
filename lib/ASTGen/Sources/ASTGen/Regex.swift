@@ -41,7 +41,7 @@ extension ASTGenVisitor {
       )
       // Copy the regex string to the ASTContext.
       let regexToEmitStr = regexToEmit.withBridgedString {
-        self.ctx.copy(string: $0)
+        self.ctx.allocateCopy(string: $0)
       }
 
       return BridgedRegexLiteralExpr.createParsed(

@@ -200,10 +200,16 @@ SWIFT_NAME("BridgedASTContext.init(raw:)")
 BRIDGED_INLINE
 BridgedASTContext BridgedASTContext_fromRaw(void * _Nonnull ptr);
 
-SWIFT_NAME("BridgedASTContext.copy(self:string:)")
+SWIFT_NAME("BridgedASTContext.allocate(self:size:alignment:)")
 BRIDGED_INLINE
-BridgedStringRef BridgedASTContext_copyString(BridgedASTContext cContext,
-                                              BridgedStringRef cStr);
+void *_Nullable BridgedASTContext_allocate(BridgedASTContext bridged,
+                                           size_t size, size_t alignment);
+
+SWIFT_NAME("BridgedASTContext.allocateCopy(self:string:)")
+BRIDGED_INLINE
+BridgedStringRef
+BridgedASTContext_allocateCopyString(BridgedASTContext cContext,
+                                     BridgedStringRef cStr);
 
 SWIFT_NAME("BridgedASTContext.getIdentifier(self:_:)")
 BridgedIdentifier BridgedASTContext_getIdentifier(BridgedASTContext cContext,
@@ -1317,6 +1323,12 @@ BridgedDotSelfExpr BridgedDotSelfExpr_createParsed(BridgedASTContext cContext,
 SWIFT_NAME("BridgedErrorExpr.create(_:loc:)")
 BridgedErrorExpr BridgedErrorExpr_create(BridgedASTContext cContext,
                                          BridgedSourceRange cRange);
+
+SWIFT_NAME("BridgedFloatLiteralExpr.createParsed(_:value:loc:)")
+BridgedFloatLiteralExpr
+BridgedFloatLiteralExpr_createParsed(BridgedASTContext cContext,
+                                     BridgedStringRef cStr,
+                                     BridgedSourceLoc cTokenLoc);
 
 SWIFT_NAME("BridgedForceTryExpr.createParsed(_:tryLoc:subExpr:exclaimLoc:)")
 BridgedForceTryExpr

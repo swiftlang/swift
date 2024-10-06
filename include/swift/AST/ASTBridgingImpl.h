@@ -32,8 +32,14 @@ BridgedASTContext BridgedASTContext_fromRaw(void * _Nonnull ptr) {
   return *static_cast<swift::ASTContext *>(ptr);
 }
 
-BridgedStringRef BridgedASTContext_copyString(BridgedASTContext bridged,
-                                              BridgedStringRef cStr) {
+BRIDGED_INLINE
+void *_Nullable BridgedASTContext_allocate(BridgedASTContext bridged,
+                                           size_t size, size_t alignment) {
+  return bridged.unbridged().Allocate(size, alignment);
+}
+
+BridgedStringRef BridgedASTContext_allocateCopyString(BridgedASTContext bridged,
+                                                      BridgedStringRef cStr) {
   return bridged.unbridged().AllocateCopy(cStr.unbridged());
 }
 
