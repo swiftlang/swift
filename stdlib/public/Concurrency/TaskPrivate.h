@@ -18,6 +18,7 @@
 #define SWIFT_CONCURRENCY_TASKPRIVATE_H
 
 #include "Error.h"
+#include "TaskLocal.h"
 #include "Tracing.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/Task.h"
