@@ -228,7 +228,17 @@ BridgedForcedCheckedCastExpr BridgedForcedCheckedCastExpr_createParsed(
                                        cType.unbridged());
 }
 
-SWIFT_NAME("InOutExpr.createParsed(_:loc:subExpr:)")
+BridgedUnresolvedSpecializeExpr BridgedUnresolvedSpecializeExpr_createParsed(
+    BridgedASTContext cContext, BridgedExpr cSubExpr,
+    BridgedSourceLoc cLAngleLoc, BridgedArrayRef cArguments,
+    BridgedSourceLoc cRAngleLoc) {
+
+  ASTContext &context = cContext.unbridged();
+  return UnresolvedSpecializeExpr::create(
+      cContext.unbridged(), cSubExpr.unbridged(), cLAngleLoc.unbridged(),
+      cArguments.unbridged<TypeRepr *>(), cRAngleLoc.unbridged());
+}
+
 BridgedInOutExpr BridgedInOutExpr_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cLoc,
                                                BridgedExpr cSubExpr) {

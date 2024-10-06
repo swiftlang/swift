@@ -117,8 +117,8 @@ extension ASTGenVisitor {
       break
     case .functionCallExpr(let node):
       return self.generate(functionCallExpr: node).asExpr
-    case .genericSpecializationExpr:
-      break
+    case .genericSpecializationExpr(let node):
+      return self.generate(genericSpecializationExpr: node).asExpr
     case .ifExpr(let node):
       return self.generate(ifExpr: node).asExpr
     case .inOutExpr(let node):
@@ -474,6 +474,23 @@ extension ASTGenVisitor {
         nameLoc: nameAndLoc.loc
       ).asExpr
     }
+  }
+
+  func generate(genericSpecializationExpr node: GenericSpecializationExprSyntax) -> BridgedUnresolvedSpecializeExpr {
+    let base = self.generate(expr: node.expression)
+    let generics = node.genericArgumentClause
+    let lAngleLoc = self.generateSourceLoc(generics.leftAngle)
+    let genericArguments = generics.arguments.lazy.map {
+      self.generate(type: $0.argument)
+    }
+    let rAngleLoc = self.generateSourceLoc(generics.rightAngle)
+    return .createParsed(
+      self.ctx,
+      subExpr: base,
+      lAngleLoc: lAngleLoc,
+      arguments: genericArguments.bridgedArray(in: self),
+      rAngleLoc: rAngleLoc
+    )
   }
 
   func generate(packElementExpr node: PackElementExprSyntax) -> BridgedPackElementExpr {
