@@ -40,23 +40,22 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
   while true {
     switch current.kind {
     // Known implemented kinds.
-    case .arrayExpr, .arrowExpr, .assignmentExpr, .awaitExpr, .binaryOperatorExpr,
+    case .asExpr, .arrayExpr, .arrowExpr, .assignmentExpr, .awaitExpr, .binaryOperatorExpr,
       .booleanLiteralExpr, .borrowExpr, .closureExpr, .consumeExpr, .copyExpr,
       .discardAssignmentExpr, .declReferenceExpr, .dictionaryExpr, .floatLiteralExpr,
-      .functionCallExpr, .ifExpr, .integerLiteralExpr, .memberAccessExpr,
+      .functionCallExpr, .ifExpr,
+      .infixOperatorExpr, .inOutExpr, .integerLiteralExpr, .memberAccessExpr,
       .nilLiteralExpr, .packElementExpr, .packExpansionExpr, .patternExpr,
       .postfixOperatorExpr, .prefixOperatorExpr, .regexLiteralExpr, .sequenceExpr,
       .simpleStringLiteralExpr, .subscriptCallExpr, .stringLiteralExpr, .superExpr,
       .tryExpr, .tupleExpr, .typeExpr, .unresolvedAsExpr, .unresolvedIsExpr,
-      .unresolvedTernaryExpr:
+      .unresolvedTernaryExpr, .ternaryExpr:
       break
 
     // Known unimplemented kinds.
-    case .asExpr, 
-      .doExpr, .editorPlaceholderExpr, .forceUnwrapExpr, .inOutExpr,
-      .infixOperatorExpr, .isExpr, .keyPathExpr, .macroExpansionExpr,
+    case .doExpr, .editorPlaceholderExpr, .forceUnwrapExpr, .isExpr, .keyPathExpr, .macroExpansionExpr,
       .optionalChainingExpr, .postfixIfConfigExpr, .genericSpecializationExpr,
-      .switchExpr, .ternaryExpr:
+      .switchExpr:
       return false
 
     // Unknown expr kinds.
@@ -85,7 +84,7 @@ extension ASTGenVisitor {
     case .arrowExpr:
       preconditionFailure("should be handled in generate(sequenceExpr:)")
     case .asExpr:
-      break
+      preconditionFailure("AsExprSyntax expression only appear after operator folding")
     case .assignmentExpr:
       preconditionFailure("should be handled in generate(sequenceExpr:)")
     case .awaitExpr(let node):
@@ -122,10 +121,10 @@ extension ASTGenVisitor {
       break
     case .ifExpr(let node):
       return self.generate(ifExpr: node).asExpr
-    case .inOutExpr:
-      break
+    case .inOutExpr(let node):
+      return self.generate(inOutExpr: node).asExpr
     case .infixOperatorExpr:
-      break
+      preconditionFailure("InfixOperatorExprSyntax only appear after operator folding")
     case .integerLiteralExpr(let node):
       return self.generate(integerLiteralExpr: node).asExpr
     case .isExpr:
@@ -169,8 +168,8 @@ extension ASTGenVisitor {
       return self.generate(superExpr: node).asExpr
     case .switchExpr:
       break
-    case .ternaryExpr(let node):
-      preconditionFailure("Ternary expression only appear after operator folding")
+    case .ternaryExpr:
+      preconditionFailure("TernaryExprSyntax only appear after operator folding")
     case .tryExpr(let node):
       return self.generate(tryExpr: node)
     case .tupleExpr(let node):
@@ -497,6 +496,15 @@ extension ASTGenVisitor {
     return .createParsed(
       self.ctx,
       pattern: self.generate(pattern: node.pattern)
+    )
+  }
+
+  func generate(inOutExpr node: InOutExprSyntax) -> BridgedInOutExpr {
+    let subExpr = self.generate(expr: node.expression)
+    return .createParsed(
+      self.ctx,
+      loc: self.generateSourceLoc(node.ampersand),
+      subExpr: subExpr
     )
   }
 
