@@ -1342,6 +1342,11 @@ BridgedForcedCheckedCastExpr BridgedForcedCheckedCastExpr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAsLoc,
     BridgedSourceLoc cExclaimLoc, BridgedTypeRepr cType);
 
+SWIFT_NAME("BridgedInOutExpr.createParsed(_:loc:subExpr:)")
+BridgedInOutExpr BridgedInOutExpr_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cLoc,
+                                               BridgedExpr cSubExpr);
+
 SWIFT_NAME("BridgedIntegerLiteralExpr.createParsed(_:value:loc:)")
 BridgedIntegerLiteralExpr
 BridgedIntegerLiteralExpr_createParsed(BridgedASTContext cContext,
