@@ -125,15 +125,17 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   auto ai = swift::getActorIsolation(dd);
   auto actor = emitExecutor(Loc, ai, managedSelf);
   if (actor) {
-    ExpectedExecutor = *actor;
+    ExpectedExecutor.set(*actor);
+  } else {
+    ExpectedExecutor.setUnnecessary();
   }
 
   // Jump to the expected executor.
-  if (ExpectedExecutor) {
+  if (actor) {
     // For a synchronous function, check that we're on the same executor.
     // Note: if we "know" that the code is completely Sendable-safe, this
     // is unnecessary. The type checker will need to make this determination.
-    emitPreconditionCheckExpectedExecutor(Loc, ExpectedExecutor);
+    emitPreconditionCheckExpectedExecutor(Loc, *actor);
   }
 
   // Create a basic block to jump to for the implicit destruction behavior
