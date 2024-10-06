@@ -4120,7 +4120,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return makeParserSuccess();
       }
      
-      auto countType = parseType(diag::expected_type);
+      auto countType = parseTypeOrValue(diag::expected_type);
       if (countType.isNull()) {
         return makeParserSuccess();
       }

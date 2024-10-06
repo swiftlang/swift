@@ -1058,6 +1058,42 @@ bool SILParser::parseASTType(CanType &result,
   return false;
 }
 
+bool SILParser::parseASTTypeOrValue(CanType &result,
+                                    GenericSignature genericSig,
+                                    GenericParamList *genericParams,
+                                    bool forceContextualType) {
+  auto parsedType = P.parseTypeOrValue();
+  if (parsedType.isNull()) return true;
+
+  // If we weren't given a specific generic context to resolve the type
+  // within, use the contextual generic parameters and always produce
+  // a contextual type.  Otherwise, produce a contextual type only if
+  // we were asked for one.
+  bool wantContextualType = forceContextualType;
+  if (!genericSig) {
+    genericSig = ContextGenericSig;
+    wantContextualType = true;
+  }
+  if (genericParams == nullptr)
+    genericParams = ContextGenericParams;
+
+  bindSILGenericParams(parsedType.get());
+
+  auto resolvedType = performTypeResolution(
+      parsedType.get(), /*isSILType=*/false, genericSig, genericParams);
+  if (wantContextualType && genericSig) {
+    resolvedType = genericSig.getGenericEnvironment()
+        ->mapTypeIntoContext(resolvedType);
+  }
+
+  if (resolvedType->hasError())
+    return true;
+
+  result = resolvedType->getCanonicalType();
+
+  return false;
+}
+
 void SILParser::bindSILGenericParams(TypeRepr *TyR) {
   // Resolve the generic environments for parsed generic function and box types.
   class HandleSILGenericParamsWalker : public ASTWalker {
@@ -3098,7 +3134,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     CanType paramType;
     if (parseSILType(Ty) ||
         parseVerbatim("for") ||
-        parseASTType(paramType))
+        parseASTTypeOrValue(paramType))
       return true;
 
     ResultVal = B.createTypeValue(InstLoc, Ty, paramType);
