@@ -109,11 +109,20 @@ public struct Bool: Sendable {
   ///   the new random value.
   /// - Returns: Either `true` or `false`, randomly chosen with equal
   ///   probability.
-  @inlinable
-  public static func random<T: RandomNumberGenerator>(
+  @_alwaysEmitIntoClient
+  public static func random<T: RandomNumberGenerator & ~Copyable>(
     using generator: inout T
   ) -> Bool {
-    return (generator.next() >> 17) & 1 == 0
+    generator.next() >> 17 & 1 == 0
+  }
+  
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$sSb6random5usingSbxz_tSGRzlFZ")
+  @usableFromInline
+  internal static func __abi_random<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) -> Bool {
+    random(using: &generator)
   }
   
   /// Returns a random Boolean value.

@@ -922,14 +922,23 @@ extension Collection {
   ///   the same sequence of elements each time you run your program, that
   ///   sequence may change when your program is compiled using a different
   ///   version of Swift.
-  @inlinable
-  public func randomElement<T: RandomNumberGenerator>(
+  @_alwaysEmitIntoClient
+  public func randomElement<T: RandomNumberGenerator & ~Copyable>(
     using generator: inout T
   ) -> Element? {
     guard !isEmpty else { return nil }
     let random = Int.random(in: 0 ..< count, using: &generator)
     let idx = index(startIndex, offsetBy: random)
     return self[idx]
+  }
+  
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$sSlsE13randomElement5using0B0QzSgqd__z_tSGRd__lF")
+  @usableFromInline
+  internal func __abi_randomElement<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) -> Element? {
+    randomElement(using: &generator)
   }
 
   /// Returns a random element of the collection.
