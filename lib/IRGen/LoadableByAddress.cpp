@@ -3798,6 +3798,15 @@ protected:
     assignment.mapValueToAddress(origValue, newAddr);
     assignment.markForDeletion(bc);
   }
+
+  void visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *bc) {
+    auto builder = assignment.getBuilder(bc->getIterator());
+    auto opdAddr = assignment.getAddressForValue(bc->getOperand());
+    auto newAddr = builder.createUncheckedAddrCast(
+        bc->getLoc(), opdAddr, bc->getType().getAddressType());
+    assignment.mapValueToAddress(origValue, newAddr);
+    assignment.markForDeletion(bc);
+  }
 };
 } // namespace
 
