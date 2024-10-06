@@ -1342,6 +1342,13 @@ BridgedForcedCheckedCastExpr BridgedForcedCheckedCastExpr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAsLoc,
     BridgedSourceLoc cExclaimLoc, BridgedTypeRepr cType);
 
+SWIFT_NAME("BridgedUnresolvedSpecializeExpr.createParsed(_:subExpr:lAngleLoc:"
+           "arguments:rAngleLoc:)")
+BridgedUnresolvedSpecializeExpr BridgedUnresolvedSpecializeExpr_createParsed(
+    BridgedASTContext cContext, BridgedExpr cSubExpr,
+    BridgedSourceLoc cLAngleLoc, BridgedArrayRef cArguments,
+    BridgedSourceLoc cRAngleLoc);
+
 SWIFT_NAME("BridgedInOutExpr.createParsed(_:loc:subExpr:)")
 BridgedInOutExpr BridgedInOutExpr_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cLoc,
