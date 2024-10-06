@@ -1,0 +1,25 @@
+#ifndef CUSTOM_LIBCPP_CSTDINT
+#define CUSTOM_LIBCPP_CSTDINT
+
+#include <__config>
+#include <stdint.h>
+
+#ifndef CUSTOM_LIBCPP_STDINT_H
+#   error <cstdint> tried including <stdint.h> but didn't find libc++'s <stdint.h> header.
+#endif
+
+CUSTOM_LIBCPP_BEGIN_NAMESPACE_STD
+
+using ::int8_t;
+using ::int16_t;
+using ::int32_t;
+using ::int64_t;
+
+using ::uint8_t;
+using ::uint16_t;
+using ::uint32_t;
+using ::uint64_t;
+
+CUSTOM_LIBCPP_END_NAMESPACE_STD
+
+#endif // CUSTOM_LIBCPP_CSTDINT
