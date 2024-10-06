@@ -77,6 +77,7 @@ extension CxxTemplateInt {
 
 // expected-error@+1 {{cannot use type alias 'CxxTemplateInt' in an extension with public or '@usableFromInline' members; C++ types from imported module 'CxxModule' do not support library evolution}}
 extension CxxTemplateInt {
+    // expected-note@+1 {{instance method 'testPublicExt()' declared here must be visible to other modules}}
     public func testPublicExt() {
     }
 }
