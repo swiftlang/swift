@@ -468,8 +468,7 @@ void typeCheckASTNode(ASTNode &node, DeclContext *DC,
 std::optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
                                                            Type builderType);
 
-/// Find the return statements within the body of the given function.
-std::vector<ReturnStmt *> findReturnStatements(AnyFunctionRef fn);
+bool typeCheckClosureBody(ClosureExpr *closure);
 
 bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
 

@@ -918,13 +918,11 @@ std::optional<BraceStmt *>
 TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
   // First look for any return statements, and bail if we have any.
   auto &ctx = func->getASTContext();
-  if (evaluateOrDefault(ctx.evaluator, BraceHasReturnRequest{func->getBody()},
-                        false)) {
+  if (SmallVector<ReturnStmt *> returnStmts;
+      func->getBody()->getExplicitReturnStmts(ctx, returnStmts),
+      !returnStmts.empty()) {
     // One or more explicit 'return' statements were encountered, which
     // disables the result builder transform. Warn when we do this.
-    auto returnStmts = findReturnStatements(func);
-    assert(!returnStmts.empty());
-
     ctx.Diags.diagnose(
         returnStmts.front()->getReturnLoc(),
         diag::result_builder_disabled_by_return_warn, builderType);
@@ -1126,8 +1124,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
   // not apply the result builder transform if it contained an explicit return.
   // To maintain source compatibility, we still need to check for HasReturnStmt.
   // https://github.com/apple/swift/issues/64332.
-  if (evaluateOrDefault(getASTContext().evaluator,
-                        BraceHasReturnRequest{fn.getBody()}, false)) {
+  if (fn.getBody()->hasExplicitReturnStmt(getASTContext())) {
     // Diagnostic mode means that solver couldn't reach any viable
     // solution, so let's diagnose presence of a `return` statement
     // in the closure body.
@@ -1225,51 +1222,6 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
     return getTypeMatchFailure(locator);
 
   return getTypeMatchSuccess();
-}
-
-namespace {
-class ReturnStmtFinder : public ASTWalker {
-  std::vector<ReturnStmt *> ReturnStmts;
-
-public:
-  static std::vector<ReturnStmt *> find(const BraceStmt *BS) {
-    ReturnStmtFinder finder;
-    const_cast<BraceStmt *>(BS)->walk(finder);
-    return std::move(finder.ReturnStmts);
-  }
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Arguments;
-  }
-
-  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    return Action::SkipNode(E);
-  }
-
-  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-    // If we see a return statement, note it..
-    auto *returnStmt = dyn_cast<ReturnStmt>(S);
-    if (!returnStmt || returnStmt->isImplicit())
-      return Action::Continue(S);
-
-    ReturnStmts.push_back(returnStmt);
-    return Action::SkipNode(S);
-  }
-
-  /// Ignore patterns.
-  PreWalkResult<Pattern *> walkToPatternPre(Pattern *pat) override {
-    return Action::SkipNode(pat);
-  }
-};
-} // end anonymous namespace
-
-bool BraceHasReturnRequest::evaluate(Evaluator &evaluator,
-                                     const BraceStmt *BS) const {
-  return !ReturnStmtFinder::find(BS).empty();
-}
-
-std::vector<ReturnStmt *> TypeChecker::findReturnStatements(AnyFunctionRef fn) {
-  return ReturnStmtFinder::find(fn.getBody());
 }
 
 ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(
