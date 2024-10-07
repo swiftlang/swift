@@ -1931,13 +1931,16 @@ ConstraintSystem::matchFunctionResultTypes(Type expectedResult, Type fnResult,
     auto anchor = locator.getAnchor();
     if (auto *callExpr = getAsExpr<CallExpr>(anchor)) {
       if (auto *innerCall = getAsExpr<CallExpr>(callExpr->getSemanticFn())) {
-        auto *innerCalleeLoc =
+        if (!simplifyType(getType(innerCall->getFn()))
+                 ->is<TypeVariableType>()) {
+          auto *innerCalleeLoc =
             getCalleeLocator(getConstraintLocator(innerCall));
-        if (auto innerOverload = findSelectedOverloadFor(innerCalleeLoc)) {
-          auto choice = innerOverload->choice;
-          if (choice.getFunctionRefKind() == FunctionRefKind::DoubleApply) {
-            isSecondApply = true;
-            selected.emplace(*innerOverload);
+          if (auto innerOverload = findSelectedOverloadFor(innerCalleeLoc)) {
+            auto choice = innerOverload->choice;
+            if (choice.getFunctionRefKind() == FunctionRefKind::DoubleApply) {
+              isSecondApply = true;
+              selected.emplace(*innerOverload);
+            }
           }
         }
       }
