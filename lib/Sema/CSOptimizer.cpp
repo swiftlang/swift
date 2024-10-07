@@ -454,7 +454,15 @@ static Constraint *determineBestChoicesInContext(
         scoreCandidateMatch = [&](GenericSignature genericSig,
                                   Type candidateType, Type paramType,
                                   MatchOptions options) -> double {
-      auto areEqual = [](Type a, Type b) {
+      auto areEqual = [&options](Type a, Type b) {
+        // Double<->CGFloat implicit conversion support for literals
+        // only since in this case the conversion might not result in
+        // score penalty.
+        if (options.contains(MatchFlag::Literal) &&
+            ((a->isDouble() && b->isCGFloat()) ||
+             (a->isCGFloat() && b->isDouble())))
+          return true;
+
         return a->getDesugaredType()->isEqual(b->getDesugaredType());
       };
 
@@ -462,11 +470,13 @@ static Constraint *determineBestChoicesInContext(
         return areEqual(candidateType, paramType) ? 1 : 0;
 
       // Exact match between candidate and parameter types.
-      if (areEqual(candidateType, paramType))
+      if (areEqual(candidateType, paramType)) {
         return options.contains(MatchFlag::Literal) ? 0.3 : 1;
+      }
 
-      if (options.contains(MatchFlag::Literal))
+      if (options.contains(MatchFlag::Literal)) {
         return 0;
+      }
 
       // Check whether match would require optional injection.
       {

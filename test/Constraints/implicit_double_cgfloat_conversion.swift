@@ -361,3 +361,8 @@ do {
     return v // Ok
   }
 }
+
+func test_cgfloat_operator_is_attempted_with_literal_arguments(v: CGFloat?) {
+  let ratio = v ?? (2.0 / 16.0)
+  let _: CGFloat = ratio // Ok
+}
