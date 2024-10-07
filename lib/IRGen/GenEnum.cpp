@@ -3312,6 +3312,14 @@ namespace {
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T, bool isOutlined,
                             bool zeroizeIfSensitive) const override {
+      if (TI->isBitwiseTakable(ResilienceExpansion::Maximal)) {
+        IGF.Builder.CreateMemCpy(
+          dest.getAddress(), llvm::MaybeAlign(dest.getAlignment().getValue()),
+          src.getAddress(), llvm::MaybeAlign(src.getAlignment().getValue()),
+          TI->getSize(IGF, T));
+        return;
+      }
+
       if (!ElementsAreABIAccessible) {
         emitInitializeWithTakeCall(IGF, T, dest, src);
       } else if (isOutlined || T.hasParameterizedExistential()) {
@@ -5227,6 +5235,14 @@ namespace {
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T, bool isOutlined,
                             bool zeroizeIfSensitive) const override {
+      if (TI->isBitwiseTakable(ResilienceExpansion::Maximal)) {
+        IGF.Builder.CreateMemCpy(
+          dest.getAddress(), llvm::MaybeAlign(dest.getAlignment().getValue()),
+          src.getAddress(), llvm::MaybeAlign(src.getAlignment().getValue()),
+          TI->getSize(IGF, T));
+        return;
+      }
+
       if (!ElementsAreABIAccessible) {
         emitInitializeWithTakeCall(IGF, T, dest, src);
       } else if (isOutlined || T.hasParameterizedExistential()) {
