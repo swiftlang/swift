@@ -52,6 +52,52 @@ void BridgedTypeRepr_dump(void *type) { static_cast<TypeRepr *>(type)->dump(); }
 #pragma clang diagnostic pop
 
 //===----------------------------------------------------------------------===//
+// MARK: Metatype registration
+//===----------------------------------------------------------------------===//
+
+static bool declMetatypesInitialized = false;
+
+// Filled in by class registration in initializeSwiftModules().
+static SwiftMetatype declMetatypes[(unsigned)DeclKind::Last_Decl + 1];
+
+// Does return null if initializeSwiftModules() is never called.
+SwiftMetatype Decl::getDeclMetatype(DeclKind kind) {
+  SwiftMetatype metatype = declMetatypes[(unsigned)kind];
+  if (declMetatypesInitialized && !metatype) {
+    llvm::errs() << "Decl " << getKindName(kind) << " not registered\n";
+    abort();
+  }
+  return metatype;
+}
+
+/// Registers the metatype of a Decl class.
+/// Called by initializeSwiftModules().
+void registerBridgedDecl(BridgedStringRef bridgedClassName,
+                         SwiftMetatype metatype) {
+  declMetatypesInitialized = true;
+
+  auto declKind = llvm::StringSwitch<std::optional<swift::DeclKind>>(
+                      bridgedClassName.unbridged())
+#define DECL(Id, Parent) .Case(#Id "Decl", swift::DeclKind::Id)
+#include "swift/AST/DeclNodes.def"
+                      .Default(std::nullopt);
+
+  if (!declKind) {
+    llvm::errs() << "Unknown Decl class " << bridgedClassName.unbridged()
+                 << "\n";
+    abort();
+  }
+  declMetatypes[(unsigned)declKind.value()] = metatype;
+}
+
+BridgedOwnedString BridgedDeclObj::getDebugDescription() const {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  unbridged()->print(os);
+  return str;
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: Conformance
 //===----------------------------------------------------------------------===//
 
