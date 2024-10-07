@@ -88,13 +88,10 @@ class TypeTransform {
 
 public:
   Type doIt(Type t, TypePosition pos) {
-    if (!isa<ParenType>(t.getPointer())) {
-      // Transform this type node.
-      if (std::optional<Type> transformed = asDerived().transform(t.getPointer(), pos))
-        return *transformed;
-
-      // Recur.
-    }
+    // Transform this type node.
+    if (std::optional<Type> transformed =
+            asDerived().transform(t.getPointer(), pos))
+      return *transformed;
 
     // Recur into children of this type.
     TypeBase *base = t.getPointer();
@@ -486,18 +483,6 @@ case TypeKind::Id:
 
       return TypeAliasType::get(alias->getDecl(), newParentType, newSubMap,
                                 newUnderlyingTy);
-    }
-
-    case TypeKind::Paren: {
-      auto paren = cast<ParenType>(base);
-      Type underlying = doIt(paren->getUnderlyingType(), pos);
-      if (!underlying)
-        return Type();
-
-      if (underlying.getPointer() == paren->getUnderlyingType().getPointer())
-        return t;
-
-      return ParenType::get(ctx, underlying);
     }
 
     case TypeKind::ErrorUnion: {

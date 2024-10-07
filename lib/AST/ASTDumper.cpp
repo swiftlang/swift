@@ -4126,14 +4126,6 @@ namespace {
       printFoot();
     }
 
-    void visitParenType(ParenType *T, StringRef label) {
-      printCommon("paren_type", label);
-
-      printRec(T->getUnderlyingType());
-
-      printFoot();
-    }
-
     void visitTupleType(TupleType *T, StringRef label) {
       printCommon("tuple_type", label);
 

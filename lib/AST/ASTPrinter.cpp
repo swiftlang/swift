@@ -6124,12 +6124,6 @@ public:
     }
   }
 
-  void visitParenType(ParenType *T) {
-    Printer << "(";
-    visit(T->getUnderlyingType()->getInOutObjectType());
-    Printer << ")";
-  }
-
   void visitPackType(PackType *T) {
     if (Options.PrintExplicitPackTypes || Options.PrintTypesForDebugging)
       Printer << "Pack{";
@@ -6207,7 +6201,7 @@ public:
         Printer << ": ";
       } else if (e == 1 && !EltType->is<PackExpansionType>()) {
         // Unlabeled one-element tuples always print the empty label to
-        // distinguish them from the older syntax for ParenType.
+        // distinguish them from the older syntax for parens.
         Printer << "_: ";
       }
       visit(EltType);
