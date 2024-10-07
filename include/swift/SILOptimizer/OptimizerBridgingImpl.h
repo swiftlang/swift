@@ -417,6 +417,16 @@ OptionalBridgedVTable BridgedPassContext::lookupSpecializedVTable(BridgedType cl
   return {mod->lookUpSpecializedVTable(classType.unbridged())};
 }
 
+BridgedConformance BridgedPassContext::getSpecializedConformance(
+                                                     BridgedConformance genericConformance,
+                                                     BridgedASTType type,
+                                                     BridgedSubstitutionMap substitutions) const {
+  auto &ctxt = invocation->getPassManager()->getModule()->getASTContext();
+  auto *genConf = llvm::cast<swift::NormalProtocolConformance>(genericConformance.unbridged().getConcrete());
+  auto *c = ctxt.getSpecializedConformance(type.unbridged(), genConf, substitutions.unbridged());
+  return swift::ProtocolConformanceRef(c);
+}
+
 OptionalBridgedWitnessTable BridgedPassContext::lookupWitnessTable(BridgedConformance conformance) const {
   swift::ProtocolConformanceRef ref = conformance.unbridged();
   if (!ref.isConcrete()) {

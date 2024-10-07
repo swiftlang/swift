@@ -116,6 +116,10 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
         if context.options.enableEmbeddedSwift {
           _ = context.specializeClassMethodInst(classMethod)
         }
+      case let witnessMethod as WitnessMethodInst:
+        if context.options.enableEmbeddedSwift {
+          _ = context.specializeWitnessMethodInst(witnessMethod)
+        }
 
       case let initExRef as InitExistentialRefInst:
         if context.options.enableEmbeddedSwift {
@@ -267,12 +271,14 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
 private func specializeWitnessTables(for initExRef: InitExistentialRefInst, _ context: ModulePassContext,
                                      _ worklist: inout FunctionWorklist)
 {
-  for conformance in initExRef.conformances where conformance.isConcrete {
+  for c in initExRef.conformances where c.isConcrete {
+    let conformance = c.isInherited ? c.inheritedConformance : c
     let origWitnessTable = context.lookupWitnessTable(for: conformance)
     if conformance.isSpecialized {
       if origWitnessTable == nil {
-        let wt = specializeWitnessTable(forConformance: conformance, errorLocation: initExRef.location, context)
-        worklist.addWitnessMethods(of: wt)
+        specializeWitnessTable(forConformance: conformance, errorLocation: initExRef.location, context) {
+          worklist.addWitnessMethods(of: $0)
+        }
       }
     } else if let origWitnessTable {
       checkForGenericMethods(in: origWitnessTable, errorLocation: initExRef.location, context)

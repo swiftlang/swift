@@ -256,6 +256,7 @@ struct BridgedPassContext {
                                                                  BridgedSubstitutionMap substitutions) const;
   void deserializeAllCallees(BridgedFunction function, bool deserializeAll) const;
   bool specializeClassMethodInst(BridgedInstruction cm) const;
+  bool specializeWitnessMethodInst(BridgedInstruction wm) const;
   bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
   BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
   BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;
@@ -331,6 +332,10 @@ struct BridgedPassContext {
   OptionalBridgedVTable lookupVTable(BridgedDeclObj classDecl) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   OptionalBridgedVTable lookupSpecializedVTable(BridgedType classType) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedConformance getSpecializedConformance(BridgedConformance genericConformance,
+                                                       BridgedASTType type,
+                                                       BridgedSubstitutionMap substitutions) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   OptionalBridgedWitnessTable lookupWitnessTable(BridgedConformance conformance) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedWitnessTable createWitnessTable(BridgedLinkage linkage,

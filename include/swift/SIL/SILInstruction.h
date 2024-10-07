@@ -7717,6 +7717,13 @@ public:
     return getMember().getDecl()->getDeclContext()->getSelfProtocolDecl();
   }
 
+  // Returns true if it's expected that the witness method is looked up up from
+  // a specialized witness table.
+  // This is the case in Embedded Swift.
+  bool isSpecialized() const {
+    return !getType().castTo<SILFunctionType>()->isPolymorphic();
+  }
+
   ProtocolConformanceRef getConformance() const { return Conformance; }
 };
 
