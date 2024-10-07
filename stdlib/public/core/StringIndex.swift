@@ -524,13 +524,13 @@ extension String.Index {
     }
   }
 
-  /// A textual representation of this instance.
+  /// A textual representation of this instance, intended for debugging.
   ///
   /// - Important: The contents of the returned string are not guaranteed to
   ///    remain stable: they may arbitrarily change in any Swift release.
   @_alwaysEmitIntoClient // FIXME: Use @backDeployed
   @inline(never)
-  public var description: String {
+  public var debugDescription: String {
     // 23[utf8]+1
     var d = "\(_encodedOffset)[\(_encodingDescription)]"
     if transcodedOffset != 0 {
@@ -538,39 +538,29 @@ extension String.Index {
     }
     return d
   }
-
-  /// A textual representation of this instance.
-  @_alwaysEmitIntoClient
-  @available(*, deprecated, renamed: "description")
-  public var _description: String {
-    description
-  }
 }
 
 @available(SwiftStdlib 6.1, *)
-extension String.Index: CustomStringConvertible {}
+extension String.Index: CustomDebugStringConvertible {}
 
 extension String.Index {
-  /// A more detailed description of this string index.
+  /// A textual representation of this instance, intended for debugging.
+  ///
+  /// - Important: The contents of the returned string are not guaranteed to
+  ///    remain stable: they may arbitrarily change in any Swift release.
   @_alwaysEmitIntoClient
-  @inline(never)
+  @available(*, deprecated, renamed: "debugDescription")
+  public var _description: String {
+    debugDescription
+  }
+
+  /// A textual representation of this instance, intended for debugging.
+  ///
+  /// - Important: The contents of the returned string are not guaranteed to
+  ///    remain stable: they may arbitrarily change in any Swift release.
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, renamed: "debugDescription")
   public var _debugDescription: String {
-    /// Note: This would not make a good `debugDescription`; the current
-    /// `description` is fine for that.
-    var d = "String.Index("
-    d += "offset: \(_encodedOffset)[\(_encodingDescription)]"
-    if transcodedOffset != 0 {
-      d += "+\(transcodedOffset)"
-    }
-    if _isCharacterAligned {
-      d += ", aligned: character"
-    } else if _isScalarAligned {
-      d += ", aligned: scalar"
-    }
-    if let stride = characterStride {
-      d += ", stride: \(stride)"
-    }
-    d += ")"
-    return d
+    debugDescription
   }
 }

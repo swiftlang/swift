@@ -1240,11 +1240,11 @@ if #available(SwiftStdlib 6.1, *) {
   }
 }
 
-suite.test("String index description backdeployment") {
+suite.test("String index debugDescription backdeployment") {
   // Note: no availability check
   let str = "i\u{308}"
-  expectEqual(str.startIndex.description, "0[any]")
-  expectEqual(str.endIndex.description, "3[utf8]")
+  expectEqual(str.startIndex.debugDescription, "0[any]")
+  expectEqual(str.endIndex.debugDescription, "3[utf8]")
 }
 
 
