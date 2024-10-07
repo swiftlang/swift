@@ -4318,7 +4318,6 @@ public:
   Type openType(Type type, OpenedTypeMap &replacements,
                 ConstraintLocatorBuilder locator);
 
-private:
   /// "Open" an opaque archetype type, similar to \c openType.
   Type openOpaqueType(OpaqueTypeArchetypeType *type,
                       ConstraintLocatorBuilder locator);
@@ -4340,7 +4339,6 @@ private:
     ASSERT(erased);
   }
 
-public:
   /// Recurse over the given type and open any opaque archetype types.
   Type openOpaqueType(Type type, ContextualTypePurpose context,
                       ConstraintLocatorBuilder locator);
