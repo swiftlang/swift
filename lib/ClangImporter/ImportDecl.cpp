@@ -1506,6 +1506,9 @@ namespace {
         // bridging, i.e. if the imported typealias should name a bridged type
         // or the original C type.
         clang::QualType ClangType = Decl->getUnderlyingType();
+        if (importer::hasNonEscapableAttr(Decl))
+          Impl.nonEscapableTypes.insert(
+              ClangType->getCanonicalTypeUnqualified()->getTypePtr());
         SwiftType = Impl.importTypeIgnoreIUO(
             ClangType, ImportTypeKind::Typedef,
             ImportDiagnosticAdder(Impl, Decl, Decl->getLocation()),
@@ -2204,7 +2207,10 @@ namespace {
       }
 
       if (Impl.SwiftContext.LangOpts.hasFeature(Feature::NonescapableTypes) &&
-          importer::hasNonEscapableAttr(decl)) {
+          (importer::hasNonEscapableAttr(decl) ||
+           Impl.nonEscapableTypes.contains(decl->getTypeForDecl()
+                                               ->getCanonicalTypeUnqualified()
+                                               ->getTypePtr()))) {
         result->getAttrs().add(new (Impl.SwiftContext)
                                    NonEscapableAttr(/*Implicit=*/true));
       }

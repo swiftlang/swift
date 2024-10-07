@@ -552,6 +552,10 @@ public:
   /// Mapping of already-imported declarations.
   llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
 
+  // Types that should be imported as non-escapable. This is collected from
+  // the using declarations and used when importing template specializations.
+  llvm::DenseSet<const clang::Type *> nonEscapableTypes;
+
   /// The set of "special" typedef-name declarations, which are
   /// mapped to specific Swift types.
   ///
@@ -2029,9 +2033,9 @@ inline std::string getPrivateOperatorName(const std::string &OperatorToken) {
 
 bool hasUnsafeAPIAttr(const clang::Decl *decl);
 
-bool hasNonEscapableAttr(const clang::RecordDecl *decl);
+bool hasNonEscapableAttr(const clang::Decl *decl);
 
-bool hasEscapableAttr(const clang::RecordDecl *decl);
+bool hasEscapableAttr(const clang::Decl *decl);
 
 bool isViewType(const clang::CXXRecordDecl *decl);
 
