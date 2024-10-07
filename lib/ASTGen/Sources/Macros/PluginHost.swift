@@ -268,9 +268,6 @@ class PluginDiagnosticsEngine {
     case .note: bridgedSeverity = .note
     case .warning: bridgedSeverity = .warning
     case .remark: bridgedSeverity = .remark
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default: bridgedSeverity = .error
-#endif
     }
 
     // Emit the diagnostic

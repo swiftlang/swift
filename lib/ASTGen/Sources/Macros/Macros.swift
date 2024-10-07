@@ -378,10 +378,6 @@ func checkMacroDefinition(
       numGenericReplacementsPtr.pointee = genericReplacements.count
 
       return Int(BridgedMacroDefinitionKind.expandedMacro.rawValue)
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default:
-      fatalError()
-#endif
     }
   } catch let errDiags as DiagnosticsError {
     for diag in errDiags.diagnostics {
@@ -506,9 +502,6 @@ func expandFreestandingMacroImpl(
   case .expression: pluginMacroRole = .expression
   case .declaration: pluginMacroRole = .declaration
   case .codeItem: pluginMacroRole = .codeItem
-#if RESILIENT_SWIFT_SYNTAX
-  @unknown default: fatalError()
-#endif
   }
 
   // Send the message.
@@ -684,11 +677,6 @@ func expandAttachedMacroImpl(
     .declaration,
     .codeItem:
     preconditionFailure("unhandled macro role for attached macro")
-
-#if RESILIENT_SWIFT_SYNTAX
-  @unknown default:
-    fatalError()
-#endif
   }
 
   // Prepare syntax nodes to transfer.

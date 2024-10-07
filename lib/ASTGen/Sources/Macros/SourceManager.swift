@@ -215,11 +215,6 @@ extension SourceManager {
           at: replacementRange.upperBound
         )
         newText = replacingChildData.newChild.description
-
-#if RESILIENT_SWIFT_SYNTAX
-      @unknown default:
-        fatalError()
-#endif
       }
 
       newText.withBridgedString { bridgedMessage in
