@@ -524,7 +524,8 @@ namespace {
 struct MapTypeIntoContext: TypeTransform<MapTypeIntoContext> {
   GenericEnvironment *env;
 
-  explicit MapTypeIntoContext(GenericEnvironment *env) : env(env) {}
+  explicit MapTypeIntoContext(GenericEnvironment *env, ASTContext &ctx)
+    : TypeTransform(ctx), env(env) {}
 
   std::optional<Type> transform(TypeBase *type, TypePosition pos) {
     if (!type->hasTypeParameter())
@@ -552,7 +553,10 @@ struct MapTypeIntoContext: TypeTransform<MapTypeIntoContext> {
 
 Type GenericEnvironment::mapTypeIntoContext(Type type) const {
   assert(!type->hasPrimaryArchetype() && "already have a contextual type");
-  return MapTypeIntoContext(const_cast<GenericEnvironment *>(this))
+  if (!type->hasTypeParameter())
+    return type;
+  return MapTypeIntoContext(const_cast<GenericEnvironment *>(this),
+                            type->getASTContext())
       .doIt(type, TypePosition::Invariant);
 }
 

@@ -25,6 +25,12 @@ namespace swift {
 
 template<typename Derived>
 class TypeTransform {
+public:
+  ASTContext &ctx;
+
+  TypeTransform(ASTContext &ctx) : ctx(ctx) {}
+
+private:
   Derived &asDerived() { return *static_cast<Derived *>(this); }
 
   /// \param pos The variance position of the result type.
@@ -98,7 +104,6 @@ public:
 
     // Recur into children of this type.
     TypeBase *base = t.getPointer();
-    auto &ctx = base->getASTContext();
 
     switch (base->getKind()) {
 #define BUILTIN_TYPE(Id, Parent) \
@@ -684,14 +689,16 @@ case TypeKind::Id:
       if (!anyChanged)
         return t;
 
-      // Handle vanishing tuples -- If the transform would yield a singleton
-      // tuple, and we didn't start with one, flatten to produce the
-      // element type.
-      if (elements.size() == 1 &&
-          !elements[0].getType()->is<PackExpansionType>() &&
-          !(tuple->getNumElements() == 1 &&
-            !tuple->getElementType(0)->is<PackExpansionType>())) {
-        return elements[0].getType();
+      if (asDerived().shouldUnwrapVanishingTuples()) {
+        // Handle vanishing tuples -- If the transform would yield a singleton
+        // tuple, and we didn't start with one, flatten to produce the
+        // element type.
+        if (elements.size() == 1 &&
+            !elements[0].getType()->is<PackExpansionType>() &&
+            !(tuple->getNumElements() == 1 &&
+              !tuple->getElementType(0)->is<PackExpansionType>())) {
+          return elements[0].getType();
+        }
       }
 
       return TupleType::get(elements, ctx);
@@ -1001,6 +1008,8 @@ case TypeKind::Id:
     auto sig = subs.getGenericSignature();
     return SubstitutionMap::get(sig, newSubs, LookUpConformanceInModule());
   }
+
+  bool shouldUnwrapVanishingTuples() const { return true; }
 
   CanType transformSILField(CanType fieldTy, TypePosition pos) {
     return doIt(fieldTy, pos)->getCanonicalType();
