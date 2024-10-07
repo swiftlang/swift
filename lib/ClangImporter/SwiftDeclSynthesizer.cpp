@@ -96,7 +96,7 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
       /*Throws=*/false,
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
       params, getterType, importedDecl, clangNode);
-  getterDecl->setAccess(AccessLevel::Public);
+  getterDecl->setAccess(importedFieldDecl->getFormalAccess());
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
 
@@ -128,7 +128,7 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
   setterDecl->setIsObjC(false);
   setterDecl->setIsDynamic(false);
   setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
-  setterDecl->setAccess(AccessLevel::Public);
+  setterDecl->setAccess(importedFieldDecl->getFormalAccess());
 
   return setterDecl;
 }

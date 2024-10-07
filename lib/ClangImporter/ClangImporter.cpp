@@ -5777,6 +5777,9 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
     bodyParams = ParameterList::createEmpty(ctx);
   }
 
+  assert(baseClassVar->getFormalAccess() == AccessLevel::Public &&
+         "base class member must be public");
+
   auto getterDecl = AccessorDecl::create(
       ctx,
       /*FuncLoc=*/SourceLoc(),
@@ -7325,6 +7328,10 @@ Decl *ClangImporter::importDeclDirectly(const clang::NamedDecl *decl) {
 
 ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
     ValueDecl *decl, DeclContext *newContext) {
+  // Do not clone private C++ decls.
+  if (decl->getFormalAccess() < AccessLevel::Public)
+    return nullptr;
+
   // Make sure we don't clone the decl again for this class, as that would
   // result in multiple definitions of the same symbol.
   std::pair<ValueDecl *, DeclContext *> key = {decl, newContext};
