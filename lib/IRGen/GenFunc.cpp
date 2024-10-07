@@ -2111,7 +2111,7 @@ static llvm::Value *emitPartialApplicationForwarder(
   }
 
   // Derive the callee function pointer.
-  auto fnTy = origSig.getType()->getPointerTo();
+  auto fnTy = origSig.getType()->getPointerTo(IGM.DataLayout.getProgramAddressSpace());
   FunctionPointer fnPtr = [&]() -> FunctionPointer {
     // If we found a function pointer statically, great.
     if (staticFnPtr) {
@@ -2604,7 +2604,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
       IGF.IGM, staticFn, fnContext != nullptr, origSig, origType, substType,
       outType, subs, &layout, argConventions);
   forwarder = emitPointerAuthSign(IGF, forwarder, outAuthInfo);
-  forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
+  forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8ProgramSpacePtrTy);
   out.add(forwarder);
   out.add(data);
   return stackAddr;
