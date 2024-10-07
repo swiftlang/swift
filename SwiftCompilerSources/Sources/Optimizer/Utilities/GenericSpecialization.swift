@@ -78,7 +78,8 @@ func specializeVTablesOfSuperclasses(_ moduleContext: ModulePassContext) {
 
 func specializeWitnessTable(forConformance conformance: Conformance,
                             errorLocation: Location,
-                            _ context: ModulePassContext) -> WitnessTable
+                            _ context: ModulePassContext,
+                            _ notifyNewWitnessTable: (WitnessTable) -> ())
 {
   let genericConformance = conformance.genericConformance
   guard let witnessTable = context.lookupWitnessTable(for: genericConformance) else {
@@ -88,6 +89,8 @@ func specializeWitnessTable(forConformance conformance: Conformance,
 
   let newEntries = witnessTable.entries.map { origEntry in
     switch origEntry {
+    case .invalid:
+      return WitnessTable.Entry.invalid
     case .method(let requirement, let witness):
       guard let origMethod = witness else {
         return origEntry
@@ -101,11 +104,23 @@ func specializeWitnessTable(forConformance conformance: Conformance,
         return origEntry
       }
       return .method(requirement: requirement, witness: specializedMethod)
-    default:
-      // TODO: handle other witness table entry kinds
-      fatalError("unsupported witness table etnry")
+    case .baseProtocol(let requirement, let witness):
+      let baseConf = context.getSpecializedConformance(of: witness,
+                                                       for: conformance.type,
+                                                       substitutions: conformance.specializedSubstitutions)
+      specializeWitnessTable(forConformance: baseConf, errorLocation: errorLocation, context, notifyNewWitnessTable)
+      return .baseProtocol(requirement: requirement, witness: baseConf)
+    case .associatedType(let requirement, let witness):
+      let substType = witness.subst(with: conformance.specializedSubstitutions)
+      return .associatedType(requirement: requirement, witness: substType)
+    case .associatedConformance(let requirement, let proto, let witness):
+      if witness.isSpecialized {
+        specializeWitnessTable(forConformance: witness, errorLocation: errorLocation, context, notifyNewWitnessTable)
+      }
+      return .associatedConformance(requirement: requirement, protocol: proto, witness: witness)
     }
-    return origEntry
   }
-  return context.createWitnessTable(entries: newEntries, conformance: conformance, linkage: .shared, serialized: false)
+  let newWT = context.createWitnessTable(entries: newEntries,conformance: conformance,
+                                         linkage: .shared, serialized: false)
+  notifyNewWitnessTable(newWT)
 }

@@ -47,6 +47,16 @@ public struct Conformance: CustomStringConvertible, NoReflectionChildren {
     return bridged.getGenericConformance().conformance
   }
 
+  public var isInherited: Bool {
+    assert(isConcrete)
+    return bridged.isInheritedConformance()
+  }
+
+  public var inheritedConformance: Conformance {
+    assert(isInherited)
+    return bridged.getInheritedConformance().conformance
+  }
+
   public var specializedSubstitutions: SubstitutionMap {
     assert(isSpecialized)
     return SubstitutionMap(bridged: bridged.getSpecializedSubstitutions())

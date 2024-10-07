@@ -120,6 +120,8 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// Swift protocol witness table associated conformance witness table
   /// access functions.
+  /// In Embedded Swift used for associated conformance witness table
+  /// pointers.
   PointerAuthSchema ProtocolAssociatedTypeWitnessTableAccessFunctions;
 
   /// Swift class v-table functions.

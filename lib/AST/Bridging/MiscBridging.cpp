@@ -51,6 +51,10 @@ void BridgedTypeRepr_dump(void *type) { static_cast<TypeRepr *>(type)->dump(); }
 
 #pragma clang diagnostic pop
 
+//===----------------------------------------------------------------------===//
+// MARK: Conformance
+//===----------------------------------------------------------------------===//
+
 BridgedOwnedString BridgedConformance::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
@@ -58,5 +62,17 @@ BridgedOwnedString BridgedConformance::getDebugDescription() const {
   return str;
 }
 
+//===----------------------------------------------------------------------===//
+// MARK: SubstitutionMap
+//===----------------------------------------------------------------------===//
+
 static_assert(sizeof(BridgedSubstitutionMap) >= sizeof(swift::SubstitutionMap),
               "BridgedSubstitutionMap has wrong size");
+
+BridgedOwnedString BridgedSubstitutionMap::getDebugDescription() const {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  unbridged().dump(os);
+  return str;
+}
+
