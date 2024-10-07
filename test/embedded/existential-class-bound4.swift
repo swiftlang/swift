@@ -5,8 +5,11 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu
 
-protocol ClassBound: AnyObject {
+public protocol Base: AnyObject {
     func foo()
+}
+
+protocol ClassBound: Base {
     func bar()
 }
 

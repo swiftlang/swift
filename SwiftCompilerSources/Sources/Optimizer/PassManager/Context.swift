@@ -74,6 +74,14 @@ extension Context {
     return _bridged.lookupSpecializedVTable(classType.bridged).vTable
   }
 
+  func getSpecializedConformance(of genericConformance: Conformance,
+                                 for type: AST.`Type`,
+                                 substitutions: SubstitutionMap) -> Conformance
+  {
+    let c = _bridged.getSpecializedConformance(genericConformance.bridged, type.bridged, substitutions.bridged)
+    return Conformance(bridged: c)
+  }
+
   func notifyNewFunction(function: Function, derivedFrom: Function) {
     _bridged.addFunctionToPassManagerWorklist(function.bridged, derivedFrom.bridged)
   }
@@ -342,6 +350,15 @@ struct FunctionPassContext : MutatingContext {
 
   func specializeClassMethodInst(_ cm: ClassMethodInst) -> Bool {
     if _bridged.specializeClassMethodInst(cm.bridged) {
+      notifyInstructionsChanged()
+      notifyCallsChanged()
+      return true
+    }
+    return false
+  }
+
+  func specializeWitnessMethodInst(_ wm: WitnessMethodInst) -> Bool {
+    if _bridged.specializeWitnessMethodInst(wm.bridged) {
       notifyInstructionsChanged()
       notifyCallsChanged()
       return true
