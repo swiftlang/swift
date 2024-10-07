@@ -15,6 +15,7 @@
 
 #include "swift/AST/Attr.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -198,6 +199,15 @@ public:
   class ConditionalMember : public BuilderMember {
   public:
     ConditionalMember(MemberKind MemberKind,
+                      std::vector<PlatformVersionConstraintAvailabilitySpec>
+                          AvailabilityAttributes,
+                      std::vector<std::shared_ptr<BuilderMember>> IfElements,
+                      std::vector<std::shared_ptr<BuilderMember>> ElseElements)
+        : BuilderMember(MemberKind),
+          AvailabilityAttributes(AvailabilityAttributes),
+          IfElements(IfElements), ElseElements(ElseElements) {}
+
+    ConditionalMember(MemberKind MemberKind,
                       std::vector<std::shared_ptr<BuilderMember>> IfElements,
                       std::vector<std::shared_ptr<BuilderMember>> ElseElements)
         : BuilderMember(MemberKind), IfElements(IfElements),
@@ -210,6 +220,10 @@ public:
              (Kind == MemberKind::Optional);
     }
 
+    std::optional<std::vector<PlatformVersionConstraintAvailabilitySpec>>
+    getAvailabilityAttributes() const {
+      return AvailabilityAttributes;
+    }
     std::vector<std::shared_ptr<BuilderMember>> getIfElements() const {
       return IfElements;
     }
@@ -218,6 +232,8 @@ public:
     }
 
   private:
+    std::optional<std::vector<PlatformVersionConstraintAvailabilitySpec>>
+        AvailabilityAttributes;
     std::vector<std::shared_ptr<BuilderMember>> IfElements;
     std::vector<std::shared_ptr<BuilderMember>> ElseElements;
   };

@@ -945,6 +945,7 @@ getResultBuilderElementFromASTNode(const ASTNode node) {
 
 BuilderValue::ConditionalMember
 getConditionalMemberFromIfStmt(const IfStmt *ifStmt) {
+  std::vector<PlatformVersionConstraintAvailabilitySpec> AvailabilityAttributes;
   std::vector<std::shared_ptr<BuilderValue::BuilderMember>> IfElements;
   std::vector<std::shared_ptr<BuilderValue::BuilderMember>> ElseElements;
   if (auto thenBraceStmt = ifStmt->getThenStmt()) {
@@ -976,12 +977,24 @@ getConditionalMemberFromIfStmt(const IfStmt *ifStmt) {
   }
   for (auto elt : ifStmt->getCond()) {
     if (elt.getKind() == StmtConditionElement::CK_Availability) {
+      for (auto *Q : elt.getAvailability()->getQueries()) {
+        if (auto *availability =
+                dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Q)) {
+          AvailabilityAttributes.push_back(*availability);
+        }
+      }
       memberKind = BuilderValue::LimitedAvailability;
       break;
     }
   }
 
-  return BuilderValue::ConditionalMember(memberKind, IfElements, ElseElements);
+  if (AvailabilityAttributes.empty()) {
+    return BuilderValue::ConditionalMember(memberKind, IfElements,
+                                           ElseElements);
+  }
+
+  return BuilderValue::ConditionalMember(memberKind, AvailabilityAttributes,
+                                         IfElements, ElseElements);
 }
 
 BuilderValue::ArrayMember
@@ -1094,6 +1107,17 @@ void writeBuilderMember(
 
   default: {
     auto member = cast<BuilderValue::ConditionalMember>(Member);
+    if (auto availabilityAttributes = member->getAvailabilityAttributes()) {
+      JSON.attributeArray("availabilityAttributes", [&] {
+        for (auto elem : *availabilityAttributes) {
+          JSON.object([&] {
+            JSON.attribute("platform",
+                           platformString(elem.getPlatform()).str());
+            JSON.attribute("minVersion", elem.getVersion().getAsString());
+          });
+        }
+      });
+    }
     JSON.attributeArray("ifElements", [&] {
       for (auto elem : member->getIfElements()) {
         JSON.object([&] { writeBuilderMember(JSON, elem); });
