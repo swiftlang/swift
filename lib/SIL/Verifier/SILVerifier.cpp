@@ -3338,7 +3338,7 @@ public:
             "cannot directly copy type with inaccessible ABI");
     require(cai->getModule().getStage() == SILStage::Raw ||
                 (cai->isTakeOfSrc() || !cai->getSrc()->getType().isMoveOnly()),
-            "'MoveOnly' types can only be copied in Raw SIL?!");
+            "MoveOnly types cannot be copied after Raw SIL!");
   }
 
   void checkExplicitCopyAddrInst(ExplicitCopyAddrInst *ecai) {
@@ -3351,6 +3351,9 @@ public:
                     "Store operand type and dest type mismatch");
     require(checkTypeABIAccessible(F, ecai->getDest()->getType()),
             "cannot directly copy type with inaccessible ABI");
+    require(ecai->getModule().getStage() == SILStage::Raw ||
+        (ecai->isTakeOfSrc() || !ecai->getSrc()->getType().isMoveOnly()),
+            "MoveOnly types cannot be copied after Raw SIL!");
   }
 
   void checkMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *SI) {
@@ -3389,7 +3392,7 @@ public:
             "ownership");
     require(I->getModule().getStage() == SILStage::Raw ||
                 !I->getOperand()->getType().isMoveOnly(),
-            "'MoveOnly' types can only be copied in Raw SIL?!");
+            "MoveOnly types cannot be copied after Raw SIL!");
   }
 
   void checkUnownedCopyValueInst(UnownedCopyValueInst *I) {
@@ -3419,6 +3422,9 @@ public:
             "Source value should be an object value");
     require(!I->getOperand()->getType().isTrivial(*I->getFunction()),
             "Source value should be non-trivial");
+    require(I->getModule().getStage() == SILStage::Raw ||
+        !I->getOperand()->getType().isMoveOnly(),
+            "MoveOnly types cannot be copied after Raw SIL!");
   }
 
   void checkDestroyValueInst(DestroyValueInst *I) {
