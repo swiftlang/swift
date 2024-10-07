@@ -31,6 +31,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeTransform.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
@@ -1199,6 +1200,50 @@ Type ConstraintSystem::replaceInferableTypesWithTypeVars(
   return type;
 }
 
+namespace {
+
+struct TypeOpener : public TypeTransform<TypeOpener> {
+  OpenedTypeMap &replacements;
+  ConstraintLocatorBuilder locator;
+  ConstraintSystem &cs;
+
+  TypeOpener(OpenedTypeMap &replacements,
+             ConstraintLocatorBuilder locator,
+             ConstraintSystem &cs)
+      : TypeTransform<TypeOpener>(cs.getASTContext()),
+        replacements(replacements), locator(locator), cs(cs) {}
+
+  std::optional<Type> transform(TypeBase *type, TypePosition pos) {
+    if (!type->hasTypeParameter())
+      return Type(type);
+
+    return std::nullopt;
+  }
+
+  Type transformGenericTypeParamType(GenericTypeParamType *genericParam,
+                                     TypePosition pos) {
+    auto known = replacements.find(
+      cast<GenericTypeParamType>(genericParam->getCanonicalType()));
+    // FIXME: This should be an assert, however protocol generic signatures
+    // drop outer generic parameters.
+    // assert(known != replacements.end());
+    if (known == replacements.end())
+      return ErrorType::get(ctx);
+    return known->second;
+  }
+
+  Type transformPackExpansionType(PackExpansionType *expansion,
+                                  TypePosition pos) {
+    return cs.openPackExpansionType(expansion, replacements, locator);
+  }
+
+  bool shouldUnwrapVanishingTuples() const {
+    return false;
+  }
+};
+
+}
+
 Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements,
                                 ConstraintLocatorBuilder locator) {
   assert(!type->hasUnboundGenericType());
@@ -1206,42 +1251,8 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements,
   if (!type->hasTypeParameter())
     return type;
 
-  return type.transformRec([&](Type type) -> std::optional<Type> {
-      assert(!type->is<GenericFunctionType>());
-
-      // Preserve single element tuples if their element is
-      // pack expansion, otherwise it wouldn't be expanded.
-      if (auto *tuple = type->getAs<TupleType>()) {
-        if (tuple->getNumElements() == 1) {
-          const auto &elt = tuple->getElement(0);
-          if (!elt.hasName() && elt.getType()->is<PackExpansionType>()) {
-            return TupleType::get(
-                {openPackExpansionType(
-                    elt.getType()->castTo<PackExpansionType>(), replacements,
-                    locator)},
-                tuple->getASTContext());
-          }
-        }
-      }
-
-      if (auto *expansion = type->getAs<PackExpansionType>()) {
-        return openPackExpansionType(expansion, replacements, locator);
-      }
-
-      // Replace a generic type parameter with its corresponding type variable.
-      if (auto genericParam = type->getAs<GenericTypeParamType>()) {
-        auto known = replacements.find(
-          cast<GenericTypeParamType>(genericParam->getCanonicalType()));
-        // FIXME: This should be an assert, however protocol generic signatures
-        // drop outer generic parameters.
-        // assert(known != replacements.end());
-        if (known == replacements.end())
-          return ErrorType::get(getASTContext());
-        return known->second;
-      }
-
-      return std::nullopt;
-    });
+  return TypeOpener(replacements, locator, *this)
+      .doIt(type, TypePosition::Invariant);
 }
 
 Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
