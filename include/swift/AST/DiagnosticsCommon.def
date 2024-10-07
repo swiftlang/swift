@@ -208,6 +208,9 @@ ERROR(scanner_arguments_invalid, none,
 ERROR(error_scanner_extra, none,
       "failed inside dependency scanner: '%0'", (StringRef))
 
+ERROR(error_missing_chained_header, none,
+      "bridging header doesn't chain include the bridging header '%0' from module '%1'", (StringRef, StringRef))
+
 WARNING(warn_scanner_deserialize_failed, none,
         "Failed to load module scanning dependency cache from: '%0', re-building scanner cache from scratch.", (StringRef))
 
