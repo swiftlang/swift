@@ -472,9 +472,27 @@ case TypeKind::Id:
         return newUnderlyingTy;
 
       auto oldSubMap = alias->getSubstitutionMap();
-      auto newSubMap = asDerived().transformSubMap(oldSubMap);
-      if (oldSubMap && !newSubMap)
-        return Type();
+      SubstitutionMap newSubMap;
+
+      // We leave the old behavior behind for ConstraintSystem::openType(), where
+      // preserving sugar introduces a performance penalty.
+      if (asDerived().shouldDesugarTypeAliases()) {
+        for (auto oldReplacementType : oldSubMap.getReplacementTypes()) {
+          Type newReplacementType = doIt(oldReplacementType, TypePosition::Invariant);
+          if (!newReplacementType)
+            return Type();
+
+          // If anything changed with the replacement type, we lose the sugar.
+          if (newReplacementType.getPointer() != oldReplacementType.getPointer())
+            return newUnderlyingTy;
+        }
+
+        newSubMap = oldSubMap;
+      } else {
+        newSubMap = asDerived().transformSubMap(oldSubMap);
+        if (oldSubMap && !newSubMap)
+          return Type();
+      }
 
       if (oldParentType.getPointer() == newParentType.getPointer() &&
           oldUnderlyingTy.getPointer() == newUnderlyingTy.getPointer() &&
@@ -1010,6 +1028,8 @@ case TypeKind::Id:
   }
 
   bool shouldUnwrapVanishingTuples() const { return true; }
+
+  bool shouldDesugarTypeAliases() const { return false; }
 
   CanType transformSILField(CanType fieldTy, TypePosition pos) {
     return doIt(fieldTy, pos)->getCanonicalType();

@@ -1240,6 +1240,10 @@ struct TypeOpener : public TypeTransform<TypeOpener> {
   bool shouldUnwrapVanishingTuples() const {
     return false;
   }
+
+  bool shouldDesugarTypeAliases() const {
+    return true;
+  }
 };
 
 }
