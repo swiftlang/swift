@@ -68,10 +68,6 @@ extension ASTGenVisitor {
       return self.generate(typeAliasDecl: node).asDecl
     case .variableDecl(let node):
       return self.generate(variableDecl: node).asDecl
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default:
-      fatalError()
-#endif
     }
     return self.generateWithLegacy(node)
   }
@@ -425,10 +421,6 @@ extension ASTGenVisitor {
         accessors: CollectionOfOne(accessor).bridgedArray(in: self),
         rBraceLoc: rightBrace
       )
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default:
-      fatalError()
-#endif
     }
   }
 
@@ -734,10 +726,6 @@ extension ASTGenVisitor {
         } else {
           body.associativity = associativity
         }
-#if RESILIENT_SWIFT_SYNTAX
-      @unknown default:
-        fatalError()
-#endif
       }
     }
 
