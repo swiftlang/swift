@@ -80,11 +80,6 @@ fileprivate func emitDiagnosticParts(
       replaceStartLoc = bridgedSourceLoc(at: replacementRange.lowerBound)
       replaceEndLoc = bridgedSourceLoc(at: replacementRange.upperBound)
       newText = replacingChildData.newChild.description
-      
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default:
-      fatalError()
-#endif
     }
 
     newText.withBridgedString { bridgedMessage in
@@ -152,9 +147,6 @@ extension DiagnosticSeverity {
     case .note: return .note
     case .warning: return .warning
     case .remark: return .remark
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default: return .error
-#endif
     }
   }
 }
