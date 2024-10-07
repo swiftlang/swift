@@ -23,6 +23,9 @@
 
 #include "ExecutorImpl.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wgnu-offsetof-extensions"
+
 // JobFlags
 static_assert(sizeof(swift::JobFlags) == sizeof(SwiftJobFlags));
 
@@ -65,3 +68,5 @@ static_assert((SwiftClockId)swift::swift_clock_id_continuous
               == SwiftContinuousClock);
 static_assert((SwiftClockId)swift::swift_clock_id_suspending
               == SwiftSuspendingClock);
+
+#pragma clang diagnostic pop
