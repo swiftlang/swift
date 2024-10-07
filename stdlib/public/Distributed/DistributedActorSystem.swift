@@ -555,12 +555,20 @@ extension DistributedActorSystem {
         errorCode: .typeDeserializationFailure)
     }
 
-    var executeDistributedTargetHasThrown = false
+    // we start out assuming we may have thrown,
+    // and set this to false when we return without having thrown
+    var executeDistributedTargetHasThrown = true
+
     func doDestroyReturnTypeBuffer<R>(_: R.Type) {
       let buf = resultBuffer.assumingMemoryBound(to: R.self)
+
       if !executeDistributedTargetHasThrown {
+        // since the _execute function has NOT thrown,
+        // there must be a value in the result buffer that we must deinitialize
         buf.deinitialize(count: 1)
-      }
+      } // otherwise, the _execute has thrown and not populated the result buffer
+
+      // finally, deallocate the buffer
       buf.deallocate()
     }
 
@@ -584,6 +592,9 @@ extension DistributedActorSystem {
         witnessTables: witnessTablesBuffer,
         numWitnessTables: UInt(numWitnessTables)
       )
+      // execute has not thrown, so the result buffer has been filled with some value,
+      // we must properly deinitialize it.
+      executeDistributedTargetHasThrown = false
 
       if returnType == Void.self {
         try await handler.onReturnVoid()
@@ -595,7 +606,6 @@ extension DistributedActorSystem {
         )
       }
     } catch {
-      executeDistributedTargetHasThrown = true
       try await handler.onThrow(error: error)
     }
   }
