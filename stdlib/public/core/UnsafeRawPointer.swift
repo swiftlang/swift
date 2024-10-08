@@ -1444,10 +1444,14 @@ extension UnsafeMutableRawPointer {
   ///   - offset: The offset from this pointer, in bytes. `offset` must be
   ///     nonnegative. The default is zero.
   ///   - type: The type of `value`.
+  @abi(
+    // This custom ABI is chosen to not interfere with the old ABI
+    public func _new_se0349_storeBytes<T>(
+      of value: T, toByteOffset offset: Int, as type: T.Type
+    )
+  )
   @inlinable
   @_alwaysEmitIntoClient
-  // This custom silgen name is chosen to not interfere with the old ABI
-  @_silgen_name("_swift_se0349_UnsafeMutableRawPointer_storeBytes")
   public func storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
@@ -1470,8 +1474,12 @@ extension UnsafeMutableRawPointer {
   // This obsolete implementation uses the expected mangled name
   // of `storeBytes<T>(of:toByteOffset:as:)`, and provides an entry point for
   // any binary compiled against the stdlib binary for Swift 5.6 and older.
+  @abi(
+    public func storeBytes<T>(
+      of value: T, toByteOffset offset: Int, as type: T.Type
+    )
+  )
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$sSv10storeBytes2of12toByteOffset2asyx_SixmtlF")
   @usableFromInline func _legacy_se0349_storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {

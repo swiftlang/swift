@@ -902,8 +902,13 @@ extension UnsafeMutableBufferPointer {
   ///   buffer.
   /// - Returns: An iterator to any elements of `source` that didn't fit in the
   ///   buffer, and an index to the next uninitialized element in the buffer.
+  @abi(
+    public func initialize<S: Sequence>(
+      from source: S
+    ) -> (/* not 'unwritten:' */ S.Iterator, /* not 'index:' */ Index)
+      where S.Element == Element
+  )
   @inlinable // unsafe-performance
-  @_silgen_name("$sSr10initialize4from8IteratorQyd___Sitqd___t7ElementQyd__RszSTRd__lF")
   public func initialize<S: Sequence>(
     from source: S
   ) -> (unwritten: S.Iterator, index: Index) where S.Element == Element {
@@ -972,8 +977,8 @@ extension UnsafeMutableBufferPointer {
   ///
   /// - Parameters:
   ///   - repeatedValue: The value used when updating this pointer's memory.
+  @abi(public func assign(repeating repeatedValue: Element))
   @inlinable // unsafe-performance
-  @_silgen_name("$sSr6assign9repeatingyx_tF")
   public func update(repeating repeatedValue: Element) {
     guard let dstBase = _position else {
       return
@@ -982,9 +987,9 @@ extension UnsafeMutableBufferPointer {
     dstBase.update(repeating: repeatedValue, count: count)
   }
 
+  @abi(public func update(repeating repeatedValue: Element))
   @_alwaysEmitIntoClient
   @available(*, deprecated, renamed: "update(repeating:)")
-  @_silgen_name("_swift_se0370_UnsafeMutableBufferPointer_assign_repeating")
   public func assign(repeating repeatedValue: Element) {
     update(repeating: repeatedValue)
   }
@@ -1390,12 +1395,13 @@ extension Unsafe${Mutable}BufferPointer {
   // of `withMemoryRebound<T, Result>(to:_:)`, and provides
   // an entry point for any binary linked against the stdlib binary
   // for Swift 5.6 and older.
+  @abi(
+    public func withMemoryRebound<T, Result>(
+      to type: T.Type,
+      _ body: (${Self}<T>) throws -> Result
+    ) rethrows -> Result
+  )
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-% if Mutable:
-  @_silgen_name("$sSr17withMemoryRebound2to_qd_0_qd__m_qd_0_Sryqd__GKXEtKr0_lF")
-% else:
-  @_silgen_name("$sSR17withMemoryRebound2to_qd_0_qd__m_qd_0_SRyqd__GKXEtKr0_lF")
-% end
   @usableFromInline
   internal func _legacy_se0333_withMemoryRebound<T, Result>(
     to type: T.Type,

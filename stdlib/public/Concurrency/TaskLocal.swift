@@ -220,10 +220,16 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   //
   // This function also doubles as an ABI-compatibility shim predating the
   // introduction of #isolation.
+  @abi(
+    public func withValue<R>(
+      _ valueDuringOperation: Value,
+      operation: () async throws -> R,
+      file: String, line: UInt
+    ) async rethrows -> R
+  )
   @discardableResult
   @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
   @available(SwiftStdlib 5.1, *)
-  @_silgen_name("$ss9TaskLocalC9withValue_9operation4file4lineqd__x_qd__yYaKXESSSutYaKlF")
   public func _unsafeInheritExecutor_withValue<R>(
     _ valueDuringOperation: Value,
     operation: () async throws -> R,
@@ -264,7 +270,13 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
     return try await operation()
   }
 
-  @_silgen_name("$ss9TaskLocalC13withValueImpl_9operation4file4lineqd__xn_qd__yYaKXESSSutYaKlF")
+  @abi(
+    @inlinable internal func withValueImpl<R>(
+      _ valueDuringOperation: __owned Value,
+      operation: () async throws -> R,
+      file: String, line: UInt
+    ) async rethrows -> R
+  )
   @inlinable
   @discardableResult
   @_unsafeInheritExecutor // internal for backwards compatibility; though may be able to be removed safely?

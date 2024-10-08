@@ -378,3 +378,15 @@ Struct UnsafePointer is now with @unsafe
 Struct UnsafeRawBufferPointer is now with @unsafe
 Struct UnsafeRawPointer is now with @unsafe
 Var Optional.unsafelyUnwrapped is now with @unsafe
+
+// Renames made by SE-0370. There are also new deprecated methods to preserve
+// source compatibility. These only started being flagged when the ABI magic
+// switched from @_silgen_name to @abi.
+Func UnsafeMutableBufferPointer.assign(repeating:) has been renamed to Func update(repeating:)
+Func UnsafeMutablePointer.assign(from:count:) has been renamed to Func update(from:count:)
+Func UnsafeMutablePointer.assign(repeating:count:) has been renamed to Func update(repeating:count:)
+
+// False positive: this is a new overload of a method with some @abi trickery
+// that confuses the API checker into losing track of the old overload.
+// FIXME: It'd be nice if this didn't happen.
+Func UnsafeMutableRawPointer.storeBytes(of:toByteOffset:as:) has generic signature change from <T> to <T where T : Swift.BitwiseCopyable>

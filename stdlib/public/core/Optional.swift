@@ -807,10 +807,15 @@ public func ?? <T: ~Copyable>(
   }
 }
 
+@abi(
+  public func ?? <T>(
+    optional: T?,
+    defaultValue: @autoclosure () throws -> T
+  ) rethrows -> T
+)
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-@_silgen_name("$ss2qqoiyxxSg_xyKXKtKlF")
 @usableFromInline
-internal func _legacy_abi_optionalNilCoalescingOperator <T>(
+internal func _copyable_optionalNilCoalescingOperator <T>(
   optional: T?,
   defaultValue: @autoclosure () throws -> T
 ) rethrows -> T {
@@ -879,9 +884,15 @@ public func ?? <T: ~Copyable>(
   }
 }
 
+@abi(
+  public func ?? <T>(
+    optional: T?,
+    defaultValue: @autoclosure () throws -> T?
+  ) rethrows -> T?
+)
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @usableFromInline
-internal func ?? <T>(
+internal func _copyable_optionalNilCoalescingOperator <T>(
   optional: T?,
   defaultValue: @autoclosure () throws -> T?
 ) rethrows -> T? {

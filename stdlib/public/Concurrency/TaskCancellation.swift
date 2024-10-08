@@ -89,9 +89,14 @@ public func withTaskCancellationHandler<T>(
 //
 // This function also doubles as an ABI-compatibility shim predating the
 // introduction of #isolation.
+@abi(
+  public func withTaskCancellationHandler<T>(
+    operation: () async throws -> T,
+    onCancel handler: @Sendable () -> Void
+  ) async rethrows -> T
+)
 @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
 @available(SwiftStdlib 5.1, *)
-@_silgen_name("$ss27withTaskCancellationHandler9operation8onCancelxxyYaKXE_yyYbXEtYaKlF")
 public func _unsafeInheritExecutor_withTaskCancellationHandler<T>(
   operation: () async throws -> T,
   onCancel handler: @Sendable () -> Void

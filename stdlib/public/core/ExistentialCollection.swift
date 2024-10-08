@@ -1335,11 +1335,14 @@ extension AnySequence {
   }
 
   // ABI-only entrypoint for the rethrows version of map, which has been
-  // superseded by the typed-throws version. Expressed as "throws", which is
-  // ABI-compatible with "rethrows".
+  // superseded by the typed-throws version.
+  @abi(
+    public func map<T>(
+      _ transform: (Element) throws -> T
+    ) rethrows -> [T]
+  )
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
-  @_silgen_name("$ss11AnySequenceV3mapySayqd__Gqd__xKXEKlF")
   func __rethrows_map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
@@ -1439,11 +1442,14 @@ extension AnyCollection {
   }
 
   // ABI-only entrypoint for the rethrows version of map, which has been
-  // superseded by the typed-throws version. Expressed as "throws", which is
-  // ABI-compatible with "rethrows".
+  // superseded by the typed-throws version.
+  @abi(
+    public func map<T>(
+      _ transform: (Element) throws -> T
+    ) rethrows -> [T]
+  )
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
-  @_silgen_name("$ss13AnyCollectionV3mapySayqd__Gqd__xKXEKlF")
   func __rethrows_map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
@@ -1549,11 +1555,14 @@ extension AnyBidirectionalCollection {
   }
 
   // ABI-only entrypoint for the rethrows version of map, which has been
-  // superseded by the typed-throws version. Expressed as "throws", which is
-  // ABI-compatible with "rethrows".
+  // superseded by the typed-throws version.
+  @abi(
+    public func map<T>(
+      _ transform: (Element) throws -> T
+    ) rethrows -> [T]
+  )
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
-  @_silgen_name("$ss26AnyBidirectionalCollectionV3mapySayqd__Gqd__xKXEKlF")
   func __rethrows_map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
@@ -1663,9 +1672,13 @@ extension AnyRandomAccessCollection {
   // ABI-only entrypoint for the rethrows version of map, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
+  @abi(
+    public func map<T>(
+      _ transform: (Element) throws -> T
+    ) rethrows -> [T]
+  )
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
-  @_silgen_name("$ss25AnyRandomAccessCollectionV3mapySayqd__Gqd__xKXEKlF")
   func __rethrows_map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {

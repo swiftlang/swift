@@ -164,10 +164,16 @@ public func withTaskExecutorPreference<T, Failure>(
 //
 // This function also doubles as an ABI-compatibility shim predating the
 // introduction of #isolation.
+@abi(
+  @_unavailableInEmbedded
+  public func withTaskExecutorPreference<T: Sendable>(
+    _ taskExecutor: (any TaskExecutor)?,
+    operation: @Sendable () async throws -> T
+  ) async rethrows -> T
+)
 @_unavailableInEmbedded
 @available(SwiftStdlib 6.0, *)
 @_unsafeInheritExecutor // for ABI compatibility
-@_silgen_name("$ss26withTaskExecutorPreference_9operationxSch_pSg_xyYaYbKXEtYaKs8SendableRzlF")
 public func _unsafeInheritExecutor_withTaskExecutorPreference<T: Sendable>(
   _ taskExecutor: (any TaskExecutor)?,
   operation: @Sendable () async throws -> T

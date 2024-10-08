@@ -77,24 +77,13 @@ Protocol SerialExecutor has added inherited protocol Escapable
 Protocol AsyncSequence is now without @rethrows
 
 // #isolated adoption in with...Continuation
-// api-digester is not aware of silgen_name trickery we do to keep this ABI compatible
-Func withCheckedContinuation(function:_:) has parameter 0 type change from Swift.String to (any _Concurrency.Actor)?
-Func withCheckedContinuation(function:_:) has parameter 1 type change from (_Concurrency.CheckedContinuation<τ_0_0, Swift.Never>) -> () to Swift.String
-Func withCheckedThrowingContinuation(function:_:) has been renamed to Func withCheckedThrowingContinuation(isolation:function:_:)
-Func withCheckedThrowingContinuation(function:_:) has mangled name changing from '_Concurrency.withCheckedThrowingContinuation<A>(function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Error>) -> ()) async throws -> A' to '_Concurrency.withCheckedThrowingContinuation<A>(isolation: isolated Swift.Optional<Swift.Actor>, function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Error>) -> ()) async throws -> A'
-Func withCheckedThrowingContinuation(function:_:) has parameter 0 type change from Swift.String to (any _Concurrency.Actor)?
-Func withCheckedThrowingContinuation(function:_:) has parameter 1 type change from (_Concurrency.CheckedContinuation<τ_0_0, any Swift.Error>) -> () to Swift.String
+// There are new @_alwaysEmitIntoClient functions to preserve source compatibility
+Func withCheckedContinuation(function:_:) has been renamed to Func _unsafeInheritExecutor_withCheckedContinuation(function:_:)
+Func withCheckedThrowingContinuation(function:_:) has been renamed to Func _unsafeInheritExecutor_withCheckedThrowingContinuation(function:_:)
 
 // #isolation adoption for cancellation handlers; old APIs are kept ABI compatible
-Func withTaskCancellationHandler(operation:onCancel:) has been renamed to Func withTaskCancellationHandler(operation:onCancel:isolation:)
-Func withTaskCancellationHandler(operation:onCancel:) has mangled name changing from '_Concurrency.withTaskCancellationHandler<A>(operation: () async throws -> A, onCancel: @Sendable () -> ()) async throws -> A' to '_Concurrency.withTaskCancellationHandler<A>(operation: () async throws -> A, onCancel: @Sendable () -> (), isolation: isolated Swift.Optional<Swift.Actor>) async throws -> A'
-
-// #isolated was adopted and the old methods kept: $ss31withCheckedThrowingContinuation8function_xSS_yScCyxs5Error_pGXEtYaKlF
-Func withCheckedContinuation(function:_:) has been renamed to Func withCheckedContinuation(isolation:function:_:)
-Func withCheckedContinuation(function:_:) has mangled name changing from '_Concurrency.withCheckedContinuation<A>(function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Never>) -> ()) async -> A' to '_Concurrency.withCheckedContinuation<A>(isolation: isolated Swift.Optional<Swift.Actor>, function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Never>) -> ()) async -> A'
-
-// AsyncStream.init(unfolding:onCancel:) uses @_silgen_name to preserve mangling after adding @preconcurrency.
-Constructor AsyncStream.init(unfolding:onCancel:) has mangled name changing from 'Swift.AsyncStream.init(unfolding: () async -> Swift.Optional<A>, onCancel: Swift.Optional<@Sendable () -> ()>) -> Swift.AsyncStream<A>' to 'Swift.AsyncStream.init(unfolding: () async -> Swift.Optional<A>, onCancel: Swift.Optional<() -> ()>) -> Swift.AsyncStream<A>'
+// There's a new @_alwaysEmitIntoClient function to preserve source compatibility
+Func withTaskCancellationHandler(operation:onCancel:) has been renamed to Func _unsafeInheritExecutor_withTaskCancellationHandler(operation:onCancel:)
 
 // We did not change the mangling, we did change from Default to Shared. Both
 // took their arg at +0, so there is no actual ABI difference.
@@ -111,19 +100,18 @@ Func SerialExecutor.enqueue(_:) has been added as a protocol requirement
 Func Executor.enqueue(_:) is a new API without @available attribute
 
 // Adopt #isolation in TaskLocal.withValue APIs
-Func TaskLocal.withValue(_:operation:file:line:) has been renamed to Func withValue(_:operation:isolation:file:line:)
-Func TaskLocal.withValue(_:operation:file:line:) has mangled name changing from '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () async throws -> A1, file: Swift.String, line: Swift.UInt) async throws -> A1' to '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () throws -> A1, file: Swift.String, line: Swift.UInt) throws -> A1'
-Func TaskLocal.withValue(_:operation:file:line:) has mangled name changing from '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () throws -> A1, file: Swift.String, line: Swift.UInt) throws -> A1' to '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () async throws -> A1, isolation: isolated Swift.Optional<Swift.Actor>, file: Swift.String, line: Swift.UInt) async throws -> A1'
-Func TaskLocal.withValue(_:operation:file:line:) has parameter 1 type change from () async throws -> τ_1_0 to () throws -> τ_1_0
-Func TaskLocal.withValue(_:operation:file:line:) has parameter 1 type change from () throws -> τ_1_0 to () async throws -> τ_1_0
-Func TaskLocal.withValue(_:operation:file:line:) has parameter 2 type change from Swift.String to (any _Concurrency.Actor)?
-Func TaskLocal.withValue(_:operation:file:line:) has parameter 3 type change from Swift.UInt to Swift.String
+Func TaskLocal.withValue(_:operation:file:line:) has been renamed to Func _unsafeInheritExecutor_withValue(_:operation:file:line:)
 Func withTaskGroup(of:returning:body:) has parameter 2 type change from (inout _Concurrency.TaskGroup<τ_0_0>) async -> τ_0_1 to (any _Concurrency.Actor)?
 Func withThrowingTaskGroup(of:returning:body:) has been renamed to Func withThrowingTaskGroup(of:returning:isolation:body:)
 Func withThrowingTaskGroup(of:returning:body:) has mangled name changing from '_Concurrency.withThrowingTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, body: (inout Swift.ThrowingTaskGroup<A, Swift.Error>) async throws -> B) async throws -> B' to '_Concurrency.withThrowingTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Optional<Swift.Actor>, body: (inout Swift.ThrowingTaskGroup<A, Swift.Error>) async throws -> B) async throws -> B'
 Func withThrowingTaskGroup(of:returning:body:) has parameter 2 type change from (inout _Concurrency.ThrowingTaskGroup<τ_0_0, any Swift.Error>) async throws -> τ_0_1 to (any _Concurrency.Actor)?
 Func withTaskGroup(of:returning:body:) has been renamed to Func withTaskGroup(of:returning:isolation:body:)
 Func withTaskGroup(of:returning:body:) has mangled name changing from '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, body: (inout Swift.TaskGroup<A>) async -> B) async -> B' to '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Optional<Swift.Actor>, body: (inout Swift.TaskGroup<A>) async -> B) async -> B'
+
+// False ABI digester positive caused by replacement of @_silgen_name hack with
+// @abi; the USR isn't affected by @_silgen_name but is affected by @abi, so the
+// baseline has data in it that doesn't reflect the actual mangled name.
+Func ThrowingTaskGroup.nextResultForABI() has mangled name changing from 'Swift.ThrowingTaskGroup.nextResultForABI() async throws -> Swift.Optional<Swift.Result<A, B>>' to 'Swift.ThrowingTaskGroup.nextResult() async throws -> Swift.Optional<Swift.Result<A, B>>'
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 

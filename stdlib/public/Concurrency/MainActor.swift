@@ -148,10 +148,16 @@ extension MainActor {
     }
   }
 
+  @abi(
+    @usableFromInline
+    internal static func assumeIsolated<T /* not ': Sendable' */>(
+        _ operation: @MainActor () throws -> T,
+        file: StaticString, line: UInt
+    ) rethrows -> T
+  )
   @available(SwiftStdlib 5.9, *)
   @usableFromInline
-  @_silgen_name("$sScM14assumeIsolated_4file4linexxyKScMYcXE_s12StaticStringVSutKlFZ")
-  internal static func __abi__assumeIsolated<T : Sendable>(
+  internal static func __nonsendable_assumeIsolated<T : Sendable>(
       _ operation: @MainActor () throws -> T,
       _ file: StaticString, _ line: UInt
   ) rethrows -> T {

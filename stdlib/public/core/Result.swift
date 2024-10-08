@@ -63,10 +63,14 @@ extension Result {
     }
   }
 
+  @abi(
+    public func map<NewSuccess>(
+      _ transform: (Success) -> NewSuccess
+    ) -> Result<NewSuccess, Failure>
+  )
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss6ResultO3mapyAByqd__q_Gqd__xXElF")
   @usableFromInline
-  internal func __abi_map<NewSuccess>(
+  internal func __copyable_map<NewSuccess>(
     _ transform: (Success) -> NewSuccess
   ) -> Result<NewSuccess, Failure> {
     switch self {
@@ -203,10 +207,14 @@ extension Result {
     }
   }
 
+  @abi(
+    public func flatMap<NewSuccess>(
+      _ transform: (Success) -> Result<NewSuccess, Failure>
+    ) -> Result<NewSuccess, Failure>
+  )
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss6ResultO7flatMapyAByqd__q_GADxXElF")
   @usableFromInline
-  internal func __abi_flatMap<NewSuccess>(
+  internal func __copyable_flatMap<NewSuccess>(
     _ transform: (Success) -> Result<NewSuccess, Failure>
   ) -> Result<NewSuccess, Failure> {
     switch self {
@@ -268,10 +276,14 @@ extension Result where Success: ~Copyable {
 }
 
 extension Result {
+  @abi(
+    public func flatMapError<NewFailure>(
+      _ transform: (Failure) -> Result<Success, NewFailure>
+    ) -> Result<Success, NewFailure>
+  )
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss6ResultO12flatMapErroryAByxqd__GADq_XEs0D0Rd__lF")
   @usableFromInline
-  internal func __abi_flatMapError<NewFailure>(
+  internal func __copyable_flatMapError<NewFailure>(
     _ transform: (Failure) -> Result<Success, NewFailure>
   ) -> Result<Success, NewFailure> {
     switch self {
@@ -328,10 +340,10 @@ extension Result where Success: ~Copyable {
 
 extension Result {
   /// ABI: Historical get() throws
+  @abi(public func get() throws -> Success)
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss6ResultO3getxyKF")
   @usableFromInline
-  func __abi_get() throws -> Success {
+  func __untyped_throws_get() throws -> Success {
     switch self {
     case let .success(success):
       return success
@@ -343,11 +355,12 @@ extension Result {
 }
 
 extension Result where Failure == Swift.Error {
-  /// ABI: Historical init(catching:)
+  // ABI: Historical `init(catching:)`; this gets the old ABI because of the
+  // `where` clause on the extension.
+  @abi(public init(catching body: () throws -> Success))
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss6ResultOss5Error_pRs_rlE8catchingAByxsAC_pGxyKXE_tcfC")
   @usableFromInline
-  init(__abi_catching body: () throws(Failure) -> Success) {
+  init(__untyped_throws_catching body: () throws(Failure) -> Success) {
     do {
       self = .success(try body())
     } catch {

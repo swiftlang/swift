@@ -313,9 +313,14 @@ public func withCheckedContinuation<T>(
 //
 // This function also doubles as an ABI-compatibility shim predating the
 // introduction of #isolation.
+@abi(
+  public func withCheckedContinuation<T>(
+    function: String,
+    _ body: (CheckedContinuation<T, Never>) -> Void
+  ) async -> T
+)
 @available(SwiftStdlib 5.1, *)
 @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
-@_silgen_name("$ss23withCheckedContinuation8function_xSS_yScCyxs5NeverOGXEtYalF")
 public func _unsafeInheritExecutor_withCheckedContinuation<T>(
   function: String = #function,
   _ body: (CheckedContinuation<T, Never>) -> Void
@@ -377,9 +382,14 @@ public func withCheckedThrowingContinuation<T>(
 //
 // This function also doubles as an ABI-compatibility shim predating the
 // introduction of #isolation.
+@abi(
+  public func withCheckedThrowingContinuation<T>(
+    function: String,
+    _ body: (CheckedContinuation<T, Error>) -> Void
+  ) async throws -> T
+)
 @available(SwiftStdlib 5.1, *)
 @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
-@_silgen_name("$ss31withCheckedThrowingContinuation8function_xSS_yScCyxs5Error_pGXEtYaKlF")
 public func _unsafeInheritExecutor_withCheckedThrowingContinuation<T>(
   function: String = #function,
   _ body: (CheckedContinuation<T, Error>) -> Void

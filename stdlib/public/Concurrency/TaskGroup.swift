@@ -97,8 +97,15 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 //
 // This function also doubles as an ABI-compatibility shim predating the
 // introduction of #isolation.
+@abi(
+  @preconcurrency   // TaskGroup.ChildTaskResult: Sendable
+  public func withTaskGroup<ChildTaskResult, GroupResult>(
+    of childTaskResultType: ChildTaskResult.Type,
+    returning returnType: GroupResult.Type = GroupResult.self,
+    body: (inout TaskGroup<ChildTaskResult>) async -> GroupResult
+  ) async -> GroupResult
+)
 @available(SwiftStdlib 5.1, *)
-@_silgen_name("$ss13withTaskGroup2of9returning4bodyq_xm_q_mq_ScGyxGzYaXEtYar0_lF")
 @_unsafeInheritExecutor // for ABI compatibility
 @inlinable
 public func _unsafeInheritExecutor_withTaskGroup<ChildTaskResult, GroupResult>(
@@ -243,8 +250,15 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
 //
 // This function also doubles as an ABI-compatibility shim predating the
 // introduction of #isolation.
+@abi(
+  @preconcurrency   // ThrowingTaskGroup.ChildTaskResult: Sendable
+  public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
+    of childTaskResultType: ChildTaskResult.Type,
+    returning returnType: GroupResult.Type = GroupResult.self,
+    body: (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
+  ) async rethrows -> GroupResult
+)
 @available(SwiftStdlib 5.1, *)
-@_silgen_name("$ss21withThrowingTaskGroup2of9returning4bodyq_xm_q_mq_Scgyxs5Error_pGzYaKXEtYaKr0_lF")
 @_unsafeInheritExecutor // for ABI compatibility
 public func _unsafeInheritExecutor_withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
@@ -994,7 +1008,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     return try await _taskGroupWaitNext(group: _group)
   }
 
-  @_silgen_name("$sScg10nextResults0B0Oyxq_GSgyYaKF")
+  @abi(public mutating func nextResult() async throws -> Result<ChildTaskResult, Failure>?)
   @usableFromInline
   mutating func nextResultForABI() async throws -> Result<ChildTaskResult, Failure>? {
     do {
