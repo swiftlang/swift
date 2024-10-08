@@ -5165,7 +5165,8 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
   auto lParenLoc = consumeAttributeLParen(); // consume the l_paren
 
   std::optional<LifetimeDescriptor> targetDescriptor;
-  if (Tok.isAny(tok::identifier, tok::integer_literal, tok::kw_self) &&
+  if (!isInSILMode() &&
+      Tok.isAny(tok::identifier, tok::integer_literal, tok::kw_self) &&
       peekToken().is(tok::colon)) {
     targetDescriptor = parseLifetimeDescriptor(*this);
     if (!targetDescriptor) {
