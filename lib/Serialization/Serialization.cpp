@@ -2854,6 +2854,16 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   }
 #include "swift/AST/DeclAttr.def"
 
+    case DeclAttrKind::ABI: {
+      auto *theAttr = cast<ABIAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[ABIDeclAttrLayout::Code];
+      auto abiDeclID = S.addDeclRef(theAttr->abiDecl);
+      ABIDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                    theAttr->isImplicit(), theAttr->isInverse(),
+                                    abiDeclID);
+      return;
+    }
+
     case DeclAttrKind::SILGenName: {
       auto *theAttr = cast<SILGenNameAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[SILGenNameDeclAttrLayout::Code];

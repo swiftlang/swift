@@ -187,6 +187,14 @@ public:
   IGNORED_ATTR(PreInverseGenerics)
 #undef IGNORED_ATTR
 
+  void visitABIAttr(ABIAttr *attr) {
+    // Inverse ABI attrs are an implementation detail and don't need checking.
+    if (attr->isInverse())
+      return;
+
+    // TODO: Validate more
+  }
+
   void visitAlignmentAttr(AlignmentAttr *attr) {
     // Alignment must be a power of two.
     auto value = attr->getValue();

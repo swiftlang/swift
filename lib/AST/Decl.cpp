@@ -4168,6 +4168,43 @@ bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
   return false;
 }
 
+VarDecl *PatternBindingDecl::
+getVarAtSimilarStructuralPosition(VarDecl *otherVar) {
+  auto otherPBD = otherVar->getParentPatternBinding();
+
+  if (!otherPBD)
+    return getSingleVar();
+  if (otherPBD == this)
+    return otherVar;
+
+  // Find the entry index and sibling index for `otherVar` within its PBD.
+  auto entryIndex = otherPBD->getPatternEntryIndexForVarDecl(otherVar);
+  
+  SmallVector<VarDecl *, 16> otherSiblings;
+  otherPBD->getPattern(entryIndex)->collectVariables(otherSiblings);
+  size_t siblingIndex =
+      llvm::find(otherSiblings, otherVar) - otherSiblings.begin();
+
+  ASSERT(siblingIndex != otherSiblings.size()
+            && "otherVar not in its own pattern?");
+
+  // Look up the same entry index and sibling index in this PBD, returning null
+  // if that index doesn't exist.
+
+  // Corresponding PBD has more patterns in it
+  if (entryIndex >= getNumPatternEntries())
+    return nullptr;
+
+  SmallVector<VarDecl *, 16> siblings;
+  getPattern(entryIndex)->collectVariables(siblings);
+
+  // Corresponding pattern has more vars in it
+  if (siblingIndex >= siblings.size())
+    return nullptr;
+
+  return siblings[siblingIndex];
+}
+
 SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
   // Some decls have a parent/child split where the introducer keyword is on the
   // parent, but the attributes are on the children. If this is a child in such

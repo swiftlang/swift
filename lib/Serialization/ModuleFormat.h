@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 894; // ThunkInst
+const uint16_t SWIFTMODULE_VERSION_MINOR = 895; // @abi attribute
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2328,6 +2328,13 @@ namespace decls_block {
   using ExclusivityDeclAttrLayout = BCRecordLayout<
     Optimize_DECL_ATTR,
     BCFixed<2>  // exclusivity mode
+  >;
+
+  using ABIDeclAttrLayout = BCRecordLayout<
+    ABI_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCFixed<1>, // inverse flag
+    DeclIDField // ABI decl
   >;
 
   using AvailableDeclAttrLayout = BCRecordLayout<
