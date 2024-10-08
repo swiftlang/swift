@@ -1868,8 +1868,7 @@ void PotentialBindings::infer(Constraint *constraint) {
     DelayedBy.push_back(constraint);
     break;
 
-  case ConstraintKind::ConformsTo:
-  case ConstraintKind::SelfObjectOfProtocol: {
+  case ConstraintKind::ConformsTo: {
     auto protocolTy = constraint->getSecondType();
     if (protocolTy->is<ProtocolType>())
       Protocols.push_back(constraint);
@@ -1980,7 +1979,6 @@ void PotentialBindings::retract(Constraint *constraint) {
 
   switch (constraint->getKind()) {
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::SelfObjectOfProtocol:
     Protocols.erase(llvm::remove_if(Protocols, isMatchingConstraint),
                     Protocols.end());
     break;
