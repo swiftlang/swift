@@ -33,6 +33,13 @@ using namespace constraints;
 
 #define DEBUG_TYPE "SolverTrail"
 
+SolverTrail::SolverTrail(ConstraintSystem &cs)
+  : CS(cs) {
+  for (unsigned i = 0; i <= unsigned(ChangeKind::Last); ++i) {
+    Profile[i] = 0;
+  }
+}
+
 SolverTrail::~SolverTrail() {
   // If constraint system is in an invalid state, it's
   // possible that constraint graph is corrupted as well
@@ -41,8 +48,34 @@ SolverTrail::~SolverTrail() {
     ASSERT(Changes.empty() && "Trail corrupted");
 }
 
+#define LOCATOR_CHANGE(Name, _) \
+  SolverTrail::Change \
+  SolverTrail::Change::Name(ConstraintLocator *locator) { \
+    Change result; \
+    result.Kind = ChangeKind::Name; \
+    result.TheLocator = locator; \
+    return result; \
+  }
+#define EXPR_CHANGE(Name) \
+  SolverTrail::Change \
+  SolverTrail::Change::Name(Expr *expr) { \
+    Change result; \
+    result.Kind = ChangeKind::Name; \
+    result.TheExpr = expr; \
+    return result; \
+  }
+#define CLOSURE_CHANGE(Name) \
+  SolverTrail::Change \
+  SolverTrail::Change::Name(ClosureExpr *closure) { \
+    Change result; \
+    result.Kind = ChangeKind::Name; \
+    result.TheClosure = closure; \
+    return result; \
+  }
+#include "swift/Sema/CSTrail.def"
+
 SolverTrail::Change
-SolverTrail::Change::addedTypeVariable(TypeVariableType *typeVar) {
+SolverTrail::Change::AddedTypeVariable(TypeVariableType *typeVar) {
   Change result;
   result.Kind = ChangeKind::AddedTypeVariable;
   result.TypeVar = typeVar;
@@ -50,7 +83,7 @@ SolverTrail::Change::addedTypeVariable(TypeVariableType *typeVar) {
 }
 
 SolverTrail::Change
-SolverTrail::Change::addedConstraint(TypeVariableType *typeVar,
+SolverTrail::Change::AddedConstraint(TypeVariableType *typeVar,
                                      Constraint *constraint) {
   Change result;
   result.Kind = ChangeKind::AddedConstraint;
@@ -60,7 +93,7 @@ SolverTrail::Change::addedConstraint(TypeVariableType *typeVar,
 }
 
 SolverTrail::Change
-SolverTrail::Change::removedConstraint(TypeVariableType *typeVar,
+SolverTrail::Change::RemovedConstraint(TypeVariableType *typeVar,
                                        Constraint *constraint) {
   Change result;
   result.Kind = ChangeKind::RemovedConstraint;
@@ -70,7 +103,7 @@ SolverTrail::Change::removedConstraint(TypeVariableType *typeVar,
 }
 
 SolverTrail::Change
-SolverTrail::Change::extendedEquivalenceClass(TypeVariableType *typeVar,
+SolverTrail::Change::ExtendedEquivalenceClass(TypeVariableType *typeVar,
                                               unsigned prevSize) {
   Change result;
   result.Kind = ChangeKind::ExtendedEquivalenceClass;
@@ -80,7 +113,7 @@ SolverTrail::Change::extendedEquivalenceClass(TypeVariableType *typeVar,
 }
 
 SolverTrail::Change
-SolverTrail::Change::relatedTypeVariables(TypeVariableType *typeVar,
+SolverTrail::Change::RelatedTypeVariables(TypeVariableType *typeVar,
                                           TypeVariableType *otherTypeVar) {
   Change result;
   result.Kind = ChangeKind::RelatedTypeVariables;
@@ -90,7 +123,7 @@ SolverTrail::Change::relatedTypeVariables(TypeVariableType *typeVar,
 }
 
 SolverTrail::Change
-SolverTrail::Change::inferredBindings(TypeVariableType *typeVar,
+SolverTrail::Change::InferredBindings(TypeVariableType *typeVar,
                                      Constraint *constraint) {
   Change result;
   result.Kind = ChangeKind::InferredBindings;
@@ -100,7 +133,7 @@ SolverTrail::Change::inferredBindings(TypeVariableType *typeVar,
 }
 
 SolverTrail::Change
-SolverTrail::Change::retractedBindings(TypeVariableType *typeVar,
+SolverTrail::Change::RetractedBindings(TypeVariableType *typeVar,
                                        Constraint *constraint) {
   Change result;
   result.Kind = ChangeKind::RetractedBindings;
@@ -110,7 +143,7 @@ SolverTrail::Change::retractedBindings(TypeVariableType *typeVar,
 }
 
 SolverTrail::Change
-SolverTrail::Change::updatedTypeVariable(
+SolverTrail::Change::UpdatedTypeVariable(
     TypeVariableType *typeVar,
     llvm::PointerUnion<TypeVariableType *, TypeBase *> parentOrFixed,
 	  unsigned options) {
@@ -123,7 +156,7 @@ SolverTrail::Change::updatedTypeVariable(
 }
 
 SolverTrail::Change
-SolverTrail::Change::addedConversionRestriction(Type srcType, Type dstType) {
+SolverTrail::Change::AddedConversionRestriction(Type srcType, Type dstType) {
   Change result;
   result.Kind = ChangeKind::AddedConversionRestriction;
   result.Restriction.SrcType = srcType;
@@ -132,15 +165,15 @@ SolverTrail::Change::addedConversionRestriction(Type srcType, Type dstType) {
 }
 
 SolverTrail::Change
-SolverTrail::Change::addedFix(ConstraintFix *fix) {
+SolverTrail::Change::AddedFix(ConstraintFix *fix) {
   Change result;
   result.Kind = ChangeKind::AddedFix;
-  result.Fix = fix;
+  result.TheFix = fix;
   return result;
 }
 
 SolverTrail::Change
-SolverTrail::Change::addedFixedRequirement(GenericTypeParamType *GP,
+SolverTrail::Change::AddedFixedRequirement(GenericTypeParamType *GP,
                                            unsigned reqKind,
                                            Type reqTy) {
   Change result;
@@ -152,83 +185,187 @@ SolverTrail::Change::addedFixedRequirement(GenericTypeParamType *GP,
 }
 
 SolverTrail::Change
-SolverTrail::Change::recordedDisjunctionChoice(ConstraintLocator *locator,
-                                               unsigned index) {
-  Change result;
-  result.Kind = ChangeKind::RecordedDisjunctionChoice;
-  result.Locator = locator;
-  result.Options = index;
-  return result;
-}
-
-SolverTrail::Change
-SolverTrail::Change::recordedAppliedDisjunction(ConstraintLocator *locator) {
-  Change result;
-  result.Kind = ChangeKind::RecordedAppliedDisjunction;
-  result.Locator = locator;
-  return result;
-}
-
-SolverTrail::Change
-SolverTrail::Change::recordedMatchCallArgumentResult(ConstraintLocator *locator) {
-  Change result;
-  result.Kind = ChangeKind::RecordedMatchCallArgumentResult;
-  result.Locator = locator;
-  return result;
-}
-
-SolverTrail::Change
-SolverTrail::Change::recordedOpenedTypes(ConstraintLocator *locator) {
-  Change result;
-  result.Kind = ChangeKind::RecordedOpenedTypes;
-  result.Locator = locator;
-  return result;
-}
-
-SolverTrail::Change
-SolverTrail::Change::recordedOpenedExistentialType(ConstraintLocator *locator) {
-  Change result;
-  result.Kind = ChangeKind::RecordedOpenedExistentialType;
-  result.Locator = locator;
-  return result;
-}
-
-SolverTrail::Change
-SolverTrail::Change::recordedOpenedPackExpansionType(PackExpansionType *expansionTy) {
+SolverTrail::Change::RecordedOpenedPackExpansionType(PackExpansionType *expansionTy) {
   Change result;
   result.Kind = ChangeKind::RecordedOpenedPackExpansionType;
-  result.ExpansionTy = expansionTy;
+  result.TheExpansion = expansionTy;
   return result;
 }
 
 SolverTrail::Change
-SolverTrail::Change::recordedPackExpansionEnvironment(ConstraintLocator *locator) {
-  Change result;
-  result.Kind = ChangeKind::RecordedPackExpansionEnvironment;
-  result.Locator = locator;
-  return result;
-}
-
-SolverTrail::Change
-SolverTrail::Change::recordedPackEnvironment(PackElementExpr *packElement) {
+SolverTrail::Change::RecordedPackEnvironment(PackElementExpr *packElement) {
   Change result;
   result.Kind = ChangeKind::RecordedPackEnvironment;
-  result.ElementExpr = packElement;
+  result.TheElement = packElement;
   return result;
 }
 
 SolverTrail::Change
-SolverTrail::Change::recordedDefaultedConstraint(ConstraintLocator *locator) {
+SolverTrail::Change::RecordedNodeType(ASTNode node, Type oldType) {
   Change result;
-  result.Kind = ChangeKind::RecordedDefaultedConstraint;
-  result.Locator = locator;
+  result.Kind = ChangeKind::RecordedNodeType;
+  result.Node.Node = node;
+  result.Node.OldType = oldType;
   return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::RecordedKeyPathComponentType(const KeyPathExpr *expr,
+                                                  unsigned component,
+                                                  Type oldType) {
+  Change result;
+  result.Kind = ChangeKind::RecordedKeyPathComponentType;
+  result.Options = component;
+  result.KeyPath.Expr = expr;
+  result.KeyPath.OldType = oldType;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::DisabledConstraint(Constraint *constraint) {
+  Change result;
+  result.Kind = ChangeKind::DisabledConstraint;
+  result.TheConstraint.Constraint = constraint;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::FavoredConstraint(Constraint *constraint) {
+  Change result;
+  result.Kind = ChangeKind::FavoredConstraint;
+  result.TheConstraint.Constraint = constraint;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::RecordedResultBuilderTransform(AnyFunctionRef fn) {
+  Change result;
+  result.Kind = ChangeKind::RecordedResultBuilderTransform;
+  result.TheRef = fn;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::RecordedContextualInfo(ASTNode node) {
+  Change result;
+  result.Kind = ChangeKind::RecordedContextualInfo;
+  result.Node.Node = node;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::RecordedTarget(SyntacticElementTargetKey key) {
+  Change result;
+  result.Kind = ChangeKind::RecordedTarget;
+  result.Options = unsigned(key.kind);
+
+  switch (key.kind) {
+  case SyntacticElementTargetKey::Kind::empty:
+  case SyntacticElementTargetKey::Kind::tombstone:
+    llvm_unreachable("Invalid SyntacticElementTargetKey::Kind");
+  case SyntacticElementTargetKey::Kind::stmtCondElement:
+    result.TheCondElt = key.storage.stmtCondElement;
+    break;
+  case SyntacticElementTargetKey::Kind::expr:
+    result.TheExpr = key.storage.expr;
+    break;
+  case SyntacticElementTargetKey::Kind::closure:
+    result.TheClosure = cast<ClosureExpr>(key.storage.expr);
+    break;
+  case SyntacticElementTargetKey::Kind::stmt:
+    result.TheStmt = key.storage.stmt;
+    break;
+  case SyntacticElementTargetKey::Kind::pattern:
+    result.ThePattern = key.storage.pattern;
+    break;
+  case SyntacticElementTargetKey::Kind::patternBindingEntry:
+    result.ThePatternBinding = key.storage.patternBindingEntry.patternBinding;
+    result.Options |= key.storage.patternBindingEntry.index << 8;
+    break;
+  case SyntacticElementTargetKey::Kind::varDecl:
+    result.TheVar = key.storage.varDecl;
+    break;
+  case SyntacticElementTargetKey::Kind::functionRef:
+    result.TheDeclContext = key.storage.functionRef;
+    break;
+  }
+
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::RecordedCaseLabelItemInfo(CaseLabelItem *item) {
+  Change result;
+  result.Kind = ChangeKind::RecordedCaseLabelItemInfo;
+  result.TheItem = item;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::RecordedPotentialThrowSite(CatchNode catchNode) {
+  Change result;
+  result.Kind = ChangeKind::RecordedPotentialThrowSite;
+  result.TheCatchNode = catchNode;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::RecordedIsolatedParam(ParamDecl *param) {
+  Change result;
+  result.Kind = ChangeKind::RecordedIsolatedParam;
+  result.TheParam = param;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::RecordedKeyPath(KeyPathExpr *expr) {
+  Change result;
+  result.Kind = ChangeKind::RecordedKeyPath;
+  result.KeyPath.Expr = expr;
+  return result;
+}
+
+SyntacticElementTargetKey
+SolverTrail::Change::getSyntacticElementTargetKey() const {
+  ASSERT(Kind == ChangeKind::RecordedTarget);
+
+  auto kind = SyntacticElementTargetKey::Kind(Options & 0xff);
+
+  switch (kind) {
+  case SyntacticElementTargetKey::Kind::empty:
+  case SyntacticElementTargetKey::Kind::tombstone:
+    llvm_unreachable("Invalid SyntacticElementTargetKey::Kind");
+  case SyntacticElementTargetKey::Kind::stmtCondElement:
+    return SyntacticElementTargetKey(TheCondElt);
+  case SyntacticElementTargetKey::Kind::expr:
+    return SyntacticElementTargetKey(TheExpr);
+  case SyntacticElementTargetKey::Kind::closure:
+    return SyntacticElementTargetKey(TheClosure);
+  case SyntacticElementTargetKey::Kind::stmt:
+    return SyntacticElementTargetKey(TheStmt);
+  case SyntacticElementTargetKey::Kind::pattern:
+    return SyntacticElementTargetKey(ThePattern);
+  case SyntacticElementTargetKey::Kind::patternBindingEntry:
+    return SyntacticElementTargetKey(ThePatternBinding, Options >> 8);
+  case SyntacticElementTargetKey::Kind::varDecl:
+    return SyntacticElementTargetKey(TheVar);
+  case SyntacticElementTargetKey::Kind::functionRef:
+    return SyntacticElementTargetKey(TheDeclContext);
+  }
 }
 
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
   switch (Kind) {
+#define LOCATOR_CHANGE(Name, Map) \
+  case ChangeKind::Name: { \
+    bool erased = cs.Map.erase(TheLocator); \
+    ASSERT(erased); \
+    break; \
+  }
+#include "swift/Sema/CSTrail.def"
+
   case ChangeKind::AddedTypeVariable:
     cg.removeNode(TypeVar);
     break;
@@ -270,7 +407,7 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     break;
 
   case ChangeKind::AddedFix:
-    cs.removeFix(Fix);
+    cs.removeFix(TheFix);
     break;
 
   case ChangeKind::AddedFixedRequirement:
@@ -278,40 +415,77 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
                               FixedRequirement.ReqTy);
     break;
 
-  case ChangeKind::RecordedDisjunctionChoice:
-    cs.removeDisjunctionChoice(Locator);
-    break;
-
-  case ChangeKind::RecordedAppliedDisjunction:
-    cs.removeAppliedDisjunction(Locator);
-    break;
-
-  case ChangeKind::RecordedMatchCallArgumentResult:
-    cs.removeMatchCallArgumentResult(Locator);
-    break;
-
-  case ChangeKind::RecordedOpenedTypes:
-    cs.removeOpenedType(Locator);
-    break;
-
-  case ChangeKind::RecordedOpenedExistentialType:
-    cs.removeOpenedExistentialType(Locator);
-    break;
-
   case ChangeKind::RecordedOpenedPackExpansionType:
-    cs.removeOpenedPackExpansionType(ExpansionTy);
-    break;
-
-  case ChangeKind::RecordedPackExpansionEnvironment:
-    cs.removePackExpansionEnvironment(Locator);
+    cs.removeOpenedPackExpansionType(TheExpansion);
     break;
 
   case ChangeKind::RecordedPackEnvironment:
-    cs.removePackEnvironment(ElementExpr);
+    cs.removePackEnvironment(TheElement);
     break;
 
-  case ChangeKind::RecordedDefaultedConstraint:
-    cs.removeDefaultedConstraint(Locator);
+  case ChangeKind::RecordedNodeType:
+    cs.restoreType(Node.Node, Node.OldType);
+    break;
+
+  case ChangeKind::RecordedKeyPathComponentType:
+    cs.restoreType(KeyPath.Expr, Options, KeyPath.OldType);
+    break;
+
+  case ChangeKind::DisabledConstraint:
+    TheConstraint.Constraint->setEnabled();
+    break;
+
+  case ChangeKind::FavoredConstraint:
+    ASSERT(TheConstraint.Constraint->isFavored());
+    TheConstraint.Constraint->setFavored(false);
+    break;
+
+  case ChangeKind::RecordedResultBuilderTransform:
+    cs.removeResultBuilderTransform(TheRef);
+    break;
+
+  case ChangeKind::AppliedPropertyWrapper:
+    cs.removePropertyWrapper(TheExpr);
+    break;
+
+  case ChangeKind::RecordedClosureType:
+    cs.removeClosureType(TheClosure);
+    break;
+
+  case ChangeKind::RecordedImpliedResult:
+    cs.removeImpliedResult(TheExpr);
+    break;
+
+  case ChangeKind::RecordedContextualInfo:
+    cs.removeContextualInfo(Node.Node);
+    break;
+
+  case ChangeKind::RecordedTarget:
+    cs.removeTargetFor(getSyntacticElementTargetKey());
+    break;
+
+  case ChangeKind::RecordedCaseLabelItemInfo:
+    cs.removeCaseLabelItemInfo(TheItem);
+    break;
+
+  case ChangeKind::RecordedPotentialThrowSite:
+    cs.removePotentialThrowSite(TheCatchNode);
+    break;
+
+  case ChangeKind::RecordedExprPattern:
+    cs.removeExprPatternFor(TheExpr);
+    break;
+
+  case ChangeKind::RecordedIsolatedParam:
+    cs.removeIsolatedParam(TheParam);
+    break;
+
+  case ChangeKind::RecordedPreconcurrencyClosure:
+    cs.removePreconcurrencyClosure(TheClosure);
+    break;
+
+  case ChangeKind::RecordedKeyPath:
+    cs.removeKeyPath(KeyPath.Expr);
     break;
   }
 }
@@ -325,14 +499,35 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
   out.indent(indent);
 
   switch (Kind) {
+
+#define LOCATOR_CHANGE(Name, _) \
+  case ChangeKind::Name: \
+    out << "(" << #Name << " at "; \
+    TheLocator->dump(&cs.getASTContext().SourceMgr, out); \
+    out << ")\n"; \
+    break;
+#define EXPR_CHANGE(Name) \
+  case ChangeKind::Name: \
+    out << "(" << #Name << " "; \
+    simple_display(out, TheExpr); \
+    out << ")\n"; \
+    break;
+#define CLOSURE_CHANGE(Name) \
+  case ChangeKind::Name: \
+    out << "(" << #Name << " "; \
+    simple_display(out, TheClosure); \
+    out << ")\n"; \
+    break;
+#include "swift/Sema/CSTrail.def"
+
   case ChangeKind::AddedTypeVariable:
-    out << "(added type variable ";
+    out << "(AddedTypeVariable ";
     TypeVar->print(out, PO);
     out << ")\n";
     break;
 
   case ChangeKind::AddedConstraint:
-    out << "(added constraint ";
+    out << "(AddedConstraint ";
     TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
                          indent + 2);
     out << " to type variable ";
@@ -341,7 +536,7 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     break;
 
   case ChangeKind::RemovedConstraint:
-    out << "(removed constraint ";
+    out << "(RemovedConstraint ";
     TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
                                     indent + 2);
     out << " from type variable ";
@@ -350,14 +545,14 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     break;
 
   case ChangeKind::ExtendedEquivalenceClass: {
-    out << "(equivalence ";
+    out << "(ExtendedEquivalenceClass ";
     EquivClass.TypeVar->print(out, PO);
     out << " " << EquivClass.PrevSize << ")\n";
     break;
    }
 
   case ChangeKind::RelatedTypeVariables:
-    out << "(related type variable ";
+    out << "(RelatedTypeVariables ";
     Relation.TypeVar->print(out, PO);
     out << " with ";
     Relation.OtherTypeVar->print(out, PO);
@@ -365,7 +560,7 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     break;
 
   case ChangeKind::InferredBindings:
-    out << "(inferred bindings from ";
+    out << "(InferredBindings from ";
     TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
                          indent + 2);
     out << " for type variable ";
@@ -374,7 +569,7 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     break;
 
   case ChangeKind::RetractedBindings:
-    out << "(retracted bindings from ";
+    out << "(RetractedBindings from ";
     TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
                                     indent + 2);
     out << " for type variable ";
@@ -383,7 +578,7 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     break;
 
   case ChangeKind::UpdatedTypeVariable: {
-    out << "(updated type variable ";
+    out << "(UpdatedTypeVariable ";
     Update.TypeVar->print(out, PO);
 
     auto parentOrFixed = Update.TypeVar->getImpl().ParentOrFixed;
@@ -402,7 +597,7 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
   }
 
   case ChangeKind::AddedConversionRestriction:
-    out << "(added restriction with source ";
+    out << "(AddedConversionRestriction with source ";
     Restriction.SrcType->print(out, PO);
     out << " and destination ";
     Restriction.DstType->print(out, PO);
@@ -410,13 +605,13 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     break;
 
   case ChangeKind::AddedFix:
-    out << "(added a fix ";
-    Fix->print(out);
+    out << "(AddedFix ";
+    TheFix->print(out);
     out << ")\n";
     break;
 
   case ChangeKind::AddedFixedRequirement:
-    out << "(added a fixed requirement ";
+    out << "(AddedFixedRequirement ";
     FixedRequirement.GP->print(out, PO);
     out << " kind ";
     out << Options << " ";
@@ -424,56 +619,91 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << ")\n";
     break;
 
-  case ChangeKind::RecordedDisjunctionChoice:
-    out << "(recorded disjunction choice at ";
-    Locator->dump(&cs.getASTContext().SourceMgr, out);
-    out << " index ";
-    out << Options << ")\n";
-    break;
-
-  case ChangeKind::RecordedAppliedDisjunction:
-    out << "(recorded applied disjunction at ";
-    Locator->dump(&cs.getASTContext().SourceMgr, out);
-    out << ")\n";
-    break;
-
-  case ChangeKind::RecordedMatchCallArgumentResult:
-    out << "(recorded argument matching choice at ";
-    Locator->dump(&cs.getASTContext().SourceMgr, out);
-    out << ")\n";
-    break;
-
-  case ChangeKind::RecordedOpenedTypes:
-    out << "(recorded list of opened types at ";
-    Locator->dump(&cs.getASTContext().SourceMgr, out);
-    out << ")\n";
-    break;
-
-  case ChangeKind::RecordedOpenedExistentialType:
-    out << "(recorded opened existential type at ";
-    Locator->dump(&cs.getASTContext().SourceMgr, out);
-    out << ")\n";
-    break;
-
   case ChangeKind::RecordedOpenedPackExpansionType:
-    out << "(recorded opened pack expansion type for ";
-    ExpansionTy->print(out, PO);
-    out << ")\n";
-    break;
-
-  case ChangeKind::RecordedPackExpansionEnvironment:
-    out << "(recorded pack expansion environment at ";
-    Locator->dump(&cs.getASTContext().SourceMgr, out);
+    out << "(RecordedOpenedPackExpansionType for ";
+    TheExpansion->print(out, PO);
     out << ")\n";
     break;
 
   case ChangeKind::RecordedPackEnvironment:
-    out << "(recorded pack environment)\n";
+    // FIXME: Print short form of PackExpansionExpr
+    out << "(RecordedPackEnvironment ";
+    simple_display(out, TheElement);
+    out << "\n";
     break;
 
-  case ChangeKind::RecordedDefaultedConstraint:
-    out << "(recorded defaulted constraint at ";
-    Locator->dump(&cs.getASTContext().SourceMgr, out);
+  case ChangeKind::RecordedNodeType:
+    out << "(RecordedNodeType at ";
+    Node.Node.getStartLoc().print(out, cs.getASTContext().SourceMgr);
+    out << " previous ";
+    if (Node.OldType)
+      Node.OldType->print(out, PO);
+    else
+      out << "null";
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedKeyPathComponentType:
+    out << "(RecordedKeyPathComponentType ";
+    simple_display(out, KeyPath.Expr);
+    out << " with component type ";
+    if (Node.OldType)
+      Node.OldType->print(out, PO);
+    else
+      out << "null";
+    out << " for component " << Options << ")\n";
+    break;
+
+  case ChangeKind::DisabledConstraint:
+    out << "(DisabledConstraint ";
+    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
+                                    indent + 2);
+    out << ")\n";
+    break;
+
+  case ChangeKind::FavoredConstraint:
+    out << "(FavoredConstraint ";
+    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
+                                    indent + 2);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedResultBuilderTransform:
+    out << "(RecordedResultBuilderTransform ";
+    simple_display(out, TheRef);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedContextualInfo:
+    // FIXME: Print short form of ASTNode
+    out << "(RecordedContextualInfo)\n";
+    break;
+
+  case ChangeKind::RecordedTarget:
+    out << "(RecordedTarget ";
+    getSyntacticElementTargetKey().dump(out);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedCaseLabelItemInfo:
+    // FIXME: Print something here
+    out << "(RecordedCaseLabelItemInfo)\n";
+    break;
+
+  case ChangeKind::RecordedPotentialThrowSite:
+    // FIXME: Print something here
+    out << "(RecordedPotentialThrowSite)\n";
+    break;
+
+  case ChangeKind::RecordedIsolatedParam:
+    out << "(RecordedIsolatedParam ";
+    TheParam->dumpRef(out);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedKeyPath:
+    out << "(RecordedKeyPath ";
+    simple_display(out, KeyPath.Expr);
     out << ")\n";
     break;
   }
@@ -485,6 +715,7 @@ void SolverTrail::recordChange(Change change) {
 
   Changes.push_back(change);
 
+  ++Profile[unsigned(change.Kind)];
   ++Total;
   if (Changes.size() > Max)
     Max = Changes.size();
@@ -496,9 +727,19 @@ void SolverTrail::undo(unsigned toIndex) {
   if (CS.inInvalidState())
     return;
 
+  auto dumpHistogram = [&]() {
+#define CHANGE(Name) \
+    if (auto count = Profile[unsigned(ChangeKind::Name)]) \
+      llvm::dbgs() << "* " << #Name << ": " << count << "\n";
+#include "swift/Sema/CSTrail.def"
+  };
+
   LLVM_DEBUG(llvm::dbgs() << "decisions " << Changes.size()
                           << " max " << Max
-                          << " total " << Total << "\n");
+                          << " total " << Total << "\n";
+             dumpHistogram();
+             llvm::dbgs() << "\n");
+
   ASSERT(Changes.size() >= toIndex && "Trail corrupted");
   ASSERT(!UndoActive);
   UndoActive = true;
