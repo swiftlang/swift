@@ -1326,6 +1326,26 @@ void writeConformances(llvm::json::OStream &JSON,
   });
 }
 
+void writeAllConformances(llvm::json::OStream &JSON,
+                          const NominalTypeDecl &NomTypeDecl) {
+  JSON.attributeArray("allConformances", [&] {
+    for (auto *Conformance : NomTypeDecl.getAllConformances()) {
+      auto Proto = Conformance->getProtocol();
+      // FIXME(noncopyable_generics): Should these be included?
+      if (Proto->getInvertibleProtocolKind())
+        continue;
+
+      JSON.object([&] {
+        JSON.attribute("protocolName",
+                       toFullyQualifiedProtocolNameString(*Proto));
+        JSON.attribute(
+            "conformanceDefiningModule",
+            Conformance->getDeclContext()->getParentModule()->getName().str());
+      });
+    }
+  });
+}
+
 void writeTypeName(llvm::json::OStream &JSON, const TypeDecl &TypeDecl) {
   JSON.attribute("typeName",
                  toFullyQualifiedTypeNameString(
@@ -1359,6 +1379,10 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
         writeNominalTypeKind(JSON, *NomTypeDecl);
         writeLocationInformation(JSON, SourceLoc, Ctx);
         writeConformances(JSON, *NomTypeDecl);
+
+        // "conformances" will be removed once all clients move to
+        // "allConformances"
+        writeAllConformances(JSON, *NomTypeDecl);
         writeAssociatedTypeAliases(JSON, *NomTypeDecl);
         writeProperties(JSON, TypeInfo, *NomTypeDecl);
         writeEnumCases(JSON, TypeInfo.EnumElements);
