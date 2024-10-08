@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking
 
-// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -disable-availability-checking 2>&1 | %FileCheck %s
-
+// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -disable-availability-checking >%t.output 2>&1
+// RUN: %FileCheck --input-file %t.output %s
 
 /// Test some invalid syntax first
 
@@ -176,7 +176,7 @@ struct OpaqueTypes<E> {
 // CHECK: Generic signature: <Self where Self : Sequence, Self.[Sequence]Element == Int>
 extension Sequence<Int> {
 
-  // CHECK-LABEL: parameterized_protocol.(file).Sequence extension.doSomethingGeneric@
+  // CHECK-LABEL: parameterized_protocol.(file).Sequence<Int> extension.doSomethingGeneric@
   // CHECK: Generic signature: <Self, E where Self : Sequence, Self.[Sequence]Element == Int>
   func doSomethingGeneric<E>(_: E) {}
 }
