@@ -110,6 +110,21 @@ struct ASTGenVisitor {
       split: Self.splitCodeBlockItemIfConfig
     ) { element in
       let loc = self.generateSourceLoc(element)
+
+      func endLoc() -> BridgedSourceLoc {
+        if let endTok = element.lastToken(viewMode: .sourceAccurate) {
+          switch endTok.parent?.kind {
+          case .stringLiteralExpr, .regexLiteralExpr:
+            // string/regex literal are single token in AST.
+            return self.generateSourceLoc(endTok.parent)
+          default:
+            return self.generateSourceLoc(endTok)
+          }
+        } else {
+          return loc
+        }
+      }
+
       let swiftASTNodes = generate(codeBlockItem: element)
       switch swiftASTNodes {
       case .decl(let d):
@@ -120,7 +135,7 @@ struct ASTGenVisitor {
           declContext: self.declContext,
           startLoc: loc,
           stmt: s,
-          endLoc: loc
+          endLoc: endLoc()
         )
         out.append(topLevelDecl.asDecl)
       case .expr(let e):
@@ -129,7 +144,7 @@ struct ASTGenVisitor {
           declContext: self.declContext,
           startLoc: loc,
           expr: e,
-          endLoc: loc
+          endLoc: endLoc()
         )
         out.append(topLevelDecl.asDecl)
       }
