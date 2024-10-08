@@ -19,7 +19,7 @@
 #include "swift/Basic/SourceManager.h"
 
 struct swift::BlockListStore::Implementation {
-  SourceManager &SM;
+  SourceManager SM;
   llvm::StringMap<std::vector<BlockListAction>> ModuleActionDict;
   llvm::StringMap<std::vector<BlockListAction>> ProjectActionDict;
   void addConfigureFilePath(StringRef path);
@@ -45,7 +45,7 @@ struct swift::BlockListStore::Implementation {
     return std::string();
   }
 
-  Implementation(SourceManager &SM) : SM(SM) {}
+  Implementation(SourceManager &SM) : SM(SM.getFileSystem()) {}
 };
 
 swift::BlockListStore::BlockListStore(swift::SourceManager &SM)
