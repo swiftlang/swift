@@ -63,9 +63,6 @@ public:
   // Availability: "As late as possible."  Consume the value in the last blocks
   //               beyond the non-consuming uses in which the value has been
   //               consumed on no incoming paths.
-  //
-  //                        This boundary works around bugs where SILGen emits
-  //                        illegal OSSA lifetimes.
   struct Boundary {
     enum Value : uint8_t {
       Liveness,
