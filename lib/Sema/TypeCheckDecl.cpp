@@ -3350,6 +3350,7 @@ SourceLoc PrettyPrintDeclRequest::evaluate(Evaluator &eval, const Decl *decl) co
         getBufferAccessLevel(decl),
         ctx.TypeCheckerOpts.PrintFullConvention);
     decl->print(printer, options);
+
     // Close all of the enclosing types.
     for (const auto & enclosingType: enclosingTypes) {
       (void)enclosingType;
@@ -3380,6 +3381,12 @@ SourceLoc PrettyPrintDeclRequest::evaluate(Evaluator &eval, const Decl *decl) co
         nullptr
       }
   );
+
+  // Add a source file for the buffer.
+  auto moduleDecl = decl->getDeclContext()->getParentModule();
+  auto sourceFile = new (ctx) SourceFile(
+      *moduleDecl, SourceFileKind::Library, bufferID);
+  sourceFile->setImports({ });
 
   return memBufferStartLoc.getAdvancedLoc(targetDeclOffsetInBuffer);
 }

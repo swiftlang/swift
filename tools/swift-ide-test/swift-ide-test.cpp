@@ -263,6 +263,10 @@ SecondSourceFilename("second-source-filename",
                      llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
+ImplicitModuleImports("import-module", llvm::cl::desc("Force import of named modules"),
+               llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
 InputFilenames(llvm::cl::Positional, llvm::cl::desc("[input files...]"),
                llvm::cl::ZeroOrMore, llvm::cl::cat(Category));
 
@@ -4584,6 +4588,11 @@ int main(int argc, char *argv[]) {
         PluginSearchOption::PluginPath{path});
   }
   InitInvok.setDefaultInProcessPluginServerPathIfNecessary();
+
+  for (auto implicitImport : options::ImplicitModuleImports) {
+    InitInvok.getFrontendOptions().ImplicitImportModuleNames.emplace_back(
+        implicitImport, /*isTestable=*/false);
+  }
 
   // Process the clang arguments last and allow them to override previously
   // set options.
