@@ -237,3 +237,12 @@ do {
     assert(s.isEmpty, "") // Ok
   }
 }
+
+extension Double {
+    public static func * (left: Float, right: Double) -> Double { 0 }
+}
+
+func test_non_default_literal_use(arg: Float) {
+    let v = arg * 2.0 // shouldn't use `(Float, Double) -> Double` overload
+    let _: Float = v // Ok
+}
