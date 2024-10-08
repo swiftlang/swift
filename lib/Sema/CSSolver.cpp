@@ -272,9 +272,10 @@ Solution ConstraintSystem::finalize() {
   return solution;
 }
 
-void ConstraintSystem::applySolution(const Solution &solution) {
-  // Update the score.
-  CurrentScore += solution.getFixedScore();
+void ConstraintSystem::replaySolution(const Solution &solution,
+                                      bool shouldIncreaseScore) {
+  if (shouldIncreaseScore)
+    CurrentScore += solution.getFixedScore();
 
   // Assign fixed types to the type variables solved by this solution.
   for (auto binding : solution.typeBindings) {

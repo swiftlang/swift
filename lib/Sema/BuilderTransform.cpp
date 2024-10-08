@@ -1082,7 +1082,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
   }
 
   // FIXME: Shouldn't need to do this.
-  cs.applySolution(solutions.front());
+  cs.replaySolution(solutions.front());
 
   // Apply the solution to the function body.
   if (auto result = cs.applySolution(solutions.front(), target)) {
