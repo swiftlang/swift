@@ -450,10 +450,16 @@ static Constraint *determineBestChoicesInContext(
     // - Array-to-pointer conversion
     // - Value to existential conversion
     // - Exact match on top-level types
-    std::function<double(GenericSignature, Type, Type, MatchOptions)>
-        scoreCandidateMatch = [&](GenericSignature genericSig,
-                                  Type candidateType, Type paramType,
-                                  MatchOptions options) -> double {
+    //
+    // In situations when it's not possible to determine whether a candidate
+    // type matches a parameter type (i.e. when partially resolved generic
+    // types are matched) this function is going to produce \c std::nullopt
+    // instead of `0` that indicates "not a match".
+    std::function<std::optional<double>(GenericSignature, Type, Type,
+                                        MatchOptions)>
+        scoreCandidateMatch =
+            [&](GenericSignature genericSig, Type candidateType, Type paramType,
+                MatchOptions options) -> std::optional<double> {
       auto areEqual = [&options](Type a, Type b) {
         // Double<->CGFloat implicit conversion support for literals
         // only since in this case the conversion might not result in
@@ -527,10 +533,12 @@ static Constraint *determineBestChoicesInContext(
 
       // Check protocol requirement(s) if this parameter is a
       // generic parameter type.
-      if (genericSig && paramType->is<GenericTypeParamType>()) {
-        // If candidate is not fully resolved, check conformances only
-        // and lower the score.
-        if (candidateType->hasTypeVariable()) {
+      if (genericSig && paramType->isTypeParameter()) {
+        // If candidate is not fully resolved or is matched against a
+        // dependent member type (i.e. `Self.T`), let's check conformances
+        // only and lower the score.
+        if (candidateType->hasTypeVariable() ||
+            paramType->is<DependentMemberType>()) {
           auto protocolRequirements =
               genericSig->getRequiredProtocols(paramType);
           if (llvm::all_of(protocolRequirements, [&](ProtocolDecl *protocol) {
@@ -546,6 +554,10 @@ static Constraint *determineBestChoicesInContext(
 
           return 0;
         }
+
+        // Cannot match anything but generic type parameters here.
+        if (!paramType->is<GenericTypeParamType>())
+          return std::nullopt;
 
         // If the candidate type is fully resolved, let's check all of
         // the requirements that are associated with the corresponding
@@ -718,10 +730,15 @@ static Constraint *determineBestChoicesInContext(
               if (favorExactMatchesOnly)
                 options |= MatchFlag::ExactOnly;
 
-              auto score = scoreCandidateMatch(genericSig, candidateType,
-                                               paramType, options);
-              if (score > 0) {
-                bestCandidateScore = std::max(bestCandidateScore, score);
+              auto candidateScore = scoreCandidateMatch(
+                  genericSig, candidateType, paramType, options);
+
+              if (!candidateScore)
+                continue;
+
+              if (candidateScore > 0) {
+                bestCandidateScore =
+                    std::max(bestCandidateScore, candidateScore.value());
                 continue;
               }
 
