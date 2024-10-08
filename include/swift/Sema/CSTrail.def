@@ -30,6 +30,10 @@
 #define CLOSURE_CHANGE(Name) CHANGE(Name)
 #endif
 
+#ifndef CONSTRAINT_CHANGE
+#define CONSTRAINT_CHANGE(Name) CHANGE(Name)
+#endif
+
 #ifndef LAST_CHANGE
 #define LAST_CHANGE(Name)
 #endif
@@ -54,6 +58,10 @@ EXPR_CHANGE(RecordedExprPattern)
 CLOSURE_CHANGE(RecordedClosureType)
 CLOSURE_CHANGE(RecordedPreconcurrencyClosure)
 
+CONSTRAINT_CHANGE(DisabledConstraint)
+CONSTRAINT_CHANGE(FavoredConstraint)
+CONSTRAINT_CHANGE(GeneratedConstraint)
+
 CHANGE(AddedTypeVariable)
 CHANGE(AddedConstraint)
 CHANGE(RemovedConstraint)
@@ -69,8 +77,6 @@ CHANGE(RecordedOpenedPackExpansionType)
 CHANGE(RecordedPackEnvironment)
 CHANGE(RecordedNodeType)
 CHANGE(RecordedKeyPathComponentType)
-CHANGE(DisabledConstraint)
-CHANGE(FavoredConstraint)
 CHANGE(RecordedResultBuilderTransform)
 CHANGE(RecordedContextualInfo)
 CHANGE(RecordedTarget)
@@ -86,5 +92,6 @@ LAST_CHANGE(DecreasedScore)
 #undef LOCATOR_CHANGE
 #undef EXPR_CHANGE
 #undef CLOSURE_CHANGE
+#undef CONSTRAINT_CHANGE
 #undef LAST_CHANGE
 #undef CHANGE

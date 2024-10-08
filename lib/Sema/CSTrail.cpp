@@ -72,6 +72,14 @@ SolverTrail::~SolverTrail() {
     result.TheClosure = closure; \
     return result; \
   }
+#define CONSTRAINT_CHANGE(Name) \
+  SolverTrail::Change \
+  SolverTrail::Change::Name(Constraint *constraint) { \
+    Change result; \
+    result.Kind = ChangeKind::Name; \
+    result.TheConstraint.Constraint = constraint; \
+    return result; \
+  }
 #include "swift/Sema/CSTrail.def"
 
 SolverTrail::Change
@@ -218,22 +226,6 @@ SolverTrail::Change::RecordedKeyPathComponentType(const KeyPathExpr *expr,
   result.Options = component;
   result.KeyPath.Expr = expr;
   result.KeyPath.OldType = oldType;
-  return result;
-}
-
-SolverTrail::Change
-SolverTrail::Change::DisabledConstraint(Constraint *constraint) {
-  Change result;
-  result.Kind = ChangeKind::DisabledConstraint;
-  result.TheConstraint.Constraint = constraint;
-  return result;
-}
-
-SolverTrail::Change
-SolverTrail::Change::FavoredConstraint(Constraint *constraint) {
-  Change result;
-  result.Kind = ChangeKind::FavoredConstraint;
-  result.TheConstraint.Constraint = constraint;
   return result;
 }
 
@@ -522,6 +514,12 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     cs.CurrentScore.Data[kind] += value;
     break;
   }
+
+  case ChangeKind::GeneratedConstraint: {
+    auto iter = ConstraintList::iterator(TheConstraint.Constraint);
+    cs.InactiveConstraints.erase(iter);
+    break;
+  }
   }
 }
 
@@ -551,6 +549,13 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
   case ChangeKind::Name: \
     out << "(" << #Name << " "; \
     simple_display(out, TheClosure); \
+    out << ")\n"; \
+    break;
+#define CONSTRAINT_CHANGE(Name) \
+  case ChangeKind::Name: \
+    out << "(" << #Name << " "; \
+    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr, \
+                                    indent + 2); \
     out << ")\n"; \
     break;
 #include "swift/Sema/CSTrail.def"
@@ -687,20 +692,6 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     else
       out << "null";
     out << " for component " << Options << ")\n";
-    break;
-
-  case ChangeKind::DisabledConstraint:
-    out << "(DisabledConstraint ";
-    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
-                                    indent + 2);
-    out << ")\n";
-    break;
-
-  case ChangeKind::FavoredConstraint:
-    out << "(FavoredConstraint ";
-    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
-                                    indent + 2);
-    out << ")\n";
     break;
 
   case ChangeKind::RecordedResultBuilderTransform:

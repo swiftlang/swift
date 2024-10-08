@@ -142,6 +142,7 @@ public:
 #define LOCATOR_CHANGE(Name, _) static Change Name(ConstraintLocator *locator);
 #define EXPR_CHANGE(Name) static Change Name(Expr *expr);
 #define CLOSURE_CHANGE(Name) static Change Name(ClosureExpr *closure);
+#define CONSTRAINT_CHANGE(Name) static Change Name(Constraint *constraint);
 #include "swift/Sema/CSTrail.def"
 
     /// Create a change that added a type variable.
@@ -201,12 +202,6 @@ public:
     static Change RecordedKeyPathComponentType(const KeyPathExpr *expr,
                                                unsigned component,
                                                Type oldType);
-
-    /// Create a change that disabled a constraint.
-    static Change DisabledConstraint(Constraint *constraint);
-
-    /// Create a change that favored a constraint.
-    static Change FavoredConstraint(Constraint *constraint);
 
     /// Create a change that recorded a result builder transform.
     static Change RecordedResultBuilderTransform(AnyFunctionRef fn);

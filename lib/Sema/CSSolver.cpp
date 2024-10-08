@@ -658,9 +658,6 @@ ConstraintSystem::SolverState::~SolverState() {
   // to constraint system.
   assert(!hasRetiredConstraints());
 
-  // Make sure that all of the generated constraints have been handled.
-  assert(generatedConstraints.empty());
-
   // Re-activate constraints which were initially marked as "active"
   // to restore original state of the constraint system.
   for (auto *constraint : activeConstraints) {
