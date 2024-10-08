@@ -44,6 +44,12 @@ private func baz() -> some protoA<testModBStruct> & protoB<Float> & testModBProt
 // CHECK-NEXT:    "conformances": [
 // CHECK-NEXT:      "ExtractOpaqueTypealias.myProto"
 // CHECK-NEXT:    ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocol": "ExtractOpaqueTypealias.myProto"
+// CHECK-NEXT:        "definingModule": "ExtractOpaqueTypealias"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
 // CHECK-NEXT:    "associatedTypeAliases": [
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "typeAliasName": "PerformReturn",
