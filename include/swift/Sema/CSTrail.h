@@ -17,6 +17,9 @@
 #ifndef SWIFT_SEMA_CSTRAIL_H
 #define SWIFT_SEMA_CSTRAIL_H
 
+#include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include <vector>
 
 namespace llvm {
@@ -31,53 +34,18 @@ class TypeVariableType;
 namespace constraints {
 
 class Constraint;
+struct SyntacticElementTargetKey;
 
 class SolverTrail {
 public:
 
   /// The kind of change made to the graph.
   enum class ChangeKind: unsigned {
-    /// Added a new vertex to the constraint graph.
-    AddedTypeVariable,
-    /// Added a new constraint to the constraint graph.
-    AddedConstraint,
-    /// Removed an existing constraint from the constraint graph.
-    RemovedConstraint,
-    /// Extended the equivalence class of a type variable in the constraint graph.
-    ExtendedEquivalenceClass,
-    /// Added a new edge in the constraint graph.
-    RelatedTypeVariables,
-    /// Inferred potential bindings from a constraint.
-    InferredBindings,
-    /// Retracted potential bindings from a constraint.
-    RetractedBindings,
-    /// Set the fixed type or parent and flags for a type variable.
-    UpdatedTypeVariable,
-    /// Recorded a conversion restriction kind.
-    AddedConversionRestriction,
-    /// Recorded a fix.
-    AddedFix,
-    /// Recorded a fixed requirement.
-    AddedFixedRequirement,
-    /// Recorded a disjunction choice.
-    RecordedDisjunctionChoice,
-    /// Recorded an applied disjunction.
-    RecordedAppliedDisjunction,
-    /// Recorded an argument matching choice.
-    RecordedMatchCallArgumentResult,
-    /// Recorded a list of opened types at a locator.
-    RecordedOpenedTypes,
-    /// Recorded the opening of an existential type at a locator.
-    RecordedOpenedExistentialType,
-    /// Recorded the opening of a pack existential type.
-    RecordedOpenedPackExpansionType,
-    /// Recorded the creation of a generic environment for a pack expansion expression.
-    RecordedPackExpansionEnvironment,
-    /// Recorded the mapping from a pack element expression to its parent
-    /// pack expansion expression.
-    RecordedPackEnvironment,
-    /// Record a defaulted constraint at a locator.
-    RecordedDefaultedConstraint,
+#define CHANGE(Name) Name,
+#define LAST_CHANGE(Name) Last = Name
+#include "CSTrail.def"
+#undef CHANGE
+#undef LAST_CHANGE
   };
 
   /// A change made to the constraint system.
@@ -135,91 +103,131 @@ public:
         Type DstType;
       } Restriction;
 
-      ConstraintFix *Fix;
 
       struct {
         GenericTypeParamType *GP;
         Type ReqTy;
       } FixedRequirement;
 
-      ConstraintLocator *Locator;
-      PackExpansionType *ExpansionTy;
-      PackElementExpr *ElementExpr;
+      struct {
+        ASTNode Node;
+        Type OldType;
+      } Node;
+
+      struct {
+        const KeyPathExpr *Expr;
+        Type OldType;
+      } KeyPath;
+
+      ConstraintFix *TheFix;
+      ConstraintLocator *TheLocator;
+      PackExpansionType *TheExpansion;
+      PackElementExpr *TheElement;
+      Expr *TheExpr;
+      Stmt *TheStmt;
+      StmtConditionElement *TheCondElt;
+      Pattern *ThePattern;
+      PatternBindingDecl *ThePatternBinding;
+      VarDecl *TheVar;
+      AnyFunctionRef TheRef;
+      ClosureExpr *TheClosure;
+      DeclContext *TheDeclContext;
+      CaseLabelItem *TheItem;
+      CatchNode TheCatchNode;
+      ParamDecl *TheParam;
     };
 
     Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
 
+#define LOCATOR_CHANGE(Name, _) static Change Name(ConstraintLocator *locator);
+#define EXPR_CHANGE(Name) static Change Name(Expr *expr);
+#define CLOSURE_CHANGE(Name) static Change Name(ClosureExpr *closure);
+#include "swift/Sema/CSTrail.def"
+
     /// Create a change that added a type variable.
-    static Change addedTypeVariable(TypeVariableType *typeVar);
+    static Change AddedTypeVariable(TypeVariableType *typeVar);
 
     /// Create a change that added a constraint.
-    static Change addedConstraint(TypeVariableType *typeVar, Constraint *constraint);
+    static Change AddedConstraint(TypeVariableType *typeVar, Constraint *constraint);
 
     /// Create a change that removed a constraint.
-    static Change removedConstraint(TypeVariableType *typeVar, Constraint *constraint);
+    static Change RemovedConstraint(TypeVariableType *typeVar, Constraint *constraint);
 
     /// Create a change that extended an equivalence class.
-    static Change extendedEquivalenceClass(TypeVariableType *typeVar,
+    static Change ExtendedEquivalenceClass(TypeVariableType *typeVar,
                                            unsigned prevSize);
 
     /// Create a change that updated the references/referenced by sets of
     /// a type variable pair.
-    static Change relatedTypeVariables(TypeVariableType *typeVar,
+    static Change RelatedTypeVariables(TypeVariableType *typeVar,
                                        TypeVariableType *otherTypeVar);
 
     /// Create a change that inferred bindings from a constraint.
-    static Change inferredBindings(TypeVariableType *typeVar,
+    static Change InferredBindings(TypeVariableType *typeVar,
                                    Constraint *constraint);
 
     /// Create a change that retracted bindings from a constraint.
-    static Change retractedBindings(TypeVariableType *typeVar,
+    static Change RetractedBindings(TypeVariableType *typeVar,
                                     Constraint *constraint);
 
     /// Create a change that updated a type variable.
-    static Change updatedTypeVariable(
+    static Change UpdatedTypeVariable(
                TypeVariableType *typeVar,
                llvm::PointerUnion<TypeVariableType *, TypeBase *> parentOrFixed,
                unsigned options);
 
     /// Create a change that recorded a restriction.
-    static Change addedConversionRestriction(Type srcType, Type dstType);
+    static Change AddedConversionRestriction(Type srcType, Type dstType);
 
     /// Create a change that recorded a fix.
-    static Change addedFix(ConstraintFix *fix);
+    static Change AddedFix(ConstraintFix *fix);
 
     /// Create a change that recorded a fixed requirement.
-    static Change addedFixedRequirement(GenericTypeParamType *GP,
+    static Change AddedFixedRequirement(GenericTypeParamType *GP,
                                         unsigned reqKind,
                                         Type requirementTy);
 
-    /// Create a change that recorded a disjunction choice.
-    static Change recordedDisjunctionChoice(ConstraintLocator *locator,
-                                            unsigned index);
-
-    /// Create a change that recorded an applied disjunction.
-    static Change recordedAppliedDisjunction(ConstraintLocator *locator);
-
-    /// Create a change that recorded an applied disjunction.
-    static Change recordedMatchCallArgumentResult(ConstraintLocator *locator);
-
-    /// Create a change that recorded a list of opened types.
-    static Change recordedOpenedTypes(ConstraintLocator *locator);
-
-    /// Create a change that recorded the opening of an existential type.
-    static Change recordedOpenedExistentialType(ConstraintLocator *locator);
-
     /// Create a change that recorded the opening of a pack expansion type.
-    static Change recordedOpenedPackExpansionType(PackExpansionType *expansion);
-
-    /// Create a change that recorded the opening of a pack expansion type.
-    static Change recordedPackExpansionEnvironment(ConstraintLocator *locator);
+    static Change RecordedOpenedPackExpansionType(PackExpansionType *expansion);
 
     /// Create a change that recorded a mapping from a pack element expression
     /// to its parent expansion expression.
-    static Change recordedPackEnvironment(PackElementExpr *packElement);
+    static Change RecordedPackEnvironment(PackElementExpr *packElement);
 
-    /// Create a change that recorded a defaulted constraint at a locator.
-    static Change recordedDefaultedConstraint(ConstraintLocator *locator);
+    /// Create a change that recorded an assignment of a type to an AST node.
+    static Change RecordedNodeType(ASTNode node, Type oldType);
+
+    /// Create a change that recorded an assignment of a type to an AST node.
+    static Change RecordedKeyPathComponentType(const KeyPathExpr *expr,
+                                               unsigned component,
+                                               Type oldType);
+
+    /// Create a change that disabled a constraint.
+    static Change DisabledConstraint(Constraint *constraint);
+
+    /// Create a change that favored a constraint.
+    static Change FavoredConstraint(Constraint *constraint);
+
+    /// Create a change that recorded a result builder transform.
+    static Change RecordedResultBuilderTransform(AnyFunctionRef fn);
+
+    /// Create a change that recorded the contextual type of an AST node.
+    static Change RecordedContextualInfo(ASTNode node);
+
+    /// Create a change that recorded a SyntacticElementTarget.
+    static Change RecordedTarget(SyntacticElementTargetKey key);
+
+    /// Create a change that recorded a SyntacticElementTarget.
+    static Change RecordedCaseLabelItemInfo(CaseLabelItem *item);
+
+    /// Create a change that recorded a potential throw site.
+    static Change RecordedPotentialThrowSite(CatchNode catchNode);
+
+    /// Create a change that recorded an isolated parameter.
+    static Change RecordedIsolatedParam(ParamDecl *param);
+
+    /// Create a change that recorded a key path expression.
+    static Change RecordedKeyPath(KeyPathExpr *expr);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.
@@ -229,9 +237,12 @@ public:
 
     void dump(llvm::raw_ostream &out, ConstraintSystem &cs,
               unsigned indent = 0) const;
+
+  private:
+    SyntacticElementTargetKey getSyntacticElementTargetKey() const;
   };
 
-  SolverTrail(ConstraintSystem &cs) : CS(cs) {}
+  SolverTrail(ConstraintSystem &cs);
 
   ~SolverTrail();
 
@@ -257,6 +268,8 @@ private:
 
   /// The list of changes made to this constraint system.
   std::vector<Change> Changes;
+
+  uint64_t Profile[unsigned(ChangeKind::Last) + 1];
 
   bool UndoActive = false;
   unsigned Total = 0;

@@ -21,8 +21,11 @@
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <tuple>
+
+#define DEBUG_TYPE "PotentialBindings"
 
 using namespace swift;
 using namespace constraints;
@@ -1774,7 +1777,7 @@ void PotentialBindings::infer(Constraint *constraint) {
 
   // Record the change, if there are active scopes.
   if (CS.isRecordingChanges())
-    CS.recordChange(SolverTrail::Change::inferredBindings(TypeVar, constraint));
+    CS.recordChange(SolverTrail::Change::InferredBindings(TypeVar, constraint));
 
   switch (constraint->getKind()) {
   case ConstraintKind::Bind:
@@ -1949,7 +1952,14 @@ void PotentialBindings::retract(Constraint *constraint) {
 
   // Record the change, if there are active scopes.
   if (CS.isRecordingChanges())
-    CS.recordChange(SolverTrail::Change::retractedBindings(TypeVar, constraint));
+    CS.recordChange(SolverTrail::Change::RetractedBindings(TypeVar, constraint));
+
+  LLVM_DEBUG(
+    llvm::dbgs() << Constraints.size() << " " << Bindings.size() << " "
+                 << Protocols.size() << " " << Literals.size() << " "
+                 << AdjacentVars.size() << " " << DelayedBy.size() << " "
+                 << SubtypeOf.size() << " " << SupertypeOf.size() << " "
+                 << EquivalentTo.size() << "\n");
 
   Bindings.erase(
       llvm::remove_if(Bindings,

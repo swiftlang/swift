@@ -8329,6 +8329,16 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   return matchExistentialTypes(type, protocol, kind, flags, locator);
 }
 
+void ConstraintSystem::recordSynthesizedConformance(
+                                           ConstraintLocator *locator,
+                                           ProtocolConformanceRef conformance) {
+  bool inserted = SynthesizedConformances.insert({locator, conformance}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedSynthesizedConformance(locator));
+}
+
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  Type type,
                                  ProtocolDecl *protocol,
@@ -8487,7 +8497,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           ProtocolConformanceRef synthesized(protocol);
           auto witnessLoc = getConstraintLocator(
               locator.getAnchor(), LocatorPathElt::Witness(witness));
-          SynthesizedConformances.insert({witnessLoc, synthesized});
+          // FIXME: Why are we recording the same locator more than once here?
+          if (SynthesizedConformances.count(witnessLoc) == 0)
+            recordSynthesizedConformance(witnessLoc, synthesized);
           return recordConformance(synthesized);
         };
 
@@ -11513,6 +11525,36 @@ static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
   return builderType;
 }
 
+void ConstraintSystem::recordIsolatedParam(ParamDecl *param) {
+  bool inserted = isolatedParams.insert(param).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedIsolatedParam(param));
+}
+
+void ConstraintSystem::removeIsolatedParam(ParamDecl *param) {
+  bool erased = isolatedParams.erase(param);
+  ASSERT(erased);
+}
+
+void ConstraintSystem::recordPreconcurrencyClosure(
+    const ClosureExpr *closure) {
+  bool inserted = preconcurrencyClosures.insert(closure).second;
+  ASSERT(inserted);
+
+  if (solverState) {
+    recordChange(SolverTrail::Change::RecordedPreconcurrencyClosure(
+      const_cast<ClosureExpr *>(closure)));
+  }
+}
+
+void ConstraintSystem::removePreconcurrencyClosure(
+    const ClosureExpr *closure) {
+  bool erased = preconcurrencyClosures.erase(closure);
+  ASSERT(erased);
+}
+
 bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
                                       Type contextualType,
                                       ConstraintLocatorBuilder locator) {
@@ -11522,7 +11564,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
   // Note if this closure is isolated by preconcurrency.
   if (hasPreconcurrencyCallee(locator))
-    preconcurrencyClosures.insert(closure);
+    recordPreconcurrencyClosure(closure);
 
   // Let's look through all optionals associated with contextual
   // type to make it possible to infer parameter/result type of
@@ -11658,7 +11700,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
         // Note when a parameter is inferred to be isolated.
         if (contextualParam->isIsolated() && !flags.isIsolated() && paramDecl)
-          isolatedParams.insert(paramDecl);
+          recordIsolatedParam(paramDecl);
 
         // Carry-over the ownership specifier from the contextual parameter.
         auto paramOwnership =
@@ -12869,7 +12911,11 @@ createImplicitRootForCallAsFunction(ConstraintSystem &cs, Type refType,
     // Record a type of the new reference in the constraint system.
     cs.setType(implicitRef, refType);
     // Record new `.callAsFunction` in the constraint system.
-    cs.recordCallAsFunction(implicitRef, arguments, calleeLocator);
+    cs.recordImplicitCallAsFunctionRoot(calleeLocator, implicitRef);
+
+    auto *implicitRefLocator = cs.getConstraintLocator(
+        implicitRef, ConstraintLocator::ApplyArgument);
+    cs.associateArgumentList(implicitRefLocator, arguments);
   }
 
   return implicitRef;
@@ -14052,6 +14098,17 @@ void ConstraintSystem::addRestrictedConstraint(
                                      TMF_GenerateConstraints, locator);
 }
 
+void ConstraintSystem::recordImplicitValueConversion(
+                             ConstraintLocator *locator,
+                             ConversionRestrictionKind restriction) {
+  bool inserted = ImplicitValueConversions.insert(
+        {getConstraintLocator(locator), restriction}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedImplicitValueConversion(locator));
+}
+
 /// Given that we have a conversion constraint between two types, and
 /// that the given constraint-reduction rule applies between them at
 /// the top level, apply it and generate any necessary recursive
@@ -14624,7 +14681,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
           getASTContext(), {Argument(SourceLoc(), Identifier(), nullptr)},
           /*firstTrailingClosureIndex=*/std::nullopt,
           AllocationArena::ConstraintSolver);
-      ArgumentLists.insert({argumentsLoc, argList});
+      recordArgumentList(argumentsLoc, argList);
     }
 
     auto *memberTypeLoc = getConstraintLocator(
@@ -14927,25 +14984,37 @@ void ConstraintSystem::recordMatchCallArgumentResult(
     ConstraintLocator *locator, MatchCallArgumentResult result) {
   assert(locator->isLastElement<LocatorPathElt::ApplyArgument>());
   bool inserted = argumentMatchingChoices.insert({locator, result}).second;
-  if (inserted) {
-    if (isRecordingChanges())
-      recordChange(SolverTrail::Change::recordedMatchCallArgumentResult(locator));
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedMatchCallArgumentResult(locator));
+}
+
+void ConstraintSystem::recordImplicitCallAsFunctionRoot(
+    ConstraintLocator *locator, UnresolvedDotExpr *root) {
+  bool inserted = ImplicitCallAsFunctionRoots.insert({locator, root}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedImplicitCallAsFunctionRoot(locator));
+}
+
+void ConstraintSystem::recordKeyPath(const KeyPathExpr *keypath,
+                                     TypeVariableType *root,
+                                     TypeVariableType *value, DeclContext *dc) {
+  bool inserted = KeyPaths.insert(
+    std::make_pair(keypath, std::make_tuple(root, value, dc))).second;
+  ASSERT(inserted);
+
+  if (solverState) {
+    recordChange(SolverTrail::Change::RecordedKeyPath(
+      const_cast<KeyPathExpr *>(keypath)));
   }
 }
 
-void ConstraintSystem::recordCallAsFunction(UnresolvedDotExpr *root,
-                                            ArgumentList *arguments,
-                                            ConstraintLocator *locator) {
-  ImplicitCallAsFunctionRoots.insert({locator, root});
-
-  associateArgumentList(
-      getConstraintLocator(root, ConstraintLocator::ApplyArgument), arguments);
-}
-
-void ConstraintSystem::recordKeyPath(KeyPathExpr *keypath,
-                                     TypeVariableType *root,
-                                     TypeVariableType *value, DeclContext *dc) {
-  KeyPaths.insert(std::make_pair(keypath, std::make_tuple(root, value, dc)));
+void ConstraintSystem::removeKeyPath(const KeyPathExpr *keypath) {
+  bool erased = KeyPaths.erase(keypath);
+  ASSERT(erased);
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
