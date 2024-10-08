@@ -388,8 +388,8 @@ class TypeSubstituter : public TypeTransform<TypeSubstituter> {
   InFlightSubstitution &IFS;
 
 public:
-  TypeSubstituter(unsigned level, InFlightSubstitution &IFS)
-    : level(level), IFS(IFS) {}
+  TypeSubstituter(ASTContext &ctx, unsigned level, InFlightSubstitution &IFS)
+    : TypeTransform(ctx), level(level), IFS(IFS) {}
 
   std::optional<Type> transform(TypeBase *type, TypePosition pos);
 
@@ -566,7 +566,7 @@ Type Type::subst(InFlightSubstitution &IFS) const {
   if (IFS.isInvariant(*this))
     return *this;
 
-  TypeSubstituter transform(/*level=*/0, IFS);
+  TypeSubstituter transform((*this)->getASTContext(), /*level=*/0, IFS);
   return transform.doIt(*this, TypePosition::Invariant);
 }
 

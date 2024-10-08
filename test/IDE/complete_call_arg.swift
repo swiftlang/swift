@@ -1119,7 +1119,7 @@ func testLValueBaseTyOfSubscript() {
   var cache: [String: Codable] = [:]
   if let cached = cache[#^LVALUEBASETY^#
 
-  // LVALUEBASETY-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]/IsSystem: ['[']{#(position): Dictionary<String, any Codable>.Index#}[']'][#Dictionary<String, any Codable>.Element#];
+  // LVALUEBASETY-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]/IsSystem: ['[']{#(position): Dictionary<String, any Codable>.Index#}[']'][#(key: String, value: any Codable)#];
   // LVALUEBASETY-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]/IsSystem: ['[']{#(key): String#}[']'][#@lvalue (any Codable)?#];
 }
 
