@@ -26,6 +26,7 @@
 #include "swift/Basic/SourceLoc.h"
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
 
@@ -137,22 +138,30 @@ public:
   }
 };
 
-// TODO: Use TrailingObjects to tail allocate sources
-class LifetimeEntry {
+class LifetimeEntry final
+    : private llvm::TrailingObjects<LifetimeEntry, LifetimeDescriptor> {
+  friend TrailingObjects;
+
 private:
   SourceLoc startLoc, endLoc;
-  ArrayRef<LifetimeDescriptor> sources;
+  unsigned numSources;
   std::optional<LifetimeDescriptor> targetDescriptor;
 
   LifetimeEntry(
       SourceLoc startLoc, SourceLoc endLoc,
       ArrayRef<LifetimeDescriptor> sources,
       std::optional<LifetimeDescriptor> targetDescriptor = std::nullopt)
-      : startLoc(startLoc), endLoc(endLoc), sources(sources),
-        targetDescriptor(targetDescriptor) {}
+      : startLoc(startLoc), endLoc(endLoc), numSources(sources.size()),
+        targetDescriptor(targetDescriptor) {
+    std::uninitialized_copy(sources.begin(), sources.end(),
+                            getTrailingObjects<LifetimeDescriptor>());
+  }
+
+  size_t numTrailingObjects(OverloadToken<LifetimeDescriptor>) const {
+    return numSources;
+  }
 
 public:
-  /// \p sources should be allocated on the ASTContext
   static LifetimeEntry *
   create(const ASTContext &ctx, SourceLoc startLoc, SourceLoc endLoc,
          ArrayRef<LifetimeDescriptor> sources,
@@ -162,13 +171,13 @@ public:
   SourceLoc getStartLoc() const { return startLoc; }
   SourceLoc getEndLoc() const { return endLoc; }
 
-  ArrayRef<LifetimeDescriptor> getSources() const { return sources; }
+  ArrayRef<LifetimeDescriptor> getSources() const {
+    return {getTrailingObjects<LifetimeDescriptor>(), numSources};
+  }
 
   std::optional<LifetimeDescriptor> getTargetDescriptor() const {
     return targetDescriptor;
   }
-
-  bool empty() const { return !sources.empty(); }
 
   std::string getString() const {
     std::string result = "@lifetime(";
@@ -178,7 +187,7 @@ public:
     }
 
     bool firstElem = true;
-    for (auto source : sources) {
+    for (auto source : getSources()) {
       if (!firstElem) {
         result += ", ";
       }

@@ -5210,7 +5210,7 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
   }
 
   auto *lifetimeEntry = LifetimeEntry::create(
-      Context, loc, rParenLoc, Context.AllocateCopy(sources), targetDescriptor);
+      Context, loc, rParenLoc, sources, targetDescriptor);
   return ParserResult<LifetimeEntry>(lifetimeEntry);
 }
 

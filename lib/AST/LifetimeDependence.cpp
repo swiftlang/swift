@@ -29,7 +29,8 @@ LifetimeEntry *
 LifetimeEntry::create(const ASTContext &ctx, SourceLoc startLoc,
                       SourceLoc endLoc, ArrayRef<LifetimeDescriptor> sources,
                       std::optional<LifetimeDescriptor> targetDescriptor) {
-  void *mem = ctx.Allocate(sizeof(LifetimeEntry), alignof(LifetimeEntry));
+  unsigned size = totalSizeToAlloc<LifetimeDescriptor>(sources.size());
+  void *mem = ctx.Allocate(size, alignof(LifetimeEntry));
   return new (mem) LifetimeEntry(startLoc, endLoc, sources, targetDescriptor);
 }
 
