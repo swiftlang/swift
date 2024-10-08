@@ -1084,6 +1084,10 @@ def AssumeSingleThreaded : Flag<["-"], "assume-single-threaded">,
   HelpText<"Assume that code will be executed in a single-threaded "
            "environment">;
 
+def OptimizeEmbeddedModuleAs : Joined<["-"], "optimize-embedded-module-as=">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Specify whether the module is 'leaf' or 'library'">;
+
 // Debug info options
 
 def g_Group : OptionGroup<"<debug info options>">;
