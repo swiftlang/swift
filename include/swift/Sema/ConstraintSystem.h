@@ -2566,8 +2566,7 @@ private:
     ///
     /// \param constraint The newly generated constraint.
     void addGeneratedConstraint(Constraint *constraint) {
-      assert(constraint && "Null generated constraint?");
-      generatedConstraints.push_back(constraint);
+      Trail.recordChange(SolverTrail::Change::GeneratedConstraint(constraint));
     }
 
     /// Register given scope to be tracked by the current solver state,
@@ -2582,8 +2581,7 @@ private:
 
       CS.incrementScopeCounter();
       auto scopeInfo =
-        std::make_tuple(scope, retiredConstraints.begin(),
-                        generatedConstraints.size());
+        std::make_tuple(scope, retiredConstraints.begin());
       scopes.push_back(scopeInfo);
     }
 
@@ -2604,10 +2602,8 @@ private:
       SolverScope *savedScope;
       // The position of last retired constraint before given scope.
       ConstraintList::iterator lastRetiredPos;
-      // The original number of generated constraints before given scope.
-      unsigned numGenerated;
 
-      std::tie(savedScope, lastRetiredPos, numGenerated) =
+      std::tie(savedScope, lastRetiredPos) =
         scopes.pop_back_val();
 
       assert(savedScope == scope && "Scope rollback not in LIFO order!");
@@ -2616,15 +2612,6 @@ private:
       CS.InactiveConstraints.splice(CS.InactiveConstraints.end(),
                                     retiredConstraints,
                                     retiredConstraints.begin(), lastRetiredPos);
-
-      // And remove all of the generated constraints.
-      auto genStart = generatedConstraints.begin() + numGenerated,
-           genEnd = generatedConstraints.end();
-      for (auto genI = genStart; genI != genEnd; ++genI) {
-        CS.InactiveConstraints.erase(ConstraintList::iterator(*genI));
-      }
-
-      generatedConstraints.erase(genStart, genEnd);
     }
 
     /// Check whether constraint system is allowed to form solutions
@@ -2660,17 +2647,13 @@ private:
     /// creating, it's used to re-activate them on destruction.
     SmallVector<Constraint *, 4> activeConstraints;
 
-    /// The current set of generated constraints.
-    SmallVector<Constraint *, 4> generatedConstraints;
-
     /// The collection which holds association between solver scope
     /// and position of the last retired constraint and number of
     /// constraints generated before registration of given scope,
     /// this helps to rollback all of the constraints retired/generated
     /// each of the registered scopes correct (LIFO) order.
     llvm::SmallVector<
-      std::tuple<SolverScope *, ConstraintList::iterator, unsigned>, 4> scopes;
-
+      std::tuple<SolverScope *, ConstraintList::iterator>, 4> scopes;
 
     /// Depth of the solution stack.
     unsigned depth = 0;
