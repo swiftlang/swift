@@ -143,16 +143,13 @@ public:
 #define EXPR_CHANGE(Name) static Change Name(Expr *expr);
 #define CLOSURE_CHANGE(Name) static Change Name(ClosureExpr *closure);
 #define CONSTRAINT_CHANGE(Name) static Change Name(Constraint *constraint);
+#define SCORE_CHANGE(Name) static Change Name(ScoreKind kind, unsigned value);
+#define GRAPH_NODE_CHANGE(Name) static Change Name(TypeVariableType *typeVar, \
+                                                   Constraint *constraint);
 #include "swift/Sema/CSTrail.def"
 
     /// Create a change that added a type variable.
     static Change AddedTypeVariable(TypeVariableType *typeVar);
-
-    /// Create a change that added a constraint.
-    static Change AddedConstraint(TypeVariableType *typeVar, Constraint *constraint);
-
-    /// Create a change that removed a constraint.
-    static Change RemovedConstraint(TypeVariableType *typeVar, Constraint *constraint);
 
     /// Create a change that extended an equivalence class.
     static Change ExtendedEquivalenceClass(TypeVariableType *typeVar,
@@ -162,14 +159,6 @@ public:
     /// a type variable pair.
     static Change RelatedTypeVariables(TypeVariableType *typeVar,
                                        TypeVariableType *otherTypeVar);
-
-    /// Create a change that inferred bindings from a constraint.
-    static Change InferredBindings(TypeVariableType *typeVar,
-                                   Constraint *constraint);
-
-    /// Create a change that retracted bindings from a constraint.
-    static Change RetractedBindings(TypeVariableType *typeVar,
-                                    Constraint *constraint);
 
     /// Create a change that updated a type variable.
     static Change UpdatedTypeVariable(
@@ -223,12 +212,6 @@ public:
 
     /// Create a change that recorded a key path expression.
     static Change RecordedKeyPath(KeyPathExpr *expr);
-
-    /// Create a change that increased the score.
-    static Change IncreasedScore(ScoreKind kind, unsigned value);
-
-    /// Create a change that decreased the score.
-    static Change DecreasedScore(ScoreKind kind, unsigned value);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

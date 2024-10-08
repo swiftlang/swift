@@ -80,6 +80,25 @@ SolverTrail::~SolverTrail() {
     result.TheConstraint.Constraint = constraint; \
     return result; \
   }
+#define GRAPH_NODE_CHANGE(Name) \
+  SolverTrail::Change \
+  SolverTrail::Change::Name(TypeVariableType *typeVar, \
+                            Constraint *constraint) { \
+    Change result; \
+    result.Kind = ChangeKind::Name; \
+    result.TheConstraint.TypeVar = typeVar; \
+    result.TheConstraint.Constraint = constraint; \
+    return result; \
+  }
+#define SCORE_CHANGE(Name) \
+  SolverTrail::Change \
+  SolverTrail::Change::Name(ScoreKind kind, unsigned value) { \
+    ASSERT(value <= 0xffffff && "value must fit in 24 bits"); \
+    Change result; \
+    result.Kind = ChangeKind::Name; \
+    result.Options = unsigned(kind) | (value << 8); \
+    return result; \
+  }
 #include "swift/Sema/CSTrail.def"
 
 SolverTrail::Change
@@ -87,26 +106,6 @@ SolverTrail::Change::AddedTypeVariable(TypeVariableType *typeVar) {
   Change result;
   result.Kind = ChangeKind::AddedTypeVariable;
   result.TypeVar = typeVar;
-  return result;
-}
-
-SolverTrail::Change
-SolverTrail::Change::AddedConstraint(TypeVariableType *typeVar,
-                                     Constraint *constraint) {
-  Change result;
-  result.Kind = ChangeKind::AddedConstraint;
-  result.TheConstraint.TypeVar = typeVar;
-  result.TheConstraint.Constraint = constraint;
-  return result;
-}
-
-SolverTrail::Change
-SolverTrail::Change::RemovedConstraint(TypeVariableType *typeVar,
-                                       Constraint *constraint) {
-  Change result;
-  result.Kind = ChangeKind::RemovedConstraint;
-  result.TheConstraint.TypeVar = typeVar;
-  result.TheConstraint.Constraint = constraint;
   return result;
 }
 
@@ -127,26 +126,6 @@ SolverTrail::Change::RelatedTypeVariables(TypeVariableType *typeVar,
   result.Kind = ChangeKind::RelatedTypeVariables;
   result.Relation.TypeVar = typeVar;
   result.Relation.OtherTypeVar = otherTypeVar;
-  return result;
-}
-
-SolverTrail::Change
-SolverTrail::Change::InferredBindings(TypeVariableType *typeVar,
-                                     Constraint *constraint) {
-  Change result;
-  result.Kind = ChangeKind::InferredBindings;
-  result.TheConstraint.TypeVar = typeVar;
-  result.TheConstraint.Constraint = constraint;
-  return result;
-}
-
-SolverTrail::Change
-SolverTrail::Change::RetractedBindings(TypeVariableType *typeVar,
-                                       Constraint *constraint) {
-  Change result;
-  result.Kind = ChangeKind::RetractedBindings;
-  result.TheConstraint.TypeVar = typeVar;
-  result.TheConstraint.Constraint = constraint;
   return result;
 }
 
@@ -314,26 +293,6 @@ SolverTrail::Change::RecordedKeyPath(KeyPathExpr *expr) {
   Change result;
   result.Kind = ChangeKind::RecordedKeyPath;
   result.KeyPath.Expr = expr;
-  return result;
-}
-
-SolverTrail::Change
-SolverTrail::Change::IncreasedScore(ScoreKind kind, unsigned value) {
-  ASSERT(value <= 0xffffff && "value must fit in 24 bits");
-
-  Change result;
-  result.Kind = ChangeKind::IncreasedScore;
-  result.Options = unsigned(kind) | (value << 8);
-  return result;
-}
-
-SolverTrail::Change
-SolverTrail::Change::DecreasedScore(ScoreKind kind, unsigned value) {
-  ASSERT(value <= 0xffffff && "value must fit in 24 bits");
-
-  Change result;
-  result.Kind = ChangeKind::DecreasedScore;
-  result.Options = unsigned(kind) | (value << 8);
   return result;
 }
 
@@ -562,29 +521,26 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
                                     indent + 2); \
     out << ")\n"; \
     break;
+#define GRAPH_NODE_CHANGE(Name) \
+    case ChangeKind::Name: \
+      out << "(" << #Name << " "; \
+      TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr, \
+                                      indent + 2); \
+      out << " on type variable "; \
+      TheConstraint.TypeVar->print(out, PO); \
+      out << ")\n"; \
+      break;
+#define SCORE_CHANGE(Name) \
+    case ChangeKind::Name: \
+      out << "(" << #Name << " "; \
+      out << Score::getNameFor(ScoreKind(Options & 0xff)); \
+      out << " by " << (Options >> 8) << ")\n"; \
+      break;
 #include "swift/Sema/CSTrail.def"
 
   case ChangeKind::AddedTypeVariable:
     out << "(AddedTypeVariable ";
     TypeVar->print(out, PO);
-    out << ")\n";
-    break;
-
-  case ChangeKind::AddedConstraint:
-    out << "(AddedConstraint ";
-    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
-                         indent + 2);
-    out << " to type variable ";
-    TheConstraint.TypeVar->print(out, PO);
-    out << ")\n";
-    break;
-
-  case ChangeKind::RemovedConstraint:
-    out << "(RemovedConstraint ";
-    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
-                                    indent + 2);
-    out << " from type variable ";
-    TheConstraint.TypeVar->print(out, PO);
     out << ")\n";
     break;
 
@@ -600,24 +556,6 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     Relation.TypeVar->print(out, PO);
     out << " with ";
     Relation.OtherTypeVar->print(out, PO);
-    out << ")\n";
-    break;
-
-  case ChangeKind::InferredBindings:
-    out << "(InferredBindings from ";
-    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
-                         indent + 2);
-    out << " for type variable ";
-    TheConstraint.TypeVar->print(out, PO);
-    out << ")\n";
-    break;
-
-  case ChangeKind::RetractedBindings:
-    out << "(RetractedBindings from ";
-    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
-                                    indent + 2);
-    out << " for type variable ";
-    TheConstraint.TypeVar->print(out, PO);
     out << ")\n";
     break;
 
@@ -735,18 +673,6 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << "(RecordedKeyPath ";
     simple_display(out, KeyPath.Expr);
     out << ")\n";
-    break;
-
-  case ChangeKind::IncreasedScore:
-    out << "(IncreasedScore ";
-    out << Score::getNameFor(ScoreKind(Options & 0xff));
-    out << " by " << (Options >> 8) << ")\n";
-    break;
-
-  case ChangeKind::DecreasedScore:
-    out << "(DecreasedScore ";
-    out << Score::getNameFor(ScoreKind(Options & 0xff));
-    out << " by " << (Options >> 8) << ")\n";
     break;
   }
 }
