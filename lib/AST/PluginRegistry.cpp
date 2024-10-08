@@ -108,7 +108,7 @@ InProcessPlugins::create(const char *serverPath) {
                                    "entry point not found in '%s'", serverPath);
   }
   return std::unique_ptr<InProcessPlugins>(new InProcessPlugins(
-      serverPath, server, reinterpret_cast<HandleMessageFunction>(funcPtr)));
+      serverPath, reinterpret_cast<HandleMessageFunction>(funcPtr)));
 }
 
 llvm::Error InProcessPlugins::sendMessage(llvm::StringRef message) {
