@@ -481,6 +481,22 @@ static Constraint *determineBestChoicesInContext(
       }
 
       if (options.contains(MatchFlag::Literal)) {
+        // Integer and floating-point literals can match any parameter
+        // type that conforms to `ExpressibleBy{Integer, Float}Literal`
+        // protocol but since that would constitute a non-default binding
+        // the score has to be slightly lowered.
+        if (!paramType->hasTypeParameter()) {
+          if (candidateType->isInt() &&
+              TypeChecker::conformsToKnownProtocol(
+                  paramType, KnownProtocolKind::ExpressibleByIntegerLiteral))
+            return 0.2;
+
+          if (candidateType->isDouble() &&
+              TypeChecker::conformsToKnownProtocol(
+                  paramType, KnownProtocolKind::ExpressibleByFloatLiteral))
+            return 0.2;
+        }
+
         return 0;
       }
 
@@ -634,7 +650,10 @@ static Constraint *determineBestChoicesInContext(
           if (!matchings)
             return;
 
-          bool favorExactMatchesOnly = false;
+          // If all of the arguments are literals, let's prioritize exact
+          // matches to filter out non-default literal bindings which otherwise
+          // could cause "over-favoring".
+          bool favorExactMatchesOnly = onlyLiteralCandidates;
           // Preserves old behavior where for unary calls to members
           // the solver would not consider choices that didn't match on
           // the number of parameters (regardless of defaults) and only
@@ -810,7 +829,7 @@ static Constraint *determineBestChoicesInContext(
                                [&resultTy](const auto &param) {
                                  return param.getPlainType()->isEqual(resultTy);
                                }))
-                score += 0.001;
+                score += 0.1;
             }
 
             favoredChoices.push_back({choice, score});
