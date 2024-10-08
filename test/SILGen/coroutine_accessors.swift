@@ -115,7 +115,7 @@ public var irm: Int {
 // CHECK:      dealloc_stack [[OLD_VALUE_ADDR]]
 // CHECK:      return [[OLD_VALUE]]
 // CHECK:    bb2([[ERROR:%[^,]+]] : @owned $any Error):
-// CHECK:      abort_apply [[TOKEN]]
+// CHECK:      end_apply [[TOKEN]]
 // CHECK:      end_access [[SELF_ACCESS]]
 // CHECK:      dealloc_stack [[NEW_VALUE_ADDR]]
 // CHECK:      dealloc_stack [[OLD_VALUE_ADDR]]
