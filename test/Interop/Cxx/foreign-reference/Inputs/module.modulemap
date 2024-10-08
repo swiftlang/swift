@@ -18,6 +18,11 @@ module Nullable {
   requires cplusplus
 }
 
+module Inheritance {
+  header "inheritance.h"
+  requires cplusplus
+}
+
 module WitnessTable {
   header "witness-table.h"
   requires cplusplus

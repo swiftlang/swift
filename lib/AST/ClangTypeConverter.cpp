@@ -839,7 +839,11 @@ clang::QualType ClangTypeConverter::convert(Type type) {
     if (auto clangDecl = decl->getClangDecl()) {
       auto &ctx = ClangASTContext;
       if (auto clangTypeDecl = dyn_cast<clang::TypeDecl>(clangDecl)) {
-        return ctx.getTypeDeclType(clangTypeDecl).getUnqualifiedType();
+        auto qualType = ctx.getTypeDeclType(clangTypeDecl);
+        if (type->isForeignReferenceType()) {
+          qualType = ctx.getPointerType(qualType);
+        }
+        return qualType.getUnqualifiedType();
       } else if (auto ifaceDecl = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
         auto clangType  = ctx.getObjCInterfaceType(ifaceDecl);
         return ctx.getObjCObjectPointerType(clangType);
