@@ -342,7 +342,7 @@ class ComponentStep final : public SolverStep {
     ConstraintSystem::SolverScope *SolverScope;
 
     SetVector<TypeVariableType *> TypeVars;
-    ConstraintSystem::SolverScope *PrevPartialScope = nullptr;
+    unsigned prevPartialSolutionFixes = 0;
 
     // The component this scope is associated with.
     ComponentStep &Component;
@@ -352,7 +352,7 @@ class ComponentStep final : public SolverStep {
 
     ~Scope() {
       delete SolverScope; // rewind back all of the changes.
-      CS.solverState->PartialSolutionScope = PrevPartialScope;
+      CS.solverState->numPartialSolutionFixes = prevPartialSolutionFixes;
 
       // return all of the saved type variables back to the system.
       CS.TypeVariables = std::move(TypeVars);

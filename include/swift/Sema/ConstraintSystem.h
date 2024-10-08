@@ -2533,8 +2533,8 @@ private:
     /// The number of the solution attempts we're looking at.
     unsigned SolutionAttempt;
 
-    /// Refers to the innermost partial solution scope.
-    SolverScope *PartialSolutionScope = nullptr;
+    /// The number of fixes in the innermost partial solution scope.
+    unsigned numPartialSolutionFixes = 0;
 
     // Statistics
     #define CS_STATISTIC(Name, Description) unsigned Name = 0;
@@ -2783,11 +2783,6 @@ public:
 
     /// The length of \c Trail.
     unsigned numTrailChanges;
-
-    /// The length of \c Fixes.
-    ///
-    /// FIXME: Remove this.
-    unsigned numFixes;
 
     /// The scope number of this scope. Set when the scope is registered.
     unsigned scopeNumber = 0;
