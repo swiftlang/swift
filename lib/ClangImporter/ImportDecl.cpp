@@ -9646,6 +9646,13 @@ bool ClangImporter::Implementation::addMemberAndAlternatesToExtension(
       if (!isa<AccessorDecl>(alternate))
         ext->addMember(alternate);
   }
+
+  member->visitAuxiliaryDecls([&](Decl *aux) {
+    if (auto auxValue = dyn_cast<ValueDecl>(aux)) {
+      ext->addMember(auxValue);
+    }
+  });
+
   return true;
 }
 
@@ -9717,6 +9724,16 @@ void ClangImporter::Implementation::insertMembersAndAlternates(
         members.push_back(alternate);
       }
     }
+
+    // If there are auxiliary declarations (e.g., produced by macros), load
+    // those.
+    member->visitAuxiliaryDecls([&](Decl *aux) {
+      if (auto auxValue = dyn_cast<ValueDecl>(aux)) {
+        if (auxValue->getDeclContext() == expectedDC &&
+            knownAlternateMembers.insert(auxValue).second)
+          members.push_back(auxValue);
+      }
+    });
 
     // If this declaration shouldn't be visible, don't add it to
     // the list.

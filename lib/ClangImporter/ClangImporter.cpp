@@ -683,6 +683,11 @@ void importer::getNormalInvocationArguments(
   if (LangOpts.hasFeature(Feature::SendingArgsAndResults))
     invocationArgStrs.push_back("-D__SWIFT_ATTR_SUPPORTS_SENDING=1");
 
+  // Indicate that the compiler will respect macros applied to imported
+  // declarations via '__attribute__((swift_attr("@...")))'.
+  if (LangOpts.hasFeature(Feature::MacrosOnImports))
+    invocationArgStrs.push_back("-D__SWIFT_ATTR_SUPPORTS_MACROS=1");
+
   if (searchPathOpts.getSDKPath().empty()) {
     invocationArgStrs.push_back("-Xclang");
     invocationArgStrs.push_back("-nostdsysteminc");
@@ -4722,6 +4727,17 @@ bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
         anyMatching = true;
       }
     }
+
+    // Visit auxiliary declarations to check for name matches.
+    decl->visitAuxiliaryDecls([&](Decl *aux) {
+      if (auto auxValue = dyn_cast<ValueDecl>(aux)) {
+        if (auxValue->getName().matchesRef(name) &&
+            auxValue->getDeclContext()->isModuleScopeContext()) {
+          consumer.foundDecl(auxValue, DeclVisibilityKind::VisibleAtTopLevel);
+          anyMatching = true;
+        }
+      }
+    });
 
     // If we have a declaration and nothing matched so far, try the names used
     // in other versions of Swift.

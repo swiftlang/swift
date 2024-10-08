@@ -121,6 +121,7 @@ UNINTERESTING_FEATURE(Embedded)
 UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 UNINTERESTING_FEATURE(StructLetDestructuring)
+UNINTERESTING_FEATURE(MacrosOnImports)
 
 static bool usesFeatureNonescapableTypes(Decl *decl) {
   auto containsNonEscapable =
