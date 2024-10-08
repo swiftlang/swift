@@ -1634,12 +1634,16 @@ extension Array {
 
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
+  @abi(
+    mutating func withUnsafeMutableBufferPointer<R>(
+      _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    ) rethrows -> R
+  )
   @_semantics("array.withUnsafeMutableBufferPointer")
   @_effects(notEscaping self.value**)
   @usableFromInline
   @inline(__always)
-  @_silgen_name("$sSa30withUnsafeMutableBufferPointeryqd__qd__SryxGzKXEKlF")
-  mutating func __abi_withUnsafeMutableBufferPointer<R>(
+  mutating func __rethrows_withUnsafeMutableBufferPointer<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     _makeMutableAndUnique()
