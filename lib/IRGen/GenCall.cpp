@@ -4635,6 +4635,16 @@ void irgen::emitDeallocYieldManyCoroutineBuffer(IRGenFunction &IGF,
   IGF.Builder.CreateLifetimeEnd(buffer, bufferSize);
 }
 
+void irgen::emitDeallocYieldOnce2CoroutineFrame(IRGenFunction &IGF,
+                                                llvm::Value *allocation) {
+  if (IGF.IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
+    assert(!allocation);
+    return;
+  }
+  assert(allocation);
+  llvm::report_fatal_error("unimplemented");
+}
+
 Address irgen::emitAllocAsyncContext(IRGenFunction &IGF,
                                      llvm::Value *sizeValue) {
   auto alignment = IGF.IGM.getAsyncContextAlignment();

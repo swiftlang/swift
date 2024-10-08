@@ -214,6 +214,11 @@ static SILInstruction *createDealloc(SILInstruction *Alloc,
     case SILInstructionKind::AllocVectorInst:
       return B.createDeallocStack(Location,
                                   cast<SingleValueInstruction>(Alloc));
+    case SILInstructionKind::BeginApplyInst: {
+      auto *bai = cast<BeginApplyInst>(Alloc);
+      assert(bai->isCalleeAllocated());
+      return B.createDeallocStack(Location, bai->getCalleeAllocationResult());
+    }
     case SILInstructionKind::AllocRefDynamicInst:
     case SILInstructionKind::AllocRefInst:
       assert(cast<AllocRefInstBase>(Alloc)->canAllocOnStack());
