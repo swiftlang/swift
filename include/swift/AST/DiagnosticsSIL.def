@@ -1036,6 +1036,9 @@ NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value,
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_task_isolated, none,
      "closure captures %0 which is accessible to code in the current task",
      (DeclName))
+NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_boxed_value_task_isolated, none,
+     "closure captures reference to mutable %1 %0 which is accessible to code in the current task",
+     (DeclName, DescriptiveDeclKind))
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_region, none,
      "closure captures %1 which is accessible to %0 code",
      (StringRef, DeclName))

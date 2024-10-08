@@ -1456,6 +1456,19 @@ public:
 
     auto capturedLoc = RegularLocation(capturedValue.getLoc());
     if (getIsolationRegionInfo().getIsolationInfo().isTaskIsolated()) {
+      // If we have a closure capture box, emit a special diagnostic.
+      if (auto *fArg = dyn_cast<SILFunctionArgument>(
+              getIsolationRegionInfo().getIsolationInfo().getIsolatedValue())) {
+        if (fArg->isClosureCapture() && fArg->getType().is<SILBoxType>()) {
+          auto diag = diag::
+              regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_boxed_value_task_isolated;
+          auto *decl = capturedValue.getDecl();
+          diagnoseNote(capturedLoc, diag, decl->getName(),
+                       decl->getDescriptiveKind());
+          return;
+        }
+      }
+
       auto diag = diag::
           regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_task_isolated;
       diagnoseNote(capturedLoc, diag, capturedValue.getDecl()->getName());
