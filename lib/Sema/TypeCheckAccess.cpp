@@ -1997,7 +1997,9 @@ swift::getDisallowedOriginKind(const Decl *decl,
       where.getDeclContext()->getAsDecl() &&
       where.getDeclContext()->getAsDecl()->getModuleContext()->isResilient() &&
       decl->hasClangNode() && !decl->getModuleContext()->isSwiftShimsModule() &&
-      isFragileClangNode(decl->getClangNode()))
+      isFragileClangNode(decl->getClangNode()) &&
+      !SF->getASTContext().LangOpts.hasFeature(
+          Feature::AssumeResilientCxxTypes))
     return DisallowedOriginKind::FragileCxxAPI;
 
   // Report non-public import last as it can be ignored by the caller.
