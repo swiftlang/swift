@@ -339,7 +339,7 @@ public:
 class ComponentStep final : public SolverStep {
   class Scope {
     ConstraintSystem &CS;
-    ConstraintSystem::SolverScope *SolverScope;
+    std::optional<ConstraintSystem::SolverScope> SolverScope;
 
     SetVector<TypeVariableType *> TypeVars;
     unsigned prevPartialSolutionFixes = 0;
@@ -347,11 +347,14 @@ class ComponentStep final : public SolverStep {
     // The component this scope is associated with.
     ComponentStep &Component;
 
+    Scope(const Scope &) = delete;
+    Scope &operator=(const Scope &) = delete;
+
   public:
-    Scope(ComponentStep &component);
+    explicit Scope(ComponentStep &component);
 
     ~Scope() {
-      delete SolverScope; // rewind back all of the changes.
+      SolverScope.reset(); // rewind back all of the changes.
       CS.solverState->numPartialSolutionFixes = prevPartialSolutionFixes;
 
       // return all of the saved type variables back to the system.
@@ -383,7 +386,7 @@ class ComponentStep final : public SolverStep {
 
   /// If this step depends on other smaller steps to be solved first
   /// we need to keep active scope until all of the work is done.
-  std::unique_ptr<Scope> ComponentScope = nullptr;
+  std::optional<Scope> ComponentScope;
 
   /// Type variables and constraints "in scope" of this step.
   TinyPtrVector<TypeVariableType *> TypeVars;
@@ -474,7 +477,7 @@ private:
       log << "(solving component #" << Index << '\n';
     }
     
-    ComponentScope = std::make_unique<Scope>(*this);
+    ComponentScope.emplace(*this);
     
     if (CS.isDebugMode()) {
       auto &log = getDebugLogger();
@@ -834,7 +837,7 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
     /// this scope would be initialized once all of the
     /// elements are successfully solved to continue solving
     /// along the current path as-if there was no conjunction.
-    std::unique_ptr<Scope> IsolationScope = nullptr;
+    std::optional<Scope> IsolationScope;
 
   public:
     SolverSnapshot(ConstraintSystem &cs, Constraint *conjunction)
@@ -862,7 +865,7 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
 
       // Establish isolation scope so that conjunction solution
       // and follow-up steps could be rolled back.
-      IsolationScope = std::make_unique<Scope>(CS);
+      IsolationScope.emplace(CS);
 
       // Apply solution inferred for the conjunction.
       replaySolution(solution);

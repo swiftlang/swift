@@ -41,7 +41,7 @@ ComponentStep::Scope::Scope(ComponentStep &component)
   auto &workList = CS.InactiveConstraints;
   workList.splice(workList.end(), *component.Constraints);
 
-  SolverScope = new ConstraintSystem::SolverScope(CS);
+  SolverScope.emplace(CS);
   prevPartialSolutionFixes = CS.solverState->numPartialSolutionFixes;
   CS.solverState->numPartialSolutionFixes = CS.Fixes.size();
 }
