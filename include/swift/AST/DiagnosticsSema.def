@@ -8165,5 +8165,10 @@ ERROR(attr_abi_mismatched_var,none,
       "no match for %select{%kind0 in the ABI|ABI %kind0}1",
       (ValueDecl *, /*isABI=*/bool))
 
+ERROR(attr_abi_incompatible_with_silgen_name,none,
+      "cannot use '@_silgen_name' and '@abi' on the same %0 because they serve "
+      "the same purpose",
+      (DescriptiveDeclKind))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
