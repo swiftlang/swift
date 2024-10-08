@@ -120,6 +120,14 @@ struct cxx_allocator {
     typedef cxx_allocator<U> other;
   };
 
+  cxx_allocator() noexcept {}
+  cxx_allocator(const cxx_allocator &other) noexcept { (void)other; }
+
+  template <class U>
+  cxx_allocator(const cxx_allocator<U> &other) noexcept { (void)other; }
+
+  ~cxx_allocator() {}
+
   pointer address(reference x) const noexcept {
     return reinterpret_cast<pointer>(&reinterpret_cast<volatile char &>(x));
   }
