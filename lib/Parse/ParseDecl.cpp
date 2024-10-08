@@ -5161,8 +5161,8 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
     status.setIsParseError();
     return status;
   }
-  // consume the l_paren
-  auto lParenLoc = consumeToken();
+
+  auto lParenLoc = consumeAttributeLParen(); // consume the l_paren
 
   std::optional<LifetimeDescriptor> targetDescriptor;
   if (Tok.isAny(tok::identifier, tok::integer_literal, tok::kw_self) &&
