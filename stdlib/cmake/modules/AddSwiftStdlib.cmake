@@ -557,7 +557,7 @@ function(_add_target_variant_link_flags)
     if(NOT CMAKE_HOST_SYSTEM MATCHES Windows)
       # The Android resource dir is specified from build.ps1 on windows.
       if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
-        if("${SWIFT_ANDROID_NDK_PATH}" MATCHES "r26")
+        if("${SWIFT_ANDROID_NDK_PATH}" MATCHES "r26|r27")
           file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib/clang/*)
         else()
           file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib64/clang/*)
