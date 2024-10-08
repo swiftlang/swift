@@ -78,8 +78,10 @@ CHANGE(RecordedCaseLabelItemInfo)
 CHANGE(RecordedPotentialThrowSite)
 CHANGE(RecordedIsolatedParam)
 CHANGE(RecordedKeyPath)
+CHANGE(IncreasedScore)
+CHANGE(DecreasedScore)
 
-LAST_CHANGE(RecordedKeyPath)
+LAST_CHANGE(DecreasedScore)
 
 #undef LOCATOR_CHANGE
 #undef EXPR_CHANGE

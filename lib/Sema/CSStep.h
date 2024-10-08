@@ -906,8 +906,6 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
 
   /// Best solution solver reached so far.
   std::optional<Score> BestScore;
-  /// The score established before conjunction is attempted.
-  Score CurrentScore;
 
   /// The number of constraint solver scopes already explored
   /// before accepting this conjunction.
@@ -949,7 +947,7 @@ public:
                   SmallVectorImpl<Solution> &solutions)
       : BindingStep(cs, {cs, conjunction},
                     conjunction->isIsolated() ? IsolatedSolutions : solutions),
-        BestScore(getBestScore()), CurrentScore(getCurrentScore()),
+        BestScore(getBestScore()),
         OuterScopeCount(cs.CountScopes, 0), Conjunction(conjunction),
         AfterConjunction(erase(conjunction)), OuterSolutions(solutions) {
     assert(conjunction->getKind() == ConstraintKind::Conjunction);
@@ -975,11 +973,8 @@ public:
 
     // Restore best score only if conjunction fails because
     // successful outcome should keep a score set by `restoreOuterState`.
-    if (HadFailure) {
-      auto solutionScore = Score();
+    if (HadFailure)
       restoreBestScore();
-      restoreCurrentScore(solutionScore);
-    }
 
     if (OuterTimeRemaining) {
       auto anchor = OuterTimeRemaining->first;
@@ -1033,7 +1028,6 @@ protected:
 private:
   /// Restore best and current scores as they were before conjunction.
   void restoreCurrentScore(const Score &solutionScore) const {
-    CS.CurrentScore = CurrentScore;
     CS.increaseScore(SK_Fix, Conjunction->getLocator(),
                      solutionScore.Data[SK_Fix]);
     CS.increaseScore(SK_Hole, Conjunction->getLocator(),

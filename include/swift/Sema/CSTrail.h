@@ -229,6 +229,12 @@ public:
     /// Create a change that recorded a key path expression.
     static Change RecordedKeyPath(KeyPathExpr *expr);
 
+    /// Create a change that increased the score.
+    static Change IncreasedScore(ScoreKind kind, unsigned value);
+
+    /// Create a change that decreased the score.
+    static Change DecreasedScore(ScoreKind kind, unsigned value);
+
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.
     ///

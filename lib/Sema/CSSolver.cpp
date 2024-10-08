@@ -274,8 +274,15 @@ Solution ConstraintSystem::finalize() {
 
 void ConstraintSystem::replaySolution(const Solution &solution,
                                       bool shouldIncreaseScore) {
-  if (shouldIncreaseScore)
-    CurrentScore += solution.getFixedScore();
+  if (shouldIncreaseScore) {
+    // Update the score. We do this instead of operator+= because we
+    // want to record the increments in the trail.
+    auto solutionScore = solution.getFixedScore();
+    for (unsigned i = 0; i < NumScoreKinds; ++i) {
+      if (unsigned value = solutionScore.Data[i])
+        increaseScore(ScoreKind(i), value);
+    }
+  }
 
   // Assign fixed types to the type variables solved by this solution.
   for (auto binding : solution.typeBindings) {
@@ -711,8 +718,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
 
-  PreviousScore = cs.CurrentScore;
-
   cs.solverState->registerScope(this);
   assert(!cs.failedConstraint && "Unexpected failed constraint!");
 }
@@ -741,9 +746,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // e.g. add retired constraints back to the circulation and remove generated
   // constraints introduced by the current scope.
   cs.solverState->rollback(this);
-
-  // Reset the previous score.
-  cs.CurrentScore = PreviousScore;
 
   // Clear out other "failed" state.
   cs.failedConstraint = nullptr;
