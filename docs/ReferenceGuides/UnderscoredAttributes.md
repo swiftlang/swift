@@ -1131,15 +1131,17 @@ ways to misuse it:
   be reliably recovered through C interfaces like `dlsym`. If you want to
   implement a plugin-style interface, use `Bundle`/`NSBundle` if available, or
   export your plugin entry points as C entry points using `@_cdecl`.
-  
+- Don't use `@_silgen_name` when you need to make a change to an ABI-stable
+  declaration's signature that would normally alter its mangled name, but you
+  need to preserve the old mangled name for ABI compatibility. We used to use it
+  for this task, but `@abi` can do it with fewer limitations, more safety, and
+  better readability. If for some reason you do need `@_silgen_name`, you will
+  need to be careful that the change doesn't materially affect the actual
+  calling convention of the function in an incompatible way.
+
 Legitimate uses may include:
 
 - Use `@_silgen_name` if you're implementing the Swift runtime.
-- Use `@_silgen_name` if you need to make a change to an ABI-stable
-  declaration's signature that would normally alter its mangled name, but you
-  need to preserve the old mangled name for ABI compatibility. You will need
-  to be careful that the change doesn't materially affect the actual calling
-  convention of the function in an incompatible way.
 - Use `@_silgen_name` if certain declarations need to have predictable symbol
   names, such as to be easily referenced by linker scripts or other highly
   customized build environments (and it's OK for those predictable symbols to

@@ -455,6 +455,8 @@ This attribute specifies the name that a declaration will have at link time. It 
 1. To specify the symbol name of a Swift function so that it can be called from Swift-aware C. Such functions have bodies.
 2. To provide a Swift declaration which really represents a C declaration. Such functions do not have bodies.
 
+In the past it was sometimes used for ABI backwards compatibility hacks, but `@abi` does this job better.
+
 ##### Using `@_silgen_name` to call Swift from Swift-aware C
 
 Rather than hard-code Swift mangling into C code, `@_silgen_name` is used to provide a stable and known symbol name for linking. Note that C code still must understand and use the Swift calling convention (available in swift-clang) for such Swift functions (if they use Swift's CC). Example:

@@ -421,8 +421,14 @@ extension UnsafePointer {
   // of `withMemoryRebound<T, Result>(to:capacity:_:)`, and provides
   // an entry point for any binary linked against the stdlib binary
   // for Swift 5.6 and older.
+  @abi(
+    func withMemoryRebound<T, Result>(
+      to type: T.Type,
+      capacity count: Int,
+      _ body: (UnsafePointer<T>) throws -> Result
+    ) rethrows -> Result
+  )
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$sSP17withMemoryRebound2to8capacity_qd_0_qd__m_Siqd_0_SPyqd__GKXEtKr0_lF")
   @usableFromInline
   internal func _legacy_se0333_withMemoryRebound<T, Result>(
     to type: T.Type,
@@ -954,8 +960,8 @@ extension UnsafeMutablePointer {
   ///   - repeatedValue: The value used when updating this pointer's memory.
   ///   - count: The number of consecutive elements to update.
   ///     `count` must not be negative.
+  @abi(func assign(repeating repeatedValue: Pointee, count: Int))
   @inlinable
-  @_silgen_name("$sSp6assign9repeating5countyx_SitF")
   public func update(repeating repeatedValue: Pointee, count: Int) {
     _debugPrecondition(count >= 0, "UnsafeMutablePointer.update(repeating:count:) with negative count")
     for i in 0..<count {
@@ -963,9 +969,9 @@ extension UnsafeMutablePointer {
     }
   }
 
+  @abi(func update(repeating repeatedValue: Pointee, count: Int))
   @_alwaysEmitIntoClient
   @available(*, deprecated, renamed: "update(repeating:count:)")
-  @_silgen_name("_swift_se0370_UnsafeMutablePointer_assign_repeating_count")
   public func assign(repeating repeatedValue: Pointee, count: Int) {
     unsafe update(repeating: repeatedValue, count: count)
   }
@@ -988,8 +994,8 @@ extension UnsafeMutablePointer {
   ///     pointer may overlap.
   ///   - count: The number of instances to copy from the memory referenced by
   ///     `source` to this pointer's memory. `count` must not be negative.
+  @abi(func assign(from source: UnsafePointer<Pointee>, count: Int))
   @inlinable
-  @_silgen_name("$sSp6assign4from5countySPyxG_SitF")
   public func update(from source: UnsafePointer<Pointee>, count: Int) {
     _debugPrecondition(
       count >= 0, "UnsafeMutablePointer.update with negative count")
@@ -1015,9 +1021,9 @@ extension UnsafeMutablePointer {
     }
   }
 
+  @abi(func update(from source: UnsafePointer<Pointee>, count: Int))
   @_alwaysEmitIntoClient
   @available(*, deprecated, renamed: "update(from:count:)")
-  @_silgen_name("_swift_se0370_UnsafeMutablePointer_assign_from_count")
   @unsafe
   public func assign(from source: UnsafePointer<Pointee>, count: Int) {
     unsafe update(from: source, count: count)
@@ -1126,8 +1132,13 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ///     referenced by `source` and this pointer must not overlap.
   ///   - count: The number of instances to move from `source` to this
   ///     pointer's memory. `count` must not be negative.
+  @abi(
+    @_preInverseGenerics
+    func moveAssign(
+      from source: UnsafeMutablePointer, count: Int
+    )
+  )
   @inlinable
-  @_silgen_name("$sSp10moveAssign4from5countySpyxG_SitF")
   @_preInverseGenerics
   public func moveUpdate(
     @_nonEphemeral from source: UnsafeMutablePointer, count: Int
@@ -1147,9 +1158,13 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
 }
 
 extension UnsafeMutablePointer {
+  @abi(
+    func moveUpdate(
+      from source: UnsafeMutablePointer, count: Int
+    )
+  )
   @_alwaysEmitIntoClient
   @available(*, deprecated, renamed: "moveUpdate(from:count:)")
-  @_silgen_name("_swift_se0370_UnsafeMutablePointer_moveAssign_from_count")
   public func moveAssign(
     @_nonEphemeral from source: UnsafeMutablePointer, count: Int
   ) {
@@ -1268,8 +1283,14 @@ extension UnsafeMutablePointer {
   // This obsolete implementation uses the expected mangled name of
   // `withMemoryRebound<T, Result>(to:capacity:_:)`, and provides an entry point
   // for any binary linked against the stdlib binary for Swift 5.6 and older.
+  @abi(
+    func withMemoryRebound<T, Result>(
+      to type: T.Type,
+      capacity count: Int,
+      _ body: (UnsafeMutablePointer<T>) throws -> Result
+    ) rethrows -> Result
+  )
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$sSp17withMemoryRebound2to8capacity_qd_0_qd__m_Siqd_0_Spyqd__GKXEtKr0_lF")
   @usableFromInline
   internal func _legacy_se0333_withMemoryRebound<T, Result>(
     to type: T.Type,
