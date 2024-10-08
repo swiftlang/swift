@@ -25,6 +25,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Parse/ParseVersion.h"
 #include "clang/CAS/CASOptions.h"
+#include "clang/CAS/IncludeTree.h"
 #include "llvm/CAS/ActionCache.h"
 #include "llvm/CAS/BuiltinUnifiedCASDatabases.h"
 #include "llvm/CAS/ObjectStore.h"
@@ -45,7 +46,8 @@ enum class SwiftCacheToolAction {
   PrintBaseKey,
   PrintOutputKeys,
   ValidateOutputs,
-  RenderDiags
+  RenderDiags,
+  PrintIncludeTreeList,
 };
 
 struct OutputEntry {
@@ -147,6 +149,8 @@ public:
               .Case("print-output-keys", SwiftCacheToolAction::PrintOutputKeys)
               .Case("validate-outputs", SwiftCacheToolAction::ValidateOutputs)
               .Case("render-diags", SwiftCacheToolAction::RenderDiags)
+              .Case("print-include-tree-list",
+                    SwiftCacheToolAction::PrintIncludeTreeList)
               .Default(SwiftCacheToolAction::Invalid);
 
     if (ActionKind == SwiftCacheToolAction::Invalid) {
@@ -169,6 +173,8 @@ public:
       return validateOutputs();
     case SwiftCacheToolAction::RenderDiags:
       return renderDiags();
+    case SwiftCacheToolAction::PrintIncludeTreeList:
+      return printIncludeTreeList();
     case SwiftCacheToolAction::Invalid:
       return 0; // No action. Probably just print help. Return.
     }
@@ -269,6 +275,7 @@ private:
   int printOutputKeys();
   int validateOutputs();
   int renderDiags();
+  int printIncludeTreeList();
 };
 
 } // end anonymous namespace
@@ -486,6 +493,38 @@ int SwiftCacheToolInvocation::renderDiags() {
   };
 
   return llvm::any_of(Inputs, renderDiagsFromFile);
+}
+
+int SwiftCacheToolInvocation::printIncludeTreeList() {
+  auto error = [](llvm::Error err) {
+    llvm::errs() << llvm::toString(std::move(err)) << "\n";
+    return 1;
+  };
+  auto DB = CASOpts.getOrCreateDatabases();
+  if (!DB) {
+    return error(DB.takeError());
+  }
+  auto CAS = DB->first;
+  for (auto &input: Inputs) {
+    auto ID = CAS->parseID(input);
+    if (!ID)
+      return error(ID.takeError());
+
+    auto Ref = CAS->getReference(*ID);
+    if (!Ref) {
+      llvm::errs() << "CAS object not found: " << input << "\n";
+      return 1;
+    }
+
+    auto fileList = clang::cas::IncludeTree::FileList::get(*CAS, *Ref);
+    if (!fileList)
+      return error(fileList.takeError());
+
+    if (auto err = fileList->print(llvm::outs()))
+      return error(std::move(err));
+  }
+
+  return 0;
 }
 
 int swift_cache_tool_main(ArrayRef<const char *> Args, const char *Argv0,

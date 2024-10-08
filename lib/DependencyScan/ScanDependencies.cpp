@@ -180,12 +180,12 @@ static void removeMacroSearchPaths(std::vector<std::string> &cmd) {
 
 class ExplicitModuleDependencyResolver {
 public:
-  ExplicitModuleDependencyResolver(ModuleDependencyID moduleID,
-                                   ModuleDependenciesCache &cache,
-                                   CompilerInstance &instance)
+  ExplicitModuleDependencyResolver(
+      ModuleDependencyID moduleID, ModuleDependenciesCache &cache,
+      CompilerInstance &instance, std::optional<SwiftDependencyTracker> tracker)
       : moduleID(moduleID), cache(cache), instance(instance),
-        resolvingDepInfo(cache.findKnownDependency(moduleID)) {
-    tracker = cache.getScanService().createSwiftDependencyTracker();
+        resolvingDepInfo(cache.findKnownDependency(moduleID)),
+        tracker(std::move(tracker)) {
     // Copy commandline.
     commandline = resolvingDepInfo.getCommandline();
   }
@@ -412,14 +412,14 @@ private:
             .empty()) {
       if (!sourceDepDetails.textualModuleDetails.bridgingSourceFiles.empty()) {
         if (tracker) {
-          tracker->startTracking();
+          tracker->startTracking(/*includeCommonDeps*/ false);
           for (auto &file :
                sourceDepDetails.textualModuleDetails.bridgingSourceFiles)
             tracker->trackFile(file);
           auto bridgeRoot = tracker->createTreeFromDependencies();
           if (!bridgeRoot)
             return bridgeRoot.takeError();
-          rootIDs.push_back(bridgeRoot->getID().toString());
+          fileListIDs.push_back(bridgeRoot->getID().toString());
         }
       }
     } else
@@ -491,7 +491,6 @@ private:
     // Collect CAS info from current resolving module.
     if (auto *sourceDep = resolvingDepInfo.getAsSwiftSourceModule()) {
       tracker->startTracking();
-      tracker->addCommonSearchPathDeps(instance.getInvocation());
       llvm::for_each(
           sourceDep->sourceFiles,
           [this](const std::string &file) { tracker->trackFile(file); });
@@ -506,11 +505,10 @@ private:
         return root.takeError();
       auto rootID = root->getID().toString();
       dependencyInfoCopy.updateCASFileSystemRootID(rootID);
-      rootIDs.push_back(rootID);
+      fileListIDs.push_back(rootID);
     } else if (auto *textualDep =
                    resolvingDepInfo.getAsSwiftInterfaceModule()) {
       tracker->startTracking();
-      tracker->addCommonSearchPathDeps(instance.getInvocation());
       tracker->trackFile(textualDep->swiftInterfaceFile);
       llvm::for_each(
           textualDep->auxiliaryFiles,
@@ -524,7 +522,7 @@ private:
         return root.takeError();
       auto rootID = root->getID().toString();
       dependencyInfoCopy.updateCASFileSystemRootID(rootID);
-      rootIDs.push_back(rootID);
+      fileListIDs.push_back(rootID);
     }
 
     // Update build command line.
@@ -545,6 +543,11 @@ private:
         commandline.push_back("-clang-include-tree-root");
         commandline.push_back(tree);
       }
+
+      for (auto list : fileListIDs) {
+        commandline.push_back("-clang-include-tree-filelist");
+        commandline.push_back(list);
+      }
     }
 
     // Compute and update module cache key.
@@ -560,7 +563,7 @@ private:
     if (!instance.getInvocation().getCASOptions().EnableCaching)
       return llvm::Error::success();
 
-    auto &CAS = cache.getScanService().getSharedCachingFS().getCAS();
+    auto &CAS = cache.getScanService().getCAS();
     auto commandLine = depInfo.getCommandline();
     std::vector<const char *> Args;
     if (commandLine.size() > 1)
@@ -584,7 +587,7 @@ private:
   llvm::Error setupBinaryCacheKey(StringRef path,
                                   ModuleDependencyInfo &depInfo) {
     auto &CASFS = cache.getScanService().getSharedCachingFS();
-    auto &CAS = CASFS.getCAS();
+    auto &CAS = cache.getScanService().getCAS();
     // For binary module, we need to make sure the lookup key is setup here in
     // action cache. We just use the CASID of the binary module itself as key.
     auto Ref = CASFS.getObjectRefForFileContent(path);
@@ -613,6 +616,7 @@ private:
   std::optional<SwiftDependencyTracker> tracker;
   std::vector<std::string> rootIDs;
   std::vector<std::string> includeTrees;
+  std::vector<std::string> fileListIDs;
   std::vector<std::string> commandline;
   std::vector<std::string> bridgingHeaderBuildCmd;
   llvm::StringMap<MacroPluginDependency> macros;
@@ -623,8 +627,10 @@ static llvm::Error resolveExplicitModuleInputs(
     ModuleDependencyID moduleID,
     const std::set<ModuleDependencyID> &dependencies,
     ModuleDependenciesCache &cache, CompilerInstance &instance,
-    std::optional<std::set<ModuleDependencyID>> bridgingHeaderDeps) {
-  ExplicitModuleDependencyResolver resolver(moduleID, cache, instance);
+    std::optional<std::set<ModuleDependencyID>> bridgingHeaderDeps,
+    std::optional<SwiftDependencyTracker> tracker) {
+  ExplicitModuleDependencyResolver resolver(moduleID, cache, instance,
+                                            std::move(tracker));
   return resolver.resolve(dependencies, bridgingHeaderDeps);
 }
 
@@ -1437,6 +1443,8 @@ static void resolveDependencyCommandLineArguments(
   auto moduleTransitiveClosures =
       computeTransitiveClosureOfExplicitDependencies(topoSortedModuleList,
                                                      cache);
+  auto tracker = cache.getScanService().createSwiftDependencyTracker(
+      instance.getInvocation());
   for (const auto &modID : llvm::reverse(topoSortedModuleList)) {
     auto dependencyClosure = moduleTransitiveClosures[modID];
     // For main module or binary modules, no command-line to resolve.
@@ -1448,8 +1456,9 @@ static void resolveDependencyCommandLineArguments(
       bridgingHeaderDeps = computeBridgingHeaderTransitiveDependencies(
           deps, moduleTransitiveClosures, cache);
 
-    if (auto E = resolveExplicitModuleInputs(modID, dependencyClosure, cache,
-                                             instance, bridgingHeaderDeps))
+    if (auto E =
+            resolveExplicitModuleInputs(modID, dependencyClosure, cache,
+                                        instance, bridgingHeaderDeps, tracker))
       instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
                                    toString(std::move(E)));
   }
