@@ -805,3 +805,29 @@ exit:
   %retval = tuple ()
   return %retval : $()
 }
+
+sil [transparent] [ossa] @simplest_yield_once_2 : $@yield_once_2 @convention(thin) () -> @yields @in_guaranteed () {
+  %addr = alloc_stack $()
+  yield %addr : $*(), resume resume_block, unwind unwind_block
+
+unwind_block:
+  dealloc_stack %addr : $*()
+  unwind
+
+resume_block:
+  dealloc_stack %addr : $*()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simplest_begin_apply_yield_once_2 : {{.*}} {
+// CHECK-NOT:     begin_apply
+// CHECK-LABEL: } // end sil function 'simplest_begin_apply_yield_once_2'
+sil [ossa] @simplest_begin_apply_yield_once_2 : $@convention(thin) () -> () {
+  %callee = function_ref @simplest_yield_once_2 : $@yield_once_2 @convention(thin) () -> @yields @in_guaranteed ()
+  (%addr, %token, %allocation) = begin_apply %callee() : $@yield_once_2 @convention(thin) () -> @yields @in_guaranteed ()
+  end_apply %token as $()
+  dealloc_stack %allocation : $*Builtin.SILToken
+  %retval = tuple ()
+  return %retval : $()
+}

@@ -6,6 +6,7 @@
 
 sil_stage raw
 
+import Builtin
 import Swift
 
 // CHECK-LABEL: sil [ossa] @begin_apply : {{.*}} {
@@ -33,15 +34,17 @@ bb0(%0 : $Int, %1 : $Float):
 // CHECK-SAME:      [[FLOAT:%[^,]+]] :
 // CHECK-SAME:  ):
 // CHECK:         [[YIELD:%[^,]+]] = function_ref @yield_2 : $@yield_once_2 @convention(thin)
-// CHECK:         ({{%[^,]+}}, {{%[^,]+}}, [[TOKEN:%[^,]+]]) = begin_apply [[YIELD]]([[INT]], [[FLOAT]])
+// CHECK:         ({{%[^,]+}}, {{%[^,]+}}, [[TOKEN:%[^,]+]], [[ALLOCATION:%[^,]+]]) = begin_apply [[YIELD]]([[INT]], [[FLOAT]])
 // CHECK:         {{%[^,]+}} = end_apply [[TOKEN]]
+// CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK-LABEL: } // end sil function 'begin_apply_2'
 sil [ossa] @begin_apply_2 : $(Int, Float) -> () {
 bb0(%0 : $Int, %1 : $Float):
   %coro = function_ref @yield_2 : $@convention(thin) @yield_once_2 (Int, Float) -> (@yields Int, @yields Float)
-  (%int, %float, %token) = begin_apply %coro(%0, %1) : $@convention(thin) @yield_once_2 (Int, Float) -> (@yields Int, @yields Float)
+  (%int, %float, %token, %allocation) = begin_apply %coro(%0, %1) : $@convention(thin) @yield_once_2 (Int, Float) -> (@yields Int, @yields Float)
 
   end_apply %token as $()
+  dealloc_stack %allocation : $*Builtin.SILToken
   %r = tuple ()
   return %r : $()
 }

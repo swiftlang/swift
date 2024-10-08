@@ -48,8 +48,12 @@ public var irm: Int {
 // CHECK-SAME:      [[SELF:%[^,]+]] :
 // CHECK-SAME:  ):
 // CHECK:         [[READ_ACCESSOR:%[^,]+]] = function_ref @$s19coroutine_accessors1SV3irmSivy
-// CHECK:         ([[VALUE:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[READ_ACCESSOR]]([[SELF]])
+// CHECK:         ([[VALUE:%[^,]+]],
+// CHECK-SAME:     [[TOKEN:%[^,]+]],
+// CHECK-SAME:     [[ALLOCATION:%[^)]+]])
+// CHECK-SAME:    = begin_apply [[READ_ACCESSOR]]([[SELF]])
 // CHECK:         end_apply [[TOKEN]]
+// CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         return [[VALUE:%[^,]+]]
 // CHECK-LABEL: } // end sil function '$s19coroutine_accessors1SV3irmSivg'
 
@@ -65,10 +69,14 @@ public var irm: Int {
 // CHECK-SAME:  ):
 // CHECK:         [[SELF_ACCESS:%[^,]+]] = begin_access [modify] [unknown] [[SELF]]
 // CHECK:         [[MODIFY_ACCESSOR:%[^,]+]] = function_ref @$s19coroutine_accessors1SV3irmSivx
-// CHECK:         ([[VALUE_ADDRESS:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[MODIFY_ACCESSOR]]([[SELF_ACCESS]])
+// CHECK:         ([[VALUE_ADDRESS:%[^,]+]],
+// CHECK-SAME:     [[TOKEN:%[^,]+]],
+// CHECK-SAME:     [[ALLOCATION:%[^)]+]])
+// CHECK-SAME:    = begin_apply [[MODIFY_ACCESSOR]]([[SELF_ACCESS]])
 // CHECK:         assign [[NEW_VALUE:%[^,]+]] to [[VALUE_ADDRESS]]
 // CHECK:         end_apply [[TOKEN]]
 // CHECK:         end_access [[SELF_ACCESS]]
+// CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK-LABEL:} // end sil function '$s19coroutine_accessors1SV3irmSivs'
 
 // CHECK-LABEL: sil {{.*}}[ossa] @$s19coroutine_accessors1SV3irmSivM :
@@ -83,13 +91,18 @@ public var irm: Int {
 // CHECK-SAME:  ):
 // CHECK:       [[SELF_ACCESS:%[^,]+]] = begin_access [modify] [unknown] [[SELF]]
 // CHECK:       [[MODIFY_ACCESSOR:%[^,]+]] = function_ref @$s19coroutine_accessors1SV3irmSivx
-// CHECK:       ([[VALUE_ADDRESS:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[MODIFY_ACCESSOR]]([[SELF_ACCESS]])
+// CHECK:       ([[VALUE_ADDRESS:%[^,]+]],
+// CHECK-SAME:   [[TOKEN:%[^,]+]],
+// CHECK-SAME:   [[ALLOCATION:%[^)]+]])
+// CHECK-SAME:  = begin_apply [[MODIFY_ACCESSOR]]([[SELF_ACCESS]])
 // CHECK:       yield [[VALUE_ADDRESS:%[^,]+]] : $*Int, resume bb1, unwind bb2
 // CHECK:     bb1:
 // CHECK:       end_apply [[TOKEN]]
 // CHECK:       end_access [[SELF_ACCESS]]
+// CHECK:       dealloc_stack [[ALLOCATION]]
 // CHECK:     bb2:
 // CHECK:       end_apply [[TOKEN]]
+// CHECK:       dealloc_stack [[ALLOCATION]]
 // CHECK:       end_access [[SELF_ACCESS]]
 // CHECK:       unwind
 // CHECK-LABEL: } // end sil function '$s19coroutine_accessors1SV3irmSivM'
@@ -110,12 +123,16 @@ public var irm: Int {
 // CHECK:      store [[NEW_VALUE:%[^,]+]] to [trivial] [[NEW_VALUE_ADDR]]
 // CHECK:      [[SELF_ACCESS:%[^,]+]] = begin_access [modify] [unknown] [[SELF]]
 // CHECK:      [[MODIFY_ACCESSOR:%[^,]+]] = function_ref @$s19coroutine_accessors1SV3irmSivx
-// CHECK:      ([[VALUE_ADDR:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[MODIFY_ACCESSOR]]([[SELF_ACCESS]])
+// CHECK:      ([[VALUE_ADDR:%[^,]+]], 
+// CHECK-SAME:  [[TOKEN:%[^,]+]],
+// CHECK-SAME:  [[ALLOCATION:%[^)]+]])
+// CHECK-SAME: = begin_apply [[MODIFY_ACCESSOR]]([[SELF_ACCESS]])
 // CHECK:      [[UPDATE:%[^,]+]] = function_ref @$s19coroutine_accessors6update2at2toxxz_xtKSQRzlF
 // CHECK:      try_apply [[UPDATE:%[^,]+]]<Int>([[OLD_VALUE_ADDR]], [[VALUE_ADDR]], [[NEW_VALUE_ADDR]])
 // CHECK:    bb1
 // CHECK:      end_apply [[TOKEN]] as $()
 // CHECK:      end_access [[SELF_ACCESS]]
+// CHECK:      dealloc_stack [[ALLOCATION]]
 // CHECK:      dealloc_stack [[NEW_VALUE_ADDR]]
 // CHECK:      [[OLD_VALUE:%[^,]+]] = load [trivial] [[OLD_VALUE_ADDR]]
 // CHECK:      dealloc_stack [[OLD_VALUE_ADDR]]
@@ -123,6 +140,7 @@ public var irm: Int {
 // CHECK:    bb2([[ERROR:%[^,]+]] : @owned $any Error):
 // CHECK-NOUNWIND: end_apply [[TOKEN]]
 // CHECK-UNWIND: abort_apply [[TOKEN]]
+// CHECK:      dealloc_stack [[ALLOCATION]]
 // CHECK:      end_access [[SELF_ACCESS]]
 // CHECK:      dealloc_stack [[NEW_VALUE_ADDR]]
 // CHECK:      dealloc_stack [[OLD_VALUE_ADDR]]
