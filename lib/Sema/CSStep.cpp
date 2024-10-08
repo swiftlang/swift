@@ -42,8 +42,8 @@ ComponentStep::Scope::Scope(ComponentStep &component)
   workList.splice(workList.end(), *component.Constraints);
 
   SolverScope = new ConstraintSystem::SolverScope(CS);
-  PrevPartialScope = CS.solverState->PartialSolutionScope;
-  CS.solverState->PartialSolutionScope = SolverScope;
+  prevPartialSolutionFixes = CS.solverState->numPartialSolutionFixes;
+  CS.solverState->numPartialSolutionFixes = CS.Fixes.size();
 }
 
 StepResult SplitterStep::take(bool prevFailed) {

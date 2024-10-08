@@ -128,11 +128,8 @@ Solution ConstraintSystem::finalize() {
 
   // For each of the fixes, record it as an operation on the affected
   // expression.
-  unsigned firstFixIndex = 0;
-  if (solverState && solverState->PartialSolutionScope) {
-    firstFixIndex = solverState->PartialSolutionScope->numFixes;
-  }
-
+  unsigned firstFixIndex =
+      (solverState ? solverState->numPartialSolutionFixes : 0);
   for (const auto &fix :
        llvm::make_range(Fixes.begin() + firstFixIndex, Fixes.end()))
     solution.Fixes.push_back(fix);
@@ -709,7 +706,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numTrailChanges = cs.solverState->Trail.size();
 
   numTypeVariables = cs.TypeVariables.size();
-  numFixes = cs.Fixes.size();
 
   cs.solverState->beginScope(this);
   assert(!cs.failedConstraint && "Unexpected failed constraint!");
