@@ -8539,11 +8539,9 @@ bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
   // If this is a method reference on an potentially isolated
   // actor then it cannot be a remote thunk.
   bool isPotentiallyIsolated = isPotentiallyIsolatedActor(
-      actor,
-    [&](ParamDecl *P) {
-    return P->isIsolated() ||
-           llvm::is_contained(solution.isolatedParams, P);
-  });
+      actor, [&](ParamDecl *P) {
+        return P->isIsolated() || solution.isolatedParams.count(P);
+      });
 
   // Adjust the declaration context to the innermost context that is neither
   // a local function nor a closure, so that the actor reference is checked

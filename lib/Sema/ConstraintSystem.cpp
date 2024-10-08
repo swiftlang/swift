@@ -266,8 +266,8 @@ void ConstraintSystem::addConversionRestriction(
   if (!inserted)
     return;
 
-  if (isRecordingChanges()) {
-    recordChange(SolverTrail::Change::addedConversionRestriction(
+  if (solverState) {
+    recordChange(SolverTrail::Change::AddedConversionRestriction(
       srcType, dstType));
   }
 }
@@ -281,11 +281,10 @@ void ConstraintSystem::removeConversionRestriction(
 
 void ConstraintSystem::addFix(ConstraintFix *fix) {
   bool inserted = Fixes.insert(fix);
-  if (!inserted)
-    return;
+  ASSERT(inserted);
 
-  if (isRecordingChanges())
-    recordChange(SolverTrail::Change::addedFix(fix));
+  if (solverState)
+    recordChange(SolverTrail::Change::AddedFix(fix));
 }
 
 void ConstraintSystem::removeFix(ConstraintFix *fix) {
@@ -294,32 +293,23 @@ void ConstraintSystem::removeFix(ConstraintFix *fix) {
 }
 
 void ConstraintSystem::recordDisjunctionChoice(
-    ConstraintLocator *locator,
-    unsigned index) {
-  // We shouldn't ever register disjunction choices multiple times.
-  auto inserted = DisjunctionChoices.insert(
-      std::make_pair(locator, index));
-  if (!inserted.second) {
-    ASSERT(inserted.first->second == index);
-    return;
-  }
+    ConstraintLocator *locator, unsigned index) {
+  bool inserted = DisjunctionChoices.insert({locator, index}).second;
+  ASSERT(inserted);
 
-  if (isRecordingChanges()) {
-    recordChange(SolverTrail::Change::recordedDisjunctionChoice(
-      locator, index));
-  }
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedDisjunctionChoice(locator));
 }
 
 void ConstraintSystem::recordAppliedDisjunction(
     ConstraintLocator *locator, FunctionType *fnType) {
   // We shouldn't ever register disjunction choices multiple times.
-  auto inserted = AppliedDisjunctions.insert(
-      std::make_pair(locator, fnType));
-  if (inserted.second) {
-    if (isRecordingChanges()) {
-      recordChange(SolverTrail::Change::recordedAppliedDisjunction(locator));
-    }
-  }
+  bool inserted = AppliedDisjunctions.insert(
+      std::make_pair(locator, fnType)).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedAppliedDisjunction(locator));
 }
 
 /// Retrieve a dynamic result signature for the given declaration.
@@ -446,6 +436,18 @@ bool ConstraintSystem::containsIDEInspectionTarget(
 }
 
 void ConstraintSystem::recordPotentialThrowSite(
+    CatchNode catchNode, PotentialThrowSite site) {
+  potentialThrowSites.push_back({catchNode, site});
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedPotentialThrowSite(catchNode));
+}
+
+void ConstraintSystem::removePotentialThrowSite(CatchNode catchNode) {
+  ASSERT(potentialThrowSites.back().first == catchNode);
+  potentialThrowSites.pop_back();
+}
+
+void ConstraintSystem::recordPotentialThrowSite(
     PotentialThrowSite::Kind kind, Type type,
     ConstraintLocatorBuilder locator) {
   ASTContext &ctx = getASTContext();
@@ -471,9 +473,8 @@ void ConstraintSystem::recordPotentialThrowSite(
   // do..catch statements without an explicit `throws` clause do infer
   // thrown types.
   if (auto doCatch = catchNode.dyn_cast<DoCatchStmt *>()) {
-    potentialThrowSites.push_back(
-        {catchNode,
-         PotentialThrowSite{kind, type, getConstraintLocator(locator)}});
+    PotentialThrowSite site{kind, type, getConstraintLocator(locator)};
+    recordPotentialThrowSite(catchNode, site);
     return;
   }
 
@@ -486,9 +487,8 @@ void ConstraintSystem::recordPotentialThrowSite(
   if (!closureEffects(closure).isThrowing())
     return;
 
-  potentialThrowSites.push_back(
-      {catchNode,
-       PotentialThrowSite{kind, type, getConstraintLocator(locator)}});
+  PotentialThrowSite site{kind, type, getConstraintLocator(locator)};
+  recordPotentialThrowSite(catchNode, site);
 }
 
 Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
@@ -853,10 +853,10 @@ std::pair<Type, OpenedArchetypeType *> ConstraintSystem::openExistentialType(
 void ConstraintSystem::recordOpenedExistentialType(
     ConstraintLocator *locator, OpenedArchetypeType *opened) {
   bool inserted = OpenedExistentialTypes.insert({locator, opened}).second;
-  if (inserted) {
-    if (isRecordingChanges())
-      recordChange(SolverTrail::Change::recordedOpenedExistentialType(locator));
-  }
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedOpenedExistentialType(locator));
 }
 
 GenericEnvironment *
@@ -894,12 +894,10 @@ ConstraintSystem::getPackElementEnvironment(ConstraintLocator *locator,
 void ConstraintSystem::recordPackExpansionEnvironment(
     ConstraintLocator *locator, std::pair<UUID, Type> uuidAndShape) {
   bool inserted = PackExpansionEnvironments.insert({locator, uuidAndShape}).second;
-  if (inserted) {
-    if (isRecordingChanges()) {
-      recordChange(
-        SolverTrail::Change::recordedPackExpansionEnvironment(locator));
-    }
-  }
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedPackExpansionEnvironment(locator));
 }
 
 PackExpansionExpr *
@@ -910,12 +908,11 @@ ConstraintSystem::getPackEnvironment(PackElementExpr *packElement) const {
 
 void ConstraintSystem::addPackEnvironment(PackElementExpr *packElement,
                                           PackExpansionExpr *packExpansion) {
-  bool inserted =
-      PackEnvironments.insert({packElement, packExpansion}).second;
-  if (inserted) {
-    if (isRecordingChanges())
-      recordChange(SolverTrail::Change::recordedPackEnvironment(packElement));
-  }
+  bool inserted = PackEnvironments.insert({packElement, packExpansion}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedPackEnvironment(packElement));
 }
 
 /// Extend the given depth map by adding depths for all of the subexpressions
@@ -1028,7 +1025,8 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
   openGeneric(decl->getDeclContext(), decl->getGenericSignature(), locator,
               replacements);
 
-  recordOpenedTypes(locator, replacements);
+  // FIXME: Get rid of fixmeAllowDuplicates.
+  recordOpenedTypes(locator, replacements, /*fixmeAllowDuplicates=*/true);
 
   if (parentTy) {
     const auto parentTyInContext =
@@ -1278,10 +1276,10 @@ Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
 void ConstraintSystem::recordOpenedPackExpansionType(PackExpansionType *expansion,
                                                      TypeVariableType *expansionVar) {
   bool inserted = OpenedPackExpansionTypes.insert({expansion, expansionVar}).second;
-  if (inserted) {
-    if (isRecordingChanges())
-      recordChange(SolverTrail::Change::recordedOpenedPackExpansionType(expansion));
-  }
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedOpenedPackExpansionType(expansion));
 }
 
 Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
@@ -1687,20 +1685,16 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
 void ConstraintSystem::recordOpenedType(
     ConstraintLocator *locator, ArrayRef<OpenedType> openedTypes) {
   bool inserted = OpenedTypes.insert({locator, openedTypes}).second;
-  if (inserted) {
-    if (isRecordingChanges())
-      recordChange(SolverTrail::Change::recordedOpenedTypes(locator));
-  }
-}
+  ASSERT(inserted);
 
-void ConstraintSystem::removeOpenedType(ConstraintLocator *locator) {
-  bool erased = OpenedTypes.erase(locator);
-  ASSERT(erased);
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedOpenedTypes(locator));
 }
 
 void ConstraintSystem::recordOpenedTypes(
        ConstraintLocatorBuilder locator,
-       const OpenedTypeMap &replacements) {
+       const OpenedTypeMap &replacements,
+       bool fixmeAllowDuplicates) {
   if (replacements.empty())
     return;
 
@@ -1721,7 +1715,10 @@ void ConstraintSystem::recordOpenedTypes(
   OpenedType* openedTypes
     = Allocator.Allocate<OpenedType>(replacements.size());
   std::copy(replacements.begin(), replacements.end(), openedTypes);
-  recordOpenedType(
+
+  // FIXME: Get rid of fixmeAllowDuplicates.
+  if (!fixmeAllowDuplicates || OpenedTypes.count(locatorPtr) == 0)
+    recordOpenedType(
       locatorPtr, llvm::ArrayRef(openedTypes, replacements.size()));
 }
 
@@ -3545,12 +3542,13 @@ void ConstraintSystem::bindOverloadType(
 
     // Associate an argument list for the implicit x[dynamicMember:] subscript
     // if we haven't already.
-    auto *&argList = ArgumentLists[getArgumentInfoLocator(callLoc)];
-    if (!argList) {
-      argList = ArgumentList::createImplicit(
+    auto *argLoc = getArgumentInfoLocator(callLoc);
+    if (ArgumentLists.find(argLoc) == ArgumentLists.end()) {
+      auto *argList = ArgumentList::createImplicit(
           ctx, {Argument(SourceLoc(), ctx.Id_dynamicMember, /*expr*/ nullptr)},
           /*firstTrailingClosureIndex=*/std::nullopt,
           AllocationArena::ConstraintSolver);
+      recordArgumentList(argLoc, argList);
     }
 
     auto *callerTy = FunctionType::get(
@@ -3741,6 +3739,15 @@ void ConstraintSystem::bindOverloadType(
   }
   }
   llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
+}
+
+void ConstraintSystem::recordResolvedOverload(ConstraintLocator *locator,
+                                              SelectedOverload overload) {
+  bool inserted = ResolvedOverloads.insert({locator, overload}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::ResolvedOverload(locator));
 }
 
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
@@ -3998,9 +4005,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   auto overload = SelectedOverload{
       choice, openedType, adjustedOpenedType, refType, adjustedRefType,
       boundType};
-  auto result = ResolvedOverloads.insert({locator, overload});
-  assert(result.second && "Already resolved this overload?");
-  (void)result;
+  recordResolvedOverload(locator, overload);
 
   // Add the constraints necessary to bind the overload type.
   bindOverloadType(overload, boundType, locator, useDC,
@@ -4481,12 +4486,12 @@ size_t Solution::getTotalMemory() const {
          size_in_bytes(targets) +
          size_in_bytes(caseLabelItems) +
          size_in_bytes(exprPatterns) +
-         (isolatedParams.size() * sizeof(void *)) +
-         (preconcurrencyClosures.size() * sizeof(void *)) +
+         size_in_bytes(isolatedParams) +
+         size_in_bytes(preconcurrencyClosures) +
          size_in_bytes(resultBuilderTransformed) +
          size_in_bytes(appliedPropertyWrappers) +
          size_in_bytes(argumentLists) +
-         ImplicitCallAsFunctionRoots.getMemorySize() +
+         size_in_bytes(ImplicitCallAsFunctionRoots) +
          size_in_bytes(SynthesizedConformances);
 }
 
@@ -6517,13 +6522,20 @@ ArgumentList *ConstraintSystem::getArgumentList(ConstraintLocator *locator) {
   return nullptr;
 }
 
+void ConstraintSystem::recordArgumentList(ConstraintLocator *locator,
+                                          ArgumentList *args) {
+  bool inserted = ArgumentLists.insert({locator, args}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedArgumentList(locator));
+}
+
 void ConstraintSystem::associateArgumentList(ConstraintLocator *locator,
                                              ArgumentList *args) {
-  assert(locator && locator->getAnchor());
-  auto *argInfoLoc = getArgumentInfoLocator(locator);
-  auto inserted = ArgumentLists.insert({argInfoLoc, args}).second;
-  assert(inserted && "Multiple argument lists at locator?");
-  (void)inserted;
+  ASSERT(locator && locator->getAnchor());
+  auto *argLoc = getArgumentInfoLocator(locator);
+  recordArgumentList(argLoc, args);
 }
 
 ArgumentList *Solution::getArgumentList(ConstraintLocator *locator) const {
@@ -7443,8 +7455,8 @@ void ConstraintSystem::recordFixedRequirement(GenericTypeParamType *GP,
   bool inserted = FixedRequirements.insert(
       std::make_tuple(GP, reqKind, requirementTy.getPointer())).second;
   if (inserted) {
-    if (isRecordingChanges()) {
-      recordChange(SolverTrail::Change::addedFixedRequirement(
+    if (solverState) {
+      recordChange(SolverTrail::Change::AddedFixedRequirement(
           GP, reqKind, requirementTy));
     }
   }

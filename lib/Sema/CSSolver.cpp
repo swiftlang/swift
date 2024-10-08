@@ -218,7 +218,8 @@ Solution ConstraintSystem::finalize() {
     solution.contextualTypes.push_back({entry.first, entry.second.first});
   }
 
-  solution.targets = targets;
+  for (auto &target : targets)
+    solution.targets.insert(target);
 
   for (const auto &item : caseLabelItems)
     solution.caseLabelItems.insert(item);
@@ -230,10 +231,10 @@ Solution ConstraintSystem::finalize() {
     solution.exprPatterns.insert(pattern);
 
   for (const auto &param : isolatedParams)
-    solution.isolatedParams.push_back(param);
+    solution.isolatedParams.insert(param);
 
-  for (const auto &closure : preconcurrencyClosures)
-    solution.preconcurrencyClosures.push_back(closure);
+  for (auto closure : preconcurrencyClosures)
+    solution.preconcurrencyClosures.insert(closure);
 
   for (const auto &transformed : resultBuilderTransformed) {
     solution.resultBuilderTransformed.insert(transformed);
@@ -290,8 +291,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Register overload choices.
   // FIXME: Copy these directly into some kind of partial solution?
-  for (auto overload : solution.overloadChoices)
-    ResolvedOverloads.insert(overload);
+  for (auto overload : solution.overloadChoices) {
+    if (!ResolvedOverloads.count(overload.first))
+      recordResolvedOverload(overload.first, overload.second);
+  }
 
   // Register constraint restrictions.
   // FIXME: Copy these directly into some kind of partial solution?
@@ -304,51 +307,64 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Register the solution's disjunction choices.
   for (auto &choice : solution.DisjunctionChoices) {
-    recordDisjunctionChoice(choice.first, choice.second);
+    if (DisjunctionChoices.count(choice.first) == 0)
+      recordDisjunctionChoice(choice.first, choice.second);
   }
 
   // Register the solution's applied disjunctions.
   for (auto &choice : solution.AppliedDisjunctions) {
-    recordAppliedDisjunction(choice.first, choice.second);
+    if (AppliedDisjunctions.count(choice.first) == 0)
+      recordAppliedDisjunction(choice.first, choice.second);
   }
 
   // Remember all of the argument/parameter matching choices we made.
   for (auto &argumentMatch : solution.argumentMatchingChoices) {
-    recordMatchCallArgumentResult(argumentMatch.first, argumentMatch.second);
+    if (argumentMatchingChoices.count(argumentMatch.first) == 0)
+      recordMatchCallArgumentResult(argumentMatch.first, argumentMatch.second);
   }
 
   // Remember implied results.
-  for (auto impliedResult : solution.ImpliedResults)
-    ImpliedResults.insert(impliedResult);
+  for (auto impliedResult : solution.ImpliedResults) {
+    if (ImpliedResults.count(impliedResult.first) == 0)
+      recordImpliedResult(impliedResult.first, impliedResult.second);
+  }
 
   // Register the solution's opened types.
   for (const auto &opened : solution.OpenedTypes) {
-    recordOpenedType(opened.first, opened.second);
+    if (OpenedTypes.count(opened.first) == 0)
+      recordOpenedType(opened.first, opened.second);
   }
 
   // Register the solution's opened existential types.
   for (const auto &openedExistential : solution.OpenedExistentialTypes) {
-    recordOpenedExistentialType(openedExistential.first, openedExistential.second);
+    if (OpenedExistentialTypes.count(openedExistential.first) == 0) {
+      recordOpenedExistentialType(openedExistential.first,
+                                  openedExistential.second);
+    }
   }
 
   // Register the solution's opened pack expansion types.
   for (const auto &expansion : solution.OpenedPackExpansionTypes) {
-    recordOpenedPackExpansionType(expansion.first, expansion.second);
+    if (OpenedPackExpansionTypes.count(expansion.first) == 0)
+      recordOpenedPackExpansionType(expansion.first, expansion.second);
   }
 
   // Register the solutions's pack expansion environments.
   for (const auto &expansion : solution.PackExpansionEnvironments) {
-    recordPackExpansionEnvironment(expansion.first, expansion.second);
+    if (PackExpansionEnvironments.count(expansion.first) == 0)
+      recordPackExpansionEnvironment(expansion.first, expansion.second);
   }
 
   // Register the solutions's pack environments.
   for (auto &packEnvironment : solution.PackEnvironments) {
-    addPackEnvironment(packEnvironment.first, packEnvironment.second);
+    if (PackEnvironments.count(packEnvironment.first) == 0)
+      addPackEnvironment(packEnvironment.first, packEnvironment.second);
   }
 
   // Register the defaulted type variables.
-  for (auto *locator : solution.DefaultedConstraints)
+  for (auto *locator : solution.DefaultedConstraints) {
     recordDefaultedConstraint(locator);
+  }
 
   // Add the node types back.
   for (auto &nodeType : solution.nodeTypes) {
@@ -362,7 +378,12 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Add key paths.
   for (const auto &keypath : solution.KeyPaths) {
-    KeyPaths.insert(keypath);
+    if (KeyPaths.count(keypath.first) == 0) {
+      recordKeyPath(keypath.first,
+                    std::get<0>(keypath.second),
+                    std::get<1>(keypath.second),
+                    std::get<2>(keypath.second));
+    }
   }
 
   // Add the contextual types.
@@ -383,53 +404,78 @@ void ConstraintSystem::applySolution(const Solution &solution) {
       setCaseLabelItemInfo(info.first, info.second);
   }
 
-  potentialThrowSites.insert(potentialThrowSites.end(),
-                             solution.potentialThrowSites.begin(),
-                             solution.potentialThrowSites.end());
-
-  for (auto param : solution.isolatedParams) {
-    isolatedParams.insert(param);
+  auto sites = ArrayRef(solution.potentialThrowSites);
+  ASSERT(sites.size() >= potentialThrowSites.size());
+  for (const auto &site : sites.slice(potentialThrowSites.size())) {
+    potentialThrowSites.push_back(site);
   }
 
-  for (auto &pair : solution.exprPatterns)
-    exprPatterns.insert(pair);
+  for (auto param : solution.isolatedParams) {
+    if (isolatedParams.count(param) == 0)
+      recordIsolatedParam(param);
+  }
+
+  for (auto &pair : solution.exprPatterns) {
+    if (exprPatterns.count(pair.first) == 0)
+      setExprPatternFor(pair.first, pair.second);
+  }
 
   for (auto closure : solution.preconcurrencyClosures) {
-    preconcurrencyClosures.insert(closure);
+    if (preconcurrencyClosures.count(closure) == 0)
+      recordPreconcurrencyClosure(closure);
   }
 
   for (const auto &transformed : solution.resultBuilderTransformed) {
-    resultBuilderTransformed.insert(transformed);
+    if (resultBuilderTransformed.count(transformed.first) == 0)
+      recordResultBuilderTransform(transformed.first, transformed.second);
   }
 
   for (const auto &appliedWrapper : solution.appliedPropertyWrappers) {
-    appliedPropertyWrappers.insert(appliedWrapper);
+    auto found = appliedPropertyWrappers.find(appliedWrapper.first);
+    if (found == appliedPropertyWrappers.end()) {
+      appliedPropertyWrappers.insert(appliedWrapper);
+    } else {
+      auto &existing = found->second;
+      ASSERT(existing.size() <= appliedWrapper.second.size());
+      existing = appliedWrapper.second;
+    }
   }
 
   for (auto &valueConversion : solution.ImplicitValueConversions) {
-    ImplicitValueConversions.insert(valueConversion);
+    if (ImplicitValueConversions.count(valueConversion.first) == 0) {
+      recordImplicitValueConversion(valueConversion.first,
+                                    valueConversion.second);
+    }
   }
 
   // Register the argument lists.
   for (auto &argListMapping : solution.argumentLists) {
-    ArgumentLists.insert(argListMapping);
+    if (ArgumentLists.count(argListMapping.first) == 0)
+      recordArgumentList(argListMapping.first, argListMapping.second);
   }
 
   for (auto &implicitRoot : solution.ImplicitCallAsFunctionRoots) {
-    ImplicitCallAsFunctionRoots.insert(implicitRoot);
+    if (ImplicitCallAsFunctionRoots.count(implicitRoot.first) == 0)
+      recordImplicitCallAsFunctionRoot(implicitRoot.first, implicitRoot.second);
   }
 
   for (auto &synthesized : solution.SynthesizedConformances) {
-    SynthesizedConformances.insert(synthesized);
+    if (SynthesizedConformances.count(synthesized.first) == 0)
+      recordSynthesizedConformance(synthesized.first, synthesized.second);
   }
 
   // Register any fixes produced along this path.
-  for (auto *fix : solution.Fixes)
-    addFix(fix);
+  for (auto *fix : solution.Fixes) {
+    if (Fixes.count(fix) == 0)
+      addFix(fix);
+  }
 
   // Register fixed requirements.
-  for (auto fix : solution.FixedRequirements)
-    recordFixedRequirement(std::get<0>(fix), std::get<1>(fix), std::get<2>(fix));
+  for (auto fix : solution.FixedRequirements) {
+    recordFixedRequirement(std::get<0>(fix),
+                           std::get<1>(fix),
+                           std::get<2>(fix));
+  }
 }
 bool ConstraintSystem::simplify() {
   // While we have a constraint in the worklist, process it.
@@ -663,27 +709,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 
   numTypeVariables = cs.TypeVariables.size();
   numFixes = cs.Fixes.size();
-  numAddedNodeTypes = cs.addedNodeTypes.size();
-  numAddedKeyPathComponentTypes = cs.addedKeyPathComponentTypes.size();
-  numKeyPaths = cs.KeyPaths.size();
-  numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
-  numFavoredConstraints = cs.solverState->getNumFavoredConstraints();
-  numResultBuilderTransformed = cs.resultBuilderTransformed.size();
-  numAppliedPropertyWrappers = cs.appliedPropertyWrappers.size();
-  numResolvedOverloads = cs.ResolvedOverloads.size();
-  numInferredClosureTypes = cs.ClosureTypes.size();
-  numImpliedResults = cs.ImpliedResults.size();
-  numContextualTypes = cs.contextualTypes.size();
-  numTargets = cs.targets.size();
-  numCaseLabelItems = cs.caseLabelItems.size();
-  numPotentialThrowSites = cs.potentialThrowSites.size();
-  numExprPatterns = cs.exprPatterns.size();
-  numIsolatedParams = cs.isolatedParams.size();
-  numPreconcurrencyClosures = cs.preconcurrencyClosures.size();
-  numImplicitValueConversions = cs.ImplicitValueConversions.size();
-  numArgumentLists = cs.ArgumentLists.size();
-  numImplicitCallAsFunctionRoots = cs.ImplicitCallAsFunctionRoots.size();
-  numSynthesizedConformances = cs.SynthesizedConformances.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -698,8 +723,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Erase the end of various lists.
   truncate(cs.TypeVariables, numTypeVariables);
-
-  truncate(cs.ResolvedOverloads, numResolvedOverloads);
 
   // Move any remaining active constraints into the inactive list.
   if (!cs.ActiveConstraints.empty()) {
@@ -717,79 +740,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // e.g. add retired constraints back to the circulation and remove generated
   // constraints introduced by the current scope.
   cs.solverState->rollback(this);
-
-  // Remove any node types we registered.
-  for (unsigned i :
-           reverse(range(numAddedNodeTypes, cs.addedNodeTypes.size()))) {
-    auto node = cs.addedNodeTypes[i].first;
-    if (Type oldType = cs.addedNodeTypes[i].second)
-      cs.NodeTypes[node] = oldType;
-    else
-      cs.NodeTypes.erase(node);
-  }
-  truncate(cs.addedNodeTypes, numAddedNodeTypes);
-
-  // Remove any node types we registered.
-  for (unsigned i : reverse(range(numAddedKeyPathComponentTypes,
-                                  cs.addedKeyPathComponentTypes.size()))) {
-    auto KeyPath = std::get<0>(cs.addedKeyPathComponentTypes[i]);
-    auto KeyPathIndex = std::get<1>(cs.addedKeyPathComponentTypes[i]);
-    if (Type oldType = std::get<2>(cs.addedKeyPathComponentTypes[i])) {
-      cs.KeyPathComponentTypes[{KeyPath, KeyPathIndex}] = oldType;
-    } else {
-      cs.KeyPathComponentTypes.erase({KeyPath, KeyPathIndex});
-    }
-  }
-  truncate(cs.addedKeyPathComponentTypes, numAddedKeyPathComponentTypes);
-
-  /// Remove any key path expressions.
-  truncate(cs.KeyPaths, numKeyPaths);
-
-  /// Remove any builder transformed closures.
-  truncate(cs.resultBuilderTransformed, numResultBuilderTransformed);
-
-  // Remove any applied property wrappers.
-  truncate(cs.appliedPropertyWrappers, numAppliedPropertyWrappers);
-
-  // Remove any inferred closure types (e.g. used in result builder body).
-  truncate(cs.ClosureTypes, numInferredClosureTypes);
-
-  // Remove any implied results.
-  truncate(cs.ImpliedResults, numImpliedResults);
-
-  // Remove any contextual types.
-  truncate(cs.contextualTypes, numContextualTypes);
-
-  // Remove any targets.
-  truncate(cs.targets, numTargets);
-
-  // Remove any case label item infos.
-  truncate(cs.caseLabelItems, numCaseLabelItems);
-
-  // Remove any potential throw sites.
-  truncate(cs.potentialThrowSites, numPotentialThrowSites);
-
-  // Remove any ExprPattern mappings.
-  truncate(cs.exprPatterns, numExprPatterns);
-
-  // Remove any isolated parameters.
-  truncate(cs.isolatedParams, numIsolatedParams);
-
-  // Remove any preconcurrency closures.
-  truncate(cs.preconcurrencyClosures, numPreconcurrencyClosures);
-
-  // Remove any implicit value conversions.
-  truncate(cs.ImplicitValueConversions, numImplicitValueConversions);
-
-  // Remove any argument lists no longer in scope.
-  truncate(cs.ArgumentLists, numArgumentLists);
-
-  // Remove any implicitly generated root expressions for `.callAsFunction`
-  // which are no longer in scope.
-  truncate(cs.ImplicitCallAsFunctionRoots, numImplicitCallAsFunctionRoots);
-
-  // Remove any implicitly synthesized conformances.
-  truncate(cs.SynthesizedConformances, numSynthesizedConformances);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
@@ -1794,23 +1744,29 @@ ConstraintSystem::filterDisjunction(
       llvm::errs().indent(indent) << ")\n";
     }
 
-    if (restoreOnFail)
-      constraintsToRestoreOnFail.push_back(constraint);
-
-    if (solverState)
-      solverState->disableConstraint(constraint);
-    else
-      constraint->setDisabled();
+    if (!constraint->isDisabled()) {
+      if (restoreOnFail)
+        constraintsToRestoreOnFail.push_back(constraint);
+      else if (solverState)
+        solverState->disableConstraint(constraint);
+      else
+        constraint->setDisabled();
+    }
   }
 
-  switch (numEnabledTerms) {
-  case 0:
-    for (auto constraint : constraintsToRestoreOnFail) {
-      constraint->setEnabled();
-    }
+  if (numEnabledTerms == 0)
     return SolutionKind::Error;
 
-  case 1: {
+  if (restoreOnFail) {
+    for (auto constraint : constraintsToRestoreOnFail) {
+      if (solverState)
+        solverState->disableConstraint(constraint);
+      else
+        constraint->setDisabled();
+    }
+  }
+
+  if (numEnabledTerms == 1) {
     // Only a single constraint remains. Retire the disjunction and make
     // the remaining constraint active.
     auto choice = disjunction->getNestedConstraints()[choiceIdx];
@@ -1859,9 +1815,7 @@ ConstraintSystem::filterDisjunction(
     return failedConstraint ? SolutionKind::Unsolved : SolutionKind::Solved;
   }
 
-  default:
-    return SolutionKind::Unsolved;
-  }
+  return SolutionKind::Unsolved;
 }
 
 // Attempt to find a disjunction of bind constraints where all options
