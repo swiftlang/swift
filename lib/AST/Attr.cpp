@@ -1694,6 +1694,18 @@ uint64_t DeclAttribute::getOptions(DeclAttrKind DK) {
   llvm_unreachable("bad DeclAttrKind");
 }
 
+std::optional<Feature> DeclAttribute::getRequiredFeature(DeclAttrKind DK) {
+  switch (DK) {
+#define DECL_ATTR_FEATURE_REQUIREMENT(CLASS, FEATURE_NAME)                     \
+  case DeclAttrKind::CLASS:                                                    \
+    return Feature::FEATURE_NAME;
+#include "swift/AST/DeclAttr.def"
+  default:
+    return std::nullopt;
+  }
+  llvm_unreachable("bad DeclAttrKind");
+}
+
 StringRef DeclAttribute::getAttrName() const {
   switch (getKind()) {
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...)                                     \
@@ -2927,6 +2939,10 @@ static bool hasDeclAttribute(const LangOptions &langOpts,
     return false;
   if (DeclAttribute::isConcurrencyOnly(*kind))
     return false;
+
+  if (auto feature = DeclAttribute::getRequiredFeature(*kind))
+    if (!langOpts.hasFeature(*feature))
+      return false;
 
   return true;
 }
