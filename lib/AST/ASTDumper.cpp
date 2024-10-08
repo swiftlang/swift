@@ -1294,9 +1294,13 @@ namespace {
           OS << "\")";
         });
       }
-      auto lifetimeString = getDumpString(VD->getLifetimeAnnotation());
-      if (!lifetimeString.empty())
-        printFlag(lifetimeString);
+      // In some cases, getLifetimeAnnotation() can fail before extension
+      // binding. hasResolvedImports() approximates an extension binding check.
+      if (VD->getModuleContext()->hasResolvedImports()) {
+        auto lifetimeString = getDumpString(VD->getLifetimeAnnotation());
+        if (!lifetimeString.empty())
+          printFlag(lifetimeString);
+      }
     }
 
     void printCommon(NominalTypeDecl *NTD, const char *Name, StringRef Label,
@@ -1802,8 +1806,13 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     break;
 
   case DeclContextKind::ExtensionDecl:
-    if (auto extendedNominal = cast<ExtensionDecl>(dc)->getExtendedNominal()) {
+    if (auto repr = cast<ExtensionDecl>(dc)->getExtendedTypeRepr()) {
+      repr->print(os);
+    } else if (cast<ExtensionDecl>(dc)->hasBeenBound()) {
+      auto extendedNominal = cast<ExtensionDecl>(dc)->getExtendedNominal();
       printName(os, extendedNominal->getName());
+    } else {
+      os << "<unbound>";
     }
     os << " extension";
     break;
