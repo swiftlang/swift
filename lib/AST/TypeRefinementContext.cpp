@@ -404,7 +404,24 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
   auto R = getSourceRange();
   if (R.isValid()) {
     OS << " src_range=";
-    R.print(OS, SrcMgr, /*PrintText=*/false);
+
+    if (getReason() != Reason::Root) {
+      R.print(OS, SrcMgr, /*PrintText=*/false);
+    } else if (auto info = SrcMgr.getGeneratedSourceInfo(
+                   Node.getAsSourceFile()->getBufferID())) {
+      info->originalSourceRange.print(OS, SrcMgr, /*PrintText=*/false);
+    } else {
+      OS << "<unknown>";
+    }
+  }
+
+  if (getReason() == Reason::Root) {
+    if (auto info = SrcMgr.getGeneratedSourceInfo(
+            Node.getAsSourceFile()->getBufferID())) {
+      OS << " generated_kind=" << GeneratedSourceInfo::kindToString(info->kind);
+    } else {
+      OS << " file=" << Node.getAsSourceFile()->getFilename().str();
+    }
   }
 
   if (!ExplicitAvailabilityInfo.isAlwaysAvailable())
