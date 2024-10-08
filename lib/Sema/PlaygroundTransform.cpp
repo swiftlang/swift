@@ -461,7 +461,14 @@ public:
           }
         } else if (auto *AE = dyn_cast<ApplyExpr>(E)) {
           bool Handled = false;
-          if (auto *DRE = dyn_cast<DeclRefExpr>(AE->getFn())) {
+          DeclRefExpr *DRE = nullptr;
+          // With Swift 6 the print() function decl is a sub expression
+          // of a function conversion expression.
+          if (auto *FCE = dyn_cast<FunctionConversionExpr>(AE->getFn()))
+            DRE = dyn_cast<DeclRefExpr>(FCE->getSubExpr());
+          else
+            DRE = dyn_cast<DeclRefExpr>(AE->getFn());
+          if (DRE) {
             auto *FnD = dyn_cast<AbstractFunctionDecl>(DRE->getDecl());
             if (FnD && FnD->getModuleContext() == Context.TheStdlibModule) {
               DeclBaseName FnName = FnD->getBaseName();
