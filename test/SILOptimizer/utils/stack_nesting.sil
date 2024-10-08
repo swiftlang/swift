@@ -1,0 +1,31 @@
+// RUN: %target-sil-opt               \
+// RUN:     -test-runner              \
+// RUN:     -sil-disable-input-verify \
+// RUN:     %s                        \
+// RUN:     -o /dev/null              \
+// RUN: 2>&1 | %FileCheck %s
+
+import Builtin
+
+sil @coro : $@convention(thin) @yield_once_2 <T> () -> (@yields @in_guaranteed T)
+
+// CHECK-LABEL: begin running test {{.*}} on begin_apply_fixup: stack_nesting_fixup
+// CHECK-LABEL: sil @begin_apply_fixup : $@convention(thin) <T> () -> () {
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack
+// CHECK:         ({{%[^,]+}}, {{%[^,]+}}, [[ALLOCATION:%[^,]+]]) = begin_apply
+// CHECK:         dealloc_stack [[ALLOCATION]]
+// CHECK:         dealloc_stack [[STACK]]
+// CHECK-LABEL: } // end sil function 'begin_apply_fixup'
+// CHECK-LABEL: end running test {{.*}} on begin_apply_fixup: stack_nesting_fixup
+sil @begin_apply_fixup : $@convention(thin) <T> () -> () {
+entry:
+  specify_test "stack_nesting_fixup"
+  %stk = alloc_stack $T
+  %coro = function_ref @coro : $@convention(thin) @yield_once_2 <T> () -> (@yields @in_guaranteed T)
+  (%t, %token, %allocation) = begin_apply %coro<T>() : $@convention(thin) @yield_once_2 <T> () -> (@yields @in_guaranteed T) 
+  end_apply %token as $()
+  dealloc_stack %stk : $*T
+  dealloc_stack %allocation : $*Builtin.SILToken
+  %retval = tuple ()
+  return %retval : $()
+}

@@ -6132,11 +6132,18 @@ begin_apply
   // %float : $Float
   // %token is a token
 
+  (%anyAddr, %float, %token, %allocation) = begin_apply %0() : $@yield_once_2 () -> (@yields @inout %Any, @yields Float)
+  // %anyAddr : $*Any
+  // %float : $Float
+  // %token is a token
+  // %allocation is a pointer to a token
+
 Transfers control to coroutine ``%0``, passing it the given arguments.
 The rules for the application generally follow the rules for ``apply``,
 except:
 
-- the callee value must have a ``yield_once`` coroutine type,
+- the callee value must have be of single-yield coroutine type (``yield_once``
+  or ``yield_once_2``)
 
 - control returns to this function not when the coroutine performs a
   ``return``, but when it performs a ``yield``, and
@@ -6144,11 +6151,17 @@ except:
 - the instruction results are derived from the yields of the coroutine
   instead of its normal results.
 
-The final result of a ``begin_apply`` is a "token", a special value which
-can only be used as the operand of an ``end_apply`` or ``abort_apply``
-instruction.  Before this second instruction is executed, the coroutine
-is said to be "suspended", and the token represents a reference to its
-suspended activation record.
+The final (in the case of ``@yield_once``) or penultimate (in the case of
+``@yield_once_2``) result of a ``begin_apply`` is a "token", a special value
+which can only be used as the operand of an ``end_apply`` or ``abort_apply``
+instruction.  Before this second instruction is executed, the coroutine is said
+to be "suspended", and the token represents a reference to its suspended
+activation record.
+
+If the coroutine's kind ``yield_once_2``, its final result is an address of a
+"token", representing the allocation done by the callee coroutine.  It can only
+be used as the operand of a ``dealloc_stack`` which must appear after the
+coroutine is resumed.
 
 The other results of the instruction correspond to the yields in the
 coroutine type.  In general, the rules of a yield are similar to the rules

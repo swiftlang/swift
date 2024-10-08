@@ -2,6 +2,7 @@
 
 sil_stage raw
 
+import Builtin
 import Swift
 
 sil @use_int : $@convention(thin) (Int) -> ()
@@ -72,9 +73,10 @@ bb0(%0 : $Int, %1 : $Float):
 sil [ossa] @begin_apply_2 : $(Int, Float) -> () {
 bb0(%0 : $Int, %1 : $Float):
   %coro = function_ref @yield_2 : $@convention(thin) @yield_once_2 (Int, Float) -> (@yields Int, @yields Float)
-  (%int, %float, %token) = begin_apply %coro(%0, %1) : $@convention(thin) @yield_once_2 (Int, Float) -> (@yields Int, @yields Float)
+  (%int, %float, %token, %allocation) = begin_apply %coro(%0, %1) : $@convention(thin) @yield_once_2 (Int, Float) -> (@yields Int, @yields Float)
 
   end_apply %token as $()
+  dealloc_stack %allocation : $*Builtin.SILToken
   %r = tuple ()
   return %r : $()
 }

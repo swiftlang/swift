@@ -366,6 +366,7 @@ public:
   llvm::DenseMap<SILValue, LoweredValue> LoweredValues;
   llvm::DenseMap<SILValue, StackAddress> LoweredPartialApplyAllocations;
   llvm::DenseMap<SILType, LoweredValue> LoweredUndefs;
+  llvm::DenseMap<SILValue, llvm::Value *> LoweredSingleYieldFrames;
 
   /// All alloc_ref instructions which allocate the object on the stack.
   llvm::SmallPtrSet<SILInstruction *, 8> StackAllocs;
@@ -6262,6 +6263,13 @@ void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
     assert(closure->isOnStack());
     auto stackAddr = LoweredPartialApplyAllocations[i->getOperand()];
     emitDeallocateDynamicAlloca(stackAddr);
+    return;
+  }
+  if (isaResultOf<BeginApplyInst>(i->getOperand())) {
+    auto *mvi = getAsResultOf<BeginApplyInst>(i->getOperand());
+    auto *bai = cast<BeginApplyInst>(mvi->getParent());
+    emitDeallocYieldOnce2CoroutineFrame(
+        *this, LoweredSingleYieldFrames[bai->getCalleeAllocationResult()]);
     return;
   }
 
