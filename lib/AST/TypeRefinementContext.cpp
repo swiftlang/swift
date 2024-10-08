@@ -14,14 +14,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/TypeRefinementContext.h"
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Module.h"
-#include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 
@@ -35,7 +36,7 @@ TypeRefinementContext::TypeRefinementContext(
       ExplicitAvailabilityInfo(ExplicitInfo) {
   if (Parent) {
     assert(SrcRange.isValid());
-    Parent->addChild(this);
+    Parent->addChild(this, Ctx);
     assert(Info.isContainedIn(Parent->getAvailabilityInfo()));
   }
   Ctx.addDestructorCleanup(Children);
@@ -169,6 +170,36 @@ TypeRefinementContext::createForWhileStmtBody(ASTContext &Ctx, WhileStmt *S,
       Ctx, S, Parent, S->getBody()->getSourceRange(), Info, /* ExplicitInfo */Info);
 }
 
+void TypeRefinementContext::addChild(TypeRefinementContext *Child,
+                                     ASTContext &Ctx) {
+  assert(Child->getSourceRange().isValid());
+
+  // Handle the first child.
+  if (Children.empty()) {
+    Children.push_back(Child);
+    return;
+  }
+
+  // Handle a child that is ordered after the existing children (this should be
+  // the common case).
+  auto &srcMgr = Ctx.SourceMgr;
+  if (srcMgr.isBefore(Children.back()->getSourceRange().Start,
+                      Child->getSourceRange().Start)) {
+    Children.push_back(Child);
+    return;
+  }
+
+  // Insert the child amongst the existing sorted children.
+  auto iter = std::upper_bound(
+      Children.begin(), Children.end(), Child,
+      [&srcMgr](TypeRefinementContext *lhs, TypeRefinementContext *rhs) {
+        return srcMgr.isBefore(lhs->getSourceRange().Start,
+                               rhs->getSourceRange().Start);
+      });
+
+  Children.insert(iter, Child);
+}
+
 TypeRefinementContext *
 TypeRefinementContext::findMostRefinedSubContext(SourceLoc Loc,
                                                  ASTContext &Ctx) {
@@ -180,16 +211,23 @@ TypeRefinementContext::findMostRefinedSubContext(SourceLoc Loc,
   auto expandedChildren = evaluateOrDefault(
       Ctx.evaluator, ExpandChildTypeRefinementContextsRequest{this}, {});
 
-  // For the moment, we perform a linear search here, but we can and should
-  // do something more efficient.
-  for (TypeRefinementContext *Child : expandedChildren) {
-    if (auto *Found = Child->findMostRefinedSubContext(Loc, Ctx)) {
-      return Found;
-    }
+  // Do a binary search to find the first child with a source range that
+  // ends after the given location.
+  auto iter = std::lower_bound(
+      expandedChildren.begin(), expandedChildren.end(), Loc,
+      [&Ctx](TypeRefinementContext *context, SourceLoc loc) {
+        return Ctx.SourceMgr.isBefore(context->getSourceRange().End, loc);
+      });
+
+  // Check whether the matching child or any of its descendants contain
+  // the given location.
+  if (iter != expandedChildren.end()) {
+    if (auto found = (*iter)->findMostRefinedSubContext(Loc, Ctx))
+      return found;
   }
 
-  // Loc is in this context's range but not in any child's, so this context
-  // must be the inner-most context.
+  // The location is in this context's range but not in any child's, so this
+  // context must be the innermost context.
   return this;
 }
 
