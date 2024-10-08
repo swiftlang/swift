@@ -290,10 +290,7 @@ public:
   }
 
   /// Adds a child refinement context.
-  void addChild(TypeRefinementContext *Child) {
-    assert(Child->getSourceRange().isValid());
-    Children.push_back(Child);
-  }
+  void addChild(TypeRefinementContext *Child, ASTContext &Ctx);
 
   /// Returns the inner-most TypeRefinementContext descendant of this context
   /// for the given source location.
