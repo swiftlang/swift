@@ -4989,7 +4989,11 @@ public:
       SGF.B.createEndBorrow(l, *i);
       SGF.B.createDestroyValue(l, (*i)->getOperand());
     }
-    if (forUnwind) {
+    auto *beginApply =
+        cast<BeginApplyInst>(ApplyToken->getDefiningInstruction());
+    auto isCalleeAllocated = beginApply->isCalleeAllocated();
+    auto unwindOnCallerError = !isCalleeAllocated;
+    if (forUnwind && unwindOnCallerError) {
       SGF.B.createAbortApply(l, ApplyToken);
     } else {
       SGF.B.createEndApply(l, ApplyToken,
