@@ -475,3 +475,78 @@ void ExpandChildTypeRefinementContextsRequest::cacheResult(
   TRC->Children = children;
   TRC->setNeedsExpansion(false);
 }
+
+/// Emit an error message, dump each context with its corresponding label, and
+/// abort.
+static void
+verificationError(ASTContext &ctx, llvm::StringRef msg,
+                  std::initializer_list<
+                      std::pair<const char *, const TypeRefinementContext *>>
+                      labelsAndNodes) {
+  llvm::errs() << msg << "\n";
+  for (auto pair : labelsAndNodes) {
+    auto label = std::get<0>(pair);
+    auto context = std::get<1>(pair);
+    llvm::errs() << label << ":\n";
+    context->print(llvm::errs(), ctx.SourceMgr);
+  }
+  abort();
+}
+
+void TypeRefinementContext::verify(const TypeRefinementContext *parent,
+                                   ASTContext &ctx) const {
+  // Verify the children first.
+  for (auto child : Children) {
+    child->verify(this, ctx);
+  }
+
+  // Verify that the children are in sorted order and that their source ranges
+  // do not overlap.
+  auto &srcMgr = ctx.SourceMgr;
+  if (Children.size() > 1) {
+    auto const *previous = Children.front();
+    for (auto const *current : ArrayRef(Children).drop_front()) {
+      if (!srcMgr.isAtOrBefore(previous->getSourceRange().Start,
+                               current->getSourceRange().Start))
+        verificationError(
+            ctx, "out of order children",
+            {{"child 1", previous}, {"child 2", current}, {"parent", this}});
+
+      if (srcMgr.containsLoc(previous->getSourceRange(),
+                             current->getSourceRange().Start))
+        verificationError(
+            ctx, "overlapping children",
+            {{"child 1", previous}, {"child 2", current}, {"parent", this}});
+
+      previous = current;
+    }
+  }
+
+  // Only root nodes are allowed to have no parent.
+  if (!parent) {
+    if (getReason() != Reason::Root)
+      verificationError(ctx, "interior node without parent", {{"node", this}});
+    return;
+  }
+
+  // All nodes with a parent must have a valid source range.
+  if (!SrcRange.isValid())
+    verificationError(ctx, "invalid source range", {{"node", this}});
+
+  if (getReason() != Reason::Root) {
+    auto parentRange = parent->SrcRange;
+    if (parentRange.isValid() &&
+        !(srcMgr.isAtOrBefore(parentRange.Start, SrcRange.Start) &&
+          srcMgr.isAtOrBefore(SrcRange.End, parentRange.End)))
+      verificationError(ctx, "child source range not contained",
+                        {{"child", this}, {"parent", this}});
+  }
+
+  if (!AvailabilityInfo.isContainedIn(parent->AvailabilityInfo))
+    verificationError(ctx, "child availability range not contained",
+                      {{"child", this}, {"parent", this}});
+}
+
+void TypeRefinementContext::verify(ASTContext &ctx) {
+  verify(nullptr, ctx);
+}
