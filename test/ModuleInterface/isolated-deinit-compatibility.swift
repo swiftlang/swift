@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -enable-experimental-feature IsolatedDeinit -disable-availability-checking -emit-silgen -verify %s
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) -DEMIT_IFACE %s -enable-experimental-feature IsolatedDeinit -disable-availability-checking -module-name IsolatedDeinitCompatibility
-// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -enable-experimental-feature IsolatedDeinit -disable-availability-checking -module-name IsolatedDeinitCompatibility
-// RUN: %FileCheck %s --dump-input=always < %t.swiftinterface
+// RUN: %target-swift-frontend -enable-experimental-feature IsolatedDeinit -target %target-swift-abi-5.5-triple -emit-silgen -verify %s
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) -DEMIT_IFACE %s -enable-experimental-feature IsolatedDeinit -target %target-swift-abi-5.5-triple -module-name IsolatedDeinitCompatibility
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -enable-experimental-feature IsolatedDeinit -target %target-swift-abi-5.5-triple -module-name IsolatedDeinitCompatibility
+// RUN: %FileCheck %s < %t.swiftinterface
 
 // MARK: Sync deinit in class
 
