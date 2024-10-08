@@ -1045,6 +1045,7 @@ struct Score {
   friend Score operator-(const Score &x, const Score &y) {
     Score result;
     for (unsigned i = 0; i != NumScoreKinds; ++i) {
+      ASSERT(x.Data[i] >= y.Data[i]);
       result.Data[i] = x.Data[i] - y.Data[i];
     }
     return result;
@@ -1052,6 +1053,7 @@ struct Score {
 
   friend Score &operator-=(Score &x, const Score &y) {
     for (unsigned i = 0; i != NumScoreKinds; ++i) {
+      ASSERT(x.Data[i] >= y.Data[i]);
       x.Data[i] -= y.Data[i];
     }
     return x;

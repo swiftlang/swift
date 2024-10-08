@@ -15032,9 +15032,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     SmallVector<Type, 4> unwraps2;
     type2->lookThroughAllOptionalTypes(unwraps2);
 
-    auto impact = unwraps1.size() != unwraps2.size()
-                      ? unwraps1.size() - unwraps2.size()
-                      : 1;
+    unsigned impact = 1;
+    if (unwraps1.size() > unwraps2.size())
+      impact = unwraps1.size() - unwraps2.size();
+    else if (unwraps2.size() > unwraps1.size())
+      impact = unwraps2.size() - unwraps1.size();
+
     return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
