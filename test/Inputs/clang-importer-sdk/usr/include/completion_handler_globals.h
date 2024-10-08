@@ -1,11 +1,16 @@
-void async_divide(double x, double y, void (* _Nonnull completionHandler)(double x))
-  __attribute__((swift_attr("@macro_library.AddAsync")));
+#if __SWIFT_ATTR_SUPPORTS_MACROS
+#define ADD_ASYNC __attribute__((swift_attr("@macro_library.AddAsync")))
+#else
+#define ADD_ASYNC
+#endif
+
+void async_divide(double x, double y, void (* _Nonnull completionHandler)(double x)) ADD_ASYNC;
 
 typedef struct SlowComputer {
 } SlowComputer;
 
 void computer_divide(const SlowComputer *computer, double x, double y, void (* _Nonnull completionHandler)(double x))
-  __attribute__((swift_attr("@macro_library.AddAsync")))
+  ADD_ASYNC
   __attribute__((swift_name("SlowComputer.divide(self:_:_:completionHandler:)")));
 
 
@@ -14,7 +19,7 @@ void computer_divide(const SlowComputer *computer, double x, double y, void (* _
 
 @interface Computer: NSObject
 -(void)multiply:(double)x by:(double)y afterDone:(void (^ _Nonnull)(double x))afterDone
-  __attribute__((swift_attr("@macro_library.AddAsync")))
+  ADD_ASYNC
   __attribute__((swift_async(none)));
 @end
 #endif
