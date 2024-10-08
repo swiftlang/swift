@@ -27,7 +27,7 @@
 
 /// check cas-fs content
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json E casFSRootID > %t/E_fs.casid
-// RUN: llvm-cas --cas %t/cas --ls-tree-recursive @%t/E_fs.casid | %FileCheck %s -check-prefix FS_ROOT_E
+// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/E_fs.casid | %FileCheck %s -check-prefix FS_ROOT_E
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:F clangIncludeTree > %t/F_tree.casid
 // RUN: clang-cas-test --cas %t/cas --print-include-tree @%t/F_tree.casid | %FileCheck %s -check-prefix INCLUDE_TREE_F
@@ -49,8 +49,8 @@
 // INCLUDE_TREE_F-NEXT: CHeaders/F.h
 
 // MAIN_CMD: -direct-clang-cc1-module-build
-// MAIN_CMD: -cas-fs
 // MAIN_CMD: -clang-include-tree-root
+// MAIN_CMD: -clang-include-tree-filelist
 
 import C
 import E

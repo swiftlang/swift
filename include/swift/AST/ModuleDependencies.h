@@ -935,17 +935,26 @@ using ModuleDependenciesKindRefMap =
 class SwiftDependencyTracker {
 public:
   SwiftDependencyTracker(llvm::cas::CachingOnDiskFileSystem &FS,
-                         llvm::TreePathPrefixMapper *Mapper)
-      : FS(FS.createProxyFS()), Mapper(Mapper) {}
+                         llvm::PrefixMapper *Mapper,
+                         const CompilerInvocation &CI);
 
-  void startTracking();
-  void addCommonSearchPathDeps(const CompilerInvocation &CI);
-  void trackFile(const Twine &path) { (void)FS->status(path); }
+  void startTracking(bool includeCommonDeps = true);
+  void trackFile(const Twine &path);
   llvm::Expected<llvm::cas::ObjectProxy> createTreeFromDependencies();
 
 private:
   llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> FS;
-  llvm::TreePathPrefixMapper *Mapper;
+  llvm::PrefixMapper *Mapper;
+
+  struct FileEntry {
+    llvm::cas::ObjectRef FileRef;
+    size_t Size;
+
+    FileEntry(llvm::cas::ObjectRef FileRef, size_t Size)
+        : FileRef(FileRef), Size(Size) {}
+  };
+  llvm::StringMap<FileEntry> CommonFiles;
+  std::map<std::string, FileEntry> TrackedFiles;
 };
 
 // MARK: SwiftDependencyScanningService
@@ -984,7 +993,7 @@ class SwiftDependencyScanningService {
   std::shared_ptr<llvm::cas::ObjectStore> CAS;
 
   /// File prefix mapper.
-  std::unique_ptr<llvm::TreePathPrefixMapper> Mapper;
+  std::unique_ptr<llvm::PrefixMapper> Mapper;
 
   /// The global file system cache.
   std::optional<
@@ -1033,31 +1042,31 @@ public:
     return *SharedFilesystemCache;
   }
 
-  bool usingCachingFS() const { return !UseClangIncludeTree && (bool)CacheFS; }
-  llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem>
-  getCachingFS() const {
-    return CacheFS;
-  }
-
   llvm::cas::CachingOnDiskFileSystem &getSharedCachingFS() const {
     assert(CacheFS && "Expect CachingOnDiskFileSystem");
     return *CacheFS;
   }
 
-  std::optional<SwiftDependencyTracker> createSwiftDependencyTracker() {
+  llvm::cas::ObjectStore &getCAS() const {
+    assert(CAS && "Expect CAS available");
+    return *CAS;
+  }
+
+  std::optional<SwiftDependencyTracker>
+  createSwiftDependencyTracker(const CompilerInvocation &CI) {
     if (!CacheFS)
       return std::nullopt;
 
-    return SwiftDependencyTracker(*CacheFS, Mapper.get());
+    return SwiftDependencyTracker(*CacheFS, Mapper.get(), CI);
   }
 
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getClangScanningFS() const {
-    if (usingCachingFS())
-      return CacheFS->createProxyFS();
-
     if (UseClangIncludeTree)
       return llvm::cas::createCASProvidingFileSystem(
           CAS, llvm::vfs::createPhysicalFileSystem());
+
+    if (CacheFS)
+      return CacheFS->createProxyFS();
 
     return llvm::vfs::createPhysicalFileSystem();
   }
@@ -1065,7 +1074,7 @@ public:
   bool hasPathMapping() const {
     return Mapper && !Mapper->getMappings().empty();
   }
-  llvm::TreePathPrefixMapper *getPrefixMapper() const { return Mapper.get(); }
+  llvm::PrefixMapper *getPrefixMapper() const { return Mapper.get(); }
   std::string remapPath(StringRef Path) const {
     if (!Mapper)
       return Path.str();

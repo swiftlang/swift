@@ -420,7 +420,7 @@ ClangImporter::getModuleDependencies(Identifier moduleName,
                                      const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                                      clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                                      InterfaceSubContextDelegate &delegate,
-                                     llvm::TreePathPrefixMapper *mapper,
+                                     llvm::PrefixMapper *mapper,
                                      bool isTestableImport) {
   auto &ctx = Impl.SwiftContext;
   // Determine the command-line arguments for dependency scanning.

@@ -22,6 +22,7 @@
 #include "swift/AST/PluginLoader.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Frontend/Frontend.h"
+#include "clang/CAS/IncludeTree.h"
 #include "llvm/CAS/CASProvidingFileSystem.h"
 #include "llvm/CAS/CachingOnDiskFileSystem.h"
 #include "llvm/Config/config.h"
@@ -597,14 +598,32 @@ swift::dependencies::registerBackDeployLibraries(
   #include "swift/Frontend/BackDeploymentLibs.def"
 }
 
-void SwiftDependencyTracker::addCommonSearchPathDeps(
-    const CompilerInvocation &CI) {
+SwiftDependencyTracker::SwiftDependencyTracker(
+    llvm::cas::CachingOnDiskFileSystem &FS, llvm::PrefixMapper *Mapper,
+    const CompilerInvocation &CI)
+    : FS(FS.createProxyFS()), Mapper(Mapper) {
   auto &SearchPathOpts = CI.getSearchPathOptions();
+
+  auto addCommonFile = [&](StringRef path) {
+    auto file = FS.openFileForRead(path);
+    if (!file)
+      return;
+    auto status = (*file)->status();
+    if (!status)
+      return;
+    auto fileRef = (*file)->getObjectRefForContent();
+    if (!fileRef)
+      return;
+
+    std::string realPath = Mapper ? Mapper->mapToString(path) : path.str();
+    CommonFiles.try_emplace(realPath, **fileRef, (size_t)status->getSize());
+  };
+
   // Add SDKSetting file.
   SmallString<256> SDKSettingPath;
   llvm::sys::path::append(SDKSettingPath, SearchPathOpts.getSDKPath(),
                           "SDKSettings.json");
-  FS->status(SDKSettingPath);
+  addCommonFile(SDKSettingPath);
 
   // Add Legacy layout file.
   const std::vector<std::string> AllSupportedArches = {
@@ -616,32 +635,61 @@ void SwiftDependencyTracker::addCommonSearchPathDeps(
     for (auto &Arch : AllSupportedArches) {
       SmallString<256> LayoutFile(RuntimeLibPath);
       llvm::sys::path::append(LayoutFile, "layouts-" + Arch + ".yaml");
-      FS->status(LayoutFile);
+      addCommonFile(LayoutFile);
     }
   }
 
   // Add VFSOverlay file.
   for (auto &Overlay: SearchPathOpts.VFSOverlayFiles)
-    FS->status(Overlay);
+    addCommonFile(Overlay);
 
   // Add blocklist file.
   for (auto &File: CI.getFrontendOptions().BlocklistConfigFilePaths)
-    FS->status(File);
+    addCommonFile(File);
 }
 
-void SwiftDependencyTracker::startTracking() {
-  FS->trackNewAccesses();
+void SwiftDependencyTracker::startTracking(bool includeCommonDeps) {
+  TrackedFiles.clear();
+  if (includeCommonDeps) {
+    for (auto &entry : CommonFiles)
+      TrackedFiles.emplace(entry.first(), entry.second);
+  }
+}
+
+void SwiftDependencyTracker::trackFile(const Twine &path) {
+  auto file = FS->openFileForRead(path);
+  if (!file)
+    return;
+  auto status = (*file)->status();
+  if (!status)
+    return;
+  auto fileRef = (*file)->getObjectRefForContent();
+  if (!fileRef)
+    return;
+  std::string realPath =
+      Mapper ? Mapper->mapToString(path.str()) : path.str();
+  TrackedFiles.try_emplace(realPath, **fileRef, (size_t)status->getSize());
 }
 
 llvm::Expected<llvm::cas::ObjectProxy>
 SwiftDependencyTracker::createTreeFromDependencies() {
-  return FS->createTreeFromNewAccesses(
-      [&](const llvm::vfs::CachedDirectoryEntry &Entry,
-          llvm::SmallVectorImpl<char> &Storage) {
-        if (Mapper)
-          return Mapper->mapDirEntry(Entry, Storage);
-        return Entry.getTreePath();
-      });
+  llvm::SmallVector<clang::cas::IncludeTree::FileList::FileEntry> Files;
+  for (auto &file : TrackedFiles) {
+    auto includeTreeFile = clang::cas::IncludeTree::File::create(
+        FS->getCAS(), file.first, file.second.FileRef);
+    if (!includeTreeFile)
+      return includeTreeFile.takeError();
+    Files.push_back(
+        {includeTreeFile->getRef(),
+         (clang::cas::IncludeTree::FileList::FileSizeTy)file.second.Size});
+  }
+
+  auto includeTreeList =
+      clang::cas::IncludeTree::FileList::create(FS->getCAS(), Files, {});
+  if (!includeTreeList)
+    return includeTreeList.takeError();
+
+  return *includeTreeList;
 }
 
 bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
@@ -675,17 +723,20 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   CacheFS = std::move(*CachingFS);
 
   // Setup prefix mapping.
-  Mapper = std::make_unique<llvm::TreePathPrefixMapper>(CacheFS);
-  SmallVector<llvm::MappedPrefix, 4> Prefixes;
-  if (auto E = llvm::MappedPrefix::transformJoined(
-          Instance.getInvocation().getSearchPathOptions().ScannerPrefixMapper,
-          Prefixes)) {
-    Instance.getDiags().diagnose(SourceLoc(), diag::error_prefix_mapping,
-                                 toString(std::move(E)));
-    return true;
+  auto &ScannerPrefixMapper =
+      Instance.getInvocation().getSearchPathOptions().ScannerPrefixMapper;
+  if (!ScannerPrefixMapper.empty()) {
+    Mapper = std::make_unique<llvm::PrefixMapper>();
+    SmallVector<llvm::MappedPrefix, 4> Prefixes;
+    if (auto E = llvm::MappedPrefix::transformJoined(ScannerPrefixMapper,
+                                                     Prefixes)) {
+      Instance.getDiags().diagnose(SourceLoc(), diag::error_prefix_mapping,
+                                   toString(std::move(E)));
+      return true;
+    }
+    Mapper->addRange(Prefixes);
+    Mapper->sort();
   }
-  Mapper->addRange(Prefixes);
-  Mapper->sort();
 
   UseClangIncludeTree =
       Instance.getInvocation().getClangImporterOptions().UseClangIncludeTree;
