@@ -127,8 +127,12 @@ extension Clock {
   //
   // This function also doubles as an ABI-compatibility shim predating the
   // introduction of #isolation.
+  @abi(
+    func measure(
+        _ work: () async throws -> Void
+    ) async rethrows -> Instant.Duration
+  )
   @available(SwiftStdlib 5.7, *)
-  @_silgen_name("$ss5ClockPsE7measurey8DurationQzyyYaKXEYaKF")
   @_unsafeInheritExecutor // for ABI compatibility
   public func _unsafeInheritExecutor_measure(
     _ work: () async throws -> Void
