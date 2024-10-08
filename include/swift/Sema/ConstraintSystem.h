@@ -2857,9 +2857,6 @@ public:
     /// FIXME: Remove this.
     unsigned numFixes;
 
-    /// The previous score.
-    Score PreviousScore;
-
     /// The scope number of this scope. Set when the scope is registered.
     unsigned scopeNumber = 0;
 
@@ -5534,9 +5531,12 @@ private:
 
 public:
   /// Increase the score of the given kind for the current (partial) solution
-  /// along the.
+  /// along the current solver path.
   void increaseScore(ScoreKind kind, ConstraintLocatorBuilder Locator,
                      unsigned value = 1);
+
+  /// Primitive form of the above. Records a change in the trail.
+  void increaseScore(ScoreKind kind, unsigned value);
 
   /// Determine whether this solution is guaranteed to be worse than the best
   /// solution found so far.

@@ -885,6 +885,12 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
 
   // Make sure that element is solved in isolation
   // by dropping all scoring information.
+  for (unsigned i = 0; i < NumScoreKinds; ++i) {
+    if (unsigned value = CS.CurrentScore.Data[i]) {
+      CS.recordChange(
+        SolverTrail::Change::DecreasedScore(ScoreKind(i), value));
+    }
+  }
   CS.CurrentScore = Score();
 
   // Reset the scope counter to avoid "too complex" failures

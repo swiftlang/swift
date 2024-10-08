@@ -325,6 +325,26 @@ SolverTrail::Change::RecordedKeyPath(KeyPathExpr *expr) {
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::IncreasedScore(ScoreKind kind, unsigned value) {
+  ASSERT(value <= 0xffffff && "value must fit in 24 bits");
+
+  Change result;
+  result.Kind = ChangeKind::IncreasedScore;
+  result.Options = unsigned(kind) | (value << 8);
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::DecreasedScore(ScoreKind kind, unsigned value) {
+  ASSERT(value <= 0xffffff && "value must fit in 24 bits");
+
+  Change result;
+  result.Kind = ChangeKind::DecreasedScore;
+  result.Options = unsigned(kind) | (value << 8);
+  return result;
+}
+
 SyntacticElementTargetKey
 SolverTrail::Change::getSyntacticElementTargetKey() const {
   ASSERT(Kind == ChangeKind::RecordedTarget);
@@ -487,6 +507,21 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   case ChangeKind::RecordedKeyPath:
     cs.removeKeyPath(KeyPath.Expr);
     break;
+
+  case ChangeKind::IncreasedScore: {
+    auto kind = Options & 0xff;
+    unsigned value = Options >> 8;
+    ASSERT(cs.CurrentScore.Data[kind] >= value);
+    cs.CurrentScore.Data[kind] -= value;
+    break;
+  }
+
+  case ChangeKind::DecreasedScore: {
+    auto kind = Options & 0xff;
+    unsigned value = Options >> 8;
+    cs.CurrentScore.Data[kind] += value;
+    break;
+  }
   }
 }
 
@@ -705,6 +740,18 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << "(RecordedKeyPath ";
     simple_display(out, KeyPath.Expr);
     out << ")\n";
+    break;
+
+  case ChangeKind::IncreasedScore:
+    out << "(IncreasedScore ";
+    out << Score::getNameFor(ScoreKind(Options & 0xff));
+    out << " by " << (Options >> 8) << ")\n";
+    break;
+
+  case ChangeKind::DecreasedScore:
+    out << "(DecreasedScore ";
+    out << Score::getNameFor(ScoreKind(Options & 0xff));
+    out << " by " << (Options >> 8) << ")\n";
     break;
   }
 }
