@@ -169,37 +169,12 @@ TypeRefinementContext::createForWhileStmtBody(ASTContext &Ctx, WhileStmt *S,
       Ctx, S, Parent, S->getBody()->getSourceRange(), Info, /* ExplicitInfo */Info);
 }
 
-/// Determine whether the child location is somewhere within the parent
-/// range.
-static bool rangeContainsTokenLocWithGeneratedSource(
-    SourceManager &sourceMgr, SourceRange parentRange, SourceLoc childLoc) {
-  if (sourceMgr.rangeContainsTokenLoc(parentRange, childLoc))
-    return true;
-
-  auto childBuffer = sourceMgr.findBufferContainingLoc(childLoc);
-  while (!sourceMgr.rangeContainsTokenLoc(
-      sourceMgr.getRangeForBuffer(childBuffer), parentRange.Start)) {
-    auto *info = sourceMgr.getGeneratedSourceInfo(childBuffer);
-    if (!info)
-      return false;
-
-    childLoc = info->originalSourceRange.getStart();
-    if (childLoc.isInvalid())
-      return false;
-
-    childBuffer = sourceMgr.findBufferContainingLoc(childLoc);
-  }
-
-  return sourceMgr.rangeContainsTokenLoc(parentRange, childLoc);
-}
-
 TypeRefinementContext *
 TypeRefinementContext::findMostRefinedSubContext(SourceLoc Loc,
                                                  ASTContext &Ctx) {
   assert(Loc.isValid());
 
-  if (SrcRange.isValid() &&
-      !rangeContainsTokenLocWithGeneratedSource(Ctx.SourceMgr, SrcRange, Loc))
+  if (SrcRange.isValid() && !Ctx.SourceMgr.containsTokenLoc(SrcRange, Loc))
     return nullptr;
 
   auto expandedChildren = evaluateOrDefault(
