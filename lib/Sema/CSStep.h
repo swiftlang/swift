@@ -865,7 +865,7 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
       IsolationScope = std::make_unique<Scope>(CS);
 
       // Apply solution inferred for the conjunction.
-      applySolution(solution);
+      replaySolution(solution);
 
       // Add constraints to the graph after solution
       // has been applied to make sure that all type
@@ -901,7 +901,7 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
         CG.addConstraint(&constraint);
     }
 
-    void applySolution(const Solution &solution);
+    void replaySolution(const Solution &solution);
   };
 
   /// Best solution solver reached so far.

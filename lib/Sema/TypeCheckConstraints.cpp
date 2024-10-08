@@ -461,7 +461,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   // Apply this solution to the constraint system.
   // FIXME: This shouldn't be necessary.
   auto &solution = (*viable)[0];
-  cs.applySolution(solution);
+  cs.replaySolution(solution);
 
   // Apply the solution to the expression.
   auto resultTarget = cs.applySolution(solution, target);
@@ -753,7 +753,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
 
   auto &solution = (*viable)[0];
 
-  cs.applySolution(solution);
+  cs.replaySolution(solution);
 
   if (auto result = cs.applySolution(solution, defaultExprTarget)) {
     // Perform syntactic diagnostics on the type-checked target.
