@@ -13,7 +13,7 @@
 // RUN: %validate-json %t/deps.json &>/dev/null
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json deps casFSRootID > %t/fs.casid
-// RUN: llvm-cas --cas %t/cas --ls-tree-recursive @%t/fs.casid | %FileCheck %s -DDIR=%basename_t -check-prefix FS_ROOT
+// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/fs.casid | %FileCheck %s -DDIR=%basename_t -check-prefix FS_ROOT
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:Dummy clangIncludeTree > %t/tree.casid
 // RUN: clang-cas-test --cas %t/cas --print-include-tree @%t/tree.casid | %FileCheck %s -DDIR=%basename_t -check-prefix INCLUDE_TREE
 

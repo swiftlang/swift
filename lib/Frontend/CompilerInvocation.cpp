@@ -727,6 +727,8 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
     Opts.CASFSRootIDs.emplace_back(A);
   for (const auto &A : Args.getAllArgValues(OPT_clang_include_tree_root))
     Opts.ClangIncludeTrees.emplace_back(A);
+  for (const auto &A : Args.getAllArgValues(OPT_clang_include_tree_filelist))
+    Opts.ClangIncludeTreeFileList.emplace_back(A);
 
   if (const Arg *A = Args.getLastArg(OPT_input_file_key))
     Opts.InputFileKey = A->getValue();
@@ -734,7 +736,8 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   if (const Arg*A = Args.getLastArg(OPT_bridging_header_pch_key))
     Opts.BridgingHeaderPCHCacheKey = A->getValue();
 
-  if (!Opts.CASFSRootIDs.empty() || !Opts.ClangIncludeTrees.empty())
+  if (!Opts.CASFSRootIDs.empty() || !Opts.ClangIncludeTrees.empty() ||
+      !Opts.ClangIncludeTreeFileList.empty())
     Opts.HasImmutableFileSystem = true;
 
   return false;

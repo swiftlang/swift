@@ -43,6 +43,9 @@ public:
   /// Clang Include Trees.
   std::vector<std::string> ClangIncludeTrees;
 
+  /// Clang Include Tree FileList.
+  std::vector<std::string> ClangIncludeTreeFileList;
+
   /// CacheKey for input file.
   std::string InputFileKey;
 
@@ -60,7 +63,8 @@ public:
   bool requireCASFS() const {
     return EnableCaching &&
            (!CASFSRootIDs.empty() || !ClangIncludeTrees.empty() ||
-            !InputFileKey.empty() || !BridgingHeaderPCHCacheKey.empty());
+            !ClangIncludeTreeFileList.empty() || !InputFileKey.empty() ||
+            !BridgingHeaderPCHCacheKey.empty());
   }
 
   /// Return a hash code of any components from these options that should
