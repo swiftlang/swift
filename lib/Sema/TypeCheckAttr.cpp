@@ -1788,6 +1788,18 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
   for (auto attr : D->getExpandedAttrs()) {
     if (!attr->isValid()) continue;
 
+    // If the attribute requires a feature that is not enabled, and it is not
+    // an implicit attribute, diagnose and disable it.
+    if (auto feature = DeclAttribute::getRequiredFeature(attr->getKind())) {
+      if (!attr->isImplicit()
+            && !D->getASTContext().LangOpts.hasFeature(*feature)) {
+        Checker.diagnoseAndRemoveAttr(attr, diag::requires_experimental_feature,
+                                      attr->getAttrName(), false,
+                                      getFeatureName(*feature));
+        continue;
+      }
+    }
+
     // If Attr.def says that the attribute cannot appear on this kind of
     // declaration, diagnose it and disable it.
     if (attr->canAppearOnDecl(D)) {

@@ -31,6 +31,7 @@
 #include "swift/AST/StorageImpl.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/EnumTraits.h"
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/OptimizationMode.h"
@@ -474,6 +475,8 @@ public:
 
   LLVM_READNONE
   static bool canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK);
+
+  static std::optional<Feature> getRequiredFeature(DeclAttrKind DK);
 
   /// Returns the source name of the attribute, without the @ or any arguments.
   StringRef getAttrName() const;

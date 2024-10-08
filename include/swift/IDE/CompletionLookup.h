@@ -597,7 +597,7 @@ public:
                                         SourceLoc CodeCompletionLoc);
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
-                                    bool IsConcurrencyEnabled,
+                                    const LangOptions &langOpts,
                                     std::optional<DeclKind> DK, StringRef Name);
 
   void getAttributeDeclCompletions(bool IsInSil, std::optional<DeclKind> DK);
