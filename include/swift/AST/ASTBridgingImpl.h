@@ -52,6 +52,10 @@ BridgedSourceLoc BridgedDeclObj::Value_getNameLoc() const {
   return BridgedSourceLoc(getAs<swift::ValueDecl>()->getNameLoc().getOpaquePointerValue());
 }
 
+bool BridgedDeclObj::Value_isObjC() const {
+  return getAs<swift::ValueDecl>()->isObjC();
+}
+
 bool BridgedDeclObj::GenericType_isGenericAtAnyLevel() const {
   return getAs<swift::GenericTypeDecl>()->isGenericContext();
 }
