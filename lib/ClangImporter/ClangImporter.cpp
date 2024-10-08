@@ -622,11 +622,6 @@ void importer::getNormalInvocationArguments(
     if (clangSupportsPragmaAttributeWithSwiftAttr())
       invocationArgStrs.push_back("-D__SWIFT_ATTR_SUPPORTS_SENDABLE_DECLS=1");
 
-    // Indicate that the compiler will respect macros applied to imported
-    // declarations via '__attribute__((swift_attr("@...")))'.
-    if (LangOpts.hasFeature(Feature::MacrosOnImports))
-      invocationArgStrs.push_back("-D__SWIFT_ATTR_SUPPORTS_MACROS=1");
-
     if (triple.isXROS()) {
       // FIXME: This is a gnarly hack until some macros get adjusted in the SDK.
       invocationArgStrs.insert(invocationArgStrs.end(), {
@@ -687,6 +682,11 @@ void importer::getNormalInvocationArguments(
   // is supported.
   if (LangOpts.hasFeature(Feature::SendingArgsAndResults))
     invocationArgStrs.push_back("-D__SWIFT_ATTR_SUPPORTS_SENDING=1");
+
+  // Indicate that the compiler will respect macros applied to imported
+  // declarations via '__attribute__((swift_attr("@...")))'.
+  if (LangOpts.hasFeature(Feature::MacrosOnImports))
+    invocationArgStrs.push_back("-D__SWIFT_ATTR_SUPPORTS_MACROS=1");
 
   if (searchPathOpts.getSDKPath().empty()) {
     invocationArgStrs.push_back("-Xclang");
