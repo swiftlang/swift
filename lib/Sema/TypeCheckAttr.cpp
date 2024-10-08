@@ -2635,6 +2635,11 @@ void AttributeChecker::visitSILGenNameAttr(SILGenNameAttr *A) {
     diagnose(A->getLocation(), diag::reserved_runtime_symbol_name,
              A->Name);
   }
+
+  if (D->getAttrs().hasAttribute<ABIAttr>()) {
+    diagnoseAndRemoveAttr(A, diag::attr_abi_incompatible_with_silgen_name,
+                          D->getDescriptiveKind());
+  }
 }
 
 void AttributeChecker::visitUsedAttr(UsedAttr *attr) {

@@ -122,6 +122,14 @@ func async01() async {}
 func async11() async {}
 
 //
+// Miscellaneous function checking
+//
+
+@_silgen_name("conflictingAttrsSilgenName")
+@abi(func conflictingAttrsABI())
+func conflictingAttrsAPI() {} // expected-error@-2 {{cannot use '@_silgen_name' and '@abi' on the same global function because they serve the same purpose}} {{1-44=}}
+
+//
 // PBD shape checking
 //
 
