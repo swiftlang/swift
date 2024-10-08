@@ -4992,7 +4992,10 @@ public:
     auto *beginApply =
         cast<BeginApplyInst>(ApplyToken->getDefiningInstruction());
     auto isCalleeAllocated = beginApply->isCalleeAllocated();
-    auto unwindOnCallerError = !isCalleeAllocated;
+    auto unwindOnCallerError =
+        !isCalleeAllocated ||
+        SGF.SGM.getASTContext().LangOpts.hasFeature(
+            Feature::CoroutineAccessorsUnwindOnCallerError);
     if (forUnwind && unwindOnCallerError) {
       SGF.B.createAbortApply(l, ApplyToken);
     } else {

@@ -4825,7 +4825,8 @@ enum class SILCoroutineKind : uint8_t {
 
   /// This function is a yield-once coroutine (used by read and modify
   /// accessors).  It has the following differences from YieldOnce:
-  /// - it does not observe errors thrown by its caller
+  /// - it does not observe errors thrown by its caller (unless the feature
+  /// CoroutineAccessorsUnwindOnCallerError is enabled)
   /// - it uses the callee-allocated ABI
   YieldOnce2,
 

@@ -1,7 +1,13 @@
 // RUN: %target-swift-emit-silgen                           \
 // RUN:     %s                                              \
 // RUN:     -enable-experimental-feature CoroutineAccessors \
-// RUN: | %FileCheck %s
+// RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-NOUNWIND
+
+// RUN: %target-swift-emit-silgen                                              \
+// RUN:     %s                                                                 \
+// RUN:     -enable-experimental-feature CoroutineAccessors                    \
+// RUN:     -enable-experimental-feature CoroutineAccessorsUnwindOnCallerError \
+// RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-UNWIND
 
 // REQUIRES: asserts
 
@@ -115,7 +121,8 @@ public var irm: Int {
 // CHECK:      dealloc_stack [[OLD_VALUE_ADDR]]
 // CHECK:      return [[OLD_VALUE]]
 // CHECK:    bb2([[ERROR:%[^,]+]] : @owned $any Error):
-// CHECK:      end_apply [[TOKEN]]
+// CHECK-NOUNWIND: end_apply [[TOKEN]]
+// CHECK-UNWIND: abort_apply [[TOKEN]]
 // CHECK:      end_access [[SELF_ACCESS]]
 // CHECK:      dealloc_stack [[NEW_VALUE_ADDR]]
 // CHECK:      dealloc_stack [[OLD_VALUE_ADDR]]
