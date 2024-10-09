@@ -356,7 +356,8 @@ extension ASTGenVisitor {
     var type = generate(type: node.baseType)
 
     // Handle specifiers.
-    if let specifier = node.specifier {
+    if case .simpleTypeSpecifier(let simpleSpecifier) = node.specifiers.first {
+      let specifier = simpleSpecifier.specifier
       if let kind = BridgedAttributedTypeSpecifier(from: specifier.keywordKind) {
         type =
           BridgedSpecifierTypeRepr.createParsed(
