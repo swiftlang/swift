@@ -755,7 +755,7 @@ func _COWBufferForReading<T: AnyObject>(_ object: T) -> T {
 /// require any special handling on copying or destruction.
 @_transparent
 public // @testable
-func _isPOD<T>(_ type: T.Type) -> Bool {
+func _isPOD<T: ~Copyable & ~Escapable>(_ type: T.Type) -> Bool {
   return Bool(Builtin.ispod(type))
 }
 
