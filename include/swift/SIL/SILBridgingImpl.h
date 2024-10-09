@@ -1092,6 +1092,10 @@ SwiftInt BridgedInstruction::LoadInst_getLoadOwnership() const {
   return (SwiftInt)getAs<swift::LoadInst>()->getOwnershipQualifier();
 }
 
+bool BridgedInstruction::LoadBorrowInst_isUnchecked() const {
+  return (SwiftInt)getAs<swift::LoadBorrowInst>()->isUnchecked();
+}
+
 BridgedInstruction::BuiltinValueKind BridgedInstruction::BuiltinInst_getID() const {
   return (BuiltinValueKind)getAs<swift::BuiltinInst>()->getBuiltinInfo().ID;
 }
