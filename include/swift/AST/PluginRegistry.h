@@ -97,9 +97,6 @@ public:
 
 /// Represents a in-process plugin server.
 class InProcessPlugins : public CompilerPlugin {
-  /// PluginServer shared library handle.
-  void *server;
-
   /// Entry point in the in-process plugin server. It receives the request
   /// string and populate the response string. The return value indicates there
   /// was an error. If true the returned string contains the error message.
@@ -113,10 +110,9 @@ class InProcessPlugins : public CompilerPlugin {
   /// Temporary storage for the response data from 'handleMessageFn'.
   std::string receivedResponse;
 
-  InProcessPlugins(llvm::StringRef serverPath, void *server,
+  InProcessPlugins(llvm::StringRef serverPath,
                    HandleMessageFunction handleMessageFn)
-      : CompilerPlugin(serverPath), server(server),
-        handleMessageFn(handleMessageFn) {}
+      : CompilerPlugin(serverPath), handleMessageFn(handleMessageFn) {}
 
 public:
   /// Create an instance by loading the in-process plugin server at 'serverPath'

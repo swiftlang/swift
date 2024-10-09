@@ -967,13 +967,13 @@ static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) 
 SWIFT_CC(swift)
 static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
                                                     TaskGroup *group, const Metadata *T) {
-  ResultTypeInfo resultType;
 #if !SWIFT_CONCURRENCY_EMBEDDED
+  ResultTypeInfo resultType;
   resultType.metadata = T;
+  _swift_taskGroup_initialize(resultType, rawGroupFlags, group);
 #else
   swift_unreachable("swift_taskGroup_initializeWithFlags in embedded");
 #endif
-  _swift_taskGroup_initialize(resultType, rawGroupFlags, group);
 }
 
 // Initializes into the preallocated _group an actual instance.
