@@ -2143,8 +2143,6 @@ public:
   friend struct ClosureIsolatedByPreconcurrency;
   friend class SolverTrail;
 
-  class SolverScope;
-
   /// Expressions that are known to be unevaluated.
   /// Note: this is only used to support ObjCSelectorExpr at the moment.
   llvm::SmallPtrSet<Expr *, 2> UnevaluatedRootExprs;
@@ -2555,23 +2553,21 @@ private:
     }
 
     /// Update statistics when a scope begins.
-    ///
-    /// \param scope The scope to associate with current solver state.
-    void beginScope(SolverScope *scope) {
+    unsigned beginScope() {
       ++depth;
       maxDepth = std::max(maxDepth, depth);
-      scope->scopeNumber = NumStatesExplored++;
 
       CS.incrementScopeCounter();
+
+      return NumStatesExplored++;
     }
 
     /// Update statistics when a scope ends.
-    ///
-    /// \param scope The solver scope to rollback.
-    void endScope(SolverScope *scope) {
+    void endScope(unsigned scopeNumber) {
+      ASSERT(depth > 0);
       --depth;
 
-      unsigned countScopesExplored = NumStatesExplored - scope->scopeNumber;
+      unsigned countScopesExplored = NumStatesExplored - scopeNumber;
       if (countScopesExplored == 1)
         CS.incrementLeafScopes();
     }
@@ -2775,7 +2771,7 @@ public:
   /// this object is destroyed.
   ///
   ///
-  class SolverScope {
+  struct SolverScope {
     ConstraintSystem &cs;
 
     /// The length of \c TypeVariables.
@@ -2785,15 +2781,19 @@ public:
     unsigned numTrailChanges;
 
     /// The scope number of this scope. Set when the scope is registered.
-    unsigned scopeNumber = 0;
+    unsigned scopeNumber : 31;
+
+    /// A moved-from scope skips doing anything in the destructor.
+    unsigned moved : 1;
+
+    explicit SolverScope(ConstraintSystem &cs);
 
     SolverScope(const SolverScope &) = delete;
+    SolverScope(SolverScope &&other);
+
     SolverScope &operator=(const SolverScope &) = delete;
+    SolverScope &operator=(SolverScope &&) = delete;
 
-    friend class ConstraintSystem;
-
-  public:
-    explicit SolverScope(ConstraintSystem &cs);
     ~SolverScope();
   };
 

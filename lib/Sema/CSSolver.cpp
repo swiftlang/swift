@@ -702,21 +702,32 @@ ConstraintSystem::SolverState::~SolverState() {
 }
 
 ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
-  : cs(cs) {
-  numTrailChanges = cs.solverState->Trail.size();
+  : cs(cs),
+    numTypeVariables(cs.TypeVariables.size()),
+    numTrailChanges(cs.solverState->Trail.size()),
+    scopeNumber(cs.solverState->beginScope()),
+    moved(0) {
+  ASSERT(!cs.failedConstraint && "Unexpected failed constraint!");
+}
 
-  numTypeVariables = cs.TypeVariables.size();
-
-  cs.solverState->beginScope(this);
-  assert(!cs.failedConstraint && "Unexpected failed constraint!");
+ConstraintSystem::SolverScope::SolverScope(SolverScope &&other)
+  : cs(other.cs),
+    numTypeVariables(other.numTypeVariables),
+    numTrailChanges(other.numTrailChanges),
+    scopeNumber(other.scopeNumber),
+    moved(0) {
+  other.moved = 1;
 }
 
 ConstraintSystem::SolverScope::~SolverScope() {
+  if (moved)
+    return;
+
   // Don't attempt to rollback from an incorrect state.
   if (cs.inInvalidState())
     return;
 
-  // Erase the end of various lists.
+  // Roll back introduced type variables.
   truncate(cs.TypeVariables, numTypeVariables);
 
   // Move any remaining active constraints into the inactive list.
@@ -731,7 +742,8 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // Roll back changes to the constraint system.
   cs.solverState->Trail.undo(numTrailChanges);
 
-  cs.solverState->endScope(this);
+  // Update statistics.
+  cs.solverState->endScope(scopeNumber);
 
   // Clear out other "failed" state.
   cs.failedConstraint = nullptr;
