@@ -422,6 +422,14 @@ struct FunctionPassContext : MutatingContext {
 
       return buildFn(specializedFunction, nestedFunctionPassContext)
   }
+
+  /// Makes sure that the lifetime of `value` ends at all control flow paths, even in dead-end blocks.
+  /// Inserts destroys in dead-end blocks if those are missing.
+  func completeLifetime(of value: Value) {
+    if _bridged.completeLifetime(value.bridged) {
+      notifyInstructionsChanged()
+    }
+  }
 }
 
 struct SimplifyContext : MutatingContext {
