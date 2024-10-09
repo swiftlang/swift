@@ -271,15 +271,8 @@ Solution ConstraintSystem::finalize() {
 
 void ConstraintSystem::replaySolution(const Solution &solution,
                                       bool shouldIncreaseScore) {
-  if (shouldIncreaseScore) {
-    // Update the score. We do this instead of operator+= because we
-    // want to record the increments in the trail.
-    auto solutionScore = solution.getFixedScore();
-    for (unsigned i = 0; i < NumScoreKinds; ++i) {
-      if (unsigned value = solutionScore.Data[i])
-        increaseScore(ScoreKind(i), value);
-    }
-  }
+  if (shouldIncreaseScore)
+    replayScore(solution.getFixedScore());
 
   // Assign fixed types to the type variables solved by this solution.
   for (auto binding : solution.typeBindings) {
