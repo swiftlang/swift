@@ -1985,7 +1985,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // hundreds or thousands of lines. Skip dumping this output in that case.
   if (!Invocation.getFrontendOptions().InputsAndOutputs.isWholeModule()) {
     for_each(configurationFileBuffers.begin(), configurationFileBuffers.end(),
-             &configurationFileStackTraces[0],
+             configurationFileStackTraces.get(),
              [](const std::unique_ptr<llvm::MemoryBuffer> &buffer,
                 std::optional<PrettyStackTraceFileContents> &trace) {
                trace.emplace(*buffer);
