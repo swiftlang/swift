@@ -19,6 +19,7 @@
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrency.h"
+#include "swift/Runtime/Heap.h"
 #include "swift/Threading/ThreadLocalStorage.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include <new>
@@ -473,7 +474,9 @@ void TaskLocal::Storage::copyTo(AsyncTask *target) {
   // because it is the most "specific"/"recent" binding and any other binding
   // of a key does not matter for the target task as it will never be able to
   // observe it.
-  std::set<const HeapObject*> copied = {};
+  std::set<const HeapObject *,
+           std::less<const HeapObject *>,
+           swift::cxx_allocator<const HeapObject *>> copied = {};
 
   auto item = head;
   while (item) {
@@ -499,7 +502,9 @@ void TaskLocal::Storage::copyToOnlyOnlyFromCurrentGroup(AsyncTask *target) {
   // because it is the most "specific"/"recent" binding and any other binding
   // of a key does not matter for the target task as it will never be able to
   // observe it.
-  std::set<const HeapObject*> copied = {};
+  std::set<const HeapObject *,
+           std::less<const HeapObject *>,
+           swift::cxx_allocator<const HeapObject *>> copied = {};
 
   auto item = head;
   TaskLocal::Item *copiedHead = nullptr;

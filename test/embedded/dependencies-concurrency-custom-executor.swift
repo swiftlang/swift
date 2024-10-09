@@ -10,16 +10,6 @@
 // Fail if there is any entry in actual-dependencies.txt that's not in allowed-dependencies.txt
 // RUN: test -z "`comm -13 %t/allowed-dependencies.txt %t/actual-dependencies.txt`"
 
-// DEP: __ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6appendEPKc
-// DEP: __ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6appendEPKcm
-// DEP: __ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6insertEmPKc
-// DEP: __ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEED1Ev
-// DEP: __ZNSt3__16chrono12steady_clock3nowEv
-// DEP: __ZNSt3__19to_stringEj
-// DEP: __ZNSt3__19to_stringEy
-// DEP: __ZdlPv
-// DEP: __ZdlPvm
-// DEP: __Znwm
 // DEP: ___assert_rtn
 // DEP: ___error
 // DEP: ___stack_chk_fail
