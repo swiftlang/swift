@@ -37,13 +37,13 @@
         "swift-testing": {
             "remote": { "id": "swiftlang/swift-testing" } },
         "swift-corelibs-xctest": {
-            "remote": { "id": "apple/swift-corelibs-xctest" } },
+            "remote": { "id": "swiftlang/swift-corelibs-xctest" } },
         "swift-corelibs-foundation": {
-            "remote": { "id": "apple/swift-corelibs-foundation" } },  
+            "remote": { "id": "swiftlang/swift-corelibs-foundation" } },  
         "swift-foundation-icu": {
-            "remote": { "id": "apple/swift-foundation-icu" } },  
+            "remote": { "id": "swiftlang/swift-foundation-icu" } },  
         "swift-foundation": {
-            "remote": { "id": "apple/swift-foundation" } },
+            "remote": { "id": "swiftlang/swift-foundation" } },
         "swift-corelibs-libdispatch": {
             "remote": { "id": "apple/swift-corelibs-libdispatch" } },
         "swift-integration-tests": {
