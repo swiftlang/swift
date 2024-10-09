@@ -1256,7 +1256,15 @@ final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, B
   }
 }
 
-final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, BorrowIntroducingInstruction {}
+final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, BorrowIntroducingInstruction {
+
+  // True if the invariants on `load_borrow` have not been checked and should not be strictly enforced.
+  //
+  // This can only occur during raw SIL before move-only checking occurs. Developers can write incorrect
+  // code using noncopyable types that consumes or mutates a memory location while that location is borrowed,
+  // but the move-only checker must diagnose those problems before canonical SIL is formed.
+  public var isUnchecked: Bool { bridged.LoadBorrowInst_isUnchecked() }
+}
 
 final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction, BorrowIntroducingInstruction {
   var allocStack: AllocStackInst {
