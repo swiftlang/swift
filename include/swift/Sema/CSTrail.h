@@ -142,16 +142,14 @@ public:
 #define LOCATOR_CHANGE(Name, _) static Change Name(ConstraintLocator *locator);
 #define EXPR_CHANGE(Name) static Change Name(Expr *expr);
 #define CLOSURE_CHANGE(Name) static Change Name(ClosureExpr *closure);
+#define CONSTRAINT_CHANGE(Name) static Change Name(Constraint *constraint);
+#define SCORE_CHANGE(Name) static Change Name(ScoreKind kind, unsigned value);
+#define GRAPH_NODE_CHANGE(Name) static Change Name(TypeVariableType *typeVar, \
+                                                   Constraint *constraint);
 #include "swift/Sema/CSTrail.def"
 
     /// Create a change that added a type variable.
     static Change AddedTypeVariable(TypeVariableType *typeVar);
-
-    /// Create a change that added a constraint.
-    static Change AddedConstraint(TypeVariableType *typeVar, Constraint *constraint);
-
-    /// Create a change that removed a constraint.
-    static Change RemovedConstraint(TypeVariableType *typeVar, Constraint *constraint);
 
     /// Create a change that extended an equivalence class.
     static Change ExtendedEquivalenceClass(TypeVariableType *typeVar,
@@ -161,14 +159,6 @@ public:
     /// a type variable pair.
     static Change RelatedTypeVariables(TypeVariableType *typeVar,
                                        TypeVariableType *otherTypeVar);
-
-    /// Create a change that inferred bindings from a constraint.
-    static Change InferredBindings(TypeVariableType *typeVar,
-                                   Constraint *constraint);
-
-    /// Create a change that retracted bindings from a constraint.
-    static Change RetractedBindings(TypeVariableType *typeVar,
-                                    Constraint *constraint);
 
     /// Create a change that updated a type variable.
     static Change UpdatedTypeVariable(
@@ -201,12 +191,6 @@ public:
     static Change RecordedKeyPathComponentType(const KeyPathExpr *expr,
                                                unsigned component,
                                                Type oldType);
-
-    /// Create a change that disabled a constraint.
-    static Change DisabledConstraint(Constraint *constraint);
-
-    /// Create a change that favored a constraint.
-    static Change FavoredConstraint(Constraint *constraint);
 
     /// Create a change that recorded a result builder transform.
     static Change RecordedResultBuilderTransform(AnyFunctionRef fn);

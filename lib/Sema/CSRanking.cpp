@@ -110,6 +110,14 @@ static bool shouldIgnoreScoreIncreaseForCodeCompletion(
   return false;
 }
 
+void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
+  unsigned index = static_cast<unsigned>(kind);
+  CurrentScore.Data[index] += value;
+
+  if (solverState && value > 0)
+    recordChange(SolverTrail::Change::IncreasedScore(kind, value));
+}
+
 void ConstraintSystem::increaseScore(ScoreKind kind,
                                      ConstraintLocatorBuilder Locator,
                                      unsigned value) {
@@ -135,8 +143,7 @@ void ConstraintSystem::increaseScore(ScoreKind kind,
     llvm::errs() << ")\n";
   }
 
-  unsigned index = static_cast<unsigned>(kind);
-  CurrentScore.Data[index] += value;
+  increaseScore(kind, value);
 }
 
 bool ConstraintSystem::worseThanBestSolution() const {
