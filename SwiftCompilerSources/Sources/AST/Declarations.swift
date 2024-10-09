@@ -30,6 +30,7 @@ public class Decl: CustomStringConvertible, Hashable {
 public class ValueDecl: Decl {
   final public var nameLoc: SourceLoc? { SourceLoc(bridged: bridged.Value_getNameLoc()) }
   final public var userFacingName: StringRef { StringRef(bridged: bridged.Value_getUserFacingName()) }
+  final public var isObjC: Bool { bridged.Value_isObjC() }
 }
 
 public class TypeDecl: ValueDecl {
