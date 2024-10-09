@@ -424,6 +424,9 @@ EXPERIMENTAL_FEATURE(UnspecifiedMeansMainActorIsolated, false)
 /// modify/read single-yield coroutines
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
 
+// Used for test purposes only.
+EXPERIMENTAL_FEATURE(SupportedFeaturesTest, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
