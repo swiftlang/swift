@@ -1045,6 +1045,7 @@ struct Score {
   friend Score operator-(const Score &x, const Score &y) {
     Score result;
     for (unsigned i = 0; i != NumScoreKinds; ++i) {
+      ASSERT(x.Data[i] >= y.Data[i]);
       result.Data[i] = x.Data[i] - y.Data[i];
     }
     return result;
@@ -1052,6 +1053,7 @@ struct Score {
 
   friend Score &operator-=(Score &x, const Score &y) {
     for (unsigned i = 0; i != NumScoreKinds; ++i) {
+      ASSERT(x.Data[i] >= y.Data[i]);
       x.Data[i] -= y.Data[i];
     }
     return x;
@@ -2531,98 +2533,47 @@ private:
     /// The number of the solution attempts we're looking at.
     unsigned SolutionAttempt;
 
-    /// Refers to the innermost partial solution scope.
-    SolverScope *PartialSolutionScope = nullptr;
+    /// The number of fixes in the innermost partial solution scope.
+    unsigned numPartialSolutionFixes = 0;
 
     // Statistics
     #define CS_STATISTIC(Name, Description) unsigned Name = 0;
     #include "ConstraintSolverStats.def"
 
-    /// Check whether there are any retired constraints present.
-    bool hasRetiredConstraints() const {
-      return !retiredConstraints.empty();
-    }
-
     /// Mark given constraint as retired along current solver path.
     ///
     /// \param constraint The constraint to retire temporarily.
     void retireConstraint(Constraint *constraint) {
-      retiredConstraints.push_front(constraint);
-    }
-
-    /// Iterate over all of the retired constraints registered with
-    /// current solver state.
-    ///
-    /// \param processor The processor function to be applied to each of
-    /// the constraints retrieved.
-    void forEachRetired(llvm::function_ref<void(Constraint &)> processor) {
-      for (auto &constraint : retiredConstraints)
-        processor(constraint);
+      Trail.recordChange(SolverTrail::Change::RetiredConstraint(constraint));
     }
 
     /// Add new "generated" constraint along the current solver path.
     ///
     /// \param constraint The newly generated constraint.
     void addGeneratedConstraint(Constraint *constraint) {
-      assert(constraint && "Null generated constraint?");
-      generatedConstraints.push_back(constraint);
+      Trail.recordChange(SolverTrail::Change::GeneratedConstraint(constraint));
     }
 
-    /// Register given scope to be tracked by the current solver state,
-    /// this helps to make sure that all of the retired/generated constraints
-    /// are dealt with correctly when the life time of the scope ends.
+    /// Update statistics when a scope begins.
     ///
     /// \param scope The scope to associate with current solver state.
-    void registerScope(SolverScope *scope) {
+    void beginScope(SolverScope *scope) {
       ++depth;
       maxDepth = std::max(maxDepth, depth);
       scope->scopeNumber = NumStatesExplored++;
 
       CS.incrementScopeCounter();
-      auto scopeInfo =
-        std::make_tuple(scope, retiredConstraints.begin(),
-                        generatedConstraints.size());
-      scopes.push_back(scopeInfo);
     }
 
-    /// Restore all of the retired/generated constraints to the state
-    /// before given scope. This is required because retired constraints have
-    /// to be re-introduced to the system in order of arrival (LIFO) and list
-    /// of the generated constraints has to be truncated back to the
-    /// original size.
+    /// Update statistics when a scope ends.
     ///
     /// \param scope The solver scope to rollback.
-    void rollback(SolverScope *scope) {
+    void endScope(SolverScope *scope) {
       --depth;
 
       unsigned countScopesExplored = NumStatesExplored - scope->scopeNumber;
       if (countScopesExplored == 1)
         CS.incrementLeafScopes();
-
-      SolverScope *savedScope;
-      // The position of last retired constraint before given scope.
-      ConstraintList::iterator lastRetiredPos;
-      // The original number of generated constraints before given scope.
-      unsigned numGenerated;
-
-      std::tie(savedScope, lastRetiredPos, numGenerated) =
-        scopes.pop_back_val();
-
-      assert(savedScope == scope && "Scope rollback not in LIFO order!");
-
-      // Restore all of the retired constraints.
-      CS.InactiveConstraints.splice(CS.InactiveConstraints.end(),
-                                    retiredConstraints,
-                                    retiredConstraints.begin(), lastRetiredPos);
-
-      // And remove all of the generated constraints.
-      auto genStart = generatedConstraints.begin() + numGenerated,
-           genEnd = generatedConstraints.end();
-      for (auto genI = genStart; genI != genEnd; ++genI) {
-        CS.InactiveConstraints.erase(ConstraintList::iterator(*genI));
-      }
-
-      generatedConstraints.erase(genStart, genEnd);
     }
 
     /// Check whether constraint system is allowed to form solutions
@@ -2649,29 +2600,12 @@ private:
     }
 
   private:
-    /// The list of constraints that have been retired along the
-    /// current path, this list is used in LIFO fashion when
-    /// constraints are added back to the circulation.
-    ConstraintList retiredConstraints;
+    /// Depth of the solution stack.
+    unsigned depth = 0;
 
     /// The set of constraints which were active at the time of this state
     /// creating, it's used to re-activate them on destruction.
     SmallVector<Constraint *, 4> activeConstraints;
-
-    /// The current set of generated constraints.
-    SmallVector<Constraint *, 4> generatedConstraints;
-
-    /// The collection which holds association between solver scope
-    /// and position of the last retired constraint and number of
-    /// constraints generated before registration of given scope,
-    /// this helps to rollback all of the constraints retired/generated
-    /// each of the registered scopes correct (LIFO) order.
-    llvm::SmallVector<
-      std::tuple<SolverScope *, ConstraintList::iterator, unsigned>, 4> scopes;
-
-
-    /// Depth of the solution stack.
-    unsigned depth = 0;
   };
 
   class CacheExprTypes : public ASTWalker {
@@ -2850,14 +2784,6 @@ public:
     /// The length of \c Trail.
     unsigned numTrailChanges;
 
-    /// The length of \c Fixes.
-    ///
-    /// FIXME: Remove this.
-    unsigned numFixes;
-
-    /// The previous score.
-    Score PreviousScore;
-
     /// The scope number of this scope. Set when the scope is registered.
     unsigned scopeNumber = 0;
 
@@ -2903,7 +2829,8 @@ private:
   /// This operation is used to take a solution computed based on some
   /// subset of the constraints and then apply it back to the
   /// constraint system for further exploration.
-  void applySolution(const Solution &solution);
+  void replaySolution(const Solution &solution,
+                      bool shouldIncreaseScore=true);
 
   // FIXME: Perhaps these belong on ConstraintSystem itself.
   friend std::optional<BraceStmt *>
@@ -5531,9 +5458,12 @@ private:
 
 public:
   /// Increase the score of the given kind for the current (partial) solution
-  /// along the.
+  /// along the current solver path.
   void increaseScore(ScoreKind kind, ConstraintLocatorBuilder Locator,
                      unsigned value = 1);
+
+  /// Primitive form of the above. Records a change in the trail.
+  void increaseScore(ScoreKind kind, unsigned value);
 
   /// Determine whether this solution is guaranteed to be worse than the best
   /// solution found so far.

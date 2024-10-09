@@ -128,11 +128,8 @@ Solution ConstraintSystem::finalize() {
 
   // For each of the fixes, record it as an operation on the affected
   // expression.
-  unsigned firstFixIndex = 0;
-  if (solverState && solverState->PartialSolutionScope) {
-    firstFixIndex = solverState->PartialSolutionScope->numFixes;
-  }
-
+  unsigned firstFixIndex =
+      (solverState ? solverState->numPartialSolutionFixes : 0);
   for (const auto &fix :
        llvm::make_range(Fixes.begin() + firstFixIndex, Fixes.end()))
     solution.Fixes.push_back(fix);
@@ -272,9 +269,17 @@ Solution ConstraintSystem::finalize() {
   return solution;
 }
 
-void ConstraintSystem::applySolution(const Solution &solution) {
-  // Update the score.
-  CurrentScore += solution.getFixedScore();
+void ConstraintSystem::replaySolution(const Solution &solution,
+                                      bool shouldIncreaseScore) {
+  if (shouldIncreaseScore) {
+    // Update the score. We do this instead of operator+= because we
+    // want to record the increments in the trail.
+    auto solutionScore = solution.getFixedScore();
+    for (unsigned i = 0; i < NumScoreKinds; ++i) {
+      if (unsigned value = solutionScore.Data[i])
+        increaseScore(ScoreKind(i), value);
+    }
+  }
 
   // Assign fixed types to the type variables solved by this solution.
   for (auto binding : solution.typeBindings) {
@@ -646,13 +651,6 @@ ConstraintSystem::SolverState::~SolverState() {
   if (CS.inInvalidState())
     return;
 
-  // Make sure that all of the retired constraints have been returned
-  // to constraint system.
-  assert(!hasRetiredConstraints());
-
-  // Make sure that all of the generated constraints have been handled.
-  assert(generatedConstraints.empty());
-
   // Re-activate constraints which were initially marked as "active"
   // to restore original state of the constraint system.
   for (auto *constraint : activeConstraints) {
@@ -708,11 +706,8 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numTrailChanges = cs.solverState->Trail.size();
 
   numTypeVariables = cs.TypeVariables.size();
-  numFixes = cs.Fixes.size();
 
-  PreviousScore = cs.CurrentScore;
-
-  cs.solverState->registerScope(this);
+  cs.solverState->beginScope(this);
   assert(!cs.failedConstraint && "Unexpected failed constraint!");
 }
 
@@ -736,13 +731,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // Roll back changes to the constraint system.
   cs.solverState->Trail.undo(numTrailChanges);
 
-  // Rollback all of the changes done to constraints by the current scope,
-  // e.g. add retired constraints back to the circulation and remove generated
-  // constraints introduced by the current scope.
-  cs.solverState->rollback(this);
-
-  // Reset the previous score.
-  cs.CurrentScore = PreviousScore;
+  cs.solverState->endScope(this);
 
   // Clear out other "failed" state.
   cs.failedConstraint = nullptr;
