@@ -589,6 +589,8 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
     }
   }
 
+  ASSERT(ctx.LangOpts.hasFeature(Feature::NonescapableTypes));
+
   if (!cd && afd->hasImplicitSelfDecl()) {
     Type selfTypeInContext = dc->getSelfTypeInContext();
     if (selfTypeInContext->isEscapable()) {
@@ -724,49 +726,60 @@ std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::inferMutatingSelf(
   return dep;
 }
 
+static bool hasDependsOn(AbstractFunctionDecl *afd) {
+  if (isa_and_nonnull<LifetimeDependentTypeRepr>(afd->getResultTypeRepr())) {
+    return true;
+  }
+  for (auto param : *afd->getParameters()) {
+    if (isa_and_nonnull<LifetimeDependentTypeRepr>(param->getTypeRepr())) {
+      return true;
+    }
+  }
+  return false;
+}
+
 std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
 LifetimeDependenceInfo::get(AbstractFunctionDecl *afd) {
-  if (!afd->getASTContext().LangOpts.hasFeature(Feature::NonescapableTypes)) {
-    return std::nullopt;
-  }
   assert(isa<FuncDecl>(afd) || isa<ConstructorDecl>(afd));
 
+  // Get lifetime dependence from @lifetime attribute.
   if (afd->getAttrs().hasAttribute<LifetimeAttr>()) {
     return LifetimeDependenceInfo::fromLifetimeAttribute(afd);
   }
 
   SmallVector<LifetimeDependenceInfo> lifetimeDependencies;
-
-  for (unsigned targetIndex : indices(*afd->getParameters())) {
-    auto *param = (*afd->getParameters())[targetIndex];
-    auto paramType =
-        afd->mapTypeIntoContext(param->toFunctionParam().getParameterType());
-    if (auto result = LifetimeDependenceInfo::fromDependsOn(
-            afd, param->getTypeRepr(), paramType, targetIndex)) {
-      lifetimeDependencies.push_back(*result);
+  // Get lifetime dependence from dependsOn type modifier if present.
+  if (hasDependsOn(afd)) {
+    for (unsigned targetIndex : indices(*afd->getParameters())) {
+      auto *param = (*afd->getParameters())[targetIndex];
+      auto paramType =
+          afd->mapTypeIntoContext(param->toFunctionParam().getParameterType());
+      auto paramDependence = LifetimeDependenceInfo::fromDependsOn(
+          afd, param->getTypeRepr(), paramType, targetIndex);
+      if (paramDependence) {
+        lifetimeDependencies.push_back(*paramDependence);
+      }
     }
-  }
 
-  std::optional<LifetimeDependenceInfo> resultDependence;
-
-  if (auto *lifetimeTypeRepr = dyn_cast_or_null<LifetimeDependentTypeRepr>(
-          afd->getResultTypeRepr())) {
-    resultDependence = LifetimeDependenceInfo::fromDependsOn(
-        afd, lifetimeTypeRepr, getResultOrYield(afd),
+    auto resultDependence = LifetimeDependenceInfo::fromDependsOn(
+        afd, afd->getResultTypeRepr(), getResultOrYield(afd),
         afd->hasImplicitSelfDecl() ? afd->getParameters()->size() + 1
                                    : afd->getParameters()->size());
-  } else {
-    resultDependence = LifetimeDependenceInfo::infer(afd);
+    if (resultDependence) {
+      lifetimeDependencies.push_back(*resultDependence);
+    }
+    if (lifetimeDependencies.empty()) {
+      return std::nullopt;
+    }
+    return afd->getASTContext().AllocateCopy(lifetimeDependencies);
   }
 
-  if (resultDependence.has_value()) {
-    lifetimeDependencies.push_back(*resultDependence);
-  }
-
-  if (lifetimeDependencies.empty()) {
+  // Infer lifetime dependence if the function has a ~Escapable result.
+  auto resultDependence = LifetimeDependenceInfo::infer(afd);
+  if (!resultDependence.has_value()) {
     return std::nullopt;
   }
-
+  lifetimeDependencies.push_back(*resultDependence);
   return afd->getASTContext().AllocateCopy(lifetimeDependencies);
 }
 
@@ -774,9 +787,6 @@ std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
 LifetimeDependenceInfo::get(FunctionTypeRepr *funcRepr,
                             ArrayRef<SILParameterInfo> params,
                             ArrayRef<SILResultInfo> results, DeclContext *dc) {
-  if (!dc->getASTContext().LangOpts.hasFeature(Feature::NonescapableTypes)) {
-    return std::nullopt;
-  }
   SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
 
   auto getLifetimeDependenceFromDependsOnTypeModifier =

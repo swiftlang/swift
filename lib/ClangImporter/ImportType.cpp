@@ -2656,9 +2656,11 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // Swift doesn't support default values of inout parameters.
   // TODO: support default arguments of constructors
   // (https://github.com/apple/swift/issues/70124)
+  // TODO: support params with template parameters
   if (param->hasDefaultArg() && !isInOut &&
       !isa<clang::CXXConstructorDecl>(param->getDeclContext()) &&
-      impl->isDefaultArgSafeToImport(param)) {
+      impl->isDefaultArgSafeToImport(param) &&
+      !isa<clang::FunctionTemplateDecl>(param->getDeclContext())) {
     SwiftDeclSynthesizer synthesizer(*impl);
     if (CallExpr *defaultArgExpr = synthesizer.makeDefaultArgument(
             param, swiftParamTy, paramInfo->getParameterNameLoc())) {

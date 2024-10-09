@@ -7946,7 +7946,6 @@ ERROR(pack_iteration_where_clause_not_supported, none,
 //------------------------------------------------------------------------------
 // MARK: Lifetime Dependence Diagnostics
 //------------------------------------------------------------------------------
-
 ERROR(lifetime_dependence_invalid_param_name, none,
       "invalid parameter name specified %0", (Identifier))
 ERROR(lifetime_dependence_invalid_param_index, none,
