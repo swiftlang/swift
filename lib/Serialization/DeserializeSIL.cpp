@@ -584,6 +584,25 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   if (funcTyID == 0)
     return MF->diagnoseFatal("SILFunction typeID is 0");
+
+  // A function with [serialized_for_package] and its body should only be
+  // deserialized in clients within the same package as its defining module;
+  // for external clients, it should appear only as a declaration. If the
+  // function has shared linkage, it must have been internal or private in
+  // its defining module that's optimized, thus should remain inaccessible
+  // outside the package boundary. This ensures that instructions, which may
+  // only be valid in resilient mode when package optimization is enabled,
+  // aren't inlined at the call site, preventing potential assert fails during
+  // sil-verify.
+  if (serializedKind == SerializedKind_t::IsSerializedForPackage) {
+    if (!SILMod.getSwiftModule()->inSamePackage(getFile()->getParentModule())) {
+      if (rawLinkage == (unsigned int)(SILLinkage::Shared))
+        return nullptr;
+      if (!declarationOnly)
+        declarationOnly = true;
+    }
+  }
+
   auto astType = MF->getTypeChecked(funcTyID);
   if (!astType) {
     if (!existingFn || errorIfEmptyBody) {
@@ -3828,6 +3847,13 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
     return nullptr;
   }
 
+  // Vtable with [serialized_for_package], i.e. optimized with Package CMO,
+  // should only be deserialized into a client if its defning module and the
+  // client are in the package.
+  if (!SILMod.getSwiftModule()->inSamePackage(getFile()->getParentModule()) &&
+      SerializedKind_t(Serialized) == SerializedKind_t::IsSerializedForPackage)
+    return nullptr;
+
   ClassDecl *theClass = cast<ClassDecl>(MF->getDecl(ClassID));
 
   PrettyStackTraceDecl trace("deserializing SIL vtable for", theClass);
@@ -4200,6 +4226,13 @@ llvm::Expected<SILWitnessTable *>
                             << " for SILFunction\n");
     MF->fatal("invalid linkage code");
   }
+
+  // Witness with [serialized_for_package], i.e. optimized with Package CMO,
+  // should only be deserialized into a client if its defning module and the
+  // client are in the package.
+  if (!SILMod.getSwiftModule()->inSamePackage(getFile()->getParentModule()) &&
+      SerializedKind_t(Serialized) == SerializedKind_t::IsSerializedForPackage)
+    return nullptr;
 
   // Deserialize Conformance.
   auto maybeConformance = MF->getConformanceChecked(conformance);
