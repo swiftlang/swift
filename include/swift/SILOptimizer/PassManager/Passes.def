@@ -173,6 +173,8 @@ PASS(CopyPropagation, "copy-propagation",
      "Copy propagation to Remove Redundant SSA Copies, pruning debug info")
 PASS(MandatoryCopyPropagation, "mandatory-copy-propagation",
      "Copy propagation to Remove Redundant SSA Copies, preserving debug info")
+SWIFT_FUNCTION_PASS(LoadCopyToBorrowOptimization, "load-copy-to-borrow-optimization",
+     "Convert load [copy] instructions to load_borrow")
 PASS(COWOpts, "cow-opts",
      "Optimize COW operations")
 PASS(Differentiation, "differentiation",
