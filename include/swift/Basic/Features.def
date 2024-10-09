@@ -412,8 +412,8 @@ EXPERIMENTAL_FEATURE(WarnUnsafe, true)
 /// Import unsafe C and C++ constructs as @unsafe.
 EXPERIMENTAL_FEATURE(SafeInterop, true)
 
-// isolated deinit
-EXPERIMENTAL_FEATURE(IsolatedDeinit, true)
+// Isolated deinit
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(IsolatedDeinit, true)
 
 // Enable values in generic signatures, e.g. <let N: Int>
 EXPERIMENTAL_FEATURE(ValueGenerics, true)
