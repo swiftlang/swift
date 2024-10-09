@@ -31,9 +31,11 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Threading/Mutex.h"
 #include <atomic>
+#include <deque>
 #include <new>
 
 #if SWIFT_STDLIB_HAS_ASL
@@ -114,7 +116,7 @@ class DiscardingTaskGroup;
 
 template<typename T>
 class NaiveTaskGroupQueue {
-  std::queue <T> queue;
+  std::queue<T, std::deque<T, swift::cxx_allocator<T>>> queue;
 
 public:
   NaiveTaskGroupQueue() = default;
@@ -346,6 +348,11 @@ protected:
 public:
   virtual ~TaskGroupBase() {}
 
+  /// Because we have a virtual destructor, we need to declare a delete operator
+  /// here, otherwise the compiler will generate a deleting destructor that
+  /// calls ::operator delete.
+  SWIFT_CXX_DELETE_OPERATOR(TaskGroupBase)
+
   TaskStatusRecordKind getKind() const {
     return Flags.getKind();
   }
@@ -419,7 +426,9 @@ public:
   TaskGroupStatus statusLoadRelaxed() const;
   TaskGroupStatus statusLoadAcquire() const;
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
   std::string statusString() const;
+#endif
 
   bool isEmpty() const;
 
@@ -469,6 +478,7 @@ public:
 
 };
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 [[maybe_unused]]
 static std::string to_string(TaskGroupBase::PollStatus status) {
   switch (status) {
@@ -478,6 +488,7 @@ static std::string to_string(TaskGroupBase::PollStatus status) {
     case TaskGroupBase::PollStatus::Error: return "Error";
   }
 }
+#endif
 
 /// The status of a task group.
 ///
@@ -579,7 +590,13 @@ struct TaskGroupStatus {
     swift_asprintf(
         &message,
         "error: %sTaskGroup: detected pending task count overflow, in task group %p! Status: %s",
-        group->isDiscardingResults() ? "Discarding" : "", group, status.to_string(group).c_str());
+        group->isDiscardingResults() ? "Discarding" : "", group,
+#if !SWIFT_CONCURRENCY_EMBEDDED
+        status.to_string(group).c_str()
+#else
+        "<status unavailable in embedded>"
+#endif
+                   );
 
 #if !SWIFT_CONCURRENCY_EMBEDDED
     if (_swift_shouldReportFatalErrorsToDebugger()) {
@@ -612,6 +629,7 @@ struct TaskGroupStatus {
     abort();
   }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
   /// Pretty prints the status, as follows:
   /// If accumulating results:
   ///     TaskGroupStatus{ C:{cancelled} W:{waiting task} R:{ready tasks} P:{pending tasks} {binary repr} }
@@ -634,6 +652,7 @@ struct TaskGroupStatus {
     str.append(" }");
     return str;
   }
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
 
   /// Initially there are no waiting and no pending tasks.
   static const TaskGroupStatus initial() {
@@ -691,9 +710,11 @@ TaskGroupStatus TaskGroupBase::statusLoadAcquire() const {
   return TaskGroupStatus{status.load(std::memory_order_acquire)};
 }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 std::string TaskGroupBase::statusString() const {
   return statusLoadRelaxed().to_string(this);
 }
+#endif
 
 bool TaskGroupBase::isEmpty() const {
   auto oldStatus = TaskGroupStatus{status.load(std::memory_order_relaxed)};
@@ -749,6 +770,7 @@ TaskGroupStatus TaskGroupBase::statusAddPendingTaskAssumeRelaxed(bool unconditio
   }
 
   SWIFT_TASK_GROUP_DEBUG_LOG(this, "addPending, after: %s", s.to_string(this).c_str());
+
   return s;
 }
 

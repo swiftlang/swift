@@ -32,6 +32,7 @@
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/DispatchShims.h"
 #include "swift/Runtime/EnvironmentVariables.h"
+#include "swift/Runtime/Heap.h"
 #include "swift/Threading/Mutex.h"
 #include "swift/Threading/Once.h"
 #include "swift/Threading/Thread.h"
@@ -1325,7 +1326,7 @@ dispatch_lock_t *DefaultActorImpl::drainLockAddr() {
 
 void DefaultActorImpl::scheduleActorProcessJob(
     JobPriority priority, TaskExecutorRef taskExecutor) {
-  Job *job = new ProcessOutOfLineJob(this, priority);
+  Job *job = swift_cxx_newObject<ProcessOutOfLineJob>(this, priority);
   SWIFT_TASK_DEBUG_LOG(
       "Scheduling processing job %p for actor %p at priority %#zx, with taskExecutor %p", job, this,
       priority, taskExecutor.getIdentity());
@@ -1677,7 +1678,7 @@ void ProcessOutOfLineJob::process(Job *job) {
   auto self = cast<ProcessOutOfLineJob>(job);
   DefaultActorImpl *actor = self->Actor;
 
-  delete self;
+  swift_cxx_deleteObject(self);
   return defaultActorDrain(actor); // 'return' forces tail call
 }
 
@@ -2293,7 +2294,7 @@ public:
     auto *job = cast<IsolatedDeinitJob>(_job);
     void *object = job->Object;
     DeinitWorkFunction *work = job->Work;
-    delete job;
+    swift_cxx_deleteObject(job);
     return work(object);
   }
 
@@ -2379,7 +2380,7 @@ static void swift_task_deinitOnExecutorImpl(void *object,
   auto priority = currentTask ? swift_task_currentPriority(currentTask)
                               : swift_task_getCurrentThreadPriority();
 
-  auto job = new IsolatedDeinitJob(priority, object, work);
+  auto job = swift_cxx_newObject<IsolatedDeinitJob>(priority, object, work);
   swift_task_enqueue(job, newExecutor);
 #endif
 }
