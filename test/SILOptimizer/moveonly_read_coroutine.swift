@@ -51,23 +51,23 @@ func take(_ nc: consuming NC) {}
 
 func test(c: C) {
   borrow(c.data)
-  take(c.data) // expected-error{{'c.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(c.data) // expected-error{{'c.data' is borrowed, so it cannot be consumed here}}
 }
 func test(s: S) {
   borrow(s.data)
-  take(s.data) // expected-error{{'s.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(s.data) // expected-error{{'s.data' is borrowed, so it cannot be consumed here}}
 }
 func test(snc: borrowing SNC) {
   borrow(snc.data)
-  take(snc.data) // expected-error{{'snc.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(snc.data) // expected-error{{'snc.data' is borrowed, so it cannot be consumed here}}
 }
 
 func test<T: P>(t: T) {
   borrow(t.data)
-  take(t.data) // expected-error{{'t.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(t.data) // expected-error{{'t.data' is borrowed, so it cannot be consumed here}}
 }
 func test(p: P) {
   borrow(p.data)
-  take(p.data) // expected-error{{'p.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(p.data) // expected-error{{'p.data' is borrowed, so it cannot be consumed here}}
 }
 

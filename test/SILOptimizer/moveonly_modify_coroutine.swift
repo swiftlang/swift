@@ -61,7 +61,7 @@ func test(c: C) {
 }
 func test(s: S) {
   borrow(s.data)
-  take(s.data) // expected-error{{'s.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(s.data) //  expected-error{{'s.data' is borrowed, so it cannot be consumed here}}
 }
 func test(m_s s: inout S) {
   borrow(s.data)
@@ -70,7 +70,7 @@ func test(m_s s: inout S) {
 }
 func test(snc: borrowing SNC) {
   borrow(snc.data)
-  take(snc.data) // expected-error{{'snc.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(snc.data) //  expected-error{{'snc.data' is borrowed, so it cannot be consumed here}}
 }
 func test(m_snc snc: inout SNC) {
   borrow(snc.data)
@@ -80,7 +80,7 @@ func test(m_snc snc: inout SNC) {
 
 func test<T: P>(t: T) {
   borrow(t.data)
-  take(t.data) // expected-error{{'t.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(t.data) //  expected-error{{'t.data' is borrowed, so it cannot be consumed here}}
 }
 func test<T: P>(m_t t: inout T) {
   borrow(t.data)
@@ -90,7 +90,7 @@ func test<T: P>(m_t t: inout T) {
 
 func test(p: P) {
   borrow(p.data)
-  take(p.data) // expected-error{{'p.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(p.data) //  expected-error{{'p.data' is borrowed, so it cannot be consumed here}}
 }
 func test(m_p p: inout P) {
   borrow(p.data)

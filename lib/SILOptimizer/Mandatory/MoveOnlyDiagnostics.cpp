@@ -139,6 +139,11 @@ void DiagnosticEmitter::diagnoseConsumeOfBorrowed(
     SILInstruction *consumingUse) {
   assert(markedValue->getCheckKind() !=
     MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
+  auto &ctx = markedValue->getModule().getASTContext();
+
+  LLVM_DEBUG(llvm::dbgs() << "Emitting diagnoseConsumeOfBorrowed error!\n"
+                          << "    Mark: " << *markedValue
+                          << "    Consuming Use: " << *consumingUse);
 
   // If it's move-only wrapped, then it's a Copyable type with no-implicit-copy
   // semantics, so this kind of violation is solvable with an explicit copy.
@@ -147,14 +152,12 @@ void DiagnosticEmitter::diagnoseConsumeOfBorrowed(
   SmallString<64> varName;
   getVariableNameForValue(markedValue, varName);
 
-  diagnose(fn->getASTContext(),
+  diagnose(ctx,
            consumingUse,
            diag::movechecker_consume_of_borrow,
            varName,
            suggestExplicitCopy,
            deriveBorrowReason(markedValue));
-
-  registerDiagnosticEmitted(markedValue);
 }
 
 //===----------------------------------------------------------------------===//
@@ -324,9 +327,11 @@ void DiagnosticEmitter::emitMissingConsumeInDiscardingContext(
 
 void DiagnosticEmitter::emitObjectGuaranteedDiagnostic(
     MarkUnresolvedNonCopyableValueInst *markedValue) {
+  assert(getCanonicalizer().foundAnyConsumingUses() && "nothing to diagnose?");
 
   for (auto *user : getCanonicalizer().consumingUsesNeedingCopy) {
     diagnoseConsumeOfBorrowed(markedValue, user);
+    registerDiagnosticEmitted(markedValue);
   }
 
   for (auto *user : getCanonicalizer().consumingBoundaryUsers) {
@@ -341,47 +346,8 @@ void DiagnosticEmitter::emitObjectGuaranteedDiagnostic(
     }
 
     diagnoseConsumeOfBorrowed(markedValue, user);
+    registerDiagnosticEmitted(markedValue);
   }
-
-
-//  auto &astContext = fn->getASTContext();
-//  SmallString<64> varName;
-//  getVariableNameForValue(markedValue, varName);
-//
-//  // See if we have any closure capture uses and emit a better diagnostic.
-//  if (getCanonicalizer().hasPartialApplyConsumingUse()) {
-//    diagnose(astContext, markedValue,
-//             diag::sil_movechecking_borrowed_parameter_captured_by_closure,
-//             varName);
-//    emitObjectDiagnosticsForPartialApplyUses(varName);
-//    registerDiagnosticEmitted(markedValue);
-//  }
-//
-//  // If we do not have any non-partial apply consuming uses... just exit early.
-//  if (!getCanonicalizer().hasNonPartialApplyConsumingUse())
-//    return;
-//
-//  registerDiagnosticEmitted(markedValue);
-//
-//  // Check if this value is closure captured. In such a case, emit a special
-//  // error.
-//  if (auto *fArg = dyn_cast<SILFunctionArgument>(
-//          lookThroughCopyValueInsts(markedValue->getOperand()))) {
-//    if (fArg->isClosureCapture()) {
-//      diagnose(astContext, markedValue,
-//               diag::sil_movechecking_capture_consumed,
-//               varName);
-//      emitObjectDiagnosticsForGuaranteedUses(
-//          true /*ignore partial apply uses*/);
-//      registerDiagnosticEmitted(markedValue);
-//      return;
-//    }
-//  }
-//
-//  diagnose(astContext, markedValue,
-//           diag::sil_movechecking_guaranteed_value_consumed, varName);
-//
-//  emitObjectDiagnosticsForGuaranteedUses(true /*ignore partial apply uses*/);
 }
 
 void DiagnosticEmitter::emitObjectOwnedDiagnostic(
@@ -702,20 +668,9 @@ void DiagnosticEmitter::emitAddressDiagnosticNoCopy(
   if (!useWithDiagnostic.insert(consumingUser).second)
     return;
 
-  auto &astContext = markedValue->getFunction()->getASTContext();
-  SmallString<64> varName;
-  getVariableNameForValue(markedValue, varName);
-
-  LLVM_DEBUG(llvm::dbgs() << "Emitting no copy error!\n");
-  LLVM_DEBUG(llvm::dbgs() << "    Mark: " << *markedValue);
-  LLVM_DEBUG(llvm::dbgs() << "    Consuming Use: " << *consumingUser);
-
   // Otherwise, we need to do no implicit copy semantics. If our last use was
   // consuming message:
-  diagnose(astContext, markedValue,
-           diag::sil_movechecking_guaranteed_value_consumed, varName);
-  diagnose(astContext, consumingUser,
-           diag::sil_movechecking_consuming_use_here);
+  diagnoseConsumeOfBorrowed(markedValue, consumingUser);
   registerDiagnosticEmitted(markedValue);
 }
 

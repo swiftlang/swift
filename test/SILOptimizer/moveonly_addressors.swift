@@ -87,7 +87,7 @@ func take(_ nc: consuming NC) {}
 
 func test(c: C) {
   borrow(c.data)
-  take(c.data) // expected-error{{'c.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(c.data) //  expected-error{{'c.data' is borrowed, so it cannot be consumed here}}
 
   borrow(c.mutableData)
   mod(&c.mutableData)
@@ -95,14 +95,14 @@ func test(c: C) {
 }
 func test(s: S) {
   borrow(s.data)
-  take(s.data) // expected-error{{'s.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(s.data) //  expected-error{{'s.data' is borrowed, so it cannot be consumed here}}
 
   borrow(s.mutableData)
-  take(s.mutableData) // expected-error{{'s.mutableData' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(s.mutableData) //  expected-error{{'s.mutableData' is borrowed, so it cannot be consumed here}}
 }
 func test(mut_s s: inout S) {
   borrow(s.data)
-  take(s.data) // expected-error{{'s.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(s.data) //  expected-error{{'s.data' is borrowed, so it cannot be consumed here}}
 
   borrow(s.mutableData)
   mod(&s.mutableData)
@@ -110,14 +110,14 @@ func test(mut_s s: inout S) {
 }
 func test(snc: borrowing SNC) {
   borrow(snc.data)
-  take(snc.data) // expected-error{{'snc.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(snc.data) //  expected-error{{'snc.data' is borrowed, so it cannot be consumed here}}
 
   borrow(snc.mutableData)
-  take(snc.mutableData) // expected-error{{'snc.mutableData' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(snc.mutableData) //  expected-error{{'snc.mutableData' is borrowed, so it cannot be consumed here}}
 }
 func test(mut_snc snc: inout SNC) {
   borrow(snc.data)
-  take(snc.data) // expected-error{{'snc.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(snc.data) //  expected-error{{'snc.data' is borrowed, so it cannot be consumed here}}
 
   borrow(snc.mutableData)
   mod(&snc.mutableData)

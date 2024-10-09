@@ -18,12 +18,12 @@ func unwrapBorrow_Borrow(x: borrowing NC?) {
     borrow(x!)
 }
 
-func unwrapConsume_Borrow(x: borrowing NC?) { // expected-error{{cannot be consumed}}
-    x!.consume() // expected-note{{consumed here}}
-    consume(x!) // expected-note{{consumed here}}
+func unwrapConsume_Borrow(x: borrowing NC?) {
+    x!.consume() // expected-error{{cannot be consumed here}}
+    consume(x!) // expected-error{{cannot be consumed here}}
 
-    x!.consume() // expected-note{{consumed here}}
-    consume(x!) // expected-note{{consumed here}}
+    x!.consume() // expected-error{{cannot be consumed here}}
+    consume(x!) // expected-error{{cannot be consumed here}}
 }
 
 func unwrapBorrowMutateConsume_Consume(x: consuming NC?) {

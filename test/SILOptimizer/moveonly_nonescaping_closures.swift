@@ -78,9 +78,9 @@ func c2(x: consuming M) {
     consume(x)
 }
 
-func d(x: __owned M) { // expected-error {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
+func d(x: __owned M) {
     clodger({ consume(x) })
-    // expected-note @-1 {{consumed here}}
+    // expected-error @-1 {{'x' is borrowed by this closure, so it cannot be consumed here}}
 }
 
 func d2(x: consuming M) { // expected-error {{missing reinitialization of closure capture 'x' after consume}}

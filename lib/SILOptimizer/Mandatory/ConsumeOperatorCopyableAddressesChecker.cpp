@@ -2159,10 +2159,15 @@ bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
   if (getMoveConstraint(mvi->getSrc()).isIllegal()) {
     auto &astCtx = mvi->getFunction()->getASTContext();
     StringRef name = getDebugVarName(address);
-    diagnose(astCtx, getSourceLocFromValue(address),
-             diag::sil_movechecking_guaranteed_value_consumed, name);
+
+    assert(mvi->getSrc()->getType().isMoveOnlyWrapped()
+           && "expected to suggest an explicit copy in diagnostic");
+
     diagnose(astCtx, mvi->getLoc().getSourceLoc(),
-             diag::sil_movechecking_consuming_use_here);
+             diag::movechecker_consume_of_borrow,
+             name,
+             /*suggestExplicitCopy=*/true,
+             /*Use nonspecific message kind*/0);
 
     // Replace the marker instruction with a copy_addr to avoid subsequent
     // diagnostics.

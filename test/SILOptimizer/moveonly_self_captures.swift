@@ -65,31 +65,31 @@ struct Test : ~Copyable {
         capture()
     }
 
-    func captureByLocalFunction2() { // expected-error {{noncopyable 'self' cannot be consumed when captured by an escaping closure}}
+    func captureByLocalFunction2() {
         func capture() {
-            let _ = self.e2 // expected-note {{consumed here}}
+            let _ = self.e2 // expected-error{{'self' is borrowed by this closure, so it cannot be consumed here}}
         }
         capture()
     }
 
-    func captureByLocalFunction3() { // expected-error {{noncopyable 'self' cannot be consumed when captured by an escaping closure}}
+    func captureByLocalFunction3() {
         func capture() {
-            let _ = self // expected-note {{consumed here}}
+            let _ = self // expected-error{{'self' is borrowed by this closure, so it cannot be consumed here}}
         }
         capture()
     }
 
-    func captureByLocalLet() { // expected-error {{'self' cannot be captured by an escaping closure since it is a borrowed parameter}}
-        let f = { // expected-note {{capturing 'self' here}}
+    func captureByLocalLet() {
+        let f = {
             let _ = self.e
         }
         
         f()
     }
 
-    func captureByLocalVar() { // expected-error {{'self' cannot be captured by an escaping closure since it is a borrowed parameter}}
+    func captureByLocalVar() {
         var f = {}
-        f = { // expected-note {{closure capturing 'self' here}}
+        f = {
             let _ = self.e
         }
         f()
@@ -102,10 +102,10 @@ struct Test : ~Copyable {
         }
     }
 
-    func captureByNonEscapingClosure2() { // expected-error {{'self' cannot be consumed when captured by an escaping closure}}
+    func captureByNonEscapingClosure2() {
         func useClosure(_ f: () -> ()) {}
         useClosure {
-            let _ = self // expected-note {{consumed here}}
+            let _ = self // expected-error{{'self' is borrowed by this closure, so it cannot be consumed here}}
         }
     }
 }

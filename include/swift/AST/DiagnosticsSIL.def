@@ -828,8 +828,6 @@ ERROR(sil_movechecking_owned_value_consumed_and_used_at_same_time, none,
       "'%0' consumed and used at the same time", (StringRef))
 ERROR(sil_movechecking_value_used_after_consume, none,
       "'%0' used after consume", (StringRef))
-ERROR(sil_movechecking_guaranteed_value_consumed, none,
-      "'%0' is borrowed and cannot be consumed", (StringRef))
 ERROR(sil_movechecking_borrowed_parameter_captured_by_closure, none,
       "'%0' cannot be captured by an escaping closure since it is a borrowed "
       "parameter",

@@ -45,7 +45,7 @@ func consume(_: consuming Butt) {}
 func tryConsume() {
     // FIXME: gives different diagnostics for parse-as-library vs script global
     consume(global) // expected-error{{}} expected-note *{{}}
-    consume(StaticHolder.staticMember) // expected-error{{cannot be consumed}} expected-note{{consumed here}}
+    consume(StaticHolder.staticMember) // expected-error{{'unknown' is borrowed, so it cannot be consumed here}}
 }
 
 var globalVar = Butt()

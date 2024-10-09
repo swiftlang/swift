@@ -114,7 +114,9 @@ public:
   ////// NEW DIAGNOSTICS
 
   /// "X borrowed so it cannot be consumed"
-  void diagnoseConsumeOfBorrowed(
+  ///
+  /// Does NOT register that a diagnostic was emitted.
+  static void diagnoseConsumeOfBorrowed(
       MarkUnresolvedNonCopyableValueInst *markedValue,
       SILInstruction *consumingUse);
 
