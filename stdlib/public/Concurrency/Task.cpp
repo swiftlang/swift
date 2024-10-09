@@ -1396,7 +1396,9 @@ namespace continuationChecking {
 
 enum class State : uint8_t { Uninitialized, On, Off };
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 static std::atomic<State> CurrentState;
+#endif
 
 static LazyMutex ActiveContinuationsLock;
 static Lazy<std::unordered_set<AsyncTask *>> ActiveContinuations;
