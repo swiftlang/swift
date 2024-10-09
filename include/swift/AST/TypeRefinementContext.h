@@ -185,6 +185,8 @@ private:
     unsigned needsExpansion : 1;
   } LazyInfo = {};
 
+  void verify(const TypeRefinementContext *parent, ASTContext &ctx) const;
+
   TypeRefinementContext(ASTContext &Ctx, IntroNode Node,
                         TypeRefinementContext *Parent, SourceRange SrcRange,
                         const AvailabilityRange &Info,
@@ -290,10 +292,7 @@ public:
   }
 
   /// Adds a child refinement context.
-  void addChild(TypeRefinementContext *Child) {
-    assert(Child->getSourceRange().isValid());
-    Children.push_back(Child);
-  }
+  void addChild(TypeRefinementContext *Child, ASTContext &Ctx);
 
   /// Returns the inner-most TypeRefinementContext descendant of this context
   /// for the given source location.
@@ -305,6 +304,10 @@ public:
   void setNeedsExpansion(bool needsExpansion) {
     LazyInfo.needsExpansion = needsExpansion;
   }
+
+  /// Recursively check the tree for integrity. If any errors are found, emits
+  /// diagnosticts to stderr and aborts.
+  void verify(ASTContext &ctx);
 
   SWIFT_DEBUG_DUMPER(dump(SourceManager &SrcMgr));
   void dump(raw_ostream &OS, SourceManager &SrcMgr) const;
