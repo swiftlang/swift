@@ -64,6 +64,29 @@ public var irm: Int {
 // CHECK:         end_apply [[TOKEN]]
 // CHECK:         end_access [[SELF_ACCESS]]
 // CHECK-LABEL:} // end sil function '$s19coroutine_accessors1SV3irmSivs'
+
+// CHECK-LABEL: sil {{.*}}[ossa] @$s19coroutine_accessors1SV3irmSivM :
+// CHECK-SAME:      $@yield_once
+// CHECK-SAME:      @convention(method)
+// CHECK-SAME:      (@inout S)
+// CHECK-SAME:      ->
+// CHECK-SAME:      @yields @inout Int
+// CHECK-SAME:  {
+// CHECK:       bb0(
+// CHECK-SAME:      [[SELF:%[^,]+]] :
+// CHECK-SAME:  ):
+// CHECK:       [[SELF_ACCESS:%[^,]+]] = begin_access [modify] [unknown] [[SELF]]
+// CHECK:       [[MODIFY_ACCESSOR:%[^,]+]] = function_ref @$s19coroutine_accessors1SV3irmSivx
+// CHECK:       ([[VALUE_ADDRESS:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[MODIFY_ACCESSOR]]([[SELF_ACCESS]])
+// CHECK:       yield [[VALUE_ADDRESS:%[^,]+]] : $*Int, resume bb1, unwind bb2
+// CHECK:     bb1:
+// CHECK:       end_apply [[TOKEN]]
+// CHECK:       end_access [[SELF_ACCESS]]
+// CHECK:     bb2:
+// CHECK:       end_apply [[TOKEN]]
+// CHECK:       end_access [[SELF_ACCESS]]
+// CHECK:       unwind
+// CHECK-LABEL: } // end sil function '$s19coroutine_accessors1SV3irmSivM'
 } // public var irm
 
 } // public struct S
