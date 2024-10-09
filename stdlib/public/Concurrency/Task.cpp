@@ -34,6 +34,7 @@
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/Heap.h"
 #include "swift/Threading/Mutex.h"
 #include <atomic>
 #include <new>
@@ -220,7 +221,7 @@ void NullaryContinuationJob::process(Job *_job) {
 
   auto *continuation = job->Continuation;
 
-  delete job;
+  swift_cxx_deleteObject(job);
 
   auto *context =
     static_cast<ContinuationAsyncContext*>(continuation->ResumeContext);
@@ -1720,7 +1721,7 @@ static NullaryContinuationJob*
 swift_task_createNullaryContinuationJobImpl(
     size_t priority,
     AsyncTask *continuation) {
-  auto *job = new NullaryContinuationJob(swift_task_getCurrent(),
+  auto *job = swift_cxx_newObject<NullaryContinuationJob>(swift_task_getCurrent(),
         static_cast<JobPriority>(priority), continuation);
 
   return job;
