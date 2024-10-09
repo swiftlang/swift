@@ -335,6 +335,8 @@ FrontendOptions::formatForPrincipalOutputFileForAction(ActionType action) {
     return TY_Assembly;
 
   case ActionType::EmitIRGen:
+    return TY_RawLLVM_IR;
+
   case ActionType::EmitIR:
     return TY_LLVM_IR;
 

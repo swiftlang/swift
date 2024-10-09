@@ -108,7 +108,7 @@ static bool shouldProfile(SILDeclRef Constant) {
     auto *M = DC->getParentModule();
     if (auto *SF = M->getSourceFileContainingLocation(N.getStartLoc())) {
       auto &SM = M->getASTContext().SourceMgr;
-      if (SM.hasGeneratedSourceInfo(*SF->getBufferID())) {
+      if (SM.hasGeneratedSourceInfo(SF->getBufferID())) {
         LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: generated code\n");
         return false;
       }
@@ -1183,7 +1183,7 @@ public:
     if (SourceRegions.empty())
       return nullptr;
 
-    auto FileSourceRange = SM.getRangeForBuffer(*SF->getBufferID());
+    auto FileSourceRange = SM.getRangeForBuffer(SF->getBufferID());
     auto isLocInFile = [&](SourceLoc Loc) {
       return FileSourceRange.contains(Loc) || FileSourceRange.getEnd() == Loc;
     };

@@ -671,9 +671,13 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
            RuntimeEffect::MetaData | RuntimeEffect::Existential;
 
   case SILInstructionKind::InitExistentialRefInst:
+    impactType = inst->getOperand(0)->getType();
+    return RuntimeEffect::MetaData | RuntimeEffect::ExistentialClassBound;
+
   case SILInstructionKind::InitExistentialMetatypeInst:
     impactType = inst->getOperand(0)->getType();
     return RuntimeEffect::MetaData | RuntimeEffect::Existential;
+
   case SILInstructionKind::ObjCToThickMetatypeInst:
     impactType = inst->getOperand(0)->getType();
     return RuntimeEffect::MetaData;
@@ -693,14 +697,8 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     return RuntimeEffect::Existential;
 
   case SILInstructionKind::OpenExistentialRefInst: {
-    SILType opType = cast<OpenExistentialRefInst>(inst)->getOperand()->getType();
-    impactType = opType;
-    if (opType.getASTType()->isObjCExistentialType()) {
-      return RuntimeEffect::MetaData | RuntimeEffect::Existential;
-    }
-    return RuntimeEffect::MetaData | RuntimeEffect::Existential;
-    // TODO: should be Existential
-    //return RuntimeEffect::Existential;
+    impactType = inst->getOperand(0)->getType();
+    return RuntimeEffect::MetaData | RuntimeEffect::ExistentialClassBound;
   }
 
   case SILInstructionKind::UnconditionalCheckedCastInst:
@@ -962,9 +960,16 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     case SILFunctionTypeRepresentation::Block:
       rt |= RuntimeEffect::ObjectiveC | RuntimeEffect::MetaData;
       break;
-    case SILFunctionTypeRepresentation::WitnessMethod:
-      rt |= RuntimeEffect::MetaData | RuntimeEffect::Existential;
+    case SILFunctionTypeRepresentation::WitnessMethod: {
+      auto conformance =
+          as.getOrigCalleeType()->getWitnessMethodConformanceOrInvalid();
+      if (conformance.getRequirement()->requiresClass()) {
+          rt |= RuntimeEffect::MetaData | RuntimeEffect::ExistentialClassBound;
+      } else {
+          rt |= RuntimeEffect::MetaData | RuntimeEffect::Existential;
+      }
       break;
+    }
     case SILFunctionTypeRepresentation::CFunctionPointer:
     case SILFunctionTypeRepresentation::CXXMethod:
     case SILFunctionTypeRepresentation::Thin:
@@ -999,6 +1004,10 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
         rt |= RuntimeEffect::MetaData;
     }
     return rt;
+  }
+  case SILInstructionKind::ThunkInst: {
+    // For now be conservative since we may lower to a partial_apply.
+    return RuntimeEffect::Allocating | RuntimeEffect::Releasing;
   }
   case SILInstructionKind::WitnessMethodInst: {
     return RuntimeEffect::MetaData;
@@ -1379,4 +1388,12 @@ bool swift::visitExplodedTupleValue(
   }
 
   return true;
+}
+
+std::pair<SILFunction *, SILWitnessTable *>
+swift::lookUpFunctionInWitnessTable(WitnessMethodInst *wmi,
+                                    SILModule::LinkingMode linkingMode) {
+  SILModule &mod = wmi->getModule();
+  return mod.lookUpFunctionInWitnessTable(wmi->getConformance(), wmi->getMember(),
+                                          wmi->isSpecialized(), linkingMode);
 }

@@ -162,7 +162,7 @@ BASELINE_LANGUAGE_FEATURE(BuiltinAllocVector, 0, "Builtin.allocVector")
 BASELINE_LANGUAGE_FEATURE(BuiltinTaskRunInline, 0, "Builtin.taskRunInline")
 BASELINE_LANGUAGE_FEATURE(BuiltinUnprotectedAddressOf, 0, "Builtin.unprotectedAddressOf")
 BASELINE_LANGUAGE_FEATURE(NewCxxMethodSafetyHeuristics, 0, "Only import C++ methods that return pointers (projections) on owned types as unsafe")
-SUPPRESSIBLE_LANGUAGE_FEATURE(SpecializeAttributeWithAvailability, 0, "@_specialize attribute with availability")
+BASELINE_LANGUAGE_FEATURE(SpecializeAttributeWithAvailability, 0, "@_specialize attribute with availability")
 BASELINE_LANGUAGE_FEATURE(BuiltinAssumeAlignment, 0, "Builtin.assumeAlignment")
 BASELINE_LANGUAGE_FEATURE(BuiltinCreateTaskGroupWithFlags, 0, "Builtin.createTaskGroupWithFlags")
 BASELINE_LANGUAGE_FEATURE(UnsafeInheritExecutor, 0, "@_unsafeInheritExecutor")
@@ -223,15 +223,19 @@ UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
 // Swift 7
 UPCOMING_FEATURE(ExistentialAny, 335, 7)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
+UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
 
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
 EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
 EXPERIMENTAL_FEATURE(CodeItemMacros, false)
 EXPERIMENTAL_FEATURE(PreambleMacros, false)
+EXPERIMENTAL_FEATURE(MacrosOnImports, true)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
 EXPERIMENTAL_FEATURE(FullTypedThrows, false)
 EXPERIMENTAL_FEATURE(SameElementRequirements, false)
+EXPERIMENTAL_FEATURE(GlobalActorInferenceCutoff, false)
+EXPERIMENTAL_FEATURE(KeyPathWithStaticMembers, false)
 
 // Whether to enable @_used and @_section attributes
 EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
@@ -375,9 +379,6 @@ EXPERIMENTAL_FEATURE(GroupActorErrors, true)
 // Enable explicit isolation of closures.
 EXPERIMENTAL_FEATURE(ClosureIsolation, true)
 
-// Whether lookup of members respects the enclosing file's imports.
-EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(MemberImportVisibility, true)
-
 // Enable @implementation on extensions of ObjC classes with non-fixed layout
 // due to resilient stored properties. Requires OS support; this flag exists for
 // staging purposes.
@@ -408,8 +409,20 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AllowUnsafeAttribute, true)
 /// Warn on use of unsafe constructs.
 EXPERIMENTAL_FEATURE(WarnUnsafe, true)
 
+/// Import unsafe C and C++ constructs as @unsafe.
+EXPERIMENTAL_FEATURE(SafeInterop, true)
+
+// Isolated deinit
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(IsolatedDeinit, true)
+
 // Enable values in generic signatures, e.g. <let N: Int>
 EXPERIMENTAL_FEATURE(ValueGenerics, true)
+
+// When a parameter has unspecified isolation, infer it as main actor isolated.
+EXPERIMENTAL_FEATURE(UnspecifiedMeansMainActorIsolated, false)
+
+/// modify/read single-yield coroutines
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

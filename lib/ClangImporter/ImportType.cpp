@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "CFTypeInfo.h"
-#include "ClangDiagnosticConsumer.h"
 #include "ImporterImpl.h"
 #include "SwiftDeclSynthesizer.h"
 #include "swift/ABI/MetadataValues.h"
@@ -51,7 +50,6 @@
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Compiler.h"
 
 using namespace swift;
@@ -314,7 +312,6 @@ namespace {
       case clang::BuiltinType::BFloat16:
       case clang::BuiltinType::Float128:
       case clang::BuiltinType::NullPtr:
-      case clang::BuiltinType::Char8:
       case clang::BuiltinType::Ibm128:
         return Type();
 
@@ -2649,7 +2646,9 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // Foreign references are already references so they don't need to be passed
   // as inout.
   paramInfo->setSpecifier(isInOut ? ParamSpecifier::InOut
-                                  : ParamSpecifier::Default);
+                                  : (param->getAttr<clang::LifetimeBoundAttr>()
+                                         ? ParamSpecifier::Borrowing
+                                         : ParamSpecifier::Default));
   paramInfo->setInterfaceType(swiftParamTy);
   impl->recordImplicitUnwrapForDecl(paramInfo, isParamTypeImplicitlyUnwrapped);
 

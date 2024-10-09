@@ -346,22 +346,6 @@ public:
   /// This vector is managed by \c StructureMarkerRAII objects.
   llvm::SmallVector<StructureMarker, 16> StructureMarkers;
 
-  /// Maps of macro name and version to availability specifications.
-  typedef llvm::DenseMap<llvm::VersionTuple,
-                         SmallVector<AvailabilitySpec *, 4>>
-                        AvailabilityMacroVersionMap;
-  typedef llvm::DenseMap<StringRef, AvailabilityMacroVersionMap>
-                        AvailabilityMacroMap;
-
-  /// Cache of the availability macros parsed from the command line arguments.
-  /// Organized as two nested \c DenseMap keyed first on the macro name then
-  /// the macro version. This structure allows to peek at macro names before
-  /// parsing a version tuple.
-  AvailabilityMacroMap AvailabilityMacros;
-
-  /// Has \c AvailabilityMacros been computed?
-  bool AvailabilityMacrosComputed = false;
-
 public:
   Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
          SILParserStateBase *SIL, PersistentParserState *PersistentState);
@@ -977,10 +961,10 @@ public:
 
   void consumeDecl(ParserPosition BeginParserPosition, bool IsTopLevel);
 
-  ParserResult<Decl> parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
-                               bool IfConfigsAreDeclAttrs,
-                               llvm::function_ref<void(Decl *)> Handler,
-                               bool fromASTGen = false);
+  ParserStatus parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
+                         bool IfConfigsAreDeclAttrs,
+                         llvm::function_ref<void(Decl *)> Handler,
+                         bool fromASTGen = false);
 
   std::pair<std::vector<Decl *>, std::optional<Fingerprint>>
   parseDeclListDelayed(IterableDeclContext *IDC);
@@ -1018,12 +1002,12 @@ public:
 
   /// Parse a #if ... #endif directive.
   /// Delegate callback function to parse elements in the blocks.
-  ParserResult<IfConfigDecl> parseIfConfig(
+  ParserStatus parseIfConfig(
       IfConfigContext ifConfigContext,
-      llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements);
+      llvm::function_ref<void(bool)> parseElements);
 
   /// Parse an #if ... #endif containing only attributes.
-  ParserStatus parseIfConfigDeclAttributes(
+  ParserStatus parseIfConfigAttributes(
     DeclAttributes &attributes, bool ifConfigsAreDeclAttrs,
     PatternBindingInitializer *initContext);
 
@@ -2080,7 +2064,7 @@ public:
   parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs);
 
   /// Parse the availability macros definitions passed as arguments.
-  void parseAllAvailabilityMacroArguments();
+  AvailabilityMacroMap &parseAllAvailabilityMacroArguments();
 
   /// Result of parsing an availability macro definition.
   struct AvailabilityMacroDefinition {

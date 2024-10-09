@@ -11,6 +11,7 @@ add_swift_host_library(swiftSema STATIC
   CSSimplify.cpp
   CSSolver.cpp
   CSStep.cpp
+  CSTrail.cpp
   CSFix.cpp
   CSDiagnostics.cpp
   CodeSynthesis.cpp
@@ -92,7 +93,8 @@ target_link_libraries(swiftSema PRIVATE
 
 if (SWIFT_BUILD_SWIFT_SYNTAX)
   target_link_libraries(swiftSema PRIVATE
-    swiftASTGen)
+    swiftASTGen
+    swiftMacros)
 endif()
 
 set_swift_llvm_is_available(swiftSema)

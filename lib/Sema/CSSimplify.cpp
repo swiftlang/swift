@@ -3630,10 +3630,8 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   TypeMatchOptions subflags = TMF_GenerateConstraints;
 
   // Handle opaque archetypes.
-  if (auto arch1 = type1->getAs<ArchetypeType>()) {
-    auto arch2 = type2->castTo<ArchetypeType>();
-    auto opaque1 = cast<OpaqueTypeArchetypeType>(arch1);
-    auto opaque2 = cast<OpaqueTypeArchetypeType>(arch2);
+  if (auto opaque1 = type1->getAs<OpaqueTypeArchetypeType>()) {
+    auto opaque2 = type2->castTo<OpaqueTypeArchetypeType>();
     assert(opaque1->getDecl() == opaque2->getDecl());
 
     // It's possible to declare a generic requirement like Self == Self.Iterator
@@ -3707,34 +3705,24 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
                                   locator);
   }
 
-  if (type1->isExistentialType()) {
-    auto layout1 = type1->getExistentialLayout();
-    auto layout2 = type2->getExistentialLayout();
+  // Members of protocol compositions have to match.
+  if (auto pct1 = type1->getAs<ProtocolCompositionType>()) {
+    auto pct2 = type2->castTo<ProtocolCompositionType>();
 
-    // Explicit AnyObject and protocols must match exactly.
-    if (layout1.hasExplicitAnyObject != layout2.hasExplicitAnyObject)
+    auto members1 = pct1->getMembers();
+    auto members2 = pct2->getMembers();
+    if (members1.size() != members2.size())
       return getTypeMatchFailure(locator);
-
-    if (layout1.getProtocols().size() != layout2.getProtocols().size())
+    if (pct1->getInverses() != pct2->getInverses())
       return getTypeMatchFailure(locator);
-
-    for (unsigned i: indices(layout1.getProtocols())) {
-      if (layout1.getProtocols()[i] != layout2.getProtocols()[i])
-        return getTypeMatchFailure(locator);
-    }
-
-    // This is the only interesting case. We might have type variables
-    // on either side of the superclass constraint, so make sure we
-    // recursively call matchTypes() here.
-    if (layout1.explicitSuperclass || layout2.explicitSuperclass) {
-      if (!layout1.explicitSuperclass || !layout2.explicitSuperclass)
-        return getTypeMatchFailure(locator);
-
+    if (pct1->hasExplicitAnyObject() != pct2->hasExplicitAnyObject())
+      return getTypeMatchFailure(locator);
+    for (unsigned i = 0, e = members1.size(); i < e; ++i) {
+      auto member1 = members1[i];
+      auto member2 = members2[i];
       auto subLocator = locator.withPathElement(
-                          ConstraintLocator::ProtocolCompositionSuperclassType);
-      auto result = matchTypes(layout1.explicitSuperclass,
-                               layout2.explicitSuperclass,
-                               ConstraintKind::Bind, subflags,
+                          LocatorPathElt::ProtocolCompositionMemberType(i));
+      auto result = matchTypes(member1, member2, ConstraintKind::Bind, subflags,
                                subLocator);
       if (result.isFailure())
         return result;
@@ -4441,11 +4429,11 @@ ConstraintSystem::matchTypesBindTypeVar(
     type.visit([&](Type t) {
       if (auto *tvt = dyn_cast<TypeVariableType>(t.getPointer())) {
         if (!typeVar->getImpl().canBindToLValue()) {
-          tvt->getImpl().setCanBindToLValue(getSavedBindings(),
+          tvt->getImpl().setCanBindToLValue(getTrail(),
                                             /*enabled=*/false);
         }
         if (!typeVar->getImpl().canBindToNoEscape()) {
-          tvt->getImpl().setCanBindToNoEscape(getSavedBindings(),
+          tvt->getImpl().setCanBindToNoEscape(getTrail(),
                                               /*enabled=*/false);
         }
       }
@@ -7580,6 +7568,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     // Class and protocol metatypes are interoperable with certain Objective-C
     // runtime classes, but only when ObjC interop is enabled.
 
+    // Foreign reference types do *not* conform to AnyObject.
+    if (type1->isForeignReferenceType() && type2->isAnyObject())
+      return getTypeMatchFailure(locator);
+
     if (getASTContext().LangOpts.EnableObjCInterop) {
       // These conversions are between concrete types that don't need further
       // resolution, so we can consider them immediately solved.
@@ -7589,10 +7581,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                                   type1, type2, locator);
           return getTypeMatchSuccess();
         };
-
-      // Foreign reference types do *not* conform to AnyObject.
-      if (type1->isForeignReferenceType() && type2->isAnyObject())
-        return getTypeMatchFailure(locator);
       
       if (auto meta1 = type1->getAs<MetatypeType>()) {
         if (meta1->getInstanceType()->mayHaveSuperclass()
@@ -8341,6 +8329,16 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   return matchExistentialTypes(type, protocol, kind, flags, locator);
 }
 
+void ConstraintSystem::recordSynthesizedConformance(
+                                           ConstraintLocator *locator,
+                                           ProtocolConformanceRef conformance) {
+  bool inserted = SynthesizedConformances.insert({locator, conformance}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedSynthesizedConformance(locator));
+}
+
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  Type type,
                                  ProtocolDecl *protocol,
@@ -8499,7 +8497,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           ProtocolConformanceRef synthesized(protocol);
           auto witnessLoc = getConstraintLocator(
               locator.getAnchor(), LocatorPathElt::Witness(witness));
-          SynthesizedConformances.insert({witnessLoc, synthesized});
+          // FIXME: Why are we recording the same locator more than once here?
+          if (SynthesizedConformances.count(witnessLoc) == 0)
+            recordSynthesizedConformance(witnessLoc, synthesized);
           return recordConformance(synthesized);
         };
 
@@ -10455,7 +10455,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
       baseType = MetatypeType::get(baseType);
   } else if (auto *keyPathExpr = getAsExpr<KeyPathExpr>(anchor)) {
     // Key path can't refer to initializers e.g. `\Type.init`
-    return AllowInvalidRefInKeyPath::forRef(cs, init, locator);
+    return AllowInvalidRefInKeyPath::forRef(cs, baseType, init, locator);
   }
 
   if (!baseType)
@@ -10526,7 +10526,8 @@ static ConstraintFix *fixMemberRef(
     if (locator->isForKeyPathDynamicMemberLookup() ||
         locator->isForKeyPathComponent() ||
         locator->isKeyPathSubscriptComponent()) {
-      if (auto *fix = AllowInvalidRefInKeyPath::forRef(cs, decl, locator))
+      if (auto *fix =
+              AllowInvalidRefInKeyPath::forRef(cs, baseTy, decl, locator))
         return fix;
     }
   }
@@ -11524,6 +11525,36 @@ static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
   return builderType;
 }
 
+void ConstraintSystem::recordIsolatedParam(ParamDecl *param) {
+  bool inserted = isolatedParams.insert(param).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedIsolatedParam(param));
+}
+
+void ConstraintSystem::removeIsolatedParam(ParamDecl *param) {
+  bool erased = isolatedParams.erase(param);
+  ASSERT(erased);
+}
+
+void ConstraintSystem::recordPreconcurrencyClosure(
+    const ClosureExpr *closure) {
+  bool inserted = preconcurrencyClosures.insert(closure).second;
+  ASSERT(inserted);
+
+  if (solverState) {
+    recordChange(SolverTrail::Change::RecordedPreconcurrencyClosure(
+      const_cast<ClosureExpr *>(closure)));
+  }
+}
+
+void ConstraintSystem::removePreconcurrencyClosure(
+    const ClosureExpr *closure) {
+  bool erased = preconcurrencyClosures.erase(closure);
+  ASSERT(erased);
+}
+
 bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
                                       Type contextualType,
                                       ConstraintLocatorBuilder locator) {
@@ -11533,7 +11564,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
   // Note if this closure is isolated by preconcurrency.
   if (hasPreconcurrencyCallee(locator))
-    preconcurrencyClosures.insert(closure);
+    recordPreconcurrencyClosure(closure);
 
   // Let's look through all optionals associated with contextual
   // type to make it possible to infer parameter/result type of
@@ -11669,7 +11700,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
         // Note when a parameter is inferred to be isolated.
         if (contextualParam->isIsolated() && !flags.isIsolated() && paramDecl)
-          isolatedParams.insert(paramDecl);
+          recordIsolatedParam(paramDecl);
 
         // Carry-over the ownership specifier from the contextual parameter.
         auto paramOwnership =
@@ -12835,7 +12866,7 @@ bool ConstraintSystem::simplifyAppliedOverloads(
   auto *applicableFn = result->first;
   auto *fnTypeVar = applicableFn->getSecondType()->castTo<TypeVariableType>();
   auto argFnType = applicableFn->getFirstType()->castTo<FunctionType>();
-  AppliedDisjunctions[disjunction->getLocator()] = argFnType;
+  recordAppliedDisjunction(disjunction->getLocator(), argFnType);
   return simplifyAppliedOverloadsImpl(disjunction, fnTypeVar, argFnType,
                                       /*numOptionalUnwraps*/ result->second,
                                       applicableFn->getLocator());
@@ -12855,7 +12886,7 @@ bool ConstraintSystem::simplifyAppliedOverloads(
   if (!disjunction)
     return false;
 
-  AppliedDisjunctions[disjunction->getLocator()] = argFnType;
+  recordAppliedDisjunction(disjunction->getLocator(), argFnType);
   return simplifyAppliedOverloadsImpl(disjunction, fnTypeVar, argFnType,
                                       numOptionalUnwraps, locator);
 }
@@ -12880,7 +12911,11 @@ createImplicitRootForCallAsFunction(ConstraintSystem &cs, Type refType,
     // Record a type of the new reference in the constraint system.
     cs.setType(implicitRef, refType);
     // Record new `.callAsFunction` in the constraint system.
-    cs.recordCallAsFunction(implicitRef, arguments, calleeLocator);
+    cs.recordImplicitCallAsFunctionRoot(calleeLocator, implicitRef);
+
+    auto *implicitRefLocator = cs.getConstraintLocator(
+        implicitRef, ConstraintLocator::ApplyArgument);
+    cs.associateArgumentList(implicitRefLocator, arguments);
   }
 
   return implicitRef;
@@ -14063,6 +14098,17 @@ void ConstraintSystem::addRestrictedConstraint(
                                      TMF_GenerateConstraints, locator);
 }
 
+void ConstraintSystem::recordImplicitValueConversion(
+                             ConstraintLocator *locator,
+                             ConversionRestrictionKind restriction) {
+  bool inserted = ImplicitValueConversions.insert(
+        {getConstraintLocator(locator), restriction}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedImplicitValueConversion(locator));
+}
+
 /// Given that we have a conversion constraint between two types, and
 /// that the given constraint-reduction rule applies between them at
 /// the top level, apply it and generate any necessary recursive
@@ -14635,7 +14681,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
           getASTContext(), {Argument(SourceLoc(), Identifier(), nullptr)},
           /*firstTrailingClosureIndex=*/std::nullopt,
           AllocationArena::ConstraintSolver);
-      ArgumentLists.insert({argumentsLoc, argList});
+      recordArgumentList(argumentsLoc, argList);
     }
 
     auto *memberTypeLoc = getConstraintLocator(
@@ -14688,8 +14734,7 @@ ConstraintSystem::simplifyRestrictedConstraint(
       addFixConstraint(fix, matchKind, type1, type2, locator);
     }
 
-    ConstraintRestrictions.insert({
-        std::make_pair(type1.getPointer(), type2.getPointer()), restriction});
+    addConversionRestriction(type1, type2, restriction);
     return SolutionKind::Solved;
   }
   case SolutionKind::Unsolved:
@@ -14868,7 +14913,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
     return true;
 
   if (isAugmentingFix(fix)) {
-    Fixes.insert(fix);
+    addFix(fix);
     return false;
   }
 
@@ -14900,13 +14945,13 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   }
 
   if (!found)
-    Fixes.insert(fix);
+    addFix(fix);
 
   return false;
 }
 
 void ConstraintSystem::recordPotentialHole(TypeVariableType *typeVar) {
-  typeVar->getImpl().enableCanBindToHole(getSavedBindings());
+  typeVar->getImpl().enableCanBindToHole(getTrail());
 }
 
 void ConstraintSystem::recordAnyTypeVarAsPotentialHole(Type type) {
@@ -14915,7 +14960,7 @@ void ConstraintSystem::recordAnyTypeVarAsPotentialHole(Type type) {
 
   type.visit([&](Type type) {
     if (auto *typeVar = type->getAs<TypeVariableType>()) {
-      typeVar->getImpl().enableCanBindToHole(getSavedBindings());
+      typeVar->getImpl().enableCanBindToHole(getTrail());
     }
   });
 }
@@ -14938,22 +14983,38 @@ void ConstraintSystem::recordTypeVariablesAsHoles(Type type) {
 void ConstraintSystem::recordMatchCallArgumentResult(
     ConstraintLocator *locator, MatchCallArgumentResult result) {
   assert(locator->isLastElement<LocatorPathElt::ApplyArgument>());
-  argumentMatchingChoices.insert({locator, result});
+  bool inserted = argumentMatchingChoices.insert({locator, result}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedMatchCallArgumentResult(locator));
 }
 
-void ConstraintSystem::recordCallAsFunction(UnresolvedDotExpr *root,
-                                            ArgumentList *arguments,
-                                            ConstraintLocator *locator) {
-  ImplicitCallAsFunctionRoots.insert({locator, root});
+void ConstraintSystem::recordImplicitCallAsFunctionRoot(
+    ConstraintLocator *locator, UnresolvedDotExpr *root) {
+  bool inserted = ImplicitCallAsFunctionRoots.insert({locator, root}).second;
+  ASSERT(inserted);
 
-  associateArgumentList(
-      getConstraintLocator(root, ConstraintLocator::ApplyArgument), arguments);
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedImplicitCallAsFunctionRoot(locator));
 }
 
-void ConstraintSystem::recordKeyPath(KeyPathExpr *keypath,
+void ConstraintSystem::recordKeyPath(const KeyPathExpr *keypath,
                                      TypeVariableType *root,
                                      TypeVariableType *value, DeclContext *dc) {
-  KeyPaths.insert(std::make_pair(keypath, std::make_tuple(root, value, dc)));
+  bool inserted = KeyPaths.insert(
+    std::make_pair(keypath, std::make_tuple(root, value, dc))).second;
+  ASSERT(inserted);
+
+  if (solverState) {
+    recordChange(SolverTrail::Change::RecordedKeyPath(
+      const_cast<KeyPathExpr *>(keypath)));
+  }
+}
+
+void ConstraintSystem::removeKeyPath(const KeyPathExpr *keypath) {
+  bool erased = KeyPaths.erase(keypath);
+  ASSERT(erased);
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(

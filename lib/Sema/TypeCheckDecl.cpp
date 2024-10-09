@@ -26,6 +26,7 @@
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -332,7 +333,8 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
   case AccessorKind::Get: {
     auto readImpl = storage->getReadImpl();
     if (!isObjC &&
-        (readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Address))
+        (readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2 ||
+         readImpl == ReadImplKind::Address))
       return false;
     return storage->isDynamic();
   }
@@ -342,6 +344,7 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
   case AccessorKind::Set: {
     auto writeImpl = storage->getWriteImpl();
     if (!isObjC && (writeImpl == WriteImplKind::Modify ||
+                    writeImpl == WriteImplKind::Modify2 ||
                     writeImpl == WriteImplKind::MutableAddress ||
                     writeImpl == WriteImplKind::StoredWithObservers))
       return false;
@@ -351,8 +354,17 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
     if (!isObjC && storage->getReadImpl() == ReadImplKind::Read)
       return storage->isDynamic();
     return false;
+  case AccessorKind::Read2:
+    if (!isObjC && storage->getReadImpl() == ReadImplKind::Read2)
+      return storage->isDynamic();
+    return false;
   case AccessorKind::Modify: {
     if (!isObjC && storage->getWriteImpl() == WriteImplKind::Modify)
+      return storage->isDynamic();
+    return false;
+  }
+  case AccessorKind::Modify2: {
+    if (!isObjC && storage->getWriteImpl() == WriteImplKind::Modify2)
       return storage->isDynamic();
     return false;
   }
@@ -1633,12 +1645,14 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::Get:
     case AccessorKind::DistributedGet:
     case AccessorKind::Read:
+    case AccessorKind::Read2:
       break;
 
     case AccessorKind::Init:
     case AccessorKind::MutableAddress:
     case AccessorKind::Set:
     case AccessorKind::Modify:
+    case AccessorKind::Modify2:
       if (AD->isInstanceMember() && AD->getDeclContext()->hasValueSemantics())
         return SelfAccessKind::Mutating;
       break;
@@ -2104,7 +2118,9 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     // Coroutine accessors don't mention the value type directly.
     // If we add yield types to the function type, we'll need to update this.
     case AccessorKind::Read:
+    case AccessorKind::Read2:
     case AccessorKind::Modify:
+    case AccessorKind::Modify2:
       return TupleType::getEmpty(ctx);
     }
   }
@@ -2383,7 +2399,6 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
   case DeclKind::PrecedenceGroup:
-  case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
   case DeclKind::Missing:
   case DeclKind::MissingMember:
@@ -3194,4 +3209,184 @@ bool IsUnsafeRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
   }
 
   return false;
+}
+
+//----------------------------------------------------------------------------//
+// PrettyPrintDeclRequest
+//----------------------------------------------------------------------------//
+
+/// Returns the access level for pretty-printed declarations.
+///
+/// This is always \c Public unless \p decl is a \c ValueDecl and its
+/// access level is below \c Public. (That can happen with @testable and
+/// @_private imports.)
+static AccessLevel getBufferAccessLevel(const Decl *decl) {
+  AccessLevel level = AccessLevel::Public;
+  if (auto *VD = dyn_cast<ValueDecl>(decl))
+    level = VD->getFormalAccessScope().accessLevelForDiagnostics();
+  if (level > AccessLevel::Public) level = AccessLevel::Public;
+  return level;
+}
+
+namespace {
+  /// Keep track of the offsets at which a given target declaration is printed.
+  class TrackingPrinter : public StreamPrinter {
+    const Decl *targetDecl;
+
+  public:
+    std::optional<uint64_t> targetDeclOffset;
+
+    TrackingPrinter(const Decl *targetDecl, raw_ostream &out)
+      : StreamPrinter(out), targetDecl(targetDecl) { }
+
+    void printDeclLoc(const Decl *D) override {
+      if (D == targetDecl)
+        targetDeclOffset = OS.tell();
+    }
+  };
+}
+
+SourceLoc PrettyPrintDeclRequest::evaluate(Evaluator &eval, const Decl *decl) const {
+  // Conjure a buffer name for this declaration.
+  SmallVector<std::string, 4> nameComponents;
+  DeclContext *dc;
+  if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
+    nameComponents.push_back(valueDecl->getBaseName().userFacingName().str());
+    dc = valueDecl->getDeclContext();
+  } else {
+    dc = decl->getInnermostDeclContext();
+  }
+
+  // Collect context information for the buffer name.
+  while (dc) {
+    switch (dc->getContextKind()) {
+      case DeclContextKind::Package:
+        break;
+      case DeclContextKind::Module:
+        nameComponents.push_back(
+            cast<ModuleDecl>(dc)->getPublicModuleName(/*onlyIfImported=*/true
+              ).str().str());
+        break;
+
+      case DeclContextKind::FileUnit:
+      case DeclContextKind::TopLevelCodeDecl:
+      case DeclContextKind::SerializedTopLevelCodeDecl:
+        break;
+
+      case DeclContextKind::ExtensionDecl:
+        nameComponents.push_back(
+            cast<ExtensionDecl>(dc)->getExtendedType().getString());
+        break;
+
+      case DeclContextKind::GenericTypeDecl:
+      case DeclContextKind::Initializer:
+      case DeclContextKind::AbstractClosureExpr:
+      case DeclContextKind::SerializedAbstractClosure:
+      case DeclContextKind::AbstractFunctionDecl:
+      case DeclContextKind::SubscriptDecl:
+      case DeclContextKind::EnumElementDecl:
+      case DeclContextKind::MacroDecl:
+        if (auto valueDecl = dyn_cast_or_null<ValueDecl>(dc->getAsDecl())) {
+          nameComponents.push_back(
+              valueDecl->getBaseName().userFacingName().str());
+        }
+        break;
+    }
+
+    dc = dc->getParent();
+  }
+
+
+  std::string bufferName;
+  {
+    llvm::raw_string_ostream out(bufferName);
+    for (auto iter = nameComponents.rbegin(); iter != nameComponents.rend(); ++iter) {
+      out << *iter;
+
+      if (iter + 1 != nameComponents.rend())
+        out << ".";
+    }
+  }
+
+  // Compute the name of the enclosing type(s), if there is one. We'll embed the
+  // printed declaration in the type definition to establish the lexical
+  // context.
+  std::vector<std::string> enclosingTypes;
+  for (auto dc = decl->getDeclContext(); dc; dc = dc->getParent()) {
+    if (auto nominal = dc->getSelfNominalTypeDecl()) {
+      // The name of this enclosing type.
+      auto nominalKindName =
+          Decl::getDescriptiveKindName(nominal->getDescriptiveKind());
+      enclosingTypes.push_back(
+          (nominalKindName + " " +
+            nominal->getBaseName().userFacingName()).str());
+
+      // Jump from an extension over to the extended type.
+      dc = nominal;
+    }
+  }
+  std::reverse(enclosingTypes.begin(), enclosingTypes.end());
+
+  // Render the buffer contents.
+  ASTContext &ctx = decl->getASTContext();
+  llvm::SmallString<128> bufferContents;
+  uint64_t targetDeclOffsetInBuffer;
+  {
+    llvm::raw_svector_ostream out(bufferContents);
+
+    // Produce the enclosing types.
+    unsigned indent = 0;
+    for (const auto &enclosingType : enclosingTypes) {
+      out << std::string(indent, ' ') << enclosingType << " {\n";
+      indent += 2;
+    }
+
+    // Print this declaration.
+    TrackingPrinter printer(decl, out);
+    printer.setIndent(indent);
+    llvm::SaveAndRestore<bool> isPrettyPrinting(
+        ctx.Diags.IsPrettyPrintingDecl, true);
+    auto options = PrintOptions::printForDiagnostics(
+        getBufferAccessLevel(decl),
+        ctx.TypeCheckerOpts.PrintFullConvention);
+    decl->print(printer, options);
+
+    // Close all of the enclosing types.
+    for (const auto & enclosingType: enclosingTypes) {
+      (void)enclosingType;
+      indent -= 2;
+      out << std::string(indent, ' ') << "}\n";
+    }
+    assert(indent == 0);
+
+    if (!printer.targetDeclOffset)
+      return SourceLoc();
+
+    targetDeclOffsetInBuffer = *printer.targetDeclOffset;
+  }
+
+  // Build a buffer with the pretty-printed declaration.
+  SourceManager &sourceMgr = ctx.SourceMgr;
+  auto bufferID = sourceMgr.addMemBufferCopy(bufferContents, bufferName);
+  auto memBufferStartLoc = sourceMgr.getLocForBufferStart(bufferID);
+
+  // Note that this is a pretty-printed buffer.
+  sourceMgr.setGeneratedSourceInfo(
+      bufferID,
+      GeneratedSourceInfo{
+        GeneratedSourceInfo::PrettyPrinted,
+        CharSourceRange(),
+        CharSourceRange(memBufferStartLoc, bufferContents.size()),
+        ASTNode(const_cast<Decl *>(decl)).getOpaqueValue(),
+        nullptr
+      }
+  );
+
+  // Add a source file for the buffer.
+  auto moduleDecl = decl->getDeclContext()->getParentModule();
+  auto sourceFile = new (ctx) SourceFile(
+      *moduleDecl, SourceFileKind::Library, bufferID);
+  sourceFile->setImports({ });
+
+  return memBufferStartLoc.getAdvancedLoc(targetDeclOffsetInBuffer);
 }

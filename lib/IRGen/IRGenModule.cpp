@@ -1381,6 +1381,10 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
   if (Opts.UseJIT)
     return false;
 
+  // witness tables are always emitted lazily in embedded swift.
+  if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return true;
+
   // Regardless of the access level, if the witness table is shared it means
   // we can safely not emit it. Every other module which needs it will generate
   // its own shared copy of it.
@@ -1407,7 +1411,10 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
 }
 
 void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
-  assert(!SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded));
+  // In Embedded Swift, only class-bound wtables are allowed.
+  if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    assert(Conf->getProtocol()->requiresClass());
+  }
 
   if (auto *wt = SIL.lookUpWitnessTable(Conf)) {
     // Add it to the queue if it hasn't already been put there.

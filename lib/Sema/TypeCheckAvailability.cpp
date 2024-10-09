@@ -44,6 +44,9 @@
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
+static const Decl *
+concreteSyntaxDeclForAvailableAttribute(const Decl *AbstractSyntaxDecl);
+
 ExportContext::ExportContext(
     DeclContext *DC, AvailabilityRange runningOSVersion,
     FragileFunctionKind kind, bool spi, bool exported, bool implicit,
@@ -451,6 +454,8 @@ class TypeRefinementContextBuilder : private ASTWalker {
   };
   std::vector<ContextInfo> ContextStack;
 
+  llvm::SmallVector<const Decl *, 4> ConcreteDeclStack;
+
   /// Represents an entry in a stack of pending decl body type refinement
   /// contexts. TRCs in this stack should be pushed onto \p ContextStack when
   /// \p BodyStmt is encountered.
@@ -540,12 +545,27 @@ private:
     return MacroWalking::Arguments;
   }
 
+  bool shouldSkipDecl(Decl *D) const {
+    // Implicit decls don't have source locations so they cannot have a TRC.
+    if (D->isImplicit())
+      return true;
+
+    // Only visit a node that has a corresponding concrete syntax node if we are
+    // already walking that concrete syntax node.
+    auto *concreteDecl = concreteSyntaxDeclForAvailableAttribute(D);
+    if (concreteDecl != D) {
+      if (ConcreteDeclStack.empty() || ConcreteDeclStack.back() != concreteDecl)
+        return true;
+    }
+
+    return false;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     PrettyStackTraceDecl trace(stackTraceAction(), D);
 
-    // Implicit decls don't have source locations so they cannot have a TRC.
-    if (D->isImplicit())
-      return Action::Continue();
+    if (shouldSkipDecl(D))
+      return Action::SkipNode();
 
     // The AST of this decl may not be ready to traverse yet if it hasn't been
     // full typechecked. If that's the case, we leave a placeholder node in the
@@ -561,10 +581,21 @@ private:
 
     // Create TRCs that cover only the body of the declaration.
     buildContextsForBodyOfDecl(D);
+
+    // If this decl is the concrete syntax decl for some abstract syntax decl,
+    // push it onto the stack so that the abstract syntax decls may be visited.
+    auto *abstractDecl = abstractSyntaxDeclForAvailableAttribute(D);
+    if (abstractDecl != D) {
+      ConcreteDeclStack.push_back(D);
+    }
     return Action::Continue();
   }
 
   PostWalkAction walkToDeclPost(Decl *D) override {
+    if (!ConcreteDeclStack.empty() && ConcreteDeclStack.back() == D) {
+      ConcreteDeclStack.pop_back();
+    }
+
     while (ContextStack.back().ScopeNode.getAsDecl() == D) {
       ContextStack.pop_back();
     }
@@ -640,6 +671,7 @@ private:
   /// if no new context should be introduced.
   TypeRefinementContext *getNewContextForSignatureOfDecl(Decl *D) {
     if (!isa<ValueDecl>(D) &&
+        !isa<EnumCaseDecl>(D) &&
         !isa<ExtensionDecl>(D) &&
         !isa<MacroExpansionDecl>(D) &&
         !isa<PatternBindingDecl>(D))
@@ -651,12 +683,10 @@ private:
     if (isa<AbstractStorageDecl>(D) && D->getDeclContext()->isLocalContext())
       return nullptr;
 
-    // Don't introduce for variable declarations that have a parent pattern
-    // binding; all of the relevant information is on the pattern binding.
-    if (auto var = dyn_cast<VarDecl>(D)) {
-      if (var->getParentPatternBinding())
-        return nullptr;
-    }
+    // Don't introduce for abstract syntax nodes that have separate concrete
+    // syntax nodes. The TRC will be introduced for the concrete node instead.
+    if (concreteSyntaxDeclForAvailableAttribute(D) != D)
+      return nullptr;
 
     // Declarations with an explicit availability attribute always get a TRC.
     if (hasActiveAvailableAttribute(D, Context)) {
@@ -1312,18 +1342,20 @@ private:
 } // end anonymous namespace
 
 void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF) {
-  TypeRefinementContext *RootTRC = SF.getTypeRefinementContext();
   ASTContext &Context = SF.getASTContext();
   assert(!Context.LangOpts.DisableAvailabilityChecking);
 
-  if (!RootTRC) {
-    // The root type refinement context reflects the fact that all parts of
-    // the source file are guaranteed to be executing on at least the minimum
-    // platform version for inlining.
-    auto MinPlatformReq = AvailabilityRange::forInliningTarget(Context);
-    RootTRC = TypeRefinementContext::createForSourceFile(&SF, MinPlatformReq);
-    SF.setTypeRefinementContext(RootTRC);
-  }
+  // If there's already a root node, then we're done.
+  if (SF.getTypeRefinementContext())
+    return;
+
+  // The root type refinement context reflects the fact that all parts of
+  // the source file are guaranteed to be executing on at least the minimum
+  // platform version for inlining.
+  auto MinPlatformReq = AvailabilityRange::forInliningTarget(Context);
+  TypeRefinementContext *RootTRC =
+      TypeRefinementContext::createForSourceFile(&SF, MinPlatformReq);
+  SF.setTypeRefinementContext(RootTRC);
 
   // Build refinement contexts, if necessary, for all declarations starting
   // with StartElem.
@@ -1627,12 +1659,6 @@ static const Decl *findContainingDeclaration(SourceRange ReferenceRange,
     if (ReferenceRange.isInvalid())
       return false;
 
-    // Members of an active #if are represented both inside the
-    // IfConfigDecl and in the enclosing context. Skip over the IfConfigDecl
-    // so that the member declaration is found rather the #if itself.
-    if (isa<IfConfigDecl>(D))
-      return false;
-
     return SM.rangeContains(D->getSourceRange(), ReferenceRange);
   };
 
@@ -1686,7 +1712,8 @@ concreteSyntaxDeclForAvailableAttribute(const Decl *AbstractSyntaxDecl) {
   // event, multiple variables can be introduced with a single 'var'),
   // so suggest adding an attribute to the PatterningBindingDecl instead.
   if (auto *VD = dyn_cast<VarDecl>(AbstractSyntaxDecl)) {
-    return VD->getParentPatternBinding();
+    if (auto *PBD = VD->getParentPatternBinding())
+      return PBD;
   }
 
   // Similarly suggest applying the Fix-It to the parent enum case rather than
@@ -4624,9 +4651,20 @@ void swift::checkExplicitAvailability(Decl *decl) {
   // Skip if the command line option was not set and
   // accessors as we check the pattern binding decl instead.
   auto &ctx = decl->getASTContext();
-  auto DiagLevel = ctx.LangOpts.RequireExplicitAvailability;
-  if (!DiagLevel || isa<AccessorDecl>(decl))
+  if (isa<AccessorDecl>(decl))
     return;
+
+  DiagnosticBehavior DiagLevel;
+  switch (ctx.LangOpts.RequireExplicitAvailabilityBehavior) {
+  case LangOptions::RequireExplicitAvailabilityDiagnosticBehavior::Ignore:
+    return;
+  case LangOptions::RequireExplicitAvailabilityDiagnosticBehavior::Warning:
+    DiagLevel = DiagnosticBehavior::Warning;
+    break;
+  case LangOptions::RequireExplicitAvailabilityDiagnosticBehavior::Error:
+    DiagLevel = DiagnosticBehavior::Error;
+    break;
+  }
 
   // Only look at decls at module level or in extensions.
   // This could be changed to force having attributes on all decls.
@@ -4668,7 +4706,7 @@ void swift::checkExplicitAvailability(Decl *decl) {
 
   if (declNeedsExplicitAvailability(decl)) {
     auto diag = decl->diagnose(diag::public_decl_needs_availability);
-    diag.limitBehavior(*DiagLevel);
+    diag.limitBehavior(DiagLevel);
 
     auto suggestPlatform = ctx.LangOpts.RequireExplicitAvailabilityTarget;
     if (!suggestPlatform.empty()) {

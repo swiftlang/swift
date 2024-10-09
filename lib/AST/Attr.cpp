@@ -39,6 +39,7 @@
 using namespace swift;
 
 #define DECL_ATTR(_, Id, ...) \
+  static_assert(DeclAttrKind::Id <= DeclAttrKind::Last_DeclAttr); \
   static_assert(IsTriviallyDestructible<Id##Attr>::value, \
                 "Attrs are BumpPtrAllocated; the destructor is never called");
 #include "swift/AST/DeclAttr.def"
@@ -68,6 +69,10 @@ static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::
               DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIStableToRemove),     \
               #Name " needs to specify either APIBreakingToRemove or APIStableToRemove");
 #include "swift/AST/DeclAttr.def"
+
+#define TYPE_ATTR(_, Id)                                                       \
+  static_assert(TypeAttrKind::Id <= TypeAttrKind::Last_TypeAttr);
+#include "swift/AST/TypeAttr.def"
 
 StringRef swift::getAccessLevelSpelling(AccessLevel value) {
   switch (value) {
@@ -1033,7 +1038,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     if (!Options.PrintUserInaccessibleAttrs &&
         DeclAttribute::isUserInaccessible(DA->getKind()))
       continue;
-    if (Options.excludeAttrKind(DA->getKind()))
+    if (Options.excludeAttr(DA))
       continue;
 
     // In the public interfaces of -library-level=api modules, skip attributes
@@ -1463,12 +1468,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     // Don't print the _specialize attribute if it is marked spi and we are
     // asked to skip SPI.
     if (Options.printPublicInterface() && !attr->getSPIGroups().empty())
-      return false;
-
-    // Don't print the _specialize attribute if we are asked to skip the ones
-    // with availability parameters.
-    if (!Options.PrintSpecializeAttributeWithAvailability &&
-        !attr->getAvailableAttrs().empty())
       return false;
 
     Printer << "@" << getAttrName() << "(";

@@ -155,6 +155,8 @@ else()
     set(SWIFT_HOST_VARIANT_SDK_default "ANDROID")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     set(SWIFT_HOST_VARIANT_SDK_default "OSX")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "WASI")
+    set(SWIFT_HOST_VARIANT_SDK_default "WASI")
   else()
     message(FATAL_ERROR "Unable to detect SDK for host system: ${CMAKE_SYSTEM_NAME}")
   endif()
@@ -419,11 +421,21 @@ set(SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY
   ${SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY_default}
   CACHE STRING "MSVC Runtime Library for the standard library")
 
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows" AND BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" AND
+    CMAKE_BUILD_TYPE STREQUAL "Debug")
+  # Building with the host Swift toolchain requires linking just-built binaries
+  # against the host Swift runtime. In debug builds, that means linking a debug
+  # binary against a release binary. The MSVC linker does not normally permit
+  # this, since debug builds enable bounds-checked C++ iterators by default,
+  # which are not ABI-compatible with regular iterators. Let's instruct MSVC to
+  # disable bounds-checked iterators to make it possible to do a debug build of
+  # the Swift compiler with a host toolchain.
+  add_definitions(-D_ITERATOR_DEBUG_LEVEL=0)
+endif()
 
 if(BRIDGING_MODE STREQUAL "DEFAULT" OR NOT BRIDGING_MODE)
   if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS" OR (CMAKE_Swift_COMPILER AND CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.8))
     # In debug builds, to workaround a problem with LLDB's `po` command (rdar://115770255).
-    # On Windows, to workaround a build problem.
     # If the host Swift version is less than 5.8, use pure mode to workaround a C++ interop compiler crash.
     set(BRIDGING_MODE "PURE")
   else()

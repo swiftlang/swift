@@ -365,6 +365,7 @@ Entities
   entity-spec ::= 'fP'                       // property wrapper backing initializer
   entity-spec ::= 'fW'                       // property wrapper init from projected value
   entity-spec ::= 'fD'                       // deallocating destructor; untyped
+  entity-spec ::= 'fZ'                       // isolated deallocating destructor; untyped
   entity-spec ::= 'fd'                       // non-deallocating destructor; untyped
   entity-spec ::= 'fE'                       // ivar destroyer; untyped
   entity-spec ::= 'fe'                       // ivar initializer; untyped
@@ -387,11 +388,13 @@ Entities
   ACCESSOR ::= 'G'                           // global getter
   ACCESSOR ::= 'w'                           // willSet
   ACCESSOR ::= 'W'                           // didSet
-  ACCESSOR ::= 'r'                           // read
-  ACCESSOR ::= 'M'                           // modify (temporary)
+  ACCESSOR ::= 'r'                           // _read
+  ACCESSOR ::= 'M'                           // _modify (temporary)
   ACCESSOR ::= 'a' ADDRESSOR-KIND            // mutable addressor
   ACCESSOR ::= 'l' ADDRESSOR-KIND            // non-mutable addressor
   ACCESSOR ::= 'p'                           // pseudo accessor referring to the storage itself
+  ACCESSOR ::= 'x'                           // modify
+  ACCESSOR ::= 'y'                           // read
 
   ADDRESSOR-KIND ::= 'u'                     // unsafe addressor (no owner)
   ADDRESSOR-KIND ::= 'O'                     // owning addressor (non-native owner), not used anymore

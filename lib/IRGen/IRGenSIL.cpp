@@ -1425,6 +1425,10 @@ public:
   void visitIncrementProfilerCounterInst(IncrementProfilerCounterInst *I);
 
   void visitConvertFunctionInst(ConvertFunctionInst *i);
+  void visitThunkInst(ThunkInst *i) {
+    llvm_unreachable(
+        "Should have been lowered before IRGen by the ThunkLowering pass");
+  }
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *i);
   void visitUpcastInst(UpcastInst *i);
   void visitAddressToPointerInst(AddressToPointerInst *i);
@@ -2478,10 +2482,6 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
   if (f->isExternalDeclaration())
     return;
 
-  if (Context.LangOpts.hasFeature(Feature::Embedded) &&
-      f->getLoweredFunctionType()->isPolymorphic())
-    return;
-
   // Do not emit bodies of public_external or package_external functions.
   if (hasPublicOrPackageVisibility(f->getLinkage(),
                                    f->getASTContext().SILOpts.EnableSerializePackage) &&
@@ -2526,7 +2526,13 @@ void IRGenSILFunction::emitSILFunction() {
 
     if (IGM.getOptions().EmitAsyncFramePushPopMetadata) {
       CurFn->addFnAttr("async_entry");
+      CurFn->addFnAttr(llvm::Attribute::NoInline);
     }
+
+    // For debugging purposes we always want a frame that stores the async
+    // context.
+    if (IGM.getOptions().AsyncFramePointerAll)
+      CurFn->addFnAttr("frame-pointer", "all");
   }
   if (isAsyncFn) {
     IGM.noteSwiftAsyncFunctionDef();

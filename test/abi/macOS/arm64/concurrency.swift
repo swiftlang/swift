@@ -336,4 +336,38 @@ Added: _$ss9TaskLocalC13withValueImpl_9operation9isolation4file4lineqd__xn_qd__y
 Added: _$ss9TaskLocalC9withValue_9operation9isolation4file4lineqd__x_qd__yYaKXEScA_pSgYiSSSutYaKlF
 Added: _$ss9TaskLocalC9withValue_9operation9isolation4file4lineqd__x_qd__yYaKXEScA_pSgYiSSSutYaKlFTu
 
+// isolated deinit
+Added: _swift_task_deinitOnExecutor
+
 Added: __swift_concurrency_debug_internal_layout_version
+
+Added: _swift_task_getMainExecutor_hook
+Added: _swift_task_invokeSwiftCheckIsolated
+Added: _swift_task_isMainExecutor
+Added: _swift_task_isMainExecutor_hook
+
+Added: _swift_task_donateThreadToGlobalExecutorUntil
+Added: _swift_task_donateThreadToGlobalExecutorUntil_hook
+
+// Add property descriptors for static properties
+Added: _$sScM21sharedUnownedExecutorScevpZMV
+Added: _$sScM6sharedScMvpZMV
+Added: _$sScP10backgroundScPvpZMV
+Added: _$sScP11unspecifiedScPvpZMV
+Added: _$sScP13userInitiatedScPvpZMV
+Added: _$sScP15userInteractiveScPvpZMV
+Added: _$sScP3lowScPvpZMV
+Added: _$sScP4highScPvpZMV
+Added: _$sScP6mediumScPvpZMV
+Added: _$sScP7defaultScPvpZMV
+Added: _$sScP7utilityScPvpZMV
+Added: _$sScTss5NeverORszABRs_rlE11isCancelledSbvpZMV
+Added: _$sScTss5NeverORszABRs_rlE12basePriorityScPSgvpZMV
+Added: _$sScTss5NeverORszABRs_rlE15currentPriorityScPvpZMV
+Added: _$ss15ContinuousClockV3nowAB7InstantVvpZMV
+Added: _$ss15ContinuousClockV7InstantV3nowADvpZMV
+Added: _$ss15SuspendingClockV3nowAB7InstantVvpZMV
+Added: _$ss15SuspendingClockV7InstantV3nowADvpZMV
+Added: _$ss9TaskLocalC18_enclosingInstance7wrapped7storagexs5NeverO_s24ReferenceWritableKeyPathCyAGxGAIyAgByxGGtcipZMV
+
+Added: _swift_taskGroup_initializeWithOptions

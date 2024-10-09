@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/Demangler.h"
 #include "gtest/gtest.h"
 
 using namespace swift::Demangle;
@@ -42,4 +43,18 @@ TEST(Demangle, CustomGenericParameterNames) {
   };
   std::string Result = demangleSymbolAsString(SymbolName, Options);
   EXPECT_STREQ(DemangledName.c_str(), Result.c_str());
+}
+
+TEST(Demangle, DeepEquals) {
+  static std::string Symbols[]{
+#define SYMBOL(Mangled, Demangled) Mangled,
+#include "ManglingTestData.def"
+  };
+  for (const auto &Symbol : Symbols) {
+    Demangler D1;
+    Demangler D2;
+    auto tree1 = D1.demangleSymbol(Symbol);
+    auto tree2 = D2.demangleSymbol(Symbol);
+    EXPECT_TRUE(tree1->isDeepEqualTo(tree2)) << "Failing symbol: " << Symbol;
+  }
 }

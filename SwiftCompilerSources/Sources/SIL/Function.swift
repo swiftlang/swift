@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import Basic
+import AST
 import SILBridging
 
 @_semantics("arc.immortal")
@@ -54,7 +55,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   ///    @substituted <τ_0_0> () -> @out τ_0_0 for <ActualResultType>
   /// and this outside its module
   ///    @substituted <τ_0_0> () -> @out τ_0_0 for <some P>
-  public var loweredFunctionType: BridgedASTType { bridged.getLoweredFunctionTypeInContext() }
+  public var loweredFunctionType: CanonicalType {
+    CanonicalType(bridged: bridged.getLoweredFunctionTypeInContext())
+  }
 
   /// Returns true if the function is a definition and not only an external declaration.
   ///

@@ -319,7 +319,7 @@ StepResult ComponentStep::take(bool prevFailed) {
   // One of the previous components created by "split"
   // failed, it means that we can't solve this component.
   if ((prevFailed && DependsOnPartialSolutions.empty()) ||
-      CS.isTooComplex(Solutions))
+      CS.isTooComplex(Solutions) || CS.worseThanBestSolution())
     return done(/*isSuccess=*/false);
 
   // Setup active scope, only if previous component didn't fail.
@@ -457,10 +457,12 @@ StepResult ComponentStep::take(bool prevFailed) {
   }
 
   auto printConstraints = [&](const ConstraintList &constraints) {
-    for (auto &constraint : constraints)
+    for (auto &constraint : constraints) {
       constraint.print(
           getDebugLogger().indent(CS.solverState->getCurrentIndent()),
           &CS.getASTContext().SourceMgr, CS.solverState->getCurrentIndent());
+      getDebugLogger() << "\n";
+    }
   };
 
   // If we don't have any disjunction or type variable choices left, we're done
@@ -924,6 +926,10 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
 
   // Rewind back the constraint system information.
   ActiveChoice.reset();
+
+  // Reset the best score which was updated by `ConstraintSystem::finalize`
+  // while forming solution(s) for the current element.
+  CS.solverState->BestScore.reset();
 
   if (CS.isDebugMode())
     getDebugLogger() << ")\n";

@@ -86,6 +86,8 @@ NominalTypeDecl *CanType::getAnyNominal() const {
 }
 
 GenericTypeDecl *CanType::getAnyGeneric() const {
+  // FIXME: Remove checking for existential types. `getAnyGeneric` should return
+  // the GenericTypeDecl the type is directly bound to.
   if (auto existential = dyn_cast<ExistentialType>(*this))
     return existential->getConstraintType()->getAnyGeneric();
   if (auto ppt = dyn_cast<ParameterizedProtocolType>(*this))
@@ -3186,6 +3188,13 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
     ext2 = ext2.withSendable(false);
   }
 
+  if (matchMode.contains(TypeMatchFlags::IgnoreFunctionGlobalActorIsolation)) {
+    if (ext1.getGlobalActor())
+      ext1 = ext1.withoutIsolation();
+    if (ext2.getGlobalActor())
+      ext2 = ext2.withoutIsolation();
+  }
+
   // If specified, allow an escaping function parameter to override a
   // non-escaping function parameter when the parameter is optional.
   // Note that this is checking 'ext2' rather than 'ext1' because parameters
@@ -3739,12 +3748,17 @@ void ParameterizedProtocolType::getRequirements(
   auto argTypes = getArgs();
   assert(argTypes.size() <= assocTypes.size());
 
+  auto conformance = lookupConformance(baseType, protoDecl);
+  auto subMap = SubstitutionMap::getProtocolSubstitutions(
+      protoDecl, baseType, conformance);
+
   for (unsigned i : indices(argTypes)) {
     auto argType = argTypes[i];
     auto *assocType = assocTypes[i];
-    auto subjectType = assocType->getDeclaredInterfaceType()
-        ->castTo<DependentMemberType>()
-        ->substBaseType(baseType);
+    // Do a general type substitution here because the associated type might be
+    // from an inherited protocol, in which case we will evaluate a non-trivial
+    // conformance path.
+    auto subjectType = assocType->getDeclaredInterfaceType().subst(subMap);
     reqs.emplace_back(RequirementKind::SameType, subjectType, argType);
   }
 }
@@ -4078,14 +4092,15 @@ Type Type::transformRec(
   class Transform : public TypeTransform<Transform> {
     llvm::function_ref<std::optional<Type>(TypeBase *)> fn;
   public:
-    explicit Transform(llvm::function_ref<std::optional<Type>(TypeBase *)> fn) : fn(fn) {}
+    explicit Transform(llvm::function_ref<std::optional<Type>(TypeBase *)> fn,
+                       ASTContext &ctx) : TypeTransform(ctx), fn(fn) {}
 
     std::optional<Type> transform(TypeBase *type, TypePosition position) {
       return fn(type);
     }
   };
 
-  return Transform(fn).doIt(*this, TypePosition::Invariant);
+  return Transform(fn, (*this)->getASTContext()).doIt(*this, TypePosition::Invariant);
 }
 
 Type Type::transformWithPosition(
@@ -4095,14 +4110,15 @@ Type Type::transformWithPosition(
   class Transform : public TypeTransform<Transform> {
     llvm::function_ref<std::optional<Type>(TypeBase *, TypePosition)> fn;
   public:
-    explicit Transform(llvm::function_ref<std::optional<Type>(TypeBase *, TypePosition)> fn) : fn(fn) {}
+    explicit Transform(llvm::function_ref<std::optional<Type>(TypeBase *, TypePosition)> fn,
+                       ASTContext &ctx) : TypeTransform(ctx), fn(fn) {}
 
     std::optional<Type> transform(TypeBase *type, TypePosition position) {
       return fn(type, position);
     }
   };
 
-  return Transform(fn).doIt(*this, pos);
+  return Transform(fn, (*this)->getASTContext()).doIt(*this, pos);
 }
 
 bool Type::findIf(llvm::function_ref<bool(Type)> pred) const {
@@ -4450,14 +4466,12 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
   auto associatedTypeLookup =
       differentiableProtocol->lookupDirect(ctx.Id_TangentVector);
   assert(associatedTypeLookup.size() == 1);
-  auto *dependentType = DependentMemberType::get(
-      differentiableProtocol->getDeclaredInterfaceType(),
-      cast<AssociatedTypeDecl>(associatedTypeLookup[0]));
+  auto *assocDecl = cast<AssociatedTypeDecl>(associatedTypeLookup[0]);
 
   // Try to get the `TangentVector` associated type of `base`.
   // Return the associated type if it is valid.
-  auto assocTy =
-      dependentType->substBaseType(this, lookupConformance, std::nullopt);
+  auto conformance = swift::lookupConformance(this, differentiableProtocol);
+  auto assocTy = conformance.getTypeWitness(this, assocDecl);
   if (!assocTy->hasError())
     return cache(TangentSpace::getTangentVector(assocTy));
 

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SILBridging
 
 public struct VTable : CustomStringConvertible, NoReflectionChildren {
@@ -18,9 +19,46 @@ public struct VTable : CustomStringConvertible, NoReflectionChildren {
   public init(bridged: BridgedVTable) { self.bridged = bridged }
 
   public struct Entry : CustomStringConvertible, NoReflectionChildren {
-    fileprivate let bridged: BridgedVTableEntry
-    
-    public var function: Function { bridged.getImplementation().function }
+    public let bridged: BridgedVTableEntry
+
+    public enum Kind {
+      /// The vtable entry is for a method defined directly in this class.
+      case normal
+      /// The vtable entry is inherited from the superclass.
+      case inherited
+      /// The vtable entry is inherited from the superclass, and overridden in this class.
+      case overridden
+    }
+
+    fileprivate init(bridged: BridgedVTableEntry) {
+      self.bridged = bridged
+    }
+
+    public init(kind: Kind, isNonOverridden: Bool, methodDecl: DeclRef, implementation: Function) {
+      let bridgedKind: BridgedVTableEntry.Kind
+      switch kind {
+        case .normal:     bridgedKind = .Normal
+        case .inherited:  bridgedKind = .Inherited
+        case .overridden: bridgedKind = .Override
+      }
+      self.bridged = BridgedVTableEntry.create(bridgedKind, isNonOverridden,
+                                               methodDecl.bridged, implementation.bridged)
+    }
+
+    public var kind: Kind {
+      switch bridged.getKind() {
+        case .Normal:    return .normal
+        case .Inherited: return .inherited
+        case .Override:  return .overridden
+        default: fatalError()
+      }
+    }
+
+    public var isNonOverridden: Bool { bridged.isNonOverridden() }
+
+    public var methodDecl: DeclRef { DeclRef(bridged: bridged.getMethodDecl()) }
+
+    public var implementation: Function { bridged.getImplementation().function }
 
     public var description: String {
       return String(taking: bridged.getDebugDescription())
@@ -28,24 +66,41 @@ public struct VTable : CustomStringConvertible, NoReflectionChildren {
   }
 
   public struct EntryArray : BridgedRandomAccessCollection {
-    fileprivate let base: BridgedVTableEntry
+    fileprivate let bridgedTable: BridgedVTable
     public let count: Int
     
+    init(vTable: VTable) {
+      self.bridgedTable = vTable.bridged
+      self.count = vTable.bridged.getNumEntries()
+    }
+
     public var startIndex: Int { return 0 }
     public var endIndex: Int { return count }
     
     public subscript(_ index: Int) -> Entry {
       assert(index >= startIndex && index < endIndex)
-      return Entry(bridged: base.advanceBy(index))
+      return Entry(bridged: bridgedTable.getEntry(index))
     }
   }
 
-  public var entries: EntryArray {
-    let entries = bridged.getEntries()
-    return EntryArray(base: entries.base, count: entries.count)
-  }
+  public var entries: EntryArray { EntryArray(vTable: self) }
+
+  public var `class`: ClassDecl { bridged.getClass().getAs(ClassDecl.self) }
+
+  public var specializedClassType: Type? { bridged.getSpecializedClassType().typeOrNil }
+
+  public var isSpecialized: Bool { specializedClassType != nil }
 
   public var description: String {
     return String(taking: bridged.getDebugDescription())
+  }
+}
+
+extension OptionalBridgedVTable {
+  public var vTable: VTable? {
+    if let table {
+      return VTable(bridged: BridgedVTable(vTable: table))
+    }
+    return nil
   }
 }

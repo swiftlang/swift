@@ -1142,8 +1142,9 @@ void IRGenModule::emitGlobalLists() {
 // Eagerly emit functions that are externally visible. Functions that are
 // dynamic replacements must also be eagerly emitted.
 static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
-  // Embedded Swift only emits specialized function, so don't emit generic
-  // functions, even if they're externally visible.
+  // Embedded Swift only emits specialized function (except when they are
+  // protocol witness methods). So don't emit generic functions, even if they're
+  // externally visible.
   if (f.getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
       f.getLoweredFunctionType()->getSubstGenericSignature()) {
     return true;
@@ -1332,9 +1333,8 @@ void IRGenerator::emitLazyDefinitions() {
     assert(LazyFieldDescriptors.empty());
     // LazyFunctionDefinitions are allowed, but they must not be generic
     for (SILFunction *f : LazyFunctionDefinitions) {
-      assert(!f->isGeneric());
+      ASSERT(hasValidSignatureForEmbedded(f));
     }
-    assert(LazyWitnessTables.empty());
     assert(LazyCanonicalSpecializedMetadataAccessors.empty());
     assert(LazyMetadataAccessors.empty());
     // LazyClassMetadata is allowed
@@ -1482,7 +1482,7 @@ void IRGenerator::addLazyFunction(SILFunction *f) {
 
   // Embedded Swift doesn't expect any generic functions to be referenced.
   if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
-    assert(!f->isGeneric());
+    ASSERT(hasValidSignatureForEmbedded(f));
   }
 
   assert(!FinishedEmittingLazyDefinitions);
@@ -2568,7 +2568,6 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::TypeAlias:
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType:
-  case DeclKind::IfConfig: 
   case DeclKind::PoundDiagnostic:
   case DeclKind::Macro:
     return;
@@ -3473,6 +3472,24 @@ llvm::CallBase *swift::irgen::emitCXXConstructorCall(
   return result;
 }
 
+// For a SILFunction to be legal in Embedded Swift, it must be either
+// - non-generic
+// - generic with parameters thar are either
+//     - fully specialized (concrete)
+//     - a class-bound archetype (class-bound existential)
+bool swift::irgen::hasValidSignatureForEmbedded(SILFunction *f) {
+  auto s = f->getLoweredFunctionType()->getInvocationGenericSignature();
+  for (auto genParam : s.getGenericParams()) {
+    auto mappedParam = f->getGenericEnvironment()->mapTypeIntoContext(genParam);
+    if (auto archeTy = dyn_cast<ArchetypeType>(mappedParam)) {
+      if (archeTy->requiresClass())
+        continue;
+    }
+    return false;
+  }
+  return true;
+}
+
 StackProtectorMode IRGenModule::shouldEmitStackProtector(SILFunction *f) {
   const SILOptions &opts = IRGen.SIL.getOptions();
   return (opts.EnableStackProtection && f->needsStackProtection()) ?
@@ -4352,7 +4369,10 @@ static bool conformanceIsVisibleViaMetadata(
 
 
 void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
-
+  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+    return;
+  }
+    
   emitProtocolConformance(record);
 
   if (conformanceIsVisibleViaMetadata(record.conformance)) {
@@ -5706,7 +5726,6 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::Missing:
       llvm_unreachable("missing decl in IRGen");
 
-    case DeclKind::IfConfig:
     case DeclKind::PoundDiagnostic:
     case DeclKind::Macro:
       continue;
@@ -6088,7 +6107,7 @@ IRGenModule::getAddrOfWitnessTableLazyCacheVariable(
 ///
 /// This can only be used with non-dependent conformances.
 llvm::Constant*
-IRGenModule::getAddrOfWitnessTable(const RootProtocolConformance *conf,
+IRGenModule::getAddrOfWitnessTable(const ProtocolConformance *conf,
                                    ConstantInit definition) {
   IRGen.addLazyWitnessTable(conf);
 

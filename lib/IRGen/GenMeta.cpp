@@ -263,8 +263,12 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
       return Flags::Kind::Setter;
     case AccessorKind::Read:
       return Flags::Kind::ReadCoroutine;
+    case AccessorKind::Read2:
+      return Flags::Kind::Read2Coroutine;
     case AccessorKind::Modify:
       return Flags::Kind::ModifyCoroutine;
+    case AccessorKind::Modify2:
+      return Flags::Kind::Modify2Coroutine;
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
     case AccessorKind::ID:
@@ -1155,12 +1159,12 @@ namespace {
 
       for (auto &entry : DefaultWitnesses->getEntries()) {
         if (!entry.isValid() ||
-            entry.getKind() != SILWitnessTable::AssociatedTypeProtocol ||
-            entry.getAssociatedTypeProtocolWitness().Protocol != requirement ||
-            entry.getAssociatedTypeProtocolWitness().Requirement != association)
+            entry.getKind() != SILWitnessTable::AssociatedConformance ||
+            entry.getAssociatedConformanceWitness().Protocol != requirement ||
+            entry.getAssociatedConformanceWitness().Requirement != association)
           continue;
 
-        auto witness = entry.getAssociatedTypeProtocolWitness().Witness;
+        auto witness = entry.getAssociatedConformanceWitness().Witness;
         AssociatedConformance conformance(Proto, association, requirement);
         defineDefaultAssociatedConformanceAccessFunction(conformance, witness);
         return IGM.getMangledAssociatedConformance(nullptr, conformance);

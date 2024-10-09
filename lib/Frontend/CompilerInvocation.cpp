@@ -519,12 +519,11 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
                  ::getenv("SWIFT_ALIAS_MODULE_NAMES_IN_INTERFACES"));
   Opts.PrintFullConvention |=
     Args.hasArg(OPT_experimental_print_full_convention);
-  Opts.ExperimentalSPIImports |=
-    Args.hasArg(OPT_experimental_spi_imports);
   Opts.DebugPrintInvalidSyntax |=
     Args.hasArg(OPT_debug_emit_invalid_swiftinterface_syntax);
   Opts.PrintMissingImports =
     !Args.hasArg(OPT_disable_print_missing_imports_in_module_interface);
+  Opts.ABIComments = Args.hasArg(OPT_abi_comments_in_module_interface);
 
   if (const Arg *A = Args.getLastArg(OPT_library_level)) {
     StringRef contents = A->getValue();
@@ -728,6 +727,8 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
     Opts.CASFSRootIDs.emplace_back(A);
   for (const auto &A : Args.getAllArgValues(OPT_clang_include_tree_root))
     Opts.ClangIncludeTrees.emplace_back(A);
+  for (const auto &A : Args.getAllArgValues(OPT_clang_include_tree_filelist))
+    Opts.ClangIncludeTreeFileList.emplace_back(A);
 
   if (const Arg *A = Args.getLastArg(OPT_input_file_key))
     Opts.InputFileKey = A->getValue();
@@ -735,7 +736,8 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   if (const Arg*A = Args.getLastArg(OPT_bridging_header_pch_key))
     Opts.BridgingHeaderPCHCacheKey = A->getValue();
 
-  if (!Opts.CASFSRootIDs.empty() || !Opts.ClangIncludeTrees.empty())
+  if (!Opts.CASFSRootIDs.empty() || !Opts.ClangIncludeTrees.empty() ||
+      !Opts.ClangIncludeTreeFileList.empty())
     Opts.HasImmutableFileSystem = true;
 
   return false;
@@ -1167,11 +1169,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_EQ)) {
     StringRef diagLevel = A->getValue();
     if (diagLevel == "warn") {
-      Opts.RequireExplicitAvailability = DiagnosticBehavior::Warning;
+      Opts.RequireExplicitAvailabilityBehavior =
+          LangOptions::RequireExplicitAvailabilityDiagnosticBehavior::Warning;
     } else if (diagLevel == "error") {
-      Opts.RequireExplicitAvailability = DiagnosticBehavior::Error;
+      Opts.RequireExplicitAvailabilityBehavior =
+          LangOptions::RequireExplicitAvailabilityDiagnosticBehavior::Error;
     } else if (diagLevel == "ignore") {
-      Opts.RequireExplicitAvailability = std::nullopt;
+      Opts.RequireExplicitAvailabilityBehavior =
+          LangOptions::RequireExplicitAvailabilityDiagnosticBehavior::Ignore;
     } else {
       Diags.diagnose(SourceLoc(),
                      diag::error_unknown_require_explicit_availability,
@@ -1180,7 +1185,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   } else if (Args.getLastArg(OPT_require_explicit_availability,
                              OPT_require_explicit_availability_target) ||
              Opts.LibraryLevel == LibraryLevel::API) {
-    Opts.RequireExplicitAvailability = DiagnosticBehavior::Warning;
+    Opts.RequireExplicitAvailabilityBehavior =
+        LangOptions::RequireExplicitAvailabilityDiagnosticBehavior::Warning;
   }
 
   if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_target)) {
@@ -1188,6 +1194,16 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   Opts.EnableSPIOnlyImports = Args.hasArg(OPT_experimental_spi_only_imports);
+  if (Args.hasArg(OPT_experimental_spi_imports)) {
+    if (Opts.EffectiveLanguageVersion.isVersionAtLeast(6)) {
+      Diags.diagnose(SourceLoc(), diag::flag_unsuppored,
+                     "-experimental-spi-imports");
+      HadError = true;
+    } else {
+      Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
+                     "-experimental-spi-imports");
+    }
+  }
 
   if (Args.hasArg(OPT_warn_swift3_objc_inference_minimal))
     Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
@@ -3464,6 +3480,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_async_frame_push_pop_metadata,
                  OPT_disable_async_frame_push_pop_metadata,
                  Opts.EmitAsyncFramePushPopMetadata);
+  Opts.AsyncFramePointerAll = Args.hasFlag(OPT_enable_async_frame_pointer_all,
+                                           OPT_disable_async_frame_pointer_all,
+                                           Opts.AsyncFramePointerAll);
   Opts.EnableLargeLoadableTypesReg2Mem =
       Args.hasFlag(OPT_enable_large_loadable_types_reg2mem,
                    OPT_disable_large_loadable_types_reg2mem,
@@ -3725,15 +3744,10 @@ bool CompilerInvocation::parseArgs(
     }
   }
 
-  // With Swift 6, enable @_spiOnly by default and forbid the old version.
-  // This also enables proper error reporting of ioi references from spi decls.
+  // With Swift 6, enable @_spiOnly by default. This also enables proper error
+  // reporting of ioi references from spi decls.
   if (LangOpts.EffectiveLanguageVersion.isVersionAtLeast(6)) {
     LangOpts.EnableSPIOnlyImports = true;
-
-    if (ParsedArgs.hasArg(OPT_experimental_spi_imports)) {
-      Diags.diagnose(SourceLoc(), diag::error_old_spi_only_import_unsupported);
-      return true;
-    }
   }
 
   return false;

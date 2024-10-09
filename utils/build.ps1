@@ -102,6 +102,11 @@ in batch file format instead of executing them.
 .PARAMETER HostArchName
 The architecture where the toolchain will execute.
 
+.PARAMETER Allocator
+The memory allocator used in the toolchain binaries, if it's
+`mimalloc`, it uses mimalloc. Otherwise, it uses the default
+allocator.
+
 .EXAMPLE
 PS> .\Build.ps1
 
@@ -138,6 +143,7 @@ param(
   [switch] $DebugInfo,
   [switch] $EnableCaching,
   [string] $Cache = "",
+  [string] $Allocator = "",
   [switch] $Summary,
   [switch] $ToBatch
 )
@@ -694,20 +700,20 @@ function Fetch-Dependencies {
         $installerWriteTime = (Get-Item $source).LastWriteTime
         $extractedWriteTime = (Get-Item $destination).LastWriteTime
         if ($installerWriteTime -le $extractedWriteTime) {
-            Write-Output "'$ToolchainName' is already extracted and up to date."
+            Write-Output "'$InstallerExeName' is already extracted and up to date."
             return
         }
     }
 
-    Write-Output "Extracting '$ToolchainName' ..."
+    Write-Output "Extracting '$InstallerExeName' ..."
 
     # The new runtime MSI is built to expand files into the immediate directory. So, setup the installation location.
     New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains\$PinnedToolchain\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin | Out-Null
-    Invoke-Program $BinaryCache\WiX-$WiXVersion\tools\net6.0\any\wix.exe -- burn extract $BinaryCache\$ToolchainName.exe -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\
-    Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | % {
+    Invoke-Program $BinaryCache\WiX-$WiXVersion\tools\net6.0\any\wix.exe -- burn extract $BinaryCache\$InstallerExeName -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\
+    Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
       $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
       $TARGETDIR = if ($_.Name -eq "rtl.msi") { "$BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin" } else { "$BinaryCache\toolchains\$ToolchainName" }
-    Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$_ ALLUSERS=0 TARGETDIR=$TARGETDIR
+    Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=$TARGETDIR
     }
   }
 
@@ -978,6 +984,13 @@ function Build-CMakeProject {
         # Add additional linker flags for generating the debug info.
         Append-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS "/debug"
         Append-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS "/debug"
+      } elseif ($Platform -eq "Android") {
+        # Use a built lld linker as the Android's NDK linker might be too
+        # old and not support all required relocations needed by the Swift
+        # runtime.
+        $ldPath = ([IO.Path]::Combine($CompilersBinaryCache, "bin", "ld.lld"))
+        Append-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS "--ld-path=$ldPath"
+        Append-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS "--ld-path=$ldPath"
       }
     }
 
@@ -1415,7 +1428,7 @@ function Build-Compilers() {
     # of Clang. If bootstrapping with an older toolchain, we need to relax to relax this requirement with
     # ALLOW_COMPILER_AND_STL_VERSION_MISMATCH.
     $SwiftFlags = @();
-    if ([System.Version](Get-PinnedToolchainVersion) -lt [System.Version]"6.0") {
+    if ([System.Version](Get-PinnedToolchainVersion) -lt [System.Version]"6.0" -and [System.Version](Get-PinnedToolchainVersion) -ne [System.Version]"0.0.0") {
       $SwiftFlags += @("-Xcc", "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH");
     }
 
@@ -1462,6 +1475,59 @@ function Build-Compilers() {
         SWIFT_PATH_TO_SWIFT_SDK = (Get-PinnedToolchainSDK);
         "cmark-gfm_DIR" = "$($Arch.ToolchainInstallRoot)\usr\lib\cmake";
       })
+  }
+}
+
+# Reference: https://github.com/microsoft/mimalloc/tree/dev/bin#minject
+# TODO: Add ARM64
+function Build-Mimalloc() {
+  [CmdletBinding(PositionalBinding = $false)]
+  param
+  (
+    [Parameter(Position = 0, Mandatory = $true)]
+    [hashtable]$Arch
+  )
+
+  if ($Arch -eq $ArchX64) {
+    $Args = @()
+    Isolate-EnvVars {
+      Invoke-VsDevShell $Arch
+      # Avoid hard-coding the VC tools version number
+      $VCRedistDir = (Get-ChildItem "${env:VCToolsRedistDir}\$($HostArch.ShortName)" -Filter "Microsoft.VC*.CRT").FullName
+      if ($VCRedistDir) {
+        $Args += "-p:VCRedistDir=$VCRedistDir\"
+      }
+    }
+    $Args += "$SourceCache\mimalloc\ide\vs2022\mimalloc.sln"
+    $Args += "-p:Configuration=Release"
+    $Args += "-p:ProductArchitecture=$($Arch.VSName)"
+    Invoke-Program $msbuild @Args
+    $Dest = "$($Arch.ToolchainInstallRoot)\usr\bin"
+    Copy-Item -Path "$SourceCache\mimalloc\out\msvc-$($Arch.ShortName)\Release\mimalloc-override.dll" `
+      -Destination "$Dest"
+    Copy-Item -Path "$SourceCache\mimalloc\out\msvc-$($Arch.ShortName)\Release\mimalloc-redirect.dll" `
+      -Destination "$Dest"
+    $MimallocExecutables = @("swift.exe","swiftc.exe","swift-driver.exe","swift-frontend.exe")
+    $MimallocExecutables += @("clang.exe","clang++.exe","clang-cl.exe")
+    $MimallocExecutables += @("lld.exe","lld-link.exe","ld.lld.exe","ld64.lld.exe")
+    foreach ($Exe in $MimallocExecutables) {
+      $ExePath = [IO.Path]::Combine($Dest, $Exe)
+      # Binary-patch in place
+      $Args = @()
+      $Args += "-f"
+      $Args += "-i"
+      $Args += "-v"
+      $Args += $ExePath
+      Invoke-Program "$SourceCache\mimalloc\bin\minject" @Args
+      # Log the import table
+      $Args = @()
+      $Args += "-l"
+      $Args += $ExePath
+      Invoke-Program "$SourceCache\mimalloc\bin\minject" @Args
+      dir "$ExePath"
+    }
+  } else {
+    throw "mimalloc is currently supported for X64 only"
   }
 }
 
@@ -1914,6 +1980,8 @@ function Build-XCTest([Platform]$Platform, $Arch, [switch]$Test = $false) {
 }
 
 function Build-Testing([Platform]$Platform, $Arch, [switch]$Test = $false) {
+  $DispatchBinaryCache = Get-TargetProjectBinaryCache $Arch Dispatch
+  $FoundationBinaryCache = Get-TargetProjectBinaryCache $Arch Foundation
   $SwiftTestingBinaryCache = Get-TargetProjectBinaryCache $Arch Testing
 
   Isolate-EnvVars {
@@ -1934,6 +2002,8 @@ function Build-Testing([Platform]$Platform, $Arch, [switch]$Test = $false) {
       -Defines (@{
         BUILD_SHARED_LIBS = "YES";
         CMAKE_BUILD_WITH_INSTALL_RPATH = "YES";
+        dispatch_DIR = "$DispatchBinaryCache\cmake\modules";
+        Foundation_DIR = "$FoundationBinaryCache\cmake\modules";
         SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
         SwiftTesting_MACRO = "$(Get-BuildProjectBinaryCache TestingMacros)\TestingMacros.dll";
       })
@@ -2020,6 +2090,19 @@ function Install-Platform([Platform]$Platform, $Arch) {
   }
   Copy-File "$($Arch.XCTestInstallRoot)\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\$($Arch.LLVMName)\XCTest.swiftmodule" "$XCTestInstallRoot\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\XCTest.swiftmodule\$($Arch.LLVMTarget).swiftmodule"
   Copy-File "$($Arch.XCTestInstallRoot)\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\$($Arch.LLVMName)\XCTest.swiftdoc" "$XCTestInstallRoot\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\XCTest.swiftmodule\$($Arch.LLVMTarget).swiftdoc"
+
+  # Copy Testing
+  $SwiftTestingInstallRoot = [IO.Path]::Combine((Get-InstallDir $HostArch), "Platforms", "${Platform}.platform", "Developer", "Library", "Testing-development")
+  switch ($Platform) {
+    Windows {
+      Copy-File "$($Arch.SwiftTestingInstallRoot)\usr\bin\Testing.dll" "$SwiftTestingInstallRoot\usr\$($Arch.BinaryDir)\"
+      Copy-File "$($Arch.SwiftTestingInstallRoot)\usr\lib\swift\windows\Testing.lib" "$SwiftTestingInstallRoot\usr\lib\swift\windows\$($Arch.LLVMName)\"
+    }
+    default {
+      Copy-File "$($Arch.SwiftTestingInstallRoot)\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\libTesting.so" "$SwiftTestingInstallRoot\usr\lib\$($Arch.BinaryDir)\"
+    }
+  }
+  Copy-Directory "$($Arch.SwiftTestingInstallRoot)\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\Testing.swiftmodule" "$SwiftTestingInstallRoot\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\"
 }
 
 function Build-SQLite($Arch) {
@@ -2457,6 +2540,7 @@ function Build-Installer($Arch) {
   # when cross-compiling https://github.com/apple/swift/issues/71655
   $INCLUDE_SWIFT_INSPECT = if ($IsCrossCompiling) { "false" } else { "true" }
   $INCLUDE_SWIFT_DOCC = if ($IsCrossCompiling) { "false" } else { "true" }
+  $ENABLE_MIMALLOC = if ($Allocator -eq "mimalloc" -and $Arch -eq $ArchX64) { "true" } else { "false" }
 
   $Properties = @{
     BundleFlavor = "offline";
@@ -2465,6 +2549,7 @@ function Build-Installer($Arch) {
     INCLUDE_SWIFT_INSPECT = $INCLUDE_SWIFT_INSPECT;
     SWIFT_INSPECT_BUILD = "$($Arch.BinaryCache)\swift-inspect\release";
     INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
+    ENABLE_MIMALLOC = $ENABLE_MIMALLOC;
     SWIFT_DOCC_BUILD = "$($Arch.BinaryCache)\swift-docc\release";
     SWIFT_DOCC_RENDER_ARTIFACT_ROOT = "${SourceCache}\swift-docc-render-artifact";
   }
@@ -2527,9 +2612,9 @@ if (-not $SkipBuild) {
 }
 
 if ($Clean) {
-  10..[HostComponent].getEnumValues()[-1] | % { Remove-Item -Force -Recurse "$BinaryCache\$_" -ErrorAction Ignore }
+  10..[HostComponent].getEnumValues()[-1] | ForEach-Object { Remove-Item -Force -Recurse "$BinaryCache\$_" -ErrorAction Ignore }
   foreach ($Arch in $WindowsSDKArchs) {
-    0..[TargetComponent].getEnumValues()[-1] | % { Remove-Item -Force -Recurse "$BinaryCache\$($Arch.BuildID + $_)" -ErrorAction Ignore }
+    0..[TargetComponent].getEnumValues()[-1] | ForEach-Object { Remove-Item -Force -Recurse "$BinaryCache\$($Arch.BuildID + $_)" -ErrorAction Ignore }
   }
 }
 
@@ -2616,6 +2701,10 @@ if (-not $SkipBuild) {
 
 Install-HostToolchain
 
+if (-not $SkipBuild -and $Allocator -eq "mimalloc") {
+  Invoke-BuildStep Build-Mimalloc $HostArch
+}
+
 if (-not $SkipBuild -and -not $IsCrossCompiling) {
   Invoke-BuildStep Build-Inspect $HostArch
   Invoke-BuildStep Build-DocC $HostArch
@@ -2685,6 +2774,6 @@ if (-not $IsCrossCompiling) {
   exit 1
 } finally {
   if ($Summary) {
-    $TimingData | Select Platform,Arch,Checkout,"Elapsed Time" | Sort -Descending -Property "Elapsed Time" | Format-Table -AutoSize
+    $TimingData | Select-Object Platform,Arch,Checkout,"Elapsed Time" | Sort-Object -Descending -Property "Elapsed Time" | Format-Table -AutoSize
   }
 }

@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 890; // @lifetime attribute
+const uint16_t SWIFTMODULE_VERSION_MINOR = 894; // ThunkInst
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -205,6 +205,7 @@ enum class ReadImplKind : uint8_t {
   Inherited,
   Address,
   Read,
+  Read2,
 };
 using ReadImplKindField = BCFixed<3>;
 
@@ -218,6 +219,7 @@ enum class WriteImplKind : uint8_t {
   Set,
   MutableAddress,
   Modify,
+  Modify2,
 };
 using WriteImplKindField = BCFixed<3>;
 
@@ -229,6 +231,7 @@ enum class ReadWriteImplKind : uint8_t {
   MutableAddress,
   MaterializeToTemporary,
   Modify,
+  Modify2,
   StoredWithDidSet,
   InheritedWithDidSet,
 };
@@ -333,7 +336,9 @@ enum AccessorKind : uint8_t {
   Address,
   MutableAddress,
   Read,
+  Read2,
   Modify,
+  Modify2,
   Init,
   DistributedGet,
 };
@@ -1077,6 +1082,7 @@ namespace input_block {
     DEPENDENCY_DIRECTORY,
     MODULE_INTERFACE_PATH,
     IMPORTED_MODULE_SPIS,
+    EXTERNAL_MACRO,
   };
 
   using ImportedModuleLayout = BCRecordLayout<
@@ -1092,6 +1098,12 @@ namespace input_block {
   using ImportedModuleLayoutSPI = BCRecordLayout<
     IMPORTED_MODULE_SPIS,
     BCBlob // SPI names, separated by \0s
+  >;
+
+  using ExternalMacroLayout = BCRecordLayout<
+    EXTERNAL_MACRO,
+    ImportControlField, // import kind
+    BCBlob // ModuleName, Library Path, Executable Path, separated by \0s
   >;
 
   using LinkLibraryLayout = BCRecordLayout<

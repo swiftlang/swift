@@ -1,3 +1,9 @@
+module StdNumeric {
+  header "std-numeric.h"
+  requires cplusplus
+  export *
+}
+
 module StdVector {
   header "std-vector.h"
   requires cplusplus

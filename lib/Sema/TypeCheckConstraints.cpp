@@ -84,15 +84,6 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
   }
 }
 
-SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
-  : TypeVar(typeVar), Options(typeVar->getImpl().getRawOptions()),
-    ParentOrFixed(typeVar->getImpl().ParentOrFixed) { }
-
-void SavedTypeVariableBinding::restore() {
-  TypeVar->getImpl().setRawOptions(Options);
-  TypeVar->getImpl().ParentOrFixed = ParentOrFixed;
-}
-
 GenericTypeParamType *
 TypeVariableType::Implementation::getGenericParameter() const {
   return locator ? locator->getGenericParameter() : nullptr;
@@ -979,8 +970,16 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
                                                Type t) {
   llvm::DenseMap<SubstitutableType *, TypeVariableType *> types;
 
-  return t.subst(
-    [&](SubstitutableType *origType) -> Type {
+  // FIXME: This operation doesn't really make sense with a generic function type.
+  // We should open the signature instead.
+  if (auto *gft = t->getAs<GenericFunctionType>()) {
+    t = FunctionType::get(gft->getParams(), gft->getResult(), gft->getExtInfo());
+  }
+
+  return t.transformRec(
+    [&](TypeBase *origType) -> std::optional<Type> {
+      // FIXME: By folding primary and opaque archetypes together, this doesn't
+      // really capture the correct semantics for opaque archetypes.
       if (auto archetypeTy = dyn_cast<ArchetypeType>(origType)) {
         return openTypeParameter(cs,
                                  archetypeTy->getInterfaceType(),
@@ -989,22 +988,20 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
       }
 
       // FIXME: Remove this case
-      auto *paramTy = cast<GenericTypeParamType>(origType);
-      auto found = types.find(paramTy);
-      if (found != types.end())
-        return found->second;
+      if (auto *paramTy = dyn_cast<GenericTypeParamType>(origType)) {
+        auto found = types.find(paramTy);
+        if (found != types.end())
+          return found->second;
 
-      auto locator = cs.getConstraintLocator({});
-      auto replacement = cs.createTypeVariable(locator,
-                                               TVO_CanBindToNoEscape);
-      types[paramTy] = replacement;
-      return replacement;
-    },
-    MakeAbstractConformanceForGenericType(),
-    // FIXME: By folding primary and opaque archetypes together, this doesn't
-    // really capture the correct semantics for opaque archetypes.
-    SubstFlags::SubstitutePrimaryArchetypes |
-    SubstFlags::SubstituteOpaqueArchetypes);
+        auto locator = cs.getConstraintLocator({});
+        auto replacement = cs.createTypeVariable(locator,
+                                                 TVO_CanBindToNoEscape);
+        types[paramTy] = replacement;
+        return replacement;
+      }
+
+      return std::nullopt;
+    });
 }
 
 bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
@@ -2332,7 +2329,9 @@ ForcedCheckedCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   return nullptr;
 }
 
-bool swift::canAddExplicitConsume(ModuleDecl *module, Expr *expr) {
+bool swift::canAddExplicitConsume(constraints::Solution &sol,
+                                  ModuleDecl *module,
+                                  Expr *expr) {
   expr = expr->getSemanticsProvidingExpr();
 
   // Is it already wrapped in a `consume`?
@@ -2340,7 +2339,8 @@ bool swift::canAddExplicitConsume(ModuleDecl *module, Expr *expr) {
     return false;
 
   // Is this expression valid to wrap inside a `consume`?
-  auto diags = findSyntacticErrorForConsume(module, SourceLoc(), expr);
+  auto diags = findSyntacticErrorForConsume(module, SourceLoc(), expr,
+                            [&](Expr *e) { return sol.getResolvedType(e); });
   return diags.empty();
 }
 

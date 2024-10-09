@@ -19,6 +19,7 @@ endif()
 # can be used from tools that has its own swift-syntax libraries as SwiftPM dependencies.
 set(SWIFT_MODULE_ABI_NAME_PREFIX "Compiler")
 set(SWIFTSYNTAX_PACKAGE_NAME "Toolchain")
+set(SWIFTSYNTAX_EMIT_MODULE ON)
 
 file(TO_CMAKE_PATH "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}" swift_syntax_path)
 FetchContent_Declare(SwiftSyntax SOURCE_DIR "${swift_syntax_path}")

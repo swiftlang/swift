@@ -22,12 +22,8 @@
 
 GROUP(no_group, "")
 
-GROUP(deprecated, "deprecated.md")
-GROUP_LINK(deprecated, availability_deprecated)
-
-GROUP(availability_deprecated, "availability_deprecated.md")
-
-GROUP(unknown_warning_group, "unknown_warning_group.md")
+GROUP(DeprecatedDeclaration, "DeprecatedDeclaration.md")
+GROUP(UnknownWarningGroup, "UnknownWarningGroup.md")
 
 #define UNDEFINE_DIAGNOSTIC_GROUPS_MACROS
 #include "swift/AST/DefineDiagnosticGroupsMacros.h"

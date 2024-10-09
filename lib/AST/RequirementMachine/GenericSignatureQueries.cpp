@@ -33,6 +33,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -332,6 +333,8 @@ bool RequirementMachine::isReducedType(Type type) const {
 /// Given a type parameter 'T.A1.A2...An', a suffix length m where m <= n,
 /// and a replacement type U, produce the type 'U.A(n-m)...An' by replacing
 /// 'T.A1...A(n-m-1)' with 'U'.
+///
+/// FIXME: Remove this.
 static Type substPrefixType(Type type, unsigned suffixLength, Type prefixType,
                             GenericSignature sig) {
   if (suffixLength == 0)
@@ -340,9 +343,10 @@ static Type substPrefixType(Type type, unsigned suffixLength, Type prefixType,
   auto *memberType = type->castTo<DependentMemberType>();
   auto substBaseType = substPrefixType(memberType->getBase(), suffixLength - 1,
                                        prefixType, sig);
-  return memberType->substBaseType(
-      substBaseType, LookUpConformanceInModule(),
-      std::nullopt);
+  auto *assocDecl = memberType->getAssocType();
+  auto *proto = assocDecl->getProtocol();
+  auto conformance = lookupConformance(substBaseType, proto);
+  return conformance.getTypeWitness(substBaseType, assocDecl);
 }
 
 Type RequirementMachine::getReducedTypeParameter(
@@ -380,6 +384,8 @@ Type RequirementMachine::getReducedTypeParameter(
   //
   // Note that V can be empty if T is fully valid; we expect this to be
   // true most of the time.
+  //
+  // FIXME: Remove all of this.
   auto prefix = getLongestValidPrefix(term);
 
   // Get a type (concrete or dependent) for U.

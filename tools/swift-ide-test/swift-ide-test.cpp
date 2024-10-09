@@ -263,6 +263,10 @@ SecondSourceFilename("second-source-filename",
                      llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
+ImplicitModuleImports("import-module", llvm::cl::desc("Force import of named modules"),
+               llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
 InputFilenames(llvm::cl::Positional, llvm::cl::desc("[input files...]"),
                llvm::cl::ZeroOrMore, llvm::cl::cat(Category));
 
@@ -368,10 +372,9 @@ ModuleAliases("module-alias",
             llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
-SkipDeinit("skip-deinit",
-           llvm::cl::desc("Whether to skip printing destructors"),
-           llvm::cl::cat(Category),
-           llvm::cl::init(true));
+    SkipDeinit("skip-deinit",
+               llvm::cl::desc("Whether to skip printing destructors"),
+               llvm::cl::cat(Category), llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 SkipImports("skip-imports",
@@ -1229,9 +1232,9 @@ static int printConformingMethodList(
           llvm::outs() << " []";
         llvm::outs() << "\n";
         for (auto VD : Result->Members) {
-          auto funcTy = cast<FuncDecl>(VD)->getMethodInterfaceType();
-          funcTy = Result->ExprType->getTypeOfMember(VD, funcTy);
-          auto resultTy = funcTy->castTo<FunctionType>()->getResult();
+          auto resultTy = cast<FuncDecl>(VD)->getResultInterfaceType();
+          resultTy = resultTy.subst(
+                Result->ExprType->getMemberSubstitutionMap(VD));
 
           llvm::outs() << "   - Name: ";
           VD->getName().print(llvm::outs());
@@ -1761,8 +1764,9 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
   importInfo.StdlibKind = ImplicitStdlibKind::Stdlib;
   auto *M = ModuleDecl::create(ctx.getIdentifier(Invocation.getModuleName()),
                                ctx, importInfo);
+  auto bufferID = ctx.SourceMgr.addMemBufferCopy("// nothing\n");
   auto *SF =
-      new (ctx) SourceFile(*M, SourceFileKind::Main, /*BufferID*/ std::nullopt);
+      new (ctx) SourceFile(*M, SourceFileKind::Main, bufferID);
   M->addFile(*SF);
   performImportResolution(*SF);
 
@@ -2618,7 +2622,7 @@ static int doPrintExpressionTypes(const CompilerInvocation &InitInvok,
   llvm::SmallString<256> TypeBuffer;
   llvm::raw_svector_ostream OS(TypeBuffer);
   SourceFile &SF = *CI.getPrimarySourceFile();
-  auto Source = SF.getASTContext().SourceMgr.getRangeForBuffer(*SF.getBufferID()).str();
+  auto Source = SF.getASTContext().SourceMgr.getRangeForBuffer(SF.getBufferID()).str();
   std::vector<std::pair<unsigned, std::string>> SortedTags;
 
   std::vector<const char*> Usrs;
@@ -3424,8 +3428,14 @@ public:
       case AccessorKind::Read:
         OS << "<read accessor for ";
         break;
+      case AccessorKind::Read2:
+        OS << "<read2 accessor for ";
+        break;
       case AccessorKind::Modify:
         OS << "<modify accessor for ";
+        break;
+      case AccessorKind::Modify2:
+        OS << "<modify2 accessor for ";
         break;
       case AccessorKind::Init:
         OS << "init accessor for ";
@@ -4003,9 +4013,8 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
       break;
   }
   assert(SF && "no source file?");
-  assert(SF->getBufferID().has_value() && "no buffer id?");
   SourceManager &SM = SF->getASTContext().SourceMgr;
-  unsigned bufferID = SF->getBufferID().value();
+  unsigned bufferID = SF->getBufferID();
   SourceLoc StartLoc = SM.getLocForLineCol(bufferID, StartLineCol.first,
                                            StartLineCol.second);
   SourceLoc EndLoc = SM.getLocForLineCol(bufferID, EndLineCol.first,
@@ -4109,7 +4118,6 @@ static int doPrintIndexedSymbols(const CompilerInvocation &InitInvok,
       break;
   }
   assert(SF && "no source file?");
-  assert(SF->getBufferID().has_value() && "no buffer id?");
 
   llvm::outs() << llvm::sys::path::filename(SF->getFilename()) << '\n';
   llvm::outs() << "------------\n";
@@ -4580,6 +4588,11 @@ int main(int argc, char *argv[]) {
         PluginSearchOption::PluginPath{path});
   }
   InitInvok.setDefaultInProcessPluginServerPathIfNecessary();
+
+  for (auto implicitImport : options::ImplicitModuleImports) {
+    InitInvok.getFrontendOptions().ImplicitImportModuleNames.emplace_back(
+        implicitImport, /*isTestable=*/false);
+  }
 
   // Process the clang arguments last and allow them to override previously
   // set options.

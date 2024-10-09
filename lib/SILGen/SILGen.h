@@ -28,6 +28,7 @@
 namespace swift {
   class SILBasicBlock;
   class ForeignAsyncConvention;
+  class SymbolSource;
 
 namespace Lowering {
   class TypeConverter;
@@ -123,6 +124,12 @@ public:
   void operator=(SILGenModule const &) = delete;
 
   ASTContext &getASTContext() { return M.getASTContext(); }
+
+  /// Main entry point.
+  void emitSourceFile(SourceFile *sf);
+
+  /// Lazy entry point for Feature::LazyImmediate.
+  void emitSymbolSource(SymbolSource Source);
 
   llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>> FileIDsByFilePath;
 
@@ -266,7 +273,6 @@ public:
   void visitFuncDecl(FuncDecl *fd);
   void visitPatternBindingDecl(PatternBindingDecl *vd);
   void visitTopLevelCodeDecl(TopLevelCodeDecl *td) {}
-  void visitIfConfigDecl(IfConfigDecl *icd);
   void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD);
   void visitNominalTypeDecl(NominalTypeDecl *ntd);
   void visitExtensionDecl(ExtensionDecl *ed);
@@ -552,6 +558,8 @@ public:
   FuncDecl *getAsyncMainDrainQueue();
   /// Retrieve the _Concurrency._swiftJobRun intrinsic.
   FuncDecl *getSwiftJobRun();
+  /// Retrieve the _Concurrency._deinitOnExecutor intrinsic.
+  FuncDecl *getDeinitOnExecutor();
   // Retrieve the _SwiftConcurrencyShims.exit intrinsic.
   FuncDecl *getExit();
 
@@ -623,6 +631,12 @@ private:
 
   /// Emit the deallocator for a class that uses the objc allocator.
   void emitObjCAllocatorDestructor(ClassDecl *cd, DestructorDecl *dd);
+
+  /// Emit the actual body of deallocator.
+  /// If deinit is isolated, function should be an isolated deallocator, an
+  /// actual deallocator is just a thunk that switches executors. If deinit is
+  /// isolated, function should be the deallocator itself.
+  void emitDeallocatorImpl(SILDeclRef constant, SILFunction *f);
 };
  
 } // end namespace Lowering

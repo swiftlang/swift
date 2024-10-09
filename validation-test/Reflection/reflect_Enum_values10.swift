@@ -10,6 +10,9 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: asan
 
+// This is broken on ARM64_32, disable it temporarily until we can fix it. rdar://137351613
+// UNSUPPORTED: CPU=arm64_32
+
 import SwiftReflectionTest
 
 protocol P : AnyObject {

@@ -30,6 +30,10 @@ class BridgedLegacyParser {
   swift::Parser *_Nonnull const handle;
 
 public:
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedLegacyParser() : handle(nullptr) {}
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedLegacyParser(swift::Parser &P) : handle(&P) {}
 

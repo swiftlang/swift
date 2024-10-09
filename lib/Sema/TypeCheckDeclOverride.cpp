@@ -522,7 +522,10 @@ static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
 namespace {
   enum class OverrideCheckingAttempt {
     PerfectMatch,
+    // Ignores only @Sendable and `any Sendable` annotations
     MismatchedSendability,
+    // Ignores both sendability and global actor isolation annotations.
+    MismatchedConcurrency,
     MismatchedOptional,
     MismatchedTypes,
     BaseName,
@@ -555,16 +558,36 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
   case OverrideCheckingAttempt::MismatchedSendability: {
     SendableCheckContext fromContext(decl->getDeclContext(),
                                      SendableCheck::Explicit);
-    auto baseDeclClass =
-        decl->getOverriddenDecl()->getDeclContext()->getSelfClassDecl();
 
-    diagnoseSendabilityErrorBasedOn(baseDeclClass, fromContext,
-                                    [&](DiagnosticBehavior limit) {
-      diags.diagnose(decl, diag::override_sendability_mismatch, decl->getName())
-          .limitBehaviorUntilSwiftVersion(limit, 6)
+    for (const auto &match : matches) {
+      auto baseDeclClass = match.Decl->getDeclContext()->getSelfClassDecl();
+
+      diagnoseSendabilityErrorBasedOn(
+          baseDeclClass, fromContext, [&](DiagnosticBehavior limit) {
+            diags
+                .diagnose(decl, diag::override_sendability_mismatch,
+                          decl->getName())
+                .limitBehaviorUntilSwiftVersion(limit, 6)
+                .limitBehaviorIf(
+                    fromContext.preconcurrencyBehavior(baseDeclClass));
+            return false;
+          });
+    }
+    break;
+  }
+  case OverrideCheckingAttempt::MismatchedConcurrency: {
+    SendableCheckContext fromContext(decl->getDeclContext(),
+                                     SendableCheck::Explicit);
+
+    for (const auto &match : matches) {
+      auto baseDeclClass = match.Decl->getDeclContext()->getSelfClassDecl();
+
+      diags
+          .diagnose(decl, diag::override_global_actor_isolation_mismatch,
+                    decl->getName())
+          .limitBehaviorUntilSwiftVersion(DiagnosticBehavior::Warning, 6)
           .limitBehaviorIf(fromContext.preconcurrencyBehavior(baseDeclClass));
-      return false;
-    });
+    }
     break;
   }
   case OverrideCheckingAttempt::BaseName:
@@ -591,7 +614,7 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
 
   for (auto match : matches) {
     auto matchDecl = match.Decl;
-    if (attempt == OverrideCheckingAttempt::PerfectMatch) {
+    if (attempt <= OverrideCheckingAttempt::MismatchedConcurrency) {
       diags.diagnose(matchDecl, diag::overridden_here);
       continue;
     }
@@ -896,6 +919,7 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
   switch (attempt) {
   case OverrideCheckingAttempt::PerfectMatch:
   case OverrideCheckingAttempt::MismatchedSendability:
+  case OverrideCheckingAttempt::MismatchedConcurrency:
   case OverrideCheckingAttempt::MismatchedOptional:
   case OverrideCheckingAttempt::MismatchedTypes:
     name = decl->getName();
@@ -992,6 +1016,11 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     }
     if (attempt == OverrideCheckingAttempt::MismatchedSendability)
       matchMode |= TypeMatchFlags::IgnoreFunctionSendability;
+
+    if (attempt == OverrideCheckingAttempt::MismatchedConcurrency) {
+      matchMode |= TypeMatchFlags::IgnoreFunctionSendability;
+      matchMode |= TypeMatchFlags::IgnoreFunctionGlobalActorIsolation;
+    }
 
     auto declFnTy = getDeclComparisonType()->getAs<AnyFunctionType>();
     auto parentDeclTy = getMemberTypeForComparison(parentDecl, decl);
@@ -1199,29 +1228,13 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   Type declTy = getDeclComparisonType();
   Type owningTy = dc->getDeclaredInterfaceType();
   auto isClassContext = classDecl != nullptr;
-  bool allowsSendabilityMismatches =
+  bool allowsConcurrencyMismatches =
       attempt == OverrideCheckingAttempt::MismatchedSendability ||
+      attempt == OverrideCheckingAttempt::MismatchedConcurrency ||
       (attempt == OverrideCheckingAttempt::PerfectMatch &&
        baseDecl->preconcurrency());
   bool mismatchedOnSendability = false;
-
-  auto diagnoseSendabilityMismatch = [&]() {
-    SendableCheckContext fromContext(decl->getDeclContext(),
-                                     SendableCheck::Explicit);
-    auto baseDeclClass = baseDecl->getDeclContext()->getSelfClassDecl();
-
-    diagnoseSendabilityErrorBasedOn(
-        baseDeclClass, fromContext, [&](DiagnosticBehavior limit) {
-          diags
-              .diagnose(decl, diag::override_sendability_mismatch,
-                        decl->getName())
-              .limitBehaviorUntilSwiftVersion(limit, 6)
-              .limitBehaviorIf(
-                  fromContext.preconcurrencyBehavior(baseDeclClass));
-          diags.diagnose(baseDecl, diag::overridden_here);
-          return false;
-        });
-  };
+  bool mismatchedOnIsolation = false;
 
   if (declIUOAttr == matchDeclIUOAttr && declTy->isEqual(baseTy)) {
     // Nothing to do.
@@ -1289,15 +1302,21 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     TypeMatchOptions options;
     options |= TypeMatchFlags::AllowOverride;
     if (!propertyTy->matches(parentPropertyCanTy, options)) {
-      if (allowsSendabilityMismatches) {
+      if (allowsConcurrencyMismatches) {
         options |= TypeMatchFlags::IgnoreSendability;
         options |= TypeMatchFlags::IgnoreFunctionSendability;
 
         mismatchedOnSendability =
             propertyTy->matches(parentPropertyCanTy, options);
+
+        if (!mismatchedOnSendability) {
+          options |= TypeMatchFlags::IgnoreFunctionGlobalActorIsolation;
+          mismatchedOnIsolation =
+              propertyTy->matches(parentPropertyCanTy, options);
+        }
       }
 
-      if (!mismatchedOnSendability) {
+      if (!mismatchedOnSendability && !mismatchedOnIsolation) {
         diags.diagnose(property, diag::override_property_type_mismatch,
                        property->getName(), propertyTy, parentPropertyTy);
         noteFixableMismatchedTypes(decl, baseDecl);
@@ -1316,28 +1335,36 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
 
     // The overridden property must not be mutable.
     if (cast<AbstractStorageDecl>(baseDecl)->supportsMutation() &&
-        !(optionalVsIUO || mismatchedOnSendability)) {
+        !(optionalVsIUO || mismatchedOnSendability || mismatchedOnIsolation)) {
       diags.diagnose(property, diag::override_mutable_covariant_property,
-                  property->getName(), parentPropertyTy, propertyTy);
+                     property->getName(), parentPropertyTy, propertyTy);
       diags.diagnose(baseDecl, diag::property_override_here);
       return true;
-    }
-
-    if (mismatchedOnSendability && !emittedMatchError) {
-      diagnoseSendabilityMismatch();
-      return checkSingleOverride(decl, baseDecl);
     }
   }
 
   if (emittedMatchError)
     return true;
 
-  if (attempt == OverrideCheckingAttempt::MismatchedSendability) {
-    diagnoseSendabilityMismatch();
+  if (mismatchedOnSendability || mismatchedOnIsolation) {
+    OverrideMatch match{baseDecl, /*isExact=*/false};
+
+    if (mismatchedOnSendability) {
+      diagnoseGeneralOverrideFailure(
+          decl, match, OverrideCheckingAttempt::MismatchedSendability);
+    }
+
+    if (mismatchedOnIsolation) {
+      diagnoseGeneralOverrideFailure(
+          decl, match, OverrideCheckingAttempt::MismatchedConcurrency);
+    }
+
+    return checkSingleOverride(decl, baseDecl);
   }
+
   // Catch-all to make sure we don't silently accept something we shouldn't.
-  else if (attempt != OverrideCheckingAttempt::PerfectMatch) {
-    OverrideMatch match{decl, /*isExact=*/false};
+  if (attempt != OverrideCheckingAttempt::PerfectMatch) {
+    OverrideMatch match{baseDecl, /*isExact=*/false};
     diagnoseGeneralOverrideFailure(decl, match, attempt);
   }
 
@@ -1400,6 +1427,7 @@ checkPotentialOverrides(ValueDecl *decl,
     case OverrideCheckingAttempt::PerfectMatch:
       break;
     case OverrideCheckingAttempt::MismatchedSendability:
+    case OverrideCheckingAttempt::MismatchedConcurrency:
       // Don't keep looking if the user didn't indicate it's an override.
       if (!decl->getAttrs().hasAttribute<OverrideAttr>())
         return false;
@@ -1570,6 +1598,7 @@ namespace  {
     UNINTERESTING_ATTR(Indirect)
     UNINTERESTING_ATTR(InheritsConvenienceInitializers)
     UNINTERESTING_ATTR(Inline)
+    UNINTERESTING_ATTR(Isolated)
     UNINTERESTING_ATTR(Optimize)
     UNINTERESTING_ATTR(Exclusivity)
     UNINTERESTING_ATTR(NoLocks)
@@ -1837,11 +1866,13 @@ isRedundantAccessorOverrideAvailabilityDiagnostic(ValueDecl *override,
     break;
 
   case AccessorKind::Read:
+  case AccessorKind::Read2:
     if (accessorOverrideAlreadyDiagnosed(AccessorKind::Get))
       return true;
     break;
 
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
     if (accessorOverrideAlreadyDiagnosed(AccessorKind::Get) ||
         accessorOverrideAlreadyDiagnosed(AccessorKind::Set)) {
       return true;
@@ -2347,7 +2378,9 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
     case AccessorKind::Get:
     case AccessorKind::Set:
     case AccessorKind::Read:
+    case AccessorKind::Read2:
     case AccessorKind::Modify:
+    case AccessorKind::Modify2:
       break;
 
     case AccessorKind::WillSet:
@@ -2385,9 +2418,11 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
       case AccessorKind::Get:
       case AccessorKind::DistributedGet:
       case AccessorKind::Read:
+      case AccessorKind::Read2:
         break;
 
       case AccessorKind::Modify:
+      case AccessorKind::Modify2:
       case AccessorKind::Set:
         // For setter accessors, we need the base's setter to be
         // accessible from the overriding context, or it's not an override.

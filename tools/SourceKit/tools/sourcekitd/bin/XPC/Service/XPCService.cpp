@@ -41,12 +41,12 @@ static void postNotification(sourcekitd_response_t Notification) {
     goto done;
 
   {
-    xpc_object_t contents = xpc_array_create(nullptr, 0);
+    xpc_object_t contents = xpc_array_create_empty();
     xpc_array_set_uint64(contents, XPC_ARRAY_APPEND,
                          (uint64_t)xpc::Message::Notification);
     xpc_array_set_value(contents, XPC_ARRAY_APPEND, Notification);
 
-    xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr, 0);
+    xpc_object_t msg = xpc_dictionary_create_empty();
     xpc_dictionary_set_value(msg, xpc::KeyInternalMsg, contents);
     xpc_release(contents);
 
@@ -85,12 +85,12 @@ static sourcekitd_uid_t xpcSKDUIDFromUIdent(UIdent UID) {
   if (!peer)
     return nullptr;
 
-  xpc_object_t contents = xpc_array_create(nullptr, 0);
+  xpc_object_t contents = xpc_array_create_empty();
   xpc_array_set_uint64(contents, XPC_ARRAY_APPEND,
                        (uint64_t)xpc::Message::UIDSynchronization);
   xpc_array_set_string(contents, XPC_ARRAY_APPEND, UID.c_str());
 
-  xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr,  0);
+  xpc_object_t msg = xpc_dictionary_create_empty();
   xpc_dictionary_set_value(msg, xpc::KeyInternalMsg, contents);
   xpc_release(contents);
 
@@ -122,12 +122,12 @@ static UIdent xpcUIdentFromSKDUID(sourcekitd_uid_t SKDUID) {
   if (!Peer)
     return UIdent();
 
-  xpc_object_t contents = xpc_array_create(nullptr, 0);
+  xpc_object_t contents = xpc_array_create_empty();
   xpc_array_set_uint64(contents, XPC_ARRAY_APPEND,
                        (uint64_t)xpc::Message::UIDSynchronization);
   xpc_array_set_uint64(contents, XPC_ARRAY_APPEND, uintptr_t(SKDUID));
 
-  xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr,  0);
+  xpc_object_t msg = xpc_dictionary_create_empty();
   xpc_dictionary_set_value(msg, xpc::KeyInternalMsg, contents);
   xpc_release(contents);
 
@@ -324,11 +324,11 @@ static void sourcekitdServer_peer_event_handler(xpc_connection_t peer,
 }
 
 static void getInitializationInfo(xpc_connection_t peer) {
-  xpc_object_t contents = xpc_array_create(nullptr, 0);
+  xpc_object_t contents = xpc_array_create_empty();
   xpc_array_set_uint64(contents, XPC_ARRAY_APPEND,
                        (uint64_t)xpc::Message::Initialization);
 
-  xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr,  0);
+  xpc_object_t msg = xpc_dictionary_create_empty();
   xpc_dictionary_set_value(msg, xpc::KeyInternalMsg, contents);
   xpc_release(contents);
 

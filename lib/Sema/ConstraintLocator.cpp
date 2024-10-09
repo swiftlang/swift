@@ -58,7 +58,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::UnresolvedMember:
   case ConstraintLocator::ParentType:
   case ConstraintLocator::ExistentialConstraintType:
-  case ConstraintLocator::ProtocolCompositionSuperclassType:
+  case ConstraintLocator::ProtocolCompositionMemberType:
   case ConstraintLocator::LValueConversion:
   case ConstraintLocator::DynamicType:
   case ConstraintLocator::SubscriptMember:
@@ -278,9 +278,11 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     out << "existential constraint type";
     break;
 
-  case ConstraintLocator::ProtocolCompositionSuperclassType:
-    out << "protocol composition superclass type";
+  case ConstraintLocator::ProtocolCompositionMemberType: {
+    auto memberElt = elt.castTo<LocatorPathElt::ProtocolCompositionMemberType>();
+    out << "protocol composition member " << llvm::utostr(memberElt.getIndex());
     break;
+  }
 
   case ConstraintLocator::LValueConversion:
     out << "@lvalue-to-inout conversion";

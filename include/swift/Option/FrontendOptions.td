@@ -86,6 +86,11 @@ def primary_file : Separate<["-"], "primary-file">,
   Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
   HelpText<"Produce output for this file, not the whole module">;
 
+def block_list_file
+  : Separate<["-"], "blocklist-file">, MetaVarName<"<path>">,
+    Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
+    HelpText<"The path to a blocklist configuration file">;
+
 let Flags = [FrontendOption, NoDriverOption] in {
 
 def triple : Separate<["-"], "triple">, Alias<target>;
@@ -287,10 +292,6 @@ def Raccess_note : Separate<["-"], "Raccess-note">,
     HelpText<"Control access note remarks (default: all)">;
 def Raccess_note_EQ : Joined<["-"], "Raccess-note=">,
     Alias<Raccess_note>;
-
-def block_list_file
-  : Separate<["-"], "blocklist-file">, MetaVarName<"<path>">,
-    HelpText<"The path to a blocklist configuration file">;
 } // end let Flags = [FrontendOption, NoDriverOption]
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
@@ -1049,6 +1050,9 @@ def disable_alias_module_names_in_module_interface :
   Flag<["-"], "disable-alias-module-names-in-module-interface">,
   HelpText<"When emitting a module interface, disable disambiguating modules "
            "using distinct alias names">;
+def abi_comments_in_module_interface :
+  Flag<["-"], "abi-comments-in-module-interface">,
+  HelpText<"When emitting a module interface, emit comments with ABI details">;
 
 def experimental_spi_imports :
   Flag<["-"], "experimental-spi-imports">,
@@ -1324,6 +1328,13 @@ def disable_async_frame_push_pop_metadata :
   Flag<["-"], "disable-async-frame-push-pop-metadata">,
   HelpText<"Disable async frame push pop metadata">;
 
+def enable_async_frame_pointer_all :
+  Flag<["-"], "enable-async-frame-pointer-all">,
+  HelpText<"Always emit async frame stack frames (frame-pointer=all)">;
+def disable_async_frame_pointer_all:
+  Flag<["-"], "disable-async-frame-pointer-all">,
+  HelpText<"Disable always emit async frame stack frames">;
+
 def enable_split_cold_code :
   Flag<["-"], "enable-split-cold-code">,
   HelpText<"Enable splitting of cold code when optimizing">;
@@ -1375,7 +1386,8 @@ def cas_fs: Separate<["-"], "cas-fs">,
 
 def clang_include_tree_root: Separate<["-"], "clang-include-tree-root">,
   HelpText<"Clang Include Tree CASID">, MetaVarName<"<cas-id>">;
-
+def clang_include_tree_filelist: Separate<["-"], "clang-include-tree-filelist">,
+  HelpText<"Clang Include Tree FileList CASID">, MetaVarName<"<cas-id>">;
 
 def experimental_spi_only_imports :
   Flag<["-"], "experimental-spi-only-imports">,

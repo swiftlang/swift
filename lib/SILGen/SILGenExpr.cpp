@@ -1723,7 +1723,19 @@ static ManagedValue convertCFunctionSignature(SILGenFunction &SGF,
                                               FunctionConversionExpr *e,
                                               SILType loweredResultTy,
                                 llvm::function_ref<ManagedValue ()> fnEmitter) {
-  SILType loweredDestTy = SGF.getLoweredType(e->getType());
+  SILType loweredDestTy;
+  auto destTy = e->getType();
+  auto clangInfo =
+      destTy->castTo<AnyFunctionType>()->getExtInfo().getClangTypeInfo();
+  if (clangInfo.empty())
+    loweredDestTy = SGF.getLoweredType(destTy);
+  else
+    // This won't be necessary after we stop dropping clang types when
+    // canonicalizing function types.
+    loweredDestTy = SGF.getLoweredType(
+        AbstractionPattern(destTy->getCanonicalType(), clangInfo.getType()),
+        destTy);
+
   ManagedValue result;
 
   // We're converting between C function pointer types. They better be
@@ -1794,7 +1806,9 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
 #endif
     semanticExpr = conv->getSubExpr()->getSemanticsProvidingExpr();
   }
-  
+
+  const clang::Type *destFnType = nullptr;
+
   if (auto declRef = dyn_cast<DeclRefExpr>(semanticExpr)) {
     setLocFromConcreteDeclRef(declRef->getDeclRef());
   } else if (auto memberRef = dyn_cast<MemberRefExpr>(semanticExpr)) {
@@ -1808,12 +1822,18 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
       loc = closure;
       return ManagedValue();
     });
+    auto clangInfo = conversionExpr->getType()
+                         ->castTo<FunctionType>()
+                         ->getExtInfo()
+                         .getClangTypeInfo();
+    if (!clangInfo.empty())
+      destFnType = clangInfo.getType();
   } else {
     llvm_unreachable("c function pointer converted from a non-concrete decl ref");
   }
 
   // Produce a reference to the C-compatible entry point for the function.
-  SILDeclRef constant(loc, /*foreign*/ true);
+  SILDeclRef constant(loc, /*foreign*/ true, false, false, destFnType);
   SILConstantInfo constantInfo =
       SGF.getConstantInfo(SGF.getTypeExpansionContext(), constant);
 
@@ -3174,6 +3194,11 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
   auto paramSubstValue = subSGF.emitOrigToSubstValue(loc, paramOrigValue,
                                              AbstractionPattern::getOpaque(),
                                              baseType);
+
+  // If base is a metatype, it cannot be opened as an existential or upcasted
+  // from a class.
+  if (baseType->is<MetatypeType>())
+    return paramSubstValue;
   
   // Pop open an existential container base.
   if (baseType->isAnyExistentialType()) {
@@ -4011,9 +4036,30 @@ getIdForKeyPathComponentComputedProperty(SILGenModule &SGM,
                                          AbstractStorageDecl *storage,
                                          ResilienceExpansion expansion,
                                          AccessStrategy strategy) {
+  auto getAccessorFunction = [&SGM](AbstractStorageDecl *storage,
+                                    bool isForeign) -> SILFunction * {
+    // Identify the property using its (unthunked) getter. For a
+    // computed property, this should be stable ABI; for a resilient public
+    // property, this should also be stable ABI across modules.
+    auto representativeDecl = getRepresentativeAccessorForKeyPath(storage);
+    // If the property came from an import-as-member function defined in C,
+    // use the original C function as the key.
+    auto ref =
+        SILDeclRef(representativeDecl, SILDeclRef::Kind::Func, isForeign);
+    // TODO: If the getter has shared linkage (say it's synthesized for a
+    // Clang-imported thing), we'll need some other sort of
+    // stable identifier.
+    return SGM.getFunction(ref, NotForDefinition);
+  };
+
   switch (strategy.getKind()) {
   case AccessStrategy::Storage:
-    // Identify reabstracted stored properties by the property itself.
+    if (auto decl = cast<VarDecl>(storage); decl->isStatic()) {
+      // For metatype keypaths, identify property via accessors.
+      return getAccessorFunction(storage, /*isForeign=*/false);
+    }
+    // Otherwise, identify reabstracted stored properties by the property
+    // itself.
     return cast<VarDecl>(storage);
   case AccessStrategy::MaterializeToTemporary:
     // Use the read strategy.  But try to avoid turning e.g. an
@@ -4026,19 +4072,9 @@ getIdForKeyPathComponentComputedProperty(SILGenModule &SGM,
     }
     LLVM_FALLTHROUGH;
   case AccessStrategy::DirectToAccessor: {
-    // Identify the property using its (unthunked) getter. For a
-    // computed property, this should be stable ABI; for a resilient public
-    // property, this should also be stable ABI across modules.
-    auto representativeDecl = getRepresentativeAccessorForKeyPath(storage);
-    // If the property came from an import-as-member function defined in C,
-    // use the original C function as the key.
-    bool isForeign = representativeDecl->isImportAsMember();
-    auto getterRef = SILDeclRef(representativeDecl,
-                                SILDeclRef::Kind::Func, isForeign);
-    // TODO: If the getter has shared linkage (say it's synthesized for a
-    // Clang-imported thing), we'll need some other sort of
-    // stable identifier.
-    return SGM.getFunction(getterRef, NotForDefinition);
+    return getAccessorFunction(
+        storage,
+        getRepresentativeAccessorForKeyPath(storage)->isImportAsMember());
   }
   case AccessStrategy::DispatchToAccessor: {
     // Identify the property by its vtable or wtable slot.
@@ -4244,19 +4280,25 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     CanType componentTy;
     if (!var->getDeclContext()->isTypeContext()) {
       componentTy = var->getInterfaceType()->getCanonicalType();
+    } else if (var->getDeclContext()->getSelfProtocolDecl() &&
+               baseTy->isExistentialType()) {
+      componentTy = var->getValueInterfaceType()->getCanonicalType();
+      ASSERT(!componentTy->hasTypeParameter());
     } else {
-      componentTy =
+      // The mapTypeIntoContext() / mapTypeOutOfContext() dance is there
+      // to handle the case where baseTy being a type parameter subject
+      // to a superclass requirement.
+      componentTy = var->getValueInterfaceType().subst(
         GenericEnvironment::mapTypeIntoContext(genericEnv, baseTy)
-          ->getTypeOfMember(var)
-          ->getReferenceStorageReferent()
+          ->getContextSubstitutionMap(var->getDeclContext()))
           ->mapTypeOutOfContext()
           ->getCanonicalType();
+    }
 
-      // The component type for an @objc optional requirement needs to be
-      // wrapped in an optional.
-      if (var->getAttrs().hasAttribute<OptionalAttr>()) {
-        componentTy = OptionalType::get(componentTy)->getCanonicalType();
-      }
+    // The component type for an @objc optional requirement needs to be
+    // wrapped in an optional.
+    if (var->getAttrs().hasAttribute<OptionalAttr>()) {
+      componentTy = OptionalType::get(componentTy)->getCanonicalType();
     }
   
     if (canStorageUseStoredKeyPathComponent(var, expansion)) {
@@ -6730,53 +6772,18 @@ RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
 
 RValue RValueEmitter::visitCurrentContextIsolationExpr(
     CurrentContextIsolationExpr *E, SGFContext C) {
-  // If we are in an actor initializer that is isolated to, the current context
-  // isolation flow-sensitive: before 'self' has been initialized, it will be
-  // nil. After 'self' has been initialized, it will be 'self'. Introduce a
-  // custom builtin that Definite Initialization will rewrite appropriately.
+  // If we are in an actor initializer that is isolated to self, the
+  // current isolation is flow-sensitive; use that instead of the
+  // synthesized expression.
   if (auto ctor = dyn_cast_or_null<ConstructorDecl>(
           SGF.F.getDeclRef().getDecl())) {
     auto isolation = getActorIsolation(ctor);
     if (ctor->isDesignatedInit() &&
         isolation == ActorIsolation::ActorInstance &&
         isolation.getActorInstance() == ctor->getImplicitSelfDecl()) {
-      ASTContext &ctx = SGF.getASTContext();
-      auto builtinName = ctx.getIdentifier(
-          isolation.isDistributedActor()
-              ? getBuiltinName(BuiltinValueKind::FlowSensitiveDistributedSelfIsolation)
-              : getBuiltinName(BuiltinValueKind::FlowSensitiveSelfIsolation));
-      SILType resultTy = SGF.getLoweredType(E->getType());
-
-      auto injection = cast<InjectIntoOptionalExpr>(E->getActor());
-      ProtocolConformanceRef conformance;
-      Expr *origActorExpr;
-      if (isolation.isDistributedActor()) {
-        // Create a reference to the asLocalActor getter.
-        auto asLocalActorDecl = getDistributedActorAsLocalActorComputedProperty(
-            SGF.F.getDeclContext()->getParentModule());
-        auto asLocalActorGetter = asLocalActorDecl->getAccessor(AccessorKind::Get);
-        SILDeclRef asLocalActorRef = SILDeclRef(
-            asLocalActorGetter, SILDeclRef::Kind::Func);
-        SGF.emitGlobalFunctionRef(E, asLocalActorRef);
-
-        // Extract the base ('self') and the DistributedActor conformance.
-        auto memberRef = cast<MemberRefExpr>(injection->getSubExpr());
-        conformance = memberRef->getDecl().getSubstitutions()
-            .getConformances()[0];
-        origActorExpr = memberRef->getBase();
-      } else {
-        auto erasure = cast<ErasureExpr>(injection->getSubExpr());
-        conformance = erasure->getConformances()[0];
-        origActorExpr = erasure->getSubExpr();
-      }
-      SGF.SGM.useConformance(conformance);
-
-      SubstitutionMap subs = SubstitutionMap::getProtocolSubstitutions(
-          conformance.getRequirement(), origActorExpr->getType(), conformance);
-      auto origActor = SGF.maybeEmitValueOfLocalVarDecl(
-          ctor->getImplicitSelfDecl(), AccessKind::Read).getValue();
-      auto call = SGF.B.createBuiltin(E, builtinName, resultTy, subs, origActor);
-      return RValue(SGF, E, ManagedValue::forForwardedRValue(SGF, call));
+      auto isolationValue =
+        SGF.emitFlowSensitiveSelfIsolation(E, isolation);
+      return RValue(SGF, E, isolationValue);
     }
   }
 

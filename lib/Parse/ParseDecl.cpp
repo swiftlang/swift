@@ -257,10 +257,7 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
   // Perform round-trip and/or validation checking.
   if (parsingOpts.contains(ParsingFlags::RoundTrip) &&
       swift_ASTGen_roundTripCheck(exportedSourceFile)) {
-    SourceLoc loc;
-    if (auto bufferID = SF.getBufferID()) {
-      loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
-    }
+    SourceLoc loc = Context.SourceMgr.getLocForBufferStart(SF.getBufferID());
     diagnose(loc, diag::parser_round_trip_error);
     return;
   }
@@ -277,10 +274,7 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
       // which case we still have `hadAnyError() == false`. To avoid
       // emitting the same warnings from SwiftParser, only emit errors from
       // SwiftParser
-      SourceLoc loc;
-      if (auto bufferID = SF.getBufferID()) {
-          loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
-      }
+      SourceLoc loc = Context.SourceMgr.getLocForBufferStart(SF.getBufferID());
       diagnose(loc, diag::parser_new_parser_errors);
     }
   }
@@ -298,10 +292,7 @@ void *ExportedSourceFileRequest::evaluate(Evaluator &evaluator,
   auto &SM = ctx.SourceMgr;
 
   auto bufferID = SF->getBufferID();
-  if (!bufferID)
-    return nullptr;
-
-  StringRef contents = SM.extractText(SM.getRangeForBuffer(*bufferID));
+  StringRef contents = SM.extractText(SM.getRangeForBuffer(bufferID));
 
   // Parse the source file.
   auto exportedSourceFile = swift_ASTGen_parseSourceFile(
@@ -2072,22 +2063,20 @@ void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,
 }
 
 bool Parser::peekAvailabilityMacroName() {
-  parseAllAvailabilityMacroArguments();
-  AvailabilityMacroMap Map = AvailabilityMacros;
+  AvailabilityMacroMap &Map = parseAllAvailabilityMacroArguments();
 
   StringRef MacroName = Tok.getText();
-  return Map.find(MacroName) != Map.end();
+  return Map.Impl.find(MacroName) != Map.Impl.end();
 }
 
 ParserStatus
 Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   // Get the macros from the compiler arguments.
-  parseAllAvailabilityMacroArguments();
-  AvailabilityMacroMap Map = AvailabilityMacros;
+  AvailabilityMacroMap &Map = parseAllAvailabilityMacroArguments();
 
   StringRef MacroName = Tok.getText();
-  auto NameMatch = Map.find(MacroName);
-  if (NameMatch == Map.end())
+  auto NameMatch = Map.Impl.find(MacroName);
+  if (NameMatch == Map.Impl.end())
     return makeParserSuccess(); // No match, it could be a standard platform.
 
   consumeToken();
@@ -2123,20 +2112,26 @@ Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   return makeParserSuccess();
 }
 
-void Parser::parseAllAvailabilityMacroArguments() {
-
-  if (AvailabilityMacrosComputed) return;
-
-  AvailabilityMacroMap Map;
+AvailabilityMacroMap &Parser::parseAllAvailabilityMacroArguments() {
+  AvailabilityMacroMap &Map = Context.getAvailabilityMacroCache();
+  if (Map.WasParsed)
+    return Map;
 
   SourceManager &SM = Context.SourceMgr;
   LangOptions LangOpts = Context.LangOpts;
 
+  // Allocate all buffers in one go to avoid repeating the sorting in
+  // findBufferContainingLocInternal.
+  llvm::SmallVector<unsigned, 4> bufferIDs;
   for (StringRef macro: LangOpts.AvailabilityMacros) {
+    unsigned bufferID = SM.addMemBufferCopy(macro,
+                                            "-define-availability argument");
+    bufferIDs.push_back(bufferID);
+  }
 
+  // Parse each macro definition.
+  for (unsigned bufferID: bufferIDs) {
     // Create temporary parser.
-    int bufferID = SM.addMemBufferCopy(macro,
-                                       "-define-availability argument");
     swift::ParserUnit PU(SM, SourceFileKind::Main, bufferID, LangOpts,
                          TypeCheckerOptions(), SILOptions(), "unknown");
 
@@ -2165,9 +2160,9 @@ void Parser::parseAllAvailabilityMacroArguments() {
     ParsedMacro.Specs = SpecsCopy;
 
     // Find the macro info by name.
-    AvailabilityMacroVersionMap MacroDefinition;
-    auto NameMatch = Map.find(ParsedMacro.Name);
-    if (NameMatch != Map.end()) {
+    AvailabilityMacroMap::VersionEntry MacroDefinition;
+    auto NameMatch = Map.Impl.find(ParsedMacro.Name);
+    if (NameMatch != Map.Impl.end()) {
       MacroDefinition = NameMatch->getSecond();
     }
 
@@ -2180,12 +2175,12 @@ void Parser::parseAllAvailabilityMacroArguments() {
     }
 
     // Save back the macro spec.
-    Map.erase(ParsedMacro.Name);
-    Map.insert({ParsedMacro.Name, MacroDefinition});
+    Map.Impl.erase(ParsedMacro.Name);
+    Map.Impl.insert({ParsedMacro.Name, MacroDefinition});
   }
 
-  AvailabilityMacros = Map;
-  AvailabilityMacrosComputed = true;
+  Map.WasParsed = true;
+  return Map;
 }
 
 ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
@@ -2828,6 +2823,15 @@ ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(SourceLoc atLoc,
       diag::expected_rparen_after_lifetime_dependence, [&]() -> ParserStatus {
         ParserStatus listStatus;
         foundParamId = true;
+
+        auto lifetimeDependenceKind = ParsedLifetimeDependenceKind::Default;
+        if (Tok.isContextualKeyword("borrow") &&
+            peekToken().isAny(tok::identifier, tok::integer_literal,
+                              tok::kw_self)) {
+          lifetimeDependenceKind = ParsedLifetimeDependenceKind::Scope;
+          consumeToken();
+        }
+
         switch (Tok.getKind()) {
         case tok::identifier: {
           Identifier paramName;
@@ -2837,8 +2841,8 @@ ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(SourceLoc atLoc,
             lifetimeEntries.push_back(
                 LifetimeEntry::getImmortalLifetimeEntry(paramLoc));
           } else {
-            lifetimeEntries.push_back(
-                LifetimeEntry::getNamedLifetimeEntry(paramLoc, paramName));
+            lifetimeEntries.push_back(LifetimeEntry::getNamedLifetimeEntry(
+                paramLoc, paramName, lifetimeDependenceKind));
           }
           break;
         }
@@ -2851,14 +2855,14 @@ ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(SourceLoc atLoc,
             listStatus.setIsParseError();
             return listStatus;
           }
-          lifetimeEntries.push_back(
-              LifetimeEntry::getOrderedLifetimeEntry(paramLoc, paramNum));
+          lifetimeEntries.push_back(LifetimeEntry::getOrderedLifetimeEntry(
+              paramLoc, paramNum, lifetimeDependenceKind));
           break;
         }
         case tok::kw_self: {
           auto paramLoc = consumeToken(tok::kw_self);
-          lifetimeEntries.push_back(
-              LifetimeEntry::getSelfLifetimeEntry(paramLoc));
+          lifetimeEntries.push_back(LifetimeEntry::getSelfLifetimeEntry(
+              paramLoc, lifetimeDependenceKind));
           break;
         }
         default:
@@ -5293,7 +5297,7 @@ ParserStatus Parser::parseDeclAttributeList(
       if (!ifConfigsAreDeclAttrs && !ifConfigContainsOnlyAttributes())
         break;
 
-      Status |= parseIfConfigDeclAttributes(
+      Status |= parseIfConfigAttributes(
           Attributes, ifConfigsAreDeclAttrs, initContext);
     }
   }
@@ -5341,7 +5345,7 @@ ParserStatus Parser::parseClosureDeclAttributeList(DeclAttributes &Attributes) {
       if (!ifConfigsAreDeclAttrs && !ifConfigContainsOnlyAttributes()) {
         break;
       }
-      Status |= parseIfConfigDeclAttributes(Attributes, ifConfigsAreDeclAttrs,
+      Status |= parseIfConfigAttributes(Attributes, ifConfigsAreDeclAttrs,
                                             initContext);
     }
   }
@@ -6256,13 +6260,17 @@ static Parser::ParseDeclOptions getParseDeclOptions(DeclContext *DC) {
 ///
 /// \param fromASTGen If true , this function in called from ASTGen as the
 /// fallback, so do not attempt a callback to ASTGen.
-ParserResult<Decl> Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
-                                     bool IfConfigsAreDeclAttrs,
-                                     llvm::function_ref<void(Decl *)> Handler,
-                                     bool fromASTGen) {
+ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
+                               bool IfConfigsAreDeclAttrs,
+                               llvm::function_ref<void(Decl *)> Handler,
+                               bool fromASTGen) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
-  if (IsForASTGen && !fromASTGen)
-    return parseDeclFromSyntaxTree();
+  if (IsForASTGen && !fromASTGen) {
+    auto result = parseDeclFromSyntaxTree();
+    if (auto resultDecl = result.getPtrOrNull())
+      Handler(resultDecl);
+    return result;
+  }
 #endif
   ParseDeclOptions Flags = getParseDeclOptions(CurDeclContext);
   ParserPosition BeginParserPosition;
@@ -6272,13 +6280,17 @@ ParserResult<Decl> Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
   if (Tok.is(tok::pound_if) && !ifConfigContainsOnlyAttributes()) {
     auto IfConfigResult = parseIfConfig(
         IfConfigContext::DeclItems,
-        [&](SmallVectorImpl<ASTNode> &Decls, bool IsActive) {
+        [&](bool IsActive) {
           ParserStatus Status;
           bool PreviousHadSemi = true;
           while (Tok.isNot(tok::pound_else, tok::pound_endif, tok::pound_elseif,
                            tok::r_brace, tok::eof)) {
             Status |= parseDeclItem(PreviousHadSemi,
-                                    [&](Decl *D) { Decls.emplace_back(D); });
+                                    [&](Decl *D) {
+              if (IsActive) {
+                Handler(D);
+              }
+            });
           }
         });
     if (IfConfigResult.hasCodeCompletion() && isIDEInspectionFirstPass()) {
@@ -6286,19 +6298,7 @@ ParserResult<Decl> Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
       return makeParserError();
     }
 
-    if (auto ICD = IfConfigResult.getPtrOrNull()) {
-      // The IfConfigDecl is ahead of its members in source order.
-      Handler(ICD);
-      // Copy the active members into the entries list.
-      for (auto activeMember : ICD->getActiveClauseElements()) {
-        auto *D = activeMember.get<Decl*>();
-        if (isa<IfConfigDecl>(D))
-          // Don't hoist nested '#if'.
-          continue;
-        Handler(D);
-      }
-    }
-    return IfConfigResult;
+    return makeParserSuccess();
   }
   if (Tok.isAny(tok::pound_warning, tok::pound_error)) {
     auto Result = parseDeclPoundDiagnostic();
@@ -7059,15 +7059,19 @@ ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
     return LineDirectiveStatus;
   }
 
-  ParserResult<Decl> Result =
+  Decl *LastResultDecl = nullptr;
+  ParserStatus Result =
       parseDecl(IsAtStartOfLineOrPreviousHadSemi,
-                /* IfConfigsAreDeclAttrs=*/false, handler);
-  if (Result.isParseErrorOrHasCompletion())
+                /* IfConfigsAreDeclAttrs=*/false, [&](Decl *decl) {
+        handler(decl);
+        LastResultDecl = decl;
+      });
+  if (Result.isErrorOrHasCompletion())
     skipUntilDeclRBrace(tok::semi, tok::pound_endif);
   SourceLoc SemiLoc;
   PreviousHadSemi = consumeIf(tok::semi, SemiLoc);
-  if (PreviousHadSemi && Result.isNonNull())
-    Result.get()->TrailingSemiLoc = SemiLoc;
+  if (PreviousHadSemi && LastResultDecl)
+    LastResultDecl->TrailingSemiLoc = SemiLoc;
   return Result;
 }
 
@@ -7870,7 +7874,9 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::Read:
+  case AccessorKind::Read2:
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
     return false;
 
   case AccessorKind::Init:
@@ -7906,6 +7912,7 @@ struct Parser::ParsedAccessors {
     if (Init) return Init;
     if (Set) return Set;
     if (Modify) return Modify;
+    if (Modify2) return Modify2;
     if (MutableAddress) return MutableAddress;
     return nullptr;
   }
@@ -7913,8 +7920,9 @@ struct Parser::ParsedAccessors {
 
 static ParserStatus parseAccessorIntroducer(Parser &P,
                                             DeclAttributes &Attributes,
-                                            AccessorKind &Kind,
-                                            SourceLoc &Loc) {
+                                            AccessorKind &Kind, SourceLoc &Loc,
+                                            bool isFirstAccessor,
+                                            bool *featureUnavailable) {
   ParserStatus Status;
   assert(Attributes.isEmpty());
   auto AttributeStatus = P.parseDeclAttributeList(Attributes);
@@ -7953,8 +7961,24 @@ static ParserStatus parseAccessorIntroducer(Parser &P,
     Status.setIsParseError();
     return Status;
   }
-#define SUPPRESS_ARTIFICIAL_ACCESSORS 1
 #define ACCESSOR_KEYWORD(KEYWORD)
+// Existing source code may have an implicit getter whose first expression is a
+// call to a function named experimental_accessor passing a trailing closure.
+// To maintain compatibility, if the feature corresponding to
+// experimental_accessor is not enabled, do not parse the token as an
+// introducer, so that it can be parsed as such a function call.
+#define EXPERIMENTAL_COROUTINE_ACCESSOR(ID, KEYWORD, FEATURE)                  \
+  else if (P.Tok.getRawText() == #KEYWORD) {                                   \
+    if (!P.Context.LangOpts.hasFeature(Feature::FEATURE)) {                    \
+      if (featureUnavailable)                                                  \
+        *featureUnavailable = true;                                            \
+      if (isFirstAccessor) {                                                   \
+        Status.setIsParseError();                                              \
+        return Status;                                                         \
+      }                                                                        \
+    }                                                                          \
+    Kind = AccessorKind::ID;                                                   \
+  }
 #define SINGLETON_ACCESSOR(ID, KEYWORD)                                        \
   else if (P.Tok.getRawText() == #KEYWORD) {                                   \
     Kind = AccessorKind::ID;                                                   \
@@ -8066,6 +8090,12 @@ bool Parser::parseAccessorAfterIntroducer(
                                existingAccessor);
   }
 
+  if (requiresFeatureCoroutineAccessors(Kind) &&
+      !Context.LangOpts.hasFeature(Feature::CoroutineAccessors)) {
+    diagnose(Tok, diag::accessor_requires_coroutine_accessors,
+             getAccessorNameForDiagnostic(Kind, /*article*/ false));
+  }
+
   // There should be no body in the limited syntax; diagnose unexpected
   // accessor implementations.
   if (parsingLimitedSyntax) {
@@ -8153,8 +8183,9 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
     DeclAttributes Attributes;
     AccessorKind Kind = AccessorKind::Get;
     SourceLoc Loc;
-    ParserStatus AccessorStatus =
-        parseAccessorIntroducer(*this, Attributes, Kind, Loc);
+    bool featureUnavailable = false;
+    ParserStatus AccessorStatus = parseAccessorIntroducer(
+        *this, Attributes, Kind, Loc, IsFirstAccessor, &featureUnavailable);
     Status |= AccessorStatus;
     if (AccessorStatus.isError() && !AccessorStatus.hasCodeCompletion()) {
       if (Tok.is(tok::code_complete)) {
@@ -8181,7 +8212,9 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
 
       // Cannot have an implicit getter after other accessor.
       if (!IsFirstAccessor) {
-        diagnose(Tok, diag::expected_accessor_kw);
+        if (!featureUnavailable) {
+          diagnose(Tok, diag::expected_accessor_kw);
+        }
         skipUntil(tok::r_brace);
         // Don't signal an error since we recovered.
         break;
@@ -8255,18 +8288,23 @@ void Parser::parseTopLevelAccessors(
   ParserStatus status;
   bool hasEffectfulGet = false;
   bool parsingLimitedSyntax = false;
+  bool IsFirstAccessor = true;
   while (!Tok.isAny(tok::r_brace, tok::eof)) {
     DeclAttributes attributes;
     AccessorKind kind = AccessorKind::Get;
     SourceLoc loc;
     ParserStatus accessorStatus =
-        parseAccessorIntroducer(*this, attributes, kind, loc);
+        parseAccessorIntroducer(*this, attributes, kind, loc, IsFirstAccessor,
+                                /*featureUnavailable=*/nullptr);
     if (accessorStatus.isError())
       break;
 
     (void)parseAccessorAfterIntroducer(loc, kind, accessors, hasEffectfulGet,
                                        parsingLimitedSyntax, attributes,
                                        PD_Default, storage, status);
+    if (IsFirstAccessor) {
+      IsFirstAccessor = false;
+    }
   }
 
   if (hadLBrace && Tok.is(tok::r_brace)) {
@@ -8530,9 +8568,12 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
   // 'get', 'read', and a non-mutable addressor are all exclusive.
   if (Get) {
     diagnoseConflictingAccessors(P, Get, Read);
+    diagnoseConflictingAccessors(P, Get, Read2);
     diagnoseConflictingAccessors(P, Get, Address);
   } else if (Read) {
     diagnoseConflictingAccessors(P, Read, Address);
+  } else if (Read2) {
+    diagnoseConflictingAccessors(P, Read2, Address);
   } else if (Address) {
     // Nothing can go wrong.
 
@@ -8543,9 +8584,9 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
       P.diagnose(mutator->getLoc(),
                  // Don't mention the more advanced accessors if the user
                  // only provided a setter without a getter.
-                 (MutableAddress || Modify)
-                   ? diag::missing_reading_accessor
-                   : diag::missing_getter,
+                 (MutableAddress || Modify || Modify2)
+                     ? diag::missing_reading_accessor
+                     : diag::missing_getter,
                  isa<SubscriptDecl>(storage),
                  getAccessorNameForDiagnostic(mutator, /*article*/ true));
     }

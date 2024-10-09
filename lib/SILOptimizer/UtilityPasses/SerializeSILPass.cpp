@@ -362,6 +362,15 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
     return wouldChange;
   }
 
+  case SILInstructionKind::ThunkInst: {
+    auto subs = cast<ThunkInst>(&inst)->getSubstitutionMap();
+    for (auto ty : subs.getReplacementTypes()) {
+      if (opaqueArchetypeWouldChange(context, ty->getCanonicalType()))
+        return true;
+    }
+    break;
+  }
+
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::PartialApplyInst:
   case SILInstructionKind::TryApplyInst:

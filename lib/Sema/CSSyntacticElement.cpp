@@ -26,6 +26,36 @@
 using namespace swift;
 using namespace swift::constraints;
 
+void ConstraintSystem::setTargetFor(SyntacticElementTargetKey key,
+                                    SyntacticElementTarget target) {
+  bool inserted = targets.insert({key, target}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedTarget(key));
+}
+
+void ConstraintSystem::removeTargetFor(SyntacticElementTargetKey key) {
+  bool erased = targets.erase(key);
+  ASSERT(erased);
+}
+
+std::optional<SyntacticElementTarget>
+ConstraintSystem::getTargetFor(SyntacticElementTargetKey key) const {
+  auto known = targets.find(key);
+  if (known == targets.end())
+    return std::nullopt;
+  return known->second;
+}
+
+std::optional<SyntacticElementTarget>
+Solution::getTargetFor(SyntacticElementTargetKey key) const {
+  auto known = targets.find(key);
+  if (known == targets.end())
+    return std::nullopt;
+  return known->second;
+}
+
 namespace {
 
 // Produce an implicit empty tuple expression.
@@ -265,12 +295,9 @@ static bool isViableElement(ASTNode element,
                             ConstraintSystem &cs) {
   if (auto *decl = element.dyn_cast<Decl *>()) {
     // - Ignore variable declarations, they are handled by pattern bindings;
-    // - Ignore #if, the chosen children should appear in the
-    // surrounding context;
     // - Skip #warning and #error, they are handled during solution
     //   application.
-    if (isa<VarDecl>(decl) || isa<IfConfigDecl>(decl) ||
-        isa<PoundDiagnosticDecl>(decl))
+    if (isa<VarDecl>(decl) || isa<PoundDiagnosticDecl>(decl))
       return false;
   }
 
@@ -835,12 +862,6 @@ private:
         return;
       }
     }
-
-    // Just ignore #if; the chosen children should appear in the
-    // surrounding context.  This isn't good for source tools but it
-    // at least works.
-    if (isa<IfConfigDecl>(decl))
-      return;
 
     // Skip #warning/#error; we'll handle them when applying the closure.
     if (isa<PoundDiagnosticDecl>(decl))
@@ -1740,9 +1761,6 @@ private:
   }
 
   void visitDecl(Decl *decl) {
-    if (isa<IfConfigDecl>(decl))
-      return;
-
     if (auto *PBD = dyn_cast<PatternBindingDecl>(decl)) {
       if (visitPatternBindingDecl(PBD)) {
         hadError = true;
@@ -2563,7 +2581,7 @@ bool ConstraintSystem::applySolution(AnyFunctionRef fn,
         param->setIsolated(true);
     }
 
-    if (llvm::is_contained(solution.preconcurrencyClosures, closure))
+    if (solution.preconcurrencyClosures.count(closure))
       closure->setIsolatedByPreconcurrency();
 
     // Coerce the result type, if it was written explicitly.

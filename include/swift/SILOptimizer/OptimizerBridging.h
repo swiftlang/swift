@@ -94,6 +94,10 @@ struct BridgedCalleeAnalysis {
   struct CalleeList {
     uint64_t storage[3];
 
+    // Ensure that this struct value type will be indirectly returned on
+    // Windows ARM64
+    CalleeList() {}
+
 #ifdef USED_IN_CPP_SOURCE
     CalleeList(swift::CalleeList list) {
       *reinterpret_cast<swift::CalleeList *>(&storage) = list;
@@ -222,7 +226,7 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeadEndBlocksAnalysis getDeadEndBlocksAnalysis() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDomTree getDomTree() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedPostDomTree getPostDomTree() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNominalTypeDecl getSwiftArrayDecl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftArrayDecl() const;
 
   // AST
 
@@ -248,9 +252,11 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE DevirtResult tryDevirtualizeApply(BridgedInstruction apply, bool isMandatory) const;
   bool tryOptimizeKeypath(BridgedInstruction apply) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;
-  SWIFT_IMPORT_UNSAFE swift::SILVTable * _Nullable specializeVTableForType(BridgedType type,
-                                                                           BridgedFunction function) const;
+  SWIFT_IMPORT_UNSAFE OptionalBridgedFunction specializeFunction(BridgedFunction function,
+                                                                 BridgedSubstitutionMap substitutions) const;
+  void deserializeAllCallees(BridgedFunction function, bool deserializeAll) const;
   bool specializeClassMethodInst(BridgedInstruction cm) const;
+  bool specializeWitnessMethodInst(BridgedInstruction wm) const;
   bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
   BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
   BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;
@@ -307,16 +313,12 @@ struct BridgedPassContext {
 
   // Access SIL module data structures
 
-  struct VTableArray {
-    swift::SILVTable * const _Nonnull * _Nullable base;
-    SwiftInt count;
-  };
-
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction getFirstFunctionInModule() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE static OptionalBridgedFunction getNextFunctionInModule(BridgedFunction function);
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedGlobalVar getFirstGlobalInModule() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE static OptionalBridgedGlobalVar getNextGlobalInModule(BridgedGlobalVar global);
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE VTableArray getVTables() const;
+  BRIDGED_INLINE SwiftInt getNumVTables() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedVTable getVTable(SwiftInt index) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedWitnessTable getFirstWitnessTableInModule() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE static OptionalBridgedWitnessTable getNextWitnessTableInModule(
                                                                                   BridgedWitnessTable table);
@@ -326,9 +328,26 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction lookupFunction(BridgedStringRef name) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction loadFunction(BridgedStringRef name,
                                                                           bool loadCalleesRecursively) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  OptionalBridgedVTable lookupVTable(BridgedDeclObj classDecl) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  OptionalBridgedVTable lookupSpecializedVTable(BridgedType classType) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedConformance getSpecializedConformance(BridgedConformance genericConformance,
+                                                       BridgedASTType type,
+                                                       BridgedSubstitutionMap substitutions) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  OptionalBridgedWitnessTable lookupWitnessTable(BridgedConformance conformance) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedWitnessTable createWitnessTable(BridgedLinkage linkage,
+                                                                            bool serialized,
+                                                                            BridgedConformance conformance,
+                                                                            BridgedArrayRef bridgedEntries) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedVTable createSpecializedVTable(BridgedType classType,
+                                                                           bool serialized,
+                                                                           BridgedArrayRef bridgedEntries) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE void loadFunction(BridgedFunction function, bool loadCalleesRecursively) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookupStdlibFunction(BridgedStringRef name) const;
-  SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookUpNominalDeinitFunction(BridgedNominalTypeDecl nominal) const;
+  SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookUpNominalDeinitFunction(BridgedDeclObj nominal) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap(BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBuiltinIntegerType(SwiftInt bitWidth) const;
   SWIFT_IMPORT_UNSAFE BridgedFunction createEmptyFunction(BridgedStringRef name,

@@ -100,11 +100,11 @@ public:
         silParsed(isSILParsed), parameterIndex(0) {}
 
   static ActorIsolation forUnspecified() {
-    return ActorIsolation(Unspecified, nullptr);
+    return ActorIsolation(Unspecified);
   }
 
   static ActorIsolation forNonisolated(bool unsafe) {
-    return ActorIsolation(unsafe ? NonisolatedUnsafe : Nonisolated, nullptr);
+    return ActorIsolation(unsafe ? NonisolatedUnsafe : Nonisolated);
   }
 
   static ActorIsolation forActorInstanceSelf(ValueDecl *decl);
@@ -132,6 +132,8 @@ public:
   static ActorIsolation forGlobalActor(Type globalActor) {
     return ActorIsolation(GlobalActor, globalActor);
   }
+
+  static ActorIsolation forMainActor(ASTContext &ctx);
 
   static ActorIsolation forErased() {
     return ActorIsolation(Erased);

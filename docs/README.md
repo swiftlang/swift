@@ -356,8 +356,6 @@ provide greater clarity to contributors wanting to add new documentation.
 - [Testing.md](/docs/Testing.md):
   TODO: Consider splitting into a how-to guide on writing a new test case
   and an explanation for how the compiler is tested.
-- [SwiftIndent.md](/docs/SwiftIndent.md):
-  TODO: Unclear if this is intended to be an explanation or a reference guide.
 - [Random.md](/docs/Random.md): Stub.
 
 ### Archive

@@ -13,6 +13,7 @@ struct Lock: ~Copyable {
     var _address: Builtin.RawPointer { return Builtin.addressOfBorrow(self) }
 
     // CHECK-LABEL: // Lock.init()
+    // CHECK-NEXT: Isolation: unspecified
     // CHECK-NEXT: sil{{.*}} @[[INIT:\$.*4LockV.*fC]] :
     init() {
         // CHECK-NOT: destroy_addr
@@ -26,6 +27,7 @@ struct Lock: ~Copyable {
     }
 
     // CHECK-LABEL: // Lock.deinit
+    // CHECK-NEXT: // Isolation: nonisolated
     // CHECK-NEXT: sil{{.*}} @[[DEINIT:\$.*4LockV.*fD]] :
     deinit {
         // CHECK-NOT: destroy_addr

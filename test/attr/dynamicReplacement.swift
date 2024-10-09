@@ -75,3 +75,23 @@ extension P {
   func replacement_f() {
   }
 }
+
+struct ImplicitModifier {
+  var i: Int {
+    get { 1 }
+    set {}
+  }
+}
+
+extension ImplicitModifier {
+  @_dynamicReplacement(for: i) // expected-error{{replaced 'modify' accessor for 'i' is not explicitly defined}}
+  var _i: Int {
+    get {
+      0
+    }
+    _modify {
+      var i: Int = 0
+      yield &i
+    }
+  }
+}

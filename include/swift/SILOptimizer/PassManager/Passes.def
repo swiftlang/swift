@@ -258,8 +258,6 @@ SWIFT_FUNCTION_PASS(DeadStoreElimination, "dead-store-elimination",
      "Dead Store Elimination")
 PASS(GenericSpecializer, "generic-specializer",
      "Generic Function Specialization on Static Types")
-PASS(VTableSpecializer, "vtable-specializer",
-     "Generic Specialization on VTables")
 PASS(ExistentialSpecializer, "existential-specializer",
      "Existential Specializer")
 PASS(SILSkippingChecker, "check-sil-skipping",
@@ -512,11 +510,14 @@ SWIFT_FUNCTION_PASS(UpdateBorrowedFrom, "update-borrowed-from",
      "Test pass for update borrowed-from instructions")
 PASS(DiagnoseUnnecessaryPreconcurrencyImports, "sil-diagnose-unnecessary-preconcurrency-imports",
      "Diagnose any preconcurrency imports that Sema and TransferNonSendable did not use")
+PASS(ThunkLowering, "sil-thunk-lowering",
+     "Lower thunk instructions to actual thunks")
 PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AliasInfoDumper, PruneVTables)
 
 SWIFT_SILCOMBINE_PASS(BeginCOWMutationInst)
+SWIFT_SILCOMBINE_PASS(ClassifyBridgeObjectInst)
 SWIFT_SILCOMBINE_PASS(GlobalValueInst)
 SWIFT_SILCOMBINE_PASS(StrongRetainInst)
 SWIFT_SILCOMBINE_PASS(StrongReleaseInst)

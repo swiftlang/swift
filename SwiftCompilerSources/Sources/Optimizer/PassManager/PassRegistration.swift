@@ -10,11 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 import OptimizerBridging
 
 @_cdecl("initializeSwiftModules")
 public func initializeSwiftModules() {
+  registerAST()
   registerSILClasses()
   registerSwiftAnalyses()
   registerUtilities()
@@ -109,6 +111,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(DestructureStructInst.self, { run(DestructureStructInst.self, $0) })
   registerForSILCombine(DestructureTupleInst.self, { run(DestructureTupleInst.self, $0) })
   registerForSILCombine(TypeValueInst.self, { run(TypeValueInst.self, $0) })
+  registerForSILCombine(ClassifyBridgeObjectInst.self, { run(ClassifyBridgeObjectInst.self, $0) })
 
   // Test passes
   registerPass(aliasInfoDumper, { aliasInfoDumper.run($0) })

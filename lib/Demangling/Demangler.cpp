@@ -1532,34 +1532,53 @@ NodePointer Demangler::demangleExtensionContext() {
 
 /// Associate any \c OpaqueReturnType nodes with the declaration whose opaque
 /// return type they refer back to.
-static Node *setParentForOpaqueReturnTypeNodes(Demangler &D,
-                                              Node *parent,
-                                              Node *visitedNode) {
-  if (!parent || !visitedNode)
-    return nullptr;
-  if (visitedNode->getKind() == Node::Kind::OpaqueReturnType) {
+/// Implementation for \c setParentForOpaqueReturnTypeNodes. Don't invoke
+/// directly.
+static void setParentForOpaqueReturnTypeNodesImpl(
+    Demangler &D, Node &visitedNode,
+    llvm::function_ref<StringRef()> getParentID) {
+  if (visitedNode.getKind() == Node::Kind::OpaqueReturnType) {
     // If this node is not already parented, parent it.
-    if (visitedNode->hasChildren()
-        && visitedNode->getLastChild()->getKind() == Node::Kind::OpaqueReturnTypeParent) {
-      return parent;
+    if (visitedNode.hasChildren() && visitedNode.getLastChild()->getKind() ==
+                                         Node::Kind::OpaqueReturnTypeParent) {
+      return;
     }
-    visitedNode->addChild(D.createNode(Node::Kind::OpaqueReturnTypeParent,
-                                       (Node::IndexType)parent), D);
-    return parent;
+    visitedNode.addChild(D.createNode(Node::Kind::OpaqueReturnTypeParent,
+                                      StringRef(getParentID())),
+                         D);
+    return;
   }
-  
+
   // If this node is one that may in turn define its own opaque return type,
   // stop recursion, since any opaque return type nodes underneath would refer
   // to the nested declaration rather than the one we're looking at.
-  if (visitedNode->getKind() == Node::Kind::Function
-      || visitedNode->getKind() == Node::Kind::Variable
-      || visitedNode->getKind() == Node::Kind::Subscript) {
-    return parent;
+  if (visitedNode.getKind() == Node::Kind::Function ||
+      visitedNode.getKind() == Node::Kind::Variable ||
+      visitedNode.getKind() == Node::Kind::Subscript) {
+    return;
   }
-  
-  for (size_t i = 0, e = visitedNode->getNumChildren(); i < e; ++i) {
-    setParentForOpaqueReturnTypeNodes(D, parent, visitedNode->getChild(i));
+
+  for (Node *child : visitedNode) {
+    assert(child);
+    setParentForOpaqueReturnTypeNodesImpl(D, *child, getParentID);
   }
+}
+
+/// Associate any \c OpaqueReturnType nodes with the declaration whose opaque
+/// return type they refer back to.
+static Node *setParentForOpaqueReturnTypeNodes(Demangler &D, Node *parent,
+                                               Node *visitedNode) {
+  if (!parent || !visitedNode)
+    return nullptr;
+  std::string parentID;
+  setParentForOpaqueReturnTypeNodesImpl(D, *visitedNode, [&] {
+    if (!parentID.empty())
+      return StringRef(parentID);
+    const auto mangleResult = mangleNode(parent);
+    assert(mangleResult.isSuccess());
+    parentID = mangleResult.result();
+    return StringRef(parentID);
+  });
   return parent;
 }
 
@@ -3913,7 +3932,9 @@ NodePointer Demangler::demangleAccessor(NodePointer ChildNode) {
     case 'w': Kind = Node::Kind::WillSet; break;
     case 'W': Kind = Node::Kind::DidSet; break;
     case 'r': Kind = Node::Kind::ReadAccessor; break;
+    case 'y': Kind = Node::Kind::Read2Accessor; break;
     case 'M': Kind = Node::Kind::ModifyAccessor; break;
+    case 'x': Kind = Node::Kind::Modify2Accessor; break;
     case 'i': Kind = Node::Kind::InitAccessor; break;
     case 'a':
       switch (nextChar()) {
@@ -3954,6 +3975,10 @@ NodePointer Demangler::demangleFunctionEntity() {
   switch (nextChar()) {
     case 'D': Args = None; Kind = Node::Kind::Deallocator; break;
     case 'd': Args = None; Kind = Node::Kind::Destructor; break;
+    case 'Z':
+      Args = None;
+      Kind = Node::Kind::IsolatedDeallocator;
+      break;
     case 'E': Args = None; Kind = Node::Kind::IVarDestroyer; break;
     case 'e': Args = None; Kind = Node::Kind::IVarInitializer; break;
     case 'i': Args = None; Kind = Node::Kind::Initializer; break;

@@ -115,6 +115,8 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
     Dependencies.emplace_back(coreDep);
   }
 
+  MacroModuleNames = core->MacroModuleNames;
+
   // `ModuleFileSharedCore` has immutable data, we copy these into `ModuleFile`
   // so we can mutate the arrays and replace the offsets with AST object
   // pointers as we lazily deserialize them.
@@ -531,6 +533,11 @@ void ModuleFile::getImportedModules(SmallVectorImpl<ImportedModule> &results,
     assert(dep.isLoaded());
     results.push_back(*(dep.Import));
   }
+}
+
+void ModuleFile::getExternalMacros(
+    SmallVectorImpl<ExternalMacroPlugin> &macros) {
+  macros = MacroModuleNames;
 }
 
 void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {

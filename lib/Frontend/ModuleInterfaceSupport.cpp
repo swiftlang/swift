@@ -270,41 +270,23 @@ static void printImports(raw_ostream &out,
       ModuleDecl::ImportFilterKind::Default,
       ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay};
 
-  // With -experimental-spi-imports:
-  // When printing the private or package swiftinterface file, print implementation-only
-  // imports only if they are also SPI. First, list all implementation-only imports and
-  // filter them later.
-  llvm::SmallSet<ImportedModule, 4, ImportedModule::Order> ioiImportSet;
-  if (!Opts.printPublicInterface() && Opts.ExperimentalSPIImports) {
-
-    SmallVector<ImportedModule, 4> ioiImports, allImports;
-    M->getImportedModules(ioiImports,
-                          ModuleDecl::ImportFilterKind::ImplementationOnly);
-
-    // Only consider modules imported consistently as implementation-only.
-    M->getImportedModules(allImports,
-                          allImportFilter);
-    llvm::SmallSet<ImportedModule, 8, ImportedModule::Order> allImportSet;
-    allImportSet.insert(allImports.begin(), allImports.end());
-
-    for (auto import: ioiImports)
-      if (allImportSet.count(import) == 0)
-        ioiImportSet.insert(import);
-
-    allImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-  }
+  using ImportSet = llvm::SmallSet<ImportedModule, 8, ImportedModule::Order>;
+  auto getImports = [M](ModuleDecl::ImportFilter filter) -> ImportSet {
+    SmallVector<ImportedModule, 8> matchingImports;
+    M->getImportedModules(matchingImports, filter);
+    ImportSet importSet;
+    importSet.insert(matchingImports.begin(), matchingImports.end());
+    return importSet;
+  };
 
   /// Collect @_spiOnly imports that are not imported elsewhere publicly.
-  llvm::SmallSet<ImportedModule, 4, ImportedModule::Order> spiOnlyImportSet;
+  ImportSet spiOnlyImportSet;
   if (!Opts.printPublicInterface()) {
     SmallVector<ImportedModule, 4> spiOnlyImports, otherImports;
     M->getImportedModules(spiOnlyImports,
                           ModuleDecl::ImportFilterKind::SPIOnly);
 
-    M->getImportedModules(otherImports,
-                          allImportFilter);
-    llvm::SmallSet<ImportedModule, 8, ImportedModule::Order> otherImportsSet;
-    otherImportsSet.insert(otherImports.begin(), otherImports.end());
+    ImportSet otherImportsSet = getImports(allImportFilter);
 
     // Rule out inconsistent imports.
     for (auto import: spiOnlyImports)
@@ -316,25 +298,19 @@ static void printImports(raw_ostream &out,
 
   // Collect the public imports as a subset so that we can mark them with
   // '@_exported'.
-  SmallVector<ImportedModule, 8> exportedImports;
-  M->getImportedModules(exportedImports, ModuleDecl::ImportFilterKind::Exported);
-  llvm::SmallSet<ImportedModule, 8, ImportedModule::Order> exportedImportSet;
-  exportedImportSet.insert(exportedImports.begin(), exportedImports.end());
+  ImportSet exportedImportSet =
+      getImports(ModuleDecl::ImportFilterKind::Exported);
 
   // All of the above are considered `public` including `@_spiOnly public import`
   // and `@_spi(name) public import`, and should override `package import`.
   // Track the `public` imports here to determine whether to override.
-  llvm::SmallSet<ImportedModule, 8, ImportedModule::Order> publicImportSet;
-  SmallVector<ImportedModule, 8> publicImports;
-  M->getImportedModules(publicImports, allImportFilter);
-  publicImportSet.insert(publicImports.begin(), publicImports.end());
+  ImportSet publicImportSet = getImports(allImportFilter);
 
   // Used to determine whether `package import` should be overriden below.
-  llvm::SmallSet<ImportedModule, 8, ImportedModule::Order> packageOnlyImportSet;
+  ImportSet packageOnlyImportSet;
   if (Opts.printPackageInterface()) {
-    SmallVector<ImportedModule, 8> packageOnlyImports;
-    M->getImportedModules(packageOnlyImports, ModuleDecl::ImportFilterKind::PackageOnly);
-    packageOnlyImportSet.insert(packageOnlyImports.begin(), packageOnlyImports.end());
+    packageOnlyImportSet =
+        getImports(ModuleDecl::ImportFilterKind::PackageOnly);
     allImportFilter |= ModuleDecl::ImportFilterKind::PackageOnly;
   }
 
@@ -370,24 +346,11 @@ static void printImports(raw_ostream &out,
     llvm::SmallSetVector<Identifier, 4> spis;
     M->lookupImportedSPIGroups(importedModule, spis);
 
-    // Only print implementation-only imports which have an SPI import.
-    if (ioiImportSet.count(import)) {
-      if (spis.empty())
-        continue;
-      out << "@_implementationOnly ";
-    }
-
     if (exportedImportSet.count(import))
       out << "@_exported ";
 
     if (!Opts.printPublicInterface()) {
       // An import visible in the private or package swiftinterface only.
-      //
-      // In the long term, we want to print this attribute for consistency and
-      // to enforce exportability analysis of generated code.
-      // For now, not printing the attribute allows us to have backwards
-      // compatible swiftinterfaces and we can live without
-      // checking the generate code for a while.
       if (spiOnlyImportSet.count(import))
         out << "@_spiOnly ";
 
@@ -914,7 +877,7 @@ bool swift::emitSwiftInterface(raw_ostream &out,
       M, Opts.PreserveTypesAsWritten, Opts.PrintFullConvention,
       Opts.InterfaceContentMode,
       useExportedModuleNames,
-      Opts.AliasModuleNames, &aliasModuleNamesTargets);
+      Opts.AliasModuleNames, &aliasModuleNamesTargets, Opts.ABIComments);
   InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
 
   SmallVector<Decl *, 16> topLevelDecls;

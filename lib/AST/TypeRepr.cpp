@@ -435,7 +435,21 @@ void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
   }
   Printer << " -> ";
   Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
-  printTypeRepr(RetTy, Printer, Opts);
+
+  // Check if we are supposed to suppress sending results. If so, look through
+  // the ret ty if it is a Sending TypeRepr.
+  //
+  // DISCUSSION: The reason why we do this is that Sending TypeRepr is used for
+  // arguments and results... and we need the arguments case when we suppress to
+  // print __owned. So this lets us handle both cases.
+  auto ActualRetTy = RetTy;
+  if (Opts.SuppressSendingArgsAndResults) {
+    if (auto *x = dyn_cast<SendingTypeRepr>(RetTy)) {
+      ActualRetTy = x->getBase();
+    }
+  }
+  printTypeRepr(ActualRetTy, Printer, Opts);
+
   Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   Printer.printStructurePost(PrintStructureKind::FunctionType);
 }
@@ -853,7 +867,13 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
     Printer.printKeyword("isolated", Opts, " ");
     break;
   case TypeReprKind::Sending:
-    Printer.printKeyword("sending", Opts, " ");
+    // This handles the argument case. The result case is handled in
+    // FunctionTypeRepr.
+    if (!Opts.SuppressSendingArgsAndResults) {
+      Printer.printKeyword("sending", Opts, " ");
+    } else {
+      Printer.printKeyword("__owned", Opts, " ");
+    }
     break;
   case TypeReprKind::CompileTimeConst:
     Printer.printKeyword("_const", Opts, " ");

@@ -200,7 +200,6 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
     return false;
 
   auto *oldSF = CachedCI->getIDEInspectionFile();
-  assert(oldSF->getBufferID());
 
   auto *oldState = oldSF->getDelayedParserState();
   assert(oldState->hasIDEInspectionDelayedDeclState());
@@ -208,7 +207,7 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
 
   auto &SM = CachedCI->getSourceMgr();
   auto bufferName = ideInspectionTargetBuffer->getBufferIdentifier();
-  if (SM.getIdentifierForBuffer(*oldSF->getBufferID()) != bufferName)
+  if (SM.getIdentifierForBuffer(oldSF->getBufferID()) != bufferName)
     return false;
 
   if (shouldCheckDependencies()) {
@@ -223,7 +222,7 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
     }
 
     if (areAnyDependentFilesInvalidated(
-            *CachedCI, *FileSystem, *oldSF->getBufferID(),
+            *CachedCI, *FileSystem, oldSF->getBufferID(),
             DependencyCheckedTimestamp, InMemoryDependencyHash))
       return false;
     DependencyCheckedTimestamp = std::chrono::system_clock::now();
@@ -255,7 +254,6 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
   ModuleDecl *tmpM = ModuleDecl::create(Identifier(), *tmpCtx);
   SourceFile *tmpSF = new (*tmpCtx)
       SourceFile(*tmpM, oldSF->Kind, tmpBufferID, oldSF->getParsingOptions());
-  tmpM->addAuxiliaryFile(*tmpSF);
 
   // FIXME: Since we don't setup module loaders on the temporary AST context,
   // 'canImport()' conditional compilation directive always fails. That causes

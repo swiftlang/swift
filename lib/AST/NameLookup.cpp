@@ -40,6 +40,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Strings.h"
 #include "clang/AST/DeclObjC.h"
@@ -1718,6 +1719,15 @@ SmallVector<MacroDecl *, 1> namelookup::lookupMacros(DeclContext *dc,
         ctx.evaluator, UnqualifiedLookupRequest{moduleLookupDesc}, {});
     auto foundTypeDecl = moduleLookup.getSingleTypeResult();
     auto *moduleDecl = dyn_cast_or_null<ModuleDecl>(foundTypeDecl);
+
+    // When resolving macro names for imported entities, we look for any
+    // loaded module.
+    if (!moduleDecl && isa<ClangModuleUnit>(moduleScopeDC) &&
+        ctx.LangOpts.hasFeature(Feature::MacrosOnImports)) {
+      moduleDecl = ctx.getLoadedModule(moduleName.getBaseIdentifier());
+      moduleScopeDC = moduleDecl;
+    }
+
     if (!moduleDecl)
       return {};
 
@@ -2504,7 +2514,7 @@ bool DeclContext::lookupQualified(Type type,
 }
 
 bool DeclContext::isDeclImported(const Decl *decl) const {
-  auto declModule = decl->getDeclContext()->getParentModule();
+  auto declModule = decl->getModuleContextForNameLookup();
   return getASTContext().getImportCache().isImportedBy(declModule, this);
 }
 

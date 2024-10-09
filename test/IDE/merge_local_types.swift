@@ -3,7 +3,7 @@
 // RUN: %empty-directory(%t)
 
 // Create separate modules and merge them together
-// RUN: %target-swiftc_driver -v -emit-module -module-name LocalTypesMerged -o %t/LocalTypesMerged.swiftmodule %s %S/local_types.swift
+// RUN: %target-swiftc_driver -v -no-emit-module-separately -emit-module -module-name LocalTypesMerged -o %t/LocalTypesMerged.swiftmodule %s %S/local_types.swift
 
 // RUN: %target-swift-ide-test -print-local-types -I %t -module-to-print LocalTypesMerged -source-filename %s | %FileCheck %s -allow-deprecated-dag-overlap
 

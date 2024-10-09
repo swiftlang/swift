@@ -236,7 +236,7 @@ llvm::Value *FixedTypeInfo::getIsTriviallyDestroyable(IRGenFunction &IGF, SILTyp
 }
 llvm::Value *FixedTypeInfo::getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const {
   return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
-                                isBitwiseTakable(ResilienceExpansion::Maximal) == IsBitwiseTakable);
+      getBitwiseTakable(ResilienceExpansion::Maximal) >= IsBitwiseTakableOnly);
 }
 llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
   return IGM.getSize(getFixedStride());
@@ -2484,7 +2484,7 @@ namespace {
         if (!elt->hasAssociatedValues() || elt->isIndirect())
           continue;
 
-        if (visit(elt->getArgumentInterfaceType()->getCanonicalType()))
+        if (visit(elt->getPayloadInterfaceType()->getCanonicalType()))
           return true;
       }
       return false;

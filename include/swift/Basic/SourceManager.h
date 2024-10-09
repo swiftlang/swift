@@ -18,15 +18,34 @@
 #include "clang/Basic/FileManager.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/SourceMgr.h"
 #include <map>
 #include <optional>
 #include <vector>
 
 namespace swift {
+  class SourceFile;
+}
+
+namespace llvm {
+  template <> struct PointerLikeTypeTraits<swift::SourceFile *> {
+  public:
+    static inline swift::SourceFile *getFromVoidPointer(void *P) {
+      return (swift::SourceFile *)P;
+    }
+    static inline void *getAsVoidPointer(swift::SourceFile *S) {
+      return (void *)S;
+    }
+    enum { NumLowBitsAvailable = /*swift::DeclContextAlignInBits=*/ 3 };
+  };
+}
+
+namespace swift {
 
 class CustomAttr;
 class DeclContext;
+class SourceFile;
 
 /// Augments a buffer that was created specifically to hold generated source
 /// code with the reasons for it being generated.
@@ -36,6 +55,7 @@ public:
   enum Kind {
 #define MACRO_ROLE(Name, Description) Name##MacroExpansion,
 #include "swift/Basic/MacroRoles.def"
+#undef MACRO_ROLE
 
     /// A new function body that is replacing an existing function body.
     ReplacedFunctionBody,
@@ -46,6 +66,23 @@ public:
     /// The expansion of default argument at caller side
     DefaultArgument,
   } kind;
+
+  static StringRef kindToString(GeneratedSourceInfo::Kind kind) {
+    switch (kind) {
+#define MACRO_ROLE(Name, Description)                                          \
+  case Name##MacroExpansion:                                                   \
+    return #Name "MacroExpansion";
+#include "swift/Basic/MacroRoles.def"
+#undef MACRO_ROLE
+    case ReplacedFunctionBody:
+      return "ReplacedFunctionBody";
+    case PrettyPrinted:
+      return "PrettyPrinted";
+    case DefaultArgument:
+      return "DefaultArgument";
+    }
+    llvm_unreachable("Invalid kind");
+  }
 
   /// The source range in the enclosing buffer where this source was generated.
   ///
@@ -122,6 +159,13 @@ private:
   /// The starting source locations of regex literals written in source. This
   /// is an unfortunate hack needed to allow for correct re-lexing.
   llvm::DenseSet<SourceLoc> RegexLiteralStartLocs;
+
+  /// Mapping from each buffer ID to the source files that describe it
+  /// semantically.
+  llvm::DenseMap<
+    unsigned,
+    llvm::TinyPtrVector<SourceFile *>
+  > bufferIDToSourceFiles;
 
   std::map<const char *, VirtualFile> VirtualFiles;
   mutable std::pair<const char *, const VirtualFile*> CachedVFile = {nullptr, nullptr};
@@ -322,6 +366,13 @@ public:
 
   /// Adds a memory buffer to the SourceManager, taking ownership of it.
   unsigned addNewSourceBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer);
+
+  /// Record the source file as having the given buffer ID.
+  void recordSourceFile(unsigned bufferID, SourceFile *sourceFile);
+
+  /// Retrieve the source files for the given buffer ID.
+  llvm::TinyPtrVector<SourceFile *>
+  getSourceFilesForBufferID(unsigned bufferID) const;
 
   /// Add a \c #sourceLocation-defined virtual file region of \p Length.
   void createVirtualFile(SourceLoc Loc, StringRef Name, int LineOffset,

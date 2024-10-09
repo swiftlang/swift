@@ -43,10 +43,6 @@ else()
   message(FATAL_ERROR "Invalid value for SWIFT_CONCURRENCY_GLOBAL_EXECUTOR (\"${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}\").")
 endif()
 
-if(NOT SWIFT_CONCURRENCY_USES_DISPATCH)
-
-endif()
-
 if(NOT swift_concurrency_async_fp_mode)
   set(swift_concurrency_async_fp_mode "always")
 endif()
@@ -78,8 +74,10 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   AsyncLet.cpp
   Clock.cpp
   GlobalExecutor.cpp
+  ConcurrencyHooks.cpp
   EmbeddedSupport.cpp
   Error.cpp
+  ExecutorChecks.cpp
   Setup.cpp
   Task.cpp
   TaskAlloc.cpp
@@ -90,6 +88,27 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   TracingSignpost.cpp
   AsyncStream.cpp
   linker-support/magic-symbols-for-install-name.c
+)
+
+if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
+  set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
+    DispatchGlobalExecutor.cpp
+  )
+elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded")
+  set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
+    CooperativeGlobalExecutor.cpp
+  )
+elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "hooked" OR
+    "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "none")
+  set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
+    NonDispatchGlobalExecutor.cpp
+  )
+endif()
+
+set(LLVM_OPTIONAL_SOURCES
+  CooperativeGlobalExecutor.cpp
+  DispatchGlobalExecutor.cpp
+  NonDispatchGlobalExecutor.cpp
 )
 
 set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
@@ -158,10 +177,12 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
 
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
+  ${SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES}
   ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
 
   SWIFT_MODULE_DEPENDS_ANDROID Android
   SWIFT_MODULE_DEPENDS_LINUX Glibc
+  SWIFT_MODULE_DEPENDS_LINUX_STATIC Musl
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
   SWIFT_MODULE_DEPENDS_OPENBSD Glibc
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
@@ -229,7 +250,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       set(extra_c_compile_flags -D__MACH__ -D__APPLE__ -ffreestanding)
       set(extra_swift_compile_flags -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding)
     endif()
-    
+
     set(SWIFT_SDK_embedded_THREADING_PACKAGE none)
     set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
@@ -242,37 +263,13 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       IS_STDLIB IS_FRAGILE
 
       ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
-      # TODO: Only a subset of Swift Concurrency .swift sources, for now.
-      Actor.swift
-      AsyncLet.swift
-      CheckedContinuation.swift
-      Errors.swift
-      Executor.swift
-      ExecutorAssertions.swift
-      AsyncCompactMapSequence.swift
-      AsyncDropFirstSequence.swift
-      AsyncDropWhileSequence.swift
-      AsyncFilterSequence.swift
-      AsyncFlatMapSequence.swift
-      AsyncIteratorProtocol.swift
-      AsyncMapSequence.swift
-      AsyncPrefixSequence.swift
-      AsyncPrefixWhileSequence.swift
-      AsyncSequence.swift
-      AsyncThrowingCompactMapSequence.swift
-      AsyncThrowingDropWhileSequence.swift
-      AsyncThrowingFilterSequence.swift
-      AsyncThrowingFlatMapSequence.swift
-      AsyncThrowingMapSequence.swift
-      AsyncThrowingPrefixWhileSequence.swift
-      GlobalActor.swift
-      PartialAsyncTask.swift
-      Task.swift
-      TaskCancellation.swift
+      ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
+      CooperativeGlobalExecutor.cpp
 
       SWIFT_COMPILE_FLAGS
         ${extra_swift_compile_flags} -enable-experimental-feature Embedded
         -parse-stdlib -DSWIFT_CONCURRENCY_EMBEDDED
+        -Xfrontend -emit-empty-object-file
         ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
       C_COMPILE_FLAGS
         ${extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS} -DSWIFT_CONCURRENCY_EMBEDDED=1
@@ -297,4 +294,25 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
 
     add_dependencies(embedded-concurrency embedded-concurrency-${mod})
   endforeach()
+
+  # Copy the ExecutorImpl.h header into the local include directory
+  # and install it in the compiler toolchain
+  add_custom_command(
+    OUTPUT "${SWIFT_INCLUDE_DIR}/swift/ExecutorImpl.h"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/ExecutorImpl.h"
+    COMMAND "${CMAKE_COMMAND}" "-E" "copy"
+            "${CMAKE_CURRENT_SOURCE_DIR}/ExecutorImpl.h"
+            "${SWIFT_INCLUDE_DIR}/swift")
+
+  add_custom_target("copy_executor_impl_header"
+    DEPENDS "${SWIFT_INCLUDE_DIR}/swift/ExecutorImpl.h"
+    COMMENT "Copying executor implementation header to ${SWIFT_INCLUDE_DIR}/swift")
+
+  swift_install_in_component(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/ExecutorImpl.h"
+    DESTINATION "include/swift"
+    COMPONENT compiler)
+
+  add_dependencies(embedded-concurrency "copy_executor_impl_header")
 endif()
+

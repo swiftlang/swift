@@ -156,9 +156,7 @@ private:
   std::optional<StableHasher> InterfaceHasher;
 
   /// The ID for the memory buffer containing this file's source.
-  ///
-  /// May be -1, to indicate no association with a buffer.
-  int BufferID;
+  unsigned BufferID;
 
   /// The parsing options for the file.
   ParsingOptions ParsingOpts;
@@ -370,7 +368,7 @@ public:
   /// \c #sourceLocation(file:) declarations.
   llvm::StringMap<SourceFilePathInfo> getInfoForUsedFilePaths() const;
 
-  SourceFile(ModuleDecl &M, SourceFileKind K, std::optional<unsigned> bufferID,
+  SourceFile(ModuleDecl &M, SourceFileKind K, unsigned bufferID,
              ParsingOptions parsingOpts = {}, bool isPrimary = false);
 
   ~SourceFile();
@@ -578,6 +576,9 @@ public:
   getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                      ModuleDecl::ImportFilter filter) const override;
 
+  virtual void getExternalMacros(
+      SmallVectorImpl<ExternalMacroPlugin> &macros) const override;
+
   virtual void
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const override;
 
@@ -590,9 +591,7 @@ public:
 
   /// The buffer ID for the file that was imported, or None if there
   /// is no associated buffer.
-  std::optional<unsigned> getBufferID() const {
-    if (BufferID == -1)
-      return std::nullopt;
+  unsigned getBufferID() const {
     return BufferID;
   }
 

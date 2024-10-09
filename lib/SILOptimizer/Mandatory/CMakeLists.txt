@@ -44,6 +44,7 @@ target_sources(swiftSILOptimizer PRIVATE
   PMOMemoryUseCollector.cpp
   RawSILInstLowering.cpp
   ReferenceBindingTransform.cpp
+  ThunkLowering.cpp
   TransferNonSendable.cpp
   LowerTupleAddrConstructor.cpp
   SILGenCleanup.cpp

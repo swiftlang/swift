@@ -335,6 +335,21 @@ llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
   assert(subs.getReplacementTypes().size() == 1 &&
          "createTaskGroup should have a type substitution");
   auto resultType = subs.getReplacementTypes()[0]->getCanonicalType();
+
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    // In Embedded Swift, call swift_taskGroup_initializeWithOptions instead, to
+    // avoid needing a Metadata argument.
+    llvm::Value *options = llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
+    llvm::Value *resultTypeMetadata = llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
+    options = maybeAddEmbeddedSwiftResultTypeInfo(IGF, options, resultType);
+    if (!groupFlags) groupFlags = llvm::ConstantInt::get(IGF.IGM.SizeTy, 0);
+    llvm::CallInst *call = IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeWithOptionsFunctionPointer(),
+                                  {groupFlags, group, resultTypeMetadata, options});
+    call->setDoesNotThrow();
+    call->setCallingConv(IGF.IGM.SwiftCC);
+    return group;
+  }
+
   auto resultTypeMetadata = IGF.emitAbstractTypeMetadataRef(resultType);
 
   llvm::CallInst *call;
@@ -342,8 +357,9 @@ llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
     call = IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeWithFlagsFunctionPointer(),
                                   {groupFlags, group, resultTypeMetadata});
   } else {
-    call = IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeFunctionPointer(),
-                                  {group, resultTypeMetadata});
+    call =
+        IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeFunctionPointer(),
+                               {group, resultTypeMetadata});
   }
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);

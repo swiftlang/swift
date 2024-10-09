@@ -534,7 +534,8 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   LocWithParent loc(inst->getLoc().getSourceLoc(), parentLoc);
 
   if (perfConstr == PerformanceConstraints::NoExistentials &&
-      (impact & RuntimeEffect::Existential)) {
+      ((impact & RuntimeEffect::Existential) ||
+       (impact & RuntimeEffect::ExistentialClassBound))) {
     PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
     if (impactType) {
       diagnose(loc, diag::perf_diag_existential_type, impactType.getASTType());
@@ -556,6 +557,8 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   }
 
   if (module.getOptions().EmbeddedSwift) {
+    // Explicitly don't detect RuntimeEffect::ExistentialClassBound - those are
+    // allowed in Embedded Swift.
     if (impact & RuntimeEffect::Existential) {
       PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
       if (impactType) {
@@ -911,7 +914,7 @@ private:
       for (SILFunction *function : constructorsAndDestructors) {
         diagnoser.visitFunctionEmbeddedSwift(function);
       }
-    }    
+    }
   }
 };
 

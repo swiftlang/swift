@@ -1017,6 +1017,12 @@ ManglingError Remangler::mangleDeallocator(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleIsolatedDeallocator(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "fZ";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleDeclContext(Node *node, unsigned depth) {
   return mangleSingleChildNode(node, depth + 1);
 }
@@ -2343,6 +2349,10 @@ ManglingError Remangler::mangleModifyAccessor(Node *node, unsigned depth) {
   return mangleAbstractStorage(node->getFirstChild(), "M", depth + 1);
 }
 
+ManglingError Remangler::mangleModify2Accessor(Node *node, unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "x", depth + 1);
+}
+
 ManglingError Remangler::mangleModule(Node *node, unsigned depth) {
   auto text = node->getText();
   if (text == STDLIB_NAME) {
@@ -2993,6 +3003,10 @@ ManglingError Remangler::mangleIndexSubset(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleReadAccessor(Node *node, unsigned depth) {
   return mangleAbstractStorage(node->getFirstChild(), "r", depth + 1);
+}
+
+ManglingError Remangler::mangleRead2Accessor(Node *node, unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "y", depth + 1);
 }
 
 ManglingError Remangler::mangleKeyPathThunkHelper(Node *node, StringRef op,

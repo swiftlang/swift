@@ -61,20 +61,6 @@ extension FormattedLikeArray {
   }
 }
 
-/// RandomAccessCollection which bridges to some C++ array.
-///
-/// It fixes the default reflection for bridged random access collections, which usually have a
-/// `bridged` stored property.
-/// Conforming to this protocol displays the "real" children  not just `bridged`.
-public protocol BridgedRandomAccessCollection : RandomAccessCollection, CustomReflectable {
-}
-
-extension BridgedRandomAccessCollection {
-  public var customMirror: Mirror {
-    Mirror(self, children: self.map { (label: nil, value: $0 as Any) })
-  }
-}
-
 /// A Sequence which is not consuming and therefore behaves like a Collection.
 ///
 /// Many sequences in SIL and the optimizer should be collections but cannot
@@ -104,20 +90,28 @@ public extension CollectionLikeSequence {
 
 // Also make the lazy sequences a CollectionLikeSequence if the underlying sequence is one.
 
-extension LazySequence : CollectionLikeSequence,
-                         FormattedLikeArray, CustomStringConvertible, CustomReflectable
+extension LazySequence : /*@retroactive*/ SIL.CollectionLikeSequence,
+                         /*@retroactive*/ SIL.FormattedLikeArray,
+                         /*@retroactive*/ Swift.CustomStringConvertible,
+                         /*@retroactive*/ Swift.CustomReflectable
                          where Base: CollectionLikeSequence {}
 
-extension FlattenSequence : CollectionLikeSequence,
-                            FormattedLikeArray, CustomStringConvertible, CustomReflectable
+extension FlattenSequence : /*@retroactive*/ SIL.CollectionLikeSequence,
+                            /*@retroactive*/ SIL.FormattedLikeArray,
+                            /*@retroactive*/ Swift.CustomStringConvertible,
+                            /*@retroactive*/ Swift.CustomReflectable
                             where Base: CollectionLikeSequence {}
 
-extension LazyMapSequence : CollectionLikeSequence,
-                            FormattedLikeArray, CustomStringConvertible, CustomReflectable
+extension LazyMapSequence : /*@retroactive*/ SIL.CollectionLikeSequence,
+                            /*@retroactive*/ SIL.FormattedLikeArray,
+                            /*@retroactive*/ Swift.CustomStringConvertible,
+                            /*@retroactive*/ Swift.CustomReflectable
                             where Base: CollectionLikeSequence {}
 
-extension LazyFilterSequence : CollectionLikeSequence,
-                               FormattedLikeArray, CustomStringConvertible, CustomReflectable
+extension LazyFilterSequence : /*@retroactive*/ SIL.CollectionLikeSequence,
+                               /*@retroactive*/ SIL.FormattedLikeArray,
+                               /*@retroactive*/ Swift.CustomStringConvertible,
+                               /*@retroactive*/ Swift.CustomReflectable
                                where Base: CollectionLikeSequence {}
 
 //===----------------------------------------------------------------------===//

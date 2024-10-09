@@ -50,16 +50,6 @@ static bool usesTypeMatching(Decl *decl, llvm::function_ref<bool(Type)> fn) {
 #define UNINTERESTING_FEATURE(FeatureName)                                     \
   static bool usesFeature##FeatureName(Decl *decl) { return false; }
 
-static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    for (auto specialize : func->getAttrs().getAttributes<SpecializeAttr>()) {
-      if (!specialize->getAvailableAttrs().empty())
-        return true;
-    }
-  }
-  return false;
-}
-
 // ----------------------------------------------------------------------------
 // MARK: - Upcoming Features
 // ----------------------------------------------------------------------------
@@ -78,6 +68,7 @@ UNINTERESTING_FEATURE(FullTypedThrows)
 UNINTERESTING_FEATURE(ExistentialAny)
 UNINTERESTING_FEATURE(InferSendableFromCaptures)
 UNINTERESTING_FEATURE(ImplicitOpenExistentials)
+UNINTERESTING_FEATURE(MemberImportVisibility)
 
 // ----------------------------------------------------------------------------
 // MARK: - Experimental Features
@@ -130,6 +121,7 @@ UNINTERESTING_FEATURE(Embedded)
 UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 UNINTERESTING_FEATURE(StructLetDestructuring)
+UNINTERESTING_FEATURE(MacrosOnImports)
 
 static bool usesFeatureNonescapableTypes(Decl *decl) {
   auto containsNonEscapable =
@@ -204,6 +196,9 @@ UNINTERESTING_FEATURE(ExtractConstantsFromMembers)
 UNINTERESTING_FEATURE(FixedArrays)
 UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
+UNINTERESTING_FEATURE(UnspecifiedMeansMainActorIsolated)
+UNINTERESTING_FEATURE(GlobalActorInferenceCutoff)
+UNINTERESTING_FEATURE(KeyPathWithStaticMembers)
 
 static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   auto isFunctionTypeWithSending = [](Type type) {
@@ -283,7 +278,6 @@ static bool usesFeatureIsolatedAny(Decl *decl) {
   });
 }
 
-UNINTERESTING_FEATURE(MemberImportVisibility)
 UNINTERESTING_FEATURE(IsolatedAny2)
 UNINTERESTING_FEATURE(GlobalActorIsolatedTypesUsability)
 UNINTERESTING_FEATURE(ObjCImplementation)
@@ -300,6 +294,24 @@ static bool usesFeatureAllowUnsafeAttribute(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(WarnUnsafe)
+UNINTERESTING_FEATURE(SafeInterop)
+
+bool swift::usesFeatureIsolatedDeinit(const Decl *decl) {
+  if (auto cd = dyn_cast<ClassDecl>(decl)) {
+    return cd->getFormalAccess() == AccessLevel::Open &&
+           usesFeatureIsolatedDeinit(cd->getDestructor());
+  } else if (auto dd = dyn_cast<DestructorDecl>(decl)) {
+    if (dd->hasExplicitIsolationAttribute()) {
+      return true;
+    }
+    if (auto superDD = dd->getSuperDeinit()) {
+      return usesFeatureIsolatedDeinit(superDD);
+    }
+    return false;
+  } else {
+    return false;
+  }
+}
 
 static bool usesFeatureValueGenerics(Decl *decl) {
   auto genericContext = decl->getAsGenericContext();
@@ -315,6 +327,25 @@ static bool usesFeatureValueGenerics(Decl *decl) {
   }
 
   return false;
+}
+
+static bool usesFeatureCoroutineAccessors(Decl *decl) {
+  auto accessorDeclUsesFeatureCoroutineAccessors = [](AccessorDecl *accessor) {
+    return requiresFeatureCoroutineAccessors(accessor->getAccessorKind());
+  };
+  switch (decl->getKind()) {
+  case DeclKind::Var: {
+    auto *var = cast<VarDecl>(decl);
+    return llvm::any_of(var->getAllAccessors(),
+                        accessorDeclUsesFeatureCoroutineAccessors);
+  }
+  case DeclKind::Accessor: {
+    auto *accessor = cast<AccessorDecl>(decl);
+    return accessorDeclUsesFeatureCoroutineAccessors(accessor);
+  }
+  default:
+    return false;
+  }
 }
 
 // ----------------------------------------------------------------------------

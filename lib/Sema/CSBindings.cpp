@@ -21,8 +21,11 @@
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <tuple>
+
+#define DEBUG_TYPE "PotentialBindings"
 
 using namespace swift;
 using namespace constraints;
@@ -1769,6 +1772,13 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 /// representative type variable, along with flags indicating whether
 /// those types should be opened.
 void PotentialBindings::infer(Constraint *constraint) {
+  if (!Constraints.insert(constraint).second)
+    return;
+
+  // Record the change, if there are active scopes.
+  if (CS.isRecordingChanges())
+    CS.recordChange(SolverTrail::Change::InferredBindings(TypeVar, constraint));
+
   switch (constraint->getKind()) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
@@ -1855,10 +1865,6 @@ void PotentialBindings::infer(Constraint *constraint) {
     break;
 
   case ConstraintKind::Disjunction:
-    // If there is additional context available via disjunction
-    // associated with closure literal (e.g. coercion to some other
-    // type) let's delay resolving the closure until the disjunction
-    // is attempted.
     DelayedBy.push_back(constraint);
     break;
 
@@ -1941,6 +1947,20 @@ void PotentialBindings::infer(Constraint *constraint) {
 }
 
 void PotentialBindings::retract(Constraint *constraint) {
+  if (!Constraints.erase(constraint))
+    return;
+
+  // Record the change, if there are active scopes.
+  if (CS.isRecordingChanges())
+    CS.recordChange(SolverTrail::Change::RetractedBindings(TypeVar, constraint));
+
+  LLVM_DEBUG(
+    llvm::dbgs() << Constraints.size() << " " << Bindings.size() << " "
+                 << Protocols.size() << " " << Literals.size() << " "
+                 << AdjacentVars.size() << " " << DelayedBy.size() << " "
+                 << SubtypeOf.size() << " " << SupertypeOf.size() << " "
+                 << EquivalentTo.size() << "\n");
+
   Bindings.erase(
       llvm::remove_if(Bindings,
                       [&constraint](const PotentialBinding &binding) {
@@ -2737,7 +2757,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
 
   // If this was from a defaultable binding note that.
   if (Binding.isDefaultableBinding()) {
-    cs.DefaultedConstraints.insert(srcLocator);
+    cs.recordDefaultedConstraint(srcLocator);
 
     // Fail if hole reporting fails.
     if (type->isPlaceholder() && reportHole())
@@ -2750,10 +2770,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   // If all of the re-activated constraints where simplified,
   // let's notify binding inference about the fact that type
   // variable has been bound successfully.
-  {
-    auto &CG = cs.getConstraintGraph();
-    CG[TypeVar].introduceToInference(type);
-  }
+  cs.getConstraintGraph().introduceToInference(TypeVar, type);
 
   return true;
 }

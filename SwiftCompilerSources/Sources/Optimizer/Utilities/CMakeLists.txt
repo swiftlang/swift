@@ -17,6 +17,7 @@ swift_compiler_sources(Optimizer
   EscapeUtils.swift
   ForwardingUtils.swift
   FunctionSignatureTransforms.swift
+  GenericSpecialization.swift
   LifetimeDependenceUtils.swift
   LocalVariableUtils.swift
   OptUtils.swift

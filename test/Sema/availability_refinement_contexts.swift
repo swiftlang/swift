@@ -273,3 +273,33 @@ struct SomeStruct {
   @available(OSX 52, *)
   func someMethodAvailable52() -> Int { return 52 }
 }
+
+// CHECK-NEXT: {{^}}  (decl version=51 decl=SomeEnum
+// CHECK-NEXT: {{^}}    (decl version=52 decl=a
+// CHECK-NEXT: {{^}}    (decl version=53 decl=b
+
+@available(OSX 51, *)
+enum SomeEnum {
+  @available(OSX 52, *)
+  case a
+
+  @available(OSX 53, *)
+  case b, c
+}
+
+// CHECK-NEXT: {{^}}  (decl_implicit version=50 decl=someComputedGlobalVar
+// CHECK-NEXT: {{^}}    (decl version=51 decl=_
+// CHECK-NEXT: {{^}}    (decl version=52 decl=_
+
+var someComputedGlobalVar: Int {
+  @available(OSX 51, *)
+  get { 1 }
+
+  @available(OSX 52, *)
+  set { }
+}
+
+// CHECK-NEXT: {{^}}  (decl version=51 decl=FinalDecl
+
+@available(OSX 51, *)
+typealias FinalDecl = Int

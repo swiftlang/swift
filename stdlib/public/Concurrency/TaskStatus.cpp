@@ -1118,4 +1118,4 @@ void TaskDependencyStatusRecord::performEscalationAction(JobPriority newPriority
 }
 
 #define OVERRIDE_TASK_STATUS COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

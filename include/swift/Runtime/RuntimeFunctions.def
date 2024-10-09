@@ -2278,7 +2278,7 @@ FUNCTION(GetTypeByMangledNameInContextInMetadataState2,
          EFFECT(MetaData),
          MEMEFFECTS(ArgMemOnly))
 
-// AsyncTask *swift_task_getCurrent();s
+// AsyncTask *swift_task_getCurrent();
 FUNCTION(GetCurrentTask,
          swift_task_getCurrent, SwiftCC,
          ConcurrencyAvailability,
@@ -2347,6 +2347,20 @@ FUNCTION(TaskSwitchFunc,
          ATTRS(NoUnwind),
          EFFECT(Concurrency),
          UNKNOWN_MEMEFFECTS)
+         
+// void swift_task_deinitOnExecutor(void *object,
+//                                  DeinitWorkFunction *work,
+//                                  SerialExecutorRef newExecutor,
+//                                  size_t flags);
+FUNCTION(DeinitOnExecutorFunc,
+         swift_task_deinitOnExecutor, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, Int8PtrTy, ExecutorFirstTy, ExecutorSecondTy, SizeTy),
+         ATTRS(NoUnwind),
+         EFFECT(Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
 
 // AsyncTask *swift_continuation_init(AsyncContext *continuationContext,
 //                                    AsyncContinuationFlags);
@@ -2555,7 +2569,7 @@ FUNCTION(TaskRunInline,
          EFFECT(NoEffect),
          UNKNOWN_MEMEFFECTS)
 
-// void swift_taskGroup_initialize(TaskGroup *group);
+// void swift_taskGroup_initialize(TaskGroup *group, const Metadata *T);
 FUNCTION(TaskGroupInitialize,
          swift_taskGroup_initialize, SwiftCC,
          ConcurrencyAvailability,
@@ -2565,7 +2579,7 @@ FUNCTION(TaskGroupInitialize,
          EFFECT(Concurrency),
          UNKNOWN_MEMEFFECTS)
 
-// void swift_taskGroup_initializeWithFlags(size_t flags, TaskGroup *group);
+// void swift_taskGroup_initializeWithFlags(size_t flags, TaskGroup *group, const Metadata *T);
 FUNCTION(TaskGroupInitializeWithFlags,
          swift_taskGroup_initializeWithFlags, SwiftCC,
          ConcurrencyDiscardingTaskGroupAvailability,
@@ -2573,6 +2587,20 @@ FUNCTION(TaskGroupInitializeWithFlags,
          ARGS(SizeTy,           // flags
               Int8PtrTy,        // group
               TypeMetadataPtrTy // T.Type
+         ),
+         ATTRS(NoUnwind),
+         EFFECT(Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_taskGroup_initializeWithTaskOptions(size_t flags, TaskGroup *group, const Metadata *T, TaskOptionRecord *options);
+FUNCTION(TaskGroupInitializeWithOptions,
+         swift_taskGroup_initializeWithOptions, SwiftCC,
+         ConcurrencyDiscardingTaskGroupAvailability,
+         RETURNS(VoidTy),
+         ARGS(SizeTy,                     // flags
+              Int8PtrTy,                  // group
+              TypeMetadataPtrTy,          // T.Type
+              SwiftTaskOptionRecordPtrTy  // options
          ),
          ATTRS(NoUnwind),
          EFFECT(Concurrency),

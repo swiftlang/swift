@@ -347,7 +347,7 @@ std::string LinkEntity::mangleAsString() const {
     return mangler.mangleFieldOffset(getDecl());
 
   case Kind::ProtocolWitnessTable:
-    return mangler.mangleWitnessTable(getRootProtocolConformance());
+    return mangler.mangleWitnessTable(getProtocolConformance());
 
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
     return mangler.mangleGenericProtocolWitnessTableInstantiationFunction(
@@ -1371,7 +1371,6 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
   case Kind::ClassMetadataBaseOffset:
-  case Kind::PropertyDescriptor:
   case Kind::NominalTypeDescriptor:
   case Kind::NominalTypeDescriptorRecord:
   case Kind::ModuleDescriptor:
@@ -1390,6 +1389,11 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::OpaqueTypeDescriptorAccessorVar:
   case Kind::DistributedAccessor:
     return getDecl()->isWeakImported(module);
+      
+  case Kind::PropertyDescriptor:
+    // Static properties may have nil property descriptors if declared in
+    // modules compiled with older compilers and should be weak linked.
+    return (getDecl()->isWeakImported(module) || getDecl()->isStatic());
 
   case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
     return getType()->getClassOrBoundGenericClass()->isWeakImported(module);

@@ -215,6 +215,17 @@ void swift_taskGroup_initialize(TaskGroup *group, const Metadata *T);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_taskGroup_initializeWithFlags(size_t flags, TaskGroup *group, const Metadata *T);
 
+/// Initialize a `TaskGroup` in the passed `group` memory location.
+/// The caller is responsible for retaining and managing the group's lifecycle.
+///
+/// Its Swift signature is
+///
+/// \code
+/// func swift_taskGroup_initialize(flags: Int, group: Builtin.RawPointer)
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_taskGroup_initializeWithOptions(size_t flags, TaskGroup *group, const Metadata *T, TaskOptionRecord *options);
+
 /// Attach a child task to the parent task's task group record.
 ///
 /// This function MUST be called from the AsyncTask running the task group.
@@ -605,6 +616,11 @@ swift_task_createNullaryContinuationJob(
     size_t priority,
     AsyncTask *continuation);
 
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+void swift_task_deinitOnExecutor(void *object, DeinitWorkFunction *work,
+                                 SerialExecutorRef newExecutor, size_t flags);
+
 /// Report error about attempting to bind a task-local value from an illegal context.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroup(
@@ -720,6 +736,13 @@ void swift_task_enqueueGlobal(Job *job);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_checkIsolated(SerialExecutorRef executor);
 
+/// Invoke a Swift executor's `checkIsolated` implementation; returns
+/// `true` if it invoked the Swift implementation, `false` otherwise.
+/// Executors will want to call this from their `swift_task_checkIsolatedImpl`
+/// implementation.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_invokeSwiftCheckIsolated(SerialExecutorRef executor);
+
 /// A count in nanoseconds.
 using JobDelay = unsigned long long;
 
@@ -760,64 +783,22 @@ void swift_task_enqueueOnDispatchQueue(Job *job, HeapObject *queue);
 
 #endif
 
-/// A hook to take over global enqueuing.
-typedef SWIFT_CC(swift) void (*swift_task_enqueueGlobal_original)(Job *job);
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift) void (*swift_task_enqueueGlobal_hook)(
-    Job *job, swift_task_enqueueGlobal_original original);
+// Declare all the hooks
+#define SWIFT_CONCURRENCY_HOOK(returnType, name, ...)                   \
+  typedef SWIFT_CC(swift) returnType (*name##_original)(__VA_ARGS__);   \
+  typedef SWIFT_CC(swift) returnType                                    \
+    (*name##_hook_t)(__VA_ARGS__, name##_original original);            \
+  SWIFT_EXPORT_FROM(swift_Concurrency) name##_hook_t name##_hook
 
-/// A hook to take over global enqueuing with delay.
-typedef SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDelay_original)(
-    unsigned long long delay, Job *job);
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDelay_hook)(
-    unsigned long long delay, Job *job,
-    swift_task_enqueueGlobalWithDelay_original original);
+#define SWIFT_CONCURRENCY_HOOK0(returnType, name)                       \
+  typedef SWIFT_CC(swift) returnType (*name##_original)();              \
+  typedef SWIFT_CC(swift) returnType                                    \
+    (*name##_hook_t)(name##_original original);                         \
+  SWIFT_EXPORT_FROM(swift_Concurrency) name##_hook_t name##_hook
 
-typedef SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDeadline_original)(
-    long long sec,
-    long long nsec,
-    long long tsec,
-    long long tnsec,
-    int clock, Job *job);
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDeadline_hook)(
-    long long sec,
-    long long nsec,
-    long long tsec,
-    long long tnsec,
-    int clock, Job *job,
-    swift_task_enqueueGlobalWithDeadline_original original);
+#include "ConcurrencyHooks.def"
 
-typedef SWIFT_CC(swift) void (*swift_task_checkIsolated_original)(SerialExecutorRef executor);
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift) void (*swift_task_checkIsolated_hook)(
-    SerialExecutorRef executor, swift_task_checkIsolated_original original);
-
-
-typedef SWIFT_CC(swift) bool (*swift_task_isOnExecutor_original)(
-    HeapObject *executor,
-    const Metadata *selfType,
-    const SerialExecutorWitnessTable *wtable);
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift) bool (*swift_task_isOnExecutor_hook)(
-    HeapObject *executor,
-    const Metadata *selfType,
-    const SerialExecutorWitnessTable *wtable,
-    swift_task_isOnExecutor_original original);
-
-/// A hook to take over main executor enqueueing.
-typedef SWIFT_CC(swift) void (*swift_task_enqueueMainExecutor_original)(
-    Job *job);
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift) void (*swift_task_enqueueMainExecutor_hook)(
-    Job *job, swift_task_enqueueMainExecutor_original original);
-
-/// A hook to override the entrypoint to the main runloop used to drive the
-/// concurrency runtime and drain the main queue. This function must not return.
-/// Note: If the hook is wrapping the original function and the `compatOverride`
-///       is passed in, the `original` function pointer must be passed into the
-///       compatibility override function as the original function.
+// This is a compatibility hook, *not* a concurrency hook
 typedef SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_original)();
 typedef SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_override)(
     swift_task_asyncMainDrainQueue_original original);
@@ -913,10 +894,15 @@ extern "C" SWIFT_CC(swift)
 void swift_continuation_logFailedCheck(const char *message);
 
 /// Drain the queue
-/// If the binary links CoreFoundation, uses CFRunLoopRun
-/// Otherwise it uses dispatchMain.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_asyncMainDrainQueue [[noreturn]]();
+
+/// Drain the global executor.  This does the same as the above, but
+/// swift_task_asyncMainDrainQueue() is a compatibility override point,
+/// whereas this function has a concurrency hook.  The default
+/// swift_task_asyncMainDrainQueue() implementation just calls this function.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_drainGlobalExecutor [[noreturn]]();
 
 /// Establish that the current thread is running as the given
 /// executor, then run a job.
@@ -951,6 +937,10 @@ SerialExecutorRef swift_task_getCurrentExecutor(void);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 SerialExecutorRef swift_task_getMainExecutor(void);
 
+/// Test if an executor is the main executor.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_isMainExecutor(SerialExecutorRef executor);
+
 /// Return the preferred task executor of the current task,
 /// or ``TaskExecutorRef::undefined()`` if no preference.
 ///
@@ -984,16 +974,12 @@ JobPriority swift_task_getCurrentThreadPriority(void);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_startOnMainActor(AsyncTask* job);
 
-#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
-
 /// Donate this thread to the global executor until either the
 /// given condition returns true or we've run out of cooperative
 /// tasks to run.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
                                                   void *context);
-
-#endif
 
 enum swift_clock_id : int {
   swift_clock_id_continuous = 1,

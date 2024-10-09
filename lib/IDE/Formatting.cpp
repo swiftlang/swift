@@ -1414,6 +1414,12 @@ private:
       // interpolated string literal.
       if (E->getArgs() == Args)
         ContextLoc = getContextLocForArgs(SM, E);
+    } else if (auto *D = Parent.getAsDecl()) {
+      if (auto *MED = dyn_cast<MacroExpansionDecl>(D)) {
+        if (MED->getArgs() == Args) {
+          ContextLoc = MED->getStartLoc();
+        }
+      }
     }
 
     auto Action = HandlePre(Args, Args->isImplicit());
@@ -2700,10 +2706,17 @@ private:
     if (TrailingTarget)
       return std::nullopt;
 
-    auto *ParentE = Parent.getAsExpr();
-    assert(ParentE && "Trailing closures can only occur in expr contexts");
-    return IndentContext{
-        ContextLoc, !OutdentChecker::hasOutdent(SM, ContextToEnd, ParentE)};
+    bool hasOutdent;
+    if (auto *ParentE = Parent.getAsExpr()) {
+      hasOutdent = OutdentChecker::hasOutdent(SM, ContextToEnd, ParentE);
+    } else if (auto *ParentD = Parent.getAsDecl()) {
+      assert(isa<MacroExpansionDecl>(ParentD) && "Trailing closures in decls can only occur in macro expansions");
+      hasOutdent = OutdentChecker::hasOutdent(SM, ContextToEnd, ParentD);
+    } else {
+      assert(false && "Trailing closures can only occur in expr contexts and macro expansions");
+      return std::nullopt;
+    }
+    return IndentContext{ContextLoc, !hasOutdent};
   }
 
   std::optional<IndentContext>
@@ -3040,7 +3053,7 @@ std::pair<LineRange, std::string> swift::ide::reformat(LineRange Range,
     // default value.
     Options.TabWidth = Options.IndentWidth ? Options.IndentWidth : 4;
   }
-  auto SourceBufferID = SF.getBufferID().value();
+  auto SourceBufferID = SF.getBufferID();
   StringRef Text = SM.getLLVMSourceMgr()
     .getMemoryBuffer(SourceBufferID)->getBuffer();
   size_t Offset = getOffsetOfLine(Range.startLine(), Text, /*Trim*/true);

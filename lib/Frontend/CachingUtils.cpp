@@ -20,6 +20,7 @@
 #include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/CompileJobCacheResult.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/Frontend/MakeStyleDependencies.h"
 #include "swift/Option/Options.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/CAS/IncludeTree.h"
@@ -135,19 +136,21 @@ lookupCacheKey(ObjectStore &CAS, ActionCache &Cache, ObjectRef CacheKey) {
 
 bool replayCachedCompilerOutputs(
     ObjectStore &CAS, ActionCache &Cache, ObjectRef BaseKey,
-    DiagnosticEngine &Diag, const FrontendInputsAndOutputs &InputsAndOutputs,
+    DiagnosticEngine &Diag, const FrontendOptions &Opts,
     CachingDiagnosticsProcessor &CDP, bool CacheRemarks, bool UseCASBackend) {
   bool CanReplayAllOutput = true;
   struct OutputEntry {
     std::string Path;
     CASID Key;
+    file_types::ID Kind;
+    const InputFile &Input;
     ObjectProxy Proxy;
   };
   SmallVector<OutputEntry> OutputProxies;
   std::optional<OutputEntry> DiagnosticsOutput;
-  std::string ObjFile;
 
-  auto replayOutputsForInputFile = [&](const std::string &InputPath,
+  auto replayOutputsForInputFile = [&](const InputFile &Input,
+                                       const std::string &InputPath,
                                        unsigned InputIndex,
                                        const DenseMap<file_types::ID,
                                                       std::string> &Outputs) {
@@ -190,15 +193,13 @@ bool replayCachedCompilerOutputs(
           if (!Proxy)
             return Proxy.takeError();
 
-          if (Kind == file_types::ID::TY_Object && UseCASBackend)
-            ObjFile = OutputPath->second;
-
           if (Kind == file_types::ID::TY_CachedDiagnostics) {
             assert(!DiagnosticsOutput && "more than 1 diagnotics found");
-            DiagnosticsOutput = OutputEntry{OutputPath->second, OutID, *Proxy};
+            DiagnosticsOutput.emplace(
+                OutputEntry{OutputPath->second, OutID, Kind, Input, *Proxy});
           } else
             OutputProxies.emplace_back(
-                OutputEntry{OutputPath->second, OutID, *Proxy});
+                OutputEntry{OutputPath->second, OutID, Kind, Input, *Proxy});
           return Error::success();
         })) {
       Diag.diagnose(SourceLoc(), diag::error_cas, toString(std::move(Err)));
@@ -211,7 +212,7 @@ bool replayCachedCompilerOutputs(
     auto InputPath = Input.getFileName();
     DenseMap<file_types::ID, std::string> Outputs;
     if (!Input.outputFilename().empty())
-      Outputs.try_emplace(InputsAndOutputs.getPrincipalOutputType(),
+      Outputs.try_emplace(Opts.InputsAndOutputs.getPrincipalOutputType(),
                           Input.outputFilename());
 
     Input.getPrimarySpecificPaths()
@@ -233,15 +234,15 @@ bool replayCachedCompilerOutputs(
     Outputs.try_emplace(file_types::ID::TY_CachedDiagnostics,
                         "<cached-diagnostics>");
 
-    return replayOutputsForInputFile(InputPath, InputIndex, Outputs);
+    return replayOutputsForInputFile(Input, InputPath, InputIndex, Outputs);
   };
 
-  auto AllInputs = InputsAndOutputs.getAllInputs();
+  auto AllInputs = Opts.InputsAndOutputs.getAllInputs();
   // If there are primary inputs, look up only the primary input files.
   // Otherwise, prepare to do cache lookup for all inputs.
   for (unsigned Index = 0; Index < AllInputs.size(); ++Index) {
     const auto &Input = AllInputs[Index];
-    if (InputsAndOutputs.hasPrimaryInputs() && !Input.isPrimary())
+    if (Opts.InputsAndOutputs.hasPrimaryInputs() && !Input.isPrimary())
       continue;
 
     replayOutputFromInput(Input, Index);
@@ -255,8 +256,9 @@ bool replayCachedCompilerOutputs(
   // diagnostics from first file.
   if (!DiagnosticsOutput)
     replayOutputsForInputFile(
+        Opts.InputsAndOutputs.getFirstOutputProducingInput(),
         "<cached-diagnostics>",
-        InputsAndOutputs.getIndexOfFirstOutputProducingInput(),
+        Opts.InputsAndOutputs.getIndexOfFirstOutputProducingInput(),
         {{file_types::ID::TY_CachedDiagnostics, "<cached-diagnostics>"}});
 
   // Check again to make sure diagnostics is fetched successfully.
@@ -287,10 +289,16 @@ bool replayCachedCompilerOutputs(
       continue;
     }
 
-    if (UseCASBackend && Output.Path == ObjFile) {
+    if (UseCASBackend && Output.Kind == file_types::ID::TY_Object) {
       auto Schema = std::make_unique<llvm::mccasformats::v1::MCSchema>(CAS);
-      if (auto E = Schema->serializeObjectFile(Output.Proxy, *File))
+      if (auto E = Schema->serializeObjectFile(Output.Proxy, *File)) {
         Diag.diagnose(SourceLoc(), diag::error_mccas, toString(std::move(E)));
+        return false;
+      }
+    } else if (Output.Kind == file_types::ID::TY_Dependencies) {
+      if (emitMakeDependenciesFromSerializedBuffer(
+              Output.Proxy.getData(), *File, Opts, Output.Input, Diag))
+        return false;
     } else
       *File << Output.Proxy.getData();
 
@@ -376,8 +384,10 @@ static Expected<ObjectRef> mergeCASFileSystem(ObjectStore &CAS,
 
 Expected<IntrusiveRefCntPtr<vfs::FileSystem>>
 createCASFileSystem(ObjectStore &CAS, ArrayRef<std::string> FSRoots,
-                    ArrayRef<std::string> IncludeTrees) {
-  assert(!FSRoots.empty() || !IncludeTrees.empty() && "no root ID provided");
+                    ArrayRef<std::string> IncludeTrees,
+                    ArrayRef<std::string> IncludeTreeFileList) {
+  assert(!FSRoots.empty() || !IncludeTrees.empty() ||
+         !IncludeTreeFileList.empty() && "no root ID provided");
   if (FSRoots.size() == 1 && IncludeTrees.empty()) {
     auto ID = CAS.parseID(FSRoots.front());
     if (!ID)
@@ -394,6 +404,7 @@ createCASFileSystem(ObjectStore &CAS, ArrayRef<std::string> FSRoots,
     return FS.takeError();
 
   auto CASFS = makeIntrusiveRefCnt<vfs::OverlayFileSystem>(std::move(*FS));
+  std::vector<clang::cas::IncludeTree::FileList::FileEntry> Files;
   // Push all Include File System onto overlay.
   for (auto &Tree : IncludeTrees) {
     auto ID = CAS.parseID(Tree);
@@ -407,11 +418,49 @@ createCASFileSystem(ObjectStore &CAS, ArrayRef<std::string> FSRoots,
     if (!IT)
       return IT.takeError();
 
-    auto ITFS = clang::cas::createIncludeTreeFileSystem(*IT);
-    if (!ITFS)
-      return ITFS.takeError();
-    CASFS->pushOverlay(std::move(*ITFS));
+    auto ITF = IT->getFileList();
+    if (!ITF)
+      return ITF.takeError();
+
+    auto Err = ITF->forEachFile(
+        [&](clang::cas::IncludeTree::File File,
+            clang::cas::IncludeTree::FileList::FileSizeTy Size) -> llvm::Error {
+          Files.push_back({File.getRef(), Size});
+          return llvm::Error::success();
+        });
+
+    if (Err)
+      return std::move(Err);
   }
+
+  for (auto &List: IncludeTreeFileList) {
+    auto ID = CAS.parseID(List);
+    if (!ID)
+      return ID.takeError();
+
+    auto Ref = CAS.getReference(*ID);
+    if (!Ref)
+      return createCASObjectNotFoundError(*ID);
+    auto IT = clang::cas::IncludeTree::FileList::get(CAS, *Ref);
+    if (!IT)
+      return IT.takeError();
+
+    auto Err = IT->forEachFile(
+        [&](clang::cas::IncludeTree::File File,
+            clang::cas::IncludeTree::FileList::FileSizeTy Size) -> llvm::Error {
+          Files.push_back({File.getRef(), Size});
+          return llvm::Error::success();
+        });
+
+    if (Err)
+      return std::move(Err);
+  }
+
+  auto ITFS = clang::cas::createIncludeTreeFileSystem(CAS, Files);
+  if (!ITFS)
+    return ITFS.takeError();
+
+  CASFS->pushOverlay(std::move(*ITFS));
 
   return CASFS;
 }

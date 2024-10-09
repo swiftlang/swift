@@ -14,6 +14,8 @@
 #include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
 #include "ModuleFileCoreTableInfo.h"
+#include "ModuleFormat.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Parse/ParseVersion.h"
@@ -1130,6 +1132,22 @@ getActualImportControl(unsigned rawValue) {
   }
 }
 
+static std::optional<ExternalMacroPlugin::Access>
+getActualMacroAccess(unsigned rawValue) {
+  // We switch on the raw value rather than the enum in order to handle future
+  // values.
+  switch (rawValue) {
+  case static_cast<unsigned>(serialization::AccessLevel::Public):
+    return ExternalMacroPlugin::Public;
+  case static_cast<unsigned>(serialization::AccessLevel::Package):
+    return ExternalMacroPlugin::Package;
+  case static_cast<unsigned>(serialization::AccessLevel::Internal):
+    return ExternalMacroPlugin::Internal;
+  default:
+    return std::nullopt;
+  }
+}
+
 bool ModuleFileSharedCore::readModuleDocIfPresent(PathObfuscator &pathRecoverer) {
   if (!this->ModuleDocInputBuffer)
     return true;
@@ -1591,6 +1609,18 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           ModuleInterfacePath = blobData;
           break;
         }
+        case input_block::EXTERNAL_MACRO: {
+          uint8_t rawKind;
+          input_block::ExternalMacroLayout::readRecord(scratch, rawKind);
+          auto accessKind = getActualMacroAccess(rawKind);
+          if (!accessKind) {
+            info.status = error(Status::Malformed);
+            return;
+          }
+
+          MacroModuleNames.push_back({blobData.str(), *accessKind});
+          break;
+        }
         default:
           // Unknown input kind, possibly for use by a future version of the
           // module format.
@@ -1798,7 +1828,7 @@ bool ModuleFileSharedCore::hasSourceInfo() const {
 std::string ModuleFileSharedCore::resolveModuleDefiningFilePath(const StringRef SDKPath) const {
   if (!ModuleInterfacePath.empty()) {
     std::string interfacePath = ModuleInterfacePath.str();
-    if (llvm::sys::path::is_relative(interfacePath)) {
+    if (llvm::sys::path::is_relative(interfacePath) && !ModuleInterfacePath.starts_with(SDKPath)) {
       SmallString<128> absoluteInterfacePath(SDKPath);
       llvm::sys::path::append(absoluteInterfacePath, interfacePath);
       return absoluteInterfacePath.str().str();

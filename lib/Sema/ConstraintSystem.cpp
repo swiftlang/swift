@@ -31,6 +31,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeTransform.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
@@ -170,7 +171,7 @@ void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
   assert(typeVar2 == getRepresentative(typeVar2) &&
          "typeVar2 is not the representative");
   assert(typeVar1 != typeVar2 && "cannot merge type with itself");
-  typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, getSavedBindings());
+  typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, getTrail());
 
   // Merge nodes in the constraint graph.
   CG.mergeNodes(typeVar1, typeVar2);
@@ -202,7 +203,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
   assert(!type->hasError() &&
          "Should not be assigning a type involving ErrorType!");
 
-  typeVar->getImpl().assignFixedType(type, getSavedBindings());
+  typeVar->getImpl().assignFixedType(type, getTrail());
 
   if (!updateState)
     return;
@@ -241,10 +242,11 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
 
   // Notify the constraint graph.
   CG.bindTypeVariable(typeVar, type);
+
   addTypeVariableConstraintsToWorkList(typeVar);
 
   if (notifyBindingInference)
-    CG[typeVar].introduceToInference(type);
+    CG.introduceToInference(typeVar, type);
 }
 
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(
@@ -254,6 +256,61 @@ void ConstraintSystem::addTypeVariableConstraintsToWorkList(
   for (auto *constraint : CG.gatherConstraints(typeVar, gatheringKind))
     if (!constraint->isActive())
       activateConstraint(constraint);
+}
+
+void ConstraintSystem::addConversionRestriction(
+    Type srcType, Type dstType,
+    ConversionRestrictionKind restriction) {
+  auto key = std::make_pair(srcType.getPointer(), dstType.getPointer());
+  bool inserted = ConstraintRestrictions.insert(
+      std::make_pair(key, restriction)).second;
+  if (!inserted)
+    return;
+
+  if (solverState) {
+    recordChange(SolverTrail::Change::AddedConversionRestriction(
+      srcType, dstType));
+  }
+}
+
+void ConstraintSystem::removeConversionRestriction(
+    Type srcType, Type dstType) {
+  auto key = std::make_pair(srcType.getPointer(), dstType.getPointer());
+  bool erased = ConstraintRestrictions.erase(key);
+  ASSERT(erased);
+}
+
+void ConstraintSystem::addFix(ConstraintFix *fix) {
+  bool inserted = Fixes.insert(fix);
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::AddedFix(fix));
+}
+
+void ConstraintSystem::removeFix(ConstraintFix *fix) {
+  ASSERT(Fixes.back() == fix);
+  Fixes.pop_back();
+}
+
+void ConstraintSystem::recordDisjunctionChoice(
+    ConstraintLocator *locator, unsigned index) {
+  bool inserted = DisjunctionChoices.insert({locator, index}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedDisjunctionChoice(locator));
+}
+
+void ConstraintSystem::recordAppliedDisjunction(
+    ConstraintLocator *locator, FunctionType *fnType) {
+  // We shouldn't ever register disjunction choices multiple times.
+  bool inserted = AppliedDisjunctions.insert(
+      std::make_pair(locator, fnType)).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedAppliedDisjunction(locator));
 }
 
 /// Retrieve a dynamic result signature for the given declaration.
@@ -380,6 +437,18 @@ bool ConstraintSystem::containsIDEInspectionTarget(
 }
 
 void ConstraintSystem::recordPotentialThrowSite(
+    CatchNode catchNode, PotentialThrowSite site) {
+  potentialThrowSites.push_back({catchNode, site});
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedPotentialThrowSite(catchNode));
+}
+
+void ConstraintSystem::removePotentialThrowSite(CatchNode catchNode) {
+  ASSERT(potentialThrowSites.back().first == catchNode);
+  potentialThrowSites.pop_back();
+}
+
+void ConstraintSystem::recordPotentialThrowSite(
     PotentialThrowSite::Kind kind, Type type,
     ConstraintLocatorBuilder locator) {
   ASTContext &ctx = getASTContext();
@@ -405,9 +474,8 @@ void ConstraintSystem::recordPotentialThrowSite(
   // do..catch statements without an explicit `throws` clause do infer
   // thrown types.
   if (auto doCatch = catchNode.dyn_cast<DoCatchStmt *>()) {
-    potentialThrowSites.push_back(
-        {catchNode,
-         PotentialThrowSite{kind, type, getConstraintLocator(locator)}});
+    PotentialThrowSite site{kind, type, getConstraintLocator(locator)};
+    recordPotentialThrowSite(catchNode, site);
     return;
   }
 
@@ -420,9 +488,8 @@ void ConstraintSystem::recordPotentialThrowSite(
   if (!closureEffects(closure).isThrowing())
     return;
 
-  potentialThrowSites.push_back(
-      {catchNode,
-       PotentialThrowSite{kind, type, getConstraintLocator(locator)}});
+  PotentialThrowSite site{kind, type, getConstraintLocator(locator)};
+  recordPotentialThrowSite(catchNode, site);
 }
 
 Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
@@ -779,9 +846,18 @@ std::pair<Type, OpenedArchetypeType *> ConstraintSystem::openExistentialType(
     t = t->getMetatypeInstanceType();
   auto *opened = t->castTo<OpenedArchetypeType>();
 
-  assert(OpenedExistentialTypes.count(locator) == 0);
-  OpenedExistentialTypes.insert({locator, opened});
+  recordOpenedExistentialType(locator, opened);
+
   return {result, opened};
+}
+
+void ConstraintSystem::recordOpenedExistentialType(
+    ConstraintLocator *locator, OpenedArchetypeType *opened) {
+  bool inserted = OpenedExistentialTypes.insert({locator, opened}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedOpenedExistentialType(locator));
 }
 
 GenericEnvironment *
@@ -793,7 +869,7 @@ ConstraintSystem::getPackElementEnvironment(ConstraintLocator *locator,
   auto result = PackExpansionEnvironments.find(locator);
   if (result == PackExpansionEnvironments.end()) {
     uuidAndShape = std::make_pair(UUID::fromTime(), shapeClass);
-    PackExpansionEnvironments[locator] = uuidAndShape;
+    recordPackExpansionEnvironment(locator, uuidAndShape);
   } else {
     uuidAndShape = result->second;
   }
@@ -816,6 +892,15 @@ ConstraintSystem::getPackElementEnvironment(ConstraintLocator *locator,
                                               shapeParam, contextSubs);
 }
 
+void ConstraintSystem::recordPackExpansionEnvironment(
+    ConstraintLocator *locator, std::pair<UUID, Type> uuidAndShape) {
+  bool inserted = PackExpansionEnvironments.insert({locator, uuidAndShape}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedPackExpansionEnvironment(locator));
+}
+
 PackExpansionExpr *
 ConstraintSystem::getPackEnvironment(PackElementExpr *packElement) const {
   const auto match = PackEnvironments.find(packElement);
@@ -824,11 +909,11 @@ ConstraintSystem::getPackEnvironment(PackElementExpr *packElement) const {
 
 void ConstraintSystem::addPackEnvironment(PackElementExpr *packElement,
                                           PackExpansionExpr *packExpansion) {
-  assert(packElement);
-  assert(packExpansion);
-  [[maybe_unused]] const auto inserted =
-      PackEnvironments.insert({packElement, packExpansion}).second;
-  assert(inserted && "Mapping already defined?");
+  bool inserted = PackEnvironments.insert({packElement, packExpansion}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedPackEnvironment(packElement));
 }
 
 /// Extend the given depth map by adding depths for all of the subexpressions
@@ -941,7 +1026,8 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
   openGeneric(decl->getDeclContext(), decl->getGenericSignature(), locator,
               replacements);
 
-  recordOpenedTypes(locator, replacements);
+  // FIXME: Get rid of fixmeAllowDuplicates.
+  recordOpenedTypes(locator, replacements, /*fixmeAllowDuplicates=*/true);
 
   if (parentTy) {
     const auto parentTyInContext =
@@ -1114,6 +1200,54 @@ Type ConstraintSystem::replaceInferableTypesWithTypeVars(
   return type;
 }
 
+namespace {
+
+struct TypeOpener : public TypeTransform<TypeOpener> {
+  OpenedTypeMap &replacements;
+  ConstraintLocatorBuilder locator;
+  ConstraintSystem &cs;
+
+  TypeOpener(OpenedTypeMap &replacements,
+             ConstraintLocatorBuilder locator,
+             ConstraintSystem &cs)
+      : TypeTransform<TypeOpener>(cs.getASTContext()),
+        replacements(replacements), locator(locator), cs(cs) {}
+
+  std::optional<Type> transform(TypeBase *type, TypePosition pos) {
+    if (!type->hasTypeParameter())
+      return Type(type);
+
+    return std::nullopt;
+  }
+
+  Type transformGenericTypeParamType(GenericTypeParamType *genericParam,
+                                     TypePosition pos) {
+    auto known = replacements.find(
+      cast<GenericTypeParamType>(genericParam->getCanonicalType()));
+    // FIXME: This should be an assert, however protocol generic signatures
+    // drop outer generic parameters.
+    // assert(known != replacements.end());
+    if (known == replacements.end())
+      return ErrorType::get(ctx);
+    return known->second;
+  }
+
+  Type transformPackExpansionType(PackExpansionType *expansion,
+                                  TypePosition pos) {
+    return cs.openPackExpansionType(expansion, replacements, locator);
+  }
+
+  bool shouldUnwrapVanishingTuples() const {
+    return false;
+  }
+
+  bool shouldDesugarTypeAliases() const {
+    return true;
+  }
+};
+
+}
+
 Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements,
                                 ConstraintLocatorBuilder locator) {
   assert(!type->hasUnboundGenericType());
@@ -1121,42 +1255,8 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements,
   if (!type->hasTypeParameter())
     return type;
 
-  return type.transformRec([&](Type type) -> std::optional<Type> {
-      assert(!type->is<GenericFunctionType>());
-
-      // Preserve single element tuples if their element is
-      // pack expansion, otherwise it wouldn't be expanded.
-      if (auto *tuple = type->getAs<TupleType>()) {
-        if (tuple->getNumElements() == 1) {
-          const auto &elt = tuple->getElement(0);
-          if (!elt.hasName() && elt.getType()->is<PackExpansionType>()) {
-            return TupleType::get(
-                {openPackExpansionType(
-                    elt.getType()->castTo<PackExpansionType>(), replacements,
-                    locator)},
-                tuple->getASTContext());
-          }
-        }
-      }
-
-      if (auto *expansion = type->getAs<PackExpansionType>()) {
-        return openPackExpansionType(expansion, replacements, locator);
-      }
-
-      // Replace a generic type parameter with its corresponding type variable.
-      if (auto genericParam = type->getAs<GenericTypeParamType>()) {
-        auto known = replacements.find(
-          cast<GenericTypeParamType>(genericParam->getCanonicalType()));
-        // FIXME: This should be an assert, however protocol generic signatures
-        // drop outer generic parameters.
-        // assert(known != replacements.end());
-        if (known == replacements.end())
-          return ErrorType::get(getASTContext());
-        return known->second;
-      }
-
-      return std::nullopt;
-    });
+  return TypeOpener(replacements, locator, *this)
+      .doIt(type, TypePosition::Invariant);
 }
 
 Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
@@ -1186,6 +1286,15 @@ Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
 
   OpenedPackExpansionTypes[openedPackExpansion] = expansionVar;
   return expansionVar;
+}
+
+void ConstraintSystem::recordOpenedPackExpansionType(PackExpansionType *expansion,
+                                                     TypeVariableType *expansionVar) {
+  bool inserted = OpenedPackExpansionTypes.insert({expansion, expansionVar}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedOpenedPackExpansionType(expansion));
 }
 
 Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
@@ -1383,7 +1492,7 @@ getPropertyWrapperInformationFromOverload(
       VarDecl *memberDecl;
       std::tie(memberDecl, type) = *declInformation;
       if (Type baseType = resolvedOverload.choice.getBaseType()) {
-        type = baseType->getTypeOfMember(memberDecl, type);
+        type = baseType->getRValueType()->getTypeOfMember(memberDecl, type);
       }
       return std::make_pair(decl, type);
     }
@@ -1588,9 +1697,19 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
   return requestedType;
 }
 
+void ConstraintSystem::recordOpenedType(
+    ConstraintLocator *locator, ArrayRef<OpenedType> openedTypes) {
+  bool inserted = OpenedTypes.insert({locator, openedTypes}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedOpenedTypes(locator));
+}
+
 void ConstraintSystem::recordOpenedTypes(
        ConstraintLocatorBuilder locator,
-       const OpenedTypeMap &replacements) {
+       const OpenedTypeMap &replacements,
+       bool fixmeAllowDuplicates) {
   if (replacements.empty())
     return;
 
@@ -1607,20 +1726,15 @@ void ConstraintSystem::recordOpenedTypes(
 
   ConstraintLocator *locatorPtr = getConstraintLocator(locator);
   assert(locatorPtr && "No locator for opened types?");
-#if false
-  assert(std::find_if(OpenedTypes.begin(), OpenedTypes.end(),
-                      [&](const std::pair<ConstraintLocator *,
-                          ArrayRef<OpenedType>> &entry) {
-                        return entry.first == locatorPtr;
-                      }) == OpenedTypes.end() &&
-         "already registered opened types for this locator");
-#endif
 
   OpenedType* openedTypes
     = Allocator.Allocate<OpenedType>(replacements.size());
   std::copy(replacements.begin(), replacements.end(), openedTypes);
-  OpenedTypes.insert(
-      {locatorPtr, llvm::ArrayRef(openedTypes, replacements.size())});
+
+  // FIXME: Get rid of fixmeAllowDuplicates.
+  if (!fixmeAllowDuplicates || OpenedTypes.count(locatorPtr) == 0)
+    recordOpenedType(
+      locatorPtr, llvm::ArrayRef(openedTypes, replacements.size()));
 }
 
 /// Determine how many levels of argument labels should be removed from the
@@ -2668,8 +2782,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   } else if (baseObjTy->isExistentialType()) {
     auto openedArchetype =
         OpenedArchetypeType::get(baseObjTy->getCanonicalType());
-    OpenedExistentialTypes.insert(
-        {getConstraintLocator(locator), openedArchetype});
+    recordOpenedExistentialType(getConstraintLocator(locator), openedArchetype);
     baseOpenedTy = openedArchetype;
   }
 
@@ -3444,12 +3557,13 @@ void ConstraintSystem::bindOverloadType(
 
     // Associate an argument list for the implicit x[dynamicMember:] subscript
     // if we haven't already.
-    auto *&argList = ArgumentLists[getArgumentInfoLocator(callLoc)];
-    if (!argList) {
-      argList = ArgumentList::createImplicit(
+    auto *argLoc = getArgumentInfoLocator(callLoc);
+    if (ArgumentLists.find(argLoc) == ArgumentLists.end()) {
+      auto *argList = ArgumentList::createImplicit(
           ctx, {Argument(SourceLoc(), ctx.Id_dynamicMember, /*expr*/ nullptr)},
           /*firstTrailingClosureIndex=*/std::nullopt,
           AllocationArena::ConstraintSolver);
+      recordArgumentList(argLoc, argList);
     }
 
     auto *callerTy = FunctionType::get(
@@ -3640,6 +3754,15 @@ void ConstraintSystem::bindOverloadType(
   }
   }
   llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
+}
+
+void ConstraintSystem::recordResolvedOverload(ConstraintLocator *locator,
+                                              SelectedOverload overload) {
+  bool inserted = ResolvedOverloads.insert({locator, overload}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::ResolvedOverload(locator));
 }
 
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
@@ -3897,9 +4020,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   auto overload = SelectedOverload{
       choice, openedType, adjustedOpenedType, refType, adjustedRefType,
       boundType};
-  auto result = ResolvedOverloads.insert({locator, overload});
-  assert(result.second && "Already resolved this overload?");
-  (void)result;
+  recordResolvedOverload(locator, overload);
 
   // Add the constraints necessary to bind the overload type.
   bindOverloadType(overload, boundType, locator, useDC,
@@ -4165,8 +4286,7 @@ struct TypeSimplifier {
           return memberTy;
         }
 
-        auto result = conformance.getAssociatedType(
-            lookupBaseType, assocType->getDeclaredInterfaceType());
+        auto result = conformance.getTypeWitness(lookupBaseType, assocType);
         if (result && !result->hasError())
           return result;
       }
@@ -4368,11 +4488,11 @@ size_t Solution::getTotalMemory() const {
          overloadChoices.getMemorySize() +
          ConstraintRestrictions.getMemorySize() +
          (Fixes.size() * sizeof(void *)) + DisjunctionChoices.getMemorySize() +
+         AppliedDisjunctions.getMemorySize() +
          OpenedTypes.getMemorySize() + OpenedExistentialTypes.getMemorySize() +
          OpenedPackExpansionTypes.getMemorySize() +
          PackExpansionEnvironments.getMemorySize() +
          size_in_bytes(PackEnvironments) +
-         PackElementGenericEnvironments.size() +
          (DefaultedConstraints.size() * sizeof(void *)) +
          nodeTypes.getMemorySize() +
          keyPathComponentTypes.getMemorySize() +
@@ -4381,12 +4501,12 @@ size_t Solution::getTotalMemory() const {
          size_in_bytes(targets) +
          size_in_bytes(caseLabelItems) +
          size_in_bytes(exprPatterns) +
-         (isolatedParams.size() * sizeof(void *)) +
-         (preconcurrencyClosures.size() * sizeof(void *)) +
+         size_in_bytes(isolatedParams) +
+         size_in_bytes(preconcurrencyClosures) +
          size_in_bytes(resultBuilderTransformed) +
          size_in_bytes(appliedPropertyWrappers) +
          size_in_bytes(argumentLists) +
-         ImplicitCallAsFunctionRoots.getMemorySize() +
+         size_in_bytes(ImplicitCallAsFunctionRoots) +
          size_in_bytes(SynthesizedConformances);
 }
 
@@ -6146,7 +6266,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::SequenceElementType:
     case ConstraintLocator::ConstructorMemberType:
     case ConstraintLocator::ExistentialConstraintType:
-    case ConstraintLocator::ProtocolCompositionSuperclassType:
+    case ConstraintLocator::ProtocolCompositionMemberType:
       break;
 
     case ConstraintLocator::GenericArgument:
@@ -6417,13 +6537,20 @@ ArgumentList *ConstraintSystem::getArgumentList(ConstraintLocator *locator) {
   return nullptr;
 }
 
+void ConstraintSystem::recordArgumentList(ConstraintLocator *locator,
+                                          ArgumentList *args) {
+  bool inserted = ArgumentLists.insert({locator, args}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedArgumentList(locator));
+}
+
 void ConstraintSystem::associateArgumentList(ConstraintLocator *locator,
                                              ArgumentList *args) {
-  assert(locator && locator->getAnchor());
-  auto *argInfoLoc = getArgumentInfoLocator(locator);
-  auto inserted = ArgumentLists.insert({argInfoLoc, args}).second;
-  assert(inserted && "Multiple argument lists at locator?");
-  (void)inserted;
+  ASSERT(locator && locator->getAnchor());
+  auto *argLoc = getArgumentInfoLocator(locator);
+  recordArgumentList(argLoc, args);
 }
 
 ArgumentList *Solution::getArgumentList(ConstraintLocator *locator) const {
@@ -7333,9 +7460,29 @@ void ConstraintSystem::recordFixedRequirement(ConstraintLocator *reqLocator,
   if (auto reqInfo = getRequirementInfo(*this, reqLocator)) {
     auto *GP = reqInfo->first;
     auto reqKind = static_cast<unsigned>(reqInfo->second);
-    FixedRequirements.insert(
-        std::make_tuple(GP, reqKind, requirementTy.getPointer()));
+    recordFixedRequirement(GP, reqKind, requirementTy);
   }
+}
+
+void ConstraintSystem::recordFixedRequirement(GenericTypeParamType *GP,
+                                              unsigned reqKind,
+                                              Type requirementTy) {
+  bool inserted = FixedRequirements.insert(
+      std::make_tuple(GP, reqKind, requirementTy.getPointer())).second;
+  if (inserted) {
+    if (solverState) {
+      recordChange(SolverTrail::Change::AddedFixedRequirement(
+          GP, reqKind, requirementTy));
+    }
+  }
+}
+
+void ConstraintSystem::removeFixedRequirement(GenericTypeParamType *GP,
+                                              unsigned reqKind,
+                                              Type requirementTy) {
+  auto key = std::make_tuple(GP, reqKind, requirementTy.getPointer());
+  bool erased = FixedRequirements.erase(key);
+  ASSERT(erased);
 }
 
 // Replace any error types encountered with placeholders.

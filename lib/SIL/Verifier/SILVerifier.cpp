@@ -10,11 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/SILValue.h"
-#include <memory>
 #define DEBUG_TYPE "sil-verifier"
 
 #include "VerifierPrivate.h"
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTSynthesis.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -50,6 +49,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILVTableVisitor.h"
+#include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/TypeLowering.h"
@@ -59,6 +59,8 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+
+#include <memory>
 
 using namespace swift;
 using namespace swift::silverifier;
@@ -3620,7 +3622,7 @@ public:
     require(ud, "UncheckedEnumData must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "UncheckedEnumData case must be a case of the enum operand type");
-    require(UI->getElement()->getArgumentInterfaceType(),
+    require(UI->getElement()->getPayloadInterfaceType(),
             "UncheckedEnumData case must have a data type");
     require(UI->getOperand()->getType().isObject(),
             "UncheckedEnumData must take an address operand");
@@ -3642,7 +3644,7 @@ public:
     require(ud, "UncheckedTakeEnumDataAddrInst must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "UncheckedTakeEnumDataAddrInst case must be a case of the enum operand type");
-    require(UI->getElement()->getArgumentInterfaceType(),
+    require(UI->getElement()->getPayloadInterfaceType(),
             "UncheckedTakeEnumDataAddrInst case must have a data type");
     require(UI->getOperand()->getType().isAddress(),
             "UncheckedTakeEnumDataAddrInst must take an address operand");
@@ -4112,29 +4114,31 @@ public:
               == F.getModule().Types.getProtocolWitnessRepresentation(protocol),
             "result of witness_method must have correct representation for protocol");
 
-    require(methodType->isPolymorphic(),
-            "result of witness_method must be polymorphic");
+    if (methodType->isPolymorphic()) {
+      require(methodType->isPolymorphic(),
+              "result of witness_method must be polymorphic");
 
-    auto genericSig = methodType->getInvocationGenericSignature();
+      auto genericSig = methodType->getInvocationGenericSignature();
 
-    auto selfGenericParam = genericSig.getGenericParams()[0];
-    require(selfGenericParam->getDepth() == 0
-            && selfGenericParam->getIndex() == 0,
-            "method should be polymorphic on Self parameter at depth 0 index 0");
-    std::optional<Requirement> selfRequirement;
-    for (auto req : genericSig.getRequirements()) {
-      if (req.getKind() != RequirementKind::SameType) {
-        selfRequirement = req;
-        break;
+      auto selfGenericParam = genericSig.getGenericParams()[0];
+      require(selfGenericParam->getDepth() == 0
+              && selfGenericParam->getIndex() == 0,
+              "method should be polymorphic on Self parameter at depth 0 index 0");
+      std::optional<Requirement> selfRequirement;
+      for (auto req : genericSig.getRequirements()) {
+        if (req.getKind() != RequirementKind::SameType) {
+          selfRequirement = req;
+          break;
+        }
       }
-    }
 
-    require(selfRequirement &&
-            selfRequirement->getKind() == RequirementKind::Conformance,
-            "first non-same-typerequirement should be conformance requirement");
-    const auto protos = genericSig->getRequiredProtocols(selfGenericParam);
-    require(std::find(protos.begin(), protos.end(), protocol) != protos.end(),
-            "requirement Self parameter must conform to called protocol");
+      require(selfRequirement &&
+              selfRequirement->getKind() == RequirementKind::Conformance,
+              "first non-same-typerequirement should be conformance requirement");
+      const auto protos = genericSig->getRequiredProtocols(selfGenericParam);
+      require(std::find(protos.begin(), protos.end(), protocol) != protos.end(),
+              "requirement Self parameter must conform to called protocol");
+    }
 
     auto lookupType = AMI->getLookupType();
     if (getLocalArchetypeOf(lookupType) || lookupType->hasDynamicSelfType()) {
@@ -5207,6 +5211,15 @@ public:
     requireABICompatibleFunctionTypes(
         opTI, resTI, "convert_function cannot change function ABI",
         *ICI->getFunction());
+  }
+
+  void checkThunkInst(ThunkInst *ti) {
+    auto objTI =
+        requireObjectType(SILFunctionType, ti->getOperand(), "thunk operand");
+    auto resTI = requireObjectType(SILFunctionType, ti, "thunk result");
+    require(resTI == ti->getThunkKind().getDerivedFunctionType(
+                         ti->getFunction(), objTI, ti->getSubstitutionMap()),
+            "resTI is not the thunk kind assigned derived function type");
   }
 
   void checkConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *ICI) {
@@ -6284,9 +6297,10 @@ public:
 
         auto *genericEnv = archetype->getGenericEnvironment();
         auto interfaceTy = archetype->getInterfaceType();
+        auto rootParamTy = interfaceTy->getRootGenericParam();
 
         auto root = genericEnv->mapTypeIntoContext(
-            interfaceTy->getRootGenericParam())->castTo<ElementArchetypeType>();
+            rootParamTy)->castTo<ElementArchetypeType>();
         auto it = allOpened.find(root->getCanonicalType());
         assert(it != allOpened.end());
 
@@ -6299,12 +6313,12 @@ public:
           assert(!indexedShape && "pack substitution doesn't match in shape");
         }
 
-        if (interfaceTy->is<GenericTypeParamType>())
-          return packElementType;
-
-        return interfaceTy->castTo<DependentMemberType>()
-            ->substRootParam(packElementType, LookUpConformanceInModule(),
-                             std::nullopt);
+        return interfaceTy.subst(
+          [&](SubstitutableType *type) {
+            ASSERT(type->isEqual(rootParamTy));
+            return packElementType;
+          },
+          LookUpConformanceInModule());
       };
 
       // If the pack components and expected element types are SIL types,
@@ -7347,24 +7361,39 @@ void SILFunction::verifySILUndefMap() const {
   }
 }
 
+CanType SILProperty::getBaseType() const {
+  auto *decl = getDecl();
+  auto *dc = decl->getInnermostDeclContext();
+
+  // TODO: base type for global descriptors
+  auto sig = dc->getGenericSignatureOfContext();
+  auto baseTy =
+      dc->getInnermostTypeContext()->getSelfInterfaceType()->getReducedType(
+          sig);
+  if (decl->isStatic())
+    baseTy = CanMetatypeType::get(baseTy);
+
+  if (sig) {
+    auto env = dc->getGenericEnvironmentOfContext();
+    baseTy = env->mapTypeIntoContext(baseTy)->getCanonicalType();
+  }
+
+  return baseTy;
+}
+
 /// Verify that a property descriptor follows invariants.
 void SILProperty::verify(const SILModule &M) const {
   if (!verificationEnabled(M))
     return;
 
   auto *decl = getDecl();
-  auto *dc = decl->getInnermostDeclContext();
-  
-  // TODO: base type for global/static descriptors
-  auto sig = dc->getGenericSignatureOfContext();
-  auto baseTy = dc->getInnermostTypeContext()->getSelfInterfaceType()
-                  ->getReducedType(sig);
+  auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
   auto leafTy = decl->getValueInterfaceType()->getReducedType(sig);
   SubstitutionMap subs;
   if (sig) {
-    auto env = dc->getGenericEnvironmentOfContext();
+    auto env =
+        decl->getInnermostDeclContext()->getGenericEnvironmentOfContext();
     subs = env->getForwardingSubstitutionMap();
-    baseTy = env->mapTypeIntoContext(baseTy)->getCanonicalType();
     leafTy = env->mapTypeIntoContext(leafTy)->getCanonicalType();
   }
   bool hasIndices = false;
@@ -7385,6 +7414,7 @@ void SILProperty::verify(const SILModule &M) const {
     auto typeExpansionContext =
         TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
             ResilienceExpansion::Maximal);
+    auto baseTy = getBaseType();
     verifyKeyPathComponent(const_cast<SILModule&>(M),
                            typeExpansionContext,
                            getSerializedKind(),
@@ -7676,7 +7706,7 @@ void SILModule::verify(CalleeCache *calleeCache,
 
   // Check all witness tables.
   LLVM_DEBUG(llvm::dbgs() <<"*** Checking witness tables for duplicates ***\n");
-  llvm::DenseSet<RootProtocolConformance*> wtableConformances;
+  llvm::DenseSet<ProtocolConformance*> wtableConformances;
   for (const SILWitnessTable &wt : getWitnessTables()) {
     LLVM_DEBUG(llvm::dbgs() << "Witness Table:\n"; wt.dump());
     auto conformance = wt.getConformance();

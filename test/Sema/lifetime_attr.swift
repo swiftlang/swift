@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes -disable-experimental-parser-round-trip
+// FIXME: Remove '-disable-experimental-parser-round-trip'.
 // REQUIRES: asserts
 
 struct NE : ~Escapable {
@@ -28,7 +29,7 @@ func invalidDuplicateLifetimeDependence1(_ ne: borrowing NE) -> NE {
 
 class Klass {}
 
-@lifetime(x) // expected-error{{invalid use of lifetime dependence on an Escapable parameter with consuming ownership}}
+@lifetime(borrow x) // expected-error{{invalid use of borrow dependence with consuming ownership}}
 func invalidDependence(_ x: consuming Klass) -> NE {
   NE()
 }

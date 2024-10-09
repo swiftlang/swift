@@ -9,7 +9,7 @@
 func bar() {
 }
 
-// CHECK: warning: 'bar()' is deprecated: renamed to 'bar2' [availability_deprecated]{{$}}
+// CHECK: warning: 'bar()' is deprecated: renamed to 'bar2' [DeprecatedDeclaration]{{$}}
 bar()
 
 

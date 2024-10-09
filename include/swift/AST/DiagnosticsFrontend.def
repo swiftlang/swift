@@ -89,7 +89,7 @@ ERROR(error_missing_arg_value,none,
       (StringRef, unsigned))
 ERROR(error_unknown_arg,none,
       "unknown argument: '%0'", (StringRef))
-GROUPED_WARNING(unknown_warning_group, unknown_warning_group, none,
+GROUPED_WARNING(unknown_warning_group, UnknownWarningGroup, none,
                 "unknown warning group: '%0'", (StringRef))
 ERROR(error_invalid_arg_value,none,
       "invalid value '%1' in '%0'", (StringRef, StringRef))
@@ -486,6 +486,7 @@ REMARK(interface_file_backup_used,none,
       "building module from '%0' failed; retrying building module from '%1'", (StringRef, StringRef))
 
 WARNING(warn_flag_deprecated,none, "flag '%0' is deprecated", (StringRef))
+ERROR(flag_unsuppored,none, "flag '%0' is unsupported", (StringRef))
 
 // Output deterministic check
 ERROR(error_nondeterministic_output,none,

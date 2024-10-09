@@ -150,6 +150,7 @@
 
 #include "RequirementLowering.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Requirement.h"
@@ -663,9 +664,8 @@ struct InferRequirementsWalker : public TypeWalker {
       if (differentiableProtocol && fnTy->isDifferentiable()) {
         auto addSameTypeConstraint = [&](Type firstType,
                                          AssociatedTypeDecl *assocType) {
-          auto secondType = assocType->getDeclaredInterfaceType()
-              ->castTo<DependentMemberType>()
-              ->substBaseType(firstType);
+          auto conformance = lookupConformance(firstType, differentiableProtocol);
+          auto secondType = conformance.getTypeWitness(firstType, assocType);
           reqs.push_back({Requirement(RequirementKind::SameType,
                                       firstType, secondType),
                           SourceLoc()});

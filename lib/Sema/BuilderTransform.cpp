@@ -175,10 +175,6 @@ protected:
 
     if (auto *decl = element.dyn_cast<Decl *>()) {
       switch (decl->getKind()) {
-        // Just ignore #if; the chosen children should appear in
-        // the surrounding context.  This isn't good for source
-        // tools but it at least works.
-      case DeclKind::IfConfig:
         // Skip #warning/#error; we'll handle them when applying
         // the builder.
       case DeclKind::PoundDiagnostic:
@@ -1215,20 +1211,28 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
   transformInfo.transformedBody = transformedBody->second;
 
   // Record the transformation.
-  assert(
-      std::find_if(
-          resultBuilderTransformed.begin(), resultBuilderTransformed.end(),
-          [&](const std::pair<AnyFunctionRef, AppliedBuilderTransform> &elt) {
-            return elt.first == fn;
-          }) == resultBuilderTransformed.end() &&
-      "already transformed this body along this path!?!");
-  resultBuilderTransformed.insert(
-      std::make_pair(fn, std::move(transformInfo)));
+  recordResultBuilderTransform(fn, std::move(transformInfo));
 
   if (generateConstraints(fn, transformInfo.transformedBody))
     return getTypeMatchFailure(locator);
 
   return getTypeMatchSuccess();
+}
+
+void ConstraintSystem::recordResultBuilderTransform(AnyFunctionRef fn,
+                                          AppliedBuilderTransform transformInfo) {
+  bool inserted = resultBuilderTransformed.insert(
+      std::make_pair(fn, std::move(transformInfo))).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedResultBuilderTransform(fn));
+}
+
+/// Undo the above change.
+void ConstraintSystem::removeResultBuilderTransform(AnyFunctionRef fn) {
+  bool erased = resultBuilderTransformed.erase(fn);
+  ASSERT(erased);
 }
 
 namespace {

@@ -14,6 +14,7 @@ import Swift
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.7, *)
+@_unavailableInEmbedded
 extension Task where Success == Never, Failure == Never {
   @available(SwiftStdlib 5.7, *)
   internal static func _sleep(

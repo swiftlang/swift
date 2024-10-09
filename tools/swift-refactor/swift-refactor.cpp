@@ -401,7 +401,7 @@ int main(int argc, char *argv[]) {
   assert(SF && "no source file?");
 
   SourceManager &SM = SF->getASTContext().SourceMgr;
-  unsigned BufferID = SF->getBufferID().value();
+  unsigned BufferID = SF->getBufferID();
   std::string Buffer = SM.getRangeForBuffer(BufferID).str().str();
 
   auto Start = getLocsByLabelOrPosition(options::LineColumnPair, Buffer);

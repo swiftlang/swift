@@ -1239,7 +1239,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
             value.getType()
                 .getASTType()
                 ->getTypeOfMember(eltDecl,
-                                  eltDecl->getArgumentInterfaceType())
+                                  eltDecl->getPayloadInterfaceType())
                 ->getCanonicalType();
 
         AbstractionPattern origEltTy =

@@ -1014,6 +1014,20 @@ namespace llvm {
   };
 
   template<class FromTy>
+  struct CastInfo<::swift::GenericContext, FromTy, std::enable_if_t<is_simple_type<FromTy>::value>>
+      : public CastIsPossible<::swift::GenericContext, FromTy>,
+        public DefaultDoCastIfPossible<::swift::GenericContext *, FromTy,
+                                       CastInfo<::swift::GenericContext, FromTy>> {
+    static inline ::swift::GenericContext *castFailed() { return nullptr; }
+
+    static inline ::swift::GenericContext *doCast(const FromTy &val) {
+      auto *genCtxt = val->getAsGenericContext();
+      assert(genCtxt);
+      return const_cast<::swift::GenericContext *>(genCtxt);
+    }
+  };
+
+  template<class FromTy>
   struct CastInfo<::swift::IterableDeclContext, FromTy, std::enable_if_t<is_simple_type<FromTy>::value>>
       : public CastIsPossible<::swift::IterableDeclContext, FromTy>,
         public DefaultDoCastIfPossible<::swift::IterableDeclContext *, FromTy,

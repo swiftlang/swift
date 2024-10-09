@@ -42,6 +42,10 @@ struct ModuleInterfaceOptions {
   /// [TODO: Clang-type-plumbing] This check should go away.
   bool PrintFullConvention = false;
 
+  /// Print some ABI details for public symbols as comments that can be
+  /// parsed by another tool.
+  bool ABIComments = false;
+
   struct InterfaceFlags {
     /// Copy of all the command-line flags passed at .swiftinterface
     /// generation time, re-applied to CompilerInvocation when reading
@@ -62,10 +66,6 @@ struct ModuleInterfaceOptions {
 
   /// Flags which appear only in the .package.swiftinterface.
   InterfaceFlags PackageFlags = {};
-
-  /// Print imports with both @_implementationOnly and @_spi, only applies
-  /// when PrintSPIs is true.
-  bool ExperimentalSPIImports = false;
 
   /// Print imports that are missing from the source and used in API.
   bool PrintMissingImports = true;

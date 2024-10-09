@@ -1197,6 +1197,12 @@ ManglingError Remangler::mangleDeallocator(Node *node, EntityContext &ctx,
   return mangleSimpleEntity(node, 'F', "D", ctx, depth + 1);
 }
 
+ManglingError Remangler::mangleIsolatedDeallocator(Node *node,
+                                                   EntityContext &ctx,
+                                                   unsigned depth) {
+  return mangleSimpleEntity(node, 'F', "Z", ctx, depth + 1);
+}
+
 ManglingError Remangler::mangleDestructor(Node *node, EntityContext &ctx,
                                           unsigned depth) {
   return mangleSimpleEntity(node, 'F', "d", ctx, depth + 1);
@@ -1308,9 +1314,19 @@ ManglingError Remangler::mangleReadAccessor(Node *node, EntityContext &ctx,
   return mangleAccessor(node->getFirstChild(), "r", ctx, depth + 1);
 }
 
+ManglingError Remangler::mangleRead2Accessor(Node *node, EntityContext &ctx,
+                                             unsigned depth) {
+  return mangleAccessor(node->getFirstChild(), "y", ctx, depth + 1);
+}
+
 ManglingError Remangler::mangleModifyAccessor(Node *node, EntityContext &ctx,
                                               unsigned depth) {
   return mangleAccessor(node->getFirstChild(), "M", ctx, depth + 1);
+}
+
+ManglingError Remangler::mangleModify2Accessor(Node *node, EntityContext &ctx,
+                                               unsigned depth) {
+  return mangleAccessor(node->getFirstChild(), "x", ctx, depth + 1);
 }
 
 ManglingError Remangler::mangleExplicitClosure(Node *node, EntityContext &ctx,

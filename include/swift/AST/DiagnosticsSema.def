@@ -1419,6 +1419,15 @@ ERROR(optional_chain_isnt_chaining,none,
       ())
 ERROR(pattern_in_expr,none,
       "%0 cannot appear in an expression", (DescriptivePatternKind))
+ERROR(conditional_cast_in_type_casting_pattern,none,
+      "cannot conditionally downcast in a type-casting pattern",
+      ())
+ERROR(force_cast_in_type_casting_pattern,none,
+      "cannot force downcast in a type-casting pattern",
+      ())
+ERROR(cannot_bind_value_with_is,none,
+      "use 'as' keyword to bind a matched value",
+      ())
 NOTE(note_call_to_operator,none,
      "in call to operator %0", (const ValueDecl *))
 NOTE(note_call_to_func,none,
@@ -1701,9 +1710,10 @@ ERROR(functions_mutating_and_not,none,
 ERROR(static_functions_not_mutating,none,
       "static functions must not be declared mutating", ())
 
-ERROR(modify_mutatingness_differs_from_setter,none,
-      "'modify' accessor cannot be %0 when the setter is %1",
-      (SelfAccessKind, SelfAccessKind))
+ERROR(readwriter_mutatingness_differs_from_reader_or_writer_mutatingness,none,
+      "%0 cannot be %1 when "
+      "%select{both the %3 is %4 and the %5 is not %6|either the %3 is not %4 or the %5 is %6|the %3 is not %4|the %5 is %6}2",
+      (StringRef, SelfAccessKind, unsigned, StringRef, SelfAccessKind, StringRef, SelfAccessKind))
 
 ERROR(transparent_in_protocols_not_supported,none,
       "'@_transparent' attribute is not supported on declarations within protocols", ())
@@ -1814,6 +1824,17 @@ ERROR(attr_implementation_category_goes_on_objc_attr,none,
       "'@implementation'",
       ())
 
+WARNING(objc_implementation_will_become_objc,none,
+        "%kind0 will become implicitly '@objc' after adopting '@objc "
+        "@implementation'; add '%select{@nonobjc|final}1' to keep the current "
+        "behavior",
+        (const ValueDecl *, /*suggestFinal=*/bool))
+WARNING(objc_implementation_will_become_nonobjc,none,
+        "%kind0 will no longer be implicitly '@objc' after adopting '@objc "
+        "@implementation'; add '@objc' to keep the current "
+        "behavior",
+        (const ValueDecl *))
+
 ERROR(member_of_objc_implementation_not_objc_or_final,none,
       "%kind0 does not match any %kindonly0 declared in the headers for %1; "
       "did you use the %kindonly0's Swift name?",
@@ -1822,12 +1843,10 @@ NOTE(fixit_add_private_for_objc_implementation,none,
      "add 'private' or 'fileprivate' to define an Objective-C-compatible %0 "
      "not declared in the header",
      (DescriptiveDeclKind))
-NOTE(fixit_add_final_for_objc_implementation,none,
-     "add 'final' to define a Swift %0 that cannot be overridden",
-     (DescriptiveDeclKind))
-NOTE(fixit_add_nonobjc_for_objc_implementation,none,
-     "add '@nonobjc' to define a Swift-only %0",
-     (DescriptiveDeclKind))
+NOTE(fixit_add_nonobjc_or_final_for_objc_implementation,none,
+     "add '%select{@nonobjc|final}1' to define a Swift-only %0"
+     "%select{| that cannot be overridden}1",
+     (DescriptiveDeclKind, /*suggestFinal=*/bool))
 
 ERROR(objc_implementation_wrong_category,none,
       "%kind0 should be implemented in extension for "
@@ -3134,10 +3153,11 @@ ERROR(witness_unavailable,none,
         "unavailable %kind0 was used to satisfy a requirement of protocol %1%select{|: %2}2",
         (const ValueDecl *, const ProtocolDecl *, StringRef))
 
-WARNING(witness_deprecated,none,
-        "deprecated default implementation is used to satisfy %kind0 required by "
-        "protocol %1%select{|: %2}2",
-        (const ValueDecl *, Identifier, StringRef))
+GROUPED_WARNING(
+    witness_deprecated, DeprecatedDeclaration, none,
+    "deprecated default implementation is used to satisfy %kind0 required by "
+    "protocol %1%select{|: %2}2",
+    (const ValueDecl *, Identifier, StringRef))
 
 WARNING(unavailable_conformance,none,
         "conformance of %0 to protocol %1 is already unavailable",
@@ -3328,6 +3348,9 @@ ERROR(override_multiple_decls_base,none,
       (DeclName))
 ERROR(override_sendability_mismatch,none,
       "declaration %0 has a type with different sendability from any potential "
+      "overrides", (DeclName))
+ERROR(override_global_actor_isolation_mismatch,none,
+      "declaration %0 has a type with different global actor isolation from any potential "
       "overrides", (DeclName))
 ERROR(override_multiple_decls_arg_mismatch,none,
       "declaration %0 has different argument labels from any potential "
@@ -5810,6 +5833,9 @@ ERROR(nonisolated_actor_sync_init,none,
 ERROR(nonisolated_wrapped_property,none,
       "'nonisolated' is not supported on properties with property wrappers",
       ())
+ERROR(nonisolated_lazy,none,
+      "'nonisolated' is not supported on lazy properties",
+      ())
 
 ERROR(non_sendable_from_deinit,none,
         "cannot access %1 %2 with a non-sendable type %0 from nonisolated deinit",
@@ -5890,9 +5916,12 @@ ERROR(global_actor_not_usable_from_inline,none,
 NOTE(move_global_actor_attr_to_storage_decl,none,
      "move global actor attribute to %kind0", (const ValueDecl *))
 
-ERROR(actor_isolation_multiple_attr,none,
+ERROR(actor_isolation_multiple_attr_2,none,
       "%kind0 has multiple actor-isolation attributes ('%1' and '%2')",
       (const Decl *, StringRef, StringRef))
+ERROR(actor_isolation_multiple_attr_3,none,
+      "%0 %1 has multiple actor-isolation attributes ('%2', '%3' and '%4')",
+      (const Decl *, StringRef, StringRef, StringRef))
 ERROR(actor_isolation_override_mismatch,none,
       "%0 %kind1 has different actor isolation from %2 overridden declaration",
       (ActorIsolation, const ValueDecl *, ActorIsolation))
@@ -5909,6 +5938,16 @@ ERROR(async_named_decl_must_be_available_from_async,none,
 ERROR(async_unavailable_decl,none,
       "%kindbase0 is unavailable from asynchronous contexts%select{|; %1}1",
       (const ValueDecl *, StringRef))
+
+ERROR(isolated_deinit_no_isolation,none,
+      "deinit is marked isolated, but containing class %0 is not isolated to an actor",
+      (DeclName))
+ERROR(isolated_deinit_on_value_type,none,
+      "only classes and actors can have isolated deinit",
+      ())
+ERROR(isolated_deinit_experimental,none,
+      "'isolated' deinit requires frontend flag -enable-experimental-feature IsolatedDeinit "
+      "to enable the usage of this language feature", ())
 
 //------------------------------------------------------------------------------
 // MARK: String Processing
@@ -6560,8 +6599,8 @@ ERROR(dynamic_with_transparent,none,
 ERROR(dynamic_replacement_accessor_not_dynamic, none,
       "replaced accessor for %0 is not marked dynamic", (DeclName))
 ERROR(dynamic_replacement_accessor_not_explicit, none,
-      "replaced accessor %select{get|set|_read|_modify|willSet|didSet|unsafeAddress|addressWithOwner|addressWithNativeOwner|unsafeMutableAddress|mutableAddressWithOwner|}0 for %1 is not explicitly defined",
-      (unsigned, DeclName))
+      "replaced %0 for %1 is not explicitly defined",
+      (StringRef, DeclName))
 ERROR(dynamic_replacement_function_not_dynamic, none,
       "replaced function %0 is not marked dynamic", (DeclName))
 ERROR(dynamic_replacement_function_not_found, none,
@@ -6652,14 +6691,14 @@ NOTE(availability_obsoleted, none,
      "%0 was obsoleted in %1 %2",
      (const ValueDecl *, StringRef, llvm::VersionTuple))
 
-GROUPED_WARNING(availability_deprecated, availability_deprecated, Deprecation,
+GROUPED_WARNING(availability_deprecated, DeprecatedDeclaration, Deprecation,
                 "%0 %select{is|%select{is|was}3}1 "
                 "deprecated%select{| in %2%select{| %4}3}1%select{|: %5}5",
                 (const ValueDecl *, bool, StringRef, bool, llvm::VersionTuple,
                  StringRef))
 
 GROUPED_WARNING(
-      availability_deprecated_rename, availability_deprecated, Deprecation,
+      availability_deprecated_rename, DeprecatedDeclaration, Deprecation,
       "%0 %select{is|%select{is|was}3}1 "
       "deprecated%select{| in %2%select{| %4}3}1: "
       "%select{renamed to|replaced by}5%" REPLACEMENT_DECL_KIND_SELECT "6 "
@@ -6838,11 +6877,12 @@ NOTE(conformance_availability_obsoleted, none,
      "conformance of %0 to %1 was obsoleted in %2 %3",
      (Type, Type, StringRef, llvm::VersionTuple))
 
-WARNING(conformance_availability_deprecated, Deprecation,
-        "conformance of %0 to %1 %select{is|%select{is|was}4}2 "
-        "deprecated%select{| in %3%select{| %5}4}2%select{|: %6}6",
-        (Type, Type, bool, StringRef, bool, llvm::VersionTuple,
-         StringRef))
+GROUPED_WARNING(conformance_availability_deprecated,
+                DeprecatedDeclaration, Deprecation,
+                "conformance of %0 to %1 %select{is|%select{is|was}4}2 "
+                "deprecated%select{| in %3%select{| %5}4}2%select{|: %6}6",
+                (Type, Type, bool, StringRef, bool, llvm::VersionTuple,
+                 StringRef))
 
 ERROR(conformance_availability_only_version_newer, none,
       "conformance of %0 to %1 is only available in %2 %3 or newer",
@@ -7108,15 +7148,19 @@ ERROR(override_nsobject_hash_error,none,
       "'NSObject.hash(into:)' is not overridable; "
       "did you mean to override 'NSObject.hash'?", ())
 
-WARNING(hashvalue_implementation,Deprecation,
-        "'Hashable.hashValue' is deprecated as a protocol requirement; "
-        "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",
-        (Type))
+GROUPED_WARNING(
+    hashvalue_implementation, DeprecatedDeclaration, Deprecation,
+    "'Hashable.hashValue' is deprecated as a protocol requirement; "
+    "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",
+    (Type))
 
-WARNING(executor_enqueue_deprecated_owned_job_implementation,Deprecation,
-        "'Executor.enqueue(Job)' is deprecated as a protocol requirement; "
-        "conform type %0 to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead",
-        (Type))
+GROUPED_WARNING(
+    executor_enqueue_deprecated_owned_job_implementation,
+    DeprecatedDeclaration, Deprecation,
+    "'Executor.enqueue(Job)' is deprecated as a protocol requirement; "
+    "conform type %0 to 'Executor' by implementing 'func enqueue(ExecutorJob)' "
+    "instead",
+    (Type))
 WARNING(executor_enqueue_unused_implementation, none,
         "'Executor.enqueue(ExecutorJob)' will never be used, due to the presence of "
         "'enqueue(UnownedJob)'",
@@ -7952,9 +7996,15 @@ ERROR(lifetime_dependence_immortal_conflict_name, none,
 ERROR(lifetime_dependence_function_type, none,
       "lifetime dependencies on function types are not supported",
       ())
-
 ERROR(lifetime_dependence_immortal_alone, none,
       "cannot specify any other dependence source along with immortal", ())
+ERROR(lifetime_dependence_invalid_inherit_escapable_type, none,
+      "invalid lifetime dependence on a source of Escapable type, use borrow "
+      "dependence instead",
+      ())
+ERROR(lifetime_dependence_cannot_use_parsed_borrow_consuming, none,
+      "invalid use of borrow dependence with consuming ownership",
+      ())
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Sending

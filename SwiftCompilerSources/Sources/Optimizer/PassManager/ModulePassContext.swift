@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 import OptimizerBridging
 
@@ -21,7 +22,7 @@ import OptimizerBridging
 struct ModulePassContext : Context, CustomStringConvertible {
   let _bridged: BridgedPassContext
 
-  public var description: String {
+  var description: String {
     return String(taking: _bridged.getModuleDescription())
   }
 
@@ -54,14 +55,14 @@ struct ModulePassContext : Context, CustomStringConvertible {
   }
 
   struct VTableArray : BridgedRandomAccessCollection {
-    fileprivate let bridged: BridgedPassContext.VTableArray
+    fileprivate let bridgedCtxt: BridgedPassContext
 
     var startIndex: Int { return 0 }
-    var endIndex: Int { return bridged.count }
+    var endIndex: Int { return bridgedCtxt.getNumVTables() }
 
     subscript(_ index: Int) -> VTable {
       assert(index >= startIndex && index < endIndex)
-      return VTable(bridged: BridgedVTable(vTable: bridged.base![index]))
+      return VTable(bridged: bridgedCtxt.getVTable(index))
     }
   }
 
@@ -101,9 +102,7 @@ struct ModulePassContext : Context, CustomStringConvertible {
     GlobalVariableList(first: _bridged.getFirstGlobalInModule().globalVar)
   }
 
-  var vTables: VTableArray {
-    VTableArray(bridged: _bridged.getVTables())
-  }
+  var vTables: VTableArray { VTableArray(bridgedCtxt: _bridged) }
   
   var witnessTables: WitnessTableList {
     WitnessTableList(first: _bridged.getFirstWitnessTableInModule().witnessTable)
@@ -129,6 +128,44 @@ struct ModulePassContext : Context, CustomStringConvertible {
     }
     _bridged.loadFunction(function.bridged, loadCalleesRecursively)
     return function.isDefinition
+  }
+
+  func specialize(function: Function, for substitutions: SubstitutionMap) -> Function? {
+    return _bridged.specializeFunction(function.bridged, substitutions.bridged).function
+  }
+
+  enum DeserializationMode {
+    case allFunctions
+    case onlySharedFunctions
+  }
+
+  func deserializeAllCallees(of function: Function, mode: DeserializationMode) {
+    _bridged.deserializeAllCallees(function.bridged, mode == .allFunctions ? true : false)
+  }
+
+  @discardableResult
+  func createWitnessTable(entries: [WitnessTable.Entry],
+                          conformance: Conformance,
+                          linkage: Linkage,
+                          serialized: Bool) -> WitnessTable
+  {
+    let bridgedEntries = entries.map { $0.bridged }
+    let bridgedWitnessTable = bridgedEntries.withBridgedArrayRef {
+      _bridged.createWitnessTable(linkage.bridged, serialized, conformance.bridged, $0)
+    }
+    return WitnessTable(bridged: bridgedWitnessTable)
+  }
+
+  @discardableResult
+  func createSpecializedVTable(entries: [VTable.Entry],
+                               for classType: Type,
+                               isSerialized: Bool) -> VTable
+  {
+    let bridgedEntries = entries.map { $0.bridged }
+    let bridgedVTable = bridgedEntries.withBridgedArrayRef {
+      _bridged.createSpecializedVTable(classType.bridged, isSerialized, $0)
+    }
+    return VTable(bridged: bridgedVTable)
   }
 
   func createEmptyFunction(
@@ -175,5 +212,9 @@ extension GlobalVariable {
 extension Function {
   func set(linkage: Linkage, _ context: ModulePassContext) {
     bridged.setLinkage(linkage.bridged)
+  }
+
+  func set(isSerialized: Bool, _ context: ModulePassContext) {
+    bridged.setIsSerialized(isSerialized)
   }
 }

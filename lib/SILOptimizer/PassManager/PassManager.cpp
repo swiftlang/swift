@@ -34,6 +34,7 @@
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
+#include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OptimizerStatsUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
@@ -1734,14 +1735,44 @@ bool BridgedPassContext::canMakeStaticObjectReadOnly(BridgedType type) const {
   return false;
 }
 
-swift::SILVTable * BridgedPassContext::specializeVTableForType(BridgedType type, BridgedFunction function) const {
-  return ::specializeVTableForType(type.unbridged(),
-                                   function.getFunction()->getModule(),
-                                   invocation->getTransform());
+OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction function,
+                                                               BridgedSubstitutionMap substitutions) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  SILFunction *origFunc = function.getFunction();
+  SubstitutionMap subs = substitutions.unbridged();
+  ReabstractionInfo ReInfo(mod->getSwiftModule(), mod->isWholeModule(),
+                           ApplySite(), origFunc, subs, IsNotSerialized,
+                           /*ConvertIndirectToDirect=*/true,
+                           /*dropMetatypeArgs=*/false);
+
+  if (!ReInfo.canBeSpecialized()) {
+    return {nullptr};
+  }
+
+  SILOptFunctionBuilder FunctionBuilder(*invocation->getTransform());
+
+  GenericFuncSpecializer FuncSpecializer(FunctionBuilder, origFunc, subs,
+                                         ReInfo, /*isMandatory=*/true);
+  SILFunction *SpecializedF = FuncSpecializer.lookupSpecialization();
+  if (!SpecializedF) SpecializedF = FuncSpecializer.tryCreateSpecialization();
+  if (!SpecializedF || SpecializedF->getLoweredFunctionType()->hasError()) {
+    return {nullptr};
+  }
+  return {SpecializedF};
+}
+
+void BridgedPassContext::deserializeAllCallees(BridgedFunction function, bool deserializeAll) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  mod->linkFunction(function.getFunction(), deserializeAll ? SILModule::LinkingMode::LinkAll :
+                                                             SILModule::LinkingMode::LinkNormal);
 }
 
 bool BridgedPassContext::specializeClassMethodInst(BridgedInstruction cm) const {
   return ::specializeClassMethodInst(cm.getAs<ClassMethodInst>());
+}
+
+bool BridgedPassContext::specializeWitnessMethodInst(BridgedInstruction wm) const {
+  return ::specializeWitnessMethodInst(wm.getAs<WitnessMethodInst>());
 }
 
 bool BridgedPassContext::specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const {
@@ -1874,9 +1905,9 @@ OptionalBridgedFunction BridgedPassContext::lookupStdlibFunction(BridgedStringRe
   return {funcBuilder.getOrCreateFunction(SILLocation(decl), declRef, NotForDefinition)};
 }
 
-OptionalBridgedFunction BridgedPassContext::lookUpNominalDeinitFunction(BridgedNominalTypeDecl nominal)  const {
+OptionalBridgedFunction BridgedPassContext::lookUpNominalDeinitFunction(BridgedDeclObj nominal)  const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
-  return {mod->lookUpMoveOnlyDeinitFunction(nominal.unbridged())};
+  return {mod->lookUpMoveOnlyDeinitFunction(nominal.getAs<swift::NominalTypeDecl>())};
 }
 
 bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const {

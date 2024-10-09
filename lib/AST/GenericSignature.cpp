@@ -412,7 +412,8 @@ bool GenericSignatureImpl::isRequirementSatisfied(
 
     requirement = requirement.subst(
         QueryInterfaceTypeSubstitutions{genericEnv},
-        LookUpConformanceInModule());
+        LookUpConformanceInModule(),
+        SubstFlags::PreservePackExpansionLevel);
   }
 
   SmallVector<Requirement, 2> subReqs;
@@ -1173,7 +1174,39 @@ void swift::validateGenericSignature(ASTContext &context,
 
     // If the removed requirement is satisfied by the new generic signature,
     // it is redundant. Complain.
-    if (newSig->isRequirementSatisfied(requirements[victimIndex])) {
+    auto satisfied = [&](Requirement victim) {
+      if (!newSig->isValidTypeParameter(victim.getFirstType()))
+        return false;
+
+      switch (victim.getKind()) {
+      case RequirementKind::SameShape:
+        return (newSig->isValidTypeParameter(victim.getSecondType()) &&
+                newSig->haveSameShape(victim.getFirstType(),
+                                      victim.getSecondType()));
+      case RequirementKind::Conformance:
+        return newSig->requiresProtocol(victim.getFirstType(),
+                                        victim.getProtocolDecl());
+      case RequirementKind::Superclass: {
+        auto superclass = newSig->getSuperclassBound(victim.getFirstType());
+        return (superclass && superclass->isEqual(victim.getSecondType()));
+      }
+      case RequirementKind::SameType:
+        if (!victim.getSecondType().findIf([&](Type t) -> bool {
+            return (!t->isTypeParameter() ||
+                    newSig->isValidTypeParameter(t));
+          })) {
+          return false;
+        }
+        return newSig.getReducedType(victim.getFirstType())
+          ->isEqual(newSig.getReducedType(victim.getSecondType()));
+      case RequirementKind::Layout: {
+        auto layout = newSig->getLayoutConstraint(victim.getFirstType());
+        return (layout && layout == victim.getLayoutConstraint());
+      }
+      }
+    };
+
+    if (satisfied(requirements[victimIndex])) {
       SmallString<32> reqString;
       {
         llvm::raw_svector_ostream out(reqString);

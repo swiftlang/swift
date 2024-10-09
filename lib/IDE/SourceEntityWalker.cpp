@@ -89,6 +89,9 @@ private:
 
   bool handleImports(ImportDecl *Import);
   bool handleCustomAttributes(Decl *D);
+  bool handleCustomTypeAttribute(const CustomAttr *customAttr);
+  bool handleClosureAttributes(ClosureExpr *E);
+  bool handleTypeAttributes(AttributedTypeRepr *T);
   bool passModulePathElements(ImportPath::Module Path,
                               const clang::Module *ClangMod);
 
@@ -208,9 +211,6 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToDeclPreProper(Decl *D) {
     Loc = PrecD->getLoc();
     if (Loc.isValid())
       NameLen = PrecD->getName().getLength();
-
-  } else if (isa<IfConfigDecl>(D)) {
-    // Nothing to do here.
   } else if (auto *MD = dyn_cast<MacroExpansionDecl>(D)) {
     if (auto *macro =
             dyn_cast_or_null<MacroDecl>(MD->getMacroRef().getDecl())) {
@@ -606,6 +606,10 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
           return Action::Stop();
       }
     }
+  } else if (auto CE = dyn_cast<ClosureExpr>(E)) {
+    if (!handleClosureAttributes(CE))
+      return Action::Stop();
+    return Action::Continue(E);
   }
 
   return Action::Continue(E);
@@ -658,6 +662,9 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
                                     ST->getSourceRange(), Data);
       return Action::StopIf(!Continue);
     }
+  } else if (auto AT = dyn_cast<AttributedTypeRepr>(T)) {
+    auto Continue = handleTypeAttributes(AT);
+    return Action::StopIf(!Continue);
   }
 
   return Action::Continue();
@@ -760,6 +767,39 @@ bool SemaAnnotator::handleCustomAttributes(Decl *D) {
       if (!Args->walk(*this))
         return false;
     }
+  }
+
+  return true;
+}
+
+bool SemaAnnotator::handleCustomTypeAttribute(const CustomAttr *customAttr) {
+  if (auto *Repr = customAttr->getTypeRepr())
+    if (!Repr->walk(*this))
+      return false;
+
+  if (auto *Args = customAttr->getArgs())
+    if (!Args->walk(*this))
+      return false;
+
+  return true;
+}
+
+bool SemaAnnotator::handleClosureAttributes(ClosureExpr *E) {
+  for (auto *customAttr : E->getAttrs().getAttributes<CustomAttr, true>())
+    if (!handleCustomTypeAttribute(customAttr))
+      return false;
+
+  return true;
+}
+
+bool SemaAnnotator::handleTypeAttributes(AttributedTypeRepr *T) {
+  for (auto attr : T->getAttrs()) {
+    if (!attr.is<CustomAttr *>())
+      continue;
+
+    CustomAttr *customAttr = attr.get<CustomAttr *>();
+    if (!handleCustomTypeAttribute(customAttr))
+      return false;
   }
 
   return true;

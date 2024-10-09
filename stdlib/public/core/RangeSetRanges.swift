@@ -420,6 +420,7 @@ extension RangeSet.Ranges: Hashable where Bound: Hashable {
 extension RangeSet.Ranges: Sendable where Bound: Sendable {}
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension RangeSet.Ranges: CustomStringConvertible {
   public var description: String {
     _makeCollectionDescription()

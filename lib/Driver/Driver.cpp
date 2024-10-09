@@ -108,7 +108,6 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
           .Case("swift-dependency-tool", DriverKind::SwiftDependencyTool)
           .Case("swift-llvm-opt", DriverKind::SwiftLLVMOpt)
           .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
-          .Case("swift-indent", DriverKind::SwiftIndent)
           .Case("swift-symbolgraph-extract", DriverKind::SymbolGraph)
           .Case("swift-api-digester", DriverKind::APIDigester)
           .Case("swift-cache-tool", DriverKind::CacheTool)
@@ -517,7 +516,13 @@ createStatsReporter(const llvm::opt::InputArgList *ArgList,
                                                  DefaultTargetTriple,
                                                  OutputType,
                                                  OptType,
-                                                 A->getValue());
+                                                 A->getValue(),
+                                                 nullptr,
+                                                 nullptr,
+                                                 false,
+                                                 false,
+                                                 false,
+                                                 false);
 }
 
 static bool
@@ -1162,6 +1167,9 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       break;
 
     case options::OPT_emit_irgen:
+      OI.CompilerOutputType = file_types::TY_RawLLVM_IR;
+      break;
+
     case options::OPT_emit_ir:
       OI.CompilerOutputType = file_types::TY_LLVM_IR;
       break;
@@ -1663,6 +1671,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_dSYM:
       case file_types::TY_Dependencies:
       case file_types::TY_Assembly:
+      case file_types::TY_RawLLVM_IR:
       case file_types::TY_LLVM_IR:
       case file_types::TY_LLVM_BC:
       case file_types::TY_SerializedDiagnostics:
@@ -3108,7 +3117,6 @@ void Driver::printHelp(bool ShowHidden) const {
   case DriverKind::SwiftDependencyTool:
   case DriverKind::SwiftLLVMOpt:
   case DriverKind::AutolinkExtract:
-  case DriverKind::SwiftIndent:
   case DriverKind::SymbolGraph:
   case DriverKind::APIDigester:
   case DriverKind::CacheTool:

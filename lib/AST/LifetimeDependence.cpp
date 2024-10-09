@@ -98,7 +98,7 @@ static ValueOwnership getLoweredOwnership(AbstractFunctionDecl *afd) {
   }
   if (auto *ad = dyn_cast<AccessorDecl>(afd)) {
     if (ad->getAccessorKind() == AccessorKind::Set ||
-        ad->getAccessorKind() == AccessorKind::Modify) {
+        isYieldingDefaultMutatingAccessor(ad->getAccessorKind())) {
       return ValueOwnership::InOut;
     }
   }
@@ -218,18 +218,26 @@ getLifetimeDependenceKind(LifetimeEntry specifier, AbstractFunctionDecl *afd,
   auto ownership = decl->getValueOwnership();
   auto type = decl->getTypeInContext();
 
-  // For @lifetime attribute, we determine lifetime dependence kind based on
-  // type.
+  // For @lifetime attribute, we check if we had a "borrow" modifier, if not
+  // we infer inherit dependence.
   if (afd->getAttrs().hasAttribute<LifetimeAttr>()) {
-    auto lifetimeKind = getLifetimeDependenceKindFromType(type);
-    bool isCompatible = isLifetimeDependenceCompatibleWithOwnership(
-        lifetimeKind, type, ownership, afd);
-    if (!isCompatible) {
-      assert(lifetimeKind == LifetimeDependenceKind::Scope);
-      diags.diagnose(
-          loc, diag::lifetime_dependence_cannot_use_inferred_scoped_consuming);
+    auto parsedLifetimeKind = specifier.getParsedLifetimeDependenceKind();
+    if (parsedLifetimeKind == ParsedLifetimeDependenceKind::Scope) {
+      bool isCompatible = isLifetimeDependenceCompatibleWithOwnership(
+          LifetimeDependenceKind::Scope, type, ownership, afd);
+      if (!isCompatible) {
+        diags.diagnose(
+            loc, diag::lifetime_dependence_cannot_use_parsed_borrow_consuming);
+        return std::nullopt;
+      }
+      return LifetimeDependenceKind::Scope;
+    }
+    if (type->isEscapable()) {
+      diags.diagnose(loc,
+                     diag::lifetime_dependence_invalid_inherit_escapable_type);
       return std::nullopt;
     }
+    return LifetimeDependenceKind::Inherit;
   }
 
   // For dependsOn type modifier, we check if we had a "scoped" modifier, if not

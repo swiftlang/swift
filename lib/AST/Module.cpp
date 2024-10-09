@@ -20,6 +20,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessScope.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -30,6 +31,7 @@
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -764,102 +766,14 @@ void ModuleDecl::addFile(FileUnit &newFile) {
   clearLookupCache();
 }
 
-void ModuleDecl::addAuxiliaryFile(SourceFile &sourceFile) {
-  AuxiliaryFiles.push_back(&sourceFile);
-}
-
-namespace {
-  /// Compare the source location ranges for two files, as an ordering to
-  /// use for fast searches.
-  struct SourceFileRangeComparison {
-    SourceManager *sourceMgr;
-
-    bool operator()(SourceFile *lhs, SourceFile *rhs) const {
-      auto lhsRange = sourceMgr->getRangeForBuffer(*lhs->getBufferID());
-      auto rhsRange = sourceMgr->getRangeForBuffer(*rhs->getBufferID());
-
-      std::less<const char *> pointerCompare;
-      return pointerCompare(
-          (const char *)lhsRange.getStart().getOpaquePointerValue(),
-          (const char *)rhsRange.getStart().getOpaquePointerValue());
-    }
-
-    bool operator()(SourceFile *lhs, SourceLoc rhsLoc) const {
-      auto lhsRange = sourceMgr->getRangeForBuffer(*lhs->getBufferID());
-
-      std::less<const char *> pointerCompare;
-      return pointerCompare(
-          (const char *)lhsRange.getEnd().getOpaquePointerValue(),
-          (const char *)rhsLoc.getOpaquePointerValue());
-    }
-
-    bool operator()(SourceLoc lhsLoc, SourceFile *rhs) const {
-      auto rhsRange = sourceMgr->getRangeForBuffer(*rhs->getBufferID());
-
-      std::less<const char *> pointerCompare;
-      return pointerCompare(
-          (const char *)lhsLoc.getOpaquePointerValue(),
-          (const char *)rhsRange.getEnd().getOpaquePointerValue());
-    }
-  };
-}
-
-class swift::ModuleSourceFileLocationMap {
-public:
-  unsigned numFiles = 0;
-  unsigned numAuxiliaryFiles = 0;
-  std::vector<SourceFile *> allSourceFiles;
-  SourceFile *lastSourceFile = nullptr;
-};
-
-void ModuleDecl::updateSourceFileLocationMap() {
-  // Allocate a source file location map, if we don't have one already.
-  if (!sourceFileLocationMap) {
-    ASTContext &ctx = getASTContext();
-    sourceFileLocationMap = ctx.Allocate<ModuleSourceFileLocationMap>();
-    ctx.addCleanup([sourceFileLocationMap=sourceFileLocationMap]() {
-      sourceFileLocationMap->~ModuleSourceFileLocationMap();
-    });
-  }
-
-  // If we are up-to-date, there's nothing to do.
-  ArrayRef<FileUnit *> files = Files;
-  if (sourceFileLocationMap->numFiles == files.size() &&
-      sourceFileLocationMap->numAuxiliaryFiles ==
-          AuxiliaryFiles.size())
-    return;
-
-  // Rebuild the range structure.
-  sourceFileLocationMap->allSourceFiles.clear();
-
-  // First, add all of the source files with a backing buffer.
-  for (auto *fileUnit : files) {
-    if (auto sourceFile = dyn_cast<SourceFile>(fileUnit)) {
-      if (sourceFile->getBufferID())
-        sourceFileLocationMap->allSourceFiles.push_back(sourceFile);
-    }
-  }
-
-  // Next, add all of the macro expansion files.
-  for (auto *sourceFile : AuxiliaryFiles)
-    sourceFileLocationMap->allSourceFiles.push_back(sourceFile);
-
-  // Finally, sort them all so we can do a binary search for lookup.
-  std::sort(sourceFileLocationMap->allSourceFiles.begin(),
-            sourceFileLocationMap->allSourceFiles.end(),
-            SourceFileRangeComparison{&getASTContext().SourceMgr});
-
-  sourceFileLocationMap->numFiles = files.size();
-  sourceFileLocationMap->numAuxiliaryFiles = AuxiliaryFiles.size();
-}
-
 SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
   if (loc.isInvalid())
     return nullptr;
 
+  auto &sourceMgr = getASTContext().SourceMgr;
+
   // Check whether this location is in a "replaced" range, in which case
   // we want to use the original source file.
-  auto &sourceMgr = getASTContext().SourceMgr;
   SourceLoc adjustedLoc = loc;
   for (const auto &pair : sourceMgr.getReplacedRanges()) {
     if (sourceMgr.rangeContainsTokenLoc(pair.second, loc)) {
@@ -868,35 +782,14 @@ SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
     }
   }
 
-  // Before we do any extra work, check the last source file we found a result
-  // in to see if it contains this.
-  if (sourceFileLocationMap) {
-    if (auto lastSourceFile = sourceFileLocationMap->lastSourceFile) {
-      auto range = sourceMgr.getRangeForBuffer(*lastSourceFile->getBufferID());
-      if (range.contains(adjustedLoc))
-        return lastSourceFile;
-    }
+  auto bufferID = sourceMgr.findBufferContainingLoc(adjustedLoc);
+  auto sourceFiles = sourceMgr.getSourceFilesForBufferID(bufferID);
+  for (auto sourceFile: sourceFiles) {
+    if (sourceFile->getParentModule() == this)
+      return sourceFile;
   }
 
-  updateSourceFileLocationMap();
-
-  auto found = std::lower_bound(sourceFileLocationMap->allSourceFiles.begin(),
-                                sourceFileLocationMap->allSourceFiles.end(),
-                                adjustedLoc,
-                                SourceFileRangeComparison{&sourceMgr});
-  if (found == sourceFileLocationMap->allSourceFiles.end())
-    return nullptr;
-
-  auto foundSourceFile = *found;
-  auto foundRange = sourceMgr.getRangeForBuffer(*foundSourceFile->getBufferID());
-  // Positions inside an empty file or at EOF should still be considered within
-  // this file.
-  if (!foundRange.contains(adjustedLoc) && adjustedLoc != foundRange.getEnd())
-    return nullptr;
-
-  // Update the last source file.
-  sourceFileLocationMap->lastSourceFile = foundSourceFile;
-  return foundSourceFile;
+  return nullptr;
 }
 
 std::pair<unsigned, SourceLoc>
@@ -1192,7 +1085,7 @@ SourceRange SourceFile::getMacroInsertionRange() const {
     return SourceRange();
 
   auto generatedInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
   auto origRange = generatedInfo.originalSourceRange;
   return {origRange.getStart(), origRange.getEnd()};
 }
@@ -1202,7 +1095,7 @@ CustomAttr *SourceFile::getAttachedMacroAttribute() const {
     return nullptr;
 
   auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
   return genInfo.attachedMacroCustomAttr;
 }
 
@@ -1211,7 +1104,7 @@ std::optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
     return std::nullopt;
 
   auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
   switch (genInfo.kind) {
 #define MACRO_ROLE(Name, Description)               \
   case GeneratedSourceInfo::Name##MacroExpansion: \
@@ -1231,7 +1124,7 @@ SourceFile *SourceFile::getEnclosingSourceFile() const {
     return nullptr;
 
   auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
   auto sourceLoc = genInfo.originalSourceRange.getStart();
   return getParentModule()->getSourceFileContainingLocation(sourceLoc);
 }
@@ -1242,7 +1135,7 @@ ASTNode SourceFile::getNodeInEnclosingSourceFile() const {
     return nullptr;
 
   auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
   return ASTNode::getFromOpaqueValue(genInfo.astNode);
 }
 
@@ -1470,7 +1363,7 @@ SourceFile::getExternalRawLocsForDecl(const Decl *D) const {
   bool InGeneratedBuffer =
       !SM.rangeContainsTokenLoc(SM.getRangeForBuffer(BufferID), MainLoc);
   if (InGeneratedBuffer) {
-    int UnderlyingBufferID;
+    unsigned UnderlyingBufferID;
     std::tie(UnderlyingBufferID, MainLoc) =
         D->getModuleContext()->getOriginalLocation(MainLoc);
     if (BufferID != UnderlyingBufferID)
@@ -1723,6 +1616,11 @@ void ModuleDecl::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
   FORWARD(getImportedModules, (modules, filter));
 }
 
+void ModuleDecl::getExternalMacros(
+    SmallVectorImpl<ExternalMacroPlugin> &macros) const {
+  FORWARD(getExternalMacros, (macros));
+}
+
 void ModuleDecl::getImplicitImportsForModuleInterface(
     SmallVectorImpl<ImportedModule> &imports) const {
   FORWARD(getImplicitImportsForModuleInterface, (imports));
@@ -1811,6 +1709,29 @@ SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
 
     if (filter.contains(requiredFilter))
       modules.push_back(desc.module);
+  }
+}
+
+void SourceFile::getExternalMacros(
+    SmallVectorImpl<ExternalMacroPlugin> &macros) const {
+  for (auto *D : getTopLevelDecls()) {
+    auto macroDecl = dyn_cast<MacroDecl>(D);
+    if (!macroDecl)
+      continue;
+
+    auto macroDef = macroDecl->getDefinition();
+    if (macroDef.kind != MacroDefinition::Kind::External)
+      continue;
+
+    auto formalAccess = macroDecl->getFormalAccess();
+    ExternalMacroPlugin::Access access = ExternalMacroPlugin::Access::Internal;
+    if (formalAccess >= AccessLevel::Public)
+      access = ExternalMacroPlugin::Access::Public;
+    else if (formalAccess >= AccessLevel::Package)
+      access = ExternalMacroPlugin::Access::Package;
+
+    auto external = macroDef.getExternalMacro();
+    macros.push_back({external.moduleName.str().str(), access});
   }
 }
 
@@ -2108,8 +2029,8 @@ bool ModuleDecl::registerEntryPointFile(
     if (existingDecl) {
       existingDiagLoc = sourceFile->getMainDeclDiagLoc();
     } else {
-      if (auto bufID = sourceFile->getBufferID())
-        existingDiagLoc = getASTContext().SourceMgr.getLocForBufferStart(*bufID);
+      auto bufID = sourceFile->getBufferID();
+      existingDiagLoc = getASTContext().SourceMgr.getLocForBufferStart(bufID);
     }
   }
 
@@ -2548,6 +2469,14 @@ bool ModuleDecl::getRequiredBystandersIfCrossImportOverlay(
       return true;
   }
   return false;
+}
+
+bool ModuleDecl::isClangHeaderImportModule() const {
+  auto importer = getASTContext().getClangModuleLoader();
+  if (!importer)
+    return false;
+
+  return this == importer->getImportedHeaderModule();
 }
 
 namespace {
@@ -3296,10 +3225,8 @@ llvm::StringMap<SourceFilePathInfo>
 SourceFile::getInfoForUsedFilePaths() const {
   llvm::StringMap<SourceFilePathInfo> result;
 
-  if (BufferID != -1) {
-    result[getFilename()].physicalFileLoc =
-        getASTContext().SourceMgr.getLocForBufferStart(BufferID);
-  }
+  result[getFilename()].physicalFileLoc =
+      getASTContext().SourceMgr.getLocForBufferStart(BufferID);
 
   for (auto &vpath : VirtualFilePaths) {
     result[vpath.Item].virtualFileLocs.insert(vpath.Loc);
@@ -3433,10 +3360,11 @@ ModuleDecl::computeFileIDMap(bool shouldDiagnose) const {
 }
 
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
-                       std::optional<unsigned> bufferID,
+                       unsigned bufferID,
                        ParsingOptions parsingOpts, bool isPrimary)
-    : FileUnit(FileUnitKind::Source, M), BufferID(bufferID ? *bufferID : -1),
+    : FileUnit(FileUnitKind::Source, M), BufferID(bufferID),
       ParsingOpts(parsingOpts), IsPrimary(isPrimary), Kind(K) {
+  assert(BufferID != (unsigned)~0);
   M.getASTContext().addDestructorCleanup(*this);
 
   assert(!IsPrimary || M.isMainModule() &&
@@ -3448,9 +3376,7 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
     (void)problem;
   }
 
-  if (Kind == SourceFileKind::MacroExpansion ||
-      Kind == SourceFileKind::DefaultArgument)
-    M.addAuxiliaryFile(*this);
+  M.getASTContext().SourceMgr.recordSourceFile(bufferID, this);
 }
 
 SourceFile::ParsingOptions
@@ -3643,8 +3569,6 @@ bool SourceFile::walk(ASTWalker &walker) {
 }
 
 StringRef SourceFile::getFilename() const {
-  if (BufferID == -1)
-    return "";
   SourceManager &SM = getASTContext().SourceMgr;
   return SM.getIdentifierForBuffer(BufferID);
 }
@@ -4062,11 +3986,15 @@ bool IsNonUserModuleRequest::evaluate(Evaluator &evaluator, ModuleDecl *mod) con
   if (!mod->hasName() || mod->getFiles().empty())
     return false;
   
-  auto *LF = dyn_cast_or_null<LoadedFile>(mod->getFiles().front());
-  if (!LF)
-    return false;
-  
-  StringRef modulePath = LF->getSourceFilename();
+  StringRef modulePath;
+  auto fileUnit = mod->getFiles().front();
+  if (auto *LF = dyn_cast_or_null<LoadedFile>(fileUnit)) {
+    modulePath = LF->getSourceFilename();
+  } else if (auto *SF = dyn_cast_or_null<SourceFile>(fileUnit)) {
+    // Checking for SourceFiles lets custom tools get the correct is-system
+    // state for index units when compiling a textual interface directly.
+    modulePath = SF->getFilename();
+  }
   if (modulePath.empty())
     return false;
 

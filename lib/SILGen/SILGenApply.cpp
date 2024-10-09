@@ -3317,9 +3317,9 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
 
   if (!storage)
     return nullptr;
-  if (!storage->hasStorage()
-      && storage->getReadImpl() != ReadImplKind::Read
-      && storage->getReadImpl() != ReadImplKind::Address) {
+  if (!storage->hasStorage() && storage->getReadImpl() != ReadImplKind::Read &&
+      storage->getReadImpl() != ReadImplKind::Read2 &&
+      storage->getReadImpl() != ReadImplKind::Address) {
     return nullptr;
   }
 
@@ -5709,8 +5709,10 @@ RValue SILGenFunction::emitApply(
     }
 
     breadcrumb = emitHopToTargetExecutor(loc, executor);
-  } else if (ExpectedExecutor &&
-             (substFnType->isAsync() || calleeTypeInfo.foreign.async)) {
+  } else if ((substFnType->isAsync() || calleeTypeInfo.foreign.async) &&
+             ExpectedExecutor.isNecessary()) {
+    assert(F.isAsync());
+
     // Otherwise, if we're in an actor method ourselves, and we're calling into
     // any sort of async function, we'll want to make sure to hop back to our
     // own executor afterward, since the callee could have made arbitrary hops

@@ -50,6 +50,7 @@
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/OptionalEnum.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/SwiftObjectHeader.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -151,7 +152,6 @@ enum class DescriptiveDeclKind : uint8_t {
   Extension,
   EnumCase,
   TopLevelCode,
-  IfConfig,
   PoundDiagnostic,
   PatternBinding,
   Var,
@@ -349,7 +349,7 @@ enum class ArtificialMainKind : uint8_t {
 };
 
 /// Decl - Base class for all declarations in Swift.
-class alignas(1 << DeclAlignInBits) Decl : public ASTAllocated<Decl> {
+class alignas(1 << DeclAlignInBits) Decl : public ASTAllocated<Decl>, public SwiftObjectHeader {
 protected:
   // clang-format off
   //
@@ -819,11 +819,6 @@ protected:
     HasLazyConformances : 1
   );
 
-  SWIFT_INLINE_BITFIELD(IfConfigDecl, Decl, 1,
-    /// Whether this decl is missing its closing '#endif'.
-    HadMissingEnd : 1
-  );
-
   SWIFT_INLINE_BITFIELD(PoundDiagnosticDecl, Decl, 1+1,
     /// `true` if the diagnostic is an error, `false` if it's a warning.
     IsError : 1,
@@ -865,6 +860,8 @@ private:
   Decl(const Decl&) = delete;
   void operator=(const Decl&) = delete;
   SourceLoc getLocFromSource() const;
+
+  static SwiftMetatype getDeclMetatype(DeclKind kind);
 
   /// Returns the serialized locations of this declaration from the
   /// corresponding .swiftsourceinfo file. "Empty" (ie. \c BufferID of 0, an
@@ -911,7 +908,7 @@ private:
 protected:
 
   Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)
-    : Context(context) {
+    : SwiftObjectHeader(getDeclMetatype(kind)), Context(context) {
     Bits.OpaqueBits = 0;
     Bits.Decl.Kind = unsigned(kind);
     Bits.Decl.Invalid = false;
@@ -984,6 +981,12 @@ public:
   /// Retrieve the module in which this declaration resides.
   LLVM_READONLY
   ModuleDecl *getModuleContext() const;
+
+  /// Retrieve the module in which this declaration would be found by name
+  /// lookup queries. The result can differ from that of `getModuleContext()`
+  /// when the decl was imported via Cxx interop.
+  LLVM_READONLY
+  ModuleDecl *getModuleContextForNameLookup() const;
 
   /// getASTContext - Return the ASTContext that this decl lives in.
   LLVM_READONLY
@@ -1366,6 +1369,10 @@ public:
   std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
   getGlobalActorAttr() const;
 
+  /// Determine whether there is an explicit isolation attribute
+  /// of any kind.
+  bool hasExplicitIsolationAttribute() const;
+
   /// If an alternative module name is specified for this decl, e.g. using
   /// @_originalDefinedIn attribute, this function returns this module name.
   StringRef getAlternateModuleName() const;
@@ -1568,6 +1575,8 @@ public:
   /// Retrieve the position of any where clause for this context's
   /// generic parameters.
   SourceRange getGenericTrailingWhereClauseSourceRange() const;
+
+  static bool classof(const Decl *D);
 };
 static_assert(sizeof(_GenericContext) + sizeof(DeclContext) ==
               sizeof(GenericContext), "Please add fields to _GenericContext");
@@ -2658,51 +2667,6 @@ public:
   }
 };
 
-/// IfConfigDecl - This class represents #if/#else/#endif blocks.
-/// Active and inactive block members are stored separately, with the intention
-/// being that active members will be handed back to the enclosing context.
-class IfConfigDecl : public Decl {
-  /// An array of clauses controlling each of the #if/#elseif/#else conditions.
-  /// The array is ASTContext allocated.
-  ArrayRef<IfConfigClause> Clauses;
-  SourceLoc EndLoc;
-  SourceLoc getLocFromSource() const { return Clauses[0].Loc; }
-  friend class Decl;
-public:
-  
-  IfConfigDecl(DeclContext *Parent, ArrayRef<IfConfigClause> Clauses,
-               SourceLoc EndLoc, bool HadMissingEnd)
-    : Decl(DeclKind::IfConfig, Parent), Clauses(Clauses), EndLoc(EndLoc)
-  {
-    Bits.IfConfigDecl.HadMissingEnd = HadMissingEnd;
-  }
-
-  ArrayRef<IfConfigClause> getClauses() const { return Clauses; }
-
-  /// Return the active clause, or null if there is no active one.
-  const IfConfigClause *getActiveClause() const {
-    for (auto &Clause : Clauses)
-      if (Clause.isActive) return &Clause;
-    return nullptr;
-  }
-
-  const ArrayRef<ASTNode> getActiveClauseElements() const {
-    if (auto *Clause = getActiveClause())
-      return Clause->Elements;
-    return {};
-  }
-  
-  SourceLoc getEndLoc() const { return EndLoc; }
-
-  bool hadMissingEnd() const { return Bits.IfConfigDecl.HadMissingEnd; }
-  
-  SourceRange getSourceRange() const;
-  
-  static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::IfConfig;
-  }
-};
-
 class StringLiteralExpr;
 
 class PoundDiagnosticDecl : public Decl {
@@ -3092,6 +3056,10 @@ public:
 
   /// Retrieve the declaration that this declaration overrides, if any.
   ValueDecl *getOverriddenDecl() const;
+
+  /// Retrieve the declaration that this declaration overrides, including super
+  /// deinit.
+  ValueDecl *getOverriddenDeclOrSuperDeinit() const;
 
   /// Retrieve the declarations that this declaration overrides, if any.
   llvm::TinyPtrVector<ValueDecl *> getOverriddenDecls() const;
@@ -8558,7 +8526,9 @@ public:
     return hasName() ? getBaseIdentifier().str() : "_";
   }
 
-  Type getArgumentInterfaceType() const;
+  /// Retrieve the payload type for the enum element, which is a tuple of the
+  /// associated values, or null if there are no associated values.
+  Type getPayloadInterfaceType() const;
 
   void setParameterList(ParameterList *params);
   ParameterList *getParameterList() const { return Params; }
@@ -8891,6 +8861,10 @@ public:
 
   /// Retrieve the Objective-C selector for destructors.
   ObjCSelector getObjCSelector() const;
+
+  /// Retrieves destructor decl from the superclass, or nil if there is no
+  /// superclass
+  DestructorDecl *getSuperDeinit() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Destructor;
@@ -9627,6 +9601,16 @@ inline bool DeclContext::classof(const Decl *D) {
   default: return false;
 #define DECL(ID, PARENT) // See previous line
 #define CONTEXT_DECL(ID, PARENT) \
+  case DeclKind::ID: return true;
+#include "swift/AST/DeclNodes.def"
+  }
+}
+
+inline bool GenericContext::classof(const Decl *D) {
+  switch (D->getKind()) { //
+  default: return false;
+#define DECL(ID, PARENT) // See previous line
+#define GENERIC_DECL(ID, PARENT) \
   case DeclKind::ID: return true;
 #include "swift/AST/DeclNodes.def"
   }
