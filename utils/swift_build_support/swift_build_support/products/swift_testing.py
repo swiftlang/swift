@@ -51,7 +51,7 @@ class SwiftTesting(product.Product):
         return False
 
     def should_install(self, host_target):
-        return self.args.install_swift_testing_macros
+        return self.args.install_swift_testing
 
     def _cmake_product(self, host_target):
         build_root = os.path.dirname(self.build_dir)
