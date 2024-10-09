@@ -5465,6 +5465,15 @@ public:
   /// Primitive form of the above. Records a change in the trail.
   void increaseScore(ScoreKind kind, unsigned value);
 
+  /// Apply the score from a partial solution. Records the change in the
+  /// trail.
+  void replayScore(const Score &score);
+
+  /// Temporarily zero out the score, and record this in the trail so that
+  /// we restore the score when the scope ends. Used when solving a
+  /// ConjunctionStep.
+  void clearScore();
+
   /// Determine whether this solution is guaranteed to be worse than the best
   /// solution found so far.
   bool worseThanBestSolution() const;
