@@ -41,9 +41,9 @@ ComponentStep::Scope::Scope(ComponentStep &component)
   auto &workList = CS.InactiveConstraints;
   workList.splice(workList.end(), *component.Constraints);
 
-  SolverScope = new ConstraintSystem::SolverScope(CS);
-  PrevPartialScope = CS.solverState->PartialSolutionScope;
-  CS.solverState->PartialSolutionScope = SolverScope;
+  SolverScope.emplace(CS);
+  prevPartialSolutionFixes = CS.solverState->numPartialSolutionFixes;
+  CS.solverState->numPartialSolutionFixes = CS.Fixes.size();
 }
 
 StepResult SplitterStep::take(bool prevFailed) {
@@ -234,7 +234,7 @@ bool SplitterStep::mergePartialSolutions() const {
       if (!IncludeInMergedResults[i])
         continue;
 
-      CS.applySolution(PartialSolutions[i][indices[i]]);
+      CS.replaySolution(PartialSolutions[i][indices[i]]);
     }
 
     // This solution might be worse than the best solution found so far.
@@ -328,7 +328,7 @@ StepResult ComponentStep::take(bool prevFailed) {
   // If there are any dependent partial solutions to compose, do so now.
   if (!DependsOnPartialSolutions.empty()) {
     for (auto partial : DependsOnPartialSolutions) {
-      CS.applySolution(*partial);
+      CS.replaySolution(*partial);
     }
 
     // Activate all of the one-way constraints.
@@ -879,11 +879,18 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
     // Note that solution is removed here. This is done
     // because we want build a single complete solution
     // incrementally.
-    CS.applySolution(Solutions.pop_back_val());
+    CS.replaySolution(Solutions.pop_back_val(),
+                      /*shouldIncrementScore=*/false);
   }
 
   // Make sure that element is solved in isolation
   // by dropping all scoring information.
+  for (unsigned i = 0; i < NumScoreKinds; ++i) {
+    if (unsigned value = CS.CurrentScore.Data[i]) {
+      CS.recordChange(
+        SolverTrail::Change::DecreasedScore(ScoreKind(i), value));
+    }
+  }
   CS.CurrentScore = Score();
 
   // Reset the scope counter to avoid "too complex" failures
@@ -1024,9 +1031,10 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
         for (auto &solution : Solutions) {
           ConstraintSystem::SolverScope scope(CS);
 
-          CS.applySolution(solution);
+          CS.replaySolution(solution,
+                            /*shouldIncrementScore=*/false);
 
-          // `applySolution` changes best/current scores
+          // `replaySolution` changes best/current scores
           // of the constraint system, so they have to be
           // restored right afterwards because score of the
           // element does contribute to the overall score.
@@ -1100,8 +1108,9 @@ void ConjunctionStep::restoreOuterState(const Score &solutionScore) const {
   }
 }
 
-void ConjunctionStep::SolverSnapshot::applySolution(const Solution &solution) {
-  CS.applySolution(solution);
+void ConjunctionStep::SolverSnapshot::replaySolution(const Solution &solution) {
+  CS.replaySolution(solution,
+                    /*shouldIncreaseScore=*/false);
 
   if (!CS.shouldAttemptFixes())
     return;
