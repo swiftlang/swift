@@ -1027,8 +1027,10 @@ protected:
   }
 
 private:
-  /// Restore best and current scores as they were before conjunction.
-  void restoreCurrentScore(const Score &solutionScore) const {
+  /// We need to do this to make sure that we rank solutions with
+  /// invalid closures appropriately and don’t produce a valid
+  /// solution if a multi-statement closure failed.
+  void updateScoreAfterConjunction(const Score &solutionScore) const {
     CS.increaseScore(SK_Fix, Conjunction->getLocator(),
                      solutionScore.Data[SK_Fix]);
     CS.increaseScore(SK_Hole, Conjunction->getLocator(),
