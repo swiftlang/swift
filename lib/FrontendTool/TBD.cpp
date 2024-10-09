@@ -85,6 +85,10 @@ static bool validateSymbols(DiagnosticEngine &diags,
       auto externallyVisible =
           (GV->hasExternalLinkage() || GV->hasCommonLinkage())
         && !GV->hasHiddenVisibility();
+      if (auto G = GV->getAliaseeObject())
+        if (G->getName().equals("_swift_dead_method_stub"))
+          continue;
+
       if (!GV->isDeclaration() && externallyVisible) {
         // Is it listed?
         if (!symbolSet.erase(name))

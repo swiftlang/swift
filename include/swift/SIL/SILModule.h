@@ -569,7 +569,7 @@ public:
   void invalidateSILLoaderCaches();
 
   /// Erase a function from the module.
-  void eraseFunction(SILFunction *F);
+  void eraseFunction(SILFunction *F, bool remove = true);
 
   /// Invalidate a function in SILLoader cache.
   void invalidateFunctionInSILCache(SILFunction *F);

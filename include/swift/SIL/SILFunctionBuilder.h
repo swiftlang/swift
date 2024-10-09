@@ -106,7 +106,7 @@ class SILFunctionBuilder {
       Inline_t inlineStrategy = InlineDefault,
       EffectsKind EK = EffectsKind::Unspecified,
       SILFunction *InsertBefore = nullptr,
-      const SILDebugScope *DebugScope = nullptr);
+      const SILDebugScope *DebugScope = nullptr, bool isZombie = false);
 
   void addFunctionAttributes(
       SILFunction *F, DeclAttributes &Attrs, SILModule &M,
@@ -120,6 +120,8 @@ class SILFunctionBuilder {
   static void setHasOwnership(SILFunction *F, bool newValue) {
     F->setHasOwnership(newValue);
   }
+
+  SILFunction *resurrectFunction(StringRef name);
 };
 
 } // namespace swift

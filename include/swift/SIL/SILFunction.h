@@ -522,8 +522,9 @@ private:
          Inline_t inlineStrategy = InlineDefault,
          EffectsKind EffectsKindAttr = EffectsKind::Unspecified,
          SILFunction *InsertBefore = nullptr,
-         const SILDebugScope *DebugScope = nullptr);
+         const SILDebugScope *DebugScope = nullptr, bool isZombie = false);
 
+  static SILFunction *resurrectFunction(SILModule &M, StringRef name);
   void init(SILLinkage Linkage, StringRef Name, CanSILFunctionType LoweredType,
             GenericEnvironment *genericEnv, IsBare_t isBareSILFunction,
             IsTransparent_t isTrans, SerializedKind_t serializedKind,

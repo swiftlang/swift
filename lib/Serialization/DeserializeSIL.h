@@ -79,6 +79,15 @@ namespace swift {
         ModuleFile::PartiallySerialized<SILDifferentiabilityWitness *>>
         DifferentiabilityWitnesses;
 
+    MutableArrayRef<
+        ModuleFile::PartiallySerialized<SILLocation::FilenameAndLocation *>>
+        SourceLocs;
+
+    MutableArrayRef<ModuleFile::PartiallySerialized<SILDebugScope *>>
+        DebugScopes;
+
+    uint32_t DebugScopeIndex = 1;
+
     //-----
     // End Deserialization Caches
     //
@@ -113,7 +122,7 @@ namespace swift {
     llvm::Expected<SILFunction *>
     readSILFunctionChecked(serialization::DeclID, SILFunction *InFunc,
                            StringRef Name, bool declarationOnly,
-                           bool errorIfEmptyBody = true);
+                           bool errorIfEmptyBody = true, bool isDebug = false);
 
     /// Read a SIL basic block within a given SIL function.
     SILBasicBlock *readSILBasicBlock(SILFunction *Fn,
@@ -146,8 +155,19 @@ namespace swift {
     SILDifferentiabilityWitness *
     getSILDifferentiabilityWitnessForReference(StringRef mangledKey);
 
+    SILLocation::FilenameAndLocation *
+    getSourceLoc(serialization::DeclID Offset);
+    const SILDebugScope *readDebugScopes(SILFunction *F,
+                                         SmallVectorImpl<uint64_t> &scratch,
+                                         SILBuilder &Builder, unsigned kind);
+    SILLocation readLoc(unsigned kind, SmallVectorImpl<uint64_t> &scratch);
+
+    unsigned readNextRecord(SmallVectorImpl<uint64_t> &scratch);
+    llvm::DenseMap<unsigned, const SILDebugScope *> ParsedScopes;
+    llvm::DenseMap<unsigned, SILLocation::FilenameAndLocation *> ParsedLocs;
+
     SILFunction *getFuncForReference(StringRef Name, SILType Ty, TypeExpansionContext context);
-    SILFunction *getFuncForReference(StringRef Name);
+    SILFunction *getFuncForReference(StringRef Name, bool isDebug = false);
     SILVTable *readVTable(serialization::DeclID);
     SILMoveOnlyDeinit *readMoveOnlyDeinit(serialization::DeclID);
     SILGlobalVariable *getGlobalForReference(StringRef Name);

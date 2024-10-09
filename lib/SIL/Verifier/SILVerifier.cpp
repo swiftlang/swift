@@ -7201,7 +7201,7 @@ public:
     case SILLinkage::Public:
     case SILLinkage::Package:
     case SILLinkage::Shared:
-      require(F->isDefinition() || F->hasForeignBody(),
+      require(F->isDefinition() || F->hasForeignBody() || F->isZombie(),
               "public/package/shared function must have a body");
       break;
     case SILLinkage::PublicNonABI:
@@ -7247,7 +7247,7 @@ public:
     }
 
     if (F->isExternalDeclaration()) {
-      if (F->hasForeignBody())
+      if (F->hasForeignBody() || F->isZombie())
         return;
 
       require(F->isAvailableExternally(),

@@ -44,7 +44,8 @@ STATISTIC(NumSlabsAllocated, "number of slabs allocated in SILModule");
 class SILModule::SerializationCallback final
     : public DeserializationNotificationHandler {
   void didDeserialize(ModuleDecl *M, SILFunction *fn) override {
-    updateLinkage(fn);
+    if (!fn->isZombie())
+      updateLinkage(fn);
   }
 
   void didDeserialize(ModuleDecl *M, SILGlobalVariable *var) override {
@@ -350,7 +351,7 @@ SILFunction *SILModule::lookUpFunction(SILDeclRef fnRef) {
 bool SILModule::loadFunction(SILFunction *F, LinkingMode LinkMode) {
   SILFunction *NewF =
     getSILLoader()->lookupSILFunction(F, /*onlyUpdateLinkage*/ false);
-  if (!NewF)
+  if (!NewF || NewF->isZombie())
     return false;
 
   linkFunction(NewF, LinkMode);
@@ -364,7 +365,7 @@ SILFunction *SILModule::loadFunction(StringRef name, LinkingMode LinkMode,
   SILFunction *func = lookUpFunction(name);
   if (!func)
     func = getSILLoader()->lookupSILFunction(name, linkage);
-  if (!func)
+  if (!func || func->isZombie())
     return nullptr;
 
   linkFunction(func, LinkMode);
@@ -405,7 +406,7 @@ SILFunction *SILModule::removeFromZombieList(StringRef Name) {
 }
 
 /// Erase a function from the module.
-void SILModule::eraseFunction(SILFunction *F) {
+void SILModule::eraseFunction(SILFunction *F, bool Remove) {
   assert(!F->isZombie() && "zombie function is in list of alive functions");
   assert(F->snapshotID == 0 && "cannot erase a snapshot function");
 
@@ -417,12 +418,14 @@ void SILModule::eraseFunction(SILFunction *F) {
   // The owner of the function's Name is the FunctionTable key. As we remove
   // the function from the table we need to use the allocated name string from
   // the ZombieFunctionTable.
-  FunctionTable.erase(F->getName());
+  if (Remove)
+    FunctionTable.erase(F->getName());
   F->setName(zombieName);
 
   // The function is dead, but we need it later (at IRGen) for debug info
   // or vtable stub generation. So we move it into the zombie list.
-  getFunctionList().remove(F);
+  if (Remove)
+    getFunctionList().remove(F);
   zombieFunctions.push_back(F);
   entry->setValue(F);
   F->setZombie();
