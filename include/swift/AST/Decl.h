@@ -8805,8 +8805,6 @@ public:
     Bits.ConstructorDecl.HasStubImplementation = stub;
   }
 
-  bool hasLifetimeDependentReturn() const;
-
   ConstructorDecl *getOverriddenDecl() const {
     return cast_or_null<ConstructorDecl>(
         AbstractFunctionDecl::getOverriddenDecl());

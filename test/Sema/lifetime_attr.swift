@@ -17,7 +17,7 @@ func invalidAttrOnNonExistingSelf(_ ne: NE) -> NE {
   ne
 }
 
-@lifetime(2) // expected-error{{invalid parameter index specified 2}}
+@lifetime(2) // expected-error{{invalid parameter index specified '2'}}
 func invalidAttrOnNonExistingParamIndex(_ ne: NE) -> NE {
   ne
 }
@@ -34,3 +34,13 @@ func invalidDependence(_ x: consuming Klass) -> NE {
   NE()
 }
 
+@lifetime(result: source) 
+@lifetime(result: source) // TODO: display error here
+func invalidTarget(_ result: inout NE, _ source: consuming NE) { // expected-error{{invalid duplicate target lifetime dependencies on function}}
+  result = source
+}
+
+@lifetime(immortal)
+func immortalConflict(_ immortal: Int) -> NE { // expected-error{{conflict between the parameter name and 'immortal' contextual keyword}}
+  NE()
+}

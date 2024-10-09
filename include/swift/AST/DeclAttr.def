@@ -510,7 +510,7 @@ SIMPLE_DECL_ATTR(unsafe, Unsafe,
   160)
 
 DECL_ATTR(lifetime, Lifetime,
-  OnAccessor | OnConstructor | OnFunc | OnSubscript | LongAttribute | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  OnAccessor | OnConstructor | OnFunc | OnSubscript | LongAttribute | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | AllowMultipleAttributes,
   161)
 
 LAST_DECL_ATTR(Lifetime)

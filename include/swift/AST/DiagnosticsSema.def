@@ -7948,9 +7948,9 @@ ERROR(pack_iteration_where_clause_not_supported, none,
 //------------------------------------------------------------------------------
 
 ERROR(lifetime_dependence_invalid_param_name, none,
-      "invalid parameter name specified %0", (Identifier))
+      "invalid parameter name specified '%0'", (StringRef))
 ERROR(lifetime_dependence_invalid_param_index, none,
-      "invalid parameter index specified %0", (unsigned))
+      "invalid parameter index specified '%0'", (unsigned))
 ERROR(lifetime_dependence_invalid_self_in_static, none,
       "invalid lifetime dependence specifier on non-existent self", ())
 ERROR(lifetime_dependence_invalid_self_in_init, none,
@@ -7992,7 +7992,7 @@ ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
        "Escapable",
        ())
 ERROR(lifetime_dependence_immortal_conflict_name, none,
-      "conflict between the parameter name and immortal keyword", ())
+      "conflict between the parameter name and 'immortal' contextual keyword", ())
 ERROR(lifetime_dependence_function_type, none,
       "lifetime dependencies on function types are not supported",
       ())
@@ -8005,6 +8005,8 @@ ERROR(lifetime_dependence_invalid_inherit_escapable_type, none,
 ERROR(lifetime_dependence_cannot_use_parsed_borrow_consuming, none,
       "invalid use of borrow dependence with consuming ownership",
       ())
+ERROR(lifetime_dependence_duplicate_target, none,
+      "invalid duplicate target lifetime dependencies on function", ())
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Sending

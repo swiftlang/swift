@@ -1726,23 +1726,6 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
     // 'nil'.
     auto *nilExpr = dyn_cast<NilLiteralExpr>(E->getSemanticsProvidingExpr());
     if (!nilExpr) {
-      if (ctor->hasLifetimeDependentReturn()) {
-        bool isSelf = false;
-        if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
-          isSelf = UDRE->getName().isSimpleName(ctx.Id_self);
-          // Result the result expression so that rest of the compilation
-          // pipeline handles initializers with lifetime dependence specifiers
-          // in the same way as other initializers.
-          RS->setResult(nullptr);
-        }
-        if (!isSelf) {
-          ctx.Diags.diagnose(
-              RS->getStartLoc(),
-              diag::lifetime_dependence_ctor_non_self_or_nil_return);
-          RS->setResult(nullptr);
-        }
-        return RS;
-      }
       ctx.Diags.diagnose(RS->getReturnLoc(), diag::return_init_non_nil)
           .highlight(E->getSourceRange());
       RS->setResult(nullptr);

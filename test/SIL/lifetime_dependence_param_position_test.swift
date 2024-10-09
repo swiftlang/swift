@@ -13,9 +13,8 @@ public struct Span<Element> : ~Escapable {
       count: Int,
       dependsOn owner: borrowing Owner
     ) {
-      self.init(
-        baseAddress: baseAddress, count: count, dependsOn: owner
-      )
+    self.baseAddress = baseAddress
+    self.count = count
   }
 }
 
@@ -29,8 +28,9 @@ extension ContiguousArray {
   }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s39lifetime_dependence_param_position_test11mayReassign4span2toyAA4SpanVySiGzYlsUS__s15ContiguousArrayVySiGtF : $@convention(thin) (@inout Span<Int>, @guaranteed ContiguousArray<Int>) -> _scope(1)  () {
-func mayReassign(span: dependsOn(to) inout Span<Int>, to: ContiguousArray<Int>) {
+// CHECK-LABEL: sil hidden @$s39lifetime_dependence_param_position_test11mayReassign4span2toyAA4SpanVySiGz_s15ContiguousArrayVySiGtF : $@convention(thin) (_lifetime(_borrow 1) @inout Span<Int>, @guaranteed ContiguousArray<Int>) -> () {
+@lifetime(span: borrow to)
+func mayReassign(span: inout Span<Int>, to: ContiguousArray<Int>) {
   span = to.span
 }
 
