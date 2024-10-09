@@ -517,6 +517,7 @@ PASS(PruneVTables, "prune-vtables",
 PASS_RANGE(AllPasses, AliasInfoDumper, PruneVTables)
 
 SWIFT_SILCOMBINE_PASS(BeginCOWMutationInst)
+SWIFT_SILCOMBINE_PASS(ClassifyBridgeObjectInst)
 SWIFT_SILCOMBINE_PASS(GlobalValueInst)
 SWIFT_SILCOMBINE_PASS(StrongRetainInst)
 SWIFT_SILCOMBINE_PASS(StrongReleaseInst)

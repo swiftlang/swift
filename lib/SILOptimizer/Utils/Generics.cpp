@@ -2982,6 +2982,13 @@ static bool usePrespecialized(
   if (refF->getSpecializeAttrs().empty())
     return false;
 
+  // `Array._endMutation` was added for pre-specialization by mistake. But we
+  // cannot remove the specialize-attributes anymore because the pre-specialized
+  // functions are now part of the stdlib's ABI.
+  // Therefore make an exception for `Array._endMutation` here.
+  if (refF->getName() == "$sSa12_endMutationyyF")
+    return false;
+
   SmallVector<std::tuple<unsigned, ReabstractionInfo, AvailabilityRange>, 4>
       layoutMatches;
 
