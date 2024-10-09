@@ -18,11 +18,13 @@ precedencegroup AssignmentPrecedence { assignment: true }
 
 protocol P {
   associatedtype E: ~Escapable
-  borrowing func getE() -> dependsOn(self) E
+  @lifetime(borrow self)
+  borrowing func getE() -> E
 }
 
 extension P {
-  borrowing func getDefault() -> dependsOn(self) E {
+  @lifetime(borrow self)
+  borrowing func getDefault() -> E {
     return getE()
   }
 }
@@ -49,26 +51,29 @@ struct NCInt: ~Copyable {
 struct NEInt: ~Escapable {
   let value: Builtin.Int64
 
-  init<O: ~Copyable & ~Escapable>(v: Builtin.Int64, o: borrowing O) -> dependsOn(o) Self {
+  @lifetime(o)
+  init<O: ~Copyable & ~Escapable>(v: Builtin.Int64, o: borrowing O) {
     self.value = v
-    return self
   }
 
   // Test a generic storage owner.
-  init(borrowed: borrowing NCInt) -> dependsOn(borrowed) Self {
+  @lifetime(borrow borrowed)
+  init(borrowed: borrowing NCInt) {
     self.init(v: borrowed.value, o: borrowed)
-    return self
   }
 }
 
-public func consume_indirect<NE: ~Escapable>(ne: consuming NE) -> dependsOn(ne) NE {
+@lifetime(ne)
+public func consume_indirect<NE: ~Escapable>(ne: consuming NE) -> NE {
   return ne
 }
 
-public func copy_indirect<NE: ~Escapable>(ne: borrowing NE) -> dependsOn(ne) NE {
+@lifetime(ne)
+public func copy_indirect<NE: ~Escapable>(ne: borrowing NE) -> NE {
   return copy ne
 }
 
-public func copy_inout<NE: ~Escapable>(ne: inout NE) -> dependsOn(ne) NE {
+@lifetime(ne)
+public func copy_inout<NE: ~Escapable>(ne: inout NE) -> NE {
   return copy ne
 }

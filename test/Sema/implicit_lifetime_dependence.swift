@@ -4,7 +4,8 @@
 struct BufferView : ~Escapable, ~Copyable {
   let ptr: UnsafeRawBufferPointer?
   let c: Int
-  init(_ ptr: UnsafeRawBufferPointer?, _ c: Int) -> dependsOn(ptr) Self {
+  @lifetime(borrow ptr)
+  init(_ ptr: UnsafeRawBufferPointer?, _ c: Int) {
     self.ptr = ptr
     self.c = c
   }

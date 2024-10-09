@@ -12,7 +12,8 @@ struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let i: Int
 
-  init(_ p: UnsafeRawPointer, _ i: Int) -> dependsOn(p) Self {
+  @lifetime(borrow p)
+  init(_ p: UnsafeRawPointer, _ i: Int) {
     self.p = p
     self.i = i
   }
@@ -23,7 +24,8 @@ struct NC : ~Copyable {
   let i: Int
 
   // Requires a borrow.
-  borrowing func getBV() -> dependsOn(self) BV {
+  @lifetime(borrow self)
+  borrowing func getBV() -> BV {
     BV(p, i)
   }
 }
@@ -35,7 +37,7 @@ func use(_ o : borrowing BV)
 // CHECK: [[A:%.*]] = begin_access [read] [unknown] %{{.*}} : $*NC
 // CHECK: [[U:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[A]] : $*NC 
 // CHECK: [[L:%.*]] = load [copy] [[U]] : $*NC
-// CHECK:   [[R:%.*]] = apply %{{.*}}([[L]]) : $@convention(method) (@guaranteed NC) -> _scope(0) @owned BV
+// CHECK:   [[R:%.*]] = apply %{{.*}}([[L]]) : $@convention(method) (@guaranteed NC) -> @lifetime(borrow 0) @owned BV
 // CHECK:   [[M:%.*]] = mark_dependence [unresolved] [[R]] : $BV on [[A]] : $*NC
 // CHECK:   end_access [[A]] : $*NC
 // CHECK:   [[MV:%.*]] = move_value [var_decl] [[M]] : $BV
