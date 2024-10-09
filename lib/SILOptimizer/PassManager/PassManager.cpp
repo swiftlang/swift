@@ -21,6 +21,7 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/OSSALifetimeCompletion.h"
 #include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
@@ -2039,6 +2040,16 @@ ClosureSpecializer_createEmptyFunctionWithSpecializedSignature(BridgedStringRef 
     specializedApplySiteCallee->addSemanticsAttr(Attr);
   
   return {specializedApplySiteCallee};
+}
+
+bool BridgedPassContext::completeLifetime(BridgedValue value) const {
+  SILValue v = value.getSILValue();
+  SILFunction *f = v->getFunction();
+  DeadEndBlocks *deb = invocation->getPassManager()->getAnalysis<DeadEndBlocksAnalysis>()->get(f);
+  DominanceInfo *domInfo = invocation->getPassManager()->getAnalysis<DominanceAnalysis>()->get(f);
+  OSSALifetimeCompletion completion(f, domInfo, *deb);
+  auto result = completion.completeOSSALifetime(v, OSSALifetimeCompletion::Boundary::Availability);
+  return result == LifetimeCompletion::WasCompleted;
 }
 
 bool FullApplySite_canInline(BridgedInstruction apply) {
