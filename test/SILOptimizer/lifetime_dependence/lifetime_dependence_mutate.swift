@@ -12,7 +12,8 @@ struct MutableSpan : ~Escapable, ~Copyable {
   let base: UnsafeMutableRawPointer
   let count: Int
 
-  init(_ p: UnsafeMutableRawPointer, _ c: Int) -> dependsOn(p) Self {
+  @lifetime(borrow p)
+  init(_ p: UnsafeMutableRawPointer, _ c: Int) {
     self.base = p
     self.count = c
   }
@@ -33,7 +34,8 @@ struct MutableSpan : ~Escapable, ~Copyable {
     var base: UnsafeMutableRawPointer
     var count: Int
 
-    init(base: UnsafeMutableRawPointer, count: Int) -> dependsOn(base) Self {
+    @lifetime(borrow base)
+    init(base: UnsafeMutableRawPointer, count: Int) {
       self.base = base
       self.count = count
     }
@@ -64,7 +66,8 @@ struct NC : ~Copyable {
   let c: Int
 
   // Requires a mutable borrow.
-  mutating func getMutableSpan() -> dependsOn(self) MutableSpan {
+  @lifetime(borrow self)
+  mutating func getMutableSpan() -> MutableSpan {
     MutableSpan(p, c)
   }
 }

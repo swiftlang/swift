@@ -11,9 +11,10 @@
 // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence should be expressed by a builtin that is
 // hidden within the function body.
 @_unsafeNonescapableResult
+@lifetime(source)
 func unsafeLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
   dependent: consuming T, dependsOn source: borrowing U)
-  -> dependsOn(source) T {
+  -> T {
   dependent
 }
 
@@ -21,17 +22,20 @@ struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let i: Int
 
-  init(_ p: UnsafeRawPointer, _ i: Int) -> dependsOn(p) Self {
+  @lifetime(borrow p)
+  init(_ p: UnsafeRawPointer, _ i: Int) {
     self.p = p
     self.i = i
   }
 
-  init(independent p: UnsafeRawPointer, _ i: Int) -> dependsOn(p) Self {
+  @lifetime(borrow p)
+  init(independent p: UnsafeRawPointer, _ i: Int) {
     self.p = p
     self.i = i
   }
 
-  consuming func derive() -> dependsOn(self) BV {
+  @lifetime(borrow self)
+  consuming func derive() -> BV {
     // Technically, this "new" view does not depend on the 'view' argument.
     // This unsafely creates a new view with no dependence.
     let bv = BV(independent: self.p, self.i)
@@ -42,8 +46,8 @@ struct BV : ~Escapable {
 struct NE : ~Escapable {
   var bv: BV
 
-  init(_ bv: consuming BV) -> dependsOn(bv) Self {
+  @lifetime(bv)
+  init(_ bv: consuming BV) {
     self.bv = bv
-    return self
   }
 }

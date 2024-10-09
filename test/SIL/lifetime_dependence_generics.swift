@@ -7,11 +7,13 @@
 
 protocol P {
   associatedtype E: ~Escapable
-  borrowing func getE() -> dependsOn(self) E
+  @lifetime(borrow self)
+  borrowing func getE() -> E
 }
 
 extension P {
-  borrowing func getDefault() -> dependsOn(self) E {
+  @lifetime(borrow self)
+  borrowing func getDefault() -> E {
     return getE()
   }
 }
@@ -23,17 +25,17 @@ public struct View: ~Escapable {
 }
 
 public struct PView: P {
-  borrowing func getE() -> dependsOn(self) View { return View() }
+  borrowing func getE() -> View { return View() }
 }
 
-public func test(pview: borrowing PView) -> dependsOn(pview) View {
+public func test(pview: borrowing PView) -> View {
   return pview.getDefault()
 }
 
-// CHECK-LABEL: sil hidden @$s28lifetime_dependence_generics1PPAAE10getDefault1EQzyF : $@convention(method) <Self where Self : P> (@in_guaranteed Self) -> _scope(0)  @out Self.E {
+// CHECK-LABEL: sil hidden @$s28lifetime_dependence_generics1PPAAE10getDefault1EQzyF : $@convention(method) <Self where Self : P> (@in_guaranteed Self) -> @lifetime(borrow 0)  @out Self.E {
 
-// CHECK-LABEL: sil hidden @$s28lifetime_dependence_generics5PViewV4getEAA4ViewVyF : $@convention(method) (PView) -> _scope(0)  @owned View {
+// CHECK-LABEL: sil hidden @$s28lifetime_dependence_generics5PViewV4getEAA4ViewVyF : $@convention(method) (PView) -> @lifetime(borrow 0)  @owned View {
 
-// CHECK-LABEL: sil private [transparent] [thunk] @$s28lifetime_dependence_generics5PViewVAA1PA2aDP4getE1EQzyFTW : $@convention(witness_method: P) (@in_guaranteed PView) -> _scope(0)  @out View {
+// CHECK-LABEL: sil private [transparent] [thunk] @$s28lifetime_dependence_generics5PViewVAA1PA2aDP4getE1EQzyFTW : $@convention(witness_method: P) (@in_guaranteed PView) -> @lifetime(borrow 0)  @out View {
 
-// CHECK-LABEL: sil @$s28lifetime_dependence_generics4test5pviewAA4ViewVAA5PViewV_tF : $@convention(thin) (PView) -> _scope(0)  @owned View {
+// CHECK-LABEL: sil @$s28lifetime_dependence_generics4test5pviewAA4ViewVAA5PViewV_tF : $@convention(thin) (PView) -> @lifetime(borrow 0)  @owned View {

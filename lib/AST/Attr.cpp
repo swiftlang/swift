@@ -1814,15 +1814,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DeclAttrKind::Lifetime: {
     auto *attr = cast<LifetimeAttr>(this);
-    bool firstElem = true;
-    Printer << "@lifetime(";
-    for (auto entry : attr->getLifetimeEntries()) {
-      if (!firstElem) {
-        Printer << ", ";
-      }
-      Printer << entry.getParamString();
-    }
-    Printer << ")";
+    Printer << attr->getLifetimeEntry()->getString();
     break;
   }
 
@@ -3055,20 +3047,10 @@ AllowFeatureSuppressionAttr *AllowFeatureSuppressionAttr::create(
       AllowFeatureSuppressionAttr(atLoc, range, implicit, inverted, features);
 }
 
-LifetimeAttr::LifetimeAttr(SourceLoc atLoc, SourceRange baseRange,
-                           bool implicit, ArrayRef<LifetimeEntry> entries)
-    : DeclAttribute(DeclAttrKind::Lifetime, atLoc, baseRange, implicit),
-      NumEntries(entries.size()) {
-  std::copy(entries.begin(), entries.end(),
-            getTrailingObjects<LifetimeEntry>());
-}
-
 LifetimeAttr *LifetimeAttr::create(ASTContext &context, SourceLoc atLoc,
                                    SourceRange baseRange, bool implicit,
-                                   ArrayRef<LifetimeEntry> entries) {
-  unsigned size = totalSizeToAlloc<LifetimeEntry>(entries.size());
-  void *mem = context.Allocate(size, alignof(LifetimeEntry));
-  return new (mem) LifetimeAttr(atLoc, baseRange, implicit, entries);
+                                   LifetimeEntry *entry) {
+  return new (context) LifetimeAttr(atLoc, baseRange, implicit, entry);
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
