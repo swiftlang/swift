@@ -218,7 +218,7 @@ if ($AndroidSDKs.Length -gt 0) {
 
 if ($Test -contains "*") {
   # Explicitly don't include llbuild yet since tests are known to fail on Windows
-  $Test = @("swift", "dispatch", "foundation", "xctest")
+  $Test = @("swift", "dispatch", "foundation", "xctest", "swift-format")
 }
 
 # Architecture definitions
@@ -1223,6 +1223,8 @@ function Build-SPMProject {
     [string] $Src,
     [string] $Bin,
     [hashtable] $Arch,
+    [hashtable] $AdditionalEnv = @{},
+    [string] $InstallExe = "",
     [switch] $Test = $false,
     [Parameter(ValueFromRemainingArguments)]
     [string[]] $AdditionalArguments
@@ -1243,6 +1245,10 @@ function Build-SPMProject {
 
     $env:Path = "$RuntimeInstallRoot\usr\bin;$($HostArch.ToolchainInstallRoot)\usr\bin;${env:Path}"
     $env:SDKROOT = $SDKInstallRoot
+
+    foreach ($Var in $AdditionalEnv.GetEnumerator()) {
+      New-Item -Path "env:\$($Var.Key)" -Value $Var.Value -ErrorAction Ignore | Out-Null
+    }
 
     $Arguments = @(
         "--scratch-path", $Bin,
@@ -1265,6 +1271,14 @@ function Build-SPMProject {
 
     $Action = if ($Test) { "test" } else { "build" }
     Invoke-Program "$($HostArch.ToolchainInstallRoot)\usr\bin\swift.exe" $Action @Arguments @AdditionalArguments
+
+    if ($InstallExe -ne "") {
+      $BinPath = (Invoke-Program "$($HostArch.ToolchainInstallRoot)\usr\bin\swift.exe" build @Arguments --show-bin-path)
+      $ExecPath = Join-Path -Path $BinPath -ChildPath $InstallExe
+      $InstallDestination = "$($Arch.ToolchainInstallRoot)\usr\bin"
+      Write-Host "Installing $($ExecPath) to $($InstallDestination)"
+      Copy-Item -Path $ExecPath -Destination $InstallDestination
+    }
   }
 
   if (-not $ToBatch) {
@@ -2355,23 +2369,44 @@ function Build-Markdown($Arch) {
     }
 }
 
-function Build-Format($Arch) {
-  Build-CMakeProject `
-    -Src $SourceCache\swift-format `
-    -Bin (Get-HostProjectBinaryCache Format) `
-    -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
-    -Arch $Arch `
-    -Platform Windows `
-    -UseMSVCCompilers C `
-    -UseBuiltCompilers Swift `
-    -SwiftSDK (Get-HostSwiftSDK) `
-    -Defines @{
-      BUILD_SHARED_LIBS = "YES";
-      ArgumentParser_DIR = (Get-HostProjectCMakeModules ArgumentParser);
-      SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
-      SwiftMarkdown_DIR = (Get-HostProjectCMakeModules Markdown);
-      "cmark-gfm_DIR" = "$($Arch.ToolchainInstallRoot)\usr\lib\cmake";
-    }
+function Build-Format() {
+  [CmdletBinding(PositionalBinding = $false)]
+  param
+  (
+    [hashtable]$Arch,
+    [switch] $Test
+  )
+
+  $SwiftPMArguments = @(
+    # swift-syntax
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache Compilers)\lib\swift\host",
+    # swift-argument-parser
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache ArgumentParser)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache ArgumentParser)\lib",
+    # swift-cmark
+    "-Xswiftc", "-I$($Arch.ToolchainInstallRoot)\usr\include\cmark_gfm",
+    "-Xswiftc", "-I$($Arch.ToolchainInstallRoot)\usr\include\cmark_gfm_extensions",
+    "-Xlinker", "$($Arch.ToolchainInstallRoot)\usr\lib\cmark-gfm.lib",
+    "-Xlinker", "$($Arch.ToolchainInstallRoot)\usr\lib\cmark-gfm-extensions.lib",
+    # swift-markdown
+    "-Xlinker", "$(Get-HostProjectBinaryCache Markdown)\lib\CAtomic.lib",
+    "-Xswiftc", "-I$($SourceCache)\swift-markdown\Sources\CAtomic\include",
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache Markdown)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache Markdown)\lib"
+  )
+
+  $Options = @{
+    Src = "$SourceCache\swift-format"
+    Bin = (Get-HostProjectBinaryCache Format)
+    Arch = $Arch
+    Test = $Test
+    InstallExe = If ($Test) { "" } Else { "swift-format.exe" }
+  }
+
+  Isolate-EnvVars {
+    $env:SWIFTFORMAT_OMIT_EXTERNAL_DEPENDENCIES=1
+    Build-SPMProject @Options @SwiftPMArguments
+  }
 }
 
 function Build-IndexStoreDB($Arch) {
@@ -2694,7 +2729,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-Certificates $HostArch
   Invoke-BuildStep Build-PackageManager $HostArch
   Invoke-BuildStep Build-Markdown $HostArch
-  Invoke-BuildStep Build-Format $HostArch
+  Invoke-BuildStep Build-Format -Arch $HostArch
   Invoke-BuildStep Build-IndexStoreDB $HostArch
   Invoke-BuildStep Build-SourceKitLSP $HostArch
 }
@@ -2744,6 +2779,7 @@ if (-not $IsCrossCompiling) {
   }
   if ($Test -contains "llbuild") { Build-LLBuild $HostArch -Test }
   if ($Test -contains "swiftpm") { Test-PackageManager $HostArch }
+  if ($Test -contains "swift-format") { Build-Format -Arch $HostArch -Test }
 }
 
 # Custom exception printing for more detailed exception information
