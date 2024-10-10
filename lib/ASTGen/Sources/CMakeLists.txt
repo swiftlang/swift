@@ -1,3 +1,3 @@
 add_subdirectory(ASTGen)
-add_subdirectory(Macros)
+add_subdirectory(MacroEvaluation)
 add_subdirectory(SwiftIDEUtilsBridging)
