@@ -529,7 +529,13 @@ public:
     bool reflectionNameMatches(RemoteRef<char> reflectionName,
                                StringRef searchName);
 
+    std::optional<std::reference_wrapper<const ReflectionInfo>>
+    findReflectionInfoWithTypeRefContainingAddress(uint64_t remoteAddr);
+
     std::vector<ReflectionInfo> ReflectionInfos;
+
+    // Sorted indexes of elements in ReflectionInfos.
+    std::vector<uint32_t> ReflectionInfoIndexesSortedByTypeReferenceRange;
 
     /// Indexes of Reflection Infos we've already processed.
     llvm::DenseSet<size_t> ProcessedReflectionInfoIndexes;
