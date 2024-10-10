@@ -1,7 +1,11 @@
 // RUN: %target-swift-frontend %s \
 // RUN: -emit-sil  \
 // RUN: -enable-builtin-module \
-// RUN: -enable-experimental-feature NonescapableTypes | %FileCheck %s
+// RUN: -enable-experimental-feature NonescapableTypes \
+// RUN: -disable-experimental-parser-round-trip \
+// RUN: | %FileCheck %s
+
+// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
 
 import Builtin
 
