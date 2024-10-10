@@ -115,8 +115,8 @@ public struct Bat {
 // CHECK-NEXT:              "name": "adder",
 // CHECK-NEXT:              "arguments": [
 // CHECK-NEXT:                {
-// CHECK-NEXT:                  "label": "",
-// CHECK-NEXT:                  "type": "Swift.Int",
+// CHECK-NEXT:                   "label": "",
+// CHECK-NEXT:                   "type": "Swift.Int",
 // CHECK-NEXT:                   "valueKind": "RawLiteral",
 // CHECK-NEXT:                   "value": "2"
 // CHECK-NEXT:                 },
