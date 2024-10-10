@@ -11,7 +11,7 @@
 // CHECK-NEXT:   struct PublicStruct {
 // CHECK-NEXT:     init()
 // CHECK-NEXT:   }
-// CHECK-NEXT:   struct PublicEnum : Equatable, RawRepresentable {
+// CHECK-NEXT:   struct PublicEnum : Hashable, Equatable, RawRepresentable {
 // CHECK-NEXT:     init(_ rawValue: [[ENUM_UNDERLYING_TYPE:Int32|UInt32]])
 // CHECK-NEXT:     init(rawValue: [[ENUM_UNDERLYING_TYPE]])
 // CHECK-NEXT:     var rawValue: [[ENUM_UNDERLYING_TYPE]]
