@@ -374,6 +374,15 @@ namespace irgen {
     }
 
   public:
+
+    FunctionPointer withProfilingThunk(llvm::Function *thunk) const {
+      auto res = FunctionPointer(kind, thunk, nullptr/*secondaryValue*/,
+                                 AuthInfo, Sig);
+      res.useSignature = useSignature;
+      return res;
+    }
+
+
     FunctionPointer()
         : kind(FunctionPointer::Kind::Function), Value(nullptr),
           SecondaryValue(nullptr) {}

@@ -486,6 +486,8 @@ public:
   // (LLVM's 'frame-pointer=all').
   unsigned AsyncFramePointerAll : 1;
 
+  unsigned UseProfilingMarkerThunks : 1;
+
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
 
@@ -576,7 +578,7 @@ public:
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false),
         EnableHotColdSplit(false), EmitAsyncFramePushPopMetadata(false),
-        AsyncFramePointerAll(false),
+        AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
         CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),

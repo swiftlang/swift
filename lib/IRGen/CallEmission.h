@@ -77,6 +77,8 @@ protected:
   /// RemainingArgsForCallee, at least between calls.
   bool EmittedCall;
 
+  bool UseProfilingThunk = false;
+
   /// The basic block to which the call to a potentially throwing foreign
   /// function should jump to continue normal execution of the program.
   llvm::BasicBlock *invokeNormalDest = nullptr;
@@ -121,6 +123,10 @@ public:
 
   SubstitutionMap getSubstitutions() const {
     return CurCallee.getSubstitutions();
+  }
+
+  void useProfilingThunk() {
+    UseProfilingThunk = true;
   }
 
   virtual void begin();
