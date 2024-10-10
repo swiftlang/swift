@@ -1272,7 +1272,8 @@ static bool hasConversions(Type type) {
   }
 
   return !(type->is<StructType>() || type->is<EnumType>() ||
-           type->is<BuiltinType>() || type->is<ArchetypeType>());
+           type->is<BuiltinType>() || type->is<ArchetypeType>() ||
+           type->isVoid());
 }
 
 bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
