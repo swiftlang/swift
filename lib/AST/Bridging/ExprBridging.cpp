@@ -198,12 +198,26 @@ BridgedDotSelfExpr BridgedDotSelfExpr_createParsed(BridgedASTContext cContext,
       cSubExpr.unbridged(), cDotLoc.unbridged(), cSelfLoc.unbridged());
 }
 
+BridgedErrorExpr BridgedErrorExpr_create(BridgedASTContext cContext,
+                                         BridgedSourceRange cRange) {
+  return new (cContext.unbridged()) ErrorExpr(cRange.unbridged());
+}
+
 BridgedForceTryExpr
 BridgedForceTryExpr_createParsed(BridgedASTContext cContext,
                                  BridgedSourceLoc cTryLoc, BridgedExpr cSubExpr,
                                  BridgedSourceLoc cExclaimLoc) {
   return new (cContext.unbridged()) ForceTryExpr(
       cTryLoc.unbridged(), cSubExpr.unbridged(), cExclaimLoc.unbridged());
+}
+
+BridgedFloatLiteralExpr
+BridgedFloatLiteralExpr_createParsed(BridgedASTContext cContext,
+                                     BridgedStringRef cStr,
+                                     BridgedSourceLoc cTokenLoc) {
+  ASTContext &context = cContext.unbridged();
+  return new (context)
+      FloatLiteralExpr(cStr.unbridged(), cTokenLoc.unbridged());
 }
 
 BridgedForcedCheckedCastExpr BridgedForcedCheckedCastExpr_createParsed(
@@ -214,13 +228,48 @@ BridgedForcedCheckedCastExpr BridgedForcedCheckedCastExpr_createParsed(
                                        cType.unbridged());
 }
 
+BridgedUnresolvedSpecializeExpr BridgedUnresolvedSpecializeExpr_createParsed(
+    BridgedASTContext cContext, BridgedExpr cSubExpr,
+    BridgedSourceLoc cLAngleLoc, BridgedArrayRef cArguments,
+    BridgedSourceLoc cRAngleLoc) {
+
+  ASTContext &context = cContext.unbridged();
+  return UnresolvedSpecializeExpr::create(
+      cContext.unbridged(), cSubExpr.unbridged(), cLAngleLoc.unbridged(),
+      cArguments.unbridged<TypeRepr *>(), cRAngleLoc.unbridged());
+}
+
+BridgedInOutExpr BridgedInOutExpr_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cLoc,
+                                               BridgedExpr cSubExpr) {
+  ASTContext &context = cContext.unbridged();
+  return new (context)
+      InOutExpr(cLoc.unbridged(), cSubExpr.unbridged(), Type());
+}
+
 BridgedIntegerLiteralExpr
 BridgedIntegerLiteralExpr_createParsed(BridgedASTContext cContext,
                                        BridgedStringRef cStr,
                                        BridgedSourceLoc cTokenLoc) {
   ASTContext &context = cContext.unbridged();
-  auto str = context.AllocateCopy(cStr.unbridged());
-  return new (context) IntegerLiteralExpr(str, cTokenLoc.unbridged());
+  return new (context)
+      IntegerLiteralExpr(cStr.unbridged(), cTokenLoc.unbridged());
+}
+
+BridgedSuperRefExpr
+BridgedSuperRefExpr_createParsed(BridgedASTContext cContext,
+                                 BridgedSourceLoc cSuperLoc) {
+  ASTContext &context = cContext.unbridged();
+  return new (context)
+      SuperRefExpr(/*Self=*/nullptr, cSuperLoc.unbridged(), /*Implicit=*/false);
+}
+
+BridgedSubscriptExpr
+BridgedSubscriptExpr_createParsed(BridgedASTContext cContext,
+                                  BridgedExpr cBaseExpr,
+                                  BridgedArgumentList cArgs) {
+  return SubscriptExpr::create(cContext.unbridged(), cBaseExpr.unbridged(),
+                               cArgs.unbridged());
 }
 
 BridgedInterpolatedStringLiteralExpr
@@ -281,6 +330,27 @@ BridgedPrefixUnaryExpr_createParsed(BridgedASTContext cContext,
                                     BridgedExpr oper, BridgedExpr operand) {
   return PrefixUnaryExpr::create(cContext.unbridged(), oper.unbridged(),
                                  operand.unbridged());
+}
+
+BridgedData BridgedRegexLiteralExpr_allocateCaptureStructureSerializationBuffer(
+    BridgedASTContext cContext, SwiftInt size) {
+  auto buf = cContext.unbridged().AllocateUninitialized<uint8_t>(
+      RegexLiteralExpr::getCaptureStructureSerializationAllocationSize(
+          unsigned(size)));
+  return BridgedData(reinterpret_cast<const char *>(buf.data()), buf.size());
+}
+
+BridgedRegexLiteralExpr BridgedRegexLiteralExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cLoc,
+    BridgedStringRef cRegexText, SwiftInt version,
+    BridgedData cCaptureStructure) {
+  ArrayRef<uint8_t> captures(
+      reinterpret_cast<const uint8_t *>(cCaptureStructure.BaseAddress),
+      cCaptureStructure.Length);
+
+  return RegexLiteralExpr::createParsed(cContext.unbridged(), cLoc.unbridged(),
+                                        cRegexText.unbridged(),
+                                        unsigned(version), captures);
 }
 
 BridgedSequenceExpr BridgedSequenceExpr_createParsed(BridgedASTContext cContext,

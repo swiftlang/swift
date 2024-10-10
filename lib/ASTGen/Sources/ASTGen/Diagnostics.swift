@@ -110,3 +110,12 @@ struct UnknownAccessorSpecifierError: ASTGenError {
     "unknown accessor specifier '\(specifier.text)'"
   }
 }
+
+struct RegexParserError: ASTGenError {
+  var message: String
+  init(_ message: String) {
+    self.message = message
+  }
+
+  var severity: DiagnosticSeverity { .error }
+}
