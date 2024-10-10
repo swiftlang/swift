@@ -145,6 +145,7 @@ public struct ObservationTracking: Sendable {
   
   /// A representation of a tracked key path that avoids the potential of
   /// allowing un-privledged access to subscripting of objects
+  @available(SwiftStdlib 9999, *)
   public struct Path {
     var keyPath: AnyKeyPath
     public var rootType: Any.Type {
@@ -172,6 +173,7 @@ public struct ObservationTracking: Sendable {
     }
   }
   
+  @available(SwiftStdlib 9999, *)
   public struct Options: ExpressibleByArrayLiteral {
     enum Value {
       case exclusive
@@ -220,6 +222,8 @@ public struct ObservationTracking: Sendable {
       Options(.filter(predicate))
     }
   }
+
+  @available(SwiftStdlib 9999, *)
   /// Verification that a given property is tracked
   public func contains<Object, Member>(
     _ keyPath: KeyPath<Object, Member>
@@ -227,6 +231,7 @@ public struct ObservationTracking: Sendable {
     list.contains(keyPath)
   }
   
+  @available(SwiftStdlib 9999, *)
   public var changedPath: Path? {
     changed.map { Path(keyPath: $0) }
   }
