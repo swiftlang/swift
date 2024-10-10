@@ -423,11 +423,15 @@ SILFunction *SILFunctionBuilder::createFunction(
     IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible,
     ProfileCounter entryCount, IsThunk_t isThunk, SubclassScope subclassScope,
     Inline_t inlineStrategy, EffectsKind EK, SILFunction *InsertBefore,
-    const SILDebugScope *DebugScope) {
-  return SILFunction::create(mod, linkage, name, loweredType, genericEnv, loc,
-                             isBareSILFunction, isTrans, serializedKind,
-                             entryCount, isDynamic, isDistributed,
-                             isRuntimeAccessible, IsNotExactSelfClass, isThunk,
-                             subclassScope, inlineStrategy, EK, InsertBefore,
-                             DebugScope);
+    const SILDebugScope *DebugScope, bool isZombie) {
+  return SILFunction::create(
+      mod, linkage, name, loweredType, genericEnv, loc, isBareSILFunction,
+      isTrans, serializedKind, entryCount, isDynamic, isDistributed,
+      isRuntimeAccessible, IsNotExactSelfClass, isThunk, subclassScope,
+      inlineStrategy, EK, InsertBefore, DebugScope, isZombie);
+}
+
+SILFunction *SILFunctionBuilder::resurrectFunction(
+    StringRef name) {
+  return SILFunction::resurrectFunction(mod, name);
 }

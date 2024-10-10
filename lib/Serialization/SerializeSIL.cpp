@@ -159,7 +159,12 @@ namespace {
 
   class SILSerializer {
     using TypeID = serialization::TypeID;
-    
+    using DebugScopeID = DeclID;
+    using DebugScopeIDField = DeclIDField;
+
+    using LocationID = DeclID;
+    using LocationIDField = DeclIDField;
+
     Serializer &S;
 
     llvm::BitstreamWriter &Out;
@@ -222,12 +227,18 @@ namespace {
     std::vector<BitOffset> DifferentiabilityWitnessOffset;
     uint32_t /*DeclID*/ NextDifferentiabilityWitnessID = 1;
 
+    llvm::DenseMap<PointerUnion<const SILDebugScope *, SILFunction *>, DeclID>
+        DebugScopeMap;
+
+    llvm::DenseMap<const void *, DeclID> SourceLocMap;
     /// Give each SILBasicBlock a unique ID.
     llvm::DenseMap<const SILBasicBlock *, unsigned> BasicBlockMap;
 
     /// Functions that we've emitted a reference to. If the key maps
     /// to true, we want to emit a declaration only.
     llvm::DenseMap<const SILFunction *, bool> FuncsToEmit;
+    bool EmittingDebug = false;
+    llvm::DenseSet<const SILFunction *> FuncsToEmitDebug;
 
     /// Global variables that we've emitted a reference to.
     llvm::DenseSet<const SILGlobalVariable *> GlobalsToEmit;
@@ -257,6 +268,7 @@ namespace {
     }
 
     bool ShouldSerializeAll;
+    bool SerializeDebugInfo;
 
     void addMandatorySILFunction(const SILFunction *F,
                                  bool emitDeclarationsForOnoneSupport);
@@ -287,6 +299,12 @@ namespace {
 
     void writeSILBlock(const SILModule *SILMod);
     void writeIndexTables();
+    ValueID recordSILDebugScopes(const SILDebugScope *Scope, bool isFuncStart,
+                                 SourceManager &SM);
+    void writeSILDebugScopes(SourceManager &SM);
+    void writeDebugScopes(const SILDebugScope *Scope, const SourceManager &SM);
+    bool forceSerialize(const SILFunction *ParentFn);
+    void writeSourceLoc(SourceLoc SLoc, const SourceManager &SM);
 
     void writeNoOperandLayout(const SILInstruction *I) {
       unsigned abbrCode = SILAbbrCodes[SILInstNoOperandLayout::Code];
@@ -325,11 +343,13 @@ namespace {
     /// deserialization if the function body for F should be deserialized.
     bool shouldEmitFunctionBody(const SILFunction *F, bool isReference = true);
 
-    IdentifierID addSILFunctionRef(SILFunction *F);
+    IdentifierID addSILFunctionRef(SILFunction *F, bool isDebug = false);
 
   public:
-    SILSerializer(Serializer &S, llvm::BitstreamWriter &Out, bool serializeAll)
-      : S(S), Out(Out), ShouldSerializeAll(serializeAll) {}
+    SILSerializer(Serializer &S, llvm::BitstreamWriter &Out, bool serializeAll,
+                  bool serializeDebugInfo)
+        : S(S), Out(Out), ShouldSerializeAll(serializeAll),
+          SerializeDebugInfo(serializeDebugInfo) {}
 
     void writeSILModule(const SILModule *SILMod);
   };
@@ -467,7 +487,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   // If we have a body, we might have a generic environment.
   GenericSignatureID genericSigID = 0;
-  if (!NoBody)
+  if (!NoBody || EmittingDebug)
     if (auto *genericEnv = F.getGenericEnvironment())
       genericSigID = S.addGenericSignatureRef(genericEnv->getGenericSignature());
 
@@ -525,9 +545,9 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       LIST_VER_TUPLE_PIECES(available), (unsigned)F.isDynamicallyReplaceable(),
       (unsigned)F.isExactSelfClass(), (unsigned)F.isDistributed(),
       (unsigned)F.isRuntimeAccessible(),
-      (unsigned)F.forceEnableLexicalLifetimes(), FnID, replacedFunctionID,
-      usedAdHocWitnessFunctionID, genericSigID, clangNodeOwnerID,
-      parentModuleID, SemanticsIDs);
+      (unsigned)F.forceEnableLexicalLifetimes(), EmittingDebug, FnID,
+      replacedFunctionID, usedAdHocWitnessFunctionID, genericSigID,
+      clangNodeOwnerID, parentModuleID, SemanticsIDs);
 
   F.visitArgEffects(
     [&](int effectIdx, int argumentIndex, bool isDerived) {
@@ -585,6 +605,11 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
         );
   }
 
+  DebugScopeMap.clear();
+  SourceLocMap.clear();
+
+  if (SerializeDebugInfo)
+    writeDebugScopes(F.getDebugScope(), F.getModule().getSourceManager());
   // Assign a unique ID to each basic block of the SILFunction.
   unsigned BasicID = 0;
   BasicBlockMap.clear();
@@ -670,8 +695,34 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
   unsigned abbrCode = SILAbbrCodes[SILBasicBlockLayout::Code];
   SILBasicBlockLayout::emitRecord(Out, ScratchRecord, abbrCode, Args);
 
-  for (const SILInstruction &SI : BB)
+  const SILDebugScope *Prev = BB.getParent()->getDebugScope();
+  auto PrevSourceLoc =
+      BB.getParent()->getLocation().getSourceLoc().getOpaquePointerValue();
+  auto &SM = BB.getParent()->getModule().getSourceManager();
+  // if
+  // (BB.getParent()->getName().contains("ss17swift_allocObject8metadata12requiredSize0E13AlignmentMaskSpys04HeapC0VGSpys13ClassMetadataVG_S2itF"))
+  // { BB.dump();
+  //}
+  if (BB.getParent()->getName().contains(
+          "sSy10FoundationE20replacingOccurrences2of4with7options5rangeSSqd___"
+          "qd_0_So22NSStringCompareOptionsVSnySS5IndexVGSgtSyRd__SyRd_0_r0_"
+          "lFfA1_")) {
+    llvm::errs() << "HERE\n";
+  }
+  for (const SILInstruction &SI : BB) {
+    if (SerializeDebugInfo) {
+      if (SI.getDebugScope() != Prev) {
+        Prev = SI.getDebugScope();
+        writeDebugScopes(Prev, SM);
+      }
+    }
+    auto SourceLocPtr = SI.getLoc().getSourceLoc().getOpaquePointerValue();
+    if (SourceLocPtr != PrevSourceLoc) {
+      writeSourceLoc(SI.getLoc().getSourceLoc(), SM);
+    }
+
     writeSILInstruction(SI);
+  }
 }
 
 /// Add SILDeclRef to ListOfValues, so we can reconstruct it at
@@ -685,7 +736,7 @@ static void handleSILDeclRef(Serializer &S, const SILDeclRef &Ref,
 
 /// Get an identifier ref for a SILFunction and add it to the list of referenced
 /// functions.
-IdentifierID SILSerializer::addSILFunctionRef(SILFunction *F) {
+IdentifierID SILSerializer::addSILFunctionRef(SILFunction *F, bool isDebug) {
   addReferencedSILFunction(F);
   return S.addUniquedStringRef(F->getName());
 }
@@ -937,7 +988,98 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
 
-  case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::DebugValueInst: {
+    auto DVI = cast<DebugValueInst>(&SI);
+    unsigned attrs = unsigned(DVI->poisonRefs() & 0x1);
+    attrs |= unsigned(DVI->usesMoveableValueDebugInfo()) << 1;
+    attrs |= unsigned(DVI->hasTrace()) << 2;
+
+    auto Operand = DVI->getOperand();
+    auto Type = Operand->getType();
+
+    unsigned DebugVarTypeCategory = 0;
+    auto DebugVar = DVI->getVarInfo();
+    const SILDebugScope *ScopeToWrite = nullptr;
+
+    auto &SM = SI.getFunction()->getModule().getSourceManager();
+
+    SmallVector<uint64_t, 8> ListOfValues;
+    ListOfValues.push_back(addValueRef(Operand));
+    ListOfValues.push_back(S.addTypeRef(Type.getRawASTType()));
+
+    if (DebugVar) {
+      /*
+        SILDebugValueLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILDebugValueLayout::Code],
+        (unsigned)Type.getCategory(), 0, attrs, ListOfValues);
+        break;
+        */
+
+      attrs |= 1 << 3; // has debug var
+      attrs |= DebugVar->isLet() << 4;
+      attrs |= DebugVar->isDenseMapSingleton << 5; // needs two bits
+
+      ListOfValues.push_back(S.addUniquedStringRef(DebugVar->Name));
+      ListOfValues.push_back(DebugVar->ArgNo);
+
+      if (DebugVar->Type.has_value()) {
+        attrs |= 1 << 7;
+        ListOfValues.push_back(S.addTypeRef(DebugVar->Type->getRawASTType()));
+        DebugVarTypeCategory = (unsigned)DebugVar->Type->getCategory();
+      }
+
+      if (DebugVar->Scope && DebugVar->Scope != DVI->getDebugScope()) {
+        attrs |= 1 << 8;
+        ScopeToWrite = DebugVar->Scope;
+      }
+
+      if (DebugVar->Loc) {
+        auto RawLoc = DebugVar->Loc.value();
+        SourceLoc Loc = RawLoc.getSourceLoc();
+        if (Loc.isValid()) {
+          attrs |= 1 << 9;
+          auto LC = SM.getPresumedLineAndColumnForLoc(Loc);
+          auto FName = SM.getDisplayNameForLoc(Loc);
+          auto FNameID = S.addUniquedStringRef(FName);
+
+          ListOfValues.push_back(LC.first);
+          ListOfValues.push_back(LC.second);
+          ListOfValues.push_back(FNameID);
+        }
+      }
+
+      for (auto &Expr : DebugVar->DIExpr.elements()) {
+        attrs |= 1 << 10;
+        ListOfValues.push_back(Expr.getKind());
+        switch (Expr.getKind()) {
+        case SILDIExprElement::Kind::OperatorKind:
+          ListOfValues.push_back((unsigned)Expr.getAsOperator());
+          break;
+        case SILDIExprElement::Kind::DeclKind:
+          ListOfValues.push_back(S.addDeclRef(Expr.getAsDecl()));
+          break;
+        case SILDIExprElement::Kind::ConstIntKind: {
+          llvm::SmallString<10> Str;
+          APInt(64, Expr.getAsConstInt().value()).toStringUnsigned(Str);
+          ListOfValues.push_back(S.addUniquedStringRef(Str));
+          break;
+        }
+        case SILDIExprElement::Kind::TypeKind:
+          ListOfValues.push_back(S.addTypeRef(Expr.getAsType()));
+        }
+      }
+    }
+    /*
+    SILDebugValueLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILDebugValueLayout::Code],
+        (unsigned)Type.getCategory(), DebugVarTypeCategory, attrs,
+    ListOfValues);
+
+        */
+    // if (ScopeToWrite)
+    // writeDebugScopes(ScopeToWrite, SM);
+    break;
+  }
   case SILInstructionKind::DebugStepInst:
     // Currently we don't serialize debug info, so it doesn't make
     // sense to write those instructions at all.
@@ -3025,6 +3167,141 @@ void SILSerializer::writeSILProperty(const SILProperty &prop) {
     componentValues);
 }
 
+void SILSerializer::writeSourceLoc(SourceLoc SLoc, const SourceManager &SM) {
+  return;
+  auto OpaquePtr = SLoc.getOpaquePointerValue();
+  if (SourceLocMap.find(OpaquePtr) != SourceLocMap.end()) {
+    SourceLocRefLayout::emitRecord(Out, ScratchRecord,
+                                   SILAbbrCodes[SourceLocRefLayout::Code],
+                                   SourceLocMap[OpaquePtr]);
+    return;
+  }
+
+  ValueID Row = 0;
+  ValueID Column = 0;
+  ValueID FNameID = 0;
+
+  if (!SLoc.isValid())
+    return;
+
+  if (SLoc.isValid()) {
+    std::tie(Row, Column) = SM.getPresumedLineAndColumnForLoc(SLoc);
+    FNameID = S.addUniquedStringRef(SM.getDisplayNameForLoc(SLoc));
+  }
+
+  SourceLocMap.insert({OpaquePtr, SourceLocMap.size() + 1});
+  SourceLocLayout::emitRecord(Out, ScratchRecord,
+                              SILAbbrCodes[SourceLocLayout::Code], Row, Column,
+                              FNameID);
+}
+
+bool SILSerializer::forceSerialize(const SILFunction *ParentFn) {
+  if (hasSharedVisibility(ParentFn->getLinkage())) {
+    if (ParentFn->isZombie())
+      return true;
+    if (!ParentFn->isAnySerialized() && !ParentFn->hasForeignBody()) {
+      assert(ParentFn->isZombie());
+      assert(FuncsToEmit.count(ParentFn) == 0 || !FuncsToEmit[ParentFn]);
+      return true;
+    }
+  } else if (hasPrivateVisibility(ParentFn->getLinkage()) ||
+             ParentFn->getLinkage() == swift::SILLinkage::Hidden) {
+    assert(FuncsToEmit.count(ParentFn) == 0 || !FuncsToEmit[ParentFn]);
+    return true;
+  }
+  return false;
+}
+// Serialize and write SILDebugScope graph in post order
+void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
+                                     const SourceManager &SM) {
+
+  if (DebugScopeMap.find(Scope) != DebugScopeMap.end()) {
+    // We won't be in a recursive call here
+    SILDebugScopeRefLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILDebugScopeRefLayout::Code],
+        DebugScopeMap[Scope]);
+    return;
+  }
+
+  ValueID ParentID = 0, InlinedID = 0;
+  TypeID ParentType = 0;
+  SILValueCategory ParentCat = (SILValueCategory)0;
+  unsigned isFuncParent = 0;
+
+  const SILFunction *Pr = nullptr;
+  assert(!Scope->Parent.isNull());
+  if (Scope->Parent) {
+    if (Scope->Parent.is<const SILDebugScope *>()) {
+      auto Parent = Scope->Parent.get<const SILDebugScope *>();
+      if (DebugScopeMap.find(Parent) == DebugScopeMap.end()) {
+        writeDebugScopes(Parent, SM);
+      }
+      ParentID = DebugScopeMap[Parent];
+    } else {
+      const SILFunction *ParentFn = Scope->Parent.get<SILFunction *>();
+      assert(ParentFn);
+      isFuncParent = true;
+      Pr = ParentFn;
+
+      // if (ParentFn->isSpecialization())
+      // ParentFn = ParentFn->getSpecializationInfo()->getParent();
+      // addReferencedSILFunction(ParentFn);
+      // if (forceSerialize(ParentFn)) {
+      FuncsToEmitDebug.insert(ParentFn);
+      // functionWorklist.push_back(ParentFn);
+      //} else {
+      //  addReferencedSILFunction(ParentFn);
+      //}
+      /*
+      if (FuncsToEmit.count(ParentFn) == 0) {
+         FuncsToEmit[ParentFn] = false;
+         functionWorklist.push_back(ParentFn);
+      }
+      */
+      // if (FuncsToEmit[ParentFn]) {
+      // }
+      ParentID = S.addUniquedStringRef(ParentFn->getName());
+      // ParentType = S.addTypeRef(ParentFn->getLoweredType().getRawASTType());
+      // ParentCat = ParentFn->getLoweredType().getCategory();
+    }
+  }
+
+  assert(ParentID != 0);
+  if (auto Inlined = Scope->InlinedCallSite) {
+    if (DebugScopeMap.find(Inlined) == DebugScopeMap.end()) {
+      writeDebugScopes(Inlined, SM);
+    }
+    InlinedID = DebugScopeMap[Inlined];
+  }
+
+  SourceLoc SLoc = Scope->getLoc().getSourceLoc();
+
+  ValueID Row = 0;
+  ValueID Column = 0;
+  ValueID FNameID = 0;
+  // TODO: we can emit SourceLocRef here
+  if (SLoc.isValid()) {
+    std::tie(Row, Column) = SM.getPresumedLineAndColumnForLoc(SLoc);
+    FNameID = S.addUniquedStringRef(SM.getDisplayNameForLoc(SLoc));
+  }
+
+  DebugScopeMap.insert({Scope, DebugScopeMap.size() + 1});
+
+  // llvm::errs() << "Writing debugscope " << ParentID << " " << InlinedID << "
+  // " << Row << " " << Column << " " << FNameID << " ";
+  if (isFuncParent) {
+    // llvm::errs() << Pr->getName() << " FuncsToEmit " <<
+    // (unsigned)FuncsToEmit.count(Pr) << " zombie: " << Pr->isZombie() << "
+    // Linkage " << (unsigned)Pr->getLinkage() << " anySerialized: " <<
+    // Pr->isAnySerialized() << " hasforeign body: "<< Pr->hasForeignBody();
+  }
+  // llvm::errs() << "\n";
+  SILDebugScopeLayout::emitRecord(
+      Out, ScratchRecord, SILAbbrCodes[SILDebugScopeLayout::Code], isFuncParent,
+      ParentID, InlinedID, Row, Column, FNameID, ParentType,
+      (unsigned)ParentCat);
+}
+
 void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
   WitnessTableList[wt.getName()] = NextWitnessTableID++;
   WitnessTableOffset.push_back(Out.GetCurrentBitNo());
@@ -3267,6 +3544,11 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<DefaultWitnessTableNoEntryLayout>();
   registerSILAbbr<PropertyLayout>();
   registerSILAbbr<DifferentiabilityWitnessLayout>();
+  registerSILAbbr<SILDebugValueLayout>();
+  registerSILAbbr<SILDebugScopeLayout>();
+  registerSILAbbr<SILDebugScopeRefLayout>();
+  registerSILAbbr<SourceLocLayout>();
+  registerSILAbbr<SourceLocRefLayout>();
 
   // Write out VTables first because it may require serializations of
   // non-transparent SILFunctions (body is not needed).
@@ -3376,6 +3658,21 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
     }
   }
 
+  for (auto Fn : FuncsToEmitDebug) {
+    if (FuncsToEmit.count(Fn) == 0) {
+      FuncsToEmit[Fn] = true; // emit decl only
+      functionWorklist.push_back(Fn);
+    } else {
+      // emitted declaration or defintion already
+    }
+  }
+
+  EmittingDebug = true;
+  processWorklists();
+  EmittingDebug = false;
+
+  FuncsToEmitDebug.clear();
+
   assert(functionWorklist.empty() && globalWorklist.empty() &&
          "Did not emit everything in worklists");
 }
@@ -3385,10 +3682,11 @@ void SILSerializer::writeSILModule(const SILModule *SILMod) {
   writeIndexTables();
 }
 
-void Serializer::writeSIL(const SILModule *SILMod, bool serializeAllSIL) {
+void Serializer::writeSIL(const SILModule *SILMod, bool serializeAllSIL,
+                          bool serializeDebugInfo) {
   if (!SILMod)
     return;
 
-  SILSerializer SILSer(*this, Out, serializeAllSIL);
+  SILSerializer SILSer(*this, Out, serializeAllSIL, serializeDebugInfo);
   SILSer.writeSILModule(SILMod);
 }

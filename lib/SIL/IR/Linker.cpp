@@ -83,7 +83,12 @@ void SILLinkerVisitor::deserializeAndPushToWorklist(SILFunction *F) {
     Mod.getSILLoader()->lookupSILFunction(F, /*onlyUpdateLinkage*/ false);
   ASSERT(!NewF || NewF == F);
   if (!NewF || F->isExternalDeclaration()) {
-    ASSERT((!hasSharedVisibility(F->getLinkage()) || F->hasForeignBody()) &&
+    if (!(!hasSharedVisibility(F->getLinkage()) || F->hasForeignBody() ||
+          F->isZombie())) {
+      F->dump();
+    }
+    ASSERT((!hasSharedVisibility(F->getLinkage()) || F->hasForeignBody() ||
+            F->isZombie()) &&
            "cannot deserialize shared function");
     return;
   }

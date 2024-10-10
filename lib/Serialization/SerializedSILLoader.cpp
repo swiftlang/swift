@@ -50,9 +50,11 @@ SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee,
   for (auto &Des : LoadedSILSections) {
     if (auto Func = Des->lookupSILFunction(Callee,
                                       /*declarationOnly*/ onlyUpdateLinkage)) {
-      LLVM_DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
-                 << Des->getModuleIdentifier().str() << "\n");
-      if (!Func->empty())
+      // llvm::dbgs() << "Deserialized " << Func->getName() << " from "
+      //<< Des->getModuleIdentifier().str() << " is empty " << Func->empty() <<
+      //" is zombie: " << Func->isZombie()<<"\n";
+
+      if (!Func->empty() && !Func->isZombie())
         return Func;
       retVal = Func;
     }
@@ -79,7 +81,9 @@ SerializedSILLoader::lookupSILFunction(StringRef Name,
           continue;
         }
       }
-      return Func;
+
+      if (!Func->isZombie())
+        return Func;
     }
   }
   return nullptr;

@@ -159,10 +159,45 @@ SILFunction *SILFunction::create(
     IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible,
     IsExactSelfClass_t isExactSelfClass, IsThunk_t isThunk,
     SubclassScope classSubclassScope, Inline_t inlineStrategy, EffectsKind E,
-    SILFunction *insertBefore, const SILDebugScope *debugScope) {
+    SILFunction *insertBefore, const SILDebugScope *debugScope, bool isZombie) {
   // Get a StringMapEntry for the function.  As a sop to error cases,
   // allow the name to have an empty string.
   llvm::StringMapEntry<SILFunction*> *entry = nullptr;
+  if (isZombie) {
+    if (name.empty()) {
+    }
+    // llvm::errs() << "Inserting zombie: " << name << " generic env " <<
+    // genericEnv << "\n";
+    assert(!name.empty());
+    // TODO: eraseFunction also tries to insert into the table. FIXME
+    entry = &*M.ZombieFunctionTable.insert(std::make_pair(name, nullptr)).first;
+    // if already have zombie return that
+    if (auto Fn = entry->getValue()) {
+      // llvm::errs() << "Already found in zombie\n";
+      return Fn;
+    }
+
+    auto iter = M.FunctionTable.find(name);
+    if (iter != M.FunctionTable.end()) {
+      assert(false);
+      // llvm::errs() << "already found in func table\n";
+      auto Fn = &*iter->getValue();
+      M.eraseFunction(Fn);
+      return Fn;
+    }
+
+    // neither zombie nor old function -> create new zombie
+    // llvm::errs() << "creating new func\n";
+    auto Fn = new (M) SILFunction(
+        M, linkage, name, loweredType, genericEnv, isBareSILFunction, isTrans,
+        serializedKind, entryCount, isThunk, classSubclassScope, inlineStrategy,
+        E, debugScope, isDynamic, isExactSelfClass, isDistributed,
+        isRuntimeAccessible);
+
+    M.eraseFunction(Fn, false);
+    return Fn;
+  }
+
   if (!name.empty()) {
     entry = &*M.FunctionTable.insert(std::make_pair(name, nullptr)).first;
     PrettyStackTraceSILFunction trace("creating", entry->getValue());
@@ -231,6 +266,38 @@ SILFunction::SILFunction(
     initFunction({this}, &libswiftSpecificData, sizeof(libswiftSpecificData));
 }
 
+SILFunction *SILFunction::resurrectFunction(SILModule &M, StringRef name) {
+  llvm::StringMapEntry<SILFunction *> *entry = nullptr;
+  if (!name.empty()) {
+    entry = &*M.FunctionTable.insert(std::make_pair(name, nullptr)).first;
+    PrettyStackTraceSILFunction trace("creating", entry->getValue());
+    assert(!entry->getValue() && "function already exists");
+    name = entry->getKey();
+  }
+
+  SILFunction *fn = M.removeFromZombieList(name);
+  assert(fn);
+  // Resurrect a zombie function.
+  // This happens for example if a specialized function gets dead and gets
+  assert(fn->empty());
+  fn->init(fn->getLinkage(), name, fn->getLoweredFunctionType(),
+           fn->getGenericEnvironment(), fn->isBare(), fn->isTransparent(),
+           fn->getSerializedKind(), fn->getEntryCount(), fn->isThunk(),
+           fn->getClassSubclassScope(), fn->getInlineStrategy(),
+           fn->getEffectsKind(), fn->getDebugScope(),
+           fn->isDynamicallyReplaceable(), fn->isExactSelfClass(),
+           fn->isDistributed(), fn->isRuntimeAccessible());
+
+  // E, debugScope, isDynamic, isExactSelfClass,
+  // isDistributed, isRuntimeAccessible);
+
+  if (entry)
+    entry->setValue(fn);
+
+  M.functions.push_back(fn);
+
+  return fn;
+}
 void SILFunction::init(
     SILLinkage Linkage, StringRef Name, CanSILFunctionType LoweredType,
     GenericEnvironment *genericEnv, IsBare_t isBareSILFunction,

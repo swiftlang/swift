@@ -108,17 +108,17 @@ namespace sil_index_block {
   };
 
   using ListLayout = BCGenericRecordLayout<
-    BCFixed<4>,  // record ID
+    BCFixed<5>,  // record ID
     BCVBR<16>,  // table offset within the blob
     BCBlob      // map from identifier strings to IDs.
   >;
 
   using OffsetLayout = BCGenericRecordLayout<
-    BCFixed<4>,  // record ID
+    BCFixed<5>,  // record ID
     BCArray<BitOffsetField>
   >;
 
-// clang-format on
+  // clang-format on
 }
 
 /// The record types within the "sil" block.
@@ -175,6 +175,12 @@ namespace sil_block {
     SIL_PACK_ELEMENT_SET,
     SIL_TYPE_VALUE,
     SIL_THUNK,
+    SIL_DEBUG_LOCATION,
+    SIL_DEBUG_VALUE,
+    SIL_DEBUG_SCOPE,
+    SIL_DEBUG_SCOPE_REF,
+    SIL_SOURCE_LOC,
+    SIL_SOURCE_LOC_REF
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -290,6 +296,44 @@ namespace sil_block {
     BCArray<ValueIDField>       // Parameter and result indices
   >;
 
+  using SILDebugScopeRefLayout = BCRecordLayout<
+    SIL_DEBUG_SCOPE_REF,
+    ValueIDField
+  >;
+
+  using SILDebugScopeLayout = BCRecordLayout<
+    SIL_DEBUG_SCOPE,
+    BCFixed<1>,
+    ValueIDField, // Parent
+    ValueIDField, // InlinedCallSite
+    ValueIDField, // SourceLoc Row
+    ValueIDField, // Column
+    ValueIDField,  // FName
+    TypeIDField,
+    SILTypeCategoryField 
+  >;
+
+  using SILDebugValueLayout = BCRecordLayout<
+    SIL_DEBUG_VALUE,
+    
+    SILTypeCategoryField, // operand type category
+    SILTypeCategoryField, // debug var type category
+    BCFixed<11>,// poison, movableValueDebuginfo, trace, hasDebugVar, isLet, isDenseMapSingleton(two bits), hasSource, hasLoc, hasExpr
+    BCArray<ValueIDField> // operand info: operand, type, debug var info: name, argno, optional stuff: typeid
+    >;
+
+  using SourceLocLayout = BCRecordLayout<
+    SIL_SOURCE_LOC,
+    ValueIDField,
+    ValueIDField,
+    ValueIDField
+  >;
+
+  using SourceLocRefLayout = BCRecordLayout<
+    SIL_SOURCE_LOC_REF,
+    ValueIDField
+  >;
+
   using SILFunctionLayout =
       BCRecordLayout<SIL_FUNCTION, SILLinkageField,
                      BCFixed<1>,  // transparent
@@ -312,6 +356,7 @@ namespace sil_block {
                      BCFixed<1>,  // is distributed
                      BCFixed<1>,  // is runtime accessible
                      BCFixed<1>,  // are lexical lifetimes force-enabled
+                     BCFixed<1>,  // zombie
                      TypeIDField, // SILFunctionType
                      DeclIDField,  // SILFunction name or 0 (replaced function)
                      DeclIDField,  // SILFunction name or 0 (used ad-hoc requirement witness function)

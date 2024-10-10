@@ -25,13 +25,18 @@ public:
 
   /// Create a SILFunction declaration for use either as a forward reference or
   /// for the eventual deserialization of a function body.
-  SILFunction *createDeclaration(StringRef name, SILType type,
-                                 SILLocation loc) {
+  SILFunction *createDeclaration(StringRef name, SILType type, SILLocation loc,
+                                 bool isZombie = false) {
     return builder.createFunction(
-        SILLinkage::Private, name, type.getAs<SILFunctionType>(), nullptr,
-        loc, IsNotBare, IsNotTransparent,
-        IsNotSerialized, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
-        ProfileCounter(), IsNotThunk, SubclassScope::NotApplicable);
+        SILLinkage::Private, name, type.getAs<SILFunctionType>(), nullptr, loc,
+        IsNotBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
+        IsNotDistributed, IsNotRuntimeAccessible, ProfileCounter(), IsNotThunk,
+        SubclassScope::NotApplicable, InlineDefault, EffectsKind::Unspecified,
+        nullptr, nullptr, isZombie);
+  }
+
+  SILFunction *resurrectFunction(StringRef name) {
+    return builder.resurrectFunction(name);
   }
 
   void setHasOwnership(SILFunction *f, bool newValue) {
