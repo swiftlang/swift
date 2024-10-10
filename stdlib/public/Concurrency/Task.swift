@@ -1259,3 +1259,156 @@ internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: __owne
 #endif
 
 #endif
+
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && !SWIFT_CONCURRENCY_EMBEDDED
+
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+
+// READ THIS: The declarations in this section are only used on Darwin when we
+// backwards deploy _runOnMainActor. To avoid needing to actually link in
+// headers for these libraries, we just use silgen_name declarations for
+// them.
+
+@_silgen_name("pthread_main_np")
+@usableFromInline
+internal func _swift_task_pthread_main_np() -> CInt
+
+@_silgen_name("dispatch_get_current_queue")
+@usableFromInline
+func _swift_task_dispatch_queue_getCurrentQueue() -> UnsafeRawPointer
+
+@_silgen_name("dispatch_queue_set_specific")
+@usableFromInline
+internal func _swift_task_dispatch_queue_setSpecific(_ queue: UnsafeRawPointer,
+                                                     _ key: UnsafeRawPointer,
+                                                     _ value: UnsafeRawPointer,
+                                                     _ destructor: UnsafeRawPointer?)
+
+@_silgen_name("dispatch_queue_get_specific")
+@usableFromInline
+internal func _swift_task_dispatch_queue_getSpecific(
+  _ queue: UnsafeRawPointer, _ key: UnsafeRawPointer) -> UnsafeRawPointer
+
+#endif
+
+// Implemented in Task.cpp.
+@available(SwiftStdlib 9999, *)
+@usableFromInline
+@_silgen_name("swift_task_isOnMainActor")
+internal func _taskIsOnMainActor() -> Bool
+
+// The reason why this is @available(SwiftStdlib 5.1) is b/c
+// (_getCurrentAsyncTask) swift_task_getCurrent() was introduced in Swift Stdlib
+// 5.1.
+@_alwaysEmitIntoClient
+@available(SwiftStdlib 5.1, *)
+internal func _isOnMainActor() -> Bool {
+  // We handle Darwin specially so that this backwards deploys on Darwin. On all
+  // other platforms, we just delegate to the c++ function
+  // swift_task_isOnMainActor.
+  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+
+  // If we are a new enough stdlib, just call the library entrypoint.
+  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999, *) {
+    // Once we remove the 9999 check for a real version check above, the check
+    // below can be removed.
+    //
+    // DISCUSSION: On 14.5, the 9999 check always returns true. So make sure we
+    // only call _isOnMainActor if we are later than 9999 and 14.6.
+    if #available(macOS 14.6, *) {
+      return _taskIsOnMainActor()
+    }
+  }
+
+  // Otherwise, we are working in a backward deployment world. Begin by checking
+  // if we are in a purely synchronous context. If so, just return
+  // pthread_main_np().
+  guard let _task = _getCurrentAsyncTask() else {
+    return _swift_task_pthread_main_np() != 0
+  }
+
+  // FIXME: We need to retain to balance the destroy on _task. We do not get a
+  // retain when we call _getCurrentAsyncTask for some reason.
+  Builtin.retain(_task)
+
+  // Since dispatch_queue_get_main() has a later availability, we cheat a little
+  // and grab dispatch_main from the main executor using the older swift runtime
+  // feature. We know that the first field of the executor will be a pointer to
+  // main. So, we just can convert the main executor to an unsafe raw pointer
+  // since that will point at the first field. Then we can use that for our
+  // identity check.
+  //
+  // This is the layout of Executor in the ABI:
+  //
+  // struct Executor {
+  //   HeapObject *actualQueue;
+  //   ... other fields ...
+  // }
+  //
+  // We use withExtendedLifetime to ensure that our main executor sticks around
+  // long enough after we reinterpret cast it to a raw pointer.
+  return withExtendedLifetime(_getMainExecutor()) { exec in
+    // We can't use unsafeBitCast here since we are not casting in between same
+    // size things.
+    let mainQueue: UnsafeRawPointer = Builtin.reinterpretCast(exec)
+    let currentQueue = _swift_task_dispatch_queue_getCurrentQueue()
+
+    // If the main queue and the current queue are the same queue, then we know
+    // that we must be on the main queue. This should handle the vast majority of cases.
+    if mainQueue == currentQueue {
+      return true
+    }
+
+    // If main is not current queue, we need to do more work since the current
+    // queue may be a child queue of the main queue. To figure that out, we attach
+    // to the main queue using dispatch_queue_setSpecific a key, value pair of two
+    // pointers to itself. This gives us a pointer that is unique to our program.
+    //
+    // TODO: It is unfortunate that we cannot use a std::once_t so we only do
+    // this once. This is because we would need to introduce a compatibility
+    // library or come up with some sort of always emit into client internal
+    // global that could perform this operation lazily... but that does not
+    // exist...
+    _swift_task_dispatch_queue_setSpecific(mainQueue, mainQueue, mainQueue, nil)
+
+    // Then see if we can find the same thing from our queue here. This queue
+    // may be a child queue of the main queue but the logic in
+    // dispatch_queue_getSpecific understands how to handle child queues
+    // appropriately.
+    return _swift_task_dispatch_queue_getSpecific(currentQueue, mainQueue) == mainQueue
+  }
+  #else
+  // On other platforms just rely on _taskIsMainActor.
+  return _taskIsOnMainActor()
+  #endif
+}
+
+/// SPI that is used by the compiler to implement the hop to main actor if
+/// needed thunk. This thunk is used when passing preconcurrency code a main
+/// actor isolated callback. If when invoked, we are dynamically on the main
+/// actor, we just invoke the function without creating a task. Otherwise, we
+/// create a Task and run operation within it.
+@_spi(MainActorUtilities)
+@_alwaysEmitIntoClient
+@available(SwiftStdlib 5.1, *)
+public func _runOnMainActor(operation: @escaping @MainActor () throws -> ()) rethrows {
+  typealias YesActor = @MainActor () throws -> ()
+  typealias NoActor = () throws -> ()
+
+  // First check if we are on the main actor. If so, just call the synchronous
+  // function directly.
+  if _isOnMainActor() {
+    return try withoutActuallyEscaping(operation) {
+      (_ fn: @escaping YesActor) throws -> () in
+      let rawFn = unsafeBitCast(fn, to: NoActor.self)
+      return try rawFn()
+    }
+  }
+
+  // Otherwise, create a new task on the main actor and run operation there.
+  Task { @MainActor in
+    try operation()
+  }
+}
+
+#endif
