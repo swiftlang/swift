@@ -33,7 +33,11 @@ class ClangTypeConverter :
   using super = TypeVisitor<ClangTypeConverter, clang::QualType>;
 
   llvm::DenseMap<Type, clang::QualType> Cache;
+
+  // Bidirectional mapping between types exported from Swift to their
+  // C family counterparts.
   llvm::DenseMap<const clang::Decl *, swift::Decl *> ReversedExportMap;
+  llvm::DenseMap<swift::Decl *, const clang::Decl *> ReversedExportMapBackwards;
 
   bool StdlibTypesAreCached = false;
 
