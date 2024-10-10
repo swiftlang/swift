@@ -46,6 +46,12 @@ public struct Bat {
 // CHECK-NEXT:    "conformances": [
 // CHECK-NEXT:      "ExtractCalls.MyProto"
 // CHECK-NEXT:    ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocol": "ExtractCalls.MyProto"
+// CHECK-NEXT:        "definingModule": "ExtractCalls"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
 // CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [
 // CHECK-NEXT:      {

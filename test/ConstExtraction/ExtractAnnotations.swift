@@ -37,6 +37,12 @@ public struct DeprecatedAnnotations: MyProto {}
 // CHECK-NEXT:    "conformances": [
 // CHECK-NEXT:      "ExtractAnnotations.MyProto"
 // CHECK-NEXT:    ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocol": "ExtractAnnotations.MyProto"
+// CHECK-NEXT:        "definingModule": "ExtractAnnotations"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
 // CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [
 // CHECK-NEXT:      {
@@ -138,6 +144,12 @@ public struct DeprecatedAnnotations: MyProto {}
 // CHECK-NEXT:    "line": 28,
 // CHECK-NEXT:    "conformances": [
 // CHECK-NEXT:      "ExtractAnnotations.MyProto"
+// CHECK-NEXT:    ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocol": "ExtractAnnotations.MyProto"
+// CHECK-NEXT:        "definingModule": "ExtractAnnotations"
+// CHECK-NEXT:      }
 // CHECK-NEXT:    ],
 // CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [],
