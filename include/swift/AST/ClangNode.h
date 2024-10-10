@@ -96,6 +96,9 @@ public:
   /// clang::ImportDecl or null if it's neither.
   const clang::Module *getClangModule() const;
 
+  /// Returns the owning clang module of this node, if it exists.
+  const clang::Module *getOwningClangModule() const;
+
   clang::SourceLocation getLocation() const;
   clang::SourceRange getSourceRange() const;
 

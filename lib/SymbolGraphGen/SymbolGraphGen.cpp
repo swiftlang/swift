@@ -17,6 +17,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/Basic/Module.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
@@ -62,18 +63,34 @@ int symbolgraphgen::emitSymbolGraphForModule(
     ModuleDecl *M, const SymbolGraphOptions &Options) {
   ModuleDecl::ImportCollector importCollector(Options.MinimumAccessLevel);
 
-  auto importFilter = [&Options](const ModuleDecl *module) {
-      if (!module)
-        return false;
+  bool IncludeClangSubmodules = false;
+  if (auto *ClangModule = M->findUnderlyingClangModule()) {
+    // If a Clang module has a definition that includes `export *; module * {
+    // export *; }` then we want to treat those inferred submodules as part of
+    // the parent module, to preserve historical behavior.
+    if (ClangModule->InferSubmodules && ClangModule->InferExportWildcard) {
+      IncludeClangSubmodules = true;
+    }
+  }
 
+  auto importFilter = [&Options, &IncludeClangSubmodules,
+                       &M](const ModuleDecl *module) {
+    if (!module)
+      return false;
+
+    if (IncludeClangSubmodules && module->isSubmoduleOf(M)) {
+      return true;
+    }
+
+    if (Options.AllowedReexportedModules.has_value())
       for (const auto &allowedModuleName : *Options.AllowedReexportedModules)
         if (allowedModuleName == module->getNameStr())
           return true;
 
-       return false;
-    };
+    return false;
+  };
 
-  if (Options.AllowedReexportedModules.has_value())
+  if (Options.AllowedReexportedModules.has_value() || IncludeClangSubmodules)
     importCollector.importFilter = std::move(importFilter);
 
   SmallVector<Decl *, 64> ModuleDecls;
