@@ -54,6 +54,7 @@ class CrossModuleOptimization {
   friend class InstructionVisitor;
 
   llvm::DenseMap<SILType, bool> typesChecked;
+  llvm::DenseMap<CanType, bool> canTypesChecked;
   llvm::SmallPtrSet<TypeBase *, 16> typesHandled;
 
   SILModule &M;
@@ -98,6 +99,8 @@ private:
   bool canSerializeGlobal(SILGlobalVariable *global);
 
   bool canSerializeType(SILType type);
+  bool canSerializeType(CanType type);
+  bool canSerializeDecl(NominalTypeDecl *decl);
 
   bool canUseFromInline(DeclContext *declCtxt);
 
@@ -120,8 +123,6 @@ private:
   void makeDeclUsableFromInline(ValueDecl *decl);
 
   void makeTypeUsableFromInline(CanType type);
-
-  void makeSubstUsableFromInline(const SubstitutionMap &substs);
 };
 
 /// Visitor for making used types of an instruction inlinable.
@@ -138,10 +139,10 @@ class InstructionVisitor : public SILCloner<InstructionVisitor> {
 
 private:
   CrossModuleOptimization &CMS;
-
+  bool checkSerializableInst;
 public:
-  InstructionVisitor(SILFunction &F, CrossModuleOptimization &CMS) :
-    SILCloner(F), CMS(CMS) {}
+  InstructionVisitor(SILFunction &F, CrossModuleOptimization &CMS, bool checkSerializableInst) :
+    SILCloner(F), CMS(CMS), checkSerializableInst(checkSerializableInst) {}
 
   SILType remapType(SILType Ty) {
     if (Ty.hasLocalArchetype()) {
@@ -151,7 +152,10 @@ public:
                     SubstFlags::SubstituteLocalArchetypes);
     }
 
-    CMS.makeTypeUsableFromInline(Ty.getASTType());
+    if (checkSerializableInst)
+      CMS.canSerializeType(Ty);
+    else
+      CMS.makeTypeUsableFromInline(Ty.getASTType());
     return Ty;
   }
 
@@ -162,7 +166,10 @@ public:
                     SubstFlags::SubstituteLocalArchetypes)->getCanonicalType();
     }
 
-    CMS.makeTypeUsableFromInline(Ty);
+    if (checkSerializableInst)
+      CMS.canSerializeType(Ty);
+    else
+      CMS.makeTypeUsableFromInline(Ty);
     return Ty;
   }
 
@@ -173,7 +180,23 @@ public:
                         SubstFlags::SubstituteLocalArchetypes);
     }
 
-    CMS.makeSubstUsableFromInline(Subs);
+    for (Type replType : Subs.getReplacementTypes()) {
+      if (checkSerializableInst)
+        CMS.canSerializeType(replType->getCanonicalType());
+      else
+        /// Ensure that all replacement types of \p Subs are usable from serialized
+        /// functions.
+        CMS.makeTypeUsableFromInline(replType->getCanonicalType());
+    }
+    for (ProtocolConformanceRef pref : Subs.getConformances()) {
+      if (pref.isConcrete()) {
+        ProtocolConformance *concrete = pref.getConcrete();
+        if (checkSerializableInst)
+          CMS.canSerializeDecl(concrete->getProtocol());
+        else
+          CMS.makeDeclUsableFromInline(concrete->getProtocol());
+      }
+    }
     return Subs;
   }
 
@@ -434,13 +457,18 @@ bool CrossModuleOptimization::canSerializeFunction(
     return false;
 
   // Check if any instruction prevents serializing the function.
+  InstructionVisitor visitor(*function, *this, true);
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
+      visitor.getBuilder().setInsertionPoint(&inst);
+      visitor.visit(&inst);
       if (!canSerializeInstruction(&inst, canSerializeFlags, maxDepth)) {
         return false;
       }
     }
   }
+  M.reclaimUnresolvedLocalArchetypeDefinitions();
+
   canSerializeFlags[function] = true;
   return true;
 }
@@ -572,30 +600,50 @@ bool CrossModuleOptimization::canSerializeGlobal(SILGlobalVariable *global) {
   return true;
 }
 
-bool CrossModuleOptimization::canSerializeType(SILType type) {
-  auto iter = typesChecked.find(type);
-  if (iter != typesChecked.end())
+bool CrossModuleOptimization::canSerializeDecl(NominalTypeDecl *decl) {
+  if (!decl)
+    return true;
+
+  // In conservative mode we don't want to change the access level of types.
+  if (conservative && decl->getEffectiveAccess() < AccessLevel::Package) {
+    return false;
+  }
+
+  // Exclude types which are defined in an @_implementationOnly imported
+  // module. Such modules are not transitively available.
+  if (!canUseFromInline(decl)) {
+    return false;
+  }
+
+  if (auto *nominalCtx = dyn_cast<NominalTypeDecl>(decl->getDeclContext())) {
+    if (!canSerializeDecl(nominalCtx))
+      return false;
+  } else if (auto *extCtx = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
+    if (auto *extendedNominal = extCtx->getExtendedNominal()) {
+      if (!canSerializeDecl(extendedNominal))
+        return false;
+    }
+  }
+  return true;
+}
+
+bool CrossModuleOptimization::canSerializeType(CanType type) {
+  auto iter = canTypesChecked.find(type);
+  if (iter != canTypesChecked.end())
     return iter->getSecond();
 
-  bool success = !type.getASTType().findIf(
-    [this](Type rawSubType) {
-      CanType subType = rawSubType->getCanonicalType();
-      if (NominalTypeDecl *subNT = subType->getNominalOrBoundGenericNominal()) {
+  bool success = type.findIf(
+     [this](Type rawSubType) {
+       CanType subType = rawSubType->getCanonicalType();
+       return canSerializeDecl(subType->getNominalOrBoundGenericNominal());
+     });
 
-        if (conservative && subNT->getEffectiveAccess() < AccessLevel::Package) {
-          return true;
-        }
-
-        // Exclude types which are defined in an @_implementationOnly imported
-        // module. Such modules are not transitively available.
-        if (!canUseFromInline(subNT)) {
-          return true;
-        }
-      }
-      return false;
-    });
-  typesChecked[type] = success;
+  canTypesChecked[type] = success;
   return success;
+}
+
+bool CrossModuleOptimization::canSerializeType(SILType type) {
+  return canSerializeType(type.getASTType());
 }
 
 /// Returns true if the function in \p funcCtxt could be linked statically to
@@ -730,7 +778,7 @@ void CrossModuleOptimization::serializeFunction(SILFunction *function,
   }
   function->setSerializedKind(getRightSerializedKind(M));
 
-  InstructionVisitor visitor(*function, *this);
+  InstructionVisitor visitor(*function, *this, false);
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
       visitor.getBuilder().setInsertionPoint(&inst);
@@ -927,21 +975,6 @@ void CrossModuleOptimization::makeTypeUsableFromInline(CanType type) {
       }
     }
   });
-}
-
-/// Ensure that all replacement types of \p substs are usable from serialized
-/// functions.
-void CrossModuleOptimization::makeSubstUsableFromInline(
-                                                const SubstitutionMap &substs) {
-  for (Type replType : substs.getReplacementTypes()) {
-    makeTypeUsableFromInline(replType->getCanonicalType());
-  }
-  for (ProtocolConformanceRef pref : substs.getConformances()) {
-    if (pref.isConcrete()) {
-      ProtocolConformance *concrete = pref.getConcrete();
-      makeDeclUsableFromInline(concrete->getProtocol());
-    }
-  }
 }
 
 class CrossModuleOptimizationPass: public SILModuleTransform {
