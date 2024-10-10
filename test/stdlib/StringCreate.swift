@@ -292,3 +292,51 @@ StringCreateTests.test("Validating.utf32")
   expectNil(String(validating: AnyCollection(i3), as: UTF32.self))
   expectEqual(String(validating: AnySequence(i4), as: UTF32.self), s4)
 }
+
+StringCreateTests.test("_tryAppendFromUTF8")
+.skip(.custom(
+  { if #available(SwiftStdlib 6.0, *) { false } else { true } },
+  reason: "Requires Swift 6.0's standard library"
+))
+.code {
+  guard #available(SwiftStdlib 6.0, *) else { return }
+
+  let baseString = "Hello"
+
+  let i1 = Array(s1.utf8)
+  let i2 = Array(s2.utf8)
+  let i3 = {
+    var modified = i1
+    let index = modified.lastIndex(of: 240)
+    expectNotNil(index)
+    index.map { modified[$0] = 0 }
+    return modified
+  }()
+
+  for simpleString in SimpleString.allCases {
+    let expected = baseString + simpleString.rawValue
+    var modified = baseString
+    var local = simpleString.rawValue
+    local.withUTF8 {
+      expectTrue(modified._tryAppendFromUTF8($0))
+    }
+    expectEqual(modified, expected)
+  }
+
+  func test(_ array: Array<UInt8>) -> Bool {
+    var modified = baseString
+    let success = array.withUnsafeBufferPointer {
+      modified._tryAppendFromUTF8($0)
+    }
+    if success {
+      expectEqual(modified, baseString + String(validating: array, as: UTF8.self)!)
+    } else {
+      // Unmodified in the case of validation failure
+      expectEqual(modified, baseString)
+    }
+    return success
+  }
+  expectTrue(test(i1))
+  expectTrue(test(i2))
+  expectFalse(test(i3))
+}
