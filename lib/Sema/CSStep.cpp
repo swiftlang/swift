@@ -885,13 +885,7 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
 
   // Make sure that element is solved in isolation
   // by dropping all scoring information.
-  for (unsigned i = 0; i < NumScoreKinds; ++i) {
-    if (unsigned value = CS.CurrentScore.Data[i]) {
-      CS.recordChange(
-        SolverTrail::Change::DecreasedScore(ScoreKind(i), value));
-    }
-  }
-  CS.CurrentScore = Score();
+  CS.clearScore();
 
   // Reset the scope counter to avoid "too complex" failures
   // when closure has a lot of elements in the body.
@@ -1039,7 +1033,7 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
           // restored right afterwards because score of the
           // element does contribute to the overall score.
           restoreBestScore();
-          restoreCurrentScore(solution.getFixedScore());
+          updateScoreAfterConjunction(solution.getFixedScore());
 
           // Transform all of the unbound outer variables into
           // placeholders since we are not going to solve for
@@ -1091,10 +1085,10 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
 }
 
 void ConjunctionStep::restoreOuterState(const Score &solutionScore) const {
-  // Restore best/current score, since upcoming step is going to
-  // work with outer scope in relation to the conjunction.
+  // Restore best score and update current score, since upcoming step
+  // is going to work with outer scope in relation to the conjunction.
   restoreBestScore();
-  restoreCurrentScore(solutionScore);
+  updateScoreAfterConjunction(solutionScore);
 
   // Active all of the previously out-of-scope constraints
   // because conjunction can propagate type information up

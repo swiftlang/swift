@@ -1282,7 +1282,7 @@ bool ConstraintGraph::contractEdges() {
         continue;
 
       // This closure is not currently in scope.
-      if (!CS.TypeVariables.count(paramTy))
+      if (!CS.isActiveTypeVariable(paramTy))
         break;
 
       // Nothing to contract here since outside parameter

@@ -519,7 +519,7 @@ protected:
   /// being attempted, helps to rewind state of the
   /// constraint system back to original before attempting
   /// next binding, if any.
-  std::optional<std::pair<std::unique_ptr<Scope>, typename P::Element>>
+  std::optional<std::pair<Scope, typename P::Element>>
       ActiveChoice;
 
   BindingStep(ConstraintSystem &cs, P producer,
@@ -548,16 +548,14 @@ public:
       }
 
       {
-        auto &trail = CS.solverState->Trail;
-        unsigned size = trail.size();
-
-        auto scope = std::make_unique<Scope>(CS);
+        Scope scope(CS);
         if (attempt(*choice)) {
           ActiveChoice.emplace(std::move(scope), *choice);
 
           if (CS.isDebugMode()) {
-            trail.dumpActiveScopeChanges(
-              llvm::errs(), size, CS.solverState->getCurrentIndent());
+            CS.solverState->Trail.dumpActiveScopeChanges(
+              llvm::errs(), ActiveChoice->first.numTrailChanges,
+              CS.solverState->getCurrentIndent());
           }
           
           return suspend(std::make_unique<SplitterStep>(CS, Solutions));
@@ -1029,8 +1027,10 @@ protected:
   }
 
 private:
-  /// Restore best and current scores as they were before conjunction.
-  void restoreCurrentScore(const Score &solutionScore) const {
+  /// We need to do this to make sure that we rank solutions with
+  /// invalid closures appropriately and don’t produce a valid
+  /// solution if a multi-statement closure failed.
+  void updateScoreAfterConjunction(const Score &solutionScore) const {
     CS.increaseScore(SK_Fix, Conjunction->getLocator(),
                      solutionScore.Data[SK_Fix]);
     CS.increaseScore(SK_Hole, Conjunction->getLocator(),
