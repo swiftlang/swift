@@ -454,7 +454,8 @@ void decodeRequirement(
     BuilderType &Builder) {
   for (auto &child : *node) {
     if (child->getKind() == Demangle::Node::Kind::DependentGenericParamCount ||
-        child->getKind() == Demangle::Node::Kind::DependentGenericParamPackMarker)
+        child->getKind() == Demangle::Node::Kind::DependentGenericParamPackMarker ||
+        child->getKind() == Demangle::Node::Kind::DependentGenericParamValueMarker)
       continue;
 
     if (child->getNumChildren() != 2)
