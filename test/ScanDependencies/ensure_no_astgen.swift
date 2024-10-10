@@ -1,4 +1,5 @@
 // REQUIRES: swift_swift_parser
+// REQUIRES: asserts
 
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/stats)
