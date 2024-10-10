@@ -90,6 +90,9 @@ class SwiftLookupTable;
 class TypeDecl;
 class ValueDecl;
 class VisibleDeclConsumer;
+using ModuleDependencyIDSetVector =
+    llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
+                    std::set<ModuleDependencyID>>;
 enum class SelectorSplitKind;
 
 /// Kinds of optional types.
@@ -492,7 +495,11 @@ public:
       ModuleDependencyInfo &MDI,
       const clang::tooling::dependencies::TranslationUnitDeps &deps);
 
-  /// Add dependency information for header dependencies
+  void getBridgingHeaderOptions(
+      const clang::tooling::dependencies::TranslationUnitDeps &deps,
+      std::vector<std::string> &swiftArgs);
+
+  /// Query dependency information for header dependencies
   /// of a binary Swift module.
   ///
   /// \param moduleID the name of the Swift module whose dependency
@@ -505,10 +512,14 @@ public:
   /// about new Clang modules discovered along the way.
   ///
   /// \returns \c true if an error occurred, \c false otherwise
-  bool addHeaderDependencies(
+  bool getHeaderDependencies(
       ModuleDependencyID moduleID,
       clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
-      ModuleDependenciesCache &cache);
+      ModuleDependenciesCache &cache,
+      ModuleDependencyIDSetVector &headerClangModuleDependencies,
+      std::vector<std::string> &headerFileInputs,
+      std::vector<std::string> &bridgingHeaderCommandLine,
+      std::optional<std::string> &includeTreeID);
 
   clang::TargetInfo &getModuleAvailabilityTarget() const override;
   clang::ASTContext &getClangASTContext() const override;
