@@ -110,7 +110,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define(
             'SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_WASI_SYSROOT_PATH:STRING',
-                                  self._wasi_sysroot_path(target_triple))
+                                  self._wasi_sysroot_path())
 
         # compiler-rt for WebAssembly target is not installed in the host toolchain
         # so skip compiler health checks here.
@@ -178,7 +178,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         test_driver_options = [
             # compiler-rt is not installed in the final toolchain, so use one
             # in build dir
-            '-Xclang-linker', '-resource-dir=' + self._wasi_sysroot_path(target_triple),
+            '-Xclang-linker', '-resource-dir=' + self._wasi_sysroot_path(),
         ]
         # Leading space is needed to separate from other options
         self.cmake_options.define('SWIFT_DRIVER_TEST_OPTIONS:STRING',
@@ -230,9 +230,9 @@ class WasmStdlib(cmake_product.CMakeProduct):
         build_root = os.path.dirname(self.build_dir)
         return os.path.join('..', build_root, '%s-%s' % ('swift', host_target))
 
-    def _wasi_sysroot_path(self, target_triple):
+    def _wasi_sysroot_path(self):
         build_root = os.path.dirname(self.build_dir)
-        return wasisysroot.WASILibc.sysroot_install_path(build_root, target_triple)
+        return wasisysroot.WASILibc.sysroot_install_path(build_root)
 
     def should_install(self, host_target):
         return False
