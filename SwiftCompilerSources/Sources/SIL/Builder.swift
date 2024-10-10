@@ -205,8 +205,14 @@ public struct Builder {
     return notifyNew(bridged.createCopyValue(operand.bridged).getAs(CopyValueInst.self))
   }
 
-  public func createBeginBorrow(of value: Value) -> BeginBorrowInst {
-    return notifyNew(bridged.createBeginBorrow(value.bridged).getAs(BeginBorrowInst.self))
+  public func createBeginBorrow(
+    of value: Value,
+    isLexical: Bool = false,
+    hasPointerEscape: Bool = false,
+    isFromVarDecl: Bool = false
+  ) -> BeginBorrowInst {
+    return notifyNew(bridged.createBeginBorrow(value.bridged,
+             isLexical, hasPointerEscape, isFromVarDecl).getAs(BeginBorrowInst.self))
   }
 
   public func createBorrowedFrom(borrowedValue: Value, enclosingValues: [Value]) -> BorrowedFromInst {

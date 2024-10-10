@@ -415,6 +415,7 @@ struct BridgedOperand {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue getValue() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction getUser() const;
   BRIDGED_INLINE OperandOwnership getOperandOwnership() const;
+  void changeOwnership(BridgedValue::Ownership from, BridgedValue::Ownership to) const;
 };
 
 struct OptionalBridgedOperand {
@@ -787,6 +788,7 @@ struct BridgedInstruction {
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef CondFailInst_getMessage() const;
   BRIDGED_INLINE SwiftInt LoadInst_getLoadOwnership() const ;
+  BRIDGED_INLINE bool LoadBorrowInst_isUnchecked() const ;
   BRIDGED_INLINE BuiltinValueKind BuiltinInst_getID() const;
   BRIDGED_INLINE IntrinsicID BuiltinInst_getIntrinsicID() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap BuiltinInst_getSubstitutionMap() const;
@@ -1220,7 +1222,10 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUnownedRelease(BridgedValue op) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createFunctionRef(BridgedFunction function) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createCopyValue(BridgedValue op) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBeginBorrow(BridgedValue op) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBeginBorrow(BridgedValue op,
+                                                                          bool isLexical,
+                                                                          bool hasPointerEscape,
+                                                                          bool isFromVarDecl) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBorrowedFrom(BridgedValue borrowedValue,
                                                                            BridgedValueArray enclosingValues) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndBorrow(BridgedValue op) const;

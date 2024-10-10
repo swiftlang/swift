@@ -422,6 +422,14 @@ struct FunctionPassContext : MutatingContext {
 
       return buildFn(specializedFunction, nestedFunctionPassContext)
   }
+
+  /// Makes sure that the lifetime of `value` ends at all control flow paths, even in dead-end blocks.
+  /// Inserts destroys in dead-end blocks if those are missing.
+  func completeLifetime(of value: Value) {
+    if _bridged.completeLifetime(value.bridged) {
+      notifyInstructionsChanged()
+    }
+  }
 }
 
 struct SimplifyContext : MutatingContext {
@@ -639,6 +647,12 @@ extension Sequence where Element == Operand {
 extension Operand {
   func set(to value: Value, _ context: some MutatingContext) {
     instruction.setOperand(at: index, to: value, context)
+  }
+
+  func changeOwnership(from: Ownership, to: Ownership, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.changeOwnership(from._bridged, to._bridged)
+    context.notifyInstructionChanged(instruction)
   }
 }
 
