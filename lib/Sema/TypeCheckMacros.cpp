@@ -42,7 +42,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Bridging/ASTGen.h"
-#include "swift/Bridging/Macros.h"
+#include "swift/Bridging/MacroEvaluation.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Lexer.h"

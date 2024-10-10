@@ -68,7 +68,7 @@ let package = Package(
       swiftSettings: swiftSetttings
     ),
     .target(
-      name: "swiftMacros",
+      name: "swiftMacroEvaluation",
       dependencies: [
         "swiftASTGen",
         .product(name: "_SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
