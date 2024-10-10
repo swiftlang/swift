@@ -201,6 +201,14 @@ public:
     return tryMangleSubstitution(type.getPointer());
   }
 
+protected:
+  using Mangler::addSubstitution;
+  void addSubstitution(const Decl *decl);
+
+  using Mangler::tryMangleSubstitution;
+  bool tryMangleSubstitution(const Decl *decl);
+
+public:
   std::string mangleClosureEntity(const AbstractClosureExpr *closure,
                                   SymbolKind SKind);
 

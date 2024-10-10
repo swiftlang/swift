@@ -530,6 +530,9 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
                                 DeclContext *UseDC, DeclNameLoc NameLoc,
                                 bool Implicit, FunctionRefKind functionRefKind) {
   assert(!Decls.empty() && "Must have at least one declaration");
+  ASSERT(llvm::any_of(Decls, [](ValueDecl *VD) {
+            return ABIRoleInfo(VD).providesAPI();
+          }) && "DeclRefExpr can't refer to ABI-only decl");
 
   auto &Context = UseDC->getASTContext();
 

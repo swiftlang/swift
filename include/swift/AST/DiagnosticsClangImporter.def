@@ -289,5 +289,15 @@ NOTE(forward_declared_protocol_clashes_with_imported_objc_Swift_protocol, none,
      "its name conflicts with a %1 in module %2",
      (const clang::NamedDecl*, StringRef, StringRef))
 
+NOTE(bridged_type_not_found_in_module,none,
+     "could not find type '%0' for bridging; module '%1' may be broken",
+     (StringRef, StringRef))
+
+NOTE(bridged_pointer_type_not_found,none,
+     "could not find type '%select{UnsafeMutableRawPointer|UnsafeRawPointer|"
+     "UnsafeMutablePointer|UnsafePointer|AutoreleasingUnsafeMutablePointer}0' "
+     "for bridging; module 'Swift' may be broken",
+     (unsigned))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

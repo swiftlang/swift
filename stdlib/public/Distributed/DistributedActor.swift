@@ -362,10 +362,15 @@ extension DistributedActor {
   /// state.
   ///
   /// When the actor is remote, the closure won't be executed and this function will return nil.
+  @abi(
+    // We need to @abi here because the signature is the same as
+    // `__separately_compiled_typed_throws_whenLocal(_:)`, and even though this
+    // is @AEIC, the symbol name would conflict.
+    public nonisolated func __typed_throws_whenLocal<T: Sendable, E>(
+      _ body: @Sendable (isolated Self) async throws(E) -> T
+    ) async throws(E) -> T?
+  )
   @_alwaysEmitIntoClient
-  // we need to silgen_name here because the signature is the same as __abi_whenLocal,
-  // and even though this is @AEIC, the symbol name would conflict.
-  @_silgen_name("$s11Distributed0A5ActorPAAE20whenLocalTypedThrowsyqd__Sgqd__xYiYaYbqd_0_YKXEYaqd_0_YKs8SendableRd__s5ErrorRd_0_r0_lF")
   public nonisolated func whenLocal<T: Sendable, E>(
     _ body: @Sendable (isolated Self) async throws(E) -> T
   ) async throws(E) -> T? {
@@ -380,18 +385,26 @@ extension DistributedActor {
   // ABI: This is a workaround when in Swift 6 this method was introduced
   // in order to support typed-throws, but missed to add @_aeic.
   // In practice, this method should not ever be used by anyone, ever.
+  @abi(
+    public nonisolated func whenLocal<T: Sendable, E>(
+      _ body: @Sendable (isolated Self) async throws(E) -> T
+    ) async throws(E) -> T?
+  )
   @usableFromInline
-  @_silgen_name("$s11Distributed0A5ActorPAAE9whenLocalyqd__Sgqd__xYiYaYbqd_0_YKXEYaqd_0_YKs8SendableRd__s5ErrorRd_0_r0_lF")
-  internal nonisolated func __abi_whenLocal<T: Sendable, E>(
+  nonisolated func __separately_compiled_typed_throws_whenLocal<T: Sendable, E>(
     _ body: @Sendable (isolated Self) async throws(E) -> T
   ) async throws(E) -> T? {
     try await whenLocal(body)
   }
 
   // ABI: Historical whenLocal, rethrows was changed to typed throws `throws(E)`
-  @_silgen_name("$s11Distributed0A5ActorPAAE9whenLocalyqd__Sgqd__xYiYaYbKXEYaKs8SendableRd__lF")
+  @abi(
+    public nonisolated func whenLocal<T: Sendable>(
+      _ body: @Sendable (isolated Self) async throws -> T
+    ) async rethrows -> T?
+  )
   @usableFromInline
-  nonisolated func __abi_whenLocal<T: Sendable>(
+  nonisolated func __rethrows_whenLocal<T: Sendable>(
     _ body: @Sendable (isolated Self) async throws -> T
   ) async rethrows -> T? {
     try await whenLocal(body)

@@ -186,7 +186,7 @@ extension String {
   ///
   /// - Parameter nullTerminatedUTF8:
   ///     A pointer to a null-terminated sequence of UTF-8 code units.
-  @_silgen_name("$sSS14validatingUTF8SSSgSPys4Int8VG_tcfC")
+  @abi(public init?(validatingUTF8 nullTerminatedUTF8: UnsafePointer<CChar>))
   public init?(validatingCString nullTerminatedUTF8: UnsafePointer<CChar>) {
     let len = UTF8._nullCodeUnitOffset(in: nullTerminatedUTF8)
     let validated = nullTerminatedUTF8.withMemoryRebound(
@@ -231,7 +231,7 @@ extension String {
   @inlinable
   @_alwaysEmitIntoClient
   @available(swift, deprecated: 6, renamed: "String.init(validatingCString:)")
-  @_silgen_name("_swift_se0405_String_validatingUTF8")
+  @abi(public init?(validatingCString nullTerminatedUTF8: UnsafePointer<CChar>))
   public init?(validatingUTF8 cString: UnsafePointer<CChar>) {
     self.init(validatingCString: cString)
   }

@@ -633,6 +633,7 @@ function(_compile_swift_files
   list(APPEND swift_flags "-enable-experimental-feature" "NonescapableTypes")
 
   list(APPEND swift_flags "-enable-experimental-feature" "ExtensionImportVisiblity")
+  list(APPEND swift_flags "-enable-experimental-feature" "ABIAttribute")
 
   if (SWIFT_STDLIB_ENABLE_STRICT_CONCURRENCY_COMPLETE)
     list(APPEND swift_flags "-strict-concurrency=complete")

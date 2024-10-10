@@ -142,6 +142,7 @@ class ASTScopeImpl : public ASTAllocated<ASTScopeImpl> {
   friend class IterableTypeBodyPortion;
   friend class ScopeCreator;
   friend class ASTSourceFileScope;
+  friend class ABIAttributeScope;
   friend class Lowering::SILGenFunction;
 
 #pragma mark - tree state
@@ -250,12 +251,15 @@ public:
 
   void printRange(llvm::raw_ostream &out) const;
 
+  void printParents(llvm::raw_ostream &out) const;
+
 protected:
   virtual void printSpecifics(llvm::raw_ostream &out) const {}
   virtual NullablePtr<const void> addressForPrinting() const;
 
 public:
   SWIFT_DEBUG_DUMP;
+  SWIFT_DEBUG_DUMPER(dumpParents());
 
   void dumpOneScopeMapLocation(std::pair<unsigned, unsigned> lineColumn);
 
@@ -301,6 +305,9 @@ public:
   static void lookupEnclosingMacroScope(
       SourceFile *sourceFile, SourceLoc loc,
       llvm::function_ref<bool(ASTScope::PotentialMacro)> consume);
+
+  static ABIAttr *lookupEnclosingABIAttributeScope(
+      SourceFile *sourceFile, SourceLoc loc);
 
   static CatchNode lookupCatchNode(ModuleDecl *module, SourceLoc loc);
 
@@ -940,6 +947,40 @@ private:
 public:
   static bool classof(const ASTScopeImpl *scope) {
     return scope->getKind() == ScopeKind::CustomAttribute;
+  }
+};
+
+/// The scope for ABI attributes and their arguments.
+///
+/// Source locations for the attribute name and its arguments are in the
+/// custom attribute, so lookup is invoked from within the attribute
+/// itself.
+class ABIAttributeScope final : public ASTScopeImpl {
+public:
+  ABIAttr *attr;
+  Decl *decl;
+
+  ABIAttributeScope(ABIAttr *attr, Decl *decl)
+      : ASTScopeImpl(ScopeKind::ABIAttribute), attr(attr), decl(decl) {}
+  virtual ~ABIAttributeScope() {}
+
+protected:
+  ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
+
+public:
+  SourceRange
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
+  NullablePtr<const void> addressForPrinting() const override { return decl; }
+
+  bool ignoreInDebugInfo() const override { return true; }
+
+private:
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+
+public:
+  static bool classof(const ASTScopeImpl *scope) {
+    return scope->getKind() == ScopeKind::ABIAttribute;
   }
 };
 

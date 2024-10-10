@@ -1025,7 +1025,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   AttributeVector attributes;
   AttributeVector modifiers;
   bool libraryLevelAPI =
-      D->getASTContext().LangOpts.LibraryLevel == LibraryLevel::API;
+      D && D->getASTContext().LangOpts.LibraryLevel == LibraryLevel::API;
 
   for (auto DA : llvm::reverse(FlattenedAttrs)) {
     // Don't skip implicit custom attributes. Custom attributes like global
@@ -1040,6 +1040,11 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
       continue;
     if (Options.excludeAttr(DA))
       continue;
+
+    // Skip inverse ABIAttrs--these are an implementation detail.
+    if (auto abiAttr = dyn_cast<ABIAttr>(DA))
+      if (abiAttr->isInverse())
+        continue;
 
     // In the public interfaces of -library-level=api modules, skip attributes
     // that reference SPI platforms.
@@ -1258,6 +1263,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     }
     break;
   }
+
+  case DeclAttrKind::ABI:
+    // Inverse attributes should never be printed.
+    if (cast<ABIAttr>(this)->isInverse())
+      return false;
+    break;
+
   default:
     break;
   }
@@ -1818,6 +1830,23 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::ABI: {
+    auto *attr = cast<ABIAttr>(this);
+    Printer << "@abi(";
+    ASSERT(!attr->isInverse() && "should be skipped above");
+    Decl *abiDecl = attr->abiDecl;
+    if (abiDecl && Options.ExplodePatternBindingDecls
+          && isa<PatternBindingDecl>(abiDecl) && D && isa<VarDecl>(D))
+      abiDecl = cast<PatternBindingDecl>(abiDecl)
+                    ->getVarAtSimilarStructuralPosition(
+                                      const_cast<VarDecl *>(cast<VarDecl>(D)));
+    if (abiDecl)
+      attr->abiDecl->print(Printer, Options);
+    Printer << ")";
+
+    break;
+  }
+
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DeclAttrKind::CLASS:
 #include "swift/AST/DeclAttr.def"
     llvm_unreachable("handled above");
@@ -1857,12 +1886,26 @@ uint64_t DeclAttribute::getOptions(DeclAttrKind DK) {
   llvm_unreachable("bad DeclAttrKind");
 }
 
+std::optional<Feature> DeclAttribute::getRequiredFeature(DeclAttrKind DK) {
+  switch (DK) {
+#define DECL_ATTR_FEATURE_REQUIREMENT(CLASS, FEATURE_NAME)                     \
+  case DeclAttrKind::CLASS:                                                    \
+    return Feature::FEATURE_NAME;
+#include "swift/AST/DeclAttr.def"
+  default:
+    return std::nullopt;
+  }
+  llvm_unreachable("bad DeclAttrKind");
+}
+
 StringRef DeclAttribute::getAttrName() const {
   switch (getKind()) {
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...)                                     \
   case DeclAttrKind::CLASS:                                                    \
     return #NAME;
 #include "swift/AST/DeclAttr.def"
+  case DeclAttrKind::ABI:
+    return "abi";
   case DeclAttrKind::SILGenName:
     return "_silgen_name";
   case DeclAttrKind::Alignment:
@@ -3053,6 +3096,38 @@ LifetimeAttr *LifetimeAttr::create(ASTContext &context, SourceLoc atLoc,
   return new (context) LifetimeAttr(atLoc, baseRange, implicit, entry);
 }
 
+void ABIAttr::connectToInverse(Decl *owner) const {
+  if (isInverse())
+    return;
+
+  // If necessary, convert abiDecl's PBD to a specific VarDecl.
+  auto correspondingDecl = abiDecl;
+  if (auto PBD = dyn_cast<PatternBindingDecl>(correspondingDecl)) {
+    if (!isa<VarDecl>(owner))
+      // Invalid code (e.g. `@abi(var x) func x()`). Won't be able to connect.
+      return;
+
+    correspondingDecl =
+        PBD->getVarAtSimilarStructuralPosition(cast<VarDecl>(owner));
+  }
+
+  if (!correspondingDecl)
+    return;
+
+  auto inverseAttr = correspondingDecl->getAttrs().getAttribute<ABIAttr>();
+  ASSERT(inverseAttr && inverseAttr->isInverse());
+
+  // Reverse of the above: If we're trying to connect to a VarDecl, connect to
+  // its PBD instead.
+  auto inverseCorrespondingDecl = owner;
+  if (auto VD = dyn_cast<VarDecl>(inverseCorrespondingDecl))
+    if (auto PBD = VD->getParentPatternBinding())
+      inverseCorrespondingDecl = PBD;
+
+  inverseAttr->abiDecl = inverseCorrespondingDecl;
+}
+
+
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
   if (attr)
     attr->print(out);
@@ -3075,6 +3150,10 @@ static bool hasDeclAttribute(const LangOptions &langOpts,
     return false;
   if (DeclAttribute::isConcurrencyOnly(*kind))
     return false;
+
+  if (auto feature = DeclAttribute::getRequiredFeature(*kind))
+    if (!langOpts.hasFeature(*feature))
+      return false;
 
   return true;
 }

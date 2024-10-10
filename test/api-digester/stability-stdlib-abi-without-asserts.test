@@ -84,7 +84,7 @@ Enum Never has added a conformance to an existing protocol Decodable
 Enum Never has added a conformance to an existing protocol Encodable
 Enum Never has added a conformance to an existing protocol Identifiable
 
-// These functions haven't actually changed ABI, but are using @_silgen_name tricks to maintain the old ABI while moving to typed throws.
+// These functions haven't actually changed ABI, but are using @abi tricks to maintain the old ABI while moving to typed throws.
 Func AnyBidirectionalCollection.map(_:) has been removed
 Func AnyCollection.map(_:) has been removed
 Func AnyRandomAccessCollection.map(_:) has been removed
@@ -92,11 +92,9 @@ Func AnySequence.map(_:) has been removed
 Func Collection.map(_:) has been removed
 Func Sequence.map(_:) has been removed
 Constructor Result.init(catching:) has been removed
-Func withoutActuallyEscaping(_:do:) has been renamed to Func __abi_withoutActuallyEscaping(_:do:)
-Func withoutActuallyEscaping(_:do:) has mangled name changing from 'Swift.withoutActuallyEscaping<A, B>(_: A, do: (A) throws -> B) throws -> B' to 'Swift.__abi_withoutActuallyEscaping<A, B>(_: A, do: (A) throws -> B) throws -> B'
+Func withoutActuallyEscaping(_:do:) has been renamed to Func __rethrows_withoutActuallyEscaping(_:do:)
 Func withoutActuallyEscaping(_:do:) is now without @rethrows
-Func _openExistential(_:do:) has been renamed to Func __abi_openExistential(_:do:)
-Func _openExistential(_:do:) has mangled name changing from 'Swift._openExistential<A, B, C>(_: A, do: (B) throws -> C) throws -> C' to 'Swift.__abi_openExistential<A, B, C>(_: A, do: (B) throws -> C) throws -> C'
+Func _openExistential(_:do:) has been renamed to Func __rethrows_openExistential(_:do:)
 Func _openExistential(_:do:) is now without @rethrows
 
 
@@ -129,25 +127,20 @@ Func _RandomAccessCollectionBox._map(_:) is now without @rethrows
 Func _SequenceBox._map(_:) is now without @rethrows
 Func UnsafeMutableRawBufferPointer.storeBytes(of:toByteOffset:as:) has been removed
 Func UnsafeMutableRawPointer.storeBytes(of:toByteOffset:as:) has been removed
-Func UnsafeMutableBufferPointer.assign(repeating:) has been removed
-Func UnsafeMutableBufferPointer.update(repeating:) is a new API without @available attribute
-Func UnsafeMutablePointer.assign(from:count:) has been removed
-Func UnsafeMutablePointer.update(from:count:) is a new API without @available attribute
-Func UnsafeMutablePointer.assign(repeating:count:) has been removed
-Func UnsafeMutablePointer.update(repeating:count:) is a new API without @available attribute
+Func UnsafeMutableBufferPointer.assign(repeating:) has been renamed to Func update(repeating:)
+Func UnsafeMutablePointer.assign(from:count:) has been renamed to Func update(from:count:)
+Func UnsafeMutablePointer.assign(repeating:count:) has been renamed to Func update(repeating:count:)
 Func UnsafeMutablePointer.moveAssign(from:count:) has been removed
 Func UnsafeMutablePointer.moveUpdate(from:count:) is a new API without @available attribute
 
 // These haven't actually been removed; they were renamed at the source level while
 // retaining their old mangled name. The source break was accepted as part of se-0370.
-Func UnsafeMutableBufferPointer.initialize(from:) has mangled name changing from 'Swift.UnsafeMutableBufferPointer.initialize<A where A == A1.Element, A1: Swift.Sequence>(from: A1) -> (A1.Iterator, Swift.Int)' to 'Swift.UnsafeMutableBufferPointer.initialize<A where A == A1.Element, A1: Swift.Sequence>(from: A1) -> (unwritten: A1.Iterator, index: Swift.Int)'
 Func UnsafeMutableBufferPointer.initialize(from:) has return type change from (τ_1_0.Iterator, Swift.Int) to (unwritten: τ_1_0.Iterator, index: Swift.Int)
 
-// This hasn't actually been removed; it was renamed at the source level while
-// retaining its old mangled/silgen name. The old source-level name is preserved
-// as an @_alwaysEmitIntoClient function. The source break was accepted as part of se-0405.
-Constructor String.init(validatingCString:) is a new API without @available attribute
-Constructor String.init(validatingUTF8:) has been removed
+// This was renamed at the source level while preserving its ABI using @abi.
+// The old source-level name is preserved as an @_alwaysEmitIntoClient function.
+// The source break was accepted as part of se-0405.
+Constructor String.init(validatingUTF8:) has been renamed to Constructor init(validatingCString:)
 
 // These haven't actually been removed; they are simply marked unavailable.
 // This seems to be a false positive in the ABI checker. This is not an ABI
@@ -796,26 +789,17 @@ Var UnsafeMutableBufferPointer.debugDescription is now with @_preInverseGenerics
 
 Func FixedWidthInteger.&*(_:_:) has been added as a protocol requirement
 
-Func Array.withUnsafeMutableBufferPointer(_:) has been renamed to Func __abi_withUnsafeMutableBufferPointer(_:)
-Func Array.withUnsafeMutableBufferPointer(_:) has mangled name changing from 'Swift.Array.withUnsafeMutableBufferPointer<A>((inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1' to 'Swift.Array.__abi_withUnsafeMutableBufferPointer<A>((inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1'
-Func ArraySlice.withUnsafeMutableBufferPointer(_:) has been renamed to Func __abi_withUnsafeMutableBufferPointer(_:)
-Func ArraySlice.withUnsafeMutableBufferPointer(_:) has mangled name changing from 'Swift.ArraySlice.withUnsafeMutableBufferPointer<A>((inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1' to 'Swift.ArraySlice.__abi_withUnsafeMutableBufferPointer<A>((inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1'
-Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has been renamed to Func __abi_withUnsafeMutableBufferPointer(_:)
-Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has mangled name changing from 'Swift.ContiguousArray.withUnsafeMutableBufferPointer<A>((inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1' to 'Swift.ContiguousArray.__abi_withUnsafeMutableBufferPointer<A>((inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1'
-Func _ArrayBuffer.withUnsafeBufferPointer(_:) has been renamed to Func __abi_withUnsafeBufferPointer(_:)
-Func _ArrayBuffer.withUnsafeBufferPointer(_:) has mangled name changing from 'Swift._ArrayBuffer.withUnsafeBufferPointer<A>((Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> A1' to 'Swift._ArrayBuffer.__abi_withUnsafeBufferPointer<A>((Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> A1'
-Func _ArrayBuffer.withUnsafeMutableBufferPointer(_:) has been renamed to Func __abi_withUnsafeMutableBufferPointer(_:)
-Func _ArrayBuffer.withUnsafeMutableBufferPointer(_:) has mangled name changing from 'Swift._ArrayBuffer.withUnsafeMutableBufferPointer<A>((Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1' to 'Swift._ArrayBuffer.__abi_withUnsafeMutableBufferPointer<A>((Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1'
+Func Array.withUnsafeMutableBufferPointer(_:) has been renamed to Func __rethrows_withUnsafeMutableBufferPointer(_:)
+Func ArraySlice.withUnsafeMutableBufferPointer(_:) has been renamed to Func __rethrows_withUnsafeMutableBufferPointer(_:)
+Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has been renamed to Func __rethrows_withUnsafeMutableBufferPointer(_:)
+Func _ArrayBuffer.withUnsafeBufferPointer(_:) has been renamed to Func __rethrows_withUnsafeBufferPointer(_:)
+Func _ArrayBuffer.withUnsafeMutableBufferPointer(_:) has been renamed to Func __rethrows_withUnsafeMutableBufferPointer(_:)
 Func _ArrayBufferProtocol.withUnsafeBufferPointer(_:) has been added as a protocol requirement
 Func _ArrayBufferProtocol.withUnsafeMutableBufferPointer(_:) has been added as a protocol requirement
-Func _ContiguousArrayBuffer.withUnsafeBufferPointer(_:) has been renamed to Func __abi_withUnsafeBufferPointer(_:)
-Func _ContiguousArrayBuffer.withUnsafeBufferPointer(_:) has mangled name changing from 'Swift._ContiguousArrayBuffer.withUnsafeBufferPointer<A>((Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> A1' to 'Swift._ContiguousArrayBuffer.__abi_withUnsafeBufferPointer<A>((Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> A1'
-Func _ContiguousArrayBuffer.withUnsafeMutableBufferPointer(_:) has been renamed to Func __abi_withUnsafeMutableBufferPointer(_:)
-Func _ContiguousArrayBuffer.withUnsafeMutableBufferPointer(_:) has mangled name changing from 'Swift._ContiguousArrayBuffer.withUnsafeMutableBufferPointer<A>((Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1' to 'Swift._ContiguousArrayBuffer.__abi_withUnsafeMutableBufferPointer<A>((Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1'
-Func _SliceBuffer.withUnsafeBufferPointer(_:) has been renamed to Func __abi_withUnsafeBufferPointer(_:)
-Func _SliceBuffer.withUnsafeBufferPointer(_:) has mangled name changing from 'Swift._SliceBuffer.withUnsafeBufferPointer<A>((Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> A1' to 'Swift._SliceBuffer.__abi_withUnsafeBufferPointer<A>((Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> A1'
-Func _SliceBuffer.withUnsafeMutableBufferPointer(_:) has been renamed to Func __abi_withUnsafeMutableBufferPointer(_:)
-Func _SliceBuffer.withUnsafeMutableBufferPointer(_:) has mangled name changing from 'Swift._SliceBuffer.withUnsafeMutableBufferPointer<A>((Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1' to 'Swift._SliceBuffer.__abi_withUnsafeMutableBufferPointer<A>((Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1'
+Func _ContiguousArrayBuffer.withUnsafeBufferPointer(_:) has been renamed to Func __rethrows_withUnsafeBufferPointer(_:)
+Func _ContiguousArrayBuffer.withUnsafeMutableBufferPointer(_:) has been renamed to Func __rethrows_withUnsafeMutableBufferPointer(_:)
+Func _SliceBuffer.withUnsafeBufferPointer(_:) has been renamed to Func __rethrows_withUnsafeBufferPointer(_:)
+Func _SliceBuffer.withUnsafeMutableBufferPointer(_:) has been renamed to Func __rethrows_withUnsafeMutableBufferPointer(_:)
 
 Struct String.Index has added a conformance to an existing protocol CustomDebugStringConvertible
 

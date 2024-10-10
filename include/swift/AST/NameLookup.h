@@ -253,6 +253,11 @@ enum class UnqualifiedLookupFlags {
   /// This lookup should include members that would otherwise be filtered out
   /// because they come from a module that has not been imported.
   IgnoreMissingImports = 1 << 10,
+  /// If @abi attributes are present, return the decls representing the ABI,
+  /// not the API.
+  ABIProviding = 1 << 11,
+
+  // Reminder: If you add a flag, make sure you update simple_display() below
 };
 
 using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;
@@ -553,6 +558,9 @@ template <typename Result>
 void filterForDiscriminator(SmallVectorImpl<Result> &results,
                             DebuggerClient *debugClient);
 
+/// \returns Whether the given source location is inside an \@abi attribute.
+bool isInABIAttr(SourceFile *sourceFile, SourceLoc loc);
+
 /// \returns The set of macro declarations with the given name that
 /// fulfill any of the given macro roles.
 SmallVector<MacroDecl *, 1> lookupMacros(DeclContext *dc,
@@ -747,7 +755,15 @@ public:
   /// local declarations inside the innermost syntactic scope only.
   static void lookupLocalDecls(SourceFile *, DeclName, SourceLoc,
                                bool stopAfterInnermostBraceStmt,
+                               ABIRole roleFilter,
                                SmallVectorImpl<ValueDecl *> &);
+
+  static void lookupLocalDecls(SourceFile *sf, DeclName name, SourceLoc loc,
+                               bool stopAfterInnermostBraceStmt,
+                               SmallVectorImpl<ValueDecl *> &results) {
+    lookupLocalDecls(sf, name, loc, stopAfterInnermostBraceStmt,
+                     ABIRole::ProvidesAPI, results);
+  }
 
   /// Returns the result if there is exactly one, nullptr otherwise.
   static ValueDecl *lookupSingleLocalDecl(SourceFile *, DeclName, SourceLoc);
@@ -792,6 +808,18 @@ public:
   static void lookupEnclosingMacroScope(
       SourceFile *sourceFile, SourceLoc loc,
       llvm::function_ref<bool(PotentialMacro macro)> consume);
+
+  /// Look up the scope tree for the nearest enclosing ABI attribute at
+  /// the given source location.
+  ///
+  /// \param sourceFile The source file containing the given location.
+  /// \param loc        The source location to start lookup from.
+  /// \param consume    A function that is called when an ABI attribute
+  ///                   scope is found. If \c consume returns \c true, lookup
+  ///                   will stop. If \c consume returns \c false, lookup will
+  ///                   continue up the scope tree.
+  static ABIAttr *lookupEnclosingABIAttributeScope(
+      SourceFile *sourceFile, SourceLoc loc);
 
   /// Look up the scope tree for the nearest point at which an error thrown from
   /// this location can be caught or rethrown.

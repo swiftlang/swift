@@ -474,8 +474,13 @@ bool ASTScopeImpl::lookupLocalBindingsInPattern(const Pattern *p,
     return false;
   bool isDone = false;
   p->forEachVariable([&](VarDecl *var) {
-    if (!isDone)
-      isDone = consumer.consume({var});
+    if (!isDone) {
+      SmallVector<ValueDecl *, 2> vars = { var };
+      auto abiRole = ABIRoleInfo(var);
+      if (!abiRole.providesABI())
+        vars.push_back(abiRole.getCounterpart());
+      isDone = consumer.consume(vars);
+    }
   });
   return isDone;
 }
@@ -664,6 +669,23 @@ void ASTScopeImpl::lookupEnclosingMacroScope(
       return;
 
   } while ((scope = scope->getParent().getPtrOrNull()));
+}
+
+ABIAttr *ASTScopeImpl::
+lookupEnclosingABIAttributeScope(SourceFile *sourceFile, SourceLoc loc) {
+  if (!sourceFile || loc.isInvalid())
+    return nullptr;
+
+  auto *fileScope = sourceFile->getScope().impl;
+  auto *scope = fileScope->findInnermostEnclosingScope(
+      sourceFile->getParentModule(), loc, nullptr);
+  do {
+    if (auto abiAttrScope = dyn_cast<ABIAttributeScope>(scope)) {
+      return abiAttrScope->attr;
+    }
+  } while ((scope = scope->getParent().getPtrOrNull()));
+  
+  return nullptr;
 }
 
 static std::pair<CatchNode, const BraceStmtScope *>

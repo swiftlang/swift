@@ -569,9 +569,13 @@ extension _ArrayBuffer {
 
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
+  @abi(
+    public func withUnsafeBufferPointer<R>(
+      _ body: (UnsafeBufferPointer<Element>) throws -> R
+    ) rethrows -> R
+  )
   @usableFromInline
-  @_silgen_name("$ss12_ArrayBufferV010withUnsafeB7Pointeryqd__qd__SRyxGKXEKlF")
-  internal func __abi_withUnsafeBufferPointer<R>(
+  internal func __rethrows_withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     if _fastPath(_isNative) {
@@ -599,9 +603,13 @@ extension _ArrayBuffer {
 
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
+  @abi(
+    public mutating func withUnsafeMutableBufferPointer<R>(
+      _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
+    ) rethrows -> R
+  )
   @usableFromInline
-  @_silgen_name("$ss12_ArrayBufferV017withUnsafeMutableB7Pointeryqd__qd__SryxGKXEKlF")
-  internal mutating func __abi_withUnsafeMutableBufferPointer<R>(
+  internal mutating func __rethrows_withUnsafeMutableBufferPointer<R>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     return try withUnsafeMutableBufferPointer(body)

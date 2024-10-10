@@ -116,6 +116,9 @@ void swift::simple_display(llvm::raw_ostream &out,
       {UnqualifiedLookupFlags::TypeLookup, "TypeLookup"},
       {UnqualifiedLookupFlags::MacroLookup, "MacroLookup"},
       {UnqualifiedLookupFlags::ModuleLookup, "ModuleLookup"},
+      {UnqualifiedLookupFlags::DisregardSelfBounds, "DisregardSelfBounds"},
+      {UnqualifiedLookupFlags::IgnoreMissingImports, "IgnoreMissingImports"},
+      {UnqualifiedLookupFlags::ABIProviding, "ABIProviding"},
   };
 
   auto flagsToPrint = llvm::make_filter_range(
@@ -294,6 +297,10 @@ void LookupResultEntry::print(llvm::raw_ostream& out) const {
     out << "\n";
   } else
     out << "\n(no-base)\n";
+
+  auto abiRole = ABIRoleInfo(getValueDecl());
+  out << "provides API=" << abiRole.providesAPI()
+      << ", provides ABI=" << abiRole.providesABI() << "\n";
 }
 
 
@@ -1509,6 +1516,10 @@ void MemberLookupTable::addMember(Decl *member) {
   // And if given a synonym, under that name too.
   if (A)
     A->getMemberName().addToLookupTable(Lookup, vd);
+
+  auto abiRole = ABIRoleInfo(vd);
+  if (!abiRole.providesABI())
+    addMember(abiRole.getCounterpart());
 }
 
 void MemberLookupTable::addMembers(DeclRange members) {
@@ -2061,29 +2072,34 @@ void NominalTypeDecl::prepareLookupTable() {
   LookupTable.setInt(true);
 }
 
-static TinyPtrVector<ValueDecl *>
-maybeFilterOutUnwantedDecls(TinyPtrVector<ValueDecl *> decls,
-                            DeclName name,
-                            bool includeAttrImplements,
-                            bool excludeMacroExpansions) {
-  if (includeAttrImplements && !excludeMacroExpansions)
-    return decls;
+static TinyPtrVector<ValueDecl *> maybeFilterOutUnwantedDecls(
+      TinyPtrVector<ValueDecl *> decls,
+      DeclName name,
+      OptionSet<NominalTypeDecl::LookupDirectFlags> flags) {
+  using Flags = NominalTypeDecl::LookupDirectFlags;
+
   TinyPtrVector<ValueDecl*> result;
   for (auto V : decls) {
     // If we're supposed to exclude anything that comes from a macro expansion,
     // check whether the source location of the declaration is in a macro
     // expansion, and skip this declaration if it does.
-    if (excludeMacroExpansions) {
+    if (flags.contains(Flags::ExcludeMacroExpansions)) {
       auto sourceFile =
           V->getModuleContext()->getSourceFileContainingLocation(V->getLoc());
       if (sourceFile && sourceFile->Kind == SourceFileKind::MacroExpansion)
         continue;
     }
 
+    // If this decl is on either side of an @abi attribute, make sure it's on
+    // the side we want.
+    if (!ABIRoleInfo(V).matchesOptions(flags))
+      continue;
+
     // Filter-out any decl that doesn't have the name we're looking for
     // (asserting as a consistency-check that such entries all have
     // @_implements attrs for the name!)
-    if (V->getName().matchesRef(name)) {
+    if (flags.contains(Flags::IncludeAttrImplements)
+            || V->getName().matchesRef(name)) {
       result.push_back(V);
     } else {
       auto A = V->getAttrs().getAttribute<ImplementsAttr>();
@@ -2109,8 +2125,6 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
   auto *decl = desc.DC;
 
   ASTContext &ctx = decl->getASTContext();
-  const bool includeAttrImplements =
-      flags.contains(NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements);
   const bool excludeMacroExpansions =
       flags.contains(NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions);
 
@@ -2146,9 +2160,8 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
       if (!allFound.empty()) {
         auto known = Table.find(name);
         if (known != Table.end()) {
-          auto swiftLookupResult = maybeFilterOutUnwantedDecls(
-              known->second, name, includeAttrImplements,
-              excludeMacroExpansions);
+          auto swiftLookupResult =
+              maybeFilterOutUnwantedDecls(known->second, name, flags);
           for (auto foundSwiftDecl : swiftLookupResult) {
             allFound.push_back(foundSwiftDecl);
           }
@@ -2194,9 +2207,7 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
   }
 
   // We found something; return it.
-  return maybeFilterOutUnwantedDecls(known->second, name,
-                                     includeAttrImplements,
-                                     excludeMacroExpansions);
+  return maybeFilterOutUnwantedDecls(known->second, name, flags);
 }
 
 bool NominalTypeDecl::createObjCMethodLookup() {
@@ -2376,7 +2387,24 @@ static bool isAcceptableLookupResult(const DeclContext *dc,
       return false;
   }
 
+  // Check that it has the appropriate ABI role.
+  if (!ABIRoleInfo(decl).matchesOptions(options))
+    return false;
+
   return true;
+}
+
+bool namelookup::isInABIAttr(SourceFile *sourceFile, SourceLoc loc) {
+  // Make sure that the source location is actually within the given source
+  // file.
+  if (sourceFile && loc.isValid()) {
+    sourceFile =
+        sourceFile->getParentModule()->getSourceFileContainingLocation(loc);
+    if (!sourceFile)
+      return false;
+  }
+
+  return ASTScope::lookupEnclosingABIAttributeScope(sourceFile, loc) != nullptr;
 }
 
 void namelookup::pruneLookupResultSet(const DeclContext *dc, NLOptions options,
@@ -2608,6 +2636,8 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
       flags |= NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements;
     if (options & NL_ExcludeMacroExpansions)
       flags |= NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions;
+    if (options & NL_ABIProviding)
+      flags |= NominalTypeDecl::LookupDirectFlags::ABIProviding;
 
     // Note that the source loc argument doesn't matter, because excluding
     // macro expansions is already propagated through the lookup flags above.
@@ -2750,7 +2780,8 @@ AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
   QualifiedLookupResult decls;
 
   // Type-only and macro lookup won't find anything on AnyObject.
-  if (options & (NL_OnlyTypes | NL_OnlyMacros))
+  // AnyObject doesn't provide ABI.
+  if (options & (NL_OnlyTypes | NL_OnlyMacros | NL_ABIProviding))
     return decls;
 
   // Collect all of the visible declarations.
@@ -2943,6 +2974,11 @@ static DirectlyReferencedTypeDecls directReferencesForUnqualifiedTypeLookup(
   // is overridden below.
   if (namelookup::isInMacroArgument(dc->getParentSourceFile(), loc))
     options |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
+
+  // If the source location is located anywhere within an `@abi` attribute, look
+  // up using ABI names.
+  if (namelookup::isInABIAttr(dc->getParentSourceFile(), loc))
+    options |= UnqualifiedLookupFlags::ABIProviding;
 
   // In a protocol or protocol extension, the 'where' clause can refer to
   // associated types without 'Self' qualification:
@@ -4130,6 +4166,7 @@ void swift::simple_display(llvm::raw_ostream &out, NLOptions options) {
     FLAG(NL_ExcludeMacroExpansions)
     FLAG(NL_OnlyMacros)
     FLAG(NL_IgnoreMissingImports)
+    FLAG(NL_ABIProviding)
 #undef FLAG
   };
 

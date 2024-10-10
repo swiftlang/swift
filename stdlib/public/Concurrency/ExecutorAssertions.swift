@@ -368,11 +368,18 @@ extension Actor {
     }
   }
 
+  @abi(
+    @usableFromInline
+    @_unavailableInEmbedded
+    internal nonisolated func assumeIsolated<T /* not ': Sendable' */>(
+        _ operation: (isolated Self) throws -> T,
+        file: StaticString, line: UInt
+    ) rethrows -> T
+  )
   @available(SwiftStdlib 5.9, *)
   @usableFromInline
   @_unavailableInEmbedded
-  @_silgen_name("$sScAsE14assumeIsolated_4file4lineqd__qd__xYiKXE_s12StaticStringVSutKlF")
-  internal nonisolated func __abi__assumeIsolated<T : Sendable>(
+  internal nonisolated func __nonsendable_assumeIsolated<T : Sendable>(
       _ operation: (isolated Self) throws -> T,
       _ file: StaticString, _ line: UInt
   ) rethrows -> T {

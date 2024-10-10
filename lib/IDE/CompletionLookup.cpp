@@ -3008,7 +3008,7 @@ void CompletionLookup::getGenericRequirementCompletions(
 }
 
 bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
-                                             bool IsConcurrencyEnabled,
+                                             const LangOptions &langOpts,
                                              std::optional<DeclKind> DK,
                                              StringRef Name) {
   if (DeclAttribute::isUserInaccessible(DAK))
@@ -3019,8 +3019,12 @@ bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
     return false;
   if (!IsInSil && DeclAttribute::isSilOnly(DAK))
     return false;
-  if (!IsConcurrencyEnabled && DeclAttribute::isConcurrencyOnly(DAK))
+  if (!langOpts.EnableExperimentalConcurrency
+        && DeclAttribute::isConcurrencyOnly(DAK))
     return false;
+  if (auto feature = DeclAttribute::getRequiredFeature(DAK))
+    if (!langOpts.hasFeature(*feature))
+      return false;
   if (!DK.has_value())
     return true;
   // Hide underscored attributes even if they are not marked as user
@@ -3044,11 +3048,10 @@ void CompletionLookup::getAttributeDeclCompletions(bool IsInSil,
 #include "swift/AST/DeclNodes.def"
     }
   }
-  bool IsConcurrencyEnabled = Ctx.LangOpts.EnableExperimentalConcurrency;
   std::string Description = TargetName.str() + " Attribute";
 #define DECL_ATTR_ALIAS(KEYWORD, NAME) DECL_ATTR(KEYWORD, NAME, 0, 0)
 #define DECL_ATTR(KEYWORD, NAME, ...)                                          \
-  if (canUseAttributeOnDecl(DeclAttrKind::NAME, IsInSil, IsConcurrencyEnabled, \
+  if (canUseAttributeOnDecl(DeclAttrKind::NAME, IsInSil, Ctx.LangOpts,         \
                             DK, #KEYWORD))                                     \
     addDeclAttrKeyword(#KEYWORD, Description);
 #include "swift/AST/DeclAttr.def"

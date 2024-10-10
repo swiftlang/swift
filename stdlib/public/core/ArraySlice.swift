@@ -1212,11 +1212,15 @@ extension ArraySlice {
 
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
+  @abi(
+    public mutating func withUnsafeMutableBufferPointer<R>(
+      _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    ) rethrows -> R
+  )
   @_semantics("array.withUnsafeMutableBufferPointer")
   @usableFromInline
   @inline(__always)
-  @_silgen_name("$ss10ArraySliceV30withUnsafeMutableBufferPointeryqd__qd__SryxGzKXEKlF")
-  mutating func __abi_withUnsafeMutableBufferPointer<R>(
+  mutating func __rethrows_withUnsafeMutableBufferPointer<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     return try withUnsafeMutableBufferPointer(body)

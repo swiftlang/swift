@@ -3247,33 +3247,6 @@ static bool attributeChainContains(DeclAttribute *attr) {
   return tempAttrs.hasAttribute<DERIVED>();
 }
 
-// Set original declaration and parameter indices in `@differentiable`
-// attributes.
-//
-// Serializing/deserializing the original declaration DeclID in
-// `@differentiable` attributes does not work because it causes
-// `@differentiable` attribute deserialization to enter an infinite loop.
-//
-// Instead, call this ad-hoc function after deserializing a declaration to set
-// the original declaration and parameter indices for its `@differentiable`
-// attributes.
-static void setOriginalDeclarationAndParameterIndicesInDifferentiableAttributes(
-    Decl *decl, DeclAttribute *attrs,
-    llvm::DenseMap<DifferentiableAttr *, IndexSubset *>
-        &diffAttrParamIndicesMap) {
-  DeclAttributes tempAttrs;
-  tempAttrs.setRawAttributeChain(attrs);
-  for (auto *attr : tempAttrs.getAttributes<DifferentiableAttr>()) {
-    auto *diffAttr = const_cast<DifferentiableAttr *>(attr);
-    diffAttr->setOriginalDeclaration(decl);
-    diffAttr->setParameterIndices(diffAttrParamIndicesMap[diffAttr]);
-  }
-  for (auto *attr : tempAttrs.getAttributes<DerivativeAttr>()) {
-    auto *derAttr = const_cast<DerivativeAttr *>(attr);
-    derAttr->setOriginalDeclaration(decl);
-  }
-}
-
 Decl *ModuleFile::getDecl(DeclID DID) {
   Expected<Decl *> deserialized = getDeclChecked(DID);
   if (!deserialized) {
@@ -3305,6 +3278,9 @@ class DeclDeserializer {
 
   // Auxiliary map for deserializing `@differentiable` attributes.
   llvm::DenseMap<DifferentiableAttr *, IndexSubset *> diffAttrParamIndicesMap;
+
+  /// State for resolving the declaration in an ABIAttr.
+  std::optional<std::pair<ABIAttr *, DeclID>> unresolvedABIAttr;
 
   void AddAttribute(DeclAttribute *Attr) {
     // Advance the linked list.
@@ -3348,6 +3324,8 @@ class DeclDeserializer {
     else
       decl.get<ExtensionDecl *>()->setInherited(inherited);
   }
+
+  void finishRecursiveAttrs(Decl *decl, DeclAttribute *attrs);
 
 public:
   DeclDeserializer(ModuleFile &MF, Serialized<Decl *> &declOrOffset)
@@ -5739,6 +5717,17 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       DeclAttribute *Attr = nullptr;
       bool skipAttr = false;
       switch (recordID) {
+      case decls_block::ABI_DECL_ATTR: {
+        bool isImplicit;
+        bool isInverse;
+        DeclID abiDeclID;
+        serialization::decls_block::ABIDeclAttrLayout::readRecord(
+            scratch, isImplicit, isInverse, abiDeclID);
+        Attr = new (ctx) ABIAttr(nullptr, isInverse, isImplicit);
+        unresolvedABIAttr.emplace(cast<ABIAttr>(Attr), abiDeclID);
+        break;
+      }
+
       case decls_block::SILGenName_DECL_ATTR: {
         bool isImplicit;
         serialization::decls_block::SILGenNameDeclAttrLayout::readRecord(
@@ -6478,6 +6467,37 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
   }
 }
 
+/// Set original declaration and parameter indices in `@differentiable`
+/// attributes.
+///
+/// Serializing/deserializing the original declaration DeclID in
+/// `@differentiable` attributes does not work because it causes
+/// `@differentiable` attribute deserialization to enter an infinite loop.
+///
+/// Instead, call this ad-hoc function after deserializing a declaration to set
+/// the original declaration and parameter indices for its `@differentiable`
+/// attributes.
+void DeclDeserializer::finishRecursiveAttrs(Decl *decl, DeclAttribute *attrs) {
+  DeclAttributes tempAttrs;
+  tempAttrs.setRawAttributeChain(attrs);
+
+  // @differentiable and @derivative
+  for (auto *attr : tempAttrs.getAttributes<DifferentiableAttr>()) {
+    auto *diffAttr = const_cast<DifferentiableAttr *>(attr);
+    diffAttr->setOriginalDeclaration(decl);
+    diffAttr->setParameterIndices(diffAttrParamIndicesMap[diffAttr]);
+  }
+  for (auto *attr : tempAttrs.getAttributes<DerivativeAttr>()) {
+    auto *derAttr = const_cast<DerivativeAttr *>(attr);
+    derAttr->setOriginalDeclaration(decl);
+  }
+
+  // @abi
+  if (unresolvedABIAttr) {
+    unresolvedABIAttr->first->abiDecl = MF.getDecl(unresolvedABIAttr->second);
+  }
+}
+
 Expected<Decl *>
 DeclDeserializer::getDeclCheckedImpl(
   llvm::function_ref<bool(DeclAttributes)> matchAttributes) {
@@ -6523,12 +6543,7 @@ DeclDeserializer::getDeclCheckedImpl(
   case decls_block::RECORD_NAME##Layout::Code: {\
     auto declOrError = deserialize##RECORD_NAME(scratch, blobData); \
     if (declOrError) { \
-      /* \
-      // Set original declaration and parameter indices in `@differentiable` \
-      // attributes. \
-      */ \
-      setOriginalDeclarationAndParameterIndicesInDifferentiableAttributes(\
-          declOrError.get(), DAttrs, diffAttrParamIndicesMap); \
+      finishRecursiveAttrs(declOrError.get(), DAttrs); \
     } \
     if (!declOrError) \
       return declOrError; \

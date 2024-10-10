@@ -97,9 +97,14 @@ public func withDiscardingTaskGroup<GroupResult>(
 //
 // This function also doubles as an ABI-compatibility shim predating the
 // introduction of #isolation.
+@abi(
+  public func withDiscardingTaskGroup<GroupResult>(
+    returning returnType: GroupResult.Type = GroupResult.self,
+    body: (inout DiscardingTaskGroup) async -> GroupResult
+  ) async -> GroupResult
+)
 @available(SwiftStdlib 5.9, *)
 @_unsafeInheritExecutor // for ABI compatibility
-@_silgen_name("$ss23withDiscardingTaskGroup9returning4bodyxxm_xs0bcD0VzYaXEtYalF")
 public func _unsafeInheritExecutor_withDiscardingTaskGroup<GroupResult>(
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout DiscardingTaskGroup) async -> GroupResult
@@ -513,9 +518,14 @@ public func withThrowingDiscardingTaskGroup<GroupResult>(
   return result
 }
 
+@abi(
+  public func withThrowingDiscardingTaskGroup<GroupResult>(
+      returning returnType: GroupResult.Type = GroupResult.self,
+      body: (inout ThrowingDiscardingTaskGroup<Error>) async throws -> GroupResult
+  ) async throws -> GroupResult
+)
 @available(SwiftStdlib 5.9, *)
 @_unsafeInheritExecutor // for ABI compatibility
-@_silgen_name("$ss31withThrowingDiscardingTaskGroup9returning4bodyxxm_xs0bcdE0Vys5Error_pGzYaKXEtYaKlF")
 public func _unsafeInheritExecutor_withThrowingDiscardingTaskGroup<GroupResult>(
     returning returnType: GroupResult.Type = GroupResult.self,
     body: (inout ThrowingDiscardingTaskGroup<Error>) async throws -> GroupResult

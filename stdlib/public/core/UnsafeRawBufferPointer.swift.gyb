@@ -497,9 +497,13 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   - type: The type to use for the newly constructed instance. The memory
   ///     must be initialized to a value of a type that is layout compatible
   ///     with `type`.
+  @abi(
+    // This is chosen to not interfere with the old ABI
+    @usableFromInline func _new_se0349_storeBytes<T>(
+      of value: T, toByteOffset offset: Int, as type: T.Type
+    )
+  )
   @_alwaysEmitIntoClient
-  // This custom silgen name is chosen to not interfere with the old ABI
-  @_silgen_name("_swift_se0349_UnsafeMutableRawBufferPointer_storeBytes")
   public func storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
@@ -514,8 +518,12 @@ extension Unsafe${Mutable}RawBufferPointer {
   // This unavailable implementation uses the expected mangled name
   // of `storeBytes<T>(of:toByteOffset:as:)`, and provides an entry point for
   // any binary linked against the stdlib binary for Swift 5.6 and older.
+  @abi(
+    public func storeBytes<T>(
+      of value: T, toByteOffset offset: Int, as type: T.Type
+    )
+  )
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$sSw10storeBytes2of12toByteOffset2asyx_SixmtlF")
   @usableFromInline func _legacy_se0349_storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
@@ -1220,10 +1228,14 @@ public func withUnsafeMutableBytes<T: ~Copyable, E: Error, Result: ~Copyable>(
   return try body(.init(start: pointer, count: MemoryLayout<T>.size))
 }
 
-/// ABI: Historical withUnsafeMutableBytes(of:_:) rethrows,
-/// expressed as "throws", which is ABI-compatible with "rethrows".
+/// ABI: Historical withUnsafeMutableBytes(of:_:) rethrows.
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-@_silgen_name("$ss22withUnsafeMutableBytes2of_q_xz_q_SwKXEtKr0_lF")
+@abi(
+  public func withUnsafeMutableBytes<T, Result>(
+    of value: inout T,
+    _ body: (UnsafeMutableRawBufferPointer) throws -> Result
+  ) rethrows -> Result
+)
 @usableFromInline
 func __abi_se0413_withUnsafeMutableBytes<T, Result>(
   of value: inout T,
@@ -1287,10 +1299,14 @@ public func withUnsafeBytes<T: ~Copyable, E: Error, Result: ~Copyable>(
   return try body(.init(start: address, count: MemoryLayout<T>.size))
 }
 
-/// ABI: Historical withUnsafeBytes(of:_:) rethrows,
-/// expressed as "throws", which is ABI-compatible with "rethrows".
+/// ABI: Historical withUnsafeBytes(of:_:) rethrows.
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-@_silgen_name("$ss15withUnsafeBytes2of_q_xz_q_SWKXEtKr0_lF")
+@abi(
+  public func withUnsafeBytes<T, Result>(
+    of value: inout T,
+    _ body: (UnsafeRawBufferPointer) throws -> Result
+  ) rethrows -> Result
+)
 @usableFromInline
 func __abi_se0413_withUnsafeBytes<T, Result>(
   of value: inout T,
@@ -1354,7 +1370,12 @@ public func withUnsafeBytes<
 /// ABI: Historical withUnsafeBytes(of:_:) rethrows,
 /// expressed as "throws", which is ABI-compatible with "rethrows".
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-@_silgen_name("$ss15withUnsafeBytes2of_q_x_q_SWKXEtKr0_lF")
+@abi(
+  public func withUnsafeBytes<T, Result>(
+    of value: T,
+    _ body: (UnsafeRawBufferPointer) throws -> Result
+  ) throws -> Result
+)
 @usableFromInline
 func __abi_se0413_withUnsafeBytes<T, Result>(
   of value: T,

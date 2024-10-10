@@ -1214,11 +1214,14 @@ extension Collection {
   }
 
   // ABI-only entrypoint for the rethrows version of map, which has been
-  // superseded by the typed-throws version. Expressed as "throws", which is
-  // ABI-compatible with "rethrows".
+  // superseded by the typed-throws version.
+  @abi(
+    public func map<T>(
+      _ transform: (Element) throws -> T
+    ) rethrows -> [T]
+  )
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
-  @_silgen_name("$sSlsE3mapySayqd__Gqd__7ElementQzKXEKlF")
   func __rethrows_map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
