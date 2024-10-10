@@ -969,6 +969,25 @@ public:
   bool isCached() const { return true; }
 };
 
+using CustomDerivativesLookupResult = SmallVector<AbstractFunctionDecl *, 0>;
+
+class CustomDerivativesLookupRequest
+    : public SimpleRequest<CustomDerivativesLookupRequest,
+                           CustomDerivativesLookupResult(ModuleDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  CustomDerivativesLookupResult evaluate(Evaluator &evaluator,
+                                         ModuleDecl *module) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 using ObjCCategoryNameMap =
   llvm::DenseMap<Identifier, llvm::TinyPtrVector<ExtensionDecl *>>;
 
