@@ -7,6 +7,7 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: distributed
+// REQUIRES: swift_feature_IsolatedDeinit
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

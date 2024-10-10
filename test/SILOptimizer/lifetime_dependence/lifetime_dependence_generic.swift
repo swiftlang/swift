@@ -6,8 +6,9 @@
 // RUN:   -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:   -parse-stdlib -module-name Swift
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
 
 @_marker public protocol Escapable {}
 

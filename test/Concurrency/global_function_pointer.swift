@@ -10,6 +10,7 @@
 
 // rdar://76038845
 // REQUIRES: concurrency_runtime
+// REQUIRES: swift_feature_SymbolLinkageMarkers
 // UNSUPPORTED: back_deployment_runtime
 
 @MainActor

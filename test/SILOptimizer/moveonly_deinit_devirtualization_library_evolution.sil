@@ -1,6 +1,8 @@
 // RUN: %target-sil-opt -enable-library-evolution -module-name main -enable-sil-verify-all -deinit-devirtualizer -enable-experimental-feature MoveOnlyClasses -enable-experimental-feature MoveOnlyEnumDeinits %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_MoveOnlyClasses
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
 
 sil_stage raw
 

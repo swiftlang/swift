@@ -4,8 +4,8 @@
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   2>&1 | %FileCheck %s
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_NonescapableTypes
 
 struct BV : ~Escapable {
   let p: UnsafeRawPointer

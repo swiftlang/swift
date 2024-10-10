@@ -1,7 +1,7 @@
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 // REQUIRES: OS=macosx
 // REQUIRES: embedded_stdlib
+// REQUIRES: swift_feature_Embedded
 // RUN: %batch-code-completion -target %target-cpu-apple-macos14 -enable-experimental-feature Embedded
 
 func test() {

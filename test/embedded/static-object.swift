@@ -22,6 +22,7 @@
 
 // Currently, constant static arrays only work on Darwin platforms.
 // REQUIRES: VENDOR=apple
+// REQUIRES: swift_feature_Embedded
 
 
 public struct Str {

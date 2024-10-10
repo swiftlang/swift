@@ -3,9 +3,9 @@
 // RUN: %target-swift-frontend -enable-experimental-move-only -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
 // RUN: %target-swift-frontend -enable-experimental-move-only -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
-// REQUIRES: asserts
 
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 public protocol EventLoop: Sendable {}
 

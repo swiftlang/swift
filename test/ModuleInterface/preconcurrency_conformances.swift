@@ -24,8 +24,8 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface) -I %t -module-name Client \
 // RUN:   -disable-availability-checking -enable-upcoming-feature DynamicActorIsolation -verify
 
-// REQUIRES: asserts
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_DynamicActorIsolation
 
 //--- A.swift
 public protocol P {

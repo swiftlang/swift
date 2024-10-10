@@ -7,6 +7,7 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: CPU=arm64e
+// REQUIRES: swift_feature_Embedded
 
 // BEGIN header.h
 

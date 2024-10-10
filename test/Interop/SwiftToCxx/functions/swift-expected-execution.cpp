@@ -9,11 +9,9 @@
 // RUN: %target-run %t/swift-expected-execution | %FileCheck %s
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_GenerateBindingsForThrowingFunctionsInCXX
 // UNSUPPORTED: OS=windows-msvc
 // UNSUPPORTED: CPU=arm64e
-
-// for experimental feature GenerateBindingsForThrowingFunctionsInCXX:
-// REQUIRES: asserts
 
 #include <cassert>
 #include <cstdio>

@@ -83,6 +83,8 @@ public import Lib // expected-warning {{public import of 'Lib' was not used in p
 // RUN: %target-swift-frontend -typecheck -I %t \
 // RUN    %t/GeneratedAssetSymbols.swift \
 // RUN:   -primary-file %t/UserWrittenFile.swift -verify
+
+// REQUIRES: swift_feature_InternalImportsByDefault
 //--- UserWrittenFile.swift
 internal import Lib
 //--- GeneratedAssetSymbols.swift

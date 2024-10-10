@@ -4,6 +4,8 @@
 // RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name basic2 -enable-experimental-feature ValueGenerics
 // RUN: %target-sil-opt %t/tmp.2.sib -module-name basic2 -emit-sorted-sil -enable-experimental-feature ValueGenerics | %FileCheck %s
 
+// REQUIRES: swift_feature_ValueGenerics
+
 import Builtin
 import Swift
 

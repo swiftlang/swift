@@ -5,7 +5,6 @@
 // RUN:     -o %t/lifetime_dependence.swiftmodule \
 // RUN:     -emit-module-interface-path %t/lifetime_dependence.swiftinterface \
 // RUN:     %S/Inputs/lifetime_dependence.swift
-// REQUIRES: asserts
 
 // Check the interfaces
 
@@ -19,6 +18,8 @@
 
 // RUN: %target-swift-frontend -typecheck -I %t %s \
 // RUN:    -enable-experimental-feature NonescapableTypes
+
+// REQUIRES: swift_feature_NonescapableTypes
 
 import lifetime_dependence
 // CHECK: @lifetime(borrow a)

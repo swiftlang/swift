@@ -8,6 +8,8 @@
 // RUN: %target-swift-frontend -module-name lifetime-dependence -emit-sil -I %t %s \
 // RUN: -enable-experimental-feature NonescapableTypes | %FileCheck %s
 
+// REQUIRES: swift_feature_NonescapableTypes
+
 import def_explicit_lifetime_dependence
 func testBasic() {
   let capacity = 4

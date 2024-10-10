@@ -7,6 +7,7 @@
 // RUN: %target-swift-frontend -c -o %t/Main.o -I %t %t/Main.swift -enable-experimental-feature Embedded -parse-as-library
 
 // REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
 
 // BEGIN MyModule.swift
 

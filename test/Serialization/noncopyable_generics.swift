@@ -14,6 +14,8 @@
 // RUN:    -I %t -source-filename=%s                                           \
 // RUN:    | %FileCheck -check-prefix=CHECK-PRINT %s
 
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
+
 // CHECK-NOT: UnknownCode
 
 // CHECK-PRINT-DAG: protocol Generator<Value> {

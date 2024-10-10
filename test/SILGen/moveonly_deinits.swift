@@ -2,6 +2,8 @@
 // RUN: %target-swift-emit-sil -enable-experimental-feature MoveOnlyEnumDeinits %s | %FileCheck -check-prefix=SIL %s
 // RUN: %target-swift-emit-sil -O -sil-verify-all -enable-experimental-feature MoveOnlyEnumDeinits %s
 
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
+
 // Test that makes sure that throughout the pipeline we properly handle
 // conditional releases for trivial and non-trivial move only types.
 

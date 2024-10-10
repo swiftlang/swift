@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 @Sendable func globalFunc() { }
 

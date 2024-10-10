@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -disable-availability-checking -parse-as-library %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 // This should pass without any warnings or errors
 

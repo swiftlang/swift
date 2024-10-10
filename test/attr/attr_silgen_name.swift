@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern
 
+// REQUIRES: swift_feature_Extern
+
 @_silgen_name("foo") // expected-note {{attribute already specified here}}
 @_silgen_name("bar") // expected-error {{duplicate attribute}}
 func duplicateAsmName() {}

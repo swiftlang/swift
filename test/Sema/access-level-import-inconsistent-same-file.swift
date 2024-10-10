@@ -19,6 +19,8 @@
 // RUN: %target-swift-frontend -typecheck -verify %t/Client_Swift5.swift -I %t \
 // RUN:   -swift-version 5
 
+// REQUIRES: swift_feature_InternalImportsByDefault
+
 //--- Lib.swift
 
 public struct Type1 {}

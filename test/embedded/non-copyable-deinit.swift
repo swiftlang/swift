@@ -2,6 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
 
 var deinitCalled = false
 

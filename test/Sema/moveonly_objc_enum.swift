@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature MoveOnlyEnumDeinits
 
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
 
 // Validate that we can't mark an objc enum as move only.
 

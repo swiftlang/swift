@@ -10,7 +10,8 @@
 // RUN:     -enable-experimental-feature NonescapableTypes   \
 // RUN:     -enable-builtin-module
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_BuiltinModule
+// REQUIRES: swift_feature_NonescapableTypes
 
 // Force verification of TypeLowering's isTrivial.
 

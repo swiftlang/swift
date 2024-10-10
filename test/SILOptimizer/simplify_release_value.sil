@@ -1,6 +1,7 @@
 // RUN: %target-sil-opt -enable-experimental-feature MoveOnlyEnumDeinits -enable-sil-verify-all %s -simplification -simplify-instruction=release_value | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
 
 import Swift
 import Builtin

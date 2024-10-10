@@ -6,6 +6,9 @@
 // Make sure everything compiles without error when unsafe code is allowed.
 // RUN: %target-swift-frontend -typecheck -enable-experimental-feature AllowUnsafeAttribute %s -I %t
 
+// REQUIRES: swift_feature_AllowUnsafeAttribute
+// REQUIRES: swift_feature_WarnUnsafe
+
 import unsafe_swift_decls
 
 // -----------------------------------------------------------------------

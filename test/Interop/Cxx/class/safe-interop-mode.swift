@@ -4,6 +4,10 @@
 // RUN: %target-swift-frontend -typecheck -verify -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs  %t/test.swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe -enable-experimental-feature NonescapableTypes -enable-experimental-feature SafeInterop -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1
 
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_AllowUnsafeAttribute
+// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_SafeInterop
+// REQUIRES: swift_feature_WarnUnsafe
 
 //--- Inputs/module.modulemap
 module Test {

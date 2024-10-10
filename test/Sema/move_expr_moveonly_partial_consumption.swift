@@ -3,6 +3,8 @@
 // RUN:     -enable-experimental-feature NoImplicitCopy             \
 // RUN:     -debug-diagnostic-names
 
+// REQUIRES: swift_feature_NoImplicitCopy
+
 @_silgen_name("get")
 func get<T : ~Copyable>(_ t: T.Type = T.self) -> T
 

@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature GroupActorErrors  -strict-concurrency=complete
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_GroupActorErrors
 
 @MainActor
 protocol P {

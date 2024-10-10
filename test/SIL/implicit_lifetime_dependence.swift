@@ -1,7 +1,8 @@
 // RUN: %target-swift-frontend %s \
 // RUN: -emit-sil  -disable-availability-checking \
 // RUN: -enable-experimental-feature NonescapableTypes | %FileCheck %s
-// REQUIRES: asserts
+
+// REQUIRES: swift_feature_NonescapableTypes
 
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer

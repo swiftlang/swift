@@ -180,5 +180,6 @@ if '@SWIFT_BUILD_SWIFT_SYNTAX@' == 'TRUE':
 # Let the main config do the real work.
 if config.test_exec_root is None:
     config.test_exec_root = os.path.dirname(lit.util.abs_path_preserve_drive(__file__))
+lit_config.load_config(config, os.path.join(config.test_exec_root, "lit.swift-features.cfg"))
 lit_config.load_config(
     config, os.path.join(config.swift_src_root, "test", "lit.cfg"))

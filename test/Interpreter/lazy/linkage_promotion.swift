@@ -1,9 +1,7 @@
 // REQUIRES: OS=macosx
 // REQUIRES: swift_interpreter
+// REQUIRES: swift_feature_LazyImmediate
 // RUN: %target-jit-run %s -enable-experimental-feature LazyImmediate | %FileCheck %s
-
-// -enable-experimental-feature requires an asserts build
-// REQUIRES: asserts
 
 // Tests that the linkage of private symbols is
 // promoted to hidden external, allowing

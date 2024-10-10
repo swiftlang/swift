@@ -8,8 +8,8 @@
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// -enable-experimental-feature requires an asserts build
-// REQUIRES: asserts
+// REQUIRES: swift_feature_ParserASTGen
+
 // rdar://116686158
 // UNSUPPORTED: asan
 

@@ -3,6 +3,7 @@
 // RUN: %FileCheck %s < %t/core.h
 
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_Embedded
 
 public func id(_ x: Int) -> Int {
     return x

@@ -8,7 +8,7 @@
 // RUN: %target-swift-frontend -disable-availability-checking -I %t -enable-library-evolution -swift-version 5 -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 @_implementationOnly import ImplementationOnlyDefs
 // expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}

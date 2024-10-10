@@ -6,6 +6,7 @@
 // RUN: %target-run %t/refcount_overflow
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_Extern
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 

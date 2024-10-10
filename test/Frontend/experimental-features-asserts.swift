@@ -2,6 +2,8 @@
 // an asserts compilers.
 
 // REQUIRES: asserts
+// REQUIRES: swift_feature_AccessLevelOnImport
+// REQUIRES: swift_feature_ParserValidation
 
 // 'AccessLevelOnImport' is allowed in production
 // RUN: %target-swift-frontend -typecheck %s -enable-experimental-feature AccessLevelOnImport -verify

@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -enable-experimental-feature Sensitive -emit-ir %s | %FileCheck %s
 // RUN: %target-swift-frontend -target %module-target-future -enable-experimental-feature Sensitive -emit-ir %s | %FileCheck %s
 
+// REQUIRES: swift_feature_Sensitive
+
 sil_stage canonical
 
 import Builtin

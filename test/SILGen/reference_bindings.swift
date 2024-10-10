@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature ReferenceBindings -o - %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-sil -sil-verify-all -enable-experimental-feature ReferenceBindings -o - %s | %FileCheck -check-prefix=SIL %s
 
+// REQUIRES: swift_feature_ReferenceBindings
+
 class Klass {}
 struct S {
   var k = Klass()
