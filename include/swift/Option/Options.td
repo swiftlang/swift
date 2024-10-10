@@ -805,6 +805,10 @@ def experimental_package_interface_load:
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Enables loading a package interface if in the same package specified with package-name">;
 
+def experimental_serialize_debug_info:
+  Flag<["-"], "experimental-serialize-debug-info">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Enables seriailzation/deserialization of debug scopes">;
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,

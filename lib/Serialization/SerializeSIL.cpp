@@ -268,6 +268,7 @@ namespace {
     }
 
     bool ShouldSerializeAll;
+    bool SerializeDebugInfo;
 
     void addMandatorySILFunction(const SILFunction *F,
                                  bool emitDeclarationsForOnoneSupport);
@@ -345,8 +346,10 @@ namespace {
     IdentifierID addSILFunctionRef(SILFunction *F, bool isDebug = false);
 
   public:
-    SILSerializer(Serializer &S, llvm::BitstreamWriter &Out, bool serializeAll)
-      : S(S), Out(Out), ShouldSerializeAll(serializeAll) {}
+    SILSerializer(Serializer &S, llvm::BitstreamWriter &Out, bool serializeAll,
+                  bool serializeDebugInfo)
+        : S(S), Out(Out), ShouldSerializeAll(serializeAll),
+          SerializeDebugInfo(serializeDebugInfo) {}
 
     void writeSILModule(const SILModule *SILMod);
   };
@@ -605,7 +608,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   DebugScopeMap.clear();
   SourceLocMap.clear();
 
-  writeDebugScopes(F.getDebugScope(), F.getModule().getSourceManager());
+  if (SerializeDebugInfo)
+    writeDebugScopes(F.getDebugScope(), F.getModule().getSourceManager());
   // Assign a unique ID to each basic block of the SILFunction.
   unsigned BasicID = 0;
   BasicBlockMap.clear();
@@ -706,9 +710,11 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
     llvm::errs() << "HERE\n";
   }
   for (const SILInstruction &SI : BB) {
-    if (SI.getDebugScope() != Prev) {
-      Prev = SI.getDebugScope();
-      writeDebugScopes(Prev, SM);
+    if (SerializeDebugInfo) {
+      if (SI.getDebugScope() != Prev) {
+        Prev = SI.getDebugScope();
+        writeDebugScopes(Prev, SM);
+      }
     }
     auto SourceLocPtr = SI.getLoc().getSourceLoc().getOpaquePointerValue();
     if (SourceLocPtr != PrevSourceLoc) {
@@ -3676,10 +3682,11 @@ void SILSerializer::writeSILModule(const SILModule *SILMod) {
   writeIndexTables();
 }
 
-void Serializer::writeSIL(const SILModule *SILMod, bool serializeAllSIL) {
+void Serializer::writeSIL(const SILModule *SILMod, bool serializeAllSIL,
+                          bool serializeDebugInfo) {
   if (!SILMod)
     return;
 
-  SILSerializer SILSer(*this, Out, serializeAllSIL);
+  SILSerializer SILSer(*this, Out, serializeAllSIL, serializeDebugInfo);
   SILSer.writeSILModule(SILMod);
 }

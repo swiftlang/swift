@@ -825,6 +825,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       assert(!fn->isZombie());
       fn->setLinkage(
           linkage); // we force funcs to private when deserializing as zombie
+
+      Callback->didDeserialize(MF->getAssociatedModule(), fn);
     }
     if (fn->getLoweredType() != ty) {
       auto error = llvm::make_error<SILFunctionTypeMismatch>(
@@ -882,12 +884,11 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     if (name.contains("sSW5start5countSWSVSg_SitcfC")) {
       llvm::errs() << "HERE FID: " << (unsigned)FID << "\n";
     }
-    fn = builder.createDeclaration(name, ty, loc, isDebug);
+    fn = builder.createDeclaration(name, ty, loc);
 
     // TODO: for functions deserialized for debug scopes, set linkage to private
     // as public symbols make into the final binary even when zombies?
     fn->setLinkage(isDebug ? SILLinkage::Private : linkage);
-    // fn->setLinkage(linkage);
     fn->setTransparent(IsTransparent_t(isTransparent == 1));
     fn->setSerializedKind(SerializedKind_t(serializedKind));
     fn->setThunk(IsThunk_t(isThunk));
@@ -924,11 +925,13 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     for (auto ID : SemanticsIDs) {
       fn->addSemanticsAttr(MF->getIdentifierText(ID));
     }
-    if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), fn);
+    if (isDebug) {
+      SILMod.eraseFunction(fn);
+    }
+    if (Callback && !isDebug)
+      Callback->didDeserialize(MF->getAssociatedModule(), fn);
   }
 
-  llvm::errs() << "deserialized : " << fn->getName() << " isDebug: " << isDebug
-               << "\n";
   // First before we do /anything/ validate that our function is truly empty.
   assert(fn->empty() && "SILFunction to be deserialized starts being empty.");
 
@@ -1047,7 +1050,6 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   GenericEnvironment *genericEnv = nullptr;
   if (!declarationOnly || isDebug) {
     genericEnv = MF->getGenericSignature(genericSigID).getGenericEnvironment();
-    // llvm::errs() <<  "Generic Env: " << genericEnv << "\n";
   }
 
   // If the next entry is the end of the block, then this function has
@@ -1074,9 +1076,6 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
                << " FID: " << FID << "\n";
   // Stop here if we have nothing else to do.
   if (isEmptyFunction || declarationOnly) {
-    llvm::errs() << "is empty or decl only\n";
-    fn->dump();
-
     const SILDebugScope *DS = new (SILMod) SILDebugScope(loc, fn);
     fn->setDebugScope(DS);
     if (/*isDebug && */ genericEnv)
