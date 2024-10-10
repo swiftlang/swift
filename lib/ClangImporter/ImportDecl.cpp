@@ -2947,7 +2947,7 @@ namespace {
       if (!clangDecl->hasAttrs())
         return;
 
-      SmallVector<clang::Attr*, 40> conformsToMatches;
+      SmallVector<clang::Attr*, 1> conformsToMatches;
       llvm::copy_if(clangDecl->getAttrs(), std::back_inserter(conformsToMatches), [](auto *attr) -> bool {
         if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
           return swiftAttr->getAttribute().starts_with("conforms_to:");
