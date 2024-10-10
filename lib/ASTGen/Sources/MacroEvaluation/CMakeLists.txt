@@ -1,4 +1,4 @@
-add_pure_swift_host_library(swiftMacros STATIC CXX_INTEROP
+add_pure_swift_host_library(swiftMacroEvaluation STATIC CXX_INTEROP
   Macros.swift
   PluginHost.swift
   SourceManager.swift
