@@ -215,7 +215,21 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
     }
   }
 
+  // Below is a list of supported inference sources (in relation to the function
+  // in question), followed by a list of inference rules.
+  //
+  // (a): Its dynamically replaced function.
+  // (b): Protocol requirements that it witnesses.
+  // (c): Protocol requirements that its dynamically replaced function
+  //     witnesses.
+  //
+  // (r1): (a) and (b) are always attempted.
+  // (r2): (c) is attempted only if (a) has no result builder.
+
   auto *dc = decl->getDeclContext();
+
+  // Neither of the aforementioned inference sources apply to a protocol
+  // requirement.
   if (isa<ProtocolDecl>(dc)) {
     return Type();
   }
@@ -225,6 +239,29 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
     return Type();
   }
 
+  // A potentially inferred result builder will not be used to transform
+  // the body in the following cases:
+  // - The function has no body.
+  // - The function was deserialized (has no parent source file) and, thus,
+  //   is already type-checked.
+  // - The body has an explicit 'return' statement, which disables the result
+  //   builder transform.
+  //
+  // In these cases, inference can be skipped as an optimization.
+  //
+  // To demostrate that skipping inference here will not affect result builder
+  // inference for other functions, suppose that the function at hand ('x') is
+  // an inference source for another function ('y'). Since 'x' is not a protocol
+  // requirement, the only inference source it can assume is (a). Consequently,
+  // the only inference source available to 'x' is (b) because a dynamically
+  // replaced declaration cannot itself be '@_dynamicReplacement'.
+  //
+  // This implies that inferring a result builder for 'x' is equivalent to
+  // attempting (b) for 'x', which in turn is equivalent to attempting (c) for
+  // 'y'. Now, recall that 'x' is (a) for 'y'. According to rule (r2), skipping
+  // inference for 'x' will cause (c) to be attempted for 'y'. We see that
+  // the result of inferring for 'x' will be considered when inferring for 'y'
+  // either way.
   if (!funcDecl->hasBody() || !dc->getParentSourceFile() ||
       !TypeChecker::findReturnStatements(funcDecl).empty()) {
     return Type();
