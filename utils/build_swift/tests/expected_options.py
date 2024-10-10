@@ -629,6 +629,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--enable-experimental-string-processing'),
     EnableOption('--enable-experimental-observation'),
     EnableOption('--enable-experimental-parser-validation'),
+    EnableOption('--enable-experimental-pointer-bounds'),
     EnableOption('--enable-lsan'),
     EnableOption('--enable-sanitize-coverage'),
     EnableOption('--enable-tsan'),

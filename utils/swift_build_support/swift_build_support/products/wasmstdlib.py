@@ -164,6 +164,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_ENABLE_SYNCHRONIZATION:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_ENABLE_VOLATILE:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL', 'TRUE')
+        self.cmake_options.define('SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS:BOOL', 'TRUE')
 
         self.add_extra_cmake_options()
 

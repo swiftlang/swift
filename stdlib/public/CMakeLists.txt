@@ -281,6 +281,10 @@ if(SWIFT_BUILD_STDLIB)
     add_subdirectory(StringProcessing)
     add_subdirectory(RegexBuilder)
   endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS)
+    add_subdirectory(PointerBounds)
+  endif()
 endif()
 
 if(SWIFT_BUILD_STDLIB AND NOT SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES)
