@@ -36,6 +36,8 @@
 #include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
 #include "GenOpaque.h"
+#include "GenType.h"
+#include "NonFixedTypeInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
@@ -1536,4 +1538,372 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
 
   llvm_unreachable("IRGen unimplemented for this builtin!");
+}
+
+class LoadableArrayTypeInfo final : public LoadableTypeInfo {
+  static llvm::Type *getArrayType(unsigned arraySize,
+                                  const LoadableTypeInfo &elementTI) {
+    // Start with the element's storage type.
+    llvm::Type *elementTy = elementTI.getStorageType();
+    auto &LLVMContext = elementTy->getContext();
+
+    if (arraySize == 0) {
+      return llvm::StructType::get(LLVMContext, {});
+    }
+    
+    // If we need to, pad it to stride.
+    if (elementTI.getFixedSize() < elementTI.getFixedStride()) {
+      unsigned paddingBytes = elementTI.getFixedStride().getValue()
+        - elementTI.getFixedSize().getValue();
+      auto byteTy = llvm::IntegerType::get(LLVMContext, 8);
+      elementTy = llvm::StructType::get(LLVMContext,
+        {elementTy,
+         llvm::ArrayType::get(byteTy, paddingBytes)},
+        /*packed*/ true);
+    }
+    
+    return llvm::ArrayType::get(elementTy, arraySize);
+  }
+  
+  static Size getArraySize(unsigned arraySize,
+                           const LoadableTypeInfo &elementTI) {
+    // We always pad out the stride, even for the final element.
+    return Size(arraySize * elementTI.getFixedStride().getValue());
+  }
+  
+  static SpareBitVector getArraySpareBits(unsigned arraySize,
+                                          const LoadableTypeInfo &elementTI) {
+    if (arraySize == 0) {
+      return SpareBitVector();
+    }
+    
+    // Take spare bits from the first element only.
+    SpareBitVector result = elementTI.getSpareBits();
+    result.appendClearBits(getArraySize(arraySize, elementTI).getValueInBits()
+                             - result.size());
+    return result;
+  }
+  
+  const unsigned ArraySize;
+  const LoadableTypeInfo &Element;
+  
+  static SILType getElementSILType(IRGenModule &IGM,
+                                   SILType arrayType) {
+    return IGM.getLoweredType(AbstractionPattern::getOpaque(),
+                  arrayType.castTo<BuiltinFixedArrayType>()->getElementType());
+  }
+  
+public:
+  LoadableArrayTypeInfo(unsigned arraySize,
+                        const LoadableTypeInfo &elementTI)
+    : LoadableTypeInfo(getArrayType(arraySize, elementTI),
+                       getArraySize(arraySize, elementTI),
+                       getArraySpareBits(arraySize, elementTI),
+                       elementTI.getFixedAlignment(),
+                       elementTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
+                       elementTI.isCopyable(ResilienceExpansion::Maximal),
+                       elementTI.isFixedSize(ResilienceExpansion::Minimal),
+                       elementTI.isABIAccessible()),
+      ArraySize(arraySize), Element(elementTI)
+  {
+  }
+  
+  unsigned getExplosionSize() const override {
+    return Element.getExplosionSize() * ArraySize;
+  }
+
+  template<typename Body>
+  void eachElementAddr(IRGenFunction &IGF,
+                       Address addr,
+                       Body &&body) const {
+    for (unsigned i = 0; i < ArraySize; ++i) {
+      auto elementAddr = IGF.Builder.CreateArrayGEP(addr,
+        llvm::ConstantInt::get(IGF.IGM.IntPtrTy, i), Element.getFixedStride());
+      
+      body(elementAddr);
+    }
+  }
+  template<typename Body>
+  void eachElement(Body &&body) const {
+    for (unsigned i = 0; i < ArraySize; ++i) {
+      body();
+    }
+  }
+
+  void getSchema(ExplosionSchema &schema) const override {
+    eachElement([&]{
+      Element.getSchema(schema);
+    });
+  }
+  
+  TypeLayoutEntry *
+  buildTypeLayoutEntry(IRGenModule &IGM,
+                       SILType T,
+                       bool useStructLayouts) const override {
+    std::vector<TypeLayoutEntry *> elements;
+    auto eltTy = getElementSILType(IGM, T);
+    eachElement([&]{
+      elements.push_back(Element.buildTypeLayoutEntry(IGM, eltTy,
+                                                      useStructLayouts));
+    });
+    return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(elements, T,
+                                Element.getFixedAlignment().getValue(), *this);
+  }
+
+  void loadAsCopy(IRGenFunction &IGF, Address addr,
+                  Explosion &explosion) const override {
+    eachElementAddr(IGF, addr,
+                    [&](Address elementAddr) {
+                      Element.loadAsCopy(IGF, elementAddr, explosion);
+                    });
+  }
+
+  void loadAsTake(IRGenFunction &IGF, Address addr,
+                  Explosion &explosion) const override {
+    eachElementAddr(IGF, addr,
+                    [&](Address elementAddr) {
+                      Element.loadAsTake(IGF, elementAddr, explosion);
+                    });
+  }
+  
+  void assign(IRGenFunction &IGF, Explosion &explosion, Address addr,
+              bool isOutlined, SILType T) const override {
+    auto eltTy = getElementSILType(IGF.IGM, T);
+    eachElementAddr(IGF, addr,
+                    [&](Address elementAddr) {
+                      Element.assign(IGF, explosion, addr, isOutlined,
+                                     eltTy);
+                    });
+  }
+
+  void initialize(IRGenFunction &IGF, Explosion &explosion, Address addr,
+                  bool isOutlined) const override {
+    eachElementAddr(IGF, addr,
+                    [&](Address elementAddr) {
+                      Element.initialize(IGF, explosion, addr, isOutlined);
+                    });
+  }
+  
+  void reexplode(Explosion &sourceExplosion,
+                 Explosion &targetExplosion) const override {
+    eachElement([&]{
+      Element.reexplode(sourceExplosion, targetExplosion);
+    });
+  }
+  
+  void copy(IRGenFunction &IGF,
+            Explosion &sourceExplosion,
+            Explosion &targetExplosion,
+            Atomicity atomicity) const override {
+    eachElement([&]{
+      Element.copy(IGF, sourceExplosion, targetExplosion, atomicity);
+    });
+  }
+  
+  void consume(IRGenFunction &IGF, Explosion &explosion,
+               Atomicity atomicity,
+               SILType T) const override {
+    auto eltTy = getElementSILType(IGF.IGM, T);
+    eachElement([&]{
+      Element.consume(IGF, explosion, atomicity, eltTy);
+    });
+  }
+
+  void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                            Address src, SILType T,
+                            bool isOutlined) const override {
+    auto eltTy = getElementSILType(IGF.IGM, T);
+    eachElementAddr(IGF, src,
+                    [&](Address elementAddr) {
+                      Element.initializeFromParams(IGF, params, elementAddr,
+                                                   eltTy, isOutlined);
+                    });
+  }
+  
+  void fixLifetime(IRGenFunction &IGF,
+                   Explosion &explosion) const override {
+    eachElement([&]{
+      Element.fixLifetime(IGF, explosion);
+    });
+  }
+  
+  template<typename...Addresses, typename Body>
+  void eachElementAddrLoop(IRGenFunction &IGF,
+                           Body &&body,
+                           Addresses...addrs) const {
+    switch (ArraySize) {
+    case 0:
+      // empty type, nothing to do
+      return;
+    case 1:
+      // only one element to operate on
+      return body(addrs...);
+    
+    default:
+      // emit a loop below
+      break;
+    }
+    
+    auto predBB = IGF.Builder.GetInsertBlock();
+    
+    auto loopBB = IGF.createBasicBlock("each_vector_element");
+    auto endBB = IGF.createBasicBlock("end_vector_element");
+
+    IGF.Builder.CreateBr(loopBB);
+
+    IGF.Builder.emitBlock(loopBB);
+
+    auto countPhi = IGF.Builder.CreatePHI(IGF.IGM.IntPtrTy, 2);
+    countPhi->addIncoming(llvm::ConstantInt::get(IGF.IGM.IntPtrTy, ArraySize),
+                          predBB);
+
+    auto one = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 1);
+    auto zero = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0);
+
+#define PACK_LET(pack, value, body) \
+   [&](auto...pack) body ((value)...)
+    
+    PACK_LET(addrPhis, IGF.Builder.CreatePHI(addrs.getType(), 2), {
+      PACK_LET(eltAddrs,
+               Address(addrPhis, getStorageType(), addrs.getAlignment()), {
+
+        body((addrPhis->addIncoming(addrs.getAddress(), predBB),
+              eltAddrs)...);
+
+        [](auto...){}((
+          addrPhis->addIncoming(IGF.Builder.CreateArrayGEP(eltAddrs,
+                                    one, Element.getFixedStride()).getAddress(),
+                                loopBB),
+          0)...);
+        
+      });
+    });
+
+    auto nextCount = IGF.Builder.CreateSub(countPhi, one);
+    countPhi->addIncoming(nextCount, loopBB);
+    
+    auto done = IGF.Builder.CreateICmpEQ(nextCount, zero);
+    IGF.Builder.CreateCondBr(done, endBB, loopBB);
+    
+    IGF.Builder.emitBlock(endBB);
+  }
+
+  void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                      SILType T, bool isOutlined) const override {
+    auto eltTy = getElementSILType(IGF.IGM, T);
+    eachElementAddrLoop(IGF,
+                        [&](Address destElt, Address srcElt) {
+                          Element.assignWithCopy(IGF, destElt, srcElt,
+                                                 eltTy, isOutlined);
+                        }, dest, src);
+  }
+
+  void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
+                      SILType T, bool isOutlined) const override {
+    auto eltTy = getElementSILType(IGF.IGM, T);
+    eachElementAddrLoop(IGF,
+                        [&](Address destElt, Address srcElt) {
+                          Element.assignWithTake(IGF, destElt, srcElt,
+                                                 eltTy, isOutlined);
+                        }, dest, src);
+  }
+
+  void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                          SILType T, bool isOutlined) const override {
+    auto eltTy = getElementSILType(IGF.IGM, T);
+    eachElementAddrLoop(IGF,
+                        [&](Address destElt, Address srcElt) {
+                          Element.initializeWithCopy(IGF, destElt, srcElt,
+                                                     eltTy, isOutlined);
+                        }, dest, src);
+  }
+  
+
+  void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
+                          SILType T,
+                          bool isOutlined,
+                          bool zeroizeIfSensitive) const override {
+    auto eltTy = getElementSILType(IGF.IGM, T);
+    eachElementAddrLoop(IGF,
+                        [&](Address destElt, Address srcElt) {
+                          Element.initializeWithTake(IGF, destElt, srcElt,
+                                                     eltTy, isOutlined,
+                                                     zeroizeIfSensitive);
+                        }, dest, src);
+  }
+  
+  virtual void destroy(IRGenFunction &IGF, Address address, SILType T,
+                       bool isOutlined) const override {
+    auto eltTy = getElementSILType(IGF.IGM, T);
+    eachElementAddrLoop(IGF,
+                        [&](Address elt) {
+                          Element.destroy(IGF, elt, eltTy, isOutlined);
+                        }, address);
+  }
+  
+  template<typename Body>
+  void eachElementOffset(Body &&body) const {
+    for (unsigned i = 0; i < ArraySize; ++i) {
+      body(i * Element.getFixedStride().getValue());
+    }
+  }
+  
+  void packIntoEnumPayload(IRGenModule &IGM,
+                           IRBuilder &builder,
+                           EnumPayload &payload,
+                           Explosion &sourceExplosion,
+                           unsigned offset) const override {
+    eachElementOffset([&](unsigned eltByteOffset){
+      Element.packIntoEnumPayload(IGM, builder, payload,
+                                  sourceExplosion,
+                                  offset + eltByteOffset * 8);
+    });
+  }
+  
+  void unpackFromEnumPayload(IRGenFunction &IGF,
+                             const EnumPayload &payload,
+                             Explosion &targetExplosion,
+                             unsigned offset) const override {
+    eachElementOffset([&](unsigned eltByteOffset){
+      Element.unpackFromEnumPayload(IGF, payload,
+                                    targetExplosion,
+                                    offset + eltByteOffset * 8);
+    });
+  }
+  
+  void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                        Size offset) const override {
+    eachElementOffset([&](unsigned eltByteOffset){
+      Element.addToAggLowering(IGM, lowering,
+                               Size(offset.getValue() + eltByteOffset));
+    });
+  }
+};
+
+/*
+class NonFixedArrayTypeInfo final
+  : public WitnessSizedTypeInfo<NonFixedArrayTypeInfo> {
+public:
+  
+};
+*/
+
+const TypeInfo *
+TypeConverter::convertBuiltinFixedArrayType(BuiltinFixedArrayType *T) {
+  // Most of our layout properties come from the element type.
+  auto &elementTI = IGM.getTypeInfoForUnlowered(AbstractionPattern::getOpaque(),
+                                                T->getElementType());
+  // ...unless the array size is not fixed, then the array layout is never
+  // fixed.
+  auto fixedSize = T->getFixedSize();
+                                  
+  if (!fixedSize.has_value() || !elementTI.isFixedSize()) {
+    llvm_unreachable("todo");//return new NonFixedArrayTypeInfo(T->getSize(), elementTI);
+  }
+  
+  if (auto *loadableTI = dyn_cast<LoadableTypeInfo>(&elementTI)) {
+    return new LoadableArrayTypeInfo(fixedSize.value(), *loadableTI);
+  }
+  
+  llvm_unreachable("todo");//return new FixedArrayTypeInfo(fixedSize, elementTI);
 }

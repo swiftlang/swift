@@ -1794,6 +1794,14 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
 
     // Here goes!
     switch (BaseTy->getKind()) {
+    case TypeKind::BuiltinUnboundGeneric:
+      llvm_unreachable("not a real type");
+      
+    case TypeKind::BuiltinFixedArray: {
+      #warning "todo"
+      llvm_unreachable("todo");
+    }
+    
     case TypeKind::BuiltinPackIndex:
     case TypeKind::BuiltinInteger: {
       Encoding = llvm::dwarf::DW_ATE_unsigned;

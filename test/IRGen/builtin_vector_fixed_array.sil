@@ -1,0 +1,92 @@
+// RUN: %target-swift-frontend -emit-ir -disable-availability-checking -enable-experimental-feature ValueGenerics -enable-experimental-feature BuiltinModule %s | %FileCheck %s
+import Builtin
+import Swift
+
+sil @trivial_fixed: $@convention(thin) (Builtin.Vector<2, Int>) -> (Builtin.Vector<2, Int>, Builtin.Vector<2, Int>) {
+entry(%v : $Builtin.Vector<2, Int>):
+    %r = tuple (%v : $Builtin.Vector<2, Int>, %v : $Builtin.Vector<2, Int>)
+    return %r : $(Builtin.Vector<2, Int>, Builtin.Vector<2, Int>)
+}
+
+sil @loadable_fixed: $@convention(thin) (@owned Builtin.Vector<2, AnyObject>) -> @owned (Builtin.Vector<2, AnyObject>, Builtin.Vector<2, AnyObject>) {
+entry(%v : $Builtin.Vector<2, AnyObject>):
+    retain_value %v : $Builtin.Vector<2, AnyObject>
+    %r = tuple (%v : $Builtin.Vector<2, AnyObject>, %v : $Builtin.Vector<2, AnyObject>)
+    return %r : $(Builtin.Vector<2, AnyObject>, Builtin.Vector<2, AnyObject>)
+}
+
+sil @loadable_fixed_indirect: $@convention(thin) (@in Builtin.Vector<420, AnyObject>) -> @out (Builtin.Vector<420, AnyObject>, Builtin.Vector<420, AnyObject>) {
+entry(%r : $*(Builtin.Vector<420, AnyObject>, Builtin.Vector<420, AnyObject>), %v : $*Builtin.Vector<420, AnyObject>):
+    %a = tuple_element_addr %r : $*(Builtin.Vector<420, AnyObject>, Builtin.Vector<420, AnyObject>), 0
+    copy_addr %v to [init] %a: $*Builtin.Vector<420, AnyObject>
+    %b = tuple_element_addr %r : $*(Builtin.Vector<420, AnyObject>, Builtin.Vector<420, AnyObject>), 1
+    copy_addr [take] %v to [init] %b: $*Builtin.Vector<420, AnyObject>
+    return undef : $()
+}
+
+struct Padded {
+    var a: Int32
+    var b: Int8
+}
+
+sil @loadable_padded_fixed: $@convention(thin) (Builtin.Vector<2, Padded>) -> (Builtin.Vector<2, Padded>, Builtin.Vector<2, Padded>) {
+entry(%v : $Builtin.Vector<2, Padded>):
+    %r = tuple (%v : $Builtin.Vector<2, Padded>, %v : $Builtin.Vector<2, Padded>)
+    return %r : $(Builtin.Vector<2, Padded>, Builtin.Vector<2, Padded>)
+}
+
+/*
+sil @ao_fixed: $@convention(thin) (@in Builtin.Vector<2, Any>) -> @out (Builtin.Vector<2, Any>, Builtin.Vector<2, Any>) {
+entry(%r : $*(Builtin.Vector<2, Any>, Builtin.Vector<2, Any>), %v : $*Builtin.Vector<2, Any>):
+    %a = tuple_element_addr %r : $*(Builtin.Vector<2, Any>, Builtin.Vector<2, Any>), 0
+    copy_addr %v to [init] %a: $*Builtin.Vector<2, Any>
+    %b = tuple_element_addr %r : $*(Builtin.Vector<2, Any>, Builtin.Vector<2, Any>), 1
+    copy_addr [take] %v to [init] %b: $*Builtin.Vector<2, Any>
+    return undef : $()
+}
+
+sil @dep_fixed: $@convention(thin) <T>(@in Builtin.Vector<2, T>) -> @out (Builtin.Vector<2, T>, Builtin.Vector<2, T>) {
+entry(%r : $*(Builtin.Vector<2, T>, Builtin.Vector<2, T>), %v : $*Builtin.Vector<2, T>):
+    %a = tuple_element_addr %r : $*(Builtin.Vector<2, T>, Builtin.Vector<2, T>), 0
+    copy_addr %v to [init] %a: $*Builtin.Vector<2, T>
+    %b = tuple_element_addr %r : $*(Builtin.Vector<2, T>, Builtin.Vector<2, T>), 1
+    copy_addr [take] %v to [init] %b: $*Builtin.Vector<2, T>
+    return undef : $()
+}
+
+sil @trivial_dep: $@convention(thin) <let N: Int>(@in Builtin.Vector<2, Int>) -> @out (Builtin.Vector<2, Int>, Builtin.Vector<2, Int>) {
+entry(%r : $*(Builtin.Vector<2, Int>, Builtin.Vector<2, Int>), %v : $*Builtin.Vector<2, Int>):
+    %a = tuple_element_addr %r : $*(Builtin.Vector<2, Int>, Builtin.Vector<2, Int>), 0
+    copy_addr %v to [init] %a: $*Builtin.Vector<2, Int>
+    %b = tuple_element_addr %r : $*(Builtin.Vector<2, Int>, Builtin.Vector<2, Int>), 1
+    copy_addr [take] %v to [init] %b: $*Builtin.Vector<2, Int>
+    return undef : $()
+}
+
+sil @loadable_dep: $@convention(thin) <let N: Int>(@in Builtin.Vector<2, AnyObject>) -> @out (Builtin.Vector<2, AnyObject>, Builtin.Vector<2, AnyObject>) {
+entry(%r : $*(Builtin.Vector<2, AnyObject>, Builtin.Vector<2, AnyObject>), %v : $*Builtin.Vector<2, AnyObject>):
+    %a = tuple_element_addr %r : $*(Builtin.Vector<2, AnyObject>, Builtin.Vector<2, AnyObject>), 0
+    copy_addr %v to [init] %a: $*Builtin.Vector<2, AnyObject>
+    %b = tuple_element_addr %r : $*(Builtin.Vector<2, AnyObject>, Builtin.Vector<2, AnyObject>), 1
+    copy_addr [take] %v to [init] %b: $*Builtin.Vector<2, AnyObject>
+    return undef : $()
+}
+
+sil @ao_dep: $@convention(thin) <let N: Int>(@in Builtin.Vector<2, Any>) -> @out (Builtin.Vector<2, Any>, Builtin.Vector<2, Any>) {
+entry(%r : $*(Builtin.Vector<2, Any>, Builtin.Vector<2, Any>), %v : $*Builtin.Vector<2, Any>):
+    %a = tuple_element_addr %r : $*(Builtin.Vector<2, Any>, Builtin.Vector<2, Any>), 0
+    copy_addr %v to [init] %a: $*Builtin.Vector<2, Any>
+    %b = tuple_element_addr %r : $*(Builtin.Vector<2, Any>, Builtin.Vector<2, Any>), 1
+    copy_addr [take] %v to [init] %b: $*Builtin.Vector<2, Any>
+    return undef : $()
+}
+
+sil @dep_dep: $@convention(thin) <let N: Int, T>(@in Builtin.Vector<2, T>) -> @out (Builtin.Vector<2, T>, Builtin.Vector<2, T>) {
+entry(%r : $*(Builtin.Vector<2, T>, Builtin.Vector<2, T>), %v : $*Builtin.Vector<2, T>):
+    %a = tuple_element_addr %r : $*(Builtin.Vector<2, T>, Builtin.Vector<2, T>), 0
+    copy_addr %v to [init] %a: $*Builtin.Vector<2, T>
+    %b = tuple_element_addr %r : $*(Builtin.Vector<2, T>, Builtin.Vector<2, T>), 1
+    copy_addr [take] %v to [init] %b: $*Builtin.Vector<2, T>
+    return undef : $()
+}
+*/
