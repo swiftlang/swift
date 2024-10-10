@@ -108,6 +108,16 @@ extension String {
     return String._uncheckedFromUTF8(input, isASCII: extraInfo.isASCII)
   }
 
+  public // SPI(Foundation)
+  mutating func _tryAppendFromUTF8(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
+    guard case .success(let extraInfo) = validateUTF8(input) else {
+      return false
+    }
+
+    self._guts.append(input, isASCII: extraInfo.isASCII)
+    return true
+  }
+
   @usableFromInline
   internal static func _fromUTF8Repairing(
     _ input: UnsafeBufferPointer<UInt8>
