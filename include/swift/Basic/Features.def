@@ -412,6 +412,9 @@ EXPERIMENTAL_FEATURE(WarnUnsafe, true)
 /// Import unsafe C and C++ constructs as @unsafe.
 EXPERIMENTAL_FEATURE(SafeInterop, true)
 
+/// Ignore resilience errors due to C++ types.
+EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
+
 // Isolated deinit
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(IsolatedDeinit, true)
 
