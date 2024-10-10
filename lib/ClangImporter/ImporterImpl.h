@@ -900,6 +900,11 @@ public:
     return Instance->getASTContext();
   }
 
+  /// Has Clang AST contenxt.
+  bool hasClangASTContext() const {
+    return Instance->hasASTContext();
+  }
+
   /// Retrieve the Clang Sema object.
   clang::Sema &getClangSema() const {
     return Instance->getSema();

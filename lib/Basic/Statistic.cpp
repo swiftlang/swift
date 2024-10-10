@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Config.h"
 #include "clang/Basic/SourceLocation.h"
@@ -317,8 +318,6 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            StringRef OutputType,
                                            StringRef OptType,
                                            StringRef Directory,
-                                           SourceManager *SM,
-                                           clang::SourceManager *CSM,
                                            bool FineGrainedTimers,
                                            bool TraceEvents,
                                            bool ProfileEvents,
@@ -330,7 +329,7 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                  OutputType,
                                  OptType),
                          Directory,
-                         SM, CSM, FineGrainedTimers,
+                         FineGrainedTimers,
                          TraceEvents, ProfileEvents, ProfileEntities)
 {
 }
@@ -338,8 +337,6 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
 UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            StringRef AuxName,
                                            StringRef Directory,
-                                           SourceManager *SM,
-                                           clang::SourceManager *CSM,
                                            bool FineGrainedTimers,
                                            bool TraceEvents,
                                            bool ProfileEvents,
@@ -354,8 +351,6 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
     Timer(std::make_unique<NamedRegionTimer>(AuxName,
                                         "Building Target",
                                         ProgramName, "Running Program")),
-    SourceMgr(SM),
-    ClangSourceMgr(CSM),
     RecursiveTimers(std::make_unique<RecursionSafeTimers>()),
     FineGrainedTimers(FineGrainedTimers),
     IsFlushingTracesAndProfiles(false)
@@ -372,6 +367,12 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
     EventProfilers =std::make_unique<StatsProfilers>();
   if (ProfileEntities)
     EntityProfilers =std::make_unique<StatsProfilers>();
+}
+
+void UnifiedStatsReporter::setSourceManager(SourceManager *SM,
+                                            clang::SourceManager *CSM) {
+  SourceMgr = SM;
+  ClangSourceMgr = CSM;
 }
 
 void UnifiedStatsReporter::recordJobMaxRSS(long rss) {

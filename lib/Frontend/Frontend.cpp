@@ -340,11 +340,12 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
   return false;
 }
 
-void CompilerInstance::setupStatsReporter() {
+void CompilerInstance::initStatsReporter() {
   const auto &Invoke = getInvocation();
   const std::string &StatsOutputDir =
       Invoke.getFrontendOptions().StatsOutputDir;
-  if (StatsOutputDir.empty())
+  const auto &FEOpts = Invoke.getFrontendOptions();
+  if (StatsOutputDir.empty() || !FEOpts.InputsAndOutputs.hasInputs())
     return;
 
   auto silOptModeArgStr = [](OptimizationMode mode) -> StringRef {
@@ -358,20 +359,11 @@ void CompilerInstance::setupStatsReporter() {
     }
   };
 
-  auto getClangSourceManager = [](ASTContext &Ctx) -> clang::SourceManager * {
-    if (auto *clangImporter = static_cast<ClangImporter *>(
-            Ctx.getClangModuleLoader())) {
-      return &clangImporter->getClangASTContext().getSourceManager();
-    }
-    return nullptr;
-  };
-
-  const auto &FEOpts = Invoke.getFrontendOptions();
   const auto &LangOpts = Invoke.getLangOptions();
   const auto &SILOpts = Invoke.getSILOptions();
   const std::string &OutFile =
       FEOpts.InputsAndOutputs.lastInputProducingOutput().outputFilename();
-  auto Reporter = std::make_unique<UnifiedStatsReporter>(
+  Stats = std::make_unique<UnifiedStatsReporter>(
       "swift-frontend",
       FEOpts.ModuleName,
       FEOpts.InputsAndOutputs.getStatsFileMangledInputName(),
@@ -379,17 +371,35 @@ void CompilerInstance::setupStatsReporter() {
       llvm::sys::path::extension(OutFile),
       silOptModeArgStr(SILOpts.OptMode),
       StatsOutputDir,
-      &getSourceMgr(),
-      getClangSourceManager(getASTContext()),
-      Invoke.getFrontendOptions().FineGrainedTimers,
-      Invoke.getFrontendOptions().TraceStats,
-      Invoke.getFrontendOptions().ProfileEvents,
-      Invoke.getFrontendOptions().ProfileEntities);
+      FEOpts.FineGrainedTimers,
+      FEOpts.TraceStats,
+      FEOpts.ProfileEvents,
+      FEOpts.ProfileEntities);
+}
+
+void CompilerInstance::finalizeStatsReporter() {
+  if (!Stats)
+    return;
+
+  auto getClangSourceManager = [](ASTContext &Ctx) -> clang::SourceManager * {
+    if (auto *clangImporter = static_cast<ClangImporter *>(
+            Ctx.getClangModuleLoader())) {
+      if (!clangImporter->hasClangASTContext())
+        return nullptr;
+
+      return &clangImporter->getClangASTContext().getSourceManager();
+    }
+    return nullptr;
+  };
+  Stats->setSourceManager(&getSourceMgr(),
+                          getClangSourceManager(getASTContext()));
+
   // Hand the stats reporter down to the ASTContext so the rest of the compiler
   // can use it.
-  getASTContext().setStatsReporter(Reporter.get());
-  Diagnostics.setStatsReporter(Reporter.get());
-  Stats = std::move(Reporter);
+  getASTContext().setStatsReporter(Stats.get());
+  Diagnostics.setStatsReporter(Stats.get());
+  if (CASOutputBackend)
+    CASOutputBackend->setStatsReporter(Stats.get());
 }
 
 bool CompilerInstance::setupDiagnosticVerifierIfNeeded() {
@@ -532,6 +542,8 @@ void CompilerInstance::setupCachingDiagnosticsProcessorIfNeeded() {
 bool CompilerInstance::setup(const CompilerInvocation &Invoke,
                              std::string &Error, ArrayRef<const char *> Args) {
   Invocation = Invoke;
+  initStatsReporter();
+  FrontendStatsTracer tracer(getStatsReporter(), "compilerinstance-setup");
 
   if (setupCASIfNeeded(Args)) {
     Error = "Setting up CAS failed";
@@ -562,8 +574,6 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
     return true;
   }
 
-  setupStatsReporter();
-
   if (setupDiagnosticVerifierIfNeeded()) {
     Error = "Setting up diagnostics verifier failed";
     return true;
@@ -593,6 +603,8 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
     return true;
   }
 
+  finalizeStatsReporter();
+
   return false;
 }
 
@@ -614,6 +626,7 @@ bool CompilerInstance::setupForReplay(const CompilerInvocation &Invoke,
 }
 
 bool CompilerInstance::setUpVirtualFileSystemOverlays() {
+  FrontendStatsTracer tracer(getStatsReporter(), "compilerinstance-setup-vfs");
   const auto &CASOpts = getInvocation().getCASOptions();
   if (CASOpts.EnableCaching && !CASOpts.HasImmutableFileSystem &&
       FrontendOptions::supportCompilationCaching(
