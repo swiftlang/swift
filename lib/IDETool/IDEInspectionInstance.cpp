@@ -354,6 +354,7 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
           nullptr
         }
     );
+    SM.recordSourceFile(newBufferID, AFD->getParentSourceFile());
 
     AFD->setBodyToBeReparsed(newBodyRange);
     oldSF->clearScope();
