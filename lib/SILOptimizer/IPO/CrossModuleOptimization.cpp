@@ -995,25 +995,13 @@ void CrossModuleOptimization::makeFunctionUsableFromInline(SILFunction *function
   }
 }
 
-/// Make a nominal type, including it's context, usable from inline.
+/// Make a nominal type, including its context, usable from inline.
 void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
   if (decl->getEffectiveAccess() >= AccessLevel::Package)
-    return;
+    return;  
 
-  // FIXME: rdar://130456707
-  // Currently not all types are visited in canSerialize* calls, sometimes
-  // resulting in an internal type getting @usableFromInline, which is
-  // incorrect.
-  // For example, for `let q = P() as? Q`, where Q is an internal class
-  // inherting a public class P, Q is not visited in the canSerialize*
-  // checks, thus resulting in `@usableFromInline class Q`; this is not
-  // the intended behavior in the conservative mode as it modifies AST.
-  //
-  // To properly fix, instruction visitor needs to be refactored to do
-  // both the "canSerialize" check (that visits all types) and serialize
-  // or update visibility (modify AST in non-conservative modes). 
-  if (isPackageCMOEnabled(M.getSwiftModule()))
-    return;
+  // This function should not be called in Package CMO mode.
+  assert(!isPackageCMOEnabled(M.getSwiftModule()));
 
   // We must not modify decls which are defined in other modules.
   if (M.getSwiftModule() != decl->getDeclContext()->getParentModule())
