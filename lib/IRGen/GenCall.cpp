@@ -1462,9 +1462,13 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   // Generate function info for this signature.
   auto extInfo = clang::FunctionType::ExtInfo();
 
-  auto &FI = clang::CodeGen::arrangeFreeFunctionCall(IGM.ClangCodeGen->CGM(),
-                                             clangResultTy, paramTys, extInfo,
-                                             clang::CodeGen::RequiredArgs::All);
+  bool isCXXMethod =
+      FnType->getRepresentation() == SILFunctionTypeRepresentation::CXXMethod;
+  auto &FI = isCXXMethod ?
+      clang::CodeGen::arrangeCXXMethodCall(IGM.ClangCodeGen->CGM(),
+          clangResultTy, paramTys, extInfo, clang::CodeGen::RequiredArgs::All) :
+      clang::CodeGen::arrangeFreeFunctionCall(IGM.ClangCodeGen->CGM(),
+          clangResultTy, paramTys, extInfo, clang::CodeGen::RequiredArgs::All);
   ForeignInfo.ClangInfo = &FI;
 
   assert(FI.arg_size() == paramTys.size() &&
