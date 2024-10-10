@@ -548,16 +548,16 @@ bool ConstraintSystem::simplify() {
       log.indent(solverState->getCurrentIndent()) << ")\n";
     }
 
-    // Check whether a constraint failed. If so, we're done.
-    if (failedConstraint) {
-      return true;
-    }
-
     // If the current score is worse than the best score we've seen so far,
     // there's no point in continuing. So don't.
     if (worseThanBestSolution()) {
       return true;
     }
+  }
+
+  // Check whether a constraint failed. If so, we're done.
+  if (failedConstraint) {
+    return true;
   }
 
   return false;
