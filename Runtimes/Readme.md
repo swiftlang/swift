@@ -2,6 +2,24 @@
 
 This directory contains the pieces of the Swift runtime libraries.
 
+## Development
+
+While we're bringing up the new standard library build, please do not commit the
+standard library source files. Use the `Resync.cmake` file to copy the files as
+needed.
+
+```sh
+$ cmake -P Resync.cmake
+```
+
+> [!IMPORTANT]
+> Re-run this script after updating your Swift checkout to ensure that you are
+> building the latest standard library sources.
+
+Once the migration is completed, we will be deleting this script. It
+is a temporary workaround to avoid trying to keep multiple sets of files in
+sync.
+
 ## Layering
 
 ```
