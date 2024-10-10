@@ -953,27 +953,11 @@ void swift::performPlaygroundTransform(SourceFile &SF, PlaygroundOptionSet Opts)
     }
 
     PreWalkAction walkToDeclPre(Decl *D) override {
-      // If the selective transform option is enabled then skip any
-      // non-annotated nodes.
-      if (Options.SelectiveTransform) {
-        // Only funcs can be annotated with @_PlaygroundTransformed.
-        auto *funcDecl = dyn_cast<FuncDecl>(D);
-        // In addition to file-level funcs, also support annotated funcs in
-        // structs, classes, extensions and macro expansions.
-        bool isAllowedOuterDecl =
-            (dyn_cast<StructDecl>(D) || dyn_cast<ClassDecl>(D) ||
-             dyn_cast<ExtensionDecl>(D) || dyn_cast<MacroExpansionDecl>(D));
-        // Skip transforming any nodes that are not one of the allowed container
-        // decls and are not @_PlaygroundTransformed annotated functions.
-        if (!isAllowedOuterDecl &&
-            !(funcDecl &&
-              funcDecl->getAttrs().hasAttribute<PlaygroundTransformedAttr>()))
-          return Action::SkipNode();
-      }
-
       if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
+        // If SelectiveTransform is enabled, only select annotated functions.
+        bool isSelected = (!Options.SelectiveTransform || FD->getAttrs().hasAttribute<PlaygroundTransformedAttr>());
         // Skip any functions that do not have user-written source code.
-        if (!FD->isImplicit() && !FD->isBodySkipped() &&
+        if (isSelected && !FD->isImplicit() && !FD->isBodySkipped() &&
             !FD->isInMacroExpansionInContext()) {
           if (BraceStmt *Body = FD->getBody()) {
             const ParameterList *PL = FD->getParameters();
@@ -987,7 +971,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, PlaygroundOptionSet Opts)
           }
         }
       } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
-        if (!TLCD->isImplicit()) {
+        if (!Options.SelectiveTransform && !TLCD->isImplicit()) {
           if (BraceStmt *Body = TLCD->getBody()) {
             Instrumenter I(ctx, TLCD, RNG, Options, TmpNameIndex);
             BraceStmt *NewBody = I.transformBraceStmt(Body, nullptr, true);

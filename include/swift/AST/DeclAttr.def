@@ -511,7 +511,7 @@ DECL_ATTR(lifetime, Lifetime,
   161)
 
 SIMPLE_DECL_ATTR(_PlaygroundTransformed, PlaygroundTransformed,
-  OnFunc | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | OnConstructor | OnDestructor | OnAccessor | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   162)
 
 LAST_DECL_ATTR(PlaygroundTransformed)

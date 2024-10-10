@@ -128,3 +128,98 @@ c.func4(i4: 4)
 // CHECK-NEXT: {{.*}} __builtin_log[i4='4']
 // CHECK-NEXT: {{.*}} __builtin_log[='8']
 // CHECK-NEXT: {{.*}} __builtin_log_scope_exit
+
+func quadrupled(x: Int) -> Int {
+    @_PlaygroundTransformed
+    func double(xx: Int) -> Int {
+        return xx * 2
+    }
+
+    return double(xx: double(xx: x))
+}
+quadrupled(x: 4)
+// CHECK-NEXT: {{.*}} __builtin_log_scope_entry
+// CHECK-NEXT: {{.*}} __builtin_log[xx='4']
+// CHECK-NEXT: {{.*}} __builtin_log[='8']
+// CHECK-NEXT: {{.*}} __builtin_log_scope_exit
+// CHECK-NEXT: {{.*}} __builtin_log_scope_entry
+// CHECK-NEXT: {{.*}} __builtin_log[xx='8']
+// CHECK-NEXT: {{.*}} __builtin_log[='16']
+// CHECK-NEXT: {{.*}} __builtin_log_scope_exit
+
+@_PlaygroundTransformed
+func tripled(t: Int) -> Int {
+    func _triple(tt: Int) -> Int {
+        return tt * 3
+    }
+
+    return _triple(tt: t)
+}
+tripled(t: 4)
+// CHECK-NEXT: {{.*}} __builtin_log_scope_entry
+// CHECK-NEXT: {{.*}} __builtin_log[t='4']
+// CHECK-NEXT: {{.*}} __builtin_log_scope_entry
+// CHECK-NEXT: {{.*}} __builtin_log[tt='4']
+// CHECK-NEXT: {{.*}} __builtin_log[='12']
+// CHECK-NEXT: {{.*}} __builtin_log_scope_exit
+// CHECK-NEXT: {{.*}} __builtin_log[='12']
+// CHECK-NEXT: {{.*}} __builtin_log_scope_exit
+
+// @_PlaygroundTransformed can be used on init/deinit
+// and get/set/didSet for vars.
+class D {
+    var _negative: Int {
+        @_PlaygroundTransformed
+        didSet {
+            let actualValue = -_negative
+            print(actualValue)
+        }
+    }
+    var foo: Int {
+        @_PlaygroundTransformed
+        get {
+            let getValue = -_negative
+            return getValue
+        }
+        @_PlaygroundTransformed
+        set {
+            let setValue = -newValue
+            _negative = setValue
+        }
+    }
+    @_PlaygroundTransformed
+    init() {
+        let init_value = 0
+        _negative = 0
+    }
+    @_PlaygroundTransformed
+    deinit {
+        let deinit_value = 0
+        _negative = deinit_value
+    }
+}
+var d: D? = D()
+d!.foo = 42
+d!.foo
+d = nil
+// CHECK-NEXT: {{.*}} __builtin_log_scope_entry
+// CHECK-NEXT: {{.*}} __builtin_log[init_value='0']
+// CHECK-NEXT: {{.*}} __builtin_log_scope_exit
+// CHECK-NEXT: {{.*}} __builtin_log_scope_entry
+// CHECK-NEXT: {{.*}} __builtin_log[newValue='42']
+// CHECK-NEXT: {{.*}} __builtin_log[setValue='-42']
+// CHECK-NEXT: {{.*}} __builtin_log_scope_entry
+// CHECK-NEXT: {{.*}} __builtin_log[actualValue='42']
+// CHECK-NEXT: 42
+// CHECK-NEXT: {{.*}} __builtin_postPrint
+// CHECK-NEXT: {{.*}} __builtin_log_scope_exit
+// CHECK-NEXT: {{.*}} __builtin_log[self='main{{.?}}.D']
+// CHECK-NEXT: {{.*}} __builtin_log_scope_exit
+// CHECK-NEXT: {{.*}} __builtin_log_scope_entry
+// CHECK-NEXT: {{.*}} __builtin_log[getValue='42']
+// CHECK-NEXT: {{.*}} __builtin_log[='42']
+// CHECK-NEXT: {{.*}} __builtin_log_scope_exit
+// CHECK-NEXT: {{.*}} __builtin_log_scope_entry
+// CHECK-NEXT: {{.*}} __builtin_log[deinit_value='0']
+// CHECK-NEXT: {{.*}} __builtin_log[self='main{{.?}}.D']
+// CHECK-NEXT: {{.*}} __builtin_log_scope_exit
