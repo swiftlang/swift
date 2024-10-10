@@ -61,6 +61,8 @@ def main():
             write_obj_file = True
         elif arg == '-disable-incremental-llvm-codegen':
             compare_time = False
+        elif arg == '-emit-empty-object-file':
+            compare_time = False
         elif arg == '-o':
             next_arg_is_output = True
 
