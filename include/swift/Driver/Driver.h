@@ -184,6 +184,7 @@ public:
     APIDigester,     // swift-api-digester
     CacheTool,       // swift-cache-tool
     ParseTest,       // swift-parse-test
+    SynthesizeInterface,  // swift-synthesize-interface
   };
 
   class InputInfoMap;

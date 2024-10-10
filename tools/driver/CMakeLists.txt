@@ -173,6 +173,11 @@ swift_create_post_build_symlink(swift-frontend
   DESTINATION "swift-parse-test${CMAKE_EXECUTABLE_SUFFIX}"
   WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 
+swift_create_post_build_symlink(swift-frontend
+  SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
+  DESTINATION "swift-synthesize-interface${CMAKE_EXECUTABLE_SUFFIX}"
+  WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+
 add_dependencies(compiler swift-frontend)
 swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift${CMAKE_EXECUTABLE_SUFFIX}"
                            DESTINATION "bin"
@@ -187,6 +192,9 @@ swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-api-diges
                            DESTINATION "bin"
                            COMPONENT compiler)
 swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-cache-tool${CMAKE_EXECUTABLE_SUFFIX}"
+                           DESTINATION "bin"
+                           COMPONENT compiler)
+swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-synthesize-interface${CMAKE_EXECUTABLE_SUFFIX}"
                            DESTINATION "bin"
                            COMPONENT compiler)
 add_dependencies(autolink-driver swift-frontend)

@@ -1,0 +1,8 @@
+module m1 {
+  header "m1.h"
+}
+
+module mcxx {
+  requires cplusplus
+  header "mcxx.h"
+}

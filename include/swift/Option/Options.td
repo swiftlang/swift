@@ -60,6 +60,9 @@ def SupplementaryOutput : OptionFlag;
 // The option should be accepted by swift-symbolgraph-extract.
 def SwiftSymbolGraphExtractOption : OptionFlag;
 
+// The option should be accepted by swift-synthesize-interface.
+def SwiftSynthesizeInterfaceOption : OptionFlag;
+
 // The option should be accepted by swift-api-digester.
 def SwiftAPIDigesterOption : OptionFlag;
 
@@ -215,7 +218,8 @@ def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
 
 def help : Flag<["-", "--"], "help">,
   Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
-         SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+         SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption,
+         SwiftSynthesizeInterfaceOption]>,
   HelpText<"Display available options">;
 def h : Flag<["-"], "h">, Alias<help>;
 def help_hidden : Flag<["-", "--"], "help-hidden">,
@@ -223,7 +227,8 @@ def help_hidden : Flag<["-", "--"], "help-hidden">,
   HelpText<"Display available options, including hidden options">;
 
 def v : Flag<["-"], "v">,
-  Flags<[DoesNotAffectIncrementalBuild, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+  Flags<[DoesNotAffectIncrementalBuild, SwiftSymbolGraphExtractOption,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Show commands to run and use verbose output">;
 def version : Flag<["-", "--"], "version">, Flags<[FrontendOption]>,
   HelpText<"Print version information and exit">;
@@ -236,26 +241,30 @@ def parseable_output : Flag<["-"], "parseable-output">,
 
 def windows_sdk_root : Separate<["-"], "windows-sdk-root">,
   Flags<[ArgumentIsPath, FrontendOption,
-         SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+         SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption,
+         SwiftSynthesizeInterfaceOption]>,
   HelpText<"Windows SDK Root">, MetaVarName<"<root>">;
 def windows_sdk_version : Separate<["-"], "windows-sdk-version">,
   Flags<[FrontendOption,
-         SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+         SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption,
+         SwiftSynthesizeInterfaceOption]>,
   HelpText<"Windows SDK Version">, MetaVarName<"<version>">;
 def visualc_tools_root : Separate<["-"], "visualc-tools-root">,
   Flags<[ArgumentIsPath, FrontendOption,
-         SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+         SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption,
+         SwiftSynthesizeInterfaceOption]>,
   HelpText<"VisualC++ Tools Root">, MetaVarName<"<root>">;
 def visualc_tools_version : Separate<["-"], "visualc-tools-version">,
   Flags<[FrontendOption,
-         SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+         SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption,
+         SwiftSynthesizeInterfaceOption]>,
   HelpText<"VisualC++ ToolSet Version">, MetaVarName<"<version>">;
 
 // Android Options
 
 def sysroot : Separate<["-"], "sysroot">,
   Flags<[ArgumentIsPath, FrontendOption, SwiftSymbolGraphExtractOption,
-         SwiftAPIDigesterOption]>,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Native Platform sysroot">, MetaVarName<"<sysroot>">;
 
 // Standard Options
@@ -265,7 +274,7 @@ def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
 def o : JoinedOrSeparate<["-"], "o">,
   Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
          NoInteractiveOption, ArgumentIsPath, SwiftAPIDigesterOption,
-         CacheInvariant]>,
+         SwiftSynthesizeInterfaceOption, CacheInvariant]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
 def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
@@ -273,18 +282,18 @@ def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
 
 def sdk : Separate<["-"], "sdk">,
   Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption,
-         SwiftAPIDigesterOption]>,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
 
 def swift_version : Separate<["-"], "swift-version">,
   Flags<[FrontendOption, ModuleInterfaceOption, SwiftSymbolGraphExtractOption,
-         SwiftAPIDigesterOption]>,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Interpret input according to a specific Swift language version number">,
   MetaVarName<"<vers>">;
 
 def language_mode : Separate<["-"], "language-mode">,
   Flags<[FrontendOption, ModuleInterfaceOption, SwiftSymbolGraphExtractOption,
-         SwiftAPIDigesterOption]>,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Interpret input according to a specific Swift language mode">,
   MetaVarName<"<mode>">,
   Alias<swift_version>;
@@ -306,17 +315,20 @@ def e : Separate<["-"], "e">, Flags<[NewDriverOnlyOption]>,
   HelpText<"Executes a line of code provided on the command line">;
 
 def F : JoinedOrSeparate<["-"], "F">,
-  Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Add directory to framework search path">;
 def F_EQ : Joined<["-"], "F=">, Flags<[FrontendOption, ArgumentIsPath]>,
   Alias<F>;
 
 def Fsystem : Separate<["-"], "Fsystem">,
-  Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption]>,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption,
+         SwiftSynthesizeInterfaceOption]>,
   HelpText<"Add directory to system framework search path">;
 
 def I : JoinedOrSeparate<["-"], "I">,
-  Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Add directory to the import search path">;
 def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption, ArgumentIsPath]>,
   Alias<I>;
@@ -492,7 +504,8 @@ def localization_path : Separate<["-"], "localization-path">,
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath,
-         SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+         SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption,
+         SwiftSynthesizeInterfaceOption]>,
   HelpText<"Specifies the module cache path">;
 
 def enable_library_evolution : Flag<["-"], "enable-library-evolution">,
@@ -556,11 +569,11 @@ def library_level_EQ : Joined<["-"], "library-level=">,
 
 def module_name : Separate<["-"], "module-name">,
   Flags<[FrontendOption, ModuleInterfaceOption,
-         SwiftSymbolGraphExtractOption]>,
+         SwiftSymbolGraphExtractOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Name of the module to build">;
 def project_name : Separate<["-"], "project-name">,
   Flags<[FrontendOption, ModuleInterfaceOptionIgnorable,
-         SwiftSymbolGraphExtractOption]>,
+         SwiftSymbolGraphExtractOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Name of the project this module to build belongs to">;
 
 def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
@@ -787,7 +800,8 @@ def enable_experimental_cxx_interop :
 
 def cxx_interoperability_mode :
   Joined<["-"], "cxx-interoperability-mode=">,
-  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSymbolGraphExtractOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSymbolGraphExtractOption,
+         SwiftSynthesizeInterfaceOption]>,
   HelpText<"Enables C++ interoperability; pass 'default' to enable or 'off' to disable">;
 
 def experimental_c_foreign_reference_types :
@@ -1381,7 +1395,9 @@ def num_threads : Separate<["-"], "num-threads">,
 def Xfrontend : Separate<["-"], "Xfrontend">, Flags<[HelpHidden]>,
   MetaVarName<"<arg>">, HelpText<"Pass <arg> to the Swift frontend">;
 
-def Xcc : Separate<["-"], "Xcc">, Flags<[FrontendOption, SwiftSymbolGraphExtractOption]>,
+def Xcc : Separate<["-"], "Xcc">,
+  Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
+         SwiftSynthesizeInterfaceOption]>,
   MetaVarName<"<arg>">,
   HelpText<"Pass <arg> to the C/C++/Objective-C compiler">;
 
@@ -1393,13 +1409,16 @@ def Xllvm : Separate<["-"], "Xllvm">,
   MetaVarName<"<arg>">, HelpText<"Pass <arg> to LLVM.">;
 
 def resource_dir : Separate<["-"], "resource-dir">,
-  Flags<[FrontendOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption, HelpHidden, ArgumentIsPath]>,
+  Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption,
+         HelpHidden, ArgumentIsPath]>,
   MetaVarName<"</usr/lib/swift>">,
   HelpText<"The directory that holds the compiler resource files">;
 
 def target : Separate<["-"], "target">,
-  Flags<[FrontendOption, ModuleWrapOption, ModuleInterfaceOption, SwiftSymbolGraphExtractOption,
-         SwiftAPIDigesterOption]>,
+  Flags<[FrontendOption, ModuleWrapOption, ModuleInterfaceOption,
+         SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption,
+         SwiftSynthesizeInterfaceOption]>,
   HelpText<"Generate code for the given target <triple>, such as x86_64-apple-macos10.9">, MetaVarName<"<triple>">;
 def target_legacy_spelling : Joined<["--"], "target=">,
   Flags<[FrontendOption]>, Alias<target>;
@@ -1416,7 +1435,8 @@ def target_variant : Separate<["-"], "target-variant">,
            " variant target triple in addition to the main -target triple">;
 
 def clang_target : Separate<["-"], "clang-target">,
-  Flags<[FrontendOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+  Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Separately set the target we should use for internal Clang instance">;
 
 def disable_clang_target : Flag<["-"], "disable-clang-target">,
