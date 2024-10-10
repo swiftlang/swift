@@ -328,7 +328,6 @@ private:
     case Node::Kind::SugaredOptional:
     case Node::Kind::SugaredArray:
     case Node::Kind::SugaredDictionary:
-    case Node::Kind::SugaredParen:
     case Node::Kind::Integer:
     case Node::Kind::NegativeInteger:
       return true;
@@ -3249,11 +3248,6 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << " : ";
     print(Node->getChild(1), depth + 1);
     Printer << "]";
-    return nullptr;
-  case Node::Kind::SugaredParen:
-    Printer << "(";
-    print(Node->getChild(0), depth + 1);
-    Printer << ")";
     return nullptr;
   case Node::Kind::OpaqueReturnType:
     Printer << "some";

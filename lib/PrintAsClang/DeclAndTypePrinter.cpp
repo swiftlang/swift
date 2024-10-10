@@ -2718,11 +2718,6 @@ private:
     llvm_unreachable("Not implemented");
   }
 
-  void visitParenType(ParenType *PT,
-                      std::optional<OptionalTypeKind> optionalKind) {
-    visitPart(PT->getSinglyDesugaredType(), optionalKind);
-  }
-
   void visitSyntaxSugarType(SyntaxSugarType *SST,
                             std::optional<OptionalTypeKind> optionalKind) {
     visitPart(SST->getSinglyDesugaredType(), optionalKind);

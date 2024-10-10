@@ -1043,7 +1043,7 @@ class infer_instanceVar1 {
   // expected-note@-2 {{empty tuple type cannot be represented in Objective-C}}
 
   var var_tuple3: (Int)
-// CHECK-LABEL: {{^}} var var_tuple3: (Int)
+// CHECK-LABEL: {{^}} var var_tuple3: Int
 
   @objc // access-note-move{{infer_instanceVar1.var_tuple3_}}
   var var_tuple3_: (Int) // no-error
@@ -1277,10 +1277,10 @@ class infer_instanceVar1 {
   var var_ExistentialMetatype9: (Protocol_ObjC1 & Protocol_ObjC2).Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype0: any Any.Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype1: any PlainProtocol.Type
-// CHECK-LABEL: {{^}}  var var_ExistentialMetatype2: any (PlainProtocol).Type
+// CHECK-LABEL: {{^}}  var var_ExistentialMetatype2: any PlainProtocol.Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype3: any (PlainProtocol & Protocol_Class1).Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype4: any (PlainProtocol & Protocol_ObjC1).Type
-// CHECK-LABEL: {{^}}  var var_ExistentialMetatype5: any (Protocol_Class1).Type
+// CHECK-LABEL: {{^}}  var var_ExistentialMetatype5: any Protocol_Class1.Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype6: any (Protocol_Class1 & Protocol_Class2).Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype7: any (Protocol_Class1 & Protocol_ObjC1).Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype8: any Protocol_ObjC1.Type
@@ -2357,7 +2357,7 @@ class ImplicitClassThrows1 {
   // CHECK: {{^}} func methodReturnsOptionalObjCClass() throws -> Class_ObjC1?
   func methodReturnsOptionalObjCClass() throws -> Class_ObjC1? { return nil }
 
-  // CHECK: {{^}} func methodWithTrailingClosures(_ s: String, fn1: @escaping ((Int) -> Int), fn2: @escaping (Int) -> Int, fn3: @escaping (Int) -> Int)
+  // CHECK: {{^}} func methodWithTrailingClosures(_ s: String, fn1: @escaping (Int) -> Int, fn2: @escaping (Int) -> Int, fn3: @escaping (Int) -> Int)
   // CHECK-DUMP-LABEL: func_decl{{.*}}"methodWithTrailingClosures(_:fn1:fn2:fn3:)"
   // CHECK-DUMP-NOT:  foreign_error_convention
   func methodWithTrailingClosures(_ s: String, fn1: (@escaping (Int) -> Int), fn2: @escaping (Int) -> Int, fn3: @escaping (Int) -> Int) throws { }
@@ -2379,7 +2379,7 @@ class ImplicitClassThrows1 {
   // CHECK: {{^}} func methodReturnsError() throws -> any Error
   func methodReturnsError() throws -> Error { return ErrorEnum.failed }
 
-  // CHECK: {{^}} func methodReturnStaticBridged() throws -> ((Int) -> (Int) -> Int)
+  // CHECK: {{^}} func methodReturnStaticBridged() throws -> (Int) -> (Int) -> Int
   func methodReturnStaticBridged() throws -> ((Int) -> (Int) -> Int) {
     func add(x: Int) -> (Int) -> Int { 
       return { x + $0 }
@@ -2391,7 +2391,7 @@ class ImplicitClassThrows1 {
 // CHECK-DUMP-LABEL: class_decl{{.*}}"SubclassImplicitClassThrows1"
 @objc // access-note-move{{SubclassImplicitClassThrows1}}
 class SubclassImplicitClassThrows1 : ImplicitClassThrows1 {
-  // CHECK: {{^}} override func methodWithTrailingClosures(_ s: String, fn1: @escaping ((Int) -> Int), fn2: @escaping ((Int) -> Int), fn3: @escaping ((Int) -> Int))
+  // CHECK: {{^}} override func methodWithTrailingClosures(_ s: String, fn1: @escaping (Int) -> Int, fn2: @escaping (Int) -> Int, fn3: @escaping (Int) -> Int)
   // CHECK-DUMP-LABEL: func_decl{{.*}}"methodWithTrailingClosures(_:fn1:fn2:fn3:)"
   // CHECK-DUMP: (foreign_error_convention kind=ZeroResult unowned param=1 paramtype="Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>" resulttype="ObjCBool")
   override func methodWithTrailingClosures(_ s: String, fn1: (@escaping (Int) -> Int), fn2: (@escaping (Int) -> Int), fn3: (@escaping (Int) -> Int)) throws { }

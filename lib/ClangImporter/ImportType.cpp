@@ -651,7 +651,7 @@ namespace {
         return Type();
       
       if (size == 1)
-        return ParenType::get(elementType->getASTContext(), elementType);
+        return elementType;
 
       SmallVector<TupleTypeElt, 8> elts{static_cast<size_t>(size), elementType};
       return TupleType::get(elts, elementType->getASTContext());
@@ -757,8 +757,7 @@ namespace {
       if (!inner)
         return Type();
 
-      return { ParenType::get(Impl.SwiftContext, inner.AbstractType),
-               inner.Hint };
+      return { inner.AbstractType, inner.Hint };
     }
 
     /// Imports the type defined by \p objcTypeParamDecl.

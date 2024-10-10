@@ -1106,7 +1106,7 @@ TypeChecker::addImplicitLoadExpr(ASTContext &Context, Expr *expr,
         setType(E, getType(FVE->getSubExpr())->getOptionalObjectType());
 
       if (auto *PE = dyn_cast<ParenExpr>(E))
-        setType(E, ParenType::get(Ctx, getType(PE->getSubExpr())));
+        setType(E, getType(PE->getSubExpr()));
 
       return Action::Continue(E);
     }
@@ -1153,7 +1153,7 @@ TypeChecker::coerceToRValue(ASTContext &Context, Expr *expr,
   if (auto paren = dyn_cast<IdentityExpr>(expr)) {
     auto sub =  coerceToRValue(Context, paren->getSubExpr(), getType, setType);
     paren->setSubExpr(sub);
-    setType(paren, ParenType::get(Context, getType(sub)));
+    setType(paren, getType(sub));
     return paren;
   }
 

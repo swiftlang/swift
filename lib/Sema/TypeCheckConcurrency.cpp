@@ -2419,7 +2419,7 @@ namespace {
           case ActorIsolation::Unspecified:
             if (behavior != DiagnosticBehavior::Note) {
               fn->diagnose(diag::invalid_isolated_calls_in_body,
-                           globalActor->getWithoutParens().getString(), fn)
+                           globalActor->getString(), fn)
                   .limitBehaviorUntilSwiftVersion(behavior, 6);
             }
 
@@ -2429,8 +2429,7 @@ namespace {
               return false;
 
             fn->diagnose(diag::add_globalactor_to_decl,
-                         globalActor->getWithoutParens().getString(),
-                         fn, globalActor)
+                         globalActor->getString(), fn, globalActor)
                 .fixItInsert(fn->getAttributeInsertionLoc(false),
                              diag::insert_globalactor_attr, globalActor);
             return true;
@@ -6205,9 +6204,8 @@ void swift::checkGlobalIsolation(VarDecl *var) {
         auto mainActor = var->getASTContext().getMainActorType();
         if (mainActor) {
           diagVar
-              ->diagnose(diag::add_globalactor_to_decl,
-                         mainActor->getWithoutParens().getString(), diagVar,
-                         mainActor)
+              ->diagnose(diag::add_globalactor_to_decl, mainActor->getString(),
+                         diagVar, mainActor)
               .fixItInsert(diagVar->getAttributeInsertionLoc(false),
                            diag::insert_globalactor_attr, mainActor);
         }

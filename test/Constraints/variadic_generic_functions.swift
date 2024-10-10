@@ -56,9 +56,9 @@ func contextualTyping() {
   }
 
   let (_, _): (Int?, String?) = firsts([42], [""]) // OK
-  let (_, _): (String?, String?) = firsts([42], [""]) // expected-error {{cannot convert value of type '((Int)?, (String)?)' to specified type '(String?, String?)'}}
-  let (_, _): ([Int], String?) = firsts([42], [""]) // expected-error {{cannot convert value of type '((Int)?, (String)?)' to specified type '([Int], String?)'}}
-  let (_, _, _): (String?, String?, Int) = firsts([42], [""]) // expected-error {{'((Int)?, (String)?)' is not convertible to '(String?, String?, Int)', tuples have a different number of elements}}
+  let (_, _): (String?, String?) = firsts([42], [""]) // expected-error {{cannot convert value of type '(Int?, String?)' to specified type '(String?, String?)'}}
+  let (_, _): ([Int], String?) = firsts([42], [""]) // expected-error {{cannot convert value of type '(Int?, String?)' to specified type '([Int], String?)'}}
+  let (_, _, _): (String?, String?, Int) = firsts([42], [""]) // expected-error {{'(Int?, String?)' is not convertible to '(String?, String?, Int)', tuples have a different number of elements}}
 
   func dependent<each T>(_ seqs: repeat Array<each T>) -> (repeat Array<each T>.Element?) {
     fatalError()
