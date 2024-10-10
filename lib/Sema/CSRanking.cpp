@@ -146,6 +146,27 @@ void ConstraintSystem::increaseScore(ScoreKind kind,
   increaseScore(kind, value);
 }
 
+void ConstraintSystem::replayScore(const Score &score) {
+  if (solverState) {
+    for (unsigned i = 0; i < NumScoreKinds; ++i) {
+      if (unsigned value = score.Data[i])
+        recordChange(
+          SolverTrail::Change::IncreasedScore(ScoreKind(i), value));
+    }
+  }
+  CurrentScore += score;
+}
+
+void ConstraintSystem::clearScore() {
+  for (unsigned i = 0; i < NumScoreKinds; ++i) {
+    if (unsigned value = CurrentScore.Data[i]) {
+      recordChange(
+        SolverTrail::Change::DecreasedScore(ScoreKind(i), value));
+    }
+  }
+  CurrentScore = Score();
+}
+
 bool ConstraintSystem::worseThanBestSolution() const {
   if (getASTContext().TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return false;
