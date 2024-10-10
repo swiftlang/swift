@@ -265,6 +265,13 @@ public:
     for (auto *EndBorrow : EndBorrows)
       EndBorrow->eraseFromParent();
 
+    if (auto allocation = BeginApply->getCalleeAllocationResult()) {
+      for (auto *user : allocation->getUsers()) {
+        auto *dsi = cast<DeallocStackInst>(user);
+        dsi->eraseFromParent();
+      }
+    }
+
     assert(!BeginApply->hasUsesOfAnyResult());
   }
 };

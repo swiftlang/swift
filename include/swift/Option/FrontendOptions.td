@@ -1335,6 +1335,13 @@ def disable_async_frame_pointer_all:
   Flag<["-"], "disable-async-frame-pointer-all">,
   HelpText<"Disable always emit async frame stack frames">;
 
+def enable_callee_allocated_single_yield_coro_abi :
+  Flag<["-"], "enable-callee-allocated-single-yield-coro-abi">,
+  HelpText<"Non-underscored accessor coroutines use callee-allocated ABI">;
+def disable_callee_allocated_single_yield_coro_abi :
+  Flag<["-"], "disable-callee-allocated-single-yield-coro-abi">,
+  HelpText<"Non-underscored accessor coroutines don't use callee-allocated ABI">;
+
 def enable_split_cold_code :
   Flag<["-"], "enable-split-cold-code">,
   HelpText<"Enable splitting of cold code when optimizing">;

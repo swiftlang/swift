@@ -582,6 +582,8 @@ getCoroutineKind(ImplCoroutineKind kind) {
     return SILCoroutineKind::None;
   case ImplCoroutineKind::YieldOnce:
     return SILCoroutineKind::YieldOnce;
+  case ImplCoroutineKind::YieldOnce2:
+    return SILCoroutineKind::YieldOnce2;
   case ImplCoroutineKind::YieldMany:
     return SILCoroutineKind::YieldMany;
   }

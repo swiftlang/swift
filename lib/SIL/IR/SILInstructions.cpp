@@ -665,13 +665,18 @@ BeginApplyInst *BeginApplyInst::create(
             : SILModuleConventions(parentFunction.getModule())));
   }
 
-  resultTypes.push_back(
-      SILType::getSILTokenType(parentFunction.getASTContext()));
+  auto tokenTy = SILType::getSILTokenType(parentFunction.getASTContext());
+  resultTypes.push_back(tokenTy);
   // The begin_apply token represents the borrow scope of all owned and
   // guaranteed call arguments. Although SILToken is (currently) trivially
   // typed, it must have guaranteed ownership so end_apply and abort_apply will
   // be recognized as lifetime-ending uses.
   resultOwnerships.push_back(OwnershipKind::Guaranteed);
+
+  if (substCalleeType->isCalleeAllocatedCoroutine()) {
+    resultTypes.push_back(tokenTy.getAddressType());
+    resultOwnerships.push_back(OwnershipKind::None);
+  }
 
   SmallVector<SILValue, 32> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, parentFunction,

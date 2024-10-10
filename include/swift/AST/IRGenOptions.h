@@ -165,6 +165,9 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
   /// Resumption functions from yield-once coroutines.
   PointerAuthSchema YieldOnceResumeFunctions;
 
+  /// Resumption functions from yield-once-2 coroutines.
+  PointerAuthSchema YieldOnce2ResumeFunctions;
+
   /// Resumption functions from yield-many coroutines.
   PointerAuthSchema YieldManyResumeFunctions;
 
@@ -482,6 +485,9 @@ public:
 
   unsigned EmitAsyncFramePushPopMetadata : 1;
 
+  // Whether to use the yield_once ABI when emitting yield_once_2 coroutines.
+  unsigned EmitYieldOnce2AsYieldOnce : 1;
+
   // Whether to force emission of a frame for all async functions
   // (LLVM's 'frame-pointer=all').
   unsigned AsyncFramePointerAll : 1;
@@ -574,10 +580,10 @@ public:
         EmitGenericRODatas(true), NoPreallocatedInstantiationCaches(false),
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
-        UseFragileResilientProtocolWitnesses(false),
-        EnableHotColdSplit(false), EmitAsyncFramePushPopMetadata(false),
-        AsyncFramePointerAll(false),
-        CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
+        UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
+        EmitAsyncFramePushPopMetadata(false), EmitYieldOnce2AsYieldOnce(true),
+        AsyncFramePointerAll(false), CmdArgs(),
+        SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
         CASObjMode(llvm::CASBackendMode::Native) {
