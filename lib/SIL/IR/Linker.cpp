@@ -161,7 +161,7 @@ bool SILLinkerVisitor::processFunction(SILFunction *F) {
 }
 
 bool SILLinkerVisitor::processConformance(ProtocolConformanceRef conformanceRef) {
-  visitProtocolConformance(conformanceRef);
+  visitProtocolConformance(conformanceRef, false);
   process();
   return Changed;
 }
@@ -247,12 +247,15 @@ static bool mustDeserializeProtocolConformance(SILModule &M,
     && conformance->isSynthesized();
 }
 
-void SILLinkerVisitor::visitProtocolConformance(ProtocolConformanceRef ref) {
+void SILLinkerVisitor::visitProtocolConformance(
+    ProtocolConformanceRef ref, bool referencedFromInitExistential) {
   // If an abstract protocol conformance was passed in, do nothing.
   if (ref.isAbstract())
     return;
   
-  bool mustDeserialize = mustDeserializeProtocolConformance(Mod, ref);
+  bool isEmbedded = Mod.getOptions().EmbeddedSwift;
+  bool mustDeserialize = (isEmbedded && referencedFromInitExistential) ||
+                         mustDeserializeProtocolConformance(Mod, ref);
 
   // Otherwise try and lookup a witness table for C.
   ProtocolConformance *C = ref.getConcrete();
@@ -260,8 +263,9 @@ void SILLinkerVisitor::visitProtocolConformance(ProtocolConformanceRef ref) {
   if (!VisitedConformances.insert(C).second)
     return;
 
-  auto *WT = Mod.lookUpWitnessTable(C);
-  
+  RootProtocolConformance *rootC = C->getRootConformance();
+  auto *WT = Mod.lookUpWitnessTable(rootC);
+
   if ((!WT || WT->isDeclaration()) &&
       (mustDeserialize || Mode == SILModule::LinkingMode::LinkAll)) {
     if (!WT) {
@@ -269,7 +273,6 @@ void SILLinkerVisitor::visitProtocolConformance(ProtocolConformanceRef ref) {
       if (C->getProtocol()->isMarkerProtocol())
         return;
 
-      RootProtocolConformance *rootC = C->getRootConformance();
       SILLinkage linkage = getLinkageForProtocolConformance(rootC, NotForDefinition);
       WT = SILWitnessTable::create(Mod, linkage,
                                    const_cast<RootProtocolConformance *>(rootC));
@@ -305,7 +308,7 @@ void SILLinkerVisitor::visitProtocolConformance(ProtocolConformanceRef ref) {
     // However, we *must* pull in shared clang-importer-derived conformances
     // we potentially use, since we may not otherwise have a local definition.
     if (mustDeserializeProtocolConformance(Mod, c))
-      visitProtocolConformance(c);
+      visitProtocolConformance(c, referencedFromInitExistential);
   };
   
   // For each entry in the witness table...
@@ -332,8 +335,8 @@ void SILLinkerVisitor::visitProtocolConformance(ProtocolConformanceRef ref) {
       maybeVisitRelatedConformance(ProtocolConformanceRef(baseConformance));
       break;
     }
-    case SILWitnessTable::WitnessKind::AssociatedTypeProtocol: {
-      auto assocConformance = E.getAssociatedTypeProtocolWitness().Witness;
+    case SILWitnessTable::WitnessKind::AssociatedConformance: {
+      auto assocConformance = E.getAssociatedConformanceWitness().Witness;
       maybeVisitRelatedConformance(assocConformance);
       break;
     }
@@ -355,7 +358,7 @@ void SILLinkerVisitor::visitApplySubstitutions(SubstitutionMap subs) {
     // However, we *must* pull in shared clang-importer-derived conformances
     // we potentially use, since we may not otherwise have a local definition.
     if (mustDeserializeProtocolConformance(Mod, conformance)) {
-      visitProtocolConformance(conformance);
+      visitProtocolConformance(conformance, false);
     }
   }
 }
@@ -371,7 +374,7 @@ void SILLinkerVisitor::visitInitExistentialAddrInst(
   // visiting the open_existential_addr/witness_method before the
   // init_existential_inst.
   for (ProtocolConformanceRef C : IEI->getConformances()) {
-    visitProtocolConformance(C);
+    visitProtocolConformance(C, true);
   }
 }
 
@@ -385,9 +388,10 @@ void SILLinkerVisitor::visitInitExistentialRefInst(
   // not going to be smart about this to enable avoiding any issues with
   // visiting the protocol_method before the init_existential_inst.
   for (ProtocolConformanceRef C : IERI->getConformances()) {
-    visitProtocolConformance(C);
+    visitProtocolConformance(C, true);
   }
 }
+
 void SILLinkerVisitor::visitAllocRefDynamicInst(AllocRefDynamicInst *ARI) {
   if (!isLinkAll())
     return;

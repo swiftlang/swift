@@ -2142,6 +2142,7 @@ static void performBasicLayout(TypeLayout &layout,
   size_t alignMask = layout.flags.getAlignmentMask();
   bool isPOD = layout.flags.isPOD();
   bool isBitwiseTakable = layout.flags.isBitwiseTakable();
+  bool isBitwiseBorrowable = layout.flags.isBitwiseBorrowable();
   for (unsigned i = 0; i != numElements; ++i) {
     auto &elt = elements[i];
 
@@ -2157,6 +2158,7 @@ static void performBasicLayout(TypeLayout &layout,
     alignMask = std::max(alignMask, eltLayout->flags.getAlignmentMask());
     if (!eltLayout->flags.isPOD()) isPOD = false;
     if (!eltLayout->flags.isBitwiseTakable()) isBitwiseTakable = false;
+    if (!eltLayout->flags.isBitwiseBorrowable()) isBitwiseBorrowable = false;
   }
   bool isInline =
       ValueWitnessTable::isValueInline(isBitwiseTakable, size, alignMask + 1);
@@ -2166,6 +2168,7 @@ static void performBasicLayout(TypeLayout &layout,
                      .withAlignmentMask(alignMask)
                      .withPOD(isPOD)
                      .withBitwiseTakable(isBitwiseTakable)
+                     .withBitwiseBorrowable(isBitwiseBorrowable)
                      .withInlineStorage(isInline);
   layout.extraInhabitantCount = 0;
   layout.stride = std::max(size_t(1), roundUpToAlignMask(size, alignMask));
@@ -3050,7 +3053,9 @@ void swift::swift_initRawStructMetadata(StructMetadata *structType,
   vwtable->stride = stride;
   vwtable->flags = ValueWitnessFlags()
                     .withAlignmentMask(alignMask)
-                    .withCopyable(false);
+                    .withCopyable(false)
+                    .withBitwiseTakable(true)
+                    .withBitwiseBorrowable(false);
   vwtable->extraInhabitantCount = extraInhabitantCount;
 }
 
@@ -3090,6 +3095,9 @@ void swift::swift_initRawStructMetadata2(StructMetadata *structType,
     vwtable->flags = vwtable->flags
                 .withBitwiseTakable(likeTypeLayout->flags.isBitwiseTakable());
   }
+  
+  vwtable->flags = vwtable->flags
+    .withBitwiseBorrowable(isRawLayoutBitwiseBorrowable(rawLayoutFlags));
 
   // If the calculated size of this raw layout type is available to be put in
   // value buffers, then set the inline storage bit if our like type is also
@@ -4454,27 +4462,44 @@ public:
 
 class OpaqueExistentialValueWitnessTableCacheEntry {
 public:
+  struct Key {
+    unsigned numWitnessTables : 31;
+    unsigned copyable : 1;
+    
+    bool operator==(struct Key k) {
+      return k.numWitnessTables == numWitnessTables
+        && k.copyable == copyable;
+    }
+  };
+
   ValueWitnessTable Data;
 
-  OpaqueExistentialValueWitnessTableCacheEntry(unsigned numTables);
+  OpaqueExistentialValueWitnessTableCacheEntry(Key key);
 
   unsigned getNumWitnessTables() const {
     return (Data.size - sizeof(OpaqueExistentialContainer))
               / sizeof(const WitnessTable *);
+  }
+  
+  bool isCopyable() const {
+    return Data.flags.isCopyable();
   }
 
   intptr_t getKeyIntValueForDump() {
     return getNumWitnessTables();
   }
 
-  bool matchesKey(unsigned key) const { return key == getNumWitnessTables(); }
+  bool matchesKey(Key key) const {
+    return key == Key{getNumWitnessTables(), isCopyable()};
+  }
 
   friend llvm::hash_code
   hash_value(const OpaqueExistentialValueWitnessTableCacheEntry &value) {
-    return llvm::hash_value(value.getNumWitnessTables());
+    return llvm::hash_value(
+      std::make_pair(value.getNumWitnessTables(), value.isCopyable()));
   }
 
-  static size_t getExtraAllocationSize(unsigned numTables) {
+  static size_t getExtraAllocationSize(Key key) {
     return 0;
   }
   size_t getExtraAllocationSize() const {
@@ -4562,19 +4587,24 @@ OpaqueExistentialValueWitnessTables;
 /// Instantiate a value witness table for an opaque existential container with
 /// the given number of witness table pointers.
 static const ValueWitnessTable *
-getOpaqueExistentialValueWitnesses(unsigned numWitnessTables) {
+getOpaqueExistentialValueWitnesses(unsigned numWitnessTables,
+                                   bool copyable) {
   // We pre-allocate a couple of important cases.
-  if (numWitnessTables == 0)
-    return &OpaqueExistentialValueWitnesses_0;
-  if (numWitnessTables == 1)
-    return &OpaqueExistentialValueWitnesses_1;
+  if (copyable) {
+    if (numWitnessTables == 0)
+      return &OpaqueExistentialValueWitnesses_0;
+    if (numWitnessTables == 1)
+      return &OpaqueExistentialValueWitnesses_1;
+  }
 
-  return &OpaqueExistentialValueWitnessTables.getOrInsert(numWitnessTables)
-                                             .first->Data;
+  return &OpaqueExistentialValueWitnessTables
+    .getOrInsert(OpaqueExistentialValueWitnessTableCacheEntry::Key{
+                  numWitnessTables, copyable})
+    .first->Data;
 }
 
 OpaqueExistentialValueWitnessTableCacheEntry::
-OpaqueExistentialValueWitnessTableCacheEntry(unsigned numWitnessTables) {
+OpaqueExistentialValueWitnessTableCacheEntry(Key key) {
   using Box = NonFixedOpaqueExistentialBox;
   using Witnesses = NonFixedValueWitnesses<Box, /*known allocated*/ true>;
 
@@ -4584,16 +4614,24 @@ OpaqueExistentialValueWitnessTableCacheEntry(unsigned numWitnessTables) {
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
 #include "swift/ABI/ValueWitness.def"
 
-  Data.size = Box::Container::getSize(numWitnessTables);
+  Data.size = Box::Container::getSize(key.numWitnessTables);
   Data.flags = ValueWitnessFlags()
-    .withAlignment(Box::Container::getAlignment(numWitnessTables))
+    .withAlignment(Box::Container::getAlignment(key.numWitnessTables))
     .withPOD(false)
     .withBitwiseTakable(true)
-    .withInlineStorage(false);
+    .withInlineStorage(false)
+    .withCopyable(key.copyable)
+    // Non-bitwise-takable values are always stored out-of-line in existentials,
+    // so the existential representation itself is always bitwise-takable.
+    // Noncopyable values however can be bitwise-takable without being
+    // bitwise-borrowable, so noncopyable existentials are not bitwise-borrowable
+    // in the general case.
+    .withBitwiseBorrowable(key.copyable);
   Data.extraInhabitantCount = Witnesses::numExtraInhabitants;
-  Data.stride = Box::Container::getStride(numWitnessTables);
+  Data.stride = Box::Container::getStride(key.numWitnessTables);
 
-  assert(getNumWitnessTables() == numWitnessTables);
+  assert(getNumWitnessTables() == key.numWitnessTables);
+  assert(isCopyable() == key.copyable);
 }
 
 static const ValueWitnessTable ClassExistentialValueWitnesses_1 =
@@ -4662,7 +4700,8 @@ static const ValueWitnessTable *
 getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
                              const Metadata *superclassConstraint,
                              unsigned numWitnessTables,
-                             SpecialProtocol special) {
+                             SpecialProtocol special,
+                             bool copyable) {
   // Use special representation for special protocols.
   switch (special) {
   case SpecialProtocol::Error:
@@ -4685,7 +4724,7 @@ getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
                                              numWitnessTables);
   case ProtocolClassConstraint::Any:
     assert(superclassConstraint == nullptr);
-    return getOpaqueExistentialValueWitnesses(numWitnessTables);
+    return getOpaqueExistentialValueWitnesses(numWitnessTables, copyable);
   }
 
   swift_unreachable("Unhandled ProtocolClassConstraint in switch.");
@@ -4928,7 +4967,8 @@ ExistentialCacheEntry::ExistentialCacheEntry(Key key) {
   Data.ValueWitnesses = getExistentialValueWitnesses(key.ClassConstraint,
                                                      key.SuperclassConstraint,
                                                      numWitnessTables,
-                                                     special);
+                                                     special,
+                                                     /*copyable*/ true);
   Data.Flags = ExistentialTypeFlags()
     .withNumWitnessTables(numWitnessTables)
     .withClassConstraint(key.ClassConstraint)
@@ -5164,6 +5204,7 @@ public:
 const ValueWitnessTable *
 ExtendedExistentialTypeCacheEntry::getOrCreateVWT(Key key) {
   auto shape = key.Shape;
+  bool copyable = shape->isCopyable();
 
   if (auto witnesses = shape->getSuggestedValueWitnesses())
     return witnesses;
@@ -5202,7 +5243,8 @@ ExtendedExistentialTypeCacheEntry::getOrCreateVWT(Key key) {
     return getExistentialValueWitnesses(ProtocolClassConstraint::Any,
                                         /*superclass*/ nullptr,
                                         wtableStorageSizeInWords,
-                                        SpecialProtocol::None);
+                                        SpecialProtocol::None,
+                                        copyable);
 
   case SpecialKind::ExplicitLayout:
     swift_unreachable("shape with explicit layout but no suggested VWT");
@@ -5214,7 +5256,8 @@ ExtendedExistentialTypeCacheEntry::getOrCreateVWT(Key key) {
     return getExistentialValueWitnesses(ProtocolClassConstraint::Class,
                                         /*superclass*/ nullptr,
                                         wtableStorageSizeInWords,
-                                        SpecialProtocol::None);
+                                        SpecialProtocol::None,
+                                        /*copyable*/ true);
 
   case SpecialKind::Metatype:
     // Existential metatypes don't store type metadata.
@@ -5819,9 +5862,9 @@ static const unsigned swift_ptrauth_key_associated_type =
 
 /// Given an unsigned pointer to an associated-type protocol witness,
 /// fill in the appropriate slot in the witness table we're building.
-static void initAssociatedTypeProtocolWitness(const Metadata **slot,
-                                              const Metadata *witness,
-                                              const ProtocolRequirement &reqt) {
+static void initAssociatedConformanceWitness(const Metadata **slot,
+                                             const Metadata *witness,
+                                             const ProtocolRequirement &reqt) {
   assert(reqt.Flags.getKind() ==
            ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction);
   // FIXME: this should use ptrauth_key_process_independent_data
@@ -5862,7 +5905,9 @@ static void initProtocolWitness(void **slot, void *witness,
   case ProtocolRequirementFlags::Kind::Getter:
   case ProtocolRequirementFlags::Kind::Setter:
   case ProtocolRequirementFlags::Kind::ReadCoroutine:
+  case ProtocolRequirementFlags::Kind::Read2Coroutine:
   case ProtocolRequirementFlags::Kind::ModifyCoroutine:
+  case ProtocolRequirementFlags::Kind::Modify2Coroutine:
     swift_ptrauth_init_code_or_data(slot, witness,
                                     reqt.Flags.getExtraDiscriminator(),
                                     !reqt.Flags.isAsync());
@@ -5873,11 +5918,11 @@ static void initProtocolWitness(void **slot, void *witness,
     return;
 
   case ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction:
-    initAssociatedTypeProtocolWitness(reinterpret_cast<const Metadata **>(
+    initAssociatedConformanceWitness(reinterpret_cast<const Metadata **>(
                                         const_cast<const void**>(slot)),
-                                      reinterpret_cast<const Metadata *>(
+                                     reinterpret_cast<const Metadata *>(
                                         witness),
-                                      reqt);
+                                     reqt);
     return;
   }
   swift_unreachable("bad witness kind");
@@ -5903,7 +5948,9 @@ static void copyProtocolWitness(void **dest, void * const *src,
   case ProtocolRequirementFlags::Kind::Getter:
   case ProtocolRequirementFlags::Kind::Setter:
   case ProtocolRequirementFlags::Kind::ReadCoroutine:
+  case ProtocolRequirementFlags::Kind::Read2Coroutine:
   case ProtocolRequirementFlags::Kind::ModifyCoroutine:
+  case ProtocolRequirementFlags::Kind::Modify2Coroutine:
     swift_ptrauth_copy_code_or_data(
         dest, src, reqt.Flags.getExtraDiscriminator(), !reqt.Flags.isAsync(),
         /*allowNull*/ true); // NULL allowed for VFE (methods in the vtable
@@ -7878,7 +7925,7 @@ const HeapObject *swift_getKeyPathImpl(const void *pattern,
 
 #define OVERRIDE_KEYPATH COMPATIBILITY_OVERRIDE
 #define OVERRIDE_WITNESSTABLE COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"
 
 // Autolink with libc++, for cases where libswiftCore is linked statically.
 #if defined(__MACH__)

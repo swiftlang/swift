@@ -381,6 +381,7 @@ void CompilerInstance::setupStatsReporter() {
       StatsOutputDir,
       &getSourceMgr(),
       getClangSourceManager(getASTContext()),
+      Invoke.getFrontendOptions().FineGrainedTimers,
       Invoke.getFrontendOptions().TraceStats,
       Invoke.getFrontendOptions().ProfileEvents,
       Invoke.getFrontendOptions().ProfileEntities);
@@ -622,10 +623,12 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
   }
 
   if (Invocation.getCASOptions().requireCASFS()) {
-    if (!CASOpts.CASFSRootIDs.empty() || !CASOpts.ClangIncludeTrees.empty()) {
+    if (!CASOpts.CASFSRootIDs.empty() || !CASOpts.ClangIncludeTrees.empty() ||
+        !CASOpts.ClangIncludeTreeFileList.empty()) {
       // Set up CASFS as BaseFS.
       auto FS = createCASFileSystem(*CAS, CASOpts.CASFSRootIDs,
-                                    CASOpts.ClangIncludeTrees);
+                                    CASOpts.ClangIncludeTrees,
+                                    CASOpts.ClangIncludeTreeFileList);
       if (!FS) {
         Diagnostics.diagnose(SourceLoc(), diag::error_cas,
                              toString(FS.takeError()));

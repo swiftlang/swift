@@ -228,6 +228,8 @@ static StringRef getDumpString(ReadImplKind kind) {
     return "addressor";
   case ReadImplKind::Read:
     return "read_coroutine";
+  case ReadImplKind::Read2:
+    return "read2_coroutine";
   }
   llvm_unreachable("bad kind");
 }
@@ -248,6 +250,8 @@ static StringRef getDumpString(WriteImplKind kind) {
     return "mutable_addressor";
   case WriteImplKind::Modify:
     return "modify_coroutine";
+  case WriteImplKind::Modify2:
+    return "modify2_coroutine";
   }
   llvm_unreachable("bad kind");
 }
@@ -264,6 +268,8 @@ static StringRef getDumpString(ReadWriteImplKind kind) {
     return "materialize_to_temporary";
   case ReadWriteImplKind::Modify:
     return "modify_coroutine";
+  case ReadWriteImplKind::Modify2:
+    return "modify2_coroutine";
   case ReadWriteImplKind::StoredWithDidSet:
     return "stored_with_didset";
   case ReadWriteImplKind::InheritedWithDidSet:
@@ -3570,13 +3576,12 @@ public:
   void visitLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *T,
                                       StringRef label) {
     printCommon("type_lifetime_dependent_return", label);
-    for (auto &dep : T->getLifetimeDependencies()) {
-      printFieldRaw(
-          [&](raw_ostream &out) {
-            out << " " << dep.getDependsOnString() << " ";
-          },
-          "");
-    }
+
+    printFieldRaw(
+        [&](raw_ostream &out) {
+          out << " " << T->getLifetimeEntry()->getString() << " ";
+        },
+        "");
     printRec(T->getBase());
     printFoot();
   }

@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_BRIDGING_ASTGEN_H
+#define SWIFT_BRIDGING_ASTGEN_H
+
 #include "swift/AST/ASTBridging.h"
 #include "swift/Parse/ParseBridging.h"
 
@@ -60,51 +63,6 @@ void swift_ASTGen_buildTopLevelASTNodes(
     void (*_Nonnull)(void *_Nonnull, void *_Nonnull));
 
 void swift_ASTGen_freeBridgedString(BridgedStringRef);
-
-void *_Nonnull swift_ASTGen_resolveExternalMacro(
-    const char *_Nonnull moduleName, const char *_Nonnull typeName,
-    void *_Nonnull opaquePluginHandle);
-void swift_ASTGen_destroyExternalMacro(void *_Nonnull macro);
-
-bool swift_ASTGen_checkDefaultArgumentMacroExpression(
-    void *_Nonnull diagEngine, void *_Nonnull sourceFile,
-    const void *_Nonnull macroSourceLocation);
-
-ptrdiff_t swift_ASTGen_checkMacroDefinition(
-    void *_Nonnull diagEngine, BridgedStringRef sourceFileBuffer,
-    BridgedStringRef macroDeclText,
-    BridgedStringRef *_Nonnull expansionSourceOutPtr,
-    ptrdiff_t *_Nullable *_Nonnull replacementsPtr,
-    ptrdiff_t *_Nonnull numReplacements,
-    ptrdiff_t *_Nullable *_Nonnull genericReplacementsPtr,
-    ptrdiff_t *_Nonnull numGenericReplacements);
-void swift_ASTGen_freeExpansionReplacements(
-    ptrdiff_t *_Nullable replacementsPtr, ptrdiff_t numReplacements);
-
-ptrdiff_t swift_ASTGen_expandFreestandingMacro(
-    void *_Nonnull diagEngine, const void *_Nonnull macro,
-    const char *_Nonnull discriminator, uint8_t rawMacroRole,
-    void *_Nonnull sourceFile, const void *_Nullable sourceLocation,
-    BridgedStringRef *_Nonnull evaluatedSourceOut);
-
-ptrdiff_t swift_ASTGen_expandAttachedMacro(
-    void *_Nonnull diagEngine, const void *_Nonnull macro,
-    const char *_Nonnull discriminator, const char *_Nonnull qualifiedType,
-    const char *_Nonnull conformances, uint8_t rawMacroRole,
-    void *_Nonnull customAttrSourceFile,
-    const void *_Nullable customAttrSourceLocation,
-    void *_Nonnull declarationSourceFile,
-    const void *_Nullable declarationSourceLocation,
-    void *_Nullable parentDeclSourceFile,
-    const void *_Nullable parentDeclSourceLocation,
-    BridgedStringRef *_Nonnull evaluatedSourceOut);
-
-bool swift_ASTGen_initializePlugin(void *_Nonnull handle,
-                                   void *_Nullable diagEngine);
-void swift_ASTGen_deinitializePlugin(void *_Nonnull handle);
-bool swift_ASTGen_pluginServerLoadLibraryPlugin(
-    void *_Nonnull handle, const char *_Nonnull libraryPath,
-    const char *_Nonnull moduleName, BridgedStringRef *_Nullable errorOut);
 
 /// Build a TypeRepr for AST node for the type at the given source location in
 /// the specified file.
@@ -162,3 +120,5 @@ void swift_ASTGen_freeConfiguredRegions(
 #ifdef __cplusplus
 }
 #endif
+
+#endif // SWIFT_BRIDGING_ASTGEN_H

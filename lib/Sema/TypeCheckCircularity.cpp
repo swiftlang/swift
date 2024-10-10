@@ -282,7 +282,7 @@ bool CircularityChecker::expandEnum(CanType type, EnumDecl *E,
     if (!elt->hasAssociatedValues())
       continue;
 
-    auto eltType = elt->getArgumentInterfaceType().subst(subMap);
+    auto eltType = elt->getPayloadInterfaceType().subst(subMap);
     if (addMember(type, elt, eltType, depth))
       return true;
   }
@@ -346,7 +346,7 @@ static size_t findCycleIndex(const Path &path) {
 
 static Type getMemberStorageInterfaceType(ValueDecl *member) {
   if (auto elt = dyn_cast<EnumElementDecl>(member)) {
-    return elt->getArgumentInterfaceType();
+    return elt->getPayloadInterfaceType();
   } else {
     return member->getInterfaceType();
   }
@@ -599,14 +599,14 @@ void CircularityChecker::diagnoseNonWellFoundedEnum(EnumDecl *E) {
       if (!elt->isIndirect() && !E->isIndirect())
         return false;
 
-      auto argTy = elt->getArgumentInterfaceType();
-      if (!argTy)
+      auto payloadTy = elt->getPayloadInterfaceType();
+      if (!payloadTy)
         return false;
 
-      if (auto tuple = argTy->getAs<TupleType>()) {
+      if (auto tuple = payloadTy->getAs<TupleType>()) {
         if (!containsType(tuple, E->getSelfInterfaceType()))
           return false;
-      } else if (auto paren = dyn_cast<ParenType>(argTy.getPointer())) {
+      } else if (auto paren = dyn_cast<ParenType>(payloadTy.getPointer())) {
         if (!E->getSelfInterfaceType()->isEqual(paren->getUnderlyingType()))
           return false;
       }

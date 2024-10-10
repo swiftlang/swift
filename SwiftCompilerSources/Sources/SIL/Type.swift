@@ -11,8 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 import Basic
+import AST
 import SILBridging
 
+/// A Swift type that has been lowered to a SIL representation type.
+/// A `SIL.Type` is basically an `AST.CanonicalType` with the distinction between "object" and "address" type
+/// (`*T` is the type of an address pointing at T).
+/// Note that not all `CanonicalType`s can be represented as a `SIL.Type`.
 public struct Type : CustomStringConvertible, NoReflectionChildren {
   public let bridged: BridgedType
 
@@ -21,6 +26,8 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
 
   public var addressType: Type { bridged.getAddressType().type }
   public var objectType: Type { bridged.getObjectType().type }
+
+  public var canonicalASTType: CanonicalType { CanonicalType(bridged: bridged.getCanType()) }
 
   public func isTrivial(in function: Function) -> Bool {
     return bridged.isTrivial(function.bridged)
@@ -49,7 +56,6 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
 
   public var hasArchetype: Bool { bridged.hasArchetype() }
 
-  public var isNominal: Bool { bridged.isNominalOrBoundGenericNominal() }
   public var isClass: Bool { bridged.isClassOrBoundGenericClass() }
   public var isStruct: Bool { bridged.isStructOrBoundGenericStruct() }
   public var isTuple: Bool { bridged.isTuple() }
@@ -76,9 +82,20 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   }
 
   /// Can only be used if the type is in fact a nominal type (`isNominal` is true).
-  public var nominal: NominalTypeDecl {
-    NominalTypeDecl(_bridged: bridged.getNominalOrBoundGenericNominal())
+  public var nominal: NominalTypeDecl? {
+    bridged.getNominalOrBoundGenericNominal().getAs(NominalTypeDecl.self)
   }
+
+  public var superClassType: Type? {
+    precondition(isClass)
+    return bridged.getSuperClassType().typeOrNil
+  }
+
+  public var contextSubstitutionMap: SubstitutionMap {
+    SubstitutionMap(bridged: bridged.getContextSubstitutionMap())
+  }
+
+  public var isGenericAtAnyLevel: Bool { bridged.isGenericAtAnyLevel() }
 
   public var isOrContainsObjectiveCClass: Bool { bridged.isOrContainsObjectiveCClass() }
 
@@ -113,7 +130,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   /// Returns nil if the nominal is a resilient type because in this case the complete list
   /// of fields is not known.
   public func getNominalFields(in function: Function) -> NominalFieldsArray? {
-    if nominal.isResilient(in: function) {
+    if nominal!.isResilient(in: function) {
       return nil
     }
     return NominalFieldsArray(type: self, function: function)
@@ -123,7 +140,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   /// Returns nil if the enum is a resilient type because in this case the complete list
   /// of cases is not known.
   public func getEnumCases(in function: Function) -> EnumCases? {
-    if nominal.isResilient(in: function) {
+    if nominal!.isResilient(in: function) {
       return nil
     }
     return EnumCases(enumType: self, function: function)
@@ -207,7 +224,7 @@ extension Type: Equatable {
 }
 
 public struct TypeArray : RandomAccessCollection, CustomReflectable {
-  private let bridged: BridgedSILTypeArray
+  public let bridged: BridgedSILTypeArray
 
   public var startIndex: Int { return 0 }
   public var endIndex: Int { return bridged.getCount() }
@@ -313,39 +330,4 @@ public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
 extension BridgedType {
   public var type: Type { Type(bridged: self) }
   var typeOrNil: Type? { isNull() ? nil : type }
-}
-
-// TODO: use an AST type for this once we have it
-public struct NominalTypeDecl : Equatable, Hashable {
-  public let bridged: BridgedNominalTypeDecl
-
-  public init(_bridged: BridgedNominalTypeDecl) {
-    self.bridged = _bridged
-  }
-
-  public var name: StringRef { StringRef(bridged: bridged.getName()) }
-
-  public static func ==(lhs: NominalTypeDecl, rhs: NominalTypeDecl) -> Bool {
-    lhs.bridged.raw == rhs.bridged.raw
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(bridged.raw)
-  }
-
-  public func isResilient(in function: Function) -> Bool {
-    function.bridged.isResilientNominalDecl(bridged)
-  }
-
-  public var isStructWithUnreferenceableStorage: Bool {
-    bridged.isStructWithUnreferenceableStorage()
-  }
-
-  public var isGlobalActor: Bool {
-    return bridged.isGlobalActor()
-  }
-
-  public var hasValueDeinit: Bool {
-    return bridged.hasValueDeinit()
-  }
 }

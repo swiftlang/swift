@@ -188,7 +188,8 @@ public:
   static std::unique_ptr<ClangImporter>
   create(ASTContext &ctx,
          std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
-         DWARFImporterDelegate *dwarfImporterDelegate = nullptr);
+         DWARFImporterDelegate *dwarfImporterDelegate = nullptr,
+         bool ignoreFileMapping = false);
 
   static std::vector<std::string>
   getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget = false);
@@ -481,11 +482,10 @@ public:
 
   llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
   getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath,
-                        llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                         clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                         InterfaceSubContextDelegate &delegate,
-                        llvm::TreePathPrefixMapper *mapper,
+                        llvm::PrefixMapper *mapper,
                         bool isTestableImport = false) override;
 
   void recordBridgingHeaderOptions(
@@ -718,17 +718,26 @@ ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
 } // namespace importer
 
 struct ClangInvocationFileMapping {
+  /// Mapping from a file name to an existing file path.
   SmallVector<std::pair<std::string, std::string>, 2> redirectedFiles;
+
+  /// Mapping from a file name to a string of characters that represents the
+  /// contents of the file.
   SmallVector<std::pair<std::string, std::string>, 1> overridenFiles;
+
   bool requiresBuiltinHeadersInSystemModules;
 };
 
 /// On Linux, some platform libraries (glibc, libstdc++) are not modularized.
 /// We inject modulemaps for those libraries into their include directories
 /// to allow using them from Swift.
+///
+/// `suppressDiagnostic` prevents us from emitting warning messages when we
+/// are unable to find headers.
 ClangInvocationFileMapping getClangInvocationFileMapping(
     ASTContext &ctx,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr);
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr,
+    bool suppressDiagnostic = false);
 
 } // end namespace swift
 

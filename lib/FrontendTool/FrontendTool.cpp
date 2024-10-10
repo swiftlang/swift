@@ -54,6 +54,7 @@
 #include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/DiagnosticHelper.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/Frontend/MakeStyleDependencies.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/IRGen/TBDGen.h"
@@ -107,15 +108,13 @@ static std::string displayName(StringRef MainExecutablePath) {
   return Name;
 }
 
-static void emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
-                                         DependencyTracker *depTracker,
-                                         const FrontendOptions &opts,
-                                         llvm::vfs::OutputBackend &backend) {
-  opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
-      [&](const InputFile &f) -> bool {
-        return swift::emitMakeDependenciesIfNeeded(diags, depTracker, opts, f,
-                                                   backend);
-      });
+static void emitMakeDependenciesIfNeeded(CompilerInstance &instance) {
+  instance.getInvocation()
+      .getFrontendOptions()
+      .InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+          [&](const InputFile &f) -> bool {
+            return swift::emitMakeDependenciesIfNeeded(instance, f);
+          });
 }
 
 static void
@@ -1056,9 +1055,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   emitSwiftdepsForAllPrimaryInputsIfNeeded(Instance);
 
   // Emit Make-style dependencies.
-  emitMakeDependenciesIfNeeded(Instance.getDiags(),
-                               Instance.getDependencyTracker(), opts,
-                               Instance.getOutputBackend());
+  emitMakeDependenciesIfNeeded(Instance);
 
   // Emit extracted constant values for every file in the batch
   emitConstValuesForAllPrimaryInputsIfNeeded(Instance);
@@ -1322,7 +1319,7 @@ static bool tryReplayCompilerResults(CompilerInstance &Instance) {
   bool replayed = replayCachedCompilerOutputs(
       Instance.getObjectStore(), Instance.getActionCache(),
       *Instance.getCompilerBaseKey(), Instance.getDiags(),
-      Instance.getInvocation().getFrontendOptions().InputsAndOutputs, *CDP,
+      Instance.getInvocation().getFrontendOptions(), *CDP,
       Instance.getInvocation().getCASOptions().EnableCachingRemarks,
       Instance.getInvocation().getIRGenOptions().UseCASBackend);
 
@@ -1988,7 +1985,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // hundreds or thousands of lines. Skip dumping this output in that case.
   if (!Invocation.getFrontendOptions().InputsAndOutputs.isWholeModule()) {
     for_each(configurationFileBuffers.begin(), configurationFileBuffers.end(),
-             &configurationFileStackTraces[0],
+             configurationFileStackTraces.get(),
              [](const std::unique_ptr<llvm::MemoryBuffer> &buffer,
                 std::optional<PrettyStackTraceFileContents> &trace) {
                trace.emplace(*buffer);

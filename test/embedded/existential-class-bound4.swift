@@ -5,11 +5,11 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu
 
-// Generic classes don't work yet.
-// XFAIL: *
-
-protocol ClassBound: AnyObject {
+public protocol Base: AnyObject {
     func foo()
+}
+
+protocol ClassBound: Base {
     func bar()
 }
 

@@ -431,6 +431,9 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
   if (self == other) {
     return YES;
   }
+  if (other == nil) {
+    return NO;
+  }
   if (runtime::bincompat::useLegacySwiftObjCHashing()) {
     // Legacy behavior: Don't proxy to Swift Hashable or Equatable
     return NO; // We know the ids are different
@@ -1377,12 +1380,25 @@ id swift_dynamicCastObjCProtocolConditional(id object,
   return object;
 }
 
+// Check whether the current ObjC runtime supports lazy realization. If it does,
+// then we can avoid forcing realization of classes before we use them.
+static bool objcSupportsLazyRealization() {
+#if OBJC_SUPPORTSLAZYREALIZATION_DEFINED
+  return SWIFT_LAZY_CONSTANT(_objc_supportsLazyRealization());
+#else
+  return false;
+#endif
+}
+
 void swift::swift_instantiateObjCClass(const ClassMetadata *_c) {
   static const objc_image_info ImageInfo = {0, 0};
 
-  // Ensure the superclass is realized.
   Class c = class_const_cast(_c);
-  [class_getSuperclass(c) class];
+
+  if (!objcSupportsLazyRealization()) {
+    // Ensure the superclass is realized.
+    [class_getSuperclass(c) class];
+  }
 
   // Register the class.
   Class registered = objc_readClassPair(c, &ImageInfo);
@@ -1392,14 +1408,16 @@ void swift::swift_instantiateObjCClass(const ClassMetadata *_c) {
 }
 
 Class swift::swift_getInitializedObjCClass(Class c) {
-  // Used when we have class metadata and we want to ensure a class has been
-  // initialized by the Objective-C runtime. We need to do this because the
-  // class "c" might be valid metadata, but it hasn't been initialized yet.
-  // Send a message that's likely not to be overridden to minimize potential
-  // side effects. Ignore the return value in case it is overridden to
-  // return something different. See
-  // https://github.com/apple/swift/issues/52863 for an example.
-  [c self];
+  if (!objcSupportsLazyRealization()) {
+    // Used when we have class metadata and we want to ensure a class has been
+    // initialized by the Objective-C runtime. We need to do this because the
+    // class "c" might be valid metadata, but it hasn't been initialized yet.
+    // Send a message that's likely not to be overridden to minimize potential
+    // side effects. Ignore the return value in case it is overridden to
+    // return something different. See
+    // https://github.com/apple/swift/issues/52863 for an example.
+    [c self];
+  }
   return c;
 }
 
@@ -1759,7 +1777,7 @@ const ClassMetadata *swift::getRootSuperclass() {
 }
 
 #define OVERRIDE_OBJC COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"
 
 #define OVERRIDE_FOREIGN COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

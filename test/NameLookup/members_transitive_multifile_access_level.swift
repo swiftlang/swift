@@ -19,7 +19,7 @@
 // RUN:   -primary-file %t/extensions.swift \
 // RUN:   %t/imports.swift \
 // RUN:   -I %t -package-name Package \
-// RUN:   -enable-experimental-feature MemberImportVisibility \
+// RUN:   -enable-upcoming-feature MemberImportVisibility \
 // RUN:   -verify-additional-prefix public-by-default-
 
 // RUN: %target-swift-frontend -typecheck -verify -swift-version 5 \
@@ -29,7 +29,7 @@
 // RUN:   -primary-file %t/extensions.swift \
 // RUN:   %t/imports.swift \
 // RUN:   -I %t -package-name Package \
-// RUN:   -enable-experimental-feature MemberImportVisibility \
+// RUN:   -enable-upcoming-feature MemberImportVisibility \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault \
 // RUN:   -verify-additional-prefix internal-by-default-
 

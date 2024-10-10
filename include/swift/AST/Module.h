@@ -145,6 +145,19 @@ struct SourceFilePathInfo {
   }
 };
 
+/// This is used to idenfity an external macro definition.
+struct ExternalMacroPlugin {
+  std::string ModuleName;
+
+  enum Access {
+    Internal = 0,
+    Package,
+    Public,
+  };
+
+  Access MacroAccess;
+};
+
 /// Discriminator for resilience strategy.
 enum class ResilienceStrategy : unsigned {
   /// Public nominal types: fragile
@@ -601,6 +614,9 @@ public:
   void findDeclaredCrossImportOverlaysTransitive(
       SmallVectorImpl<ModuleDecl *> &overlays);
 
+  /// Returns true if this module is the Clang header import module.
+  bool isClangHeaderImportModule() const;
+
   /// Convenience accessor for clients that know what kind of file they're
   /// dealing with.
   SourceFile &getMainSourceFile() const;
@@ -918,16 +934,13 @@ public:
   enum class ImportFilterKind {
     /// Include imports declared with `@_exported`.
     Exported = 1 << 0,
-    /// Include "regular" imports with an access-level of `public`.
+    /// Include "regular" imports with an effective access level of `public`.
     Default = 1 << 1,
     /// Include imports declared with `@_implementationOnly`.
     ImplementationOnly = 1 << 2,
-    /// Include imports declared with `package import`.
+    /// Include imports declared with an access level of `package`.
     PackageOnly = 1 << 3,
-    /// Include imports marked `internal` or lower. These differs form
-    /// implementation-only imports by stricter type-checking and loading
-    /// policies. At this moment, we can group them under the same category
-    /// as they have the same loading behavior.
+    /// Include imports with an effective access level of `internal` or lower.
     InternalOrBelow = 1 << 4,
     /// Include imports declared with `@_spiOnly`.
     SPIOnly = 1 << 5,
@@ -967,7 +980,10 @@ public:
   /// \p filter controls whether public, private, or any imports are included
   /// in this list.
   void getImportedModules(SmallVectorImpl<ImportedModule> &imports,
-                          ImportFilter filter = ImportFilterKind::Exported) const;
+                          ImportFilter filter) const;
+
+  /// Looks up which external macros are defined by this file.
+  void getExternalMacros(SmallVectorImpl<ExternalMacroPlugin> &macros) const;
 
   /// Lists modules that are not imported from a file and used in API.
   void getImplicitImportsForModuleInterface(

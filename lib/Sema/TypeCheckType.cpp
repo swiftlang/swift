@@ -4561,6 +4561,10 @@ SILParameterInfo TypeResolver::resolveSILParameter(
 
   std::optional<TypeAttrSet> attrsBuffer;
   TypeAttrSet *attrs = nullptr;
+
+  if (auto *lifetimeRepr = dyn_cast<LifetimeDependentTypeRepr>(repr)) {
+    repr = lifetimeRepr->getBase();
+  }
   if (yieldAttrs) {
     attrs = yieldAttrs;
     assert(!isa<AttributedTypeRepr>(repr));

@@ -84,15 +84,6 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
   }
 }
 
-SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
-  : TypeVar(typeVar), Options(typeVar->getImpl().getRawOptions()),
-    ParentOrFixed(typeVar->getImpl().ParentOrFixed) { }
-
-void SavedTypeVariableBinding::restore() {
-  TypeVar->getImpl().setRawOptions(Options);
-  TypeVar->getImpl().ParentOrFixed = ParentOrFixed;
-}
-
 GenericTypeParamType *
 TypeVariableType::Implementation::getGenericParameter() const {
   return locator ? locator->getGenericParameter() : nullptr;
@@ -470,7 +461,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   // Apply this solution to the constraint system.
   // FIXME: This shouldn't be necessary.
   auto &solution = (*viable)[0];
-  cs.applySolution(solution);
+  cs.replaySolution(solution);
 
   // Apply the solution to the expression.
   auto resultTarget = cs.applySolution(solution, target);
@@ -762,7 +753,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
 
   auto &solution = (*viable)[0];
 
-  cs.applySolution(solution);
+  cs.replaySolution(solution);
 
   if (auto result = cs.applySolution(solution, defaultExprTarget)) {
     // Perform syntactic diagnostics on the type-checked target.
@@ -1515,15 +1506,6 @@ void ConstraintSystem::print(raw_ostream &out) const {
       constraint.print(out, &getASTContext().SourceMgr);
       out << "\n";
     }
-  }
-
-  if (solverState && solverState->hasRetiredConstraints()) {
-    out.indent(indent) << "Retired Constraints:\n";
-    solverState->forEachRetired([&](Constraint &constraint) {
-      out.indent(indent + 2);
-      constraint.print(out, &getASTContext().SourceMgr);
-      out << "\n";
-    });
   }
 
   if (!ResolvedOverloads.empty()) {
@@ -2338,7 +2320,9 @@ ForcedCheckedCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   return nullptr;
 }
 
-bool swift::canAddExplicitConsume(ModuleDecl *module, Expr *expr) {
+bool swift::canAddExplicitConsume(constraints::Solution &sol,
+                                  ModuleDecl *module,
+                                  Expr *expr) {
   expr = expr->getSemanticsProvidingExpr();
 
   // Is it already wrapped in a `consume`?
@@ -2346,7 +2330,8 @@ bool swift::canAddExplicitConsume(ModuleDecl *module, Expr *expr) {
     return false;
 
   // Is this expression valid to wrap inside a `consume`?
-  auto diags = findSyntacticErrorForConsume(module, SourceLoc(), expr);
+  auto diags = findSyntacticErrorForConsume(module, SourceLoc(), expr,
+                            [&](Expr *e) { return sol.getResolvedType(e); });
   return diags.empty();
 }
 

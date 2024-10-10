@@ -1005,6 +1005,10 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     }
     return rt;
   }
+  case SILInstructionKind::ThunkInst: {
+    // For now be conservative since we may lower to a partial_apply.
+    return RuntimeEffect::Allocating | RuntimeEffect::Releasing;
+  }
   case SILInstructionKind::WitnessMethodInst: {
     return RuntimeEffect::MetaData;
   }
@@ -1384,4 +1388,12 @@ bool swift::visitExplodedTupleValue(
   }
 
   return true;
+}
+
+std::pair<SILFunction *, SILWitnessTable *>
+swift::lookUpFunctionInWitnessTable(WitnessMethodInst *wmi,
+                                    SILModule::LinkingMode linkingMode) {
+  SILModule &mod = wmi->getModule();
+  return mod.lookUpFunctionInWitnessTable(wmi->getConformance(), wmi->getMember(),
+                                          wmi->isSpecialized(), linkingMode);
 }

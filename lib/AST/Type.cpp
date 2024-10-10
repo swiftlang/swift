@@ -86,6 +86,8 @@ NominalTypeDecl *CanType::getAnyNominal() const {
 }
 
 GenericTypeDecl *CanType::getAnyGeneric() const {
+  // FIXME: Remove checking for existential types. `getAnyGeneric` should return
+  // the GenericTypeDecl the type is directly bound to.
   if (auto existential = dyn_cast<ExistentialType>(*this))
     return existential->getConstraintType()->getAnyGeneric();
   if (auto ppt = dyn_cast<ParameterizedProtocolType>(*this))
@@ -4090,14 +4092,15 @@ Type Type::transformRec(
   class Transform : public TypeTransform<Transform> {
     llvm::function_ref<std::optional<Type>(TypeBase *)> fn;
   public:
-    explicit Transform(llvm::function_ref<std::optional<Type>(TypeBase *)> fn) : fn(fn) {}
+    explicit Transform(llvm::function_ref<std::optional<Type>(TypeBase *)> fn,
+                       ASTContext &ctx) : TypeTransform(ctx), fn(fn) {}
 
     std::optional<Type> transform(TypeBase *type, TypePosition position) {
       return fn(type);
     }
   };
 
-  return Transform(fn).doIt(*this, TypePosition::Invariant);
+  return Transform(fn, (*this)->getASTContext()).doIt(*this, TypePosition::Invariant);
 }
 
 Type Type::transformWithPosition(
@@ -4107,14 +4110,15 @@ Type Type::transformWithPosition(
   class Transform : public TypeTransform<Transform> {
     llvm::function_ref<std::optional<Type>(TypeBase *, TypePosition)> fn;
   public:
-    explicit Transform(llvm::function_ref<std::optional<Type>(TypeBase *, TypePosition)> fn) : fn(fn) {}
+    explicit Transform(llvm::function_ref<std::optional<Type>(TypeBase *, TypePosition)> fn,
+                       ASTContext &ctx) : TypeTransform(ctx), fn(fn) {}
 
     std::optional<Type> transform(TypeBase *type, TypePosition position) {
       return fn(type, position);
     }
   };
 
-  return Transform(fn).doIt(*this, pos);
+  return Transform(fn, (*this)->getASTContext()).doIt(*this, pos);
 }
 
 bool Type::findIf(llvm::function_ref<bool(Type)> pred) const {

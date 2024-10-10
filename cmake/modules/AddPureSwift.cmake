@@ -82,6 +82,39 @@ function(_add_host_swift_compile_options name)
   endif()
 endfunction()
 
+# Set compile options for C/C++ interop
+function(_set_swift_cxx_interop_options name)
+  target_compile_options(${name} PRIVATE
+    "SHELL: -Xcc -std=c++17 -Xcc -DCOMPILED_WITH_SWIFT"
+
+    # FIXME: Needed to work around an availability issue with CxxStdlib
+    "SHELL: -Xfrontend -disable-target-os-checking"
+
+    # Necessary to avoid treating IBOutlet and IBAction as keywords
+    "SHELL:-Xcc -UIBOutlet -Xcc -UIBAction -Xcc -UIBInspectable"
+  )
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    target_compile_options(${name} PRIVATE
+      # Make 'offsetof()' a const value.
+      "SHELL:-Xcc -D_CRT_USE_BUILTIN_OFFSETOF"
+      # Workaround for https://github.com/swiftlang/llvm-project/issues/7172
+      "SHELL:-Xcc -Xclang -Xcc -fmodule-format=raw"
+    )
+  endif()
+
+  # Prior to 5.9, we have to use the experimental flag for C++ interop.
+  if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
+    target_compile_options(${name} PRIVATE
+      "SHELL:-Xfrontend -enable-experimental-cxx-interop"
+    )
+  else()
+    target_compile_options(${name} PRIVATE
+      "-cxx-interoperability-mode=default"
+    )
+  endif()
+endfunction()
+
 function(_set_pure_swift_link_flags name relpath_to_lib_dir)
   if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
     # Don't add builder's stdlib RPATH automatically.
@@ -171,6 +204,9 @@ endfunction()
 # STATIC
 #   Build a static library.
 #
+# CXX_INTEROP
+#   Use C++ interop.
+#
 # EMIT_MODULE
 #   Emit '.swiftmodule' to
 #
@@ -196,6 +232,7 @@ function(add_pure_swift_host_library name)
   set(options
         SHARED
         STATIC
+        CXX_INTEROP
         EMIT_MODULE)
   set(single_parameter_options
         PACKAGE_NAME)
@@ -223,6 +260,9 @@ function(add_pure_swift_host_library name)
   add_library(${name} ${libkind} ${APSHL_SOURCES})
   _add_host_swift_compile_options(${name})
   _set_pure_swift_package_options(${name} "${APSHL_PACKAGE_NAME}")
+  if(APSHL_CXX_INTEROP)
+    _set_swift_cxx_interop_options(${name})
+  endif()
 
   set_property(TARGET ${name}
     PROPERTY BUILD_WITH_INSTALL_RPATH YES)

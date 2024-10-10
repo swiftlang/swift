@@ -5868,6 +5868,78 @@ public:
   bool onlyConvertsSendable() const;
 };
 
+class ThunkInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::ThunkInst, ThunkInst, SingleValueInstruction> {
+public:
+  struct Kind {
+    enum InnerTy {
+      Invalid = 0,
+
+      /// A thunk that just calls the passed in function. Used for testing
+      /// purposes of the underlying thunking machinery.
+      Identity = 1,
+
+      MaxValue = Identity,
+    };
+
+    InnerTy innerTy;
+
+    Kind() : innerTy(InnerTy::Invalid) {}
+    Kind(InnerTy innerTy) : innerTy(innerTy) {}
+    Kind(unsigned inputInnerTy) : innerTy(InnerTy(inputInnerTy)) {
+      assert(inputInnerTy <= MaxValue && "Invalid value");
+    }
+
+    operator InnerTy() const { return innerTy; }
+
+    /// Given the current enum state returned the derived output function from
+    /// \p inputFunction.
+    CanSILFunctionType getDerivedFunctionType(SILFunction *fn,
+                                              CanSILFunctionType inputFunction,
+                                              SubstitutionMap subMap) const;
+
+    SILType getDerivedFunctionType(SILFunction *fn, SILType inputFunctionType,
+                                   SubstitutionMap subMap) const {
+      auto fType = inputFunctionType.castTo<SILFunctionType>();
+      return SILType::getPrimitiveType(
+          getDerivedFunctionType(fn, fType, subMap),
+          inputFunctionType.getCategory());
+    }
+  };
+
+  /// The type of thunk we are supposed to produce.
+  Kind kind;
+
+  /// The substitutions being applied to the callee when we generate thunks for
+  /// it. E.x.: if we generate a partial_apply, this will be the substitution
+  /// map used to generate the partial_apply.
+  SubstitutionMap substitutions;
+
+private:
+  friend SILBuilder;
+
+  ThunkInst(SILDebugLocation debugLoc, SILValue operand,
+            ArrayRef<SILValue> typeDependentOperands, SILType outputType,
+            Kind kind, SubstitutionMap subs)
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            debugLoc, operand, typeDependentOperands, outputType),
+        kind(kind), substitutions(subs) {}
+
+  static ThunkInst *create(SILDebugLocation debugLoc, SILValue operand,
+                           SILModule &mod, SILFunction *func, Kind kind,
+                           SubstitutionMap subs);
+
+public:
+  Kind getThunkKind() const { return kind; }
+
+  SubstitutionMap getSubstitutionMap() const { return substitutions; }
+
+  CanSILFunctionType getOrigCalleeType() const {
+    return getOperand()->getType().castTo<SILFunctionType>();
+  }
+};
+
 /// ConvertEscapeToNoEscapeInst - Change the type of a escaping function value
 /// to a trivial function type (@noescape T -> U).
 class ConvertEscapeToNoEscapeInst final
@@ -7641,6 +7713,13 @@ public:
   CanType getLookupType() const { return LookupType; }
   ProtocolDecl *getLookupProtocol() const {
     return getMember().getDecl()->getDeclContext()->getSelfProtocolDecl();
+  }
+
+  // Returns true if it's expected that the witness method is looked up up from
+  // a specialized witness table.
+  // This is the case in Embedded Swift.
+  bool isSpecialized() const {
+    return !getType().castTo<SILFunctionType>()->isPolymorphic();
   }
 
   ProtocolConformanceRef getConformance() const { return Conformance; }

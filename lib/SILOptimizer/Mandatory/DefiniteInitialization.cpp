@@ -1372,20 +1372,50 @@ void LifetimeChecker::handleFlowSensitiveActorIsolationUse(
 
   ASTContext &ctx = F.getASTContext();
   auto builtinInst = cast<BuiltinInst>(Use.Inst);
+  auto builtinKind = builtinInst->getBuiltinKind();
+  assert(builtinKind == BuiltinValueKind::FlowSensitiveSelfIsolation ||
+         builtinKind == BuiltinValueKind::FlowSensitiveDistributedSelfIsolation);
+  bool isDistributed =
+    (*builtinKind == BuiltinValueKind::FlowSensitiveDistributedSelfIsolation);
+
   SILBuilderWithScope B(builtinInst);
   SILValue replacement;
   SILType optExistentialType = builtinInst->getType();
   SILLocation loc = builtinInst->getLoc();
   if (isInitializedAtUse(Use, &IsSuperInitComplete, &FailedSelfUse)) {
     // 'self' is initialized, so replace this builtin with the appropriate
-    // operation to produce `any Actor.
+    // operation to produce `any Actor`.
+
+    auto conformance = builtinInst->getSubstitutions().getConformances()[0];
+
+    // The path for distributed actors below does a call that wants a
+    // borrowed argument. The path for normal actors directly does an
+    // existential erasure, which needs an owned value.
+    bool wantOwnedActor = !isDistributed;
+
+    // Compute the actor reference.  In delegating initializers, the argument
+    // to the builtin will be a projection from the box; otherwise it's a
+    // direct actor reference.
+    SILValue actor = [&]() -> SILValue {
+      SILValue builtinArg = builtinInst->getArguments()[0];
+      if (builtinArg->getType().isAddress()) {
+        if (wantOwnedActor) {
+          return B.createLoad(loc, builtinArg, LoadOwnershipQualifier::Copy);
+        } else {
+          return B.createLoadBorrow(loc, builtinArg);
+        }
+      } else {
+        if (wantOwnedActor) {
+          return B.createCopyValue(loc, builtinArg);
+        } else {
+          return B.createBeginBorrow(loc, builtinArg);
+        }
+      }
+    }();
 
     SILValue anyActorValue;
-    auto conformance = builtinInst->getSubstitutions().getConformances()[0];
-    if (builtinInst->getBuiltinKind() == BuiltinValueKind::FlowSensitiveSelfIsolation) {
-      // Create a copy of the actor argument, which we intentionally did not
-      // copy in SILGen.
-      SILValue actor = B.createCopyValue(loc, builtinInst->getArguments()[0]);
+    if (!isDistributed) {
+      assert(wantOwnedActor);
 
       // Inject 'self' into 'any Actor'.
       ProtocolConformanceRef conformances[1] = { conformance };
@@ -1394,10 +1424,6 @@ void LifetimeChecker::handleFlowSensitiveActorIsolationUse(
           loc, existentialType, actor->getType().getASTType(), actor,
           ctx.AllocateCopy(conformances));
     } else {
-      // Borrow the actor argument, which we need to form the appropriate
-      // call to the asLocalActor getter.
-      SILValue actor = B.createBeginBorrow(loc, builtinInst->getArguments()[0]);
-
       // Dig out the getter for asLocalActor.
       auto asLocalActorDecl = getDistributedActorAsLocalActorComputedProperty(
           F.getDeclContext()->getParentModule());
@@ -1416,6 +1442,10 @@ void LifetimeChecker::handleFlowSensitiveActorIsolationUse(
                                { actor->getType().getASTType() },
                                { conformance }),
                                { actor });
+
+      assert(!wantOwnedActor);
+
+      // End the load_borrow or begin_borrow we did above.
       B.createEndBorrow(loc, actor);
     }
 
@@ -1771,10 +1801,12 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
         case AccessorKind::Get:
         case AccessorKind::DistributedGet:
         case AccessorKind::Read:
+        case AccessorKind::Read2:
         case AccessorKind::Address:
           return false;
         case AccessorKind::Set:
         case AccessorKind::Modify:
+        case AccessorKind::Modify2:
         case AccessorKind::MutableAddress:
         case AccessorKind::DidSet:
         case AccessorKind::WillSet:

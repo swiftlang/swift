@@ -182,6 +182,18 @@ static bool shouldPrintAllSemanticDetails(const PrintOptions &options) {
   return false;
 }
 
+bool PrintOptions::excludeAttr(const DeclAttribute *DA) const {
+  if (excludeAttrKind(DA->getKind())) {
+    return true;
+  }
+  if (auto CA = dyn_cast<CustomAttr>(DA)) {
+    if (std::any_of(ExcludeCustomAttrList.begin(), ExcludeCustomAttrList.end(),
+                    [CA](CustomAttr *other) { return other == CA; }))
+      return true;
+  }
+  return false;
+}
+
 /// Forces printing types with the `some` keyword, instead of the full stable
 /// reference.
 struct PrintWithOpaqueResultTypeKeywordRAII {
@@ -207,8 +219,8 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool useExportedModuleNames,
                                                    bool aliasModuleNames,
                                                    llvm::SmallSet<StringRef, 4>
-                                                     *aliasModuleNamesTargets
-                                                   ) {
+                                                     *aliasModuleNamesTargets,
+                                                   bool abiComments) {
   PrintOptions result;
   result.IsForSwiftInterface = true;
   result.PrintLongAttrsOnSeparateLines = true;
@@ -230,6 +242,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   result.PreferTypeRepr = preferTypeRepr;
   result.AliasModuleNames = aliasModuleNames;
   result.AliasModuleNamesTargets = aliasModuleNamesTargets;
+  result.PrintABIComments = abiComments;
   if (printFullConvention)
     result.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::Full;
@@ -770,19 +783,28 @@ class PrintAST : public ASTVisitor<PrintAST> {
     printRawComment(RC);
   }
 
-  void printDocumentationComment(const Decl *D) {
-    if (!Options.PrintDocumentationComments)
-      return;
+  /// If we should print a mangled name for this declaration, return that
+  /// mangled name.
+  std::optional<std::string> mangledNameToPrint(const Decl *D);
 
-    // Try to print a comment from Clang.
-    auto MaybeClangNode = D->getClangNode();
-    if (MaybeClangNode) {
-      if (auto *CD = MaybeClangNode.getAsDecl())
-        printClangDocumentationComment(CD);
-      return;
+  void printDocumentationComment(const Decl *D) {
+    if (Options.PrintDocumentationComments) {
+      // Try to print a comment from Clang.
+      auto MaybeClangNode = D->getClangNode();
+      if (MaybeClangNode) {
+        if (auto *CD = MaybeClangNode.getAsDecl())
+          printClangDocumentationComment(CD);
+        return;
+      }
+
+      printSwiftDocumentationComment(D);
     }
 
-    printSwiftDocumentationComment(D);
+    if (auto mangledName = mangledNameToPrint(D)) {
+      indent();
+      Printer << "// MANGLED NAME: " << *mangledName;
+      Printer.printNewline();
+    }
   }
 
   void printStaticKeyword(StaticSpellingKind StaticSpelling) {
@@ -839,7 +861,13 @@ class PrintAST : public ASTVisitor<PrintAST> {
     if (D->getDeclContext()->isLocalContext())
       return;
     
-    printAccess(D->getFormalAccess());
+    if (Options.SuppressIsolatedDeinit &&
+        D->getFormalAccess() == AccessLevel::Open &&
+        usesFeatureIsolatedDeinit(D)) {
+      printAccess(AccessLevel::Public);
+    } else {
+      printAccess(D->getFormalAccess());
+    }
     bool shouldSkipSetterAccess =
         llvm::is_contained(Options.ExcludeAttrList, DeclAttrKind::SetterAccess);
 
@@ -1234,6 +1262,10 @@ void PrintAST::printAttributes(const Decl *D) {
   // Save the current number of exclude attrs to restore once we're done.
   unsigned originalExcludeAttrCount = Options.ExcludeAttrList.size();
 
+  // ExcludeCustomAttrList stores instances of attributes, which are specific
+  // for each decl They cannot be shared across different decls.
+  assert(Options.ExcludeCustomAttrList.empty());
+
   if (Options.PrintImplicitAttrs) {
 
     // Don't print a redundant 'final' if we are printing a 'static' decl.
@@ -1325,9 +1357,19 @@ void PrintAST::printAttributes(const Decl *D) {
     Options.ExcludeAttrList.push_back(DeclAttrKind::Borrowing);
   }
 
+  if (isa<DestructorDecl>(D) && Options.SuppressIsolatedDeinit) {
+    Options.ExcludeAttrList.push_back(DeclAttrKind::Nonisolated);
+    Options.ExcludeAttrList.push_back(DeclAttrKind::Isolated);
+    if (auto globalActor = D->getGlobalActorAttr()) {
+      Options.ExcludeCustomAttrList.push_back(globalActor->first);
+    }
+  }
+  
   attrs.print(Printer, Options, D);
 
+
   Options.ExcludeAttrList.resize(originalExcludeAttrCount);
+  Options.ExcludeCustomAttrList.clear();
 }
 
 void PrintAST::printTypedPattern(const TypedPattern *TP) {
@@ -2349,6 +2391,12 @@ void PrintAST::printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD) {
   }
 }
 
+static bool
+shouldPrintUnderscoredCoroutineAccessors(const AbstractStorageDecl *ASD) {
+  // TODO: CoroutineAccessors: Print only when necessary.
+  return true;
+}
+
 void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   if (isa<VarDecl>(ASD) && !Options.PrintPropertyAccessors)
     return;
@@ -2491,8 +2539,13 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   // Collect the accessor declarations that we should print.
   SmallVector<AccessorDecl *, 4> accessorsToPrint;
   auto AddAccessorToPrint = [&](AccessorKind kind) {
+    if (Options.SuppressCoroutineAccessors &&
+        requiresFeatureCoroutineAccessors(kind))
+      return;
     auto *Accessor = ASD->getAccessor(kind);
-    if (Accessor && shouldPrint(Accessor))
+    if (!Accessor)
+      return;
+    if (shouldPrint(Accessor))
       accessorsToPrint.push_back(Accessor);
   };
 
@@ -2518,6 +2571,13 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     case ReadImplKind::Read:
       AddAccessorToPrint(AccessorKind::Read);
       break;
+    case ReadImplKind::Read2:
+      if (ASD->getAccessor(AccessorKind::Read) &&
+          shouldPrintUnderscoredCoroutineAccessors(ASD)) {
+        AddAccessorToPrint(AccessorKind::Read);
+      }
+      AddAccessorToPrint(AccessorKind::Read2);
+      break;
     }
     switch (impl.getWriteImpl()) {
     case WriteImplKind::Immutable:
@@ -2532,8 +2592,10 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     }
     case WriteImplKind::Set:
       AddAccessorToPrint(AccessorKind::Set);
-      if (!shouldHideModifyAccessor())
+      if (!shouldHideModifyAccessor()) {
         AddAccessorToPrint(AccessorKind::Modify);
+        AddAccessorToPrint(AccessorKind::Modify2);
+      }
       break;
     case WriteImplKind::MutableAddress:
       AddAccessorToPrint(AccessorKind::MutableAddress);
@@ -2542,6 +2604,13 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       break;
     case WriteImplKind::Modify:
       AddAccessorToPrint(AccessorKind::Modify);
+      break;
+    case WriteImplKind::Modify2:
+      if (ASD->getAccessor(AccessorKind::Modify) &&
+          shouldPrintUnderscoredCoroutineAccessors(ASD)) {
+        AddAccessorToPrint(AccessorKind::Modify);
+      }
+      AddAccessorToPrint(AccessorKind::Modify2);
       break;
     }
   }
@@ -3061,12 +3130,58 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
   }
 }
 
-static void suppressingFeatureSpecializeAttributeWithAvailability(
-                                        PrintOptions &options,
-                                        llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<bool> scope(
-    options.PrintSpecializeAttributeWithAvailability, false);
-  action();
+std::optional<std::string> PrintAST::mangledNameToPrint(const Decl *D) {
+  using ASTMangler = Mangle::ASTMangler;
+
+  if (!Options.PrintABIComments)
+    return std::nullopt;
+
+  auto valueDecl = dyn_cast<ValueDecl>(D);
+  if (!valueDecl)
+    return std::nullopt;
+
+  // Anything with an access level less than "package" isn't meant to be
+  // referenced from source code outside the module.
+  if (valueDecl->getEffectiveAccess() < AccessLevel::Package)
+    return std::nullopt;
+
+  // For functions, mangle the entity directly.
+  if (auto func = dyn_cast<FuncDecl>(D)) {
+    ASTMangler mangler;
+    return mangler.mangleEntity(func);
+  }
+
+  // For initializers, mangle the allocating initializer.
+  if (auto init = dyn_cast<ConstructorDecl>(D)) {
+    ASTMangler mangler;
+    return mangler.mangleConstructorEntity(init, /*isAllocating=*/true);
+  }
+
+  // For global and static variables, mangle the entity directly.
+  if (auto var = dyn_cast<VarDecl>(D)) {
+    if (!var->isInstanceMember()) {
+      ASTMangler mangler;
+      return mangler.mangleEntity(var);
+    }
+  }
+
+  // For subscripts, mangle the entity directly.
+  if (auto subscript = dyn_cast<SubscriptDecl>(D)) {
+    ASTMangler mangler;
+    return mangler.mangleEntity(subscript);
+  }
+
+  // For nominal types, mangle the type metadata accessor.
+  if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
+    if (!isa<ProtocolDecl>(nominal) && !nominal->getGenericSignature()) {
+      ASTMangler mangler;
+      std::string name = mangler.mangleNominalType(nominal);
+      name += "Ma";
+      return name;
+    }
+  }
+
+  return std::nullopt;
 }
 
 static void suppressingFeatureIsolatedAny(PrintOptions &options,
@@ -3085,10 +3200,15 @@ suppressingFeatureSendingArgsAndResults(PrintOptions &options,
 static void
 suppressingFeatureBitwiseCopyable2(PrintOptions &options,
                                    llvm::function_ref<void()> action) {
-  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
   llvm::SaveAndRestore<bool> scope(options.SuppressBitwiseCopyable, true);
   action();
-  options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
+static void
+suppressingFeatureIsolatedDeinit(PrintOptions &options,
+                                 llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressIsolatedDeinit, true);
+  action();
 }
 
 static void
@@ -3108,6 +3228,13 @@ suppressingFeatureNonescapableTypes(PrintOptions &options,
   llvm::SaveAndRestore<bool> scope(options.SuppressNonEscapableTypes, true);
   action();
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
+static void
+suppressingFeatureCoroutineAccessors(PrintOptions &options,
+                                     llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressCoroutineAccessors, true);
+  action();
 }
 
 /// Suppress the printing of a particular feature.
@@ -3984,6 +4111,10 @@ bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
 }
 
 void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
+  if (Options.SuppressCoroutineAccessors &&
+      requiresFeatureCoroutineAccessors(decl->getAccessorKind())) {
+    return;
+  }
   printDocumentationComment(decl);
   printAttributes(decl);
   // Explicitly print 'mutating' and 'nonmutating' if needed.
@@ -3994,7 +4125,9 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   case AccessorKind::DistributedGet:
   case AccessorKind::Address:
   case AccessorKind::Read:
+  case AccessorKind::Read2:
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
   case AccessorKind::DidSet:
   case AccessorKind::MutableAddress:
     recordDeclLoc(decl,
@@ -4113,16 +4246,6 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 
       Printer.printDeclResultTypePre(decl, ResultTyLoc);
       Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
-      {
-        if (!Options.SuppressNonEscapableTypes) {
-          if (auto *typeRepr = dyn_cast_or_null<LifetimeDependentTypeRepr>(
-                  decl->getResultTypeRepr())) {
-            for (auto &dep : typeRepr->getLifetimeDependencies()) {
-              Printer << " " << dep.getDependsOnString() << " ";
-            }
-          }
-        }
-      }
 
       if (!Options.SuppressSendingArgsAndResults) {
         if (decl->hasSendingResult()) {
@@ -4366,18 +4489,6 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 
       printGenericDeclGenericParams(decl);
       printFunctionParameters(decl);
-      if (!Options.SuppressNonEscapableTypes) {
-        if (decl->hasLifetimeDependentReturn()) {
-          Printer << " -> ";
-          auto *typeRepr =
-              cast<LifetimeDependentTypeRepr>(decl->getResultTypeRepr());
-          for (auto &dep : typeRepr->getLifetimeDependencies()) {
-            Printer << dep.getDependsOnString() << " ";
-          }
-          // TODO: Handle failable initializers with lifetime dependent returns
-          Printer << "Self";
-        }
-      }
     });
 
   printDeclGenericRequirements(decl);

@@ -14,12 +14,14 @@ struct Span<T>: ~Escapable {
   private var base: UnsafePointer<T>
   private var count: Int
 
-  init(base: UnsafePointer<T>, count: Int) -> dependsOn(base) Self {
+  @lifetime(borrow base)
+  init(base: UnsafePointer<T>, count: Int) {
     self.base = base
     self.count = count
   }
 
-  init<S>(base: UnsafePointer<T>, count: Int, generic: borrowing S) -> dependsOn(generic) Self {
+  @lifetime(borrow generic)
+  init<S>(base: UnsafePointer<T>, count: Int, generic: borrowing S) {
     self.base = base
     self.count = count
   }
@@ -35,23 +37,25 @@ extension Span {
 // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence should be expressed by a builtin that is
 // hidden within the function body.
 @_unsafeNonescapableResult
+@lifetime(source)
 func unsafeLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
   dependent: consuming T, dependsOn source: borrowing U)
-  -> dependsOn(source) T {
+  -> T {
   dependent
 }
 
 // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence should be expressed by a builtin that is
 // hidden within the function body.
 @_unsafeNonescapableResult
+@lifetime(borrow source)
 func unsafeLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
   dependent: consuming T, scope source: borrowing U)
-  -> dependsOn(scoped source) T {
+  -> T {
   dependent
 }
 
 extension Span {
-  mutating func droppingPrefix(length: Int) -> /* dependsOn(self) */ Span<T> {
+  mutating func droppingPrefix(length: Int) -> /* */ Span<T> {
     let oldBase = base
     let result = Span(base: oldBase, count: length)
     self.base += length
@@ -61,8 +65,8 @@ extension Span {
 }
 
 extension Array {
-  // TODO: comment out dependsOn(scoped)
-  borrowing func span() -> /* dependsOn(scoped self) */ Span<Element> {
+  // TODO: comment out
+  borrowing func span() -> /* */ Span<Element> {
     /* not the real implementation */
     let p = self.withUnsafeBufferPointer { $0.baseAddress! }
     return Span(base: p, count: 1)
@@ -100,7 +104,7 @@ func testScopedCopy(_ arg: [Int] ) {
 // Inherited dependence on values
 // =============================================================================
 
-func copySpan<T>(_ arg: Span<T>) -> /* dependsOn(arg) */ Span<T> { arg }
+func copySpan<T>(_ arg: Span<T>) -> /* */ Span<T> { arg }
 
 func testInheritedCopy(_ arg: [Int] ) {
   let a: Array<Int> = arg
@@ -132,7 +136,8 @@ func testInheritedCopyVar(_ arg: [Int] ) {
 // Scoped dependence on inherited dependence
 // =============================================================================
 
-func reborrowSpan<T>(_ arg: Span<T>) -> dependsOn(scoped arg) Span<T> { arg }
+@lifetime(borrow arg)
+func reborrowSpan<T>(_ arg: Span<T>) -> Span<T> { arg }
 
 func testScopedOfInheritedWithCall(_ arg: [Int] ) {
   let a: Array<Int> = arg

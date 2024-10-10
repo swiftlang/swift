@@ -4,10 +4,10 @@
 // RUN: %target-swift-frontend -emit-module -I %t -o %t %S/Inputs/MemberImportVisibility/members_C.swift
 // RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 5 -package-name TestPackage -verify-additional-prefix ambiguity-
 // RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 6 -package-name TestPackage -verify-additional-prefix ambiguity-
-// RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 5 -package-name TestPackage -enable-experimental-feature MemberImportVisibility -verify-additional-prefix member-visibility-
+// RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 5 -package-name TestPackage -enable-upcoming-feature MemberImportVisibility -verify-additional-prefix member-visibility-
 
 import members_C
-// expected-member-visibility-note 15{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
+// expected-member-visibility-note 16{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
 
 
 func testExtensionMembers(x: X, y: Y<Z>) {
@@ -93,3 +93,9 @@ class DerivedFromClassInC: DerivedClassInC {
 }
 
 struct ConformsToProtocolInA: ProtocolInA {} // expected-member-visibility-error{{type 'ConformsToProtocolInA' does not conform to protocol 'ProtocolInA'}} expected-member-visibility-note {{add stubs for conformance}}
+
+func testDerivedMethodAccess() {
+  DerivedClassInC().methodInC()
+  DerivedClassInC().methodInB() // expected-member-visibility-error{{instance method 'methodInB()' is not available due to missing import of defining module 'members_B'}}
+  DerivedFromClassInC().methodInB()
+}

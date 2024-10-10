@@ -1598,6 +1598,7 @@ namespace  {
     UNINTERESTING_ATTR(Indirect)
     UNINTERESTING_ATTR(InheritsConvenienceInitializers)
     UNINTERESTING_ATTR(Inline)
+    UNINTERESTING_ATTR(Isolated)
     UNINTERESTING_ATTR(Optimize)
     UNINTERESTING_ATTR(Exclusivity)
     UNINTERESTING_ATTR(NoLocks)
@@ -1865,11 +1866,13 @@ isRedundantAccessorOverrideAvailabilityDiagnostic(ValueDecl *override,
     break;
 
   case AccessorKind::Read:
+  case AccessorKind::Read2:
     if (accessorOverrideAlreadyDiagnosed(AccessorKind::Get))
       return true;
     break;
 
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
     if (accessorOverrideAlreadyDiagnosed(AccessorKind::Get) ||
         accessorOverrideAlreadyDiagnosed(AccessorKind::Set)) {
       return true;
@@ -2375,7 +2378,9 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
     case AccessorKind::Get:
     case AccessorKind::Set:
     case AccessorKind::Read:
+    case AccessorKind::Read2:
     case AccessorKind::Modify:
+    case AccessorKind::Modify2:
       break;
 
     case AccessorKind::WillSet:
@@ -2413,9 +2418,11 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
       case AccessorKind::Get:
       case AccessorKind::DistributedGet:
       case AccessorKind::Read:
+      case AccessorKind::Read2:
         break;
 
       case AccessorKind::Modify:
+      case AccessorKind::Modify2:
       case AccessorKind::Set:
         // For setter accessors, we need the base's setter to be
         // accessible from the overriding context, or it's not an override.

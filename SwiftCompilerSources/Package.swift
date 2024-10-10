@@ -58,16 +58,13 @@ private extension Target {
 let package = Package(
   name: "SwiftCompilerSources",
   platforms: [
-    // We need at least macOS 13 here to avoid hitting an availability error
-    // for CxxStdlib. It's only needed for the package though, the CMake build
-    // works fine with a lower deployment target.
     .macOS(.v13),
   ],
   products: [
     .library(
       name: "swiftCompilerModules",
       type: .static,
-      targets: ["Basic", "SIL", "Optimizer"]),
+      targets: ["Basic", "AST", "SIL", "Optimizer"]),
   ],
   dependencies: [
   ],
@@ -78,11 +75,14 @@ let package = Package(
       name: "Basic",
       dependencies: []),
     .compilerModuleTarget(
-      name: "SIL",
+      name: "AST",
       dependencies: ["Basic"]),
     .compilerModuleTarget(
+      name: "SIL",
+      dependencies: ["Basic", "AST"]),
+    .compilerModuleTarget(
       name: "Optimizer",
-      dependencies: ["Basic", "SIL"]),
+      dependencies: ["Basic", "AST", "SIL"]),
   ],
   cxxLanguageStandard: .cxx17
 )

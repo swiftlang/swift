@@ -57,7 +57,20 @@ enum MyEnum {
 
 actor MyActor {
   // CHECK-DAG:   sil hidden [ossa] @$s12initializers7MyActorCACyYacfc : $@convention(method) @async (@sil_isolated @owned MyActor) -> @owned MyActor
-  init() async {}
+  // CHECK:       bb0(%0 : @owned $MyActor):
+  //   In the prologue, hop to the generic executor.
+  // CHECK-NEXT:    [[NIL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK-NEXT:    hop_to_executor [[NIL_EXECUTOR]] :
+  //   Later, when we return from an async call, hop to the
+  //   correct flow-sensitive value.
+  // CHECK:         [[FN:%.*]] = function_ref @$s12initializers8MyStructVACyYacfC :
+  // CHECK-NEXT:    apply [[FN]]
+  // CHECK-NEXT:    [[ISOLATION:%.*]] = builtin "flowSensitiveSelfIsolation"<MyActor>({{%.*}})
+  // CHECK-NEXT:    hop_to_executor [[ISOLATION]]
+  // CHECK-NEXT:    destroy_value [[ISOLATION]]
+  init() async {
+    _ = await MyStruct()
+  }
 }
 
 class EarthPerson : Person {
@@ -162,8 +175,10 @@ func makeBirb() async {
 actor SomeActor {
   var x: Int = 0
 
-  // NOTE: during SILGen, we don't expect any hop_to_executors in here.
-  // The implicit check-not covers that for us. The hops are inserted later.
+  // CHECK-LABEL: sil hidden [ossa] @$s12initializers9SomeActorCACyYacfc : $@convention(method) @async (@sil_isolated @owned SomeActor) -> @owned SomeActor {
+  // CHECK:       bb0(%0 :
+  // CHECK-NEXT:    [[NIL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK-NEXT:    hop_to_executor [[NIL_EXECUTOR]]
   init() async {}
 
   // CHECK-LABEL: sil hidden [ossa] @$s12initializers9SomeActorC10someMethodyyYaF : $@convention(method) @async (@sil_isolated @guaranteed SomeActor) -> () {

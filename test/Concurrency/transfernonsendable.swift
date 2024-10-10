@@ -1866,3 +1866,25 @@ extension MyActor {
   }
 }
 
+func nonSendableAllocBoxConsumingParameter(x: consuming SendableKlass) async throws {
+  try await withThrowingTaskGroup(of: Void.self) { group in
+    group.addTask { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      useValue(x) // expected-tns-note {{closure captures reference to mutable parameter 'x' which is accessible to code in the current task}}
+    }
+
+    try await group.waitForAll()
+  }
+}
+
+func nonSendableAllocBoxConsumingVar() async throws {
+  var x = SendableKlass()
+  x = SendableKlass()
+
+  try await withThrowingTaskGroup(of: Void.self) { group in
+    group.addTask { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      useValue(x) // expected-tns-note {{closure captures reference to mutable var 'x' which is accessible to code in the current task}}
+    }
+
+    try await group.waitForAll()
+  }
+}

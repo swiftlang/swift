@@ -692,7 +692,7 @@ private struct FindBeginBorrowWalker : ValueUseDefWalker {
   let beginBorrow: BorrowIntroducingInstruction
   var walkUpCache = WalkerCache<Path>()
 
-  public mutating func walkUp(value: Value, path: SmallProjectionPath) -> WalkResult {
+  mutating func walkUp(value: Value, path: SmallProjectionPath) -> WalkResult {
     if value == beginBorrow {
       return .abortWalk
     }

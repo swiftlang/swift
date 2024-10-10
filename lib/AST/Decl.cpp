@@ -263,9 +263,11 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
        return DescriptiveDeclKind::MutableAddressor;
 
      case AccessorKind::Read:
+     case AccessorKind::Read2:
        return DescriptiveDeclKind::ReadAccessor;
 
      case AccessorKind::Modify:
+     case AccessorKind::Modify2:
        return DescriptiveDeclKind::ModifyAccessor;
 
      case AccessorKind::Init:
@@ -770,6 +772,42 @@ ModuleDecl *Decl::getModuleContext() const {
   return getDeclContext()->getParentModule();
 }
 
+/// If `decl` is an imported Cxx decl, returns the actual module that the decl
+/// was imported from. This is necessary to compensate for the way that
+/// Cxx `namespace` declarations are imported. Since namespaces can span
+/// multiple Clang modules, the corresponding decls and all of their members get
+/// associated with the Clang imported header module (named `__ObjC`). This
+/// utility reaches through the Clang AST to find the actual module that members
+/// of namespaces originated from.
+static ModuleDecl *getModuleContextForNameLookupForCxxDecl(const Decl *decl) {
+  auto &ctx = decl->getASTContext();
+  if (!ctx.LangOpts.EnableCXXInterop)
+    return nullptr;
+
+  if (!decl->hasClangNode())
+    return nullptr;
+
+  auto parentModule = decl->getModuleContext();
+
+  // We only need to look for the real parent module when the existing parent
+  // is the imported header module.
+  if (!parentModule->isClangHeaderImportModule())
+    return nullptr;
+
+  auto clangModule = decl->getClangDecl()->getOwningModule();
+  if (!clangModule)
+    return nullptr;
+
+  return ctx.getClangModuleLoader()->getWrapperForModule(clangModule);
+}
+
+ModuleDecl *Decl::getModuleContextForNameLookup() const {
+  if (auto parentModule = getModuleContextForNameLookupForCxxDecl(this))
+    return parentModule;
+
+  return getModuleContext();
+}
+
 /// Retrieve the diagnostic engine for diagnostics emission.
 DiagnosticEngine &Decl::getDiags() const {
   return getASTContext().Diags;
@@ -993,6 +1031,26 @@ std::optional<CustomAttrNominalPair> Decl::getGlobalActorAttr() const {
   auto mutableThis = const_cast<Decl *>(this);
   return evaluateOrDefault(
       ctx.evaluator, GlobalActorAttributeRequest{mutableThis}, std::nullopt);
+}
+
+bool Decl::hasExplicitIsolationAttribute() const {
+  if (auto nonisolatedAttr = getAttrs().getAttribute<NonisolatedAttr>()) {
+    if (!nonisolatedAttr->isImplicit())
+      return true;
+  }
+
+  if (auto isolatedAttr = getAttrs().getAttribute<IsolatedAttr>()) {
+    if (!isolatedAttr->isImplicit()) {
+      return true;
+    }
+  }
+
+  if (auto globalActorAttr = getGlobalActorAttr()) {
+    if (!globalActorAttr->first->isImplicit())
+      return true;
+  }
+
+  return false;
 }
 
 bool Decl::preconcurrency() const {
@@ -1476,7 +1534,12 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
 
   case DeclKind::TypeAlias: {
     Type type = cast<TypeAliasDecl>(VD)->getDeclaredInterfaceType();
-    auto *nominal = type->getAnyNominal();
+    // FIXME: It's necessary to check for existentials because `getAnyNominal`
+    // looks through them.
+    auto canonical = type->getCanonicalType();
+    if (isa<ExistentialType>(canonical))
+      return ImportKind::Type;
+    auto *nominal = canonical->getAnyNominal();
     if (!nominal)
       return ImportKind::Type;
     return getBestImportKind(nominal);
@@ -2687,6 +2750,9 @@ getDirectReadAccessStrategy(const AbstractStorageDecl *storage) {
   case ReadImplKind::Read:
     return AccessStrategy::getAccessor(AccessorKind::Read,
                                        /*dispatch*/ false);
+  case ReadImplKind::Read2:
+    return AccessStrategy::getAccessor(AccessorKind::Read2,
+                                       /*dispatch*/ false);
   }
   llvm_unreachable("bad impl kind");
 }
@@ -2722,6 +2788,9 @@ getDirectWriteAccessStrategy(const AbstractStorageDecl *storage) {
   case WriteImplKind::Modify:
     return AccessStrategy::getAccessor(AccessorKind::Modify,
                                        /*dispatch*/ false);
+  case WriteImplKind::Modify2:
+    return AccessStrategy::getAccessor(AccessorKind::Modify2,
+                                       /*dispatch*/ false);
   }
   llvm_unreachable("bad impl kind");
 }
@@ -2751,6 +2820,9 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
                                        /*dispatch*/ false);
   case ReadWriteImplKind::Modify:
     return AccessStrategy::getAccessor(AccessorKind::Modify,
+                                       /*dispatch*/ false);
+  case ReadWriteImplKind::Modify2:
+    return AccessStrategy::getAccessor(AccessorKind::Modify2,
                                        /*dispatch*/ false);
   case ReadWriteImplKind::StoredWithDidSet:
   case ReadWriteImplKind::InheritedWithDidSet:
@@ -2895,8 +2967,10 @@ bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
   case AccessorKind::Set:
     return requiresOpaqueSetter();
   case AccessorKind::Read:
+  case AccessorKind::Read2:
     return requiresOpaqueReadCoroutine();
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
     return requiresOpaqueModifyCoroutine();
 
   // Other accessors are never part of the opaque-accessors set.
@@ -3302,6 +3376,16 @@ ValueDecl *ValueDecl::getOverriddenDecl() const {
 
   // FIXME: Arbitrarily pick the first overridden declaration.
   return overridden.front();
+}
+
+ValueDecl *ValueDecl::getOverriddenDeclOrSuperDeinit() const {
+  if (auto overridden = getOverriddenDecl()) {
+    return overridden;
+  }
+  if (auto dtor = dyn_cast<DestructorDecl>(this)) {
+    return dtor->getSuperDeinit();
+  }
+  return nullptr;
 }
 
 bool ValueDecl::overriddenDeclsComputed() const {
@@ -3941,7 +4025,7 @@ ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
 std::optional<AttributedImport<ImportedModule>>
 ValueDecl::findImport(const DeclContext *fromDC) const {
   // If the type is from the current module, there's no import.
-  auto module = getModuleContext();
+  auto module = getModuleContextForNameLookup();
   if (module == fromDC->getParentModule())
     return std::nullopt;
 
@@ -6757,8 +6841,10 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
   case AccessorKind::MutableAddress:
     return article ? "a mutable addressor" : "mutable addressor";
   case AccessorKind::Read:
+  case AccessorKind::Read2:
     return article ? "a 'read' accessor" : "'read' accessor";
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
     return article ? "a 'modify' accessor" : "'modify' accessor";
   case AccessorKind::WillSet:
     return "'willSet'";
@@ -8998,7 +9084,9 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
     case AccessorKind::Get:
     case AccessorKind::DistributedGet:
     case AccessorKind::Read:
+    case AccessorKind::Read2:
     case AccessorKind::Modify:
+    case AccessorKind::Modify2:
       return subscript ? subscript->getName()
                        : DeclName(ctx, storage->getBaseName(),
                                   ArrayRef<Identifier>());
@@ -10306,7 +10394,9 @@ StringRef AccessorDecl::implicitParameterNameFor(AccessorKind kind) {
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
   case AccessorKind::Read:
+  case AccessorKind::Read2:
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
     return StringRef();
@@ -10319,6 +10409,7 @@ bool AccessorDecl::isAssumedNonMutating() const {
   case AccessorKind::DistributedGet:
   case AccessorKind::Address:
   case AccessorKind::Read:
+  case AccessorKind::Read2:
     return true;
 
   case AccessorKind::Set:
@@ -10326,6 +10417,7 @@ bool AccessorDecl::isAssumedNonMutating() const {
   case AccessorKind::DidSet:
   case AccessorKind::MutableAddress:
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
   case AccessorKind::Init:
     return false;
   }
@@ -10519,10 +10611,6 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
   return params->get(0)->getInterfaceType()->isVoid();
 }
 
-bool ConstructorDecl::hasLifetimeDependentReturn() const {
-  return isa_and_nonnull<LifetimeDependentTypeRepr>(getResultTypeRepr());
-}
-
 DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Destructor, Parent,
                          DeclBaseName::createDestructor(), DestructorLoc,
@@ -10539,6 +10627,16 @@ ObjCSelector DestructorDecl::getObjCSelector() const {
   // Deinitializers are always called "dealloc".
   auto &ctx = getASTContext();
   return ObjCSelector(ctx, 0, ctx.Id_dealloc);
+}
+
+DestructorDecl *DestructorDecl::getSuperDeinit() const {
+  auto declContext = getDeclContext()->getImplementedObjCContext();
+  if (auto classDecl = dyn_cast<ClassDecl>(declContext)) {
+    if (auto superclass = classDecl->getSuperclassDecl()) {
+      return superclass->getDestructor();
+    }
+  }
+  return nullptr;
 }
 
 SourceRange FuncDecl::getSourceRange() const {
@@ -10601,7 +10699,7 @@ SourceRange EnumElementDecl::getSourceRange() const {
   return {getStartLoc(), getNameLoc()};
 }
 
-Type EnumElementDecl::getArgumentInterfaceType() const {
+Type EnumElementDecl::getPayloadInterfaceType() const {
   if (!hasAssociatedValues())
     return nullptr;
 

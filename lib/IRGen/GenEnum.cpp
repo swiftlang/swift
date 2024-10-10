@@ -231,9 +231,9 @@ const {
 
   // Empty payload addresses can be left undefined.
   if (payloadI == ElementsWithPayload.end()) {
-    auto argTy = elt->getParentEnum()->mapTypeIntoContext(
-      elt->getArgumentInterfaceType());
-    return IGF.getTypeInfoForUnlowered(argTy)
+    auto payloadTy = elt->getParentEnum()->mapTypeIntoContext(
+      elt->getPayloadInterfaceType());
+    return IGF.getTypeInfoForUnlowered(payloadTy)
       .getUndefAddress();
   }
 
@@ -254,9 +254,9 @@ const {
 
   // Empty payload addresses can be left undefined.
   if (payloadI == ElementsWithPayload.end()) {
-    auto argTy = Case->getParentEnum()->mapTypeIntoContext(
-      Case->getArgumentInterfaceType());
-    return IGF.getTypeInfoForUnlowered(argTy)
+    auto payloadTy = Case->getParentEnum()->mapTypeIntoContext(
+      Case->getPayloadInterfaceType());
+    return IGF.getTypeInfoForUnlowered(payloadTy)
       .getUndefAddress();
   }
 
@@ -3312,6 +3312,14 @@ namespace {
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T, bool isOutlined,
                             bool zeroizeIfSensitive) const override {
+      if (TI->isBitwiseTakable(ResilienceExpansion::Maximal)) {
+        IGF.Builder.CreateMemCpy(
+          dest.getAddress(), llvm::MaybeAlign(dest.getAlignment().getValue()),
+          src.getAddress(), llvm::MaybeAlign(src.getAlignment().getValue()),
+          TI->getSize(IGF, T));
+        return;
+      }
+
       if (!ElementsAreABIAccessible) {
         emitInitializeWithTakeCall(IGF, T, dest, src);
       } else if (isOutlined || T.hasParameterizedExistential()) {
@@ -3927,8 +3935,8 @@ namespace {
       } else if (allSingleRefcount
                  && ElementsWithNoPayload.size() <= 1) {
         CopyDestroyKind = TaggedRefcounted;
-      } else if (this->EnumImplStrategy::BitwiseTakable == IsBitwiseTakable &&
-                 Copyable == IsCopyable) {
+      } else if (this->EnumImplStrategy::BitwiseTakable == IsBitwiseTakableAndBorrowable
+                 && Copyable == IsCopyable) {
         CopyDestroyKind = BitwiseTakable;
       }
     }
@@ -5227,6 +5235,14 @@ namespace {
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T, bool isOutlined,
                             bool zeroizeIfSensitive) const override {
+      if (TI->isBitwiseTakable(ResilienceExpansion::Maximal)) {
+        IGF.Builder.CreateMemCpy(
+          dest.getAddress(), llvm::MaybeAlign(dest.getAlignment().getValue()),
+          src.getAddress(), llvm::MaybeAlign(src.getAlignment().getValue()),
+          TI->getSize(IGF, T));
+        return;
+      }
+
       if (!ElementsAreABIAccessible) {
         emitInitializeWithTakeCall(IGF, T, dest, src);
       } else if (isOutlined || T.hasParameterizedExistential()) {
@@ -6396,7 +6412,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto copyable = !theEnum->canBeCopyable()
     ? IsNotCopyable : IsCopyable;
-  auto bitwiseTakable = IsBitwiseTakable; // FIXME: will there be check here?
+  auto bitwiseTakable = IsBitwiseTakableAndBorrowable; // FIXME: will there be check here?
   bool allowFixedLayoutOptimizations = true;
   std::vector<Element> elementsWithPayload;
   std::vector<Element> elementsWithNoPayload;
@@ -6408,7 +6424,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
       payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal);
     copyable = copyable & payloadTI.isCopyable(ResilienceExpansion::Maximal);
     bitwiseTakable = bitwiseTakable &
-      payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal);
+      payloadTI.getBitwiseTakable(ResilienceExpansion::Maximal);
   };
 
   if (TC.IGM.isResilient(theEnum, ResilienceExpansion::Minimal))
@@ -6463,10 +6479,10 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
     // strategy. If the abstract layout of the enum is dependent on generic
     // parameters, then we additionally need to constrain any layout
     // optimizations we perform to things that are reproducible by the runtime.
-    Type origArgType = elt->getArgumentInterfaceType();
-    origArgType = theEnum->mapTypeIntoContext(origArgType);
+    Type origPayloadType = elt->getPayloadInterfaceType();
+    origPayloadType = theEnum->mapTypeIntoContext(origPayloadType);
 
-    auto origArgLoweredTy = TC.IGM.getLoweredType(origArgType);
+    auto origArgLoweredTy = TC.IGM.getLoweredType(origPayloadType);
     auto *origArgTI = &TC.getCompleteTypeInfo(origArgLoweredTy.getASTType());
 
     // If the unsubstituted argument contains a generic parameter type, or
@@ -6861,7 +6877,8 @@ EnumImplStrategy::getFixedEnumTypeInfo(llvm::StructType *T, Size S,
                                       abiAccessible);
     break;
   case Loadable:
-    assert(isBT && "loadable enum not bitwise takable?!");
+    assert(isBT == IsBitwiseTakableAndBorrowable
+           && "loadable enum not bitwise takable?!");
     mutableTI = new LoadableEnumTypeInfo(*this, T, S, std::move(SB), A,
                                          isTriviallyDestroyable,
                                          isCopyable,
@@ -7084,7 +7101,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
   getFixedEnumTypeInfo(
       enumTy, Size(sizeWithTag), spareBits.build(), alignment,
       deinit & payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
-      payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal),
+      payloadTI.getBitwiseTakable(ResilienceExpansion::Maximal),
       copyable, isABIAccessible);
 
   if (TIK >= Loadable && CopyDestroyKind == Normal) {
@@ -7120,7 +7137,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
   return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
          alignment,
          deinit & payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
-         payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal),
+         payloadTI.getBitwiseTakable(ResilienceExpansion::Maximal),
          copyable,
          enumAccessible));
 }
@@ -7155,7 +7172,7 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
     ? IsNotCopyable : IsCopyable;
   auto isTriviallyDestroyable = theEnum->getValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
-  IsBitwiseTakable_t isBT = IsBitwiseTakable;
+  IsBitwiseTakable_t isBT = IsBitwiseTakableAndBorrowable;
   PayloadSize = 0;
   for (auto &elt : ElementsWithPayload) {
     auto &fixedPayloadTI = cast<FixedTypeInfo>(*elt.ti);
@@ -7163,8 +7180,7 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
       worstAlignment = fixedPayloadTI.getFixedAlignment();
     if (!fixedPayloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal))
       isTriviallyDestroyable = IsNotTriviallyDestroyable;
-    if (!fixedPayloadTI.isBitwiseTakable(ResilienceExpansion::Maximal))
-      isBT = IsNotBitwiseTakable;
+    isBT &= fixedPayloadTI.getBitwiseTakable(ResilienceExpansion::Maximal);
 
     unsigned payloadBytes = fixedPayloadTI.getFixedSize().getValue();
     unsigned payloadBits = fixedPayloadTI.getFixedSize().getValueInBits();
@@ -7324,12 +7340,12 @@ TypeInfo *MultiPayloadEnumImplStrategy::completeDynamicLayout(
   Alignment alignment(1);
   auto td = theEnum->getValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
-  auto bt = IsBitwiseTakable;
+  auto bt = IsBitwiseTakableAndBorrowable;
   for (auto &element : ElementsWithPayload) {
     auto &payloadTI = *element.ti;
     alignment = std::max(alignment, payloadTI.getBestKnownAlignment());
     td &= payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal);
-    bt &= payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal);
+    bt &= payloadTI.getBitwiseTakable(ResilienceExpansion::Maximal);
   }
   
   applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/false, alignment);

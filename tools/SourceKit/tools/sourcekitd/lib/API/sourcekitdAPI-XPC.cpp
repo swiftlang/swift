@@ -166,7 +166,7 @@ void sourcekitd::printRequestObject(sourcekitd_object_t Obj, raw_ostream &OS) {
 //===----------------------------------------------------------------------===//
 
 ResponseBuilder::ResponseBuilder() {
-  Impl = xpc_dictionary_create(nullptr, nullptr, 0);
+  Impl = xpc_dictionary_create_empty();
 }
 
 ResponseBuilder::~ResponseBuilder() {
@@ -220,7 +220,7 @@ void ResponseBuilder::Dictionary::set(UIdent Key, int64_t val) {
 void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
                                       ArrayRef<StringRef> Strs) {
   llvm::SmallString<128> Buf;
-  xpc_object_t arr = xpc_array_create(nullptr, 0);
+  xpc_object_t arr = xpc_array_create_empty();
   for (auto Str : Strs) {
     Buf = Str;
     xpc_array_set_string(arr, XPC_ARRAY_APPEND, Buf.c_str());
@@ -231,7 +231,7 @@ void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
 
 void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
                                       ArrayRef<std::string> Strs) {
-  xpc_object_t arr = xpc_array_create(nullptr, 0);
+  xpc_object_t arr = xpc_array_create_empty();
   for (auto Str : Strs) {
     xpc_array_set_string(arr, XPC_ARRAY_APPEND, Str.c_str());
   }
@@ -241,7 +241,7 @@ void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
 
 void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
                                       ArrayRef<SourceKit::UIdent> UIDs) {
-  xpc_object_t arr = xpc_array_create(nullptr, 0);
+  xpc_object_t arr = xpc_array_create_empty();
   for (auto UID : UIDs) {
     xpc_array_set_uint64(arr, XPC_ARRAY_APPEND, uintptr_t(SKDUIDFromUIdent(UID)));
   }
@@ -255,7 +255,7 @@ void ResponseBuilder::Dictionary::setBool(UIdent Key, bool val) {
 
 ResponseBuilder::Array
 ResponseBuilder::Dictionary::setArray(UIdent Key) {
-  xpc_object_t arr = xpc_array_create(nullptr, 0);
+  xpc_object_t arr = xpc_array_create_empty();
   xpc_dictionary_set_value(Impl, Key.c_str(), arr);
   xpc_release(arr);
   return Array(arr);
@@ -263,7 +263,7 @@ ResponseBuilder::Dictionary::setArray(UIdent Key) {
 
 ResponseBuilder::Dictionary
 ResponseBuilder::Dictionary::setDictionary(UIdent Key) {
-  xpc_object_t dict = xpc_dictionary_create(nullptr, nullptr, 0);
+  xpc_object_t dict = xpc_dictionary_create_empty();
   xpc_dictionary_set_value(Impl, Key.c_str(), dict);
   xpc_release(dict);
   return Dictionary(dict);
@@ -278,7 +278,7 @@ void ResponseBuilder::Dictionary::setCustomBuffer(
 }
 
 ResponseBuilder::Dictionary ResponseBuilder::Array::appendDictionary() {
-  xpc_object_t dict = xpc_dictionary_create(nullptr, nullptr, 0);
+  xpc_object_t dict = xpc_dictionary_create_empty();
   xpc_array_append_value(Impl, dict);
   xpc_release(dict);
   return Dictionary(dict);

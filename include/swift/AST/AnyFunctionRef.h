@@ -260,9 +260,10 @@ private:
                                          ->getReferenceStorageReferent();
           if (mapIntoContext)
             valueTy = AD->mapTypeIntoContext(valueTy);
-          YieldTypeFlags flags(AD->getAccessorKind() == AccessorKind::Modify
-                                 ? ParamSpecifier::InOut
-                                 : ParamSpecifier::LegacyShared);
+          YieldTypeFlags flags(
+              isYieldingDefaultMutatingAccessor(AD->getAccessorKind())
+                  ? ParamSpecifier::InOut
+                  : ParamSpecifier::LegacyShared);
           buffer.push_back(AnyFunctionType::Yield(valueTy, flags));
           return buffer;
         }
@@ -304,4 +305,3 @@ struct DenseMapInfo<swift::AnyFunctionRef> {
 }
 
 #endif // LLVM_SWIFT_AST_ANY_FUNCTION_REF_H
-

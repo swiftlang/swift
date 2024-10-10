@@ -35,6 +35,7 @@ public enum EnumInA {
 }
 
 open class BaseClassInA {
+  public init() {}
   open func methodInA() {}
 }
 

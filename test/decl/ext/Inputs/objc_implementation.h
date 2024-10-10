@@ -13,6 +13,8 @@
 - (void)superclassMethod:(int)param;
 @property (assign) int superclassProperty;
 
++ (void)superclassClassMethod;
+
 @end
 
 @protocol ObjCProto
@@ -212,6 +214,10 @@
 @end
 
 @protocol EmptyObjCProto
+@end
+
+@interface ObjCClassWithWeirdSwiftAttributeCombo : ObjCBaseClass
+
 @end
 
 #endif

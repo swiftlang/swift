@@ -1751,20 +1751,25 @@ protected:
 };
 
 /// Diagnose an attempt to reference a static member as a key path component
-/// e.g.
+/// without .Type e.g.
 ///
 /// ```swift
 /// struct S {
 ///   static var foo: Int = 42
 /// }
 ///
-/// _ = \S.Type.foo
+/// _ = \S.foo
 /// ```
 class InvalidStaticMemberRefInKeyPath final : public InvalidMemberRefInKeyPath {
+  Type BaseType;
+
 public:
-  InvalidStaticMemberRefInKeyPath(const Solution &solution, ValueDecl *member,
-                                  ConstraintLocator *locator)
-      : InvalidMemberRefInKeyPath(solution, member, locator) {}
+  InvalidStaticMemberRefInKeyPath(const Solution &solution, Type baseType,
+                                  ValueDecl *member, ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(solution, member, locator),
+        BaseType(baseType->getRValueType()) {}
+
+  Type getBaseType() const { return BaseType; }
 
   bool diagnoseAsError() override;
 };
@@ -2604,6 +2609,18 @@ public:
       : FailureDiagnostic(solution, locator), P(pattern) {}
 
   bool diagnoseAsError() override;
+
+private:
+  /// Diagnose situations where a type-casting pattern that binds a value
+  /// expects 'as' but is given 'as!', 'as?' or 'is' instead
+  /// e.g:
+  ///
+  /// \code
+  /// case let x as? Int = y
+  /// case let x as! Int = y
+  /// case let x is Int = y
+  /// \endcode
+  bool diagnoseInvalidCheckedCast() const;
 };
 
 /// Diagnose situations where there is no context to determine a

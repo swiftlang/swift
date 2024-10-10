@@ -149,6 +149,8 @@ def run_once_with_primary(args, ast, rng, primary_idx):
                  [line.split() for line in open(os.path.join(d, trace))]
                  if len(fields) == 2}
         else:
+            command += ["-fine-grained-timers"]
+
             if args.debug:
                 command = ["lldb", "--"] + command
             stats = "stats.json"
@@ -633,6 +635,9 @@ def report(args, rng, runs):
     rows = []
     for k in keys:
         vals = [r[k] for r in runs]
+        if all(v == 0 for v in vals):
+            print("Missing data")
+            return True
         bounded = [max(v, 1) for v in vals]
         one_fit = False
         perfect_fit = False

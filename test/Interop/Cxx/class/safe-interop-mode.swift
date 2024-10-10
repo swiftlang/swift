@@ -26,7 +26,21 @@ private:
 
 struct SWIFT_ESCAPABLE Owner {};
 
-struct Unannotated {};
+struct Unannotated {
+    Unannotated();
+};
+
+struct SWIFT_UNSAFE_REFERENCE UnsafeReference {};
+
+struct SafeEscapableAggregate {
+    int a;
+    float b[5];
+};
+
+struct UnknownEscapabilityAggregate {
+    SafeEscapableAggregate agg;
+    Unannotated unann;
+};
 
 //--- test.swift
 
@@ -36,7 +50,14 @@ import CoreFoundation
 func useUnsafeParam(x: Unannotated) { // expected-warning{{reference to unsafe struct 'Unannotated'}}
 }
 
-func useSafeParams(x: Owner, y: View) {
+@available(SwiftStdlib 5.8, *)
+func useUnsafeParam2(x: UnsafeReference) { // expected-warning{{reference to unsafe class 'UnsafeReference'}}
+}
+
+func useUnsafeParam3(x: UnknownEscapabilityAggregate) { // expected-warning{{reference to unsafe struct 'UnknownEscapabilityAggregate'}}
+}
+
+func useSafeParams(x: Owner, y: View, z: SafeEscapableAggregate) {
 }
 
 func useCfType(x: CFArray) {

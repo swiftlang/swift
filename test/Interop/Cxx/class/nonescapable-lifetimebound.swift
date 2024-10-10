@@ -26,6 +26,10 @@ struct Owner {
     View handOutView() const [[clang::lifetimebound]] {
         return View(&data);
     }
+
+    View handOutView2(View v) const [[clang::lifetimebound]] {
+        return View(&data);
+    }
 };
 
 Owner makeOwner() {
@@ -65,12 +69,13 @@ private:
 };
 
 // CHECK: sil [clang makeOwner] {{.*}}: $@convention(c) () -> Owner
-// CHECK: sil [clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> _scope(0) @autoreleased View
-// CHECK: sil [clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> _scope(0) @autoreleased View
-// CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> _scope(0, 1) @autoreleased View
-// CHECK: sil [clang Owner.handOutView] {{.*}} : $@convention(cxx_method) (@in_guaranteed Owner) -> _scope(0) @autoreleased View
-// CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@guaranteed View, @guaranteed View) -> _inherit(0, 1) @autoreleased View
-// CHECK: sil [clang View.init] {{.*}} : $@convention(c) () -> @out View
+// CHECK: sil [clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @autoreleased View
+// CHECK: sil [clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow 0) @autoreleased View
+// CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow 0, borrow 1) @autoreleased View
+// CHECK: sil [clang Owner.handOutView] {{.*}} : $@convention(cxx_method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @autoreleased View
+// CHECK: sil [clang Owner.handOutView2] {{.*}} : $@convention(cxx_method) (View, @in_guaranteed Owner) -> @lifetime(borrow 1) @autoreleased View
+// CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@guaranteed View, @guaranteed View) -> @lifetime(copy 0, copy 1) @autoreleased View
+// CHECK: sil [clang View.init] {{.*}} : $@convention(c) () -> @lifetime(immortal) @out View
 
 //--- test.swift
 
@@ -83,6 +88,7 @@ public func test() {
     let v2 = getViewFromFirst(o, o2)
     let _ = getViewFromEither(o, o2)
     let _ = o.handOutView()
+    let _ = o.handOutView2(v1)
     let _ = getViewFromEither(v1, v2)
     let defaultView = View()
 }

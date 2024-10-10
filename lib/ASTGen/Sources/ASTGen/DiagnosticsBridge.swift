@@ -80,11 +80,6 @@ fileprivate func emitDiagnosticParts(
       replaceStartLoc = bridgedSourceLoc(at: replacementRange.lowerBound)
       replaceEndLoc = bridgedSourceLoc(at: replacementRange.upperBound)
       newText = replacingChildData.newChild.description
-      
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default:
-      fatalError()
-#endif
     }
 
     newText.withBridgedString { bridgedMessage in
@@ -100,7 +95,7 @@ fileprivate func emitDiagnosticParts(
 }
 
 /// Emit the given diagnostic via the diagnostic engine.
-func emitDiagnostic(
+public func emitDiagnostic(
   diagnosticEngine: BridgedDiagnosticEngine,
   sourceFileBuffer: UnsafeBufferPointer<UInt8>,
   sourceFileBufferOffset: Int = 0,
@@ -146,150 +141,12 @@ func emitDiagnostic(
 }
 
 extension DiagnosticSeverity {
-  var bridged: BridgedDiagnosticSeverity {
+  public var bridged: BridgedDiagnosticSeverity {
     switch self {
     case .error: return .error
     case .note: return .note
     case .warning: return .warning
     case .remark: return .remark
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default: return .error
-#endif
-    }
-  }
-}
-
-extension SourceManager {
-  private func diagnoseSingle<Node: SyntaxProtocol>(
-    message: String,
-    severity: DiagnosticSeverity,
-    node: Node,
-    position: AbsolutePosition,
-    highlights: [Syntax] = [],
-    fixItChanges: [FixIt.Change] = []
-  ) {
-    // Map severity
-    let bridgedSeverity = severity.bridged
-
-    // Emit the diagnostic
-    var mutableMessage = message
-    let diag = mutableMessage.withBridgedString { bridgedMessage in
-      BridgedDiagnostic(
-        at: bridgedSourceLoc(for: node, at: position),
-        message: bridgedMessage,
-        severity: bridgedSeverity,
-        engine: bridgedDiagEngine
-      )
-    }
-
-    // Emit highlights
-    for highlight in highlights {
-      diag.highlight(
-        start: bridgedSourceLoc(for: highlight, at: highlight.positionAfterSkippingLeadingTrivia),
-        end: bridgedSourceLoc(for: highlight, at: highlight.endPositionBeforeTrailingTrivia)
-      )
-    }
-
-    // Emit changes for a Fix-It.
-    for change in fixItChanges {
-      let replaceStartLoc: BridgedSourceLoc
-      let replaceEndLoc: BridgedSourceLoc
-      var newText: String
-
-      switch change {
-      case .replace(let oldNode, let newNode):
-        replaceStartLoc = bridgedSourceLoc(
-          for: oldNode,
-          at: oldNode.positionAfterSkippingLeadingTrivia
-        )
-        replaceEndLoc = bridgedSourceLoc(
-          for: oldNode,
-          at: oldNode.endPositionBeforeTrailingTrivia
-        )
-        newText = newNode.description
-
-      case .replaceLeadingTrivia(let oldToken, let newTrivia):
-        replaceStartLoc = bridgedSourceLoc(for: oldToken)
-        replaceEndLoc = bridgedSourceLoc(
-          for: oldToken,
-          at: oldToken.positionAfterSkippingLeadingTrivia
-        )
-        newText = newTrivia.description
-
-      case .replaceTrailingTrivia(let oldToken, let newTrivia):
-        replaceStartLoc = bridgedSourceLoc(
-          for: oldToken,
-          at: oldToken.endPositionBeforeTrailingTrivia
-        )
-        replaceEndLoc = bridgedSourceLoc(
-          for: oldToken,
-          at: oldToken.endPosition
-        )
-        newText = newTrivia.description
-
-      case .replaceChild(let replacingChildData):
-        let replacementRange = replacingChildData.replacementRange
-        replaceStartLoc = bridgedSourceLoc(
-          for: replacingChildData.parent,
-          at: replacementRange.lowerBound
-        )
-        replaceEndLoc = bridgedSourceLoc(
-          for: replacingChildData.parent,
-          at: replacementRange.upperBound
-        )
-        newText = replacingChildData.newChild.description
-        
-#if RESILIENT_SWIFT_SYNTAX
-      @unknown default:
-        fatalError()
-#endif
-      }
-
-      newText.withBridgedString { bridgedMessage in
-        diag.fixItReplace(
-          start: replaceStartLoc,
-          end: replaceEndLoc,
-          replacement: bridgedMessage
-        )
-      }
-    }
-
-    diag.finish();
-  }
-
-  /// Emit a diagnostic via the C++ diagnostic engine.
-  func diagnose(
-    diagnostic: Diagnostic,
-    messageSuffix: String? = nil
-  ) {
-    // Emit the main diagnostic.
-    diagnoseSingle(
-      message: diagnostic.diagMessage.message + (messageSuffix ?? ""),
-      severity: diagnostic.diagMessage.severity,
-      node: diagnostic.node,
-      position: diagnostic.position,
-      highlights: diagnostic.highlights
-    )
-
-    // Emit Fix-Its.
-    for fixIt in diagnostic.fixIts {
-      diagnoseSingle(
-        message: fixIt.message.message,
-        severity: .note,
-        node: diagnostic.node,
-        position: diagnostic.position,
-        fixItChanges: fixIt.changes
-      )
-    }
-
-    // Emit any notes as follow-ons.
-    for note in diagnostic.notes {
-      diagnoseSingle(
-        message: note.message,
-        severity: .note,
-        node: note.node,
-        position: note.position
-      )
     }
   }
 }

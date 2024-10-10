@@ -12,7 +12,8 @@
 
 import ASTBridging
 @_spi(Compiler) import SwiftParser
-import SwiftSyntax
+@_spi(RawSyntax) import SwiftSyntax
+@_spi(CompilerInterface) import _CompilerRegexParser
 
 extension ASTGenVisitor {
   func generate(stringLiteralExpr node: StringLiteralExprSyntax) -> BridgedExpr {
@@ -189,10 +190,6 @@ extension ASTGenVisitor {
         stmts.append(.expr(callExpr.asExpr))
 
         interpolationCount += 1
-      #if RESILIENT_SWIFT_SYNTAX
-      @unknown default:
-        fatalError()
-      #endif
       }
     }
 
@@ -218,17 +215,35 @@ extension ASTGenVisitor {
     )
   }
 
-  func generate(integerLiteralExpr node: IntegerLiteralExprSyntax) -> BridgedIntegerLiteralExpr {
-    // FIXME: Avoid 'String' instantiation
-    // FIXME: Strip '_'.
-    var segment = node.literal.text
-    return segment.withBridgedString { bridgedSegment in
-      return .createParsed(
-        ctx,
-        value: bridgedSegment,
-        loc: self.generateSourceLoc(node.literal)
-      )
+  func copyAndStripUnderscores(text: SyntaxText) -> BridgedStringRef {
+    assert(!text.isEmpty)
+    let start = self.ctx.allocate(size: text.count, alignment: 1)!
+      .bindMemory(to: UInt8.self, capacity: text.count)
+    var ptr = start
+    for chr in text where chr != UInt8(ascii: "_") {
+      ptr.initialize(to: chr)
+      ptr += 1
     }
+    return BridgedStringRef(
+      data: start,
+      count: start.distance(to: ptr)
+    )
+  }
+
+  func generate(integerLiteralExpr node: IntegerLiteralExprSyntax) -> BridgedIntegerLiteralExpr {
+    return .createParsed(
+      self.ctx,
+      value: self.copyAndStripUnderscores(text: node.literal.rawText),
+      loc: self.generateSourceLoc(node)
+    )
+  }
+
+  func generate(floatLiteralExpr node: FloatLiteralExprSyntax) -> BridgedFloatLiteralExpr {
+    return .createParsed(
+      self.ctx,
+      value: self.copyAndStripUnderscores(text: node.literal.rawText),
+      loc: self.generateSourceLoc(node)
+    )
   }
 
   func generate(booleanLiteralExpr node: BooleanLiteralExprSyntax) -> BridgedBooleanLiteralExpr {
@@ -281,10 +296,6 @@ extension ASTGenVisitor {
       colonLocs = elementNodes.lazy
         .map({ self.generateSourceLoc($0.colon) })
         .bridgedArray(in: self)
-    #if RESILIENT_SWIFT_SYNTAX
-    @unknown default:
-      fatalError()
-    #endif
     }
     return .createParsed(
       self.ctx,

@@ -2208,7 +2208,7 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
       // Reabstract to the substituted type, if needed.
       CanType substEltTy =
           sourceType
-              ->getTypeOfMember(elt, elt->getArgumentInterfaceType())
+              ->getTypeOfMember(elt, elt->getPayloadInterfaceType())
               ->getCanonicalType();
 
       AbstractionPattern origEltTy =
@@ -2470,7 +2470,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
       // Reabstract to the substituted type, if needed.
       CanType substEltTy =
         sourceType->getTypeOfMember(eltDecl,
-                                    eltDecl->getArgumentInterfaceType())
+                                    eltDecl->getPayloadInterfaceType())
                   ->getCanonicalType();
 
       AbstractionPattern origEltTy =
@@ -3335,7 +3335,9 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
       // Get returns an owned value.
       return false;
     case AccessorKind::Read:
+    case AccessorKind::Read2:
     case AccessorKind::Modify:
+    case AccessorKind::Modify2:
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
       // Read, modify, and addressors yield a borrowable reference.

@@ -196,8 +196,11 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
       llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>());
   registerParseRequestFunctions(ASTCtx.evaluator);
   registerTypeCheckerRequestFunctions(ASTCtx.evaluator);
-  
-  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, ""), true);
+
+  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, "",
+                                               nullptr, nullptr,
+                                               true),
+                         true);
   ModuleDecl *M = ModuleDecl::create(ASTCtx.getIdentifier("swiftmodule"), ASTCtx);
   std::unique_ptr<Lowering::TypeConverter> TC(
       new Lowering::TypeConverter(*M, ASTCtx.SILOpts.EnableSILOpaqueValues));

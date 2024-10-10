@@ -18,49 +18,30 @@ struct Span<T>: ~Escapable {
     self.count = count
   }
 
-  init<S>(base: UnsafePointer<T>, count: Int, generic: borrowing S) -> dependsOn(generic) Self {
+  @lifetime(borrow generic)
+  init<S>(base: UnsafePointer<T>, count: Int, generic: borrowing S) {
     self.base = base
     self.count = count
   }
 }
 
-extension Array {
-  // TODO: comment out dependsOn(scoped)
-  borrowing func span() -> /* dependsOn(scoped self) */ Span<Element> {
-    /* not the real implementation */
-    let p = self.withUnsafeBufferPointer { $0.baseAddress! }
-    return Span(base: p, count: 1)
+struct Wrapper<T: BitwiseCopyable>: ~Escapable {
+  private let span: Span<T>
+
+  init(span: borrowing Span<T>) {
+    self.span = copy span
   }
 }
 
-// Reassign an inout argument to a value that depends on the lifetime of another argument.
-func mayReassign(span: dependsOn(a) inout Span<Int>, to a: Array<Int>) {
-  span = a.span()
-}
+struct SuperWrapper<T: BitwiseCopyable>: ~Escapable {
+  private let wrapper: Wrapper<T>
 
-public struct OuterNE: ~Escapable {
-  // Generates a setter with an inferred dependence on the new value.
-  public var inner1: InnerNE
+  // An extra field forces a projection on 'self' within the initializer without any access scope.
+  var depth: Int = 0
 
-  // Explicit setter with an infered dependence on 'newValue'.
-  public var inner2: InnerNE {
-    get { inner1 }
-    set { inner1 = newValue }
-  }
-
-  // Modify yields inout self.
-  public var inner3: InnerNE {
-    _read { yield inner1 }
-    _modify { yield &inner1 }
-  }
-
-  public struct InnerNE: ~Escapable {
-    init<Owner: ~Escapable & ~Copyable>(
-      owner: borrowing Owner
-    ) -> dependsOn(owner) Self {}
-  }
-
-  init<Owner: ~Copyable & ~Escapable>(owner: borrowing Owner) -> dependsOn(owner) Self {
-    self.inner1 = InnerNE(owner: owner)
+  // Make sure that LocalVariableUtils can successfully analyze 'self'. That's required to determine that the assignment
+  // of `wrapper` is returned without escaping
+  init(span: borrowing Span<T>) {
+    self.wrapper = Wrapper(span: span)
   }
 }

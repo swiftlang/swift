@@ -361,6 +361,9 @@ def driver_time_compilation : Flag<["-"], "driver-time-compilation">,
 def stats_output_dir: Separate<["-"], "stats-output-dir">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
   HelpText<"Directory to write unified compilation-statistics files to">;
+def fine_grained_timers: Flag<["-"], "fine-grained-timers">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Enable per-request timers">;
 def trace_stats_events: Flag<["-"], "trace-stats-events">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Trace changes to stats in -stats-output-dir">;
@@ -1996,11 +1999,11 @@ def cas_path: Separate<["-"], "cas-path">,
   HelpText<"Path to CAS">, MetaVarName<"<path>">;
 
 def cas_plugin_path: Separate<["-"], "cas-plugin-path">,
-  Flags<[FrontendOption, NewDriverOnlyOption]>,
+  Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
   HelpText<"Path to CAS Plugin">, MetaVarName<"<path>">;
 
 def cas_plugin_option: Separate<["-"], "cas-plugin-option">,
-  Flags<[FrontendOption, NewDriverOnlyOption]>,
+  Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
   HelpText<"Option pass to CAS Plugin">, MetaVarName<"<name>=<option>">;
 
 def clang_scanner_module_cache_path : Separate<["-"], "clang-scanner-module-cache-path">,

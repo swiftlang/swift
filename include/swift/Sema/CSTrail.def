@@ -1,0 +1,110 @@
+//===--- CSTrail.def - Trail Change Kinds ---------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+///
+/// This file enumerates the kinds of SolverTrail::Change.
+///
+//===----------------------------------------------------------------------===//
+
+#ifndef CHANGE
+#define CHANGE(Name)
+#endif
+
+#ifndef LOCATOR_CHANGE
+#define LOCATOR_CHANGE(Name, Map) CHANGE(Name)
+#endif
+
+#ifndef EXPR_CHANGE
+#define EXPR_CHANGE(Name) CHANGE(Name)
+#endif
+
+#ifndef CLOSURE_CHANGE
+#define CLOSURE_CHANGE(Name) CHANGE(Name)
+#endif
+
+#ifndef CONSTRAINT_CHANGE
+#define CONSTRAINT_CHANGE(Name) CHANGE(Name)
+#endif
+
+#ifndef GRAPH_NODE_CHANGE
+#define GRAPH_NODE_CHANGE(Name) CHANGE(Name)
+#endif
+
+#ifndef SCORE_CHANGE
+#define SCORE_CHANGE(Name) CHANGE(Name)
+#endif
+
+#ifndef LAST_CHANGE
+#define LAST_CHANGE(Name)
+#endif
+
+LOCATOR_CHANGE(RecordedDisjunctionChoice, DisjunctionChoices)
+LOCATOR_CHANGE(RecordedAppliedDisjunction, AppliedDisjunctions)
+LOCATOR_CHANGE(RecordedMatchCallArgumentResult, argumentMatchingChoices)
+LOCATOR_CHANGE(RecordedOpenedTypes, OpenedTypes)
+LOCATOR_CHANGE(RecordedOpenedExistentialType, OpenedExistentialTypes)
+LOCATOR_CHANGE(RecordedPackExpansionEnvironment, PackExpansionEnvironments)
+LOCATOR_CHANGE(RecordedDefaultedConstraint, DefaultedConstraints)
+LOCATOR_CHANGE(ResolvedOverload, ResolvedOverloads)
+LOCATOR_CHANGE(RecordedImplicitValueConversion, ImplicitValueConversions)
+LOCATOR_CHANGE(RecordedArgumentList, ArgumentLists)
+LOCATOR_CHANGE(RecordedImplicitCallAsFunctionRoot, ImplicitCallAsFunctionRoots)
+LOCATOR_CHANGE(RecordedSynthesizedConformance, SynthesizedConformances)
+
+EXPR_CHANGE(AppliedPropertyWrapper)
+EXPR_CHANGE(RecordedImpliedResult)
+EXPR_CHANGE(RecordedExprPattern)
+
+CLOSURE_CHANGE(RecordedClosureType)
+CLOSURE_CHANGE(RecordedPreconcurrencyClosure)
+
+CONSTRAINT_CHANGE(DisabledConstraint)
+CONSTRAINT_CHANGE(FavoredConstraint)
+CONSTRAINT_CHANGE(GeneratedConstraint)
+CONSTRAINT_CHANGE(RetiredConstraint)
+
+GRAPH_NODE_CHANGE(AddedConstraint)
+GRAPH_NODE_CHANGE(RemovedConstraint)
+GRAPH_NODE_CHANGE(InferredBindings)
+GRAPH_NODE_CHANGE(RetractedBindings)
+
+SCORE_CHANGE(IncreasedScore)
+SCORE_CHANGE(DecreasedScore)
+
+CHANGE(AddedTypeVariable)
+CHANGE(ExtendedEquivalenceClass)
+CHANGE(RelatedTypeVariables)
+CHANGE(UpdatedTypeVariable)
+CHANGE(AddedConversionRestriction)
+CHANGE(AddedFix)
+CHANGE(AddedFixedRequirement)
+CHANGE(RecordedOpenedPackExpansionType)
+CHANGE(RecordedPackEnvironment)
+CHANGE(RecordedNodeType)
+CHANGE(RecordedKeyPathComponentType)
+CHANGE(RecordedResultBuilderTransform)
+CHANGE(RecordedContextualInfo)
+CHANGE(RecordedTarget)
+CHANGE(RecordedCaseLabelItemInfo)
+CHANGE(RecordedPotentialThrowSite)
+CHANGE(RecordedIsolatedParam)
+CHANGE(RecordedKeyPath)
+
+LAST_CHANGE(RecordedKeyPath)
+
+#undef LOCATOR_CHANGE
+#undef EXPR_CHANGE
+#undef CLOSURE_CHANGE
+#undef CONSTRAINT_CHANGE
+#undef GRAPH_NODE_CHANGE
+#undef SCORE_CHANGE
+#undef LAST_CHANGE
+#undef CHANGE

@@ -58,8 +58,8 @@ Parser::ParsedTypeAttributeList::applyAttributesToType(Parser &p,
     ty = new (p.Context) SendingTypeRepr(ty, SendingLoc);
   }
 
-  if (!lifetimeEntries.empty()) {
-    ty = LifetimeDependentTypeRepr::create(p.Context, ty, lifetimeEntries);
+  if (lifetimeEntry) {
+    ty = LifetimeDependentTypeRepr::create(p.Context, ty, lifetimeEntry);
   }
   return ty;
 }

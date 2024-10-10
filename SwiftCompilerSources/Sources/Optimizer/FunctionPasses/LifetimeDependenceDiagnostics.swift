@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 
 private let verbose = false
@@ -263,7 +264,7 @@ private struct LifetimeVariable {
   var varDecl: VarDecl?
   var sourceLoc: SourceLoc?
   
-  var name: String? {
+  var name: StringRef? {
     return varDecl?.userFacingName
   }
 
@@ -299,7 +300,7 @@ private struct LifetimeVariable {
       self.varDecl = introducer.definingInstruction?.findVarDecl()
     }
     if let varDecl {
-      sourceLoc = varDecl.sourceLoc
+      sourceLoc = varDecl.nameLoc
     }
   }
 

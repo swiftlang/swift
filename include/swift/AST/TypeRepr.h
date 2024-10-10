@@ -111,11 +111,6 @@ protected:
     /// The number of elements contained.
     NumElements : 32
   );
-
-  SWIFT_INLINE_BITFIELD_FULL(LifetimeDependentTypeRepr, TypeRepr, 32,
-      : NumPadBits,
-      NumDependencies : 32
-   );
   } Bits;
   // clang-format on
 
@@ -1531,32 +1526,19 @@ private:
   friend TypeRepr;
 };
 
-class LifetimeDependentTypeRepr final
-    : public SpecifierTypeRepr,
-      private llvm::TrailingObjects<LifetimeDependentTypeRepr, LifetimeEntry> {
-  friend TrailingObjects;
-
-  size_t numTrailingObjects(OverloadToken<LifetimeDependentTypeRepr>) const {
-    return Bits.LifetimeDependentTypeRepr.NumDependencies;
-  }
+class LifetimeDependentTypeRepr final : public SpecifierTypeRepr {
+  LifetimeEntry *entry;
 
 public:
-  LifetimeDependentTypeRepr(TypeRepr *base, ArrayRef<LifetimeEntry> specifiers)
+  LifetimeDependentTypeRepr(TypeRepr *base, LifetimeEntry *entry)
       : SpecifierTypeRepr(TypeReprKind::LifetimeDependent, base,
-                          specifiers.front().getLoc()) {
-    assert(base);
-    Bits.LifetimeDependentTypeRepr.NumDependencies = specifiers.size();
-    std::uninitialized_copy(specifiers.begin(), specifiers.end(),
-                            getTrailingObjects<LifetimeEntry>());
-  }
+                          entry->getLoc()),
+        entry(entry) {}
 
   static LifetimeDependentTypeRepr *create(ASTContext &C, TypeRepr *base,
-                                           ArrayRef<LifetimeEntry> specifiers);
+                                           LifetimeEntry *entry);
 
-  ArrayRef<LifetimeEntry> getLifetimeDependencies() const {
-    return {getTrailingObjects<LifetimeEntry>(),
-            Bits.LifetimeDependentTypeRepr.NumDependencies};
-  }
+  LifetimeEntry *getLifetimeEntry() const { return entry; }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::LifetimeDependent;

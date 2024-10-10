@@ -579,7 +579,7 @@ const TypeInfo *TypeConverter::convertBlockStorageType(SILBlockStorageType *T) {
 
     size = captureOffset + fixedCapture->getFixedSize();
     pod = fixedCapture->isTriviallyDestroyable(ResilienceExpansion::Maximal);
-    bt = fixedCapture->isBitwiseTakable(ResilienceExpansion::Maximal);
+    bt = fixedCapture->getBitwiseTakable(ResilienceExpansion::Maximal);
   }
 
   llvm::Type *storageElts[] = {

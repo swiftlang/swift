@@ -37,6 +37,8 @@ class DeclContext;
 class Type;
 class ModuleDecl;
 enum class DeclAttrKind : unsigned;
+class DeclAttribute;
+class CustomAttr;
 class SynthesizedExtensionAnalyzer;
 struct PrintOptions;
 class SILPrintContext;
@@ -342,6 +344,10 @@ struct PrintOptions {
   /// Suppress emitting @available(*, noasync)
   bool SuppressNoAsyncAvailabilityAttr = false;
 
+  /// Suppress emitting isolated or async deinit, and emit open containing class
+  /// as public
+  bool SuppressIsolatedDeinit = false;
+
   /// Whether to print the \c{/*not inherited*/} comment on factory initializers.
   bool PrintFactoryInitializerComment = true;
 
@@ -390,11 +396,16 @@ struct PrintOptions {
   /// Suppress ~Escapable types and lifetime dependence annotations
   bool SuppressNonEscapableTypes = false;
 
+  /// Suppress modify/read accessors.
+  bool SuppressCoroutineAccessors = false;
+
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {
       DeclAttrKind::Transparent, DeclAttrKind::Effects,
       DeclAttrKind::FixedLayout, DeclAttrKind::ShowInInterface,
   };
+
+  std::vector<CustomAttr *> ExcludeCustomAttrList = {};
 
   /// List of attribute kinds that should be printed exclusively.
   /// Empty means allow all.
@@ -520,6 +531,10 @@ struct PrintOptions {
   /// with types sharing a name with a module.
   bool AliasModuleNames = false;
 
+  /// Print some ABI details for public symbols as comments that can be
+  /// parsed by another tool.
+  bool PrintABIComments = false;
+
   /// Name of the modules that have been aliased in AliasModuleNames mode.
   /// Ideally we would use something other than a string to identify a module,
   /// but since one alias can apply to more than one module, strings happen
@@ -575,10 +590,6 @@ struct PrintOptions {
   /// compilers that might parse the result.
   bool PrintCompatibilityFeatureChecks = false;
 
-  /// Whether to print @_specialize attributes that have an availability
-  /// parameter.
-  bool PrintSpecializeAttributeWithAvailability = true;
-
   /// Whether to always desugar array types from `[base_type]` to `Array<base_type>`
   bool AlwaysDesugarArraySliceTypes = false;
 
@@ -626,6 +637,8 @@ struct PrintOptions {
                           [K](AnyAttrKind other) { return other == K; });
     return false;
   }
+
+  bool excludeAttr(const DeclAttribute *DA) const;
 
   /// Retrieve the set of options for verbose printing to users.
   static PrintOptions printVerbose() {
@@ -681,7 +694,8 @@ struct PrintOptions {
     result.SkipPrivateSystemDecls = true;
     result.SkipUnderscoredSystemProtocols = true;
     result.SkipUnsafeCXXMethods = true;
-    result.SkipDeinit = true;
+    result.SkipDeinit = false; // Deinit may have isolation attributes, which
+                               // are part of the interface
     result.EmptyLineBetweenDecls = true;
     result.CascadeDocComment = true;
     result.ShouldQualifyNestedDeclarations =
@@ -711,7 +725,8 @@ struct PrintOptions {
                                               bool useExportedModuleNames,
                                               bool aliasModuleNames,
                                               llvm::SmallSet<StringRef, 4>
-                                                *aliasModuleNamesTargets
+                                                *aliasModuleNamesTargets,
+                                              bool abiComments
                                               );
 
   /// Retrieve the set of options suitable for "Generated Interfaces", which

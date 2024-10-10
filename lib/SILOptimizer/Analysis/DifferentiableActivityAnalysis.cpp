@@ -273,10 +273,10 @@ void DifferentiableActivityInfo::propagateVariedInwardsThroughProjections(
     // the `inout` argument is a safe over-approximation but not always true.
     if (auto *bai = dyn_cast<BeginApplyInst>(inst)) {
       if (auto *calleeFn = bai->getCalleeFunction()) {
-        if (getAccessorKind(calleeFn) == AccessorKind::Modify) {
+        auto kind = getAccessorKind(calleeFn);
+        if (kind && isYieldingDefaultMutatingAccessor(*kind))
           for (auto inoutArg : bai->getInoutArguments())
             propagateVariedInwardsThroughProjections(inoutArg, i);
-        }
       }
     }
     return;
@@ -351,10 +351,12 @@ void DifferentiableActivityInfo::propagateUseful(
     // Note: the assumption that yielded addresses are always a projection into
     // the `inout` argument is a safe over-approximation but not always true.
     if (auto *bai = dyn_cast<BeginApplyInst>(inst)) {
-      if (auto *calleeFn = bai->getCalleeFunction())
-        if (getAccessorKind(calleeFn) == AccessorKind::Modify)
+      if (auto *calleeFn = bai->getCalleeFunction()) {
+        auto kind = getAccessorKind(calleeFn);
+        if (kind && isYieldingDefaultMutatingAccessor(*kind))
           for (auto yield : bai->getYieldedValues())
             setUsefulAndPropagateToOperands(yield, i);
+      }
     }
     // Propagate usefulness through apply site arguments.
     for (auto arg : applySite.getArgumentsWithoutIndirectResults())

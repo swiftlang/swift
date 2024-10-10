@@ -1601,7 +1601,7 @@ Pattern *TypeChecker::coercePatternToType(
     }
 
     // If there is a subpattern, push the enum element type down onto it.
-    auto argType = elt->getArgumentInterfaceType();
+    auto payloadType = elt->getPayloadInterfaceType();
     if (EEP->hasSubPattern()) {
       Pattern *sub = EEP->getSubPattern();
       if (!elt->hasAssociatedValues()) {
@@ -1615,8 +1615,8 @@ Pattern *TypeChecker::coercePatternToType(
       }
       
       Type elementType;
-      if (argType)
-        elementType = enumTy->getTypeOfMember(elt, argType);
+      if (payloadType)
+        elementType = enumTy->getTypeOfMember(elt, payloadType);
       else
         elementType = TupleType::getEmpty(Context);
       auto newSubOptions = subOptions;
@@ -1633,11 +1633,11 @@ Pattern *TypeChecker::coercePatternToType(
         return nullptr;
 
       EEP->setSubPattern(sub);
-    } else if (argType) {
+    } else if (payloadType) {
       // Else if the element pattern has no sub-pattern but the element type has
       // associated values, expand it to be semantically equivalent to an
       // element pattern of wildcards.
-      Type elementType = enumTy->getTypeOfMember(elt, argType);
+      Type elementType = enumTy->getTypeOfMember(elt, payloadType);
       SmallVector<TuplePatternElt, 8> elements;
       if (auto *TTy = dyn_cast<TupleType>(elementType.getPointer())) {
         for (auto &elt : TTy->getElements()) {

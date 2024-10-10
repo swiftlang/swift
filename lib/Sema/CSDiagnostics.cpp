@@ -4701,7 +4701,9 @@ bool InvalidMemberRefOnExistential::diagnoseAsError() {
     case AccessorKind::Get:
     case AccessorKind::DistributedGet:
     case AccessorKind::Read:
+    case AccessorKind::Read2:
     case AccessorKind::Modify:
+    case AccessorKind::Modify2:
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
       PD = SD->getIndices()->get(idx);
@@ -4993,10 +4995,10 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
 
     // If this is a reference to a static member by one of the key path
-    // components, let's provide a tailored diagnostic and return because
-    // that is unsupported so there is no fix-it.
+    // components, let's provide a tailored diagnostic with fix-it.
     if (locator->isInKeyPathComponent()) {
-      InvalidStaticMemberRefInKeyPath failure(getSolution(), Member, locator);
+      InvalidStaticMemberRefInKeyPath failure(getSolution(), BaseType, Member,
+                                              locator);
       return failure.diagnoseAsError();
     }
 
@@ -6335,8 +6337,25 @@ SourceLoc InvalidMemberRefInKeyPath::getLoc() const {
 }
 
 bool InvalidStaticMemberRefInKeyPath::diagnoseAsError() {
-  emitDiagnostic(diag::expr_keypath_static_member, getMember(),
-                 isForKeyPathDynamicMemberLookup());
+  auto *KPE = getAsExpr<KeyPathExpr>(getRawAnchor());
+  auto rootTyRepr = KPE->getExplicitRootType();
+  auto isProtocol = getBaseType()->isExistentialType();
+
+  if (!getConstraintSystem().getASTContext().LangOpts.hasFeature(
+          Feature::KeyPathWithStaticMembers)) {
+    emitDiagnostic(diag::expr_keypath_static_member, getMember(),
+                   isForKeyPathDynamicMemberLookup());
+  } else {
+    if (rootTyRepr && !isProtocol) {
+      emitDiagnostic(diag::could_not_use_type_member_on_instance, getBaseType(),
+                     DeclNameRef(getMember()->getName()))
+          .fixItInsert(rootTyRepr->getEndLoc(), ".Type");
+    } else {
+      emitDiagnostic(diag::could_not_use_type_member_on_instance, getBaseType(),
+                     DeclNameRef(getMember()->getName()));
+    }
+  }
+
   return true;
 }
 
@@ -8699,8 +8718,45 @@ bool InvalidPatternInExprFailure::diagnoseAsError() {
       E = parent;
     }
   }
-  emitDiagnostic(diag::pattern_in_expr, P->getDescriptiveKind());
+  if (!diagnoseInvalidCheckedCast()) {
+    emitDiagnostic(diag::pattern_in_expr, P->getDescriptiveKind());
+  }
   return true;
+}
+
+bool InvalidPatternInExprFailure::diagnoseInvalidCheckedCast() const {
+  auto *E = findParentExpr(castToExpr(getAnchor()));
+  // Make sure we have a CheckedCastExpr and are in an argument of `~=`.
+  while (E && !isa<CheckedCastExpr>(E))
+    E = findParentExpr(E);
+  auto *castExpr = cast_or_null<CheckedCastExpr>(E);
+  if (!castExpr)
+    return false;
+  auto *parent = findParentExpr(castExpr);
+  while (parent && !isa<BinaryExpr>(parent))
+    parent = findParentExpr(parent);
+  auto *BE = cast_or_null<BinaryExpr>(parent);
+  if (!BE || !isPatternMatchingOperator(BE->getFn()))
+    return false;
+  // Emit the appropriate diagnostic based on the cast kind.
+  if (auto *forced = dyn_cast<ForcedCheckedCastExpr>(castExpr)) {
+    emitDiagnosticAt(castExpr->getLoc(),
+                     diag::force_cast_in_type_casting_pattern)
+        .fixItRemove(forced->getExclaimLoc());
+    return true;
+  }
+  if (auto *conditional = dyn_cast<ConditionalCheckedCastExpr>(castExpr)) {
+    emitDiagnosticAt(castExpr->getLoc(),
+                     diag::conditional_cast_in_type_casting_pattern)
+        .fixItRemove(conditional->getQuestionLoc());
+    return true;
+  }
+  if (auto *isExpr = dyn_cast<IsExpr>(castExpr)) {
+    emitDiagnosticAt(castExpr->getLoc(), diag::cannot_bind_value_with_is)
+        .fixItReplace(isExpr->getAsLoc(), "as");
+    return true;
+  }
+  return false;
 }
 
 bool MissingContextualTypeForNil::diagnoseAsError() {

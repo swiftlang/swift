@@ -11,7 +11,6 @@ add_swift_host_library(swiftAST STATIC
   AccessRequests.cpp
   ActorIsolation.cpp
   ArgumentList.cpp
-  ASTBridging.cpp
   ASTContext.cpp
   ASTDemangler.cpp
   ASTDumper.cpp
@@ -117,6 +116,7 @@ add_swift_host_library(swiftAST STATIC
   SearchPathOptions.cpp
   SILLayout.cpp
   Stmt.cpp
+  StorageImpl.cpp
   SubstitutionMap.cpp
   SwiftNameTranslation.cpp
   Type.cpp
@@ -133,6 +133,8 @@ add_swift_host_library(swiftAST STATIC
   LLVM_LINK_COMPONENTS
   ${SWIFTAST_LLVM_LINK_COMPONENTS}
   )
+
+add_subdirectory(Bridging)
 
 if(SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
   if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")

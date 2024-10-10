@@ -849,12 +849,22 @@ ValueWitnessFlags getValueWitnessFlags(const TypeInfo *TI, SILType concreteType,
     bool isInline = packing == FixedPacking::OffsetZero;
     bool isBitwiseTakable =
         fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal);
+    bool isBitwiseBorrowable =
+        fixedTI->isBitwiseBorrowable(ResilienceExpansion::Maximal);
     assert(isBitwiseTakable || !isInline);
     flags = flags.withAlignment(fixedTI->getFixedAlignment().getValue())
                 .withPOD(fixedTI->isTriviallyDestroyable(ResilienceExpansion::Maximal))
                 .withCopyable(fixedTI->isCopyable(ResilienceExpansion::Maximal))
                 .withInlineStorage(isInline)
-                .withBitwiseTakable(isBitwiseTakable);
+                .withBitwiseTakable(isBitwiseTakable)
+                // the IsNotBitwiseBorrowable bit only needs to be set if the
+                // type is bitwise-takable but not bitwise-borrowable, since
+                // a type must be bitwise-takable to be bitwise-borrowable.
+                //
+                // Swift prior to version 6 didn't have the
+                // IsNotBitwiseBorrowable bit, so to avoid unnecessary variation
+                // in metadata output, we only set the bit when needed.
+                .withBitwiseBorrowable(!isBitwiseTakable || isBitwiseBorrowable);
   } else {
     flags = flags.withIncomplete(true);
   }
@@ -1532,12 +1542,12 @@ llvm::Constant *IRGenModule::emitFixedTypeLayout(CanType t,
   unsigned align = ti.getFixedAlignment().getValue();
 
   bool pod = ti.isTriviallyDestroyable(ResilienceExpansion::Maximal);
-  bool bt = ti.isBitwiseTakable(ResilienceExpansion::Maximal);
+  IsBitwiseTakable_t bt = ti.getBitwiseTakable(ResilienceExpansion::Maximal);
   unsigned numExtraInhabitants = ti.getFixedExtraInhabitantCount(*this);
 
   // Try to use common type layouts exported by the runtime.
   llvm::Constant *commonValueWitnessTable = nullptr;
-  if (pod && bt && numExtraInhabitants == 0) {
+  if (pod && bt == IsBitwiseTakableAndBorrowable && numExtraInhabitants == 0) {
     if (size == 0)
       commonValueWitnessTable =
         getAddrOfValueWitnessTable(Context.TheEmptyTupleType);
@@ -1562,7 +1572,7 @@ llvm::Constant *IRGenModule::emitFixedTypeLayout(CanType t,
 
   // Otherwise, see if a layout has been emitted with these characteristics
   // already.
-  FixedLayoutKey key{size, numExtraInhabitants, align, pod, bt};
+  FixedLayoutKey key{size, numExtraInhabitants, align, pod, unsigned(bt)};
 
   auto found = PrivateFixedLayouts.find(key);
   if (found != PrivateFixedLayouts.end())
@@ -1578,16 +1588,29 @@ llvm::Constant *IRGenModule::emitFixedTypeLayout(CanType t,
     addValueWitness(*this, witnesses, witness, packing, t, silTy, ti);
   }
 
+  auto pod_bt_string = [](bool pod, IsBitwiseTakable_t bt) -> StringRef {
+    if (pod) {
+      return "_pod";
+    }
+    switch (bt) {
+    case IsNotBitwiseTakable:
+      return "";
+    case IsBitwiseTakableOnly:
+      return "_bt_nbb";
+    case IsBitwiseTakableAndBorrowable:
+      return "_bt";
+    }
+  };
+
   auto layoutVar
     = witnesses.finishAndCreateGlobal(
         "type_layout_" + llvm::Twine(size)
                        + "_" + llvm::Twine(align)
                        + "_" + llvm::Twine::utohexstr(numExtraInhabitants)
-                       + (pod ? "_pod" :
-                          bt  ? "_bt"  : ""),
-                                      getPointerAlignment(),
-                                      /*constant*/ true,
-                                      llvm::GlobalValue::PrivateLinkage);
+                       + pod_bt_string(pod, bt),
+        getPointerAlignment(),
+        /*constant*/ true,
+        llvm::GlobalValue::PrivateLinkage);
 
   // Cast to the standard currency type for type layouts.
   auto layout = llvm::ConstantExpr::getBitCast(layoutVar, Int8PtrPtrTy);

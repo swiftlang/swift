@@ -134,6 +134,9 @@ public typealias CWideChar = UInt16
 public typealias CWideChar = Unicode.Scalar
 #endif
 
+/// The C++20 'char8_t' type, which has UTF-8 encoding.
+public typealias CChar8 = UInt8
+
 // FIXME: Swift should probably have a UTF-16 type other than UInt16.
 //
 /// The C++11 'char16_t' type, which has UTF-16 encoding.

@@ -38,12 +38,12 @@ enum class IntermoduleDepTrackingMode;
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
   friend class ArgsToFrontendOptionsConverter;
+public:
 
   /// A list of arbitrary modules to import and make implicitly visible.
   std::vector<std::pair<std::string, bool /*testable*/>>
       ImplicitImportModuleNames;
 
-public:
   FrontendInputsAndOutputs InputsAndOutputs;
 
   void forAllOutputPaths(const InputFile &input,
@@ -227,6 +227,10 @@ public:
 
   /// The path to which we should output statistics files.
   std::string StatsOutputDir;
+
+  /// Whether to enable timers tracking individual requests. This adds some
+  /// runtime overhead.
+  bool FineGrainedTimers = false;
 
   /// Trace changes to stats to files in StatsOutputDir.
   bool TraceStats = false;

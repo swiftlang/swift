@@ -272,6 +272,10 @@ public:
   getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                      ModuleDecl::ImportFilter filter) const {}
 
+  /// Looks up which external macros are defined by this file.
+  virtual void
+  getExternalMacros(SmallVectorImpl<ExternalMacroPlugin> &macros) const {}
+
   /// Lists modules that are not imported from this file and used in API.
   virtual void getImplicitImportsForModuleInterface(
       SmallVectorImpl<ImportedModule> &imports) const {}

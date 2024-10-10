@@ -1784,6 +1784,15 @@ SILCloner<ImplClass>::visitConvertFunctionInst(ConvertFunctionInst *Inst) {
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitThunkInst(ThunkInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createThunk(getOpLocation(Inst->getLoc()),
+                                     getOpValue(Inst->getOperand()),
+                                     Inst->getThunkKind()));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitConvertEscapeToNoEscapeInst(
     ConvertEscapeToNoEscapeInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -2673,7 +2682,7 @@ SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
   recordClonedInstruction(Inst,
                           getBuilder().createWitnessMethod(
                               getOpLocation(Inst->getLoc()), newLookupType,
-                              conformance, Inst->getMember(), Inst->getType()));
+                              conformance, Inst->getMember(), getOpType(Inst->getType())));
 }
 
 template<typename ImplClass>

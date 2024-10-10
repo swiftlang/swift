@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SILBridging
 
 public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
@@ -17,42 +18,90 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
 
   public init(bridged: BridgedWitnessTable) { self.bridged = bridged }
 
-  public struct Entry : CustomStringConvertible, NoReflectionChildren {
-    fileprivate let bridged: BridgedWitnessTableEntry
-    
-    public typealias Kind = BridgedWitnessTableEntry.Kind
+  public enum Entry : CustomStringConvertible, NoReflectionChildren {
 
-    public var kind: Kind {
-      return bridged.getKind()
-    }
-    
-    public var methodFunction: Function? {
-      assert(kind == .Method)
-      return bridged.getMethodFunction().function
+    case invalid
+
+    /// A witness table entry describing the witness for a method.
+    /// The witness can be nil in case dead function elimination has removed the method
+    /// or if the method was not serialized (for de-serialized witness tables).
+    case method(requirement: DeclRef, witness: Function?)
+
+    /// A witness table entry describing the witness for an associated type.
+    case associatedType(requirement: AssociatedTypeDecl, witness: CanonicalType)
+
+    /// A witness table entry describing the witness for an associated type's protocol requirement.
+    case associatedConformance(requirement: CanonicalType, protocol: ProtocolDecl, witness: Conformance)
+
+    /// A witness table entry referencing the protocol conformance for a refined base protocol.
+    case baseProtocol(requirement: ProtocolDecl, witness: Conformance)
+
+    fileprivate init(bridged: BridgedWitnessTableEntry) {
+      switch bridged.getKind() {
+      case .invalid:
+        self = .invalid
+      case .method:
+        self = .method(requirement: DeclRef(bridged: bridged.getMethodRequirement()),
+                       witness: bridged.getMethodWitness().function)
+      case .associatedType:
+        self = .associatedType(requirement: bridged.getAssociatedTypeRequirement().getAs(AssociatedTypeDecl.self),
+                               witness: CanonicalType(bridged: bridged.getAssociatedTypeWitness()))
+      case .associatedConformance:
+        self = .associatedConformance(requirement: CanonicalType(bridged: bridged.getAssociatedConformanceRequirement()),
+                                      protocol: bridged.getAssociatedConformanceDecl().getAs(ProtocolDecl.self),
+                                      witness: Conformance(bridged: bridged.getAssociatedConformanceWitness()))
+      case .baseProtocol:
+        self = .baseProtocol(requirement: bridged.getBaseProtocolRequirement().getAs(ProtocolDecl.self),
+                             witness: Conformance(bridged: bridged.getBaseProtocolWitness()))
+      default:
+        fatalError("invalid witness table entry")
+      }
     }
 
     public var description: String {
       return String(taking: bridged.getDebugDescription())
     }
-  }
 
-  public struct EntryArray : BridgedRandomAccessCollection {
-    fileprivate let base: BridgedWitnessTableEntry
-    public let count: Int
-    
-    public var startIndex: Int { return 0 }
-    public var endIndex: Int { return count }
-    
-    public subscript(_ index: Int) -> Entry {
-      assert(index >= startIndex && index < endIndex)
-      return Entry(bridged: base.advanceBy(index))
+    public var bridged: BridgedWitnessTableEntry {
+      switch self {
+      case .invalid:
+        return BridgedWitnessTableEntry.createInvalid()
+      case .method(let requirement, let witness):
+        return BridgedWitnessTableEntry.createMethod(requirement.bridged,
+                                                     OptionalBridgedFunction(obj: witness?.bridged.obj))
+      case .associatedType(let requirement, let witness):
+        return BridgedWitnessTableEntry.createAssociatedType(requirement.bridged, witness.bridged)
+      case .associatedConformance(let requirement, let protocolDecl, let witness):
+        return BridgedWitnessTableEntry.createAssociatedConformance(requirement.bridged,
+                                                                    protocolDecl.bridged,
+                                                                    witness.bridged)
+      case .baseProtocol(let requirement, let witness):
+        return BridgedWitnessTableEntry.createBaseProtocol(requirement.bridged, witness.bridged)
+      }
     }
   }
 
-  public var entries: EntryArray {
-    let entries = bridged.getEntries()
-    return EntryArray(base: entries.base, count: entries.count)
+  public struct EntryArray : BridgedRandomAccessCollection {
+    fileprivate let bridgedTable: BridgedWitnessTable
+    public let count: Int
+    
+    init(witnessTable: WitnessTable) {
+      self.bridgedTable = witnessTable.bridged
+      self.count = witnessTable.bridged.getNumEntries()
+    }
+
+    public var startIndex: Int { 0 }
+    public var endIndex: Int { count }
+
+    public subscript(_ index: Int) -> Entry {
+      precondition(index >= startIndex && index < endIndex)
+      return Entry(bridged: bridgedTable.getEntry(index))
+    }
   }
+
+  public var entries: EntryArray { EntryArray(witnessTable: self) }
+
+  public var isDefinition: Bool { !bridged.isDeclaration() }
 
   public var description: String {
     return String(taking: bridged.getDebugDescription())
@@ -65,12 +114,26 @@ public struct DefaultWitnessTable : CustomStringConvertible, NoReflectionChildre
   public init(bridged: BridgedDefaultWitnessTable) { self.bridged = bridged }
 
   public typealias Entry = WitnessTable.Entry
-  public typealias EntryArray = WitnessTable.EntryArray
 
-  public var entries: EntryArray {
-    let entries = bridged.getEntries()
-    return EntryArray(base: entries.base, count: entries.count)
+  public struct EntryArray : BridgedRandomAccessCollection {
+    fileprivate let bridgedTable: BridgedDefaultWitnessTable
+    public let count: Int
+
+    init(witnessTable: DefaultWitnessTable) {
+      self.bridgedTable = witnessTable.bridged
+      self.count = witnessTable.bridged.getNumEntries()
+    }
+
+    public var startIndex: Int { 0 }
+    public var endIndex: Int { count }
+
+    public subscript(_ index: Int) -> Entry {
+      precondition(index >= startIndex && index < endIndex)
+      return Entry(bridged: bridgedTable.getEntry(index))
+    }
   }
+
+  public var entries: EntryArray { EntryArray(witnessTable: self) }
 
   public var description: String {
     return String(taking: bridged.getDebugDescription())

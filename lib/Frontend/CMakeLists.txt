@@ -15,6 +15,7 @@ add_swift_host_library(swiftFrontend STATIC
   Frontend.cpp
   FrontendInputsAndOutputs.cpp
   FrontendOptions.cpp
+  MakeStyleDependencies.cpp
   ModuleInterfaceBuilder.cpp
   ModuleInterfaceLoader.cpp
   ModuleInterfaceSupport.cpp

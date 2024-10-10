@@ -346,22 +346,6 @@ public:
   /// This vector is managed by \c StructureMarkerRAII objects.
   llvm::SmallVector<StructureMarker, 16> StructureMarkers;
 
-  /// Maps of macro name and version to availability specifications.
-  typedef llvm::DenseMap<llvm::VersionTuple,
-                         SmallVector<AvailabilitySpec *, 4>>
-                        AvailabilityMacroVersionMap;
-  typedef llvm::DenseMap<StringRef, AvailabilityMacroVersionMap>
-                        AvailabilityMacroMap;
-
-  /// Cache of the availability macros parsed from the command line arguments.
-  /// Organized as two nested \c DenseMap keyed first on the macro name then
-  /// the macro version. This structure allows to peek at macro names before
-  /// parsing a version tuple.
-  AvailabilityMacroMap AvailabilityMacros;
-
-  /// Has \c AvailabilityMacros been computed?
-  bool AvailabilityMacrosComputed = false;
-
 public:
   Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
          SILParserStateBase *SIL, PersistentParserState *PersistentState);
@@ -1182,6 +1166,10 @@ public:
   ParserResult<LifetimeAttr> parseLifetimeAttribute(SourceLoc AtLoc,
                                                     SourceLoc Loc);
 
+  /// Common utility to parse swift @lifetime decl attribute and SIL @lifetime
+  /// type modifier.
+  ParserResult<LifetimeEntry> parseLifetimeEntry(SourceLoc loc);
+
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                   SourceLoc AtEndLoc,
@@ -1213,6 +1201,9 @@ public:
 
   bool isParameterSpecifier() {
     if (Tok.is(tok::kw_inout)) return true;
+    if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
+        isSILLifetimeDependenceToken())
+      return true;
     if (!canHaveParameterSpecifierContextualKeyword()) return false;
     if (Tok.isContextualKeyword("__shared") ||
         Tok.isContextualKeyword("__owned") ||
@@ -1224,9 +1215,6 @@ public:
     if (Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
         Tok.isContextualKeyword("sending"))
       return true;
-    if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
-        isLifetimeDependenceToken())
-      return true;
     return false;
   }
 
@@ -1237,12 +1225,9 @@ public:
     consumeToken();
   }
 
-  bool isLifetimeDependenceToken() {
-    if (!isInSILMode()) {
-      return Tok.isContextualKeyword("dependsOn");
-    }
-    return Tok.isContextualKeyword("_inherit") ||
-           Tok.isContextualKeyword("_scope");
+  bool isSILLifetimeDependenceToken() {
+    return isInSILMode() && Tok.is(tok::at_sign) &&
+           (peekToken().isContextualKeyword("lifetime"));
   }
 
   bool canHaveParameterSpecifierContextualKeyword() {
@@ -1263,15 +1248,12 @@ public:
         return true;
     }
 
-    return isLifetimeDependenceToken();
+    return false;
   }
 
   bool parseConventionAttributeInternal(SourceLoc atLoc, SourceLoc attrLoc,
                                         ConventionTypeAttr *&result,
                                         bool justChecking);
-
-  ParserStatus
-  parseLifetimeEntries(SmallVectorImpl<LifetimeEntry> &specifierList);
 
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
@@ -1474,7 +1456,7 @@ public:
     SourceLoc ConstLoc;
     SourceLoc SendingLoc;
     SmallVector<TypeOrCustomAttr> Attributes;
-    SmallVector<LifetimeEntry> lifetimeEntries;
+    LifetimeEntry *lifetimeEntry = nullptr;
 
     ParsedTypeAttributeList(ParseTypeReason reason) : ParseReason(reason) {}
 
@@ -2080,7 +2062,7 @@ public:
   parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs);
 
   /// Parse the availability macros definitions passed as arguments.
-  void parseAllAvailabilityMacroArguments();
+  AvailabilityMacroMap &parseAllAvailabilityMacroArguments();
 
   /// Result of parsing an availability macro definition.
   struct AvailabilityMacroDefinition {

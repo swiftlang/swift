@@ -63,7 +63,7 @@ public:
   
   /// A witness table entry describing the witness for an associated type's
   /// protocol requirement.
-  struct AssociatedTypeProtocolWitness {
+  struct AssociatedConformanceWitness {
     /// The associated type required.  A dependent type in the protocol's
     /// context.
     CanType Requirement;
@@ -88,7 +88,7 @@ public:
     Invalid,
     Method,
     AssociatedType,
-    AssociatedTypeProtocol,
+    AssociatedConformance,
     BaseProtocol
   } ENUM_EXTENSIBILITY_ATTR(open);
   
@@ -98,7 +98,7 @@ public:
     union {
       MethodWitness Method;
       AssociatedTypeWitness AssociatedType;
-      AssociatedTypeProtocolWitness AssociatedTypeProtocol;
+      AssociatedConformanceWitness AssociatedConformance;
       BaseProtocolWitness BaseProtocol;
     };
     
@@ -113,9 +113,9 @@ public:
       : Kind(WitnessKind::AssociatedType), AssociatedType(AssociatedType)
     {}
     
-    Entry(const AssociatedTypeProtocolWitness &AssociatedTypeProtocol)
-      : Kind(WitnessKind::AssociatedTypeProtocol),
-        AssociatedTypeProtocol(AssociatedTypeProtocol)
+    Entry(const AssociatedConformanceWitness &AssociatedConformance)
+      : Kind(WitnessKind::AssociatedConformance),
+        AssociatedConformance(AssociatedConformance)
     {}
     
     Entry(const BaseProtocolWitness &BaseProtocol)
@@ -135,10 +135,9 @@ public:
       assert(Kind == WitnessKind::AssociatedType);
       return AssociatedType;
     }
-    const AssociatedTypeProtocolWitness &
-    getAssociatedTypeProtocolWitness() const {
-      assert(Kind == WitnessKind::AssociatedTypeProtocol);
-      return AssociatedTypeProtocol;
+    const AssociatedConformanceWitness &getAssociatedConformanceWitness() const {
+      assert(Kind == WitnessKind::AssociatedConformance);
+      return AssociatedConformance;
     }
     const BaseProtocolWitness &getBaseProtocolWitness() const {
       assert(Kind == WitnessKind::BaseProtocol);
@@ -177,7 +176,7 @@ private:
   SILLinkage Linkage;
 
   /// The conformance mapped to this witness table.
-  RootProtocolConformance *Conformance;
+  ProtocolConformance *Conformance;
 
   /// The various witnesses containing in this witness table. Is empty if the
   /// table has no witness entries or if it is a declaration.
@@ -201,13 +200,13 @@ private:
 
   /// Private constructor for making SILWitnessTable definitions.
   SILWitnessTable(SILModule &M, SILLinkage Linkage, SerializedKind_t Serialized,
-                  StringRef name, RootProtocolConformance *conformance,
+                  StringRef name, ProtocolConformance *conformance,
                   ArrayRef<Entry> entries,
                   ArrayRef<ConditionalConformance> conditionalConformances);
 
   /// Private constructor for making SILWitnessTable declarations.
   SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef Name,
-                  RootProtocolConformance *conformance);
+                  ProtocolConformance *conformance);
 
   void addWitnessTable();
 
@@ -215,19 +214,19 @@ public:
   /// Create a new SILWitnessTable definition with the given entries.
   static SILWitnessTable *
   create(SILModule &M, SILLinkage Linkage, SerializedKind_t SerializedKind,
-         RootProtocolConformance *conformance, ArrayRef<Entry> entries,
+         ProtocolConformance *conformance, ArrayRef<Entry> entries,
          ArrayRef<ConditionalConformance> conditionalConformances);
 
   /// Create a new SILWitnessTable declaration.
   static SILWitnessTable *create(SILModule &M, SILLinkage Linkage,
-                                 RootProtocolConformance *conformance);
+                                 ProtocolConformance *conformance);
 
   ~SILWitnessTable();
   
   SILModule &getModule() const { return Mod; }
 
   /// Return the AST ProtocolConformance this witness table represents.
-  RootProtocolConformance *getConformance() const {
+  ProtocolConformance *getConformance() const {
     return Conformance;
   }
 

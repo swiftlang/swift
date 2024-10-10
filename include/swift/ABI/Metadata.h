@@ -2275,6 +2275,24 @@ public:
     if (!hasGeneralizationSignature()) return 0;
     return getGenSigHeader()->getArgumentLayoutSizeInWords();
   }
+  
+  bool isCopyable() const {
+    if (!hasGeneralizationSignature()) {
+      return true;
+    }
+    auto *reqts = getGenSigRequirements();
+    for (unsigned i = 0, e = getNumGenSigRequirements(); i < e; ++i) {
+      auto &reqt = reqts[i];
+      if (reqt.getKind() != GenericRequirementKind::InvertedProtocols) {
+        continue;
+      }
+      if (reqt.getInvertedProtocols()
+              .contains(InvertibleProtocolKind::Copyable)) {
+        return false;
+      }
+    }
+    return true;
+  }
 };
 using ExtendedExistentialTypeShape
   = TargetExtendedExistentialTypeShape<InProcess>;

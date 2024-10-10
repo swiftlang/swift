@@ -3932,7 +3932,9 @@ NodePointer Demangler::demangleAccessor(NodePointer ChildNode) {
     case 'w': Kind = Node::Kind::WillSet; break;
     case 'W': Kind = Node::Kind::DidSet; break;
     case 'r': Kind = Node::Kind::ReadAccessor; break;
+    case 'y': Kind = Node::Kind::Read2Accessor; break;
     case 'M': Kind = Node::Kind::ModifyAccessor; break;
+    case 'x': Kind = Node::Kind::Modify2Accessor; break;
     case 'i': Kind = Node::Kind::InitAccessor; break;
     case 'a':
       switch (nextChar()) {
@@ -3973,6 +3975,10 @@ NodePointer Demangler::demangleFunctionEntity() {
   switch (nextChar()) {
     case 'D': Args = None; Kind = Node::Kind::Deallocator; break;
     case 'd': Args = None; Kind = Node::Kind::Destructor; break;
+    case 'Z':
+      Args = None;
+      Kind = Node::Kind::IsolatedDeallocator;
+      break;
     case 'E': Args = None; Kind = Node::Kind::IVarDestroyer; break;
     case 'e': Args = None; Kind = Node::Kind::IVarInitializer; break;
     case 'i': Args = None; Kind = Node::Kind::Initializer; break;

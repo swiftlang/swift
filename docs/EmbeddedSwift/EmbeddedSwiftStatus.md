@@ -8,19 +8,20 @@ For an introduction and motivation into Embedded Swift, please see "[A Vision fo
 
 ## Embedded Swift Language Features
 
-| **Language Feature**                                  | **Currently Supported In Embedded Swift** |
-|-------------------------------------------------------|-------------------------------------------|
-| *Anything not listed below*                           | Yes                                       |
-| Library Evolution (resilience)                        | No, intentionally unsupported long-term   |
-| Objective-C interoperability                          | No, intentionally unsupported long-term   |
-| Non-WMO builds                                        | No, intentionally unsupported long-term (WMO should be used)  |
-| Existentials                                          | No, currently disallowed       |
-| Any, AnyObject                                        | No, currently disallowed       |
-| Metatypes                                             | No, currently only allowed as unused arguments (type hints) |
-| Untyped throwing                                      | No, intentionally unsupported long-term (typed throwing should be used instead) |
-| Weak references, unowned references                   | No                                        |
-| Non-final generic class methods						            | No, intentionally unsupported long-term   |
-| Parameter packs (variadic generics)				            | No, not yet supported                     |
+| **Language Feature**                                  | **Currently Supported In Embedded Swift**                                          |
+|-------------------------------------------------------|------------------------------------------------------------------------------------|
+| *Anything not listed below*                           | Yes                                                                                |
+| Library Evolution (resilience)                        | No, intentionally unsupported long-term                                            |
+| Objective-C interoperability                          | No, intentionally unsupported long-term                                            |
+| Non-WMO builds                                        | No, intentionally unsupported long-term (WMO should be used)                       |
+| Existentials (values of protocol types)               | Only class-bound existentials (for protocols derived from AnyObject) are supported |
+| Any                                                   | No, currently disallowed                                                           |
+| AnyObject                                             | Yes                                                                                |
+| Metatypes                                             | No, currently only allowed as unused arguments (type hints)                        |
+| Untyped throwing                                      | No, intentionally unsupported long-term (typed throwing should be used instead)    |
+| Weak references, unowned references                   | No                                                                                 |
+| Non-final generic class methods                       | No, intentionally unsupported long-term                                            |
+| Parameter packs (variadic generics)                   | No, not yet supported                                                              |
 
 ## Embedded Standard Library Breakdown
 
@@ -43,6 +44,7 @@ This status table describes which of the following standard library features can
 | Integer parsing                                            | No     |
 | KeyPaths                                                   | Partial (only compile-time constant key paths to stored properties supported, only usable in MemoryLayout and UnsafePointer APIs)     |
 | Lazy collections                                           | No     |
+| ManagedBuffer                                              | Yes    |
 | Mirror (runtime reflection)                                | No, intentionally unsupported long-term |
 | Objective-C bridging                                       | No, intentionally unsupported long-term |
 | Optional                                                   | Yes    |

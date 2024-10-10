@@ -5384,9 +5384,6 @@ namespace {
         auto varDecl = cast<VarDecl>(property);
         // Key paths don't work with mutating-get properties.
         assert(!varDecl->isGetterMutating());
-        // Key paths don't currently support static members.
-        // There is a fix which diagnoses such situation already.
-        assert(!varDecl->isStatic());
 
         // Compute the concrete reference to the member.
         auto ref = resolveConcreteDeclRef(property, locator);
@@ -5620,18 +5617,18 @@ namespace {
 
       /// Check if it needs an explicit consume, due to this being a cast.
       auto *module = dc->getParentModule();
-      auto origType = cs.getType(injection->getSubExpr());
+      auto origType = solution.getResolvedType(injection->getSubExpr());
       if (willHaveConfusingConsumption(origType, locator, cs) &&
-          canAddExplicitConsume(module, injection->getSubExpr()))
+          canAddExplicitConsume(solution, module, injection->getSubExpr()))
         ConsumingCoercions.push_back(injection);
     }
 
     void diagnoseExistentialErasureOf(Expr *fromExpr, Expr *toExpr,
                                       ConstraintLocatorBuilder locator) {
       auto *module = dc->getParentModule();
-      auto fromType = cs.getType(fromExpr);
+      auto fromType = solution.getResolvedType(fromExpr);
       if (willHaveConfusingConsumption(fromType, locator, cs) &&
-          canAddExplicitConsume(module, fromExpr)) {
+          canAddExplicitConsume(solution, module, fromExpr)) {
         ConsumingCoercions.push_back(toExpr);
       }
     }
@@ -8542,11 +8539,9 @@ bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
   // If this is a method reference on an potentially isolated
   // actor then it cannot be a remote thunk.
   bool isPotentiallyIsolated = isPotentiallyIsolatedActor(
-      actor,
-    [&](ParamDecl *P) {
-    return P->isIsolated() ||
-           llvm::is_contained(solution.isolatedParams, P);
-  });
+      actor, [&](ParamDecl *P) {
+        return P->isIsolated() || solution.isolatedParams.count(P);
+      });
 
   // Adjust the declaration context to the innermost context that is neither
   // a local function nor a closure, so that the actor reference is checked

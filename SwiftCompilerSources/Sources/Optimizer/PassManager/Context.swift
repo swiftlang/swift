@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 import OptimizerBridging
 
@@ -59,6 +60,26 @@ extension Context {
     name._withBridgedStringRef {
       _bridged.lookupFunction($0).function
     }
+  }
+
+  func lookupWitnessTable(for conformance: Conformance) -> WitnessTable? {
+    return _bridged.lookupWitnessTable(conformance.bridged).witnessTable
+  }
+
+  func lookupVTable(for classDecl: NominalTypeDecl) -> VTable? {
+    return _bridged.lookupVTable(classDecl.bridged).vTable
+  }
+
+  func lookupSpecializedVTable(for classType: Type) -> VTable? {
+    return _bridged.lookupSpecializedVTable(classType.bridged).vTable
+  }
+
+  func getSpecializedConformance(of genericConformance: Conformance,
+                                 for type: AST.`Type`,
+                                 substitutions: SubstitutionMap) -> Conformance
+  {
+    let c = _bridged.getSpecializedConformance(genericConformance.bridged, type.bridged, substitutions.bridged)
+    return Conformance(bridged: c)
   }
 
   func notifyNewFunction(function: Function, derivedFrom: Function) {
@@ -221,7 +242,7 @@ extension MutatingContext {
   }
 
   func getContextSubstitutionMap(for type: Type) -> SubstitutionMap {
-    SubstitutionMap(_bridged.getContextSubstitutionMap(type.bridged))
+    SubstitutionMap(bridged: _bridged.getContextSubstitutionMap(type.bridged))
   }
 
   func notifyInstructionsChanged() {
@@ -274,7 +295,7 @@ struct FunctionPassContext : MutatingContext {
   }
 
   var swiftArrayDecl: NominalTypeDecl {
-    NominalTypeDecl(_bridged: _bridged.getSwiftArrayDecl())
+    _bridged.getSwiftArrayDecl().getAs(NominalTypeDecl.self)
   }
 
   func loadFunction(name: StaticString, loadCalleesRecursively: Bool) -> Function? {
@@ -327,15 +348,17 @@ struct FunctionPassContext : MutatingContext {
     return false
   }
 
-  func specializeVTable(for type: Type, in function: Function) -> VTable? {
-    guard let vtablePtr = _bridged.specializeVTableForType(type.bridged, function.bridged) else {
-      return nil
-    }
-    return VTable(bridged: BridgedVTable(vTable: vtablePtr))
-  }
-
   func specializeClassMethodInst(_ cm: ClassMethodInst) -> Bool {
     if _bridged.specializeClassMethodInst(cm.bridged) {
+      notifyInstructionsChanged()
+      notifyCallsChanged()
+      return true
+    }
+    return false
+  }
+
+  func specializeWitnessMethodInst(_ wm: WitnessMethodInst) -> Bool {
+    if _bridged.specializeWitnessMethodInst(wm.bridged) {
       notifyInstructionsChanged()
       notifyCallsChanged()
       return true

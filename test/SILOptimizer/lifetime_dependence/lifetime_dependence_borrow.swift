@@ -21,7 +21,8 @@ struct BV : ~Escapable {
 
   public var isEmpty: Bool { i == 0 }
 
-  init(_ p: UnsafeRawPointer, _ i: Int) -> dependsOn(p) Self {
+  @lifetime(borrow p)
+  init(_ p: UnsafeRawPointer, _ i: Int) {
     self.p = p
     self.i = i
   }
@@ -37,13 +38,15 @@ struct MBV : ~Escapable, ~Copyable {
   let p: UnsafeRawPointer
   let i: Int
   
-  init(_ p: UnsafeRawPointer, _ i: Int) -> dependsOn(p) Self {
+  @lifetime(borrow p)
+  init(_ p: UnsafeRawPointer, _ i: Int) {
     self.p = p
     self.i = i
   }
 
   // Requires a borrow.
-  borrowing func getBV() -> dependsOn(self) BV {
+  @lifetime(self)
+  borrowing func getBV() -> BV {
     BV(p, i)
   }
 }
@@ -58,22 +61,26 @@ struct NEBV : ~Escapable {
 }
 
 // Propagate a borrow.
-func bv_get_borrow(container: borrowing MBV) -> dependsOn(container) BV {
+@lifetime(container)
+func bv_get_borrow(container: borrowing MBV) -> BV {
   container.getBV()
 }
 
 // Copy a borrow.
-func bv_get_copy(container: borrowing MBV) -> dependsOn(container) BV {
+@lifetime(container)
+func bv_get_copy(container: borrowing MBV) -> BV {
   return container.getBV()
 }
 
 // Recognize nested accesses as part of the same dependence scope.
-func bv_get_mutate(container: inout MBV) -> dependsOn(container) BV {
+@lifetime(container)
+func bv_get_mutate(container: inout MBV) -> BV {
   container.getBV()
 }
 
 // Create and decompose a nonescapable aggregate.
-func ne_wrap_and_extract_member(cn: borrowing CN) -> dependsOn(scoped cn) BV {
+@lifetime(borrow cn)
+func ne_wrap_and_extract_member(cn: borrowing CN) -> BV {
   let bv = BV(cn)
   let ne = NEBV(bv)
   return ne.bv

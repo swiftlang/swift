@@ -12,9 +12,61 @@
 
 import ASTBridging
 import BasicBridging
+import SwiftDiagnostics
+import SwiftSyntax
 
 #if canImport(_CompilerRegexParser)
 @_spi(CompilerInterface) import _CompilerRegexParser
+
+extension ASTGenVisitor {
+  func generate(regexLiteralExpr node: RegexLiteralExprSyntax) -> BridgedExpr {
+    let str = node.trimmedDescription
+    let captureBuffer = BridgedRegexLiteralExpr
+      .allocateCaptureStructureSerializationBuffer(self.ctx, size: str.utf8.count)
+    let captureBufferOut = UnsafeMutableRawBufferPointer(
+      start: UnsafeMutableRawPointer(mutating: captureBuffer.baseAddress),
+      count: captureBuffer.count
+    )
+
+    let loc = self.generateSourceLoc(node);
+
+    do {
+      // FIXME: We need to plumb through the 'regexToEmit' result to the caller.
+      // For now, it is the same as the input.
+      var regexToEmit: String
+      let version: Int
+      (regexToEmit, version) = try swiftCompilerParseRegexLiteral(
+        str,
+        captureBufferOut: captureBufferOut
+      )
+      // Copy the regex string to the ASTContext.
+      let regexToEmitStr = regexToEmit.withBridgedString {
+        self.ctx.allocateCopy(string: $0)
+      }
+
+      return BridgedRegexLiteralExpr.createParsed(
+        self.ctx,
+        loc: loc,
+        regexText: regexToEmitStr,
+        version: version,
+        captureStructure: captureBuffer
+      ).asExpr
+    } catch let error as _CompilerRegexParser.CompilerParseError {
+      let offset = error.location != nil ? str.utf8.offset(of: error.location!) : 0
+      let position = node.positionAfterSkippingLeadingTrivia.advanced(by: offset)
+      self.diagnose(
+        Diagnostic(
+          node: node.regex,
+          position: position,
+          message: RegexParserError(error.message)
+        )
+      )
+      return BridgedErrorExpr.create(self.ctx, loc: BridgedSourceRange(start: loc, end: loc)).asExpr
+    } catch {
+      fatalError("Expected CompilerParseError")
+    }
+  }
+}
 
 /// Bridging between C++ lexer and swiftCompilerLexRegexLiteral.
 ///

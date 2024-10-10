@@ -67,7 +67,9 @@ import Swift
 ///
 /// - SeeAlso: ``withThrowingDiscardingTaskGroup(returning:body:)``
 @available(SwiftStdlib 5.9, *)
+#if !hasFeature(Embedded)
 @backDeployed(before: SwiftStdlib 6.0)
+#endif
 @inlinable
 public func withDiscardingTaskGroup<GroupResult>(
   returning returnType: GroupResult.Type = GroupResult.self,
@@ -184,10 +186,6 @@ public struct DiscardingTaskGroup {
     let _: Void? = try await _taskGroupWaitAll(group: _group, bodyError: nil)
   }
 
-// Clone the task-creation routines in Embedded Swift so that we don't
-// introduce an implicit use of `any Actor`.
-#if !$Embedded
-
   /// Adds a child task to the group.
   ///
   /// - Parameters:
@@ -333,133 +331,6 @@ public struct DiscardingTaskGroup {
 
     return true
   }
-
-// The Embedded clones of the task-creation routines.
-#else
-
-  /// Adds a child task to the group.
-  ///
-  /// - Parameters:
-  ///   - priority: The priority of the operation task.
-  ///     Omit this parameter or pass `.unspecified`
-  ///     to set the child task's priority to the priority of the group.
-  ///   - operation: The operation to execute as part of the task group.
-  @_alwaysEmitIntoClient
-  #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
-  #endif
-  public mutating func addTask(
-    priority: TaskPriority? = nil,
-    operation: sending @escaping () async -> Void
-  ) {
-#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: false,
-      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true
-    )
-#else
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true
-    )
-#endif
-
-    // Create the task in this group.
-    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
-  }
-
-  /// Adds a child task to the group, unless the group has been canceled.
-  ///
-  /// - Parameters:
-  ///   - priority: The priority of the operation task.
-  ///     Omit this parameter or pass `.unspecified`
-  ///     to set the child task's priority to the priority of the group.
-  ///   - operation: The operation to execute as part of the task group.
-  /// - Returns: `true` if the child task was added to the group;
-  ///   otherwise `false`.
-  @_alwaysEmitIntoClient
-  #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
-  #endif
-  public mutating func addTaskUnlessCancelled(
-    priority: TaskPriority? = nil,
-    operation: sending @escaping () async -> Void
-  ) -> Bool {
-    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
-
-    guard canAdd else {
-      // the group is cancelled and is not accepting any new work
-      return false
-    }
-#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: false,
-      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
-    )
-#else
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
-    )
-#endif
-
-    // Create the task in this group.
-    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
-
-    return true
-  }
-
-  @_alwaysEmitIntoClient
-  public mutating func addTask(
-    operation: sending @escaping () async -> Void
-  ) {
-    let flags = taskCreateFlags(
-      priority: nil, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true
-    )
-
-    // Create the task in this group.
-    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
-  }
-
-  /// Adds a child task to the group, unless the group has been canceled.
-  ///
-  /// - Parameters:
-  ///   - operation: The operation to execute as part of the task group.
-  /// - Returns: `true` if the child task was added to the group;
-  ///   otherwise `false`.
-#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTaskUnlessCancelled(operation:)")
-#endif
-  @_alwaysEmitIntoClient
-  public mutating func addTaskUnlessCancelled(
-    operation: sending @escaping () async -> Void
-  ) -> Bool {
-    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
-
-    guard canAdd else {
-      // the group is cancelled and is not accepting any new work
-      return false
-    }
-
-    let flags = taskCreateFlags(
-      priority: nil, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
-    )
-
-    // Create the task in this group.
-    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
-
-    return true
-  }
-
-#endif // $Embedded
 
   /// A Boolean value that indicates whether the group has any remaining tasks.
   ///
@@ -609,7 +480,9 @@ extension DiscardingTaskGroup: Sendable { }
 /// }
 /// ```
 @available(SwiftStdlib 5.9, *)
+#if !hasFeature(Embedded)
 @backDeployed(before: SwiftStdlib 6.0)
+#endif
 @inlinable
 public func withThrowingDiscardingTaskGroup<GroupResult>(
     returning returnType: GroupResult.Type = GroupResult.self,

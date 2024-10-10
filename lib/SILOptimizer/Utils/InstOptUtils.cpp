@@ -823,7 +823,7 @@ namespace {
         if (!elt->hasAssociatedValues() || elt->isIndirect())
           continue;
 
-        if (visit(elt->getArgumentInterfaceType()->getCanonicalType()))
+        if (visit(elt->getPayloadInterfaceType()->getCanonicalType()))
           return true;
       }
       return false;
@@ -1005,6 +1005,13 @@ void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
   // If we have qualified ownership, we should just emit a destroy value.
   if (builder.getFunction().hasOwnership()) {
     callbacks.createdNewInst(builder.createDestroyValue(loc, operand));
+    return;
+  }
+
+  if (operand->getType().isUnownedStorageType()) {
+    auto release = builder.createUnownedRelease(loc, operand,
+                                                builder.getDefaultAtomicity());
+    callbacks.createdNewInst(release);
     return;
   }
 

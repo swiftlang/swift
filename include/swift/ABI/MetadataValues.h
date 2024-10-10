@@ -168,17 +168,18 @@ public:
   // flags for the struct. (The "non-inline" and "has-extra-inhabitants" bits
   // still require additional fixup.)
   enum : uint32_t {
-    AlignmentMask =       0x000000FF,
-    // unused             0x0000FF00,
-    IsNonPOD =            0x00010000,
-    IsNonInline =         0x00020000,
-    // unused             0x00040000,
-    HasSpareBits =        0x00080000,
-    IsNonBitwiseTakable = 0x00100000,
-    HasEnumWitnesses =    0x00200000,
-    Incomplete =          0x00400000,
-    IsNonCopyable =       0x00800000,
-    // unused             0xFF000000,
+    AlignmentMask =          0x000000FF,
+    // unused                0x0000FF00,
+    IsNonPOD =               0x00010000,
+    IsNonInline =            0x00020000,
+    // unused                0x00040000,
+    HasSpareBits =           0x00080000,
+    IsNonBitwiseTakable =    0x00100000,
+    HasEnumWitnesses =       0x00200000,
+    Incomplete =             0x00400000,
+    IsNonCopyable =          0x00800000,
+    IsNonBitwiseBorrowable = 0x01000000,
+    // unused                0xFE000000,
   };
 
   static constexpr const uint32_t MaxNumExtraInhabitants = 0x7FFFFFFF;
@@ -241,6 +242,27 @@ public:
   constexpr TargetValueWitnessFlags withBitwiseTakable(bool isBT) const {
     return TargetValueWitnessFlags((Data & ~IsNonBitwiseTakable) |
                                    (isBT ? 0 : IsNonBitwiseTakable));
+  }
+  
+  /// True if values of this type can be passed by value when borrowed.
+  /// If this bit is true, then borrows of the value are independent of the
+  /// value's address, so a value can be passed in registers or memcpy'd
+  /// while borrowed. This is in contrast to Rust, for instance, where a
+  /// `&T` type is always represented as a pointer, and borrowing a
+  /// value always moves the borrowed value into memory.
+  bool isBitwiseBorrowable() const {
+    /// This bit was introduced with Swift 6; prior to the introduction of
+    /// `Atomic` and `Mutex`, a type was always bitwise-borrowable if it
+    /// was bitwise-takable. Compilers and runtimes before Swift 6 would
+    /// never set the `IsNonBitwiseBorrowable` bit in the value witness
+    /// table, but any type that sets `IsNonBitwiseTakable` is definitely
+    /// not bitwise borrowable.
+    return isBitwiseTakable()
+      && !(Data & IsNonBitwiseBorrowable);
+  }
+  constexpr TargetValueWitnessFlags withBitwiseBorrowable(bool isBB) const {
+    return TargetValueWitnessFlags((Data & ~IsNonBitwiseBorrowable) |
+                                   (isBB ? 0 : IsNonBitwiseBorrowable));
   }
   
   /// True if values of this type can be copied.
@@ -350,6 +372,8 @@ public:
     Setter,
     ModifyCoroutine,
     ReadCoroutine,
+    Read2Coroutine,
+    Modify2Coroutine,
   };
 
 private:
@@ -572,6 +596,8 @@ public:
     ModifyCoroutine,
     AssociatedTypeAccessFunction,
     AssociatedConformanceAccessFunction,
+    Read2Coroutine,
+    Modify2Coroutine,
   };
 
 private:
@@ -1532,6 +1558,12 @@ enum class RawLayoutFlags : uintptr_t {
 
   /// Whether or not this raw layout type was declared 'movesAsLike'.
   MovesAsLike = 0x2,
+  
+  /// Whether this raw layout type is bitwise borrowable.
+  ///
+  /// No raw layout types are yet, but should we change our mind about that in the future,
+  /// this flag is here.
+  BitwiseBorrowable = 0x4,
 };
 static inline RawLayoutFlags operator|(RawLayoutFlags lhs,
                                        RawLayoutFlags rhs) {
@@ -1546,6 +1578,9 @@ static inline bool isRawLayoutArray(RawLayoutFlags flags) {
 }
 static inline bool shouldRawLayoutMoveAsLike(RawLayoutFlags flags) {
   return uintptr_t(flags) & uintptr_t(RawLayoutFlags::MovesAsLike);
+}
+static inline bool isRawLayoutBitwiseBorrowable(RawLayoutFlags flags) {
+  return uintptr_t(flags) & uintptr_t(RawLayoutFlags::BitwiseBorrowable);
 }
 
 namespace SpecialPointerAuthDiscriminators {
@@ -2549,7 +2584,8 @@ enum class JobKind : size_t {
   DefaultActorInline = First_Reserved,
   DefaultActorSeparate,
   DefaultActorOverride,
-  NullaryContinuation
+  NullaryContinuation,
+  IsolatedDeinit,
 };
 
 /// The priority of a job.  Higher priorities are larger values.

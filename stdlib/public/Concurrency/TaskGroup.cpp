@@ -26,13 +26,16 @@
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskGroup.h"
+#include "swift/ABI/TaskOptions.h"
 #include "swift/Basic/RelativePointer.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Threading/Mutex.h"
 #include <atomic>
+#include <deque>
 #include <new>
 
 #if SWIFT_STDLIB_HAS_ASL
@@ -113,7 +116,7 @@ class DiscardingTaskGroup;
 
 template<typename T>
 class NaiveTaskGroupQueue {
-  std::queue <T> queue;
+  std::queue<T, std::deque<T, swift::cxx_allocator<T>>> queue;
 
 public:
   NaiveTaskGroupQueue() = default;
@@ -345,6 +348,11 @@ protected:
 public:
   virtual ~TaskGroupBase() {}
 
+  /// Because we have a virtual destructor, we need to declare a delete operator
+  /// here, otherwise the compiler will generate a deleting destructor that
+  /// calls ::operator delete.
+  SWIFT_CXX_DELETE_OPERATOR(TaskGroupBase)
+
   TaskStatusRecordKind getKind() const {
     return Flags.getKind();
   }
@@ -418,7 +426,9 @@ public:
   TaskGroupStatus statusLoadRelaxed() const;
   TaskGroupStatus statusLoadAcquire() const;
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
   std::string statusString() const;
+#endif
 
   bool isEmpty() const;
 
@@ -468,6 +478,7 @@ public:
 
 };
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 [[maybe_unused]]
 static std::string to_string(TaskGroupBase::PollStatus status) {
   switch (status) {
@@ -477,6 +488,7 @@ static std::string to_string(TaskGroupBase::PollStatus status) {
     case TaskGroupBase::PollStatus::Error: return "Error";
   }
 }
+#endif
 
 /// The status of a task group.
 ///
@@ -578,7 +590,13 @@ struct TaskGroupStatus {
     swift_asprintf(
         &message,
         "error: %sTaskGroup: detected pending task count overflow, in task group %p! Status: %s",
-        group->isDiscardingResults() ? "Discarding" : "", group, status.to_string(group).c_str());
+        group->isDiscardingResults() ? "Discarding" : "", group,
+#if !SWIFT_CONCURRENCY_EMBEDDED
+        status.to_string(group).c_str()
+#else
+        "<status unavailable in embedded>"
+#endif
+                   );
 
 #if !SWIFT_CONCURRENCY_EMBEDDED
     if (_swift_shouldReportFatalErrorsToDebugger()) {
@@ -611,6 +629,7 @@ struct TaskGroupStatus {
     abort();
   }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
   /// Pretty prints the status, as follows:
   /// If accumulating results:
   ///     TaskGroupStatus{ C:{cancelled} W:{waiting task} R:{ready tasks} P:{pending tasks} {binary repr} }
@@ -633,6 +652,7 @@ struct TaskGroupStatus {
     str.append(" }");
     return str;
   }
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
 
   /// Initially there are no waiting and no pending tasks.
   static const TaskGroupStatus initial() {
@@ -690,9 +710,11 @@ TaskGroupStatus TaskGroupBase::statusLoadAcquire() const {
   return TaskGroupStatus{status.load(std::memory_order_acquire)};
 }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 std::string TaskGroupBase::statusString() const {
   return statusLoadRelaxed().to_string(this);
 }
+#endif
 
 bool TaskGroupBase::isEmpty() const {
   auto oldStatus = TaskGroupStatus{status.load(std::memory_order_relaxed)};
@@ -748,6 +770,7 @@ TaskGroupStatus TaskGroupBase::statusAddPendingTaskAssumeRelaxed(bool unconditio
   }
 
   SWIFT_TASK_GROUP_DEBUG_LOG(this, "addPending, after: %s", s.to_string(this).c_str());
+
   return s;
 }
 
@@ -954,6 +977,8 @@ TaskGroup* TaskGroupTaskStatusRecord::getGroup() {
 // =============================================================================
 // ==== initialize -------------------------------------------------------------
 
+static void _swift_taskGroup_initialize(ResultTypeInfo resultType, size_t rawGroupFlags, TaskGroup *group);
+
 // Initializes into the preallocated _group an actual TaskGroupBase.
 SWIFT_CC(swift)
 static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) {
@@ -964,11 +989,51 @@ static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) 
 SWIFT_CC(swift)
 static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
                                                     TaskGroup *group, const Metadata *T) {
-
 #if !SWIFT_CONCURRENCY_EMBEDDED
   ResultTypeInfo resultType;
   resultType.metadata = T;
+  _swift_taskGroup_initialize(resultType, rawGroupFlags, group);
+#else
+  swift_unreachable("swift_taskGroup_initializeWithFlags in embedded");
+#endif
+}
 
+// Initializes into the preallocated _group an actual instance.
+SWIFT_CC(swift)
+static void swift_taskGroup_initializeWithOptionsImpl(size_t rawGroupFlags, TaskGroup *group, const Metadata *T, TaskOptionRecord *options) {
+  ResultTypeInfo resultType;
+#if !SWIFT_CONCURRENCY_EMBEDDED
+  resultType.metadata = T;
+#endif
+
+  for (auto option = options; option; option = option->getParent()) {
+    switch (option->getKind()) {
+    case TaskOptionRecordKind::ResultTypeInfo: {
+#if SWIFT_CONCURRENCY_EMBEDDED
+      auto *typeInfo = cast<ResultTypeInfoTaskOptionRecord>(option);
+      resultType = {
+          .size = typeInfo->size,
+          .alignMask = typeInfo->alignMask,
+          .initializeWithCopy = typeInfo->initializeWithCopy,
+          .storeEnumTagSinglePayload = typeInfo->storeEnumTagSinglePayload,
+          .destroy = typeInfo->destroy,
+      };
+#else
+      swift_unreachable("ResultTypeInfo in non embedded");
+#endif
+      break;
+    }
+    default:
+      break; // ignore unknown records
+    }
+  }
+
+  assert(!resultType.isNull());
+
+  _swift_taskGroup_initialize(resultType, rawGroupFlags, group);
+}
+
+static void _swift_taskGroup_initialize(ResultTypeInfo resultType, size_t rawGroupFlags, TaskGroup *group) {
   TaskGroupFlags groupFlags(rawGroupFlags);
   SWIFT_TASK_GROUP_DEBUG_LOG_0(group, "create group, from task:%p; flags: isDiscardingResults=%d",
                                swift_task_getCurrent(),
@@ -993,9 +1058,6 @@ static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
     }
     return true;
   });
-#else
-  swift_unreachable("task groups not supported yet in embedded Swift");
-#endif
 }
 
 // =============================================================================
@@ -2084,4 +2146,4 @@ static bool swift_taskGroup_addPendingImpl(TaskGroup *_group, bool unconditional
 }
 
 #define OVERRIDE_TASK_GROUP COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"
