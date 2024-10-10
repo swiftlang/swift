@@ -207,6 +207,64 @@ public struct Range<Bound: Comparable> {
   public var isEmpty: Bool {
     return lowerBound == upperBound
   }
+  
+  /// Returns a Boolean value indicating whether the given range is contained
+  /// within this range.
+  ///
+  /// The given range is contained within this range if its bounds are equal to
+  /// or within the bounds of this range.
+  ///
+  ///     let range = 0..<10
+  ///     range.contains(2..<5)        // true
+  ///     range.contains(2..<10)       // true
+  ///     range.contains(2..<12)       // false
+  ///
+  /// Additionally, passing any empty range as `other` results in the value
+  /// `true`, even if the empty range's bounds are outside the bounds of this
+  /// range.
+  ///
+  ///     let emptyRange = 3..<3
+  ///     emptyRange.contains(3..<3)   // true
+  ///     emptyRange.contains(5..<5)   // true
+  ///
+  /// - Parameter other: A range to check for containment within this range.
+  /// - Returns: `true` if `other` is empty or wholly contained within this
+  ///   range; otherwise, `false`.
+  ///
+  /// - Complexity: O(1)
+  @backDeployed(before: SwiftStdlib 6.1)
+  @inlinable
+  public func contains(_ other: Range<Bound>) -> Bool {
+    other.isEmpty ||
+      (lowerBound <= other.lowerBound && upperBound >= other.upperBound)
+  }
+  
+  /// Returns a Boolean value indicating whether the given closed range is
+  /// contained within this range.
+  ///
+  /// The given closed range is contained within this range if its bounds are
+  /// contained within this range. If this range is empty, it cannot contain a
+  /// closed range, since closed ranges by definition contain their boundaries.
+  ///
+  ///     let range = 0..<10
+  ///     range.contains(2...5)        // true
+  ///     range.contains(2...10)       // false
+  ///     range.contains(2...12)       // false
+  ///
+  ///     let emptyRange = 3..<3
+  ///     emptyRange.contains(3...3)   // false
+  ///
+  /// - Parameter other: A closed range to check for containment within this
+  ///   range.
+  /// - Returns: `true` if `other` is wholly contained within this range;
+  ///   otherwise, `false`.
+  ///
+  /// - Complexity: O(1)
+  @backDeployed(before: SwiftStdlib 6.1)
+  @inlinable
+  public func contains(_ other: ClosedRange<Bound>) -> Bool {
+    lowerBound <= other.lowerBound && upperBound > other.upperBound
+  }
 }
 
 extension Range: Sequence
