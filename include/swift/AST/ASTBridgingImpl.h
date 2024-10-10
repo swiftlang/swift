@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_ASTBRIDGINGIMPL_H
 #define SWIFT_AST_ASTBRIDGINGIMPL_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
@@ -29,6 +30,17 @@ void * _Nonnull BridgedASTContext_raw(BridgedASTContext bridged) {
 
 BridgedASTContext BridgedASTContext_fromRaw(void * _Nonnull ptr) {
   return *static_cast<swift::ASTContext *>(ptr);
+}
+
+BRIDGED_INLINE
+void *_Nullable BridgedASTContext_allocate(BridgedASTContext bridged,
+                                           size_t size, size_t alignment) {
+  return bridged.unbridged().Allocate(size, alignment);
+}
+
+BridgedStringRef BridgedASTContext_allocateCopyString(BridgedASTContext bridged,
+                                                      BridgedStringRef cStr) {
+  return bridged.unbridged().AllocateCopy(cStr.unbridged());
 }
 
 //===----------------------------------------------------------------------===//
