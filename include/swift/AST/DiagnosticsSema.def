@@ -7030,8 +7030,8 @@ WARNING(immutable_value_never_used_but_assigned, NoUsage,
         (Identifier))
 WARNING(variable_never_mutated, none,
         "variable %0 was never mutated; "
-        "consider %select{removing 'var' to make it|changing to 'let'}1 constant",
-        (Identifier, bool))
+        "consider %select{removing 'var' to make it|changing to '%2'}1 constant",
+        (Identifier, bool, StringRef))
 WARNING(variable_never_read, none,
         "variable %0 was written to, but never read",
         (Identifier))
