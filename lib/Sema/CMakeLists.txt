@@ -46,6 +46,7 @@ add_swift_host_library(swiftSema STATIC
   ResilienceDiagnostics.cpp
   SourceLoader.cpp
   SyntacticElementTarget.cpp
+  TypeOfReference.cpp
   TypeCheckAccess.cpp
   TypeCheckAttr.cpp
   TypeCheckAvailability.cpp
