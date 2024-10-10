@@ -1,3 +1,6 @@
+import _Concurrency
+
+@available(SwiftStdlib 9999, *)
 extension Observable where Self: AnyObject {
    /// An asynchronous sequence of values of a given property determined by
    /// access tracking and mutation.

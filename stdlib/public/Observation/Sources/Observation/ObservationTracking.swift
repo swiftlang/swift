@@ -354,6 +354,7 @@ public func withObservationTracking<T>(
   return result
 }
 
+@available(SwiftStdlib 9999, *)
 fileprivate func _withObservationTracking<T>(
    options: ObservationTracking.Options,
    _ apply: () -> T,
@@ -432,6 +433,7 @@ fileprivate func _withObservationTracking<T>(
   return (result, tracking)
 }
 
+@available(SwiftStdlib 9999, *)
 public func withObservationTracking<T>(
    options: ObservationTracking.Options = [],
    _ apply: () -> T,
@@ -442,6 +444,7 @@ public func withObservationTracking<T>(
 }
 
 // Overload to make the willSet optional when the didSet is specified
+@available(SwiftStdlib 9999, *)
 public func withObservationTracking<T>(
   options: ObservationTracking.Options = [],
   _ apply: () -> T,
@@ -451,6 +454,7 @@ public func withObservationTracking<T>(
 }
 
 // Overload to make the didSet optional when the willSet is specified
+@available(SwiftStdlib 9999, *)
 public func withObservationTracking<T>(
   options: ObservationTracking.Options = [],
   _ apply: () -> T,
