@@ -2169,6 +2169,27 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
           resolveSearchPath(dylibPath), resolveSearchPath(serverPath)});
       break;
     }
+    case OPT_load_resolved_plugin: {
+      StringRef libraryPath;
+      StringRef executablePath;
+      StringRef modulesStr;
+      std::tie(libraryPath, executablePath) =
+          StringRef(A->getValue()).split('#');
+      std::tie(executablePath, modulesStr) = executablePath.split('#');
+      if (modulesStr.empty() ||
+          (libraryPath.empty() && executablePath.empty())) {
+        Diags.diagnose(SourceLoc(), diag::error_load_resolved_plugin,
+                       A->getValue());
+      }
+      std::vector<std::string> moduleNames;
+      for (auto name : llvm::split(modulesStr, ',')) {
+        moduleNames.emplace_back(name);
+      }
+      Opts.PluginSearchOpts.emplace_back(
+          PluginSearchOption::ResolvedPluginConfig{
+              libraryPath.str(), executablePath.str(), std::move(moduleNames)});
+      break;
+    }
     default:
       llvm_unreachable("unhandled plugin search option");
     }

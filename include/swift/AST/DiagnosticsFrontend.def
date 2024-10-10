@@ -127,6 +127,9 @@ ERROR(error_no_source_location_scope_map,none,
 ERROR(error_load_plugin_executable,none,
       "invalid value '%0' in '-load-plugin-executable'; "
       "make sure to use format '<plugin path>#<module names>'", (StringRef))
+ERROR(error_load_resolved_plugin,none,
+      "invalid value '%0' in '-load-resolved-plugin'; "
+      "make sure to use format '<library path>#<plugin path>#<module names>' where library and plugin path can't both be empty", (StringRef))
 
 NOTE(note_valid_swift_versions, none,
      "valid arguments to '-swift-version' are %0", (StringRef))

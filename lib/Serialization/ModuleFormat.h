@@ -693,6 +693,7 @@ enum class PluginSearchOptionKind : uint8_t {
   ExternalPluginPath,
   LoadPluginLibrary,
   LoadPluginExecutable,
+  ResolvedPluginConfig,
 };
 using PluginSearchOptionKindField = BCFixed<3>;
 
