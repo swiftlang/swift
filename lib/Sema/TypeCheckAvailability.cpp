@@ -1384,8 +1384,7 @@ TypeChecker::getOrBuildTypeRefinementContext(SourceFile *SF) {
   return TRC;
 }
 
-std::vector<TypeRefinementContext *>
-ExpandChildTypeRefinementContextsRequest::evaluate(
+evaluator::SideEffect ExpandChildTypeRefinementContextsRequest::evaluate(
     Evaluator &evaluator, TypeRefinementContext *parentTRC) const {
   assert(parentTRC->getNeedsExpansion());
   if (auto decl = parentTRC->getDeclOrNull()) {
@@ -1394,7 +1393,7 @@ ExpandChildTypeRefinementContextsRequest::evaluate(
     builder.prepareDeclForLazyExpansion(decl);
     builder.build(decl);
   }
-  return parentTRC->Children;
+  return evaluator::SideEffect();
 }
 
 AvailabilityRange TypeChecker::overApproximateAvailabilityAtLocation(
