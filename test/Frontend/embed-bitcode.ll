@@ -36,14 +36,14 @@ target datalayout = "e-m:o-i64:64-f80:128-n8:16:32:64-S128"
 ; MARKER-CMD-NEXT: 00
 
 ; CHECK-COMPILER-NOT: argument unused
-; CHECK-COMPILER: clang
+; CHECK-COMPILER: bin{{/|\\}}clang
 ; CHECK-COMPILER-SAME: -fembed-bitcode
 ; CHECK-COMPILER-SAME: -target
 ; CHECK-COMPILER-NOT: argument unused
 ; CHECK-COMPILER: Fast Register Allocator
 
 ; CHECK-COMPILER-OPT-NOT: argument unused
-; CHECK-COMPILER-OPT: clang
+; CHECK-COMPILER-OPT: bin{{/|\\}}clang
 ; CHECK-COMPILER-OPT-SAME: -fembed-bitcode
 ; CHECK-COMPILER-OPT-SAME: -target
 ; CHECK-COMPILER-OPT-SAME: -Os
