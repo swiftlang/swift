@@ -38,14 +38,14 @@ using namespace inference;
 
 #define DEBUG_TYPE "ConstraintSystem"
 
-
-
 Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
                                               Type parentTy,
                                               ConstraintLocatorBuilder locator,
-                                              bool isTypeResolution) {
+                                              bool isTypeResolution,
+                                              bool shouldRecordOpenedTypes) {
   if (parentTy) {
-    parentTy = replaceInferableTypesWithTypeVars(parentTy, locator);
+    parentTy = replaceInferableTypesWithTypeVars(parentTy, locator,
+                                                 /*shouldRecordOpenedTypes=*/false);
   }
 
   // Open up the generic type.
@@ -53,8 +53,8 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
   openGeneric(decl->getDeclContext(), decl->getGenericSignature(), locator,
               replacements);
 
-  // FIXME: Get rid of fixmeAllowDuplicates.
-  recordOpenedTypes(locator, replacements, /*fixmeAllowDuplicates=*/true);
+  if (shouldRecordOpenedTypes)
+    recordOpenedTypes(locator, replacements);
 
   if (parentTy) {
     const auto parentTyInContext =
@@ -186,14 +186,22 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
 }
 
 Type ConstraintSystem::replaceInferableTypesWithTypeVars(
-    Type type, ConstraintLocatorBuilder locator) {
-  if (!type->hasUnboundGenericType() && !type->hasPlaceholder())
+    Type type, ConstraintLocatorBuilder locator,
+    bool shouldRecordOpenedTypes) {
+  if (!type->hasPlaceholder() && !type->hasUnboundGenericType())
     return type;
 
-  type = type.transformRec([&](Type type) -> std::optional<Type> {
+  if (auto unbound = type->getAs<UnboundGenericType>()) {
+    return openUnboundGenericType(unbound->getDecl(), unbound->getParent(),
+                                  locator, /*isTypeResolution=*/false,
+                                  shouldRecordOpenedTypes);
+  }
+
+  return type.transformRec([&](Type type) -> std::optional<Type> {
       if (auto unbound = type->getAs<UnboundGenericType>()) {
         return openUnboundGenericType(unbound->getDecl(), unbound->getParent(),
-                                      locator, /*isTypeResolution=*/false);
+                                      locator, /*isTypeResolution=*/false,
+                                      /*shouldRecordOpenedTypes=*/false);
       } else if (auto *placeholderTy = type->getAs<PlaceholderType>()) {
         if (auto *typeRepr =
                 placeholderTy->getOriginator().dyn_cast<TypeRepr *>()) {
@@ -220,11 +228,6 @@ Type ConstraintSystem::replaceInferableTypesWithTypeVars(
 
       return std::nullopt;
     });
-
-  if (!type)
-    return ErrorType::get(getASTContext());
-
-  return type;
 }
 
 namespace {
@@ -573,8 +576,7 @@ void ConstraintSystem::recordOpenedType(
 
 void ConstraintSystem::recordOpenedTypes(
        ConstraintLocatorBuilder locator,
-       const OpenedTypeMap &replacements,
-       bool fixmeAllowDuplicates) {
+       const OpenedTypeMap &replacements) {
   if (replacements.empty())
     return;
 
@@ -596,10 +598,8 @@ void ConstraintSystem::recordOpenedTypes(
     = Allocator.Allocate<OpenedType>(replacements.size());
   std::copy(replacements.begin(), replacements.end(), openedTypes);
 
-  // FIXME: Get rid of fixmeAllowDuplicates.
-  if (!fixmeAllowDuplicates || OpenedTypes.count(locatorPtr) == 0)
-    recordOpenedType(
-      locatorPtr, llvm::ArrayRef(openedTypes, replacements.size()));
+  recordOpenedType(
+    locatorPtr, llvm::ArrayRef(openedTypes, replacements.size()));
 }
 
 /// Determine how many levels of argument labels should be removed from the

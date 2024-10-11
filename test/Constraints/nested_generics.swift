@@ -21,3 +21,11 @@ GInt().bar(0)
 
 GInt.static_foo(GChar())
 GInt.static_bar(0)
+
+// Opening an UnboundGenericType
+
+struct Outer<T> {
+  struct Inner<U> {}
+}
+
+var x: Outer<Int>.Inner<String> = Outer.Inner()

@@ -2437,7 +2437,8 @@ bool TypeVarBindingProducer::computeNext() {
       auto dstLocator = TypeVar->getImpl().getLocator();
       auto newType =
           CS.openUnboundGenericType(BGT->getDecl(), BGT->getParent(),
-                                    dstLocator, /*isTypeResolution=*/false)
+                                    dstLocator, /*isTypeResolution=*/false,
+                                    /*recordOpenedTypes=*/false)
               ->reconstituteSugar(/*recursive=*/false);
       addNewBinding(binding.withType(newType));
     }

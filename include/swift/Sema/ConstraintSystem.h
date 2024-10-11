@@ -4222,7 +4222,8 @@ public:
   /// \returns The opened type.
   Type openUnboundGenericType(GenericTypeDecl *decl, Type parentTy,
                               ConstraintLocatorBuilder locator,
-                              bool isTypeResolution);
+                              bool isTypeResolution,
+                              bool shouldRecordOpenedTypes=true);
 
   /// Replace placeholder types with fresh type variables, and unbound generic
   /// types with bound generic types whose generic args are fresh type
@@ -4232,7 +4233,8 @@ public:
   ///
   /// \returns The converted type.
   Type replaceInferableTypesWithTypeVars(Type type,
-                                         ConstraintLocatorBuilder locator);
+                                         ConstraintLocatorBuilder locator,
+                                         bool shouldRecordOpenedTypes=true);
 
   /// "Open" the given type by replacing any occurrences of generic
   /// parameter types and dependent member types with fresh type variables.
@@ -4334,8 +4336,7 @@ public:
   /// Record the set of opened types for the given locator.
   void recordOpenedTypes(
          ConstraintLocatorBuilder locator,
-         const OpenedTypeMap &replacements,
-         bool fixmeAllowDuplicates=false);
+         const OpenedTypeMap &replacements);
 
   /// Check whether the given type conforms to the given protocol and if
   /// so return a valid conformance reference.
@@ -5674,16 +5675,20 @@ public:
 class OpenUnboundGenericType {
   ConstraintSystem &cs;
   const ConstraintLocatorBuilder &locator;
+  bool shouldRecordOpenedTypes;
 
 public:
   explicit OpenUnboundGenericType(ConstraintSystem &cs,
                                   const ConstraintLocatorBuilder &locator)
-      : cs(cs), locator(locator) {}
+      : cs(cs), locator(locator), shouldRecordOpenedTypes(true) {}
 
   Type operator()(UnboundGenericType *unboundTy) const {
-    return cs.openUnboundGenericType(unboundTy->getDecl(),
-                                     unboundTy->getParent(), locator,
-                                     /*isTypeResolution=*/true);
+    auto result = cs.openUnboundGenericType(unboundTy->getDecl(),
+                                            unboundTy->getParent(), locator,
+                                            /*isTypeResolution=*/true,
+                                            shouldRecordOpenedTypes);
+    const_cast<OpenUnboundGenericType *>(this)->shouldRecordOpenedTypes = false;
+    return result;
   }
 };
 
