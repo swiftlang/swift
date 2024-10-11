@@ -58,9 +58,9 @@ Notice that we're using functions and variables defined in C in the Pico SDK. Fo
 
 Finally, we need to define the application's build rules in CMake that will be using CMake logic from the Pico SDK. The following content of `CMakeLists.txt` shows how to *manually call swiftc, the Swift compiler* instead of using the recently added CMake native support for Swift, so that we can see the full Swift compilation command.
 
-We'll also make sure to dynamically set the Swift compiler's target architecture based on the pico board used. This is to support both RP2040 and RP2350 in ARM mode, and RP2350's RISC-V mode.
+We'll make sure to dynamically set the Swift compiler's target architecture based on the pico board used. This is to support both RP2040 and RP2350 in ARM mode, and RP2350's RISC-V mode.
 
-Finally, we'll make sure to recursively gather all Pico SDK-related compiler definitions in order to append them to our `swiftc` command.
+We'll also ensure to recursively gather all Pico SDK-related compiler definitions in order to append them to our `swiftc` command.
 
 ```cmake
 cmake_minimum_required(VERSION 3.13)
