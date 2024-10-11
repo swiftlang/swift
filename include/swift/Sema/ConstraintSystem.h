@@ -4377,39 +4377,6 @@ public:
                                   bool wantInterfaceType = false,
                                   bool adjustForPreconcurrency = true);
 
-  /// Return the type-of-reference of the given value.
-  ///
-  /// \param baseType if non-null, return the type of a member reference to
-  ///   this value when the base has the given type
-  ///
-  /// \param UseDC The context of the access.  Some variables have different
-  ///   types depending on where they are used.
-  ///
-  /// \param locator The locator anchored at this value reference, when
-  /// it is a member reference.
-  ///
-  /// \param wantInterfaceType Whether we want the interface type, if available.
-  ///
-  /// \param getType Optional callback to extract a type for given declaration.
-  static Type
-  getUnopenedTypeOfReference(
-      VarDecl *value, Type baseType, DeclContext *UseDC,
-      llvm::function_ref<Type(VarDecl *)> getType,
-      ConstraintLocator *locator,
-      bool wantInterfaceType = false,
-      bool adjustForPreconcurrency = true,
-      llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType =
-        [](const AbstractClosureExpr *) {
-          return Type();
-        },
-      llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency =
-        [](const ClosureExpr *closure) {
-          return closure->isIsolatedByPreconcurrency();
-        },
-      llvm::function_ref<bool(Expr *)> isAssignTarget = [](Expr *) {
-        return false;
-      });
-
   /// Given the opened type and a pile of information about a member reference,
   /// determine the reference type of the member reference.
   Type getMemberReferenceTypeFromOpenedType(

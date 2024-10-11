@@ -505,43 +505,31 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
     ConstraintLocator *locator, bool wantInterfaceType,
     bool adjustForPreconcurrency) {
-  return ConstraintSystem::getUnopenedTypeOfReference(
-      value, baseType, UseDC,
-      [&](VarDecl *var) -> Type {
-        if (Type type = getTypeIfAvailable(var))
-          return type;
+  Type requestedType;
+  if (Type type = getTypeIfAvailable(value)) {
+    requestedType = type;
+  } else if (!value->hasInterfaceType()) {
+    requestedType = ErrorType::get(getASTContext());
+  } else {
+    requestedType = (wantInterfaceType
+                     ? value->getInterfaceType()
+                     : value->getTypeInContext());
+  }
 
-        if (!var->hasInterfaceType()) {
-          return ErrorType::get(getASTContext());
-        }
-
-        return wantInterfaceType ? var->getInterfaceType() : var->getTypeInContext();
-      },
-      locator, wantInterfaceType, adjustForPreconcurrency,
-      GetClosureType{*this},
-      ClosureIsolatedByPreconcurrency{*this},
-      IsInLeftHandSideOfAssignment{*this});
-}
-
-Type ConstraintSystem::getUnopenedTypeOfReference(
-    VarDecl *value, Type baseType, DeclContext *UseDC,
-    llvm::function_ref<Type(VarDecl *)> getType,
-    ConstraintLocator *locator,
-    bool wantInterfaceType, bool adjustForPreconcurrency,
-    llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType,
-    llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency,
-    llvm::function_ref<bool(Expr *)> isAssignTarget) {
-  Type requestedType =
-      getType(value)->getWithoutSpecifierType()->getReferenceStorageReferent();
+  requestedType =
+      requestedType->getWithoutSpecifierType()->getReferenceStorageReferent();
 
   // Strip pack expansion types off of pack references.
   if (auto *expansion = requestedType->getAs<PackExpansionType>())
     requestedType = expansion->getPatternType();
 
   // Adjust the type for concurrency if requested.
-  if (adjustForPreconcurrency)
+  if (adjustForPreconcurrency) {
     requestedType = adjustVarTypeForConcurrency(
-        requestedType, value, UseDC, getClosureType, isolatedByPreconcurrency);
+        requestedType, value, UseDC,
+        GetClosureType{*this},
+        ClosureIsolatedByPreconcurrency{*this});
+  }
 
   // If we're dealing with contextual types, and we referenced this type from
   // a different context, map the type.
@@ -555,7 +543,8 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
 
   // Qualify storage declarations with an lvalue when appropriate.
   // Otherwise, they yield rvalues (and the access must be a load).
-  if (doesStorageProduceLValue(value, baseType, UseDC, isAssignTarget,
+  if (doesStorageProduceLValue(value, baseType, UseDC,
+                               IsInLeftHandSideOfAssignment{*this},
                                locator) &&
       !requestedType->hasError()) {
     return LValueType::get(requestedType);
