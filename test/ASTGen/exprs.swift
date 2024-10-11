@@ -67,6 +67,8 @@ struct TestStruct {
     _ = self.method(arg:_:).self
     _ = Ty.`Self` ==  Ty.`self`
   }
+
+  var optSelf: Self? { self }
 }
 
 func testSequence(arg1: Int, arg2: () -> Int, arg3: Any) {
@@ -177,4 +179,13 @@ struct Generic<T: Comparable> {}
 func testSpecializeExpr() {
   _ = Generic<Int>.self
   _ = Generic<Int>()
+}
+
+func testOptionalChain(value: TestStruct) {
+  let _: TestStruct? = value.optSelf?.optSelf!
+  let _: TestStruct = value.optSelf!
+  let _: TestStruct = value.optSelf.self!
+
+  var value: Int? = 1
+  value? += 1
 }

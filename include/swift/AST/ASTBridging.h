@@ -1254,6 +1254,12 @@ BridgedAwaitExpr BridgedAwaitExpr_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cAwaitLoc,
                                                BridgedExpr cSubExpr);
 
+SWIFT_NAME("BridgedBindOptionalExpr.createParsed(_:subExpr:questionLoc:)")
+BridgedBindOptionalExpr
+BridgedBindOptionalExpr_createParsed(BridgedASTContext cContext,
+                                     BridgedExpr cSubExpr,
+                                     BridgedSourceLoc cQuestionLoc);
+
 SWIFT_NAME("BridgedBooleanLiteralExpr.createParsed(_:value:loc:)")
 BridgedBooleanLiteralExpr
 BridgedBooleanLiteralExpr_createParsed(BridgedASTContext cContext, bool value,
@@ -1343,6 +1349,12 @@ BridgedForceTryExpr
 BridgedForceTryExpr_createParsed(BridgedASTContext cContext,
                                  BridgedSourceLoc cTryLoc, BridgedExpr cSubExpr,
                                  BridgedSourceLoc cExclaimLoc);
+
+SWIFT_NAME("BridgedForceValueExpr.createParsed(_:subExpr:exclaimLoc:)")
+BridgedForceValueExpr
+BridgedForceValueExpr_createParsed(BridgedASTContext cContext,
+                                   BridgedExpr cSubExpr,
+                                   BridgedSourceLoc cExclaimLoc);
 
 SWIFT_NAME(
     "BridgedForcedCheckedCastExpr.createParsed(_:asLoc:exclaimLoc:type:)")
