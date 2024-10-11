@@ -4852,8 +4852,7 @@ public:
 /// Expand the children of the given type refinement context.
 class ExpandChildTypeRefinementContextsRequest
     : public SimpleRequest<ExpandChildTypeRefinementContextsRequest,
-                           std::vector<TypeRefinementContext *>(
-                               TypeRefinementContext *),
+                           evaluator::SideEffect(TypeRefinementContext *),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4861,14 +4860,14 @@ public:
 private:
   friend SimpleRequest;
 
-  std::vector<TypeRefinementContext *>
-  evaluate(Evaluator &evaluator, TypeRefinementContext *parentTRC) const;
+  evaluator::SideEffect evaluate(Evaluator &evaluator,
+                                 TypeRefinementContext *parentTRC) const;
 
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  std::optional<std::vector<TypeRefinementContext *>> getCachedResult() const;
-  void cacheResult(std::vector<TypeRefinementContext *> children) const;
+  std::optional<evaluator::SideEffect> getCachedResult() const;
+  void cacheResult(evaluator::SideEffect) const;
 };
 
 class SerializeAttrGenericSignatureRequest

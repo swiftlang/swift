@@ -208,20 +208,21 @@ TypeRefinementContext::findMostRefinedSubContext(SourceLoc Loc,
   if (SrcRange.isValid() && !Ctx.SourceMgr.containsTokenLoc(SrcRange, Loc))
     return nullptr;
 
-  auto expandedChildren = evaluateOrDefault(
-      Ctx.evaluator, ExpandChildTypeRefinementContextsRequest{this}, {});
+  (void)evaluateOrDefault(Ctx.evaluator,
+                          ExpandChildTypeRefinementContextsRequest{this}, {});
+  assert(!getNeedsExpansion());
 
   // Do a binary search to find the first child with a source range that
   // ends after the given location.
   auto iter = std::lower_bound(
-      expandedChildren.begin(), expandedChildren.end(), Loc,
+      Children.begin(), Children.end(), Loc,
       [&Ctx](TypeRefinementContext *context, SourceLoc loc) {
         return Ctx.SourceMgr.isBefore(context->getSourceRange().End, loc);
       });
 
   // Check whether the matching child or any of its descendants contain
   // the given location.
-  if (iter != expandedChildren.end()) {
+  if (iter != Children.end()) {
     if (auto found = (*iter)->findMostRefinedSubContext(Loc, Ctx))
       return found;
   }
@@ -478,18 +479,17 @@ void swift::simple_display(
   out << "TRC @" << trc;
 }
 
-std::optional<std::vector<TypeRefinementContext *>>
+std::optional<evaluator::SideEffect>
 ExpandChildTypeRefinementContextsRequest::getCachedResult() const {
   auto *TRC = std::get<0>(getStorage());
   if (TRC->getNeedsExpansion())
     return std::nullopt;
-  return TRC->Children;
+  return evaluator::SideEffect();
 }
 
 void ExpandChildTypeRefinementContextsRequest::cacheResult(
-    std::vector<TypeRefinementContext *> children) const {
+    evaluator::SideEffect sideEffect) const {
   auto *TRC = std::get<0>(getStorage());
-  TRC->Children = children;
   TRC->setNeedsExpansion(false);
 }
 
