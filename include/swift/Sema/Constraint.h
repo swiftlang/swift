@@ -344,7 +344,7 @@ enum RememberChoice_t : bool {
 
 /// A constraint between two type variables.
 class Constraint final : public llvm::ilist_node<Constraint>,
-    private llvm::TrailingObjects<Constraint, TypeVariableType *> {
+    private llvm::TrailingObjects<Constraint, TypeVariableType *, ConstraintFix *> {
   friend TrailingObjects;
 
   /// The kind of constraint.
@@ -353,8 +353,8 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// The kind of restriction placed on this constraint.
   ConversionRestrictionKind Restriction : 8;
 
-  /// The fix to be applied to the constraint before visiting it.
-  ConstraintFix *TheFix = nullptr;
+  /// Whether we have a fix.
+  unsigned HasFix : 1;
 
   /// Whether the \c Restriction field is valid.
   unsigned HasRestriction : 1;
@@ -514,6 +514,14 @@ class Constraint final : public llvm::ilist_node<Constraint>,
     return { getTrailingObjects<TypeVariableType *>(), NumTypeVariables };
   }
 
+  size_t numTrailingObjects(OverloadToken<TypeVariableType *>) const {
+    return NumTypeVariables;
+  }
+
+  size_t numTrailingObjects(OverloadToken<ConstraintFix *>) const {
+    return HasFix ? 1 : 0;
+  }
+
 public:
   /// Create a new constraint.
   static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind,
@@ -616,7 +624,11 @@ public:
   }
 
   /// Retrieve the fix associated with this constraint.
-  ConstraintFix *getFix() const { return TheFix; }
+  ConstraintFix *getFix() const {
+    if (HasFix)
+      return *getTrailingObjects<ConstraintFix *>();
+    return nullptr;
+}
 
   /// Whether this constraint is active, i.e., in the worklist.
   bool isActive() const { return IsActive; }
