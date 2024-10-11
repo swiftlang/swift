@@ -2280,8 +2280,8 @@ public:
   }
   void visitRegexLiteralExpr(RegexLiteralExpr *E, StringRef label) {
     printCommon(E, "regex_literal_expr", label);
-    
-    printFieldQuoted(E->getRegexText(), "text", LiteralValueColor);
+
+    printFieldQuoted(E->getParsedRegexText(), "text", LiteralValueColor);
     printInitializerField(E->getInitializer(), "initializer");
 
     printFoot();
