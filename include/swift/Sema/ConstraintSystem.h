@@ -2072,14 +2072,6 @@ struct ClosureIsolatedByPreconcurrency {
   bool operator()(const ClosureExpr *expr) const;
 };
 
-/// Determine whether the given expression is part of the left-hand side
-/// of an assignment expression.
-struct IsInLeftHandSideOfAssignment {
-  ConstraintSystem &cs;
-
-  bool operator()(Expr *expr) const;
-};
-
 /// Describes the type produced when referencing a declaration.
 struct DeclReferenceType {
   /// The "opened" type, which is the type of the declaration where any
