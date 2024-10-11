@@ -519,6 +519,18 @@ extension ClosedRange where Bound: Strideable, Bound.Stride: SignedInteger {
 }
 
 extension ClosedRange {
+  /// Returns a Boolean value indicating whether this range and the given closed
+  /// range contain an element in common.
+  ///
+  /// This example shows two overlapping ranges:
+  ///
+  ///     let x: Range = 0...20
+  ///     print(x.overlaps(10...1000))
+  ///     // Prints "true"
+  ///
+  /// - Parameter other: A range to check for elements in common.
+  /// - Returns: `true` if this range and `other` have at least one element in
+  ///   common; otherwise, `false`.
   @inlinable
   public func overlaps(_ other: ClosedRange<Bound>) -> Bool {
     // Disjoint iff the other range is completely before or after our range.
@@ -529,6 +541,25 @@ extension ClosedRange {
     return !isDisjoint
   }
 
+  /// Returns a Boolean value indicating whether this range and the given range
+  /// contain an element in common.
+  ///
+  /// This example shows two overlapping ranges:
+  ///
+  ///     let x: Range = 0...20
+  ///     print(x.overlaps(10..<1000))
+  ///     // Prints "true"
+  ///
+  /// Because a closed range includes its upper bound, the ranges in the
+  /// following example overlap:
+  ///
+  ///     let y = 20..<30
+  ///     print(x.overlaps(y))
+  ///     // Prints "true"
+  ///
+  /// - Parameter other: A range to check for elements in common.
+  /// - Returns: `true` if this range and `other` have at least one element in
+  ///   common; otherwise, `false`.
   @inlinable
   public func overlaps(_ other: Range<Bound>) -> Bool {
     return other.overlaps(self)

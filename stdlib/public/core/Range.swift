@@ -986,7 +986,7 @@ extension Range {
   /// This example shows two overlapping ranges:
   ///
   ///     let x: Range = 0..<20
-  ///     print(x.overlaps(10...1000))
+  ///     print(x.overlaps(10..<1000))
   ///     // Prints "true"
   ///
   /// Because a half-open range does not include its upper bound, the ranges
@@ -1011,6 +1011,25 @@ extension Range {
     return !isDisjoint
   }
 
+  /// Returns a Boolean value indicating whether this range and the given closed
+  /// range contain an element in common.
+  ///
+  /// This example shows two overlapping ranges:
+  ///
+  ///     let x: Range = 0..<20
+  ///     print(x.overlaps(10...1000))
+  ///     // Prints "true"
+  ///
+  /// Because a half-open range does not include its upper bound, the ranges
+  /// in the following example do not overlap:
+  ///
+  ///     let y = 20...30
+  ///     print(x.overlaps(y))
+  ///     // Prints "false"
+  ///
+  /// - Parameter other: A closed range to check for elements in common.
+  /// - Returns: `true` if this range and `other` have at least one element in
+  ///   common; otherwise, `false`.
   @inlinable
   public func overlaps(_ other: ClosedRange<Bound>) -> Bool {
     // Disjoint iff the other range is completely before or after our range.
