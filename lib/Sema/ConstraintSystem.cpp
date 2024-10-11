@@ -1189,8 +1189,8 @@ void ConstraintSystem::addOverloadSet(Type boundType,
   }
 
   SmallVector<Constraint *, 4> candidates;
-  generateConstraints(candidates, boundType, choices, useDC, locator,
-                      favoredIndex);
+  generateOverloadConstraints(candidates, boundType, choices, useDC, locator,
+                              favoredIndex);
   // For an overload set (disjunction) from newly generated candidates.
   addOverloadSet(candidates, locator);
 }
@@ -3815,7 +3815,7 @@ Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
   return conformance.getTypeWitnessByName(type, cs.getASTContext().Id_RawValue);
 }
 
-void ConstraintSystem::generateConstraints(
+void ConstraintSystem::generateOverloadConstraints(
     SmallVectorImpl<Constraint *> &constraints, Type type,
     ArrayRef<OverloadChoice> choices, DeclContext *useDC,
     ConstraintLocator *locator, std::optional<unsigned> favoredIndex,
