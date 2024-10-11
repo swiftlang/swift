@@ -2130,8 +2130,8 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
                         RegexLiteralExpr *expr) {
   auto &ctx = SGF.getASTContext();
   // %0 = string_literal <regex text>
-  auto strLiteralArgs = emitStringLiteralArgs(SGF, expr, expr->getRegexText(), C,
-                                          StringLiteralExpr::Encoding::UTF8);
+  auto strLiteralArgs = emitStringLiteralArgs(
+      SGF, expr, expr->getRegexToEmit(), C, StringLiteralExpr::Encoding::UTF8);
   // %1 = function_ref String.init(
   //   _builtinStringLiteral:utf8CodeUnitCount:isASCII:)
   // %2 = apply %1(%0, ..., ...) -> $String

@@ -330,25 +330,12 @@ BridgedPrefixUnaryExpr_createParsed(BridgedASTContext cContext,
                                  operand.unbridged());
 }
 
-BridgedData BridgedRegexLiteralExpr_allocateCaptureStructureSerializationBuffer(
-    BridgedASTContext cContext, SwiftInt size) {
-  auto buf = cContext.unbridged().AllocateUninitialized<uint8_t>(
-      RegexLiteralExpr::getCaptureStructureSerializationAllocationSize(
-          unsigned(size)));
-  return BridgedData(reinterpret_cast<const char *>(buf.data()), buf.size());
-}
-
-BridgedRegexLiteralExpr BridgedRegexLiteralExpr_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc cLoc,
-    BridgedStringRef cRegexText, SwiftInt version,
-    BridgedData cCaptureStructure) {
-  ArrayRef<uint8_t> captures(
-      reinterpret_cast<const uint8_t *>(cCaptureStructure.BaseAddress),
-      cCaptureStructure.Length);
-
+BridgedRegexLiteralExpr
+BridgedRegexLiteralExpr_createParsed(BridgedASTContext cContext,
+                                     BridgedSourceLoc cLoc,
+                                     BridgedStringRef cRegexText) {
   return RegexLiteralExpr::createParsed(cContext.unbridged(), cLoc.unbridged(),
-                                        cRegexText.unbridged(),
-                                        unsigned(version), captures);
+                                        cRegexText.unbridged());
 }
 
 BridgedSequenceExpr BridgedSequenceExpr_createParsed(BridgedASTContext cContext,

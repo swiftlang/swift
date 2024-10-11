@@ -589,6 +589,10 @@ SWIFT_REQUEST(TypeChecker, SuppressesConformanceRequest,
               bool(NominalTypeDecl *decl, KnownProtocolKind kp),
               SeparatelyCached, NoLocationInfo)
 
+SWIFT_REQUEST(TypeChecker, RegexLiteralPatternInfoRequest,
+              RegexLiteralPatternInfo(const RegexLiteralExpr *),
+              Cached, NoLocationInfo)
+
 SWIFT_REQUEST(TypeChecker, CaptureInfoRequest,
               CaptureInfo(AbstractFunctionDecl *),
               SeparatelyCached, NoLocationInfo)
