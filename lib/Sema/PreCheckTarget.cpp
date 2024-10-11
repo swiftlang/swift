@@ -331,6 +331,10 @@ static Expr *getMemberChainSubExpr(Expr *expr) {
     return FVE->getSubExpr();
   } else if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
     return SE->getBase();
+  } else if (auto *DSE = dyn_cast<DotSelfExpr>(expr)) {
+    return DSE->getSubExpr();
+  } else if (auto *PUE = dyn_cast<PostfixUnaryExpr>(expr)) {
+    return PUE->getOperand();
   } else if (auto *CCE = dyn_cast<CodeCompletionExpr>(expr)) {
     return CCE->getBase();
   } else {
@@ -343,6 +347,16 @@ UnresolvedMemberExpr *TypeChecker::getUnresolvedMemberChainBase(Expr *expr) {
     return getUnresolvedMemberChainBase(subExpr);
   else
     return dyn_cast<UnresolvedMemberExpr>(expr);
+}
+
+static bool isBindOptionalMemberChain(Expr *expr) {
+  if (isa<BindOptionalExpr>(expr)) {
+    return true;
+  } else if (auto *base = getMemberChainSubExpr(expr)) {
+    return isBindOptionalMemberChain(base);
+  } else {
+    return false;
+  }
 }
 
 /// Whether this expression sits at the end of a chain of member accesses.
@@ -1416,22 +1430,6 @@ public:
       return Action::Continue(expr);
     }
 
-    // Double check if there are any BindOptionalExpr remaining in the
-    // tree (see comment below for more details), if there are no BOE
-    // expressions remaining remove OptionalEvaluationExpr from the tree.
-    if (auto OEE = dyn_cast<OptionalEvaluationExpr>(expr)) {
-      bool hasBindOptional = false;
-      OEE->forEachChildExpr([&](Expr *expr) -> Expr * {
-        if (isa<BindOptionalExpr>(expr))
-          hasBindOptional = true;
-        // If at least a single BOE was found, no reason
-        // to walk any further in the tree.
-        return hasBindOptional ? nullptr : expr;
-      });
-
-      return Action::Continue(hasBindOptional ? OEE : OEE->getSubExpr());
-    }
-
     // Check if there are any BindOptionalExpr in the tree which
     // wrap DiscardAssignmentExpr, such situation corresponds to syntax
     // like - `_? = <value>`, since it doesn't really make
@@ -1471,16 +1469,45 @@ public:
       return Action::Continue(result);
     }
 
-    // If we find an unresolved member chain, wrap it in an
-    // UnresolvedMemberChainResultExpr (unless this has already been done).
-    auto *parent = Parent.getAsExpr();
-    if (isMemberChainTail(expr, parent)) {
-      if (auto *UME = TypeChecker::getUnresolvedMemberChainBase(expr)) {
-        if (!parent || !isa<UnresolvedMemberChainResultExpr>(parent)) {
-          auto *chain = new (ctx) UnresolvedMemberChainResultExpr(expr, UME);
-          return Action::Continue(chain);
+    // If this is an assignment operator, and the left operand is an optional
+    // evaluation, pull the operator into the chain.
+    if (auto *binExpr = dyn_cast<BinaryExpr>(expr)) {
+      if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(binExpr->getLHS())) {
+        if (auto *precedence =
+                TypeChecker::lookupPrecedenceGroupForInfixOperator(
+                    DC, binExpr, /*diagnose=*/false)) {
+          if (precedence->isAssignment()) {
+            binExpr->getArgs()->setExpr(0, OEE->getSubExpr());
+            OEE->setSubExpr(binExpr);
+            return Action::Continue(OEE);
+          }
         }
       }
+    } else if (auto *assignExpr = dyn_cast<AssignExpr>(expr)) {
+      if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(assignExpr->getDest())) {
+        assignExpr->setDest(OEE->getSubExpr());
+        OEE->setSubExpr(assignExpr);
+        return Action::Continue(OEE);
+      }
+    }
+
+    auto *parent = Parent.getAsExpr();
+    if (isMemberChainTail(expr, parent)) {
+      Expr *wrapped = expr;
+      // If we find an unresolved member chain, wrap it in an
+      // UnresolvedMemberChainResultExpr (unless this has already been done).
+      if (auto *UME = TypeChecker::getUnresolvedMemberChainBase(expr)) {
+        if (!parent || !isa<UnresolvedMemberChainResultExpr>(parent)) {
+          wrapped = new (ctx) UnresolvedMemberChainResultExpr(expr, UME);
+        }
+      }
+      // Wrap optional chain in an OptionalEvaluationExpr.
+      if (isBindOptionalMemberChain(expr)) {
+        if (!parent || !isa<OptionalEvaluationExpr>(parent)) {
+          wrapped = new (ctx) OptionalEvaluationExpr(wrapped);
+        }
+      }
+      expr = wrapped;
     }
     return Action::Continue(expr);
   }
