@@ -600,9 +600,8 @@ bool CompareDeclSpecializationRequest::evaluate(
   // Get the type of a reference to the second declaration.
 
   SmallVector<OpenedType, 4> unused, replacements;
-  auto openedType2 = openType(cs, innerDC1, outerDC2, type2, unused, locator);
-  auto openedType1 =
-      openType(cs, innerDC2, outerDC1, type1, replacements, locator);
+  auto openedType2 = openType(cs, innerDC2, outerDC2, type2, unused, locator);
+  auto openedType1 = openType(cs, innerDC1, outerDC1, type1, replacements, locator);
 
   for (auto replacement : replacements) {
     if (auto mapped = innerDC1->mapTypeIntoContext(replacement.first)) {
