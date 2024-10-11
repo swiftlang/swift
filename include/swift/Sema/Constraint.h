@@ -558,10 +558,10 @@ public:
       ValueDecl *requirement, DeclContext *useDC,
       FunctionRefKind functionRefKind, ConstraintLocator *locator);
 
-  /// Create an overload-binding constraint.
+  /// Create an overload-binding constraint, possibly with a fix.
   static Constraint *createBindOverload(ConstraintSystem &cs, Type type, 
                                         OverloadChoice choice, 
-                                        DeclContext *useDC,
+                                        DeclContext *useDC, ConstraintFix *fix,
                                         ConstraintLocator *locator);
 
   /// Create a restricted relational constraint.
@@ -574,13 +574,6 @@ public:
   static Constraint *createFixed(ConstraintSystem &cs, ConstraintKind kind,
                                  ConstraintFix *fix, Type first, Type second,
                                  ConstraintLocator *locator);
-
-  /// Create a bind overload choice with a fix.
-  /// Note: This constraint is going to be disabled by default.
-  static Constraint *createFixedChoice(ConstraintSystem &cs, Type type,
-                                       OverloadChoice choice,
-                                       DeclContext *useDC, ConstraintFix *fix,
-                                       ConstraintLocator *locator);
 
   /// Create a new disjunction constraint.
   static Constraint *createDisjunction(ConstraintSystem &cs,
