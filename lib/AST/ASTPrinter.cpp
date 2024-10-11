@@ -3157,12 +3157,10 @@ std::optional<std::string> PrintAST::mangledNameToPrint(const Decl *D) {
     return mangler.mangleConstructorEntity(init, /*isAllocating=*/true);
   }
 
-  // For global and static variables, mangle the entity directly.
+  // For variables, mangle the entity directly.
   if (auto var = dyn_cast<VarDecl>(D)) {
-    if (!var->isInstanceMember()) {
-      ASTMangler mangler;
-      return mangler.mangleEntity(var);
-    }
+    ASTMangler mangler;
+    return mangler.mangleEntity(var);
   }
 
   // For subscripts, mangle the entity directly.
