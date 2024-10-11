@@ -805,7 +805,8 @@ Constraint *Constraint::createMemberOrOuterDisjunction(
   memberConstraint->setFavored();
   for (auto choice : outerAlternatives) {
     constraints.push_back(
-        Constraint::createBindOverload(cs, first, choice, useDC, locator));
+        Constraint::createBindOverload(cs, first, choice, useDC, /*fix=*/nullptr,
+                                       locator));
   }
   return Constraint::createDisjunction(cs, constraints, locator, ForgetChoice);
 }
@@ -856,8 +857,22 @@ Constraint *Constraint::createValueWitness(
 Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type, 
                                            OverloadChoice choice, 
                                            DeclContext *useDC,
+                                           ConstraintFix *fix,
                                            ConstraintLocator *locator) {
-  return createFixedChoice(cs, type, choice, useDC, /*fix=*/nullptr, locator);
+  // Collect type variables.
+  SmallPtrSet<TypeVariableType *, 4> typeVars;
+  if (type->hasTypeVariable())
+    type->getTypeVariables(typeVars);
+  if (auto baseType = choice.getBaseType()) {
+    baseType->getTypeVariables(typeVars);
+  }
+
+  // Create the constraint.
+  auto size =
+    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, OverloadChoice>(
+      typeVars.size(), fix ? 1 : 0, /*hasOverloadChoice=*/1);
+  void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
+  return new (mem) Constraint(type, choice, useDC, fix, locator, typeVars);
 }
 
 Constraint *Constraint::createRestricted(ConstraintSystem &cs, 
@@ -897,27 +912,6 @@ Constraint *Constraint::createFixed(ConstraintSystem &cs, ConstraintKind kind,
       typeVars.size(), fix ? 1 : 0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, fix, first, second, locator, typeVars);
-}
-
-Constraint *Constraint::createFixedChoice(ConstraintSystem &cs, Type type,
-                                          OverloadChoice choice,
-                                          DeclContext *useDC,
-                                          ConstraintFix *fix,
-                                          ConstraintLocator *locator) {
-  // Collect type variables.
-  SmallPtrSet<TypeVariableType *, 4> typeVars;
-  if (type->hasTypeVariable())
-    type->getTypeVariables(typeVars);
-  if (auto baseType = choice.getBaseType()) {
-    baseType->getTypeVariables(typeVars);
-  }
-
-  // Create the constraint.
-  auto size =
-    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, OverloadChoice>(
-      typeVars.size(), fix ? 1 : 0, /*hasOverloadChoice=*/1);
-  void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(type, choice, useDC, fix, locator, typeVars);
 }
 
 Constraint *Constraint::createDisjunction(ConstraintSystem &cs,

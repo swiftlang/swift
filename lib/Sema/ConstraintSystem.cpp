@@ -3831,10 +3831,8 @@ void ConstraintSystem::generateConstraints(
     if (requiresFix && !fix)
       return;
 
-    auto *choice = fix ? Constraint::createFixedChoice(*this, type, overload,
-                                                       useDC, fix, locator)
-                       : Constraint::createBindOverload(*this, type, overload,
-                                                        useDC, locator);
+    auto *choice = Constraint::createBindOverload(*this, type, overload,
+                                                  useDC, fix, locator);
 
     if (isFavored)
       choice->setFavored();
