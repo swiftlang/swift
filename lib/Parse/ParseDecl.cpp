@@ -356,9 +356,11 @@ void Parser::parseSourceFileViaASTGen(
                                        appendToVector);
 
     // Spin the C++ parser to the end; we won't be using it.
+    DiagnosticTransaction noDiag(Context.Diags);
     while (!Tok.is(tok::eof)) {
       consumeToken();
     }
+    noDiag.abort();
   }
 #endif
 }
