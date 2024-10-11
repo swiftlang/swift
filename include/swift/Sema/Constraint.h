@@ -904,9 +904,6 @@ public:
   /// Retrieve the locator for this constraint.
   ConstraintLocator *getLocator() const { return Locator; }
 
-  /// Clone the given constraint.
-  Constraint *clone(ConstraintSystem &cs) const;
-
   /// Print constraint placed on type and constraint properties.
   ///
   /// \c skipLocator skips printing of locators.
