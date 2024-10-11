@@ -344,7 +344,10 @@ enum RememberChoice_t : bool {
 
 /// A constraint between two type variables.
 class Constraint final : public llvm::ilist_node<Constraint>,
-    private llvm::TrailingObjects<Constraint, TypeVariableType *, ConstraintFix *> {
+    private llvm::TrailingObjects<Constraint,
+                                  TypeVariableType *,
+                                  ConstraintFix *,
+                                  OverloadChoice> {
   friend TrailingObjects;
 
   /// The kind of constraint.
@@ -438,9 +441,6 @@ class Constraint final : public llvm::ilist_node<Constraint>,
       /// The first type
       Type First;
 
-      /// The overload choice
-      OverloadChoice Choice;
-
       /// The DC in which the use appears.
       DeclContext *UseDC;
     } Overload;
@@ -520,6 +520,10 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
   size_t numTrailingObjects(OverloadToken<ConstraintFix *>) const {
     return HasFix ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<OverloadChoice>) const {
+    return Kind == ConstraintKind::BindOverload ? 1 : 0;
   }
 
 public:
@@ -861,7 +865,7 @@ public:
   /// Retrieve the overload choice for an overload-binding constraint.
   OverloadChoice getOverloadChoice() const {
     assert(Kind == ConstraintKind::BindOverload);
-    return Overload.Choice;
+    return *getTrailingObjects<OverloadChoice>();
   }
 
   /// Retrieve the DC in which the overload was used.
