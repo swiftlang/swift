@@ -52,6 +52,7 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
   ArrayRef<OpenedType> replacements;
   if (auto sig = decl->getGenericSignature()) {
     replacements = openGenericParameters(sig, locator);
+    introduceGenericParameters(replacements);
     if (shouldRecordOpenedTypes)
       recordOpenedTypes(locator, replacements);
 
@@ -357,6 +358,7 @@ Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
   auto sig = opaqueDecl->getOpaqueInterfaceGenericSignature();
 
   auto replacements = openGenericParameters(sig, opaqueLocator);
+  introduceGenericParameters(replacements);
   recordOpenedTypes(opaqueLocatorKey, replacements);
 
   openGenericRequirements(DC, sig, opaqueLocator, replacements);
@@ -852,7 +854,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     ArrayRef<OpenedType> replacements;
     if (auto sig = func->getGenericSignature()) {
-      replacements = openGenericParameters(sig, replacements, locator);
+      replacements = openGenericParameters(sig, locator);
+      introduceGenericParameters(replacements);
       recordOpenedTypes(locator, replacements);
 
       openGenericRequirements(func->getDeclContext(), sig, locator, replacements);
@@ -890,6 +893,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     ArrayRef<OpenedType> replacements;
     if (auto sig = funcDecl->getGenericSignature()) {
       replacements = openGenericParameters(sig, locator);
+      introduceGenericParameters(replacements);
       recordOpenedTypes(locator, replacements);
 
       openGenericRequirements(funcDecl->getDeclContext(), sig, locator, replacements);
@@ -956,6 +960,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     ArrayRef<OpenedType> replacements;
     if (auto sig = macro->getGenericSignature()) {
       replacements = openGenericParameters(sig, locator);
+      introduceGenericParameters(replacements);
       recordOpenedTypes(locator, replacements);
 
       openGenericRequirements(macro->getDeclContext(), sig, locator, replacements);
@@ -1076,9 +1081,8 @@ ArrayRef<OpenedType>
 ConstraintSystem::openGenericParameters(GenericSignature sig,
                                         ConstraintLocatorBuilder locator) {
   ASSERT(sig);
-  ASSERT(replacements.empty());
 
-  SmallVector<OpenedType, 4> replacements,
+  SmallVector<OpenedType, 4> replacements;
 
   // Create the type variables for the generic parameters.
   for (auto gp : sig.getGenericParams()) {
@@ -1086,7 +1090,13 @@ ConstraintSystem::openGenericParameters(GenericSignature sig,
     replacements.emplace_back(gp, typeVar);
   }
 
-  return getASTContext().AllocateCopy(replacements, AllocationArena::ConstraintSolver);
+  return getASTContext().AllocateCopy(replacements,
+                                      AllocationArena::ConstraintSolver);
+}
+
+void ConstraintSystem::introduceGenericParameters(ArrayRef<OpenedType> replacements) {
+  for (auto pair : replacements)
+    addTypeVariable(pair.second);
 }
 
 TypeVariableType *ConstraintSystem::openGenericParameter(GenericTypeParamType *parameter,
@@ -1102,7 +1112,7 @@ TypeVariableType *ConstraintSystem::openGenericParameter(GenericTypeParamType *p
   if (shouldAttemptFixes())
     options |= TVO_CanBindToHole;
 
-  return createTypeVariable(paramLocator, options);
+  return createTypeVariableImpl(paramLocator, options);
 }
 
 void ConstraintSystem::openGenericRequirements(DeclContext *outerDC,
@@ -1485,6 +1495,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   auto genericSig = innerDC->getGenericSignatureOfContext();
   if (genericSig) {
     replacements = openGenericParameters(genericSig, locator);
+    introduceGenericParameters(replacements);
     recordOpenedTypes(locator, replacements);
   }
 

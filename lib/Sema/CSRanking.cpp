@@ -428,6 +428,7 @@ static bool isProtocolExtensionAsSpecializedAs(DeclContext *dc1,
   ArrayRef<OpenedType> replacements;
   if (sig2) {
     replacements = cs.openGenericParameters(sig2, ConstraintLocatorBuilder(nullptr));
+    cs.introduceGenericParameters(replacements);
     cs.openGenericRequirements(dc2, sig2, ConstraintLocatorBuilder(nullptr), replacements);
   }
 
@@ -588,6 +589,7 @@ bool CompareDeclSpecializationRequest::evaluate(
                       ConstraintLocator *locator) -> Type {
     if (auto sig = innerDC->getGenericSignatureOfContext()) {
       replacements = cs.openGenericParameters(sig, locator);
+      cs.introduceGenericParameters(replacements);
       cs.openGenericRequirements(outerDC, sig, locator, replacements);
 
       if (auto *funcType = type->getAs<AnyFunctionType>()) {

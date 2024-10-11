@@ -584,6 +584,10 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
         return typeVar;
 
       auto *typeVar = cs.openGenericParameter(GP, locator);
+
+      // openGenericParameter() does not add it for us.
+      cs.addTypeVariable(typeVar);
+
       genericParameters.emplace_back(GP, typeVar);
 
       return typeVar;

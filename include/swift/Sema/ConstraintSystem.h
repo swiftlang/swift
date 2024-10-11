@@ -2897,6 +2897,10 @@ public:
   ArrayRef<Type> getAlternativeLiteralTypes(KnownProtocolKind kind,
                                             SmallVectorImpl<Type> &scratch);
 
+  /// Create a new type variable without adding it to the constraint system.
+  TypeVariableType *createTypeVariableImpl(ConstraintLocator *locator,
+                                           unsigned options);
+
   /// Create a new type variable.
   TypeVariableType *createTypeVariable(ConstraintLocator *locator,
                                        unsigned options);
@@ -4277,10 +4281,15 @@ public:
                                  ConstraintLocatorBuilder locator,
                                  ArrayRef<OpenedType> replacements);
 
-  /// Open the generic parameter list creating type variables for each of the
-  /// type parameters.
+  /// Open the generic parameter list, creating type variables for each of the
+  /// type parameters, but does not add the type variables to the constraint
+  /// system. That is done by introduceGenericParameters().
   ArrayRef<OpenedType> openGenericParameters(GenericSignature signature,
                                              ConstraintLocatorBuilder locator);
+
+  /// Introduce the type variables from a list of opened generic parameters into
+  /// the constraint system.
+  void introduceGenericParameters(ArrayRef<OpenedType> replacements);
 
   /// Open a generic parameter into a type variable and record
   /// it in \c replacements.
