@@ -469,7 +469,18 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
         Uses.emplace_back(User, PMOUseKind::DependenceBase);
         continue;
       }
+      SILValue value = md->getValue();
+      assert(value == UI->get() && "missing mark_dependence use");
+      // A mark_dependence creates a new dependent value in the same memory
+      // location. Analogous to a load + init.
+      Uses.emplace_back(User, PMOUseKind::Load);
+      Uses.emplace_back(User, PMOUseKind::Initialization);
+      if (!collectUses(md))
+        return false;
+
+      continue;
     }
+
     // Otherwise, the use is something complicated, it escapes.
     Uses.emplace_back(User, PMOUseKind::Escape);
   }
