@@ -28,7 +28,7 @@ struct WasmKitEngine: WasmEngine {
     let module = try parseWasm(filePath: path)
     var moduleImports = Imports()
     imports.link(to: &moduleImports, store: store)
-    let instance = try module.instantiate(store: store)
+    let instance = try module.instantiate(store: store, imports: moduleImports)
     var functions = [String: Function]()
     for (name, export) in instance.exports {
       guard case let .function(function) = export else { continue }
