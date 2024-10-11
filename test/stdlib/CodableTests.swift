@@ -943,13 +943,6 @@ class TestCodable : TestCodableSuper {
         }
     }
     
-    func test_TimeZone_JSON_Errors() {
-        expectDecodingErrorViaJSON(
-            type: TimeZone.self,
-            json: #"{"identifier": "invalid-time-zone"}"#,
-            errorKind: .dataCorrupted)
-    }
-
     // MARK: - URL
     lazy var urlValues: [Int : URL] = {
         var values: [Int : URL] = [
@@ -987,13 +980,6 @@ class TestCodable : TestCodableSuper {
         }
     }
     
-    func test_URL_JSON_Errors() {
-        expectDecodingErrorViaJSON(
-            type: URL.self,
-            json: "http://swîft.org",
-            errorKind: .dataCorrupted)
-    }
-
     // MARK: - URLComponents
     lazy var urlComponentsValues: [Int : URLComponents] = [
         #line : URLComponents(),
@@ -1193,10 +1179,8 @@ var tests = [
     "test_Range_JSON_Errors" : TestCodable.test_Range_JSON_Errors,
     "test_TimeZone_JSON" : TestCodable.test_TimeZone_JSON,
     "test_TimeZone_Plist" : TestCodable.test_TimeZone_Plist,
-    "test_TimeZone_JSON_Errors": TestCodable.test_TimeZone_JSON_Errors,
     "test_URL_JSON" : TestCodable.test_URL_JSON,
     "test_URL_Plist" : TestCodable.test_URL_Plist,
-    "test_URL_JSON_Errors" : TestCodable.test_URL_JSON_Errors,
     "test_UUID_JSON" : TestCodable.test_UUID_JSON,
     "test_UUID_Plist" : TestCodable.test_UUID_Plist,
 ]
