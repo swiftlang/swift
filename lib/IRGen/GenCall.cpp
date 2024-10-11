@@ -79,6 +79,13 @@ static Size getCoroutineContextSize(IRGenModule &IGM,
   switch (fnType->getCoroutineKind()) {
   case SILCoroutineKind::None:
     llvm_unreachable("expand a coroutine");
+  case SILCoroutineKind::YieldOnce2:
+    if (IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
+      LLVM_FALLTHROUGH;
+    } else {
+      llvm::report_fatal_error(
+          "callee allocated coroutines do not have fixed-size buffers");
+    }
   case SILCoroutineKind::YieldOnce:
     return getYieldOnceCoroutineBufferSize(IGM);
   case SILCoroutineKind::YieldMany:
@@ -675,7 +682,8 @@ void SignatureExpansion::expandCoroutineResult(bool forContinuation) {
       llvm_unreachable("should have been filtered out before here");
 
     // Yield-once coroutines may optionaly return a value from the continuation.
-    case SILCoroutineKind::YieldOnce: {
+    case SILCoroutineKind::YieldOnce:
+    case SILCoroutineKind::YieldOnce2: {
       // Ensure that no parameters were added before to correctly record their ABI
       // details.
       assert(ParamIRTypes.empty());
@@ -1808,6 +1816,12 @@ void SignatureExpansion::expandParameters(
   switch (FnType->getCoroutineKind()) {
   case SILCoroutineKind::None:
     break;
+  case SILCoroutineKind::YieldOnce2:
+    if (IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
+      LLVM_FALLTHROUGH;
+    } else {
+      break;
+    }
 
   case SILCoroutineKind::YieldOnce:
   case SILCoroutineKind::YieldMany:
@@ -2517,8 +2531,15 @@ public:
 
     // Pass along the coroutine buffer.
     switch (origCalleeType->getCoroutineKind()) {
-    case SILCoroutineKind::YieldMany:
+    case SILCoroutineKind::YieldOnce2:
+      if (IGF.IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
+        LLVM_FALLTHROUGH;
+      } else {
+        llvm::report_fatal_error("unimplemented");
+        break;
+      }
     case SILCoroutineKind::YieldOnce:
+    case SILCoroutineKind::YieldMany:
       original.transferInto(adjusted, 1);
       break;
 
@@ -2861,6 +2882,7 @@ public:
     switch (origCalleeType->getCoroutineKind()) {
     case SILCoroutineKind::YieldMany:
     case SILCoroutineKind::YieldOnce:
+    case SILCoroutineKind::YieldOnce2:
       assert(false && "Should not reach this");
       break;
 
@@ -4437,6 +4459,13 @@ irgen::getCoroutineResumeFunctionPointerAuth(IRGenModule &IGM,
   case SILCoroutineKind::YieldMany:
     return { IGM.getOptions().PointerAuth.YieldManyResumeFunctions,
              PointerAuthEntity::forYieldTypes(fnType) };
+  case SILCoroutineKind::YieldOnce2:
+    if (IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
+      LLVM_FALLTHROUGH;
+    } else {
+      return {IGM.getOptions().PointerAuth.YieldOnce2ResumeFunctions,
+              PointerAuthEntity::forYieldTypes(fnType)};
+    }
   case SILCoroutineKind::YieldOnce:
     return { IGM.getOptions().PointerAuth.YieldOnceResumeFunctions,
              PointerAuthEntity::forYieldTypes(fnType) };
@@ -4569,6 +4598,12 @@ void irgen::emitYieldManyCoroutineEntry(
                            getYieldManyCoroutineBufferAlignment(IGF.IGM));
 }
 
+void irgen::emitYieldOnce2CoroutineEntry(
+    IRGenFunction &IGF, CanSILFunctionType fnType,
+    NativeCCEntryPointArgumentEmission &emission) {
+  llvm::report_fatal_error("unimplemented");
+}
+
 static Address createOpaqueBufferAlloca(IRGenFunction &IGF,
                                         Size size, Alignment align) {
   auto ty = llvm::ArrayType::get(IGF.IGM.Int8Ty, size.getValue());
@@ -4598,6 +4633,16 @@ void irgen::emitDeallocYieldManyCoroutineBuffer(IRGenFunction &IGF,
                                                 Address buffer) {
   auto bufferSize = getYieldManyCoroutineBufferSize(IGF.IGM);
   IGF.Builder.CreateLifetimeEnd(buffer, bufferSize);
+}
+
+void irgen::emitDeallocYieldOnce2CoroutineFrame(IRGenFunction &IGF,
+                                                llvm::Value *allocation) {
+  if (IGF.IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
+    assert(!allocation);
+    return;
+  }
+  assert(allocation);
+  llvm::report_fatal_error("unimplemented");
 }
 
 Address irgen::emitAllocAsyncContext(IRGenFunction &IGF,
