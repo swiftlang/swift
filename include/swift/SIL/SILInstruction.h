@@ -847,6 +847,9 @@ public:
   /// instruction.
   bool isAllocatingStack() const;
 
+  /// The stack allocation produced by the instruction, if any.
+  SILValue getStackAllocation() const;
+
   /// Returns true if this is the deallocation of a stack allocating instruction.
   /// The first operand must be the allocating instruction.
   bool isDeallocatingStack() const;
@@ -3251,13 +3254,25 @@ class BeginApplyInst final
 public:
   using MultipleValueInstructionTrailingObjects::totalSizeToAlloc;
 
+  bool isCalleeAllocated() const {
+    return getSubstCalleeType()->isCalleeAllocatedCoroutine();
+  }
+
   MultipleValueInstructionResult *getTokenResult() const {
+    return const_cast<MultipleValueInstructionResult *>(
+        &getAllResultsBuffer().drop_back(isCalleeAllocated() ? 1 : 0).back());
+  }
+
+  MultipleValueInstructionResult *getCalleeAllocationResult() const {
+    if (!isCalleeAllocated()) {
+      return nullptr;
+    }
     return const_cast<MultipleValueInstructionResult *>(
              &getAllResultsBuffer().back());
   }
 
   SILInstructionResultArray getYieldedValues() const {
-    return getAllResultsBuffer().drop_back();
+    return getAllResultsBuffer().drop_back(isCalleeAllocated() ? 2 : 1);
   }
 
   void getCoroutineEndPoints(

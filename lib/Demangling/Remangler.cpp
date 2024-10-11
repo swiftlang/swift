@@ -2089,6 +2089,7 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
       case Node::Kind::ImplCoroutineKind: {
         char CoroAttr = llvm::StringSwitch<char>(Child->getText())
                         .Case("yield_once", 'A')
+                        .Case("yield_once_2", 'I')
                         .Case("yield_many", 'G')
                         .Default(0);
 

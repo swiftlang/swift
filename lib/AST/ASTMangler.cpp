@@ -2149,6 +2149,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
   case SILCoroutineKind::YieldOnce:
     OpArgs.push_back('A');
     break;
+  case SILCoroutineKind::YieldOnce2:
+    OpArgs.push_back('I');
+    break;
   case SILCoroutineKind::YieldMany:
     OpArgs.push_back('G');
     break;

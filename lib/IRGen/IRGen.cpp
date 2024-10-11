@@ -797,6 +797,8 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
       PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Type);
   opts.YieldOnceResumeFunctions =
       PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Type);
+  opts.YieldOnce2ResumeFunctions =
+      PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Type);
 
   opts.ResilientClassStubInitCallbacks =
       PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Constant,
