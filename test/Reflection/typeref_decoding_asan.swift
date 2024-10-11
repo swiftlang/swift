@@ -1,4 +1,4 @@
-// XFAIL: OS=linux-gnu && CPU=aarch64
+// UNSUPPORTED: OS=linux-gnu && CPU=aarch64
 
 // rdar://100805115
 // UNSUPPORTED: CPU=arm64e
