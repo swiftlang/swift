@@ -80,7 +80,7 @@ private:
 public:
   DeclAndTypePrinter(ModuleDecl &mod, raw_ostream &out, raw_ostream &prologueOS,
                      raw_ostream &outOfLineDefinitionsOS,
-                     DelayedMemberSet &delayed,
+                     const DelayedMemberSet &delayed,
                      CxxDeclEmissionScope &topLevelEmissionScope,
                      PrimitiveTypeMapping &typeMapping,
                      SwiftToClangInteropContext &interopContext,
@@ -103,6 +103,13 @@ public:
     return *cxxDeclEmissionScope;
   }
 
+  DeclAndTypePrinter withOutputStream(raw_ostream &s) {
+    return DeclAndTypePrinter(
+        M, s, prologueOS, outOfLineDefinitionsOS, objcDelayedMembers,
+        *cxxDeclEmissionScope, typeMapping, interopContext, minRequiredAccess,
+        requiresExposedAttribute, exposedModules, outputLang);
+  }
+
   void setCxxDeclEmissionScope(CxxDeclEmissionScope &scope) {
     cxxDeclEmissionScope = &scope;
   }
@@ -116,7 +123,8 @@ public:
   bool isVisible(const ValueDecl *vd) const;
 
   void print(const Decl *D);
-  void print(Type ty);
+  void print(Type ty, std::optional<OptionalTypeKind> overrideOptionalTypeKind =
+                          std::nullopt);
 
   /// Prints the name of the type including generic arguments.
   void printTypeName(raw_ostream &os, Type ty, const ModuleDecl *moduleContext);

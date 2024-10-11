@@ -26,6 +26,7 @@
 
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/SmallString.h"
+#include <optional>
 
 using namespace swift;
 
@@ -232,8 +233,11 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
       genericSignature = AFD->getGenericSignature();
   }
   if (const auto *typeDecl = dyn_cast<NominalTypeDecl>(VD)) {
-    if (isa<ProtocolDecl>(typeDecl))
+    if (isa<ProtocolDecl>(typeDecl)) {
+      if (typeDecl->hasClangNode())
+        return {ObjCxxOnly, std::nullopt};
       return {Unsupported, UnrepresentableProtocol};
+    }
     // Swift's consume semantics are not yet supported in C++.
     if (!typeDecl->canBeCopyable())
       return {Unsupported, UnrepresentableMoveOnly};
@@ -336,7 +340,7 @@ bool swift::cxx_translation::isExposableToCxx(GenericSignature genericSig) {
         return false;
 
       auto proto = req.getProtocolDecl();
-      if (!proto->isMarkerProtocol())
+      if (!proto->isMarkerProtocol() && !proto->hasClangNode())
         return false;
     }
   }

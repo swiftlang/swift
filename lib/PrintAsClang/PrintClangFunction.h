@@ -42,7 +42,7 @@ class SwiftToClangInteropContext;
 class DeclAndTypePrinter;
 
 struct ClangRepresentation {
-  enum Kind { representable, unsupported };
+  enum Kind { representable, objcxxonly, unsupported };
 
   ClangRepresentation(Kind kind) : kind(kind) {}
 
@@ -50,8 +50,14 @@ struct ClangRepresentation {
   /// language mode.
   bool isUnsupported() const { return kind == unsupported; }
 
+  /// Returns true if the given Swift node is only supported in
+  /// Objective C++ mode.
+  bool isObjCxxOnly() const { return kind == objcxxonly; }
+
   const ClangRepresentation &merge(ClangRepresentation other) {
-    if (kind != unsupported)
+    if (other.kind == unsupported)
+      kind = unsupported;
+    else if (kind == representable)
       kind = other.kind;
     return *this;
   }
