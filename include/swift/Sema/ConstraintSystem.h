@@ -4272,32 +4272,27 @@ public:
   /// \param replacements The mapping from opened types to the type
   /// variables to which they were opened.
   ///
-  /// \param outerDC The generic context containing the declaration.
-  ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
   FunctionType *openFunctionType(AnyFunctionType *funcType,
                                  ConstraintLocatorBuilder locator,
-                                 SmallVectorImpl<OpenedType> &replacements,
-                                 DeclContext *outerDC);
-
-  /// Open the generic parameter list and its requirements,
-  /// creating type variables for each of the type parameters.
-  void openGeneric(DeclContext *outerDC,
-                   GenericSignature signature,
-                   ConstraintLocatorBuilder locator,
-                   SmallVectorImpl<OpenedType> &replacements);
+                                 ArrayRef<OpenedType> replacements);
 
   /// Open the generic parameter list creating type variables for each of the
   /// type parameters.
-  void openGenericParameters(DeclContext *outerDC,
-                             GenericSignature signature,
-                             SmallVectorImpl<OpenedType> &replacements,
-                             ConstraintLocatorBuilder locator);
+  ArrayRef<OpenedType> openGenericParameters(GenericSignature signature,
+                                             ConstraintLocatorBuilder locator);
 
   /// Open a generic parameter into a type variable and record
   /// it in \c replacements.
   TypeVariableType *openGenericParameter(GenericTypeParamType *parameter,
                                          ConstraintLocatorBuilder locator);
+
+  /// Open the generic parameter list and its requirements,
+  /// creating type variables for each of the type parameters.
+  void openGenericRequirements(DeclContext *outerDC,
+                               GenericSignature signature,
+                               ConstraintLocatorBuilder locator,
+                               ArrayRef<OpenedType> replacements);
 
   /// Given generic signature open its generic requirements,
   /// using substitution function, and record them in the
@@ -4323,7 +4318,7 @@ public:
   /// Record the set of opened types for the given locator.
   void recordOpenedTypes(
          ConstraintLocatorBuilder locator,
-         SmallVectorImpl<OpenedType> &replacements);
+         ArrayRef<OpenedType> replacements);
 
   /// Check whether the given type conforms to the given protocol and if
   /// so return a valid conformance reference.
@@ -4390,7 +4385,7 @@ public:
   DeclReferenceType getTypeOfMemberReference(
       Type baseTy, ValueDecl *decl, DeclContext *useDC, bool isDynamicLookup,
       FunctionRefKind functionRefKind, ConstraintLocator *locator,
-      SmallVectorImpl<OpenedType> *replacements = nullptr);
+      ArrayRef<OpenedType> *replacements = nullptr);
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
   /// with a type variable) at the given location.

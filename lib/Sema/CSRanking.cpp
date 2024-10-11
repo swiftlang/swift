@@ -425,8 +425,11 @@ static bool isProtocolExtensionAsSpecializedAs(DeclContext *dc1,
   // Form a constraint system where we've opened up all of the requirements of
   // the second protocol extension.
   ConstraintSystem cs(dc1, std::nullopt);
-  SmallVector<OpenedType, 4> replacements;
-  cs.openGeneric(dc2, sig2, ConstraintLocatorBuilder(nullptr), replacements);
+  ArrayRef<OpenedType> replacements;
+  if (sig2) {
+    replacements = cs.openGenericParameters(sig2, ConstraintLocatorBuilder(nullptr));
+    cs.openGenericRequirements(dc2, sig2, ConstraintLocatorBuilder(nullptr), replacements);
+  }
 
   // Bind the 'Self' type from the first extension to the type parameter from
   // opening 'Self' of the second extension.
@@ -581,16 +584,20 @@ bool CompareDeclSpecializationRequest::evaluate(
 
   auto openType = [&](ConstraintSystem &cs, DeclContext *innerDC,
                       DeclContext *outerDC, Type type,
-                      SmallVectorImpl<OpenedType> &replacements,
+                      ArrayRef<OpenedType> &replacements,
                       ConstraintLocator *locator) -> Type {
-    if (auto *funcType = type->getAs<AnyFunctionType>()) {
-      return cs.openFunctionType(funcType, locator, replacements, outerDC);
+    if (auto sig = innerDC->getGenericSignatureOfContext()) {
+      replacements = cs.openGenericParameters(sig, locator);
+      cs.openGenericRequirements(outerDC, sig, locator, replacements);
+
+      if (auto *funcType = type->getAs<AnyFunctionType>()) {
+        return cs.openFunctionType(funcType, locator, replacements);
+      }
+
+      return cs.openType(type, replacements, locator);
     }
 
-    cs.openGeneric(outerDC, innerDC->getGenericSignatureOfContext(), locator,
-                   replacements);
-
-    return cs.openType(type, replacements, locator);
+    return type;
   };
 
   bool knownNonSubtype = false;
@@ -599,7 +606,7 @@ bool CompareDeclSpecializationRequest::evaluate(
   // FIXME: Locator when anchored on a declaration.
   // Get the type of a reference to the second declaration.
 
-  SmallVector<OpenedType, 4> unused, replacements;
+  ArrayRef<OpenedType> unused, replacements;
   auto openedType2 = openType(cs, innerDC2, outerDC2, type2, unused, locator);
   auto openedType1 = openType(cs, innerDC1, outerDC1, type1, replacements, locator);
 

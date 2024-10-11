@@ -64,6 +64,7 @@ TEST_F(SemaTest, TestKeypathFunctionConversionPrefersNarrowConversion) {
                                               Context.TheEmptyTupleType)
                          ->withExtInfo(AnyFunctionType::ExtInfo());
   genericFnDecl->setInterfaceType(genericFnTy);
+  genericFnDecl->setGenericSignature(genericSig);
 
   // func f(_: (String) -> Bool?)
   auto innerConcreteFnParam = AnyFunctionType::Param(stringType);

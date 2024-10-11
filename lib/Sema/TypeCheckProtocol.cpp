@@ -1197,7 +1197,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     // Open up the type of the requirement.
     reqLocator =
         cs->getConstraintLocator(req, ConstraintLocator::ProtocolRequirement);
-    SmallVector<OpenedType, 4> reqReplacements;
+    ArrayRef<OpenedType> reqReplacements;
     reqType = cs->getTypeOfMemberReference(selfTy, req, dc,
                                            /*isDynamicResult=*/false,
                                            FunctionRefKind::DoubleApply,
