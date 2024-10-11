@@ -2703,7 +2703,8 @@ namespace {
               // function type, but this is okay for non-Sendable closures
               // because they cannot leave the isolation domain they're created
               // in anyway.
-              if (closure->isSendable())
+              if (isIsolationInferenceBoundaryClosure(
+                      closure, /*can inherit actor context*/false))
                 return false;
 
               if (closure->getActorIsolation().isActorIsolated())
