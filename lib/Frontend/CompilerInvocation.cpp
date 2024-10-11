@@ -2981,6 +2981,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                            DiagnosticEngine &Diags,
                            const FrontendOptions &FrontendOpts,
                            const SILOptions &SILOpts,
+                           const LangOptions &LangOpts,
                            StringRef SDKPath,
                            StringRef ResourceDir,
                            const llvm::Triple &Triple) {
@@ -3694,7 +3695,7 @@ bool CompilerInvocation::parseArgs(
   }
 
   if (ParseIRGenArgs(IRGenOpts, ParsedArgs, Diags, FrontendOpts, SILOpts,
-                     getSDKPath(), SearchPathOpts.RuntimeResourcePath,
+                     LangOpts, getSDKPath(), SearchPathOpts.RuntimeResourcePath,
                      LangOpts.Target)) {
     return true;
   }
