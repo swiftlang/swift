@@ -198,6 +198,15 @@ BridgedDotSelfExpr BridgedDotSelfExpr_createParsed(BridgedASTContext cContext,
       cSubExpr.unbridged(), cDotLoc.unbridged(), cSelfLoc.unbridged());
 }
 
+BridgedEditorPlaceholderExpr BridgedEditorPlaceholderExpr_createParsed(
+    BridgedASTContext cContext, BridgedIdentifier cPlaceholderId,
+    BridgedSourceLoc cLoc, BridgedNullableTypeRepr cPlaceholderTyR,
+    BridgedNullableTypeRepr cExpansionTyR) {
+  return new (cContext.unbridged()) EditorPlaceholderExpr(
+      cPlaceholderId.unbridged(), cLoc.unbridged(), cPlaceholderTyR.unbridged(),
+      cExpansionTyR.unbridged());
+}
+
 BridgedErrorExpr BridgedErrorExpr_create(BridgedASTContext cContext,
                                          BridgedSourceRange cRange) {
   return new (cContext.unbridged()) ErrorExpr(cRange.unbridged());
