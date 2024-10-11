@@ -52,7 +52,8 @@ endfunction()
 copy_library_sources(include "" "Core")
 
 set(CoreLibs
-  LLVMSupport)
+  LLVMSupport
+  SwiftShims)
 
   # Add these as we get them building
   # core

@@ -12,3 +12,4 @@ include(CompilerSettings)
 include_directories(include)
 
 add_subdirectory(LLVMSupport)
+add_subdirectory(SwiftShims/swift/shims)
