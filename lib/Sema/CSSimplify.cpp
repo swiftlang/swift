@@ -10834,7 +10834,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       }
     }
 
-    generateConstraints(
+    generateOverloadConstraints(
         candidates, memberTy, result.ViableCandidates, useDC, locator,
         result.getFavoredIndex(), /*requiresFix=*/false,
         [&](unsigned, const OverloadChoice &choice) {
@@ -10861,7 +10861,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
           allFromConditionalConformances(*this, baseTy,
                                          result.ViableCandidates);
 
-      generateConstraints(
+      generateOverloadConstraints(
           candidates, memberTy, outerAlternatives, useDC, locator, std::nullopt,
           /*requiresFix=*/!treatAsViable,
           [&](unsigned, const OverloadChoice &) {
@@ -10875,7 +10875,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   if (!result.UnviableCandidates.empty()) {
     // Generate constraints for unavailable choices if they have a fix,
     // and disable them by default, they'd get picked up in the "salvage" mode.
-    generateConstraints(
+    generateOverloadConstraints(
         candidates, memberTy, result.UnviableCandidates, useDC, locator,
         /*favoredChoice=*/std::nullopt, /*requiresFix=*/true,
         [&](unsigned idx, const OverloadChoice &choice) {

@@ -4649,7 +4649,7 @@ public:
   /// \param getFix Optional callback to determine a fix for a given
   /// choice (first argument is a position of current choice,
   /// second - the choice in question).
-  void generateConstraints(
+  void generateOverloadConstraints(
       SmallVectorImpl<Constraint *> &constraints, Type type,
       ArrayRef<OverloadChoice> choices, DeclContext *useDC,
       ConstraintLocator *locator,
