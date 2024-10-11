@@ -60,6 +60,7 @@ Finally, we need to define the application's build rules in CMake that will be u
 
 We'll also make sure to dynamically set the Swift compiler's target architecture based on the pico board used. This is to support both RP2040 and RP2350 in ARM mode, and RP2350's RISC-V mode.
 
+Finally, we'll make sure to recursively gather all Pico SDK-related compiler definitions in order to append them to our `swiftc` command.
 
 ```cmake
 cmake_minimum_required(VERSION 3.13)
@@ -86,11 +87,56 @@ elseif(PICO_PLATFORM STREQUAL "rp2350-riscv")
 endif()
 
 add_executable(swift-blinky)
+
+target_link_libraries(swift-blinky
+    pico_stdlib hardware_uart hardware_gpio
+)
+
+set_property(GLOBAL PROPERTY visited_targets "")
+set_property(GLOBAL PROPERTY compilerdefs_list "")
+
+function(gather_compile_definitions_recursive target)
+   get_property(visited_targets GLOBAL PROPERTY visited_targets)
+
+   if (${target} MATCHES "\\$<" OR ${target} MATCHES "::@" OR ${target} IN_LIST visited_targets)
+       return()
+   endif()
+
+   list(APPEND visited_targets ${target})
+   set_property(GLOBAL PROPERTY visited_targets "${visited_targets}")
+
+   get_property(compilerdefs_list GLOBAL PROPERTY compilerdefs_list)
+
+   get_target_property(target_definitions ${target} INTERFACE_COMPILE_DEFINITIONS)
+   if (target_definitions)
+       list(APPEND compilerdefs_list ${target_definitions})
+       set_property(GLOBAL PROPERTY compilerdefs_list "${compilerdefs_list}")
+   endif()
+
+   get_target_property(target_linked_libs ${target} INTERFACE_LINK_LIBRARIES)
+   if (target_linked_libs)
+       foreach(linked_target ${target_linked_libs})
+           gather_compile_definitions_recursive(${linked_target})
+       endforeach()
+   endif()
+endfunction()
+
+gather_compile_definitions_recursive(swift-blinky)
+get_property(COMPILE_DEFINITIONS GLOBAL PROPERTY compilerdefs_list)
+
+list(REMOVE_DUPLICATES COMPILE_DEFINITIONS)
+list(PREPEND COMPILE_DEFINITIONS "") # -Xcc -D
+string(REPLACE "$<TARGET_PROPERTY:PICO_TARGET_BINARY_TYPE>" "$<TARGET_PROPERTY:swift-blinky,PICO_TARGET_BINARY_TYPE>" COMPILE_DEFINITIONS "${COMPILE_DEFINITIONS}")
+string(REPLACE ";" " -Xcc -D" COMPILE_DEFINITIONS "${COMPILE_DEFINITIONS}")
+
+file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/swiftc_flags.txt CONTENT "${COMPILE_DEFINITIONS}")
+
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/_swiftcode.o
     COMMAND
         ${SWIFTC}
         ${SWIFT_TARGET} ${CLANG_ARCH_ABI_FLAGS} -Xcc -fshort-enums
+        @${CMAKE_BINARY_DIR}/swiftc_flags.txt
         -Xfrontend -function-sections -enable-experimental-feature Embedded -wmo -parse-as-library
         $$\( echo '$<TARGET_PROPERTY:swift-blinky,INCLUDE_DIRECTORIES>' | tr '\;' '\\n' | sed -e 's/\\\(.*\\\)/-Xcc -I\\1/g' \)
         $$\( echo '${CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES}'             | tr ' '  '\\n' | sed -e 's/\\\(.*\\\)/-Xcc -I\\1/g' \)
@@ -104,7 +150,6 @@ add_custom_command(
 add_custom_target(swift-blinky-swiftcode DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/_swiftcode.o)
 
 target_link_libraries(swift-blinky
-    pico_stdlib hardware_uart hardware_gpio
     ${CMAKE_CURRENT_BINARY_DIR}/_swiftcode.o
 )
 add_dependencies(swift-blinky swift-blinky-swiftcode)
