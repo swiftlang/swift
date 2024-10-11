@@ -1193,9 +1193,6 @@ struct Score {
 /// variable.
 using OpenedType = std::pair<GenericTypeParamType *, TypeVariableType *>;
 
-using OpenedTypeMap =
-    llvm::DenseMap<GenericTypeParamType *, TypeVariableType *>;
-
 /// Describes the information about a case label item that needs to be tracked
 /// within the constraint system.
 struct CaseLabelItemInfo {
@@ -4244,7 +4241,7 @@ public:
   ///                     corresponding opened type variables.
   ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
-  Type openType(Type type, OpenedTypeMap &replacements,
+  Type openType(Type type, ArrayRef<OpenedType> replacements,
                 ConstraintLocatorBuilder locator);
 
   /// "Open" an opaque archetype type, similar to \c openType.
@@ -4255,7 +4252,7 @@ public:
   /// opening its pattern and shape types and connecting them to the
   /// aforementioned variable via special constraints.
   Type openPackExpansionType(PackExpansionType *expansion,
-                             OpenedTypeMap &replacements,
+                             ArrayRef<OpenedType> replacements,
                              ConstraintLocatorBuilder locator);
 
   /// Update OpenedPackExpansionTypes and record a change in the trail.
@@ -4288,7 +4285,7 @@ public:
   /// \returns The opened type, or \c type if there are no archetypes in it.
   FunctionType *openFunctionType(AnyFunctionType *funcType,
                                  ConstraintLocatorBuilder locator,
-                                 OpenedTypeMap &replacements,
+                                 SmallVectorImpl<OpenedType> &replacements,
                                  DeclContext *outerDC);
 
   /// Open the generic parameter list and its requirements,
@@ -4296,20 +4293,18 @@ public:
   void openGeneric(DeclContext *outerDC,
                    GenericSignature signature,
                    ConstraintLocatorBuilder locator,
-                   OpenedTypeMap &replacements);
+                   SmallVectorImpl<OpenedType> &replacements);
 
   /// Open the generic parameter list creating type variables for each of the
   /// type parameters.
   void openGenericParameters(DeclContext *outerDC,
                              GenericSignature signature,
-                             OpenedTypeMap &replacements,
+                             SmallVectorImpl<OpenedType> &replacements,
                              ConstraintLocatorBuilder locator);
 
   /// Open a generic parameter into a type variable and record
   /// it in \c replacements.
-  TypeVariableType *openGenericParameter(DeclContext *outerDC,
-                                         GenericTypeParamType *parameter,
-                                         OpenedTypeMap &replacements,
+  TypeVariableType *openGenericParameter(GenericTypeParamType *parameter,
                                          ConstraintLocatorBuilder locator);
 
   /// Given generic signature open its generic requirements,
@@ -4336,7 +4331,7 @@ public:
   /// Record the set of opened types for the given locator.
   void recordOpenedTypes(
          ConstraintLocatorBuilder locator,
-         const OpenedTypeMap &replacements);
+         SmallVectorImpl<OpenedType> &replacements);
 
   /// Check whether the given type conforms to the given protocol and if
   /// so return a valid conformance reference.
@@ -4347,7 +4342,7 @@ public:
   FunctionType *adjustFunctionTypeForConcurrency(
       FunctionType *fnType, Type baseType, ValueDecl *decl, DeclContext *dc,
       unsigned numApplies, bool isMainDispatchQueue,
-      OpenedTypeMap &replacements, ConstraintLocatorBuilder locator);
+      ArrayRef<OpenedType> replacements, ConstraintLocatorBuilder locator);
 
   /// Retrieve the type of a reference to the given value declaration.
   ///
@@ -4420,7 +4415,7 @@ public:
   Type getMemberReferenceTypeFromOpenedType(
       Type &openedType, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
       ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
-      OpenedTypeMap &replacements);
+      ArrayRef<OpenedType> replacements);
 
   /// Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
@@ -4436,7 +4431,7 @@ public:
   DeclReferenceType getTypeOfMemberReference(
       Type baseTy, ValueDecl *decl, DeclContext *useDC, bool isDynamicLookup,
       FunctionRefKind functionRefKind, ConstraintLocator *locator,
-      OpenedTypeMap *replacements = nullptr);
+      SmallVectorImpl<OpenedType> *replacements = nullptr);
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
   /// with a type variable) at the given location.

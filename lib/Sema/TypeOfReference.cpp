@@ -49,7 +49,7 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
   }
 
   // Open up the generic type.
-  OpenedTypeMap replacements;
+  SmallVector<OpenedType, 4> replacements;
   openGeneric(decl->getDeclContext(), decl->getGenericSignature(), locator,
               replacements);
 
@@ -66,15 +66,13 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
 
     const auto subs =
         parentTyInContext->getContextSubstitutions(decl->getDeclContext());
-    for (auto pair : subs) {
-      auto found = replacements.find(
-        cast<GenericTypeParamType>(pair.first));
-      if (found == replacements.end()) {
-        // Can happen with invalid generic code.
+    for (auto pair : replacements) {
+      auto found = subs.find(
+        cast<GenericTypeParamType>(pair.first->getCanonicalType()));
+      if (found == subs.end())
         continue;
-      }
 
-      addConstraint(ConstraintKind::Bind, found->second, pair.second,
+      addConstraint(ConstraintKind::Bind, pair.second, found->second,
                     locator);
     }
   }
@@ -82,8 +80,9 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
   // Map the generic parameters to their corresponding type variables.
   llvm::SmallVector<Type, 2> arguments;
   for (auto gp : decl->getInnermostGenericParamTypes()) {
-    auto found = replacements.find(
-      cast<GenericTypeParamType>(gp->getCanonicalType()));
+    auto found = llvm::find_if(replacements, [&](OpenedType pair) {
+      return pair.first->isEqual(gp);
+    });
     assert(found != replacements.end() &&
            "Missing generic parameter?");
     arguments.push_back(found->second);
@@ -233,11 +232,11 @@ Type ConstraintSystem::replaceInferableTypesWithTypeVars(
 namespace {
 
 struct TypeOpener : public TypeTransform<TypeOpener> {
-  OpenedTypeMap &replacements;
+  ArrayRef<OpenedType> replacements;
   ConstraintLocatorBuilder locator;
   ConstraintSystem &cs;
 
-  TypeOpener(OpenedTypeMap &replacements,
+  TypeOpener(ArrayRef<OpenedType> replacements,
              ConstraintLocatorBuilder locator,
              ConstraintSystem &cs)
       : TypeTransform<TypeOpener>(cs.getASTContext()),
@@ -252,14 +251,14 @@ struct TypeOpener : public TypeTransform<TypeOpener> {
 
   Type transformGenericTypeParamType(GenericTypeParamType *genericParam,
                                      TypePosition pos) {
-    auto known = replacements.find(
-      cast<GenericTypeParamType>(genericParam->getCanonicalType()));
+    for (auto pair : replacements) {
+      if (pair.first->isEqual(genericParam))
+        return pair.second;
+    }
+
     // FIXME: This should be an assert, however protocol generic signatures
     // drop outer generic parameters.
-    // assert(known != replacements.end());
-    if (known == replacements.end())
-      return ErrorType::get(ctx);
-    return known->second;
+    return ErrorType::get(ctx);
   }
 
   Type transformPackExpansionType(PackExpansionType *expansion,
@@ -278,7 +277,7 @@ struct TypeOpener : public TypeTransform<TypeOpener> {
 
 }
 
-Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements,
+Type ConstraintSystem::openType(Type type, ArrayRef<OpenedType> replacements,
                                 ConstraintLocatorBuilder locator) {
   assert(!type->hasUnboundGenericType());
 
@@ -290,7 +289,7 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements,
 }
 
 Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
-                                             OpenedTypeMap &replacements,
+                                             ArrayRef<OpenedType> replacements,
                                              ConstraintLocatorBuilder locator) {
   auto patternType =
       openType(expansion->getPatternType(), replacements, locator);
@@ -353,7 +352,7 @@ Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
   auto opaqueLocator = locator.withPathElement(
       LocatorPathElt::OpenedOpaqueArchetype(opaqueDecl));
 
-  OpenedTypeMap replacements;
+  SmallVector<OpenedType, 4> replacements;
   openGeneric(DC, opaqueDecl->getOpaqueInterfaceGenericSignature(),
               opaqueLocator, replacements);
 
@@ -395,7 +394,7 @@ Type ConstraintSystem::openOpaqueType(Type type, ContextualTypePurpose context,
 FunctionType *ConstraintSystem::openFunctionType(
        AnyFunctionType *funcType,
        ConstraintLocatorBuilder locator,
-       OpenedTypeMap &replacements,
+       SmallVectorImpl<OpenedType> &replacements,
        DeclContext *outerDC) {
   if (auto *genericFn = funcType->getAs<GenericFunctionType>()) {
     auto signature = genericFn->getGenericSignature();
@@ -576,7 +575,7 @@ void ConstraintSystem::recordOpenedType(
 
 void ConstraintSystem::recordOpenedTypes(
        ConstraintLocatorBuilder locator,
-       const OpenedTypeMap &replacements) {
+       SmallVectorImpl<OpenedType> &replacements) {
   if (replacements.empty())
     return;
 
@@ -724,7 +723,7 @@ static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
 
 FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
     FunctionType *fnType, Type baseType, ValueDecl *decl, DeclContext *dc,
-    unsigned numApplies, bool isMainDispatchQueue, OpenedTypeMap &replacements,
+    unsigned numApplies, bool isMainDispatchQueue, ArrayRef<OpenedType> replacements,
     ConstraintLocatorBuilder locator) {
 
   auto *adjustedTy = swift::adjustFunctionTypeForConcurrency(
@@ -838,7 +837,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto func = cast<FuncDecl>(value);
     assert(func->isOperator() && "Lookup should only find operators");
 
-    OpenedTypeMap replacements;
+    SmallVector<OpenedType, 4> replacements;
 
     AnyFunctionType *funcType = func->getInterfaceType()
         ->castTo<AnyFunctionType>();
@@ -873,7 +872,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
   // Unqualified reference to a local or global function.
   if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(value)) {
-    OpenedTypeMap replacements;
+    SmallVector<OpenedType, 4> replacements;
 
     auto funcType = funcDecl->getInterfaceType()->castTo<AnyFunctionType>();
     auto numLabelsToRemove = getNumRemovedArgumentLabels(
@@ -939,7 +938,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     Type macroType = macro->getInterfaceType();
 
     // Open any the generic types.
-    OpenedTypeMap replacements;
+    SmallVector<OpenedType, 4> replacements;
     Type openedType = openFunctionType(
         macroType->castTo<AnyFunctionType>(), locator, replacements,
         macro->getDeclContext());
@@ -1009,21 +1008,20 @@ static void bindArchetypesFromContext(
     ConstraintSystem &cs,
     DeclContext *outerDC,
     ConstraintLocator *locatorPtr,
-    const OpenedTypeMap &replacements) {
+    ArrayRef<OpenedType> replacements) {
 
   auto bindPrimaryArchetype = [&](Type paramTy, Type contextTy) {
-    auto found = replacements.find(cast<GenericTypeParamType>(
-                                     paramTy->getCanonicalType()));
-
     // We might not have a type variable for this generic parameter
     // because either we're opening up an UnboundGenericType,
     // in which case we only want to infer the innermost generic
     // parameters, or because this generic parameter was constrained
     // away into a concrete type.
-    if (found != replacements.end()) {
-      auto typeVar = found->second;
-      cs.addConstraint(ConstraintKind::Bind, typeVar, contextTy,
-                       locatorPtr);
+    for (auto pair : replacements) {
+      if (pair.first->isEqual(paramTy)) {
+        cs.addConstraint(ConstraintKind::Bind, pair.second, contextTy,
+                         locatorPtr);
+        return;
+      }
     }
   };
 
@@ -1056,7 +1054,7 @@ void ConstraintSystem::openGeneric(
        DeclContext *outerDC,
        GenericSignature sig,
        ConstraintLocatorBuilder locator,
-       OpenedTypeMap &replacements) {
+       SmallVectorImpl<OpenedType> &replacements) {
   if (!sig)
     return;
 
@@ -1070,13 +1068,15 @@ void ConstraintSystem::openGeneric(
 
 void ConstraintSystem::openGenericParameters(DeclContext *outerDC,
                                              GenericSignature sig,
-                                             OpenedTypeMap &replacements,
+                                             SmallVectorImpl<OpenedType> &replacements,
                                              ConstraintLocatorBuilder locator) {
-  assert(sig);
+  ASSERT(sig);
+  ASSERT(replacements.empty());
 
   // Create the type variables for the generic parameters.
   for (auto gp : sig.getGenericParams()) {
-    (void)openGenericParameter(outerDC, gp, replacements, locator);
+    auto *typeVar = openGenericParameter(gp, locator);
+    replacements.emplace_back(gp, typeVar);
   }
 
   auto *baseLocator = getConstraintLocator(
@@ -1085,9 +1085,8 @@ void ConstraintSystem::openGenericParameters(DeclContext *outerDC,
   bindArchetypesFromContext(*this, outerDC, baseLocator, replacements);
 }
 
-TypeVariableType *ConstraintSystem::openGenericParameter(
-    DeclContext *outerDC, GenericTypeParamType *parameter,
-    OpenedTypeMap &replacements, ConstraintLocatorBuilder locator) {
+TypeVariableType *ConstraintSystem::openGenericParameter(GenericTypeParamType *parameter,
+                                                         ConstraintLocatorBuilder locator) {
   auto *paramLocator = getConstraintLocator(
       locator.withPathElement(LocatorPathElt::GenericParameter(parameter)));
 
@@ -1099,14 +1098,7 @@ TypeVariableType *ConstraintSystem::openGenericParameter(
   if (shouldAttemptFixes())
     options |= TVO_CanBindToHole;
 
-  auto typeVar = createTypeVariable(paramLocator, options);
-  auto result = replacements.insert(std::make_pair(
-      cast<GenericTypeParamType>(parameter->getCanonicalType()), typeVar));
-
-  assert(result.second);
-  (void)result;
-
-  return typeVar;
+  return createTypeVariable(paramLocator, options);
 }
 
 void ConstraintSystem::openGenericRequirements(
@@ -1282,7 +1274,7 @@ static bool isExistentialMemberAccessWithExplicitBaseExpression(
 Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
     Type &openedType, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
     ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
-    OpenedTypeMap &replacements) {
+    ArrayRef<OpenedType> replacements) {
   Type type = openedType;
 
   // Cope with dynamic 'Self'.
@@ -1357,9 +1349,9 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
           baseObjTy, value, locator, isDynamicLookup) &&
       // If there are no type variables, there were no references to 'Self'.
       type->hasTypeVariable()) {
-    const auto selfGP = cast<GenericTypeParamType>(
-        outerDC->getSelfInterfaceType()->getCanonicalType());
-    auto openedTypeVar = replacements.lookup(selfGP);
+    auto selfGP = outerDC->getSelfInterfaceType();
+    ASSERT(selfGP->isEqual(replacements[0].first));
+    auto openedTypeVar = replacements[0].second;
 
     type = typeEraseOpenedExistentialReference(type, baseObjTy, openedTypeVar,
                                                TypePosition::Covariant);
@@ -1447,7 +1439,7 @@ bool IsInLeftHandSideOfAssignment::operator()(Expr *expr) const {
 DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     Type baseTy, ValueDecl *value, DeclContext *useDC, bool isDynamicLookup,
     FunctionRefKind functionRefKind, ConstraintLocator *locator,
-    OpenedTypeMap *replacementsPtr) {
+    SmallVectorImpl<OpenedType> *replacementsPtr) {
   // Figure out the instance type used for the base.
   Type resolvedBaseTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
 
@@ -1513,7 +1505,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
 
   // Open the type of the generic function or member of a generic type.
   Type openedType;
-  OpenedTypeMap localReplacements;
+  SmallVector<OpenedType, 4> localReplacements;
   auto &replacements = replacementsPtr ? *replacementsPtr : localReplacements;
 
   // If we have a generic signature, open the parameters. We delay opening
@@ -1797,7 +1789,7 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
           uncurryLevel);
     };
 
-    OpenedTypeMap emptyReplacements;
+    SmallVector<OpenedType, 4> emptyReplacements;
     if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
       auto elementTy = subscript->getElementInterfaceType();
 
