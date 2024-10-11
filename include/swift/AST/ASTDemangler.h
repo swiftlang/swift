@@ -229,8 +229,6 @@ public:
 
   Type createDictionaryType(Type key, Type value);
 
-  Type createParenType(Type base);
-
   Type createIntegerType(intptr_t value);
 
   Type createNegativeIntegerType(intptr_t value);

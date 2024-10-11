@@ -996,11 +996,6 @@ private:
     // Strip off top level of type sugar (except for type aliases).
     // We don't want Optional<T> and T? to get different debug types.
     while (true) {
-      if (auto *ParenTy = dyn_cast<ParenType>(Ty.getPointer())) {
-        Ty = ParenTy->getUnderlyingType();
-        continue;
-      }
-
       if (auto *SugarTy = dyn_cast<SyntaxSugarType>(Ty.getPointer())) {
         Ty = SugarTy->getSinglyDesugaredType();
         continue;
@@ -2180,11 +2175,6 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
           DbgTy.getNumExtraInhabitants());
       return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
                                     L.File, 0, Scope);
-    }
-
-    case TypeKind::Paren: {
-      auto Ty = cast<ParenType>(BaseTy)->getUnderlyingType();
-      return getOrCreateDesugaredType(Ty, DbgTy);
     }
 
     // SyntaxSugarType derivations.

@@ -1210,14 +1210,6 @@ Type TypeBase::removeArgumentLabels(unsigned numArgumentLabels) {
   return FunctionType::get(unlabeledParams, result, fnType->getExtInfo());
 }
 
-
-Type TypeBase::getWithoutParens() {
-  Type Ty = this;
-  while (auto ParenTy = dyn_cast<ParenType>(Ty.getPointer()))
-    Ty = ParenTy->getUnderlyingType();
-  return Ty;
-}
-
 Type TypeBase::replaceCovariantResultType(Type newResultType,
                                           unsigned uncurryLevel) {
   if (uncurryLevel == 0) {
@@ -1917,15 +1909,6 @@ TypeBase *TypeBase::getWithoutSyntaxSugar() {
   static_assert(std::is_base_of<SugarType, Id##Type>::value, "Sugar mismatch");
 #include "swift/AST/TypeNodes.def"
 
-ParenType::ParenType(Type baseType, RecursiveTypeProperties properties)
-    : SugarType(TypeKind::Paren, baseType, properties) {
-  // In some situations (rdar://75740683) we appear to end up with ParenTypes
-  // that contain a nullptr baseType. Once this is eliminated, we can remove
-  // the checks for `type.isNull()` in the `DiagnosticArgumentKind::Type` case
-  // of `formatDiagnosticArgument`.
-  assert(baseType && "A ParenType should always wrap a non-null type");
-}
-
 Type SugarType::getSinglyDesugaredTypeSlow() {
   // Find the generic type that implements this syntactic sugar type.
   NominalTypeDecl *implDecl;
@@ -1937,8 +1920,6 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
   case TypeKind::Id: llvm_unreachable("non-sugared type?");
 #define SUGARED_TYPE(Id, Parent)
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::Paren:
-    llvm_unreachable("parenthesis are sugar, but not syntax sugar");
   case TypeKind::TypeAlias:
     llvm_unreachable("bound type alias types always have an underlying type");
   case TypeKind::ArraySlice:
@@ -4186,11 +4167,6 @@ bool Type::isPrivateSystemType(bool treatNonBuiltinProtocolsAsPublic) const {
 
     return Type(NAT->getSinglyDesugaredType())
         .isPrivateSystemType(treatNonBuiltinProtocolsAsPublic);
-  }
-
-  if (auto Paren = dyn_cast<ParenType>(Ty.getPointer())) {
-    Type Underlying = Paren->getUnderlyingType();
-    return Underlying.isPrivateSystemType(treatNonBuiltinProtocolsAsPublic);
   }
 
   if (Type Unwrapped = Ty->getOptionalObjectType())

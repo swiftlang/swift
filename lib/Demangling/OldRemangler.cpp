@@ -2836,10 +2836,6 @@ ManglingError Remangler::mangleSugaredDictionary(Node *node, unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-ManglingError Remangler::mangleSugaredParen(Node *node, unsigned depth) {
-  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
-}
-
 ManglingError Remangler::mangleOpaqueReturnType(Node *node, unsigned depth) {
   if (node->hasChildren()
       && node->getFirstChild()->getKind() == Node::Kind::OpaqueReturnTypeIndex){
