@@ -12,8 +12,6 @@
 
 #define DEBUG_TYPE "sil-verifier"
 
-#include "VerifierPrivate.h"
-
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTSynthesis.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -63,7 +61,6 @@
 #include <memory>
 
 using namespace swift;
-using namespace swift::silverifier;
 
 using Lowering::AbstractionPattern;
 
@@ -934,8 +931,6 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   /// TODO: LifetimeCompletion: shared_ptr -> unique_ptr
   std::shared_ptr<DeadEndBlocks> deadEndBlocks;
 
-  LoadBorrowImmutabilityAnalysis loadBorrowImmutabilityAnalysis;
-
   /// A cache of the isOperandInValueUse check. When we process an operand, we
   /// fix this for each of its uses.
   llvm::DenseSet<std::pair<SILValue, const Operand *>> isOperandInValueUsesCache;
@@ -1185,8 +1180,7 @@ public:
         SingleFunction(SingleFunction),
         checkLinearLifetime(checkLinearLifetime),
         Dominance(nullptr),
-        InstNumbers(numInstsInFunction(F)),
-        loadBorrowImmutabilityAnalysis(DEBlocks.get(), &F) {
+        InstNumbers(numInstsInFunction(F)) {
     if (F.isExternalDeclaration())
       return;
 
@@ -2659,13 +2653,6 @@ public:
     requireSameType(LBI->getOperand()->getType().getObjectType(),
                     LBI->getType(),
                     "Load operand type and result type mismatch");
-    if (LBI->isUnchecked()) {
-      require(LBI->getModule().getStage() == SILStage::Raw,
-              "load_borrow can only be [unchecked] in raw SIL");
-    } else {
-      require(loadBorrowImmutabilityAnalysis.isImmutable(LBI),
-              "Found load borrow that is invalidated by a local write?!");
-    }
   }
 
   void checkBeginBorrowInst(BeginBorrowInst *bbi) {
