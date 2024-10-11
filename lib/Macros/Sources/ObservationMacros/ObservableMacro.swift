@@ -16,7 +16,7 @@ import SwiftOperators
 import SwiftSyntaxBuilder
 
 public struct ObservableMacro {
-  static let moduleName = "ObservationPackage"
+  static let moduleName = "Observation"
 
   static let conformanceName = "Observable"
   static var qualifiedConformanceName: String {
