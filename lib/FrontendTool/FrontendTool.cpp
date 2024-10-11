@@ -463,6 +463,18 @@ getPrimaryOrMainSourceFile(const CompilerInstance &Instance) {
 /// Dumps the AST of all available primary source files. If corresponding output
 /// files were specified, use them; otherwise, dump the AST to stdout.
 static bool dumpAST(CompilerInstance &Instance) {
+  const FrontendOptions &opts = Instance.getInvocation().getFrontendOptions();
+  auto dumpAST = [&](SourceFile *SF, raw_ostream &out) {
+    switch (opts.DumpASTFormat) {
+    case FrontendOptions::ASTFormat::Default:
+      SF->dump(out, /*parseIfNeeded*/ true);
+      break;
+    case FrontendOptions::ASTFormat::JSON:
+      SF->dumpJSON(Instance.getASTContext(), out);
+      break;
+    }
+  };
+
   auto primaryFiles = Instance.getPrimarySourceFiles();
   if (!primaryFiles.empty()) {
     for (SourceFile *sourceFile: primaryFiles) {
@@ -471,7 +483,7 @@ static bool dumpAST(CompilerInstance &Instance) {
       if (withOutputPath(Instance.getASTContext().Diags,
                          Instance.getOutputBackend(), OutputFilename,
                          [&](raw_ostream &out) -> bool {
-                           sourceFile->dump(out, /*parseIfNeeded*/ true);
+                           dumpAST(sourceFile, out);
                            return false;
                          }))
         return true;
@@ -480,7 +492,7 @@ static bool dumpAST(CompilerInstance &Instance) {
     // Some invocations don't have primary files. In that case, we default to
     // looking for the main file and dumping it to `stdout`.
     auto &SF = getPrimaryOrMainSourceFile(Instance);
-    SF.dump(llvm::outs(), /*parseIfNeeded*/ true);
+    dumpAST(&SF, llvm::outs());
   }
   return Instance.getASTContext().hadError();
 }

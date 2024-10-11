@@ -201,6 +201,13 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   computeDumpScopeMapLocations();
 
+  if (const Arg *A = Args.getLastArg(OPT_dump_ast_format)) {
+    Opts.DumpASTFormat =
+        llvm::StringSwitch<FrontendOptions::ASTFormat>(A->getValue())
+            .Case("json", FrontendOptions::ASTFormat::JSON)
+            .Default(FrontendOptions::ASTFormat::Default);
+  }
+
   std::optional<FrontendInputsAndOutputs> inputsAndOutputs =
       ArgsToFrontendInputsConverter(Diags, Args).convert(buffers);
 
