@@ -304,6 +304,16 @@ static_assert((int)BridgedLinkage::PackageExternal == (int)swift::SILLinkage::Pa
 static_assert((int)BridgedLinkage::HiddenExternal == (int)swift::SILLinkage::HiddenExternal);
 
 //===----------------------------------------------------------------------===//
+//                                Operand
+//===----------------------------------------------------------------------===//
+
+void BridgedOperand::changeOwnership(BridgedValue::Ownership from, BridgedValue::Ownership to) const {
+  swift::ForwardingOperand forwardingOp(op);
+  assert(forwardingOp);
+  forwardingOp.replaceOwnershipKind(BridgedValue::castToOwnership(from), BridgedValue::castToOwnership(to));
+}
+
+//===----------------------------------------------------------------------===//
 //                            SILGlobalVariable
 //===----------------------------------------------------------------------===//
 
