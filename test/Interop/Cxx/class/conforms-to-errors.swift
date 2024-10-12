@@ -34,7 +34,7 @@ protocol A {}
 // CHECK: error: protocol 'X' in specified protocol conformance is not found in module 'SwiftTest'
 // CHECK: error: ambiguous reference to protocol 'A' in specified protocol conformance; module 'SwiftTest' contains multiple protocols named 'A'
 // CHECK: error: struct 'B' referenced in protocol conformance 'SwiftTest.B' is not a protocol
-// CHECK: conforms to both protocol A and a struct B it should error: struct 'B' referenced in protocol conformance 'SwiftTest.B' is not a protocol
-// CHECK: conforms to both protocol A and a X it should error: expected module name and protocol name separated by '.' in protocol conformance; 'X' is invalid
+// CHECK: error: struct 'B' referenced in protocol conformance 'SwiftTest.B' is not a protocol
+// CHECK: error: expected module name and protocol name separated by '.' in protocol conformance; 'X' is invalid
 
 func test(_ inv: CInv, _ invMod: CModInv, _ x: CX, _ a: CA, _ b: CB, c: ConformsToValidAProtocolButAlsoStructB, d: ConformsToValidAProtocolButInvalidX) {}
