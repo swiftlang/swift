@@ -18,13 +18,13 @@
 #ifndef SWIFT_TYPEREFINEMENTCONTEXT_H
 #define SWIFT_TYPEREFINEMENTCONTEXT_H
 
-#include "swift/AST/Identifier.h"
 #include "swift/AST/Availability.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/Stmt.h" // for PoundAvailableInfo
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -173,11 +173,6 @@ private:
   /// root context.
   AvailabilityRange AvailabilityInfo;
 
-  /// If this context was annotated with an availability attribute, this property captures that.
-  /// It differs from the above `AvailabilityInfo` by being independent of the deployment target,
-  /// and is used for providing availability attribute redundancy warning diagnostics.
-  AvailabilityRange ExplicitAvailabilityInfo;
-
   std::vector<TypeRefinementContext *> Children;
 
   struct {
@@ -189,20 +184,18 @@ private:
 
   TypeRefinementContext(ASTContext &Ctx, IntroNode Node,
                         TypeRefinementContext *Parent, SourceRange SrcRange,
-                        const AvailabilityRange &Info,
-                        const AvailabilityRange &ExplicitInfo);
+                        const AvailabilityRange &Info);
 
 public:
-  
   /// Create the root refinement context for the given SourceFile.
   static TypeRefinementContext *
   createForSourceFile(SourceFile *SF, const AvailabilityRange &Info);
 
   /// Create a refinement context for the given declaration.
-  static TypeRefinementContext *
-  createForDecl(ASTContext &Ctx, Decl *D, TypeRefinementContext *Parent,
-                const AvailabilityRange &Info,
-                const AvailabilityRange &ExplicitInfo, SourceRange SrcRange);
+  static TypeRefinementContext *createForDecl(ASTContext &Ctx, Decl *D,
+                                              TypeRefinementContext *Parent,
+                                              const AvailabilityRange &Info,
+                                              SourceRange SrcRange);
 
   /// Create a refinement context for the given declaration.
   static TypeRefinementContext *
@@ -276,6 +269,10 @@ public:
       PlatformKind Platform,
       const llvm::VersionTuple &Version) const;
 
+  /// Returns the availability version range that was explicitly written in
+  /// source, if applicable. Otherwise, returns null.
+  std::optional<const AvailabilityRange> getExplicitAvailabilityRange() const;
+
   /// Returns the source range on which this context refines types.
   SourceRange getSourceRange() const { return SrcRange; }
 
@@ -285,16 +282,10 @@ public:
     return AvailabilityInfo;
   }
 
-  /// Returns the information on what availability was specified by the programmer
-  /// on this context (if any).
-  const AvailabilityRange &getExplicitAvailabilityInfo() const {
-    return ExplicitAvailabilityInfo;
-  }
-
   /// Adds a child refinement context.
   void addChild(TypeRefinementContext *Child, ASTContext &Ctx);
 
-  /// Returns the inner-most TypeRefinementContext descendant of this context
+  /// Returns the innermost TypeRefinementContext descendant of this context
   /// for the given source location.
   TypeRefinementContext *findMostRefinedSubContext(SourceLoc Loc,
                                                    ASTContext &Ctx);
@@ -306,7 +297,7 @@ public:
   }
 
   /// Recursively check the tree for integrity. If any errors are found, emits
-  /// diagnosticts to stderr and aborts.
+  /// diagnostics to stderr and aborts.
   void verify(ASTContext &ctx);
 
   SWIFT_DEBUG_DUMPER(dump(SourceManager &SrcMgr));
