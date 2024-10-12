@@ -4,8 +4,8 @@
 // RUN: | %FileCheck %s
 // FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_NonescapableTypes
 
 struct NCContainer : ~Copyable {
   let ptr: UnsafeRawBufferPointer

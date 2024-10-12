@@ -26,8 +26,8 @@
 // RUN:   -enable-upcoming-feature DynamicActorIsolation \
 // RUN:    %t/src/Client.swift -verify | %FileCheck %s
 
-// REQUIRES: asserts
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_DynamicActorIsolation
 
 //--- API.swift
 public func compute<T>(_: ((T) -> Void)?) {}

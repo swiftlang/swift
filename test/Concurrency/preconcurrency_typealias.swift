@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -verify-additional-prefix complete-tns- -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 @preconcurrency @MainActor func f() { }
 // expected-note @-1 2{{calls to global function 'f()' from outside of its actor context are implicitly asynchronous}}

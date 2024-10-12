@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -verify-additional-prefix complete-and-tns- -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 @available(SwiftStdlib 5.1, *)
 class NotSendable { // expected-note 9{{class 'NotSendable' does not conform to the 'Sendable' protocol}}

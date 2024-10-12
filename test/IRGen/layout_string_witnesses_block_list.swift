@@ -10,6 +10,9 @@
 
 // RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-layout-string-value-witnesses -emit-ir -blocklist-file %t/blocklist.yml -module-name Foo %s 2>&1 | %FileCheck %s --check-prefix=CHECK-BLOCKED
 
+// REQUIRES: swift_feature_LayoutStringValueWitnesses
+// REQUIRES: swift_feature_LayoutStringValueWitnessesInstantiation
+
 // CHECK: type_layout_string
 
 // CHECK-BLOCKED: note: Layout string value witnesses have been disabled for module 'Foo' through block list entry

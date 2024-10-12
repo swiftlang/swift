@@ -3,6 +3,8 @@
 // RUN:     -enable-builtin-module                              \
 // RUN:     -debug-diagnostic-names
 
+// REQUIRES: swift_feature_NonescapableTypes
+
 // This test file only exists in order to test without noncopyable_generics and can be deleted once that is always enabled.
 
 @_nonescapable

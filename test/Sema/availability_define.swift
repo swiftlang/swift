@@ -15,6 +15,7 @@
 // RUN:   -enable-experimental-feature AvailabilityMacro="_myProject 2.5:macOS 52.5"
 
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_AvailabilityMacro
 
 @available(_iOS53Aligned, *)
 public func onMacOS50() {}

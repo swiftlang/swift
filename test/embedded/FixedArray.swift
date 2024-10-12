@@ -11,6 +11,8 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: VENDOR=apple
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_feature_FixedArrays
 
 func simpleStackAllocated() {
   var a = FixedArray<Int>(capacity: 10)

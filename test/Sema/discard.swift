@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature MoveOnlyEnumDeinits
 
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
+
 // Typechecking for the discard statement.
 
 func discard() -> Int {}

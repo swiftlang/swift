@@ -2,6 +2,8 @@
 // RUN: %{python} %utils/chex.py < %s > %t/moveonly_deinit.sil
 // RUN: %target-swift-frontend -enable-experimental-feature MoveOnlyEnumDeinits -emit-ir %t/moveonly_deinit.sil | %FileCheck %t/moveonly_deinit.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
+
 // UNSUPPORTED: CPU=arm64e
 
 import Builtin

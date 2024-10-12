@@ -7,6 +7,8 @@
 
 // FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
 
+// REQUIRES: swift_feature_NonescapableTypes
+
 import Builtin
 
 struct BufferView : ~Escapable {

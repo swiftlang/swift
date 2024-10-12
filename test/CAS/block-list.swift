@@ -40,6 +40,9 @@
 // RUN:   -cache-replay-prefix-map /^tmp=%t \
 // RUN:   /^tmp/main.swift @%t/MyApp.cmd 2>&1 | %FileCheck %s --check-prefix CHECK-BLOCKED
 
+// REQUIRES: swift_feature_LayoutStringValueWitnesses
+// REQUIRES: swift_feature_LayoutStringValueWitnessesInstantiation
+
 // CHECK-BLOCKED: note: Layout string value witnesses have been disabled for module 'Test' through block list entry
 // CHECK-BLOCKED-NOT: type_layout_string
 

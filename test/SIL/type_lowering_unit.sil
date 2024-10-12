@@ -2,6 +2,8 @@
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   %s -o /dev/null 2>&1 | %FileCheck %s
 
+// REQUIRES: swift_feature_NonescapableTypes
+
 sil_stage raw
 
 import Builtin

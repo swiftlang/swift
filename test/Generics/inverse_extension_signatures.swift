@@ -3,6 +3,8 @@
 // RUN:   -verify -typecheck %s -debug-generic-signatures \
 // RUN:   -debug-inverse-requirements 2>&1 | %FileCheck %s --implicit-check-not "error:"
 
+// REQUIRES: swift_feature_NonescapableTypes
+
 // CHECK-LABEL: .Outer@
 // CHECK: Generic signature: <A where A : Escapable>
 

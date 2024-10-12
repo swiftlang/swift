@@ -5,7 +5,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 // rdar://106849189 move-only types should be supported in freestanding mode
 // UNSUPPORTED: freestanding

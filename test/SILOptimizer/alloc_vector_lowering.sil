@@ -1,6 +1,7 @@
 // RUN: %target-sil-opt %s -alloc-vector-lowering -enable-experimental-feature FixedArrays | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_FixedArrays
 
 sil_stage canonical
 

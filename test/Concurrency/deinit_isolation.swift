@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature IsolatedDeinit -emit-silgen -DSILGEN %s | %FileCheck -check-prefix=CHECK-SYMB %s
 
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_IsolatedDeinit
 
 // Fixtures
 

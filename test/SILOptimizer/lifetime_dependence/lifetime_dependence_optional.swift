@@ -6,8 +6,8 @@
 // RUN:   -disable-experimental-parser-round-trip
 // FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_NonescapableTypes
 
 // Simply test that it is possible for a module to define a pseudo-Optional type without triggering any compiler errors.
 

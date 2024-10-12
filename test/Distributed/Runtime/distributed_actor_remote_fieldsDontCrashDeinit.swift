@@ -7,6 +7,7 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: distributed
+// REQUIRES: swift_feature_IsolatedDeinit
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib

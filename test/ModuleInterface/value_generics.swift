@@ -3,6 +3,8 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name ValueGeneric -disable-availability-checking -disable-experimental-parser-round-trip
 // RUN: %FileCheck %s < %t.swiftinterface
 
+// REQUIRES: swift_feature_ValueGenerics
+
 // CHECK: public struct Vector<Element, let N : Swift.Int>
 public struct Vector<Element, let N: Int> {
   // CHECK-LABEL: public var count: Swift.Int {

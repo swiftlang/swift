@@ -1,5 +1,8 @@
 // RUN: %target-typecheck-verify-swift -parse-stdlib -module-name Swift -enable-experimental-feature BuiltinModule -enable-experimental-feature NonescapableTypes
 
+// REQUIRES: swift_feature_BuiltinModule
+// REQUIRES: swift_feature_NonescapableTypes
+
 
 
 /// This test specifically covers constructs that are only valid in the stdlib.

@@ -13,6 +13,8 @@
 
 // FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
 
+// REQUIRES: swift_feature_NonescapableTypes
+
 import def_implicit_lifetime_dependence
 
 func use(_ x: borrowing BufferView) {}

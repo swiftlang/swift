@@ -2,6 +2,9 @@
 // RUN: %{python} %utils/chex.py < %s > %t/raw_layout.sil
 // RUN: %target-swift-frontend -enable-experimental-feature RawLayout -enable-experimental-feature ValueGenerics -emit-ir -disable-availability-checking -I %S/Inputs -cxx-interoperability-mode=upcoming-swift %t/raw_layout.sil | %FileCheck %t/raw_layout.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
+// REQUIRES: swift_feature_RawLayout
+// REQUIRES: swift_feature_ValueGenerics
+
 import Builtin
 import Swift
 import RawLayoutCXX

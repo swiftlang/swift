@@ -7,6 +7,8 @@
 // RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %t/A.swift %t/B.swift %t/C.swift -I %t -verify -swift-version 6
 // RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %t/A.swift %t/B.swift %t/C.swift -I %t -verify -swift-version 5 -enable-upcoming-feature MemberImportVisibility -verify-additional-prefix member-visibility-
 
+// REQUIRES: swift_feature_MemberImportVisibility
+
 //--- main.swift
 
 // expected-member-visibility-note@+2 {{add import of module 'members_A'}}{{1-1=@_implementationOnly import members_A\n}}

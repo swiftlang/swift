@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -import-objc-header %S/Inputs/objc_implementation.h -enable-experimental-feature ObjCImplementation -enable-experimental-feature CImplementation -target %target-stable-abi-triple
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_CImplementation
+// REQUIRES: swift_feature_ObjCImplementation
 
 protocol EmptySwiftProto {}
 

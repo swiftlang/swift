@@ -24,6 +24,8 @@
 // RUN:   -enable-library-evolution \
 // RUN:   -enable-experimental-feature AccessLevelOnImport -verify
 
+// REQUIRES: swift_feature_AccessLevelOnImport
+
 //--- PublicLib.swift
 public struct PublicImportType {
     public init() {}
