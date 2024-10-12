@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 
 /// Promotes heap allocated objects to the stack.
@@ -72,6 +73,17 @@ private func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
   // not visible and let the object appear to escape.
   if allocRef.type.nominal!.isResilient(in: allocRef.parentFunction) {
     return false
+  }
+
+  if let dtor = (allocRef.type.nominal as? ClassDecl)?.destructor {
+    if dtor.isIsolated {
+      // Classes (including actors) with isolated deinit can escape implicitly.
+      //
+      // We could optimize this further and allow promotion if we can prove that
+      // deinit will take fast path (i.e. it will not schedule a job).
+      // But for now, let's keep things simple and disable promotion conservatively.
+      return false
+    }
   }
 
   // The most important check: does the object escape the current function?

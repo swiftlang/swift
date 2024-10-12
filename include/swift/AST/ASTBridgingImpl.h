@@ -142,6 +142,16 @@ BridgedASTType BridgedDeclObj::Class_getSuperclass() const {
   return {getAs<swift::ClassDecl>()->getSuperclass().getPointer()};
 }
 
+BridgedDeclObj BridgedDeclObj::Class_getDestructor() const {
+  return {getAs<swift::ClassDecl>()->getDestructor()};
+}
+
+bool BridgedDeclObj::Destructor_isIsolated() const {
+  auto dd = getAs<swift::DestructorDecl>();
+  auto ai = swift::getActorIsolation(dd);
+  return ai.isActorIsolated();
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedASTNode
 //===----------------------------------------------------------------------===//
