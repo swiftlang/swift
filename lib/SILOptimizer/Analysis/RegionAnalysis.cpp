@@ -1495,14 +1495,15 @@ public:
 
     REGIONBASEDISOLATION_LOG(
         llvm::dbgs()
-        << PER_FUNCTION_SEP_STR
-        << "Beginning processing: " << function->getName() << '\n'
-        << "Demangled: "
-        << Demangle::demangleSymbolAsString(
-               function->getName(),
-               Demangle::DemangleOptions::SimplifiedUIDemangleOptions())
-        << '\n'
-        << PER_FUNCTION_SEP_STR);
+            << PER_FUNCTION_SEP_STR
+            << "Beginning processing: " << function->getName() << '\n'
+            << "Demangled: "
+            << Demangle::demangleSymbolAsString(
+                   function->getName(),
+                   Demangle::DemangleOptions::SimplifiedUIDemangleOptions())
+            << '\n'
+            << PER_FUNCTION_SEP_STR << "Dump:\n";
+        function->print(llvm::dbgs()));
 
     gatherFlowInsensitiveInformationBeforeDataflow();
 

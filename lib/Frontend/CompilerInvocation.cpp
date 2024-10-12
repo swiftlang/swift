@@ -2981,6 +2981,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                            DiagnosticEngine &Diags,
                            const FrontendOptions &FrontendOpts,
                            const SILOptions &SILOpts,
+                           const LangOptions &LangOpts,
                            StringRef SDKPath,
                            StringRef ResourceDir,
                            const llvm::Triple &Triple) {
@@ -3472,6 +3473,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_fragile_resilient_protocol_witnesses,
                  OPT_disable_fragile_resilient_protocol_witnesses,
                  Opts.UseFragileResilientProtocolWitnesses);
+  Opts.EmitYieldOnce2AsYieldOnce =
+      !LangOpts.hasFeature(Feature::CoroutineAccessorsAllocateInCallee);
   Opts.EnableHotColdSplit =
       Args.hasFlag(OPT_enable_split_cold_code,
                    OPT_disable_split_cold_code,
@@ -3694,7 +3697,7 @@ bool CompilerInvocation::parseArgs(
   }
 
   if (ParseIRGenArgs(IRGenOpts, ParsedArgs, Diags, FrontendOpts, SILOpts,
-                     getSDKPath(), SearchPathOpts.RuntimeResourcePath,
+                     LangOpts, getSDKPath(), SearchPathOpts.RuntimeResourcePath,
                      LangOpts.Target)) {
     return true;
   }

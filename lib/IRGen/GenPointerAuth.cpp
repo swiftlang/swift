@@ -601,6 +601,8 @@ static uint64_t getYieldTypesHash(IRGenModule &IGM, CanSILFunctionType type) {
     switch (type->getCoroutineKind()) {
     case SILCoroutineKind::YieldMany: return "yield_many:";
     case SILCoroutineKind::YieldOnce: return "yield_once:";
+    case SILCoroutineKind::YieldOnce2:
+      return "yield_once_2:";
     case SILCoroutineKind::None: llvm_unreachable("not a coroutine");
     }
     llvm_unreachable("bad coroutine kind");

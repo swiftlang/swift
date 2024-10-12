@@ -296,6 +296,8 @@ static bool usesFeatureAllowUnsafeAttribute(Decl *decl) {
 UNINTERESTING_FEATURE(WarnUnsafe)
 UNINTERESTING_FEATURE(SafeInterop)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
+UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
+UNINTERESTING_FEATURE(CoroutineAccessorsAllocateInCallee)
 
 bool swift::usesFeatureIsolatedDeinit(const Decl *decl) {
   if (auto cd = dyn_cast<ClassDecl>(decl)) {

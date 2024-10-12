@@ -366,6 +366,7 @@ public:
   llvm::DenseMap<SILValue, LoweredValue> LoweredValues;
   llvm::DenseMap<SILValue, StackAddress> LoweredPartialApplyAllocations;
   llvm::DenseMap<SILType, LoweredValue> LoweredUndefs;
+  llvm::DenseMap<SILValue, llvm::Value *> LoweredSingleYieldFrames;
 
   /// All alloc_ref instructions which allocate the object on the stack.
   llvm::SmallPtrSet<SILInstruction *, 8> StackAllocs;
@@ -2130,6 +2131,13 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   switch (funcTy->getCoroutineKind()) {
   case SILCoroutineKind::None:
     break;
+  case SILCoroutineKind::YieldOnce2:
+    if (IGF.IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
+      LLVM_FALLTHROUGH;
+    } else {
+      emitYieldOnce2CoroutineEntry(IGF, funcTy, *emission);
+      break;
+    }
   case SILCoroutineKind::YieldOnce:
     emitYieldOnceCoroutineEntry(IGF, funcTy, *emission);
     break;
@@ -3782,6 +3790,14 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   switch (origCalleeType->getCoroutineKind()) {
   case SILCoroutineKind::None:
     break;
+
+  case SILCoroutineKind::YieldOnce2:
+    if (IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
+      LLVM_FALLTHROUGH;
+    } else {
+      // @yield_once_2 coroutines allocate in the callee
+      break;
+    }
 
   case SILCoroutineKind::YieldOnce:
     coroutineBuffer = emitAllocYieldOnceCoroutineBuffer(*this);
@@ -6247,6 +6263,13 @@ void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
     assert(closure->isOnStack());
     auto stackAddr = LoweredPartialApplyAllocations[i->getOperand()];
     emitDeallocateDynamicAlloca(stackAddr);
+    return;
+  }
+  if (isaResultOf<BeginApplyInst>(i->getOperand())) {
+    auto *mvi = getAsResultOf<BeginApplyInst>(i->getOperand());
+    auto *bai = cast<BeginApplyInst>(mvi->getParent());
+    emitDeallocYieldOnce2CoroutineFrame(
+        *this, LoweredSingleYieldFrames[bai->getCalleeAllocationResult()]);
     return;
   }
 
