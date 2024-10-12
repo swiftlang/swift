@@ -1431,8 +1431,22 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
 
 DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     Type baseTy, ValueDecl *value, DeclContext *useDC, bool isDynamicLookup,
+    FunctionRefKind functionRefKind, ConstraintLocator *locator) {
+  ArrayRef<OpenedType> replacements;
+  if (!isa<TypeDecl>(value)) {
+    auto *innerDC = value->getInnermostDeclContext();
+    if (auto genericSig = innerDC->getGenericSignatureOfContext())
+      replacements = openGenericParameters(genericSig, locator);
+  }
+
+  return getTypeOfMemberReference(baseTy, value, useDC, isDynamicLookup,
+                                  functionRefKind, locator, replacements);
+}
+
+DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
+    Type baseTy, ValueDecl *value, DeclContext *useDC, bool isDynamicLookup,
     FunctionRefKind functionRefKind, ConstraintLocator *locator,
-    ArrayRef<OpenedType> *replacementsPtr) {
+    ArrayRef<OpenedType> replacements) {
   // Figure out the instance type used for the base.
   Type resolvedBaseTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
 
@@ -1448,21 +1462,9 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   auto baseObjTy = resolvedBaseTy->getMetatypeInstanceType();
   FunctionType::Param baseObjParam(baseObjTy);
 
-  // Indicates whether this is a valid reference to a static member on a
-  // protocol metatype. Such a reference is only valid if performed through
-  // leading dot syntax e.g. `foo(.bar)` where implicit base is a protocol
-  // metatype and `bar` is static member declared in a protocol  or its
-  // extension.
-  bool isStaticMemberRefOnProtocol = false;
-  if (baseObjTy->isExistentialType() && value->isStatic() &&
-      locator->isLastElement<LocatorPathElt::UnresolvedMember>()) {
-    assert(resolvedBaseTy->is<MetatypeType>() &&
-           "Assumed base of unresolved member access must be a metatype");
-    isStaticMemberRefOnProtocol = true;
-  }
-
   if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
-    assert(!isa<ModuleDecl>(typeDecl) && "Nested module?");
+    ASSERT(replacements.empty());
+    ASSERT(!isa<ModuleDecl>(typeDecl) && "Nested module?");
 
     auto memberTy = TypeChecker::substMemberTypeWithBase(typeDecl, baseObjTy);
 
@@ -1485,6 +1487,19 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     return { openedType, openedType, memberTy, memberTy, Type() };
   }
 
+  // Indicates whether this is a valid reference to a static member on a
+  // protocol metatype. Such a reference is only valid if performed through
+  // leading dot syntax e.g. `foo(.bar)` where implicit base is a protocol
+  // metatype and `bar` is static member declared in a protocol  or its
+  // extension.
+  bool isStaticMemberRefOnProtocol = false;
+  if (baseObjTy->isExistentialType() && value->isStatic() &&
+      locator->isLastElement<LocatorPathElt::UnresolvedMember>()) {
+    assert(resolvedBaseTy->is<MetatypeType>() &&
+           "Assumed base of unresolved member access must be a metatype");
+    isStaticMemberRefOnProtocol = true;
+  }
+
   if (isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) {
     if (value->getInterfaceType()->is<ErrorType>()) {
       auto genericErrorTy = ErrorType::get(getASTContext());
@@ -1496,14 +1511,11 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   DeclContext *innerDC = value->getInnermostDeclContext();
   DeclContext *outerDC = value->getDeclContext();
 
-  ArrayRef<OpenedType> localReplacements;
-  auto &replacements = replacementsPtr ? *replacementsPtr : localReplacements;
-
   // If we have a generic signature, open the parameters. We delay opening
   // requirements to allow contextual types to affect the situation.
   auto genericSig = innerDC->getGenericSignatureOfContext();
   if (genericSig) {
-    replacements = openGenericParameters(genericSig, locator);
+    ASSERT(!replacements.empty());
     introduceGenericParameters(replacements);
     recordOpenedTypes(locator, replacements);
   }
@@ -2353,7 +2365,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       declRefType = getTypeOfMemberReference(
           baseTy, choice.getDecl(), useDC,
           (kind == OverloadChoiceKind::DeclViaDynamic),
-          choice.getFunctionRefKind(), locator, nullptr);
+          choice.getFunctionRefKind(), locator);
     } else {
       declRefType = getTypeOfReference(
           choice.getDecl(), choice.getFunctionRefKind(), locator, useDC);

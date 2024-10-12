@@ -4400,8 +4400,12 @@ public:
   /// \returns a description of the type of this declaration reference.
   DeclReferenceType getTypeOfMemberReference(
       Type baseTy, ValueDecl *decl, DeclContext *useDC, bool isDynamicLookup,
+      FunctionRefKind functionRefKind, ConstraintLocator *locator);
+
+  DeclReferenceType getTypeOfMemberReference(
+      Type baseTy, ValueDecl *decl, DeclContext *useDC, bool isDynamicLookup,
       FunctionRefKind functionRefKind, ConstraintLocator *locator,
-      ArrayRef<OpenedType> *replacements = nullptr);
+      ArrayRef<OpenedType> replacements);
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
   /// with a type variable) at the given location.
