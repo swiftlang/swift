@@ -33,8 +33,8 @@
 // CHECK-NO-PCMO-SIL-DAG: sil private [transparent] [thunk] @$s3Lib3PubVAA5ProtoA2aDP3fooSSvgTW : $@convention(witness_method: Proto) (@in_guaranteed Pub) -> @owned String {
 // CHECK-SIL-DAG:         sil shared [transparent] [thunk] @$s3Lib3PubVAA5ProtoA2aDP3fooSSvgTW : $@convention(witness_method: Proto) (@in_guaranteed Pub) -> @owned String {
 
-// CHECK-NO-PCMO-IR-DAG: define internal swiftcc { {{i64|i32}}, ptr } @"$s3Lib3PubVAA5ProtoA2aDP3fooSSvgTW"
-// CHECK-IR-DAG:         define linkonce_odr hidden swiftcc { {{i64|i32}}, ptr } @"$s3Lib3PubVAA5ProtoA2aDP3fooSSvgTW"
+// CHECK-NO-PCMO-IR-DAG: define internal swiftcc { {{i64, ptr|i32, i32, i32}} } @"$s3Lib3PubVAA5ProtoA2aDP3fooSSvgTW"
+// CHECK-IR-DAG:         define linkonce_odr hidden swiftcc { {{i64, ptr|i32, i32, i32}} } @"$s3Lib3PubVAA5ProtoA2aDP3fooSSvgTW"
 
 // protocol witness for Proto.bar(_:) in conformance Pub
 
@@ -45,7 +45,7 @@
 // CHECK-SIL-DAG:         sil shared [transparent] [thunk] @$s3Lib3PubVAA5ProtoA2aDP3baryS2iFTW : $@convention(witness_method: Proto) (Int, @in_guaranteed Pub) -> Int {
 
 // CHECK-NO-PCMO-IR-DAG: define internal swiftcc {{i64|i32}} @"$s3Lib3PubVAA5ProtoA2aDP3baryS2iFTW"
-// CHECK-IR-DAG:         define linkonce_odr hidden swiftcc i64 @"$s3Lib3PubVAA5ProtoA2aDP3baryS2iFTW"
+// CHECK-IR-DAG:         define linkonce_odr hidden swiftcc {{i64|i32}} @"$s3Lib3PubVAA5ProtoA2aDP3baryS2iFTW"
 
 // CHECK-NO-PCMO-TBD-NOT: s3Lib3PubVAA5ProtoA2aDP3fooSSvgTW
 // CHECK-NO-PCMO-TBD-NOT: s3Lib3PubVAA5ProtoA2aDP3baryS2iFTW
