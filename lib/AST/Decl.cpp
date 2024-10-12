@@ -2344,11 +2344,35 @@ PatternBindingDecl::getInitializerIsolation(unsigned i) const {
   return var->getInitializerIsolation();
 }
 
+Expr *PatternBindingDecl::getContextualizedInit(unsigned i) const {
+  auto *mutableThis = const_cast<PatternBindingDecl *>(this);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      PatternBindingCheckedAndContextualizedInitRequest{mutableThis, i},
+      nullptr);
+}
+
 Expr *PatternBindingDecl::getCheckedAndContextualizedInit(unsigned i) const {
-  return evaluateOrDefault(getASTContext().evaluator,
-                           PatternBindingCheckedAndContextualizedInitRequest{
-                               const_cast<PatternBindingDecl *>(this), i},
-                           nullptr);
+  auto *expr = getContextualizedInit(i);
+
+  if (auto *initContext = getInitContext(i)) {
+    // Property wrapper isolation is checked separately while
+    // synthesizing the backing property wrapper initializer.
+    auto *var = getSingleVar();
+    if (!(var && var->hasAttachedPropertyWrapper())) {
+      (void)getInitializerIsolation(i);
+    }
+
+    // Effects checking for 'async' needs actor isolation to be
+    // computed. Always run effects checking after the actor
+    // isolation checker.
+    evaluateOrDefault(
+        getASTContext().evaluator,
+        CheckInitEffectsRequest{initContext, expr},
+        {});
+  }
+
+  return expr;
 }
 
 Expr *PatternBindingDecl::getCheckedAndContextualizedExecutableInit(

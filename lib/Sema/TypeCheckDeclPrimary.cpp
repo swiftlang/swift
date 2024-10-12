@@ -2885,22 +2885,6 @@ public:
         // Trigger a request that will complete typechecking for the
         // initializer.
         (void) PBD->getCheckedAndContextualizedInit(i);
-
-        if (auto *var = PBD->getSingleVar()) {
-          if (var->hasAttachedPropertyWrapper())
-            return;
-        }
-
-        if (!PBD->getDeclContext()->isLocalContext()) {
-          (void) PBD->getInitializerIsolation(i);
-        }
-
-        // Effects checking for 'async' needs actor isolation to be computed.
-        // Always run effects checking after the actor isolation checker.
-        if (auto *initContext = PBD->getInitContext(i)) {
-          auto *init = PBD->getInit(i);
-          TypeChecker::checkInitializerEffects(initContext, init);
-        }
       }
     }
 
