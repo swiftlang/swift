@@ -689,14 +689,13 @@ private:
       return nullptr;
 
     // Declarations with an explicit availability attribute always get a TRC.
-    if (hasActiveAvailableAttribute(D, Context)) {
-      AvailabilityRange DeclaredAvailability =
-          swift::AvailabilityInference::availableRange(D, Context);
-
+    AvailabilityRange DeclaredAvailability =
+        swift::AvailabilityInference::availableRange(D, Context);
+    if (!DeclaredAvailability.isAlwaysAvailable()) {
       return TypeRefinementContext::createForDecl(
           Context, D, getCurrentTRC(),
           getEffectiveAvailabilityForDeclSignature(D, DeclaredAvailability),
-          DeclaredAvailability, refinementSourceRangeForDecl(D));
+          refinementSourceRangeForDecl(D));
     }
 
     // Declarations without explicit availability get a TRC if they are
@@ -1096,8 +1095,6 @@ private:
     for (StmtConditionElement Element : Cond) {
       TypeRefinementContext *CurrentTRC = getCurrentTRC();
       AvailabilityRange CurrentInfo = CurrentTRC->getAvailabilityInfo();
-      AvailabilityRange CurrentExplicitInfo =
-          CurrentTRC->getExplicitAvailabilityInfo();
 
       // If the element is not a condition, walk it in the current TRC.
       if (Element.getKind() != StmtConditionElement::CK_Availability) {
@@ -1178,7 +1175,8 @@ private:
       // current TRC is completely contained in the range for the spec, then
       // a version query can never be false, so the spec is useless.
       // If so, report this.
-      if (CurrentExplicitInfo.isContainedIn(NewConstraint)) {
+      auto ExplicitRange = CurrentTRC->getExplicitAvailabilityRange();
+      if (ExplicitRange && ExplicitRange->isContainedIn(NewConstraint)) {
         // Unavailability refinements are always "useless" from a symbol
         // availability point of view, so only useless availability specs are
         // reported.
@@ -1939,16 +1937,15 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
   if (!TRC)
     return false;
 
-  AvailabilityRange AvailabilityAtLoc = TRC->getExplicitAvailabilityInfo();
-  if (!AvailabilityAtLoc.isAlwaysAvailable() &&
-      !RequiredAvailability.isAlwaysAvailable() &&
+  auto ExplicitAvailability = TRC->getExplicitAvailabilityRange();
+  if (ExplicitAvailability && !RequiredAvailability.isAlwaysAvailable() &&
       TRC->getReason() != TypeRefinementContext::Reason::Root &&
-      RequiredAvailability.isContainedIn(AvailabilityAtLoc)) {
+      RequiredAvailability.isContainedIn(*ExplicitAvailability)) {
 
     // Only fix situations that are "nearby" versions, meaning
     // disagreement on a minor-or-less version (subminor-or-less version for
     // macOS 10.x.y).
-    auto RunningVers = AvailabilityAtLoc.getRawMinimumVersion();
+    auto RunningVers = ExplicitAvailability->getRawMinimumVersion();
     auto RequiredVers = RequiredAvailability.getRawMinimumVersion();
     auto Platform = targetPlatform(Context.LangOpts);
     if (RunningVers.getMajor() != RequiredVers.getMajor())
