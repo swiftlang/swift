@@ -8,6 +8,10 @@
 // REQUIRES: concurrency
 // REQUIRES: asserts
 
+// This tests errors emitted in definite initialization; this test file cannot
+// have any type checker errors. Type checker errors for IsolatedDefaultValues
+// are tested in isolated_default_arguments.swift
+
 @globalActor
 actor SomeGlobalActor {
   static let shared = SomeGlobalActor()

@@ -16,7 +16,6 @@
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckMacros.h"
-#include "TypeCheckRegex.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
@@ -1242,12 +1241,18 @@ namespace {
       CS.setType(expr, expansionType);
     }
 
-    virtual Type visitErrorExpr(ErrorExpr *E) {
+    /// Records a fix for an invalid AST node, and returns a potential hole
+    /// type variable for it.
+    Type recordInvalidNode(ASTNode node) {
       CS.recordFix(
-          IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(E)));
+          IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(node)));
 
-      return CS.createTypeVariable(CS.getConstraintLocator(E),
+      return CS.createTypeVariable(CS.getConstraintLocator(node),
                                    TVO_CanBindToHole);
+    }
+
+    virtual Type visitErrorExpr(ErrorExpr *E) {
+      return recordInvalidNode(E);
     }
 
     virtual Type visitCodeCompletionExpr(CodeCompletionExpr *E) {
@@ -1498,30 +1503,12 @@ namespace {
     }
 
     Type visitRegexLiteralExpr(RegexLiteralExpr *E) {
-      auto &ctx = CS.getASTContext();
-      auto *regexDecl = ctx.getRegexDecl();
-      if (!regexDecl) {
-        ctx.Diags.diagnose(E->getLoc(),
-                           diag::string_processing_lib_missing,
-                           ctx.Id_Regex.str());
-        return Type();
-      }
-      SmallVector<TupleTypeElt, 4> matchElements;
-      if (decodeRegexCaptureTypes(ctx,
-                                  E->getSerializedCaptureStructure(),
-                                  /*atomType*/ ctx.getSubstringType(),
-                                  matchElements)) {
-        ctx.Diags.diagnose(E->getLoc(),
-                           diag::regex_capture_types_failed_to_decode);
-        return Type();
-      }
-      assert(!matchElements.empty() && "Should have decoded at least an atom");
-      if (matchElements.size() == 1)
-        return BoundGenericStructType::get(
-            regexDecl, Type(), matchElements.front().getType());
-      // Form a tuple.
-      auto matchType = TupleType::get(matchElements, ctx);
-      return BoundGenericStructType::get(regexDecl, Type(), {matchType});
+      // Retrieve the computed Regex type from the compiler regex library.
+      auto ty = E->getRegexType();
+      if (!ty)
+        return recordInvalidNode(E);
+
+      return ty;
     }
 
     PackExpansionExpr *getParentPackExpansionExpr(Expr *E) const {

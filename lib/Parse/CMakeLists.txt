@@ -39,7 +39,7 @@ endif()
 
 if(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER)
   target_compile_definitions(swiftParse
-    PRIVATE
+    PUBLIC
     SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
   )
 endif()

@@ -154,7 +154,7 @@ extension ASTGenVisitor {
     case .prefixOperatorExpr(let node):
       return self.generate(prefixOperatorExpr: node).asExpr
     case .regexLiteralExpr(let node):
-      return self.generate(regexLiteralExpr: node)
+      return self.generate(regexLiteralExpr: node).asExpr
     case .sequenceExpr(let node):
       return self.generate(sequenceExpr: node)
     case .simpleStringLiteralExpr:
@@ -602,6 +602,19 @@ extension ASTGenVisitor {
         kind: .prefixOperator
       ).asExpr,
       operand: self.generate(expr: node.expression)
+    )
+  }
+
+  func generate(regexLiteralExpr node: RegexLiteralExprSyntax) -> BridgedRegexLiteralExpr {
+    // Copy the regex string to the ASTContext.
+    var str = node.trimmedDescription
+    let regexText = str.withBridgedString {
+      self.ctx.allocateCopy(string: $0)
+    }
+    return .createParsed(
+      self.ctx,
+      loc: self.generateSourceLoc(node),
+      regexText: regexText
     )
   }
 
