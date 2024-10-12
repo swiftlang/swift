@@ -847,19 +847,42 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      FunctionRefKind functionRefKind,
                                      ConstraintLocatorBuilder locator,
                                      DeclContext *useDC) {
+  ArrayRef<OpenedType> replacements;
+
+  if (isa<AbstractFunctionDecl>(value) || isa<MacroDecl>(value)) {
+    auto *innerDC = value->getInnermostDeclContext();
+    if (auto sig = innerDC->getGenericSignatureOfContext()) {
+      replacements = openGenericParameters(sig, locator);
+    }
+  }
+
+  return getTypeOfReference(value, functionRefKind, locator,
+                            replacements, useDC);
+}
+
+DeclReferenceType
+ConstraintSystem::getTypeOfReference(ValueDecl *value,
+                                     FunctionRefKind functionRefKind,
+                                     ConstraintLocatorBuilder locator,
+                                     ArrayRef<OpenedType> replacements,
+                                     DeclContext *useDC) {
+  auto *innerDC = value->getInnermostDeclContext();
+  auto *outerDC = value->getDeclContext();
+
+  if (isa<AbstractFunctionDecl>(value) || isa<MacroDecl>(value)) {
+    if (auto sig = innerDC->getGenericSignatureOfContext()) {
+      ASSERT(!replacements.empty());
+      introduceGenericParameters(replacements);
+      recordOpenedTypes(locator, replacements);
+
+      openGenericRequirements(outerDC, sig, locator, replacements);
+    }
+  }
+
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
     // Unqualified lookup can find operator names within nominal types.
     auto func = cast<FuncDecl>(value);
     assert(func->isOperator() && "Lookup should only find operators");
-
-    ArrayRef<OpenedType> replacements;
-    if (auto sig = func->getGenericSignature()) {
-      replacements = openGenericParameters(sig, locator);
-      introduceGenericParameters(replacements);
-      recordOpenedTypes(locator, replacements);
-
-      openGenericRequirements(func->getDeclContext(), sig, locator, replacements);
-    }
 
     AnyFunctionType *funcType = func->getInterfaceType()
         ->castTo<AnyFunctionType>();
@@ -890,15 +913,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
   // Unqualified reference to a local or global function.
   if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(value)) {
-    ArrayRef<OpenedType> replacements;
-    if (auto sig = funcDecl->getGenericSignature()) {
-      replacements = openGenericParameters(sig, locator);
-      introduceGenericParameters(replacements);
-      recordOpenedTypes(locator, replacements);
-
-      openGenericRequirements(funcDecl->getDeclContext(), sig, locator, replacements);
-    }
-
     auto funcType = funcDecl->getInterfaceType()->castTo<AnyFunctionType>();
     auto numLabelsToRemove = getNumRemovedArgumentLabels(
         funcDecl, /*isCurriedInstanceReference=*/false, functionRefKind);
@@ -930,6 +944,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
   // Unqualified reference to a type.
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
+    ASSERT(replacements.empty());
+
     // Resolve the reference to this type declaration in our current context.
     auto type =
         TypeResolution::forInterface(useDC, TypeResolverContext::InExpression,
@@ -957,15 +973,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   // Unqualified reference to a macro.
   if (auto macro = dyn_cast<MacroDecl>(value)) {
     // Open any the generic types.
-    ArrayRef<OpenedType> replacements;
-    if (auto sig = macro->getGenericSignature()) {
-      replacements = openGenericParameters(sig, locator);
-      introduceGenericParameters(replacements);
-      recordOpenedTypes(locator, replacements);
-
-      openGenericRequirements(macro->getDeclContext(), sig, locator, replacements);
-    }
-
     auto macroType = macro->getInterfaceType()->castTo<AnyFunctionType>();
 
     Type openedType = openFunctionType(macroType, locator, replacements);
@@ -974,6 +981,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     return { openedType, openedType, openedType, openedType, Type() };
   }
+
+  ASSERT(replacements.empty());
 
   // Only remaining case: unqualified reference to a property.
   auto *varDecl = cast<VarDecl>(value);

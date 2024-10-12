@@ -4355,6 +4355,13 @@ public:
                           ConstraintLocatorBuilder locator,
                           DeclContext *useDC);
 
+  DeclReferenceType getTypeOfReference(
+                          ValueDecl *decl,
+                          FunctionRefKind functionRefKind,
+                          ConstraintLocatorBuilder locator,
+                          ArrayRef<OpenedType> replacements,
+                          DeclContext *useDC);
+
   /// Return the type-of-reference of the given value.
   ///
   /// \param baseType if non-null, return the type of a member reference to
