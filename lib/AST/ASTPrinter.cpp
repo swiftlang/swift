@@ -4746,7 +4746,7 @@ void PrintAST::visitBooleanLiteralExpr(BooleanLiteralExpr *expr) {
 }
 
 void PrintAST::visitRegexLiteralExpr(RegexLiteralExpr *expr) {
-  Printer << expr->getRegexText();
+  Printer << expr->getParsedRegexText();
 }
 
 void PrintAST::visitErrorExpr(ErrorExpr *expr) {

@@ -214,6 +214,18 @@ class C3 {
   @SomeGlobalActor var y = 2
 }
 
+class C4 {
+  let task1 = Task {
+    // expected-error@+2 {{expression is 'async' but is not marked with 'await'}}
+    // expected-note@+1 {{calls to global function 'requiresMainActor()' from outside of its actor context are implicitly asynchronous}}
+    requiresMainActor()
+  }
+
+  let task2 = Task {
+    await requiresMainActor() // okay
+  }
+}
+
 @MainActor struct NonIsolatedInit {
   var x = 0
   var y = 0

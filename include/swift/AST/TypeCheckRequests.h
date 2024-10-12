@@ -3929,6 +3929,25 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Run effects checking for an initializer expression.
+class CheckInitEffectsRequest
+    : public SimpleRequest<CheckInitEffectsRequest,
+                           evaluator::SideEffect(Initializer *, Expr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator,
+                                 Initializer *initCtx,
+                                 Expr *init) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 /// Retrieves the primary source files in the main module.
 // FIXME: This isn't really a type-checking request, if we ever split off a
 // zone for more basic AST requests, this should be moved there.
@@ -5082,6 +5101,31 @@ private:
 
   bool evaluate(Evaluator &evaluator, NominalTypeDecl *decl,
                 KnownProtocolKind kp) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+struct RegexLiteralPatternInfo {
+  StringRef RegexToEmit;
+  Type RegexType;
+  size_t Version;
+};
+
+/// Parses the regex pattern for a given regex literal using the
+/// compiler's regex parsing library, and returns the resulting info.
+class RegexLiteralPatternInfoRequest
+    : public SimpleRequest<RegexLiteralPatternInfoRequest,
+                           RegexLiteralPatternInfo(const RegexLiteralExpr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  RegexLiteralPatternInfo evaluate(Evaluator &evaluator,
+                                   const RegexLiteralExpr *regex) const;
 
 public:
   bool isCached() const { return true; }
