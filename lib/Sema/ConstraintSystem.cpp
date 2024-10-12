@@ -1184,7 +1184,8 @@ void ConstraintSystem::addOverloadSet(Type boundType,
                                       std::optional<unsigned> favoredIndex) {
   // If there is a single choice, add the bind overload directly.
   if (choices.size() == 1) {
-    addBindOverloadConstraint(boundType, choices.front(), locator, useDC);
+    auto preparedChoice = getPreparedOverload(locator, choices.front());
+    resolveOverload(locator, boundType, preparedChoice, useDC);
     return;
   }
 

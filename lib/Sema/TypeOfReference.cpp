@@ -848,7 +848,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      ConstraintLocatorBuilder locator,
                                      DeclContext *useDC) {
   ArrayRef<OpenedType> replacements;
-
   if (isa<AbstractFunctionDecl>(value) || isa<MacroDecl>(value)) {
     auto *innerDC = value->getInnermostDeclContext();
     if (auto sig = innerDC->getGenericSignatureOfContext()) {
@@ -1452,7 +1451,8 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
 
   // If the base is a module type, just use the type of the decl.
   if (resolvedBaseTy->is<ModuleType>()) {
-    return getTypeOfReference(value, functionRefKind, locator, useDC);
+    return getTypeOfReference(value, functionRefKind, locator, replacements,
+                              useDC);
   }
 
   // Check to see if the self parameter is applied, in which case we'll want to
@@ -2317,10 +2317,59 @@ void ConstraintSystem::recordResolvedOverload(ConstraintLocator *locator,
     recordChange(SolverTrail::Change::ResolvedOverload(locator));
 }
 
+PreparedOverloadChoice
+ConstraintSystem::getPreparedOverload(ConstraintLocator *locator,
+                                      OverloadChoice choice) {
+  ArrayRef<OpenedType> replacements;
+
+  switch (auto kind = choice.getKind()) {
+  case OverloadChoiceKind::Decl:
+  case OverloadChoiceKind::DeclViaBridge:
+  case OverloadChoiceKind::DeclViaDynamic:
+  case OverloadChoiceKind::DeclViaUnwrappedOptional:
+  case OverloadChoiceKind::DynamicMemberLookup:
+  case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
+    auto *value = choice.getDecl();
+
+    auto semantics = TypeChecker::getDeclTypeCheckingSemantics(value);
+    if (semantics != DeclTypeCheckingSemantics::Normal)
+      break;
+
+    if (choice.getBaseType()) {
+      if (!isa<TypeDecl>(value)) {
+        auto *innerDC = value->getInnermostDeclContext();
+        if (auto genericSig = innerDC->getGenericSignatureOfContext())
+          replacements = openGenericParameters(genericSig, locator);
+      }
+    } else {
+      if (isa<AbstractFunctionDecl>(value) || isa<MacroDecl>(value)) {
+        auto *innerDC = value->getInnermostDeclContext();
+        if (auto sig = innerDC->getGenericSignatureOfContext()) {
+          replacements = openGenericParameters(sig, locator);
+        }
+      }
+    }
+
+    break;
+  }
+
+  case OverloadChoiceKind::TupleIndex:
+  case OverloadChoiceKind::MaterializePack:
+  case OverloadChoiceKind::ExtractFunctionIsolation:
+  case OverloadChoiceKind::KeyPathApplication:
+    break;
+  }
+
+  return PreparedOverloadChoice(choice, replacements);
+}
+
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                        Type boundType,
-                                       OverloadChoice choice,
+                                       PreparedOverloadChoice preparedChoice,
                                        DeclContext *useDC) {
+  const auto &choice = preparedChoice.getChoice();
+  auto replacements = preparedChoice.getReplacements();
+
   // Add a conformance constraint to make sure that given type conforms
   // to Hashable protocol, which is important for key path subscript
   // components.
@@ -2350,10 +2399,11 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::DynamicMemberLookup:
   case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
+    auto *value = choice.getDecl();
+
     // If we refer to a top-level decl with special type-checking semantics,
     // handle it now.
-    const auto semantics =
-        TypeChecker::getDeclTypeCheckingSemantics(choice.getDecl());
+    auto semantics = TypeChecker::getDeclTypeCheckingSemantics(value);
     DeclReferenceType declRefType;
     if (semantics != DeclTypeCheckingSemantics::Normal) {
       declRefType = getTypeOfReferenceWithSpecialTypeCheckingSemantics(
@@ -2363,12 +2413,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       assert(!baseTy->hasTypeParameter());
 
       declRefType = getTypeOfMemberReference(
-          baseTy, choice.getDecl(), useDC,
+          baseTy, value, useDC,
           (kind == OverloadChoiceKind::DeclViaDynamic),
           choice.getFunctionRefKind(), locator);
     } else {
       declRefType = getTypeOfReference(
-          choice.getDecl(), choice.getFunctionRefKind(), locator, useDC);
+          value, choice.getFunctionRefKind(), locator,
+          replacements, useDC);
     }
 
     openedType = declRefType.openedType;

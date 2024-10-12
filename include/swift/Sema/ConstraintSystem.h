@@ -1189,10 +1189,6 @@ struct Score {
   }
 };
 
-/// Describes a dependent type that has been opened to a particular type
-/// variable.
-using OpenedType = std::pair<GenericTypeParamType *, TypeVariableType *>;
-
 /// Describes the information about a case label item that needs to be tracked
 /// within the constraint system.
 struct CaseLabelItemInfo {
@@ -3724,13 +3720,6 @@ public:
                                Type first, Type second,
                                ConstraintLocatorBuilder locator);
 
-  /// Add a constraint that binds an overload set to a specific choice.
-  void addBindOverloadConstraint(Type boundTy, OverloadChoice choice,
-                                 ConstraintLocator *locator,
-                                 DeclContext *useDC) {
-    resolveOverload(locator, boundTy, choice, useDC);
-  }
-
   /// Add a value member constraint to the constraint system.
   void addValueMemberConstraint(Type baseTy, DeclNameRef name, Type memberTy,
                                 DeclContext *useDC,
@@ -4822,9 +4811,12 @@ public:
   void recordResolvedOverload(ConstraintLocator *locator,
                               SelectedOverload choice);
 
+  PreparedOverloadChoice getPreparedOverload(ConstraintLocator *locator,
+                                             OverloadChoice choice);
+
   /// Resolve the given overload set to the given choice.
   void resolveOverload(ConstraintLocator *locator, Type boundType,
-                       OverloadChoice choice, DeclContext *useDC);
+                       PreparedOverloadChoice choice, DeclContext *useDC);
 
   /// Simplify a type, by replacing type variables with either their
   /// fixed types (if available) or their representatives.

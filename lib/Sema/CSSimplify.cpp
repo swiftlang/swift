@@ -11286,8 +11286,10 @@ ConstraintSystem::simplifyValueWitnessConstraint(
     return fail();
 
   auto choice = OverloadChoice(resolvedBaseType, witness.getDecl(), functionRefKind);
-  resolveOverload(getConstraintLocator(locator), memberType, choice,
-                  useDC);
+
+  auto *locatorPtr = getConstraintLocator(locator);
+  auto preparedChoice = getPreparedOverload(locatorPtr, choice);
+  resolveOverload(locatorPtr, memberType, preparedChoice, useDC);
   return SolutionKind::Solved;
 }
 
@@ -16031,7 +16033,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         constraint.getFirstType(), constraint.getSecondType(),
         constraint.getThirdType(), std::nullopt, constraint.getLocator());
 
-  case ConstraintKind::BindOverload:
+  case ConstraintKind::BindOverload: {
     if (auto *fix = constraint.getFix()) {
       // TODO(diagnostics): Impact should be associated with a fix unless
       // it's a contextual problem, then only solver can decide what the impact
@@ -16042,10 +16044,13 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         return SolutionKind::Error;
     }
 
-    resolveOverload(constraint.getLocator(), constraint.getFirstType(),
-                    constraint.getOverloadChoice(),
-                    constraint.getOverloadUseDC());
+    auto locator = constraint.getLocator();
+    auto choice = constraint.getOverloadChoice();
+    auto preparedChoice = getPreparedOverload(locator, choice);
+    resolveOverload(locator, constraint.getFirstType(),
+                    preparedChoice, constraint.getOverloadUseDC());
     return SolutionKind::Solved;
+  }
 
   case ConstraintKind::SubclassOf:
     return simplifySubclassOfConstraint(constraint.getFirstType(),

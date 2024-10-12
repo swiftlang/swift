@@ -320,6 +320,30 @@ public:
   void dump(Type adjustedOpenedType, SourceManager *sm, raw_ostream &out) const;
 };
 
+/// Describes a dependent type that has been opened to a particular type
+/// variable.
+using OpenedType = std::pair<GenericTypeParamType *, TypeVariableType *>;
+
+/// Describes a choice of overload together with the opened type of the
+/// overload.
+class PreparedOverloadChoice {
+  OverloadChoice choice;
+  ArrayRef<OpenedType> replacements;
+
+public:
+  PreparedOverloadChoice(OverloadChoice choice,
+                         ArrayRef<OpenedType> replacements)
+    : choice(choice), replacements(replacements) {}
+
+  const OverloadChoice &getChoice() const {
+    return choice;
+  }
+
+  ArrayRef<OpenedType> getReplacements() const {
+    return replacements;
+  }
+};
+
 } // end namespace constraints
 } // end namespace swift
 
