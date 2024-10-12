@@ -43,6 +43,9 @@ SWIFT_REQUEST(TypeChecker, CheckInconsistentAccessLevelOnImportSameFileRequest,
               evaluator::SideEffect(SourceFile *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CheckInconsistentWeakLinkedImportsRequest,
               evaluator::SideEffect(ModuleDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CheckInitEffectsRequest,
+              evaluator::SideEffect(Initializer *, Expr *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CheckRedeclarationRequest,
               evaluator::SideEffect(ValueDecl *),
               Uncached, NoLocationInfo)

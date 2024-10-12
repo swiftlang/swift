@@ -2476,8 +2476,12 @@ public:
     getMutablePatternList()[i].setOriginalInit(E);
   }
 
-  /// Returns a fully typechecked init expression for the pattern at the given
+  /// Returns a typechecked init expression for the pattern at the given
   /// index.
+  Expr *getContextualizedInit(unsigned i) const;
+
+  /// Returns an init expression for the pattern at the given index.
+  /// The initializer is fully type checked, including effects checking.
   Expr *getCheckedAndContextualizedInit(unsigned i) const;
 
   /// Returns the result of `getCheckedAndContextualizedInit()` if the init is

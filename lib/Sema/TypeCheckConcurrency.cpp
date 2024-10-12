@@ -698,27 +698,6 @@ static bool isAsyncCall(
 /// features.
 static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc);
 
-/// Determine whether this closure should be treated as Sendable.
-///
-/// \param forActorIsolation Whether this check is for the purposes of
-/// determining whether the closure must be non-isolated.
-static bool isSendableClosure(
-    const AbstractClosureExpr *closure, bool forActorIsolation) {
-  if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
-    if (forActorIsolation && explicitClosure->inheritsActorContext()) {
-      return false;
-    }
-  }
-
-  if (auto type = closure->getType()) {
-    if (auto fnType = type->getAs<AnyFunctionType>())
-      if (fnType->isSendable())
-        return true;
-  }
-
-  return false;
-}
-
 /// Returns true if this closure acts as an inference boundary in the AST. An
 /// inference boundary is an expression in the AST where we newly infer
 /// isolation different from our parent decl context.
@@ -733,30 +712,23 @@ static bool isSendableClosure(
 /// function. That @MainActor closure would act as an Isolation Inference
 /// Boundary.
 ///
-/// \arg forActorIsolation we currently have two slightly varying semantics
-/// here. If this is set, then we assuming that we are being called recursively
-/// while walking up a decl context path to determine the actor isolation of a
-/// closure. In such a case, we do not want to be a boundary if we should
-/// inheritActorContext. In other contexts though, we want to determine if the
-/// closure is part of an init or deinit. In such a case, we are walking up the
-/// decl context chain and we want to stop if we see a sending parameter since
-/// in such a case, the sending closure parameter is known to not be part of the
-/// init or deinit.
+/// \param canInheritActorContext Whether or not the closure is allowed to
+/// inherit the isolation of the enclosing context. If this is \c true ,
+/// the closure is not considered an isolation inference boundary if the
+/// \c @_inheritActorContext attribute is applied to the closure. This
+/// attribute is inferred from a parameter declaration for closure arguments,
+/// and it's set on the closure in CSApply.
 static bool
 isIsolationInferenceBoundaryClosure(const AbstractClosureExpr *closure,
-                                    bool forActorIsolation) {
+                                    bool canInheritActorContext) {
   if (auto *ce = dyn_cast<ClosureExpr>(closure)) {
-    if (!forActorIsolation) {
-      // For example, one would along this path see if for flow sensitive
-      // isolation the closure is part of an init or deinit.
-      if (ce->isPassedToSendingParameter())
-        return true;
-    } else {
-      // This is for actor isolation. If we have inheritActorContext though, we
-      // do not want to do anything since we are part of our parent's isolation.
-      if (!ce->inheritsActorContext() && ce->isPassedToSendingParameter())
-        return true;
-    }
+    // If the closure can inherit the isolation of the enclosing context,
+    // it is not an actor isolation inference boundary.
+    if (canInheritActorContext && ce->inheritsActorContext())
+      return false;
+
+    if (ce->isPassedToSendingParameter())
+      return true;
   }
 
   // An autoclosure for an async let acts as a boundary. It is non-Sendable
@@ -766,7 +738,7 @@ isIsolationInferenceBoundaryClosure(const AbstractClosureExpr *closure,
       return true;
   }
 
-  return isSendableClosure(closure, forActorIsolation);
+  return closure->isSendable();
 }
 
 /// Add Fix-It text for the given nominal type to adopt Sendable.
@@ -1693,7 +1665,7 @@ swift::isActorInitOrDeInitContext(const DeclContext *dc) {
     // Stop looking if we hit an isolation inference boundary.
     if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
       if (isIsolationInferenceBoundaryClosure(closure,
-                                              false /*is for actor isolation*/))
+                                              /*canInheritActorContext*/false))
         return nullptr;
 
       // Otherwise, look through our closure at the closure's parent decl
@@ -2703,7 +2675,8 @@ namespace {
               // function type, but this is okay for non-Sendable closures
               // because they cannot leave the isolation domain they're created
               // in anyway.
-              if (closure->isSendable())
+              if (isIsolationInferenceBoundaryClosure(
+                      closure, /*canInheritActorContext*/false))
                 return false;
 
               if (closure->getActorIsolation().isActorIsolated())
@@ -3237,7 +3210,7 @@ namespace {
           case ActorIsolation::Unspecified:
           case ActorIsolation::Nonisolated:
           case ActorIsolation::NonisolatedUnsafe:
-            if (isSendableClosure(closure, /*forActorIsolation=*/true)) {
+            if (closure->isSendable()) {
               return ReferencedActor(var, isPotentiallyIsolated, ReferencedActor::SendableClosure);
             }
 
@@ -4515,7 +4488,7 @@ namespace {
       // know that all Sendable closures must be nonisolated. That is why it is
       // safe to rely on this path to handle Sendable closures.
       if (isIsolationInferenceBoundaryClosure(
-              closure, true /*is for closure isolation*/))
+              closure, /*canInheritActorContext*/true))
         return ActorIsolation::forNonisolated(/*unsafe=*/false)
             .withPreconcurrency(preconcurrency);
 
@@ -4606,7 +4579,7 @@ bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
   while (useContext != defContext) {
     // If we find a concurrent closure... it can be run concurrently.
     if (auto closure = dyn_cast<AbstractClosureExpr>(useContext)) {
-      if (isSendableClosure(closure, /*forActorIsolation=*/false))
+      if (closure->isSendable())
         return true;
 
       if (isolatedStateMayEscape)
@@ -6063,7 +6036,7 @@ DefaultInitializerIsolation::evaluate(Evaluator &evaluator,
     auto i = pbd->getPatternEntryIndexForVarDecl(var);
 
     dc = cast<Initializer>(pbd->getInitContext(i));
-    initExpr = pbd->getCheckedAndContextualizedInit(i);
+    initExpr = pbd->getContextualizedInit(i);
     enclosingIsolation = getActorIsolation(var);
   } else if (auto *param = dyn_cast<ParamDecl>(var)) {
     // If this parameter corresponds to a stored property for a
