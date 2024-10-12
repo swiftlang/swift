@@ -2415,7 +2415,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       declRefType = getTypeOfMemberReference(
           baseTy, value, useDC,
           (kind == OverloadChoiceKind::DeclViaDynamic),
-          choice.getFunctionRefKind(), locator);
+          choice.getFunctionRefKind(), locator, replacements);
     } else {
       declRefType = getTypeOfReference(
           value, choice.getFunctionRefKind(), locator,

@@ -235,7 +235,7 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 
-Constraint::Constraint(Type type, OverloadChoice choice, DeclContext *useDC,
+Constraint::Constraint(Type type, PreparedOverloadChoice choice, DeclContext *useDC,
                        ConstraintFix *fix, ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(ConstraintKind::BindOverload), HasFix(fix != nullptr), HasRestriction(false),
@@ -246,7 +246,7 @@ Constraint::Constraint(Type type, OverloadChoice choice, DeclContext *useDC,
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
   if (fix)
     *getTrailingObjects<ConstraintFix *>() = fix;
-  *getTrailingObjects<OverloadChoice>() = choice;
+  *getTrailingObjects<PreparedOverloadChoice>() = choice;
 }
 
 Constraint::Constraint(ConstraintKind kind,
@@ -761,8 +761,8 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
 
   // Create the constraint.
   auto size =
-    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, OverloadChoice>(
-      typeVars.size(), /*hasFix=*/0, /*hasOverloadChoice=*/0);
+    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, PreparedOverloadChoice>(
+        typeVars.size(), /*hasFix=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return ::new (mem) Constraint(kind, first, second, locator, typeVars);
 }
@@ -782,7 +782,7 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
     third->getTypeVariables(typeVars);
 
   auto size =
-    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, OverloadChoice>(
+    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, PreparedOverloadChoice>(
       typeVars.size(), /*hasFix=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return ::new (mem) Constraint(kind,
@@ -804,9 +804,10 @@ Constraint *Constraint::createMemberOrOuterDisjunction(
   constraints.push_back(memberConstraint);
   memberConstraint->setFavored();
   for (auto choice : outerAlternatives) {
+    auto preparedChoice = cs.getPreparedOverload(locator, choice);
     constraints.push_back(
-        Constraint::createBindOverload(cs, first, choice, useDC, /*fix=*/nullptr,
-                                       locator));
+        Constraint::createBindOverload(cs, first, preparedChoice, useDC,
+                                       /*fix=*/nullptr, locator));
   }
   return Constraint::createDisjunction(cs, constraints, locator, ForgetChoice);
 }
@@ -825,7 +826,7 @@ Constraint *Constraint::createMember(ConstraintSystem &cs, ConstraintKind kind,
 
   // Create the constraint.
   auto size =
-    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, OverloadChoice>(
+    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, PreparedOverloadChoice>(
       typeVars.size(), /*hasFix=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, first, second, member, useDC,
@@ -847,7 +848,7 @@ Constraint *Constraint::createValueWitness(
 
   // Create the constraint.
   auto size =
-    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, OverloadChoice>(
+    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, PreparedOverloadChoice>(
       typeVars.size(), /*hasFix=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, first, second, requirement, useDC,
@@ -855,7 +856,7 @@ Constraint *Constraint::createValueWitness(
 }
 
 Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type, 
-                                           OverloadChoice choice, 
+                                           PreparedOverloadChoice choice,
                                            DeclContext *useDC,
                                            ConstraintFix *fix,
                                            ConstraintLocator *locator) {
@@ -863,13 +864,13 @@ Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type,
   SmallPtrSet<TypeVariableType *, 4> typeVars;
   if (type->hasTypeVariable())
     type->getTypeVariables(typeVars);
-  if (auto baseType = choice.getBaseType()) {
+  if (auto baseType = choice.getChoice().getBaseType()) {
     baseType->getTypeVariables(typeVars);
   }
 
   // Create the constraint.
   auto size =
-    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, OverloadChoice>(
+    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, PreparedOverloadChoice>(
       typeVars.size(), fix ? 1 : 0, /*hasOverloadChoice=*/1);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(type, choice, useDC, fix, locator, typeVars);
@@ -889,7 +890,7 @@ Constraint *Constraint::createRestricted(ConstraintSystem &cs,
 
   // Create the constraint.
   auto size =
-    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, OverloadChoice>(
+    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, PreparedOverloadChoice>(
       typeVars.size(), /*hasFix=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, restriction, first, second, locator,
@@ -908,7 +909,7 @@ Constraint *Constraint::createFixed(ConstraintSystem &cs, ConstraintKind kind,
 
   // Create the constraint.
   auto size =
-    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, OverloadChoice>(
+    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, PreparedOverloadChoice>(
       typeVars.size(), fix ? 1 : 0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, fix, first, second, locator, typeVars);
@@ -980,7 +981,7 @@ Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
 
   // Create the disjunction constraint.
   auto size =
-    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, OverloadChoice>(
+    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, PreparedOverloadChoice>(
       typeVars.size(), /*hasFix=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   auto disjunction = new (mem)
@@ -1001,7 +1002,7 @@ Constraint *Constraint::createConjunction(
 
   assert(!constraints.empty() && "Empty conjunction constraint");
   auto size =
-    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, OverloadChoice>(
+    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, PreparedOverloadChoice>(
       typeVars.size(), /*hasFix=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   auto conjunction = new (mem)
@@ -1023,7 +1024,7 @@ Constraint *Constraint::createApplicableFunction(
 
   // Create the constraint.
   auto size =
-    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, OverloadChoice>(
+    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, PreparedOverloadChoice>(
       typeVars.size(), /*hasFix=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   auto constraint = new (mem) Constraint(
@@ -1067,7 +1068,7 @@ Constraint *Constraint::createSyntacticElement(ConstraintSystem &cs,
     contextTy->getTypeVariables(typeVars);
 
   auto size =
-    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, OverloadChoice>(
+    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, PreparedOverloadChoice>(
       typeVars.size(), /*hasFix=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(node, context, isDiscarded, locator, typeVars);

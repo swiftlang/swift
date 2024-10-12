@@ -3832,7 +3832,8 @@ void ConstraintSystem::generateOverloadConstraints(
     if (requiresFix && !fix)
       return;
 
-    auto *choice = Constraint::createBindOverload(*this, type, overload,
+    auto preparedOverload = getPreparedOverload(locator, overload);
+    auto *choice = Constraint::createBindOverload(*this, type, preparedOverload,
                                                   useDC, fix, locator);
 
     if (isFavored)

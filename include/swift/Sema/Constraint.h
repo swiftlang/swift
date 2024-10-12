@@ -347,7 +347,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
     private llvm::TrailingObjects<Constraint,
                                   TypeVariableType *,
                                   ConstraintFix *,
-                                  OverloadChoice> {
+                                  PreparedOverloadChoice> {
   friend TrailingObjects;
 
   /// The kind of constraint.
@@ -490,7 +490,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a new overload-binding constraint, which might have a fix.
-  Constraint(Type type, OverloadChoice choice, DeclContext *useDC,
+  Constraint(Type type, PreparedOverloadChoice choice, DeclContext *useDC,
              ConstraintFix *fix, ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
@@ -522,7 +522,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
     return HasFix ? 1 : 0;
   }
 
-  size_t numTrailingObjects(OverloadToken<OverloadChoice>) const {
+  size_t numTrailingObjects(OverloadToken<PreparedOverloadChoice>) const {
     return Kind == ConstraintKind::BindOverload ? 1 : 0;
   }
 
@@ -560,7 +560,7 @@ public:
 
   /// Create an overload-binding constraint, possibly with a fix.
   static Constraint *createBindOverload(ConstraintSystem &cs, Type type, 
-                                        OverloadChoice choice, 
+                                        PreparedOverloadChoice choice,
                                         DeclContext *useDC, ConstraintFix *fix,
                                         ConstraintLocator *locator);
 
@@ -856,9 +856,14 @@ public:
   }
 
   /// Retrieve the overload choice for an overload-binding constraint.
-  OverloadChoice getOverloadChoice() const {
+  const PreparedOverloadChoice &getPreparedOverloadChoice() const {
     assert(Kind == ConstraintKind::BindOverload);
-    return *getTrailingObjects<OverloadChoice>();
+    return *getTrailingObjects<PreparedOverloadChoice>();
+  }
+
+  /// Retrieve the overload choice for an overload-binding constraint.
+  const OverloadChoice &getOverloadChoice() const {
+    return getPreparedOverloadChoice().getChoice();
   }
 
   /// Retrieve the DC in which the overload was used.

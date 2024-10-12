@@ -16045,8 +16045,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     }
 
     auto locator = constraint.getLocator();
-    auto choice = constraint.getOverloadChoice();
-    auto preparedChoice = getPreparedOverload(locator, choice);
+    auto preparedChoice = constraint.getPreparedOverloadChoice();
     resolveOverload(locator, constraint.getFirstType(),
                     preparedChoice, constraint.getOverloadUseDC());
     return SolutionKind::Solved;
