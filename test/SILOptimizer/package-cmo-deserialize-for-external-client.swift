@@ -20,13 +20,12 @@
 /// Test 1: They should be deserialized into Client as Lib and Client are in the same package.
 // RUN: %FileCheck -check-prefix=CHECK-INPKG %s < %t/InPkgClient.sil
 
-// Pub.init(_:) is removed after getting lined below.
-// CHECK-INPKG-NOT: @$s3Lib3PubCyACSicfc
-
 // Pub.__allocating_init(_:)
 // CHECK-INPKG: sil public_external @$s3Lib3PubCyACSicfC : $@convention(method) (Int, @thick Pub.Type) -> @owned Pub {
-//   Pub.init(_:) is inlined in this block, as its body was deserialized.
-// CHECK-INPKG:     ref_element_addr {{.*}} : $Pub, #Pub.pubVar
+// CHECK-INPKG:     function_ref @$s3Lib3PubCyACSicfc
+
+// Pub.init(_:)
+// CHECK-INPKG: sil @$s3Lib3PubCyACSicfc : $@convention(method) (Int, @owned Pub) -> @owned Pub
 
 // CHECK-INPKG: sil_vtable Pub {
 // CHECK-INPKG: #Pub.pubVar!getter: (Pub) -> () -> Int : @$s3Lib3PubC6pubVarSivg  // Pub.pubVar.getter
@@ -72,11 +71,6 @@
 
 // CHECK-LIB: sil [serialized] [exact_self_class] [canonical] @$s3Lib3PubCyACSicfC : $@convention(method) (Int, @thick Pub.Type) -> @owned Pub {
 // CHECK-LIB:  function_ref @$s3Lib3PubCyACSicfc : $@convention(method) (Int, @owned Pub) -> @owned Pub
-// Pub.init(_:)
-
-// CHECK-LIB: sil [serialized_for_package] [canonical] @$s3Lib3PubCyACSicfc : $@convention(method) (Int, @owned Pub) -> @owned Pub {
-// CHECK-LIB:  ref_element_addr {{.*}} : $Pub, #Pub.pubVar
-// Pub.__allocating_init(_:)
 
 // Pub.pkgVar.getter
 // CHECK-LIB: sil package [serialized_for_package] [canonical] @$s3Lib3PubC6pkgVarSivg : $@convention(method) (@guaranteed Pub) -> Int {
@@ -106,19 +100,33 @@ public protocol PubProto {
 public class Pub: PubProto {
   public var pubVar: Int = 1
   package var pkgVar: Int = 2
+  var internalVar: Int = 3
   public init(_ arg: Int) {
     pubVar = arg
     pkgVar = arg
+  }
+  public func pubFunc(_ arg: Pub) {
+    print(arg.pubVar)
+  }
+}
+
+public class SubPub: Pub {
+  override public func pubFunc(_ arg: Pub) {
+    print(arg.pubVar, arg.internalVar)
   }
 }
 
 //--- Client.swift
 import Lib
 
-public func test(_ arg: Int) -> Int {
+public func test1(_ arg: Int) -> Int {
   let x = Pub(arg)
   x.pubVar = 3
   return x.run()
+}
+
+public func test2(_ arg: Int) {
+  SubPub(arg).pubFunc(Pub(arg))
 }
 
 public extension PubProto {
