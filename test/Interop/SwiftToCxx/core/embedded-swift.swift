@@ -3,6 +3,7 @@
 // RUN: %FileCheck %s < %t/core.h
 
 // REQUIRES: OS=macosx
+// REQUIRES: embedded_stdlib
 
 public func id(_ x: Int) -> Int {
     return x
