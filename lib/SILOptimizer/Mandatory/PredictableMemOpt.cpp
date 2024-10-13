@@ -300,8 +300,7 @@ public:
   AvailableValue emitBeginBorrow(SILBuilder &b, SILLocation loc) const {
     // If we do not have ownership or already are guaranteed, just return a copy
     // of our state.
-    if (!b.hasOwnership() ||
-        Value->getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed)) {
+    if (Value->getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed)) {
       return {Value, SubElementNumber, InsertionPoints};
     }
 
@@ -439,8 +438,6 @@ static SILValue nonDestructivelyExtractSubElement(const AvailableValue &Val,
   // load [copy] or a load [trivial], while in non-[ossa] SIL we will
   // be replacing unqualified loads.
   assert(SubElementNumber == 0 && "Miscalculation indexing subelements");
-  if (!B.hasOwnership())
-    return Val.getValue();
   return B.emitCopyValueOperation(Loc, Val.getValue());
 }
 
@@ -778,12 +775,6 @@ void AvailableValueAggregator::print(llvm::raw_ostream &os) const {
 // address.
 bool AvailableValueAggregator::canTake(SILType loadTy,
                                        unsigned firstElt) const {
-  // If we do not have ownership, we can always take since we do not need to
-  // keep any ownership invariants up to date. In the future, we should be able
-  // to chop up larger values before they are being stored.
-  if (!B.hasOwnership())
-    return true;
-
   // If we are trivially fully available, just return true.
   if (isFullyAvailable(loadTy, firstElt, AvailableValueList))
     return true;
@@ -888,13 +879,10 @@ SILValue AvailableValueAggregator::aggregateValues(SILType LoadTy,
   auto &val = AvailableValueList[FirstElt];
   if (!val) {
     LoadInst *load = ([&]() {
-      if (B.hasOwnership()) {
-        SILBuilderWithScope builder(&*B.getInsertionPoint(),
-                                    &ownershipFixup.insertedInsts);
-        return builder.createTrivialLoadOr(Loc, Address,
-                                           LoadOwnershipQualifier::Copy);
-      }
-      return B.createLoad(Loc, Address, LoadOwnershipQualifier::Unqualified);
+      SILBuilderWithScope builder(&*B.getInsertionPoint(),
+                                  &ownershipFixup.insertedInsts);
+      return builder.createTrivialLoadOr(Loc, Address,
+                                         LoadOwnershipQualifier::Copy);
     }());
     Uses.emplace_back(load, PMOUseKind::Load);
     return load;
@@ -2188,18 +2176,6 @@ bool OptimizeAllocLoads::promoteLoadCopy(LoadInst *li) {
   LLVM_DEBUG(llvm::dbgs() << "      To value: " << *newVal);
   ++NumLoadPromoted;
 
-  // If we did not have ownership, we did not insert extra copies at our stores,
-  // so we can just RAUW and return.
-  if (!li->getFunction()->hasOwnership()) {
-    li->replaceAllUsesWith(newVal);
-
-    SILValue addr = li->getOperand();
-    deleter.forceDelete(li);
-    if (auto *addrI = addr->getDefiningInstruction())
-      deleter.deleteIfDead(addrI);
-    return true;
-  }
-
   // If we inserted any copies, we created the copies at our stores. We know
   // that in our load block, we will reform the aggregate as appropriate at the
   // load implying that the value /must/ be fully consumed. If we promoted a +0
@@ -2946,9 +2922,6 @@ bool swift::optimizeMemoryAccesses(SILFunction *fn) {
 }
 
 bool swift::eliminateDeadAllocations(SILFunction *fn, DominanceInfo *domInfo) {
-  if (!fn->hasOwnership())
-    return false;
-
   bool changed = false;
   DeadEndBlocks deadEndBlocks(fn);
 
@@ -3000,6 +2973,9 @@ class PredictableMemoryAccessOptimizations : public SILFunctionTransform {
   /// or has a pass order dependency on other early passes.
   void run() override {
     auto *func = getFunction();
+    if (!func->hasOwnership())
+      return;
+
     LLVM_DEBUG(llvm::dbgs() << "Looking at: " << func->getName() << "\n");
     // TODO: Can we invalidate here just instructions?
     if (optimizeMemoryAccesses(func))
@@ -3010,6 +2986,9 @@ class PredictableMemoryAccessOptimizations : public SILFunctionTransform {
 class PredictableDeadAllocationElimination : public SILFunctionTransform {
   void run() override {
     auto *func = getFunction();
+    if (!func->hasOwnership())
+      return;
+
     LLVM_DEBUG(llvm::dbgs() << "Looking at: " << func->getName() << "\n");
     auto *da = getAnalysis<DominanceAnalysis>();
     // If we are already canonical or do not have ownership, just bail.
