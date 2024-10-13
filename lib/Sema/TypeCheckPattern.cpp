@@ -397,52 +397,11 @@ public:
                                 E->getRParenLoc());
   }
 
-  Pattern *convertBindingsToOptionalSome(Expr *E) {
-    auto *expr = E->getSemanticsProvidingExpr();
-    auto *bindExpr = dyn_cast<BindOptionalExpr>(expr);
-    if (!bindExpr) {
-      // Let's see if this expression prefixed with any number of '?'
-      // has any other disjoint 'BindOptionalExpr' inside of it, if so,
-      // we need to wrap such sub-expression into `OptionalEvaluationExpr`.
-      bool hasDisjointChaining = false;
-      expr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
-        // If there is `OptionalEvaluationExpr` in the AST
-        // it means that all of possible `BindOptionalExpr`
-        // which follow are covered by it.
-        if (isa<OptionalEvaluationExpr>(subExpr))
-          return nullptr;
-
-        if (isa<BindOptionalExpr>(subExpr)) {
-          hasDisjointChaining = true;
-          return nullptr;
-        }
-
-        return subExpr;
-      });
-
-      if (hasDisjointChaining)
-        E = new (Context) OptionalEvaluationExpr(E);
-
-      return getSubExprPattern(E);
-    }
-
-    auto *subExpr = convertBindingsToOptionalSome(bindExpr->getSubExpr());
-    return OptionalSomePattern::create(Context, subExpr,
-                                       bindExpr->getQuestionLoc());
+  // Convert a x? to OptionalSome pattern.
+  Pattern *visitBindOptionalExpr(BindOptionalExpr *E) {
+    return OptionalSomePattern::create(
+        Context, getSubExprPattern(E->getSubExpr()), E->getQuestionLoc());
   }
-
-  // Convert a x? to OptionalSome pattern.  In the AST form, this will look like
-  // an OptionalEvaluationExpr with an immediate BindOptionalExpr inside of it.
-  Pattern *visitOptionalEvaluationExpr(OptionalEvaluationExpr *E) {
-    auto *subExpr = E->getSubExpr();
-    // We only handle the case where one or more bind expressions are subexprs
-    // of the optional evaluation.  Other cases are not simple postfix ?'s.
-    if (!isa<BindOptionalExpr>(subExpr->getSemanticsProvidingExpr()))
-      return nullptr;
-
-    return convertBindingsToOptionalSome(subExpr);
-  }
-
 
   // Unresolved member syntax '.Element' forms an EnumElement pattern. The
   // element will be resolved when we type-check the pattern.
