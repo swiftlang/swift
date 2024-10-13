@@ -1962,6 +1962,17 @@ BraceStmt * AbstractClosureExpr::getBody() const {
   llvm_unreachable("Unknown closure expression");
 }
 
+bool AbstractClosureExpr::bodyHasExplicitReturnStmt() const {
+  return AnyFunctionRef(const_cast<AbstractClosureExpr *>(this))
+      .bodyHasExplicitReturnStmt();
+}
+
+void AbstractClosureExpr::getExplicitReturnStmts(
+    SmallVectorImpl<ReturnStmt *> &results) const {
+  AnyFunctionRef(const_cast<AbstractClosureExpr *>(this))
+      .getExplicitReturnStmts(results);
+}
+
 Type AbstractClosureExpr::getResultType(
     llvm::function_ref<Type(Expr *)> getType) const {
   auto *E = const_cast<AbstractClosureExpr *>(this);
@@ -2738,12 +2749,27 @@ SourceRange TapExpr::getSourceRange() const {
                               Body->getSourceRange());
 }
 
-RegexLiteralExpr *
-RegexLiteralExpr::createParsed(ASTContext &ctx, SourceLoc loc,
-                               StringRef regexText, unsigned version,
-                               ArrayRef<uint8_t> serializedCaps) {
-  return new (ctx) RegexLiteralExpr(loc, regexText, version, serializedCaps,
-                                    /*implicit*/ false);
+RegexLiteralExpr *RegexLiteralExpr::createParsed(ASTContext &ctx, SourceLoc loc,
+                                                 StringRef regexText) {
+  return new (ctx) RegexLiteralExpr(&ctx, loc, regexText, /*implicit*/ false);
+}
+
+StringRef RegexLiteralExpr::getRegexToEmit() const {
+  auto &eval = getASTContext().evaluator;
+  return evaluateOrDefault(eval, RegexLiteralPatternInfoRequest{this}, {})
+      .RegexToEmit;
+}
+
+Type RegexLiteralExpr::getRegexType() const {
+  auto &eval = getASTContext().evaluator;
+  return evaluateOrDefault(eval, RegexLiteralPatternInfoRequest{this}, {})
+      .RegexType;
+}
+
+unsigned RegexLiteralExpr::getVersion() const {
+  auto &eval = getASTContext().evaluator;
+  return evaluateOrDefault(eval, RegexLiteralPatternInfoRequest{this}, {})
+      .Version;
 }
 
 TypeJoinExpr::TypeJoinExpr(llvm::PointerUnion<DeclRefExpr *, TypeBase *> result,
@@ -2849,11 +2875,7 @@ SourceLoc swift::extractNearestSourceLoc(const ClosureExpr *expr) {
   return expr->getLoc();
 }
 
-SourceLoc swift::extractNearestSourceLoc(const DefaultArgumentExpr *expr) {
-  return expr->getLoc();
-}
-
-SourceLoc swift::extractNearestSourceLoc(const MacroExpansionExpr *expr) {
+SourceLoc swift::extractNearestSourceLoc(const Expr *expr) {
   return expr->getLoc();
 }
 

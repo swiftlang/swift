@@ -101,6 +101,7 @@ SIMPLE_SIL_TYPE_ATTR(pseudogeneric, Pseudogeneric)
 SIMPLE_SIL_TYPE_ATTR(unimplementable, Unimplementable)
 SIMPLE_SIL_TYPE_ATTR(yields, Yields)
 SIMPLE_SIL_TYPE_ATTR(yield_once, YieldOnce)
+SIMPLE_SIL_TYPE_ATTR(yield_once_2, YieldOnce2)
 SIMPLE_SIL_TYPE_ATTR(yield_many, YieldMany)
 SIMPLE_SIL_TYPE_ATTR(captures_generics, CapturesGenerics)
 // Used at the SIL level to mark a type as moveOnly.

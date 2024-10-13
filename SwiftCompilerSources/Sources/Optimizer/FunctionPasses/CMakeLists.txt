@@ -22,6 +22,7 @@ swift_compiler_sources(Optimizer
   LifetimeDependenceDiagnostics.swift
   LifetimeDependenceInsertion.swift
   LifetimeDependenceScopeFixup.swift
+  LoadCopyToBorrowOptimization.swift
   ObjectOutliner.swift
   ObjCBridgingOptimization.swift
   MergeCondFails.swift

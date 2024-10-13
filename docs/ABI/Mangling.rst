@@ -856,6 +856,7 @@ mangled in to disambiguate.
   FUNC-REPRESENTATION ::= 'W'                // protocol witness
 
   COROUTINE-KIND ::= 'A'                     // yield-once coroutine
+  COROUTINE-KIND ::= 'I'                     // yield-once-2 coroutine
   COROUTINE-KIND ::= 'G'                     // yield-many coroutine
 
   #if SWIFT_RUNTIME_VERSION >= 5.5

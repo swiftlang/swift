@@ -5249,6 +5249,7 @@ static uint8_t getRawStableSILCoroutineKind(
   switch (kind) {
   SIMPLE_CASE(SILCoroutineKind, None)
   SIMPLE_CASE(SILCoroutineKind, YieldOnce)
+  SIMPLE_CASE(SILCoroutineKind, YieldOnce2)
   SIMPLE_CASE(SILCoroutineKind, YieldMany)
   }
   llvm_unreachable("bad kind");

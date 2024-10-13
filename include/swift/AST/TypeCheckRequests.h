@@ -3050,9 +3050,9 @@ public:
   void cacheResult(ProtocolConformanceRef value) const;
 };
 
-class BraceHasReturnRequest
-    : public SimpleRequest<BraceHasReturnRequest, bool(const BraceStmt *),
-                           RequestFlags::Cached> {
+class BraceHasExplicitReturnStmtRequest
+    : public SimpleRequest<BraceHasExplicitReturnStmtRequest,
+                           bool(const BraceStmt *), RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -3926,6 +3926,25 @@ private:
 
 public:
   // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Run effects checking for an initializer expression.
+class CheckInitEffectsRequest
+    : public SimpleRequest<CheckInitEffectsRequest,
+                           evaluator::SideEffect(Initializer *, Expr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator,
+                                 Initializer *initCtx,
+                                 Expr *init) const;
+
+public:
   bool isCached() const { return true; }
 };
 
@@ -4852,8 +4871,7 @@ public:
 /// Expand the children of the given type refinement context.
 class ExpandChildTypeRefinementContextsRequest
     : public SimpleRequest<ExpandChildTypeRefinementContextsRequest,
-                           std::vector<TypeRefinementContext *>(
-                               TypeRefinementContext *),
+                           evaluator::SideEffect(TypeRefinementContext *),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4861,14 +4879,14 @@ public:
 private:
   friend SimpleRequest;
 
-  std::vector<TypeRefinementContext *>
-  evaluate(Evaluator &evaluator, TypeRefinementContext *parentTRC) const;
+  evaluator::SideEffect evaluate(Evaluator &evaluator,
+                                 TypeRefinementContext *parentTRC) const;
 
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  std::optional<std::vector<TypeRefinementContext *>> getCachedResult() const;
-  void cacheResult(std::vector<TypeRefinementContext *> children) const;
+  std::optional<evaluator::SideEffect> getCachedResult() const;
+  void cacheResult(evaluator::SideEffect) const;
 };
 
 class SerializeAttrGenericSignatureRequest
@@ -5083,6 +5101,31 @@ private:
 
   bool evaluate(Evaluator &evaluator, NominalTypeDecl *decl,
                 KnownProtocolKind kp) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+struct RegexLiteralPatternInfo {
+  StringRef RegexToEmit;
+  Type RegexType;
+  size_t Version;
+};
+
+/// Parses the regex pattern for a given regex literal using the
+/// compiler's regex parsing library, and returns the resulting info.
+class RegexLiteralPatternInfoRequest
+    : public SimpleRequest<RegexLiteralPatternInfoRequest,
+                           RegexLiteralPatternInfo(const RegexLiteralExpr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  RegexLiteralPatternInfo evaluate(Evaluator &evaluator,
+                                   const RegexLiteralExpr *regex) const;
 
 public:
   bool isCached() const { return true; }

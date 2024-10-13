@@ -12,8 +12,6 @@
 
 #define DEBUG_TYPE "sil-verifier"
 
-#include "VerifierPrivate.h"
-
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTSynthesis.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -63,7 +61,6 @@
 #include <memory>
 
 using namespace swift;
-using namespace swift::silverifier;
 
 using Lowering::AbstractionPattern;
 
@@ -934,8 +931,6 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   /// TODO: LifetimeCompletion: shared_ptr -> unique_ptr
   std::shared_ptr<DeadEndBlocks> deadEndBlocks;
 
-  LoadBorrowImmutabilityAnalysis loadBorrowImmutabilityAnalysis;
-
   /// A cache of the isOperandInValueUse check. When we process an operand, we
   /// fix this for each of its uses.
   llvm::DenseSet<std::pair<SILValue, const Operand *>> isOperandInValueUsesCache;
@@ -1185,8 +1180,7 @@ public:
         SingleFunction(SingleFunction),
         checkLinearLifetime(checkLinearLifetime),
         Dominance(nullptr),
-        InstNumbers(numInstsInFunction(F)),
-        loadBorrowImmutabilityAnalysis(DEBlocks.get(), &F) {
+        InstNumbers(numInstsInFunction(F)) {
     if (F.isExternalDeclaration())
       return;
 
@@ -1688,8 +1682,11 @@ public:
   }
 
   static bool isLegalSILTokenProducer(SILValue value) {
-    if (auto *baResult = isaResultOf<BeginApplyInst>(value))
-      return baResult->isBeginApplyToken();
+    if (auto *baResult = isaResultOf<BeginApplyInst>(value)) {
+      auto *bai = cast<BeginApplyInst>(baResult->getParent());
+      return value == bai->getTokenResult() ||
+             value == bai->getCalleeAllocationResult();
+    }
 
     if (isa<OpenPackElementInst>(value))
       return true;
@@ -2110,8 +2107,12 @@ public:
               "begin_apply instruction cannot call function with error result");
     }
 
-    require(calleeConv.funcTy->getCoroutineKind() == SILCoroutineKind::YieldOnce,
-            "must call yield_once coroutine with begin_apply");
+    auto coroKind = calleeConv.funcTy->getCoroutineKind();
+
+    require(coroKind == SILCoroutineKind::YieldOnce ||
+                coroKind == SILCoroutineKind::YieldOnce2,
+            "first operand of begin_apply must be a yield_once or yield_once_2 "
+            "coroutine");
     require(!calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync(),
             "cannot call an async function from a non async function");
   }
@@ -2659,13 +2660,6 @@ public:
     requireSameType(LBI->getOperand()->getType().getObjectType(),
                     LBI->getType(),
                     "Load operand type and result type mismatch");
-    if (LBI->isUnchecked()) {
-      require(LBI->getModule().getStage() == SILStage::Raw,
-              "load_borrow can only be [unchecked] in raw SIL");
-    } else {
-      require(loadBorrowImmutabilityAnalysis.isImmutable(LBI),
-              "Found load borrow that is invalidated by a local write?!");
-    }
   }
 
   void checkBeginBorrowInst(BeginBorrowInst *bbi) {
@@ -3768,12 +3762,23 @@ public:
   }
 
   void checkDeallocStackInst(DeallocStackInst *DI) {
+    auto isTokenFromCalleeAllocatedBeginApply = [](SILValue value) -> bool {
+      auto *inst = value->getDefiningInstruction();
+      if (!inst)
+        return false;
+      auto *bai = dyn_cast<BeginApplyInst>(inst);
+      if (!bai)
+        return false;
+      return value == bai->getCalleeAllocationResult();
+    };
     require(isa<SILUndef>(DI->getOperand()) ||
                 isa<AllocStackInst>(DI->getOperand()) ||
                 isa<AllocVectorInst>(DI->getOperand()) ||
                 (isa<PartialApplyInst>(DI->getOperand()) &&
-                 cast<PartialApplyInst>(DI->getOperand())->isOnStack()),
-            "Operand of dealloc_stack must be an alloc_stack, alloc_vector or partial_apply "
+                 cast<PartialApplyInst>(DI->getOperand())->isOnStack()) ||
+                (isTokenFromCalleeAllocatedBeginApply(DI->getOperand())),
+            "Operand of dealloc_stack must be an alloc_stack, alloc_vector or "
+            "partial_apply "
             "[stack]");
   }
   void checkDeallocPackInst(DeallocPackInst *DI) {
@@ -6764,7 +6769,7 @@ public:
     };
 
     struct BBState {
-      std::vector<SingleValueInstruction*> Stack;
+      std::vector<SILValue> Stack;
 
       /// Contents: BeginAccessInst*, BeginApplyInst*.
       std::set<SILInstruction*> ActiveOps;
@@ -6814,9 +6819,15 @@ public:
         }
           
         if (i.isAllocatingStack()) {
-          state.Stack.push_back(cast<SingleValueInstruction>(&i));
-
-        } else if (i.isDeallocatingStack()) {
+          if (auto *BAI = dyn_cast<BeginApplyInst>(&i)) {
+            state.Stack.push_back(BAI->getCalleeAllocationResult());
+          } else {
+            state.Stack.push_back(cast<SingleValueInstruction>(&i));
+          }
+          // Not "else if": begin_apply both allocates stack and begins an
+          // operation.
+        }
+        if (i.isDeallocatingStack()) {
           SILValue op = i.getOperand(0);
           while (auto *mvi = dyn_cast<MoveValueInst>(op)) {
             op = mvi->getOperand();

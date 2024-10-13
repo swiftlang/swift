@@ -29,10 +29,15 @@ import Lib
 
 /// There should be no linker error on a public function 
 /// that contains symbols internal to Lib module.
+///
+
+// CHECK-MAIN-NOT: s3Lib14createPubClassySixlF
+// CHECK-MAIN-NOT: s3Lib19usePubStructKeypathySixlF
+
 // CHECK-MAIN: function_ref @$s3Lib11useInternalySiAA4BaseCF : $@convention(thin) (@guaranteed Base) -> Int
 let x = useInternal(Base())
 
-/// Since Base is not serialized, accessing its field should go 
+/// Since Base is not serialized, accessing its field should go
 /// through `class_method`.
 // CHECK-MAIN: class_method {{.*}} : $Base, #Base.baseVarPkg!getter : (Base) -> () -> Int, $@convention(method) (@guaranteed Base) -> Int
 let y = usePkg(Base())
@@ -51,7 +56,55 @@ let w = usePubWithInternalField(PubKlassWithInternalMember(1))
 // CHECK-MAIN: sil @$s3Lib11useInternalySiAA4BaseCF : $@convention(thin) (@guaranteed Base) -> Int
 
 // PubKlassWithInternalMember.__allocating_init(_:)
-// CHECK-MAIN: sil public_external @$s3Lib26PubKlassWithInternalMemberCyACSicfC : $@convention(method) (Int, @thick PubKlassWithInternalMember.Type) -> @owned PubKlassWithInternalMember {
+// CHECK-MAIN-DAG: sil public_external @$s3Lib26PubKlassWithInternalMemberCyACSicfC : $@convention(method) (Int, @thick PubKlassWithInternalMember.Type) -> @owned PubKlassWithInternalMember {
+
+func checkNested() {
+  // PubContainer initializer is inlined.
+  // CHECK-MAIN: struct $PubContainer ()
+  let c = PubContainer()
+  // CHECK-MAIN: function_ref @$s3Lib12PubContainerV9pubMemberyxxlF
+  print(c.pubMember(27))
+}
+
+
+func checkClasses() {
+  /// Inlined
+  print(createPubClass(0))
+
+  /// Not inlined as functions below contain private/internal symbols
+  // CHECK-MAIN: function_ref @$s3Lib20createPubClass_neverySixlF
+  print(createPubClass_never(0))
+
+  // CHECK-MAIN: function_ref @$s3Lib14createPrvClassySixlF
+  print(createPrvClass(0))
+
+  // CHECK-MAIN: function_ref @$s3Lib20createPrvClass_neverySixlF
+  print(createPrvClass_never(0))
+}
+
+func checkKeyPaths() {
+  /// Inlined
+  // CHECK-MAIN: function_ref @$s3Lib19getPubStructKeypathys7KeyPathCyAA0cD0VSiGxlF
+  print(usePubStructKeypath(0))
+
+  /// Not inlined as functions below contain private/internal symbols
+  // CHECK-MAIN: function_ref @$s3Lib24useInternalStructKeypathySixlF
+  print(useInternalStructKeypath(0))
+
+  // CHECK-MAIN: function_ref @$s3Lib15useClassKeypathySixlF
+  print(useClassKeypath(0))
+}
+
+checkNested()
+checkClasses()
+checkKeyPaths()
+
+// CHECK-MAIN-DAG: sil public_external [_semantics "optimize.sil.specialize.generic.never"] @$s3Lib20createPubClass_neverySixlF : $@convention(thin) <T> (@in_guaranteed T) -> Int {
+// CHECK-MAIN-DAG: sil @$s3Lib14createPrvClassySixlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> Int
+// CHECK-MAIN-DAG: sil [_semantics "optimize.sil.specialize.generic.never"] @$s3Lib20createPrvClass_neverySixlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> Int
+// CHECK-MAIN-DAG: sil @$s3Lib12PubContainerV9pubMemberyxxlF : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @in_guaranteed PubContainer) -> @out τ_0_0
+// CHECK-MAIN-DAG: sil @$s3Lib24useInternalStructKeypathySixlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> Int
+// CHECK-MAIN-DAG: sil @$s3Lib15useClassKeypathySixlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> Int
 
 
 //--- Lib.swift
@@ -138,6 +191,139 @@ public class PubKlassWithInternalMember {
   package var pkgVar: Int {
     return 2
   }
+}
+
+// createPubClass<A>(_:)
+// CHECK-DAG: sil [serialized_for_package] [canonical] @$s3Lib14createPubClassySixlF : $@convention(thin) <T> (@in_guaranteed T) -> Int {
+public func createPubClass<T>(_ t: T) -> Int {
+  return getPubClass(t).foo()
+}
+
+// CHECK-DAG: sil [serialized_for_package] [_semantics "optimize.sil.specialize.generic.never"] [canonical] @$s3Lib20createPubClass_neverySixlF : $@convention(thin) <T> (@in_guaranteed T) -> Int {
+@_semantics("optimize.sil.specialize.generic.never")
+public func createPubClass_never<T>(_ t: T) -> Int {
+  return getPubClass(t).foo()
+}
+
+// CHECK-DAG: sil [serialized_for_package] [canonical] @$s3Lib11getPubClassyAA13PublicDerivedCyxGxlF : $@convention(thin) <T> (@in_guaranteed T) -> @owned PublicDerived<T> {
+public func getPubClass<T>(_ t : T) -> PublicDerived<T> {
+  return PublicDerived<T>(t)
+}
+
+// Not serialized
+public func createPrvClass<T>(_ t: T) -> Int {
+  return getPrvClass(t).foo()
+}
+
+// Not serialized
+@_semantics("optimize.sil.specialize.generic.never")
+public func createPrvClass_never<T>(_ t: T) -> Int {
+  return getPrvClass(t).foo()
+}
+
+// Not serialized
+private func getPrvClass<T>(_ t : T) -> PrivateBase<T> {
+  return PrivateDerived<T>(t)
+}
+
+public class PublicBase<T> {
+  public var t: T
+  public func foo() -> Int { return 27 }
+  public init(_ t: T) { self.t = t }
+}
+
+public class PublicDerived<T> : PublicBase<T> {
+  override public func foo() -> Int { return 28 }
+}
+
+private class PrivateBase<T> {
+  var t: T
+  func foo() -> Int { return 27 }
+  init(_ t: T) { self.t = t }
+}
+
+private class PrivateDerived<T> : PrivateBase<T> {
+  override func foo() -> Int { return 28 }
+}
+
+public struct PubContainer {
+  private final class PrvBase {}
+  public init() {}
+
+  // Not serialized; contains exported func
+  // but references a private class.
+  public func pubMember<T>(_ t: T) -> T {
+    var arr = Array<PrvBase>()
+    arr.append(PrvBase())
+    print(arr)
+    exportedFunc(arr)
+    return t
+  }
+}
+
+@_specialize(exported: true, where T == Int)
+@inlinable
+public func exportedFunc<T>(_ t: T) {
+  print(t)
+}
+
+public func pubFunc<T>(_ t: T) -> Int {
+  return getPubClass(t).foo()
+}
+
+@_semantics("optimize.sil.specialize.generic.never")
+public func pubFuncNoSpecialize<T>(_ t: T) -> Int {
+  return getPubClass(t).foo()
+}
+
+struct MyInternalStruct {
+  var x: Int { return 27 }
+  var y: Int { return 28 }
+}
+
+public struct PubStruct {
+  public var x: Int { return 27 }
+  public var y: Int { return 28 }
+}
+
+class Myclass {
+  var x: Int { return 27 }
+  var y: Int { return 28 }
+}
+
+class Derived : Myclass {
+  override var x: Int { return 29 }
+  override var y: Int { return 30 }
+}
+
+
+func getInternalStructKeypath<T>(_ t: T) -> KeyPath<MyInternalStruct, Int> {
+  return \MyInternalStruct.x
+}
+
+// CHECK-DAG: sil [canonical] @$s3Lib19getPubStructKeypathys7KeyPathCyAA0cD0VSiGxlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned KeyPath<PubStruct, Int>
+public func getPubStructKeypath<T>(_ t: T) -> KeyPath<PubStruct, Int> {
+  return \PubStruct.x
+}
+
+public func useInternalStructKeypath<T>(_ t: T) -> Int {
+  let s = MyInternalStruct()
+  return s[keyPath: getInternalStructKeypath(t)]
+}
+
+// CHECK-DAG: sil [serialized_for_package] [canonical] @$s3Lib19usePubStructKeypathySixlF : $@convention(thin) <T> (@in_guaranteed T) -> Int {
+public func usePubStructKeypath<T>(_ t: T) -> Int {
+  let p = PubStruct()
+  return p[keyPath: getPubStructKeypath(t)]
+}
+
+func getClassKeypath<T>(_ t: T) -> KeyPath<Myclass, Int> {
+  return \Myclass.x
+}
+
+public func useClassKeypath<T>(_ t: T) -> Int {
+  let c = Derived()
+  return c[keyPath: getClassKeypath(t)]
 }
 
 /// PubKlass doesn't contain internal symbols so its vtable is serialized.

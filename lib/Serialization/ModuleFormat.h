@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 895; // Add PluginSearchOptionKind::LoadPlugin
+const uint16_t SWIFTMODULE_VERSION_MINOR = 897; // Add PluginSearchOptionKind::LoadPlugin
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -311,7 +311,8 @@ using SILFunctionTypeRepresentationField = BCFixed<5>;
 enum class SILCoroutineKind : uint8_t {
   None = 0,
   YieldOnce = 1,
-  YieldMany = 2,
+  YieldOnce2 = 2,
+  YieldMany = 3,
 };
 using SILCoroutineKindField = BCFixed<2>;
 

@@ -71,6 +71,7 @@ namespace swift {
   class KeyPathExpr;
   class CaptureListExpr;
   class ThenStmt;
+  class ReturnStmt;
 
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -993,39 +994,32 @@ public:
 
 /// A regular expression literal e.g '(a|c)*'.
 class RegexLiteralExpr : public LiteralExpr {
+  ASTContext *Ctx;
   SourceLoc Loc;
-  StringRef RegexText;
-  unsigned Version;
-  ArrayRef<uint8_t> SerializedCaptureStructure;
+  StringRef ParsedRegexText;
 
-  RegexLiteralExpr(SourceLoc loc, StringRef regexText, unsigned version,
-                   ArrayRef<uint8_t> serializedCaps,
+  RegexLiteralExpr(ASTContext *ctx, SourceLoc loc, StringRef parsedRegexText,
                    bool isImplicit)
-      : LiteralExpr(ExprKind::RegexLiteral, isImplicit), Loc(loc),
-        RegexText(regexText), Version(version),
-        SerializedCaptureStructure(serializedCaps) {}
+      : LiteralExpr(ExprKind::RegexLiteral, isImplicit), Ctx(ctx), Loc(loc),
+        ParsedRegexText(parsedRegexText) {}
 
 public:
-  static RegexLiteralExpr *createParsed(
-      ASTContext &ctx, SourceLoc loc, StringRef regexText, unsigned version,
-      ArrayRef<uint8_t> serializedCaptureStructure);
+  static RegexLiteralExpr *createParsed(ASTContext &ctx, SourceLoc loc,
+                                        StringRef regexText);
 
-  typedef uint16_t CaptureStructureSerializationVersion;
+  ASTContext &getASTContext() const { return *Ctx; }
 
-  static unsigned getCaptureStructureSerializationAllocationSize(
-      unsigned regexLength) {
-    return sizeof(CaptureStructureSerializationVersion) + regexLength + 1;
-  }
+  /// Retrieve the raw parsed regex text.
+  StringRef getParsedRegexText() const { return ParsedRegexText; }
 
-  /// Retrieve the raw regex text.
-  StringRef getRegexText() const { return RegexText; }
+  /// Retrieve the regex pattern to emit.
+  StringRef getRegexToEmit() const;
+
+  /// Retrieve the computed type for the regex.
+  Type getRegexType() const;
 
   /// Retrieve the version of the regex string.
-  unsigned getVersion() const { return Version; }
-
-  ArrayRef<uint8_t> getSerializedCaptureStructure() {
-    return SerializedCaptureStructure;
-  }
+  unsigned getVersion() const;
 
   SourceRange getSourceRange() const { return Loc; }
 
@@ -4051,6 +4045,18 @@ public:
   /// returns nullptr if the closure doesn't have a body
   BraceStmt *getBody() const;
 
+  /// Returns a boolean value indicating whether the body, if any, contains
+  /// an explicit `return` statement.
+  ///
+  /// \returns `true` if the body contains an explicit `return` statement,
+  /// `false` otherwise.
+  bool bodyHasExplicitReturnStmt() const;
+
+  /// Finds occurrences of explicit `return` statements within the body, if any.
+  ///
+  /// \param results An out container to which the results are added.
+  void getExplicitReturnStmts(SmallVectorImpl<ReturnStmt *> &results) const;
+
   ActorIsolation getActorIsolation() const {
     return actorIsolation;
   }
@@ -6545,9 +6551,8 @@ void simple_display(llvm::raw_ostream &out, const ClosureExpr *CE);
 void simple_display(llvm::raw_ostream &out, const DefaultArgumentExpr *expr);
 void simple_display(llvm::raw_ostream &out, const Expr *expr);
 
-SourceLoc extractNearestSourceLoc(const DefaultArgumentExpr *expr);
-SourceLoc extractNearestSourceLoc(const MacroExpansionExpr *expr);
 SourceLoc extractNearestSourceLoc(const ClosureExpr *expr);
+SourceLoc extractNearestSourceLoc(const Expr *expr);
 
 } // end namespace swift
 

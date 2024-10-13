@@ -8862,7 +8862,8 @@ bool ReferenceToInvalidDeclaration::diagnoseAsError() {
 bool InvalidReturnInResultBuilderBody::diagnoseAsError() {
   auto *closure = castToExpr<ClosureExpr>(getAnchor());
 
-  auto returnStmts = TypeChecker::findReturnStatements(closure);
+  SmallVector<ReturnStmt *> returnStmts;
+  closure->getExplicitReturnStmts(returnStmts);
   assert(!returnStmts.empty());
 
   auto loc = returnStmts.front()->getReturnLoc();

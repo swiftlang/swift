@@ -43,6 +43,9 @@ SWIFT_REQUEST(TypeChecker, CheckInconsistentAccessLevelOnImportSameFileRequest,
               evaluator::SideEffect(SourceFile *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CheckInconsistentWeakLinkedImportsRequest,
               evaluator::SideEffect(ModuleDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CheckInitEffectsRequest,
+              evaluator::SideEffect(Initializer *, Expr *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CheckRedeclarationRequest,
               evaluator::SideEffect(ValueDecl *),
               Uncached, NoLocationInfo)
@@ -383,7 +386,7 @@ SWIFT_REQUEST(TypeChecker, HasUserDefinedDesignatedInitRequest,
               bool(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasMemberwiseInitRequest,
               bool(StructDecl *), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, BraceHasReturnRequest,
+SWIFT_REQUEST(TypeChecker, BraceHasExplicitReturnStmtRequest,
               bool(const BraceStmt *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveImplicitMemberRequest,
@@ -588,6 +591,10 @@ SWIFT_REQUEST(TypeChecker, LifetimeDependenceInfoRequest,
 SWIFT_REQUEST(TypeChecker, SuppressesConformanceRequest,
               bool(NominalTypeDecl *decl, KnownProtocolKind kp),
               SeparatelyCached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, RegexLiteralPatternInfoRequest,
+              RegexLiteralPatternInfo(const RegexLiteralExpr *),
+              Cached, NoLocationInfo)
 
 SWIFT_REQUEST(TypeChecker, CaptureInfoRequest,
               CaptureInfo(AbstractFunctionDecl *),
