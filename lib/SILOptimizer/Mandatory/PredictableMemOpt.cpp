@@ -670,360 +670,6 @@ SILValue AvailableValueAggregationFixup::mergeCopies(
     .emitCopyValueOperation(availableAtInst->getLoc(), result);
 }
 
-//===----------------------------------------------------------------------===//
-//                        Available Value Aggregation
-//===----------------------------------------------------------------------===//
-
-static bool anyMissing(unsigned StartSubElt, unsigned NumSubElts,
-                       ArrayRef<AvailableValue> &Values) {
-  while (NumSubElts) {
-    if (!Values[StartSubElt])
-      return true;
-    ++StartSubElt;
-    --NumSubElts;
-  }
-  return false;
-}
-
-namespace {
-
-enum class AvailableValueExpectedOwnership {
-  Take,
-  Borrow,
-  Copy,
-};
-
-/// A class that aggregates available values, loading them if they are not
-/// available.
-class AvailableValueAggregator {
-  SILModule &M;
-  SILBuilderWithScope B;
-  SILLocation Loc;
-  ArrayRef<AvailableValue> AvailableValueList;
-  SmallVectorImpl<PMOMemoryUse> &Uses;
-  AvailableValueExpectedOwnership expectedOwnership;
-
-  AvailableValueAggregationFixup ownershipFixup;
-
-public:
-  AvailableValueAggregator(SILInstruction *Inst,
-                           ArrayRef<AvailableValue> AvailableValueList,
-                           SmallVectorImpl<PMOMemoryUse> &Uses,
-                           DeadEndBlocks &deadEndBlocks,
-                           AvailableValueExpectedOwnership expectedOwnership)
-      : M(Inst->getModule()), B(Inst), Loc(Inst->getLoc()),
-        AvailableValueList(AvailableValueList), Uses(Uses),
-        expectedOwnership(expectedOwnership), ownershipFixup(deadEndBlocks)
-  {}
-
-  // This is intended to be passed by reference only once constructed.
-  AvailableValueAggregator(const AvailableValueAggregator &) = delete;
-  AvailableValueAggregator(AvailableValueAggregator &&) = delete;
-  AvailableValueAggregator &
-  operator=(const AvailableValueAggregator &) = delete;
-  AvailableValueAggregator &operator=(AvailableValueAggregator &&) = delete;
-
-  SILValue aggregateValues(SILType LoadTy, SILValue Address, unsigned FirstElt,
-                           bool isTopLevel = true);
-  bool canTake(SILType loadTy, unsigned firstElt) const;
-
-  void print(llvm::raw_ostream &os) const;
-  void dump() const LLVM_ATTRIBUTE_USED;
-
-  bool isTake() const {
-    return expectedOwnership == AvailableValueExpectedOwnership::Take;
-  }
-
-  bool isBorrow() const {
-    return expectedOwnership == AvailableValueExpectedOwnership::Borrow;
-  }
-
-  bool isCopy() const {
-    return expectedOwnership == AvailableValueExpectedOwnership::Copy;
-  }
-
-  /// Given a load_borrow that we have aggregated a new value for, fixup the
-  /// reference counts of the intermediate copies and phis to ensure that all
-  /// forwarding operations in the CFG are strongly control equivalent (i.e. run
-  /// the same number of times).
-  void fixupOwnership(SILInstruction *load, SILValue newVal) {
-    assert(isa<LoadBorrowInst>(load) || isa<LoadInst>(load));
-    ownershipFixup.fixupOwnership(load, newVal);
-  }
-
-private:
-  SILValue aggregateFullyAvailableValue(SILType loadTy, unsigned firstElt);
-  SILValue aggregateTupleSubElts(TupleType *tt, SILType loadTy,
-                                 SILValue address, unsigned firstElt);
-  SILValue aggregateStructSubElts(StructDecl *sd, SILType loadTy,
-                                  SILValue address, unsigned firstElt);
-};
-
-} // end anonymous namespace
-
-void AvailableValueAggregator::dump() const { print(llvm::dbgs()); }
-
-void AvailableValueAggregator::print(llvm::raw_ostream &os) const {
-  os << "Available Value List, N = " << AvailableValueList.size()
-     << ". Elts:\n";
-  for (auto &V : AvailableValueList) {
-    os << V;
-  }
-}
-
-// We can only take if we never have to split a larger value to promote this
-// address.
-bool AvailableValueAggregator::canTake(SILType loadTy,
-                                       unsigned firstElt) const {
-  // If we are trivially fully available, just return true.
-  if (isFullyAvailable(loadTy, firstElt, AvailableValueList))
-    return true;
-
-  // Otherwise see if we are an aggregate with fully available leaf types.
-  if (TupleType *tt = loadTy.getAs<TupleType>()) {
-    return llvm::all_of(indices(tt->getElements()), [&](unsigned eltNo) {
-      SILType eltTy = loadTy.getTupleElementType(eltNo);
-      unsigned numSubElt =
-          getNumSubElements(eltTy, M, TypeExpansionContext(B.getFunction()));
-      bool success = canTake(eltTy, firstElt);
-      firstElt += numSubElt;
-      return success;
-    });
-  }
-
-  if (auto *sd = getFullyReferenceableStruct(loadTy)) {
-    return llvm::all_of(sd->getStoredProperties(), [&](VarDecl *decl) -> bool {
-      auto context = TypeExpansionContext(B.getFunction());
-      SILType eltTy = loadTy.getFieldType(decl, M, context);
-      unsigned numSubElt = getNumSubElements(eltTy, M, context);
-      bool success = canTake(eltTy, firstElt);
-      firstElt += numSubElt;
-      return success;
-    });
-  }
-
-  // Otherwise, fail. The value is not fully available at its leafs. We can not
-  // perform a take.
-  return false;
-}
-
-/// Given a bunch of primitive subelement values, build out the right aggregate
-/// type (LoadTy) by emitting tuple and struct instructions as necessary.
-SILValue AvailableValueAggregator::aggregateValues(SILType LoadTy,
-                                                   SILValue Address,
-                                                   unsigned FirstElt,
-                                                   bool isTopLevel) {
-  // If we are performing a take, make sure that we have available values for
-  // /all/ of our values. Otherwise, bail.
-  if (isTopLevel && isTake() && !canTake(LoadTy, FirstElt)) {
-    return SILValue();
-  }
-
-  // Check to see if the requested value is fully available, as an aggregate.
-  // This is a super-common case for single-element structs, but is also a
-  // general answer for arbitrary structs and tuples as well.
-  if (SILValue Result = aggregateFullyAvailableValue(LoadTy, FirstElt)) {
-    return Result;
-  }
-
-  // If we have a tuple type, then aggregate the tuple's elements into a full
-  // tuple value.
-  if (TupleType *tupleType = LoadTy.getAs<TupleType>()) {
-    SILValue result =
-        aggregateTupleSubElts(tupleType, LoadTy, Address, FirstElt);
-    if (isTopLevel && result->getOwnershipKind() == OwnershipKind::Guaranteed) {
-      SILValue borrowedResult = result;
-      SILBuilderWithScope builder(&*B.getInsertionPoint(),
-                                  &ownershipFixup.insertedInsts);
-      result = builder.emitCopyValueOperation(Loc, borrowedResult);
-      SmallVector<BorrowedValue, 4> introducers;
-      bool foundIntroducers =
-          getAllBorrowIntroducingValues(borrowedResult, introducers);
-      (void)foundIntroducers;
-      assert(foundIntroducers);
-      for (auto value : introducers) {
-        builder.emitEndBorrowOperation(Loc, value.value);
-      }
-    }
-    return result;
-  }
-
-  // If we have a struct type, then aggregate the struct's elements into a full
-  // struct value.
-  if (auto *structDecl = getFullyReferenceableStruct(LoadTy)) {
-    SILValue result =
-        aggregateStructSubElts(structDecl, LoadTy, Address, FirstElt);
-    if (isTopLevel && result->getOwnershipKind() == OwnershipKind::Guaranteed) {
-      SILValue borrowedResult = result;
-      SILBuilderWithScope builder(&*B.getInsertionPoint(),
-                                  &ownershipFixup.insertedInsts);
-      result = builder.emitCopyValueOperation(Loc, borrowedResult);
-      SmallVector<BorrowedValue, 4> introducers;
-      bool foundIntroducers =
-          getAllBorrowIntroducingValues(borrowedResult, introducers);
-      (void)foundIntroducers;
-      assert(foundIntroducers);
-      for (auto value : introducers) {
-        builder.emitEndBorrowOperation(Loc, value.value);
-      }
-    }
-    return result;
-  }
-
-  // Otherwise, we have a non-aggregate primitive. Load or extract the value.
-  //
-  // NOTE: We should never call this when taking since when taking we know that
-  // our underlying value is always fully available.
-  assert(!isTake());
-  // If the value is not available, load the value and update our use list.
-  auto &val = AvailableValueList[FirstElt];
-  if (!val) {
-    LoadInst *load = ([&]() {
-      SILBuilderWithScope builder(&*B.getInsertionPoint(),
-                                  &ownershipFixup.insertedInsts);
-      return builder.createTrivialLoadOr(Loc, Address,
-                                         LoadOwnershipQualifier::Copy);
-    }());
-    Uses.emplace_back(load, PMOUseKind::Load);
-    return load;
-  }
-  return ownershipFixup.mergeCopies(val, LoadTy, &*B.getInsertionPoint(),
-                                    /*isFullyAvailable*/false);
-}
-
-// See if we have this value is fully available. In such a case, return it as an
-// aggregate. This is a super-common case for single-element structs, but is
-// also a general answer for arbitrary structs and tuples as well.
-SILValue
-AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
-                                                       unsigned firstElt) {
-  // Check if our underlying type is fully available. If it isn't, bail.
-  if (!isFullyAvailable(loadTy, firstElt, AvailableValueList))
-    return SILValue();
-
-  // Ok, grab out first value. (note: any actually will do).
-  auto &firstVal = AvailableValueList[firstElt];
-
-  // Ok, we know that all of our available values are all parts of the same
-  // value.
-  assert(B.hasOwnership() && "requires OSSA");
-  if (isTake())
-    return firstVal.getValue();
-
-  // Otherwise, we need to put in a copy. This is b/c we only propagate along +1
-  // values and we are eliminating a load [copy].
-  return
-    ownershipFixup.mergeCopies(firstVal, loadTy, &*B.getInsertionPoint(),
-                               /*isFullyAvailable*/true);
-}
-
-SILValue AvailableValueAggregator::aggregateTupleSubElts(TupleType *TT,
-                                                         SILType LoadTy,
-                                                         SILValue Address,
-                                                         unsigned FirstElt) {
-  SmallVector<SILValue, 4> ResultElts;
-
-  for (unsigned EltNo : indices(TT->getElements())) {
-    SILType EltTy = LoadTy.getTupleElementType(EltNo);
-    unsigned NumSubElt =
-        getNumSubElements(EltTy, M, TypeExpansionContext(B.getFunction()));
-
-    // If we are missing any of the available values in this struct element,
-    // compute an address to load from.
-    SILValue EltAddr;
-    if (anyMissing(FirstElt, NumSubElt, AvailableValueList)) {
-      assert(!isTake() && "When taking, values should never be missing?!");
-      EltAddr =
-          B.createTupleElementAddr(Loc, Address, EltNo, EltTy.getAddressType());
-    }
-
-    ResultElts.push_back(
-        aggregateValues(EltTy, EltAddr, FirstElt, /*isTopLevel*/ false));
-    FirstElt += NumSubElt;
-  }
-
-  // If we are going to use this to promote a borrowed value, insert borrow
-  // operations. Eventually I am going to do this for everything, but this
-  // should make it easier to bring up.
-  if (!isTake()) {
-    for (unsigned i : indices(ResultElts)) {
-      ResultElts[i] = B.emitBeginBorrowOperation(Loc, ResultElts[i]);
-    }
-  }
-
-  return B.createTuple(Loc, LoadTy, ResultElts);
-}
-
-SILValue AvailableValueAggregator::aggregateStructSubElts(StructDecl *sd,
-                                                          SILType loadTy,
-                                                          SILValue address,
-                                                          unsigned firstElt) {
-  SmallVector<SILValue, 4> resultElts;
-
-  for (auto *decl : sd->getStoredProperties()) {
-    auto context = TypeExpansionContext(B.getFunction());
-    SILType eltTy = loadTy.getFieldType(decl, M, context);
-    unsigned numSubElt = getNumSubElements(eltTy, M, context);
-
-    // If we are missing any of the available values in this struct element,
-    // compute an address to load from.
-    SILValue eltAddr;
-    if (anyMissing(firstElt, numSubElt, AvailableValueList)) {
-      assert(!isTake() && "When taking, values should never be missing?!");
-      eltAddr =
-          B.createStructElementAddr(Loc, address, decl, eltTy.getAddressType());
-    }
-
-    resultElts.push_back(
-        aggregateValues(eltTy, eltAddr, firstElt, /*isTopLevel*/ false));
-    firstElt += numSubElt;
-  }
-
-  if (!isTake()) {
-    for (unsigned i : indices(resultElts)) {
-      resultElts[i] = B.emitBeginBorrowOperation(Loc, resultElts[i]);
-    }
-  }
-
-  return B.createStruct(Loc, loadTy, resultElts);
-}
-
-static SILInstruction *
-getNonPhiBlockIncomingValueDef(SILValue incomingValue,
-                               SingleValueInstruction *phiCopy) {
-  assert(isa<CopyValueInst>(phiCopy));
-  auto *phiBlock = phiCopy->getParent();
-  if (phiBlock == incomingValue->getParentBlock()) {
-    return nullptr;
-  }
-
-  if (auto *cvi = dyn_cast<CopyValueInst>(incomingValue)) {
-    return cvi;
-  }
-
-  assert(isa<SILPhiArgument>(incomingValue));
-
-  // Otherwise, our copy_value may not be post-dominated by our phi. To
-  // work around that, we need to insert destroys along the other
-  // paths. So set base to the first instruction in our argument's block,
-  // so we can insert destroys for our base.
-  return &*incomingValue->getParentBlock()->begin();
-}
-
-static bool
-terminatorHasAnyKnownPhis(TermInst *ti,
-                          ArrayRef<SILPhiArgument *> insertedPhiNodesSorted) {
-  for (auto succArgList : ti->getSuccessorBlockArgumentLists()) {
-    if (llvm::any_of(succArgList, [&](SILArgument *arg) {
-          return binary_search(insertedPhiNodesSorted,
-                               cast<SILPhiArgument>(arg));
-        })) {
-      return true;
-    }
-  }
-
-  return false;
-}
 
 namespace {
 
@@ -1062,6 +708,43 @@ public:
 };
 
 } // end anonymous namespace
+
+static SILInstruction *
+getNonPhiBlockIncomingValueDef(SILValue incomingValue,
+                               SingleValueInstruction *phiCopy) {
+  assert(isa<CopyValueInst>(phiCopy));
+  auto *phiBlock = phiCopy->getParent();
+  if (phiBlock == incomingValue->getParentBlock()) {
+    return nullptr;
+  }
+
+  if (auto *cvi = dyn_cast<CopyValueInst>(incomingValue)) {
+    return cvi;
+  }
+
+  assert(isa<SILPhiArgument>(incomingValue));
+
+  // Otherwise, our copy_value may not be post-dominated by our phi. To
+  // work around that, we need to insert destroys along the other
+  // paths. So set base to the first instruction in our argument's block,
+  // so we can insert destroys for our base.
+  return &*incomingValue->getParentBlock()->begin();
+}
+
+static bool
+terminatorHasAnyKnownPhis(TermInst *ti,
+                          ArrayRef<SILPhiArgument *> insertedPhiNodesSorted) {
+  for (auto succArgList : ti->getSuccessorBlockArgumentLists()) {
+    if (llvm::any_of(succArgList, [&](SILArgument *arg) {
+          return binary_search(insertedPhiNodesSorted,
+                               cast<SILPhiArgument>(arg));
+        })) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 void PhiNodeCopyCleanupInserter::emit(DeadEndBlocks &deadEndBlocks) && {
   // READ THIS: We are being very careful here to avoid allowing for
@@ -1385,6 +1068,324 @@ void AvailableValueAggregationFixup::addMissingDestroysForCopiedValues(
     builder.emitDestroyValueOperation(
         RegularLocation::getAutoGeneratedLocation(), cvi);
   }
+}
+
+//===----------------------------------------------------------------------===//
+//                        Available Value Aggregation
+//===----------------------------------------------------------------------===//
+
+static bool anyMissing(unsigned StartSubElt, unsigned NumSubElts,
+                       ArrayRef<AvailableValue> &Values) {
+  while (NumSubElts) {
+    if (!Values[StartSubElt])
+      return true;
+    ++StartSubElt;
+    --NumSubElts;
+  }
+  return false;
+}
+
+namespace {
+
+enum class AvailableValueExpectedOwnership {
+  Take,
+  Borrow,
+  Copy,
+};
+
+/// A class that aggregates available values, loading them if they are not
+/// available.
+class AvailableValueAggregator {
+  SILModule &M;
+  SILBuilderWithScope B;
+  SILLocation Loc;
+  ArrayRef<AvailableValue> AvailableValueList;
+  SmallVectorImpl<PMOMemoryUse> &Uses;
+  AvailableValueExpectedOwnership expectedOwnership;
+
+  AvailableValueAggregationFixup ownershipFixup;
+
+public:
+  AvailableValueAggregator(SILInstruction *Inst,
+                           ArrayRef<AvailableValue> AvailableValueList,
+                           SmallVectorImpl<PMOMemoryUse> &Uses,
+                           DeadEndBlocks &deadEndBlocks,
+                           AvailableValueExpectedOwnership expectedOwnership)
+      : M(Inst->getModule()), B(Inst), Loc(Inst->getLoc()),
+        AvailableValueList(AvailableValueList), Uses(Uses),
+        expectedOwnership(expectedOwnership), ownershipFixup(deadEndBlocks)
+  {}
+
+  // This is intended to be passed by reference only once constructed.
+  AvailableValueAggregator(const AvailableValueAggregator &) = delete;
+  AvailableValueAggregator(AvailableValueAggregator &&) = delete;
+  AvailableValueAggregator &
+  operator=(const AvailableValueAggregator &) = delete;
+  AvailableValueAggregator &operator=(AvailableValueAggregator &&) = delete;
+
+  SILValue aggregateValues(SILType LoadTy, SILValue Address, unsigned FirstElt,
+                           bool isTopLevel = true);
+  bool canTake(SILType loadTy, unsigned firstElt) const;
+
+  void print(llvm::raw_ostream &os) const;
+  void dump() const LLVM_ATTRIBUTE_USED;
+
+  bool isTake() const {
+    return expectedOwnership == AvailableValueExpectedOwnership::Take;
+  }
+
+  bool isBorrow() const {
+    return expectedOwnership == AvailableValueExpectedOwnership::Borrow;
+  }
+
+  bool isCopy() const {
+    return expectedOwnership == AvailableValueExpectedOwnership::Copy;
+  }
+
+  /// Given a load_borrow that we have aggregated a new value for, fixup the
+  /// reference counts of the intermediate copies and phis to ensure that all
+  /// forwarding operations in the CFG are strongly control equivalent (i.e. run
+  /// the same number of times).
+  void fixupOwnership(SILInstruction *load, SILValue newVal) {
+    assert(isa<LoadBorrowInst>(load) || isa<LoadInst>(load));
+    ownershipFixup.fixupOwnership(load, newVal);
+  }
+
+private:
+  SILValue aggregateFullyAvailableValue(SILType loadTy, unsigned firstElt);
+  SILValue aggregateTupleSubElts(TupleType *tt, SILType loadTy,
+                                 SILValue address, unsigned firstElt);
+  SILValue aggregateStructSubElts(StructDecl *sd, SILType loadTy,
+                                  SILValue address, unsigned firstElt);
+};
+
+} // end anonymous namespace
+
+void AvailableValueAggregator::dump() const { print(llvm::dbgs()); }
+
+void AvailableValueAggregator::print(llvm::raw_ostream &os) const {
+  os << "Available Value List, N = " << AvailableValueList.size()
+     << ". Elts:\n";
+  for (auto &V : AvailableValueList) {
+    os << V;
+  }
+}
+
+// We can only take if we never have to split a larger value to promote this
+// address.
+bool AvailableValueAggregator::canTake(SILType loadTy,
+                                       unsigned firstElt) const {
+  // If we are trivially fully available, just return true.
+  if (isFullyAvailable(loadTy, firstElt, AvailableValueList))
+    return true;
+
+  // Otherwise see if we are an aggregate with fully available leaf types.
+  if (TupleType *tt = loadTy.getAs<TupleType>()) {
+    return llvm::all_of(indices(tt->getElements()), [&](unsigned eltNo) {
+      SILType eltTy = loadTy.getTupleElementType(eltNo);
+      unsigned numSubElt =
+          getNumSubElements(eltTy, M, TypeExpansionContext(B.getFunction()));
+      bool success = canTake(eltTy, firstElt);
+      firstElt += numSubElt;
+      return success;
+    });
+  }
+
+  if (auto *sd = getFullyReferenceableStruct(loadTy)) {
+    return llvm::all_of(sd->getStoredProperties(), [&](VarDecl *decl) -> bool {
+      auto context = TypeExpansionContext(B.getFunction());
+      SILType eltTy = loadTy.getFieldType(decl, M, context);
+      unsigned numSubElt = getNumSubElements(eltTy, M, context);
+      bool success = canTake(eltTy, firstElt);
+      firstElt += numSubElt;
+      return success;
+    });
+  }
+
+  // Otherwise, fail. The value is not fully available at its leafs. We can not
+  // perform a take.
+  return false;
+}
+
+/// Given a bunch of primitive subelement values, build out the right aggregate
+/// type (LoadTy) by emitting tuple and struct instructions as necessary.
+SILValue AvailableValueAggregator::aggregateValues(SILType LoadTy,
+                                                   SILValue Address,
+                                                   unsigned FirstElt,
+                                                   bool isTopLevel) {
+  // If we are performing a take, make sure that we have available values for
+  // /all/ of our values. Otherwise, bail.
+  if (isTopLevel && isTake() && !canTake(LoadTy, FirstElt)) {
+    return SILValue();
+  }
+
+  // Check to see if the requested value is fully available, as an aggregate.
+  // This is a super-common case for single-element structs, but is also a
+  // general answer for arbitrary structs and tuples as well.
+  if (SILValue Result = aggregateFullyAvailableValue(LoadTy, FirstElt)) {
+    return Result;
+  }
+
+  // If we have a tuple type, then aggregate the tuple's elements into a full
+  // tuple value.
+  if (TupleType *tupleType = LoadTy.getAs<TupleType>()) {
+    SILValue result =
+        aggregateTupleSubElts(tupleType, LoadTy, Address, FirstElt);
+    if (isTopLevel && result->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      SILValue borrowedResult = result;
+      SILBuilderWithScope builder(&*B.getInsertionPoint(),
+                                  &ownershipFixup.insertedInsts);
+      result = builder.emitCopyValueOperation(Loc, borrowedResult);
+      SmallVector<BorrowedValue, 4> introducers;
+      bool foundIntroducers =
+          getAllBorrowIntroducingValues(borrowedResult, introducers);
+      (void)foundIntroducers;
+      assert(foundIntroducers);
+      for (auto value : introducers) {
+        builder.emitEndBorrowOperation(Loc, value.value);
+      }
+    }
+    return result;
+  }
+
+  // If we have a struct type, then aggregate the struct's elements into a full
+  // struct value.
+  if (auto *structDecl = getFullyReferenceableStruct(LoadTy)) {
+    SILValue result =
+        aggregateStructSubElts(structDecl, LoadTy, Address, FirstElt);
+    if (isTopLevel && result->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      SILValue borrowedResult = result;
+      SILBuilderWithScope builder(&*B.getInsertionPoint(),
+                                  &ownershipFixup.insertedInsts);
+      result = builder.emitCopyValueOperation(Loc, borrowedResult);
+      SmallVector<BorrowedValue, 4> introducers;
+      bool foundIntroducers =
+          getAllBorrowIntroducingValues(borrowedResult, introducers);
+      (void)foundIntroducers;
+      assert(foundIntroducers);
+      for (auto value : introducers) {
+        builder.emitEndBorrowOperation(Loc, value.value);
+      }
+    }
+    return result;
+  }
+
+  // Otherwise, we have a non-aggregate primitive. Load or extract the value.
+  //
+  // NOTE: We should never call this when taking since when taking we know that
+  // our underlying value is always fully available.
+  assert(!isTake());
+  // If the value is not available, load the value and update our use list.
+  auto &val = AvailableValueList[FirstElt];
+  if (!val) {
+    LoadInst *load = ([&]() {
+      SILBuilderWithScope builder(&*B.getInsertionPoint(),
+                                  &ownershipFixup.insertedInsts);
+      return builder.createTrivialLoadOr(Loc, Address,
+                                         LoadOwnershipQualifier::Copy);
+    }());
+    Uses.emplace_back(load, PMOUseKind::Load);
+    return load;
+  }
+  return ownershipFixup.mergeCopies(val, LoadTy, &*B.getInsertionPoint(),
+                                    /*isFullyAvailable*/false);
+}
+
+// See if we have this value is fully available. In such a case, return it as an
+// aggregate. This is a super-common case for single-element structs, but is
+// also a general answer for arbitrary structs and tuples as well.
+SILValue
+AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
+                                                       unsigned firstElt) {
+  // Check if our underlying type is fully available. If it isn't, bail.
+  if (!isFullyAvailable(loadTy, firstElt, AvailableValueList))
+    return SILValue();
+
+  // Ok, grab out first value. (note: any actually will do).
+  auto &firstVal = AvailableValueList[firstElt];
+
+  // Ok, we know that all of our available values are all parts of the same
+  // value.
+  assert(B.hasOwnership() && "requires OSSA");
+  if (isTake())
+    return firstVal.getValue();
+
+  // Otherwise, we need to put in a copy. This is b/c we only propagate along +1
+  // values and we are eliminating a load [copy].
+  return
+    ownershipFixup.mergeCopies(firstVal, loadTy, &*B.getInsertionPoint(),
+                               /*isFullyAvailable*/true);
+}
+
+SILValue AvailableValueAggregator::aggregateTupleSubElts(TupleType *TT,
+                                                         SILType LoadTy,
+                                                         SILValue Address,
+                                                         unsigned FirstElt) {
+  SmallVector<SILValue, 4> ResultElts;
+
+  for (unsigned EltNo : indices(TT->getElements())) {
+    SILType EltTy = LoadTy.getTupleElementType(EltNo);
+    unsigned NumSubElt =
+        getNumSubElements(EltTy, M, TypeExpansionContext(B.getFunction()));
+
+    // If we are missing any of the available values in this struct element,
+    // compute an address to load from.
+    SILValue EltAddr;
+    if (anyMissing(FirstElt, NumSubElt, AvailableValueList)) {
+      assert(!isTake() && "When taking, values should never be missing?!");
+      EltAddr =
+          B.createTupleElementAddr(Loc, Address, EltNo, EltTy.getAddressType());
+    }
+
+    ResultElts.push_back(
+        aggregateValues(EltTy, EltAddr, FirstElt, /*isTopLevel*/ false));
+    FirstElt += NumSubElt;
+  }
+
+  // If we are going to use this to promote a borrowed value, insert borrow
+  // operations. Eventually I am going to do this for everything, but this
+  // should make it easier to bring up.
+  if (!isTake()) {
+    for (unsigned i : indices(ResultElts)) {
+      ResultElts[i] = B.emitBeginBorrowOperation(Loc, ResultElts[i]);
+    }
+  }
+
+  return B.createTuple(Loc, LoadTy, ResultElts);
+}
+
+SILValue AvailableValueAggregator::aggregateStructSubElts(StructDecl *sd,
+                                                          SILType loadTy,
+                                                          SILValue address,
+                                                          unsigned firstElt) {
+  SmallVector<SILValue, 4> resultElts;
+
+  for (auto *decl : sd->getStoredProperties()) {
+    auto context = TypeExpansionContext(B.getFunction());
+    SILType eltTy = loadTy.getFieldType(decl, M, context);
+    unsigned numSubElt = getNumSubElements(eltTy, M, context);
+
+    // If we are missing any of the available values in this struct element,
+    // compute an address to load from.
+    SILValue eltAddr;
+    if (anyMissing(firstElt, numSubElt, AvailableValueList)) {
+      assert(!isTake() && "When taking, values should never be missing?!");
+      eltAddr =
+          B.createStructElementAddr(Loc, address, decl, eltTy.getAddressType());
+    }
+
+    resultElts.push_back(
+        aggregateValues(eltTy, eltAddr, firstElt, /*isTopLevel*/ false));
+    firstElt += numSubElt;
+  }
+
+  if (!isTake()) {
+    for (unsigned i : indices(resultElts)) {
+      resultElts[i] = B.emitBeginBorrowOperation(Loc, resultElts[i]);
+    }
+  }
+
+  return B.createStruct(Loc, loadTy, resultElts);
 }
 
 //===----------------------------------------------------------------------===//
