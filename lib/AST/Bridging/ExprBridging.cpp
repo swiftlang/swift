@@ -90,6 +90,15 @@ BridgedAwaitExpr BridgedAwaitExpr_createParsed(BridgedASTContext cContext,
       AwaitExpr(cAwaitLoc.unbridged(), cSubExpr.unbridged());
 }
 
+BridgedBindOptionalExpr
+BridgedBindOptionalExpr_createParsed(BridgedASTContext cContext,
+                                     BridgedExpr cSubExpr,
+                                     BridgedSourceLoc cQuestionLoc) {
+  ASTContext &context = cContext.unbridged();
+  return new (context) BindOptionalExpr(cSubExpr.unbridged(),
+                                        cQuestionLoc.unbridged(), /*depth=*/0);
+}
+
 BridgedBooleanLiteralExpr
 BridgedBooleanLiteralExpr_createParsed(BridgedASTContext cContext, bool value,
                                        BridgedSourceLoc cTokenLoc) {
@@ -218,6 +227,15 @@ BridgedForceTryExpr_createParsed(BridgedASTContext cContext,
                                  BridgedSourceLoc cExclaimLoc) {
   return new (cContext.unbridged()) ForceTryExpr(
       cTryLoc.unbridged(), cSubExpr.unbridged(), cExclaimLoc.unbridged());
+}
+
+BridgedForceValueExpr
+BridgedForceValueExpr_createParsed(BridgedASTContext cContext,
+                                   BridgedExpr cSubExpr,
+                                   BridgedSourceLoc cExclaimLoc) {
+  ASTContext &context = cContext.unbridged();
+  return new (context)
+      ForceValueExpr(cSubExpr.unbridged(), cExclaimLoc.unbridged());
 }
 
 BridgedFloatLiteralExpr
