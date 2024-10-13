@@ -333,8 +333,6 @@ static Expr *getMemberChainSubExpr(Expr *expr) {
     return SE->getBase();
   } else if (auto *DSE = dyn_cast<DotSelfExpr>(expr)) {
     return DSE->getSubExpr();
-  } else if (auto *PUE = dyn_cast<PostfixUnaryExpr>(expr)) {
-    return PUE->getOperand();
   } else if (auto *CCE = dyn_cast<CodeCompletionExpr>(expr)) {
     return CCE->getBase();
   } else {
@@ -1104,6 +1102,9 @@ class PreCheckTarget final : public ASTWalker {
   /// resolution failure, or `nullptr` if transformation is not applicable.
   Expr *simplifyTypeConstructionWithLiteralArg(Expr *E);
 
+  /// Pull some operator expressions into the optional chain.
+  OptionalEvaluationExpr *hoistOptionalEvaluationExprIfNeeded(Expr *E);
+
   /// Whether the given expression "looks like" a (possibly sugared) type. For
   /// example, `(foo, bar)` "looks like" a type, but `foo + bar` does not.
   bool exprLooksLikeAType(Expr *expr);
@@ -1469,26 +1470,8 @@ public:
       return Action::Continue(result);
     }
 
-    // If this is an assignment operator, and the left operand is an optional
-    // evaluation, pull the operator into the chain.
-    if (auto *binExpr = dyn_cast<BinaryExpr>(expr)) {
-      if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(binExpr->getLHS())) {
-        if (auto *precedence =
-                TypeChecker::lookupPrecedenceGroupForInfixOperator(
-                    DC, binExpr, /*diagnose=*/false)) {
-          if (precedence->isAssignment()) {
-            binExpr->getArgs()->setExpr(0, OEE->getSubExpr());
-            OEE->setSubExpr(binExpr);
-            return Action::Continue(OEE);
-          }
-        }
-      }
-    } else if (auto *assignExpr = dyn_cast<AssignExpr>(expr)) {
-      if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(assignExpr->getDest())) {
-        assignExpr->setDest(OEE->getSubExpr());
-        OEE->setSubExpr(assignExpr);
-        return Action::Continue(OEE);
-      }
+    if (auto *OEE = hoistOptionalEvaluationExprIfNeeded(expr)) {
+      return Action::Continue(OEE);
     }
 
     auto *parent = Parent.getAsExpr();
@@ -2649,6 +2632,45 @@ Expr *PreCheckTarget::simplifyTypeConstructionWithLiteralArg(Expr *E) {
                                           call->getSourceRange(),
                                           typeExpr->getTypeRepr())
              : nullptr;
+}
+
+/// Pull some operator expressions into the optional chain if needed.
+///
+///   foo? = newFoo // LHS of the assignment operator
+///   foo?.bar += value // LHS of 'assignment: true' precedence group operators.
+///   for?.bar++ // Postfix operator.
+///
+/// In such cases, the operand is constructed to be an 'OperatorEvaluationExpr'
+/// wrapping the actual operand. This function hoist it and wraps the entire
+/// expression with it. Returns the result 'OperatorEvaluationExpr', or nullptr
+/// if 'expr' didn't match the condition.
+OptionalEvaluationExpr *
+PreCheckTarget::hoistOptionalEvaluationExprIfNeeded(Expr *expr) {
+  if (auto *assignE = dyn_cast<AssignExpr>(expr)) {
+    if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(assignE->getDest())) {
+      assignE->setDest(OEE->getSubExpr());
+      OEE->setSubExpr(assignE);
+      return OEE;
+    }
+  } else if (auto *binaryE = dyn_cast<BinaryExpr>(expr)) {
+    if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(binaryE->getLHS())) {
+      if (auto *precedence = TypeChecker::lookupPrecedenceGroupForInfixOperator(
+              DC, binaryE, /*diagnose=*/false)) {
+        if (precedence->isAssignment()) {
+          binaryE->getArgs()->setExpr(0, OEE->getSubExpr());
+          OEE->setSubExpr(binaryE);
+          return OEE;
+        }
+      }
+    }
+  } else if (auto *postfixE = dyn_cast<PostfixUnaryExpr>(expr)) {
+    if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(postfixE->getOperand())) {
+      postfixE->setOperand(OEE->getSubExpr());
+      OEE->setSubExpr(postfixE);
+      return OEE;
+    }
+  }
+  return nullptr;
 }
 
 bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target) {
