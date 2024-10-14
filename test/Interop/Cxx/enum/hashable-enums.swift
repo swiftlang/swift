@@ -1,5 +1,5 @@
 // REQUIRES: executable_test
-// RUN: %target-run-simple-swiftgyb(-cxx-interoperability-mode=default -Xfrontend -disable-availability-checking -I %S/Inputs)
+// RUN: %target-run-simple-swift(-cxx-interoperability-mode=default -Xfrontend -disable-availability-checking -I %S/Inputs)
 
 import StdlibUnittest
 import TypedUntypedEnums
@@ -11,56 +11,55 @@ func getHash<H>(_ x: H) -> Int where H: Hashable {
     return h.finalize()
 }
 
-%{
-Colors = ["kRed", "kBlue", "kGreen", "kYellow"]
-Numbers = ["kOne", "kTwo", "kThree", "kFour"]
-Pets = ["Pet.goat", "Pet.cat", "Pet.dogcow", "Pet.rabbit"]
-}%
+let Colors = [kRed, kBlue, kGreen, kYellow]
+let Numbers = [kOne, kTwo, kThree, kFour]
+let Pets = [Pet.goat, Pet.cat, Pet.dogcow, Pet.rabbit]
 
 var HashableEnumsTestSuite = TestSuite("Enums are hashable")
 
 HashableEnumsTestSuite.test("Hashes preserve equality") {
-    % for m in Colors:
-    %   for n in Colors:
-    %     if m == n:
-              expectEqual(getHash(${m}), getHash(${n}))
-    %     else:
-              expectNotEqual(getHash(${m}), getHash(${n}))
-    %     end
-    %   end
-    % end
+    for m in 0..<Colors.count {
+        for n in 0..<Colors.count {
+          if m == n {
+              expectEqual(getHash(Colors[m]), getHash(Colors[n]))
+          } else {
+              expectNotEqual(getHash(Colors[m]), getHash(Colors[n]))
+          }
+        }
+    }
 
-    % for m in Pets:
-    %   for n in Pets:
-    %     if m == n:
-              expectEqual(getHash(${m}), getHash(${n}))
-    %     else:
-              expectNotEqual(getHash(${m}), getHash(${n}))
-    %     end
-    %   end
-    % end
+    for m in 0..<Numbers.count {
+        for n in 0..<Numbers.count {
+          if m == n {
+              expectEqual(getHash(Numbers[m]), getHash(Numbers[n]))
+          } else {
+              expectNotEqual(getHash(Numbers[m]), getHash(Numbers[n]))
+          }
+        }
+    }
 
-    % for m in Numbers:
-    %   for n in Numbers:
-    %     if m == n:
-              expectEqual(getHash(${m}), getHash(${n}))
-    %     else:
-              expectNotEqual(getHash(${m}), getHash(${n}))
-    %     end
-    %   end
-    % end
+    for m in 0..<Pets.count {
+        for n in 0..<Pets.count {
+          if m == n {
+              expectEqual(getHash(Pets[m]), getHash(Pets[n]))
+          } else {
+              expectNotEqual(getHash(Pets[m]), getHash(Pets[n]))
+          }
+        }
+    }
 }
 
 HashableEnumsTestSuite.test("Untyped enums hash using underlying value") {
-    % for m in range(4):
-    %   for n in range(4):
-    %     if m == n:
-              expectEqual(getHash(${Numbers[m]}), getHash(${n + 1}))
-    %     else:
-              expectNotEqual(getHash(${Numbers[m]}), getHash(${n + 1}))
-    %     end
-    %   end
-    % end
+    for m in 1...4 {
+        for n in 1...Numbers.count {
+            let number = Numbers[n - 1]
+            if m == n {
+                expectEqual(getHash(m), getHash(number))
+            } else {
+                expectNotEqual(getHash(m), getHash(number))
+            }
+        }
+    }
 }
 
 HashableEnumsTestSuite.test("Typed enums and class enums hash using other info") {
