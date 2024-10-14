@@ -2065,7 +2065,7 @@ void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,
 }
 
 bool Parser::peekAvailabilityMacroName() {
-  AvailabilityMacroMap &Map = parseAllAvailabilityMacroArguments();
+  AvailabilityMacroMap Map = parseAllAvailabilityMacroArguments();
 
   StringRef MacroName = Tok.getText();
   return Map.Impl.find(MacroName) != Map.Impl.end();
@@ -2074,7 +2074,7 @@ bool Parser::peekAvailabilityMacroName() {
 ParserStatus
 Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   // Get the macros from the compiler arguments.
-  AvailabilityMacroMap &Map = parseAllAvailabilityMacroArguments();
+  AvailabilityMacroMap Map = parseAllAvailabilityMacroArguments();
 
   StringRef MacroName = Tok.getText();
   auto NameMatch = Map.Impl.find(MacroName);
@@ -2114,13 +2114,19 @@ Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   return makeParserSuccess();
 }
 
-AvailabilityMacroMap &Parser::parseAllAvailabilityMacroArguments() {
-  AvailabilityMacroMap &Map = Context.getAvailabilityMacroCache();
-  if (Map.WasParsed)
-    return Map;
+AvailabilityMacroMap
+Parser::parseAllAvailabilityMacroArguments() {
+  return evaluateOrDefault(Context.evaluator,
+                           AvailabilityMacroArgumentsRequest{&Context},
+                           AvailabilityMacroMap());
+}
 
-  SourceManager &SM = Context.SourceMgr;
-  LangOptions LangOpts = Context.LangOpts;
+AvailabilityMacroMap
+AvailabilityMacroArgumentsRequest::evaluate(Evaluator &evaluator,
+                                            ASTContext *ctx) const {
+  AvailabilityMacroMap Map;
+  SourceManager &SM = ctx->SourceMgr;
+  LangOptions LangOpts = ctx->LangOpts;
 
   // Allocate all buffers in one go to avoid repeating the sorting in
   // findBufferContainingLocInternal.
@@ -2137,11 +2143,11 @@ AvailabilityMacroMap &Parser::parseAllAvailabilityMacroArguments() {
     swift::ParserUnit PU(SM, SourceFileKind::Main, bufferID, LangOpts,
                          TypeCheckerOptions(), SILOptions(), "unknown");
 
-    ForwardingDiagnosticConsumer PDC(Context.Diags);
+    ForwardingDiagnosticConsumer PDC(ctx->Diags);
     PU.getDiagnosticEngine().addConsumer(PDC);
 
     // Parse the argument.
-    AvailabilityMacroDefinition ParsedMacro;
+    Parser::AvailabilityMacroDefinition ParsedMacro;
     ParserStatus Status =
       PU.getParser().parseAvailabilityMacroDefinition(ParsedMacro);
     if (Status.isError())
@@ -2154,7 +2160,7 @@ AvailabilityMacroMap &Parser::parseAllAvailabilityMacroArguments() {
       if (auto *PlatformVersionSpec =
           dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec)) {
         auto SpecCopy =
-          new (Context) PlatformVersionConstraintAvailabilitySpec(
+          new (*ctx) PlatformVersionConstraintAvailabilitySpec(
                                                          *PlatformVersionSpec);
         SpecsCopy.push_back(SpecCopy);
       }
@@ -2172,8 +2178,11 @@ AvailabilityMacroMap &Parser::parseAllAvailabilityMacroArguments() {
     auto PreviousEntry =
       MacroDefinition.insert({ParsedMacro.Version, ParsedMacro.Specs});
     if (!PreviousEntry.second) {
-      diagnose(PU.getParser().PreviousLoc, diag::attr_availability_duplicate,
-               ParsedMacro.Name, ParsedMacro.Version.getAsString());
+      auto &Diags = ctx->Diags;
+      Diags.diagnose(PU.getParser().PreviousLoc,
+                     diag::attr_availability_duplicate,
+                     ParsedMacro.Name, ParsedMacro.Version.getAsString());
+
     }
 
     // Save back the macro spec.
@@ -2181,8 +2190,12 @@ AvailabilityMacroMap &Parser::parseAllAvailabilityMacroArguments() {
     Map.Impl.insert({ParsedMacro.Name, MacroDefinition});
   }
 
-  Map.WasParsed = true;
   return Map;
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const ASTContext *value) {
+  out << "ASTContext: " << value;
 }
 
 ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
