@@ -562,7 +562,6 @@ public:
 
   void printAsOperand(raw_ostream &OS, bool PrintType = true);
 
-#ifndef NDEBUG
   /// Print the ID of the block, bbN.
   void dumpID(bool newline = true) const;
 
@@ -571,7 +570,6 @@ public:
 
   /// Print the ID of the block with \p Ctx, bbN.
   void printID(SILPrintContext &Ctx, bool newline = true) const;
-#endif
 
   /// getSublistAccess() - returns pointer to member of instruction list
   static InstListType SILBasicBlock::*getSublistAccess() {
