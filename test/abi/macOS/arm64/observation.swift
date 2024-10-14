@@ -80,3 +80,51 @@ Added: _$s11Observation0A8TrackingV4PathVMn
 
 // type metadata for Observation.ObservationTracking.Path
 Added: _$s11Observation0A8TrackingV4PathVN
+
+// Observation.withObservationTracking<A>(options: Observation.ObservationTracking.Options, _: () -> A, didSet: @Sendable (Observation.ObservationTracking) -> ()) -> (A, Observation.ObservationTracking)
+Added: _$s11Observation04withA8Tracking7options_6didSetx_AA0aC0VtAF7OptionsV_xyXEyAFYbctlF
+
+// Observation.withObservationTracking<A>(options: Observation.ObservationTracking.Options, _: () -> A, willSet: @Sendable (Observation.ObservationTracking) -> (), didSet: @Sendable (Observation.ObservationTracking) -> ()) -> (A, Observation.ObservationTracking)
+Added: _$s11Observation04withA8Tracking7options_7willSet03didF0x_AA0aC0VtAG7OptionsV_xyXEyAGYbcyAGYbctlF
+
+// Observation.withObservationTracking<A>(options: Observation.ObservationTracking.Options, _: () -> A, willSet: @Sendable (Observation.ObservationTracking) -> ()) -> (A, Observation.ObservationTracking)
+Added: _$s11Observation04withA8Tracking7options_7willSetx_AA0aC0VtAF7OptionsV_xyXEyAFYbctlF
+
+// Observation.ObservationTracking.Options.init(arrayLiteral: Observation.ObservationTracking.Options...) -> Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsV12arrayLiteralA2Ed_tcfC
+
+// static Observation.ObservationTracking.Options.cancelOnFirstChange.getter : Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsV19cancelOnFirstChangeAEvgZ
+
+// property descriptor for static Observation.ObservationTracking.Options.cancelOnFirstChange : Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsV19cancelOnFirstChangeAEvpZMV
+
+// static Observation.ObservationTracking.Options.exclusive.getter : Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsV9exclusiveAEvgZ
+
+// property descriptor for static Observation.ObservationTracking.Options.exclusive : Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsV9exclusiveAEvpZMV
+
+// static Observation.ObservationTracking.Options.filtering(@Sendable (Observation.ObservationTracking.Path) -> Swift.Bool) -> Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsV9filteringyAESbAC4PathVYbcFZ
+
+// type metadata accessor for Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsVMa
+
+// nominal type descriptor for Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsVMn
+
+// type metadata for Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsVN
+
+// protocol conformance descriptor for Observation.ObservationTracking.Options : Swift.ExpressibleByArrayLiteral in Observation
+Added: _$s11Observation0A8TrackingV7OptionsVs25ExpressibleByArrayLiteralAAMc
+
+// Observation.ObservationTracking.contains<A, B>(Swift.KeyPath<A, B>) -> Swift.Bool
+Added: _$s11Observation0A8TrackingV8containsySbs7KeyPathCyxq_Gr0_lF
+
+// (extension in Observation):Observation.Observable< where A: AnyObject>.observeValues<A where A1: Swift.Sendable>(for: Swift.KeyPath<A, A1>) -> some
+Added: _$s11Observation10ObservablePAARlzCrlE13observeValues3forQrs7KeyPathCyxqd__G_ts8SendableRd__lF
+
+// opaque type descriptor for <<opaque return type of (extension in Observation):Observation.Observable< where A: AnyObject>.observeValues<A where A1: Swift.Sendable>(for: Swift.KeyPath<A, A1>) -> some>>
+Added: _$s11Observation10ObservablePAARlzCrlE13observeValues3forQrs7KeyPathCyxqd__G_ts8SendableRd__lFQOMQ
