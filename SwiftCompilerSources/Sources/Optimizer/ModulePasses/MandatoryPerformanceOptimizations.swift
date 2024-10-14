@@ -208,13 +208,28 @@ private func removeUnusedMetatypeInstructions(in function: Function, _ context: 
 }
 
 private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlinedFunctions: inout Set<PathFunctionTuple>) -> Bool {
+  if let beginApply = apply as? BeginApplyInst,
+     !beginApply.canInline
+  {
+    return false
+  }
+
+  if !callee.canBeInlinedIntoCaller(withSerializedKind: apply.parentFunction.serializedKind) &&
+     // Even if the serialization kind doesn't match, we need to make sure to inline witness method thunks
+     // in embedded swift.
+     callee.thunkKind != .thunk
+  {
+    return false
+  }
+
+  // Cannot inline a non-ossa function into an ossa function
+  if apply.parentFunction.hasOwnership && !callee.hasOwnership {
+    return false
+  }
+
   if callee.isTransparent {
     precondition(callee.hasOwnership, "transparent functions should have ownership at this stage of the pipeline")
     return true
-  }
-
-  if !apply.canInline {
-    return false
   }
 
   if apply is BeginApplyInst {

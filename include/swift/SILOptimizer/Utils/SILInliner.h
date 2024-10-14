@@ -58,6 +58,8 @@ public:
       : FuncBuilder(FuncBuilder), deleter(deleter), IKind(IKind),
         ApplySubs(ApplySubs) {}
 
+  static bool canInlineBeginApply(BeginApplyInst *BA);
+
   /// Returns true if we are able to inline \arg AI.
   ///
   /// *NOTE* This must be checked before attempting to inline \arg AI. If one
