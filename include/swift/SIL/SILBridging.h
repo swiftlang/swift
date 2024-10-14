@@ -1065,17 +1065,18 @@ struct BridgedVTableEntryArray {
 };
 
 struct BridgedVTable {
-  const swift::SILVTable * _Nonnull vTable;
+  swift::SILVTable * _Nonnull vTable;
 
   BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE SwiftInt getNumEntries() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedVTableEntry getEntry(SwiftInt index) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getClass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getSpecializedClassType() const;
+  BRIDGED_INLINE void replaceEntries(BridgedArrayRef bridgedEntries) const;
 };
 
 struct OptionalBridgedVTable {
-  const swift::SILVTable * _Nullable table;
+  swift::SILVTable * _Nullable table;
 };
 
 struct BridgedWitnessTableEntry {
@@ -1328,7 +1329,8 @@ struct BridgedChangeNotificationHandler {
     instructionsChanged,
     callsChanged,
     branchesChanged,
-    effectsChanged
+    effectsChanged,
+    functionTablesChanged
   };
 
   void notifyChanges(Kind changeKind) const;

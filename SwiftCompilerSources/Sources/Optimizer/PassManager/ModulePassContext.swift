@@ -168,6 +168,14 @@ struct ModulePassContext : Context, CustomStringConvertible {
     return VTable(bridged: bridgedVTable)
   }
 
+  func replaceVTableEntries(of vTable: VTable, with entries: [VTable.Entry]) {
+    let bridgedEntries = entries.map { $0.bridged }
+    bridgedEntries.withBridgedArrayRef {
+      vTable.bridged.replaceEntries($0)
+    }
+    notifyFunctionTablesChanged()
+  }
+
   func createEmptyFunction(
     name: String,
     parameters: [ParameterInfo],
@@ -200,6 +208,10 @@ struct ModulePassContext : Context, CustomStringConvertible {
                                                    function.bridged))
       }
     }
+  }
+
+  func notifyFunctionTablesChanged() {
+    _bridged.asNotificationHandler().notifyChanges(.functionTablesChanged)
   }
 }
 
