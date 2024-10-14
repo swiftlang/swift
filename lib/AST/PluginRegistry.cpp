@@ -223,16 +223,10 @@ PluginRegistry::loadExecutablePlugin(StringRef path, bool disableSandbox) {
 
 llvm::Error LoadedExecutablePlugin::spawnIfNeeded() {
   if (Process) {
-    // See if the loaded one is still usable.
-    if (!Process->isStale)
-      return llvm::Error::success();
-
     // NOTE: We don't check the mtime here because 'stat(2)' call is too heavy.
     // PluginRegistry::loadExecutablePlugin() checks it and replace this object
     // itself if the plugin is updated.
-
-    // The plugin is stale. Discard the previously opened process.
-    Process.reset();
+    return llvm::Error::success();
   }
 
   // Create command line arguments.
