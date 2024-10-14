@@ -14,7 +14,7 @@ import AST
 import SILBridging
 
 public struct VTable : CustomStringConvertible, NoReflectionChildren {
-  let bridged: BridgedVTable
+  public let bridged: BridgedVTable
 
   public init(bridged: BridgedVTable) { self.bridged = bridged }
 
