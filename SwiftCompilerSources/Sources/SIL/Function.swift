@@ -162,8 +162,26 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     }
   }
 
-  public func canBeInlinedIntoCaller(_ kind: SerializedKind) -> Bool {
-    bridged.canBeInlinedIntoCaller(serializedKindBridged(kind))
+  public func canBeInlinedIntoCaller(withSerializedKind callerSerializedKind: SerializedKind) -> Bool {
+    switch serializedKind {
+    // If both callee and caller are not_serialized, the callee can be inlined into the caller
+    // during SIL inlining passes even if it (and the caller) might contain private symbols.
+    case .notSerialized:
+      return callerSerializedKind == .notSerialized;
+
+    // If Package-CMO is enabled, we serialize package, public, and @usableFromInline decls as
+    // [serialized_for_package].
+    // Their bodies must not, however, leak into @inlinable functons (that are [serialized])
+    // since they are inlined outside of their defining module.
+    //
+    // If this callee is [serialized_for_package], the caller must be either non-serialized
+    // or [serialized_for_package] for this callee's body to be inlined into the caller.
+    // It can however be referenced by [serialized] caller.
+    case .serializedForPackage:
+      return callerSerializedKind != .serialized;
+    case .serialized:
+      return true;
+    }
   }
 
   public func hasValidLinkageForFragileRef(_ kind: SerializedKind) -> Bool {

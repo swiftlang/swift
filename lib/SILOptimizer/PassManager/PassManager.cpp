@@ -2062,9 +2062,8 @@ bool BridgedPassContext::completeLifetime(BridgedValue value) const {
   return result == LifetimeCompletion::WasCompleted;
 }
 
-bool FullApplySite_canInline(BridgedInstruction apply) {
-  return swift::SILInliner::canInlineApplySite(
-      swift::FullApplySite(apply.unbridged()));
+bool BeginApply_canInline(BridgedInstruction beginApply) {
+  return swift::SILInliner::canInlineBeginApply(beginApply.getAs<BeginApplyInst>());
 }
 
 BridgedDynamicCastResult classifyDynamicCastBridged(BridgedType sourceTy, BridgedType destTy,
