@@ -23,7 +23,7 @@ NS_ASSUME_NONNULL_BEGIN
   NSArray<NSString *> *bridgedStrings;
 }
 
-- (id)init;
+- (instancetype)init NS_DESIGNATED_INITIALIZER;
 - (void)setUpStringTests:(NSArray<NSString *> *)bridgedStrings;
 - (void)testFromString:(NSString *) str;
 - (NSString *)testToString;
