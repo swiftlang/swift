@@ -81,8 +81,6 @@ protocol P1 {
   func invariantSelf11() -> Struct<Self>.InnerGeneric<Void>
   // https://github.com/apple/swift/issues/61934
   func invariantSelf12() -> any Sequence<Self>
-  // FIXME
-  // expected-error@+1 {{non-protocol, non-class type 'Sequence<Self>' cannot be used within a protocol-constrained type}}
   func invariantSelf13() -> any P1 & Sequence<Self>
   func invariantSelf14() -> (any Sequence<Self>).Type
   func invariantAssoc1(_: inout Q)
@@ -97,10 +95,8 @@ protocol P1 {
   func invariantAssoc10(_: any P1 & Class<Q>)
   func invariantAssoc11() -> Struct<Q>.InnerGeneric<Void>
   func invariantAssoc12() -> any Sequence<Q>
-  // FIXME
-  // expected-error@+1 {{non-protocol, non-class type 'Sequence<Self.Q>' cannot be used within a protocol-constrained type}}
   func invariantAssoc13() -> any P1 & Sequence<Q>
-func invariantAssoc14() -> (any Sequence<Q>).Type
+  func invariantAssoc14() -> (any Sequence<Q>).Type
 
   // Properties
   var covariantSelfProp1: Self { get }

@@ -5697,11 +5697,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
       continue;
     }
 
-    // FIXME: Support compositions involving parameterized protocol types,
-    // like 'any Collection<String> & Sendable', etc.
-    if (ty->is<ParameterizedProtocolType>() &&
-        !options.isConstraintImplicitExistential() &&
-        options.getContext() != TypeResolverContext::ExistentialConstraint) {
+    if (ty->is<ParameterizedProtocolType>()) {
       checkMember(tyR->getStartLoc(), ty);
       Members.push_back(ty);
       continue;
