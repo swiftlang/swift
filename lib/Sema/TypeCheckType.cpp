@@ -5112,8 +5112,28 @@ TypeResolver::resolveSendingTypeRepr(SendingTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
+  NeverNullType resolvedType = resolveType(repr->getBase(), options);
+
+  // If resolved type is Sendable, warn about unnecessary 'sending' annotation.
+  bool isFunctionParam = options.is(TypeResolverContext::FunctionInput);
+  bool isFunctionResult = options.is(TypeResolverContext::FunctionResult);
+  if (inStage(TypeResolutionStage::Interface) 
+      && (isFunctionParam || isFunctionResult)) {
+    auto contextTy = GenericEnvironment::mapTypeIntoContext(
+        resolution.getGenericSignature().getGenericEnvironment(), 
+        resolvedType);
+    if (contextTy->isSendableType()) {
+      diagnose(repr->getSpecifierLoc(),
+               isFunctionParam
+                 ? diag::sending_applied_to_sendable_parameter
+                 : diag::sending_applied_to_sendable_result,
+               resolvedType.get())
+      .fixItRemove(repr->getSpecifierLoc());
+    }
+  }
+
   // Return the type.
-  return resolveType(repr->getBase(), options);
+  return resolvedType;
 }
 
 NeverNullType

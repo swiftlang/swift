@@ -2,32 +2,36 @@
 
 // REQUIRES: asserts
 
-func testArg(_ x: sending String) {
+class NonSendable {
+  init(){}
 }
 
-func testResult() -> sending String {
-  ""
+func testArg(_ x: sending NonSendable) {
 }
 
-func testArgResult(_ x: sending String) -> sending String {
+func testResult() -> sending NonSendable {
+  return NonSendable()
+}
+
+func testArgResult(_ x: sending NonSendable) -> sending NonSendable {
 }
 
 func testVarDeclDoesntWork() {
-  var x: sending String // expected-error {{'sending' may only be used on parameter}}
+  var x: sending NonSendable // expected-error {{'sending' may only be used on parameter}}
 }
 
-func testVarDeclTupleElt() -> (sending String, String) {} // expected-error {{'sending' cannot be applied to tuple elements}}
+func testVarDeclTupleElt() -> (sending NonSendable, NonSendable) {} // expected-error {{'sending' cannot be applied to tuple elements}}
 
-func testVarDeclTuple2(_ x: (sending String)) {}
-func testVarDeclTuple2(_ x: (sending String, String)) {} // expected-error {{'sending' cannot be applied to tuple elements}}
+func testVarDeclTuple2(_ x: (sending NonSendable)) {}
+func testVarDeclTuple2(_ x: (sending NonSendable, NonSendable)) {} // expected-error {{'sending' cannot be applied to tuple elements}}
 
-func testArgWithConsumingWrongOrder(_ x: sending consuming String, _ y: sending inout String) {}
+func testArgWithConsumingWrongOrder(_ x: sending consuming NonSendable, _ y: sending inout NonSendable) {}
 // expected-error @-1 {{'sending' must be placed after specifier 'consuming'}}
 // expected-error @-2 {{'sending' must be placed after specifier 'inout'}}
 
-func testArgWithConsumingWrongOrderType(_ x: (sending consuming String, sending inout String) -> ()) {}
+func testArgWithConsumingWrongOrderType(_ x: (sending consuming NonSendable, sending inout NonSendable) -> ()) {}
 // expected-error @-1 {{'sending' must be placed after specifier 'consuming'}}
 // expected-error @-2 {{'sending' must be placed after specifier 'inout'}}
 
-func testBorrowSending(_ x: borrowing sending String) {}
+func testBorrowSending(_ x: borrowing sending NonSendable) {}
 // expected-error @-1 {{'sending' cannot be used together with 'borrowing'}}
