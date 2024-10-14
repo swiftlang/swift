@@ -1501,14 +1501,17 @@ extension BinaryInteger {
   @inlinable
   @inline(__always)
   public func advanced(by n: Int) -> Self {
-    if Self.isSigned {
-      return self.bitWidth < n.bitWidth
-        ? Self(Int(truncatingIfNeeded: self) + n)
-        : self + Self(truncatingIfNeeded: n)
+    // This compares its maximum bit width versus Int.bitWidth.
+    // All small unsigned integers are bounded by [0, Int.max].
+    // It should constant-fold since we use constant arguments.
+    if Self(exactly: Int.min.magnitude) == nil {
+      return Self(Int(truncatingIfNeeded: self) + n)
+    } else if Self.isSigned {
+      return self + Self(truncatingIfNeeded: n)
+    } else if n < (0 as Int) {
+      return self - Self(truncatingIfNeeded: UInt(bitPattern: 0 &- n))
     } else {
-      return n < (0 as Int)
-        ? self - Self(UInt(bitPattern: ~n &+ 1))
-        : self + Self(UInt(bitPattern: n))
+      return self + Self(truncatingIfNeeded: UInt(bitPattern: n))
     }
   }
 }
