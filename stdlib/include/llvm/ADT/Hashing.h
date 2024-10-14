@@ -666,9 +666,12 @@ hash_code hash_value_tuple_helper(const std::tuple<Ts...> &arg,
 
 template <typename... Ts>
 hash_code hash_value(const std::tuple<Ts...> &arg) {
-  // TODO: Use std::apply when LLVM starts using C++17.
-  return ::llvm::hashing::detail::hash_value_tuple_helper(
-      arg, typename std::index_sequence_for<Ts...>());
+  return std::apply(
+      [](const Ts &...args) {
+        return ::llvm::hashing::detail::hash_value_tuple_helper(
+            args..., std::index_sequence_for<Ts...>());
+      },
+      arg);
 }
 
 // Declared and documented above, but defined here so that any of the hashing
