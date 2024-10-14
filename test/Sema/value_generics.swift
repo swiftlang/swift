@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature ValueGenerics -enable-experimental-feature NonescapableTypes -disable-availability-checking -disable-experimental-parser-round-trip
+// FIXME: Remove -disable-experimental-parser-round-trip after https://github.com/swiftlang/swift-syntax/pull/2859 is merged
 
 protocol P {}
 

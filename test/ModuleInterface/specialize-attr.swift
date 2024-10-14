@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name Test
-// R/UN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name Test -disable-experimental-parser-round-trip
+// R/UN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name Test
 // RUN: %FileCheck %s --implicit-check-not "\$SpecializeAttributeWithAvailability" < %t.swiftinterface
 
 // CHECK: @_specialize(exported: false, kind: full, where T == Swift.Double)
