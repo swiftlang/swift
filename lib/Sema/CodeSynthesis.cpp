@@ -626,8 +626,7 @@ configureInheritedDesignatedInitAttributes(ClassDecl *classDecl,
     if (auto *parentDecl = classDecl->getInnermostDeclWithAvailability()) {
       asAvailableAs.push_back(parentDecl);
     }
-    AvailabilityInference::applyInferredAvailableAttrs(
-        ctor, asAvailableAs, ctx);
+    AvailabilityInference::applyInferredAvailableAttrs(ctor, asAvailableAs);
   }
 
   // Wire up the overrides.

@@ -2510,8 +2510,7 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
   }
   
   if (!asAvailableAs.empty()) {
-    AvailabilityInference::applyInferredAvailableAttrs(
-        setter, asAvailableAs, ctx);
+    AvailabilityInference::applyInferredAvailableAttrs(setter, asAvailableAs);
   }
   
   finishImplicitAccessor(setter, ctx);
@@ -2575,8 +2574,7 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
     addPropertyWrapperAccessorAvailability(var, kind, asAvailableAs);
   }
 
-  AvailabilityInference::applyInferredAvailableAttrs(accessor,
-                                                     asAvailableAs, ctx);
+  AvailabilityInference::applyInferredAvailableAttrs(accessor, asAvailableAs);
 
   // A modify coroutine should have the same SPI visibility as the setter.
   if (isYieldingDefaultMutatingAccessor(kind)) {

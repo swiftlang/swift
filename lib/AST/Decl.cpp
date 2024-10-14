@@ -1254,8 +1254,7 @@ AvailabilityRange Decl::getAvailabilityForLinkage() const {
   if (auto backDeployVersion = getBackDeployedBeforeOSVersion(ctx))
     return AvailabilityRange{VersionRange::allGTE(*backDeployVersion)};
 
-  auto containingContext =
-      AvailabilityInference::annotatedAvailableRange(this, getASTContext());
+  auto containingContext = AvailabilityInference::annotatedAvailableRange(this);
   if (containingContext.has_value()) {
     // If this entity comes from the concurrency module, adjust its
     // availability for linkage purposes up to Swift 5.5, so that we use
