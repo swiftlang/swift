@@ -6475,7 +6475,7 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
       const bool IsProbablyFuncDecl =
           Tok.isIdentifierOrUnderscore() || Tok.isAnyOperator();
 
-      if (IsProbablyFuncDecl) {
+      if (IsProbablyFuncDecl && (!peekToken().is(tok::period))) {
 
         DescriptiveDeclKind DescriptiveKind;
 
