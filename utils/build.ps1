@@ -1432,6 +1432,15 @@ function Build-Compilers() {
       $SwiftFlags += @("-Xcc", "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH");
     }
 
+    if (-not $IsCrossCompiling) {
+      # We hardcode LLVM_DEFAULT_TARGET_TRIPLE to x86_64-unknown-windows-msvc,
+      # but the host triple might be inferred as x86_64-pc-windows-msvc, which
+      # causes llvm-lit to skip `REQUIRES: native` tests.
+      $TestingDefines += @{
+        LLVM_HOST_TRIPLE = $Arch.LLVMTarget
+      }
+    }
+
     Build-CMakeProject `
       -Src $SourceCache\llvm-project\llvm `
       -Bin $CompilersBinaryCache `
