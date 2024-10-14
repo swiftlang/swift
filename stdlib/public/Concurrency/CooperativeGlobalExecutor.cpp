@@ -156,7 +156,7 @@ void swift_task_checkIsolatedImpl(SwiftExecutorRef executor) {
 
 /// Insert a job into the cooperative global queue with a delay.
 SWIFT_CC(swift)
-void swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,
+void swift_task_enqueueGlobalWithDelayImpl(uint64_t delay,
                                            SwiftJob *newJob) {
   assert(newJob && "no job provided");
 
@@ -169,20 +169,20 @@ void swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,
 }
 
 SWIFT_CC(swift)
-void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
-                                              long long nsec,
-                                              long long tsec,
-                                              long long tnsec,
-                                              int clock, SwiftJob *newJob) {
+void swift_task_enqueueGlobalWithDeadlineImpl(SwiftTime runAt,
+                                              SwiftTolerance tolerance,
+                                              SwiftClockId clock,
+                                              SwiftJob *newJob) {
   assert(newJob && "no job provided");
 
   SwiftTime now = swift_time_now(clock);
+  SwiftDuration delta = swift_time_sub(runAt, now);
 
-  uint64_t delta = (sec - now.seconds) * NSEC_PER_SEC + nsec - now.nanoseconds;
+  int64_t deltaNs = swift_duration_toNanoseconds(delta);
 
   auto deadline = std::chrono::steady_clock::now()
                 + std::chrono::duration_cast<JobDeadline::duration>(
-                    std::chrono::nanoseconds(delta));
+                    std::chrono::nanoseconds(deltaNs));
   JobDeadlineStorage<>::set(newJob, deadline);
 
   insertDelayedJob(newJob, deadline);

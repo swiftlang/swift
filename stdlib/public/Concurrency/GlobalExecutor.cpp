@@ -95,14 +95,16 @@ extern "C" void _swift_job_run_c(SwiftJob *job, SwiftExecutorRef executor)
 extern "C" SwiftTime swift_time_now(SwiftClockId clock)
 {
   SwiftTime result;
-  swift_get_time(&result.seconds, &result.nanoseconds, (swift_clock_id)clock);
+  swift_get_time(&result.seconds,
+                 (int64_t *)&result.nanoseconds,
+                 (swift_clock_id)clock);
   return result;
 }
 
-extern "C" SwiftTime swift_time_getResolution(SwiftClockId clock)
+extern "C" SwiftDuration swift_time_getResolution(SwiftClockId clock)
 {
-  SwiftTime result;
-  swift_get_clock_res(&result.seconds, &result.nanoseconds,
+  SwiftDuration result;
+  swift_get_clock_res(&result.seconds, (int64_t *)&result.nanoseconds,
                       (swift_clock_id)clock);
   return result;
 }
