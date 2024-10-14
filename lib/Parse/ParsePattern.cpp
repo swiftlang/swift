@@ -1141,7 +1141,8 @@ ParserResult<Pattern> Parser::parsePattern() {
   }
   case tok::identifier: {
     Identifier name;
-    SourceLoc loc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/true);
+    SourceLoc loc = consumeIdentifier(name,
+        /*diagnoseDollarPrefix=*/!isa<ProtocolDecl>(CurDeclContext));
     if (Tok.isIdentifierOrUnderscore() && !Tok.isContextualDeclKeyword() &&
         !Tok.isAtStartOfLine())
       diagnoseConsecutiveIDs(name.str(), loc,
