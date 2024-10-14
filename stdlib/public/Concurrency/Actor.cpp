@@ -645,12 +645,14 @@ void swift::swift_task_reportUnexpectedExecutor(
         &details);
   }
 
-#if defined(_WIN32)
+#if defined(_WIN32) && !SWIFT_CONCURRENCY_EMBEDDED
 #define STDERR_FILENO 2
   _write(STDERR_FILENO, message, strlen(message));
-#else
+#elif !SWIFT_CONCURRENCY_EMBEDDED
   fputs(message, stderr);
   fflush(stderr);
+#else
+  puts(message);
 #endif
 #if SWIFT_STDLIB_HAS_ASL
 #pragma clang diagnostic push
