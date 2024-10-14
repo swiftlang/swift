@@ -33,11 +33,6 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
   // For embedded Swift, optimize all the functions (there cannot be any
   // generics, type metadata, etc.)
   if moduleContext.options.enableEmbeddedSwift {
-    // We need to specialize all vtables which are referenced from non-generic contexts. Beside
-    // `alloc_ref`s of generic classes in non-generic functions, we also need to specialize generic
-    // superclasses of non-generic classes. E.g. `class Derived : Base<Int> {}`
-    specializeVTablesOfSuperclasses(moduleContext)
-
     worklist.addAllNonGenericFunctions(of: moduleContext)
   } else {
     worklist.addAllPerformanceAnnotatedFunctions(of: moduleContext)
@@ -102,15 +97,18 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
       // Embedded Swift specific transformations
       case let alloc as AllocRefInst:
         if context.options.enableEmbeddedSwift {
-          specializeVTableAndAddEntriesToWorklist(for: alloc.type, in: function,
-                                                  errorLocation: alloc.location,
-                                                  moduleContext, &worklist)
+          specializeVTable(forClassType: alloc.type, errorLocation: alloc.location, moduleContext) {
+            worklist.pushIfNotVisited($0)
+          }
         }
       case let metatype as MetatypeInst:
         if context.options.enableEmbeddedSwift {
-          specializeVTableAndAddEntriesToWorklist(for: metatype.type, in: function,
-                                                  errorLocation: metatype.location,
-                                                  moduleContext, &worklist)
+          let instanceType = metatype.type.loweredInstanceTypeOfMetatype(in: function)
+          if instanceType.isClass {
+            specializeVTable(forClassType: instanceType, errorLocation: metatype.location, moduleContext) {
+              worklist.pushIfNotVisited($0)
+            }
+          }
         }
       case let classMethod as ClassMethodInst:
         if context.options.enableEmbeddedSwift {
@@ -163,29 +161,6 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
     // If this is a just specialized function, try to optimize copy_addr, etc.
     changed = context.optimizeMemoryAccesses(in: function) || changed
     changed = context.eliminateDeadAllocations(in: function) || changed
-  }
-}
-
-private func specializeVTableAndAddEntriesToWorklist(for type: Type, in function: Function,
-                                                     errorLocation: Location,
-                                                     _ moduleContext: ModulePassContext,
-                                                     _ worklist: inout FunctionWorklist) {
-  let vTablesCountBefore = moduleContext.vTables.count
-
-  guard specializeVTable(forClassType: type, errorLocation: errorLocation, moduleContext) != nil else {
-    return
-  }
-
-  // More than one new vtable might have been created (superclasses), process them all
-  let vTables = moduleContext.vTables
-  for i in vTablesCountBefore ..< vTables.count {
-    for entry in vTables[i].entries
-      // A new vtable can still contain a generic function if the method couldn't be specialized for some reason
-      // and an error has been printed. Exclude generic functions to not run into an assert later.
-      where !entry.implementation.isGeneric
-    {
-      worklist.pushIfNotVisited(entry.implementation)
-    }
   }
 }
 
