@@ -1715,6 +1715,14 @@ BridgedType BridgedVTable::getSpecializedClassType() const {
   return {vTable->getClassType()};
 }
 
+void BridgedVTable::replaceEntries(BridgedArrayRef bridgedEntries) const {
+  llvm::SmallVector<swift::SILVTableEntry, 8> entries;
+  for (const BridgedVTableEntry &e : bridgedEntries.unbridged<BridgedVTableEntry>()) {
+    entries.push_back(e.unbridged());
+  }
+  vTable->replaceEntries(entries);
+}
+
 //===----------------------------------------------------------------------===//
 //               BridgedWitnessTable, BridgedDefaultWitnessTable
 //===----------------------------------------------------------------------===//
