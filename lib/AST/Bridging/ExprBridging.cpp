@@ -313,6 +313,24 @@ BridgedIsExpr BridgedIsExpr_createParsed(BridgedASTContext cContext,
                         cType.unbridged());
 }
 
+BridgedMacroExpansionExpr BridgedMacroExpansionExpr_createParsed(
+    BridgedDeclContext cDeclContext, BridgedSourceLoc cPoundLoc,
+    BridgedDeclNameRef cMacroNameRef, BridgedDeclNameLoc cMacroNameLoc,
+    BridgedSourceLoc cLeftAngleLoc, BridgedArrayRef cGenericArgs,
+    BridgedSourceLoc cRightAngleLoc, BridgedNullableArgumentList cArgList) {
+  auto *DC = cDeclContext.unbridged();
+  auto &Context = DC->getASTContext();
+  return MacroExpansionExpr::create(
+      cDeclContext.unbridged(), cPoundLoc.unbridged(),
+      /*module name=*/DeclNameRef(), /*module name loc=*/DeclNameLoc(),
+      cMacroNameRef.unbridged(), cMacroNameLoc.unbridged(),
+      cLeftAngleLoc.unbridged(),
+      Context.AllocateCopy(cGenericArgs.unbridged<TypeRepr *>()),
+      cRightAngleLoc.unbridged(), cArgList.unbridged(),
+      DC->isTypeContext() ? MacroRole::Declaration
+                          : getFreestandingMacroRoles());
+}
+
 BridgedNilLiteralExpr
 BridgedNilLiteralExpr_createParsed(BridgedASTContext cContext,
                                    BridgedSourceLoc cNilKeywordLoc) {

@@ -966,6 +966,14 @@ BridgedAssociatedTypeDecl BridgedAssociatedTypeDecl_createParsed(
     BridgedNullableTypeRepr opaqueDefaultType,
     BridgedNullableTrailingWhereClause genericWhereClause);
 
+SWIFT_NAME("BridgedMacroExpansionDecl.createParsed(_:poundLoc:macroNameRef:"
+           "macroNameLoc:leftAngleLoc:genericArgs:rightAngleLoc:args:)")
+BridgedMacroExpansionDecl BridgedMacroExpansionDecl_createParsed(
+    BridgedDeclContext cDeclContext, BridgedSourceLoc cPoundLoc,
+    BridgedDeclNameRef cMacroNameRef, BridgedDeclNameLoc cMacroNameLoc,
+    BridgedSourceLoc cLeftAngleLoc, BridgedArrayRef cGenericArgs,
+    BridgedSourceLoc cRightAngleLoc, BridgedNullableArgumentList cArgList);
+
 SWIFT_NAME(
     "BridgedExtensionDecl.createParsed(_:declContext:extensionKeywordLoc:"
     "extendedType:inheritedTypes:genericWhereClause:braceRange:)")
@@ -1324,6 +1332,14 @@ SWIFT_NAME("BridgedIsExpr.createParsed(_:isLoc:type:)")
 BridgedIsExpr BridgedIsExpr_createParsed(BridgedASTContext cContext,
                                          BridgedSourceLoc cIsLoc,
                                          BridgedTypeRepr cType);
+
+SWIFT_NAME("BridgedMacroExpansionExpr.createParsed(_:poundLoc:macroNameRef:"
+           "macroNameLoc:leftAngleLoc:genericArgs:rightAngleLoc:args:)")
+BridgedMacroExpansionExpr BridgedMacroExpansionExpr_createParsed(
+    BridgedDeclContext cDeclContext, BridgedSourceLoc cPoundLoc,
+    BridgedDeclNameRef cMacroNameRef, BridgedDeclNameLoc cMacroNameLoc,
+    BridgedSourceLoc cLeftAngleLoc, BridgedArrayRef cGenericArgs,
+    BridgedSourceLoc cRightAngleLoc, BridgedNullableArgumentList cArgList);
 
 SWIFT_NAME("BridgedNilLiteralExpr.createParsed(_:nilKeywordLoc:)")
 BridgedNilLiteralExpr

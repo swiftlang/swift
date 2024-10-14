@@ -46,8 +46,8 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
       .discardAssignmentExpr, .declReferenceExpr, .dictionaryExpr, .doExpr,
       .editorPlaceholderExpr, .floatLiteralExpr, .forceUnwrapExpr, .functionCallExpr,
       .genericSpecializationExpr, .ifExpr, .infixOperatorExpr, .inOutExpr,
-      .integerLiteralExpr, .isExpr, .memberAccessExpr, .nilLiteralExpr, .optionalChainingExpr,
-      .packElementExpr, .packExpansionExpr, .patternExpr, .postfixIfConfigExpr,
+      .integerLiteralExpr, .isExpr, .macroExpansionExpr, .memberAccessExpr, .nilLiteralExpr,
+      .optionalChainingExpr, .packElementExpr, .packExpansionExpr, .patternExpr, .postfixIfConfigExpr,
       .postfixOperatorExpr, .prefixOperatorExpr, .regexLiteralExpr, .sequenceExpr,
       .simpleStringLiteralExpr, .subscriptCallExpr, .stringLiteralExpr, .superExpr,
       .switchExpr, .tryExpr, .tupleExpr, .typeExpr, .unresolvedAsExpr, .unresolvedIsExpr,
@@ -55,7 +55,7 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
       break
 
     // Known unimplemented kinds.
-    case .keyPathExpr, .macroExpansionExpr:
+    case .keyPathExpr:
       return false
 
     // Unknown expr kinds.
@@ -131,8 +131,8 @@ extension ASTGenVisitor {
       preconditionFailure("IsExprSyntax only appear after operator folding")
     case .keyPathExpr:
       break
-    case .macroExpansionExpr:
-      break
+    case .macroExpansionExpr(let node):
+      return self.generate(macroExpansionExpr: node).asExpr
     case .memberAccessExpr(let node):
       return self.generate(memberAccessExpr: node)
     case .missingExpr:
@@ -532,6 +532,49 @@ extension ASTGenVisitor {
       stmt: stmt,
       declContext: declContext,
       mustBeExpr: true
+    )
+  }
+
+  func generate(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedMacroExpansionExpr {
+    let nameLoc = self.generateIdentifierAndSourceLoc(node.macroName)
+
+    let leftAngleLoc: BridgedSourceLoc
+    let genericArgs: [BridgedTypeRepr]
+    let rightAngleLoc: BridgedSourceLoc
+    if let generics = node.genericArgumentClause {
+      leftAngleLoc = self.generateSourceLoc(generics.leftAngle)
+      genericArgs = generics.arguments.lazy.map {
+        self.generate(type: $0.argument)
+      }
+      rightAngleLoc = self.generateSourceLoc(generics.rightAngle)
+    } else {
+      leftAngleLoc = nil
+      genericArgs = []
+      rightAngleLoc = nil
+    }
+
+    let arguments: BridgedArgumentList?
+    if (node.leftParen != nil || node.trailingClosure != nil) {
+      arguments = self.generateArgumentList(
+        leftParen: node.leftParen,
+        labeledExprList: node.arguments,
+        rightParen: node.rightParen,
+        trailingClosure: node.trailingClosure,
+        additionalTrailingClosures: node.additionalTrailingClosures
+      )
+    } else {
+      arguments = nil
+    }
+
+    return .createParsed(
+      self.declContext,
+      poundLoc: self.generateSourceLoc(node.pound),
+      macroNameRef: .createParsed(.createIdentifier(nameLoc.identifier)),
+      macroNameLoc: .createParsed(nameLoc.sourceLoc),
+      leftAngleLoc: leftAngleLoc,
+      genericArgs: genericArgs.lazy.bridgedArray(in: self),
+      rightAngleLoc: rightAngleLoc,
+      args: arguments.asNullable
     )
   }
 
