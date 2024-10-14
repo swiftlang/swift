@@ -13,65 +13,92 @@
 import AST
 import SIL
 
-@discardableResult
 func specializeVTable(forClassType classType: Type,
                       errorLocation: Location,
-                      _ context: ModulePassContext) -> VTable?
+                      _ context: ModulePassContext,
+                      notifyNewFunction: (Function) -> ())
 {
-  guard let nominal = classType.nominal,
-        let classDecl = nominal as? ClassDecl,
-        classType.isGenericAtAnyLevel else
-  {
-    return nil
-  }
-
-  if context.lookupSpecializedVTable(for: classType) != nil {
-    return nil
-  }
-
-  guard let origVTable = context.lookupVTable(for: classDecl) else {
-    context.diagnosticEngine.diagnose(errorLocation.sourceLoc, .cannot_specialize_class, classType)
-    return nil
-  }
-
-  let classContextSubs = classType.contextSubstitutionMap
-
-  let newEntries = origVTable.entries.map { origEntry in
-    if !origEntry.implementation.isGeneric {
-      return origEntry
-    }
-    let methodSubs = classContextSubs.getMethodSubstitutions(for: origEntry.implementation)
-
-    guard !methodSubs.conformances.contains(where: {!$0.isValid}),
-          let specializedMethod = context.specialize(function: origEntry.implementation, for: methodSubs) else
-    {
-      context.diagnosticEngine.diagnose(origEntry.methodDecl.location.sourceLoc, .non_final_generic_class_function)
-      return origEntry
-    }
-
-    context.deserializeAllCallees(of: specializedMethod, mode: .allFunctions)
-    specializedMethod.set(linkage: .public, context)
-    specializedMethod.set(isSerialized: false, context)
-
-    return VTable.Entry(kind: origEntry.kind, isNonOverridden: origEntry.isNonOverridden,
-                        methodDecl: origEntry.methodDecl, implementation: specializedMethod)
-  }
-
-  let specializedVTable = context.createSpecializedVTable(entries: newEntries, for: classType, isSerialized: false)
-  if let superClassTy = classType.superClassType {
-    specializeVTable(forClassType: superClassTy, errorLocation: classDecl.location, context)
-  }
-  return specializedVTable
+  var specializer = VTableSpecializer(errorLocation: errorLocation, context)
+  specializer.specializeVTable(forClassType: classType, notifyNewFunction)
 }
 
-func specializeVTablesOfSuperclasses(_ moduleContext: ModulePassContext) {
-  for vtable in moduleContext.vTables {
-    if !vtable.isSpecialized,
-       !vtable.class.isGenericAtAnyLevel,
-       let superClassTy = vtable.class.superClassType,
-       superClassTy.isGenericAtAnyLevel
-    {
-      specializeVTable(forClassType: superClassTy, errorLocation: vtable.class.location, moduleContext)
+private struct VTableSpecializer {
+  let errorLocation: Location
+  let context: ModulePassContext
+
+  // The type of the first class in the hierarchy which implements a method
+  private var baseTypesOfMethods = Dictionary<Function, Type>()
+
+  init(errorLocation: Location, _ context: ModulePassContext) {
+    self.errorLocation = errorLocation
+    self.context = context
+  }
+
+  mutating func specializeVTable(forClassType classType: Type, _ notifyNewFunction: (Function) -> ()) {
+    // First handle super classes.
+    // This is also required for non-generic classes - in case a superclass is generic, e.g.
+    // `class Derived : Base<Int> {}` - for two reasons:
+    // * A vtable of a derived class references the vtable of the super class. And of course the referenced
+    //   super-class vtable needs to be a specialized vtable.
+    // * Even a non-generic derived class can contain generic methods of the base class in case a base-class
+    //   method is not overridden.
+    //
+    if let superClassTy = classType.superClassType {
+      specializeVTable(forClassType: superClassTy, notifyNewFunction)
+    }
+
+    let classDecl = classType.nominal! as! ClassDecl
+    guard let origVTable = context.lookupVTable(for: classDecl) else {
+      context.diagnosticEngine.diagnose(errorLocation.sourceLoc, .cannot_specialize_class, classType)
+      return
+    }
+
+    for entry in origVTable.entries {
+      if baseTypesOfMethods[entry.implementation] == nil {
+        baseTypesOfMethods[entry.implementation] = classType
+      }
+    }
+
+    if classType.isGenericAtAnyLevel {
+      if context.lookupSpecializedVTable(for: classType) != nil {
+        // We already specialized the vtable
+        return
+      }
+      let newEntries = specializeEntries(of: origVTable, notifyNewFunction)
+      context.createSpecializedVTable(entries: newEntries, for: classType, isSerialized: false)
+    } else {
+      if !origVTable.entries.contains(where: { $0.implementation.isGeneric }) {
+        // The vtable (of the non-generic class) doesn't contain any generic functions (from a generic base class).
+        return
+      }
+      let newEntries = specializeEntries(of: origVTable, notifyNewFunction)
+      context.replaceVTableEntries(of: origVTable, with: newEntries)
+    }
+  }
+
+  private func specializeEntries(of vTable: VTable, _ notifyNewFunction: (Function) -> ()) -> [VTable.Entry] {
+    return vTable.entries.compactMap { entry in
+      if !entry.implementation.isGeneric {
+        return entry
+      }
+      let baseType = baseTypesOfMethods[entry.implementation]!
+      let classContextSubs = baseType.contextSubstitutionMap
+      let methodSubs = classContextSubs.getMethodSubstitutions(for: entry.implementation)
+
+      guard !methodSubs.conformances.contains(where: {!$0.isValid}),
+            let specializedMethod = context.specialize(function: entry.implementation, for: methodSubs) else
+      {
+        context.diagnosticEngine.diagnose(entry.methodDecl.location.sourceLoc, .non_final_generic_class_function)
+        return nil
+      }
+      notifyNewFunction(specializedMethod)
+
+      context.deserializeAllCallees(of: specializedMethod, mode: .allFunctions)
+      specializedMethod.set(linkage: .public, context)
+      specializedMethod.set(isSerialized: false, context)
+
+      return VTable.Entry(kind: entry.kind, isNonOverridden: entry.isNonOverridden,
+                          methodDecl: entry.methodDecl, implementation: specializedMethod)
     }
   }
 }
