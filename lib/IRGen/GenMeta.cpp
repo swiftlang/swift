@@ -287,7 +287,8 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
 static void buildMethodDescriptorFields(IRGenModule &IGM,
                              const SILVTable *VTable,
                              SILDeclRef fn,
-                             ConstantStructBuilder &descriptor) {
+                             ConstantStructBuilder &descriptor,
+                             ClassDecl *classDecl) {
   auto *func = cast<AbstractFunctionDecl>(fn.getDecl());
   // Classify the method.
   using Flags = MethodDescriptorFlags;
@@ -318,6 +319,13 @@ static void buildMethodDescriptorFields(IRGenModule &IGM,
       descriptor.addRelativeAddress(implFn);
     } else {
       llvm::Function *implFn = IGM.getAddrOfSILFunction(impl, NotForDefinition);
+
+      if (IGM.getOptions().UseProfilingMarkerThunks &&
+          classDecl->getSelfNominalTypeDecl()->isGenericContext() &&
+          !impl->getLoweredFunctionType()->isCoroutine()) {
+        implFn = IGM.getAddrOfVTableProfilingThunk(implFn, classDecl);
+      }
+
       descriptor.addCompactFunctionReference(implFn);
     }
   } else {
@@ -328,7 +336,8 @@ static void buildMethodDescriptorFields(IRGenModule &IGM,
 }
 
 void IRGenModule::emitNonoverriddenMethodDescriptor(const SILVTable *VTable,
-                                                    SILDeclRef declRef) {
+                                                    SILDeclRef declRef,
+                                                    ClassDecl *classDecl) {
   auto entity = LinkEntity::forMethodDescriptor(declRef);
   auto *var = cast<llvm::GlobalVariable>(
       getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo()));
@@ -343,7 +352,7 @@ void IRGenModule::emitNonoverriddenMethodDescriptor(const SILVTable *VTable,
   ConstantInitBuilder ib(*this);
   ConstantStructBuilder sb(ib.beginStruct(MethodDescriptorStructTy));
 
-  buildMethodDescriptorFields(*this, VTable, declRef, sb);
+  buildMethodDescriptorFields(*this, VTable, declRef, sb, classDecl);
   
   auto init = sb.finishAndCreateFuture();
   
@@ -2081,7 +2090,7 @@ namespace {
 
       // Actually build the descriptor.
       auto descriptor = B.beginStruct(IGM.MethodDescriptorStructTy);
-      buildMethodDescriptorFields(IGM, VTable, fn, descriptor);
+      buildMethodDescriptorFields(IGM, VTable, fn, descriptor, getType());
       descriptor.finishAndAddTo(B);
 
       // Emit method dispatch thunk if the class is resilient.
@@ -2129,7 +2138,7 @@ namespace {
       // exist in the table in the class's context descriptor since it isn't
       // in the vtable, but external clients need to be able to link against the
       // symbol.
-      IGM.emitNonoverriddenMethodDescriptor(VTable, fn);
+      IGM.emitNonoverriddenMethodDescriptor(VTable, fn, getType());
     }
 
     void addOverrideTable() {
