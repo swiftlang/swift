@@ -11,13 +11,13 @@ extension Observable where Self: AnyObject {
   @available(SwiftStdlib 9999, *)
   public func observeValues<Member: Sendable>(
      for keyPath: KeyPath<Self, Member>
-  ) -> ObservedValues<Self, Member> {
+  ) -> some AsyncSequence<Member, Never> {
     ObservedValues(observable: self, keyPath: keyPath)
   }
 }
 
 @available(SwiftStdlib 9999, *)
-public struct ObservedValues<O: Observable & AnyObject, Element> {
+struct ObservedValues<O: Observable & AnyObject, Element> {
   let access: () -> Element?
   
   init(observable: O, keyPath: KeyPath<O, Element>) {
@@ -30,9 +30,9 @@ public struct ObservedValues<O: Observable & AnyObject, Element> {
 
 @available(SwiftStdlib 9999, *)
 extension ObservedValues: AsyncSequence {
-  public typealias Failure = Never
+  typealias Failure = Never
   
-  public struct Iterator: AsyncIteratorProtocol {
+  struct Iterator: AsyncIteratorProtocol {
     enum State {
       case idle
       case pending(Element?)
@@ -128,7 +128,7 @@ extension ObservedValues: AsyncSequence {
       self.token = token
     }
     
-    public func next() async -> Element? {
+    func next() async -> Element? {
       await withTaskCancellationHandler {
         return await withUnsafeContinuation { continuation in
           let resumption = state.withCriticalRegion { state -> Resumption? in
@@ -154,7 +154,7 @@ extension ObservedValues: AsyncSequence {
     }
   }
   
-  public func makeAsyncIterator() -> Iterator {
+  func makeAsyncIterator() -> Iterator {
     Iterator(access)
   }
 }
