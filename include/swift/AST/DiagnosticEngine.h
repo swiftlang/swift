@@ -1500,6 +1500,8 @@ namespace swift {
   /// in LIFO order. An open transaction is implicitly committed upon
   /// destruction.
   class DiagnosticTransaction {
+    DiagnosticBehavior behaviorLimit = DiagnosticBehavior::Unspecified;
+
   protected:
     DiagnosticEngine &Engine;
 
@@ -1553,6 +1555,10 @@ namespace swift {
       return false;
     }
 
+    void limitAllBehavior(DiagnosticBehavior limit) {
+      behaviorLimit = limit;
+    }
+
     /// Abort and close this transaction and erase all diagnostics
     /// record while it was open.
     void abort() {
@@ -1565,6 +1571,14 @@ namespace swift {
     /// Commit and close this transaction. If this is the top-level
     /// transaction, emit any diagnostics that were recorded while it was open.
     void commit() {
+      if (behaviorLimit != DiagnosticBehavior::Unspecified) {
+        auto startIt = Engine.TentativeDiagnostics.begin() + PrevDiagnostics;
+        auto endIt = Engine.TentativeDiagnostics.end();
+        for (auto diagIt = startIt; diagIt != endIt; ++diagIt) {
+          diagIt->setBehaviorLimit(behaviorLimit);
+        }
+      }
+
       close();
       if (Depth == 0) {
         assert(PrevDiagnostics == 0);
