@@ -1,5 +1,5 @@
-// REQUIRES: executable_test
 // RUN: %target-run-simple-swift(-cxx-interoperability-mode=default -Xfrontend -disable-availability-checking -I %S/Inputs)
+// REQUIRES: executable_test
 
 import StdlibUnittest
 import TypedUntypedEnums
