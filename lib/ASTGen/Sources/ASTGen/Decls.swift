@@ -496,7 +496,7 @@ extension ASTGenVisitor {
     if let accessors = binding.accessorBlock {
       // FIXME: We ought to have a better way of converting from the Nullable
       // wrapper back to Optional.
-      if let primaryVar = pattern.singleVar.raw.map(BridgedVarDecl.init) {
+      if let primaryVar = BridgedVarDecl(pattern.singleVar) {
         let storage = primaryVar.asAbstractStorageDecl
         storage.setAccessors(generate(accessorBlock: accessors, for: storage))
       } else {

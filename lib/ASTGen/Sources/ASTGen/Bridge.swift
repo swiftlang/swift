@@ -17,6 +17,7 @@ import BasicBridging
 public protocol BridgedNullable: ExpressibleByNilLiteral {
   associatedtype RawPtr
   init(raw: RawPtr?)
+  var raw: RawPtr? { get }
 }
 extension BridgedNullable {
   public init(nilLiteral: ()) {
@@ -35,6 +36,8 @@ extension BridgedNullableTrailingWhereClause: /*@retroactive*/ swiftASTGen.Bridg
 extension BridgedNullableParameterList: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 extension BridgedNullablePatternBindingInitializer: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 extension BridgedNullableArgumentList: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullablePatternBindingDecl: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableVarDecl: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 
 extension BridgedIdentifier: /*@retroactive*/ Swift.Equatable {
   public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -47,12 +50,21 @@ extension BridgedIdentifier: /*@retroactive*/ Swift.Equatable {
 /// E.g. BridgedExpr vs BridgedNullableExpr.
 protocol BridgedHasNullable {
   associatedtype Nullable: BridgedNullable
+  init(raw: Nullable.RawPtr)
   var raw: Nullable.RawPtr { get }
 }
 extension Optional where Wrapped: BridgedHasNullable {
   /// Convert an Optional to Nullable variation of the wrapped type.
   var asNullable: Wrapped.Nullable {
     Wrapped.Nullable(raw: self?.raw)
+  }
+}
+extension BridgedHasNullable {
+  init?(_ nullable: Nullable) {
+    guard let newRaw = nullable.raw else {
+      return nil
+    }
+    self.init(raw: newRaw)
   }
 }
 
@@ -82,6 +94,12 @@ extension BridgedPatternBindingInitializer: BridgedHasNullable {
 }
 extension BridgedArgumentList: BridgedHasNullable {
   typealias Nullable = BridgedNullableArgumentList
+}
+extension BridgedPatternBindingDecl: BridgedHasNullable {
+  typealias Nullable = BridgedNullablePatternBindingDecl
+}
+extension BridgedVarDecl: BridgedHasNullable {
+  typealias Nullable = BridgedNullableVarDecl
 }
 
 public extension BridgedSourceLoc {

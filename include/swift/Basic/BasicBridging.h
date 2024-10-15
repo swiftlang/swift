@@ -322,6 +322,11 @@ public:
 SWIFT_NAME("getter:BridgedSourceLoc.isValid(self:)")
 BRIDGED_INLINE bool BridgedSourceLoc_isValid(BridgedSourceLoc loc);
 
+SWIFT_NAME("getter:BridgedSourceLoc.raw(self:)")
+inline const void * _Nullable BridgedSourceLoc_getRaw(BridgedSourceLoc bridged) {
+  return bridged.getOpaquePointerValue();
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: SourceRange
 //===----------------------------------------------------------------------===//
