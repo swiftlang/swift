@@ -3706,6 +3706,10 @@ ERROR(conformance_from_implementation_only_module,none,
       (Type, Identifier, unsigned, Identifier, unsigned))
 NOTE(assoc_conformance_from_implementation_only_module,none,
      "in associated type %0 (inferred as %1)", (Type, Type))
+NOTE(note_public_extension_member,none,
+     "%kind0 %select{declared here|synthesized automatically}1 must be "
+     "visible to other modules",
+     (const ValueDecl*, bool))
 ERROR(unexportable_clang_function_type,none,
       "cannot export the underlying C type of the function type %0; "
       "it may use anonymous types or types defined outside of a module",

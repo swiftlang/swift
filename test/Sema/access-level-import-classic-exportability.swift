@@ -89,7 +89,7 @@ extension PublicImportType {
 public protocol PackageConstrainedExtensionProto {}
 extension Array: PackageConstrainedExtensionProto where Element == PackageImportType {} // expected-error {{cannot use struct 'PackageImportType' in an extension with conditional conformances; 'PackageLib' was not imported publicly}}
 extension PackageImportType { // expected-error {{cannot use struct 'PackageImportType' in an extension with public or '@usableFromInline' members; 'PackageLib' was not imported publicly}}
-    public func publicMethod() {}
+    public func publicMethod() {} // expected-note {{instance method 'publicMethod()' declared here must be visible to other modules}}
 }
 
 package protocol PackageConstrainedExtensionProtoInPackage {}
@@ -119,7 +119,7 @@ extension PackageImportType {
 public protocol InternalConstrainedExtensionProto {}
 extension Array: InternalConstrainedExtensionProto where Element == InternalImportType {} // expected-error {{cannot use struct 'InternalImportType' in an extension with conditional conformances; 'InternalLib' was not imported publicly}}
 extension InternalImportType { // expected-error {{cannot use struct 'InternalImportType' in an extension with public or '@usableFromInline' members; 'InternalLib' was not imported publicly}}
-    public func foo() {}
+    public func foo() {} // expected-note {{instance method 'foo()' declared here must be visible to other modules}}
 }
 
 package protocol InternalConstrainedExtensionProtoInPackage {}
@@ -149,7 +149,7 @@ extension InternalImportType {
 public protocol FileprivateConstrainedExtensionProto {}
 extension Array: FileprivateConstrainedExtensionProto where Element == FileprivateImportType {} // expected-error {{cannot use struct 'FileprivateImportType' in an extension with conditional conformances; 'FileprivateLib' was not imported publicly}}
 extension FileprivateImportType { // expected-error {{cannot use struct 'FileprivateImportType' in an extension with public or '@usableFromInline' members; 'FileprivateLib' was not imported publicly}}
-    public func foo() {}
+    public func foo() {} // expected-note {{instance method 'foo()' declared here must be visible to other modules}}
 }
 
 package protocol FileprivateConstrainedExtensionProtoInPackage {}
@@ -179,7 +179,7 @@ extension FileprivateImportType {
 public protocol PrivateConstrainedExtensionProto {}
 extension Array: PrivateConstrainedExtensionProto where Element == PrivateImportType {} // expected-error {{cannot use struct 'PrivateImportType' in an extension with conditional conformances; 'PrivateLib' was not imported publicly}}
 extension PrivateImportType { // expected-error {{cannot use struct 'PrivateImportType' in an extension with public or '@usableFromInline' members; 'PrivateLib' was not imported publicly}}
-    public func foo() {}
+    public func foo() {} // expected-note {{instance method 'foo()' declared here must be visible to other modules}}
 }
 
 package protocol PrivateConstrainedExtensionProtoInPackage {}

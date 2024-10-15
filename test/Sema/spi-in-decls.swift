@@ -139,9 +139,10 @@ extension BadStruct {
 }
 
 extension Array where Element == BadStruct { // expected-error {{cannot use struct 'BadStruct' in an extension with public or '@usableFromInline' members; it is SPI}}
-  public func testExtensionWithBadRequirement() {}
-  public var testExtensionVarBad: Int { 0 }
-  public subscript(bad _: Int) -> Int { 0 }
+  public func testExtensionWithBadRequirement() {} // expected-note {{instance method 'testExtensionWithBadRequirement()' declared here must be visible to other modules}}
+  public var testExtensionVarBad: Int { 0 } // expected-note {{property 'testExtensionVarBad' declared here must be visible to other modules}}
+  public subscript(bad _: Int) -> Int { 0 } // expected-note {{subscript 'subscript(bad:)' declared here must be visible to other modules}}
+  func testExtensionWithBadRequirementNotTheCause() {} // no-note
 }
 
 extension Array where Element == BadStruct {
@@ -226,7 +227,7 @@ public func testInheritedConformance(_: NormalProtoAssocHolder<SubclassOfNormalC
 public func testSpecializedConformance(_: NormalProtoAssocHolder<GenericStruct<Int>>) {} // expected-error {{cannot use conformance of 'GenericStruct<T>' to 'NormalProto' here; the conformance is declared as SPI}}
 
 extension Array where Element == NormalProtoAssocHolder<NormalStruct> { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in an extension with public or '@usableFromInline' members; the conformance is declared as SPI}}
-  public func testConstrainedExtensionUsingBadConformance() {}
+  public func testConstrainedExtensionUsingBadConformance() {} // expected-note {{instance method 'testConstrainedExtensionUsingBadConformance()' declared here must be visible to other modules}}
 }
 
 public struct ConditionalGenericStruct<T> {}
