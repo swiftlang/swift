@@ -364,10 +364,8 @@ TypeRefinementContext::getExplicitAvailabilityRange() const {
 
   case Reason::Decl: {
     auto decl = Node.getAsDecl();
-    auto &ctx = decl->getASTContext();
-    if (auto attr =
-            AvailabilityInference::attrForAnnotatedAvailableRange(decl, ctx))
-      return AvailabilityInference::availableRange(attr, ctx);
+    if (auto attr = AvailabilityInference::attrForAnnotatedAvailableRange(decl))
+      return AvailabilityInference::availableRange(attr, decl->getASTContext());
 
     return std::nullopt;
   }

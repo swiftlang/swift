@@ -710,7 +710,7 @@ static bool isCheckExpectedExecutorIntrinsicAvailable(SILGenModule &SGM) {
   if (!C.LangOpts.DisableAvailabilityChecking) {
     auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(C);
     auto declAvailability =
-        AvailabilityInference::availableRange(checkExecutor, C);
+        AvailabilityInference::availableRange(checkExecutor);
     return deploymentAvailability.isContainedIn(declAvailability);
   }
 

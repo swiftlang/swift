@@ -6041,7 +6041,7 @@ static void inferStaticInitializeObjCMetadata(ClassDecl *classDecl) {
   // a new-enough OS.
   if (auto sourceFile = classDecl->getParentSourceFile()) {
     AvailabilityRange safeRangeUnderApprox{
-        AvailabilityInference::availableRange(classDecl, ctx)};
+        AvailabilityInference::availableRange(classDecl)};
     AvailabilityRange runningOSOverApprox =
         AvailabilityRange::forDeploymentTarget(ctx);
 
