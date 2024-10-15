@@ -1492,11 +1492,13 @@ private:
   /// StartingFrom. We only compute the values for set bits in \p
   /// RequiredElts. We return the vailable values in \p Result. If any available
   /// values were found, return true. Otherwise, return false.
-  bool computeAvailableValues(SILInstruction *StartingFrom,
-                              LoadInfo loadInfo,
-                              SmallBitVector &RequiredElts,
-                              SmallVectorImpl<AvailableValue> &Result);
-
+  ///
+  /// In OptimizationMode::PreserveAlloc, this may insert casts and copies to
+  /// propagate owned values.
+  bool computeAvailableElementValues(SILInstruction *StartingFrom,
+                                     LoadInfo loadInfo,
+                                     SmallBitVector &RequiredElts,
+                                     SmallVectorImpl<AvailableValue> &Result);
 
   void computeAvailableValuesFrom(
       SILBasicBlock::iterator StartingFrom, SILBasicBlock *BB,
@@ -1608,7 +1610,8 @@ AvailableValueDataflowContext::computeAvailableValues(
   RequiredElts.set(*loadInfo.range().begin(), *loadInfo.range().end());
 
   // Find out if we have any available values.
-  if (!computeAvailableValues(Inst, loadInfo, RequiredElts, AvailableValues)) {
+  if (!computeAvailableElementValues(Inst, loadInfo, RequiredElts,
+                                     AvailableValues)) {
     return std::nullopt;
   }
   return loadInfo;
@@ -1801,7 +1804,7 @@ void AvailableValueDataflowContext::updateAvailableValues(
   return;
 }
 
-bool AvailableValueDataflowContext::computeAvailableValues(
+bool AvailableValueDataflowContext::computeAvailableElementValues(
     SILInstruction *StartingFrom, LoadInfo loadInfo,
     SmallBitVector &RequiredElts, SmallVectorImpl<AvailableValue> &Result) {
   llvm::SmallDenseMap<SILBasicBlock*, SmallBitVector, 32> VisitedBlocks;
