@@ -80,6 +80,13 @@
 // CHECK:   static func == (lhs: HasTypedefIteratorTag, other: HasTypedefIteratorTag) -> Bool
 // CHECK: }
 
+// CHECK: struct MutableRACIterator : UnsafeCxxMutableRandomAccessIterator, UnsafeCxxMutableInputIterator {
+// CHECK:   func successor() -> MutableRACIterator
+// CHECK:   var pointee: Int32
+// CHECK:   typealias Pointee = Int32
+// CHECK:   typealias Distance = Int32
+// CHECK: }
+
 // CHECK-NOT: struct HasNoIteratorCategory : UnsafeCxxInputIterator
 // CHECK-NOT: struct HasInvalidIteratorCategory : UnsafeCxxInputIterator
 // CHECK-NOT: struct HasNoEqualEqual : UnsafeCxxInputIterator
@@ -138,11 +145,4 @@
 // CHECK:   func successor() -> InputOutputConstIterator
 // CHECK:   var pointee: Int32 { get nonmutating set }
 // CHECK:   typealias Pointee = Int32
-// CHECK: }
-
-// CHECK: struct MutableRACIterator : UnsafeCxxMutableRandomAccessIterator, UnsafeCxxMutableInputIterator {
-// CHECK:   func successor() -> MutableRACIterator
-// CHECK:   var pointee: Int32
-// CHECK:   typealias Pointee = Int32
-// CHECK:   typealias Distance = Int32
 // CHECK: }
