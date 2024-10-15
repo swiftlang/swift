@@ -432,8 +432,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
                               /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                               /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                               /*ThrownType=*/TypeLoc(), paramList,
-                              /*GenericParams=*/nullptr, parentDC,
-                              /*LifetimeDependentTypeRepr*/ nullptr);
+                              /*GenericParams=*/nullptr, parentDC);
 
   initDecl->setImplicit();
   initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);

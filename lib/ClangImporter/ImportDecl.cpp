@@ -3792,8 +3792,7 @@ namespace {
             /*failable=*/false, /*FailabilityLoc=*/SourceLoc(),
             /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-            /*ThrownType=*/TypeLoc(), bodyParams, genericParams, dc,
-            /*LifetimeDependentTypeRepr*/ nullptr);
+            /*ThrownType=*/TypeLoc(), bodyParams, genericParams, dc);
       } else {
         auto resultTy = importedType.getType();
 
@@ -6456,8 +6455,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
       /*FailabilityLoc=*/SourceLoc(),
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
-      parameterList, /*GenericParams=*/nullptr, dc,
-      /*LifetimeDependentTypeRepr*/ nullptr);
+      parameterList, /*GenericParams=*/nullptr, dc);
   result->setImplicitlyUnwrappedOptional(isIUO);
   result->getASTContext().evaluator.cacheOutput(InitKindRequest{result},
                                                 std::move(initKind));
@@ -6971,8 +6969,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/importedName.getErrorInfo().has_value(),
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(), bodyParams,
-      /*GenericParams=*/nullptr, const_cast<DeclContext *>(dc),
-      /*LifetimeDependentTypeRepr*/ nullptr);
+      /*GenericParams=*/nullptr, const_cast<DeclContext *>(dc));
 
   addObjCAttribute(result, selector);
   recordMemberInContext(dc, result);

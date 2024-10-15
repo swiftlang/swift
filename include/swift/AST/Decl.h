@@ -8689,18 +8689,12 @@ class ConstructorDecl : public AbstractFunctionDecl {
   /// inserted at the end of the initializer by SILGen.
   Expr *CallToSuperInit = nullptr;
 
-  /// Valid when lifetime dependence specifiers are present.
-  TypeLoc InitRetType;
-
 public:
-  ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
-                  bool Failable, SourceLoc FailabilityLoc,
-                  bool Async, SourceLoc AsyncLoc,
-                  bool Throws, SourceLoc ThrowsLoc,
-                  TypeLoc thrownTy,
-                  ParameterList *BodyParams,
-                  GenericParamList *GenericParams,
-                  DeclContext *Parent, TypeRepr *InitRetTy);
+  ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc, bool Failable,
+                  SourceLoc FailabilityLoc, bool Async, SourceLoc AsyncLoc,
+                  bool Throws, SourceLoc ThrowsLoc, TypeLoc thrownTy,
+                  ParameterList *BodyParams, GenericParamList *GenericParams,
+                  DeclContext *Parent);
 
   static ConstructorDecl *
   createImported(ASTContext &ctx, ClangNode clangNode, DeclName name,
@@ -8721,8 +8715,6 @@ public:
 
   /// Get the interface type of the initializing constructor.
   Type getInitializerInterfaceType();
-
-  TypeRepr *getResultTypeRepr() const { return InitRetType.getTypeRepr(); }
 
   void setDeserializedResultTypeLoc(TypeLoc ResultTyR);
 
