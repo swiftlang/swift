@@ -13,6 +13,7 @@
 a json .config file and a series of .git repos with "fake commits".
 """
 
+import copy
 import json
 import os
 import subprocess
@@ -192,7 +193,13 @@ class SchemeMockTestCase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(SchemeMockTestCase, self).__init__(*args, **kwargs)
 
-        self.config = MOCK_CONFIG.copy()
+        # The test runner will first create TestCase instances for all test
+        # methods in the suite and only then run each test. Although we should
+        # not be mutating a configuration at run time, have each instance get a
+        # copy of the given configuration so that potential mutations to it do
+        # not affect subsequent tests.
+        self.config = copy.deepcopy(MOCK_CONFIG)
+
         self.workspace = os.getenv(BASEDIR_ENV_VAR)
         if self.workspace is None:
             raise RuntimeError(
