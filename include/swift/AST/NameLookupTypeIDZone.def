@@ -118,3 +118,5 @@ SWIFT_REQUEST(NameLookup, LookupIntrinsicRequest,
               FuncDecl *(ModuleDecl *, Identifier), Cached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, ObjCCategoryNameMapRequest,
               ObjCCategoryNameMap(ClassDecl *, ExtensionDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, CustomDerivativesLookupRequest,
+              CustomDerivativesLookupResult(ModuleDecl *), Cached, NoLocationInfo)
