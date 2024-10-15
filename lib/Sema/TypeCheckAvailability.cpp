@@ -690,7 +690,7 @@ private:
 
     // Declarations with an explicit availability attribute always get a TRC.
     AvailabilityRange DeclaredAvailability =
-        swift::AvailabilityInference::availableRange(D, Context);
+        swift::AvailabilityInference::availableRange(D);
     if (!DeclaredAvailability.isAlwaysAvailable()) {
       return TypeRefinementContext::createForDecl(
           Context, D, getCurrentTRC(),
@@ -1431,7 +1431,7 @@ AvailabilityRange TypeChecker::overApproximateAvailabilityAtLocation(
     loc = D->getLoc();
 
     std::optional<AvailabilityRange> Info =
-        AvailabilityInference::annotatedAvailableRange(D, Context);
+        AvailabilityInference::annotatedAvailableRange(D);
 
     if (Info.has_value()) {
       OverApproximateContext.constrainWith(Info.value());
@@ -1472,7 +1472,7 @@ bool TypeChecker::isDeclarationUnavailable(
   }
 
   AvailabilityRange safeRangeUnderApprox{
-      AvailabilityInference::availableRange(D, Context)};
+      AvailabilityInference::availableRange(D)};
 
   if (safeRangeUnderApprox.isAlwaysAvailable())
     return false;
@@ -1499,8 +1499,7 @@ TypeChecker::checkDeclarationAvailability(const Decl *D,
   if (isDeclarationUnavailable(D, Where.getDeclContext(), [&Where] {
         return Where.getAvailabilityRange();
       })) {
-    auto &Context = Where.getDeclContext()->getASTContext();
-    return AvailabilityInference::availableRange(D, Context);
+    return AvailabilityInference::availableRange(D);
   }
 
   return std::nullopt;
@@ -4639,7 +4638,7 @@ static bool declNeedsExplicitAvailability(const Decl *decl) {
     return false;
 
   // Warn on decls without an introduction version.
-  auto safeRangeUnderApprox = AvailabilityInference::availableRange(decl, ctx);
+  auto safeRangeUnderApprox = AvailabilityInference::availableRange(decl);
   return safeRangeUnderApprox.isAlwaysAvailable();
 }
 

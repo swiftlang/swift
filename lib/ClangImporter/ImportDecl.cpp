@@ -576,7 +576,7 @@ static void inferProtocolMemberAvailability(ClangImporter::Implementation &impl,
 
   const Decl *innermostDecl = dc->getInnermostDeclarationDeclContext();
   AvailabilityRange containingDeclRange =
-      AvailabilityInference::availableRange(innermostDecl, C);
+      AvailabilityInference::availableRange(innermostDecl);
 
   requiredRange.intersectWith(containingDeclRange);
 
@@ -6788,7 +6788,7 @@ bool SwiftDeclConverter::existingConstructorIsWorse(
   // other?
   llvm::VersionTuple introduced = findLatestIntroduction(objcMethod);
   AvailabilityRange existingAvailability =
-      AvailabilityInference::availableRange(existingCtor, Impl.SwiftContext);
+      AvailabilityInference::availableRange(existingCtor);
   assert(!existingAvailability.isKnownUnreachable());
 
   if (existingAvailability.isAlwaysAvailable()) {
@@ -9096,7 +9096,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
       if (proto->getAttrs().hasAttribute<AvailableAttr>()) {
         if (!result->getAttrs().hasAttribute<AvailableAttr>()) {
           AvailabilityRange protoRange =
-              AvailabilityInference::availableRange(proto, SwiftContext);
+              AvailabilityInference::availableRange(proto);
           applyAvailableAttribute(result, protoRange, SwiftContext);
         }
       } else {
