@@ -329,3 +329,14 @@ enum I60954 {
   }
   init?<S>(_ string: S) where S: StringProtocol {} // expected-note{{where 'S' = 'I60954'}}
 }
+
+// https://github.com/swiftlang/swift/issues/72533
+func f_72533() {
+  Int.min..<Int16.max
+  // expected-error@-1{{binary operator '..<' cannot be applied to operands of type 'Int' and 'Int16'}}
+  // expected-note@-2{{overloads for '..<' exist with these partially matching parameter lists: (Int, Int), (Int16, Int16)}}
+  let foo: Int = 1
+  Int(foo)..<Int16.max
+  // expected-error@-1{{binary operator '..<' cannot be applied to operands of type 'Int' and 'Int16'}}
+  // expected-note@-2{{overloads for '..<' exist with these partially matching parameter lists: (Int, Int), (Int16, Int16)}}
+}

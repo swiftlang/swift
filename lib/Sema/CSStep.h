@@ -572,6 +572,10 @@ public:
         break;
     }
 
+    if (mergeOperatorFixesIfPossible()) {
+      return suspend(std::make_unique<SplitterStep>(CS, Solutions));
+    }
+
     return done(/*isSuccess=*/AnySolved);
   }
 
@@ -601,6 +605,13 @@ protected:
     return false;
   }
 
+  /// If at the end of this binding step the only fixes are for mismatched
+  /// argument types on the same operator, attempt to merge them into a
+  /// single fix.
+  virtual bool mergeOperatorFixesIfPossible() {
+    return false;
+  }
+
   bool needsToComputeNext() const { return Producer.needsToComputeNext(); }
 
   ConstraintLocator *getLocator() const { return Producer.getLocator(); }
@@ -625,6 +636,8 @@ public:
         TypeVar(bindings.getTypeVariable()) {}
 
   void setup() override;
+
+  bool mergeOperatorFixesIfPossible() override;
 
   StepResult resume(bool prevFailed) override;
 
