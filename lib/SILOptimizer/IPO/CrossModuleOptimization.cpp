@@ -236,7 +236,30 @@ public:
     Cloned->eraseFromParent();
   }
 
-  SILValue getMappedValue(SILValue Value) { return Value; }
+  // This method retrieves the operand passed as \p Value as mapped
+  // in a previous instruction.
+  SILValue getMappedValue(SILValue Value) {
+    switch (mode) {
+    case VisitMode::DetectSerializableInst:
+      // Typically, the type of the operand (\p Value) is already checked
+      // and remapped as the resulting type of a previous instruction, so
+      // rechecking the type isn't necessary. However, certain instructions
+      // have operands that weren’t previously mapped, such as:
+      //
+      // ```
+      // bb0(%0 : $*Foo):
+      //   %1 = struct_element_addr %0 : $*Foo, #Foo.bar
+      // ```
+      // where the operand of the first instruction is the argument of the
+      // basic block. In such case, an explicit check for the operand's type
+      // is required to ensure serializability.
+      remapType(Value->getType());
+      break;
+    case VisitMode::SerializeInst:
+      break;
+    }
+    return Value;
+  }
 
   SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
 
@@ -493,27 +516,17 @@ bool CrossModuleOptimization::canSerializeFunction(
 
   // Check if any instruction prevents serializing the function.
   InstructionVisitor visitor(*function, *this, InstructionVisitor::VisitMode::DetectSerializableInst);
+
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
       visitor.getBuilder().setInsertionPoint(&inst);
-      // First, visit each instruction and see if its result
-      // types (lowered) are serializalbe.
+      // First, visit each instruction and see if its
+      // canonical or substituted types are serializalbe.
       visitor.visit(&inst);
       if (!visitor.canSerializeTypesInInst(&inst)) {
         M.reclaimUnresolvedLocalArchetypeDefinitions();
         return false;
       }
-
-      // Next, check operand types (lowered) for serializability
-      // as they are not tracked in the visit above.
-      for (Operand &op : inst.getAllOperands()) {
-        auto remapped = visitor.remapType(op.get()->getType());
-        if (!canSerializeType(remapped)) {
-          M.reclaimUnresolvedLocalArchetypeDefinitions();
-          return false;
-        }
-      }
-
       // Next, check for any fields that weren't visited.
       if (!canSerializeFieldsByInstructionKind(&inst, canSerializeFlags, maxDepth)) {
         M.reclaimUnresolvedLocalArchetypeDefinitions();
