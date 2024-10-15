@@ -401,7 +401,7 @@ struct BridgedPassContext {
   bool completeLifetime(BridgedValue value) const;
 };
 
-bool FullApplySite_canInline(BridgedInstruction apply);
+bool BeginApply_canInline(BridgedInstruction beginApply);
 
 enum class BridgedDynamicCastResult {
   willSucceed,
