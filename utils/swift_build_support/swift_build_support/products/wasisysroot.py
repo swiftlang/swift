@@ -209,6 +209,7 @@ class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
         self.cmake_options.define('LIBCXX_ABI_VERSION', '2')
         self.cmake_options.define('LIBCXXABI_ENABLE_EXCEPTIONS:BOOL', 'FALSE')
         self.cmake_options.define('LIBCXXABI_ENABLE_SHARED:BOOL', 'FALSE')
+        self.cmake_options.define('LIBCXXABI_USE_LLVM_UNWINDER:BOOL', 'FALSE')
         self.cmake_options.define('LIBCXXABI_SILENT_TERMINATE:BOOL', 'TRUE')
         self.cmake_options.define('LIBCXXABI_ENABLE_THREADS:BOOL', cmake_has_threads)
         self.cmake_options.define('LIBCXXABI_HAS_PTHREAD_API:BOOL', cmake_has_threads)
