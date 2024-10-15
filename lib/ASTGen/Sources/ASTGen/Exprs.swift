@@ -535,7 +535,18 @@ extension ASTGenVisitor {
     )
   }
 
-  func generate(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedMacroExpansionExpr {
+  struct FreestandingMacroExpansionInfo {
+    var poundLoc: BridgedSourceLoc
+    var macroNameRef: BridgedDeclNameRef
+    var macroNameLoc: BridgedDeclNameLoc
+    var leftAngleLoc: BridgedSourceLoc
+    var genericArgs: BridgedArrayRef
+    var rightAngleLoc: BridgedSourceLoc
+    var arguments: BridgedNullableArgumentList
+  }
+
+  func generate(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> FreestandingMacroExpansionInfo {
+    let poundLoc = self.generateSourceLoc(node.pound)
     let nameLoc = self.generateIdentifierAndSourceLoc(node.macroName)
 
     let leftAngleLoc: BridgedSourceLoc
@@ -543,7 +554,7 @@ extension ASTGenVisitor {
     let rightAngleLoc: BridgedSourceLoc
     if let generics = node.genericArgumentClause {
       leftAngleLoc = self.generateSourceLoc(generics.leftAngle)
-      genericArgs = generics.arguments.lazy.map {
+      genericArgs = generics.arguments.map {
         self.generate(type: $0.argument)
       }
       rightAngleLoc = self.generateSourceLoc(generics.rightAngle)
@@ -566,15 +577,28 @@ extension ASTGenVisitor {
       arguments = nil
     }
 
-    return .createParsed(
-      self.declContext,
-      poundLoc: self.generateSourceLoc(node.pound),
+    return FreestandingMacroExpansionInfo(
+      poundLoc: poundLoc,
       macroNameRef: .createParsed(.createIdentifier(nameLoc.identifier)),
       macroNameLoc: .createParsed(nameLoc.sourceLoc),
       leftAngleLoc: leftAngleLoc,
       genericArgs: genericArgs.lazy.bridgedArray(in: self),
       rightAngleLoc: rightAngleLoc,
-      args: arguments.asNullable
+      arguments: arguments.asNullable
+    )
+  }
+
+  func generate(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedMacroExpansionExpr {
+    let info = self.generate(freestandingMacroExpansion: node)
+    return .createParsed(
+      self.declContext,
+      poundLoc: info.poundLoc,
+      macroNameRef: info.macroNameRef,
+      macroNameLoc: info.macroNameLoc,
+      leftAngleLoc: info.leftAngleLoc,
+      genericArgs: info.genericArgs,
+      rightAngleLoc: info.rightAngleLoc,
+      args: info.arguments
     )
   }
 

@@ -625,46 +625,17 @@ extension ASTGenVisitor {
 extension ASTGenVisitor {
   func generate(macroExpansionDecl node: MacroExpansionDeclSyntax) -> BridgedMacroExpansionDecl {
     let attrs = self.generateDeclAttributes(node, allowStatic: true)
-
-    let nameLoc = self.generateIdentifierAndSourceLoc(node.macroName)
-
-    let leftAngleLoc: BridgedSourceLoc
-    let genericArgs: [BridgedTypeRepr]
-    let rightAngleLoc: BridgedSourceLoc
-    if let generics = node.genericArgumentClause {
-      leftAngleLoc = self.generateSourceLoc(generics.leftAngle)
-      genericArgs = generics.arguments.lazy.map {
-        self.generate(type: $0.argument)
-      }
-      rightAngleLoc = self.generateSourceLoc(generics.rightAngle)
-    } else {
-      leftAngleLoc = nil
-      genericArgs = []
-      rightAngleLoc = nil
-    }
-
-    let arguments: BridgedArgumentList?
-    if (node.leftParen != nil || node.trailingClosure != nil) {
-      arguments = self.generateArgumentList(
-        leftParen: node.leftParen,
-        labeledExprList: node.arguments,
-        rightParen: node.rightParen,
-        trailingClosure: node.trailingClosure,
-        additionalTrailingClosures: node.additionalTrailingClosures
-      )
-    } else {
-      arguments = nil
-    }
+    let info = self.generate(freestandingMacroExpansion: node)
 
     let decl = BridgedMacroExpansionDecl.createParsed(
       self.declContext,
-      poundLoc: self.generateSourceLoc(node.pound),
-      macroNameRef: .createParsed(.createIdentifier(nameLoc.identifier)),
-      macroNameLoc: .createParsed(nameLoc.sourceLoc),
-      leftAngleLoc: leftAngleLoc,
-      genericArgs: genericArgs.lazy.bridgedArray(in: self),
-      rightAngleLoc: rightAngleLoc,
-      args: arguments.asNullable
+      poundLoc: info.poundLoc,
+      macroNameRef: info.macroNameRef,
+      macroNameLoc: info.macroNameLoc,
+      leftAngleLoc: info.leftAngleLoc,
+      genericArgs: info.genericArgs,
+      rightAngleLoc: info.rightAngleLoc,
+      args: info.arguments
     )
     decl.asDecl.setAttrs(attrs.attributes)
 
