@@ -116,9 +116,21 @@ static inline SwiftJobPriority swift_job_getPriority(SwiftJob *job) {
 /// task is cleaned up.
 ///
 /// N.B. **Requires that the job kind is SwiftJobKindTask.**
+///
+/// Note also that the allocator used is a bump pointer allocator with
+/// stack discipline.  This means that you must deallocate in the
+/// opposite order to the order in which you allocate memory.
 void *swift_job_alloc(SwiftJob *job, size_t size);
 
 /// Release memory allocated using `swift_job_alloc()`.
+///
+/// Note that the allocator used here is a bump pointer allocator with
+/// stack discipline; you can only deallocate the last extant allocation.
+/// Attempting to dealloc anything other than the most recent extant
+/// allocation will result in a fatal error.
+///
+/// TL/DR: You must deallocate in the opposite order to the order
+///        in which you allocated memory.
 void swift_job_dealloc(SwiftJob *job, void *ptr);
 
 /// Swift's refcounted objects start with this header
