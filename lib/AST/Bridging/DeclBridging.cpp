@@ -115,6 +115,10 @@ static AccessorKind unbridged(BridgedAccessorKind kind) {
   return static_cast<AccessorKind>(kind);
 }
 
+BridgedDeclAttributes BridgedDecl_getAttrs(BridgedDecl decl) {
+  return decl.unbridged()->getAttrs();
+}
+
 void BridgedDecl_setAttrs(BridgedDecl decl, BridgedDeclAttributes attrs) {
   decl.unbridged()->getAttrs() = attrs.unbridged();
 }
