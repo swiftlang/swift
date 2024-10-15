@@ -142,6 +142,8 @@ PROTOCOL(UnsafeCxxInputIterator)
 PROTOCOL(UnsafeCxxMutableInputIterator)
 PROTOCOL(UnsafeCxxRandomAccessIterator)
 PROTOCOL(UnsafeCxxMutableRandomAccessIterator)
+PROTOCOL(UnsafeCxxContiguousIterator)
+PROTOCOL(UnsafeCxxMutableContiguousIterator)
 
 PROTOCOL(AsyncSequence)
 PROTOCOL(AsyncIteratorProtocol)

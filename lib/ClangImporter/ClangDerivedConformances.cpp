@@ -462,17 +462,26 @@ void swift::conformToCxxIteratorIfNeeded(
   auto isRandomAccessIteratorDecl = [&](const clang::CXXRecordDecl *base) {
     return isIteratorCategoryDecl(base, "random_access_iterator_tag");
   };
+  auto isContiguousIteratorDecl = [&](const clang::CXXRecordDecl *base) {
+    return isIteratorCategoryDecl(base, "contiguous_iterator_tag"); // C++20
+  };
 
   // Traverse all transitive bases of `underlyingDecl` to check if
   // it inherits from `std::input_iterator_tag`.
   bool isInputIterator = isInputIteratorDecl(underlyingCategoryDecl);
   bool isRandomAccessIterator =
       isRandomAccessIteratorDecl(underlyingCategoryDecl);
+  bool isContiguousIterator = isContiguousIteratorDecl(underlyingCategoryDecl);
   underlyingCategoryDecl->forallBases([&](const clang::CXXRecordDecl *base) {
     if (isInputIteratorDecl(base)) {
       isInputIterator = true;
     }
     if (isRandomAccessIteratorDecl(base)) {
+      isRandomAccessIterator = true;
+      isInputIterator = true;
+    }
+    if (isContiguousIteratorDecl(base)) {
+      isContiguousIterator = true;
       isRandomAccessIterator = true;
       isInputIterator = true;
       return false;
@@ -594,6 +603,15 @@ void swift::conformToCxxIteratorIfNeeded(
   else
     impl.addSynthesizedProtocolAttrs(
         decl, {KnownProtocolKind::UnsafeCxxRandomAccessIterator});
+
+  if (isContiguousIterator) {
+    if (pointeeSettable)
+      impl.addSynthesizedProtocolAttrs(
+          decl, {KnownProtocolKind::UnsafeCxxMutableContiguousIterator});
+    else
+      impl.addSynthesizedProtocolAttrs(
+          decl, {KnownProtocolKind::UnsafeCxxContiguousIterator});
+  }
 }
 
 void swift::conformToCxxConvertibleToBoolIfNeeded(
