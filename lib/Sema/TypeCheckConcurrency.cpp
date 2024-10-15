@@ -1491,7 +1491,7 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
   } else {
     // Check if the availability of nominal is high enough to be using the ExecutorJob version
     AvailabilityRange requirementInfo =
-        AvailabilityInference::availableRange(moveOnlyEnqueueRequirement, C);
+        AvailabilityInference::availableRange(moveOnlyEnqueueRequirement);
     AvailabilityRange declInfo =
         TypeChecker::overApproximateAvailabilityAtLocation(
             nominal->getLoc(), dyn_cast<DeclContext>(nominal));

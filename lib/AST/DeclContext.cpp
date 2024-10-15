@@ -1540,7 +1540,7 @@ bool DeclContext::isAlwaysAvailableConformanceContext() const {
   auto &ctx = getASTContext();
 
   AvailabilityRange conformanceAvailability{
-      AvailabilityInference::availableRange(ext, ctx)};
+      AvailabilityInference::availableRange(ext)};
 
   auto deploymentTarget = AvailabilityRange::forDeploymentTarget(ctx);
 
