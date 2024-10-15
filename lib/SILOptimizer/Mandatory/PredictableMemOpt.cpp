@@ -485,12 +485,18 @@ struct AvailableValueDataflowFixup: AvailableValueFixup {
 
   // Verify ownership of promoted instructions in asserts builds or when
   // -sil-verify-all is set.
+  //
+  // Clears insertedInsts.
   void verifyOwnership(DeadEndBlocks &deBlocks);
 
-  /// Fix ownership of inserted instructions and delete dead instructions.
+  // Fix ownership of inserted instructions and delete dead instructions.
+  //
+  // Clears insertedInsts.
   void fixupOwnership(InstructionDeleter &deleter,
                       DeadEndBlocks &deBlocks);
 
+  // Deletes all insertedInsts without fixing ownership.
+  // Clears insertedInsts.
   void deleteInsertedInsts(InstructionDeleter &deleter);
 };
 
@@ -532,6 +538,7 @@ void AvailableValueDataflowFixup::verifyOwnership(DeadEndBlocks &deBlocks) {
       result.verifyOwnership(&deBlocks);
     }
   }
+  insertedInsts.clear();
 }
 
 // In OptimizationMode::PreserveAlloc, delete any inserted instructions that are
