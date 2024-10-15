@@ -10,9 +10,6 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: asan
 
-// This is broken on ARM64_32, disable it temporarily until we can fix it. rdar://137351613
-// UNSUPPORTED: CPU=arm64_32
-
 import SwiftReflectionTest
 
 protocol P : AnyObject {
@@ -24,7 +21,8 @@ class C : P {
   init() { a = 0; b = 0; }
 }
 
-// MemoryLayout<B>.size == 8
+// On 64-bit: MemoryLayout<B>.size == 8
+// On 32-bit: MemoryLayout<B>.size == 4
 enum B {
 case a(C)
 case b(C)
@@ -44,8 +42,8 @@ reflect(enumValue: B.b(C()))
 // CHECKALL-NEXT: (enum reflect_Enum_values10.B)
 // CHECKALL-NEXT: Value: .b(_)
 
-// MemoryLayout<Q>.size == 16
-// MemoryLayout<P>.size == 16
+// On 64-bit: MemoryLayout<Q>.size == MemoryLayout<P>.size == 16
+// On 32-bit: MemoryLayout<Q>.size == MemoryLayout<P>.size == 8
 enum Q {
 case a(P)
 case b(P)
@@ -64,6 +62,90 @@ reflect(enumValue: Q.b(C()))
 // CHECKALL-NEXT: Type reference:
 // CHECKALL-NEXT: (enum reflect_Enum_values10.Q)
 // CHECKALL-NEXT: Value: .b(_)
+
+enum B1 {
+case a(C)
+case b
+}
+
+reflect(enumValue: B1.a(C()))
+
+// CHECKALL: Reflecting an enum value.
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (enum reflect_Enum_values10.B1)
+// CHECKALL-NEXT: Value: .a(_)
+
+reflect(enumValue: B1.b)
+
+// CHECKALL: Reflecting an enum value.
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (enum reflect_Enum_values10.B1)
+// CHECKALL-NEXT: Value: .b
+
+enum Q1 {
+case a(P)
+case b
+}
+
+reflect(enumValue: Q1.a(C()))
+
+// CHECKALL: Reflecting an enum value.
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (enum reflect_Enum_values10.Q1)
+// CHECKALL-NEXT: Value: .a(_)
+
+reflect(enumValue: Q1.b)
+
+// CHECKALL: Reflecting an enum value.
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (enum reflect_Enum_values10.Q1)
+// CHECKALL-NEXT: Value: .b
+
+enum B2 {
+case a(C)
+case b(C)
+case c(C)
+case d(C)
+case e(C)
+}
+
+reflect(enumValue: B2.a(C()))
+
+// CHECKALL: Reflecting an enum value.
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (enum reflect_Enum_values10.B2)
+// CHECKALL-NEXT: Value: .a(_)
+
+reflect(enumValue: B2.e(C()))
+
+// CHECKALL: Reflecting an enum value.
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (enum reflect_Enum_values10.B2)
+// CHECKALL-NEXT: Value: .e(_)
+
+// On 64-bit: MemoryLayout<Q>.size == MemoryLayout<P>.size == 16
+// On 32-bit: MemoryLayout<Q>.size == MemoryLayout<P>.size == 8
+enum Q2 {
+case a(P)
+case b(P)
+case c(P)
+case d(P)
+case e(P)
+}
+
+reflect(enumValue: Q2.a(C()))
+
+// CHECKALL: Reflecting an enum value.
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (enum reflect_Enum_values10.Q2)
+// CHECKALL-NEXT: Value: .a(_)
+
+reflect(enumValue: Q2.e(C()))
+
+// CHECKALL: Reflecting an enum value.
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (enum reflect_Enum_values10.Q2)
+// CHECKALL-NEXT: Value: .e(_)
 
 doneReflecting()
 
