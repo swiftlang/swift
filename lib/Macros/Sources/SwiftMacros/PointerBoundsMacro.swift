@@ -600,12 +600,13 @@ public struct PointerBoundsMacro: PeerMacro {
             .with(\.attributes, funcDecl.attributes.filter { e in
                 switch e {
                 case .attribute(let attr):
-                    // don't apply this macro recursively
+                    // don't apply this macro recursively, and avoid dupe _alwaysEmitIntoClient
                     let name = attr.attributeName.as(IdentifierTypeSyntax.self)?.name.text
-                    return name == nil || name != "PointerBounds"
+                    return name == nil || (name != "PointerBounds" && name != "_alwaysEmitIntoClient")
                 default: return true
                 }
-            })
+            } + [.attribute(AttributeSyntax(atSign: .atSignToken(),
+                    attributeName: IdentifierTypeSyntax(name: "_alwaysEmitIntoClient")))])
         return [DeclSyntax(newFunc)]
         } catch let error as DiagnosticError {
             context.diagnose(Diagnostic(node: error.node, message: MacroExpansionErrorMessage(error.description),

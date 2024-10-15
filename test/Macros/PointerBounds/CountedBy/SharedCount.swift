@@ -1,7 +1,7 @@
 // REQUIRES: swift_swift_parser
 // REQUIRES: pointer_bounds
 
-// RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -enable-experimental-feature SymbolLinkageMarkers -plugin-path %swift-plugin-dir -dump-macro-expansions 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions 2>&1 | %FileCheck %s
 
 import _PointerBounds
 
@@ -9,7 +9,8 @@ import _PointerBounds
 func myFunc(_ ptr: UnsafePointer<CInt>, _ ptr2: UnsafePointer<CInt>, _ len: CInt) {
 }
 
-// CHECK:      func myFunc(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointer<CInt>, _ len: CInt) {
+// CHECK:      @_alwaysEmitIntoClient
+// CHECK-NEXT: func myFunc(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointer<CInt>, _ len: CInt) {
 // CHECK-NEXT:     let _ptrCount: some BinaryInteger = len
 // CHECK-NEXT:     if ptr.count < _ptrCount || _ptrCount < 0 {
 // CHECK-NEXT:         fatalError("bounds check failure when calling unsafe function")
