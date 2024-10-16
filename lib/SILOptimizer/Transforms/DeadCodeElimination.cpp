@@ -55,6 +55,10 @@ static bool seemsUseful(SILInstruction *I) {
       isa<EndBorrowInst>(I))
     return false;
 
+  if (isa<UnconditionalCheckedCastInst>(I)) {
+    return false;
+  }
+
   // A load [copy] is okay to be DCE'ed if there are no useful dependencies
   if (auto *load = dyn_cast<LoadInst>(I)) {
     if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
