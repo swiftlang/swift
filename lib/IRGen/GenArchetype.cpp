@@ -451,12 +451,16 @@ withOpaqueTypeGenericArgs(IRGenFunction &IGF,
     SmallVector<llvm::Value *, 4> args;
     SmallVector<llvm::Type *, 4> types;
 
+    // We need to pass onHeapPacks=true because the runtime demangler
+    // expects to differentiate on-heap packs from non-pack types by
+    // checking the least significant bit of the metadata pointer.
     enumerateGenericSignatureRequirements(
         opaqueDecl->getGenericSignature().getCanonicalSignature(),
         [&](GenericRequirement reqt) {
           auto arg = emitGenericRequirementFromSubstitutions(
               IGF, reqt, MetadataState::Abstract,
-              archetype->getSubstitutions());
+              archetype->getSubstitutions(),
+              /*onHeapPacks=*/true);
           args.push_back(arg);
           types.push_back(args.back()->getType());
         });
