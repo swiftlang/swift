@@ -56,7 +56,8 @@ set(CoreLibs
   LLVMSupport
   SwiftShims
   runtime
-  CompatibilityOverride)
+  CompatibilityOverride
+  stubs)
 
   # Add these as we get them building
   # core
