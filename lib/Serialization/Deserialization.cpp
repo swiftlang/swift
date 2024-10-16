@@ -3749,10 +3749,9 @@ public:
       lifetimeDependencies.push_back(*info);
     }
 
-    if (!lifetimeDependencies.empty()) {
-      ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{ctor},
-                                ctx.AllocateCopy(lifetimeDependencies));
-    }
+    ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{ctor},
+                              lifetimeDependencies.empty()? std::nullopt :
+                                  ctx.AllocateCopy(lifetimeDependencies));
 
     if (auto errorConvention = MF.maybeReadForeignErrorConvention())
       ctor->setForeignErrorConvention(*errorConvention);
@@ -4338,10 +4337,9 @@ public:
       lifetimeDependencies.push_back(*info);
     }
 
-    if (!lifetimeDependencies.empty()) {
-      ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{fn},
-                                ctx.AllocateCopy(lifetimeDependencies));
-    }
+    ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{fn},
+                              lifetimeDependencies.empty() ? std::nullopt
+                                  : ctx.AllocateCopy(lifetimeDependencies));
 
     if (auto errorConvention = MF.maybeReadForeignErrorConvention())
       fn->setForeignErrorConvention(*errorConvention);
