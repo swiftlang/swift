@@ -2211,10 +2211,6 @@ private:
 
   llvm::SetVector<TypeVariableType *> TypeVariables;
 
-  /// Maps expressions to types for choosing a favored overload
-  /// type in a disjunction constraint.
-  llvm::DenseMap<Expr *, TypeBase *> FavoredTypes;
-
   /// Maps discovered closures to their types inferred
   /// from declared parameters/result and body.
   ///
@@ -2953,15 +2949,6 @@ public:
     if (result != KeyPaths.end())
       return std::get<0>(result->second);
     return nullptr;
-  }
-
-  TypeBase* getFavoredType(Expr *E) {
-    assert(E != nullptr);
-    return this->FavoredTypes[E];
-  }
-  void setFavoredType(Expr *E, TypeBase *T) {
-    assert(E != nullptr);
-    this->FavoredTypes[E] = T;
   }
 
   /// Set the type in our type map for the given node, and record the change
