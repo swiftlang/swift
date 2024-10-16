@@ -28,7 +28,8 @@ function(copy_library_sources name from_prefix to_prefix)
     "${StdlibSources}/${from_prefix}/${name}/*.def"
     "${StdlibSources}/${from_prefix}/${name}/*.gyb"
     "${StdlibSources}/${from_prefix}/${name}/*.apinotes"
-    "${StdlibSources}/${from_prefix}/${name}/*.yaml")
+    "${StdlibSources}/${from_prefix}/${name}/*.yaml"
+    "${StdlibSources}/${from_prefix}/${name}/*.inc")
 
   foreach(file ${filenames})
     # Get and create the directory
@@ -53,7 +54,9 @@ copy_library_sources(include "" "Core")
 
 set(CoreLibs
   LLVMSupport
-  SwiftShims)
+  SwiftShims
+  runtime
+  CompatibilityOverride)
 
   # Add these as we get them building
   # core

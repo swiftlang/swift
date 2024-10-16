@@ -92,3 +92,4 @@ Runtimes/**/*.def
 Runtimes/**/*.gyb
 Runtimes/**/*.apinotes
 Runtimes/**/*.yaml
+Runtimes/**/*.inc
