@@ -775,6 +775,14 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
     if (isa<EndBorrowInst>(currInst))
       return false;
 
+    // destroy_value [dead_end] instructions are inserted at the availability
+    // boundary by lifetime completion.  Such instructions correctly mark the
+    // lifetime boundary of the destroyed value and never arise from dead user
+    // code.
+    auto *dvi = dyn_cast<DestroyValueInst>(currInst);
+    if (dvi && dvi->isDeadEnd())
+      return false;
+
     // If no-return instruction is not something we can point in code or
     // it's an explicit cast, skip it.
     if (!noReturnCall->getLoc().is<RegularLocation>() ||
