@@ -636,6 +636,16 @@ std::string ASTMangler::mangleSILDifferentiabilityWitness(StringRef originalName
   return finalize();
 }
 
+std::string ASTMangler::mangleSILThunkKind(StringRef originalName,
+                                           SILThunkKind thunkKind) {
+  beginManglingWithoutPrefix();
+  appendOperator(originalName);
+  // Prefix for thunk inst based thunks
+  auto code = (char)thunkKind.getMangledKind();
+  appendOperator("TT", StringRef(&code, 1));
+  return finalize();
+}
+
 std::string ASTMangler::mangleAutoDiffGeneratedDeclaration(
     AutoDiffGeneratedDeclarationKind declKind, StringRef origFnName,
     unsigned bbId, AutoDiffLinearMapKind linearMapKind,

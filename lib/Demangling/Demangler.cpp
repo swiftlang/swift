@@ -2791,6 +2791,15 @@ NodePointer Demangler::popProtocolConformance() {
 
 NodePointer Demangler::demangleThunkOrSpecialization() {
   switch (char c = nextChar()) {
+    // Thunks that are from a thunk inst. We take the TT namespace.
+    case 'T': {
+      switch (char c = nextChar()) {
+      case 'I':
+        return createWithChild(Node::Kind::SILThunkIdentity, popNode(isEntity));
+      default:
+        return nullptr;
+      }
+    }
     case 'c': return createWithChild(Node::Kind::CurryThunk, popNode(isEntity));
     case 'j': return createWithChild(Node::Kind::DispatchThunk, popNode(isEntity));
     case 'q': return createWithChild(Node::Kind::MethodDescriptor, popNode(isEntity));

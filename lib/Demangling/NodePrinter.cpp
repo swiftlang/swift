@@ -367,6 +367,7 @@ private:
     case Node::Kind::Constructor:
     case Node::Kind::CoroutineContinuationPrototype:
     case Node::Kind::CurryThunk:
+    case Node::Kind::SILThunkIdentity:
     case Node::Kind::DispatchThunk:
     case Node::Kind::Deallocator:
     case Node::Kind::IsolatedDeallocator:
@@ -1423,6 +1424,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::CurryThunk:
     Printer << "curry thunk of ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::SILThunkIdentity:
+    Printer << "identity thunk of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::DispatchThunk:

@@ -2878,6 +2878,14 @@ ThunkInst::Kind::getDerivedFunctionType(SILFunction *fn,
   llvm_unreachable("Covered switch isn't covered?!");
 }
 
+SILType ThunkInst::Kind::getDerivedFunctionType(SILFunction *fn,
+                                                SILType inputFunctionType,
+                                                SubstitutionMap subMap) const {
+  auto fType = inputFunctionType.castTo<SILFunctionType>();
+  return SILType::getPrimitiveType(getDerivedFunctionType(fn, fType, subMap),
+                                   inputFunctionType.getCategory());
+}
+
 ThunkInst *ThunkInst::create(SILDebugLocation debugLoc, SILValue operand,
                              SILModule &mod, SILFunction *f,
                              ThunkInst::Kind kind, SubstitutionMap subs) {
