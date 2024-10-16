@@ -396,6 +396,16 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
                                               bool isSelfParameter) {
   auto type = param.getArgumentType(IGM.getSILModule(), FnType,
                                     IGM.getMaximalTypeExpansionContext());
+
+  // Strip all of the marker protocols because they don't exist at runtime
+  // and cannot be factored into a convention.
+  if (auto *existential = type->getAs<ExistentialType>()) {
+    if (auto *PCT = existential->getConstraintType()
+                        ->getAs<ProtocolCompositionType>()) {
+      type = PCT->withoutMarkerProtocols()->getCanonicalType();
+    }
+  }
+
   switch (param.getConvention()) {
       // Indirect parameters do give us a value we can use, but right now
       // we don't bother, for no good reason. But if this is 'self',
@@ -696,6 +706,14 @@ bindParameterSource(SILParameterInfo param, unsigned paramIndex,
     return;
 
   CanType paramType = getArgTypeInContext(paramIndex);
+
+  // Strip marker protocols to match what happens in `considerParameter`.
+  if (auto *existential = paramType->getAs<ExistentialType>()) {
+    if (auto *PCT = existential->getConstraintType()
+                        ->getAs<ProtocolCompositionType>()) {
+      paramType = PCT->withoutMarkerProtocols()->getCanonicalType();
+    }
+  }
 
   // If the parameter is a thick metatype, bind it directly.
   // TODO: objc metatypes?
