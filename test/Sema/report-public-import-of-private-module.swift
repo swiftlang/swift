@@ -12,10 +12,10 @@
 // RUN:   -o %t/sdk/System/Library/PrivateFrameworks/PrivateSwift.framework/Modules/PrivateSwift.swiftmodule/%target-swiftmodule-name
 
 /// Expect errors when building a public client.
-// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/PublicImports.swift \
+// RUN: env ENABLE_PUBLIC_IMPORT_OF_PRIVATE_AS_ERROR=1 %target-swift-frontend -typecheck -sdk %t/sdk %t/PublicImports.swift \
 // RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ -module-cache-path %t \
 // RUN:   -library-level api -verify -module-name MainLib
-// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/PublicImports.swift \
+// RUN: env ENABLE_PUBLIC_IMPORT_OF_PRIVATE_AS_ERROR=1 %target-swift-frontend -typecheck -sdk %t/sdk %t/PublicImports.swift \
 // RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ -module-cache-path %t \
 // RUN:   -library-level=api -verify -module-name MainLib
 
@@ -139,7 +139,7 @@ private import PublicClang_Private
 private import FullyPrivateClang
 private import LocalClang
 
-// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/ExplicitlyPublicImports.swift \
+// RUN: env ENABLE_PUBLIC_IMPORT_OF_PRIVATE_AS_ERROR=1 %target-swift-frontend -typecheck -sdk %t/sdk %t/ExplicitlyPublicImports.swift \
 // RUN:   -module-name MainLib -module-cache-path %t \
 // RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
 // RUN:   -library-level api -verify
@@ -159,7 +159,7 @@ public import LocalClang // expected-error{{private module 'LocalClang' is impor
 // expected-warning @-1 {{public import of 'LocalClang' was not used in public declarations or inlinable code}}{{1-7=internal}}
 @_exported public import MainLib // expected-warning{{private module 'MainLib' is imported publicly from the public module 'MainLib'}}{{12-18=internal}}
 
-// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/ImplictlyInternalImports.swift \
+// RUN: env ENABLE_PUBLIC_IMPORT_OF_PRIVATE_AS_ERROR=1 %target-swift-frontend -typecheck -sdk %t/sdk %t/ImplictlyInternalImports.swift \
 // RUN:   -module-name MainLib -module-cache-path %t \
 // RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault \
