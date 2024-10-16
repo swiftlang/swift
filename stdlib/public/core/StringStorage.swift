@@ -540,6 +540,8 @@ extension __StringStorage {
       self._breadcrumbsAddress.pointee = nil
     }
     _invariantCheck()
+    // TODO(String performance): Consider updating isNFC when feasible.
+    _internalInvariant(countAndFlags.isASCII || !countAndFlags.isNFC)
   }
 
   // Perform common post-append adjustments and invariant enforcement.

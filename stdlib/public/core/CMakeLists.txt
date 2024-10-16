@@ -115,6 +115,8 @@ split_embedded_sources(
     NORMAL NewtypeWrapper.swift
   EMBEDDED NFC.swift
   EMBEDDED NFD.swift
+  EMBEDDED NFKC.swift
+  EMBEDDED NFKD.swift
   EMBEDDED ObjectIdentifier.swift
   EMBEDDED Optional.swift
   EMBEDDED OptionSet.swift
@@ -192,6 +194,8 @@ split_embedded_sources(
     NORMAL ThreadLocalStorage.swift
   EMBEDDED UIntBuffer.swift
   EMBEDDED UnavailableStringAPIs.swift
+  EMBEDDED Unicode+NormalizedScalars.swift
+  EMBEDDED UnicodeNormalizationCheck.swift
   EMBEDDED UnicodeData.swift
   EMBEDDED UnicodeEncoding.swift
   EMBEDDED UnicodeBreakProperty.swift
