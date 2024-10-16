@@ -1123,3 +1123,18 @@ bb1:
   return %5 : $()
 }
 
+// CHECK: sil @dont_hoist_release_accross_cast
+// CHECK: retain
+// CHECK: apply
+// CHECK: unconditional_checked_cast
+// CHECK: release
+sil @dont_hoist_release_accross_cast : $@convention(thin) (B, B) -> () {
+bb0(%0 : $B, %1: $B):
+  strong_retain %0: $B
+  apply undef() : $@convention(thin) () -> ()
+  %3 = unconditional_checked_cast %0 : $B to Builtin.NativeObject
+  strong_release %0: $B
+  %5 = tuple()
+  return %5 : $()
+}
+
