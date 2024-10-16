@@ -1618,7 +1618,8 @@ namespace {
 
         synthesizer.makeStructRawValued(
             structDecl, underlyingType,
-            {KnownProtocolKind::RawRepresentable, KnownProtocolKind::Equatable},
+            {KnownProtocolKind::RawRepresentable, KnownProtocolKind::Equatable,
+             KnownProtocolKind::Hashable},
             options, /*setterAccess=*/AccessLevel::Public);
 
         result = structDecl;

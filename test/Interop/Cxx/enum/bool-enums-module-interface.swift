@@ -2,7 +2,7 @@
 
 // TODO: these should be enums eventually (especially the enum class).
 
-// CHECK:       struct Maybe : Equatable, RawRepresentable {
+// CHECK:       struct Maybe : Hashable, Equatable, RawRepresentable {
 // CHECK-NEXT:    init(_ rawValue: Bool)
 // CHECK-NEXT:    init(rawValue: Bool)
 // CHECK-NEXT:    var rawValue: Bool
@@ -11,7 +11,7 @@
 // CHECK:       var No: Maybe { get }
 // CHECK:       var Yes: Maybe { get }
 
-// CHECK:       struct BinaryNumbers : Equatable, RawRepresentable {
+// CHECK:       struct BinaryNumbers : Hashable, Equatable, RawRepresentable {
 // CHECK-NEXT:    init(_ rawValue: Bool)
 // CHECK-NEXT:    init(rawValue: Bool)
 // CHECK-NEXT:	  var rawValue: Bool
@@ -31,7 +31,7 @@
 // CHECK:       struct WrapperStruct {
 // CHECK-NEXT:    init()
 // TODO: where is "A" and "B"? They should be member variables.
-// CHECK-NEXT:    struct InnerBoolEnum : Equatable, RawRepresentable {
+// CHECK-NEXT:    struct InnerBoolEnum : Hashable, Equatable, RawRepresentable {
 // CHECK-NEXT:      init(_ rawValue: Bool)
 // CHECK-NEXT:      init(rawValue: Bool)
 // CHECK-NEXT:      var rawValue: Bool
