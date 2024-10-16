@@ -208,9 +208,9 @@ ERROR(error_unable_to_load_supplementary_output_file_map, none,
       (StringRef, StringRef))
 
 ERROR(error_missing_entry_in_supplementary_output_file_map, none,
-      "supplementary output file map '%0' is missing an entry for '%1' "
+      "supplementary output file map '%0' is missing an entry for '%1' contents: '%2'"
       "(this likely indicates a compiler issue; " SWIFT_BUG_REPORT_MESSAGE ")",
-      (StringRef, StringRef))
+      (StringRef, StringRef, StringRef))
 
 ERROR(error_repl_requires_no_input_files,none,
       "REPL mode requires no input files", ())

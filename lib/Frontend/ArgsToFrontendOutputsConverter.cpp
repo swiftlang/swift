@@ -672,10 +672,13 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
         const TypeToPathMap *mapForInput =
             OFM->getOutputMapForInput(input.getFileName());
         if (!mapForInput) {
+          llvm::SmallString<128> t;
+          llvm::raw_svector_ostream os(t);
+          OFM->dump(os);
           Diags.diagnose(
               SourceLoc(),
               diag::error_missing_entry_in_supplementary_output_file_map,
-              supplementaryFileMapPath, input.getFileName());
+              supplementaryFileMapPath, input.getFileName(), os.str());
           hadError = true;
         }
         outputPaths.push_back(createFromTypeToPathMap(mapForInput));
