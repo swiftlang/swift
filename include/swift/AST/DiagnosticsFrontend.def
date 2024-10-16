@@ -438,7 +438,6 @@ NOTE(compiled_module_ignored_reason,none,
      "compiled module '%0' was ignored because %select{%error"
      "|it belongs to a framework in the SDK"
      "|loading from module interfaces is preferred"
-     "|it's a compiler host module"
      "|the module name is blocklisted,"
      "|the default is to load from module interfaces}1",
      (StringRef, unsigned))
