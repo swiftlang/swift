@@ -18,6 +18,15 @@ struct SWIFT_NONESCAPABLE View {
     View(const View&) = default;
 private:
     const int *member;
+    friend struct OtherView;
+};
+
+struct SWIFT_NONESCAPABLE OtherView {
+    OtherView() : member(nullptr) {}
+    OtherView(View v [[clang::lifetimebound]]) : member(v.member) {}
+    OtherView(const OtherView&) = default;
+private:
+    const int *member;
 };
 
 struct Owner {
@@ -76,6 +85,7 @@ private:
 // CHECK: sil [clang Owner.handOutView2] {{.*}} : $@convention(cxx_method) (View, @in_guaranteed Owner) -> @lifetime(borrow 1) @autoreleased View
 // CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@guaranteed View, @guaranteed View) -> @lifetime(copy 0, copy 1) @autoreleased View
 // CHECK: sil [clang View.init] {{.*}} : $@convention(c) () -> @lifetime(immortal) @out View
+// CHECK: sil [clang OtherView.init] {{.*}} : $@convention(c) (@guaranteed View) -> @lifetime(copy 0) @out OtherView
 
 //--- test.swift
 
@@ -91,4 +101,5 @@ public func test() {
     let _ = o.handOutView2(v1)
     let _ = getViewFromEither(v1, v2)
     let defaultView = View()
+    let _ = OtherView(defaultView)
 }
