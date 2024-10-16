@@ -223,7 +223,14 @@ bool ElementUseCollector::collectContainerUses(SILValue boxValue) {
         return false;
       continue;
     }
-
+    if (auto *md = dyn_cast<MarkDependenceInst>(user)) {
+      // Another value depends on the current in-memory value. Consider that a
+      // load.
+      if (md->getBase() == ui->get()) {
+        Uses.emplace_back(user, PMOUseKind::DependenceBase);
+        continue;
+      }
+    }
     // Other uses of the container are considered escapes of the underlying
     // value.
     //
@@ -456,6 +463,23 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
     // We don't care about debug instructions.
     if (User->isDebugInstruction())
       continue;
+
+    if (auto *md = dyn_cast<MarkDependenceInst>(User)) {
+      if (md->getBase() == UI->get()) {
+        Uses.emplace_back(User, PMOUseKind::DependenceBase);
+        continue;
+      }
+      SILValue value = md->getValue();
+      assert(value == UI->get() && "missing mark_dependence use");
+      // A mark_dependence creates a new dependent value in the same memory
+      // location. Analogous to a load + init.
+      Uses.emplace_back(User, PMOUseKind::Load);
+      Uses.emplace_back(User, PMOUseKind::Initialization);
+      if (!collectUses(md))
+        return false;
+
+      continue;
+    }
 
     // Otherwise, the use is something complicated, it escapes.
     Uses.emplace_back(User, PMOUseKind::Escape);

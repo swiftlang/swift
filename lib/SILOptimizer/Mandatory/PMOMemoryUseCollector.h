@@ -122,6 +122,9 @@ enum PMOUseKind {
   /// An indirect 'in' parameter of an Apply instruction.
   IndirectIn,
 
+  /// The base of a dependence.
+  DependenceBase,
+
   /// This instruction is a general escape of the value, e.g. a call to a
   /// closure that captures it.
   Escape,
