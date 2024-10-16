@@ -322,7 +322,8 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            bool FineGrainedTimers,
                                            bool TraceEvents,
                                            bool ProfileEvents,
-                                           bool ProfileEntities)
+                                           bool ProfileEntities,
+                                           bool PrintZeroStats)
   : UnifiedStatsReporter(ProgramName,
                          auxName(ModuleName,
                                  InputName,
@@ -331,7 +332,8 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                  OptType),
                          Directory,
                          SM, CSM, FineGrainedTimers,
-                         TraceEvents, ProfileEvents, ProfileEntities)
+                         TraceEvents, ProfileEvents, ProfileEntities,
+                         PrintZeroStats)
 {
 }
 
@@ -343,7 +345,8 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            bool FineGrainedTimers,
                                            bool TraceEvents,
                                            bool ProfileEvents,
-                                           bool ProfileEntities)
+                                           bool ProfileEntities,
+                                           bool PrintZeroStats)
   : currentProcessExitStatusSet(false),
     currentProcessExitStatus(EXIT_FAILURE),
     StatsFilename(Directory),
@@ -358,7 +361,8 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
     ClangSourceMgr(CSM),
     RecursiveTimers(std::make_unique<RecursionSafeTimers>()),
     FineGrainedTimers(FineGrainedTimers),
-    IsFlushingTracesAndProfiles(false)
+    IsFlushingTracesAndProfiles(false),
+    IsPrintingZeroStats(PrintZeroStats)
 {
   path::append(StatsFilename, makeStatsFileName(ProgramName, AuxName));
   path::append(TraceFilename, makeTraceFileName(ProgramName, AuxName));
@@ -430,7 +434,8 @@ UnifiedStatsReporter::publishAlwaysOnStatsToLLVM() {
 #define FRONTEND_STATISTIC(TY, NAME)                            \
     do {                                                        \
       static Statistic Stat = {#TY, #NAME, #NAME};              \
-      Stat = 0;                                                 \
+      if (IsPrintingZeroStats)                                  \
+        Stat = 0;                                               \
       Stat += (C).NAME;                                         \
     } while (0);
 #include "swift/Basic/Statistics.def"
@@ -441,7 +446,8 @@ UnifiedStatsReporter::publishAlwaysOnStatsToLLVM() {
 #define DRIVER_STATISTIC(NAME)                                       \
     do {                                                             \
       static Statistic Stat = {"Driver", #NAME, #NAME};              \
-      Stat = 0;                                                      \
+      if (IsPrintingZeroStats)                                       \
+        Stat = 0;                                                    \
       Stat += (C).NAME;                                              \
     } while (0);
 #include "swift/Basic/Statistics.def"
@@ -458,7 +464,7 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
     auto &C = getFrontendCounters();
 #define FRONTEND_STATISTIC(TY, NAME)                          \
     do {                                                      \
-      if (C.NAME) {                                           \
+      if (C.NAME || IsPrintingZeroStats) {                    \
         OS << delim << "\t\"" #TY "." #NAME "\": " << C.NAME; \
         delim = ",\n";                                        \
       }                                                       \
@@ -470,7 +476,7 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
     auto &C = getDriverCounters();
 #define DRIVER_STATISTIC(NAME)                                \
     do {                                                      \
-      if (C.NAME) {                                           \
+      if (C.NAME || IsPrintingZeroStats) {                    \
         OS << delim << "\t\"Driver." #NAME "\": " << C.NAME;  \
         delim = ",\n";                                        \
       }                                                       \

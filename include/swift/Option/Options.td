@@ -361,6 +361,9 @@ def driver_time_compilation : Flag<["-"], "driver-time-compilation">,
 def stats_output_dir: Separate<["-"], "stats-output-dir">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
   HelpText<"Directory to write unified compilation-statistics files to">;
+def print_zero_stats: Flag<["-"], "print-zero-stats">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Prints all stats even if they are zero">;
 def fine_grained_timers: Flag<["-"], "fine-grained-timers">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Enable per-request timers">;
