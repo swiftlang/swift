@@ -195,6 +195,11 @@ static unsigned computeSubelement(SILValue Pointer,
       continue;
     }
 
+    if (auto *MD = dyn_cast<MarkDependenceInst>(Pointer)) {
+      Pointer = MD->getValue();
+      continue;
+    }
+
     // This fails when we visit unchecked_take_enum_data_addr. We should just
     // add support for enums.
     assert(isa<InitExistentialAddrInst>(Pointer) &&
@@ -220,7 +225,7 @@ struct AvailableValue {
 
   /// If this gets too expensive in terms of copying, we can use an arena and a
   /// FrozenPtrSet like we do in ARC.
-  llvm::SmallSetVector<StoreInst *, 1> InsertionPoints;
+  llvm::SmallSetVector<SILInstruction *, 1> InsertionPoints;
 
   /// Just for updating.
   SmallVectorImpl<PMOMemoryUse> *Uses;
@@ -233,7 +238,7 @@ public:
   /// *NOTE* We assume that all available values start with a singular insertion
   /// point and insertion points are added by merging.
   AvailableValue(SILValue Value, unsigned SubElementNumber,
-                 StoreInst *InsertPoint)
+                 SILInstruction *InsertPoint)
       : Value(Value), SubElementNumber(SubElementNumber), InsertionPoints() {
     InsertionPoints.insert(InsertPoint);
   }
@@ -273,7 +278,7 @@ public:
   SILValue getValue() const { return Value; }
   SILType getType() const { return Value->getType(); }
   unsigned getSubElementNumber() const { return SubElementNumber; }
-  ArrayRef<StoreInst *> getInsertionPoints() const {
+  ArrayRef<SILInstruction *> getInsertionPoints() const {
     return InsertionPoints.getArrayRef();
   }
 
@@ -282,7 +287,7 @@ public:
     InsertionPoints.set_union(Other.InsertionPoints);
   }
 
-  void addInsertionPoint(StoreInst *si) & { InsertionPoints.insert(si); }
+  void addInsertionPoint(SILInstruction *i) & { InsertionPoints.insert(i); }
 
   AvailableValue emitStructExtract(SILBuilder &B, SILLocation Loc, VarDecl *D,
                                    unsigned SubElementNumber) const {
@@ -478,9 +483,21 @@ struct AvailableValueDataflowFixup: AvailableValueFixup {
   /// an invalid SILValue.
   SILValue getSingleOwnedValue(const AvailableValue &availableVal);
 
-  /// Fix ownership of inserted instructions and delete dead instructions.
+  // Verify ownership of promoted instructions in asserts builds or when
+  // -sil-verify-all is set.
+  //
+  // Clears insertedInsts.
+  void verifyOwnership(DeadEndBlocks &deBlocks);
+
+  // Fix ownership of inserted instructions and delete dead instructions.
+  //
+  // Clears insertedInsts.
   void fixupOwnership(InstructionDeleter &deleter,
                       DeadEndBlocks &deBlocks);
+
+  // Deletes all insertedInsts without fixing ownership.
+  // Clears insertedInsts.
+  void deleteInsertedInsts(InstructionDeleter &deleter);
 };
 
 } // end namespace
@@ -504,12 +521,24 @@ SILValue AvailableValueDataflowFixup::getSingleOwnedValue(
   if (value->getType().isTrivial(*value->getFunction())) {
     return value;
   }
-  ArrayRef<StoreInst *> insertPts = availableVal.getInsertionPoints();
+  ArrayRef<SILInstruction *> insertPts = availableVal.getInsertionPoints();
   if (insertPts.size() > 1)
     return SILValue();
   
   return SILBuilderWithScope(insertPts[0], &insertedInsts)
     .emitCopyValueOperation(insertPts[0]->getLoc(), value);
+}
+
+void AvailableValueDataflowFixup::verifyOwnership(DeadEndBlocks &deBlocks) {
+  for (auto *inst : insertedInsts) {
+    if (inst->isDeleted())
+      continue;
+
+    for (auto result : inst->getResults()) {
+      result.verifyOwnership(&deBlocks);
+    }
+  }
+  insertedInsts.clear();
 }
 
 // In OptimizationMode::PreserveAlloc, delete any inserted instructions that are
@@ -534,6 +563,17 @@ void AvailableValueDataflowFixup::fixupOwnership(InstructionDeleter &deleter,
       completion.completeOSSALifetime(
         result, OSSALifetimeCompletion::Boundary::Liveness);
     }
+  }
+  insertedInsts.clear();
+}
+
+void AvailableValueDataflowFixup::
+deleteInsertedInsts(InstructionDeleter  &deleter) {
+  for (auto *inst : insertedInsts) {
+    if (inst->isDeleted())
+      continue;
+    
+    deleter.forceDeleteWithUsers(inst);
   }
   insertedInsts.clear();
 }
@@ -617,7 +657,7 @@ SILValue AvailableValueAggregationFixup::mergeCopies(
     return eltVal;
   };
 
-  ArrayRef<StoreInst *> insertPts = availableVal.getInsertionPoints();
+  ArrayRef<SILInstruction *> insertPts = availableVal.getInsertionPoints();
   if (insertPts.size() == 1) {
     SILValue eltVal = emitValue(insertPts[0]);
     if (isFullyAvailable)
@@ -1415,8 +1455,8 @@ class AvailableValueDataflowContext {
   unsigned NumMemorySubElements;
 
   /// The set of uses that we are tracking. This is only here so we can update
-  /// when exploding copy_addr. It would be great if we did not have to store
-  /// this.
+  /// when exploding copy_addr and mark_dependence. It would be great if we did
+  /// not have to store this.
   SmallVectorImpl<PMOMemoryUse> &Uses;
 
   InstructionDeleter &deleter;
@@ -1449,6 +1489,10 @@ class AvailableValueDataflowContext {
   /// conservatively.
   bool HasAnyEscape = false;
 
+  /// When promoting load [copy], the original allocation must be
+  /// preserved. This introduced extra copies.
+  OptimizationMode optimizationMode;
+
 public:
   AvailableValueDataflowContext(AllocationInst *TheMemory,
                                 unsigned NumMemorySubElements,
@@ -1461,6 +1505,10 @@ public:
   // Return the SILType of the object in 'SrcAddr' and index of the first sub
   // element in that object.
   // If not all subelements are availab, return nullopt.
+  //
+  // Available value analysis can create dead owned casts. OSSA is invalid until
+  // the ownership chain is complete by replacing the uses of the loaded value
+  // and calling fixupOwnership().
   std::optional<LoadInfo>
   computeAvailableValues(SILValue SrcAddr, SILInstruction *Inst,
                          SmallVectorImpl<AvailableValue> &AvailableValues);
@@ -1473,9 +1521,17 @@ public:
   /// Explode a copy_addr, updating the Uses at the same time.
   void explodeCopyAddr(CopyAddrInst *CAI);
 
+  void verifyOwnership(DeadEndBlocks &deBlocks) {
+    ownershipFixup.verifyOwnership(deBlocks);
+  }
+  
   void fixupOwnership(InstructionDeleter &deleter,
                       DeadEndBlocks &deBlocks) {
     ownershipFixup.fixupOwnership(deleter, deBlocks);
+  }
+
+  void deleteInsertedInsts(InstructionDeleter &deleter) {
+    ownershipFixup.deleteInsertedInsts(deleter);
   }
 
 private:
@@ -1492,11 +1548,13 @@ private:
   /// StartingFrom. We only compute the values for set bits in \p
   /// RequiredElts. We return the vailable values in \p Result. If any available
   /// values were found, return true. Otherwise, return false.
-  bool computeAvailableValues(SILInstruction *StartingFrom,
-                              LoadInfo loadInfo,
-                              SmallBitVector &RequiredElts,
-                              SmallVectorImpl<AvailableValue> &Result);
-
+  ///
+  /// In OptimizationMode::PreserveAlloc, this may insert casts and copies to
+  /// propagate owned values.
+  bool computeAvailableElementValues(SILInstruction *StartingFrom,
+                                     LoadInfo loadInfo,
+                                     SmallBitVector &RequiredElts,
+                                     SmallVectorImpl<AvailableValue> &Result);
 
   void computeAvailableValuesFrom(
       SILBasicBlock::iterator StartingFrom, SILBasicBlock *BB,
@@ -1505,6 +1563,17 @@ private:
       llvm::SmallDenseMap<SILBasicBlock *, SmallBitVector, 32>
           &VisitedBlocks,
       SmallBitVector &ConflictingValues);
+
+  /// Promote a mark_dependence, updating the available values.
+  void updateMarkDependenceValues(
+    MarkDependenceInst *md,
+    SmallBitVector &RequiredElts,
+    SmallVectorImpl<AvailableValue> &Result,
+    llvm::SmallDenseMap<SILBasicBlock *, SmallBitVector, 32> &VisitedBlocks,
+    SmallBitVector &ConflictingValues);
+
+  SILValue createAvailableMarkDependence(MarkDependenceInst *md,
+                                         AvailableValue &availableVal);
 };
 
 } // end anonymous namespace
@@ -1516,7 +1585,7 @@ AvailableValueDataflowContext::AvailableValueDataflowContext(
     : TheMemory(InputTheMemory), NumMemorySubElements(NumMemorySubElements),
       Uses(InputUses), deleter(deleter),
       HasLocalDefinition(InputTheMemory->getFunction()),
-      HasLocalKill(InputTheMemory->getFunction()) {
+      HasLocalKill(InputTheMemory->getFunction()), optimizationMode(mode) {
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
   for (unsigned ui : indices(Uses)) {
@@ -1526,7 +1595,8 @@ AvailableValueDataflowContext::AvailableValueDataflowContext(
     // If we have a load...
     if (Use.Kind == PMOUseKind::Load) {
       // Skip load borrow use and open_existential_addr.
-      if (isa<LoadBorrowInst>(Use.Inst) || isa<OpenExistentialAddrInst>(Use.Inst))
+      if (isa<LoadBorrowInst>(Use.Inst) ||
+          isa<OpenExistentialAddrInst>(Use.Inst))
         continue;
 
       // That is not a load take, continue. Otherwise, stash the load [take].
@@ -1549,9 +1619,17 @@ AvailableValueDataflowContext::AvailableValueDataflowContext(
         continue;
       }
 
+      // mark_dependence of the dependent value is equivalent to take-init.
+      if (isa<MarkDependenceInst>(Use.Inst)) {
+        HasLocalKill.set(Use.Inst->getParent());
+        continue;
+      }
       llvm_unreachable("Unhandled SILInstructionKind for PMOUseKind::Load?!");
     }
-
+    if (Use.Kind == PMOUseKind::DependenceBase) {
+      // An address used as a dependence base does not affect load promotion.
+      continue;
+    }
     // Keep track of all the uses that aren't loads.
     NonLoadUses[Use.Inst] = ui;
     HasLocalDefinition.set(Use.Inst->getParent());
@@ -1608,7 +1686,8 @@ AvailableValueDataflowContext::computeAvailableValues(
   RequiredElts.set(*loadInfo.range().begin(), *loadInfo.range().end());
 
   // Find out if we have any available values.
-  if (!computeAvailableValues(Inst, loadInfo, RequiredElts, AvailableValues)) {
+  if (!computeAvailableElementValues(Inst, loadInfo, RequiredElts,
+                                     AvailableValues)) {
     return std::nullopt;
   }
   return loadInfo;
@@ -1674,7 +1753,7 @@ static inline void updateAvailableValuesHelper(
 
     // Otherwise, we found another insertion point for our available
     // value. Today this will always be a Store.
-    entry.addInsertionPoint(cast<StoreInst>(inst));
+    entry.addInsertionPoint(inst);
   }
 }
 
@@ -1792,6 +1871,34 @@ void AvailableValueDataflowContext::updateAvailableValues(
     }
   }
 
+  if (auto *MD = dyn_cast<MarkDependenceInst>(Inst)) {
+    unsigned StartSubElt = computeSubelement(MD->getValue(), TheMemory);
+    assert(StartSubElt != ~0U && "Store within enum projection not handled");
+    SILType ValTy = MD->getValue()->getType();
+
+    // Check if this mark_dependence provides any required values before
+    // potentially bailing out (because it is address-only).
+    bool AnyRequired = false;
+    for (unsigned i : range(getNumSubElements(
+             ValTy, getModule(), TypeExpansionContext(*MD->getFunction())))) {
+      // If this element is not required, don't fill it in.
+      AnyRequired = RequiredElts[StartSubElt+i];
+      if (AnyRequired) break;
+    }
+
+    // If this is a dependence that doesn't intersect the loaded subelements,
+    // just continue with an unmodified load mask.
+    if (!AnyRequired)
+      return;
+    
+    // If the mark_dependence is loadable, promote it.
+    if (MD->getValue()->getType().isLoadable(*MD->getFunction())) {
+      updateMarkDependenceValues(MD, RequiredElts, Result, VisitedBlocks,
+                                 ConflictingValues);
+      return;
+    }
+  }
+
   // TODO: inout apply's should only clobber pieces passed in.
 
   // Otherwise, this is some unknown instruction, conservatively assume that all
@@ -1801,7 +1908,7 @@ void AvailableValueDataflowContext::updateAvailableValues(
   return;
 }
 
-bool AvailableValueDataflowContext::computeAvailableValues(
+bool AvailableValueDataflowContext::computeAvailableElementValues(
     SILInstruction *StartingFrom, LoadInfo loadInfo,
     SmallBitVector &RequiredElts, SmallVectorImpl<AvailableValue> &Result) {
   llvm::SmallDenseMap<SILBasicBlock*, SmallBitVector, 32> VisitedBlocks;
@@ -2034,6 +2141,94 @@ void AvailableValueDataflowContext::explodeCopyAddr(CopyAddrInst *CAI) {
 
   // Next, remove the copy_addr itself.
   deleter.forceDelete(CAI);
+}
+
+/// Promote a mark_dependence instruction of a loadable type into a
+/// mark_dependence
+void AvailableValueDataflowContext::updateMarkDependenceValues(
+  MarkDependenceInst *md,
+  SmallBitVector &RequiredElts,
+  SmallVectorImpl<AvailableValue> &Result,
+  llvm::SmallDenseMap<SILBasicBlock *, SmallBitVector, 32> &VisitedBlocks,
+  SmallBitVector &ConflictingValues) {
+
+  // Recursively compute all currently required available values up to the
+  // mark_dependence, regardless of whether they are required for the
+  // mark_dependence.
+  computeAvailableValuesFrom(md->getIterator(), md->getParent(), RequiredElts,
+                             Result, VisitedBlocks, ConflictingValues);
+
+  unsigned firstMDElt = computeSubelement(md->getValue(), TheMemory);
+  // If address is an enum projection, we can't promote it since we don't track
+  // subelements in a type that could be changing.
+  if (firstMDElt == ~0U) {
+    RequiredElts.clear();
+    ConflictingValues = SmallBitVector(Result.size(), true);
+    return;
+  }
+  SILType valueTy = md->getValue()->getType().getObjectType();
+  unsigned numMDSubElements = getNumSubElements(
+    valueTy, getModule(), TypeExpansionContext(*TheMemory->getFunction()));
+
+  // Update each required subelement of the mark_dependence value.
+  for (unsigned subIdx = firstMDElt; subIdx < firstMDElt + numMDSubElements;
+       ++subIdx) {
+    // If the available value has a conflict, then AvailableValue still holds
+    // a value that was available on a different path. It cannot be used.
+    if (ConflictingValues[subIdx]) {
+      Result[subIdx] = {};
+      continue;
+    }
+    // If no value is available for this subelement, or it was never required,
+    // then no promotion happens.
+    if (auto &availableVal = Result[subIdx]) {
+      auto newMD = createAvailableMarkDependence(md, availableVal);
+      // Update the available value. This may invalidate the Result.
+      Result[subIdx] = AvailableValue(newMD, subIdx, md);
+    }
+  }
+}
+
+// Find or create a mark_dependence that is a promotion of 'md' for 'value'.
+// Return nullptr if the mark_dependence cannot be promoted.
+// This does not currently allow phi creation.
+SILValue AvailableValueDataflowContext::
+createAvailableMarkDependence(MarkDependenceInst *md,
+                              AvailableValue &availableVal) {
+  SILValue value = availableVal.getValue();
+  // If the allocation is replaced, no copies are created for promoted values
+  // and any promoted mark_dependence must be reused.
+  if (optimizationMode == OptimizationMode::ReplaceAlloc) {
+    auto mdIter = md->getIterator();
+    auto instBegin = md->getParentBlock()->begin();
+    while (mdIter != instBegin) {
+      --mdIter;
+      auto *newMD = dyn_cast<MarkDependenceInst>(&*mdIter);
+      if (!newMD)
+        break;
+
+      if (newMD->getValue() == value
+          && newMD->getBase() == md->getBase()
+          && newMD->dependenceKind() == md->dependenceKind()) {
+        return newMD;
+      }
+    }
+  } else {
+    // With OptimizationMode::PreserveAlloc, always create a new copy for each
+    // promoted value. This creates separate ownership, which is needed for each
+    // promoted load, and prevents reusing the mark_dependence later (via the
+    // code above) if the allocation is eliminated.
+    value = ownershipFixup.getSingleOwnedValue(availableVal);
+    if (!value)
+      return SILValue();
+  }
+  LLVM_DEBUG(llvm::dbgs() << "  -- Promoting mark_dependence: " << *md
+             << " source: " << value << "\n");
+  auto *newMD = SILBuilderWithScope(md)
+    .createMarkDependence(md->getLoc(), value, md->getBase(),
+                          md->dependenceKind());
+  ownershipFixup.insertedInsts.push_back(newMD);
+  return newMD;
 }
 
 bool AvailableValueDataflowContext::hasEscapedAt(SILInstruction *I) {
@@ -2418,14 +2613,17 @@ struct Promotions {
   SmallVector<AvailableValue, 32> allAvailableValues;
   PromotableInstructions loadTakes;
   PromotableInstructions destroys;
+  PromotableInstructions markDepBases;
 
   Promotions()
-      : loadTakes(allAvailableValues), destroys(allAvailableValues) {}
+      : loadTakes(allAvailableValues), destroys(allAvailableValues),
+        markDepBases(allAvailableValues) {}
 
 #ifndef NDEBUG
   void verify() {
     loadTakes.verify();
     destroys.verify();
+    markDepBases.verify();
   }
 #endif
 };
@@ -2493,10 +2691,17 @@ public:
 private:
   SILInstruction *collectUsesForPromotion();
 
+  /// Return true if a mark_dependence can be promoted. If so, this initializes
+  /// the available values in promotions.
+  bool canPromoteMarkDepBase(MarkDependenceInst *md);
+
   /// Return true if a load [take] or destroy_addr can be promoted. If so, this
   /// initializes the available values in promotions.
   bool canPromoteTake(SILInstruction *i,
                       PromotableInstructions &promotableInsts);
+
+  SILValue promoteMarkDepBase(MarkDependenceInst *md,
+                              ArrayRef<AvailableValue> availableValues);
 
   /// Promote a load take cleaning up everything except for RAUWing the
   /// instruction with the aggregated result. The routine returns the new
@@ -2510,6 +2715,8 @@ private:
                            ArrayRef<AvailableValue> availableValues);
   void promoteDestroyAddr(DestroyAddrInst *dai,
                           ArrayRef<AvailableValue> availableValues);
+
+  bool canRemoveDeadAllocation();
 
   void removeDeadAllocation();
 };
@@ -2530,6 +2737,17 @@ static bool isRemovableAutogeneratedAllocation(AllocationInst *TheMemory) {
 }
 
 bool OptimizeDeadAlloc::tryToRemoveDeadAllocation() {
+  if (!canRemoveDeadAllocation()) {
+    DataflowContext.deleteInsertedInsts(deleter);
+    return false;
+  }
+  removeDeadAllocation();
+  // Once the entire allocation is promoted, non of the instructions promoted
+  // during dataflow should need ownership fixup.
+  return true;
+}
+
+bool OptimizeDeadAlloc::canRemoveDeadAllocation() {
   assert(TheMemory->getFunction()->hasOwnership() &&
          "Can only eliminate dead allocations with ownership enabled");
   assert((isa<AllocBoxInst>(TheMemory) || isa<AllocStackInst>(TheMemory)) &&
@@ -2547,10 +2765,11 @@ bool OptimizeDeadAlloc::tryToRemoveDeadAllocation() {
     return false;
   }
 
-  SWIFT_DEFER { DataflowContext.fixupOwnership(deleter, deadEndBlocks); };
-
+  for (auto *md : promotions.markDepBases.instructions()) {
+    if (!canPromoteMarkDepBase(cast<MarkDependenceInst>(md)))
+      return false;
+  }
   if (isTrivial()) {
-    removeDeadAllocation();
     return true;
   }
   for (auto *load : promotions.loadTakes.instructions()) {
@@ -2565,6 +2784,11 @@ bool OptimizeDeadAlloc::tryToRemoveDeadAllocation() {
   // fix up lifetimes later if we need to.
   for (auto pmoMemUse : Uses) {
     if (pmoMemUse.Inst && pmoMemUse.Kind == PMOUseKind::Initialization) {
+      if (isa<MarkDependenceInst>(pmoMemUse.Inst)) {
+        // mark_dependence of the dependent value is considered both a load and
+        // an init use. They can simply be deleted when the allocation is dead.
+        continue;
+      }
       // Today if we promote, this is always a store, since we would have
       // blown up the copy_addr otherwise. Given that, always make sure we
       // clean up the src as appropriate after we optimize.
@@ -2584,7 +2808,6 @@ bool OptimizeDeadAlloc::tryToRemoveDeadAllocation() {
       valuesNeedingLifetimeCompletion.insert(src);
     }
   }
-  removeDeadAllocation();
   return true;
 }
 
@@ -2616,7 +2839,15 @@ SILInstruction *OptimizeDeadAlloc::collectUsesForPromotion() {
           continue;
         }
       }
+      if (auto *md = dyn_cast<MarkDependenceInst>(u.Inst)) {
+        // A mark_dependence source use does not prevent removal. The use
+        // collector already looks through them to find other uses.
+        continue;
+      }
       return u.Inst;
+    case PMOUseKind::DependenceBase:
+      promotions.markDepBases.push(u.Inst);
+      continue;
     case PMOUseKind::Initialization:
       if (!isa<ApplyInst>(u.Inst) &&
           // A copy_addr that is not a take affects the retain count
@@ -2647,6 +2878,27 @@ SILInstruction *OptimizeDeadAlloc::collectUsesForPromotion() {
     }
   }
   return nullptr;
+}
+
+bool OptimizeDeadAlloc::canPromoteMarkDepBase(MarkDependenceInst *md) {
+  SILValue srcAddr = md->getBase();
+  SmallVector<AvailableValue, 8> availableValues;
+  auto loadInfo =
+      DataflowContext.computeAvailableValues(srcAddr, md, availableValues);
+  if (!loadInfo.has_value())
+    return false;
+
+  unsigned index = promotions.markDepBases.initializeAvailableValues(
+      md, std::move(availableValues));
+
+  SILType baseTy = loadInfo->loadType;
+  if (auto *abi = dyn_cast<AllocBoxInst>(TheMemory)) {
+    if (baseTy == abi->getType()) {
+      baseTy = MemoryType.getObjectType();
+    }
+  }
+  return isFullyAvailable(baseTy, loadInfo->firstElt,
+                          promotions.markDepBases.availableValues(index));
 }
 
 /// Return true if we can promote the given destroy.
@@ -2689,6 +2941,12 @@ bool OptimizeDeadAlloc::canPromoteTake(
 }
 
 void OptimizeDeadAlloc::removeDeadAllocation() {
+  for (auto idxVal : llvm::enumerate(promotions.markDepBases.instructions())) {
+    auto *md = cast<MarkDependenceInst>(idxVal.value());
+    auto vals = promotions.markDepBases.availableValues(idxVal.index());
+    promoteMarkDepBase(md, vals);
+  }
+
   // If our memory is trivially typed, we can just remove it without needing to
   // consider if the stored value needs to be destroyed. So at this point,
   // delete the memory!
@@ -2770,6 +3028,7 @@ void OptimizeDeadAlloc::removeDeadAllocation() {
   // If it is safe to remove, do it.  Recursively remove all instructions
   // hanging off the allocation instruction, then return success.
   deleter.forceDeleteWithUsers(TheMemory);
+  DataflowContext.verifyOwnership(deadEndBlocks);
 
   // Now look at all of our available values and complete any of their
   // post-dominating consuming use sets. This can happen if we have an enum that
@@ -2793,6 +3052,23 @@ void OptimizeDeadAlloc::removeDeadAllocation() {
     LLVM_DEBUG(v->dump());
     completion.completeOSSALifetime(v, boundary);
   }
+}
+
+SILValue OptimizeDeadAlloc::promoteMarkDepBase(
+    MarkDependenceInst *md, ArrayRef<AvailableValue> availableValues) {
+
+  LLVM_DEBUG(llvm::dbgs() << "  *** Promoting mark_dependence base: " << *md);
+  SILBuilderWithScope B(md);
+  SILValue dependentValue = md->getValue();
+  for (auto &availableValue : availableValues) {
+    dependentValue =
+        B.createMarkDependence(md->getLoc(), dependentValue,
+                               availableValue.getValue(), md->dependenceKind());
+  }
+  LLVM_DEBUG(llvm::dbgs() << "      To value: " << dependentValue);
+  md->replaceAllUsesWith(dependentValue);
+  deleter.deleteIfDead(md);
+  return dependentValue;
 }
 
 SILValue
