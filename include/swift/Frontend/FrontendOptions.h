@@ -232,6 +232,9 @@ public:
   /// runtime overhead.
   bool FineGrainedTimers = false;
 
+  /// Whether we are printing all stats even if they are zero.
+  bool PrintZeroStats = false;
+
   /// Trace changes to stats to files in StatsOutputDir.
   bool TraceStats = false;
 
