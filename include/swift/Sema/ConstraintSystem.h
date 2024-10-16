@@ -2955,15 +2955,6 @@ public:
     return nullptr;
   }
 
-  TypeBase* getFavoredType(Expr *E) {
-    assert(E != nullptr);
-    return this->FavoredTypes[E];
-  }
-  void setFavoredType(Expr *E, TypeBase *T) {
-    assert(E != nullptr);
-    this->FavoredTypes[E] = T;
-  }
-
   /// Set the type in our type map for the given node, and record the change
   /// in the trail.
   ///
