@@ -93,31 +93,6 @@ struct FieldDescriptorBase {
   getFieldRecords() = 0;
 };
 
-// There are no longer any clients of this interface, but we
-// need to keep this stubbed out until all the
-// implementors have been removed.  In particular, LLDB
-// still implements this interface.
-// TODO: Delete this after Swift 6.0 ships
-struct MultiPayloadEnumDescriptorBase {
-  virtual ~MultiPayloadEnumDescriptorBase(){ abort(); };
-
-  virtual llvm::StringRef getMangledTypeName() { abort(); };
-
-  virtual uint32_t getContentsSizeInWords() const { abort(); };
-
-  virtual size_t getSizeInBytes() const { abort(); };
-
-  virtual uint32_t getFlags() const { abort(); };
-
-  virtual bool usesPayloadSpareBits() const { abort(); };
-
-  virtual uint32_t getPayloadSpareBitMaskByteOffset() const { abort(); };
-
-  virtual uint32_t getPayloadSpareBitMaskByteCount() const { abort(); };
-
-  virtual const uint8_t *getPayloadSpareBits() const { abort(); };
-};
-
 /// Interface for finding type descriptors. Implementors may provide descriptors
 /// that live inside or outside reflection metadata.
 struct DescriptorFinder {
@@ -129,10 +104,6 @@ struct DescriptorFinder {
 
   virtual std::unique_ptr<FieldDescriptorBase>
   getFieldDescriptor(const TypeRef *TR) = 0;
-
-  // TODO: Delete this as soon as LLDB no longer attempts to override it
-  virtual std::unique_ptr<MultiPayloadEnumDescriptorBase>
-  getMultiPayloadEnumDescriptor(const TypeRef *TR) { abort(); };
 };
 
 } // namespace reflection
