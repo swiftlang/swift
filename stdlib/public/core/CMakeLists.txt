@@ -154,6 +154,9 @@ split_embedded_sources(
   EMBEDDED Slice.swift
   EMBEDDED SmallString.swift
   EMBEDDED Sort.swift
+  EMBEDDED Span/RawSpan.swift
+  EMBEDDED Span/Span.swift
+  EMBEDDED Span/StdlibSpanExtensions.swift
   EMBEDDED StaticString.swift
   EMBEDDED StaticPrint.swift
   EMBEDDED Stride.swift
@@ -315,6 +318,10 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Macros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "FreestandingMacros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Extern")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BitwiseCopyable")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "NonescapableTypes")
+
+# FIXME: This appears borken.
+list(APPEND swift_stdlib_compile_flags "-no-verify-emitted-module-interface")
 
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   set(swift_bin_dir "${CMAKE_BINARY_DIR}/bin")
