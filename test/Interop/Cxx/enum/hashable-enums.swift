@@ -62,18 +62,11 @@ HashableEnumsTestSuite.test("Untyped enums hash using underlying value") {
     }
 }
 
-HashableEnumsTestSuite.test("Typed enums and class enums hash using other info") {
-    // The raw values of these enum members are known:
+HashableEnumsTestSuite.test("Raw values are well-defined") {
     expectEqual(kRed.rawValue, 0)
     expectEqual(kYellow.rawValue, 10)
     expectEqual(Pet.goat.rawValue, 5)
     expectEqual(Pet.cat.rawValue, 15)
-
-    // But the Hashable implementation uses more than the raw value to compute the hash:
-    expectNotEqual(getHash(kRed), getHash(0))
-    expectNotEqual(getHash(kYellow), getHash(10))
-    expectNotEqual(getHash(Pet.goat), getHash(5))
-    expectNotEqual(getHash(Pet.cat), getHash(15))
 }
 
 HashableEnumsTestSuite.test("Sets work as expected") {

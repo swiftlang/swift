@@ -153,6 +153,11 @@ bb0(%1 : $Int):
 
 class SomeClass {}
 
+struct SomeClassPair {
+  var x: SomeClass
+  var y: SomeClass
+}
+
 sil @getSomeClass : $@convention(thin) () -> @owned SomeClass
 
 
