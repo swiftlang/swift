@@ -107,8 +107,6 @@ private:
 
   bool canUseFromInline(SILFunction *func);
 
-  bool shouldSerialize(SILFunction *F);
-
   void serializeFunction(SILFunction *function,
                    const FunctionFlags &canSerializeFlags);
 
@@ -510,9 +508,33 @@ bool CrossModuleOptimization::canSerializeFunction(
       return false;
   }
 
-  // Ask the heuristic.
-  if (!shouldSerialize(function))
+  if (function->hasSemanticsAttr("optimize.no.crossmodule"))
     return false;
+
+  // If package-cmo is enabled, we don't want to limit inlining
+  // or should at least increase the size limit.
+  bool skipSizeLimitCheck = isPackageCMOEnabled(M.getSwiftModule());
+
+  if (!conservative) {
+    // The basic heuristic: serialize all generic functions, because it makes a
+    // huge difference if generic functions can be specialized or not.
+    if (function->getLoweredFunctionType()->isPolymorphic())
+      skipSizeLimitCheck = true;
+    if (function->getLinkage() == SILLinkage::Shared)
+      skipSizeLimitCheck = true;
+  }
+
+  if (!skipSizeLimitCheck) {
+    // Also serialize "small" non-generic functions.
+    int size = 0;
+    for (SILBasicBlock &block : *function) {
+      for (SILInstruction &inst : block) {
+        size += (int)instructionInlineCost(inst);
+        if (size >= CMOFunctionSizeLimit)
+          return false;
+      }
+    }
+  }
 
   // Check if any instruction prevents serializing the function.
   InstructionVisitor visitor(*function, *this, InstructionVisitor::VisitMode::DetectSerializableInst);
@@ -764,45 +786,6 @@ bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
   case SILLinkage::PackageExternal:
     break;
   }
-  return true;
-}
-
-/// Decide whether to serialize a function.
-bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
-  // Check if we already handled this function before.
-  if (isSerializedWithRightKind(M, function))
-    return false;
-
-  if (everything)
-    return true;
-
-  if (function->hasSemanticsAttr("optimize.no.crossmodule"))
-    return false;
-
-  if (!conservative) {
-    // The basic heuristic: serialize all generic functions, because it makes a
-    // huge difference if generic functions can be specialized or not.
-    if (function->getLoweredFunctionType()->isPolymorphic())
-      return true;
-
-    if (function->getLinkage() == SILLinkage::Shared)
-      return true;
-  }
-
-  // If package-cmo is enabled, we don't want to limit inlining
-  // or should at least increase the cap.
-  if (!M.getSwiftModule()->serializePackageEnabled()) {
-    // Also serialize "small" non-generic functions.
-    int size = 0;
-    for (SILBasicBlock &block : *function) {
-      for (SILInstruction &inst : block) {
-        size += (int)instructionInlineCost(inst);
-        if (size >= CMOFunctionSizeLimit)
-          return false;
-      }
-    }
-  }
-
   return true;
 }
 
