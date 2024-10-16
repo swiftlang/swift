@@ -522,6 +522,7 @@ createStatsReporter(const llvm::opt::InputArgList *ArgList,
                                                  false,
                                                  false,
                                                  false,
+                                                 false,
                                                  false);
 }
 
