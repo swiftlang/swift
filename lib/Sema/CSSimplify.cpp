@@ -10834,7 +10834,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       }
     }
 
-    generateConstraints(
+    generateOverloadConstraints(
         candidates, memberTy, result.ViableCandidates, useDC, locator,
         result.getFavoredIndex(), /*requiresFix=*/false,
         [&](unsigned, const OverloadChoice &choice) {
@@ -10861,7 +10861,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
           allFromConditionalConformances(*this, baseTy,
                                          result.ViableCandidates);
 
-      generateConstraints(
+      generateOverloadConstraints(
           candidates, memberTy, outerAlternatives, useDC, locator, std::nullopt,
           /*requiresFix=*/!treatAsViable,
           [&](unsigned, const OverloadChoice &) {
@@ -10875,7 +10875,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   if (!result.UnviableCandidates.empty()) {
     // Generate constraints for unavailable choices if they have a fix,
     // and disable them by default, they'd get picked up in the "salvage" mode.
-    generateConstraints(
+    generateOverloadConstraints(
         candidates, memberTy, result.UnviableCandidates, useDC, locator,
         /*favoredChoice=*/std::nullopt, /*requiresFix=*/true,
         [&](unsigned idx, const OverloadChoice &choice) {
@@ -11286,8 +11286,10 @@ ConstraintSystem::simplifyValueWitnessConstraint(
     return fail();
 
   auto choice = OverloadChoice(resolvedBaseType, witness.getDecl(), functionRefKind);
-  resolveOverload(getConstraintLocator(locator), memberType, choice,
-                  useDC);
+
+  auto *locatorPtr = getConstraintLocator(locator);
+  auto preparedChoice = getPreparedOverload(locatorPtr, choice);
+  resolveOverload(locatorPtr, memberType, preparedChoice, useDC);
   return SolutionKind::Solved;
 }
 
@@ -11516,10 +11518,9 @@ static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
     // Find the opened type for this callee and substitute in the type
     // parameters.
     auto substitutions = cs.getOpenedTypes(calleeLocator);
-    if (!substitutions.empty()) {
-      OpenedTypeMap replacements(substitutions.begin(), substitutions.end());
-      builderType = cs.openType(builderType, replacements, locator);
-    }
+    if (!substitutions.empty())
+      builderType = cs.openType(builderType, substitutions, locator);
+
     assert(!builderType->hasTypeParameter());
   }
   return builderType;
@@ -16032,7 +16033,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         constraint.getFirstType(), constraint.getSecondType(),
         constraint.getThirdType(), std::nullopt, constraint.getLocator());
 
-  case ConstraintKind::BindOverload:
+  case ConstraintKind::BindOverload: {
     if (auto *fix = constraint.getFix()) {
       // TODO(diagnostics): Impact should be associated with a fix unless
       // it's a contextual problem, then only solver can decide what the impact
@@ -16043,10 +16044,12 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         return SolutionKind::Error;
     }
 
-    resolveOverload(constraint.getLocator(), constraint.getFirstType(),
-                    constraint.getOverloadChoice(),
-                    constraint.getOverloadUseDC());
+    auto locator = constraint.getLocator();
+    auto preparedChoice = constraint.getPreparedOverloadChoice();
+    resolveOverload(locator, constraint.getFirstType(),
+                    preparedChoice, constraint.getOverloadUseDC());
     return SolutionKind::Solved;
+  }
 
   case ConstraintKind::SubclassOf:
     return simplifySubclassOfConstraint(constraint.getFirstType(),

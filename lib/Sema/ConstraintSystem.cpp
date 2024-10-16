@@ -1184,13 +1184,14 @@ void ConstraintSystem::addOverloadSet(Type boundType,
                                       std::optional<unsigned> favoredIndex) {
   // If there is a single choice, add the bind overload directly.
   if (choices.size() == 1) {
-    addBindOverloadConstraint(boundType, choices.front(), locator, useDC);
+    auto preparedChoice = getPreparedOverload(locator, choices.front());
+    resolveOverload(locator, boundType, preparedChoice, useDC);
     return;
   }
 
   SmallVector<Constraint *, 4> candidates;
-  generateConstraints(candidates, boundType, choices, useDC, locator,
-                      favoredIndex);
+  generateOverloadConstraints(candidates, boundType, choices, useDC, locator,
+                              favoredIndex);
   // For an overload set (disjunction) from newly generated candidates.
   addOverloadSet(candidates, locator);
 }
@@ -3815,7 +3816,7 @@ Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
   return conformance.getTypeWitnessByName(type, cs.getASTContext().Id_RawValue);
 }
 
-void ConstraintSystem::generateConstraints(
+void ConstraintSystem::generateOverloadConstraints(
     SmallVectorImpl<Constraint *> &constraints, Type type,
     ArrayRef<OverloadChoice> choices, DeclContext *useDC,
     ConstraintLocator *locator, std::optional<unsigned> favoredIndex,
@@ -3831,10 +3832,9 @@ void ConstraintSystem::generateConstraints(
     if (requiresFix && !fix)
       return;
 
-    auto *choice = fix ? Constraint::createFixedChoice(*this, type, overload,
-                                                       useDC, fix, locator)
-                       : Constraint::createBindOverload(*this, type, overload,
-                                                        useDC, locator);
+    auto preparedOverload = getPreparedOverload(locator, overload);
+    auto *choice = Constraint::createBindOverload(*this, type, preparedOverload,
+                                                  useDC, fix, locator);
 
     if (isFavored)
       choice->setFavored();

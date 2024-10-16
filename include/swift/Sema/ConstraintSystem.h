@@ -1189,13 +1189,6 @@ struct Score {
   }
 };
 
-/// Describes a dependent type that has been opened to a particular type
-/// variable.
-using OpenedType = std::pair<GenericTypeParamType *, TypeVariableType *>;
-
-using OpenedTypeMap =
-    llvm::DenseMap<GenericTypeParamType *, TypeVariableType *>;
-
 /// Describes the information about a case label item that needs to be tracked
 /// within the constraint system.
 struct CaseLabelItemInfo {
@@ -2075,14 +2068,6 @@ struct ClosureIsolatedByPreconcurrency {
   bool operator()(const ClosureExpr *expr) const;
 };
 
-/// Determine whether the given expression is part of the left-hand side
-/// of an assignment expression.
-struct IsInLeftHandSideOfAssignment {
-  ConstraintSystem &cs;
-
-  bool operator()(Expr *expr) const;
-};
-
 /// Describes the type produced when referencing a declaration.
 struct DeclReferenceType {
   /// The "opened" type, which is the type of the declaration where any
@@ -2908,6 +2893,10 @@ public:
   ArrayRef<Type> getAlternativeLiteralTypes(KnownProtocolKind kind,
                                             SmallVectorImpl<Type> &scratch);
 
+  /// Create a new type variable without adding it to the constraint system.
+  TypeVariableType *createTypeVariableImpl(ConstraintLocator *locator,
+                                           unsigned options);
+
   /// Create a new type variable.
   TypeVariableType *createTypeVariable(ConstraintLocator *locator,
                                        unsigned options);
@@ -3731,13 +3720,6 @@ public:
                                Type first, Type second,
                                ConstraintLocatorBuilder locator);
 
-  /// Add a constraint that binds an overload set to a specific choice.
-  void addBindOverloadConstraint(Type boundTy, OverloadChoice choice,
-                                 ConstraintLocator *locator,
-                                 DeclContext *useDC) {
-    resolveOverload(locator, boundTy, choice, useDC);
-  }
-
   /// Add a value member constraint to the constraint system.
   void addValueMemberConstraint(Type baseTy, DeclNameRef name, Type memberTy,
                                 DeclContext *useDC,
@@ -4222,7 +4204,8 @@ public:
   /// \returns The opened type.
   Type openUnboundGenericType(GenericTypeDecl *decl, Type parentTy,
                               ConstraintLocatorBuilder locator,
-                              bool isTypeResolution);
+                              bool isTypeResolution,
+                              bool shouldRecordOpenedTypes=true);
 
   /// Replace placeholder types with fresh type variables, and unbound generic
   /// types with bound generic types whose generic args are fresh type
@@ -4232,7 +4215,8 @@ public:
   ///
   /// \returns The converted type.
   Type replaceInferableTypesWithTypeVars(Type type,
-                                         ConstraintLocatorBuilder locator);
+                                         ConstraintLocatorBuilder locator,
+                                         bool shouldRecordOpenedTypes=true);
 
   /// "Open" the given type by replacing any occurrences of generic
   /// parameter types and dependent member types with fresh type variables.
@@ -4242,7 +4226,7 @@ public:
   ///                     corresponding opened type variables.
   ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
-  Type openType(Type type, OpenedTypeMap &replacements,
+  Type openType(Type type, ArrayRef<OpenedType> replacements,
                 ConstraintLocatorBuilder locator);
 
   /// "Open" an opaque archetype type, similar to \c openType.
@@ -4253,7 +4237,7 @@ public:
   /// opening its pattern and shape types and connecting them to the
   /// aforementioned variable via special constraints.
   Type openPackExpansionType(PackExpansionType *expansion,
-                             OpenedTypeMap &replacements,
+                             ArrayRef<OpenedType> replacements,
                              ConstraintLocatorBuilder locator);
 
   /// Update OpenedPackExpansionTypes and record a change in the trail.
@@ -4281,34 +4265,32 @@ public:
   /// \param replacements The mapping from opened types to the type
   /// variables to which they were opened.
   ///
-  /// \param outerDC The generic context containing the declaration.
-  ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
   FunctionType *openFunctionType(AnyFunctionType *funcType,
                                  ConstraintLocatorBuilder locator,
-                                 OpenedTypeMap &replacements,
-                                 DeclContext *outerDC);
+                                 ArrayRef<OpenedType> replacements);
 
-  /// Open the generic parameter list and its requirements,
-  /// creating type variables for each of the type parameters.
-  void openGeneric(DeclContext *outerDC,
-                   GenericSignature signature,
-                   ConstraintLocatorBuilder locator,
-                   OpenedTypeMap &replacements);
+  /// Open the generic parameter list, creating type variables for each of the
+  /// type parameters, but does not add the type variables to the constraint
+  /// system. That is done by introduceGenericParameters().
+  ArrayRef<OpenedType> openGenericParameters(GenericSignature signature,
+                                             ConstraintLocatorBuilder locator);
 
-  /// Open the generic parameter list creating type variables for each of the
-  /// type parameters.
-  void openGenericParameters(DeclContext *outerDC,
-                             GenericSignature signature,
-                             OpenedTypeMap &replacements,
-                             ConstraintLocatorBuilder locator);
+  /// Introduce the type variables from a list of opened generic parameters into
+  /// the constraint system.
+  void introduceGenericParameters(ArrayRef<OpenedType> replacements);
 
   /// Open a generic parameter into a type variable and record
   /// it in \c replacements.
-  TypeVariableType *openGenericParameter(DeclContext *outerDC,
-                                         GenericTypeParamType *parameter,
-                                         OpenedTypeMap &replacements,
+  TypeVariableType *openGenericParameter(GenericTypeParamType *parameter,
                                          ConstraintLocatorBuilder locator);
+
+  /// Open the generic parameter list and its requirements,
+  /// creating type variables for each of the type parameters.
+  void openGenericRequirements(DeclContext *outerDC,
+                               GenericSignature signature,
+                               ConstraintLocatorBuilder locator,
+                               ArrayRef<OpenedType> replacements);
 
   /// Given generic signature open its generic requirements,
   /// using substitution function, and record them in the
@@ -4334,8 +4316,7 @@ public:
   /// Record the set of opened types for the given locator.
   void recordOpenedTypes(
          ConstraintLocatorBuilder locator,
-         const OpenedTypeMap &replacements,
-         bool fixmeAllowDuplicates=false);
+         ArrayRef<OpenedType> replacements);
 
   /// Check whether the given type conforms to the given protocol and if
   /// so return a valid conformance reference.
@@ -4346,7 +4327,7 @@ public:
   FunctionType *adjustFunctionTypeForConcurrency(
       FunctionType *fnType, Type baseType, ValueDecl *decl, DeclContext *dc,
       unsigned numApplies, bool isMainDispatchQueue,
-      OpenedTypeMap &replacements, ConstraintLocatorBuilder locator);
+      ArrayRef<OpenedType> replacements, ConstraintLocatorBuilder locator);
 
   /// Retrieve the type of a reference to the given value declaration.
   ///
@@ -4361,6 +4342,13 @@ public:
                           ValueDecl *decl,
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
+                          DeclContext *useDC);
+
+  DeclReferenceType getTypeOfReference(
+                          ValueDecl *decl,
+                          FunctionRefKind functionRefKind,
+                          ConstraintLocatorBuilder locator,
+                          ArrayRef<OpenedType> replacements,
                           DeclContext *useDC);
 
   /// Return the type-of-reference of the given value.
@@ -4381,45 +4369,12 @@ public:
                                   bool wantInterfaceType = false,
                                   bool adjustForPreconcurrency = true);
 
-  /// Return the type-of-reference of the given value.
-  ///
-  /// \param baseType if non-null, return the type of a member reference to
-  ///   this value when the base has the given type
-  ///
-  /// \param UseDC The context of the access.  Some variables have different
-  ///   types depending on where they are used.
-  ///
-  /// \param locator The locator anchored at this value reference, when
-  /// it is a member reference.
-  ///
-  /// \param wantInterfaceType Whether we want the interface type, if available.
-  ///
-  /// \param getType Optional callback to extract a type for given declaration.
-  static Type
-  getUnopenedTypeOfReference(
-      VarDecl *value, Type baseType, DeclContext *UseDC,
-      llvm::function_ref<Type(VarDecl *)> getType,
-      ConstraintLocator *locator,
-      bool wantInterfaceType = false,
-      bool adjustForPreconcurrency = true,
-      llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType =
-        [](const AbstractClosureExpr *) {
-          return Type();
-        },
-      llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency =
-        [](const ClosureExpr *closure) {
-          return closure->isIsolatedByPreconcurrency();
-        },
-      llvm::function_ref<bool(Expr *)> isAssignTarget = [](Expr *) {
-        return false;
-      });
-
   /// Given the opened type and a pile of information about a member reference,
   /// determine the reference type of the member reference.
   Type getMemberReferenceTypeFromOpenedType(
       Type &openedType, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
       ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
-      OpenedTypeMap &replacements);
+      ArrayRef<OpenedType> replacements);
 
   /// Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
@@ -4434,8 +4389,12 @@ public:
   /// \returns a description of the type of this declaration reference.
   DeclReferenceType getTypeOfMemberReference(
       Type baseTy, ValueDecl *decl, DeclContext *useDC, bool isDynamicLookup,
+      FunctionRefKind functionRefKind, ConstraintLocator *locator);
+
+  DeclReferenceType getTypeOfMemberReference(
+      Type baseTy, ValueDecl *decl, DeclContext *useDC, bool isDynamicLookup,
       FunctionRefKind functionRefKind, ConstraintLocator *locator,
-      OpenedTypeMap *replacements = nullptr);
+      ArrayRef<OpenedType> replacements);
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
   /// with a type variable) at the given location.
@@ -4649,7 +4608,7 @@ public:
   /// \param getFix Optional callback to determine a fix for a given
   /// choice (first argument is a position of current choice,
   /// second - the choice in question).
-  void generateConstraints(
+  void generateOverloadConstraints(
       SmallVectorImpl<Constraint *> &constraints, Type type,
       ArrayRef<OverloadChoice> choices, DeclContext *useDC,
       ConstraintLocator *locator,
@@ -4852,9 +4811,12 @@ public:
   void recordResolvedOverload(ConstraintLocator *locator,
                               SelectedOverload choice);
 
+  PreparedOverloadChoice getPreparedOverload(ConstraintLocator *locator,
+                                             OverloadChoice choice);
+
   /// Resolve the given overload set to the given choice.
   void resolveOverload(ConstraintLocator *locator, Type boundType,
-                       OverloadChoice choice, DeclContext *useDC);
+                       PreparedOverloadChoice choice, DeclContext *useDC);
 
   /// Simplify a type, by replacing type variables with either their
   /// fixed types (if available) or their representatives.
@@ -5674,16 +5636,20 @@ public:
 class OpenUnboundGenericType {
   ConstraintSystem &cs;
   const ConstraintLocatorBuilder &locator;
+  bool shouldRecordOpenedTypes;
 
 public:
   explicit OpenUnboundGenericType(ConstraintSystem &cs,
                                   const ConstraintLocatorBuilder &locator)
-      : cs(cs), locator(locator) {}
+      : cs(cs), locator(locator), shouldRecordOpenedTypes(true) {}
 
   Type operator()(UnboundGenericType *unboundTy) const {
-    return cs.openUnboundGenericType(unboundTy->getDecl(),
-                                     unboundTy->getParent(), locator,
-                                     /*isTypeResolution=*/true);
+    auto result = cs.openUnboundGenericType(unboundTy->getDecl(),
+                                            unboundTy->getParent(), locator,
+                                            /*isTypeResolution=*/true,
+                                            shouldRecordOpenedTypes);
+    const_cast<OpenUnboundGenericType *>(this)->shouldRecordOpenedTypes = false;
+    return result;
   }
 };
 

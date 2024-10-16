@@ -103,7 +103,7 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
   if (openedTypes == OpenedTypes.end())
     return SubstitutionMap();
 
-  TypeSubstitutionMap subs;
+  SmallVector<Type, 4> replacementTypes;
   for (const auto &opened : openedTypes->second) {
     auto type = getFixedType(opened.second);
     if (opened.first->isParameterPack()) {
@@ -115,7 +115,7 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
       } else if (!type->is<PackType>())
         type = PackType::getSingletonPackExpansion(type);
     }
-    subs[opened.first] = type;
+    replacementTypes.push_back(type);
   }
 
   auto lookupConformanceFn =
@@ -141,7 +141,7 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
   };
 
   return SubstitutionMap::get(sig,
-                              QueryTypeSubstitutionMap{subs},
+                              replacementTypes,
                               lookupConformanceFn);
 }
 

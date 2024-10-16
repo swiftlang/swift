@@ -344,7 +344,10 @@ enum RememberChoice_t : bool {
 
 /// A constraint between two type variables.
 class Constraint final : public llvm::ilist_node<Constraint>,
-    private llvm::TrailingObjects<Constraint, TypeVariableType *> {
+    private llvm::TrailingObjects<Constraint,
+                                  TypeVariableType *,
+                                  ConstraintFix *,
+                                  PreparedOverloadChoice> {
   friend TrailingObjects;
 
   /// The kind of constraint.
@@ -353,8 +356,8 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// The kind of restriction placed on this constraint.
   ConversionRestrictionKind Restriction : 8;
 
-  /// The fix to be applied to the constraint before visiting it.
-  ConstraintFix *TheFix = nullptr;
+  /// Whether we have a fix.
+  unsigned HasFix : 1;
 
   /// Whether the \c Restriction field is valid.
   unsigned HasRestriction : 1;
@@ -438,9 +441,6 @@ class Constraint final : public llvm::ilist_node<Constraint>,
       /// The first type
       Type First;
 
-      /// The overload choice
-      OverloadChoice Choice;
-
       /// The DC in which the use appears.
       DeclContext *UseDC;
     } Overload;
@@ -490,7 +490,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a new overload-binding constraint, which might have a fix.
-  Constraint(Type type, OverloadChoice choice, DeclContext *useDC,
+  Constraint(Type type, PreparedOverloadChoice choice, DeclContext *useDC,
              ConstraintFix *fix, ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
@@ -512,6 +512,18 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// Retrieve the type variables buffer, for internal mutation.
   MutableArrayRef<TypeVariableType *> getTypeVariablesBuffer() {
     return { getTrailingObjects<TypeVariableType *>(), NumTypeVariables };
+  }
+
+  size_t numTrailingObjects(OverloadToken<TypeVariableType *>) const {
+    return NumTypeVariables;
+  }
+
+  size_t numTrailingObjects(OverloadToken<ConstraintFix *>) const {
+    return HasFix ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<PreparedOverloadChoice>) const {
+    return Kind == ConstraintKind::BindOverload ? 1 : 0;
   }
 
 public:
@@ -546,10 +558,10 @@ public:
       ValueDecl *requirement, DeclContext *useDC,
       FunctionRefKind functionRefKind, ConstraintLocator *locator);
 
-  /// Create an overload-binding constraint.
+  /// Create an overload-binding constraint, possibly with a fix.
   static Constraint *createBindOverload(ConstraintSystem &cs, Type type, 
-                                        OverloadChoice choice, 
-                                        DeclContext *useDC,
+                                        PreparedOverloadChoice choice,
+                                        DeclContext *useDC, ConstraintFix *fix,
                                         ConstraintLocator *locator);
 
   /// Create a restricted relational constraint.
@@ -562,13 +574,6 @@ public:
   static Constraint *createFixed(ConstraintSystem &cs, ConstraintKind kind,
                                  ConstraintFix *fix, Type first, Type second,
                                  ConstraintLocator *locator);
-
-  /// Create a bind overload choice with a fix.
-  /// Note: This constraint is going to be disabled by default.
-  static Constraint *createFixedChoice(ConstraintSystem &cs, Type type,
-                                       OverloadChoice choice,
-                                       DeclContext *useDC, ConstraintFix *fix,
-                                       ConstraintLocator *locator);
 
   /// Create a new disjunction constraint.
   static Constraint *createDisjunction(ConstraintSystem &cs,
@@ -616,7 +621,11 @@ public:
   }
 
   /// Retrieve the fix associated with this constraint.
-  ConstraintFix *getFix() const { return TheFix; }
+  ConstraintFix *getFix() const {
+    if (HasFix)
+      return *getTrailingObjects<ConstraintFix *>();
+    return nullptr;
+}
 
   /// Whether this constraint is active, i.e., in the worklist.
   bool isActive() const { return IsActive; }
@@ -847,9 +856,14 @@ public:
   }
 
   /// Retrieve the overload choice for an overload-binding constraint.
-  OverloadChoice getOverloadChoice() const {
+  const PreparedOverloadChoice &getPreparedOverloadChoice() const {
     assert(Kind == ConstraintKind::BindOverload);
-    return Overload.Choice;
+    return *getTrailingObjects<PreparedOverloadChoice>();
+  }
+
+  /// Retrieve the overload choice for an overload-binding constraint.
+  const OverloadChoice &getOverloadChoice() const {
+    return getPreparedOverloadChoice().getChoice();
   }
 
   /// Retrieve the DC in which the overload was used.
@@ -887,9 +901,6 @@ public:
 
   /// Retrieve the locator for this constraint.
   ConstraintLocator *getLocator() const { return Locator; }
-
-  /// Clone the given constraint.
-  Constraint *clone(ConstraintSystem &cs) const;
 
   /// Print constraint placed on type and constraint properties.
   ///
