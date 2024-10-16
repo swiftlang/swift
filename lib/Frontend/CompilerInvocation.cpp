@@ -2749,7 +2749,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                    Opts.EnableLifetimeDependenceDiagnostics);
 
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
-  Opts.VerifyAll |= CONDITIONAL_ASSERT_enabled();
   Opts.VerifyNone |= Args.hasArg(OPT_sil_verify_none);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
@@ -2770,7 +2769,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.DisableSILPartialApply |=
     Args.hasArg(OPT_disable_sil_partial_apply);
   Opts.VerifySILOwnership &= !Args.hasArg(OPT_disable_sil_ownership_verifier);
-  Opts.VerifySILOwnership |= CONDITIONAL_ASSERT_enabled();
   Opts.EnableDynamicReplacementCanCallPreviousImplementation = !Args.hasArg(
       OPT_disable_previous_implementation_calls_in_dynamic_replacements);
   Opts.ParseStdlib = FEOpts.ParseStdlib;
