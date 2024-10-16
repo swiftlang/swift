@@ -244,6 +244,8 @@ def update_single_repository(pool_args):
                 full_target = full_target_name('origin', checkout_target)
                 shell.run(['git', 'reset', '--hard', full_target],
                           echo=True, prefix=prefix)
+                shell.run(['git', 'status'],
+                          echo=True, prefix=prefix)
                 return
 
             # Query whether we have a "detached HEAD", which will mean that

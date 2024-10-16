@@ -1251,7 +1251,8 @@ function Build-SPMProject {
         "-Xbuild-tools-swiftc", "-I$SDKInstallRoot\usr\lib\swift",
         "-Xbuild-tools-swiftc", "-L$SDKInstallRoot\usr\lib\swift\windows",
         "-Xcc", "-I$SDKInstallRoot\usr\lib\swift",
-        "-Xlinker", "-L$SDKInstallRoot\usr\lib\swift\windows"
+        "-Xlinker", "-L$SDKInstallRoot\usr\lib\swift\windows",
+        "--verbose"
     )
     if ($DebugInfo) {
       if ($SwiftDebugFormat -eq "dwarf") {

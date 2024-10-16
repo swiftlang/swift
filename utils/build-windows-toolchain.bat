@@ -10,6 +10,8 @@
 
 setlocal enableextensions enabledelayedexpansion
 
+SET
+
 :: Work around CI invocation in vsdevcmd
 :: The build relies on build.ps1, which should not be called in a vs dev cmd
 if "%VSCMD_ARG_HOST_ARCH%"=="" goto Start
@@ -57,10 +59,10 @@ set TEMP=%BuildRoot%\tmp
 set TMP=%BuildRoot%\tmp
 set TMPDIR=%BuildRoot%\tmp
 
-set NINJA_STATUS=[%%f/%%t][%%p][%%es] 
+set NINJA_STATUS=[%%f/%%t][%%p][%%es]
 
 :: Build the -Test argument, if any, by subtracting skipped tests
-set TestArg=-Test lld,swift,dispatch,foundation,xctest,
+set TestArg=-Test lld,swift,dispatch,foundation,xctest,swift-format,
 for %%I in (%SKIP_TESTS%) do (call set TestArg=%%TestArg:%%I,=%%)
 if "%TestArg:~-1%"=="," (set TestArg=%TestArg:~0,-1%) else (set TestArg= )
 
