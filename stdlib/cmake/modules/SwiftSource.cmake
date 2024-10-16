@@ -629,10 +629,8 @@ function(_compile_swift_files
   list(APPEND swift_flags "-enable-experimental-feature" "SuppressedAssociatedTypes")
   list(APPEND swift_flags "-enable-experimental-feature" "SE427NoInferenceOnExtension")
   list(APPEND swift_flags "-enable-experimental-feature" "AllowUnsafeAttribute")
-
   list(APPEND swift_flags "-enable-experimental-feature" "NonescapableTypes")
-
-  list(APPEND swift_flags "-enable-experimental-feature" "ExtensionImportVisiblity")
+  list(APPEND swift_flags "-enable-experimental-feature" "MemberImportVisibility")
 
   if (SWIFT_STDLIB_ENABLE_STRICT_CONCURRENCY_COMPLETE)
     list(APPEND swift_flags "-strict-concurrency=complete")
