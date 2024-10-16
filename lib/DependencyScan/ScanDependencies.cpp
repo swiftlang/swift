@@ -996,7 +996,8 @@ computeTransitiveClosureOfExplicitDependencies(
 }
 
 static std::set<ModuleDependencyID> computeBridgingHeaderTransitiveDependencies(
-    const ModuleDependencyInfo &dep,
+    CompilerInstance &instance, const ModuleDependencyInfo &dep,
+    const std::set<ModuleDependencyID> &dependencies,
     const std::unordered_map<ModuleDependencyID, std::set<ModuleDependencyID>>
         &transitiveClosures,
     const ModuleDependenciesCache &cache) {
@@ -1004,6 +1005,27 @@ static std::set<ModuleDependencyID> computeBridgingHeaderTransitiveDependencies(
   auto *sourceDep = dep.getAsSwiftSourceModule();
   if (!sourceDep)
     return result;
+
+  if (instance.getInvocation()
+          .getClangImporterOptions()
+          .BridgingHeaderChaining) {
+    std::set<std::string> bridgingHeaderDeps;
+    bridgingHeaderDeps.insert(
+        sourceDep->textualModuleDetails.bridgingSourceFiles.begin(),
+        sourceDep->textualModuleDetails.bridgingSourceFiles.end());
+    for (auto &mod: dependencies) {
+      const auto &modDeps = cache.findKnownDependency(mod);
+      auto *binaryModule = modDeps.getAsSwiftBinaryModule();
+      if (!binaryModule)
+        continue;
+      if (!binaryModule->headerImport.empty() &&
+          !bridgingHeaderDeps.count(binaryModule->headerImport)) {
+        instance.getDiags().diagnose(
+            SourceLoc(), diag::error_missing_chained_header,
+            binaryModule->headerImport, mod.ModuleName);
+      }
+    }
+  }
 
   for (auto &dep : sourceDep->textualModuleDetails.bridgingModuleDependencies) {
     ModuleDependencyID modID{dep, ModuleDependencyKind::Clang};
@@ -1454,7 +1476,7 @@ static void resolveDependencyCommandLineArguments(
     std::optional<std::set<ModuleDependencyID>> bridgingHeaderDeps;
     if (modID.Kind == ModuleDependencyKind::SwiftSource)
       bridgingHeaderDeps = computeBridgingHeaderTransitiveDependencies(
-          deps, moduleTransitiveClosures, cache);
+          instance, deps, dependencyClosure, moduleTransitiveClosures, cache);
 
     if (auto E =
             resolveExplicitModuleInputs(modID, dependencyClosure, cache,

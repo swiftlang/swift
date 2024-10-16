@@ -552,9 +552,15 @@ bool ClangImporter::addHeaderDependencies(
     // Update the cache with the new information for the module.
     cache.updateDependency(moduleID, targetModule);
   } else if (targetModule.isSwiftBinaryModule()) {
+    // If requires chaining, the source module bridging header should contain
+    // this already.
+    if (Impl.SwiftContext.ClangImporterOpts.BridgingHeaderChaining)
+      return false;
+
     auto swiftBinaryDeps = targetModule.getAsSwiftBinaryModule();
     if (!swiftBinaryDeps->headerImport.empty()) {
-      auto clangModuleDependencies = scanHeaderDependencies(swiftBinaryDeps->headerImport);
+      auto clangModuleDependencies =
+          scanHeaderDependencies(swiftBinaryDeps->headerImport);
       if (!clangModuleDependencies)
         return true;
       // TODO: CAS will require a header include tree for this.

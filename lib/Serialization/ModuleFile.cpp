@@ -155,7 +155,10 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
     if (dependency.isHeader()) {
       // The path may be empty if the file being loaded is a partial AST,
       // and the current compiler invocation is a merge-modules step.
-      if (!dependency.Core.RawPath.empty()) {
+      // Else if bridging header chaining is required, no need to import
+      // anything as the header should be brought in by PCH or bridging header.
+      if (!dependency.Core.RawPath.empty() &&
+          !ctx.ClangImporterOpts.BridgingHeaderChaining) {
         bool hadError =
             clangImporter->importHeader(dependency.Core.RawPath,
                                         file->getParentModule(),
