@@ -437,14 +437,24 @@ BitMask RecordTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const
     // Mask the rest of the fields as usual...
     break;
   }
-  case RecordKind::ClassExistential:
-    // Class existential is a bunch of pointers that expose spare bits
-    // ... so we can fall through ...
+  case RecordKind::ClassExistential: {
+    // First pointer in a Class Existential is the class pointer
+    // itself, which can be tagged or have other mysteries on 64-bit, so
+    // it exposes no spare bits from the first word there...
+    auto pointerBytes = TC.targetPointerSize();
+    if (pointerBytes == 8) {
+      auto zeroPointerSizedMask = BitMask::zeroMask(pointerBytes);
+      mask.andMask(zeroPointerSizedMask, 0);
+    }
+    // Otherwise, it's the same as an Existential Metatype
+    DISPATCH_FALLTHROUGH;
+  }
   case RecordKind::ExistentialMetatype: {
-    // A bunch of pointers that expose spare bits
+    // All the pointers in an Existential Metatype expose spare bits...
+    auto pointerBytes = TC.targetPointerSize();
     auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
-    auto mpePointerSpareBitMask = BitMask(TC.targetPointerSize(), mpePointerSpareBits);
-    for (int offset = 0; offset < (int)getSize(); offset += TC.targetPointerSize()) {
+    auto mpePointerSpareBitMask = BitMask(pointerBytes, mpePointerSpareBits);
+    for (int offset = 0; offset < (int)getSize(); offset += pointerBytes) {
       mask.andMask(mpePointerSpareBitMask, offset);
     }
     return mask;

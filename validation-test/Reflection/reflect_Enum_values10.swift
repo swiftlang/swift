@@ -147,6 +147,30 @@ reflect(enumValue: Q2.e(C()))
 // CHECKALL-NEXT: (enum reflect_Enum_values10.Q2)
 // CHECKALL-NEXT: Value: .e(_)
 
+reflect(enumValue: Optional<Q2>.some(.a(C())))
+
+// CHECKALL: Reflecting an enum value.
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (bound_generic_enum Swift.Optional
+// CHECKALL-NEXT:   (enum reflect_Enum_values10.Q2))
+// CHECKALL-NEXT: Value: .some(.a(_))
+
+reflect(enumValue: Optional<Q2>.some(.e(C())))
+
+// CHECKALL: Reflecting an enum value.
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (bound_generic_enum Swift.Optional
+// CHECKALL-NEXT:   (enum reflect_Enum_values10.Q2))
+// CHECKALL-NEXT: Value: .some(.e(_))
+
+reflect(enumValue: Optional<Q2>.none)
+
+// CHECKALL: Reflecting an enum value.
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (bound_generic_enum Swift.Optional
+// CHECKALL-NEXT:   (enum reflect_Enum_values10.Q2))
+// CHECKALL-NEXT: Value: .none
+
 doneReflecting()
 
 // CHECKALL: Done.
