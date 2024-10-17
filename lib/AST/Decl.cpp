@@ -3815,8 +3815,6 @@ TypeRepr *ValueDecl::getResultTypeRepr() const {
     returnRepr = SD->getElementTypeRepr();
   } else if (auto *MD = dyn_cast<MacroDecl>(this)) {
     returnRepr = MD->resultType.getTypeRepr();
-  } else if (auto *CD = dyn_cast<ConstructorDecl>(this)) {
-    returnRepr = CD->getResultTypeRepr();
   }
 
   return returnRepr;
@@ -10585,23 +10583,18 @@ bool FuncDecl::isMainTypeMainMethod() const {
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                                  bool Failable, SourceLoc FailabilityLoc,
-                                 bool Async, SourceLoc AsyncLoc,
-                                 bool Throws, SourceLoc ThrowsLoc,
-                                 TypeLoc ThrownType,
+                                 bool Async, SourceLoc AsyncLoc, bool Throws,
+                                 SourceLoc ThrowsLoc, TypeLoc ThrownType,
                                  ParameterList *BodyParams,
                                  GenericParamList *GenericParams,
-                                 DeclContext *Parent, TypeRepr *ResultTyR)
-  : AbstractFunctionDecl(DeclKind::Constructor, Parent, Name, ConstructorLoc,
-                         Async, AsyncLoc, Throws, ThrowsLoc, ThrownType,
-                         /*HasImplicitSelfDecl=*/true,
-                         GenericParams),
-    FailabilityLoc(FailabilityLoc),
-    SelfDecl(nullptr)
-{
+                                 DeclContext *Parent)
+    : AbstractFunctionDecl(DeclKind::Constructor, Parent, Name, ConstructorLoc,
+                           Async, AsyncLoc, Throws, ThrowsLoc, ThrownType,
+                           /*HasImplicitSelfDecl=*/true, GenericParams),
+      FailabilityLoc(FailabilityLoc), SelfDecl(nullptr) {
   if (BodyParams)
     setParameters(BodyParams);
 
-  InitRetType = TypeLoc(ResultTyR);
   Bits.ConstructorDecl.HasStubImplementation = 0;
   Bits.ConstructorDecl.Failable = Failable;
 
@@ -10617,19 +10610,12 @@ ConstructorDecl *ConstructorDecl::createImported(
     GenericParamList *genericParams, DeclContext *parent) {
   void *declPtr = allocateMemoryForDecl<ConstructorDecl>(
       ctx, sizeof(ConstructorDecl), true);
-  auto ctor = ::new (declPtr)
-      ConstructorDecl(name, constructorLoc,
-                      failable, failabilityLoc, 
-                      async, asyncLoc,
-                      throws, throwsLoc, TypeLoc::withoutLoc(thrownType),
-                      bodyParams, genericParams, parent,
-                      /*LifetimeDependenceTypeRepr*/ nullptr);
+  auto ctor = ::new (declPtr) ConstructorDecl(
+      name, constructorLoc, failable, failabilityLoc, async, asyncLoc, throws,
+      throwsLoc, TypeLoc::withoutLoc(thrownType), bodyParams, genericParams,
+      parent);
   ctor->setClangNode(clangNode);
   return ctor;
-}
-
-void ConstructorDecl::setDeserializedResultTypeLoc(TypeLoc ResultTyR) {
-  InitRetType = ResultTyR;
 }
 
 bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
