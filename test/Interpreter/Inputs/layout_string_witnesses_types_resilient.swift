@@ -20,9 +20,10 @@ public struct GenericResilient<C, T> {
 }
 
 public struct GenericResilientWithUnmanagedAndWeak<T> {
-    public let x: T
+    public let b: Bool = false
     public unowned(unsafe) var y: AnyObject?
-    public let z: Int = 500
+    public let z: Bool = false
+    public let x: T
     public weak var w: AnyObject?
 
     public init(x: T) {
