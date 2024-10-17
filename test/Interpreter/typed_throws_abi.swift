@@ -78,6 +78,66 @@ func checkSync() async {
     // CHECK: Error: OneWord(x: 0)
     await invoke { try impl.g5(false) }
 
+    // CHECK: Success: ()
+    await invoke { try impl.h0(true) }
+    // CHECK: Error: TwoWords(x: 0, y: 0)
+    await invoke { try impl.h0(false) }
+
+    // CHECK: Success: 1
+    await invoke { try impl.h1(true) }
+    // CHECK: Error: TwoWords(x: 0, y: 0)
+    await invoke { try impl.h1(false) }
+
+    // CHECK: Success: (1, 2)
+    await invoke { try impl.h2(true) }
+    // CHECK: Error: TwoWords(x: 0, y: 0)
+    await invoke { try impl.h2(false) }
+
+    // CHECK: Success: (1, 2, 3)
+    await invoke { try impl.h3(true) }
+    // CHECK: Error: TwoWords(x: 0, y: 0)
+    await invoke { try impl.h3(false) }
+
+    // CHECK: Success: (1, 2, 3, 4)
+    await invoke { try impl.h4(true) }
+    // CHECK: Error: TwoWords(x: 0, y: 0)
+    await invoke { try impl.h4(false) }
+
+    // CHECK: Success: (1, 2, 3, 4, 5)
+    await invoke { try impl.h5(true) }
+    // CHECK: Error: TwoWords(x: 0, y: 0)
+    await invoke { try impl.h5(false) }
+
+    // CHECK: Success: ()
+    await invoke { try impl.i0(true) }
+    // CHECK: Error: ThreeWords(x: 0, y: 0, z: 0)
+    await invoke { try impl.i0(false) }
+
+    // CHECK: Success: 1
+    await invoke { try impl.i1(true) }
+    // CHECK: Error: ThreeWords(x: 0, y: 0, z: 0)
+    await invoke { try impl.i1(false) }
+
+    // CHECK: Success: (1, 2)
+    await invoke { try impl.i2(true) }
+    // CHECK: Error: ThreeWords(x: 0, y: 0, z: 0)
+    await invoke { try impl.i2(false) }
+
+    // CHECK: Success: (1, 2, 3)
+    await invoke { try impl.i3(true) }
+    // CHECK: Error: ThreeWords(x: 0, y: 0, z: 0)
+    await invoke { try impl.i3(false) }
+
+    // CHECK: Success: (1, 2, 3, 4)
+    await invoke { try impl.i4(true) }
+    // CHECK: Error: ThreeWords(x: 0, y: 0, z: 0)
+    await invoke { try impl.i4(false) }
+
+    // CHECK: Success: (1, 2, 3, 4, 5)
+    await invoke { try impl.i5(true) }
+    // CHECK: Error: ThreeWords(x: 0, y: 0, z: 0)
+    await invoke { try impl.i5(false) }
+
     // CHECK: Success: (1.0, 2.0)
     await invoke { try impl.nonMatching_f0(true) }
     // CHECK: Error: OneWord(x: 0)
@@ -150,6 +210,66 @@ func checkAsync() async {
     await invoke { try await impl.g5(true) }
     // CHECK: Error: OneWord(x: 0)
     await invoke { try await impl.g5(false) }
+
+    // CHECK: Success: ()
+    await invoke { try await impl.h0(true) }
+    // CHECK: Error: TwoWords(x: 0, y: 0)
+    await invoke { try await impl.h0(false) }
+
+    // CHECK: Success: 1
+    await invoke { try await impl.h1(true) }
+    // CHECK: Error: TwoWords(x: 0, y: 0)
+    await invoke { try await impl.h1(false) }
+
+    // CHECK: Success: (1, 2)
+    await invoke { try await impl.h2(true) }
+    // CHECK: Error: TwoWords(x: 0, y: 0)
+    await invoke { try await impl.h2(false) }
+
+    // CHECK: Success: (1, 2, 3)
+    await invoke { try await impl.h3(true) }
+    // CHECK: Error: TwoWords(x: 0, y: 0)
+    await invoke { try await impl.h3(false) }
+
+    // CHECK: Success: (1, 2, 3, 4)
+    await invoke { try await impl.h4(true) }
+    // CHECK: Error: TwoWords(x: 0, y: 0)
+    await invoke { try await impl.h4(false) }
+
+    // CHECK: Success: (1, 2, 3, 4, 5)
+    await invoke { try await impl.h5(true) }
+    // CHECK: Error: TwoWords(x: 0, y: 0)
+    await invoke { try await impl.h5(false) }
+
+    // CHECK: Success: ()
+    await invoke { try await impl.i0(true) }
+    // CHECK: Error: ThreeWords(x: 0, y: 0, z: 0)
+    await invoke { try await impl.i0(false) }
+
+    // CHECK: Success: 1
+    await invoke { try await impl.i1(true) }
+    // CHECK: Error: ThreeWords(x: 0, y: 0, z: 0)
+    await invoke { try await impl.i1(false) }
+
+    // CHECK: Success: (1, 2)
+    await invoke { try await impl.i2(true) }
+    // CHECK: Error: ThreeWords(x: 0, y: 0, z: 0)
+    await invoke { try await impl.i2(false) }
+
+    // CHECK: Success: (1, 2, 3)
+    await invoke { try await impl.i3(true) }
+    // CHECK: Error: ThreeWords(x: 0, y: 0, z: 0)
+    await invoke { try await impl.i3(false) }
+
+    // CHECK: Success: (1, 2, 3, 4)
+    await invoke { try await impl.i4(true) }
+    // CHECK: Error: ThreeWords(x: 0, y: 0, z: 0)
+    await invoke { try await impl.i4(false) }
+
+    // CHECK: Success: (1, 2, 3, 4, 5)
+    await invoke { try await impl.i5(true) }
+    // CHECK: Error: ThreeWords(x: 0, y: 0, z: 0)
+    await invoke { try await impl.i5(false) }
 
     // CHECK: Success: (1.0, 2.0)
     await invoke { try await impl.nonMatching_f0(true) }
