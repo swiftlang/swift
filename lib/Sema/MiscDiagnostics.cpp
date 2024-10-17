@@ -4110,8 +4110,16 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
 
       // If this is a parameter explicitly marked 'var', remove it.
       if (FixItLoc.isInvalid()) {
+        bool suggestCaseLet = false;
+        if (auto *stmt = var->getRecursiveParentPatternStmt()) {
+          // Suggest 'var' -> 'case let' conversion
+          // in case of 'for' loop and invalid because it's
+          // tuple variable.
+          suggestCaseLet = isa<ForEachStmt>(stmt);
+        }
+
         Diags.diagnose(var->getLoc(), diag::variable_never_mutated,
-                       var->getName(), true);
+                       var->getName(), true, suggestCaseLet ? "case let": "let");
       }
       else {
         bool suggestLet = true;
@@ -4123,7 +4131,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         }
 
         auto diag = Diags.diagnose(var->getLoc(), diag::variable_never_mutated,
-                                   var->getName(), suggestLet);
+                                   var->getName(), suggestLet, "let");
 
         if (suggestLet)
           diag.fixItReplace(FixItLoc, "let");
