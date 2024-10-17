@@ -32,6 +32,9 @@ endif()
 if (SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
   list(APPEND swift_stdlib_unittest_modules "_StringProcessing")
 endif()
+if (SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS)
+  list(APPEND swift_stdlib_unittest_modules "_PointerBounds")
+endif()
 
 add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the

@@ -2094,6 +2094,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
+                if [[ "${SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS:BOOL=$(true_false "${SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS}")
+                    )
+                fi
+
                 # SWIFT_THREADING_PACKAGE can be:
                 #
                 #    - Empty
