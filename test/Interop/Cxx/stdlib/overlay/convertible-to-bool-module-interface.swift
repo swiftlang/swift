@@ -10,3 +10,6 @@
 
 // CHECK: struct DualOverloadBoolBox : CxxConvertibleToBool {
 // CHECK: }
+
+// CHECK: struct ExplicitBoolBox : CxxConvertibleToBool {
+// CHECK: }
