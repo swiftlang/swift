@@ -125,18 +125,12 @@ lookupNestedClangTypeDecl(const clang::CXXRecordDecl *clangDecl,
 
 static clang::TypeDecl *
 getIteratorCategoryDecl(const clang::CXXRecordDecl *clangDecl) {
-  clang::IdentifierInfo *iteratorCategoryDeclName =
-      &clangDecl->getASTContext().Idents.get("iterator_category");
-  auto iteratorCategories = clangDecl->lookup(iteratorCategoryDeclName);
-  // If this is a templated typedef, Clang might have instantiated several
-  // equivalent typedef decls. If they aren't equivalent, Clang has already
-  // complained about this. Let's assume that they are equivalent. (see
-  // filterNonConflictingPreviousTypedefDecls in clang/Sema/SemaDecl.cpp)
-  if (iteratorCategories.empty())
-    return nullptr;
-  auto iteratorCategory = iteratorCategories.front();
+  return lookupNestedClangTypeDecl(clangDecl, "iterator_category");
+}
 
-  return dyn_cast_or_null<clang::TypeDecl>(iteratorCategory);
+static clang::TypeDecl *
+getIteratorConceptDecl(const clang::CXXRecordDecl *clangDecl) {
+  return lookupNestedClangTypeDecl(clangDecl, "iterator_concept");
 }
 
 static ValueDecl *lookupOperator(NominalTypeDecl *decl, Identifier id,
@@ -435,35 +429,40 @@ void swift::conformToCxxIteratorIfNeeded(
   if (!iteratorCategory)
     return;
 
+  auto unwrapUnderlyingTypeDecl =
+      [](clang::TypeDecl *typeDecl) -> clang::CXXRecordDecl * {
+    clang::CXXRecordDecl *underlyingDecl = nullptr;
+    if (auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(typeDecl)) {
+      auto type = typedefDecl->getUnderlyingType();
+      underlyingDecl = type->getAsCXXRecordDecl();
+    } else {
+      underlyingDecl = dyn_cast<clang::CXXRecordDecl>(typeDecl);
+    }
+    if (underlyingDecl) {
+      underlyingDecl = underlyingDecl->getDefinition();
+    }
+    return underlyingDecl;
+  };
+
   // If `iterator_category` is a typedef or a using-decl, retrieve the
   // underlying struct decl.
-  clang::CXXRecordDecl *underlyingCategoryDecl = nullptr;
-  if (auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(iteratorCategory)) {
-    auto type = typedefDecl->getUnderlyingType();
-    underlyingCategoryDecl = type->getAsCXXRecordDecl();
-  } else {
-    underlyingCategoryDecl = dyn_cast<clang::CXXRecordDecl>(iteratorCategory);
-  }
-  if (underlyingCategoryDecl) {
-    underlyingCategoryDecl = underlyingCategoryDecl->getDefinition();
-  }
-
+  auto underlyingCategoryDecl = unwrapUnderlyingTypeDecl(iteratorCategory);
   if (!underlyingCategoryDecl)
     return;
 
-  auto isIteratorCategoryDecl = [&](const clang::CXXRecordDecl *base,
-                                    StringRef tag) {
+  auto isIteratorTagDecl = [&](const clang::CXXRecordDecl *base,
+                               StringRef tag) {
     return base->isInStdNamespace() && base->getIdentifier() &&
            base->getName() == tag;
   };
   auto isInputIteratorDecl = [&](const clang::CXXRecordDecl *base) {
-    return isIteratorCategoryDecl(base, "input_iterator_tag");
+    return isIteratorTagDecl(base, "input_iterator_tag");
   };
   auto isRandomAccessIteratorDecl = [&](const clang::CXXRecordDecl *base) {
-    return isIteratorCategoryDecl(base, "random_access_iterator_tag");
+    return isIteratorTagDecl(base, "random_access_iterator_tag");
   };
   auto isContiguousIteratorDecl = [&](const clang::CXXRecordDecl *base) {
-    return isIteratorCategoryDecl(base, "contiguous_iterator_tag"); // C++20
+    return isIteratorTagDecl(base, "contiguous_iterator_tag"); // C++20
   };
 
   // Traverse all transitive bases of `underlyingDecl` to check if
@@ -471,17 +470,11 @@ void swift::conformToCxxIteratorIfNeeded(
   bool isInputIterator = isInputIteratorDecl(underlyingCategoryDecl);
   bool isRandomAccessIterator =
       isRandomAccessIteratorDecl(underlyingCategoryDecl);
-  bool isContiguousIterator = isContiguousIteratorDecl(underlyingCategoryDecl);
   underlyingCategoryDecl->forallBases([&](const clang::CXXRecordDecl *base) {
     if (isInputIteratorDecl(base)) {
       isInputIterator = true;
     }
     if (isRandomAccessIteratorDecl(base)) {
-      isRandomAccessIterator = true;
-      isInputIterator = true;
-    }
-    if (isContiguousIteratorDecl(base)) {
-      isContiguousIterator = true;
       isRandomAccessIterator = true;
       isInputIterator = true;
       return false;
@@ -491,6 +484,27 @@ void swift::conformToCxxIteratorIfNeeded(
 
   if (!isInputIterator)
     return;
+
+  bool isContiguousIterator = false;
+  // In C++20, `std::contiguous_iterator_tag` is specified as a type called
+  // `iterator_concept`. It is not possible to detect a contiguous iterator
+  // based on its `iterator_category`. The type might not have an
+  // `iterator_concept` defined.
+  if (auto iteratorConcept = getIteratorConceptDecl(clangDecl)) {
+    if (auto underlyingConceptDecl =
+            unwrapUnderlyingTypeDecl(iteratorConcept)) {
+      isContiguousIterator = isContiguousIteratorDecl(underlyingConceptDecl);
+      if (!isContiguousIterator)
+        underlyingConceptDecl->forallBases(
+            [&](const clang::CXXRecordDecl *base) {
+              if (isContiguousIteratorDecl(base)) {
+                isContiguousIterator = true;
+                return false;
+              }
+              return true;
+            });
+    }
+  }
 
   // Check if present: `var pointee: Pointee { get }`
   auto pointeeId = ctx.getIdentifier("pointee");

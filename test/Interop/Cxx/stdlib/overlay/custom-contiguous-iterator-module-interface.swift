@@ -26,3 +26,10 @@
 // CHECK:   typealias Pointee = Int32
 // CHECK:   typealias Distance = Int32
 // CHECK: }
+
+// CHECK: struct HasNoContiguousIteratorConcept : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
+// CHECK:   func successor() -> HasNoContiguousIteratorConcept
+// CHECK:   var pointee: Int32
+// CHECK:   typealias Pointee = Int32
+// CHECK:   typealias Distance = Int32
+// CHECK: }
