@@ -16,6 +16,7 @@ add_swift_target_library(swiftObservation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
   Locking.cpp
   Locking.swift
   Observable.swift
+  ObservableValues.swift
   ObservationRegistrar.swift
   ObservationTracking.swift
   ThreadLocal.cpp
