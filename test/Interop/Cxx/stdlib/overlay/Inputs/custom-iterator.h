@@ -348,7 +348,8 @@ private:
   const int *value;
 
 public:
-  using iterator_category = std::contiguous_iterator_tag;
+  using iterator_category = std::random_access_iterator_tag;
+  using iterator_concept = std::contiguous_iterator_tag;
   using value_type = int;
   using pointer = int *;
   using reference = const int &;
@@ -403,7 +404,8 @@ private:
 
 public:
   struct CustomTag : std::contiguous_iterator_tag {};
-  using iterator_category = CustomTag;
+  using iterator_category = std::random_access_iterator_tag;
+  using iterator_concept = CustomTag;
   using value_type = int;
   using pointer = int *;
   using reference = const int &;
@@ -458,7 +460,8 @@ private:
   int *value;
 
 public:
-  using iterator_category = std::contiguous_iterator_tag;
+  using iterator_category = std::random_access_iterator_tag;
+  using iterator_concept = std::contiguous_iterator_tag;
   using value_type = int;
   using pointer = int *;
   using reference = const int &;
@@ -504,6 +507,63 @@ public:
     return value == other.value;
   }
   bool operator!=(const MutableContiguousIterator &other) const {
+    return value != other.value;
+  }
+};
+
+/// This is actually just a random access iterator
+struct HasNoContiguousIteratorConcept {
+private:
+  const int *value;
+
+public:
+  using iterator_category = std::contiguous_iterator_tag;
+  // no iterator_concept
+  using value_type = int;
+  using pointer = int *;
+  using reference = const int &;
+  using difference_type = int;
+
+  HasNoContiguousIteratorConcept(const int *value) : value(value) {}
+  HasNoContiguousIteratorConcept(const HasNoContiguousIteratorConcept &other) =
+      default;
+
+  const int &operator*() const { return *value; }
+
+  HasNoContiguousIteratorConcept &operator++() {
+    value++;
+    return *this;
+  }
+  HasNoContiguousIteratorConcept operator++(int) {
+    auto tmp = HasNoContiguousIteratorConcept(value);
+    value++;
+    return tmp;
+  }
+
+  void operator+=(difference_type v) { value += v; }
+  void operator-=(difference_type v) { value -= v; }
+  HasNoContiguousIteratorConcept operator+(difference_type v) const {
+    return HasNoContiguousIteratorConcept(value + v);
+  }
+  HasNoContiguousIteratorConcept operator-(difference_type v) const {
+    return HasNoContiguousIteratorConcept(value - v);
+  }
+  friend HasNoContiguousIteratorConcept
+  operator+(difference_type v, const HasNoContiguousIteratorConcept &it) {
+    return it + v;
+  }
+  int operator-(const HasNoContiguousIteratorConcept &other) const {
+    return value - other.value;
+  }
+
+  bool operator<(const HasNoContiguousIteratorConcept &other) const {
+    return value < other.value;
+  }
+
+  bool operator==(const HasNoContiguousIteratorConcept &other) const {
+    return value == other.value;
+  }
+  bool operator!=(const HasNoContiguousIteratorConcept &other) const {
     return value != other.value;
   }
 };
