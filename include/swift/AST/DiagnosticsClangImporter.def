@@ -289,5 +289,8 @@ NOTE(forward_declared_protocol_clashes_with_imported_objc_Swift_protocol, none,
      "its name conflicts with a %1 in module %2",
      (const clang::NamedDecl*, StringRef, StringRef))
 
+WARNING(return_escapable_with_lifetimebound, none, "the returned type '%0' is annotated as escapable; it cannot have lifetime dependencies", (StringRef))
+WARNING(return_nonescapable_without_lifetimebound, none, "the returned type '%0' is annotated as non-escapable; its lifetime dependencies must be annotated", (StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
