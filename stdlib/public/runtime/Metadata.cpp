@@ -2865,7 +2865,7 @@ void swift::swift_initStructMetadataWithLayoutString(
         writer.writeBytes(tagAndOffset);
         previousFieldOffset = fieldType->size - sizeof(uintptr_t);
       } else {
-        previousFieldOffset += fieldType->size;
+        previousFieldOffset = offset + fieldType->size;
       }
 
       fullOffset += fieldType->size;
