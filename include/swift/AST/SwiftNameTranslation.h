@@ -67,7 +67,7 @@ StringRef
 getNameForCxx(const ValueDecl *VD,
               CustomNamesOnly_t customNamesOnly = objc_translation::Normal);
 
-enum RepresentationKind { Representable, Unsupported };
+enum RepresentationKind { Representable, ObjCxxOnly, Unsupported };
 
 enum RepresentationError {
   UnrepresentableObjC,

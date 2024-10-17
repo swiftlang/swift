@@ -86,8 +86,7 @@
 // CHECK:  SWIFT_INLINE_THUNK void append(const String& other)
 // CHECK:  SWIFT_INLINE_THUNK UTF8View getUtf8() const SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT:  SWIFT_INLINE_THUNK void setUtf8(const UTF8View& newValue) SWIFT_SYMBOL({{.*}});
-// CHECK:  #if defined(__OBJC__)
-// CHECK-NEXT:  SWIFT_INLINE_THUNK operator NSString * _Nonnull () const noexcept {
+// CHECK:  SWIFT_INLINE_THUNK operator NSString * _Nonnull () const noexcept {
 // CHECK-NEXT:    return (__bridge_transfer NSString *)(_impl::$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF(_impl::swift_interop_passDirect_Swift_String(_getOpaquePointer())));
 // CHECK-NEXT:   }
 // CHECK-NEXT:  static SWIFT_INLINE_THUNK String init(NSString * _Nonnull nsString) noexcept {
@@ -97,7 +96,7 @@
 // CHECK-NEXT:  return result;
 // CHECK-NEXT:  }
 // CHECK-EMPTY:
-// CHECK-NEXT:  #endif
+// CHECK-NEXT:  #endif // defined(__OBJC__)
 // CHECK-NEXT: #define SWIFT_CXX_INTEROP_STRING_MIXIN
 
 // CHECK-NEXT: #pragma clang diagnostic push

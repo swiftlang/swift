@@ -34,6 +34,7 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
@@ -1046,6 +1047,7 @@ private:
     auto result = methodTy->getResult();
     if (result->isUninhabited())
       return getASTContext().TheEmptyTupleType;
+
     return result;
   }
 
@@ -1493,8 +1495,6 @@ private:
       StringRef comment = "") {
     std::string cRepresentationString;
     llvm::raw_string_ostream cRepresentationOS(cRepresentationString);
-    cRepresentationOS << "SWIFT_EXTERN ";
-
     DeclAndTypeClangFunctionPrinter funcPrinter(
         cRepresentationOS, owningPrinter.prologueOS, owningPrinter.typeMapping,
         owningPrinter.interopContext, owningPrinter);
@@ -1528,6 +1528,8 @@ private:
       FD->getName().print(os);
     }
     os << "\n";
+    if (representation.isObjCxxOnly())
+      os << "#endif\n";
     return representation;
   }
 
@@ -1636,6 +1638,8 @@ private:
         /*typeDeclContext=*/nullptr, FD->getModuleContext(), resultTy,
         FD->getParameters(), funcTy->isThrowing(), funcTy);
     os << "}\n";
+    if (result.isObjCxxOnly())
+      os << "#endif\n";
   }
 
   enum class PrintLeadingSpace : bool {
@@ -2982,8 +2986,9 @@ void DeclAndTypePrinter::print(const Decl *D) {
   getImpl().print(D);
 }
 
-void DeclAndTypePrinter::print(Type ty) {
-  getImpl().print(ty, /*overridingOptionality*/ std::nullopt);
+void DeclAndTypePrinter::print(
+    Type ty, std::optional<OptionalTypeKind> overrideOptionalTypeKind) {
+  getImpl().print(ty, overrideOptionalTypeKind);
 }
 
 void DeclAndTypePrinter::printTypeName(raw_ostream &os, Type ty,
