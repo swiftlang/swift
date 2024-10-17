@@ -14,6 +14,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/NullablePtr.h"
@@ -671,7 +672,20 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
            RuntimeEffect::MetaData | RuntimeEffect::Existential;
 
   case SILInstructionKind::InitExistentialRefInst:
-    impactType = inst->getOperand(0)->getType();
+    impactType = cast<InitExistentialRefInst>(inst)->getType();
+    // Make sure to get a diagnostic error in embedded swift for class existentials
+    // where not all protocols of a composition are class bound. For example:
+    //   let existential: any ClassBound & NotClassBound = MyClass()
+    // In future we might support this case and then we can remove this check.
+    for (auto protoRef : cast<InitExistentialRefInst>(inst)->getConformances()) {
+      if (protoRef.isConcrete()) {
+        ProtocolConformance *conf = protoRef.getConcrete();
+        if (isa<NormalProtocolConformance>(conf) &&
+            !conf->getProtocol()->requiresClass()) {
+          return RuntimeEffect::MetaData | RuntimeEffect::Existential;
+        }
+      }
+    }
     return RuntimeEffect::MetaData | RuntimeEffect::ExistentialClassBound;
 
   case SILInstructionKind::InitExistentialMetatypeInst:
