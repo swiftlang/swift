@@ -48,3 +48,45 @@ func testNestedResilientObjc() {
 }
 
 testNestedResilientObjc()
+
+protocol P {}
+
+extension ObjCPrintOnDealloc: P {}
+
+enum MultiPayloadObjCExistential {
+    case x(AnyObject)
+    case y(P & ObjCPrintOnDealloc)
+}
+
+struct MultiPayloadObjCExistentialWrapper {
+    let x: MultiPayloadObjCExistential
+    let y: Int = 0
+}
+
+func testMultiPayloadObjCExistentialWrapper() {
+    let ptr = allocateInternalGenericPtr(of: NestedWrapper<MultiPayloadObjCExistentialWrapper>.self)
+
+    do {
+        let x = MultiPayloadObjCExistentialWrapper(x: .y(ObjCPrintOnDealloc()))
+        testGenericInit(ptr, to: x)
+    }
+
+    do {
+        let y = MultiPayloadObjCExistentialWrapper(x: .y(ObjCPrintOnDealloc()))
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: ObjCPrintOnDealloc deinitialized!
+        testGenericAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: ObjCPrintOnDealloc deinitialized!
+    testGenericDestroy(ptr, of: NestedWrapper<MultiPayloadObjCExistentialWrapper>.self)
+
+    ptr.deallocate()
+}
+
+testMultiPayloadObjCExistentialWrapper()
