@@ -1337,6 +1337,7 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
   bool distributedActorIsRemote = swift_distributed_actor_is_remote(this);
 
   auto oldState = _status().load(std::memory_order_relaxed);
+  SwiftDefensiveRetainRAII thisRetainHelper{this};
   while (true) {
     auto newState = oldState;
 
@@ -1366,6 +1367,16 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
     if (needsScheduling || needsStealer)
       taskExecutor = TaskExecutorRef::fromTaskExecutorPreference(job);
 
+    // In some cases (we aren't scheduling the actor and priorities don't
+    // match) then we need to access `this` after the enqueue. But the enqueue
+    // can cause the job to run and release `this`, so we need to retain `this`
+    // in those cases. The conditional here matches the conditions where we can
+    // get to the code below that uses `this`.
+    bool willSchedule = !oldState.isScheduled() && newState.isScheduled();
+    bool priorityMismatch = oldState.getMaxPriority() != newState.getMaxPriority();
+    if (!willSchedule && priorityMismatch)
+        thisRetainHelper.defensiveRetain();
+
     // This needs to be a store release so that we also publish the contents of
     // the new Job we are adding to the atomic job queue. Pairs with consume
     // in drainOne.
@@ -1373,8 +1384,12 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
                    /* success */ std::memory_order_release,
                    /* failure */ std::memory_order_relaxed)) {
       // NOTE: `job` is off limits after this point, as another thread might run
-      // and destroy it now that it's enqueued.
+      // and destroy it now that it's enqueued. `this` is only accessible if
+      // `retainedThis` is true.
+      job = nullptr; // Ensure we can't use it accidentally.
 
+      // NOTE: only the pointer value of `this` is used here, so this one
+      // doesn't need a retain.
       traceActorStateTransition(this, oldState, newState, distributedActorIsRemote);
 
       if (!oldState.isScheduled() && newState.isScheduled()) {
@@ -1385,6 +1400,9 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
       if (oldState.getMaxPriority() != newState.getMaxPriority()) {
+        // We still need `this`, assert that we did a defensive retain.
+        assert(thisRetainHelper.isRetained());
+
         if (newState.isRunning()) {
           // Actor is running on a thread, escalate the thread running it
           SWIFT_TASK_DEBUG_LOG("[Override] Escalating actor %p which is running on %#x to %#x priority", this, newState.currentDrainer(), priority);
@@ -1394,11 +1412,12 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
         } else {
           // We are scheduling a stealer for an actor due to priority override.
           // This extra processing job has a reference on the actor. See
-          // ownership rule (2).
+          // ownership rule (2). That means that we need to retain `this`, which
+          // we'll take from the retain helper.
+          thisRetainHelper.takeRetain();
           SWIFT_TASK_DEBUG_LOG(
               "[Override] Scheduling a stealer for actor %p at %#x priority",
               this, newState.getMaxPriority());
-          swift_retain(this);
 
           scheduleActorProcessJob(newState.getMaxPriority(), taskExecutor);
         }
