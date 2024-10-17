@@ -9,6 +9,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@_spi(ExperimentalLanguageFeatures)
 import SwiftSyntax
 import SwiftSyntaxMacros
 import SwiftDiagnostics
@@ -141,10 +142,21 @@ extension DistributedResolvableMacro {
         specificActorSystemRequirement = conformanceReq.rightType.trimmed
         isGenericStub = true
 
-      case .sameTypeRequirement(let sameTypeReq)
-           where sameTypeReq.leftType.isActorSystem:
-        specificActorSystemRequirement = sameTypeReq.rightType.trimmed
-        isGenericStub = false
+      case .sameTypeRequirement(let sameTypeReq):
+        switch sameTypeReq.leftType {
+        case .type(let type) where type.isActorSystem:
+          switch sameTypeReq.rightType.trimmed {
+          case .type(let rightType):
+            specificActorSystemRequirement = rightType
+            isGenericStub = false
+
+          case .expr:
+            fatalError("Expression type not supported for distributed actor")
+          }
+
+        default:
+          continue
+        }
 
       default:
         continue

@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 import ASTBridging
+
+@_spi(ExperimentalLanguageFeatures)
 import SwiftSyntax
 
 extension ASTGenVisitor {
@@ -72,8 +74,8 @@ extension ASTGenVisitor {
         return BridgedRequirementRepr(
           SeparatorLoc: self.generateSourceLoc(sameType.equal),
           Kind: .sameType,
-          FirstType: self.generate(type: sameType.leftType),
-          SecondType: self.generate(type: sameType.rightType)
+          FirstType: self.generate(sameTypeLeftType: sameType.leftType),
+          SecondType: self.generate(sameTypeRightType: sameType.rightType)
         )
       case .layoutRequirement(_):
         // FIXME: Implement layout requirement translation.
@@ -86,5 +88,118 @@ extension ASTGenVisitor {
       whereKeywordLoc: self.generateSourceLoc(node.whereKeyword),
       requirements: requirements.bridgedArray(in: self)
     )
+  }
+
+  func generate(sameTypeLeftType node: SameTypeRequirementSyntax.LeftType) -> BridgedTypeRepr {
+    switch node {
+    case .type(let type):
+      return self.generate(type: type)
+
+    // The only expressions same type left types support right now are
+    // integer literals, '123', and prefix operators for negative integer
+    // literals, '-123'.
+    case .expr(let expr):
+      switch expr.as(ExprSyntaxEnum.self) {
+      case .integerLiteralExpr(let node):
+        return self.generate(integerType: node)
+
+      case .prefixOperatorExpr(let node):
+        let op = node.operator
+
+        guard op.text == "-" else {
+          fatalError("Unknown prefix operator for same type left type")
+        }
+
+        guard case .integerLiteralExpr(let node) = node.expression.as(ExprSyntaxEnum.self) else {
+          fatalError("Unknown expression kind for same type left type")
+        }
+
+        return self.generate(integerType: node, minusLoc: self.generateSourceLoc(op))
+
+      default:
+        fatalError("Unknown expression kind for same type left type")
+      }
+    }
+  }
+
+  func generate(sameTypeRightType node: SameTypeRequirementSyntax.RightType) -> BridgedTypeRepr {
+    switch node {
+    case .type(let type):
+      return self.generate(type: type)
+
+    // The only expressions same type right types support right now are
+    // integer literals, '123', and prefix operators for negative integer
+    // literals, '-123'.
+    case .expr(let expr):
+      switch expr.as(ExprSyntaxEnum.self) {
+      case .integerLiteralExpr(let node):
+        return self.generate(integerType: node)
+
+      case .prefixOperatorExpr(let node):
+        let op = node.operator
+
+        guard op.text == "-" else {
+          fatalError("Unknown prefix operator for same type right type")
+        }
+
+        guard case .integerLiteralExpr(let node) = node.expression.as(ExprSyntaxEnum.self) else {
+          fatalError("Unknown expression kind for same type right type")
+        }
+
+        return self.generate(integerType: node, minusLoc: self.generateSourceLoc(op))
+
+      default:
+        fatalError("Unknown expression kind for same type right type")
+      }
+    }
+  }
+
+  func generate(genericArgument node: GenericArgumentSyntax.Argument) -> BridgedTypeRepr {
+    switch node {
+    case .type(let type):
+      return self.generate(type: type)
+
+    // The only expressions generic argument types support right now are
+    // integer literals, '123', and prefix operators for negative integer
+    // literals, '-123'.
+    case .expr(let expr):
+      switch expr.as(ExprSyntaxEnum.self) {
+      case .integerLiteralExpr(let node):
+        return self.generate(integerType: node)
+
+      case .prefixOperatorExpr(let node):
+        let op = node.operator
+
+        guard op.text == "-" else {
+          fatalError("Unknown prefix operator for generic argument type")
+        }
+
+        guard case .integerLiteralExpr(let node) = node.expression.as(ExprSyntaxEnum.self) else {
+          fatalError("Unknown expression kind for generic argument type")
+        }
+
+        return self.generate(integerType: node, minusLoc: self.generateSourceLoc(op))
+
+      default:
+        fatalError("Unknown expression kind for generic argument type")
+      }
+    }
+  }
+
+  func generate(
+    integerType node: IntegerLiteralExprSyntax,
+    minusLoc: BridgedSourceLoc = BridgedSourceLoc()
+  ) -> BridgedTypeRepr {
+    var desc = node.trimmedDescription
+    let str = desc.withBridgedString {
+      self.ctx.allocateCopy(string: $0)
+    }
+
+    return BridgedIntegerTypeRepr.createParsed(
+      self.ctx,
+      string: str,
+      loc: self.generateSourceLoc(node),
+      minusLoc: minusLoc
+    ).asTypeRepr
   }
 }
