@@ -382,9 +382,7 @@ public:
   /// availability parameters.
   static const AvailabilityContext *
   get(const AvailabilityRange &platformAvailability, ASTContext &ctx) {
-    PlatformInfo platformInfo{
-        .Range = platformAvailability,
-    };
+    PlatformInfo platformInfo{platformAvailability};
     return get(platformInfo, ctx);
   }
 

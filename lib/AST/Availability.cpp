@@ -72,7 +72,7 @@ bool AvailabilityContext::PlatformInfo::constrainRange(const Decl *decl) {
 }
 
 const AvailabilityContext *AvailabilityContext::getDefault(ASTContext &ctx) {
-  PlatformInfo platformInfo{.Range = AvailabilityRange::forInliningTarget(ctx)};
+  PlatformInfo platformInfo{AvailabilityRange::forInliningTarget(ctx)};
   return AvailabilityContext::get(platformInfo, ctx);
 }
 
