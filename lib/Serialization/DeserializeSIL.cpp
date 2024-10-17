@@ -629,7 +629,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       (cacheEntry.isDeserialized() && (declarationOnly || forDebugScope))) {
     auto fn = cacheEntry.get();
 
-    if (fn->isZombie())
+    if (fn->isZombie() && !forDebugScope)
       return nullptr;
     return fn;
   }
@@ -834,7 +834,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
 
     // TODO: for functions deserialized for debug scopes, set linkage to private
     // as public symbols make into the final binary even when zombies?
-    fn->setLinkage(forDebugScope ? SILLinkage::Private : linkage);
+    fn->setLinkage(onlyReferencedByDebugInfo ? SILLinkage::Private : linkage);
     fn->setTransparent(IsTransparent_t(isTransparent == 1));
     fn->setSerializedKind(SerializedKind_t(serializedKind));
     fn->setThunk(IsThunk_t(isThunk));
@@ -871,10 +871,10 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     for (auto ID : SemanticsIDs) {
       fn->addSemanticsAttr(MF->getIdentifierText(ID));
     }
-    if (forDebugScope) {
+    if (onlyReferencedByDebugInfo) {
       SILMod.eraseFunction(fn);
     }
-    if (Callback && !forDebugScope)
+    if (Callback && !onlyReferencedByDebugInfo)
       Callback->didDeserialize(MF->getAssociatedModule(), fn);
   }
 
@@ -994,7 +994,8 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   }
 
   GenericEnvironment *genericEnv = nullptr;
-  if (!declarationOnly || forDebugScope) {
+  //generic signatures are stored for declarations as well in a debug context
+  if (!declarationOnly || onlyReferencedByDebugInfo) {
     genericEnv = MF->getGenericSignature(genericSigID).getGenericEnvironment();
   }
 
@@ -1005,7 +1006,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     return maybeEntry.takeError();
   entry = maybeEntry.get();
   bool isEmptyFunction = (entry.Kind == llvm::BitstreamEntry::EndBlock);
-  assert((!isEmptyFunction || !genericEnv || forDebugScope) &&
+  assert((!isEmptyFunction || !genericEnv || onlyReferencedByDebugInfo) &&
          "generic environment without body?!");
 
   // Remember this in our cache in case it's a recursive function.
