@@ -3692,10 +3692,11 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc,
     return nullptr;
   }
 
-  if (maybeFunc.get()) {
+  if (auto fn = maybeFunc.get()) {
     LLVM_DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
                maybeFunc.get()->dump());
     assert(InFunc->getName() == maybeFunc.get()->getName());
+    assert(!fn->isZombie());
   }
 
   return maybeFunc.get();
@@ -3782,6 +3783,9 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
     return false;
   }
 
+  if (onlyReferencedByDebugInfo)
+    return false;
+
   // Bail if it is not a required linkage.
   if (Linkage && linkage.value() != *Linkage)
     return false;
@@ -3807,9 +3811,10 @@ SILFunction *SILDeserializer::lookupSILFunction(StringRef name,
     return nullptr;
   }
 
-  if (maybeFunc.get()) {
+  if (auto fn = maybeFunc.get()) {
     LLVM_DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
                maybeFunc.get()->dump());
+    assert(!fn->isZombie());
   }
   return maybeFunc.get();
 }

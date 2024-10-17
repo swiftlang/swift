@@ -52,7 +52,7 @@ SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee,
                                       /*declarationOnly*/ onlyUpdateLinkage)) {
       LLVM_DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
                  << Des->getModuleIdentifier().str() << "\n");
-      if (!Func->empty() && !Func->isZombie())
+      if (!Func->empty())
         return Func;
       retVal = Func;
     }
@@ -79,9 +79,7 @@ SerializedSILLoader::lookupSILFunction(StringRef Name,
           continue;
         }
       }
-
-      if (!Func->isZombie())
-        return Func;
+      return Func;
     }
   }
   return nullptr;

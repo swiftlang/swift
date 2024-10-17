@@ -350,7 +350,7 @@ SILFunction *SILModule::lookUpFunction(SILDeclRef fnRef) {
 bool SILModule::loadFunction(SILFunction *F, LinkingMode LinkMode) {
   SILFunction *NewF =
     getSILLoader()->lookupSILFunction(F, /*onlyUpdateLinkage*/ false);
-  if (!NewF || NewF->isZombie())
+  if (!NewF)
     return false;
 
   linkFunction(NewF, LinkMode);
@@ -364,7 +364,7 @@ SILFunction *SILModule::loadFunction(StringRef name, LinkingMode LinkMode,
   SILFunction *func = lookUpFunction(name);
   if (!func)
     func = getSILLoader()->lookupSILFunction(name, linkage);
-  if (!func || func->isZombie())
+  if (!func)
     return nullptr;
 
   linkFunction(func, LinkMode);
