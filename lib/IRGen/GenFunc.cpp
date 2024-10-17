@@ -1120,11 +1120,11 @@ public:
   virtual void addDynamicFunctionContext(Explosion &explosion) = 0;
   virtual void addDynamicFunctionPointer(Explosion &explosion) = 0;
 
-  virtual void addSelf(Explosion &explosion) { addArgument(explosion); }
-  virtual void addWitnessSelfMetadata(llvm::Value *value) {
+  void addSelf(Explosion &explosion) { addArgument(explosion); }
+  void addWitnessSelfMetadata(llvm::Value *value) {
     addArgument(value);
   }
-  virtual void addWitnessSelfWitnessTable(llvm::Value *value) {
+  void addWitnessSelfWitnessTable(llvm::Value *value) {
     addArgument(value);
   }
   virtual void forwardErrorResult() = 0;
@@ -1412,12 +1412,6 @@ class CoroPartialApplicationForwarderEmission
     : public PartialApplicationForwarderEmission {
   using super = PartialApplicationForwarderEmission;
 
-private:
-  llvm::Value *Self;
-  llvm::Value *FirstData;
-  llvm::Value *SecondData;
-  WitnessMetadata Witness;
-
 public:
   CoroPartialApplicationForwarderEmission(
       IRGenModule &IGM, IRGenFunction &subIGF, llvm::Function *fwd,
@@ -1428,8 +1422,7 @@ public:
       ArrayRef<ParameterConvention> conventions)
       : PartialApplicationForwarderEmission(
             IGM, subIGF, fwd, staticFnPtr, calleeHasContext, origSig, origType,
-            substType, outType, subs, layout, conventions),
-        Self(nullptr), FirstData(nullptr), SecondData(nullptr) {}
+            substType, outType, subs, layout, conventions) {}
 
   void begin() override {
     auto unsubstType = substType->getUnsubstitutedType(IGM.getSILModule());
@@ -1473,41 +1466,13 @@ public:
   void gatherArgumentsFromApply() override {
     super::gatherArgumentsFromApply(false);
   }
-  llvm::Value *getDynamicFunctionPointer() override {
-    llvm::Value *Ret = SecondData;
-    SecondData = nullptr;
-    return Ret;
-  }
-  llvm::Value *getDynamicFunctionContext() override {
-    llvm::Value *Ret = FirstData;
-    FirstData = nullptr;
-    return Ret;
-  }
+  llvm::Value *getDynamicFunctionPointer() override { return args.takeLast(); }
+  llvm::Value *getDynamicFunctionContext() override { return args.takeLast(); }
   void addDynamicFunctionContext(Explosion &explosion) override {
-    assert(!Self && "context value overrides 'self'");
-    FirstData = explosion.claimNext();
+    addArgument(explosion);
   }
   void addDynamicFunctionPointer(Explosion &explosion) override {
-    SecondData = explosion.claimNext();
-  }
-  void addSelf(Explosion &explosion) override {
-    assert(!FirstData && "'self' overrides another context value");
-    if (!hasSelfContextParameter(origType)) {
-      // witness methods can be declared on types that are not classes. Pass
-      // such "self" argument as a plain argument.
-      addArgument(explosion);
-      return;
-    }
-    Self = explosion.claimNext();
-    FirstData = Self;
-  }
-
-  void addWitnessSelfMetadata(llvm::Value *value) override {
-    Witness.SelfMetadata = value;
-  }
-
-  void addWitnessSelfWitnessTable(llvm::Value *value) override {
-    Witness.SelfWitnessTable = value;
+    addArgument(explosion);
   }
 
   void forwardErrorResult() override {
@@ -1528,13 +1493,26 @@ public:
   }
 
   Explosion callCoroutine(FunctionPointer &fnPtr) {
-    Callee callee({origType, substType, subs}, fnPtr, FirstData, SecondData);
+    bool isWitnessMethodCallee = origType->getRepresentation() ==
+      SILFunctionTypeRepresentation::WitnessMethod;
+
+    WitnessMetadata witnessMetadata;
+    if (isWitnessMethodCallee) {
+      witnessMetadata.SelfWitnessTable = args.takeLast();
+      witnessMetadata.SelfMetadata = args.takeLast();
+    }
+
+    llvm::Value *selfValue = nullptr;
+    if (calleeHasContext || hasSelfContextParameter(origType))
+      selfValue = args.takeLast();
+
+    Callee callee({origType, substType, subs}, fnPtr, selfValue);
 
     std::unique_ptr<CallEmission> emitSuspend =
-        getCallEmission(subIGF, Self, std::move(callee));
+        getCallEmission(subIGF, callee.getSwiftContext(), std::move(callee));
 
     emitSuspend->begin();
-    emitSuspend->setArgs(args, /*isOutlined=*/false, &Witness);
+    emitSuspend->setArgs(args, /*isOutlined=*/false, &witnessMetadata);
     Explosion yieldedValues;
     emitSuspend->emitToExplosion(yieldedValues, /*isOutlined=*/false);
     emitSuspend->end();
@@ -1940,12 +1918,7 @@ static llvm::Value *emitPartialApplicationForwarder(
     } else {
       argValue = subIGF.Builder.CreateBitCast(rawData, expectedArgTy);
     }
-    if (haveContextArgument) {
-      Explosion e;
-      e.add(argValue);
-      emission->addDynamicFunctionContext(e);
-    } else
-      emission->addArgument(argValue);
+    emission->addArgument(argValue);
 
     // If there's a data pointer required, grab it and load out the
     // extra, previously-curried parameters.
