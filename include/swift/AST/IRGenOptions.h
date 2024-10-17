@@ -584,7 +584,7 @@ public:
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
         EmitAsyncFramePushPopMetadata(false), EmitYieldOnce2AsYieldOnce(true),
-        UseProfilingMarkerThunks(false), AsyncFramePointerAll(false), CmdArgs(),
+        AsyncFramePointerAll(false), UseProfilingMarkerThunks(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
