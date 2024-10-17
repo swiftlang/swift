@@ -86,6 +86,8 @@ template <typename RemarkT> static llvm::remarks::Type toRemarkType() {
     return llvm::remarks::Type::Passed;
   if (std::is_same<RemarkT, OptRemark::RemarkMissed>::value)
     return llvm::remarks::Type::Missed;
+  if (std::is_same<RemarkT, OptRemark::RemarkAnalysis>::value)
+    return llvm::remarks::Type::Analysis;
   llvm_unreachable("Unknown remark type");
 }
 

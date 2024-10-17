@@ -1268,6 +1268,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Arg *A = Args.getLastArg(OPT_Rpass_missed_EQ))
     Opts.OptimizationRemarkMissedPattern =
         generateOptimizationRemarkRegex(Diags, Args, A);
+  if (Arg *A = Args.getLastArg(OPT_Rpass_analysis_EQ))
+    Opts.OptimizationRemarkAnalysisPattern =
+        generateOptimizationRemarkRegex(Diags, Args, A);
 
   if (Arg *A = Args.getLastArg(OPT_Raccess_note)) {
     auto value =

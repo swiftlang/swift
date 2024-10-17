@@ -665,6 +665,7 @@ ERROR(non_borrowed_indirect_addressof,none,
 
 REMARK(opt_remark_passed, none, "%0", (StringRef))
 REMARK(opt_remark_missed, none, "%0", (StringRef))
+REMARK(opt_remark_analysis, none, "%0", (StringRef))
 NOTE(opt_remark_note, none, "%0", (StringRef))
 
 // Float-point to integer conversions
