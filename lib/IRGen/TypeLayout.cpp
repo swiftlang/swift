@@ -20,6 +20,7 @@
 #include "IRGen.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "ReferenceTypeInfo.h"
 #include "SwitchBuilder.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -3830,6 +3831,13 @@ TypeInfoBasedTypeLayoutEntry::layoutString(IRGenModule &IGM,
 bool TypeInfoBasedTypeLayoutEntry::refCountString(
     IRGenModule &IGM, LayoutStringBuilder &B,
     GenericSignature genericSig) const {
+  if (auto *refTI = dyn_cast<ReferenceTypeInfo>(&typeInfo)) {
+    if (refTI->getReferenceCountingType() == ReferenceCounting::ObjC) {
+      B.addRefCount(LayoutStringBuilder::RefCountingKind::ObjC,
+                    typeInfo.getFixedSize().getValue());
+      return true;
+    }
+  }
   return false;
 }
 
