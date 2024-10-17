@@ -175,7 +175,6 @@ bool swift::canUseObject(SILInstruction *Inst) {
   case SILInstructionKind::UncheckedAddrCastInst:
   case SILInstructionKind::RefToRawPointerInst:
   case SILInstructionKind::RawPointerToRefInst:
-  case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
   case SILInstructionKind::EndInitLetRefInst:
   case SILInstructionKind::BeginDeallocRefInst:

@@ -2408,7 +2408,8 @@ bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
     if (isMultiPayloadEnum() &&
         buildMultiPayloadRefCountString(IGM, B, genericSig)) {
       return true;
-    } else if (buildSinglePayloadRefCountString(IGM, B, genericSig)) {
+    } else if (!isMultiPayloadEnum() &&
+               buildSinglePayloadRefCountString(IGM, B, genericSig)) {
       return true;
     }
 
