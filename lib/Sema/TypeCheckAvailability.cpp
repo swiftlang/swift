@@ -355,8 +355,8 @@ static bool hasActiveAvailableAttribute(Decl *D,
 
 static bool computeContainedByDeploymentTarget(TypeRefinementContext *TRC,
                                                ASTContext &ctx) {
-  return TRC->getAvailabilityInfo()
-                  .isContainedIn(AvailabilityRange::forDeploymentTarget(ctx));
+  return TRC->getPlatformAvailabilityRange().isContainedIn(
+      AvailabilityRange::forDeploymentTarget(ctx));
 }
 
 /// Returns true if the reference or any of its parents is an
@@ -471,6 +471,13 @@ class TypeRefinementContextBuilder : private ASTWalker {
 
   bool isCurrentTRCContainedByDeploymentTarget() {
     return ContextStack.back().ContainedByDeploymentTarget;
+  }
+
+  const AvailabilityContext *constrainCurrentAvailabilityWithPlatformRange(
+      const AvailabilityRange &platformRange) {
+    return getCurrentTRC()
+        ->getAvailabilityContext()
+        ->constrainWithPlatformRange(platformRange, Context);
   }
 
   void pushContext(TypeRefinementContext *TRC, ParentTy PopAfterNode) {
@@ -661,7 +668,7 @@ private:
     // If we've made it this far then we've identified a declaration that
     // requires lazy expansion later.
     auto lazyTRC = TypeRefinementContext::createForDeclImplicit(
-        Context, D, currentTRC, currentTRC->getAvailabilityInfo(),
+        Context, D, currentTRC, currentTRC->getAvailabilityContext(),
         refinementSourceRangeForDecl(D));
     lazyTRC->setNeedsExpansion(true);
     return true;
@@ -688,26 +695,22 @@ private:
     if (concreteSyntaxDeclForAvailableAttribute(D) != D)
       return nullptr;
 
-    // Declarations with an explicit availability attribute always get a TRC.
-    AvailabilityRange DeclaredAvailability =
-        swift::AvailabilityInference::availableRange(D);
-    if (!DeclaredAvailability.isAlwaysAvailable()) {
+    // Declarations with explicit availability attributes always get a TRC.
+    if (AvailabilityInference::attrForAnnotatedAvailableRange(D)) {
       return TypeRefinementContext::createForDecl(
           Context, D, getCurrentTRC(),
-          getEffectiveAvailabilityForDeclSignature(D, DeclaredAvailability),
+          getEffectiveAvailabilityForDeclSignature(D),
           refinementSourceRangeForDecl(D));
     }
 
-    // Declarations without explicit availability get a TRC if they are
-    // effectively less available than the surrounding context. For example, an
-    // internal property in a public struct can be effectively less available
+    // Declarations without explicit availability attributes get a TRC if they
+    // are effectively less available than the surrounding context. For example,
+    // an internal property in a public struct can be effectively less available
     // than the containing struct decl because the internal property will only
     // be accessed by code running at the deployment target or later.
-    AvailabilityRange CurrentAvailability =
-        getCurrentTRC()->getAvailabilityInfo();
-    AvailabilityRange EffectiveAvailability =
-        getEffectiveAvailabilityForDeclSignature(D, CurrentAvailability);
-    if (CurrentAvailability.isSupersetOf(EffectiveAvailability))
+    auto CurrentAvailability = getCurrentTRC()->getAvailabilityContext();
+    auto EffectiveAvailability = getEffectiveAvailabilityForDeclSignature(D);
+    if (CurrentAvailability != EffectiveAvailability)
       return TypeRefinementContext::createForDeclImplicit(
           Context, D, getCurrentTRC(), EffectiveAvailability,
           refinementSourceRangeForDecl(D));
@@ -715,9 +718,8 @@ private:
     return nullptr;
   }
 
-  AvailabilityRange getEffectiveAvailabilityForDeclSignature(
-      Decl *D, const AvailabilityRange BaseAvailability) {
-    AvailabilityRange EffectiveAvailability = BaseAvailability;
+  const AvailabilityContext *getEffectiveAvailabilityForDeclSignature(Decl *D) {
+    auto EffectiveIntroduction = AvailabilityRange::alwaysAvailable();
 
     // As a special case, extension decls are treated as effectively as
     // available as the nominal type they extend, up to the deployment target.
@@ -726,24 +728,25 @@ private:
     if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
       auto ET = ED->getExtendedType();
       if (ET && !hasActiveAvailableAttribute(D, Context)) {
-        EffectiveAvailability.intersectWith(
+        EffectiveIntroduction.intersectWith(
             swift::AvailabilityInference::inferForType(ET));
 
         // We want to require availability to be specified on extensions of
         // types that would be potentially unavailable to the module containing
         // the extension, so limit the effective availability to the deployment
         // target.
-        EffectiveAvailability.unionWith(
+        EffectiveIntroduction.unionWith(
             AvailabilityRange::forDeploymentTarget(Context));
       }
     }
 
-    EffectiveAvailability.intersectWith(getCurrentTRC()->getAvailabilityInfo());
     if (shouldConstrainSignatureToDeploymentTarget(D))
-      EffectiveAvailability.intersectWith(
+      EffectiveIntroduction.intersectWith(
           AvailabilityRange::forDeploymentTarget(Context));
 
-    return EffectiveAvailability;
+    return getCurrentTRC()
+        ->getAvailabilityContext()
+        ->constrainWithDeclAndPlatformRange(D, EffectiveIntroduction);
   }
 
   /// Checks whether the entire declaration, including its signature, should be
@@ -811,10 +814,9 @@ private:
   // target for `range` in decl `D`.
   TypeRefinementContext *
   createImplicitDeclContextForDeploymentTarget(Decl *D, SourceRange range){
-    AvailabilityRange Availability =
-        AvailabilityRange::forDeploymentTarget(Context);
-    Availability.intersectWith(getCurrentTRC()->getAvailabilityInfo());
-
+    const AvailabilityContext *Availability =
+        constrainCurrentAvailabilityWithPlatformRange(
+            AvailabilityRange::forDeploymentTarget(Context));
     return TypeRefinementContext::createForDeclImplicit(
         Context, D, getCurrentTRC(), Availability, range);
   }
@@ -972,10 +974,10 @@ private:
     if (ThenRange.has_value()) {
       // Create a new context for the Then branch and traverse it in that new
       // context.
-      auto *ThenTRC =
-          TypeRefinementContext::createForIfStmtThen(Context, IS,
-                                                     getCurrentTRC(),
-                                                     ThenRange.value());
+      auto *AvailabilityContext =
+          constrainCurrentAvailabilityWithPlatformRange(ThenRange.value());
+      auto *ThenTRC = TypeRefinementContext::createForIfStmtThen(
+          Context, IS, getCurrentTRC(), AvailabilityContext);
       TypeRefinementContextBuilder(ThenTRC, Context).build(IS->getThenStmt());
     } else {
       build(IS->getThenStmt());
@@ -995,10 +997,10 @@ private:
     if (ElseRange.has_value()) {
       // Create a new context for the Then branch and traverse it in that new
       // context.
-      auto *ElseTRC =
-          TypeRefinementContext::createForIfStmtElse(Context, IS,
-                                                     getCurrentTRC(),
-                                                     ElseRange.value());
+      auto *AvailabilityContext =
+          constrainCurrentAvailabilityWithPlatformRange(ElseRange.value());
+      auto *ElseTRC = TypeRefinementContext::createForIfStmtElse(
+          Context, IS, getCurrentTRC(), AvailabilityContext);
       TypeRefinementContextBuilder(ElseTRC, Context).build(ElseStmt);
     } else {
       build(IS->getElseStmt());
@@ -1016,8 +1018,10 @@ private:
     if (BodyRange.has_value()) {
       // Create a new context for the body and traverse it in the new
       // context.
+      auto *AvailabilityContext =
+          constrainCurrentAvailabilityWithPlatformRange(BodyRange.value());
       auto *BodyTRC = TypeRefinementContext::createForWhileStmtBody(
-          Context, WS, getCurrentTRC(), BodyRange.value());
+          Context, WS, getCurrentTRC(), AvailabilityContext);
       TypeRefinementContextBuilder(BodyTRC, Context).build(WS->getBody());
     } else {
       build(WS->getBody());
@@ -1047,8 +1051,10 @@ private:
 
     if (Stmt *ElseBody = GS->getBody()) {
       if (ElseRange.has_value()) {
+        auto *AvailabilityContext =
+            constrainCurrentAvailabilityWithPlatformRange(ElseRange.value());
         auto *TrueTRC = TypeRefinementContext::createForGuardStmtElse(
-            Context, GS, getCurrentTRC(), ElseRange.value());
+            Context, GS, getCurrentTRC(), AvailabilityContext);
 
         TypeRefinementContextBuilder(TrueTRC, Context).build(ElseBody);
       } else {
@@ -1062,10 +1068,10 @@ private:
       return;
 
     // Create a new context for the fallthrough.
-
-    auto *FallthroughTRC =
-          TypeRefinementContext::createForGuardStmtFallthrough(Context, GS,
-              ParentBrace, getCurrentTRC(), FallthroughRange.value());
+    auto *FallthroughAvailability =
+        constrainCurrentAvailabilityWithPlatformRange(FallthroughRange.value());
+    auto *FallthroughTRC = TypeRefinementContext::createForGuardStmtFallthrough(
+        Context, GS, ParentBrace, getCurrentTRC(), FallthroughAvailability);
 
     pushContext(FallthroughTRC, ParentBrace);
   }
@@ -1097,7 +1103,8 @@ private:
 
     for (StmtConditionElement Element : Cond) {
       TypeRefinementContext *CurrentTRC = getCurrentTRC();
-      AvailabilityRange CurrentInfo = CurrentTRC->getAvailabilityInfo();
+      AvailabilityRange CurrentInfo =
+          CurrentTRC->getPlatformAvailabilityRange();
 
       // If the element is not a condition, walk it in the current TRC.
       if (Element.getKind() != StmtConditionElement::CK_Availability) {
@@ -1219,8 +1226,10 @@ private:
       // ranges of the form [x, y).
       FalseFlow.unionWith(CurrentInfo);
 
+      auto *ConstrainedAvailability =
+          constrainCurrentAvailabilityWithPlatformRange(NewConstraint);
       auto *TRC = TypeRefinementContext::createForConditionFollowingQuery(
-          Context, Query, LastElement, CurrentTRC, NewConstraint);
+          Context, Query, LastElement, CurrentTRC, ConstrainedAvailability);
 
       pushContext(TRC, ParentTy());
       ++NestedCount;
@@ -1229,14 +1238,15 @@ private:
     std::optional<AvailabilityRange> FalseRefinement = std::nullopt;
     // The version range for the false branch should never have any versions
     // that weren't possible when the condition started evaluating.
-    assert(FalseFlow.isContainedIn(StartingTRC->getAvailabilityInfo()));
+    assert(
+        FalseFlow.isContainedIn(StartingTRC->getPlatformAvailabilityRange()));
 
     // If the starting version range is not completely contained in the
     // false flow version range then it must be the case that false flow range
     // is strictly smaller than the starting range (because the false flow
     // range *is* contained in the starting range), so we should introduce a
     // new refinement for the false flow.
-    if (!StartingTRC->getAvailabilityInfo().isContainedIn(FalseFlow)) {
+    if (!StartingTRC->getPlatformAvailabilityRange().isContainedIn(FalseFlow)) {
       FalseRefinement = FalseFlow;
     }
 
@@ -1259,7 +1269,8 @@ private:
 
     assert(getCurrentTRC() == StartingTRC);
 
-    return makeResult(NestedTRC->getAvailabilityInfo(), FalseRefinement);
+    return makeResult(NestedTRC->getPlatformAvailabilityRange(),
+                      FalseRefinement);
   }
 
   /// Return the best active spec for the target platform or nullptr if no
@@ -1353,9 +1364,9 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF) {
   // The root type refinement context reflects the fact that all parts of
   // the source file are guaranteed to be executing on at least the minimum
   // platform version for inlining.
-  auto MinPlatformReq = AvailabilityRange::forInliningTarget(Context);
+  auto AvailabilityContext = AvailabilityContext::getDefault(Context);
   TypeRefinementContext *RootTRC =
-      TypeRefinementContext::createForSourceFile(&SF, MinPlatformReq);
+      TypeRefinementContext::createForSourceFile(&SF, AvailabilityContext);
   SF.setTypeRefinementContext(RootTRC);
 
   // Build refinement contexts, if necessary, for all declarations starting
@@ -1449,7 +1460,8 @@ AvailabilityRange TypeChecker::overApproximateAvailabilityAtLocation(
       TypeRefinementContext *TRC =
           rootTRC->findMostRefinedSubContext(loc, Context);
       if (TRC) {
-        OverApproximateContext.constrainWith(TRC->getAvailabilityInfo());
+        OverApproximateContext.constrainWith(
+            TRC->getPlatformAvailabilityRange());
         if (MostRefined) {
           *MostRefined = TRC;
         }
