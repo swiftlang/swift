@@ -18,6 +18,9 @@ import json
 import os
 import subprocess
 import unittest
+import urllib.parse
+
+from typing import Any, Dict
 
 # For now we only use a config with a single scheme. We should add support for
 # handling multiple schemes.
@@ -48,7 +51,7 @@ MOCK_CONFIG = {
             "remote": {"id": "repo1"},
         },
         "repo2": {
-            "remote": {"id": "repo2"},
+            "remote": {"id": os.path.join("org", "remote2")},
         },
     },
     "default-branch-scheme": "main",
@@ -121,21 +124,22 @@ def get_additional_config_path(base_dir):
     return os.path.join(base_dir, "test-additional-config.json")
 
 
-def setup_mock_remote(base_dir, base_config):
-    create_dir(base_dir)
+def get_path_from_url(url: str) -> str:
+    """
+    Returns the path component of the given URL.
+    """
 
-    # We use local as a workspace for creating commits.
-    LOCAL_PATH = os.path.join(base_dir, "local")
-    # We use remote as a directory that simulates our remote unchecked out
-    # repo.
-    REMOTE_PATH = os.path.join(base_dir, "remote")
+    return urllib.parse.urlsplit(url).path
 
-    create_dir(REMOTE_PATH)
-    create_dir(LOCAL_PATH)
 
-    for k, v in MOCK_REMOTE.items():
-        local_repo_path = os.path.join(LOCAL_PATH, k)
-        remote_repo_path = os.path.join(REMOTE_PATH, k)
+# TODO: Move this to SchemeMockTestCase.
+def setup_mock_remote(test_case, base_dir, base_config, remotes_path, local_path):
+    assert base_config["repos"].keys() == MOCK_REMOTE.keys()
+
+    for local_repo_name, changes in MOCK_REMOTE.items():
+        local_repo_path = os.path.join(local_path, local_repo_name)
+        remote_repo_path = test_case._compute_remote_path(repo_name=local_repo_name)
+
         create_dir(remote_repo_path)
         create_dir(local_repo_path)
         call_quietly(["git", "init", "--bare", remote_repo_path])
@@ -156,7 +160,7 @@ def setup_mock_remote(base_dir, base_config):
         call_quietly(
             ["git", "symbolic-ref", "HEAD", "refs/heads/main"], cwd=local_repo_path
         )
-        for i, (filename, contents) in enumerate(v):
+        for i, (filename, contents) in enumerate(changes):
             filename_path = os.path.join(local_repo_path, filename)
             with open(filename_path, "w") as f:
                 f.write(contents)
@@ -164,7 +168,7 @@ def setup_mock_remote(base_dir, base_config):
             call_quietly(["git", "commit", "-m", "Commit %d" % i], cwd=local_repo_path)
             call_quietly(["git", "push", "origin", "main"], cwd=local_repo_path)
 
-    https_clone_pattern = os.path.join("file://%s" % REMOTE_PATH, "%s")
+    https_clone_pattern = os.path.join(f"file://{remotes_path}", "%s")
     base_config["https-clone-pattern"] = https_clone_pattern
 
     with open(get_config_path(base_dir), "w") as f:
@@ -172,8 +176,6 @@ def setup_mock_remote(base_dir, base_config):
 
     with open(get_additional_config_path(base_dir), "w") as f:
         json.dump(MOCK_ADDITIONAL_SCHEME, f)
-
-    return (LOCAL_PATH, REMOTE_PATH)
 
 
 BASEDIR_ENV_VAR = "UPDATECHECKOUT_TEST_WORKSPACE_DIR"
@@ -215,11 +217,18 @@ class SchemeMockTestCase(unittest.TestCase):
                 "update-checkout at path: %s" % self.update_checkout_path
             )
         self.source_root = os.path.join(self.workspace, "source_root")
+        # We use remote as a directory that simulates our remote unchecked out
+        # repo.
+        self._remotes_path = os.path.join(self.workspace, "remote")
+        # We use local as a workspace for creating commits.
+        self.local_path = os.path.join(self.workspace, "local")
 
     def setUp(self):
         create_dir(self.source_root)
-        (self.local_path, self.remote_path) = setup_mock_remote(
-            self.workspace, self.config
+        create_dir(self._remotes_path)
+        create_dir(self.local_path)
+        setup_mock_remote(
+            self, self.workspace, self.config, self._remotes_path, self.local_path
         )
 
     def tearDown(self):
@@ -233,6 +242,27 @@ class SchemeMockTestCase(unittest.TestCase):
     @property
     def repo_names(self):
         return list(self.config["repos"].keys())
+
+    def _compute_remote_path(self, *, repo_name: str):
+        remote_info = self.config["repos"][repo_name]["remote"]
+        id = remote_info.get("id")
+        url = remote_info.get("url")
+        if id is not None:
+            return os.path.join(self._remotes_path, remote_info["id"])
+        elif url is not None:
+            url_path = get_path_from_url(url)
+            workspace_path = os.path.dirname(self._remotes_path)
+            self.assertEqual(
+                os.path.commonpath((workspace_path, url_path)), workspace_path
+            )
+            return os.path.join(self._remotes_path, os.path.basename(url_path))
+        else:
+            raise RuntimeError(
+                f"'remote' for '{local_repo_name}' must have an 'id' or 'url' item"
+            )
+
+    def remote_path(self, *, repo_name: str):
+        return self._compute_remote_path(repo_name=repo_name)
 
     def add_branch_scheme(self, name, scheme):
         self.config["branch-schemes"][name] = scheme

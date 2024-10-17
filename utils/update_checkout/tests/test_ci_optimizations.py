@@ -22,15 +22,6 @@ import os
 
 from . import scheme_mock
 
-def _add_branch_to_remotes(remote_path, repo_names, branch_name):
-    """Create *branch_name* on every bare remote repo."""
-    for repo_name in repo_names:
-        remote_repo = os.path.join(remote_path, repo_name)
-        scheme_mock.call_quietly(
-            ["git", "branch", branch_name, "main"],
-            cwd=remote_repo,
-        )
-
 
 def _add_commit_to_repos(local_path, repo_names, filename, content):
     """Commit a new file to each local clone and push it to origin."""
@@ -49,11 +40,19 @@ def _add_commit_to_repos(local_path, repo_names, filename, content):
 class ShallowCloneTestCase(scheme_mock.SchemeMockTestCase):
     """--skip-history should produce depth-1, single-branch clones."""
 
+    def _add_branch_to_remotes(self, branch_name):
+        """Create *branch_name* on every bare remote repo."""
+        for repo_name in self.repo_names:
+            scheme_mock.call_quietly(
+                ["git", "branch", branch_name, "main"],
+                cwd=self.remote_path(repo_name=repo_name),
+            )
+
     def setUp(self):
         super().setUp()
         # Add a second branch to every bare remote so single-branch tests are
         # meaningful.
-        _add_branch_to_remotes(self.remote_path, self.get_all_repos(), "other-branch")
+        self._add_branch_to_remotes("other-branch")
 
     def test_skip_history_produces_shallow_clone(self):
         """Repos cloned with --skip-history must be depth-1 shallow clones."""
