@@ -345,6 +345,18 @@ class AvailabilityContext : public llvm::FoldingSetNode {
     /// The introduction version.
     AvailabilityRange Range;
 
+    /// When `IsUnavailable` is true, this value stores the broadest platform
+    /// kind for which the context is unavailable.
+    PlatformKind UnavailablePlatform;
+
+    /// Whether or not the context is considered unavailable on the current
+    /// platform.
+    unsigned IsUnavailable : 1;
+
+    /// Whether or not the context is considered deprecated on the current
+    /// platform.
+    unsigned IsDeprecated : 1;
+
     /// Sets `Range` to `other` if `other` is more restrictive. Returns true if
     /// any property changed as a result of adding this constraint.
     bool constrainRange(const AvailabilityRange &other) {
@@ -360,8 +372,23 @@ class AvailabilityContext : public llvm::FoldingSetNode {
     /// any property changed as a result of adding this constraint.
     bool constrainRange(const Decl *decl);
 
+    /// Updates `UnavailablePlatform` and `IsUnavailable` to reflect the status
+    /// of `decl` if its platform unavailability is more restrictive. Returns
+    /// true if any property changed as a result of adding this constraint.
+    bool constrainUnavailability(const Decl *decl);
+
+    /// If `decl` is deprecated, sets `IsDeprecated` to true. Returns true if
+    /// any property changed as a result of adding this constraint.
+    bool constrainDeprecated(const Decl *decl);
+
+    /// Returns true if `other` is as available or is more available.
+    bool isContainedIn(const PlatformInfo &other) const;
+
     void Profile(llvm::FoldingSetNodeID &ID) const {
       Range.getRawVersionRange().Profile(ID);
+      ID.AddBoolean(IsUnavailable);
+      ID.AddInteger(static_cast<uint8_t>(UnavailablePlatform));
+      ID.AddBoolean(IsDeprecated);
     }
   };
   PlatformInfo PlatformAvailability;
@@ -381,8 +408,14 @@ public:
   /// Retrieves a uniqued `AvailabilityContext` with the given platform
   /// availability parameters.
   static const AvailabilityContext *
-  get(const AvailabilityRange &platformAvailability, ASTContext &ctx) {
-    PlatformInfo platformInfo{platformAvailability};
+  get(const AvailabilityRange &platformAvailability,
+      std::optional<PlatformKind> unavailablePlatform, bool deprecated,
+      ASTContext &ctx) {
+    PlatformInfo platformInfo{platformAvailability,
+                              unavailablePlatform.has_value()
+                                  ? *unavailablePlatform
+                                  : PlatformKind::none,
+                              unavailablePlatform.has_value(), deprecated};
     return get(platformInfo, ctx);
   }
 
@@ -391,6 +424,18 @@ public:
   AvailabilityRange getPlatformRange() const {
     return PlatformAvailability.Range;
   }
+
+  /// When the context is unavailable on the current platform this returns the
+  /// broadest `PlatformKind` for which the context is unavailable. Otherwise,
+  /// returns `nullopt`.
+  std::optional<PlatformKind> getUnavailablePlatformKind() const {
+    if (PlatformAvailability.IsUnavailable)
+      return PlatformAvailability.UnavailablePlatform;
+    return std::nullopt;
+  }
+
+  /// Returns true if this context is deprecated on the current platform.
+  bool isDeprecated() const { return PlatformAvailability.IsDeprecated; }
 
   /// Returns the unique context that is the result of constraining the current
   /// context's platform availability range with `platformRange`.
@@ -403,6 +448,12 @@ public:
   /// `platformRange`.
   const AvailabilityContext *constrainWithDeclAndPlatformRange(
       Decl *decl, const AvailabilityRange &platformRange) const;
+
+  /// Returns true if `other` is as available or is more available.
+  bool isContainedIn(const AvailabilityContext *other) const;
+
+  void print(llvm::raw_ostream &os) const;
+  SWIFT_DEBUG_DUMP;
 
   void Profile(llvm::FoldingSetNodeID &ID) const;
 };
