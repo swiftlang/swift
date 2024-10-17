@@ -36,7 +36,13 @@ public struct KeyPaths: MyProto {
 // CHECK-NEXT:    "conformances": [
 // CHECK-NEXT:      "ExtractKeyPaths.MyProto"
 // CHECK-NEXT:     ],
-// CHECK-NEXT:     "associatedTypeAliases": [],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractKeyPaths.MyProto"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractKeyPaths"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
+// CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [
 // CHECK-NEXT:       {
 // CHECK-NEXT:        "label": "nestedVariable",
