@@ -2452,6 +2452,81 @@ function Build-SourceKitLSP($Arch) {
     }
 }
 
+function Test-SourceKitLSP {
+  $SwiftPMArguments = @(
+    # swift-syntax
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache Compilers)\lib\swift\host",
+    "-Xswiftc", "-L$(Get-HostProjectBinaryCache Compilers)\lib\swift\host",
+    # swift-cmark
+    "-Xswiftc", "-I$($SourceCache)\cmark\src\include",
+    "-Xswiftc", "-I$($SourceCache)\cmark\extensions\include",
+    "-Xlinker", "-I$($SourceCache)\cmark\extensions\include",
+    "-Xlinker", "$(Get-CMark-BinaryCache($HostArch))\src\cmark-gfm.lib",
+    "-Xlinker", "$(Get-CMark-BinaryCache($HostArch))\extensions\cmark-gfm-extensions.lib",
+    # swift-system
+    "-Xswiftc", "-I$($SourceCache)\swift-system\Sources\CSystem\include",
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache System)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache System)\lib",
+    # swift-tools-support-core
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache ToolsSupportCore)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache ToolsSupportCore)\lib",
+    # swift-llbuild
+    "-Xswiftc", "-I$($SourceCache)\llbuild\products\libllbuild\include",
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache LLBuild)\products\llbuildSwift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache LLBuild)\lib",
+    # swift-argument-parser
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache ArgumentParser)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache ArgumentParser)\lib",
+    # swift-crypto
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache Crypto)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache Crypto)\lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache Crypto)\lib\CCryptoBoringSSL.lib",
+    # swift-package-manager
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache PackageManager)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache PackageManager)\lib",
+    # swift-markdown
+    "-Xswiftc", "-I$($SourceCache)\swift-markdown\Sources\CAtomic\inclde",
+    "-Xlinker", "$(Get-HostProjectBinaryCache Markdown)\lib\CAtomic.lib",
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache Markdown)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache Markdown)\lib",
+    # swift-format
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache Format)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache Format)\lib",
+    # indexstore-db
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache IndexStoreDB)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache IndexStoreDB)\Sources\IndexStoreDB",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\CIndexStoreDB\CIndexStoreDB.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\Core\Core.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\Database\Database.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\Index\Index.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\LLVMSupport\LLVMSupport.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\Support\Support.lib",
+    # sourcekit-lsp
+    "-Xswiftc", "-I$($SourceCache)\sourcekit-lsp\Sources\CAtomics\include",
+    "-Xswiftc", "-I$($SourceCache)\sourcekit-lsp\Sources\CSourcekitd\include",
+    "-Xlinker", "$(Get-HostProjectBinaryCache SourceKitLSP)\lib\CSourcekitd.lib",
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache SourceKitLSP)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache SourceKitLSP)\lib"
+  )
+  
+  Isolate-EnvVars {
+    $env:SOURCEKIT_LSP_BUILD_ONLY_TESTS=1
+    
+    # CI doesn't contain any sensitive information. Log everything.
+    $env:SOURCEKIT_LSP_LOG_PRIVACY_LEVEL="sensitive"
+    
+    # Log with the highest log level to simplify debugging of CI failures.
+    $env:SOURCEKIT_LSP_LOG_LEVEL="debug"
+
+    Build-SPMProject `
+      -Src "$SourceCache\sourcekit-lsp" `
+      -Bin (Join-Path -Path $HostArch.BinaryCache -ChildPath sourcekit-lsp) `
+      -Arch $HostArch `
+      -Test `
+      @SwiftPMArguments
+  }
+}
+
 function Build-TestingMacros() {
   [CmdletBinding(PositionalBinding = $false)]
   param
@@ -2783,6 +2858,7 @@ if (-not $IsCrossCompiling) {
   if ($Test -contains "llbuild") { Build-LLBuild $HostArch -Test }
   if ($Test -contains "swiftpm") { Test-PackageManager $HostArch }
   if ($Test -contains "swift-format") { Test-Format }
+  if ($Test -contains "sourcekit-lsp") { Test-SourceKitLSP }
 }
 
 # Custom exception printing for more detailed exception information
