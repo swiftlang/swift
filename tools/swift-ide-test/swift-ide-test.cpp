@@ -2000,10 +2000,8 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
     SourceManager SM;
     unsigned BufferID = SM.addNewSourceBuffer(std::move(FileBuf));
 
-    ParserUnit Parser(
-        SM, SourceFileKind::Main, BufferID, Invocation.getLangOptions(),
-        Invocation.getTypeCheckerOptions(), Invocation.getSILOptions(),
-        Invocation.getModuleName());
+    ParserUnit Parser(SM, SourceFileKind::Main, BufferID,
+                      Invocation.getLangOptions(), Invocation.getModuleName());
 
     registerTypeCheckerRequestFunctions(Parser.getParser().Context.evaluator);
     registerClangImporterRequestFunctions(Parser.getParser().Context.evaluator);
@@ -2229,9 +2227,7 @@ static int doStructureAnnotation(const CompilerInvocation &InitInvok,
   unsigned BufferID = SM.addNewSourceBuffer(std::move(FileBuf));
 
   ParserUnit Parser(SM, SourceFileKind::Main, BufferID,
-                    Invocation.getLangOptions(),
-                    Invocation.getTypeCheckerOptions(),
-                    Invocation.getSILOptions(), Invocation.getModuleName());
+                    Invocation.getLangOptions(), Invocation.getModuleName());
 
   registerTypeCheckerRequestFunctions(
       Parser.getParser().Context.evaluator);
