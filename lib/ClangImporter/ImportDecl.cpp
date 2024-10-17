@@ -2753,7 +2753,8 @@ namespace {
       if (decl->getDeclContext()->isNamespace() &&
           decl->getDeclContext()->getParent()->isStdNamespace() &&
           decl->getIdentifier() &&
-          (decl->getName() == "tzdb" || decl->getName() == "time_zone_link"))
+          (decl->getName() == "tzdb" || decl->getName() == "time_zone_link" ||
+           decl->getName() == "time_zone"))
         return nullptr;
 
       auto &clangSema = Impl.getClangSema();
