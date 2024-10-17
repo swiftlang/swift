@@ -76,7 +76,8 @@ reflect(object: C())
 
 // CHECK64-NEXT: (class_instance size=24 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK64-NEXT:   (field name=outer offset=16
-// CHECK64-NEXT:     (multi_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=126 bitwise_takable=1
+// x86_64 and arm64 have different spare bit pointer masks, hence different numbers of extra inhabitants here
+// CHECK64-NEXT:     (multi_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants={{[0-9]+}} bitwise_takable=1
 
 // CHECK32-NEXT: (class_instance size=12 alignment=4 stride=12 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK32-NEXT:   (field name=outer offset=8
