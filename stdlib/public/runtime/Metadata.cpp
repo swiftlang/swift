@@ -2853,11 +2853,10 @@ void swift::swift_initStructMetadataWithLayoutString(
     if (fieldTag) {
       const TypeLayout *fieldType = (const TypeLayout*)fieldTypes[i];
       auto alignmentMask = fieldType->flags.getAlignmentMask();
+      
       fullOffset = roundUpToAlignMask(fullOffset, alignmentMask);
-
+      size_t offset = fullOffset - unalignedOffset + previousFieldOffset;
       if (fieldTag <= 0x4) {
-        size_t offset = fullOffset - unalignedOffset + previousFieldOffset;
-
         auto tag = fieldTag <= 0x2 ? RefCountingKind::UnknownUnowned :
                                      RefCountingKind::UnknownWeak;
 
