@@ -9,6 +9,8 @@
 // UNSUPPORTED: OS=windows-msvc
 // UNSUPPORTED: OS=linux-gnu, OS=linux-android, OS=linux-androideabi
 
+// UNSUPPORTED: CPU=arm64e
+
 // NOTHUNK-NOT: __swift_prof_thunk
 
 import P
