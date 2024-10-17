@@ -1854,7 +1854,7 @@ function Build-BuildTools([Hashtable] $Platform) {
     -Bin (Get-ProjectBinaryCache $Platform BuildTools) `
     -Platform $Platform `
     -UseMSVCCompilers ASM_MASM,C,CXX `
-    -BuildTargets llvm-tblgen,clang-tblgen,clang-pseudo-gen,clang-tidy-confusable-chars-gen,lldb-tblgen,llvm-config,swift-def-to-strings-converter,swift-serialize-diagnostics,swift-compatibility-symbols `
+    -BuildTargets llvm-tblgen,clang-tblgen,clang-tidy-confusable-chars-gen,lldb-tblgen,llvm-config,swift-def-to-strings-converter,swift-serialize-diagnostics,swift-compatibility-symbols `
     -Defines @{
       CMAKE_CROSSCOMPILING = "NO";
       CLANG_ENABLE_LIBXML2 = "NO";
