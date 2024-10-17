@@ -1473,6 +1473,8 @@ static void
 collectExportedImports(const ModuleDecl *topLevelModule,
                        ModuleDecl::ImportCollector &importCollector) {
   SmallVector<const ModuleDecl *> stack;
+  SmallPtrSet<const ModuleDecl *, 4> visited;
+  visited.insert(topLevelModule);
   stack.push_back(topLevelModule);
   while (!stack.empty()) {
     const ModuleDecl *module = stack.pop_back_val();
@@ -1504,7 +1506,10 @@ collectExportedImports(const ModuleDecl *topLevelModule,
           if (module->isClangOverlayOf(im.importedModule))
             continue;
           importCollector.collect(im);
-          stack.push_back(im.importedModule);
+          if (!visited.contains(im.importedModule)) {
+            visited.insert(im.importedModule);
+            stack.push_back(im.importedModule);
+          }
         }
       }
     }
