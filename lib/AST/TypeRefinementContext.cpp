@@ -526,6 +526,7 @@ verificationError(ASTContext &ctx, llvm::StringRef msg,
     auto context = std::get<1>(pair);
     llvm::errs() << label << ":\n";
     context->print(llvm::errs(), ctx.SourceMgr);
+    llvm::errs() << "\n";
   }
   abort();
 }
@@ -570,18 +571,20 @@ void TypeRefinementContext::verify(const TypeRefinementContext *parent,
   if (!SrcRange.isValid())
     verificationError(ctx, "invalid source range", {{"node", this}});
 
+  // Child nodes must be contained by their parents in all dimensions (source
+  // range, introduction version, etc).
   if (getReason() != Reason::Root) {
     auto parentRange = parent->SrcRange;
     if (parentRange.isValid() &&
         !(srcMgr.isAtOrBefore(parentRange.Start, SrcRange.Start) &&
           srcMgr.isAtOrBefore(SrcRange.End, parentRange.End)))
       verificationError(ctx, "child source range not contained",
-                        {{"child", this}, {"parent", this}});
+                        {{"child", this}, {"parent", parent}});
   }
 
   if (!AvailabilityInfo.isContainedIn(parent->AvailabilityInfo))
     verificationError(ctx, "child availability range not contained",
-                      {{"child", this}, {"parent", this}});
+                      {{"child", this}, {"parent", parent}});
 }
 
 void TypeRefinementContext::verify(ASTContext &ctx) {

@@ -299,6 +299,18 @@ var someComputedGlobalVar: Int {
   set { }
 }
 
+// CHECK-NEXT: {{^}}  (decl_implicit version=50 decl=interpolated
+// CHECK-NEXT: {{^}}    (decl_implicit version=50 decl=string
+
+func testStringInterpolation() {
+  let interpolated = """
+    \([""].map {
+      let string = $0
+      return string
+    })
+    """
+}
+
 // CHECK-NEXT: {{^}}  (decl version=51 decl=FinalDecl
 
 @available(OSX 51, *)
