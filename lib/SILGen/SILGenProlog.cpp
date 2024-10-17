@@ -1382,20 +1382,28 @@ void SILGenFunction::emitProlog(
 
   emitExpectedExecutorProlog();
 
-  // IMPORTANT: This block should be the last one in `emitProlog`,
-  // since it terminates BB and no instructions should be insterted after it.
-  // Emit an unreachable instruction if a parameter type is
-  // uninhabited
-  if (paramList) {
-    for (auto *param : *paramList) {
-      if (param->getTypeInContext()->isStructurallyUninhabited()) {
-        SILLocation unreachableLoc(param);
-        unreachableLoc.markAsPrologue();
-        B.createUnreachable(unreachableLoc);
-        break;
-      }
-    }
-  }
+  // Emits an unreachable instruction if a parameter type (including `self`) is
+  // uninhabited. Returns `true` if an unreachable location was created.
+  auto handleUninhabitedParam = [&](ParamDecl *param) -> bool {
+    if (!param->getTypeInContext()->isStructurallyUninhabited())
+      return false;
+
+    SILLocation unreachableLoc(param);
+    unreachableLoc.markAsPrologue();
+    B.createUnreachable(unreachableLoc);
+    return true;
+  };
+
+  // IMPORTANT: An unreachable block should be the last one in `emitProlog`,
+  // since it is a terminator and no instructions should be insterted after it.
+  if (selfParam)
+    if (handleUninhabitedParam(selfParam))
+      return;
+
+  if (paramList)
+    for (auto *param : *paramList)
+      if (handleUninhabitedParam(param))
+        return;
 }
 
 static void emitIndirectPackParameter(SILGenFunction &SGF,
