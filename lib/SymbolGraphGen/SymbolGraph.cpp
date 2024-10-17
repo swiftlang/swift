@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Module.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
@@ -805,7 +806,15 @@ bool SymbolGraph::isUnconditionallyUnavailableOnAllPlatforms(const Decl *D) cons
 bool SymbolGraph::canIncludeDeclAsNode(const Decl *D) const {
   // If this decl isn't in this module or module that this module imported with `@_exported`, don't record it,
   // as it will appear elsewhere in its module's symbol graph.
-  if (D->getModuleContext()->getName() != M.getName() && !Walker.isConsideredExportedImported(D)) {
+
+  // If a Clang decl was declared in a submodule, the Swift decl's context will still point to the
+  // top-level module. Instead, we need to probe the owning module on the Clang side, which will
+  // correctly point to the submodule.
+  auto RealModuleName = (std::string)D->getModuleContext()->getName();
+  if (auto *ClangDecl = D->getClangDecl())
+    if (auto *ClangModule = ClangDecl->getOwningModule())
+      RealModuleName = ClangModule->Name;
+  if (RealModuleName != (std::string)M.getName() && !Walker.isConsideredExportedImported(D)) {
     return false;
   }
 
