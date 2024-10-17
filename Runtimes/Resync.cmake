@@ -29,7 +29,9 @@ function(copy_library_sources name from_prefix to_prefix)
     "${StdlibSources}/${from_prefix}/${name}/*.gyb"
     "${StdlibSources}/${from_prefix}/${name}/*.apinotes"
     "${StdlibSources}/${from_prefix}/${name}/*.yaml"
-    "${StdlibSources}/${from_prefix}/${name}/*.inc")
+    "${StdlibSources}/${from_prefix}/${name}/*.inc"
+    "${StdlibSources}/${from_prefix}/${name}/*.modulemap"
+    "${StdlibSources}/${from_prefix}/${name}/*.json")
 
   foreach(file ${filenames})
     # Get and create the directory
@@ -52,12 +54,16 @@ endfunction()
 # Copy shared core headers
 copy_library_sources(include "" "Core")
 
+# Copy magic linker symbols
+copy_library_sources("linker-support" "" "Core")
+
 set(CoreLibs
   LLVMSupport
   SwiftShims
   runtime
   CompatibilityOverride
-  stubs)
+  stubs
+  core)
 
   # Add these as we get them building
   # core

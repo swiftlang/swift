@@ -32,6 +32,7 @@
 cmake_minimum_required(VERSION 3.26...3.29)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules")
+include(CMakeWorkarounds)
 project(SwiftCore LANGUAGES C CXX Swift VERSION 6.1)
 
 # The Swift standard library is not intended for use as a sub-library as part of
@@ -46,18 +47,26 @@ set(SwiftCore_SWIFTC_SOURCE_DIR
   "${PROJECT_SOURCE_DIR}/../../"
   CACHE FILEPATH "Path to the root source directory of the Swift compiler")
 
+include(GNUInstallDirs)
+include(AvailabilityMacros)
 include(CompilerSettings)
 include(DefaultSettings)
+include(EmitSwiftInterface)
 include(PlatformInfo)
 include(gyb)
+
+option(SwiftCore_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime libraries" OFF)
 
 option(SwiftCore_ENABLE_CRASH_REPORTER_CLIENT "Enable Apple CrashReporter integration" OFF)
 option(SwiftCore_ENABLE_OBJC_INTEROP "Enable runtime ObjC interop" OFF)
 option(SwiftCore_ENABLE_TYPE_PRINTING "Enable printing type names" OFF)
+option(SwiftCore_ENABLE_VECTOR_TYPES "Enable vector support" OFF)
 
 option(SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS "" ${SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS_default})
 option(SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER "" ${SwiftCore_ENABLE_RIUNTIME_LEAK_CHECKER_default})
 option(SwiftCore_ENABLE_REFLECTION "" OFF)
+
+option(SwiftCore_ENABLE_COMMANDLINE_SUPPORT "Enable command line argument support" OFF)
 
 option(SwiftCore_ENABLE_BACKTRACING "Enable backtracing runtime support" OFF)
 set(SwiftCore_BACKTRACER_PATH "" CACHE STRING "Set a fixed path to the Swift backtracer")
@@ -69,6 +78,8 @@ add_compile_definitions(
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER=$<BOOL:${SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER}>>
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=$<BOOL:${SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS}>>)
 
+add_compile_options( $<$<AND:$<COMPILE_LANGUAGE:Swift>,$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>>:-enable-library-evolution>)
+
 include_directories(include)
 
 add_subdirectory(LLVMSupport)
@@ -77,3 +88,4 @@ add_subdirectory(Demangling)
 add_subdirectory(Threading)
 add_subdirectory(runtime)
 add_subdirectory(stubs)
+add_subdirectory(core)

@@ -93,3 +93,5 @@ Runtimes/**/*.gyb
 Runtimes/**/*.apinotes
 Runtimes/**/*.yaml
 Runtimes/**/*.inc
+Runtimes/**/*.json
+Runtimes/**/*.modulemap

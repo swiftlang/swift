@@ -34,4 +34,4 @@ target_include_directories(swiftShims INTERFACE
   $<$<COMPILE_LANGUAGE:C,CXX>:${CMAKE_CURRENT_SOURCE_DIR}/../../>
   $<$<COMPILE_LANGUAGE:Swift>:${CMAKE_CURRENT_SOURCE_DIR}>)
 target_compile_options(swiftShims INTERFACE
-  $<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc$<SEMICOLON>-fmodule-map-file=${CMAKE_CURRENT_SOURCE_DIR}/module.modulemap>)
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -fmodule-map-file=${CMAKE_CURRENT_SOURCE_DIR}/module.modulemap>")
