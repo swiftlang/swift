@@ -1960,6 +1960,7 @@ public:
     unsigned NonPayloadCases = 0; // `case a`
     unsigned NonGenericEmptyPayloadCases = 0; // `case a(Void)` or `case b(Never)`
     unsigned NonGenericNonEmptyPayloadCases = 0; // `case a(Int)` or `case d([Int?])`
+    unsigned IndirectPayloadCases = 0; // `indirect case a(T)` or `indirect case a(Int)`
     unsigned GenericPayloadCases = 0; // `case a(T)` or `case a([String : (Int, T)])`
 
     // For a single-payload enum, this is the only payload
@@ -1984,6 +1985,8 @@ public:
           // We don't have typeinfo; something is very broken.
           Invalid = true;
           return nullptr;
+        } else if (Case.Indirect) {
+          ++IndirectPayloadCases;
         } else if (Case.Generic) {
           ++GenericPayloadCases;
           LastPayloadCaseTR = CaseTR;
@@ -2000,7 +2003,7 @@ public:
     // same as cases with no payload, and generic cases are always considered
     // non-empty.
     unsigned EffectiveNoPayloadCases = NonPayloadCases + NonGenericEmptyPayloadCases;
-    unsigned EffectivePayloadCases = GenericPayloadCases + NonGenericNonEmptyPayloadCases;
+    unsigned EffectivePayloadCases = IndirectPayloadCases + GenericPayloadCases + NonGenericNonEmptyPayloadCases;
 
     if (Cases.empty()) {
       return TC.makeTypeInfo<EmptyEnumTypeInfo>(Cases);
@@ -2012,7 +2015,7 @@ public:
     // with zero-sized payloads get treated for layout purposes as non-payload
     // cases.
     EnumKind Kind;
-    switch (GenericPayloadCases + NonGenericEmptyPayloadCases + NonGenericNonEmptyPayloadCases) {
+    switch (IndirectPayloadCases + GenericPayloadCases + NonGenericEmptyPayloadCases + NonGenericNonEmptyPayloadCases) {
     case 0: Kind = EnumKind::NoPayloadEnum; break;
     case 1: Kind = EnumKind::SinglePayloadEnum; break;
     default: Kind = EnumKind::MultiPayloadEnum; break;
