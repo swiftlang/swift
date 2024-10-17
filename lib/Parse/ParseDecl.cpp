@@ -2135,7 +2135,7 @@ AvailabilityMacroMap &Parser::parseAllAvailabilityMacroArguments() {
   for (unsigned bufferID: bufferIDs) {
     // Create temporary parser.
     swift::ParserUnit PU(SM, SourceFileKind::Main, bufferID, LangOpts,
-                         TypeCheckerOptions(), SILOptions(), "unknown");
+                         "unknown");
 
     ForwardingDiagnosticConsumer PDC(Context.Diags);
     PU.getDiagnosticEngine().addConsumer(PDC);
