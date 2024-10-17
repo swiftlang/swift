@@ -3656,6 +3656,8 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
+  ParseAssertionArgs(ParsedArgs);
+
   if (ParseFrontendArgs(FrontendOpts, ParsedArgs, Diags,
                         ConfigurationFileBuffers)) {
     return true;
@@ -3671,8 +3673,6 @@ bool CompilerInvocation::parseArgs(
   if (ParseCASArgs(CASOpts, ParsedArgs, Diags, FrontendOpts)) {
     return true;
   }
-
-  ParseAssertionArgs(ParsedArgs);
 
   if (ParseLangArgs(LangOpts, ParsedArgs, Diags, FrontendOpts)) {
     return true;
