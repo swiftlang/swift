@@ -7330,6 +7330,10 @@ static bool verificationEnabled(const SILModule &M) {
   if (M.getOptions().VerifyAll)
     return true;
 
+  // If we have asserts enabled, always verify...
+  if (CONDITIONAL_ASSERT_enabled())
+    return true;
+
 #ifndef NDEBUG
   // Otherwise if we do have asserts enabled, always verify...
   return true;
