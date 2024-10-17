@@ -3473,6 +3473,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_fragile_resilient_protocol_witnesses,
                  OPT_disable_fragile_resilient_protocol_witnesses,
                  Opts.UseFragileResilientProtocolWitnesses);
+  Opts.UseProfilingMarkerThunks =
+    Args.hasFlag(OPT_enable_profiling_marker_thunks,
+                 OPT_disable_profiling_marker_thunks,
+                 Opts.UseProfilingMarkerThunks);
   Opts.EmitYieldOnce2AsYieldOnce =
       !LangOpts.hasFeature(Feature::CoroutineAccessorsAllocateInCallee);
   Opts.EnableHotColdSplit =

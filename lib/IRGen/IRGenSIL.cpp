@@ -3835,6 +3835,15 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     SubstitutionMap subMap = site.getSubstitutionMap();
     emitPolymorphicArguments(*this, origCalleeType,
                              subMap, &witnessMetadata, llArgs);
+
+    // We currently only support non-async calls with profiling thunks.
+    if (IGM.getOptions().UseProfilingMarkerThunks &&
+        isa<FunctionRefInst>(site.getCallee()) &&
+        !site.getOrigCalleeType()->isAsync() &&
+        subMap.hasAnySubstitutableParams() &&
+        !subMap.getRecursiveProperties().hasPrimaryArchetype()) {
+      emission->useProfilingThunk();
+    }
   }
 
   if (calleeFP.shouldPassContinuationDirectly()) {
