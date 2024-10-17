@@ -14,7 +14,7 @@ public func test() {
 
 // CHECK-MESSAGE: define {{.*}}void @"$s4main4testyyF"(){{.*}} {
 // CHECK-MESSAGE: entry:
-// CHECK-MESSAGE:   {{.*}}call {{.*}}void @"$ss17_assertionFailure__
+// CHECK-MESSAGE:   {{.*}}call {{.*}}void @"${{(ss17_assertionFailure__|ss31_embeddedReportFatalErrorInFile)}}
 // CHECK-MESSAGE-SAME: Fatal error
 // CHECK-MESSAGE-SAME: task failed successfully
 // CHECK-MESSAGE-SAME: traps-fatalerror-ir.swift
