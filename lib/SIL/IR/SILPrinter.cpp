@@ -2058,6 +2058,9 @@ public:
     case ThunkInst::Kind::Identity:
       *this << "[identity] ";
       break;
+    case ThunkInst::Kind::HopToMainActorIfNeeded:
+      *this << "[hop_to_mainactor_if_needed] ";
+      break;
     }
     *this << Ctx.getID(ti->getOperand());
     printSubstitutions(

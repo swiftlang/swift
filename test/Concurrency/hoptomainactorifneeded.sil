@@ -1,0 +1,40 @@
+// RUN: %target-sil-opt -sil-thunk-lowering %s | %FileCheck %s
+
+// REQUIRES: concurrency
+// REQUIRES: concurrency_runtime
+// REQUIRES: asserts
+// UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: back_deploy_concurrency
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: freestanding
+
+sil_stage canonical
+
+import Swift
+import SwiftShims
+import Builtin
+import _Concurrency
+
+sil @noparam_noreturn_callee : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil shared [thunk] @simple_testTTH : $@convention(thin) (@guaranteed @convention(thin) () -> ()) -> () {
+// CHECK: bb0([[FUNC:%.*]] : $@convention(thin)
+// CHECK:   [[RUN_ON_MAIN_ACTOR:%.*]] = function_ref @$ss19_taskRunOnMainActor9operationyyyScMYcc_tF : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+// CHECK:   [[CVT:%.*]] = thin_to_thick_function [[FUNC]]
+// CHECK:   apply [[RUN_ON_MAIN_ACTOR]]([[CVT]])
+// CHECK: } // end sil function 'simple_testTTH'
+
+// CHECK-LABEL: sil @simple_test : $@convention(thin) () -> @error any Error {
+// CHECK:   [[FUNC:%.*]] = function_ref @noparam_noreturn_callee : $@convention(thin) () -> ()
+// CHECK:   [[THUNK:%.*]] = function_ref @simple_testTTH : $@convention(thin) (@guaranteed @convention(thin) () -> ()) -> ()
+// CHECK:   [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[FUNC]])
+// CHECK:   apply [[THUNKED_FUNC]](
+// CHECK: } // end sil function 'simple_test'
+sil @simple_test : $@convention(thin) () -> @error any Error {
+bb0:
+  %0 = function_ref @noparam_noreturn_callee : $@convention(thin) () -> ()
+  %1 = thunk [hop_to_mainactor_if_needed] %0() : $@convention(thin) () -> ()
+  apply %1() : $@callee_guaranteed () -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}

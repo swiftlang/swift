@@ -2821,6 +2821,42 @@ bool ConvertFunctionInst::onlyConvertsSendable() const {
          getNonSendableFuncType(getType());
 }
 
+static CanSILFunctionType getDerivedFunctionTypeForHopToMainActorIfNeeded(
+    SILFunction *fn, CanSILFunctionType inputFunctionType,
+    SubstitutionMap subMap) {
+  inputFunctionType = inputFunctionType->substGenericArgs(
+      fn->getModule(), subMap, fn->getTypeExpansionContext());
+  bool needsSubstFunctionType = false;
+  for (auto param : inputFunctionType->getParameters()) {
+    needsSubstFunctionType |= param.getInterfaceType()->hasTypeParameter();
+  }
+  for (auto result : inputFunctionType->getResults()) {
+    needsSubstFunctionType |= result.getInterfaceType()->hasTypeParameter();
+  }
+  for (auto yield : inputFunctionType->getYields()) {
+    needsSubstFunctionType |= yield.getInterfaceType()->hasTypeParameter();
+  }
+
+  SubstitutionMap appliedSubs;
+  if (needsSubstFunctionType) {
+    appliedSubs = inputFunctionType->getCombinedSubstitutions();
+  }
+
+  auto extInfoBuilder =
+      inputFunctionType->getExtInfo()
+          .intoBuilder()
+          .withRepresentation(SILFunctionType::Representation::Thick)
+          .withIsPseudogeneric(false);
+
+  return SILFunctionType::get(
+      nullptr, extInfoBuilder.build(), inputFunctionType->getCoroutineKind(),
+      ParameterConvention::Direct_Guaranteed,
+      inputFunctionType->getParameters(), inputFunctionType->getYields(),
+      inputFunctionType->getResults(),
+      inputFunctionType->getOptionalErrorResult(), appliedSubs,
+      SubstitutionMap(), inputFunctionType->getASTContext());
+}
+
 static CanSILFunctionType
 getDerivedFunctionTypeForIdentityThunk(SILFunction *fn,
                                        CanSILFunctionType inputFunctionType,
@@ -2873,9 +2909,20 @@ ThunkInst::Kind::getDerivedFunctionType(SILFunction *fn,
   case Identity:
     return getDerivedFunctionTypeForIdentityThunk(fn, inputFunctionType,
                                                   subMap);
+  case HopToMainActorIfNeeded:
+    return getDerivedFunctionTypeForHopToMainActorIfNeeded(
+        fn, inputFunctionType, subMap);
   }
 
   llvm_unreachable("Covered switch isn't covered?!");
+}
+
+SILType ThunkInst::Kind::getDerivedFunctionType(SILFunction *fn,
+                                                SILType inputFunctionType,
+                                                SubstitutionMap subMap) const {
+  auto fType = inputFunctionType.castTo<SILFunctionType>();
+  return SILType::getPrimitiveType(getDerivedFunctionType(fn, fType, subMap),
+                                   inputFunctionType.getCategory());
 }
 
 ThunkInst *ThunkInst::create(SILDebugLocation debugLoc, SILValue operand,

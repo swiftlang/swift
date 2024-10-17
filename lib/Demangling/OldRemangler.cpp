@@ -2525,6 +2525,17 @@ ManglingError Remangler::mangleCurryThunk(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleSILThunkIdentity(Node *node, unsigned depth) {
+  Buffer << "<sil-identity-thunk>";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleSILThunkHopToMainActorIfNeeded(Node *node,
+                                                              unsigned depth) {
+  Buffer << "<sil-hop-to-main-actor-if-needed-thunk>";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleDispatchThunk(Node *node, unsigned depth) {
   Buffer << "<dispatch-thunk>";
   return ManglingError::Success;

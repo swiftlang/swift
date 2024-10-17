@@ -963,6 +963,45 @@ TaskExecutorRef swift_task_getPreferredTaskExecutor(void);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCurrentExecutor(SerialExecutorRef executor);
 
+/// This is an options enum that is used to pass flags to
+/// swift_task_isCurrentExecutorWithFlags. It is meant to be a flexible toggle.
+///
+/// Since this is an options enum, so all values should be powers of 2.
+///
+/// NOTE: We are purposely leaving this as a uint64_t so that on all platforms
+/// this could be a pointer to a different enum instance if we need it to be.
+enum swift_task_is_current_executor_flag : uint64_t {
+  /// We aren't passing any flags.
+  None = 0x0,
+
+  /// This is not used today, but is just future ABI reservation.
+  ///
+  /// The intention is that we may want the ability to tell future versions of
+  /// the runtime that this uint64_t is actually a pointer that it should
+  /// dereference and then have further extended behavior controlled by a
+  /// different enum. By placing this here, we ensure that we will have a tagged
+  /// pointer compatible flag for this purpose.
+  TaggedPointer = 0x1,
+
+  /// This is not used today, but is just future ABI reservation.
+  ///
+  /// \see swift_task_is_current_executor_flag::TaggedPointer
+  TaggedPointer2 = 0x2,
+
+  /// This is not used today, but is just future ABI reservation.
+  ///
+  /// \see swift_task_is_current_executor_flag::TaggedPointer
+  TaggedPointer3 = 0x4,
+
+  /// The routine should assert on failure.
+  Assert = 0x8,
+};
+
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+bool swift_task_isCurrentExecutorWithFlags(
+    SerialExecutorRef executor, swift_task_is_current_executor_flag flags);
+
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_reportUnexpectedExecutor(
     const unsigned char *file, uintptr_t fileLength, bool fileIsASCII,

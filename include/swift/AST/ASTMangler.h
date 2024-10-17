@@ -15,6 +15,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
+#include "swift/AST/SILThunkKind.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/Basic/TaggedUnion.h"
@@ -313,6 +314,9 @@ public:
   std::string mangleSILDifferentiabilityWitness(StringRef originalName,
                                                 DifferentiabilityKind kind,
                                                 const AutoDiffConfig &config);
+
+  std::string mangleSILThunkKind(StringRef originalName,
+                                 SILThunkKind thunkKind);
 
   /// Mangle the AutoDiff generated declaration for the given:
   /// - Generated declaration kind: linear map struct or branching trace enum.
