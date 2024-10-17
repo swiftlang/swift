@@ -36,6 +36,12 @@ public struct External: MyProto {
 // CHECK-NEXT:     "conformances": [
 // CHECK-NEXT:       "ExtractInterpolatedStringLiterals.MyProto"
 // CHECK-NEXT:     ],
+// CHECK-NEXT:     "allConformances": [
+// CHECK-NEXT:       {
+// CHECK-NEXT:         "protocolName": "ExtractInterpolatedStringLiterals.MyProto"
+// CHECK-NEXT:         "conformanceDefiningModule": "ExtractInterpolatedStringLiterals"
+// CHECK-NEXT:       }
+// CHECK-NEXT:     ],
 // CHECK-NEXT:     "associatedTypeAliases": [],
 // CHECK-NEXT:     "properties": [
 // CHECK-NEXT:       {
@@ -59,6 +65,12 @@ public struct External: MyProto {
 // CHECK-NEXT:     "line": 25,
 // CHECK-NEXT:     "conformances": [
 // CHECK-NEXT:       "ExtractInterpolatedStringLiterals.MyProto"
+// CHECK-NEXT:     ],
+// CHECK-NEXT:     "allConformances": [
+// CHECK-NEXT:       {
+// CHECK-NEXT:         "protocolName": "ExtractInterpolatedStringLiterals.MyProto"
+// CHECK-NEXT:         "conformanceDefiningModule": "ExtractInterpolatedStringLiterals"
+// CHECK-NEXT:       }
 // CHECK-NEXT:     ],
 // CHECK-NEXT:     "associatedTypeAliases": [],
 // CHECK-NEXT:     "properties": [
