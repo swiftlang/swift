@@ -259,6 +259,29 @@ struct HasCustomRACIteratorTag {
   }
 };
 
+struct HasCustomInheritedRACIteratorTag {
+  struct CustomTag0 : public std::random_access_iterator_tag {};
+  using CustomTag1 = CustomTag0;
+  struct CustomTag2 : public CustomTag1 {};
+  using CustomTag3 = CustomTag2;
+  using CustomTag4 = CustomTag3;
+
+  int value;
+  using iterator_category = CustomTag4;
+  const int &operator*() const { return value; }
+  HasCustomInheritedRACIteratorTag &operator++() {
+    value++;
+    return *this;
+  }
+  void operator+=(int x) { value += x; }
+  int operator-(const HasCustomInheritedRACIteratorTag &x) const {
+    return value - x.value;
+  }
+  bool operator==(const HasCustomInheritedRACIteratorTag &other) const {
+    return value == other.value;
+  }
+};
+
 struct HasCustomIteratorTagInline {
   struct iterator_category : public std::input_iterator_tag {};
 
