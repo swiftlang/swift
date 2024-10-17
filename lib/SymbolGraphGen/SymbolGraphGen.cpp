@@ -63,23 +63,43 @@ int symbolgraphgen::emitSymbolGraphForModule(
     ModuleDecl *M, const SymbolGraphOptions &Options) {
   ModuleDecl::ImportCollector importCollector(Options.MinimumAccessLevel);
 
-  bool IncludeClangSubmodules = false;
-  if (auto *ClangModule = M->findUnderlyingClangModule()) {
-    // If a Clang module has a definition that includes `export *; module * {
-    // export *; }` then we want to treat those inferred submodules as part of
-    // the parent module, to preserve historical behavior.
-    if (ClangModule->InferSubmodules && ClangModule->InferExportWildcard) {
-      IncludeClangSubmodules = true;
+  SmallPtrSet<const clang::Module *, 2> ExportedClangModules = {};
+  SmallPtrSet<const clang::Module *, 2> WildcardExportClangModules = {};
+  if (const auto *ClangModule = M->findUnderlyingClangModule()) {
+    // Scan through the Clang module's exports and collect them for later
+    // handling
+    for (auto ClangExport : ClangModule->Exports) {
+      if (ClangExport.getInt()) {
+        // Blanket exports are represented as a true boolean tag
+        if (const auto *ExportParent = ClangExport.getPointer()) {
+          // If a pointer is present, this is a scoped blanket export, like
+          // `export Submodule.*`
+          WildcardExportClangModules.insert(ExportParent);
+        } else {
+          // Otherwise it represents a full blanket `export *`
+          WildcardExportClangModules.insert(ClangModule);
+        }
+      } else if (!ClangExport.getInt() && ClangExport.getPointer()) {
+        // This is an explicit `export Submodule`
+        ExportedClangModules.insert(ClangExport.getPointer());
+      }
     }
   }
 
-  auto importFilter = [&Options, &IncludeClangSubmodules,
-                       &M](const ModuleDecl *module) {
+  auto importFilter = [&Options, &WildcardExportClangModules,
+                       &ExportedClangModules](const ModuleDecl *module) {
     if (!module)
       return false;
 
-    if (IncludeClangSubmodules && module->isSubmoduleOf(M)) {
-      return true;
+    if (const auto *ClangModule = module->findUnderlyingClangModule()) {
+      if (ExportedClangModules.contains(ClangModule)) {
+        return true;
+      }
+
+      for (const auto *ClangParent : WildcardExportClangModules) {
+        if (ClangModule->isSubModuleOf(ClangParent))
+          return true;
+      }
     }
 
     if (Options.AllowedReexportedModules.has_value())
@@ -90,7 +110,8 @@ int symbolgraphgen::emitSymbolGraphForModule(
     return false;
   };
 
-  if (Options.AllowedReexportedModules.has_value() || IncludeClangSubmodules)
+  if (Options.AllowedReexportedModules.has_value() ||
+      !WildcardExportClangModules.empty() || !ExportedClangModules.empty())
     importCollector.importFilter = std::move(importFilter);
 
   SmallVector<Decl *, 64> ModuleDecls;

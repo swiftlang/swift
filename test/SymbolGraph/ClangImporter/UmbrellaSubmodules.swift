@@ -1,6 +1,5 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %empty-directory(%t/SwiftAttr)
 // RUN: split-file %s %t
 
 // RUN: %target-swift-symbolgraph-extract -sdk %clang-importer-sdk -module-name UmbrellaSubmodules -I %t/UmbrellaSubmodules -output-dir %t -pretty-print -v
