@@ -141,7 +141,6 @@ extension ASTGenVisitor {
       return self.generate(nilLiteralExpr: node).asExpr
     case .optionalChainingExpr(let node):
       return self.generate(optionalChainingExpr: node).asExpr
-      break
     case .packElementExpr(let node):
       return self.generate(packElementExpr: node).asExpr
     case .packExpansionExpr(let node):
