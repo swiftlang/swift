@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -disable-availability-checking -parse-as-library -enable-experimental-feature Embedded %s -c -o %t/a.o
-// RUN: %target-clang -x c -std=c11 -I %swift_obj_root/include -c %S/Inputs/executor.c -o %t/executor.o
+// RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -disable-availability-checking -parse-as-library -enable-experimental-feature Embedded %s -c -o %t/a.o -Osize
+// RUN: %target-clang -x c -std=c11 -I %swift_obj_root/include -c %S/Inputs/executor.c -o %t/executor.o -Oz -DNDEBUG -DDEBUG_EXECUTOR=0
 // RUN: %target-clang %t/a.o %t/executor.o -o %t/a.out %swift_obj_root/lib/swift/embedded/%target-cpu-apple-macos/libswift_Concurrency.a -dead_strip
 
 // RUN: grep DEP\: %s | sed 's#// DEP\: ##' | sort > %t/allowed-dependencies.txt
@@ -10,7 +10,6 @@
 // Fail if there is any entry in actual-dependencies.txt that's not in allowed-dependencies.txt
 // RUN: test -z "`comm -13 %t/allowed-dependencies.txt %t/actual-dependencies.txt`"
 
-// DEP: ___assert_rtn
 // DEP: ___stack_chk_fail
 // DEP: ___stack_chk_guard
 // DEP: _abort
@@ -32,6 +31,7 @@
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx
