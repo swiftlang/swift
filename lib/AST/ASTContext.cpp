@@ -593,6 +593,9 @@ struct ASTContext::Implementation {
     /// The set of substitution maps (uniqued by their storage).
     llvm::FoldingSet<SubstitutionMap::Storage> SubstitutionMaps;
 
+    /// The set of unique AvailabilityContexts.
+    llvm::FoldingSet<AvailabilityContext> AvailabilityContexts;
+
     ~Arena() {
       for (auto &conformance : SpecializedConformances)
         conformance.~SpecializedProtocolConformance();
@@ -3301,6 +3304,7 @@ void ASTContext::Implementation::Arena::dump(llvm::raw_ostream &os) const {
     SIZE_AND_BYTES(BuiltinConformances);
     SIZE(PackConformances);
     SIZE(SubstitutionMaps);
+    SIZE(AvailabilityContexts);
 
 #undef SIZE
 #undef SIZE_AND_BYTES
@@ -5575,6 +5579,26 @@ SubstitutionMap::Storage *SubstitutionMap::Storage::get(
   auto result = new (mem) Storage(genericSig, replacementTypes, conformances);
   substitutionMaps.InsertNode(result, insertPos);
   return result;
+}
+
+const AvailabilityContext *
+AvailabilityContext::get(const PlatformInfo &platformInfo, ASTContext &ctx) {
+  llvm::FoldingSetNodeID id;
+  platformInfo.Profile(id);
+
+  auto &foldingSet =
+      ctx.getImpl().getArena(AllocationArena::Permanent).AvailabilityContexts;
+  void *insertPos;
+  auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+
+  void *mem =
+      ctx.Allocate(sizeof(AvailabilityContext), alignof(AvailabilityContext));
+  auto *newNode = ::new (mem) AvailabilityContext(platformInfo);
+  foldingSet.InsertNode(newNode, insertPos);
+
+  return newNode;
 }
 
 void GenericSignatureImpl::Profile(llvm::FoldingSetNodeID &ID,
