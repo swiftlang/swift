@@ -79,8 +79,6 @@ namespace swift {
         ModuleFile::PartiallySerialized<SILDifferentiabilityWitness *>>
         DifferentiabilityWitnesses;
 
-    uint32_t DebugScopeIndex = 1;
-
     //-----
     // End Deserialization Caches
     //
@@ -115,7 +113,7 @@ namespace swift {
     llvm::Expected<SILFunction *>
     readSILFunctionChecked(serialization::DeclID, SILFunction *InFunc,
                            StringRef Name, bool declarationOnly,
-                           bool errorIfEmptyBody = true, bool isDebug = false);
+                           bool errorIfEmptyBody = true, bool forDebugScope = false);
 
     /// Read a SIL basic block within a given SIL function.
     SILBasicBlock *readSILBasicBlock(SILFunction *Fn,
@@ -155,7 +153,7 @@ namespace swift {
     llvm::DenseMap<unsigned, const SILDebugScope *> ParsedScopes;
 
     SILFunction *getFuncForReference(StringRef Name, SILType Ty, TypeExpansionContext context);
-    SILFunction *getFuncForReference(StringRef Name, bool isDebug = false);
+    SILFunction *getFuncForReference(StringRef Name, bool forDebugScope = false);
     SILVTable *readVTable(serialization::DeclID);
     SILMoveOnlyDeinit *readMoveOnlyDeinit(serialization::DeclID);
     SILGlobalVariable *getGlobalForReference(StringRef Name);

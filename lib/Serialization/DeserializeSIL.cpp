@@ -623,10 +623,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
 
   PrettyStackTraceStringAction trace("deserializing SIL function", name);
 
-  ModuleFile::PartiallySerialized<SILFunction *> *cacheEntryOpt = nullptr;
-  cacheEntryOpt = &Funcs[FID - 1];
-
-  auto &cacheEntry = *cacheEntryOpt;
+  auto &cacheEntry = Funcs[FID - 1];
 
   if (cacheEntry.isFullyDeserialized() ||
       (cacheEntry.isDeserialized() && (declarationOnly || forDebugScope))) {
@@ -1059,7 +1056,6 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   // SIL_VTABLE or SIL_GLOBALVAR or SIL_WITNESS_TABLE record also means the end
   // of this SILFunction.
   bool isFirstScope = true;
-  auto Copy = ParsedScopes;
   ParsedScopes.clear();
   Builder.setCurrentDebugScope(fn->getDebugScope());
   while (kind != SIL_FUNCTION && kind != SIL_VTABLE && kind != SIL_GLOBALVAR &&
@@ -1075,12 +1071,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
         isFirstScope = false;
       }
       Builder.setCurrentDebugScope(Scope);
-      // Builder.applyDebugLocOverride(Scope->getLoc());
-    } /* else if (kind == SIL_SOURCE_LOC || kind == SIL_SOURCE_LOC_REF) {
-       SILLocation Loc = readLoc(kind, scratch);
-       Builder.applyDebugLocOverride(Loc);
-     } */
-    else {
+    } else {
       // If CurrentBB is empty, just return fn. The code in readSILInstruction
       // assumes that such a situation means that fn is a declaration. Thus it
       // is using return false to mean two different things, error a failure
@@ -1111,7 +1102,6 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     kind = maybeKind.get();
   }
 
-  ParsedScopes = Copy;
   // If fn is empty, we failed to deserialize its body. Return nullptr to signal
   // error.
   if (fn->empty() && errorIfEmptyBody)
@@ -1339,8 +1329,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                          SILBuilder &Builder,
                                          unsigned RecordKind,
                                          SmallVectorImpl<uint64_t> &scratch) {
-  // if (Fn)
-  //  Builder.setCurrentDebugScope(Fn->getDebugScope());
   unsigned RawOpCode = 0, TyCategory = 0, TyCategory2 = 0, TyCategory3 = 0,
            Attr = 0, Attr2 = 0, Attr3 = 0, Attr4 = 0, SubID = 0;
   ValueID ValID, ValID2, ValID3;
