@@ -1731,6 +1731,7 @@ namespace  {
     UNINTERESTING_ATTR(StaticExclusiveOnly)
     UNINTERESTING_ATTR(PreInverseGenerics)
     UNINTERESTING_ATTR(Lifetime)
+    UNINTERESTING_ATTR(PlaygroundTransformed)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
