@@ -19,8 +19,8 @@ struct  __attribute__((swift_attr("conforms_to:SwiftTest.A"))) \
     __attribute__((swift_attr("conforms_to:SwiftTest.B"))) ConformsToValidAProtocolButAlsoStructB {};
 struct  __attribute__((swift_attr("conforms_to:SwiftTest.A"))) \
     __attribute__((swift_attr("conforms_to:X"))) ConformsToValidAProtocolButInvalidX {};
-struct  __attribute__((swift_attr("conforms_to:SwiftTest.A"))) \
-    __attribute__((swift_attr("conforms_to:SwiftTest.A"))) ConformsToATwice {};
+struct  __attribute__((swift_attr("conforms_to:SwiftTest.C"))) \
+    __attribute__((swift_attr("conforms_to:SwiftTest.C"))) ConformsToCTwice {};
 
 //--- test.swift
 
@@ -30,6 +30,7 @@ struct B {}
 
 protocol A {}
 protocol A {}
+protocol C {}
 
 // CHECK: error: expected module name and protocol name separated by '.' in protocol conformance; 'X' is invalid
 // CHECK: module 'Mod' in specified protocol conformance 'Mod.X' is not found; did you mean to import it first?
@@ -38,7 +39,7 @@ protocol A {}
 // CHECK: error: struct 'B' referenced in protocol conformance 'SwiftTest.B' is not a protocol
 // CHECK: error: struct 'B' referenced in protocol conformance 'SwiftTest.B' is not a protocol
 // CHECK: error: expected module name and protocol name separated by '.' in protocol conformance; 'X' is invalid
-// CHECK: error: Redundant conformance of 'ConformsToATwice' to protocol 'SwiftTest.A'
+// CHECK: error: Redundant conformance of 'ConformsToCTwice' to protocol 'SwiftTest.C'
 
 func test(
     _ inv: CInv, 
@@ -48,5 +49,5 @@ func test(
     _ b: CB, 
     c: ConformsToValidAProtocolButAlsoStructB,
     d: ConformsToValidAProtocolButInvalidX, 
-    e: ConformsToATwice
+    e: ConformsToCTwice
 ) {}
