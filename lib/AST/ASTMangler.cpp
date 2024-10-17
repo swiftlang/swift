@@ -579,7 +579,7 @@ void ASTMangler::appendIndexSubset(IndexSubset *indices) {
 
 static NodePointer mangleSILDifferentiabilityWitnessAsNode(
     StringRef originalName, DifferentiabilityKind kind,
-    const AutoDiffConfig &config, Demangler &demangler) {
+    const AutoDiffConfig &config, Demangler &demangler, ASTMangler *mangler) {
   auto *diffWitnessNode = demangler.createNode(
       Node::Kind::DifferentiabilityWitness);
   auto origNode = demangler.demangleSymbol(originalName);
@@ -600,7 +600,7 @@ static NodePointer mangleSILDifferentiabilityWitnessAsNode(
           Node::Kind::IndexSubset, config.resultIndices->getString()),
       demangler);
   if (auto genSig = config.derivativeGenericSignature) {
-    ASTMangler genSigMangler;
+    ASTMangler genSigMangler(mangler->getASTContext());
     auto genSigSymbol = genSigMangler.mangleGenericSignature(genSig);
     auto demangledGenSig = demangler.demangleSymbol(genSigSymbol);
     assert(demangledGenSig);
@@ -620,7 +620,7 @@ std::string ASTMangler::mangleSILDifferentiabilityWitness(StringRef originalName
   if (isMangledName(originalName)) {
     Demangler demangler;
     auto *node = mangleSILDifferentiabilityWitnessAsNode(
-        originalName, kind, config, demangler);
+        originalName, kind, config, demangler, this);
     auto mangling = mangleNode(node);
     if (!mangling.isSuccess()) {
       llvm_unreachable("unexpected mangling failure");

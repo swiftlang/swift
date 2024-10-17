@@ -32,7 +32,7 @@ static NodePointer mangleGenericSignatureAsNode(GenericSignature sig,
                                                 Demangler &demangler) {
   if (!sig)
     return nullptr;
-  ASTMangler sigMangler;
+  ASTMangler sigMangler(sig->getASTContext());
   auto mangledGenSig = sigMangler.mangleGenericSignature(sig);
   auto demangledGenSig = demangler.demangleSymbol(mangledGenSig);
   assert(demangledGenSig->getKind() == Node::Kind::Global);
@@ -124,7 +124,7 @@ static NodePointer mangleDerivativeFunctionSubsetParametersThunkAsNode(
     thunk->addChild(child, demangler);
   NodePointer toTypeNode = nullptr;
   {
-    ASTMangler typeMangler;
+    ASTMangler typeMangler(toType->getASTContext());
     toTypeNode = demangler.demangleType(
         typeMangler.mangleTypeWithoutPrefix(toType));
     assert(toTypeNode && "Cannot demangle the to-type as node");

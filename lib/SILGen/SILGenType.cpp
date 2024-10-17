@@ -160,7 +160,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass, SILDeclRef derived,
   // Generate the thunk name.
   std::string name;
   {
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(getASTContext());
     if (isa<FuncDecl>(baseDecl)) {
       name = mangler.mangleVTableThunk(
         cast<FuncDecl>(baseDecl),
@@ -813,7 +813,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
       witnessRef, witnessSubsForTypeLowering, conformance);
 
   // Mangle the name of the witness thunk.
-  Mangle::ASTMangler NewMangler;
+  Mangle::ASTMangler NewMangler(M.getASTContext());
   std::string nameBuffer =
       NewMangler.mangleWitnessThunk(manglingConformance, requirement.getDecl());
   // TODO(TF-685): Proper mangling for derivative witness thunks.
@@ -932,7 +932,7 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
 
   // Mangle the name of the witness thunk.
   std::string name = [&] {
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(requirement.getASTContext());
     return mangler.mangleWitnessThunk(conformance, requirement.getDecl());
   }();
 

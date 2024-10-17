@@ -673,7 +673,7 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
     }
   } else {
     std::string mangledName =
-        Mangle::ASTMangler().mangleNominalType(nominal);
+        Mangle::ASTMangler(nominal->getASTContext()).mangleNominalType(nominal);
     for (auto item : *iter) {
       if (item.first != mangledName)
         continue;
@@ -702,7 +702,7 @@ void ModuleFile::loadObjCMethods(
     return;
   }
 
-  std::string ownerName = Mangle::ASTMangler().mangleNominalType(typeDecl);
+  std::string ownerName = Mangle::ASTMangler(typeDecl->getASTContext()).mangleNominalType(typeDecl);
   auto results = *known;
   for (const auto &result : results) {
     // If the method is the wrong kind (instance vs. class), skip it.
@@ -734,7 +734,7 @@ void ModuleFile::loadDerivativeFunctionConfigurations(
   if (!Core->DerivativeFunctionConfigurations)
     return;
   auto &ctx = originalAFD->getASTContext();
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(ctx);
   auto mangledName = Mangler.mangleDeclAsUSR(originalAFD, "");
   auto configs = Core->DerivativeFunctionConfigurations->find(mangledName);
   if (configs == Core->DerivativeFunctionConfigurations->end())

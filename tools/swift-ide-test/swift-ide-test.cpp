@@ -2701,7 +2701,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
 
     // Simulate already having mangled names
     for (auto LTD : LocalTypeDecls) {
-      Mangle::ASTMangler Mangler;
+      Mangle::ASTMangler Mangler(M->getASTContext());
       std::string MangledName = Mangler.mangleTypeForDebugger(
           LTD->getDeclaredInterfaceType(),
           LTD->getInnermostDeclContext()->getGenericSignatureOfContext());
@@ -3907,7 +3907,7 @@ public:
 
 private:
   void tryDemangleType(Type T, const DeclContext *DC, CharSourceRange range) {
-    Mangle::ASTMangler Mangler;
+    Mangle::ASTMangler Mangler(Ctx);
     auto sig = DC->getGenericSignatureOfContext();
     std::string mangledName(Mangler.mangleTypeForDebugger(T, sig));
     Type ReconstructedType = DC->mapTypeIntoContext(

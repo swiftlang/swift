@@ -1452,9 +1452,9 @@ public:
     return entity;
   }
 
-  void mangle(llvm::raw_ostream &out) const;
-  void mangle(SmallVectorImpl<char> &buffer) const;
-  std::string mangleAsString() const;
+  void mangle(ASTContext &Ctx, llvm::raw_ostream &out) const;
+  void mangle(ASTContext &Ctx, SmallVectorImpl<char> &buffer) const;
+  std::string mangleAsString(ASTContext &Ctx) const;
 
   SILDeclRef getSILDeclRef() const;
   SILLinkage getLinkage(ForDefinition_t isDefinition) const;

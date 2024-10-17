@@ -1096,7 +1096,7 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
     if (!discriminatorStr.empty())
       return discriminatorStr.str();
 #if SWIFT_BUILD_SWIFT_SYNTAX
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(macro->getASTContext());
     return mangler.mangleMacroExpansion(expansion);
 #else
     return "";
@@ -1407,7 +1407,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     if (!discriminatorStr.empty())
       return discriminatorStr.str();
 #if SWIFT_BUILD_SWIFT_SYNTAX
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(attachedTo->getASTContext());
     return mangler.mangleAttachedMacroExpansion(attachedTo, attr, role);
 #else
     return "";

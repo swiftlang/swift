@@ -124,7 +124,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   auto fromInterfaceType = fromType->mapTypeOutOfContext()->getCanonicalType();
   auto toInterfaceType = toType->mapTypeOutOfContext()->getCanonicalType();
 
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(module.getASTContext());
   std::string name = mangler.mangleReabstractionThunkHelper(
       thunkType, fromInterfaceType, toInterfaceType, Type(), Type(),
       module.getSwiftModule());
@@ -415,7 +415,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
                                   /*withoutActuallyEscaping*/ true,
                                   DifferentiationThunkKind::Reabstraction);
 
-  Mangle::DifferentiationMangler mangler;
+  Mangle::DifferentiationMangler mangler(parentThunk->getASTContext());
   auto fromInterfaceType =
       linearMapType->mapTypeOutOfContext()->getCanonicalType();
 
@@ -757,7 +757,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
                    ->getNameStr();
   }
   assert(!origName.empty() && "Original function name could not be resolved");
-  Mangle::DifferentiationMangler mangler;
+  Mangle::DifferentiationMangler mangler(adContext.getASTContext());
   auto thunkName = mangler.mangleDerivativeFunctionSubsetParametersThunk(
       origName, targetType->mapTypeOutOfContext()->getCanonicalType(),
       kind, actualConfig.parameterIndices, actualConfig.resultIndices,
