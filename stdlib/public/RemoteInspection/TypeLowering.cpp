@@ -447,7 +447,7 @@ BitMask RecordTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const
       mask.andMask(zeroPointerSizedMask, 0);
     }
     // Otherwise, it's the same as an Existential Metatype
-    DISPATCH_FALLTHROUGH;
+    SWIFT_FALLTHROUGH;
   }
   case RecordKind::ExistentialMetatype: {
     // All the pointers in an Existential Metatype expose spare bits...
