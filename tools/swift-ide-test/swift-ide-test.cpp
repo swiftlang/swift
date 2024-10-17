@@ -2508,15 +2508,17 @@ static int doSemanticAnnotation(const CompilerInvocation &InitInvok,
   return 0;
 }
 
-static int doInputCompletenessTest(StringRef SourceFilename) {
+static int doInputCompletenessTest(const CompilerInvocation &InitInvok,
+                                   StringRef SourceFilename) {
   std::unique_ptr<llvm::MemoryBuffer> FileBuf;
   if (setBufferForFile(SourceFilename, FileBuf))
     return 1;
 
   llvm::raw_ostream &OS = llvm::outs();
   OS << SourceFilename << ": ";
-  if (isSourceInputComplete(std::move(FileBuf),
-                            SourceFileKind::Main).IsComplete) {
+  if (isSourceInputComplete(std::move(FileBuf), SourceFileKind::Main,
+                            InitInvok.getLangOptions())
+          .IsComplete) {
     OS << "IS_COMPLETE\n";
   } else {
     OS << "IS_INCOMPLETE\n";
@@ -4744,7 +4746,7 @@ int main(int argc, char *argv[]) {
     break;
 
   case ActionType::TestInputCompleteness:
-    ExitCode = doInputCompletenessTest(options::SourceFilename);
+    ExitCode = doInputCompletenessTest(InitInvok, options::SourceFilename);
     break;
 
   case ActionType::PrintASTNotTypeChecked:
