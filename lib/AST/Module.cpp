@@ -955,12 +955,7 @@ bool ModuleDecl::isSubmoduleOf(const ModuleDecl *M) const {
   if (!ClangModule)
     return false;
 
-  while ((ClangModule = ClangModule->Parent)) {
-    if (ClangModule == ClangParent)
-      return true;
-  }
-
-  return false;
+  return ClangModule->isSubModuleOf(ClangParent);
 }
 
 static bool isParsedModule(const ModuleDecl *mod) {
