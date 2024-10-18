@@ -57,6 +57,9 @@ class Swift(product.Product):
         self.cmake_options.extend(self._enable_experimental_cxx_interop)
         self.cmake_options.extend(self._enable_cxx_interop_swift_bridging_header)
 
+        # Add experimental c interop flag.
+        self.cmake_options.extend(self._enable_experimental_pointer_bounds)
+
         # Add experimental distributed flag.
         self.cmake_options.extend(self._enable_experimental_distributed)
 
@@ -214,6 +217,11 @@ updated without updating swift.py?")
     def _enable_experimental_observation(self):
         return [('SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL',
                  self.args.enable_experimental_observation)]
+
+    @property
+    def _enable_experimental_pointer_bounds(self):
+        return [('SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS:BOOL',
+                 self.args.enable_experimental_pointer_bounds)]
 
     @property
     def _enable_synchronization(self):
