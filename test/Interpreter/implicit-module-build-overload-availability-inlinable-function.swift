@@ -3,8 +3,8 @@
 // RUN: %empty-directory(%t/API)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-emit-module-interface(%t/NonAPI/Library.swiftinterface) %t/Library.swift -module-name Library -target %target-swift-abi-5.8-triple
-// RUN: %target-swift-emit-module-interface(%t/API/Library.swiftinterface) %t/Library.swift -module-name Library -target %target-swift-abi-5.8-triple -library-level api
+// RUN: %target-swift-emit-module-interface(%t/NonAPI/Library.swiftinterface) %t/Library.swift -module-name Library -target %target-swift-5.8-abi-triple
+// RUN: %target-swift-emit-module-interface(%t/API/Library.swiftinterface) %t/Library.swift -module-name Library -target %target-swift-5.8-abi-triple -library-level api
 
 // Build Client.swift against the Library.swiftinterface without
 // `-library-level api`. Since the deployment target of the library is

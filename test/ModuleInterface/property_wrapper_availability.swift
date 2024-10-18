@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -module-name Library -target %target-swift-abi-5.3-triple
+// RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -module-name Library -target %target-swift-5.3-abi-triple
 // RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -module-name Library
 // RUN: %FileCheck %s < %t/Library.swiftinterface
 
