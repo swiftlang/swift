@@ -14,8 +14,10 @@
 #define SWIFT_NAME_TRANSLATION_H
 
 #include "swift/AST/AttrKind.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Identifier.h"
+#include <optional>
 
 namespace swift {
 
@@ -84,6 +86,7 @@ enum RepresentationError {
   UnrepresentableMoveOnly,
   UnrepresentableNested,
   UnrepresentableMacro,
+  UnrepresentableZeroSizedValueType,
 };
 
 /// Constructs a diagnostic that describes the given C++ representation error.
@@ -99,11 +102,17 @@ struct DeclRepresentation {
 };
 
 /// Returns the C++ representation info for the given declaration.
-DeclRepresentation getDeclRepresentation(const ValueDecl *VD);
+DeclRepresentation getDeclRepresentation(
+    const ValueDecl *VD,
+    std::optional<std::function<bool(const NominalTypeDecl *)>> isZeroSized =
+        std::nullopt);
 
 /// Returns true if the given value decl is exposable to C++.
-inline bool isExposableToCxx(const ValueDecl *VD) {
-  return !getDeclRepresentation(VD).isUnsupported();
+inline bool isExposableToCxx(
+    const ValueDecl *VD,
+    std::optional<std::function<bool(const NominalTypeDecl *)>> isZeroSized =
+        std::nullopt) {
+  return !getDeclRepresentation(VD, isZeroSized).isUnsupported();
 }
 
 /// Returns true if the given value decl D is visible to C++ of its

@@ -21,6 +21,8 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/StringExtras.h"
 
@@ -212,7 +214,9 @@ swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
 }
 
 swift::cxx_translation::DeclRepresentation
-swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
+swift::cxx_translation::getDeclRepresentation(
+    const ValueDecl *VD,
+    std::optional<std::function<bool(const NominalTypeDecl *)>> isZeroSized) {
   if (getActorIsolation(const_cast<ValueDecl *>(VD)).isActorIsolated())
     return {Unsupported, UnrepresentableIsolatedInActor};
   if (isa<MacroDecl>(VD))
@@ -253,6 +257,8 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
         isa_and_nonnull<NominalTypeDecl>(
             typeDecl->getDeclContext()->getAsDecl()))
       return {Unsupported, UnrepresentableNested};
+    if (!isa<ClassDecl>(typeDecl) && isZeroSized && (*isZeroSized)(typeDecl))
+      return {Unsupported, UnrepresentableZeroSizedValueType};
   }
   if (const auto *varDecl = dyn_cast<VarDecl>(VD)) {
     // Check if any property accessor throws, do not expose it in that case.
@@ -393,5 +399,7 @@ swift::cxx_translation::diagnoseRepresenationError(RepresentationError error,
     return Diagnostic(diag::expose_nested_type_to_cxx, vd);
   case UnrepresentableMacro:
     return Diagnostic(diag::expose_macro_to_cxx, vd);
+  case UnrepresentableZeroSizedValueType:
+    return Diagnostic(diag::expose_zero_size_to_cxx, vd);
   }
 }

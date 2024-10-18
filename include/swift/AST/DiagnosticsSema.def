@@ -2086,6 +2086,8 @@ ERROR(unexposed_other_decl_in_cxx,none,
       "%kind0 is not yet exposed to C++", (ValueDecl *))
 ERROR(unsupported_other_decl_in_cxx,none,
       "Swift %kind0 cannot be represented in C++", (ValueDecl *))
+ERROR(expose_zero_size_to_cxx,none,
+      "%0 is a zero sized value type, it cannot be exposed to C++ yet", (ValueDecl *))
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
