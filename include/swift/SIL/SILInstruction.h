@@ -23,6 +23,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/SILThunkKind.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Compiler.h"
@@ -5889,41 +5890,7 @@ class ThunkInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::ThunkInst, ThunkInst, SingleValueInstruction> {
 public:
-  struct Kind {
-    enum InnerTy {
-      Invalid = 0,
-
-      /// A thunk that just calls the passed in function. Used for testing
-      /// purposes of the underlying thunking machinery.
-      Identity = 1,
-
-      MaxValue = Identity,
-    };
-
-    InnerTy innerTy;
-
-    Kind() : innerTy(InnerTy::Invalid) {}
-    Kind(InnerTy innerTy) : innerTy(innerTy) {}
-    Kind(unsigned inputInnerTy) : innerTy(InnerTy(inputInnerTy)) {
-      assert(inputInnerTy <= MaxValue && "Invalid value");
-    }
-
-    operator InnerTy() const { return innerTy; }
-
-    /// Given the current enum state returned the derived output function from
-    /// \p inputFunction.
-    CanSILFunctionType getDerivedFunctionType(SILFunction *fn,
-                                              CanSILFunctionType inputFunction,
-                                              SubstitutionMap subMap) const;
-
-    SILType getDerivedFunctionType(SILFunction *fn, SILType inputFunctionType,
-                                   SubstitutionMap subMap) const {
-      auto fType = inputFunctionType.castTo<SILFunctionType>();
-      return SILType::getPrimitiveType(
-          getDerivedFunctionType(fn, fType, subMap),
-          inputFunctionType.getCategory());
-    }
-  };
+  using Kind = SILThunkKind;
 
   /// The type of thunk we are supposed to produce.
   Kind kind;

@@ -1251,6 +1251,13 @@ public:
     return createThunk(Loc, Op, ThunkInst::Kind::Identity, substitutionMap);
   }
 
+  ThunkInst *
+  createHopToMainActorIfNeededThunk(SILLocation Loc, SILValue Op,
+                                    SubstitutionMap substitutionMap = {}) {
+    return createThunk(Loc, Op, ThunkInst::Kind::HopToMainActorIfNeeded,
+                       substitutionMap);
+  }
+
   ConvertEscapeToNoEscapeInst *
   createConvertEscapeToNoEscape(SILLocation Loc, SILValue Op, SILType Ty,
                                 bool lifetimeGuaranteed) {
