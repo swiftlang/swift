@@ -35,7 +35,9 @@
 #include "clang/Index/IndexingAction.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Serialization/ASTReader.h"
+#include "llvm/Support/BLAKE3.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/HashBuilder.h"
 #include "llvm/Support/Path.h"
 
 using namespace swift;
@@ -50,14 +52,25 @@ using clang::index::SymbolRoleSet;
 //===----------------------------------------------------------------------===//
 
 namespace {
+
+using HashBuilderTy =
+    llvm::HashBuilder<llvm::TruncatedBLAKE3<8>, llvm::endianness::little>;
+
 class SymbolTracker {
 public:
   struct SymbolRelation {
     size_t symbolIndex;
     SymbolRoleSet roles;
 
-    llvm::hash_code hash() const { return llvm::hash_combine(symbolIndex, roles); }
+    SymbolRelation(size_t symbolIndex, SymbolRoleSet roles)
+        : symbolIndex(symbolIndex), roles(roles) {}
+
+    void hash(HashBuilderTy &HashBuilder) {
+      HashBuilder.add(symbolIndex);
+      HashBuilder.add(roles);
+    }
   };
+
   struct SymbolOccurrence {
     size_t symbolIndex;
     SymbolRoleSet roles;
@@ -65,14 +78,22 @@ public:
     unsigned column;
     SmallVector<SymbolRelation, 3> related;
 
-    llvm::hash_code hash() const {
-      auto hash = llvm::hash_combine(symbolIndex, roles, line, column);
+    SymbolOccurrence(size_t symbolIndex, SymbolRoleSet roles, unsigned line,
+                     unsigned column, SmallVector<SymbolRelation, 3> related)
+        : symbolIndex(symbolIndex), roles(roles), line(line), column(column),
+          related(std::move(related)) {}
+
+    void hash(HashBuilderTy &HashBuilder) {
+      HashBuilder.add(symbolIndex);
+      HashBuilder.add(roles);
+      HashBuilder.add(line);
+      HashBuilder.add(column);
       for (auto &relation : related) {
-        hash = llvm::hash_combine(hash, relation.hash());
+        relation.hash(HashBuilder);
       }
-      return hash;
     }
   };
+
   struct Symbol {
     StringRef name;
     StringRef USR;
@@ -81,12 +102,19 @@ public:
     SymbolInfo symInfo;
     unsigned isTestCandidate : 1;
 
-    llvm::hash_code hash() const {
-      return llvm::hash_combine(
-          name, USR, group,
-          static_cast<unsigned>(symInfo.Kind),
-          static_cast<unsigned>(symInfo.SubKind),
-          symInfo.Properties, isTestCandidate);
+    Symbol(StringRef name, StringRef usr, StringRef group, SymbolInfo symInfo,
+           bool isTestCandidate)
+        : name(name), USR(usr), group(group), symInfo(std::move(symInfo)),
+          isTestCandidate(isTestCandidate) {}
+
+    void hash(HashBuilderTy &HashBuilder) {
+      HashBuilder.add(name);
+      HashBuilder.add(USR);
+      HashBuilder.add(group);
+      HashBuilder.add(symInfo.Kind);
+      HashBuilder.add(symInfo.SubKind);
+      HashBuilder.add(symInfo.Properties);
+      HashBuilder.add(isTestCandidate);
     }
   };
 
@@ -114,13 +142,9 @@ public:
     auto pair = USRToSymbol.insert(std::make_pair(indexSym.USR.data(),
                                                   symbols.size()));
     if (pair.second) {
-      Symbol symbol{indexSym.name,
-                    indexSym.USR,
-                    indexSym.group,
-                    indexSym.symInfo,
-                    0};
-      recordHash = llvm::hash_combine(recordHash, symbol.hash());
-      symbols.push_back(std::move(symbol));
+      symbols.emplace_back(indexSym.name, indexSym.USR, indexSym.group,
+                           indexSym.symInfo, 0);
+      symbols.back().hash(HashBuilder);
     }
 
     return pair.first->second;
@@ -131,26 +155,28 @@ public:
 
     SmallVector<SymbolRelation, 3> relations;
     for(IndexRelation indexRel: indexOccur.Relations) {
-      relations.push_back({addSymbol(indexRel), indexRel.roles});
+      relations.emplace_back(addSymbol(indexRel), indexRel.roles);
     }
 
-    occurrences.push_back({/*symbolIndex=*/addSymbol(indexOccur),
-                           indexOccur.roles,
-                           indexOccur.line,
-                           indexOccur.column,
-                           std::move(relations)});
-
-    recordHash = llvm::hash_combine(recordHash, occurrences.back().hash());
+    occurrences.emplace_back(addSymbol(indexOccur), indexOccur.roles,
+                             indexOccur.line, indexOccur.column,
+                             std::move(relations));
+    occurrences.back().hash(HashBuilder);
   }
 
-  llvm::hash_code hashRecord() const { return recordHash; }
+  uint64_t hashRecord() {
+    std::array<uint8_t, 8> recordHashArr = HashBuilder.final();
+    uint64_t recordHash = 0;
+    std::memcpy(&recordHash, recordHashArr.data(), recordHashArr.size());
+    return recordHash;
+  }
 
 private:
   llvm::DenseMap<const char *, size_t> USRToSymbol;
   std::vector<Symbol> symbols;
   std::vector<SymbolOccurrence> occurrences;
   bool sorted = false;
-  llvm::hash_code recordHash = 0;
+  HashBuilderTy HashBuilder;
 };
 
 class IndexRecordingConsumer : public IndexDataConsumer {
