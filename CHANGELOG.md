@@ -3,7 +3,7 @@
 > [!NOTE]
 > This is in reverse chronological order, so newer entries are added to the top.
 
-## Swift (next)
+## Swift 6.1
 
 * [SE-0444][]:
   When the upcoming feature `MemberImportVisibility` is enabled, Swift will
@@ -40,7 +40,7 @@
 * [SE-0442][]:
   TaskGroups can now be created without explicitly specifying their child task's result types:
 
-Previously the child task type would have to be specified explicitly when creating the task group:
+  Previously the child task type would have to be specified explicitly when creating the task group:
 
   ```swift
   await withTaskGroup(of: Int.self) { group in 
@@ -50,7 +50,7 @@ Previously the child task type would have to be specified explicitly when creati
   } 
   ```
 
-Now the type is inferred based on the first use of the task group within the task group's body:
+  Now the type is inferred based on the first use of the task group within the task group's body:
 
   ```swift
   await withTaskGroup { group in 
@@ -62,6 +62,8 @@ Now the type is inferred based on the first use of the task group within the tas
 
 
 ## Swift 6.0
+
+### 2024-09-17 (Xcode 16.0)
 
 * Swift 6 comes with a new language mode that prevents the risk of data races
   at compile time. This guarantee is accomplished through _data isolation_; the
