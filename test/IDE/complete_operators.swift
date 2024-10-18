@@ -52,7 +52,7 @@ func testPostfix6() {
 func testPostfix7() {
   1 + 2 * 3.0#^POSTFIX_7^#
 }
-// POSTFIX_7: Decl[PostfixOperatorFunction]/CurrModule:  ***[#Double#]
+// POSTFIX_7: Decl[PostfixOperatorFunction]/CurrModule/TypeRelation[Convertible]:  ***[#Double#]
 
 func testPostfix8(x: S) {
   x#^POSTFIX_8^#
