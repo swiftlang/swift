@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -print-diagnostic-groups -disable-availability-checking -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null
-// RUN: %target-swift-frontend -print-diagnostic-groups -disable-availability-checking -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null -strict-concurrency=targeted
-// RUN: %target-swift-frontend -print-diagnostic-groups -disable-availability-checking -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null -strict-concurrency=complete
-// RUN: %target-swift-frontend -print-diagnostic-groups -disable-availability-checking -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
+// RUN: %target-swift-frontend -print-diagnostic-groups -target %target-swift-5.1-abi-triple -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null
+// RUN: %target-swift-frontend -print-diagnostic-groups -target %target-swift-5.1-abi-triple -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null -strict-concurrency=targeted
+// RUN: %target-swift-frontend -print-diagnostic-groups -target %target-swift-5.1-abi-triple -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null -strict-concurrency=complete
+// RUN: %target-swift-frontend -print-diagnostic-groups -target %target-swift-5.1-abi-triple -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

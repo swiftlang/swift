@@ -10,7 +10,7 @@
 // Build client with module
 // RUN: %target-swift-emit-silgen \
 // RUN:   -I %t \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-5.1-abi-triple \
 // RUN:   -module-name Client \
 // RUN:   -swift-version 6 \
 // RUN:    %t/src/Client.swift -verify | %FileCheck %s

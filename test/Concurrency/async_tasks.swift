@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -strict-concurrency=targeted -disable-availability-checking %s -o /dev/null -verify -emit-sil  -DALLOW_TYPECHECKER_ERRORS -verify-additional-prefix typechecker-
-// RUN: %target-swift-frontend -strict-concurrency=complete -disable-availability-checking %s -o /dev/null -verify -emit-sil -DALLOW_TYPECHECKER_ERRORS -verify-additional-prefix typechecker-
-// RUN: %target-swift-frontend -strict-concurrency=complete -disable-availability-checking %s -o /dev/null -verify -emit-sil -verify-additional-prefix tns-
+// RUN: %target-swift-frontend -strict-concurrency=targeted -target %target-swift-5.1-abi-triple %s -o /dev/null -verify -emit-sil  -DALLOW_TYPECHECKER_ERRORS -verify-additional-prefix typechecker-
+// RUN: %target-swift-frontend -strict-concurrency=complete -target %target-swift-5.1-abi-triple %s -o /dev/null -verify -emit-sil -DALLOW_TYPECHECKER_ERRORS -verify-additional-prefix typechecker-
+// RUN: %target-swift-frontend -strict-concurrency=complete -target %target-swift-5.1-abi-triple %s -o /dev/null -verify -emit-sil -verify-additional-prefix tns-
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

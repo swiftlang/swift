@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %import-libdispatch -Xfrontend -disable-availability-checking -enable-actor-data-race-checks -parse-as-library %s -o %t/a.out -module-name main
+// RUN: %target-build-swift %import-libdispatch -target %target-swift-5.1-abi-triple -enable-actor-data-race-checks -parse-as-library %s -o %t/a.out -module-name main
 // RUN: %target-codesign %t/a.out
 
 // We specifically test for legacy behavior here, apps compiled against old SDKs
