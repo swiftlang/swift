@@ -940,6 +940,11 @@ def Rpass_missed_EQ : Joined<["-"], "Rpass-missed=">,
   HelpText<"Report missed transformations by optimization passes whose "
            "name matches the given POSIX regular expression">;
 
+def Rpass_analysis_EQ : Joined<["-"], "Rpass-analysis=">,
+  Flags<[FrontendOption]>,
+  HelpText<"Report transformation analysis from optimization passes whose "
+           "name matches the given POSIX regular expression">;
+
 def save_optimization_record : Flag<["-"], "save-optimization-record">,
   Flags<[FrontendOption]>, HelpText<"Generate a YAML optimization record file">;
 def save_optimization_record_EQ : Joined<["-"], "save-optimization-record=">,

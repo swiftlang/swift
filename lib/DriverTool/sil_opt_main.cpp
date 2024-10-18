@@ -508,6 +508,13 @@ struct SILOptOptions {
       cl::Hidden);
 
   cl::opt<std::string>
+    PassRemarksAnalysis = cl::opt<std::string>(
+      "sil-remarks-analysis", cl::value_desc("pattern"),
+      cl::desc("Enable analysis remarks from passes whose name match "
+               "the given regular expression"),
+      cl::Hidden);
+
+  cl::opt<std::string>
       RemarksFilename = cl::opt<std::string>("save-optimization-record-path",
                       cl::desc("YAML output filename for pass remarks"),
                       cl::value_desc("filename"));
@@ -780,6 +787,8 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       createOptRemarkRegex(options.PassRemarksPassed);
   Invocation.getLangOptions().OptimizationRemarkMissedPattern =
       createOptRemarkRegex(options.PassRemarksMissed);
+  Invocation.getLangOptions().OptimizationRemarkAnalysisPattern =
+      createOptRemarkRegex(options.PassRemarksAnalysis);
 
   if (options.EnableExperimentalStaticAssert)
     Invocation.getLangOptions().enableFeature(Feature::StaticAssert);
