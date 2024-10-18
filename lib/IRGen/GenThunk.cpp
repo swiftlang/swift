@@ -143,14 +143,23 @@ void IRGenThunk::prepareArguments() {
 
     // Set the typed error value result slot.
     if (conv.isTypedError() && !conv.hasIndirectSILErrorResults()) {
-      auto directTypedErrorAddr = original.takeLast();
       auto errorType =
         conv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext());
       auto &errorTI = cast<FixedTypeInfo>(IGF.getTypeInfo(errorType));
+      auto &errorSchema = errorTI.nativeReturnValueSchema(IGF.IGM);
+      auto resultType =
+          conv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext());
+      auto &resultTI = cast<FixedTypeInfo>(IGF.getTypeInfo(resultType));
+      auto &resultSchema = resultTI.nativeReturnValueSchema(IGF.IGM);
 
-     IGF.setCalleeTypedErrorResultSlot(Address(directTypedErrorAddr,
-                                               errorTI.getStorageType(),
-                                               errorTI.getFixedAlignment()));
+      if (resultSchema.requiresIndirect() ||
+          errorSchema.shouldReturnTypedErrorIndirectly() ||
+          conv.hasIndirectSILResults()) {
+        auto directTypedErrorAddr = original.takeLast();
+        IGF.setCalleeTypedErrorResultSlot(Address(directTypedErrorAddr,
+                                                  errorTI.getStorageType(),
+                                                  errorTI.getFixedAlignment()));
+      }
     } else if (conv.isTypedError()) {
       auto directTypedErrorAddr = original.takeLast();
       // Store for later processing when we know the argument index.
@@ -327,7 +336,8 @@ void IRGenThunk::emit() {
 
   llvm::Value *errorValue = nullptr;
 
-  if (isAsync && origTy->hasErrorResult()) {
+  if (emission->getTypedErrorExplosion() ||
+      (isAsync && origTy->hasErrorResult())) {
     SILType errorType = conv.getSILErrorType(expansionContext);
     Address calleeErrorSlot = emission->getCalleeErrorSlot(
         errorType, /*isCalleeAsync=*/origTy->isAsync());
@@ -336,23 +346,150 @@ void IRGenThunk::emit() {
 
   emission->end();
 
-  if (isAsync) {
-    Explosion error;
-    if (errorValue)
-      error.add(errorValue);
-    emitAsyncReturn(IGF, *asyncLayout, directResultType, origTy, result, error);
-    return;
+  // FIXME: we shouldn't have to generate all of this. We should just forward
+  // the value as is
+  if (auto &error = emission->getTypedErrorExplosion()) {
+    llvm::BasicBlock *successBB = IGF.createBasicBlock("success");
+    llvm::BasicBlock *errorBB = IGF.createBasicBlock("failure");
+
+    llvm::Value *nil = llvm::ConstantPointerNull::get(
+        cast<llvm::PointerType>(errorValue->getType()));
+    auto *hasError = IGF.Builder.CreateICmpNE(errorValue, nil);
+
+    // Predict no error is thrown.
+    hasError = IGF.IGM.getSILModule().getOptions().EnableThrowsPrediction
+                   ? IGF.Builder.CreateExpectCond(IGF.IGM, hasError, false)
+                   : hasError;
+
+    IGF.Builder.CreateCondBr(hasError, errorBB, successBB);
+
+    IGF.Builder.emitBlock(errorBB);
+    if (isAsync) {
+      auto &IGM = IGF.IGM;
+      SILType silErrorTy = conv.getSILErrorType(expansionContext);
+      auto &errorTI = IGF.IGM.getTypeInfo(silErrorTy);
+      auto &errorSchema = errorTI.nativeReturnValueSchema(IGF.IGM);
+      auto combined = combineResultAndTypedErrorType(IGM, schema, errorSchema);
+
+      Explosion errorArgValues;
+
+      if (!combined.combinedTy->isVoidTy()) {
+        llvm::Value *expandedResult =
+            llvm::UndefValue::get(combined.combinedTy);
+        if (!errorSchema.getExpandedType(IGM)->isVoidTy()) {
+          auto nativeError =
+              errorSchema.mapIntoNative(IGM, IGF, *error, silErrorTy, false);
+
+          if (auto *structTy =
+                  dyn_cast<llvm::StructType>(combined.combinedTy)) {
+            for (unsigned i : combined.errorValueMapping) {
+              llvm::Value *elt = nativeError.claimNext();
+              auto *nativeTy = structTy->getElementType(i);
+              elt = convertForDirectError(IGF, elt, nativeTy,
+                                          /*forExtraction*/ false);
+              expandedResult =
+                  IGF.Builder.CreateInsertValue(expandedResult, elt, i);
+            }
+            IGF.emitAllExtractValues(expandedResult, structTy, errorArgValues);
+          } else if (!errorSchema.getExpandedType(IGM)->isVoidTy()) {
+            errorArgValues = convertForDirectError(IGF, nativeError.claimNext(),
+                                                   combined.combinedTy,
+                                                   /*forExtraction*/ false);
+          }
+        } else if (auto *structTy =
+                       dyn_cast<llvm::StructType>(combined.combinedTy)) {
+          IGF.emitAllExtractValues(expandedResult, structTy, errorArgValues);
+        } else {
+          errorArgValues = expandedResult;
+        }
+      }
+      errorArgValues.add(errorValue);
+      emitAsyncReturn(IGF, *asyncLayout, origTy, errorArgValues.claimAll());
+
+      IGF.Builder.emitBlock(successBB);
+
+      Explosion resultArgValues;
+      if (result.empty()) {
+        if (!combined.combinedTy->isVoidTy()) {
+          if (auto *structTy =
+                  dyn_cast<llvm::StructType>(combined.combinedTy)) {
+            IGF.emitAllExtractValues(llvm::UndefValue::get(structTy), structTy,
+                                     resultArgValues);
+          } else {
+            resultArgValues = llvm::UndefValue::get(combined.combinedTy);
+          }
+        }
+      } else {
+        if (auto *structTy = dyn_cast<llvm::StructType>(combined.combinedTy)) {
+          llvm::Value *expandedResult =
+              llvm::UndefValue::get(combined.combinedTy);
+          for (size_t i = 0, count = result.size(); i < count; i++) {
+            llvm::Value *elt = result.claimNext();
+            auto *nativeTy = structTy->getElementType(i);
+            elt = convertForDirectError(IGF, elt, nativeTy,
+                                        /*forExtraction*/ false);
+            expandedResult =
+                IGF.Builder.CreateInsertValue(expandedResult, elt, i);
+          }
+          IGF.emitAllExtractValues(expandedResult, structTy, resultArgValues);
+        } else {
+          resultArgValues = convertForDirectError(IGF, result.claimNext(),
+                                                  combined.combinedTy,
+                                                  /*forExtraction*/ false);
+        }
+      }
+
+      resultArgValues.add(errorValue);
+      emitAsyncReturn(IGF, *asyncLayout, origTy, resultArgValues.claimAll());
+
+      return;
+    } else {
+      if (!error->empty()) {
+        // Map the direct error explosion from the call back to the native
+        // explosion for the return.
+        SILType silErrorTy = conv.getSILErrorType(expansionContext);
+        auto &errorTI = IGF.IGM.getTypeInfo(silErrorTy);
+        auto &errorSchema = errorTI.nativeReturnValueSchema(IGF.IGM);
+        auto combined =
+            combineResultAndTypedErrorType(IGF.IGM, schema, errorSchema);
+        Explosion nativeAgg;
+        buildDirectError(IGF, combined, errorSchema, silErrorTy, *error,
+                         /*forAsync*/ false, nativeAgg);
+        IGF.emitScalarReturn(IGF.CurFn->getReturnType(), nativeAgg);
+      } else {
+        if (IGF.CurFn->getReturnType()->isVoidTy()) {
+          IGF.Builder.CreateRetVoid();
+        } else {
+          IGF.Builder.CreateRet(
+              llvm::UndefValue::get(IGF.CurFn->getReturnType()));
+        }
+      }
+      IGF.Builder.emitBlock(successBB);
+    }
+  } else {
+    if (isAsync) {
+      Explosion error;
+      if (errorValue)
+        error.add(errorValue);
+      emitAsyncReturn(IGF, *asyncLayout, directResultType, origTy, result,
+                      error);
+      return;
+    }
   }
 
   // Return the result.
   if (result.empty()) {
-    IGF.Builder.CreateRetVoid();
+    if (emission->getTypedErrorExplosion() &&
+        !IGF.CurFn->getReturnType()->isVoidTy()) {
+      IGF.Builder.CreateRet(llvm::UndefValue::get(IGF.CurFn->getReturnType()));
+    } else {
+      IGF.Builder.CreateRetVoid();
+    }
     return;
   }
 
   auto resultTy = conv.getSILResultType(expansionContext);
   resultTy = resultTy.subst(IGF.getSILModule(), subMap);
-
   IGF.emitScalarReturn(resultTy, resultTy, result,
                        /*swiftCCReturn=*/false,
                        /*isOutlined=*/false);
