@@ -14,7 +14,7 @@
 // of unspecified type.
 @_disallowFeatureSuppression(NonescapableTypes)
 @frozen
-public struct RawSpan: Copyable, ~Escapable {
+public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
   @usableFromInline let _pointer: UnsafeRawPointer?
 
   @usableFromInline @inline(__always)
@@ -24,18 +24,18 @@ public struct RawSpan: Copyable, ~Escapable {
 
   @_disallowFeatureSuppression(NonescapableTypes)
   @usableFromInline @inline(__always)
+  @lifetime(immortal)
   init(
     _unchecked start: UnsafeRawPointer?,
     byteCount: Int
-  ) -> dependsOn(immortal) Self {
+  ) {
     _pointer = start
     _count = byteCount
   }
 }
 
 @_disallowFeatureSuppression(NonescapableTypes)
-@available(*, unavailable)
-extension RawSpan: Sendable {}
+extension RawSpan: @unchecked Sendable {}
 
 @_disallowFeatureSuppression(NonescapableTypes)
 extension RawSpan {
@@ -51,12 +51,22 @@ extension RawSpan {
   ///            the newly created `RawSpan`.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  @lifetime(immortal)
   public init(
     _unsafeBytes buffer: UnsafeRawBufferPointer
-  ) -> dependsOn(immortal) Self {
+  ) {
     self.init(
       _unchecked: buffer.baseAddress, byteCount: buffer.count
     )
+  }
+
+  @_disallowFeatureSuppression(NonescapableTypes)
+  @_alwaysEmitIntoClient
+  @lifetime(immortal)
+  public init(
+    _unsafeBytes buffer: Slice<UnsafeRawBufferPointer>
+  ) {
+    self.init(_unsafeBytes: UnsafeRawBufferPointer(rebasing: buffer))
   }
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -70,10 +80,20 @@ extension RawSpan {
   ///            the newly created `RawSpan`.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  @lifetime(immortal)
   public init(
     _unsafeBytes buffer: UnsafeMutableRawBufferPointer
-  ) -> dependsOn(immortal) Self {
+  ) {
     self.init(_unsafeBytes: UnsafeRawBufferPointer(buffer))
+  }
+
+  @_disallowFeatureSuppression(NonescapableTypes)
+  @_alwaysEmitIntoClient
+  @lifetime(immortal)
+  public init(
+    _unsafeBytes buffer: Slice<UnsafeMutableRawBufferPointer>
+  ) {
+    self.init(_unsafeBytes: UnsafeRawBufferPointer(rebasing: buffer))
   }
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -89,10 +109,11 @@ extension RawSpan {
   ///            the newly created `RawSpan`.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  @lifetime(immortal)
   public init(
     _unsafeStart pointer: UnsafeRawPointer,
     byteCount: Int
-  ) -> dependsOn(immortal) Self {
+  ) {
     _precondition(byteCount >= 0, "Count must not be negative")
     self.init(_unchecked: pointer, byteCount: byteCount)
   }
@@ -108,9 +129,10 @@ extension RawSpan {
   ///            the newly created `RawSpan`.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  @lifetime(immortal)
   public init<T: BitwiseCopyable>(
     _unsafeElements buffer: UnsafeBufferPointer<T>
-  ) -> dependsOn(immortal) Self {
+  ) {
     self.init(_unsafeBytes: UnsafeRawBufferPointer(buffer))
   }
 
@@ -125,9 +147,10 @@ extension RawSpan {
   ///            the newly created `RawSpan`.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  @lifetime(immortal)
   public init<T: BitwiseCopyable>(
     _unsafeElements buffer: UnsafeMutableBufferPointer<T>
-  ) -> dependsOn(immortal) Self {
+  ) {
     self.init(_unsafeElements: UnsafeBufferPointer(buffer))
   }
 
@@ -144,10 +167,11 @@ extension RawSpan {
   ///            the newly created `RawSpan`.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  @lifetime(immortal)
   public init<T: BitwiseCopyable>(
     _unsafeStart pointer: UnsafePointer<T>,
     count: Int
-  ) -> dependsOn(immortal) Self {
+  ) {
     _precondition(count >= 0, "Count must not be negative")
     self.init(
       _unchecked: pointer, byteCount: count*MemoryLayout<T>.stride
@@ -162,12 +186,13 @@ extension RawSpan {
   @_disallowFeatureSuppression(NonescapableTypes)
   @unsafe // remove when fixing the lifetime annotation
   @_alwaysEmitIntoClient
-  public init<T: BitwiseCopyable>(
-    _unsafeSpan span: borrowing Span<T>
-  ) -> dependsOn(immortal) Self {
+  @lifetime(immortal)
+  public init<Element: BitwiseCopyable>(
+    _unsafeSpan span: borrowing Span<Element>
+  ) {
     self.init(
       _unchecked: UnsafeRawPointer(span._start),
-      byteCount: span.count * MemoryLayout<T>.stride
+      byteCount: span.count &* MemoryLayout<Element>.stride
     )
   }
 }
@@ -205,46 +230,8 @@ extension RawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  public var _byteOffsets: Range<Int> {
+  public var byteOffsets: Range<Int> {
     .init(_uncheckedBounds: (0, byteCount))
-  }
-}
-
-//MARK: Bounds Checking
-@_disallowFeatureSuppression(NonescapableTypes)
-extension RawSpan {
-
-  /// Return true if `offset` is a valid byte offset into this `RawSpan`
-  ///
-  /// - Parameters:
-  ///   - position: a byte offset to validate
-  /// - Returns: true if `offset` is a valid byte offset
-  @_disallowFeatureSuppression(NonescapableTypes)
-  @_alwaysEmitIntoClient
-  public func boundsContain(_ offset: Int) -> Bool {
-    0 <= offset && offset < byteCount
-  }
-
-  /// Return true if `offsets` is a valid range of offsets into this `RawSpan`
-  ///
-  /// - Parameters:
-  ///   - offsets: a range of byte offsets to validate
-  /// - Returns: true if `offsets` is a valid range of byte offsets
-  @_disallowFeatureSuppression(NonescapableTypes)
-  @_alwaysEmitIntoClient
-  public func boundsContain(_ offsets: Range<Int>) -> Bool {
-    boundsContain(offsets.lowerBound) && offsets.upperBound <= byteCount
-  }
-
-  /// Return true if `offsets` is a valid range of offsets into this `RawSpan`
-  ///
-  /// - Parameters:
-  ///   - offsets: a range of byte offsets to validate
-  /// - Returns: true if `offsets` is a valid range of byte offsets
-  @_disallowFeatureSuppression(NonescapableTypes)
-  @_alwaysEmitIntoClient
-  public func boundsContain(_ offsets: ClosedRange<Int>) -> Bool {
-    boundsContain(offsets.lowerBound) && offsets.upperBound < byteCount
   }
 }
 
@@ -266,8 +253,13 @@ extension RawSpan {
   ///
   /// - Complexity: O(1)
   @_disallowFeatureSuppression(NonescapableTypes)
-  @usableFromInline func _extracting(_ bounds: Range<Int>) -> Self {
-    _precondition(boundsContain(bounds))
+  @_alwaysEmitIntoClient
+  public func _extracting(_ bounds: Range<Int>) -> Self {
+    _precondition(
+      UInt(bitPattern: bounds.lowerBound) <  UInt(bitPattern: _count) &&
+      UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
+      "byte offset range out of bounds"
+    )
     return _extracting(unchecked: bounds)
   }
 
@@ -294,7 +286,8 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_disallowFeatureSuppression(NonescapableTypes)
   @unsafe
-  @usableFromInline func _extracting(unchecked bounds: Range<Int>) -> Self {
+  @_alwaysEmitIntoClient
+  public func _extracting(unchecked bounds: Range<Int>) -> Self {
     RawSpan(
       _unchecked: _pointer?.advanced(by: bounds.lowerBound),
       byteCount: bounds.count
@@ -322,8 +315,9 @@ extension RawSpan {
   ///
   /// - Complexity: O(1)
   @_disallowFeatureSuppression(NonescapableTypes)
-  @usableFromInline func _extracting(_ bounds: some RangeExpression<Int>) -> Self {
-    _extracting(bounds.relative(to: _byteOffsets))
+  @_alwaysEmitIntoClient
+  public func _extracting(_ bounds: some RangeExpression<Int>) -> Self {
+    _extracting(bounds.relative(to: byteOffsets))
   }
 
   @_disallowFeatureSuppression(NonescapableTypes)
@@ -349,10 +343,11 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_disallowFeatureSuppression(NonescapableTypes)
   @unsafe
-  @usableFromInline func _extracting(
+  @_alwaysEmitIntoClient
+  public func _extracting(
     unchecked bounds: some RangeExpression<Int>
   ) -> Self {
-    _extracting(unchecked: bounds.relative(to: _byteOffsets))
+    _extracting(unchecked: bounds.relative(to: byteOffsets))
   }
 
   @_disallowFeatureSuppression(NonescapableTypes)
@@ -372,7 +367,8 @@ extension RawSpan {
   ///
   /// - Complexity: O(1)
   @_disallowFeatureSuppression(NonescapableTypes)
-  @usableFromInline func _extracting(_: UnboundedRange) -> Self {
+  @_alwaysEmitIntoClient
+  public func _extracting(_: UnboundedRange) -> Self {
     self
   }
 }
@@ -424,9 +420,10 @@ extension RawSpan {
   @_disallowFeatureSuppression(NonescapableTypes)
   @unsafe
   @_alwaysEmitIntoClient
+  @lifetime(immortal)
   public func _unsafeView<T: BitwiseCopyable>(
     as type: T.Type
-  ) -> dependsOn(immortal) Span<T> {
+  ) -> Span<T> {
     Span(_unsafeStart: _start, byteCount: byteCount)
   }
 }
@@ -458,9 +455,11 @@ extension RawSpan {
   public func unsafeLoad<T>(
     fromByteOffset offset: Int = 0, as: T.Type
   ) -> T {
-    _precondition(boundsContain(
-      Range(_uncheckedBounds: (offset, offset+MemoryLayout<T>.size))
-    ))
+    _precondition(
+      UInt(bitPattern: offset) <  UInt(bitPattern: _count) &&
+      UInt(bitPattern: offset&+MemoryLayout<T>.size) <= UInt(bitPattern: _count),
+      "byte offset range out of bounds"
+    )
     return unsafeLoad(fromUncheckedByteOffset: offset, as: T.self)
   }
 
@@ -513,9 +512,11 @@ extension RawSpan {
   public func unsafeLoadUnaligned<T: BitwiseCopyable>(
     fromByteOffset offset: Int = 0, as: T.Type
   ) -> T {
-    _precondition(boundsContain(
-      Range(_uncheckedBounds: (offset, offset+MemoryLayout<T>.size))
-    ))
+    _precondition(
+      UInt(bitPattern: offset) <  UInt(bitPattern: _count) &&
+      UInt(bitPattern: offset&+MemoryLayout<T>.size) <= UInt(bitPattern: _count),
+      "byte offset range out of bounds"
+    )
     return unsafeLoadUnaligned(fromUncheckedByteOffset: offset, as: T.self)
   }
 
@@ -599,7 +600,8 @@ extension RawSpan {
   ///
   /// - Complexity: O(1)
   @_disallowFeatureSuppression(NonescapableTypes)
-  @usableFromInline func _extracting(first maxLength: Int) -> Self {
+  @_alwaysEmitIntoClient
+  public func _extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length.")
     let newCount = min(maxLength, byteCount)
     return Self(_unchecked: _pointer, byteCount: newCount)
@@ -626,7 +628,8 @@ extension RawSpan {
   ///
   /// - Complexity: O(1)
   @_disallowFeatureSuppression(NonescapableTypes)
-  @usableFromInline func _extracting(droppingLast k: Int) -> Self {
+  @_alwaysEmitIntoClient
+  public func _extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements.")
     let dc = min(k, byteCount)
     return Self(_unchecked: _pointer, byteCount: byteCount&-dc)
@@ -654,7 +657,8 @@ extension RawSpan {
   ///
   /// - Complexity: O(1)
   @_disallowFeatureSuppression(NonescapableTypes)
-  @usableFromInline func _extracting(last maxLength: Int) -> Self {
+  @_alwaysEmitIntoClient
+  public func _extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length.")
     let newCount = min(maxLength, byteCount)
     let newStart = _pointer?.advanced(by: byteCount&-newCount)
@@ -682,7 +686,8 @@ extension RawSpan {
   ///
   /// - Complexity: O(1)
   @_disallowFeatureSuppression(NonescapableTypes)
-  @usableFromInline func _extracting(droppingFirst k: Int) -> Self {
+  @_alwaysEmitIntoClient
+  public func _extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements.")
     let dc = min(k, byteCount)
     let newStart = _pointer?.advanced(by: dc)
