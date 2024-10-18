@@ -517,7 +517,6 @@ void addFunctionPasses(SILPassPipelinePlan &P,
     P.addCopyPropagation();
   }
   P.addSemanticARCOpts();
-  P.addLoadCopyToBorrowOptimization();
 
   if (!P.getOptions().EnableOSSAModules) {
     if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
@@ -547,7 +546,6 @@ void addFunctionPasses(SILPassPipelinePlan &P,
       P.addCopyPropagation();
     }
     P.addSemanticARCOpts();
-    P.addLoadCopyToBorrowOptimization();
   }
 
   // Promote stack allocations to values and eliminate redundant
@@ -576,7 +574,6 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   }
   // Optimize copies created during RLE.
   P.addSemanticARCOpts();
-  P.addLoadCopyToBorrowOptimization();
 
   P.addCOWOpts();
   P.addPerformanceConstantPropagation();
@@ -614,7 +611,6 @@ void addFunctionPasses(SILPassPipelinePlan &P,
       P.addCopyPropagation();
     }
     P.addSemanticARCOpts();
-    P.addLoadCopyToBorrowOptimization();
   }
 }
 
@@ -652,7 +648,6 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
     P.addCopyPropagation();
   }
   P.addSemanticARCOpts();
-  P.addLoadCopyToBorrowOptimization();
 
   // Devirtualizes differentiability witnesses into functions that reference them.
   // This unblocks many other passes' optimizations (e.g. inlining) and this is
@@ -999,7 +994,6 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
       P.addCopyPropagation();
     }
     P.addSemanticARCOpts();
-    P.addLoadCopyToBorrowOptimization();
   }
 
   P.addCrossModuleOptimization();

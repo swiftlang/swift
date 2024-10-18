@@ -1,5 +1,4 @@
-// RUN: %target-sil-opt %s -verify-continue-on-failure=true -o /dev/null 2>&1 | %FileCheck %s
-
+// RUN: %target-sil-opt %s -disable-swift-verification -verify-continue-on-failure=true -o /dev/null 2>&1 | %FileCheck %s
 import Builtin
 
 class Klass {}
@@ -8,7 +7,7 @@ sil @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
 
 // Write:   store {{.*}} [assign] {{.*}}
 // CHECK: Begin Error in function test_write_reborrow
-// CHECK: SIL verification failed: Load borrow invalidated by a local write
+// CHECK: SIL verification failed: Found load borrow that is invalidated by a local write?!: loadBorrowImmutabilityAnalysis.isImmutable(LBI)
 // CHECK: End Error in function test_write_reborrow
 sil [ossa] @test_write_reborrow : $@convention(thin) (@owned Klass, @owned Klass) -> () {
 bb0(%0 : @owned $Klass, %1 : @owned $Klass):
@@ -17,8 +16,7 @@ bb0(%0 : @owned $Klass, %1 : @owned $Klass):
   %ld1 = load_borrow %stk : $*Klass
   br bb2(%ld1 : $Klass)
 
-bb2(%ldarg : @guaranteed $Klass):
-  %ld = borrowed %ldarg : $Klass from ()
+bb2(%ld : @guaranteed $Klass):
   store %1 to [assign] %stk : $*Klass
   %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
   %4 = apply %3(%ld) : $@convention(thin) (@guaranteed Klass) -> ()
@@ -29,10 +27,13 @@ bb2(%ldarg : @guaranteed $Klass):
   return %6 : $()
 }
 
+// CHECK: Write:   destroy_addr %2 : $*Klass
 // CHECK: Begin Error in function test_multiple_loadborrows
-// CHECK: SIL verification failed: Load borrow invalidated by a local write
+// CHECK: SIL verification failed: Found load borrow that is invalidated by a local write?!: loadBorrowImmutabilityAnalysis.isImmutable(LBI)
 // CHECK: Verifying instruction:
-// CHECK: ->  destroy_addr
+// CHECK:      %2 = alloc_stack [lexical] $Klass
+// CHECK: ->   %14 = load_borrow %2 : $*Klass
+// CHECK:      br bb6(%14 : $Klass)
 // CHECK: End Error in function test_multiple_loadborrows
 sil [ossa] @test_multiple_loadborrows : $@convention(thin) (@owned Klass, @owned Klass) -> () {
 bb0(%0 : @owned $Klass, %1 : @owned $Klass):
@@ -62,8 +63,7 @@ bb5:
   destroy_addr %stk : $*Klass
   br bb6(%ld2 : $Klass)
 
-bb6(%ldarg : @guaranteed $Klass):
-  %ld = borrowed %ldarg : $Klass from ()
+bb6(%ld : @guaranteed $Klass):
   %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
   %4 = apply %3(%ld) : $@convention(thin) (@guaranteed Klass) -> ()
   end_borrow %ld : $Klass
@@ -83,9 +83,9 @@ struct MyArray<T> {
 struct MyStruct {
 }
 
+// CHECK: Write:   %4 = is_unique %1 : $*ArrayIntBuffer
 // CHECK: Begin Error in function test_is_unique
-// CHECK: SIL verification failed: Load borrow invalidated by a local write
-// CHECK: -> %4 = is_unique %1 : $*ArrayIntBuffer
+// CHECK: SIL verification failed: Found load borrow that is invalidated by a local write?!: loadBorrowImmutabilityAnalysis.isImmutable(LBI)
 // CHECK: End Error in function test_is_unique
 sil [ossa] @test_is_unique : $@convention(thin) (@in MyArray<MyStruct>) -> () {
 bb0(%0 : $*MyArray<MyStruct>):
