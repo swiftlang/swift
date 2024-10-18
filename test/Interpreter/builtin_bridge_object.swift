@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift(-Onone -parse-stdlib -Xfrontend -enable-copy-propagation -target %target-swift-abi-5.6-triple) | %FileCheck %s --check-prefixes=CHECK,CHECK-DBG,CHECK-%target-ptrsize
-// RUN: %target-run-simple-swift(-O -parse-stdlib -Xfrontend -enable-copy-propagation -target %target-swift-abi-5.6-triple) | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT,CHECK-%target-ptrsize
+// RUN: %target-run-simple-swift(-Onone -parse-stdlib -Xfrontend -enable-copy-propagation -target %target-swift-5.6-abi-triple) | %FileCheck %s --check-prefixes=CHECK,CHECK-DBG,CHECK-%target-ptrsize
+// RUN: %target-run-simple-swift(-O -parse-stdlib -Xfrontend -enable-copy-propagation -target %target-swift-5.6-abi-triple) | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT,CHECK-%target-ptrsize
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
