@@ -442,6 +442,9 @@ static std::string adjustMacroExpansionBufferName(StringRef name) {
   if (name.starts_with(MANGLING_PREFIX_STR)) {
     result += MACRO_EXPANSION_BUFFER_MANGLING_PREFIX;
     name = name.drop_front(StringRef(MANGLING_PREFIX_STR).size());
+  } else if (name.starts_with(MANGLING_PREFIX_EMBEDDED_STR)) {
+    result += MACRO_EXPANSION_BUFFER_MANGLING_PREFIX;
+    name = name.drop_front(StringRef(MANGLING_PREFIX_EMBEDDED_STR).size());
   }
 
   result += name;

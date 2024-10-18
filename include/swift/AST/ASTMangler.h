@@ -193,6 +193,9 @@ public:
       DWARFMangling = true;
       RespectOriginallyDefinedIn = false;
     }
+    Flavor = Ctx.LangOpts.hasFeature(Feature::Embedded)
+                 ? ManglingFlavor::Embedded
+                 : ManglingFlavor::Default;
   }
 
   const ASTContext &getASTContext() { return Context; }

@@ -2756,7 +2756,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       while (node->getKind() != NodeKind::LocalDeclName)
         node = node->getChild(1); // local decl name
 
-      auto mangling = Demangle::mangleNode(typeNode);
+      auto mangling = Demangle::mangleNode(typeNode, Mangle::ManglingFlavor::Default);
       if (!mangling.isSuccess()) {
         llvm::errs() << "Couldn't remangle type (failed at Node "
                      << mangling.error().node << " with error "

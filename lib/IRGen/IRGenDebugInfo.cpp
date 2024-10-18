@@ -1096,7 +1096,8 @@ private:
              "no mangled name and no human readable name given");
     else
       assert((UniqueID.starts_with("_T") ||
-              UniqueID.starts_with(MANGLING_PREFIX_STR)) &&
+              UniqueID.starts_with(MANGLING_PREFIX_STR) ||
+              UniqueID.starts_with(MANGLING_PREFIX_EMBEDDED_STR)) &&
              "UID is not a mangled name");
 #endif
 

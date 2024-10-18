@@ -65,6 +65,10 @@ std::string SpecializationMangler::finalize() {
     FuncTopLevel = D.demangleSymbol(FuncName);
     assert(FuncTopLevel);
   }
+  else if (FuncName.starts_with(MANGLING_PREFIX_EMBEDDED_STR)) {
+    FuncTopLevel = D.demangleSymbol(FuncName);
+    assert(FuncTopLevel);
+  }
   if (!FuncTopLevel) {
     FuncTopLevel = D.createNode(Node::Kind::Global);
     FuncTopLevel->addChild(D.createNode(Node::Kind::Identifier, FuncName), D);
@@ -72,10 +76,10 @@ std::string SpecializationMangler::finalize() {
   for (NodePointer FuncChild : *FuncTopLevel) {
     TopLevel->addChild(FuncChild, D);
   }
-  auto mangling = Demangle::mangleNode(TopLevel);
+  auto mangling = Demangle::mangleNode(TopLevel, Flavor);
   assert(mangling.isSuccess());
   std::string mangledName = mangling.result();
-  verify(mangledName);
+  verify(mangledName, Flavor);
   return mangledName;
 }
 

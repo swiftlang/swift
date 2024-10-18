@@ -19,5 +19,5 @@ struct Foo {
 let foo = Foo()
 let _ = foo[5]
 
-// CHECK: $s4main3FooVyS2icig
-// CHECK-NOT: $s4main3FooVyS2icis
+// CHECK: $e4main3FooVyS2icig
+// CHECK-NOT: $e4main3FooVyS2icis
