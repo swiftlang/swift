@@ -324,7 +324,7 @@ EnumImplStrategy::emitOutlinedGetEnumTag(IRGenFunction &IGF, SILType T,
                             .getAddress());
 
   auto outlinedFn = [T, &IGF] () -> llvm::Constant* {
-    IRGenMangler mangler;
+    IRGenMangler mangler(T.getASTContext());
     auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
     auto funcName = mangler.mangleOutlinedEnumGetTag(manglingBits.first,
                                                      manglingBits.second);
@@ -1864,7 +1864,7 @@ namespace {
 
     llvm::Function *
     emitCopyEnumFunction(IRGenModule &IGM, SILType theEnumType) const {
-      IRGenMangler Mangler;
+      IRGenMangler Mangler(IGM.Context);
       auto manglingBits =
         getTypeAndGenericSignatureForManglingOutlineFunction(theEnumType);
       std::string name =
@@ -1922,7 +1922,7 @@ namespace {
     llvm::Function *
     emitConsumeEnumFunction(IRGenModule &IGM, SILType theEnumType,
                             OutliningMetadataCollector &collector) const {
-      IRGenMangler Mangler;
+      IRGenMangler Mangler(IGM.Context);
       auto manglingBits =
         getTypeAndGenericSignatureForManglingOutlineFunction(theEnumType);
       std::string name =
@@ -3799,7 +3799,7 @@ namespace {
     }
 
     llvm::Function *emitCopyEnumFunction(IRGenModule &IGM, SILType type) const {
-      IRGenMangler Mangler;
+      IRGenMangler Mangler(IGM.Context);
       auto manglingBits =
         getTypeAndGenericSignatureForManglingOutlineFunction(type);
       std::string name =
@@ -3831,7 +3831,7 @@ namespace {
     llvm::Function *
     emitConsumeEnumFunction(IRGenModule &IGM, SILType type,
                             OutliningMetadataCollector &collector) const {
-      IRGenMangler Mangler;
+      IRGenMangler Mangler(IGM.Context);
       auto manglingBits =
         getTypeAndGenericSignatureForManglingOutlineFunction(type);
       std::string name =
@@ -7551,7 +7551,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedDestructiveProjectDataForLoad(
                               SILType T, const TypeInfo &ti,
                               EnumElementDecl *theCase,
                               unsigned caseIdx) {
-  IRGenMangler mangler;
+  IRGenMangler mangler(Context);
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName =
     mangler.mangleOutlinedEnumProjectDataForLoadFunction(manglingBits.first,
@@ -7627,7 +7627,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedEnumTagStoreFunction(
                               SILType T, const TypeInfo &ti,
                               EnumElementDecl *theCase,
                               unsigned caseIdx) {
-  IRGenMangler mangler;
+  IRGenMangler mangler(Context);
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName = mangler.mangleOutlinedEnumTagStoreFunction(manglingBits.first,
                                                              manglingBits.second,

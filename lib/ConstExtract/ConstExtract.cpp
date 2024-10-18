@@ -111,7 +111,7 @@ std::string toMangledTypeNameString(const swift::Type &Type) {
   auto PrintingType = Type;
   if (Type->hasArchetype())
     PrintingType = Type->mapTypeOutOfContext();
-  return Mangle::ASTMangler().mangleTypeWithoutPrefix(PrintingType->getCanonicalType());
+  return Mangle::ASTMangler(Type->getASTContext()).mangleTypeWithoutPrefix(PrintingType->getCanonicalType());
 }
 
 } // namespace

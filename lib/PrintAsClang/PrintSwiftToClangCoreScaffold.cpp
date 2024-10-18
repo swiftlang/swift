@@ -26,35 +26,35 @@
 
 using namespace swift;
 
-static void printKnownStruct(
+static void printKnownStruct(const ASTContext &astContext,
     PrimitiveTypeMapping &typeMapping, raw_ostream &os, StringRef name,
     const IRABIDetailsProvider::TypeRecordABIRepresentation &typeRecord) {
   assert(typeRecord.getMembers().size() > 1);
   os << "struct " << name << " {\n";
   for (const auto &ty : llvm::enumerate(typeRecord.getMembers())) {
     os << "  ";
-    ClangSyntaxPrinter(os).printKnownCType(ty.value(), typeMapping);
+    ClangSyntaxPrinter(astContext, os).printKnownCType(ty.value(), typeMapping);
     os << " _" << ty.index() << ";\n";
   }
   os << "};\n";
 }
 
-static void printKnownTypedef(
+static void printKnownTypedef(const ASTContext &astContext,
     PrimitiveTypeMapping &typeMapping, raw_ostream &os, StringRef name,
     const IRABIDetailsProvider::TypeRecordABIRepresentation &typeRecord) {
   assert(typeRecord.getMembers().size() == 1);
   os << "typedef ";
-  ClangSyntaxPrinter(os).printKnownCType(typeRecord.getMembers()[0],
+  ClangSyntaxPrinter(astContext, os).printKnownCType(typeRecord.getMembers()[0],
                                          typeMapping);
   os << " " << name << ";\n";
 }
 
-static void printKnownType(
+static void printKnownType(const ASTContext &astContext,
     PrimitiveTypeMapping &typeMapping, raw_ostream &os, StringRef name,
     const IRABIDetailsProvider::TypeRecordABIRepresentation &typeRecord) {
   if (typeRecord.getMembers().size() == 1)
-    return printKnownTypedef(typeMapping, os, name, typeRecord);
-  printKnownStruct(typeMapping, os, name, typeRecord);
+    return printKnownTypedef(astContext, typeMapping, os, name, typeRecord);
+  printKnownStruct(astContext, typeMapping, os, name, typeRecord);
 }
 
 static void
@@ -143,10 +143,10 @@ static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
   os << "// Swift type metadata response type.\n";
   // Print out the type metadata structure.
   auto funcSig = ctx.getIrABIDetails().getTypeMetadataAccessFunctionSignature();
-  printKnownType(typeMapping, os, "MetadataResponseTy", funcSig.returnType);
+  printKnownType(ctx.getASTContext(), typeMapping, os, "MetadataResponseTy", funcSig.returnType);
   assert(funcSig.parameterTypes.size() == 1);
   os << "// Swift type metadata request type.\n";
-  printKnownType(typeMapping, os, "MetadataRequestTy",
+  printKnownType(ctx.getASTContext(), typeMapping, os, "MetadataRequestTy",
                  funcSig.parameterTypes[0]);
 }
 
@@ -209,7 +209,7 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
 
     auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadata(
         type->getCanonicalType(), irgen::TypeMetadataAddress::AddressPoint);
-    std::string typeMetadataVarName = typeMetadataFunc.mangleAsString();
+    std::string typeMetadataVarName = typeMetadataFunc.mangleAsString(type->getASTContext());
 
     if (isCForwardDefinition) {
       os << "// type metadata address for " << type.getString() << ".\n";
@@ -220,7 +220,7 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
 
     os << "template<>\nstruct TypeMetadataTrait<" << typeInfo.name << "> {\n"
        << "  static ";
-    ClangSyntaxPrinter(os).printInlineForThunk();
+    ClangSyntaxPrinter(astContext, os).printInlineForThunk();
     os << "void * _Nonnull getTypeMetadata() {\n"
        << "    return &" << cxx_synthesis::getCxxImplNamespaceName()
        << "::" << typeMetadataVarName << ";\n"
@@ -232,7 +232,7 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
                                           ASTContext &astContext,
                                           PrimitiveTypeMapping &typeMapping,
                                           raw_ostream &os) {
-  ClangSyntaxPrinter printer(os);
+  ClangSyntaxPrinter printer(astContext, os);
   printer.printNamespace(
       cxx_synthesis::getCxxSwiftNamespaceName(),
       [&](raw_ostream &) {
@@ -250,7 +250,7 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
             });
         os << "\n";
         // C++ only supports inline variables from C++17.
-        ClangSyntaxPrinter(os).printIgnoredCxx17ExtensionDiagnosticBlock([&]() {
+        ClangSyntaxPrinter(astContext, os).printIgnoredCxx17ExtensionDiagnosticBlock([&]() {
           printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
                                           /*isCForwardDefinition=*/false);
         });

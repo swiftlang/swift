@@ -30,7 +30,7 @@ public func main() {
   foo()
 }
 
-// CHECK: @"$s4Main022global_in_client_used_c1_D0Sivp" = {{.*}}global %TSi zeroinitializer
-// CHECK: @"$s4Main024global_in_client_unused_c1_D0Sivp" = {{.*}}global %TSi zeroinitializer
-// CHECK: @"$s8MyModule022global_in_module_used_d1_E0Sivp" = {{.*}}global %TSi zeroinitializer
-// CHECK: @"$s8MyModule024global_in_module_unused_d1_E0Sivp" = {{.*}}global %TSi zeroinitializer
+// CHECK: @"$e4Main022global_in_client_used_c1_D0Sivp" = {{.*}}global %TSi zeroinitializer
+// CHECK: @"$e4Main024global_in_client_unused_c1_D0Sivp" = {{.*}}global %TSi zeroinitializer
+// CHECK: @"$e8MyModule022global_in_module_used_d1_E0Sivp" = {{.*}}global %TSi zeroinitializer
+// CHECK: @"$e8MyModule024global_in_module_unused_d1_E0Sivp" = {{.*}}global %TSi zeroinitializer

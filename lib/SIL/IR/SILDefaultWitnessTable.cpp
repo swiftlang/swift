@@ -98,7 +98,7 @@ convertToDefinition(ArrayRef<Entry> entries) {
 }
 
 std::string SILDefaultWitnessTable::getUniqueName() const {
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(getProtocol()->getASTContext());
   return Mangler.mangleTypeWithoutPrefix(
     getProtocol()->getDeclaredInterfaceType());
 }

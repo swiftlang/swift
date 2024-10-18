@@ -311,7 +311,7 @@ bool StringOptimization::optimizeTypeName(ApplyInst *typeNameCall) {
   bool isQualified = isQualifiedOpt.value();
 
   // Create the constant type string by mangling + demangling.
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(ty->getASTContext());
   std::string mangledTypeName = mangler.mangleTypeForTypeName(ty);
 
   Demangle::DemangleOptions options;

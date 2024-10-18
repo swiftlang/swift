@@ -25,6 +25,7 @@
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -294,7 +295,7 @@ static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
   if (!Info.astNode)
     return Result;
   // Keep this in sync with ASTMangler::appendMacroExpansionContext().
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(FunctionDC->getASTContext());
   switch (Info.kind) {
   case GeneratedSourceInfo::ExpressionMacroExpansion: {
     auto parent = ASTNode::getFromOpaqueValue(Info.astNode);

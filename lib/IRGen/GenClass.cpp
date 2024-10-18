@@ -711,7 +711,7 @@ irgen::getPhysicalClassMemberAccessStrategy(IRGenModule &IGM,
 
   case FieldAccess::NonConstantDirect: {
     std::string symbol =
-      LinkEntity::forFieldOffset(field).mangleAsString();
+      LinkEntity::forFieldOffset(field).mangleAsString(IGM.Context);
     return MemberAccessStrategy::getDirectGlobal(std::move(symbol),
                                  MemberAccessStrategy::OffsetKind::Bytes_Word);
   }
@@ -2337,7 +2337,7 @@ namespace {
         llvm::raw_svector_ostream os(buffer);
         os << LinkEntity::forTypeMetadata(*prespecialization,
                                           TypeMetadataAddress::FullMetadata)
-                  .mangleAsString();
+                  .mangleAsString(IGM.Context);
         return os.str();
       }
 
@@ -3053,7 +3053,7 @@ llvm::MDString *irgen::typeIdForMethod(IRGenModule &IGM, SILDeclRef method) {
   assert(!method.getOverridden() && "must always be base method");
 
   auto entity = LinkEntity::forMethodDescriptor(method);
-  auto mangled = entity.mangleAsString();
+  auto mangled = entity.mangleAsString(IGM.Context);
   auto typeId = llvm::MDString::get(*IGM.LLVMContext, mangled);
   return typeId;
 }

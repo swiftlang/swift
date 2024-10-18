@@ -202,7 +202,7 @@ static void forwardParameters(AbstractFunctionDecl *afd,
 static llvm::StringRef
 mangleDistributedThunkForAccessorRecordName(
     ASTContext &C, AbstractFunctionDecl *thunk) {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(C);
 
   // default mangling
   auto mangled =

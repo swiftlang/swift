@@ -2748,7 +2748,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto *dwfi = cast<DifferentiabilityWitnessFunctionInst>(&SI);
     auto *witness = dwfi->getWitness();
     DifferentiabilityWitnessesToEmit.insert(witness);
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(witness->getOriginalFunction()->getASTContext());
     auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
         witness->getOriginalFunction()->getName(), witness->getKind(),
         witness->getConfig());
@@ -2936,7 +2936,7 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
 
   // Use the mangled name of the class as a key to distinguish between classes
   // which have the same name (but are in different contexts).
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(vt.getClass()->getASTContext());
   std::string mangledClassName = mangler.mangleNominalType(vt.getClass());
   size_t nameLength = mangledClassName.size();
   char *stringStorage = (char *)StringTable.Allocate(nameLength, 1);
@@ -2987,7 +2987,7 @@ void SILSerializer::writeSILMoveOnlyDeinit(const SILMoveOnlyDeinit &deinit) {
 
   // Use the mangled name of the class as a key to distinguish between classes
   // which have the same name (but are in different contexts).
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(deinit.getNominalDecl()->getASTContext());
   std::string mangledNominalName =
       mangler.mangleNominalType(deinit.getNominalDecl());
   size_t nameLength = mangledNominalName.size();
@@ -3144,7 +3144,7 @@ writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt) {
 
 void SILSerializer::writeSILDifferentiabilityWitness(
     const SILDifferentiabilityWitness &dw) {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(dw.getOriginalFunction()->getASTContext());
   auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
       dw.getOriginalFunction()->getName(), dw.getKind(), dw.getConfig());
   size_t nameLength = mangledKey.size();

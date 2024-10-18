@@ -7,4 +7,4 @@ struct String {}
 
 public func test() { }
 
-// CHECK-LABEL: define {{.*}}void @"$ss4testyyF"()
+// CHECK-LABEL: define {{.*}}void @"$es4testyyF"()

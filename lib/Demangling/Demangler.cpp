@@ -185,6 +185,7 @@ int swift::Demangle::getManglingPrefixLength(llvm::StringRef mangledName) {
     /*Swift 4*/   "_T0",
     /*Swift 4.x*/ "$S", "_$S",
     /*Swift 5+*/  "$s", "_$s",
+    /*Swift 5+ Embedded Swift*/  "$e", "_$e",
     /*Swift 5+ for filenames*/ "@__swiftmacro_",
   };
 
@@ -324,7 +325,8 @@ bool swift::Demangle::isStruct(llvm::StringRef mangledName) {
 }
 
 std::string swift::Demangle::mangledNameForTypeMetadataAccessor(
-    StringRef moduleName, StringRef typeName, Node::Kind typeKind) {
+    StringRef moduleName, StringRef typeName, Node::Kind typeKind,
+    Mangle::ManglingFlavor Flavor) {
   using namespace Demangle;
 
   //  kind=Global
@@ -353,7 +355,7 @@ std::string swift::Demangle::mangledNameForTypeMetadataAccessor(
     global->addChild(nominalDescriptor, D);
   }
 
-  auto mangleResult = mangleNode(global);
+  auto mangleResult = mangleNode(global, Flavor);
   assert(mangleResult.isSuccess());
   return mangleResult.result();
 }
@@ -746,6 +748,9 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName,
   unsigned PrefixLength = getManglingPrefixLength(MangledName);
   if (PrefixLength == 0)
     return nullptr;
+
+  if (MangledName.starts_with(MANGLING_PREFIX_EMBEDDED_STR))
+    Flavor = ManglingFlavor::Embedded;
 
   IsOldFunctionTypeMangling = isOldFunctionTypeMangling(MangledName);
   Pos += PrefixLength;
@@ -1567,14 +1572,15 @@ static void setParentForOpaqueReturnTypeNodesImpl(
 /// Associate any \c OpaqueReturnType nodes with the declaration whose opaque
 /// return type they refer back to.
 static Node *setParentForOpaqueReturnTypeNodes(Demangler &D, Node *parent,
-                                               Node *visitedNode) {
+                                               Node *visitedNode,
+                                               ManglingFlavor Flavor) {
   if (!parent || !visitedNode)
     return nullptr;
   std::string parentID;
   setParentForOpaqueReturnTypeNodesImpl(D, *visitedNode, [&] {
     if (!parentID.empty())
       return StringRef(parentID);
-    const auto mangleResult = mangleNode(parent);
+    const auto mangleResult = mangleNode(parent, Flavor);
     assert(mangleResult.isSuccess());
     parentID = mangleResult.result();
     return StringRef(parentID);
@@ -1599,7 +1605,7 @@ NodePointer Demangler::demanglePlainFunction() {
     ? createWithChildren(Node::Kind::Function, Ctx, Name, LabelList, Type)
     : createWithChildren(Node::Kind::Function, Ctx, Name, Type);
     
-  result = setParentForOpaqueReturnTypeNodes(*this, result, Type);
+  result = setParentForOpaqueReturnTypeNodes(*this, result, Type, Flavor);
   return result;
 }
 
@@ -4069,7 +4075,7 @@ NodePointer Demangler::demangleEntity(Node::Kind Kind) {
   auto result = LabelList ? createWithChildren(Kind, Context, Name, LabelList, Type)
                           : createWithChildren(Kind, Context, Name, Type);
                           
-  result = setParentForOpaqueReturnTypeNodes(*this, result, Type);
+  result = setParentForOpaqueReturnTypeNodes(*this, result, Type, Flavor);
   return result;
 }
 
@@ -4093,7 +4099,7 @@ NodePointer Demangler::demangleSubscript() {
   Subscript = addChild(Subscript, Type);
   addChild(Subscript, PrivateName);
   
-  Subscript = setParentForOpaqueReturnTypeNodes(*this, Subscript, Type);
+  Subscript = setParentForOpaqueReturnTypeNodes(*this, Subscript, Type, Flavor);
 
   return demangleAccessor(Subscript);
 }

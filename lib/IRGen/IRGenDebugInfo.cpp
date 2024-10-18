@@ -1015,7 +1015,7 @@ private:
     Ty = Ty->replaceSubstitutedSILFunctionTypesWithUnsubstituted(
         IGM.getSILModule());
 
-    Mangle::ASTMangler Mangler;
+    Mangle::ASTMangler Mangler(IGM.Context);
     std::string Result = Mangler.mangleTypeForDebugger(Ty, Sig);
 
     // TODO(https://github.com/apple/swift/issues/57699): We currently cannot round trip some C++ types.
@@ -1088,7 +1088,8 @@ private:
              "no mangled name and no human readable name given");
     else
       assert((UniqueID.starts_with("_T") ||
-              UniqueID.starts_with(MANGLING_PREFIX_STR)) &&
+              UniqueID.starts_with(MANGLING_PREFIX_STR) ||
+              UniqueID.starts_with(MANGLING_PREFIX_EMBEDDED_STR)) &&
              "UID is not a mangled name");
 #endif
 
@@ -1188,7 +1189,7 @@ private:
 
     auto DbgTy = DebugTypeInfo::getFromTypeInfo(
         UnsubstitutedTy, IGM.getTypeInfoForUnlowered(UnsubstitutedTy), IGM);
-    Mangle::ASTMangler Mangler;
+    Mangle::ASTMangler Mangler(IGM.Context);
     std::string DeclTypeMangledName = Mangler.mangleTypeForDebugger(
         UnsubstitutedTy->mapTypeOutOfContext(), {});
     if (DeclTypeMangledName == MangledName) {
@@ -1246,7 +1247,7 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
 
   auto DbgTy = DebugTypeInfo::getFromTypeInfo(
       UnsubstitutedTy, IGM.getTypeInfoForUnlowered(UnsubstitutedTy), IGM);
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(IGM.Context);
   std::string DeclTypeMangledName =
       Mangler.mangleTypeForDebugger(UnsubstitutedTy->mapTypeOutOfContext(), {});
   if (DeclTypeMangledName == MangledName) {

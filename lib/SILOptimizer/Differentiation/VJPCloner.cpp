@@ -1283,7 +1283,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
         origParam.getConvention()));
   }
 
-  Mangle::DifferentiationMangler mangler;
+  Mangle::DifferentiationMangler mangler(getASTContext());
   auto pbName = mangler.mangleLinearMap(
       original->getName(), AutoDiffLinearMapKind::Pullback, config);
   // Set pullback generic signature equal to VJP generic signature.

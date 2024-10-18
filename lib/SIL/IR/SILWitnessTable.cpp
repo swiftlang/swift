@@ -32,7 +32,7 @@
 using namespace swift;
 
 static std::string mangleConstant(ProtocolConformance *C) {
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(C->getDeclContext()->getASTContext());
   return Mangler.mangleWitnessTable(C);
 }
 

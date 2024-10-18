@@ -1118,7 +1118,7 @@ static StringRef calculateMangledName(SDKContext &Ctx, ValueDecl *VD) {
   if (auto *attr = VD->getAttrs().getAttribute<SILGenNameAttr>()) {
     return Ctx.buffer(attr->Name);
   }
-  Mangle::ASTMangler NewMangler;
+  Mangle::ASTMangler NewMangler(VD->getASTContext());
   return Ctx.buffer(NewMangler.mangleAnyDecl(VD, true,
                                     /*bool respectOriginallyDefinedIn*/true));
 }

@@ -10,4 +10,4 @@ public func regular() { }
 #endif
 
 // CHECK:    define {{.*}}void @"$s12conditionals7regularyyF"()
-// EMBEDDED: define {{.*}}void @"$s12conditionals8embeddedyyF"()
+// EMBEDDED: define {{.*}}void @"$e12conditionals8embeddedyyF"()

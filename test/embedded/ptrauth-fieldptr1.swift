@@ -25,7 +25,7 @@ public func test2(x: UnsafePointer<MyStruct>) {
     x.pointee.fptr2()
 }
 
-// CHECK: define {{.*}}@"$s4Main5test11xySPySo8MyStructVG_tF"
+// CHECK: define {{.*}}@"$e4Main5test11xySPySo8MyStructVG_tF"
 // CHECK:   call {{.*}}[ "ptrauth"(i32 0, i64 0) ]
-// CHECK: define {{.*}}@"$s4Main5test21xySPySo8MyStructVG_tF"
+// CHECK: define {{.*}}@"$e4Main5test21xySPySo8MyStructVG_tF"
 // CHECK:   call {{.*}}[ "ptrauth"(i32 0, i64 16962) ]

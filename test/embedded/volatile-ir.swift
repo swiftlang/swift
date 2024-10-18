@@ -15,7 +15,7 @@ public func test_uint8() -> UInt8 {
   return p.load()
 }
 
-// CHECK: define {{.*}}i8 @"$s4main10test_uint8s5UInt8VyF"()
+// CHECK: define {{.*}}i8 @"$e4main10test_uint8s5UInt8VyF"()
 // CHECK:   store atomic volatile i8 42, ptr inttoptr (i64 4026579625 to ptr) monotonic, align 1
 // CHECK:   [[RET:%.*]] = load atomic volatile i8, ptr inttoptr (i64 4026579625 to ptr) monotonic, align 1
 // CHECK:   ret i8 [[RET]]
@@ -27,7 +27,7 @@ public func test_uint16() -> UInt16 {
   return p.load()
 }
 
-// CHECK: define {{.*}}i16 @"$s4main11test_uint16s6UInt16VyF"()
+// CHECK: define {{.*}}i16 @"$e4main11test_uint16s6UInt16VyF"()
 // CHECK:   store atomic volatile i16 42, ptr inttoptr (i64 4026579626 to ptr) monotonic, align 2
 // CHECK:   [[RET:%.*]] = load atomic volatile i16, ptr inttoptr (i64 4026579626 to ptr) monotonic, align 2
 // CHECK:   ret i16 [[RET]]
@@ -39,7 +39,7 @@ public func test_uint32() -> UInt32 {
   return p.load()
 }
 
-// CHECK: define {{.*}}i32 @"$s4main11test_uint32s6UInt32VyF"()
+// CHECK: define {{.*}}i32 @"$e4main11test_uint32s6UInt32VyF"()
 // CHECK:   store atomic volatile i32 42, ptr inttoptr (i64 4026579626 to ptr) monotonic, align 4
 // CHECK:   [[RET:%.*]] = load atomic volatile i32, ptr inttoptr (i64 4026579626 to ptr) monotonic, align 4
 // CHECK:   ret i32 [[RET]]
@@ -51,7 +51,7 @@ public func test_uint64() -> UInt64 {
   return p.load()
 }
 
-// CHECK: define {{.*}}i64 @"$s4main11test_uint64s6UInt64VyF"()
+// CHECK: define {{.*}}i64 @"$e4main11test_uint64s6UInt64VyF"()
 // CHECK:   store atomic volatile i64 42, ptr inttoptr (i64 4026579626 to ptr) monotonic, align 8
 // CHECK:   [[RET:%.*]] = load atomic volatile i64, ptr inttoptr (i64 4026579626 to ptr) monotonic, align 8
 // CHECK:   ret i64 [[RET]]

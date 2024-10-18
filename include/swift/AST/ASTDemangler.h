@@ -22,6 +22,7 @@
 #ifndef SWIFT_AST_ASTDEMANGLER_H
 #define SWIFT_AST_ASTDEMANGLER_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Types.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/NamespaceMacros.h"
@@ -53,6 +54,7 @@ TypeDecl *getTypeDeclForUSR(ASTContext &ctx,
 /// just finds and builds things in the AST.
 class ASTBuilder {
   ASTContext &Ctx;
+  Mangle::ManglingFlavor ManglingFlavor;
   Demangle::NodeFactory Factory;
 
   /// The notional context in which we're writing and type-checking code.
@@ -88,8 +90,11 @@ public:
 
   static constexpr bool needsToPrecomputeParentGenericContextShapes = false;
 
-  explicit ASTBuilder(ASTContext &ctx, GenericSignature genericSig)
-    : Ctx(ctx) {
+  explicit ASTBuilder(ASTContext &ctx, GenericSignature genericSig) : Ctx(ctx) {
+    ManglingFlavor = ctx.LangOpts.hasFeature(Feature::Embedded)
+                 ? Mangle::ManglingFlavor::Embedded
+                 : Mangle::ManglingFlavor::Default;
+
     for (auto *paramTy : genericSig.getGenericParams()) {
       if (paramTy->isParameterPack())
         ParameterPacks.emplace_back(paramTy->getDepth(), paramTy->getIndex());
@@ -97,6 +102,7 @@ public:
   }
 
   ASTContext &getASTContext() { return Ctx; }
+  Mangle::ManglingFlavor getManglingFlavor() { return ManglingFlavor; }
   DeclContext *getNotionalDC();
 
   Demangle::NodeFactory &getNodeFactory() { return Factory; }

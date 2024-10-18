@@ -21,4 +21,4 @@ public func test() -> any Player {
 }
 
 // CHECK-A: $s4main4testAA6Player_pyF
-// CHECK-B-NOT: $s4main4testAA6Player_pyF
+// CHECK-B-NOT: $e4main4testAA6Player_pyF

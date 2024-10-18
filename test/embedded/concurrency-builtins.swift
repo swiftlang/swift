@@ -12,7 +12,7 @@ public func test() async {
     }
 }
 
-// CHECK: define {{.*}}@"$s4main4testyyYaF"(ptr swiftasync %0)
+// CHECK: define {{.*}}@"$e4main4testyyYaF"(ptr swiftasync %0)
 // CHECK: entry:
 // CHECK:   %result_type_info_record = alloca %swift.result_type_info_task_option
 // CHECK:   call {{.*}}@llvm.coro.id.async

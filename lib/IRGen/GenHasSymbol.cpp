@@ -149,7 +149,7 @@ getSymbolAddrsForDecl(IRGenModule &IGM, ValueDecl *decl,
 llvm::Function *IRGenModule::emitHasSymbolFunction(ValueDecl *decl) {
 
   PrettyStackTraceDecl trace("emitting #_hasSymbol query for", decl);
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(Context);
 
   auto func = cast<llvm::Function>(getOrCreateHelperFunction(
       mangler.mangleHasSymbolQuery(decl), Int1Ty, {},

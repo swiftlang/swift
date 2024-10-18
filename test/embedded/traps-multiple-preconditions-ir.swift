@@ -22,18 +22,18 @@ public func test(i: Int) {
 
 // "Non-production builds" - We expect 4 separate _assertionFailure() calls with different values
 // CHECK-MESSAGE: define {{.*}}void @"$s4main4test1iySi_tF"(i64 %0) {{.*}}{
-// CHECK-MESSAGE:   call {{.*}}@"${{(ss17_assertionFailure__|ss31_embeddedReportFatalErrorInFile)}}
+// CHECK-MESSAGE:   call {{.*}}@"${{(es17_assertionFailure__|es31_embeddedReportFatalErrorInFile)}}
 // CHECK-MESSAGE:   unreachable
-// CHECK-MESSAGE:   call {{.*}}@"${{(ss17_assertionFailure__|ss31_embeddedReportFatalErrorInFile)}}
+// CHECK-MESSAGE:   call {{.*}}@"${{(es17_assertionFailure__|es31_embeddedReportFatalErrorInFile)}}
 // CHECK-MESSAGE:   unreachable
-// CHECK-MESSAGE:   call {{.*}}@"${{(ss17_assertionFailure__|ss31_embeddedReportFatalErrorInFile)}}
+// CHECK-MESSAGE:   call {{.*}}@"${{(es17_assertionFailure__|es31_embeddedReportFatalErrorInFile)}}
 // CHECK-MESSAGE:   unreachable
-// CHECK-MESSAGE:   call {{.*}}@"${{(ss17_assertionFailure__|ss31_embeddedReportFatalErrorInFile)}}
+// CHECK-MESSAGE:   call {{.*}}@"${{(es17_assertionFailure__|es31_embeddedReportFatalErrorInFile)}}
 // CHECK-MESSAGE:   unreachable
 // CHECK-MESSAGE: }
 
 // "Production builds" - We expect 4 separate trap blocks in the IR.
-// CHECK-NOMESSAGE: define {{.*}}void @"$s4main4test1iySi_tF"(i64 %0) {{.*}}{
+// CHECK-NOMESSAGE: define {{.*}}void @"$e4main4test1iySi_tF"(i64 %0) {{.*}}{
 // CHECK-NOMESSAGE:   tail call void asm sideeffect "", "n"(i32 0) #3
 // CHECK-NOMESSAGE:   tail call void @llvm.trap()
 // CHECK-NOMESSAGE:   unreachable

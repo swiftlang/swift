@@ -954,7 +954,7 @@ getAccessorDeclarationName(clang::ASTContext &Ctx, NominalTypeDecl *structDecl,
                            VarDecl *fieldDecl, const char *suffix) {
   std::string id;
   llvm::raw_string_ostream IdStream(id);
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(structDecl->getASTContext());
   IdStream << "$" << mangler.mangleDeclAsUSR(structDecl, "") << "$"
            << fieldDecl->getName() << "$" << suffix;
 

@@ -46,9 +46,9 @@ public func checks(n: Int) {
 }
 
 // CHECK: define {{.*}}i32 @main(i32 %0, ptr %1)
-// CHECK: define {{.*}}i1 @"$s4main4boolSbyF"()
-// CHECK: define {{.*}}{{i32|i64}} @"$s4main3intSiyF"()
-// CHECK: define {{.*}}ptr @"$s4main3ptr1p1nS2V_SitF"(ptr %0, {{i32|i64}} %1)
-// CHECK: define {{.*}}{ {{i32|i64}}, i8 } @"$s4main8optionalSiSgyF"()
-// CHECK: define {{.*}}{ {{i32|i64}}, {{i32|i64}}, i8 } @"$s4main12staticstrings12StaticStringVyF"()
-// CHECK: define {{.*}}void @"$s4main6checks1nySi_tF"({{i32|i64}} %0)
+// CHECK: define {{.*}}i1 @"$e4main4boolSbyF"()
+// CHECK: define {{.*}}{{i32|i64}} @"$e4main3intSiyF"()
+// CHECK: define {{.*}}ptr @"$e4main3ptr1p1nS2V_SitF"(ptr %0, {{i32|i64}} %1)
+// CHECK: define {{.*}}{ {{i32|i64}}, i8 } @"$e4main8optionalSiSgyF"()
+// CHECK: define {{.*}}{ {{i32|i64}}, {{i32|i64}}, i8 } @"$e4main12staticstrings12StaticStringVyF"()
+// CHECK: define {{.*}}void @"$e4main6checks1nySi_tF"({{i32|i64}} %0)
