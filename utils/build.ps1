@@ -194,6 +194,12 @@ $WiXVersion = "4.0.5"
 # Avoid $env:ProgramFiles in case this script is running as x86
 $UnixToolsBinDir = "$env:SystemDrive\Program Files\Git\usr\bin"
 
+# The make tool isn't part of MSYS, but we need it for LLDB tests
+$MakeToolPath = "C:/Program Files (x86)/GnuWin32/bin/make.exe"
+if (-not (Test-Path $MakeToolPath)) {
+  & winget install GnuWin32.Make
+}
+
 $python = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Shared\Python39_64\python.exe"
 if (-not (Test-Path $python)) {
   $python = (where.exe python) | Select-Object -First 1
@@ -1414,7 +1420,50 @@ function Build-Compilers() {
 
       if ($TestClang) { $Targets += @("check-clang") }
       if ($TestLLD) { $Targets += @("check-lld") }
-      if ($TestLLDB) { $Targets += @("check-lldb") }
+      if ($TestLLDB) {
+        $Targets += @("check-lldb")
+
+        function Select-LitTestOverrides {
+          param([string] $TestStatus)
+
+          $MatchingLines=(Get-Content $PSScriptRoot/windows-llvm-lit-test-overrides.txt | Select-String -Pattern "`^${TestStatus}.*$")
+          $TestNames=$MatchingLines | ForEach-Object { ($_ -replace $TestStatus,"").Trim() }
+          return $TestNames
+        }
+
+        # Override some test results with llvm-lit.
+        $TestsToXFail=Select-LitTestOverrides "xfail"
+        $TestsToSkip=Select-LitTestOverrides "skip"
+        $env:LIT_XFAIL=$TestsToXFail -join ";"
+        $env:LIT_FILTER_OUT="($($TestsToSkip -join '|'))"
+
+        # Install packages that the test suite requires
+        & $python -m pip install psutil
+        & $python -m pip install packaging
+        & $python -m pip install unittest2
+
+        $RuntimeBinaryCache = Get-TargetProjectBinaryCache $Arch Runtime
+
+        # Transitive dependency if _lldb.pyd
+        cp $RuntimeBinaryCache\bin\swiftCore.dll "$CompilersBinaryCache\lib\site-packages\lldb"
+
+        # Runtime dependencies of repl_swift.exe
+        $SwiftrtSubdir = "lib\swift\windows\$($Arch.LLVMName)"
+        cp "$RuntimeBinaryCache\$SwiftrtSubdir\swiftrt.obj" "$CompilersBinaryCache\$SwiftrtSubdir"
+        cp "$RuntimeBinaryCache\bin\swiftCore.dll" "$CompilersBinaryCache\bin"
+
+        $TestingDefines += @{
+          LLDB_INCLUDE_TESTS = "YES";
+          # Check for required Python modules in CMake
+          LLDB_ENFORCE_STRICT_TEST_REQUIREMENTS = "YES";
+          # No watchpoint support on windows: https://github.com/llvm/llvm-project/issues/24820
+          LLDB_TEST_USER_ARGS = "--skip-category=watchpoint";
+          # gtest sharding breaks llvm-lit's --xfail and LIT_XFAIL inputs: https://github.com/llvm/llvm-project/issues/102264
+          LLVM_LIT_ARGS = "-v --no-gtest-sharding --show-xfail --show-unsupported";
+          # LLDB Unit tests link against this library
+          LLVM_UNITTEST_LINK_FLAGS = "$($Arch.SDKInstallRoot)\usr\lib\swift\windows\$($Arch.LLVMName)\swiftCore.lib";
+        }
+      }
       if ($TestLLVM) { $Targets += @("check-llvm") }
       if ($TestSwift) { $Targets += @("check-swift", "SwiftCompilerPlugin") }
     } else {
@@ -1453,6 +1502,7 @@ function Build-Compilers() {
         LLDB_PYTHON_EXT_SUFFIX = ".pyd";
         LLDB_PYTHON_RELATIVE_PATH = "lib/site-packages";
         LLDB_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "lldb-tblgen.exe");
+        LLDB_TEST_MAKE = $MakeToolPath;
         LLVM_CONFIG_PATH = (Join-Path -Path $BuildTools -ChildPath "llvm-config.exe");
         LLVM_EXTERNAL_SWIFT_SOURCE_DIR = "$SourceCache\swift";
         LLVM_NATIVE_TOOL_DIR = $BuildTools;
