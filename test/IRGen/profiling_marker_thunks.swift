@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/P.swiftmodule -module-name=P %S/../Inputs/resilient_protocol.swift
 // RUN: %target-swift-frontend -module-name A -I %t -enable-profiling-marker-thunks -emit-ir %s | %FileCheck %s
 // RUN: %target-swift-frontend -module-name A -I %t -enable-library-evolution -enable-profiling-marker-thunks -emit-ir %s | %FileCheck %s
-// RUN: %target-swift-frontend -module-name A -I %t -enable-profiling-marker-thunks -emit-ir %s | %FileCheck %s --check-prefix=ATTRIBUTE
+// RUN: %target-swift-frontend -module-name A -I %t -enable-profiling-marker-thunks -emit-ir %s | %FileCheck %s --check-prefix=ATTRIBUTE -DINT=i%target-ptrsize
 // RUN: %target-swift-frontend -module-name A -I %t -disable-profiling-marker-thunks -emit-ir %s | %FileCheck %s --check-prefix=NOTHUNK
 // RUN: %target-swift-frontend -module-name A -I %t -emit-ir %s | %FileCheck %s --check-prefix=NOTHUNK
 
@@ -97,8 +97,8 @@ public func test() {
 // CHECK: call swiftcc void @"$s1A7genericyyxlF"(ptr noalias %0, ptr %1)
 // CHECK: ret
 
-// CHECK: define {{.*}} void @"__swift_prof_thunk__generic_witness__$s1A9ConformerVyxGAA9SomeProtoA2aEP5plainyyKFTW"({{.*}}) #[[ATTR]] {
-// CHECK: define {{.*}} void @"__swift_prof_thunk__generic_vtable__$s1A12GenericClassC1xxvg"({{.*}}) #[[ATTR]] {
+// CHECK: define {{.*}} void @"__swift_prof_thunk__generic_witness__$s1A9ConformerVyxGAA9SomeProtoA2aEP5plainyyKFTW"({{.*}}) #[[ATTR]]{{( comdat)?}} {
+// CHECK: define {{.*}} void @"__swift_prof_thunk__generic_vtable__$s1A12GenericClassC1xxvg"({{.*}}) #[[ATTR]]{{( comdat)?}} {
 
 // CHECK: attributes #[[ATTR]] = { noinline "frame-pointer"="all"
 
@@ -108,9 +108,9 @@ public func test() {
 // ATTRIBUTE: define {{.*}} void @"__swift_prof_thunk__generic_func__1__$s1A16SomeGenericThingVySiSdGN___fun__$s1A7genericyyxlF"({{.*}}) #[[ATTR]]
 // ATTRIBUTE: define {{.*}} void @"__swift_prof_thunk__generic_witness__$s1A9ConformerVyxGAA9SomeProtoA2aEP8retAssoc1TQzyFTW"({{.*}}) #[[ATTR]]
 // ATTRIBUTE: define {{.*}} void @"__swift_prof_thunk__generic_witness__$s1A9ConformerVyxGAA9SomeProtoA2aEP5plainyyKFTW"({{.*}}) #[[ATTR]]
-// ATTRIBUTE: define {{.*}} i64 @"__swift_prof_thunk__generic_witness__$s1A18ResilientConformerVyxG1P0A12BaseProtocolAaeFP11requirementSiyFTW"({{.*}}) #[[ATTR]]
+// ATTRIBUTE: define {{.*}} [[INT]] @"__swift_prof_thunk__generic_witness__$s1A18ResilientConformerVyxG1P0A12BaseProtocolAaeFP11requirementSiyFTW"({{.*}}) #[[ATTR]]
 // ATTRIBUTE: define {{.*}} void @"__swift_prof_thunk__generic_vtable__$s1A12GenericClassC1xxvg"({{.*}}) #[[ATTR]]
 // ATTRIBUTE: define {{.*}} void @"__swift_prof_thunk__generic_vtable__$s1A12GenericClassC1xxvs"({{.*}}) #[[ATTR]]
 // ATTRIBUTE: define {{.*}} ptr @"__swift_prof_thunk__generic_vtable__$s1A12GenericClassCyACyxGxcfC"({{.*}}) #[[ATTR]]
-// ATTRIBUTE: define {{.*}} i64 @"__swift_prof_thunk__generic_vtable__$s1A12GenericClassC10someMethodSiyF"({{.*}}) #[[ATTR]]
+// ATTRIBUTE: define {{.*}} [[INT]] @"__swift_prof_thunk__generic_vtable__$s1A12GenericClassC10someMethodSiyF"({{.*}}) #[[ATTR]]
 // ATTRIBUTE: #[[ATTR]] = { noinline "frame-pointer"="all"
