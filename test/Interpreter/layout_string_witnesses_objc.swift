@@ -64,7 +64,7 @@ struct MultiPayloadObjCExistentialWrapper {
 }
 
 func testMultiPayloadObjCExistentialWrapper() {
-    let ptr = allocateInternalGenericPtr(of: NestedWrapper<MultiPayloadObjCExistentialWrapper>.self)
+    let ptr = allocateInternalGenericPtr(of: MultiPayloadObjCExistentialWrapper.self)
 
     do {
         let x = MultiPayloadObjCExistentialWrapper(x: .y(ObjCPrintOnDealloc()))
@@ -84,7 +84,7 @@ func testMultiPayloadObjCExistentialWrapper() {
     print("Before deinit")
 
     // CHECK-NEXT: ObjCPrintOnDealloc deinitialized!
-    testGenericDestroy(ptr, of: NestedWrapper<MultiPayloadObjCExistentialWrapper>.self)
+    testGenericDestroy(ptr, of: MultiPayloadObjCExistentialWrapper.self)
 
     ptr.deallocate()
 }
