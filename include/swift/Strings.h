@@ -172,6 +172,8 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_UNKNOWNOBJECT = {
 /// The name of the Builtin type for Vector
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_VEC = {
     "Builtin.Vec"};
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_FIXEDARRAY = {
+    "Builtin.FixedArray"};
 /// The name of the Builtin type for SILToken
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_SILTOKEN = {
     "Builtin.SILToken"};

@@ -1665,6 +1665,24 @@ struct TargetMetatypeMetadata : public TargetMetadata<Runtime> {
 };
 using MetatypeMetadata = TargetMetatypeMetadata<InProcess>;
 
+/// The structure of `Builtin.FixedArray` type metadata.
+template <typename Runtime>
+struct TargetFixedArrayTypeMetadata : public TargetMetadata<Runtime> {
+  using StoredPointerDifference = typename Runtime::StoredPointerDifference;
+  
+  StoredPointerDifference Count;
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> Element;
+  
+  StoredPointerDifference getCount() const {
+    return Count < 0 ? 0 : Count;
+  }
+
+  static bool classof(const TargetMetadata<Runtime> *metadata) {
+    return metadata->getKind() == MetadataKind::FixedArray;
+  }
+};
+using FixedArrayTypeMetadata = TargetFixedArrayTypeMetadata<InProcess>;
+
 /// The structure of tuple type metadata.
 template <typename Runtime>
 struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {

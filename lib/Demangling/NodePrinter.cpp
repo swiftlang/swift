@@ -296,6 +296,7 @@ private:
     case Node::Kind::BoundGenericFunction:
     case Node::Kind::BuiltinTypeName:
     case Node::Kind::BuiltinTupleType:
+    case Node::Kind::BuiltinFixedArray:
     case Node::Kind::Class:
     case Node::Kind::DependentGenericType:
     case Node::Kind::DependentMemberType:
@@ -1983,6 +1984,13 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::BuiltinTupleType:
     Printer << "Builtin.TheTupleType";
+    return nullptr;
+  case Node::Kind::BuiltinFixedArray:
+    Printer << "Builtin.FixedArray<";
+    print(Node->getChild(0), depth + 1);
+    Printer << ", ";
+    print(Node->getChild(1), depth + 1);
+    Printer << ">";
     return nullptr;
   case Node::Kind::Number:
     Printer << Node->getIndex();

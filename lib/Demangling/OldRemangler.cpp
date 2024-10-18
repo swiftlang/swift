@@ -1530,6 +1530,10 @@ static bool stripPrefix(StringRef &string, const char (&data)[N]) {
   return true;
 }
 
+ManglingError Remangler::mangleBuiltinFixedArray(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnexpectedBuiltinType, node);
+}
+
 ManglingError Remangler::mangleBuiltinTypeName(Node *node, unsigned depth) {
   Buffer << 'B';
   StringRef text = node->getText();
