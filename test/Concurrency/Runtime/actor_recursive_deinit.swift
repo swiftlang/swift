@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature IsolatedDeinit -Xfrontend -disable-availability-checking -parse-stdlib -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature IsolatedDeinit -target %target-swift-5.1-abi-triple -parse-stdlib -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency

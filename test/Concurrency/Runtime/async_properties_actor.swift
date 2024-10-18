@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -enable-copy-propagation -Xfrontend -enable-lexical-lifetimes=false  -Xfrontend -disable-availability-checking) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -enable-copy-propagation -Xfrontend -enable-lexical-lifetimes=false  -target %target-swift-5.1-abi-triple) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency

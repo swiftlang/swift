@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -verify -disable-availability-checking -strict-concurrency=complete -verify-additional-prefix region-isolation- -emit-sil -o /dev/null %s
+// RUN: %target-swift-frontend -verify -target %target-swift-5.1-abi-triple -strict-concurrency=complete -verify-additional-prefix region-isolation- -emit-sil -o /dev/null %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

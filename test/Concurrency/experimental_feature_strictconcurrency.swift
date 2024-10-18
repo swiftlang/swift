@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -disable-availability-checking -enable-experimental-feature StrictConcurrency -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -disable-availability-checking -enable-experimental-feature StrictConcurrency=complete -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -disable-availability-checking -enable-upcoming-feature StrictConcurrency -emit-sil -o /dev/null -verify %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -enable-experimental-feature StrictConcurrency -emit-sil -o /dev/null -verify %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -enable-experimental-feature StrictConcurrency=complete -emit-sil -o /dev/null -verify %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -enable-upcoming-feature StrictConcurrency -emit-sil -o /dev/null -verify %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

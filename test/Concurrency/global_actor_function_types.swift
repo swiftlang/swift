@@ -1,14 +1,14 @@
 // Typecheck.
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking -verify-additional-prefix without-transferring-
+// RUN: %target-typecheck-verify-swift  -target %target-swift-5.1-abi-triple -verify-additional-prefix without-transferring-
 
 // Emit SIL with minimal strict concurrency.
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix without-transferring-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -verify-additional-prefix without-transferring-
 
 // Emit SIL with targeted concurrency.
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix without-transferring-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix without-transferring-
 
 // Emit SIL with strict concurrency + region based isolation + transferring
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete  -verify-additional-prefix complete-tns-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=complete  -verify-additional-prefix complete-tns-
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
