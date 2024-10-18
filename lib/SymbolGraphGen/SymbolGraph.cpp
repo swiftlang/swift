@@ -465,7 +465,8 @@ void
 SymbolGraph::recordRequirementRelationships(Symbol S) {
   const auto VD = S.getSymbolDecl();
   if (const auto *Protocol = dyn_cast<ProtocolDecl>(VD->getDeclContext())) {
-    if (VD->isProtocolRequirement()) {
+    if (VD->isProtocolRequirement() &&
+        !VD->getAttrs().hasAttribute<OptionalAttr>()) {
       recordEdge(Symbol(this, VD, nullptr),
                  Symbol(this, Protocol, nullptr),
                  RelationshipKind::RequirementOf());
