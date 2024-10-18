@@ -56,7 +56,7 @@ struct RunToolchains: AsyncParsableCommand {
     }
 
     // Load our tags from swift's github repo
-    let tags = try! await getTagsFromSwiftRepo(branch: branch, dryRun: true)
+    let tags = try! await getTagsFromSwiftRepo(branch: branch)
 
     guard var tagIndex = tags.firstIndex(where: { $0.tag.name == self.tag }) else {
       log("Failed to find tag: \(self.tag)")
