@@ -13,6 +13,7 @@ set(driver_sources_and_options
                 swift_cache_tool_main.cpp
                 swift_indent_main.cpp
                 swift_symbolgraph_extract_main.cpp
+                swift_synthesize_interface_main.cpp
                 swift_parse_test_main.cpp)
 
 set(driver_common_libs
