@@ -175,6 +175,8 @@ namespace sil_block {
     SIL_PACK_ELEMENT_SET,
     SIL_TYPE_VALUE,
     SIL_THUNK,
+    SIL_DEBUG_SCOPE,
+    SIL_DEBUG_SCOPE_REF,
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -290,6 +292,23 @@ namespace sil_block {
     BCArray<ValueIDField>       // Parameter and result indices
   >;
 
+  using SILDebugScopeRefLayout = BCRecordLayout<
+    SIL_DEBUG_SCOPE_REF,
+    ValueIDField
+  >;
+
+  using SILDebugScopeLayout = BCRecordLayout<
+    SIL_DEBUG_SCOPE,
+    BCFixed<1>,
+    ValueIDField, // Parent
+    ValueIDField, // InlinedCallSite
+    ValueIDField, // SourceLoc Row
+    ValueIDField, // Column
+    ValueIDField,  // FName
+    TypeIDField,
+    SILTypeCategoryField 
+  >;
+
   using SILFunctionLayout =
       BCRecordLayout<SIL_FUNCTION, SILLinkageField,
                      BCFixed<1>,  // transparent
@@ -312,6 +331,7 @@ namespace sil_block {
                      BCFixed<1>,  // is distributed
                      BCFixed<1>,  // is runtime accessible
                      BCFixed<1>,  // are lexical lifetimes force-enabled
+                     BCFixed<1>,  // only referenced by debug info
                      TypeIDField, // SILFunctionType
                      DeclIDField,  // SILFunction name or 0 (replaced function)
                      DeclIDField,  // SILFunction name or 0 (used ad-hoc requirement witness function)
