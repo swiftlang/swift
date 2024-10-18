@@ -78,7 +78,7 @@ let package = Package(
         .product(name: "SwiftOperators", package: "swift-syntax"),
         .product(name: "SwiftSyntaxMacroExpansion", package: "swift-syntax"),
       ],
-      path: "Sources/Macros",
+      path: "Sources/MacroEvaluation",
       swiftSettings: swiftSetttings
     ),
     .target(
