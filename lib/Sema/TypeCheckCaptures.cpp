@@ -54,6 +54,16 @@ class FindCapturedVars : public ASTWalker {
   /// can go here too.
   llvm::SetVector<GenericEnvironment *> CapturedEnvironments;
 
+  /// Set of DeclRefExpr from weak/unowned capture list entries whose
+  /// DeclRefExpr's corresponding Decl has strong ownership (i.e. the capture
+  /// list entry changed ownership to weak/unowned).
+  llvm::SetVector<DeclRefExpr *> WeakifiedCaptureListDeclRefs;
+
+  /// Map from Decls with strong ownership that are captured to whether
+  /// or not the Decl was captured uniquely, i.e. only one DeclRefExpr
+  /// references it in the current scope.
+  llvm::SmallDenseMap<Decl *, bool> ReferencedStrongDeclsToUniquenessMap;
+
   SourceLoc GenericParamCaptureLoc;
   SourceLoc DynamicSelfCaptureLoc;
   DynamicSelfType *DynamicSelf = nullptr;
@@ -240,6 +250,103 @@ public:
       checkType(VD->getInterfaceType(), VD->getLoc());
   }
 
+  /// Emit warnings for capture list entries that:
+  ///   1.  Have weak/unowned reference ownership, but refer to a Decl that is
+  ///       _not_ weak/unowned.
+  ///   2.  Provide the only reference to such Decls withing the current scope
+  void
+  diagnoseImplicitWeakToStrongCaptureListBindings() { // TODO: where should a
+                                                      // method like this live?
+    // TODO: Can/should we entirely ignore non-escaping closures?
+    if (NoEscape)
+      return;
+
+    // Go through the list of potential 'weakified' capture list entry DeclRefs
+    // and check for ones that bind a Decl with non-weak ownership and for
+    // which that reference is unique within the current capture scope.
+    for (auto weakifiedRef : WeakifiedCaptureListDeclRefs) {
+      auto capturedDecl = weakifiedRef->getDecl();
+      if (ReferencedStrongDeclsToUniquenessMap[capturedDecl]) {
+        Context.Diags.diagnose(weakifiedRef->getLoc(),
+                               diag::implicit_nonstrong_to_strong_capture);
+        Context.Diags.diagnose(CaptureLoc,
+                               diag::implicit_nonstrong_to_strong_capture_loc);
+      }
+    }
+  }
+
+private:
+  static bool declHasStrongOwnershipAttr(Decl *D) {
+    bool hasStrongOwnership = true;
+    if (auto *attr = D->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
+      auto ownership = attr->get();
+      // TODO: are these semantics right? What about 'unmanaged'?
+      if (ownership == ReferenceOwnership::Weak ||
+          ownership == ReferenceOwnership::Unowned) {
+        hasStrongOwnership = false;
+      }
+    }
+    return hasStrongOwnership;
+  }
+
+  void updateUniquenessMapForCapturedDeclIfNeeded(Decl *D) {
+    if (!declHasStrongOwnershipAttr(D))
+      return;
+
+    // Mark Decl as unique iff it's not yet in the map
+    const bool alreadySeen = ReferencedStrongDeclsToUniquenessMap.count(D);
+    ReferencedStrongDeclsToUniquenessMap[D] = !alreadySeen;
+  }
+
+  void recordWeakifiedCaptureListEntryForDeclIfNeeded(Decl *D) {
+    // We're looking for 'weakified' captures like [weak a], [unowned a = b]
+    // here, where the bound Decl has strong ownership. If we find a
+    // candidate pattern, dig out the DeclRefExpr from the expected location
+    // and record it. These will be used to diagnose capture list entries that
+    // bind a weak/unowned var but in so doing induce an implicit strong
+    // capture of the associated Decl in the outer scope.
+    if (auto PBD = dyn_cast<PatternBindingDecl>(D)) {
+      if (auto VD = PBD->getSingleVar()) {
+        // If this isn't a capture list binding, ignore it
+        if (!VD->getParentCaptureList())
+          return;
+
+        // If the capture list Decl is not weak/unowned, ignore it
+        // TODO: this will also catch things with 'unmanaged' ownership – do we
+        // care?
+        if (declHasStrongOwnershipAttr(VD))
+          return;
+
+        // TODO: is getCheckedAndContextualized... the right method to use here?
+        if (auto init = PBD->getCheckedAndContextualizedInit(0)) {
+          DeclRefExpr *declRef = nullptr;
+
+          // Check if init is a DeclRefExpr or wrapped in an
+          // InjectIntoOptionalExpr
+          if (auto DRE = dyn_cast<DeclRefExpr>(init)) {
+            declRef = DRE;
+          } else if (auto IIO = dyn_cast<InjectIntoOptionalExpr>(init)) {
+            declRef = dyn_cast<DeclRefExpr>(IIO->getSubExpr());
+          }
+
+          // Couldn't find the expected DeclRef pattern in the binding
+          if (!declRef)
+            return;
+
+          // If a DeclRefExpr was found, check its Decl's ownership.
+          // If it has strong ownership, record it.
+          if (declHasStrongOwnershipAttr(declRef->getDecl()))
+            WeakifiedCaptureListDeclRefs.insert(declRef);
+        }
+      }
+    }
+  }
+
+  //------------------------------------------------------------------------------
+  // MARK: ASTWalker
+  //------------------------------------------------------------------------------
+
+public:
   LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
     // We don't want to walk into lazy initializers because they're not
     // really present at this level.  We'll catch them when processing
@@ -395,6 +502,10 @@ public:
     if (NoEscape)
       Flags |= CapturedValue::IsNoEscape;
 
+    // We found a DeclRefExpr pointing to a Decl with strong ownership;
+    // Update our uniqueness bookkeeping.
+    updateUniquenessMapForCapturedDeclIfNeeded(D);
+
     addCapture(CapturedValue(D, Flags, DRE->getStartLoc()));
     return Action::SkipNode(DRE);
   }
@@ -463,6 +574,10 @@ public:
     // the local type itself.
     if (isa<NominalTypeDecl>(D))
       return Action::SkipNode();
+
+    // Check for certain forms of capture list entries to update bookkeeping
+    // for possible diagnostics.
+    recordWeakifiedCaptureListEntryForDeclIfNeeded(D);
 
     return Action::Continue();
   }
@@ -819,6 +934,8 @@ void TypeChecker::computeCaptures(AbstractClosureExpr *ACE) {
 
   auto info = finder.getCaptureInfo();
   ACE->setCaptureInfo(info);
+
+  finder.diagnoseImplicitWeakToStrongCaptureListBindings();
 }
 
 CaptureInfo ParamCaptureInfoRequest::evaluate(Evaluator &evaluator,
