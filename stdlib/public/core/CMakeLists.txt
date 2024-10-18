@@ -212,6 +212,7 @@ split_embedded_sources(
   EMBEDDED Unicode.swift # ORDER DEPENDENCY: must follow new unicode support
   EMBEDDED StringGraphemeBreaking.swift # ORDER DEPENDENCY: Must follow UTF16.swift
   EMBEDDED ValidUTF8Buffer.swift
+  EMBEDDED Vector.swift
   EMBEDDED WriteBackMutableSlice.swift
   EMBEDDED MigrationSupport.swift
 
@@ -315,6 +316,8 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Macros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "FreestandingMacros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Extern")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BitwiseCopyable")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "RawLayout")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "ValueGenerics")
 
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   set(swift_bin_dir "${CMAKE_BINARY_DIR}/bin")
