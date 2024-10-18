@@ -340,10 +340,10 @@ private:
     // If this binary module was built with a header, the header's module
     // dependencies must also specify a .modulemap to the compilation, in
     // order to resolve the header's own header include directives.
-    for (const auto &bridgingHeaderDepName :
+    for (const auto &bridgingHeaderDepID :
          binaryDepDetails.headerModuleDependencies) {
       auto optionalBridgingHeaderDepModuleInfo = cache.findKnownDependency(
-          {bridgingHeaderDepName, ModuleDependencyKind::Clang});
+          bridgingHeaderDepID);
       const auto bridgingHeaderDepModuleDetails =
           optionalBridgingHeaderDepModuleInfo.getAsClangModule();
       commandline.push_back("-Xcc");
@@ -430,7 +430,7 @@ private:
 
   void addMacroDependencies(ModuleDependencyID moduleID,
                             const ModuleDependencyInfoStorageBase &dep) {
-    auto &directDeps = resolvingDepInfo.getDirectModuleDependencies();
+    auto directDeps = cache.getAllDependencies(this->moduleID);
     if (llvm::find(directDeps, moduleID) == directDeps.end())
       return;
 
@@ -443,6 +443,7 @@ private:
     return arg == "-ivfsoverlay" || arg == "-vfsoverlay";
   };
   static bool isXCCArg(StringRef arg) { return arg == "-Xcc"; };
+
 
   void
   collectUsedVFSOverlay(const ClangModuleDependencyStorage &clangDepDetails) {
@@ -717,18 +718,18 @@ generateFullDependencyGraph(const CompilerInstance &instance,
       new swiftscan_dependency_info_t[dependencySet->count];
 
   for (size_t i = 0; i < allModules.size(); ++i) {
-    const auto &module = allModules[i];
-    auto &moduleDeps = cache.findKnownDependency(module);
+    const auto &moduleID = allModules[i];
+    auto &moduleDependencyInfo = cache.findKnownDependency(moduleID);
     // Collect all the required pieces to build a ModuleInfo
-    auto swiftPlaceholderDeps = moduleDeps.getAsPlaceholderDependencyModule();
-    auto swiftTextualDeps = moduleDeps.getAsSwiftInterfaceModule();
-    auto swiftSourceDeps = moduleDeps.getAsSwiftSourceModule();
-    auto swiftBinaryDeps = moduleDeps.getAsSwiftBinaryModule();
-    auto clangDeps = moduleDeps.getAsClangModule();
+    auto swiftPlaceholderDeps = moduleDependencyInfo.getAsPlaceholderDependencyModule();
+    auto swiftTextualDeps = moduleDependencyInfo.getAsSwiftInterfaceModule();
+    auto swiftSourceDeps = moduleDependencyInfo.getAsSwiftSourceModule();
+    auto swiftBinaryDeps = moduleDependencyInfo.getAsSwiftBinaryModule();
+    auto clangDeps = moduleDependencyInfo.getAsClangModule();
 
     // ModulePath
     const char *modulePathSuffix =
-        moduleDeps.isSwiftModule() ? ".swiftmodule" : ".pcm";
+        moduleDependencyInfo.isSwiftModule() ? ".swiftmodule" : ".pcm";
     std::string modulePath;
     if (swiftTextualDeps)
       modulePath = swiftTextualDeps->moduleOutputPath;
@@ -739,7 +740,7 @@ generateFullDependencyGraph(const CompilerInstance &instance,
     else if (clangDeps)
       modulePath = clangDeps->pcmOutputPath;
     else
-      modulePath = module.ModuleName + modulePathSuffix;
+      modulePath = moduleID.ModuleName + modulePathSuffix;
 
     // SourceFiles
     std::vector<std::string> sourceFiles;
@@ -749,8 +750,10 @@ generateFullDependencyGraph(const CompilerInstance &instance,
       sourceFiles = clangDeps->fileDependencies;
     }
 
-    auto &depInfo = cache.findKnownDependency(module);
-    auto directDependencies = depInfo.getDirectModuleDependencies();
+    auto directDependencies = cache.getAllDependencies(moduleID);
+    std::vector<std::string> clangHeaderDependencyNames;
+    for (const auto &headerDepID : moduleDependencyInfo.getHeaderClangDependencies())
+      clangHeaderDependencyNames.push_back(headerDepID.ModuleName);
 
     // Generate a swiftscan_clang_details_t object based on the dependency kind
     auto getModuleDetails = [&]() -> swiftscan_module_details_t {
@@ -778,8 +781,7 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             bridgingHeaderPath,
             create_set(
                 swiftTextualDeps->textualModuleDetails.bridgingSourceFiles),
-            create_set(swiftTextualDeps->textualModuleDetails
-                           .bridgingModuleDependencies),
+            create_set(clangHeaderDependencyNames),
             create_set(bridgedOverlayDependencyNames),
             create_set(swiftTextualDeps->textualModuleDetails.buildCommandLine),
             /*bridgingHeaderBuildCommand*/ create_set({}),
@@ -812,8 +814,7 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             moduleInterfacePath, create_empty_set(), bridgingHeaderPath,
             create_set(
                 swiftSourceDeps->textualModuleDetails.bridgingSourceFiles),
-            create_set(swiftSourceDeps->textualModuleDetails
-                           .bridgingModuleDependencies),
+            create_set(clangHeaderDependencyNames),
             create_set(bridgedOverlayDependencyNames),
             create_set(swiftSourceDeps->textualModuleDetails.buildCommandLine),
             create_set(swiftSourceDeps->bridgingHeaderBuildCommandLine),
@@ -851,7 +852,7 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             create_clone(swiftBinaryDeps->sourceInfoPath.c_str()),
             create_set(bridgedOverlayDependencyNames),
             create_clone(swiftBinaryDeps->headerImport.c_str()),
-            create_set(swiftBinaryDeps->headerModuleDependencies),
+            create_set(clangHeaderDependencyNames),
             create_set(swiftBinaryDeps->headerSourceFiles),
             swiftBinaryDeps->isFramework,
             swiftBinaryDeps->isStatic,
@@ -876,7 +877,7 @@ generateFullDependencyGraph(const CompilerInstance &instance,
     swiftscan_dependency_info_s *moduleInfo = new swiftscan_dependency_info_s;
     dependencySet->modules[i] = moduleInfo;
 
-    std::string encodedModuleName = createEncodedModuleKindAndName(module);
+    std::string encodedModuleName = createEncodedModuleKindAndName(moduleID);
     auto ttt = create_clone(encodedModuleName.c_str());
     moduleInfo->module_name = ttt;
     moduleInfo->module_path = create_clone(modulePath.c_str());
@@ -884,12 +885,13 @@ generateFullDependencyGraph(const CompilerInstance &instance,
 
     // Create a direct dependencies set according to the output format
     std::vector<std::string> bridgedDependencyNames;
-    bridgeDependencyIDs(directDependencies, bridgedDependencyNames);
+    bridgeDependencyIDs(directDependencies.getArrayRef(),
+                        bridgedDependencyNames);
     moduleInfo->direct_dependencies = create_set(bridgedDependencyNames);
     moduleInfo->details = getModuleDetails();
 
     // Create a link libraries set for this module
-    auto &linkLibraries = depInfo.getLinkLibraries();
+    auto &linkLibraries = moduleDependencyInfo.getLinkLibraries();
     swiftscan_link_library_set_t *linkLibrarySet =
         new swiftscan_link_library_set_t;
     linkLibrarySet->count = linkLibraries.size();
@@ -1001,14 +1003,12 @@ static std::set<ModuleDependencyID> computeBridgingHeaderTransitiveDependencies(
         &transitiveClosures,
     const ModuleDependenciesCache &cache) {
   std::set<ModuleDependencyID> result;
-  auto *sourceDep = dep.getAsSwiftSourceModule();
-  if (!sourceDep)
+  if (!dep.isSwiftSourceModule())
     return result;
 
-  for (auto &dep : sourceDep->textualModuleDetails.bridgingModuleDependencies) {
-    ModuleDependencyID modID{dep, ModuleDependencyKind::Clang};
-    result.insert(modID);
-    auto succDeps = transitiveClosures.find(modID);
+  for (auto &depID : dep.getHeaderClangDependencies()) {
+    result.insert(depID);
+    auto succDeps = transitiveClosures.find(depID);
     assert(succDeps != transitiveClosures.end() && "unknown dependency");
     llvm::set_union(result, succDeps->second);
   }
@@ -1115,7 +1115,7 @@ static bool diagnoseCycle(const CompilerInstance &instance,
       const auto &nextID = *(it + 1);
       if (kindIsSwiftDependency(thisID) && kindIsSwiftDependency(nextID) &&
           llvm::any_of(
-              cache.getOnlyOverlayDependencies(thisID),
+              cache.getSwiftOverlayDependencies(thisID),
               [&](const ModuleDependencyID id) { return id == nextID; })) {
         llvm::SmallString<64> noteBuffer;
         auto clangDepPath = findClangDepPath(
@@ -1560,17 +1560,7 @@ swift::dependencies::performModuleScan(
     cache.recordDependency(mainModuleName, std::move(*mainModuleDepInfo));
 
   // Perform the full module scan starting at the main module.
-  auto allModules = scanner.getModuleDependencies(mainModuleID, cache);
-
-#ifndef NDEBUG
-  // Verify that all collected dependencies have had their
-  // imports resolved to module IDs.
-  for (const auto &moduleID : allModules)
-    assert(cache.findDependency(moduleID)
-               .value()
-               ->isResolved());
-#endif
-
+  auto allModules = scanner.performDependencyScan(mainModuleID, cache);
   if (diagnoseCycle(instance, cache, mainModuleID))
     return std::make_error_code(std::errc::not_supported);
 
@@ -1645,27 +1635,33 @@ swift::dependencies::performBatchModuleScan(
 
         StringRef moduleName = entry.moduleName;
         bool isClang = !entry.isSwift;
+        ModuleDependencyID moduleID{
+           moduleName.str(), isClang ? ModuleDependencyKind::Clang
+                                     : ModuleDependencyKind::SwiftInterface};
         std::optional<const ModuleDependencyInfo *> rootDeps;
+        std::vector<ModuleDependencyID> allDependencies;
         if (isClang) {
           // Loading the clang module using Clang importer.
           // This action will populate the cache with the main module's
           // dependencies.
-          rootDeps = scanner.getNamedClangModuleDependencyInfo(moduleName, cache);
+          ModuleDependencyIDSetVector allClangModules;
+          rootDeps = scanner.getNamedClangModuleDependencyInfo(moduleName, cache, allClangModules);
+          if (!rootDeps.has_value()) {
+            batchScanResult.push_back(
+                std::make_error_code(std::errc::invalid_argument));
+            return;
+          }
+          allDependencies = allClangModules.takeVector();
         } else {
           rootDeps = scanner.getNamedSwiftModuleDependencyInfo(moduleName, cache);
+          if (!rootDeps.has_value()) {
+            batchScanResult.push_back(
+                std::make_error_code(std::errc::invalid_argument));
+            return;
+          }
+          allDependencies = scanner.performDependencyScan(moduleID, cache);
         }
-        if (!rootDeps.has_value()) {
-          // We cannot find the clang module, abort.
-          batchScanResult.push_back(
-              std::make_error_code(std::errc::invalid_argument));
-          return;
-        }
-
-        ModuleDependencyIDSetVector allModules;
-        ModuleDependencyID moduleID{
-            moduleName.str(), isClang ? ModuleDependencyKind::Clang
-                                      : ModuleDependencyKind::SwiftInterface};
-        auto allDependencies = scanner.getModuleDependencies(moduleID, cache);
+        
         batchScanResult.push_back(
             generateFullDependencyGraph(instance, diagnosticCollector, cache,
                                         allDependencies));
