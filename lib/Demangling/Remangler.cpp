@@ -374,6 +374,9 @@ class Remangler : public RemanglerBase {
   ManglingError mangleKeyPathThunkHelper(Node *node, StringRef op,
                                          unsigned depth);
 
+  ManglingError mangleSILThunkIdentity(Node *node, StringRef op,
+                                       unsigned depth);
+
   ManglingError mangleAutoDiffFunctionOrSimpleThunk(Node *node, StringRef op,
                                                     unsigned depth);
 
@@ -3368,6 +3371,22 @@ Remangler::mangleReflectionMetadataSuperclassDescriptor(Node *node,
 ManglingError Remangler::mangleCurryThunk(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Tc";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleSILThunkIdentity(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1)); // type
+  // TT is for a thunk that is for a thunk inst... I is for identity.
+  Buffer << "TT"
+         << "I";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleSILThunkHopToMainActorIfNeeded(Node *node,
+                                                              unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1)); // type
+  Buffer << "TT"
+         << "H";
   return ManglingError::Success;
 }
 
