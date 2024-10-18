@@ -554,7 +554,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   // If both of aforementioned conditions are true, let's attempt
   // to open generic parameter and infer the type of this default
   // expression.
-  OpenedTypeMap genericParameters;
+  SmallVector<OpenedType, 4> genericParameters;
 
   ConstraintSystemOptions options;
   options |= ConstraintSystemFlags::AllowFixes;
@@ -565,8 +565,13 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       defaultValue, LocatorPathElt::ContextualType(
                         defaultExprTarget.getExprContextualTypePurpose()));
 
-  auto getCanonicalGenericParamTy = [](GenericTypeParamType *GP) {
-    return cast<GenericTypeParamType>(GP->getCanonicalType());
+  auto findParam = [&](GenericTypeParamType *GP) -> TypeVariableType * {
+    for (auto pair : genericParameters) {
+      if (pair.first->isEqual(GP))
+        return pair.second;
+    }
+
+    return nullptr;
   };
 
   // Find and open all of the generic parameters used by the parameter
@@ -575,29 +580,33 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     assert(!type->is<UnboundGenericType>());
 
     if (auto *GP = type->getAs<GenericTypeParamType>()) {
-      auto openedVar = genericParameters.find(getCanonicalGenericParamTy(GP));
-      if (openedVar != genericParameters.end()) {
-        return openedVar->second;
-      }
-      return cs.openGenericParameter(DC->getParent(), GP, genericParameters,
-                                     locator);
+      if (auto *typeVar = findParam(GP))
+        return typeVar;
+
+      auto *typeVar = cs.openGenericParameter(GP, locator);
+
+      // openGenericParameter() does not add it for us.
+      cs.addTypeVariable(typeVar);
+
+      genericParameters.emplace_back(GP, typeVar);
+
+      return typeVar;
     }
     return std::nullopt;
   });
 
-  auto containsTypes = [&](Type type, OpenedTypeMap &toFind) {
-    return type.findIf([&](Type nested) {
+  auto containsTypes = [&](Type type) {
+    return type.findIf([&](Type nested) -> bool {
       if (auto *GP = nested->getAs<GenericTypeParamType>())
-        return toFind.count(getCanonicalGenericParamTy(GP)) > 0;
+        return findParam(GP);
       return false;
     });
   };
 
-  auto containsGenericParamsExcluding = [&](Type type,
-                                            OpenedTypeMap &exclusions) -> bool {
-    return type.findIf([&](Type type) {
+  auto containsGenericParamsExcluding = [&](Type type) -> bool {
+    return type.findIf([&](Type type) -> bool {
       if (auto *GP = type->getAs<GenericTypeParamType>())
-        return !exclusions.count(getCanonicalGenericParamTy(GP));
+        return !findParam(GP);
       return false;
     });
   };
@@ -618,7 +627,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     for (unsigned i : indices(anchorTy->getParams())) {
       const auto &param = anchorTy->getParams()[i];
 
-      if (containsTypes(param.getPlainType(), genericParameters))
+      if (containsTypes(param.getPlainType()))
         affectedParams.push_back(i);
     }
 
@@ -685,8 +694,8 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
         auto rhsTy = requirement.getSecondType();
 
         // Unrelated requirement.
-        if (!containsTypes(lhsTy, genericParameters) &&
-            !containsTypes(rhsTy, genericParameters))
+        if (!containsTypes(lhsTy) &&
+            !containsTypes(rhsTy))
           continue;
 
         // If both sides are dependent members, that's okay because types
@@ -697,8 +706,8 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
 
         // Allow a subset of generic same-type requirements that only mention
         // "in scope" generic parameters e.g. `T.X == Int` or `T == U.Z`
-        if (!containsGenericParamsExcluding(lhsTy, genericParameters) &&
-            !containsGenericParamsExcluding(rhsTy, genericParameters)) {
+        if (!containsGenericParamsExcluding(lhsTy) &&
+            !containsGenericParamsExcluding(rhsTy)) {
           recordRequirement(reqIdx, requirement, requirementBaseLocator);
           continue;
         }
@@ -718,12 +727,12 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
         auto adheringTy = requirement.getFirstType();
 
         // Unrelated requirement.
-        if (!containsTypes(adheringTy, genericParameters))
+        if (!containsTypes(adheringTy))
           continue;
 
         // If adhering type has a mix or in- and out-of-scope parameters
         // mentioned we need to diagnose.
-        if (containsGenericParamsExcluding(adheringTy, genericParameters)) {
+        if (containsGenericParamsExcluding(adheringTy)) {
           diagnoseInvalidRequirement(requirement);
           return Type();
         }
@@ -731,7 +740,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
         if (requirement.getKind() == RequirementKind::Superclass) {
           auto superclassTy = requirement.getSecondType();
 
-          if (containsGenericParamsExcluding(superclassTy, genericParameters)) {
+          if (containsGenericParamsExcluding(superclassTy)) {
             diagnoseInvalidRequirement(requirement);
             return Type();
           }

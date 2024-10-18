@@ -1049,11 +1049,12 @@ namespace {
       auto tv = CS.createTypeVariable(memberLocator,
                                       TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
-      OverloadChoice choice =
-          OverloadChoice(CS.getType(base), decl, functionRefKind);
+      auto choice = OverloadChoice(CS.getType(base), decl, functionRefKind);
 
       auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
-      CS.addBindOverloadConstraint(tv, choice, locator, CurDC);
+      auto preparedChoice = CS.getPreparedOverload(locator, choice);
+
+      CS.resolveOverload(locator, tv, preparedChoice, CurDC);
       return tv;
     }
 
@@ -1149,10 +1150,9 @@ namespace {
       // a known subscript here. This might be cleaner if we split off a new
       // UnresolvedSubscriptExpr from SubscriptExpr.
       if (auto decl = declOrNull) {
-        OverloadChoice choice =
-            OverloadChoice(baseTy, decl, FunctionRefKind::DoubleApply);
-        CS.addBindOverloadConstraint(memberTy, choice, memberLocator,
-                                     CurDC);
+        auto choice = OverloadChoice(baseTy, decl, FunctionRefKind::DoubleApply);
+        auto preparedChoice = CS.getPreparedOverload(memberLocator, choice);
+        CS.resolveOverload(memberLocator, memberTy, preparedChoice, CurDC);
       } else {
         CS.addValueMemberConstraint(baseTy, DeclNameRef::createSubscript(),
                                     memberTy, CurDC,
@@ -1606,7 +1606,8 @@ namespace {
 
       OverloadChoice choice =
           OverloadChoice(Type(), E->getDecl(), E->getFunctionRefKind());
-      CS.resolveOverload(locator, tv, choice, CurDC);
+      auto preparedChoice = CS.getPreparedOverload(locator, choice);
+      CS.resolveOverload(locator, tv, preparedChoice, CurDC);
       return tv;
     }
 
