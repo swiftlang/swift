@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix targeted-complete-tns- -verify-additional-prefix complete-tns- -strict-concurrency=complete
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -verify-additional-prefix targeted-complete-tns- -verify-additional-prefix complete-tns- -strict-concurrency=complete
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

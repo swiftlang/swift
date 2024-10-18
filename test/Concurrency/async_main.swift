@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -disable-availability-checking -parse-as-library %s | %FileCheck %s --check-prefix=CHECK-SIL
-// RUN: %target-build-swift  -Xfrontend -disable-availability-checking -Xfrontend -parse-as-library %s -o %t_binary
+// RUN: %target-swift-frontend -emit-sil -target %target-swift-5.1-abi-triple -parse-as-library %s | %FileCheck %s --check-prefix=CHECK-SIL
+// RUN: %target-build-swift  -target %target-swift-5.1-abi-triple -Xfrontend -parse-as-library %s -o %t_binary
 // RUN: %target-codesign %t_binary
 // RUN: %target-run %t_binary | %FileCheck %s --check-prefix=CHECK-EXEC
 

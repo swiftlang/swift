@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -parse-as-library -disable-availability-checking -swift-version 5 -strict-concurrency=complete %s -o - | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -parse-as-library -disable-availability-checking -swift-version 6 -verify %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -parse-as-library -target %target-swift-5.1-abi-triple -swift-version 5 -strict-concurrency=complete %s -o - | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -parse-as-library -target %target-swift-5.1-abi-triple -swift-version 6 -verify %s -o /dev/null
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

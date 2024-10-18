@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-clang -x c %S/Inputs/reflect_task.c -o %t/reflect_task.c.o -c
-// RUN: %target-build-swift -c -Xfrontend -disable-availability-checking -parse-stdlib -parse-as-library -lswiftSwiftReflectionTest %s -o %t/reflect_task.swift.o -module-name reflect_task
+// RUN: %target-build-swift -c -target %target-swift-5.1-abi-triple -parse-stdlib -parse-as-library -lswiftSwiftReflectionTest %s -o %t/reflect_task.swift.o -module-name reflect_task
 // RUN: %target-build-swift %t/reflect_task.swift.o %t/reflect_task.c.o -o %t/reflect_task
 // RUN: %target-codesign %t/reflect_task
 
