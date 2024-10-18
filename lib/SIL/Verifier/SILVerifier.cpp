@@ -5225,6 +5225,27 @@ public:
     require(resTI == ti->getThunkKind().getDerivedFunctionType(
                          ti->getFunction(), objTI, ti->getSubstitutionMap()),
             "resTI is not the thunk kind assigned derived function type");
+
+    auto originalCalleeFuncType =
+        ti->getOperand()->getType().castTo<SILFunctionType>();
+
+    switch (ti->getThunkKind()) {
+    case ThunkInst::Kind::Invalid:
+      break;
+    case ThunkInst::Kind::Identity:
+      break;
+    case ThunkInst::Kind::HopToMainActorIfNeeded:
+      require(originalCalleeFuncType->getParameters().empty(),
+              "Hop To Main Actor If Needed cannot have any parameters");
+      require(originalCalleeFuncType->getResults().empty(),
+              "Hop To Main Actor If Needed cannot have any results");
+      // We require that hop_to_main_actor inputs do not an error since we
+      // have to have no results.
+      require(!originalCalleeFuncType->hasErrorResult(),
+              "HopToMainActorIfNeeded thunks cannot have input without an "
+              "error result");
+      break;
+    }
   }
 
   void checkConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *ICI) {
