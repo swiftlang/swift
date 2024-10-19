@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only > %t/cpp-parser.ast.raw
+// RUN: %target-swift-frontend %s -dump-parse -target %target-swift-5.1-abi-triple -enable-experimental-move-only -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
+// RUN: %target-swift-frontend %s -dump-parse -target %target-swift-5.1-abi-triple -enable-experimental-move-only > %t/cpp-parser.ast.raw
 
 // Filter out any addresses in the dump, since they can differ.
 // RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/cpp-parser.ast.raw > %t/cpp-parser.ast

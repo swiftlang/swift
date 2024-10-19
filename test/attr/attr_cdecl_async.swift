@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop  -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -enable-objc-interop -target %target-swift-5.1-abi-triple
 
 // REQUIRES: concurrency
 

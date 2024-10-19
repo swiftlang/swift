@@ -2135,6 +2135,9 @@ bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
 
 void TypeChecker::checkConcurrencyAvailability(SourceRange ReferenceRange,
                                                const DeclContext *ReferenceDC) {
+  if (ReferenceDC->getASTContext().LangOpts.DisableAvailabilityChecking) {
+    llvm::report_fatal_error("DisableAvailabilityChecking");
+  }
   checkAvailability(
       ReferenceRange,
       ReferenceDC->getASTContext().getBackDeployedConcurrencyAvailability(),

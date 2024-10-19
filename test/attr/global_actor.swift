@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s  -disable-availability-checking -package-name myPkg -enable-experimental-feature IsolatedDeinit
+// RUN: %target-swift-frontend -typecheck -verify %s -target %target-swift-5.1-abi-triple -package-name myPkg -enable-experimental-feature IsolatedDeinit
 // REQUIRES: concurrency
 
 actor SomeActor { }
