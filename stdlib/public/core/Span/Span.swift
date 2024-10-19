@@ -14,6 +14,7 @@
 // contains initialized instances of `Element`.
 @_disallowFeatureSuppression(NonescapableTypes)
 @frozen
+@available(SwiftStdlib 6.1, *)
 public struct Span<Element: ~Copyable & ~Escapable>
 : ~Escapable, Copyable, BitwiseCopyable {
   @usableFromInline let _pointer: UnsafeRawPointer?
@@ -36,9 +37,11 @@ public struct Span<Element: ~Copyable & ~Escapable>
 }
 
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 6.1, *)
 extension Span: @unchecked Sendable where Element: Sendable {}
 
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 6.1, *)
 extension Span where Element: ~Copyable {
 
   /// Unsafely creates a `Span` over initialized memory.
@@ -106,6 +109,7 @@ extension Span where Element: ~Copyable {
 }
 
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 6.1, *)
 extension Span {
 
   /// Unsafely creates a `Span` over initialized memory.
@@ -146,6 +150,7 @@ extension Span {
 }
 
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 6.1, *)
 extension Span where Element: BitwiseCopyable {
 
   /// Unsafely creates a `Span` over initialized memory.
@@ -276,6 +281,7 @@ extension Span where Element: BitwiseCopyable {
 }
 
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 6.1, *)
 extension Span where Element: Equatable {
 
   /// Returns a Boolean value indicating whether this and another span
@@ -349,6 +355,7 @@ extension Span where Element: Equatable {
 }
 
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 6.1, *)
 extension Span where Element: ~Copyable {
 
   /// The number of elements in the span.
@@ -381,6 +388,7 @@ extension Span where Element: ~Copyable {
 }
 
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 6.1, *)
 extension Span where Element: ~Copyable {
 
   /// Accesses the element at the specified position in the `Span`.
@@ -422,6 +430,7 @@ extension Span where Element: ~Copyable {
 }
 
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 6.1, *)
 extension Span where Element: BitwiseCopyable {
 
   /// Accesses the element at the specified position in the `Span`.
@@ -463,6 +472,7 @@ extension Span where Element: BitwiseCopyable {
 
 //MARK: sub-spans
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 6.1, *)
 extension Span where Element: ~Copyable {
 
   /// Constructs a new span over the items within the supplied range of
@@ -599,6 +609,7 @@ extension Span where Element: ~Copyable {
 
 //MARK: UnsafeBufferPointer access hatch
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 6.1, *)
 extension Span where Element: ~Copyable  {
 
   //FIXME: mark closure parameter as non-escaping
@@ -631,6 +642,7 @@ extension Span where Element: ~Copyable  {
 }
 
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 6.1, *)
 extension Span where Element: BitwiseCopyable {
 
   //FIXME: mark closure parameter as non-escaping
@@ -658,6 +670,7 @@ extension Span where Element: BitwiseCopyable {
 }
 
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 6.1, *)
 extension Span where Element: ~Copyable {
   /// Returns a Boolean value indicating whether two `Span` instances
   /// refer to the same region in memory.
@@ -693,6 +706,7 @@ extension Span where Element: ~Copyable {
 
 //MARK: prefixes and suffixes
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 6.1, *)
 extension Span where Element: ~Copyable {
 
   /// Returns a span containing the initial elements of this span,
