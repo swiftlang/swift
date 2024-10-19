@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -sil-verify-all -verify %s -disable-availability-checking
+// RUN: %target-swift-emit-sil -sil-verify-all -verify %s -target %target-swift-5.1-abi-triple
 
 // REQUIRES: concurrency
 // REQUIRES: swift_in_compiler

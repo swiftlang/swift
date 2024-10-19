@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -target %target-swift-5.1-abi-triple | %FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency

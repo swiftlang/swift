@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple
 
 // Currently, we don't support having property wrappers that are effectful.
 // Eventually we'd like to add this.

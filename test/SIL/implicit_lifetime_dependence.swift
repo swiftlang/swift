@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend %s \
-// RUN: -emit-sil  -disable-availability-checking \
+// RUN: -emit-sil  -target %target-swift-5.1-abi-triple \
 // RUN: -enable-experimental-feature NonescapableTypes \
 // RUN: -disable-experimental-parser-round-trip \
 // RUN: | %FileCheck %s

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 6 -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 6 -target %target-swift-5.1-abi-triple | %FileCheck %s
 // REQUIRES: concurrency
 // REQUIRES: asserts
 
