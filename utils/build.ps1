@@ -1350,7 +1350,7 @@ function Build-BuildTools($Arch) {
     -Bin (Get-BuildProjectBinaryCache BuildTools) `
     -Arch $Arch `
     -UseMSVCCompilers C,CXX `
-    -BuildTargets llvm-tblgen,clang-tblgen,clang-tidy-confusable-chars-gen,lldb-tblgen,llvm-config,swift-def-to-strings-converter,swift-serialize-diagnostics,swift-compatibility-symbols `
+    -BuildTargets llvm-tblgen,clang-tblgen,clang-pseudo-gen,clang-tidy-confusable-chars-gen,lldb-tblgen,llvm-config,swift-def-to-strings-converter,swift-serialize-diagnostics,swift-compatibility-symbols `
     -Defines @{
       CMAKE_CROSSCOMPILING = "NO";
       LLDB_ENABLE_PYTHON = "NO";
