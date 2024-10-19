@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@available(SwiftStdlib 9999, *)
 extension UnsafeBufferPointer where Element: ~Copyable {
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
@@ -28,6 +29,7 @@ extension UnsafeBufferPointer where Element: ~Copyable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension UnsafeMutableBufferPointer where Element: ~Copyable {
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
@@ -46,6 +48,7 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension UnsafeRawBufferPointer {
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
@@ -56,6 +59,7 @@ extension UnsafeRawBufferPointer {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension UnsafeMutableRawBufferPointer {
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
@@ -66,6 +70,7 @@ extension UnsafeMutableRawBufferPointer {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Slice {
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
@@ -122,6 +127,7 @@ extension Slice {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Array {
 
   /// Calls a closure with a `Span` of the array's contiguous storage.
@@ -224,6 +230,7 @@ extension Array {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ContiguousArray {
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
@@ -272,6 +279,7 @@ extension ContiguousArray {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ArraySlice {
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
@@ -320,6 +328,7 @@ extension ArraySlice {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension String.UTF8View {
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
@@ -373,6 +382,7 @@ extension String.UTF8View {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Substring.UTF8View {
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
@@ -427,6 +437,7 @@ extension Substring.UTF8View {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension CollectionOfOne {
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
@@ -456,6 +467,7 @@ extension CollectionOfOne {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension KeyValuePairs {
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
@@ -477,6 +489,7 @@ extension KeyValuePairs {
 }
 
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 9999, *)
 extension Span where Element: ~Copyable /*& ~Escapable*/ {
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
@@ -496,6 +509,7 @@ extension Span where Element: ~Copyable /*& ~Escapable*/ {
 }
 
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 9999, *)
 extension RawSpan {
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
