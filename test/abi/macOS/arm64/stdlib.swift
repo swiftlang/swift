@@ -767,3 +767,36 @@ Added: _$ss7UnicodeO5ASCIIO27encodedReplacementCharacters15CollectionOfOneVys5UI
 Added: _$ss7UnicodeO5UTF16O27encodedReplacementCharacters11_UIntBufferVys6UInt16VGvpZMV
 Added: _$ss7UnicodeO5UTF32O27encodedReplacementCharacters15CollectionOfOneVys6UInt32VGvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_1_0ABvpZMV
+
+// Span and RawSpan struct and properties
+Added: _$ss4SpanVMa
+Added: _$ss4SpanVMn
+Added: _$ss4SpanVsRi_zRi0_zrlE10_unchecked5countAByxGSVSg_SitcfC
+Added: _$ss4SpanVsRi_zRi0_zrlE6_countSivg
+Added: _$ss4SpanVsRi_zRi0_zrlE6_countSivpMV
+Added: _$ss4SpanVsRi_zRi0_zrlE6_startSVvg
+Added: _$ss4SpanVsRi_zRi0_zrlE6_startSVvpMV
+Added: _$ss4SpanVsRi_zRi0_zrlE8_pointerSVSgvg
+Added: _$ss4SpanVsRi_zRi0_zrlE8_pointerSVSgvpMV
+Added: _$ss4SpanVsRi_zrlE10_uncheckedAByxGSRyxG_tcfC
+Added: _$ss4SpanVsRi_zrlE11descriptionSSvpMV
+Added: _$ss4SpanVsRi_zrlE5countSivpMV
+Added: _$ss4SpanVsRi_zrlE7indicesSnySiGvpMV
+Added: _$ss4SpanVsRi_zrlE7isEmptySbvpMV
+Added: _$ss4SpanVss15BitwiseCopyableRzlE010_unsafeRawA0s0eA0VvpMV
+Added: _$ss4SpanVss15BitwiseCopyableRzlE9uncheckedxSi_tcipMV
+Added: _$ss4SpanVss15BitwiseCopyableRzlEyxSicipMV
+Added: _$ss7RawSpanV10_unchecked9byteCountABSVSg_SitcfC
+Added: _$ss7RawSpanV11byteOffsetsSnySiGvpMV
+Added: _$ss7RawSpanV12_descriptionSSvpMV
+Added: _$ss7RawSpanV6_countSivg
+Added: _$ss7RawSpanV6_countSivpMV
+Added: _$ss7RawSpanV6_startSVvg
+Added: _$ss7RawSpanV6_startSVvpMV
+Added: _$ss7RawSpanV7isEmptySbvpMV
+Added: _$ss7RawSpanV8_pointerSVSgvg
+Added: _$ss7RawSpanV8_pointerSVSgvpMV
+Added: _$ss7RawSpanV9byteCountSivpMV
+Added: _$ss7RawSpanVMa
+Added: _$ss7RawSpanVMn
+Added: _$ss7RawSpanVN
