@@ -85,6 +85,10 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
     return nullptr;
   }
 
+  if (ctx.LangOpts.DisableAvailabilityChecking) {
+    llvm::report_fatal_error("DisableAvailabilityChecking");
+  }
+
   // Check the availability of the opaque type runtime support.
   TypeChecker::checkAvailability(
       repr->getSourceRange(),
