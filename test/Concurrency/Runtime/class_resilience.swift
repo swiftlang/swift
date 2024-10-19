@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_class))  -Xfrontend -disable-availability-checking -enable-library-evolution %S/Inputs/resilient_class.swift -emit-module -emit-module-path %t/resilient_class.swiftmodule -module-name resilient_class
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_class))  -target %target-swift-5.1-abi-triple -enable-library-evolution %S/Inputs/resilient_class.swift -emit-module -emit-module-path %t/resilient_class.swiftmodule -module-name resilient_class
 // RUN: %target-codesign %t/%target-library-name(resilient_class)
 
-// RUN: %target-build-swift -parse-as-library  -Xfrontend -disable-availability-checking %s -lresilient_class -I %t -L %t -o %t/main %target-rpath(%t)
+// RUN: %target-build-swift -parse-as-library  -target %target-swift-5.1-abi-triple %s -lresilient_class -I %t -L %t -o %t/main %target-rpath(%t)
 // RUN: %target-codesign %t/main
 
 // RUN: %target-run %t/main %t/%target-library-name(resilient_class)

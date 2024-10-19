@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift( -plugin-path %swift-plugin-dir -Xfrontend -disable-availability-checking -parse-as-library %import-libdispatch) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift( -plugin-path %swift-plugin-dir -target %target-swift-5.1-abi-triple -parse-as-library %import-libdispatch) | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -swift-version 6 -disable-availability-checking -verify %s -o /dev/null -parse-as-library
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -parse-as-library
 
 // README: This is testing specific patterns around global actors that are
 // slightly different in between swift 5 and swift 6. The normal global actor
