@@ -13,6 +13,7 @@
 // A RawSpan represents a span of initialized memory
 // of unspecified type.
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
   @usableFromInline let _pointer: UnsafeRawPointer?
@@ -35,9 +36,11 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
 }
 
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 9999, *)
 extension RawSpan: @unchecked Sendable {}
 
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 9999, *)
 extension RawSpan {
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -198,6 +201,7 @@ extension RawSpan {
 }
 
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 9999, *)
 extension RawSpan {
 
   @_alwaysEmitIntoClient
@@ -208,6 +212,7 @@ extension RawSpan {
 }
 
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 9999, *)
 extension RawSpan {
 
   /// The number of bytes in the span.
@@ -237,6 +242,7 @@ extension RawSpan {
 
 //MARK: extracting sub-spans
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 9999, *)
 extension RawSpan {
 
   /// Constructs a new span over the bytes within the supplied range of
@@ -374,6 +380,7 @@ extension RawSpan {
 }
 
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 9999, *)
 extension RawSpan {
 
   //FIXME: mark closure parameter as non-escaping
@@ -401,6 +408,7 @@ extension RawSpan {
 }
 
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 9999, *)
 extension RawSpan {
 
   /// View the bytes of this span as type `T`
@@ -430,6 +438,7 @@ extension RawSpan {
 
 //MARK: load
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 9999, *)
 extension RawSpan {
 
   /// Returns a new instance of the given type, constructed from the raw memory
@@ -548,6 +557,7 @@ extension RawSpan {
 }
 
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 9999, *)
 extension RawSpan {
   /// Returns a Boolean value indicating whether two `RawSpan` instances
   /// refer to the same region in memory.
@@ -582,6 +592,7 @@ extension RawSpan {
 
 //MARK: one-sided slicing operations
 @_disallowFeatureSuppression(NonescapableTypes)
+@available(SwiftStdlib 9999, *)
 extension RawSpan {
 
   /// Returns a span containing the initial bytes of this span,
