@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -dump-ast %s -disable-availability-checking -enable-experimental-feature ClosureIsolation | %FileCheck %s
+// RUN: %target-swift-frontend -dump-ast %s -target %target-swift-5.1-abi-triple -enable-experimental-feature ClosureIsolation | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

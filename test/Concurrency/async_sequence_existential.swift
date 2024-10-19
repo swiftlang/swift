@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify
 
-// RUN: %target-swift-frontend  -disable-availability-checking %s -dump-ast 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -dump-ast 2>&1 | %FileCheck %s
 
 // REQUIRES: concurrency
 

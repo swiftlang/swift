@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -swift-version 6 -disable-availability-checking -verify %s -o /dev/null -parse-as-library
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -parse-as-library
 
 // README: Once we loosen the parser so that sending is rejected in Sema
 // instead of the parser, move into the normal

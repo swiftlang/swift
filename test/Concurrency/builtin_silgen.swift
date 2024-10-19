@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -disable-availability-checking %s -parse-as-library -enable-builtin-module -emit-sil -o - | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -parse-as-library -enable-builtin-module -emit-sil -o - | %FileCheck %s
 
 // REQUIRES: concurrency
 
