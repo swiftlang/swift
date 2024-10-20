@@ -223,13 +223,13 @@ bool diagnoseTypeReprAvailability(const TypeRepr *T,
                                   DeclAvailabilityFlags flags = std::nullopt);
 
 /// Diagnose uses of unavailable conformances in types.
-void diagnoseTypeAvailability(Type T, SourceLoc loc,
+bool diagnoseTypeAvailability(Type T, SourceLoc loc,
                               const ExportContext &context,
                               DeclAvailabilityFlags flags = std::nullopt);
 
 /// Checks both a TypeRepr and a Type, but avoids emitting duplicate
 /// diagnostics by only checking the Type if the TypeRepr succeeded.
-void diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
+bool diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
                               const ExportContext &context,
                               DeclAvailabilityFlags flags = std::nullopt);
 

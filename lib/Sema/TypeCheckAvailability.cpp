@@ -4401,6 +4401,7 @@ class ProblematicTypeFinder : public TypeDeclFinder {
   DeclAvailabilityFlags Flags;
 
 public:
+  bool foundAnyIssues = false;
   ProblematicTypeFinder(SourceLoc Loc, const ExportContext &Where,
                         DeclAvailabilityFlags Flags)
       : Loc(Loc), Where(Where), Flags(Flags) {}
@@ -4409,7 +4410,8 @@ public:
     // We only need to diagnose exportability here. Availability was
     // already checked on the TypeRepr.
     if (Where.mustOnlyReferenceExportedDecls())
-      TypeChecker::diagnoseDeclRefExportability(Loc, decl, Where);
+      foundAnyIssues |=
+          TypeChecker::diagnoseDeclRefExportability(Loc, decl, Where);
   }
 
   Action visitNominalType(NominalType *ty) override {
@@ -4427,7 +4429,7 @@ public:
       return Action::Continue;
 
     auto subs = ty->getContextSubstitutionMap();
-    (void) diagnoseSubstitutionMapAvailability(Loc, subs, Where);
+    foundAnyIssues |= diagnoseSubstitutionMapAvailability(Loc, subs, Where);
     return Action::Continue;
   }
 
@@ -4435,7 +4437,7 @@ public:
     visitTypeDecl(ty->getDecl());
 
     auto subs = ty->getContextSubstitutionMap();
-    (void)diagnoseSubstitutionMapAvailability(
+    foundAnyIssues |= diagnoseSubstitutionMapAvailability(
         Loc, subs, Where,
         /*depTy=*/Type(),
         /*replacementTy=*/Type(),
@@ -4448,7 +4450,7 @@ public:
     visitTypeDecl(ty->getDecl());
 
     auto subs = ty->getSubstitutionMap();
-    (void) diagnoseSubstitutionMapAvailability(Loc, subs, Where);
+    foundAnyIssues |= diagnoseSubstitutionMapAvailability(Loc, subs, Where);
     return Action::Continue;
   }
 
@@ -4467,6 +4469,7 @@ public:
           // canonicalization (e.g. in SIL) might break things.
           if (!loader->isSerializable(clangType, /*check canonical*/ true)) {
             ctx.Diags.diagnose(Loc, diag::unexportable_clang_function_type, T);
+            foundAnyIssues |= true;
           }
         }
       }
@@ -4478,20 +4481,22 @@ public:
 
 }
 
-void swift::diagnoseTypeAvailability(Type T, SourceLoc loc,
+bool swift::diagnoseTypeAvailability(Type T, SourceLoc loc,
                                      const ExportContext &where,
                                      DeclAvailabilityFlags flags) {
   if (!T)
-    return;
-  T.walk(ProblematicTypeFinder(loc, where, flags));
+    return false;
+  ProblematicTypeFinder finder(loc, where, flags);
+  T.walk(finder);
+  return finder.foundAnyIssues;
 }
 
-void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
+bool swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
                                      const ExportContext &where,
                                      DeclAvailabilityFlags flags) {
   if (diagnoseTypeReprAvailability(TR, where, flags))
-    return;
-  diagnoseTypeAvailability(T, loc, where, flags);
+    return true;
+  return diagnoseTypeAvailability(T, loc, where, flags);
 }
 
 static void diagnoseMissingConformance(

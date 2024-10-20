@@ -98,9 +98,10 @@ public var testMultipleBindings1: Int? = nil, testMultipleBindings2: BadStruct? 
 public var testMultipleBindings3: BadStruct? = nil, testMultipleBindings4: Int? = nil // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
 
 extension BadStruct { // expected-error {{cannot use struct 'BadStruct' in an extension with public or '@usableFromInline' members; 'BADLibrary' has been imported as implementation-only}}
-  public func testExtensionOfBadType() {}
-  public var testExtensionVarBad: Int { 0 }
-  public subscript(bad _: Int) -> Int { 0 }
+  public func testExtensionOfBadType() {} // expected-note {{instance method 'testExtensionOfBadType()' declared here must be visible to other modules}}
+  public var testExtensionVarBad: Int { 0 } // expected-note {{property 'testExtensionVarBad' declared here must be visible to other modules}}
+  public subscript(bad _: Int) -> Int { 0 } // expected-note {{subscript 'subscript(bad:)' declared here must be visible to other modules}}
+  func testExtensionOfBadTypeNotTheCause() {} // no-note
 }
 extension BadStruct {
   func testExtensionOfOkayType() {}
@@ -109,9 +110,10 @@ extension BadStruct {
 }
 
 extension Array where Element == BadStruct { // expected-error {{cannot use struct 'BadStruct' in an extension with public or '@usableFromInline' members; 'BADLibrary' has been imported as implementation-only}}
-  public func testExtensionWithBadRequirement() {}
-  public var testExtensionVarBad: Int { 0 }
-  public subscript(bad _: Int) -> Int { 0 }
+  public func testExtensionWithBadRequirement() {} // expected-note {{instance method 'testExtensionWithBadRequirement()' declared here must be visible to other modules}}
+  public var testExtensionVarBad: Int { 0 } // expected-note {{property 'testExtensionVarBad' declared here must be visible to other modules}}
+  public subscript(bad _: Int) -> Int { 0 } // expected-note {{subscript 'subscript(bad:)' declared here must be visible to other modules}}
+  func testExtensionWithBadRequirementNotTheCause() {} // no-note
 }
 
 extension Array where Element == BadStruct {
@@ -195,7 +197,7 @@ public func testInheritedConformance(_: NormalProtoAssocHolder<SubclassOfNormalC
 public func testSpecializedConformance(_: NormalProtoAssocHolder<GenericStruct<Int>>) {} // expected-error {{cannot use conformance of 'GenericStruct<T>' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
 
 extension Array where Element == NormalProtoAssocHolder<NormalStruct> { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in an extension with public or '@usableFromInline' members; 'BADLibrary' has been imported as implementation-only}}
-  public func testConstrainedExtensionUsingBadConformance() {}
+  public func testConstrainedExtensionUsingBadConformance() {} // expected-note {{instance method 'testConstrainedExtensionUsingBadConformance()' declared here must be visible to other modules}}
 }
 
 public struct ConditionalGenericStruct<T> {}

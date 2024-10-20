@@ -89,7 +89,7 @@ public struct HasMembers {
 // expected-warning@+2 {{'StructAlias' aliases 'Original.Struct' and cannot be used in an extension with public or '@usableFromInline' members because 'Original' was not imported by this file; this is an error in the Swift 6 language mode}}
 // expected-note@+1 {{The missing import of module 'Original' will be added implicitly}}
 extension StructAlias {
-  public func someFunc() {}
+  public func someFunc() {} // expected-note {{instance method 'someFunc()' declared here must be visible to other modules}}
 }
 
 
