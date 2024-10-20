@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-library-evolution -disable-availability-checking %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-library-evolution -target %target-swift-5.9-abi-triple %s | %FileCheck %s
 
 // rdar://problem/112474421
 
