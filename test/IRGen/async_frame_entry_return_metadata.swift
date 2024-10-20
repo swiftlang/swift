@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir  -module-name async -disable-availability-checking -enable-async-frame-push-pop-metadata | %FileCheck %s --check-prefix=ENABLED
-// RUN: %target-swift-frontend -primary-file %s -emit-ir  -module-name async -disable-availability-checking -O -enable-async-frame-push-pop-metadata | %FileCheck %s --check-prefix=ENABLED
-// RUN: %target-swift-frontend -primary-file %s -emit-ir  -module-name async -disable-availability-checking -disable-async-frame-push-pop-metadata | %FileCheck %s --check-prefix=DISABLED
-// RUN: %target-swift-frontend -primary-file %s -emit-ir  -module-name async -disable-availability-checking | %FileCheck %s --check-prefix=DISABLED
+// RUN: %target-swift-frontend -primary-file %s -emit-ir  -module-name async -target %target-swift-5.1-abi-triple -enable-async-frame-push-pop-metadata | %FileCheck %s --check-prefix=ENABLED
+// RUN: %target-swift-frontend -primary-file %s -emit-ir  -module-name async -target %target-swift-5.1-abi-triple -O -enable-async-frame-push-pop-metadata | %FileCheck %s --check-prefix=ENABLED
+// RUN: %target-swift-frontend -primary-file %s -emit-ir  -module-name async -target %target-swift-5.1-abi-triple -disable-async-frame-push-pop-metadata | %FileCheck %s --check-prefix=DISABLED
+// RUN: %target-swift-frontend -primary-file %s -emit-ir  -module-name async -target %target-swift-5.1-abi-triple | %FileCheck %s --check-prefix=DISABLED
 
 // REQUIRES: OS=macosx || OS=iphoneos
 // REQUIRES: PTRSIZE=64

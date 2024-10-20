@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - \
-// RUN:    -module-name a  -disable-availability-checking \
+// RUN:    -module-name a  -target %target-swift-5.1-abi-triple \
 // RUN:    -parse-as-library | %FileCheck %s --check-prefix=CHECK
 // REQUIRES: concurrency
 // REQUIRES: CPU=x86_64 || CPU=arm64
