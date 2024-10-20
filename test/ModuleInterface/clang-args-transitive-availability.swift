@@ -37,7 +37,9 @@ import ImportsMacroSpecificClangModule
 //CHECK-NEXT:      ],
 //CHECK-NEXT:      "directDependencies": [
 //CHECK-NEXT:        {
-//CHECK-NEXT:          "clang": "OnlyWithMacro"
+//CHECK-DAG:          "clang": "OnlyWithMacro"
+//CHECK-DAG:          "swift": "SwiftOnoneSupport"
+//CHECK-NEXT:        }
 
 // CHECK:      "clang": "OnlyWithMacro"
 // CHECK-NEXT:    },
