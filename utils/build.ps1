@@ -138,7 +138,7 @@ param(
   [string[]] $Test = @(),
   [string] $Stage = "",
   [string] $BuildTo = "",
-  [string] $HostArchName = $(if ($env:PROCESSOR_ARCHITEW6432 -ne $null) { "$env:PROCESSOR_ARCHITEW6432" } else { "$env:PROCESSOR_ARCHITECTURE" }),
+  [string] $HostArchName = $(if ($null -ne $env:PROCESSOR_ARCHITEW6432) { "$env:PROCESSOR_ARCHITEW6432" } else { "$env:PROCESSOR_ARCHITECTURE" }),
   [switch] $Clean,
   [switch] $DebugInfo,
   [switch] $EnableCaching,
@@ -733,13 +733,19 @@ function Fetch-Dependencies {
   Extract-Toolchain "$PinnedToolchain.exe" $BinaryCache $PinnedToolchain
 
   function Download-Python($ArchName) {
-    $PythonAMD64URL = "https://www.nuget.org/api/v2/package/python/$PythonVersion"
-    $PythonAMD64Hash = "ac43b491e9488ac926ed31c5594f0c9409a21ecbaf99dc7a93f8c7b24cf85867"
+    switch ($ArchName) {
+      "AMD64" {
+        $PythonURL = "https://www.nuget.org/api/v2/package/python/$PythonVersion"
+        $PythonHash = "ac43b491e9488ac926ed31c5594f0c9409a21ecbaf99dc7a93f8c7b24cf85867"
+      }
+      "ARM64" {
+        $PythonURL = "https://www.nuget.org/api/v2/package/pythonarm64/$PythonVersion"
+        $PythonHash = "429ada77e7f30e4bd8ff22953a1f35f98b2728e84c9b1d006712561785641f69"
+      }
+      Default { throw "Unsupported architecture $_" }
+    }
 
-    $PythonARM64URL = "https://www.nuget.org/api/v2/package/pythonarm64/$PythonVersion"
-    $PythonARM64Hash = "429ada77e7f30e4bd8ff22953a1f35f98b2728e84c9b1d006712561785641f69"
-
-    DownloadAndVerify (Get-Variable -Name "Python${ArchName}URL").Value $BinaryCache\Python$ArchName-$PythonVersion.zip (Get-Variable -Name "Python${ArchName}Hash").Value
+    DownloadAndVerify $PythonURL $BinaryCache\Python$ArchName-$PythonVersion.zip $PythonHash
 
     if (-not $ToBatch) {
       Extract-ZipFile Python$ArchName-$PythonVersion.zip $BinaryCache Python$ArchName-$PythonVersion
@@ -1351,13 +1357,12 @@ function Get-CMark-BinaryCache($Arch) {
   return "$($Arch.BinaryCache)\cmark-gfm-0.29.0.gfm.13"
 }
 function Build-CMark($Arch) {
-  $ArchName = $Arch.LLVMName
-
   Build-CMakeProject `
     -Src $SourceCache\cmark `
     -Bin (Get-CMark-BinaryCache($Arch)) `
     -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
     -Arch $Arch `
+    -UseMSVCCompilers C `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       BUILD_TESTING = "NO";
@@ -1614,8 +1619,6 @@ function Build-XML2([Platform]$Platform, $Arch) {
 }
 
 function Build-RegsGen2($Arch) {
-  $ArchName = $Arch.LLVMName
-
   Build-CMakeProject `
     -Src $SourceCache\ds2\Tools\RegsGen2 `
     -Bin "$(Get-BuildProjectBinaryCache RegsGen2)" `
@@ -1825,6 +1828,7 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
     -Arch $Arch `
     -Platform $Platform `
     -UseBuiltCompilers C,CXX,Swift `
+    -BuildTargets $Targets `
     -Defines @{
       ENABLE_SWIFT = "YES";
     }
@@ -1953,12 +1957,12 @@ function Build-FoundationMacros() {
   Build-CMakeProject `
     -Src $SourceCache\swift-foundation\Sources\FoundationMacros `
     -Bin $FoundationMacrosBinaryCache `
-    -InstallTo:$InstallDir `
+    -InstallTo $InstallDir `
     -Arch $Arch `
     -Platform $Platform `
     -UseBuiltCompilers Swift `
-    -SwiftSDK:$SwiftSDK `
-    -BuildTargets:$Targets `
+    -SwiftSDK $SwiftSDK `
+    -BuildTargets $Targets `
     -Defines @{
       SwiftSyntax_DIR = $SwiftSyntaxCMakeModules;
     }
@@ -2595,12 +2599,12 @@ function Build-TestingMacros() {
   Build-CMakeProject `
     -Src $SourceCache\swift-testing\Sources\TestingMacros `
     -Bin $TestingMacrosBinaryCache `
-    -InstallTo:$InstallDir  `
+    -InstallTo $InstallDir  `
     -Arch $Arch `
     -Platform $Platform `
     -UseBuiltCompilers Swift `
-    -SwiftSDK:$SwiftSDK `
-    -BuildTargets:$Targets `
+    -SwiftSDK $SwiftSDK `
+    -BuildTargets $Targets `
     -Defines @{
       SwiftSyntax_DIR = $SwiftSyntaxCMakeModules;
     }
@@ -2858,7 +2862,7 @@ if ($Stage) {
 }
 
 if (-not $IsCrossCompiling) {
-  if ($Test -ne $null -and (Compare-Object $Test @("clang", "lld", "lldb", "llvm", "swift") -PassThru -IncludeEqual -ExcludeDifferent) -ne $null) {
+  if ($null -ne $Test -and $null -ne (Compare-Object $Test @("clang", "lld", "lldb", "llvm", "swift") -PassThru -IncludeEqual -ExcludeDifferent)) {
     $Tests = @{
       "-TestClang" = $Test -contains "clang";
       "-TestLLD" = $Test -contains "lld";
