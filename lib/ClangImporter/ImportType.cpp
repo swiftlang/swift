@@ -1296,8 +1296,9 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
   case ImportTypeKind::Variable:
   case ImportTypeKind::AuditedVariable:
   case ImportTypeKind::Enum:
-  case ImportTypeKind::RecordField:
+  case ImportTypeKind::RecordFieldWithReferenceSemantics:
     return false;
+  case ImportTypeKind::RecordField:
   case ImportTypeKind::Result:
   case ImportTypeKind::AuditedResult:
   case ImportTypeKind::Parameter:
@@ -1325,6 +1326,7 @@ static bool isCFAudited(ImportTypeKind importKind) {
   case ImportTypeKind::Enum:
   case ImportTypeKind::RecordField:
     return false;
+  case ImportTypeKind::RecordFieldWithReferenceSemantics:
   case ImportTypeKind::AuditedVariable:
   case ImportTypeKind::AuditedResult:
   case ImportTypeKind::Parameter:
@@ -1492,8 +1494,7 @@ static ImportedType adjustTypeForConcreteImport(
     // bridge, do so.
     if (canBridgeTypes(importKind) &&
         importKind != ImportTypeKind::PropertyWithReferenceSemantics &&
-        !(importKind == ImportTypeKind::RecordField &&
-          objCLifetime <= clang::Qualifiers::OCL_ExplicitNone) &&
+        importKind != ImportTypeKind::RecordFieldWithReferenceSemantics &&
         !(importKind == ImportTypeKind::Typedef &&
           bridging == Bridgeability::None)) {
       // id and Any can be bridged without Foundation. There would be
@@ -1609,7 +1610,7 @@ static ImportedType adjustTypeForConcreteImport(
 
   assert(importedType);
 
-  if (importKind == ImportTypeKind::RecordField &&
+  if ((importKind == ImportTypeKind::RecordField || importKind == ImportTypeKind::RecordFieldWithReferenceSemantics) &&
       !importedType->isForeignReferenceType()) {
     switch (objCLifetime) {
       // Wrap retainable struct fields in Unmanaged.
@@ -1621,16 +1622,9 @@ static ImportedType adjustTypeForConcreteImport(
           importedType = getUnmanagedType(impl, importedType);
         }
         break;
-      // FIXME: Eventually we might get C++-like support for strong pointers in
-      // structs, at which point we should really be checking the lifetime
-      // qualifiers.
       case clang::Qualifiers::OCL_Strong:
-        if (!impl.SwiftContext.LangOpts.EnableCXXInterop) {
-          return {Type(), false};
-        }
-        break;
       case clang::Qualifiers::OCL_Weak:
-        return {Type(), false};
+        break;
       case clang::Qualifiers::OCL_Autoreleasing:
         llvm_unreachable("invalid Objective-C lifetime");
     }
