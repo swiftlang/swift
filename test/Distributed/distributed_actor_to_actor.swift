@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend  -disable-availability-checking %s -parse-as-library -parse-stdlib -emit-sil -o - | %FileCheck %s -check-prefix=CHECK-SIL
+// RUN: %target-swift-frontend  -target %target-swift-5.7-abi-triple %s -parse-as-library -parse-stdlib -emit-sil -o - | %FileCheck %s -check-prefix=CHECK-SIL
 
-// RUN: %target-swift-frontend  -disable-availability-checking %s -parse-as-library -parse-stdlib -emit-ir -o - | %FileCheck %s -check-prefix=CHECK-IR
+// RUN: %target-swift-frontend  -target %target-swift-5.7-abi-triple %s -parse-as-library -parse-stdlib -emit-ir -o - | %FileCheck %s -check-prefix=CHECK-IR
 
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
