@@ -1039,6 +1039,11 @@ namespace swift {
     /// invocations directly from clang cc1 args.
     bool ClangImporterDirectCC1Scan = false;
 
+    /// Whether the importer should expect all APINotes to be wrapped
+    /// in versioned attributes, where the importer must select the appropriate
+    /// ones to apply.
+    bool LoadVersionIndependentAPINotes = false;
+
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.
     llvm::hash_code getPCHHashComponents() const {
