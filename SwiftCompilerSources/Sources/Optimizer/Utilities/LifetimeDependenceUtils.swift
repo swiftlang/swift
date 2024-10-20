@@ -91,7 +91,7 @@ func gatherVariableIntroducers(for value: Value, _ context: Context)
 /// A lifetime dependence represents a scope in which some parent
 /// value is alive and accessible along with a dependent value. All
 /// values derived from the dependent value must be used within this
-/// scope. This supports diagnostics on non-escapable types.
+/// scope. This supports diagnostics on non-copyable and non-escapable types.
 ///
 /// A lifetime dependence is produced by either 'mark_dependence [nonescaping]':
 ///
@@ -114,6 +114,8 @@ struct LifetimeDependence : CustomStringConvertible {
     case yield(Value)
     /// An owned value whose OSSA lifetime encloses nonescapable values
     case owned(Value)
+    /// An borrowed value whose OSSA lifetime encloses nonescapable values
+    case borrowed(Value)
     /// Singly-initialized addressable storage (likely for an
     /// immutable address-only value). The lifetime extends until the
     /// memory is destroyed. e.g. A value produced by an @in
@@ -134,6 +136,7 @@ struct LifetimeDependence : CustomStringConvertible {
       case let .access(beginAccess): return beginAccess
       case let .yield(value): return value
       case let .owned(value): return value
+      case let .borrowed(value): return value
       case let .initialized(initialAddress, _): return initialAddress
       case let .unknown(value): return value
       }
@@ -149,6 +152,8 @@ struct LifetimeDependence : CustomStringConvertible {
         precondition(value.definingInstruction is BeginApplyInst)
       case let .owned(value):
         precondition(value.ownership == .owned)
+      case let .borrowed(value):
+        precondition(value.ownership == .guaranteed)
       case let .initialized(initialAddress, initializingStore):
         precondition(initialAddress.type.isAddress, "expected an address")
         precondition(initialAddress is AllocStackInst
@@ -166,6 +171,7 @@ struct LifetimeDependence : CustomStringConvertible {
         case .access: return "Access: "
         case .yield: return "Yield: "
         case .owned: return "Owned: "
+        case .borrowed: return "Borrowed: "
         case .initialized: return "Initialized: "
         case .unknown: return "Unknown: "
         }
@@ -225,10 +231,10 @@ extension LifetimeDependence {
     return false
   }
 
-  /// Construct LifetimeDependence from mark_dependence [unresolved]
+  /// Construct LifetimeDependence from mark_dependence [unresolved] or mark_dependence [nonescaping].
   ///
-  /// For any LifetimeDependence constructed from a mark_dependence,
-  /// its `dependentValue` will be the result of the mark_dependence.
+  /// For any LifetimeDependence constructed from a mark_dependence, its `dependentValue` will be the result of the
+  /// mark_dependence.
   ///
   /// TODO: Add SIL verification that all mark_depedence [unresolved]
   /// have a valid LifetimeDependence.
@@ -384,16 +390,11 @@ extension LifetimeDependence.Scope {
            "guaranteed phis not allowed when diagnosing lifetime dependence")
     switch beginBorrow {
     case .beginBorrow, .loadBorrow:
-      let borrowOperand = beginBorrow.baseOperand!
-      guard let scope = LifetimeDependence.Scope(base: borrowOperand.value,
-                                                 context) else {
-        return nil
-      }
-      self = scope
+      self = .borrowed(beginBorrow.value)
     case let .beginApply(value):
       self = .yield(value)
-    case .functionArgument:
-      self = .caller(beginBorrow.value as! FunctionArgument)
+    case let .functionArgument(arg):
+      self = .caller(arg)
     case .reborrow:
       fatalError("reborrows are not supported in diagnostics")
     }
@@ -446,6 +447,8 @@ extension LifetimeDependence.Scope {
       // liveness. That would be more forgiving for copies. But, then
       // how would we ensure that the borrowed mark_dependence value
       // is within this value's OSSA lifetime?
+      return computeLinearLiveness(for: value, context)
+    case let .borrowed(value):
       return computeLinearLiveness(for: value, context)
     case let .initialized(initialAddress, initializingStore):
       return LifetimeDependence.Scope.computeInitializedRange(
