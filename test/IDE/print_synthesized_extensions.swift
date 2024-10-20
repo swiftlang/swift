@@ -312,8 +312,6 @@ extension S13 : P5 {
 // CHECK11-NEXT:    public func <loc>foo3()</loc></decl>
 // CHECK11-NEXT:  <decl:Func>/// This is picked
 // CHECK11-NEXT:    public func <loc>foo4()</loc></decl>
-// CHECK11-NEXT:  <decl:Func>/// This should not crash
-// CHECK11-NEXT:    public func <loc>foo5()</loc></decl>
 // CHECK11-NEXT: }</synthesized>
 
 // CHECK12:       <decl:Protocol>public protocol <loc>P6</loc> {
@@ -338,8 +336,6 @@ extension S13 : P5 {
 // CHECK14-NEXT:     public func <loc>foo3()</loc></decl>
 // CHECK14-NEXT: <decl:Func>/// This is picked
 // CHECK14-NEXT:     public func <loc>foo4()</loc></decl>
-// CHECK14-NEXT: <decl:Func>/// This should not crash
-// CHECK14-NEXT:     public func <loc>foo5()</loc></decl>
 // CHECK14-NEXT: }</synthesized>
 
 // rdar://76868074: Make sure we print the extensions for C.
