@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t/src)
 // RUN: split-file %s %t/src
 
-// RUN: %target-swift-emit-silgen -disable-availability-checking -module-name preconcurrency_conformances -enable-upcoming-feature DynamicActorIsolation %t/src/checks.swift -verify | %FileCheck %t/src/checks.swift
-// RUN: %target-swift-emit-silgen -swift-version 6 -disable-availability-checking -module-name preconcurrency_conformances -disable-dynamic-actor-isolation %t/src/checks_disabled.swift -verify | %FileCheck %t/src/checks_disabled.swift
+// RUN: %target-swift-emit-silgen -target %target-swift-5.1-abi-triple -module-name preconcurrency_conformances -enable-upcoming-feature DynamicActorIsolation %t/src/checks.swift -verify | %FileCheck %t/src/checks.swift
+// RUN: %target-swift-emit-silgen -swift-version 6 -target %target-swift-5.1-abi-triple -module-name preconcurrency_conformances -disable-dynamic-actor-isolation %t/src/checks_disabled.swift -verify | %FileCheck %t/src/checks_disabled.swift
 
 // REQUIRES: asserts
 // REQUIRES: concurrency

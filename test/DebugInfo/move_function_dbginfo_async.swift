@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -g -emit-sil -o - %s | %FileCheck -check-prefix=SIL %s
-// RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -g -emit-ir -o - %s | %FileCheck %s
-// RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -g -c %s -o %t/out.o
+// RUN: %target-swift-frontend -parse-as-library -target %target-swift-5.1-abi-triple -g -emit-sil -o - %s | %FileCheck -check-prefix=SIL %s
+// RUN: %target-swift-frontend -parse-as-library -target %target-swift-5.1-abi-triple -g -emit-ir -o - %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -target %target-swift-5.1-abi-triple -g -c %s -o %t/out.o
 
 // This test checks that:
 //

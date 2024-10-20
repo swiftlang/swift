@@ -13,16 +13,16 @@
 // RUN:   -emit-module-path %t/Client.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Client.swiftinterface \
 // RUN:   -enable-upcoming-feature DynamicActorIsolation \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-5.1-abi-triple \
 // RUN:   -verify
 
 // RUN: %FileCheck %s < %t/Client.swiftinterface
 
 // RUN: %target-swift-emit-module-interface(%t/Client.swiftinterface) -I %t %t/src/Client.swift -module-name Client \
-// RUN:   -disable-availability-checking -enable-upcoming-feature DynamicActorIsolation -verify
+// RUN:   -target %target-swift-5.1-abi-triple -enable-upcoming-feature DynamicActorIsolation -verify
 
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface) -I %t -module-name Client \
-// RUN:   -disable-availability-checking -enable-upcoming-feature DynamicActorIsolation -verify
+// RUN:   -target %target-swift-5.1-abi-triple -enable-upcoming-feature DynamicActorIsolation -verify
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
