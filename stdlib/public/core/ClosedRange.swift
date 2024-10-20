@@ -325,6 +325,66 @@ where Bound: Strideable, Bound.Stride: SignedInteger
     // The first and last elements are the same because each element is unique.
     return _customIndexOfEquatableElement(element)
   }
+  
+  /// Returns a Boolean value indicating whether the given range is contained
+  /// within this closed range.
+  ///
+  /// The given range is contained within this closed range if the elements of
+  /// the range are all contained within this closed range.
+  ///
+  ///     let range = 0...10
+  ///     range.contains(5..<7)     // true
+  ///     range.contains(5..<10)    // true
+  ///     range.contains(5..<12)    // false
+  ///
+  ///     // Note that `5..<11` contains 5, 6, 7, 8, 9, and 10.
+  ///     range.contains(5..<11)    // true
+  ///
+  /// Additionally, passing any empty range as `other` results in the value
+  /// `true`, even if the empty range's bounds are outside the bounds of this
+  /// closed range.
+  ///
+  ///     range.contains(3..<3)     // true
+  ///     range.contains(20..<20)   // true
+  ///
+  /// - Parameter other: A range to check for containment within this closed
+  ///   range.
+  /// - Returns: `true` if `other` is empty or wholly contained within this
+  ///   closed range; otherwise, `false`.
+  ///
+  /// - Complexity: O(1)
+  @backDeployed(before: SwiftStdlib 6.1)
+  @inlinable
+  public func contains(_ other: Range<Bound>) -> Bool {
+    if other.isEmpty { return true }
+    let otherInclusiveUpper = other.upperBound.advanced(by: -1)
+    return lowerBound <= other.lowerBound && upperBound >= otherInclusiveUpper
+  }
+}
+
+extension ClosedRange {
+  /// Returns a Boolean value indicating whether the given closed range is
+  /// contained within this closed range.
+  ///
+  /// The given closed range is contained within this range if its bounds are
+  /// contained within this closed range.
+  ///
+  ///     let range = 0...10
+  ///     range.contains(2...5)        // true
+  ///     range.contains(2...10)       // true
+  ///     range.contains(2...12)       // false
+  ///
+  /// - Parameter other: A closed range to check for containment within this
+  ///   closed range.
+  /// - Returns: `true` if `other` is wholly contained within this closed range;
+  ///   otherwise, `false`.
+  ///
+  /// - Complexity: O(1)
+  @backDeployed(before: SwiftStdlib 6.1)
+  @inlinable
+  public func contains(_ other: ClosedRange<Bound>) -> Bool {
+    lowerBound <= other.lowerBound && upperBound >= other.upperBound
+  }
 }
 
 extension Comparable {  
@@ -459,6 +519,18 @@ extension ClosedRange where Bound: Strideable, Bound.Stride: SignedInteger {
 }
 
 extension ClosedRange {
+  /// Returns a Boolean value indicating whether this range and the given closed
+  /// range contain an element in common.
+  ///
+  /// This example shows two overlapping ranges:
+  ///
+  ///     let x: Range = 0...20
+  ///     print(x.overlaps(10...1000))
+  ///     // Prints "true"
+  ///
+  /// - Parameter other: A range to check for elements in common.
+  /// - Returns: `true` if this range and `other` have at least one element in
+  ///   common; otherwise, `false`.
   @inlinable
   public func overlaps(_ other: ClosedRange<Bound>) -> Bool {
     // Disjoint iff the other range is completely before or after our range.
@@ -469,6 +541,25 @@ extension ClosedRange {
     return !isDisjoint
   }
 
+  /// Returns a Boolean value indicating whether this range and the given range
+  /// contain an element in common.
+  ///
+  /// This example shows two overlapping ranges:
+  ///
+  ///     let x: Range = 0...20
+  ///     print(x.overlaps(10..<1000))
+  ///     // Prints "true"
+  ///
+  /// Because a closed range includes its upper bound, the ranges in the
+  /// following example overlap:
+  ///
+  ///     let y = 20..<30
+  ///     print(x.overlaps(y))
+  ///     // Prints "true"
+  ///
+  /// - Parameter other: A range to check for elements in common.
+  /// - Returns: `true` if this range and `other` have at least one element in
+  ///   common; otherwise, `false`.
   @inlinable
   public func overlaps(_ other: Range<Bound>) -> Bool {
     return other.overlaps(self)
