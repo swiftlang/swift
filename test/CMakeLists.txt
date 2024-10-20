@@ -286,6 +286,9 @@ foreach(SDK ${SWIFT_SDKS})
         set(SWIFT_HAVE_LIBXML2 FALSE)
       endif()
 
+      set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM FALSE)
+      set(VARIANT_EXTERNAL_EMBEDDED_DEVICE)
+
       swift_configure_lit_site_cfg(
           "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
           "${test_bin_dir}/lit.site.cfg"
@@ -523,6 +526,28 @@ foreach(SDK ${SWIFT_SDKS})
     endforeach()
   endforeach()
 endforeach()
+
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
+  set(VARIANT_SUFFIX "-embedded-armv7")
+  set(VARIANT_TRIPLE "armv7em-none-none-eabi")
+  set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM TRUE)
+  set(VARIANT_EXTERNAL_EMBEDDED_DEVICE "arm-qemu-stm32f4")
+  set(SWIFT_TEST_RESULTS_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
+  swift_configure_lit_site_cfg(
+      "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
+      "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.site.cfg"
+      "test${VARIANT_SUFFIX}.lit.site.cfg")
+
+  set(VARIANT_SUFFIX "-embedded-avr")
+  set(VARIANT_TRIPLE "avr-none-none-elf")
+  set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM TRUE)
+  set(VARIANT_EXTERNAL_EMBEDDED_DEVICE "avr-qemu-atmega2560")
+  set(SWIFT_TEST_RESULTS_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
+  swift_configure_lit_site_cfg(
+      "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
+      "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.site.cfg"
+      "test${VARIANT_SUFFIX}.lit.site.cfg")
+endif()
 
 # Add shortcuts for the default variant.
 foreach(test_mode ${TEST_MODES})
