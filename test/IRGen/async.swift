@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir  -disable-availability-checking | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
-// RUN: %target-swift-frontend -primary-file %s -emit-ir  -disable-availability-checking -enable-library-evolution
+// RUN: %target-swift-frontend -primary-file %s -emit-ir  -target %target-swift-5.1-abi-triple | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -primary-file %s -emit-ir  -target %target-swift-5.1-abi-triple -enable-library-evolution
 
 // REQUIRES: concurrency
 // UNSUPPORTED: CPU=wasm32

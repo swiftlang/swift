@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -disable-availability-checking -primary-file %s -emit-sil -O -g | %FileCheck %s --check-prefix CHECK-SIL
-// RUN: %target-swift-frontend -disable-availability-checking -primary-file %s -emit-irgen -O -g | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -primary-file %s -emit-sil -O -g | %FileCheck %s --check-prefix CHECK-SIL
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -primary-file %s -emit-irgen -O -g | %FileCheck %s
 
 // REQUIRES: CPU=arm64 || CPU=x86_64 || CPU=arm64e
 
