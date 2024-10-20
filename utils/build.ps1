@@ -127,7 +127,7 @@ param(
   [string] $PinnedBuild = "",
   [string] $PinnedSHA256 = "",
   [string] $PinnedVersion = "",
-  [string] $PythonVersion = "3.9.10",
+  [string] $PythonVersion = "3.12.6",
   [string] $AndroidNDKVersion = "r26b",
   [string] $WinSDKVersion = "",
   [switch] $Android = $false,
@@ -194,13 +194,7 @@ $WiXVersion = "4.0.5"
 # Avoid $env:ProgramFiles in case this script is running as x86
 $UnixToolsBinDir = "$env:SystemDrive\Program Files\Git\usr\bin"
 
-$python = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Shared\Python39_64\python.exe"
-if (-not (Test-Path $python)) {
-  $python = (where.exe python) | Select-Object -First 1
-  if (-not (Test-Path $python)) {
-    throw "Python.exe not found"
-  }
-}
+$PythonName = "Python{0}{1}" -f ([System.Version]$PythonVersion).Major, ([System.Version]$PythonVersion).Minor
 
 if ($Android -and ($AndroidSDKs.Length -eq 0)) {
   # Enable all android SDKs by default.
@@ -228,6 +222,7 @@ $ArchX64 = @{
   LLVMName = "x86_64";
   LLVMTarget = "x86_64-unknown-windows-msvc";
   CMakeName = "AMD64";
+  PythonName = "amd64";
   BinaryDir = "bin64";
   BuildID = 100;
   BinaryCache = "$BinaryCache\x64";
@@ -244,6 +239,7 @@ $ArchX86 = @{
   LLVMName = "i686";
   LLVMTarget = "i686-unknown-windows-msvc";
   CMakeName = "i686";
+  PythonName = "win32";
   BinaryDir = "bin32";
   BuildID = 200;
   BinaryCache = "$BinaryCache\x86";
@@ -259,6 +255,7 @@ $ArchARM64 = @{
   LLVMName = "aarch64";
   LLVMTarget = "aarch64-unknown-windows-msvc";
   CMakeName = "ARM64";
+  PythonName = "arm64";
   BinaryDir = "bin64a";
   BuildID = 300;
   BinaryCache = "$BinaryCache\arm64";
@@ -356,6 +353,10 @@ function Get-FlexExecutable {
 
 function Get-BisonExecutable {
   return Join-Path -Path $BinaryCache -ChildPath "win_flex_bison\win_bison.exe"
+}
+
+function Get-PythonExecutable {
+  return [IO.Path]::Combine($BinaryCache, "python", $PythonVersion, $HostArch.PythonName, $PythonName, "python.exe")
 }
 
 function Get-InstallDir($Arch) {
@@ -732,24 +733,93 @@ function Fetch-Dependencies {
   New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains | Out-Null
   Extract-Toolchain "$PinnedToolchain.exe" $BinaryCache $PinnedToolchain
 
-  function Download-Python($ArchName) {
-    $PythonAMD64URL = "https://www.nuget.org/api/v2/package/python/$PythonVersion"
-    $PythonAMD64Hash = "ac43b491e9488ac926ed31c5594f0c9409a21ecbaf99dc7a93f8c7b24cf85867"
+  function Download-PythonPackage($Version, $FileName) {
+    $PythonURL = "https://www.python.org/ftp/python/$Version/$FileName"
+    if (-not (Test-Path "$BinaryCache\$FileName.spdx.json")) {
+      curl.exe -sL "$PythonURL.spdx.json" -o "$BinaryCache\$FileName.spdx.json"
+    }
+    $PythonSBOM = Get-Content -Path "$BinaryCache\$FileName.spdx.json" | ConvertFrom-Json
+    $PythonSBOM = $PythonSBOM.packages | Where-Object { $_.SPDXID -eq "SPDXRef-PACKAGE-cpython" }
+    $PythonHash = ($PythonSBOM.checksums | Where-Object { $_.algorithm -eq "SHA256" }).checksumValue
 
-    $PythonARM64URL = "https://www.nuget.org/api/v2/package/pythonarm64/$PythonVersion"
-    $PythonARM64Hash = "429ada77e7f30e4bd8ff22953a1f35f98b2728e84c9b1d006712561785641f69"
+    DownloadAndVerify $PythonURL $BinaryCache\$FileName $PythonHash
+  }
 
-    DownloadAndVerify (Get-Variable -Name "Python${ArchName}URL").Value $BinaryCache\Python$ArchName-$PythonVersion.zip (Get-Variable -Name "Python${ArchName}Hash").Value
+  function Extract-Python {
+    param
+    (
+        [string]$InstallerExeName,
+        [string]$BinaryCache,
+        [string]$ArchName
+    )
 
-    if (-not $ToBatch) {
-      Extract-ZipFile Python$ArchName-$PythonVersion.zip $BinaryCache Python$ArchName-$PythonVersion
+    $source = Join-Path -Path $BinaryCache -ChildPath $InstallerExeName
+    $destination = Join-Path -Path $BinaryCache -ChildPath python\$PythonVersion\$ArchName
+
+    # Check if the extracted directory already exists and is up to date.
+    if (Test-Path $destination) {
+        $installerWriteTime = (Get-Item $source).LastWriteTime
+        $extractedWriteTime = (Get-Item $destination).LastWriteTime
+        if ($installerWriteTime -le $extractedWriteTime) {
+            Write-Output "'$InstallerExeName' is already extracted and up to date."
+            return
+        }
+    }
+
+    Write-Output "Extracting '$InstallerExeName' ..."
+    New-Item -ItemType Directory -ErrorAction Ignore "$BinaryCache\python\$PythonVersion\$ArchName\$PythonName" | Out-Null
+    Invoke-Program $BinaryCache\WiX-$WiXVersion\tools\net6.0\any\wix.exe -- burn extract $source -out $BinaryCache\python\$PythonVersion\$ArchName\ -outba $BinaryCache\python\$PythonVersion\$ArchName\
+    Get-ChildItem "$BinaryCache\python\$PythonVersion\$ArchName\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
+      if (-not @("core.msi", "dev.msi", "exe.msi", "lib.msi").Contains($_.Name)) {
+        return
+      }
+      $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
+      Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\python\$PythonVersion\$ArchName\$LogFile /qn /a $BinaryCache\python\$PythonVersion\$ArchName\WixAttachedContainer\$($_.Name) TargetDir=$BinaryCache\python\$PythonVersion\$ArchName\$PythonName
     }
   }
 
-  Download-Python $HostArchName
-  if ($IsCrossCompiling) {
-    Download-Python $BuildArchName
+  function Ensure-PythonModules($Python) {
+    # First ensure pip is installed, else bootstrap it
+    try {
+      Invoke-Program -OutNull $Python -m pip *> $null
+    } catch {
+      Write-Output "Installing pip ..."
+      Invoke-Program -OutNull $Python '-I' -m ensurepip -U --default-pip
+    }
+    # 'packaging' is required for building LLVM 18+
+    try {
+      Invoke-Program -OutNull $Python -c 'import packaging' *> $null
+    } catch {
+      $WheelURL = "https://files.pythonhosted.org/packages/08/aa/cc0199a5f0ad350994d660967a8efb233fe0416e4639146c089643407ce6/packaging-24.1-py3-none-any.whl"
+      $WheelHash = "5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124"
+      DownloadAndVerify $WheelURL "$BinaryCache\python\packaging-24.1-py3-none-any.whl" $WheelHash
+      Write-Output "Installing 'packaging-24.1-py3-none-any.whl' ..."
+      Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\packaging-24.1-py3-none-any.whl" *> $null
+    }
+    # 'setuptools' provides 'distutils' module for Python 3.12+, required for SWIG support
+    # https://github.com/swiftlang/llvm-project/issues/9289
+    try {
+      Invoke-Program -OutNull $Python -c 'import distutils' *> $null
+    } catch {
+      $WheelURL = "https://files.pythonhosted.org/packages/ff/ae/f19306b5a221f6a436d8f2238d5b80925004093fa3edea59835b514d9057/setuptools-75.1.0-py3-none-any.whl"
+      $WheelHash = "35ab7fd3bcd95e6b7fd704e4a1539513edad446c097797f2985e0e4b960772f2"
+      DownloadAndVerify $WheelURL "$BinaryCache\python\setuptools-75.1.0-py3-none-any.whl" $WheelHash
+      Write-Output "Installing 'setuptools-75.1.0-py3-none-any.whl' ..."
+      Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\setuptools-75.1.0-py3-none-any.whl" *> $null
+    }
   }
+
+  function Download-Python($Version, $Arch) {
+    Download-PythonPackage $Version "python-$Version-$($Arch.PythonName).exe"
+    Extract-Python "python-$Version-$($Arch.PythonName).exe" $BinaryCache $Arch.PythonName
+  }
+
+  Download-Python $PythonVersion $HostArch
+  if ($IsCrossCompiling) {
+    Download-Python $PythonVersion $BuildArch
+  }
+  # Ensure Python modules that are required as host build tools
+  Ensure-PythonModules "$(Get-PythonExecutable)"
 
   if ($Android) {
     # Only a specific NDK version is supported right now.
@@ -1448,6 +1518,8 @@ function Build-Compilers() {
       }
     }
 
+    $PythonRoot = Get-PythonExecutable | Split-Path -Parent
+
     # The STL in VS 17.10 requires Clang 17 or higher, but Swift toolchains prior to version 6 include older versions
     # of Clang. If bootstrapping with an older toolchain, we need to relax to relax this requirement with
     # ALLOW_COMPILER_AND_STL_VERSION_MISMATCH.
@@ -1479,10 +1551,10 @@ function Build-Compilers() {
         LLVM_NATIVE_TOOL_DIR = $BuildTools;
         LLVM_TABLEGEN = (Join-Path $BuildTools -ChildPath "llvm-tblgen.exe");
         LLVM_USE_HOST_TOOLS = "NO";
-        Python3_EXECUTABLE = "$python";
-        Python3_INCLUDE_DIR = "$BinaryCache\Python$($Arch.CMakeName)-$PythonVersion\tools\include";
-        Python3_LIBRARY = "$BinaryCache\Python$($Arch.CMakeName)-$PythonVersion\tools\libs\python39.lib";
-        Python3_ROOT_DIR = "$BinaryCache\Python$($Arch.CMakeName)-$PythonVersion\tools";
+        Python3_EXECUTABLE = "$PythonRoot\python.exe";
+        Python3_INCLUDE_DIR = "$PythonRoot\include";
+        Python3_LIBRARY = "$PythonRoot\libs\$($PythonName.ToLower()).lib";
+        Python3_ROOT_DIR = $PythonRoot;
         SWIFT_BUILD_SWIFT_SYNTAX = "YES";
         SWIFT_CLANG_LOCATION = (Get-PinnedToolchainTool);
         SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
@@ -1805,7 +1877,7 @@ function Build-Runtime([Platform]$Platform, $Arch) {
       })
   }
 
-  Invoke-Program $python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" `
+  Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" `
     -OutFile "$($Arch.SDKInstallRoot)\SDKSettings.plist"
 }
 
@@ -2036,7 +2108,7 @@ function Build-Testing([Platform]$Platform, $Arch, [switch]$Test = $false) {
 
 function Write-PlatformInfoPlist($Arch) {
     $PList = Join-Path -Path $Arch.PlatformInstallRoot -ChildPath "Info.plist"
-    Invoke-Program $python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development', 'SWIFT_TESTING_VERSION': 'development', 'SWIFTC_FLAGS': ['-use-ld=lld'] } }), encoding='utf-8'))" `
+    Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development', 'SWIFT_TESTING_VERSION': 'development', 'SWIFTC_FLAGS': ['-use-ld=lld'] } }), encoding='utf-8'))" `
       -OutFile "$PList"
 }
 
