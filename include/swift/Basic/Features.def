@@ -301,6 +301,10 @@ EXPERIMENTAL_FEATURE(ParserRoundTrip, false)
 /// Swift parser.
 EXPERIMENTAL_FEATURE(ParserValidation, false)
 
+/// Whether to perform validation of the unqualified lookup produced by
+/// ASTScope and SwiftLexicalLookup
+EXPERIMENTAL_FEATURE(UnqualifiedLookupValidation, false)
+
 /// Whether to emit diagnostics from the new parser first, and only emit
 /// diagnostics from the existing parser when there are none from the new
 /// parser.

@@ -232,6 +232,13 @@ NOTE(in_macro_expansion,none,
 ERROR(macro_experimental,none,
       "%0 macros are an experimental feature that is not enabled %select{|(%1)}1",
       (StringRef, StringRef))
+      
+//------------------------------------------------------------------------------
+// MARK: lexical lookup diagnostics
+//------------------------------------------------------------------------------
+      
+ERROR(lookup_outputs_dont_match,none,
+"Unqualified lookup output from ASTScope and SwiftLexicalLookup don't match", ())
 
 //------------------------------------------------------------------------------
 // MARK: bridged diagnostics
