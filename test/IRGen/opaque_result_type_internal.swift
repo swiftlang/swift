@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -O -disable-availability-checking -emit-module -emit-module-path=%t/R.swiftmodule -module-name=R %S/Inputs/opaque_result_type_internal_inlinable.swift
-// RUN: %target-swift-frontend -O -I %t -disable-availability-checking -c -primary-file %s
+// RUN: %target-swift-frontend -O -target %target-swift-5.1-abi-triple -emit-module -emit-module-path=%t/R.swiftmodule -module-name=R %S/Inputs/opaque_result_type_internal_inlinable.swift
+// RUN: %target-swift-frontend -O -I %t -target %target-swift-5.1-abi-triple -c -primary-file %s
 
 import R
 
