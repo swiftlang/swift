@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -disable-availability-checking
+// RUN: %target-swift-frontend -emit-ir %s -target %target-swift-5.1-abi-triple
 
 // This is a generics test, but only IRGen exercised the substitution of
 // an abstract conformance with a type parameter -- in the type checker and

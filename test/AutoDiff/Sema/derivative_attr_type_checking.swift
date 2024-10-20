@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend-typecheck -verify -disable-availability-checking %s -package-name myPkg
-// RUN: %target-swift-frontend-typecheck -enable-testing -verify -disable-availability-checking %s -package-name myPkg
+// RUN: %target-swift-frontend-typecheck -verify -target %target-swift-5.1-abi-triple %s -package-name myPkg
+// RUN: %target-swift-frontend-typecheck -enable-testing -verify -target %target-swift-5.1-abi-triple %s -package-name myPkg
 
 // Swift.AdditiveArithmetic:3:17: note: cannot yet register derivative default implementation for protocol requirements
 

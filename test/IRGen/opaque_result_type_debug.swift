@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-library-evolution -disable-availability-checking -emit-module -emit-module-path %t/opaque_result_type_debug_other.swiftmodule -module-name opaque_result_type_debug_other -enable-anonymous-context-mangled-names %s -DLIBRARY
-// RUN: %target-swift-frontend -disable-availability-checking -g -emit-ir -enable-anonymous-context-mangled-names %s -DCLIENT -I %t | %FileCheck %s
+// RUN: %target-swift-frontend -enable-library-evolution -target %target-swift-5.1-abi-triple -emit-module -emit-module-path %t/opaque_result_type_debug_other.swiftmodule -module-name opaque_result_type_debug_other -enable-anonymous-context-mangled-names %s -DLIBRARY
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -g -emit-ir -enable-anonymous-context-mangled-names %s -DCLIENT -I %t | %FileCheck %s
 
 #if LIBRARY
 
