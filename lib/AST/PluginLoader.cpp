@@ -83,18 +83,17 @@ PluginLoader::getPluginMap() {
   // Helper function to try inserting an entry if there's no existing entry
   // associated with the module name.
   auto try_emplace = [&](StringRef moduleName, StringRef libPath,
-                         StringRef execPath) {
+                         StringRef execPath, bool overwrite = false) {
     auto moduleNameIdentifier = Ctx.getIdentifier(moduleName);
-    if (map.find(moduleNameIdentifier) != map.end()) {
-      // Specified module name is already in the map.
+    if (map.find(moduleNameIdentifier) != map.end() && !overwrite) {
+      // Specified module name is already in the map and no need to overwrite
+      // the current value.
       return;
     }
 
     libPath = libPath.empty() ? "" : Ctx.AllocateCopy(libPath);
     execPath = execPath.empty() ? "" : Ctx.AllocateCopy(execPath);
-    auto result = map.insert({moduleNameIdentifier, {libPath, execPath}});
-    assert(result.second);
-    (void)result;
+    map[moduleNameIdentifier] = {libPath, execPath};
   };
 
   auto fs = getPluginLoadingFS(Ctx);
@@ -148,6 +147,18 @@ PluginLoader::getPluginMap() {
           try_emplace(moduleName, libPath, val.ServerPath);
         }
       }
+      continue;
+    }
+
+    // '-load-resolved-plugin <library path>#<server path>#<module name>,...'.
+    case PluginSearchOption::Kind::ResolvedPluginConfig: {
+      auto &val = entry.get<PluginSearchOption::ResolvedPluginConfig>();
+      // Respect resolved plugin config above other search path, and it can
+      // overwrite plugins found by other options or previous resolved
+      // configuration.
+      for (auto &moduleName : val.ModuleNames)
+        try_emplace(moduleName, val.LibraryPath, val.ExecutablePath,
+                    /*overwrite*/ true);
       continue;
     }
     }

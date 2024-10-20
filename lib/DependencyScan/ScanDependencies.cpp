@@ -159,25 +159,6 @@ parseBatchScanInputFile(ASTContext &ctx, StringRef batchInputPath,
   return result;
 }
 
-static void removeMacroSearchPaths(std::vector<std::string> &cmd) {
-  // Macro search path options.
-  static const llvm::StringSet<> macroSearchOptions = {
-      "-plugin-path",
-      "-external-plugin-path",
-      "-load-plugin-library",
-      "-load-plugin-executable",
-      "-in-process-plugin-server-path",
-  };
-
-  // Remove macro search path option and its argument.
-  for (auto it = cmd.begin(); it != cmd.end();) {
-    if (macroSearchOptions.contains(*it) && it + 1 != cmd.end())
-      it = cmd.erase(it, it + 2);
-    else
-      ++it;
-  }
-}
-
 class ExplicitModuleDependencyResolver {
 public:
   ExplicitModuleDependencyResolver(
@@ -300,6 +281,13 @@ private:
     for (auto &macro : macros)
       depInfo.addMacroDependency(
           macro.first(), macro.second.LibraryPath, macro.second.ExecutablePath);
+
+    for (auto &macro : depInfo.getMacroDependencies()) {
+      std::string arg = macro.second.LibraryPath + "#" +
+                        macro.second.ExecutablePath + "#" + macro.first;
+      commandline.push_back("-load-resolved-plugin");
+      commandline.push_back(arg);
+    }
 
     // Update CAS dependencies.
     if (auto err = collectCASDependencies(depInfo))
@@ -528,11 +516,6 @@ private:
     // Update build command line.
     if (resolvingDepInfo.isSwiftInterfaceModule() ||
         resolvingDepInfo.isSwiftSourceModule()) {
-      // If there are no external macro dependencies, drop all plugin search
-      // paths.
-      if (resolvingDepInfo.getMacroDependencies().empty() && macros.empty())
-        removeMacroSearchPaths(commandline);
-
       // Update with casfs option.
       for (auto rootID : rootIDs) {
         commandline.push_back("-cas-fs");
