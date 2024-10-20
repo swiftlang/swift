@@ -2249,9 +2249,11 @@ function Build-ArgumentParser($Arch) {
 }
 
 function Build-Driver($Arch) {
+  $DriverBinaryCache = Get-HostProjectBinaryCache Driver
+  $CompilersBinaryCache = Get-HostProjectBinaryCache Compilers
   Build-CMakeProject `
     -Src $SourceCache\swift-driver `
-    -Bin (Get-HostProjectBinaryCache Driver) `
+    -Bin $DriverBinaryCache `
     -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
     -Arch $Arch `
     -Platform Windows `
@@ -2267,9 +2269,19 @@ function Build-Driver($Arch) {
       SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.46.0\usr\include";
       SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.46.0\usr\lib\SQLite3.lib";
       SWIFT_DRIVER_BUILD_TOOLS = "YES";
-      LLVM_DIR = "$(Get-HostProjectBinaryCache Compilers)\lib\cmake\llvm";
-      Clang_DIR = "$(Get-HostProjectBinaryCache Compilers)\lib\cmake\clang";
-      Swift_DIR = "$(Get-HostProjectBinaryCache Compilers)\tools\swift\lib\cmake\swift";
+      LLVM_DIR = "$CompilersBinaryCache\lib\cmake\llvm";
+      Clang_DIR = "$CompilersBinaryCache\lib\cmake\clang";
+      Swift_DIR = "$CompilersBinaryCache\tools\swift\lib\cmake\swift";
+    }
+
+    if ($ToBatch) { return }
+
+    # Install the driver binaries into the compiler binary cache, allowing it to be used by swiftc.
+    $BinsToInstall = @("swift-driver.exe", "swift-help.exe", "swift-build-sdk-interfaces.exe")
+
+    for ($i = 0; $i -lt $BinsToInstall.Length; $i++) {
+      $DriverBin = $BinsToInstall[$i]
+      Copy-Item -Force ([IO.Path]::Combine($DriverBinaryCache, "bin", $DriverBin)) ([IO.Path]::Combine($CompilersBinaryCache, "bin", $DriverBin))
     }
 }
 
