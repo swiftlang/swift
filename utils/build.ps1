@@ -601,7 +601,7 @@ function Invoke-VsDevShell($Arch) {
   if ($ToBatch) {
     Write-Output "call `"$VSInstallRoot\Common7\Tools\VsDevCmd.bat`" $DevCmdArguments"
   } else {
-    # This dll path is valid for VS2019 and VS2022, but it was under a vsdevcmd subfolder in VS2017 
+    # This dll path is valid for VS2019 and VS2022, but it was under a vsdevcmd subfolder in VS2017
     Import-Module "$VSInstallRoot\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
     Enter-VsDevShell -VsInstallPath $VSInstallRoot -SkipAutomaticLocation -DevCmdArguments $DevCmdArguments
 
@@ -621,7 +621,7 @@ function Invoke-VsDevShell($Arch) {
       $env:INCLUDE += ";$WinSDKIncludePath"
       $env:LIB += ";$WinSDKVerLibRoot\ucrt\$($Arch.ShortName);$WinSDKVerLibRoot\um\$($Arch.ShortName)"
       $env:LIBPATH += ";$env:WindowsLibPath"
-      $env:PATH += ";$env:WindowsSdkVerBinPath\$($Arch.ShortName);$env:WindowsSdkBinPath\$($Arch.ShortName)"
+      $env:Path += ";$env:WindowsSdkVerBinPath\$($Arch.ShortName);$env:WindowsSdkBinPath\$($Arch.ShortName)"
       $env:UCRTVersion = $WinSDKVersionRevisionZero
       $env:UniversalCRTSdkDir = $CustomWinSDKRoot
     }
@@ -1319,7 +1319,7 @@ function Build-WiXProject() {
   $ProductVersionArg = $ProductVersion
   if (-not $Bundle) {
     # WiX v4 will accept a semantic version string for Bundles,
-    # but Packages still require a purely numerical version number, 
+    # but Packages still require a purely numerical version number,
     # so trim any semantic versioning suffixes
     $ProductVersionArg = [regex]::Replace($ProductVersion, "[-+].*", "")
   }
@@ -1421,6 +1421,10 @@ function Build-Compilers() {
     } else {
       Get-HostProjectBinaryCache Compilers
     }
+
+    $RuntimeBinaryCache = Get-TargetProjectBinaryCache $Arch Runtime
+    $CMarkGFMDLLDir="$($BuildArch.BinaryCache)\cmark-gfm-0.29.0.gfm.13\src"
+    $PythonDLLDir="$BinaryCache\Python$HostArchName-$PythonVersion\tools"
     $BuildTools = Join-Path -Path (Get-BuildProjectBinaryCache BuildTools) -ChildPath bin
 
     if ($TestClang -or $TestLLD -or $TestLLDB -or $TestLLVM -or $TestSwift) {
@@ -1435,7 +1439,94 @@ function Build-Compilers() {
 
       if ($TestClang) { $Targets += @("check-clang") }
       if ($TestLLD) { $Targets += @("check-lld") }
-      if ($TestLLDB) { $Targets += @("check-lldb") }
+      if ($TestLLDB) {
+        $Targets += @("check-lldb")
+
+        function Select-LitTestOverrides {
+          param([string] $TestStatus)
+
+          $MatchingLines=(Get-Content $PSScriptRoot/windows-llvm-lit-test-overrides.txt | Select-String -Pattern "`^${TestStatus}.*$")
+          $TestNames=$MatchingLines | ForEach-Object { ($_ -replace $TestStatus,"").Trim() }
+          return $TestNames
+        }
+
+        # Override some test results with llvm-lit.
+        $TestsToXFail=Select-LitTestOverrides "xfail"
+        $TestsToSkip=Select-LitTestOverrides "skip"
+        $env:LIT_XFAIL=$TestsToXFail -join ";"
+        $env:LIT_FILTER_OUT="($($TestsToSkip -join '|'))"
+
+        # lldb.exe loads these libraries which must be found on PATH.
+        # * swiftCore.dll
+        # * cmark-gfm.dll
+        # * python39.dll
+        # * dbghelp.dll
+        $env:Path="$RuntimeBinaryCache\bin;${env:Path}"
+        $env:Path="$CMarkGFMDLLDir;${env:Path}"
+        $env:Path="$BinaryCache\Python$HostArchName-$PythonVersion\tools;${env:Path}"
+        $env:Path="$VSInstallRoot\VC\Tools\Llvm\x64\bin;${env:Path}"
+
+        # The lldb test Python module needs these libraries.
+        # Python3.8+ doesn't search for dlls on PATH so we must copy them into the module's directory.
+        # TODO(https://github.com/llvm/llvm-project/issues/46235): Find a way to do this by modifying
+        # bindings/python.swig instead.
+        $LLDBPythonModuleDir="$CompilersBinaryCache\lib\site-packages\lldb"
+        cp $RuntimeBinaryCache\bin\swiftCore.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\SwiftBasicFormat.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\SwiftCompilerPluginMessageHandling.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\SwiftDiagnostics.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\SwiftIDEUtils.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\SwiftIfConfig.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\SwiftInProcPluginServer.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\SwiftLibraryPluginProvider.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\SwiftMacros.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\SwiftOperators.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\SwiftParser.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\SwiftParserDiagnostics.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\SwiftRefactor.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\SwiftSyntax.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\SwiftSyntaxBuilder.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\SwiftSyntaxMacroExpansion.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\SwiftSyntaxMacros.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\_CompilerSwiftBasicFormat.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\_CompilerSwiftCompilerPluginMessageHandling.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\_CompilerSwiftDiagnostics.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\_CompilerSwiftIDEUtils.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\_CompilerSwiftIfConfig.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\_CompilerSwiftLibraryPluginProvider.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\_CompilerSwiftOperators.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\_CompilerSwiftParser.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\_CompilerSwiftParserDiagnostics.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\_CompilerSwiftRefactor.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\_CompilerSwiftSyntax.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\_CompilerSwiftSyntaxBuilder.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\_CompilerSwiftSyntaxMacroExpansion.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\_CompilerSwiftSyntaxMacros.dll $LLDBPythonModuleDir
+        cp $CompilersBinaryCache\bin\_InternalSwiftScan.dll $LLDBPythonModuleDir
+        cp $CMarkGFMDLLDir\cmark-gfm.dll $LLDBPythonModuleDir
+
+        $TestingDefines += @{
+          LLDB_ENFORCE_STRICT_TEST_REQUIREMENTS = "YES";
+          # Optional LLDB deps. For testing, only Python is needed.
+          LLDB_ENABLE_PYTHON = "YES";
+          LLDB_ENABLE_LIBEDIT = "NO";
+          LLDB_ENABLE_CURSES = "NO";
+          LLDB_ENABLE_LZMA = "NO";
+          LLDB_ENABLE_LIBXML2 = "NO";
+          LLDB_ENABLE_LUA = "NO";
+          # These are passed to LLDB's dotest.py.
+          # Watchpoint tests fail on windows. See https://github.com/llvm/llvm-project/issues/22140.
+          # LLDB's python module requires Swift runtimelibs and cmark-gfm.dll.
+          LLDB_TEST_USER_ARGS = "--skip-category=watchpoint";
+          LLVM_ENABLE_PROJECTS = "clang;clang-tools-extra;lld;lldb";
+          LLVM_ENABLE_DIA_SDK = "YES";
+          # gtest sharding breaks llvm-lit's --xfail and LIT_XFAIL inputs. See https://github.com/llvm/llvm-project/issues/102264.
+          LLVM_LIT_ARGS = "-v --no-gtest-sharding --show-xfail --show-unsupported";
+
+          # LLDB Unit tests link against this library.
+          LLVM_UNITTEST_LINK_FLAGS = "$($Arch.SDKInstallRoot)\usr\lib\swift\windows\$($Arch.LLVMName)\swiftCore.lib";
+        }
+      }
       if ($TestLLVM) { $Targets += @("check-llvm") }
       if ($TestSwift) { $Targets += @("check-swift", "SwiftCompilerPlugin") }
     } else {
@@ -1497,6 +1588,8 @@ function Build-Compilers() {
         SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE = "$SourceCache\swift-syntax";
         SWIFT_PATH_TO_STRING_PROCESSING_SOURCE = "$SourceCache\swift-experimental-string-processing";
         SWIFT_PATH_TO_SWIFT_SDK = (Get-PinnedToolchainSDK);
+        CMAKE_C_COMPILER_LAUNCHER = "ccache";
+        CMAKE_CXX_COMPILER_LAUNCHER = "ccache";
         "cmark-gfm_DIR" = "$($Arch.ToolchainInstallRoot)\usr\lib\cmake";
       })
   }
