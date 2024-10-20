@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -debug-constraints -disable-availability-checking 2>%t.err
+// RUN: %target-typecheck-verify-swift -debug-constraints -target %target-swift-5.1-abi-triple 2>%t.err
 // RUN: %FileCheck %s < %t.err
 
 protocol P<Output> {

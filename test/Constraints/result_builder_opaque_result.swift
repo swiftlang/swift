@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -typecheck -verify %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -typecheck -verify %s
 
 protocol Taggable {}
 extension String: Taggable {}

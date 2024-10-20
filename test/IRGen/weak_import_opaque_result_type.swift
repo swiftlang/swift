@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/weak_import_opaque_result_type_helper.swiftmodule -parse-as-library %S/Inputs/weak_import_opaque_result_type_helper.swift -enable-library-evolution -disable-availability-checking
-// RUN: %target-swift-frontend -disable-type-layout -disable-availability-checking -primary-file %s -I %t -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/weak_import_opaque_result_type_helper.swiftmodule -parse-as-library %S/Inputs/weak_import_opaque_result_type_helper.swift -enable-library-evolution -target %target-swift-5.1-abi-triple
+// RUN: %target-swift-frontend -disable-type-layout -target %target-swift-5.1-abi-triple -primary-file %s -I %t -emit-ir | %FileCheck %s
 
 // UNSUPPORTED: OS=windows-msvc
 
