@@ -2686,7 +2686,7 @@ namespace {
           Impl.diagnoseTopLevelValue(
               DeclName(Impl.SwiftContext.getIdentifier(releaseOperation.name)));
         }
-      }else if (releaseOperation.kind ==
+      } else if (releaseOperation.kind ==
                  CustomRefCountingOperationResult::tooManyFound) {
         HeaderLoc loc(decl->getLocation());
         Impl.diagnose(loc,
@@ -3359,9 +3359,9 @@ namespace {
       // swift_attr("returns_unretained") then emit an error in the swift
       // compiler. Note: this error is not emitted in the clang compiler because
       // these attributes are used only for swift interop.
+      bool returnsRetainedAttrIsPresent = false;
+      bool returnsUnretainedAttrIsPresent = false;
       if (decl->hasAttrs()) {
-        bool returnsRetainedAttrIsPresent = false;
-        bool returnsUnretainedAttrIsPresent = false;
         for (const auto *attr : decl->getAttrs()) {
           if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
             if (swiftAttr->getAttribute() == "returns_unretained") {
@@ -3371,16 +3371,46 @@ namespace {
             }
           }
         }
+      }
 
-        if (returnsRetainedAttrIsPresent && returnsUnretainedAttrIsPresent) {
-          HeaderLoc loc(decl->getLocation());
-          Impl.diagnose(loc, diag::both_returns_retained_returns_unretained,
-                        decl);
+      HeaderLoc loc(decl->getLocation());
+      if (returnsRetainedAttrIsPresent && returnsUnretainedAttrIsPresent) {
+        Impl.diagnose(loc, diag::both_returns_retained_returns_unretained,
+                      decl);
+      }
+
+      if ((!returnsRetainedAttrIsPresent) && (!returnsUnretainedAttrIsPresent)) {
+        if (isForeignReferenceType(decl->getReturnType())) {
+          Impl.diagnose(loc, diag::no_returns_retained_returns_unretained,
+                      decl);
         }
       }
 
       return importFunctionDecl(decl, importedName, correctSwiftName,
                                 std::nullopt);
+    }
+
+    static bool isForeignReferenceType(const clang::QualType type) {
+      if (!type->isPointerType())
+        return false;
+
+      auto pointeeType =
+          dyn_cast<clang::RecordType>(type->getPointeeType().getCanonicalType());
+      if (pointeeType == nullptr)
+        return false;
+
+      return hasImportAsRefAttr(pointeeType->getDecl());
+    }
+
+    static bool hasImportAsRefAttr(const clang::RecordDecl *decl) {
+      return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
+              if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+                return swiftAttr->getAttribute() == "import_reference" ||
+                        // TODO: Remove this once libSwift hosttools no longer
+                        // requires it.
+                        swiftAttr->getAttribute() == "import_as_ref";
+              return false;
+            });
     }
 
     /// Handles special functions such as subscripts and dereference operators.
