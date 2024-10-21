@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.9-abi-triple
 
 // These test cases exercise variants of rdar://problem/112785081
 // and https://github.com/apple/swift/issues/68160.

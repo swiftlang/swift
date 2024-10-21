@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-ir %s -g -o - \
-// RUN:    -parse-as-library -module-name a -disable-availability-checking | %IRGenFileCheck %s
+// RUN:    -parse-as-library -module-name a -target %target-swift-5.9-abi-triple | %IRGenFileCheck %s
 
 public func foo<each T>(args: repeat each T) {
   // CHECK: define {{.*}} @"$s1a3foo4argsyxxQp_tRvzlF"
