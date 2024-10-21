@@ -430,9 +430,11 @@ StepResult ComponentStep::take(bool prevFailed) {
       return suspend(
           std::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
     }
-    case StepKind::Conjunction:
+    case StepKind::Conjunction: {
+      CS.retireConstraint(conjunction);
       return suspend(
           std::make_unique<ConjunctionStep>(CS, conjunction, Solutions));
+    }
     }
     llvm_unreachable("Unhandled case in switch!");
   }
