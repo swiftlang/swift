@@ -1389,9 +1389,21 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
       }
     }
 
+    APInt SpareBitsMask;
+    auto &EnumStrategy =
+        getEnumImplStrategy(IGM, DbgTy.getType()->getCanonicalType());
+
+    auto VariantOffsetInBits = 0;
+    if (auto SpareBitsMaskInfo = EnumStrategy.calculateSpareBitsMask()) {
+      SpareBitsMask = SpareBitsMaskInfo->bits;
+      // The offset of the variant mask in the overall enum.
+      VariantOffsetInBits = SpareBitsMaskInfo->byteOffset * 8;
+    }
+
     auto VPTy = DBuilder.createVariantPart(
         Scope, {}, File, Line, SizeInBits, AlignInBits, Flags, nullptr,
-        DBuilder.getOrCreateArray(Elements), /*UniqueIdentifier=*/"");
+        DBuilder.getOrCreateArray(Elements), /*UniqueIdentifier=*/"",
+        VariantOffsetInBits, SpareBitsMask);
 
     auto DITy = DBuilder.createStructType(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, nullptr,
