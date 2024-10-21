@@ -41,10 +41,14 @@ namespace {
 struct TransformOptions {
   bool LogScopeEvents;
   bool LogFunctionParameters;
+  bool SelectiveTransform;
 
-  TransformOptions(const PlaygroundOptionSet &opts) :
-    LogScopeEvents(opts.contains(PlaygroundOption::ScopeEvents)),
-    LogFunctionParameters(opts.contains(PlaygroundOption::FunctionParameters)) {}
+  TransformOptions(const PlaygroundOptionSet &opts)
+      : LogScopeEvents(opts.contains(PlaygroundOption::ScopeEvents)),
+        LogFunctionParameters(
+            opts.contains(PlaygroundOption::FunctionParameters)),
+        SelectiveTransform(
+            opts.contains(PlaygroundOption::SelectiveTransform)) {}
 };
 
 class Instrumenter : InstrumenterBase {
@@ -957,8 +961,12 @@ void swift::performPlaygroundTransform(SourceFile &SF, PlaygroundOptionSet Opts)
 
     PreWalkAction walkToDeclPre(Decl *D) override {
       if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
+        // If SelectiveTransform is enabled, only select annotated functions.
+        bool isSelected =
+            (!Options.SelectiveTransform ||
+             FD->getAttrs().hasAttribute<PlaygroundTransformedAttr>());
         // Skip any functions that do not have user-written source code.
-        if (!FD->isImplicit() && !FD->isBodySkipped() &&
+        if (isSelected && !FD->isImplicit() && !FD->isBodySkipped() &&
             !FD->isInMacroExpansionInContext()) {
           if (BraceStmt *Body = FD->getBody()) {
             const ParameterList *PL = FD->getParameters();
@@ -972,7 +980,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, PlaygroundOptionSet Opts)
           }
         }
       } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
-        if (!TLCD->isImplicit()) {
+        if (!Options.SelectiveTransform && !TLCD->isImplicit()) {
           if (BraceStmt *Body = TLCD->getBody()) {
             Instrumenter I(ctx, TLCD, RNG, Options, TmpNameIndex);
             BraceStmt *NewBody = I.transformBraceStmt(Body, nullptr, true);
