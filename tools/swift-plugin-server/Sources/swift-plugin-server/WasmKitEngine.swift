@@ -22,7 +22,9 @@ struct WasmKitEngine: WasmEngine {
   private let functions: [String: Function]
 
   init(path: FilePath, imports: WASIBridgeToHost) throws {
-    self.engine = Engine()
+    var configuration = EngineConfiguration()
+    configuration.stackSize = 1 << 20
+    self.engine = Engine(configuration: configuration)
     let store = Store(engine: engine)
 
     let module = try parseWasm(filePath: path)
