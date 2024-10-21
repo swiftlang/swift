@@ -71,8 +71,63 @@ bool AvailabilityContext::PlatformInfo::constrainRange(const Decl *decl) {
   return false;
 }
 
+bool AvailabilityContext::PlatformInfo::constrainUnavailability(
+    const Decl *decl) {
+  auto &ctx = decl->getASTContext();
+  auto *attr = decl->getAttrs().getUnavailable(ctx);
+  if (!attr)
+    return false;
+
+  // Check whether the decl's unavailability reason is the same.
+  if (IsUnavailable && UnavailablePlatform == attr->Platform)
+    return false;
+
+  // Check whether the decl's unavailability reason is more specific.
+  if (attr->Platform != PlatformKind::none &&
+      inheritsAvailabilityFromPlatform(attr->Platform, UnavailablePlatform))
+    return false;
+
+  IsUnavailable = true;
+  UnavailablePlatform = attr->Platform;
+  return true;
+}
+
+bool AvailabilityContext::PlatformInfo::constrainDeprecated(const Decl *decl) {
+  auto &ctx = decl->getASTContext();
+  if (IsDeprecated || !decl->getAttrs().isDeprecated(ctx))
+    return false;
+
+  IsDeprecated = true;
+  return true;
+}
+
+bool AvailabilityContext::PlatformInfo::isContainedIn(
+    const PlatformInfo &other) const {
+  if (!Range.isContainedIn(other.Range))
+    return false;
+
+  if (!IsUnavailable && other.IsUnavailable)
+    return false;
+
+  if (IsUnavailable && other.IsUnavailable) {
+    if (UnavailablePlatform != other.UnavailablePlatform &&
+        UnavailablePlatform != PlatformKind::none &&
+        !inheritsAvailabilityFromPlatform(UnavailablePlatform,
+                                          other.UnavailablePlatform))
+      return false;
+  }
+
+  if (!IsDeprecated && other.IsDeprecated)
+    return false;
+
+  return true;
+}
+
 const AvailabilityContext *AvailabilityContext::getDefault(ASTContext &ctx) {
-  PlatformInfo platformInfo{AvailabilityRange::forInliningTarget(ctx)};
+  PlatformInfo platformInfo{AvailabilityRange::forInliningTarget(ctx),
+                            PlatformKind::none,
+                            /*IsUnavailable*/ false,
+                            /*IsDeprecated*/ false};
   return AvailabilityContext::get(platformInfo, ctx);
 }
 
@@ -94,12 +149,44 @@ AvailabilityContext::constrainWithDeclAndPlatformRange(
   bool isConstrained = false;
   isConstrained |= platformAvailability.constrainRange(decl);
   isConstrained |= platformAvailability.constrainRange(platformRange);
+  isConstrained |= platformAvailability.constrainUnavailability(decl);
+  isConstrained |= platformAvailability.constrainDeprecated(decl);
 
   if (!isConstrained)
     return this;
 
   return get(platformAvailability, decl->getASTContext());
 }
+
+bool AvailabilityContext::isContainedIn(
+    const AvailabilityContext *other) const {
+  if (!PlatformAvailability.isContainedIn(other->PlatformAvailability))
+    return false;
+
+  return true;
+}
+
+static std::string
+stringForAvailability(const AvailabilityRange &availability) {
+  if (availability.isAlwaysAvailable())
+    return "all";
+  if (availability.isKnownUnreachable())
+    return "none";
+
+  return availability.getVersionString();
+}
+
+void AvailabilityContext::print(llvm::raw_ostream &os) const {
+  os << "version=" << stringForAvailability(getPlatformRange());
+
+  if (auto unavailablePlatform = getUnavailablePlatformKind())
+    os << " unavailable=" << platformString(*unavailablePlatform);
+
+  if (isDeprecated())
+    os << " deprecated";
+}
+
+void AvailabilityContext::dump() const { print(llvm::errs()); }
 
 void AvailabilityContext::Profile(llvm::FoldingSetNodeID &id) const {
   PlatformAvailability.Profile(id);

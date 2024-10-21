@@ -311,6 +311,33 @@ func testStringInterpolation() {
     """
 }
 
+// CHECK-NEXT: {{^}}  (decl_implicit version=50 unavailable=macOS decl=unavailableOnMacOS()
+// CHECK-NEXT: {{^}}    (decl_implicit version=50 unavailable=macOS decl=x
+
+@available(macOS, unavailable)
+func unavailableOnMacOS() {
+  let x = 1
+}
+
+// CHECK-NEXT: {{^}}  (decl_implicit version=50 deprecated decl=deprecatedOnMacOS()
+// CHECK-NEXT: {{^}}    (decl_implicit version=50 deprecated decl=x
+
+@available(macOS, deprecated)
+func deprecatedOnMacOS() {
+  let x = 1
+}
+
+// CHECK-NEXT: {{^}}  (decl_implicit version=50 decl=extension.SomeEnum
+// CHECK-NEXT: {{^}}    (decl_implicit version=50 unavailable=macOS decl=extension.SomeEnum
+// CHECK-NEXT: {{^}}      (decl_implicit version=50 unavailable=macOS decl=propertyInUnavailableExtension
+// CHECK-NEXT: {{^}}        (decl version=52 unavailable=macOS decl=propertyInUnavailableExtension
+
+@available(macOS, unavailable)
+extension SomeEnum {
+  @available(OSX 52, *)
+  var propertyInUnavailableExtension: Int { 1 }
+}
+
 // CHECK-NEXT: {{^}}  (decl version=51 decl=FinalDecl
 
 @available(OSX 51, *)
