@@ -20,6 +20,7 @@
 #define SWIFT_DEMANGLING_DEMANGLE_H
 
 #include "swift/Demangling/Errors.h"
+#include "swift/Demangling/ManglingFlavor.h"
 #include "swift/Demangling/NamespaceMacros.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
@@ -673,15 +674,17 @@ public:
 };
 
 /// Remangle a demangled parse tree.
-ManglingErrorOr<std::string> mangleNode(NodePointer root);
+ManglingErrorOr<std::string> mangleNode(NodePointer root,
+                                        Mangle::ManglingFlavor Flavor);
 
-using SymbolicResolver =
-  llvm::function_ref<Demangle::NodePointer (SymbolicReferenceKind,
-                                            const void *)>;
+using SymbolicResolver = llvm::function_ref<Demangle::NodePointer(
+    SymbolicReferenceKind, const void *)>;
 
 /// Remangle a demangled parse tree, using a callback to resolve
 /// symbolic references.
-ManglingErrorOr<std::string> mangleNode(NodePointer root, SymbolicResolver resolver);
+ManglingErrorOr<std::string> mangleNode(NodePointer root,
+                                        SymbolicResolver resolver,
+                                        Mangle::ManglingFlavor Flavor);
 
 /// Remangle a demangled parse tree, using a callback to resolve
 /// symbolic references.
@@ -690,7 +693,8 @@ ManglingErrorOr<std::string> mangleNode(NodePointer root, SymbolicResolver resol
 /// alive as long as the returned string is used.
 ManglingErrorOr<llvm::StringRef> mangleNode(NodePointer root,
                                             SymbolicResolver resolver,
-                                            NodeFactory &Factory);
+                                            NodeFactory &Factory,
+                                            Mangle::ManglingFlavor Flavor);
 
 /// Remangle in the old mangling scheme.
 ///
@@ -812,7 +816,8 @@ llvm::StringRef makeSymbolicMangledNameStringRef(const char *base);
 /// referenced by its module and type name.
 std::string mangledNameForTypeMetadataAccessor(llvm::StringRef moduleName,
                                                llvm::StringRef typeName,
-                                               Node::Kind typeKind);
+                                               Node::Kind typeKind,
+                                               Mangle::ManglingFlavor Flavor);
 
 SWIFT_END_INLINE_NAMESPACE
 } // end namespace Demangle

@@ -11,10 +11,10 @@ public class MySubClass: MyClass {
   override func foo() { }
 }
 
-// CHECK: @"$s4main7MyClassCN" = {{.*}}<{ ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr null, ptr @"$s4main7MyClassCfD", ptr null, ptr @"$s4main7MyClassC3fooyyF", ptr @"$s4main7MyClassC3baryyF", ptr @swift_deletedMethodError }>
-// CHECK: @"$s4main10MySubClassCN" = {{.*}}<{ ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr @"$s4main7MyClassCN", ptr @"$s4main10MySubClassCfD", ptr null, ptr @"$s4main10MySubClassC3fooyyF", ptr @"$s4main7MyClassC3baryyF", ptr @"$s4main10MySubClassCACycfC" }>
+// CHECK: @"$e4main7MyClassCN" = {{.*}}<{ ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr null, ptr @"$e4main7MyClassCfD", ptr null, ptr @"$e4main7MyClassC3fooyyF", ptr @"$e4main7MyClassC3baryyF", ptr @swift_deletedMethodError }>
+// CHECK: @"$e4main10MySubClassCN" = {{.*}}<{ ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr @"$e4main7MyClassCN", ptr @"$e4main10MySubClassCfD", ptr null, ptr @"$e4main10MySubClassC3fooyyF", ptr @"$e4main7MyClassC3baryyF", ptr @"$e4main10MySubClassCACycfC" }>
 
-// CHECK: define {{.*}}void @"$s4main4test1xyAA7MyClassC_tF"(ptr %0)
+// CHECK: define {{.*}}void @"$e4main4test1xyAA7MyClassC_tF"(ptr %0)
 public func test(x: MyClass) {
 
   x.foo() // goes through the vtable
@@ -24,15 +24,15 @@ public func test(x: MyClass) {
   // CHECK: call swiftcc void %3(ptr swiftself %0)
 
   x.bar() // does not go through the vtable
-  // CHECK: call swiftcc void @"$s4main7MyClassC3baryyF"
+  // CHECK: call swiftcc void @"$e4main7MyClassC3baryyF"
 
   let y = MySubClass()
-  // CHECK: call swiftcc ptr @"$s4main10MySubClassCACycfC"
+  // CHECK: call swiftcc ptr @"$e4main10MySubClassCACycfC"
 
   y.foo() // does not go through the vtable
-  // CHECK: call swiftcc void @"$s4main10MySubClassC3fooyyF"
+  // CHECK: call swiftcc void @"$e4main10MySubClassC3fooyyF"
 
   y.bar() // does not go through the vtable
-  // CHECK: call swiftcc void @"$s4main7MyClassC3baryyF"
+  // CHECK: call swiftcc void @"$e4main7MyClassC3baryyF"
 
 }

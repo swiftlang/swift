@@ -740,7 +740,7 @@ public:
       // FIXME: It'd be nice to share the mangler or even memoize mangled names,
       //        but we'd have to stop using `llvm::array_pod_sort()` so that we
       //        could capture some outside state.
-      Mangle::ASTMangler mangler;
+      Mangle::ASTMangler mangler((*lhs)->getASTContext());
       auto getMangledName = [&](const Decl *D) {
         auto VD = dyn_cast<ValueDecl>(D);
         if (!VD && isa<ExtensionDecl>(D))
@@ -956,10 +956,10 @@ public:
         if (nmtd->isGeneric()) {
           auto genericSignature =
               nmtd->getGenericSignature().getCanonicalSignature();
-          ClangSyntaxPrinter(os).printGenericSignature(genericSignature);
+          ClangSyntaxPrinter(nmtd->getASTContext(), os).printGenericSignature(genericSignature);
         }
         os << "class ";
-        ClangSyntaxPrinter(os).printBaseName(vd);
+        ClangSyntaxPrinter(nmtd->getASTContext(), os).printBaseName(vd);
         os << " { } SWIFT_UNAVAILABLE_MSG(\"";
 
         auto diag =
@@ -1018,7 +1018,7 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
   os << "#undef SWIFT_SYMBOL\n";
   os << "#endif\n";
   os << "#define SWIFT_SYMBOL(usrValue) SWIFT_SYMBOL_MODULE_USR(\"";
-  ClangSyntaxPrinter(os).printBaseName(&M);
+  ClangSyntaxPrinter(M.getASTContext(), os).printBaseName(&M);
   os << "\", usrValue)\n";
 
   // FIXME: Use getRequiredAccess once @expose is supported.
@@ -1034,7 +1034,7 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
     os << "#endif\n";
     os << "#include <new>\n";
     // Embed an overlay for the standard library.
-    ClangSyntaxPrinter(moduleOS).printIncludeForShimHeader(
+    ClangSyntaxPrinter(M.getASTContext(), moduleOS).printIncludeForShimHeader(
         "_SwiftStdlibCxxOverlay.h");
     // Ignore typos in Swift stdlib doc comments.
     os << "#pragma clang diagnostic push\n";
@@ -1055,9 +1055,9 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
       os << "#endif\n";
     os << "#ifdef __cplusplus\n";
     os << "namespace ";
-    ClangSyntaxPrinter(os).printBaseName(&M);
+    ClangSyntaxPrinter(M.getASTContext(), os).printBaseName(&M);
     os << " SWIFT_PRIVATE_ATTR";
-    ClangSyntaxPrinter(os).printSymbolUSRAttribute(&M);
+    ClangSyntaxPrinter(M.getASTContext(), os).printSymbolUSRAttribute(&M);
     os << " {\n";
     os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << " {\n";
     os << "extern \"C\" {\n";
@@ -1075,8 +1075,8 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
   os << "#pragma clang diagnostic push\n";
   os << "#pragma clang diagnostic ignored \"-Wreserved-identifier\"\n";
   // Construct a C++ namespace for the module.
-  ClangSyntaxPrinter(os).printNamespace(
-      [&](raw_ostream &os) { ClangSyntaxPrinter(os).printBaseName(&M); },
+  ClangSyntaxPrinter(M.getASTContext(), os).printNamespace(
+      [&](raw_ostream &os) { ClangSyntaxPrinter(M.getASTContext(), os).printBaseName(&M); },
       [&](raw_ostream &os) { os << moduleOS.str(); },
       ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate, &M);
   os << "#pragma clang diagnostic pop\n";

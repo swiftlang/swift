@@ -1694,7 +1694,7 @@ static llvm::Value *emitPartialApplicationForwarder(
   if (staticFnPtr)
     FnName = staticFnPtr->getName(IGM);
 
-  IRGenMangler Mangler;
+  IRGenMangler Mangler(IGM.Context);
   std::string thunkName = Mangler.manglePartialApplyForwarder(FnName);
 
   // FIXME: Maybe cache the thunk by function and closure types?.

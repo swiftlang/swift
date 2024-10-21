@@ -88,7 +88,7 @@ static SILInstruction *getConstant(SILValue V) {
 static std::string getClonedName(PartialApplyInst *PAI,
                                  SerializedKind_t Serialized, SILFunction *F) {
   auto P = Demangle::SpecializationPass::CapturePropagation;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(P, Serialized, F);
+  Mangle::FunctionSignatureSpecializationMangler Mangler(F->getASTContext(), P, Serialized, F);
 
   // We know that all arguments are literal insts.
   unsigned argIdx = ApplySite(PAI).getCalleeArgIndexOfFirstAppliedArg();

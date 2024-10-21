@@ -1067,7 +1067,7 @@ std::optional<std::string> TypeRef::mangle(Demangle::Demangler &Dem) const {
   auto global = Dem.createNode(Node::Kind::Global);
   global->addChild(node, Dem);
 
-  auto mangling = mangleNode(global);
+  auto mangling = mangleNode(global, Mangle::ManglingFlavor::Default);
   if (!mangling.isSuccess())
     return {};
   return mangling.result();

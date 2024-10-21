@@ -6000,7 +6000,7 @@ static void diagnoseUnstableName(ProtocolConformance *conformance,
     // Note: this is intentionally using the Swift 3 mangling,
     // to provide compatibility with archives created in the Swift 3
     // time frame.
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(classDecl->getASTContext());
     std::string mangledName = mangler.mangleObjCRuntimeName(classDecl);
     assert(Lexer::isIdentifier(mangledName) &&
            "mangled name is not an identifier; can't use @objc");

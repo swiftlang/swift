@@ -376,7 +376,7 @@ void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
 
   auto targetDecl = cast<AbstractFunctionDecl>(accessorRef.getDecl());
 
-  IRGenMangler mangler;
+  IRGenMangler mangler(Context);
 
   addAccessibleFunction(AccessibleFunction::forDistributed(
       mangler.mangleDistributedThunkRecord(targetDecl),

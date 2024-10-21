@@ -39,13 +39,13 @@ static inline StringRef getUSRSpacePrefix() {
 
 bool ide::printTypeUSR(Type Ty, raw_ostream &OS) {
   assert(!Ty->hasArchetype() && "cannot have contextless archetypes mangled.");
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(Ty->getASTContext());
   OS << Mangler.mangleTypeAsUSR(Ty->getRValueType());
   return false;
 }
 
 bool ide::printDeclTypeUSR(const ValueDecl *D, raw_ostream &OS) {
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(D->getASTContext());
   std::string MangledName = Mangler.mangleDeclType(D);
   OS << MangledName;
   return false;
@@ -254,7 +254,7 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
       }))
     return std::string();
 
-  Mangle::ASTMangler NewMangler;
+  Mangle::ASTMangler NewMangler(D->getASTContext());
   return NewMangler.mangleDeclAsUSR(D, getUSRSpacePrefix());
 }
 
@@ -276,7 +276,7 @@ swift::MangleLocalTypeDeclRequest::evaluate(Evaluator &evaluator,
   if (isa<ModuleDecl>(D))
     return std::string(); // Ignore.
 
-  Mangle::ASTMangler NewMangler;
+  Mangle::ASTMangler NewMangler(D->getASTContext());
   return NewMangler.mangleLocalTypeDecl(D);
 }
 
@@ -320,7 +320,7 @@ bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
     return printObjCUSRForAccessor(SD, AccKind, OS);
   }
 
-  Mangle::ASTMangler NewMangler;
+  Mangle::ASTMangler NewMangler(D->getASTContext());
   std::string Mangled = NewMangler.mangleAccessorEntityAsUSR(AccKind,
                           SD, getUSRSpacePrefix(), SD->isStatic());
 

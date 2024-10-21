@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/ManglingFlavor.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/CommandLine.h"
@@ -160,9 +161,16 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
     os << "Demangling for " << name << '\n';
     os << getNodeTreeAsString(pointer);
   }
+
+  swift::Mangle::ManglingFlavor ManglingFlavor = swift::Mangle::ManglingFlavor::Default;
+  if (name.starts_with(MANGLING_PREFIX_EMBEDDED_STR)) {
+    ManglingFlavor = swift::Mangle::ManglingFlavor::Embedded;
+  }
+
   if (RemangleMode) {
     std::string remangled;
     if (!pointer || !(name.starts_with(MANGLING_PREFIX_STR) ||
+                      name.starts_with(MANGLING_PREFIX_EMBEDDED_STR) ||
                       name.starts_with("_S"))) {
       // Just reprint the original mangled name if it didn't demangle or is in
       // the old mangling scheme.
@@ -170,7 +178,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       // mangling and demangling tests.
       remangled = name.str();
     } else {
-      auto mangling = swift::Demangle::mangleNode(pointer);
+      auto mangling = swift::Demangle::mangleNode(pointer, ManglingFlavor);
       if (!mangling.isSuccess()) {
         llvm::errs() << "Error: (" << mangling.error().code << ":"
                      << mangling.error().line << ") unable to re-mangle "
@@ -218,7 +226,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
         llvm::errs() << "Error: unable to de-mangle " << name << '\n';
         exit(1);
       }
-      auto mangling = swift::Demangle::mangleNode(pointer);
+      auto mangling = swift::Demangle::mangleNode(pointer, ManglingFlavor);
       if (!mangling.isSuccess()) {
         llvm::errs() << "Error: (" << mangling.error().code << ":"
                      << mangling.error().line << ") unable to re-mangle "
@@ -231,7 +239,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
     }
     if (StripSpecialization) {
       stripSpecialization(pointer);
-      auto mangling = swift::Demangle::mangleNode(pointer);
+      auto mangling = swift::Demangle::mangleNode(pointer, ManglingFlavor);
       if (!mangling.isSuccess()) {
         llvm::errs() << "Error: (" << mangling.error().code << ":"
                      << mangling.error().line << ") unable to re-mangle "

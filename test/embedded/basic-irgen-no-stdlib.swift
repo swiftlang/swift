@@ -22,13 +22,13 @@ public func main() {
   start(p: Concrete())
 }
 
-// CHECK-LABEL: define {{.*}}void @"$s4main8ConcreteVACycfC"()
+// CHECK-LABEL: define {{.*}}void @"$e4main8ConcreteVACycfC"()
 
-// CHECK-LABEL: define {{.*}}void @"$s4main5start1pyx_tAA6PlayerRzlFAA8ConcreteV_Tg5"()
+// CHECK-LABEL: define {{.*}}void @"$e4main5start1pyx_tAA6PlayerRzlFAA8ConcreteV_Tg5"()
 
-// CHECK-LABEL: define {{.*}}void @"$s4mainAAyyF"()
+// CHECK-LABEL: define {{.*}}void @"$e4mainAAyyF"()
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    call swiftcc void @"$s4main8ConcreteVACycfC"()
-// CHECK-NEXT:    call swiftcc void @"$s4main5start1pyx_tAA6PlayerRzlFAA8ConcreteV_Tg5"()
+// CHECK-NEXT:    call swiftcc void @"$e4main8ConcreteVACycfC"()
+// CHECK-NEXT:    call swiftcc void @"$e4main5start1pyx_tAA6PlayerRzlFAA8ConcreteV_Tg5"()
 // CHECK-NEXT:    ret void
 // CHECK-NEXT:  }

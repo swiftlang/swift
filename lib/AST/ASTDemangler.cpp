@@ -256,7 +256,7 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     auto definingDecl = opaqueDescriptor->getChild(0);
     auto definingGlobal = Factory.createNode(Node::Kind::Global);
     definingGlobal->addChild(definingDecl, Factory);
-    auto mangling = mangleNode(definingGlobal);
+    auto mangling = mangleNode(definingGlobal, ManglingFlavor);
     if (!mangling.isSuccess())
       return Type();
     auto mangledName = mangling.result();
@@ -1260,7 +1260,7 @@ ASTBuilder::findDeclContext(NodePointer node) {
         return nullptr;
 
       // Look up the local type by its mangling.
-      auto mangling = Demangle::mangleNode(node);
+      auto mangling = Demangle::mangleNode(node, ManglingFlavor);
       if (!mangling.isSuccess())
         return nullptr;
       auto mangledName = mangling.result();

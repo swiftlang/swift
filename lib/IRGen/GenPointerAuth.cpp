@@ -332,12 +332,12 @@ static llvm::ConstantInt *getDiscriminatorForString(IRGenModule &IGM,
 }
 
 static std::string mangle(AssociatedType association) {
-  return IRGenMangler()
+  return IRGenMangler(association.getAssociation()->getASTContext())
     .mangleAssociatedTypeAccessFunctionDiscriminator(association);
 }
 
 static std::string mangle(const AssociatedConformance &association) {
-  return IRGenMangler()
+  return IRGenMangler(association.getAssociatedRequirement()->getASTContext())
     .mangleAssociatedTypeWitnessTableAccessFunctionDiscriminator(association);
 }
 
@@ -503,7 +503,7 @@ static void hashStringForType(IRGenModule &IGM, CanType Ty, raw_ostream &Out,
     // For generic and non-generic value types, use the mangled declaration
     // name, and ignore all generic arguments.
     NominalTypeDecl *nominal = cast<NominalTypeDecl>(GTy->getDecl());
-    Out << Mangle::ASTMangler().mangleNominalType(nominal);
+    Out << Mangle::ASTMangler(IGM.Context).mangleNominalType(nominal);
   } else if (auto FTy = dyn_cast<SILFunctionType>(Ty)) {
     Out << "(";
     hashStringForFunctionType(IGM, FTy, Out, genericEnv);

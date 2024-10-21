@@ -18,5 +18,5 @@ public func copy(_ a: inout [MyStruct]) {
   var a = a
 }
 
-// CHECK: define {{.*}}@"$s4mainAAyyF"
-// CHECK: define {{.*}}@"$s4main4copyyySayAA8MyStructVGzF"
+// CHECK: define {{.*}}@"$e4mainAAyyF"
+// CHECK: define {{.*}}@"$e4main4copyyySayAA8MyStructVGzF"

@@ -29,9 +29,9 @@ using namespace swift;
 
 /// Print out the C type name of a struct/enum declaration.
 static void printCTypeName(raw_ostream &os, const NominalTypeDecl *type) {
-  ClangSyntaxPrinter printer(os);
+  ClangSyntaxPrinter printer(type->getASTContext(), os);
   printer.printModuleNameCPrefix(*type->getParentModule());
-  if (!ClangSyntaxPrinter(os).printNestedTypeNamespaceQualifiers(type))
+  if (!ClangSyntaxPrinter(type->getASTContext(), os).printNestedTypeNamespaceQualifiers(type))
     os << "::";
   printer.printBaseName(type);
 }
@@ -39,20 +39,21 @@ static void printCTypeName(raw_ostream &os, const NominalTypeDecl *type) {
 /// Print out the C++ type name of a struct/enum declaration.
 static void printCxxTypeName(raw_ostream &os, const NominalTypeDecl *type,
                              const ModuleDecl *moduleContext) {
-  ClangSyntaxPrinter(os).printPrimaryCxxTypeName(type, moduleContext);
+  ClangSyntaxPrinter(type->getASTContext(), os).printPrimaryCxxTypeName(type, moduleContext);
 }
 
 void ClangValueTypePrinter::printCxxImplClassName(raw_ostream &os,
                                                   const NominalTypeDecl *type) {
   os << "_impl_";
-  ClangSyntaxPrinter(os).printBaseName(type);
+  ClangSyntaxPrinter(type->getASTContext(), os).printBaseName(type);
 }
 
 void ClangValueTypePrinter::printMetadataAccessAsVariable(
+    const ASTContext &Context,
     raw_ostream &os, StringRef metadataFuncName,
     ArrayRef<GenericRequirement> genericRequirements, int indent,
     StringRef varName) {
-  ClangSyntaxPrinter printer(os);
+  ClangSyntaxPrinter printer(Context, os);
   os << std::string(indent, ' ') << "auto " << varName << " = "
      << cxx_synthesis::getCxxImplNamespaceName() << "::";
   printer.printSwiftTypeMetadataAccessFunctionCall(metadataFuncName,
@@ -61,11 +62,12 @@ void ClangValueTypePrinter::printMetadataAccessAsVariable(
 }
 
 void ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
+    const ASTContext &Context,
     raw_ostream &os, StringRef metadataFuncName,
     ArrayRef<GenericRequirement> genericRequirements, int indent,
     StringRef metadataVarName, StringRef vwTableVarName) {
-  ClangSyntaxPrinter printer(os);
-  printMetadataAccessAsVariable(os, metadataFuncName, genericRequirements,
+  ClangSyntaxPrinter printer(Context, os);
+  printMetadataAccessAsVariable(Context, os, metadataFuncName, genericRequirements,
                                 indent, metadataVarName);
   printer.printValueWitnessTableAccessSequenceFromTypeMetadata(
       metadataVarName, vwTableVarName, indent);
@@ -85,19 +87,19 @@ printCValueTypeStorageStruct(raw_ostream &os, const NominalTypeDecl *typeDecl,
 void ClangValueTypePrinter::forwardDeclType(
     raw_ostream &os, const NominalTypeDecl *typeDecl,
     DeclAndTypePrinter &declAndTypePrinter) {
-  ClangSyntaxPrinter(os).printParentNamespaceForNestedTypes(
+  ClangSyntaxPrinter(typeDecl->getASTContext(), os).printParentNamespaceForNestedTypes(
       typeDecl, [&](raw_ostream &) {
         if (typeDecl->isGeneric()) {
           auto genericSignature =
               typeDecl->getGenericSignature().getCanonicalSignature();
-          ClangSyntaxPrinter(os).printGenericSignature(genericSignature);
+          ClangSyntaxPrinter(typeDecl->getASTContext(), os).printGenericSignature(genericSignature);
         }
 
         os << "class";
         declAndTypePrinter.printAvailability(os, typeDecl);
-        ClangSyntaxPrinter(os).printSymbolUSRAttribute(typeDecl);
+        ClangSyntaxPrinter(typeDecl->getASTContext(), os).printSymbolUSRAttribute(typeDecl);
         os << ' ';
-        ClangSyntaxPrinter(os).printBaseName(typeDecl);
+        ClangSyntaxPrinter(typeDecl->getASTContext(), os).printBaseName(typeDecl);
         os << ";\n";
       });
   printTypePrecedingGenericTraits(os, typeDecl, typeDecl->getModuleContext());
@@ -149,16 +151,16 @@ static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
     cPrologueOS << "SWIFT_EXTERN swift_interop_stub_Swift_String "
                    "$sSS7cStringSSSPys4Int8VG_tcfC("
                    "const char * _Nonnull) SWIFT_NOEXCEPT SWIFT_CALL;\n";
-    printer.printObjCBlock([](raw_ostream &os) {
+    printer.printObjCBlock([&](raw_ostream &os) {
       os << "  ";
-      ClangSyntaxPrinter(os).printInlineForThunk();
+      ClangSyntaxPrinter(typeDecl->getASTContext(), os).printInlineForThunk();
       os << "operator NSString * _Nonnull () const noexcept {\n";
       os << "    return (__bridge_transfer NSString "
             "*)(_impl::$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF(_impl::swift_interop_"
             "passDirect_Swift_String(_getOpaquePointer())));\n";
       os << "  }\n";
       os << "static ";
-      ClangSyntaxPrinter(os).printInlineForThunk();
+      ClangSyntaxPrinter(typeDecl->getASTContext(), os).printInlineForThunk();
       os << "String init(NSString * _Nonnull nsString) noexcept {\n";
       os << "    auto result = _make();\n";
       os << "    auto res = "
@@ -188,12 +190,12 @@ void ClangValueTypePrinter::printValueTypeDecl(
   auto printGenericSignature = [&](raw_ostream &os) {
     if (!genericSignature)
       return;
-    ClangSyntaxPrinter(os).printGenericSignature(genericSignature);
+    ClangSyntaxPrinter(Context, os).printGenericSignature(genericSignature);
   };
   auto printGenericParamRefs = [&](raw_ostream &os) {
     if (!genericSignature)
       return;
-    ClangSyntaxPrinter(os).printGenericSignatureParams(genericSignature);
+    ClangSyntaxPrinter(Context, os).printGenericSignatureParams(genericSignature);
   };
   if (typeDecl->isGeneric()) {
     genericSignature = typeDecl->getGenericSignature();
@@ -215,13 +217,13 @@ void ClangValueTypePrinter::printValueTypeDecl(
 
   auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadataAccessFunction(
       typeDecl->getDeclaredType()->getCanonicalType());
-  std::string typeMetadataFuncName = typeMetadataFunc.mangleAsString();
+  std::string typeMetadataFuncName = typeMetadataFunc.mangleAsString(typeDecl->getASTContext());
   auto typeMetadataFuncGenericParams =
       interopContext.getIrABIDetails()
           .getTypeMetadataAccessFunctionGenericRequirementParameters(
               const_cast<NominalTypeDecl *>(typeDecl));
 
-  ClangSyntaxPrinter printer(os);
+  ClangSyntaxPrinter printer(Context, os);
   printer.printParentNamespaceForNestedTypes(typeDecl, [&](raw_ostream &os) {
     // Print out a forward declaration of the "hidden" _impl class.
     printer.printNamespace(
@@ -258,10 +260,10 @@ void ClangValueTypePrinter::printValueTypeDecl(
                                         StringRef vwTableName = "vwTable",
                                         StringRef enumVWTableName =
                                             "enumVWTable") {
-      ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
+      ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(Context,
           os, typeMetadataFuncName, typeMetadataFuncGenericParams);
       os << "    const auto *" << enumVWTableName << " = reinterpret_cast<";
-      ClangSyntaxPrinter(os).printSwiftImplQualifier();
+      ClangSyntaxPrinter(Context, os).printSwiftImplQualifier();
       os << "EnumValueWitnessTable";
       os << " *>(" << vwTableName << ");\n";
     };
@@ -270,13 +272,13 @@ void ClangValueTypePrinter::printValueTypeDecl(
     printGenericSignature(os);
     os << "class";
     declAndTypePrinter.printAvailability(os, typeDecl);
-    ClangSyntaxPrinter(os).printSymbolUSRAttribute(typeDecl);
+    ClangSyntaxPrinter(Context, os).printSymbolUSRAttribute(typeDecl);
     os << ' ';
-    ClangSyntaxPrinter(os).printBaseName(typeDecl);
+    ClangSyntaxPrinter(Context, os).printBaseName(typeDecl);
     os << " final {\n";
     os << "public:\n";
     if (genericSignature)
-      ClangSyntaxPrinter(os).printGenericSignatureInnerStaticAsserts(
+      ClangSyntaxPrinter(Context, os).printGenericSignatureInnerStaticAsserts(
           genericSignature);
 
     // Print out the destructor.
@@ -285,7 +287,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << '~';
     printer.printBaseName(typeDecl);
     os << "() noexcept {\n";
-    ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
+    ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(Context,
         os, typeMetadataFuncName, typeMetadataFuncGenericParams);
     os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
     os << "  }\n";
@@ -297,7 +299,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << "(const ";
     printer.printBaseName(typeDecl);
     os << " &other) noexcept {\n";
-    ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
+    ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(Context,
         os, typeMetadataFuncName, typeMetadataFuncGenericParams);
     if (isOpaqueLayout) {
       os << "    _storage = ";
@@ -317,7 +319,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << " &operator =(const ";
     printer.printBaseName(typeDecl);
     os << " &other) noexcept {\n";
-    ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
+    ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(Context,
         os, typeMetadataFuncName, typeMetadataFuncGenericParams);
     os << "    vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char "
           "*>(other._getOpaquePointer()), metadata._0);\n";
@@ -380,7 +382,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << " _make() noexcept {";
     if (isOpaqueLayout) {
       os << "\n";
-      ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
+      ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(Context,
           os, typeMetadataFuncName, typeMetadataFuncGenericParams);
       os << "    return ";
       printer.printBaseName(typeDecl);
@@ -463,18 +465,18 @@ void ClangValueTypePrinter::printValueTypeDecl(
           os << " {\n";
           os << "public:\n";
           if (genericSignature)
-            ClangSyntaxPrinter(os).printGenericSignatureInnerStaticAsserts(
+            ClangSyntaxPrinter(Context, os).printGenericSignatureInnerStaticAsserts(
                 genericSignature);
 
           os << "  static ";
-          ClangSyntaxPrinter(os).printInlineForThunk();
+          ClangSyntaxPrinter(Context, os).printInlineForThunk();
           os << "char * _Nonnull getOpaquePointer(";
           printCxxTypeName(os, typeDecl, moduleContext);
           printGenericParamRefs(os);
           os << " &object) { return object._getOpaquePointer(); }\n";
 
           os << "  static ";
-          ClangSyntaxPrinter(os).printInlineForThunk();
+          ClangSyntaxPrinter(Context, os).printInlineForThunk();
           os << "const char * _Nonnull getOpaquePointer(const ";
           printCxxTypeName(os, typeDecl, moduleContext);
           printGenericParamRefs(os);
@@ -482,7 +484,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
 
           os << "  template<class T>\n";
           os << "  static ";
-          ClangSyntaxPrinter(os).printInlineForHelperFunction();
+          ClangSyntaxPrinter(Context, os).printInlineForHelperFunction();
           printCxxTypeName(os, typeDecl, moduleContext);
           printGenericParamRefs(os);
           os << " returnNewValue(T callable) {\n";
@@ -495,11 +497,11 @@ void ClangValueTypePrinter::printValueTypeDecl(
           os << "  }\n";
           // Print out helper function for initializeWithTake
           os << "  static ";
-          ClangSyntaxPrinter(os).printInlineForThunk();
+          ClangSyntaxPrinter(Context, os).printInlineForThunk();
           os << "void initializeWithTake(char * _Nonnull "
                 "destStorage, char * _Nonnull srcStorage) {\n";
           ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
-              os, typeMetadataFuncName, typeMetadataFuncGenericParams);
+              Context, os, typeMetadataFuncName, typeMetadataFuncGenericParams);
           os << "    vwTable->initializeWithTake(destStorage, srcStorage, "
                 "metadata._0);\n";
           os << "  }\n";
@@ -541,9 +543,9 @@ void ClangValueTypePrinter::printValueTypeReturnType(
       printCxxTypeName(os, type, moduleContext);
     else {
       assert(typeUse == TypeUseKind::CxxImplTypeName);
-      ClangSyntaxPrinter(os).printBaseName(type->getModuleContext());
+      ClangSyntaxPrinter(Context, os).printBaseName(type->getModuleContext());
       os << "::";
-      if (!ClangSyntaxPrinter(os).printNestedTypeNamespaceQualifiers(type))
+      if (!ClangSyntaxPrinter(Context, os).printNestedTypeNamespaceQualifiers(type))
         os << "::";
       os << cxx_synthesis::getCxxImplNamespaceName() << "::";
       printCxxImplClassName(os, type);
@@ -574,7 +576,7 @@ void ClangValueTypePrinter::printClangTypeSwiftGenericTraits(
     return;
   auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadataAccessFunction(
       typeDecl->getDeclaredInterfaceType()->getCanonicalType());
-  std::string typeMetadataFuncName = typeMetadataFunc.mangleAsString();
+  std::string typeMetadataFuncName = typeMetadataFunc.mangleAsString(typeDecl->getASTContext());
   printTypeGenericTraits(os, typeDecl, typeMetadataFuncName,
                          /*typeMetadataFuncRequirements=*/{}, moduleContext,
                          declAndTypePrinter);
@@ -584,7 +586,7 @@ void ClangValueTypePrinter::printTypePrecedingGenericTraits(
     raw_ostream &os, const NominalTypeDecl *typeDecl,
     const ModuleDecl *moduleContext) {
   assert(!typeDecl->hasClangNode());
-  ClangSyntaxPrinter printer(os);
+  ClangSyntaxPrinter printer(typeDecl->getASTContext(), os);
   // FIXME: avoid popping out of the module's namespace here.
   os << "} // end namespace \n\n";
   os << "namespace swift SWIFT_PRIVATE_ATTR {\n";
@@ -624,16 +626,16 @@ void ClangValueTypePrinter::printTypeGenericTraits(
     const ModuleDecl *moduleContext, DeclAndTypePrinter &declAndTypePrinter,
     bool isOpaqueLayout) {
   auto *NTD = dyn_cast<NominalTypeDecl>(typeDecl);
-  ClangSyntaxPrinter printer(os);
+  ClangSyntaxPrinter printer(typeDecl->getASTContext(), os);
   // FIXME: avoid popping out of the module's namespace here.
   os << "} // end namespace \n\n";
   os << "namespace swift SWIFT_PRIVATE_ATTR {\n";
 
   if (typeDecl->hasClangNode()) {
     /// Print a reference to the type metadata function for a C++ type.
-    ClangSyntaxPrinter(os).printNamespace(
+    ClangSyntaxPrinter(typeDecl->getASTContext(), os).printNamespace(
         cxx_synthesis::getCxxImplNamespaceName(), [&](raw_ostream &os) {
-          ClangSyntaxPrinter(os).printCTypeMetadataTypeFunction(
+          ClangSyntaxPrinter(typeDecl->getASTContext(), os).printCTypeMetadataTypeFunction(
               typeDecl, typeMetadataFuncName, typeMetadataFuncRequirements);
         });
   }
@@ -661,7 +663,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   }
   os << "> {\n";
   os << "  static ";
-  ClangSyntaxPrinter(os).printInlineForHelperFunction();
+  ClangSyntaxPrinter(typeDecl->getASTContext(), os).printInlineForHelperFunction();
   os << "void * _Nonnull getTypeMetadata() {\n";
   os << "    return ";
   if (!typeDecl->hasClangNode()) {
@@ -671,7 +673,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   if (!printer.printNestedTypeNamespaceQualifiers(typeDecl))
     os << "::";
   os << cxx_synthesis::getCxxImplNamespaceName() << "::";
-  ClangSyntaxPrinter(os).printSwiftTypeMetadataAccessFunctionCall(
+  ClangSyntaxPrinter(typeDecl->getASTContext(), os).printSwiftTypeMetadataAccessFunctionCall(
       typeMetadataFuncName, typeMetadataFuncRequirements);
   os << "._0;\n";
   os << "  }\n};\n";

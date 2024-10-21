@@ -1684,7 +1684,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
     linearMapInfo->getLinearMapTupleLoweredType(origEntry).getASTType();
   dfParams.push_back({dfTupleType, ParameterConvention::Direct_Owned});
 
-  Mangle::DifferentiationMangler mangler;
+  Mangle::DifferentiationMangler mangler(module.getASTContext());
   auto diffName = mangler.mangleLinearMap(
       witness->getOriginalFunction()->getName(),
       AutoDiffLinearMapKind::Differential, witness->getConfig());

@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_ASTMANGLER_H
 #define SWIFT_AST_ASTMANGLER_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
 #include "swift/AST/SILThunkKind.h"
@@ -44,6 +45,7 @@ enum class DestructorKind {
 /// The mangler for AST declarations.
 class ASTMangler : public Mangler {
 protected:
+  const ASTContext &Context;
   ModuleDecl *Mod = nullptr;
 
   /// Optimize out protocol names if a type only conforms to one protocol.
@@ -186,12 +188,17 @@ public:
   };
 
   /// lldb overrides the defaulted argument to 'true'.
-  ASTMangler(bool DWARFMangling = false) {
+  ASTMangler(const ASTContext &Ctx, bool DWARFMangling = false) : Context(Ctx) {
     if (DWARFMangling) {
       DWARFMangling = true;
       RespectOriginallyDefinedIn = false;
     }
+    Flavor = Ctx.LangOpts.hasFeature(Feature::Embedded)
+                 ? ManglingFlavor::Embedded
+                 : ManglingFlavor::Default;
   }
+
+  const ASTContext &getASTContext() { return Context; }
 
   void addTypeSubstitution(Type type, GenericSignature sig) {
     type = dropProtocolsFromAssociatedTypes(type, sig);

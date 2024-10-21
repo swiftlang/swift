@@ -575,7 +575,7 @@ void ASTMangler::appendIndexSubset(IndexSubset *indices) {
 
 static NodePointer mangleSILDifferentiabilityWitnessAsNode(
     StringRef originalName, DifferentiabilityKind kind,
-    const AutoDiffConfig &config, Demangler &demangler) {
+    const AutoDiffConfig &config, Demangler &demangler, ASTMangler *mangler) {
   auto *diffWitnessNode = demangler.createNode(
       Node::Kind::DifferentiabilityWitness);
   auto origNode = demangler.demangleSymbol(originalName);
@@ -596,7 +596,7 @@ static NodePointer mangleSILDifferentiabilityWitnessAsNode(
           Node::Kind::IndexSubset, config.resultIndices->getString()),
       demangler);
   if (auto genSig = config.derivativeGenericSignature) {
-    ASTMangler genSigMangler;
+    ASTMangler genSigMangler(mangler->getASTContext());
     auto genSigSymbol = genSigMangler.mangleGenericSignature(genSig);
     auto demangledGenSig = demangler.demangleSymbol(genSigSymbol);
     assert(demangledGenSig);
@@ -616,8 +616,8 @@ std::string ASTMangler::mangleSILDifferentiabilityWitness(StringRef originalName
   if (isMangledName(originalName)) {
     Demangler demangler;
     auto *node = mangleSILDifferentiabilityWitnessAsNode(
-        originalName, kind, config, demangler);
-    auto mangling = mangleNode(node);
+        originalName, kind, config, demangler, this);
+    auto mangling = mangleNode(node, Flavor);
     if (!mangling.isSuccess()) {
       llvm_unreachable("unexpected mangling failure");
     }
@@ -875,7 +875,7 @@ ASTMangler::mangleAnyDecl(const ValueDecl *Decl,
   // We have a custom prefix, so finalize() won't verify for us. If we're not
   // in invalid code (coming from an IDE caller) verify manually.
   if (!Decl->isInvalid())
-    verify(Storage.str());
+    verify(Storage.str(), Flavor);
   return finalize();
 }
 
@@ -895,7 +895,7 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
   // We have a custom prefix, so finalize() won't verify for us. If we're not
   // in invalid code (coming from an IDE caller) verify manually.
   if (!decl->isInvalid())
-    verify(Storage.str().drop_front(USRPrefix.size()));
+    verify(Storage.str().drop_front(USRPrefix.size()), Flavor);
   return finalize();
 }
 

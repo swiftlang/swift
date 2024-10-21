@@ -7888,7 +7888,7 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
   if (referencesAnonymousContext(node))
     return;
 
-  auto mangling = Demangle::mangleNode(node);
+  auto mangling = Demangle::mangleNode(node, Mangle::ManglingFlavor::Default);
   if (!mangling.isSuccess()) {
     swift::warning(RuntimeErrorFlagNone,
                    "Metadata mangled name failed to roundtrip: %p couldn't be mangled\n",

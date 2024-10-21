@@ -433,6 +433,9 @@ static std::string adjustMacroExpansionBufferName(StringRef name) {
   if (name.starts_with(MANGLING_PREFIX_STR)) {
     result += MACRO_EXPANSION_BUFFER_MANGLING_PREFIX;
     name = name.drop_front(StringRef(MANGLING_PREFIX_STR).size());
+  } else if (name.starts_with(MANGLING_PREFIX_EMBEDDED_STR)) {
+    result += MACRO_EXPANSION_BUFFER_MANGLING_PREFIX;
+    name = name.drop_front(StringRef(MANGLING_PREFIX_EMBEDDED_STR).size());
   }
 
   result += name;
@@ -1084,7 +1087,7 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
     if (!discriminatorStr.empty())
       return discriminatorStr.str();
 #if SWIFT_BUILD_SWIFT_SYNTAX
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(macro->getASTContext());
     return mangler.mangleMacroExpansion(expansion);
 #else
     return "";
@@ -1393,7 +1396,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     if (!discriminatorStr.empty())
       return discriminatorStr.str();
 #if SWIFT_BUILD_SWIFT_SYNTAX
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(attachedTo->getASTContext());
     return mangler.mangleAttachedMacroExpansion(attachedTo, attr, role);
 #else
     return "";

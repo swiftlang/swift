@@ -25,7 +25,7 @@ public func catching1() {
 
 // CHECK-EXISTENTIALS: error: cannot use a value of protocol type 'any Error' in embedded Swift
 
-// CHECK-TRAPS-SIL:      sil @$s4main9throwing1SiyKF : $@convention(thin) () -> (Int, @error any Error) {
+// CHECK-TRAPS-SIL:      sil @$e4main9throwing1SiyKF : $@convention(thin) () -> (Int, @error any Error) {
 // CHECK-TRAPS-SIL-NEXT: bb0:
 // CHECK-TRAPS-SIL-NEXT:   debug_value
 // CHECK-TRAPS-SIL-NEXT:   %1 = integer_literal $Builtin.Int1, -1
@@ -34,9 +34,9 @@ public func catching1() {
 // CHECK-TRAPS-SIL-NEXT: }
 
 
-// CHECK-TRAPS-IR:      define {{.*}}@"$s4main9throwing1SiyKF"{{.*}}{
+// CHECK-TRAPS-IR:      define {{.*}}@"$e4main9throwing1SiyKF"{{.*}}{
 // CHECK-TRAPS-IR-NEXT: entry:
 // CHECK-TRAPS-IR:        call void @llvm.trap()
 // CHECK-TRAPS-IR-NEXT:   unreachable
 // CHECK-TRAPS-IR-NEXT: }
-// CHECK-TRAPS-IR:      define {{.*}}@"$s4main9catching1yyF"{{.*}}{
+// CHECK-TRAPS-IR:      define {{.*}}@"$e4main9catching1yyF"{{.*}}{

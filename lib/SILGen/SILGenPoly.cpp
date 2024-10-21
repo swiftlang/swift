@@ -5905,7 +5905,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   // Get the thunk name.
   auto fromInterfaceType = fromType->mapTypeOutOfContext()->getCanonicalType();
   auto toInterfaceType = toType->mapTypeOutOfContext()->getCanonicalType();
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(getASTContext());
   std::string name;
   // If `self` is being reordered, it is an AD-specific self-reordering
   // reabstraction thunk.
@@ -6269,7 +6269,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
       LookUpConformanceInModule(), derivativeCanGenSig);
   assert(!thunkFnTy->getExtInfo().hasContext());
 
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(getASTContext());
   auto name = getASTContext()
       .getIdentifier(
           mangler.mangleAutoDiffDerivativeFunction(originalAFD, kind, config))
