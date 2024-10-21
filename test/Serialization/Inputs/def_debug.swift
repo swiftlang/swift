@@ -6,18 +6,22 @@ public func foo(x: UInt64) -> UInt64 {
     return 1
 }
 
-
-/* Swift tries to lookup for
-   `generic specialization <serialized, Swift.Int> of Swift.Hasher.combine<A
-   where A: Swift.Hashable>(A) -> ()` which is only referenced by debug info in
-   the stdlib.  Make sure compiler handles this correctly and does not crash
-   when trying to compile this
- */
-
-@inlinable
-@inline(__always)
+@_transparent
 public func specializedGenericInlined() -> Int {
-    var hasher = Hasher()
-    hasher.combine(1)
-    return hasher.finalize()
+    return id(1)
+}
+
+@_transparent
+@inline(__always)
+public func id<T: Equatable>(_ x: T) -> T{
+    return x
+}
+
+@_alwaysEmitIntoClient
+public func barGeneric<T: Numeric>(_ x: [T], sum: T) -> T {
+    var temp = sum
+    for i in x {
+        temp += i
+    }
+    return temp
 }
