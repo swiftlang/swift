@@ -69,7 +69,6 @@ CLOSURE_CHANGE(RecordedPreconcurrencyClosure)
 CONSTRAINT_CHANGE(DisabledConstraint)
 CONSTRAINT_CHANGE(FavoredConstraint)
 CONSTRAINT_CHANGE(GeneratedConstraint)
-CONSTRAINT_CHANGE(RetiredConstraint)
 
 GRAPH_NODE_CHANGE(AddedConstraint)
 GRAPH_NODE_CHANGE(RemovedConstraint)
@@ -97,8 +96,9 @@ CHANGE(RecordedCaseLabelItemInfo)
 CHANGE(RecordedPotentialThrowSite)
 CHANGE(RecordedIsolatedParam)
 CHANGE(RecordedKeyPath)
+CHANGE(RetiredConstraint)
 
-LAST_CHANGE(RecordedKeyPath)
+LAST_CHANGE(RetiredConstraint)
 
 #undef LOCATOR_CHANGE
 #undef EXPR_CHANGE
