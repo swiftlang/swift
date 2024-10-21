@@ -74,7 +74,8 @@ class FoundationTests(product.Product):
             '--toolchain', self.install_toolchain_path(host_target),
             '--configuration', self.configuration(),
             '--scratch-path', self.build_dir,
-            '--package-path', package_path
+            '--package-path', package_path,
+            '--parallel',
         ]
         if self.args.verbose_build:
             cmd.append('--verbose')
