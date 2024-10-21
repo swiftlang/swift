@@ -19,6 +19,7 @@
 #include "ForeignRepresentationInfo.h"
 #include "SubstitutionMapStorage.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/ConformanceLookup.h"
