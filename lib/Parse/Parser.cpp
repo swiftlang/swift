@@ -1132,9 +1132,9 @@ struct ParserUnit::Implementation {
   std::unique_ptr<Parser> TheParser;
 
   Implementation(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
-                 const LangOptions &Opts, const TypeCheckerOptions &TyOpts,
-                 const SILOptions &silOpts, StringRef ModuleName)
-      : LangOpts(Opts), TypeCheckerOpts(TyOpts), SILOpts(silOpts), Diags(SM),
+                 const LangOptions &Opts, StringRef ModuleName)
+      : LangOpts(Opts), TypeCheckerOpts(TypeCheckerOptions()),
+        SILOpts(SILOptions()), Diags(SM),
         Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts, SearchPathOpts,
                              clangImporterOpts, symbolGraphOpts, CASOpts, SM,
                              Diags)) {
@@ -1156,23 +1156,19 @@ struct ParserUnit::Implementation {
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
                        unsigned BufferID)
-    : ParserUnit(SM, SFKind, BufferID, LangOptions(), TypeCheckerOptions(),
-                 SILOptions(), "input") {}
+    : ParserUnit(SM, SFKind, BufferID, LangOptions(), "input") {}
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
                        unsigned BufferID, const LangOptions &LangOpts,
-                       const TypeCheckerOptions &TypeCheckOpts,
-                       const SILOptions &SILOpts, StringRef ModuleName)
-    : Impl(*new Implementation(SM, SFKind, BufferID, LangOpts, TypeCheckOpts,
-                               SILOpts, ModuleName)) {
+                       StringRef ModuleName)
+    : Impl(*new Implementation(SM, SFKind, BufferID, LangOpts, ModuleName)) {
   Impl.TheParser.reset(new Parser(BufferID, *Impl.SF, /*SIL=*/nullptr,
                                   /*PersistentState=*/nullptr));
 }
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
                        unsigned BufferID, unsigned Offset, unsigned EndOffset)
-    : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(),
-                               TypeCheckerOptions(), SILOptions(), "input")) {
+    : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(), "input")) {
 
   std::unique_ptr<Lexer> Lex;
   Lex.reset(new Lexer(Impl.LangOpts, SM,
