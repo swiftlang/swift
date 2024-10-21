@@ -458,7 +458,8 @@ llvm::Constant *irgen::emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
   if (IGM.canMakeStaticObjectReadOnly(OI->getType())) {
     if (!IGM.swiftImmortalRefCount) {
       if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
-        // = HeapObject.immortalRefCount
+        // = HeapObject.immortalRefCount | HeapObject.doNotFreeBit
+        // 0xffff_ffff on 32-bit, 0xffff_ffff_ffff_ffff on 64-bit
         IGM.swiftImmortalRefCount = llvm::ConstantInt::get(IGM.IntPtrTy, -1);
       } else {
         IGM.swiftImmortalRefCount = llvm::ConstantExpr::getPtrToInt(
