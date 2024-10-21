@@ -380,7 +380,6 @@ extension Span where Element: ~Copyable {
   }
 }
 
-//MARK: integer offset subscripts
 @_disallowFeatureSuppression(NonescapableTypes)
 extension Span where Element: ~Copyable {
 
@@ -393,6 +392,7 @@ extension Span where Element: ~Copyable {
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
+    //FIXME: change to unsafeRawAddress or unsafeAddress when ready
     _read {
       _precondition(indices.contains(position), "index out of bounds")
       yield self[unchecked: position]
@@ -461,7 +461,7 @@ extension Span where Element: BitwiseCopyable {
   }
 }
 
-//MARK: extracting sub-spans
+//MARK: sub-spans
 @_disallowFeatureSuppression(NonescapableTypes)
 extension Span where Element: ~Copyable {
 
@@ -597,7 +597,7 @@ extension Span where Element: ~Copyable {
   }
 }
 
-//MARK: withUnsafePointer, etc.
+//MARK: UnsafeBufferPointer access hatch
 @_disallowFeatureSuppression(NonescapableTypes)
 extension Span where Element: ~Copyable  {
 
@@ -691,7 +691,7 @@ extension Span where Element: ~Copyable {
   }
 }
 
-//MARK: one-sided slicing operations
+//MARK: prefixes and suffixes
 @_disallowFeatureSuppression(NonescapableTypes)
 extension Span where Element: ~Copyable {
 
