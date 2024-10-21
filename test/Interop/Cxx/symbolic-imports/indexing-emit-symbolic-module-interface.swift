@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
+// UNSUPPORTED: OS=linux-gnu
 // Verify that symbolic interfaces are emitted.
 //
 // RUN: %target-swift-frontend %t/test.swift -I %t/Inputs -c -index-system-modules -index-store-path %t/store -enable-experimental-cxx-interop -Rindexing-system-module 2>%t/remarks

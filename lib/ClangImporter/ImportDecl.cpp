@@ -2853,6 +2853,13 @@ namespace {
               const_cast<clang::CXXRecordDecl *>(decl));
           clangSema.DefineImplicitDestructor(clang::SourceLocation(), dtor);
         }
+      } else {
+        llvm::errs() << "??? skipping generation for:\n";
+        llvm::errs() << "??? !decl->isBeingDefined(): " << !decl->isBeingDefined() << "\n";
+        llvm::errs() << "??? !decl->isDependentContext(): " << !decl->isDependentContext() << "\n";
+        llvm::errs() << "??? areRecordFieldsComplete(decl): " << areRecordFieldsComplete(decl) << "\n";
+        decl->dump(llvm::errs());
+        llvm::errs() << "\n??? =================\n";
       }
 
       // It is import that we bail on an unimportable record *before* we import

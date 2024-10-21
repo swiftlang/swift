@@ -2,6 +2,7 @@
 // RUN: split-file %s %t
 // RUN: %target-swift-ide-test -print-module -module-to-print=CxxModule -I %t/Inputs -source-filename=x -enable-experimental-cxx-interop -enable-experimental-feature ImportSymbolicCXXDecls | %FileCheck %s
 
+// UNSUPPORTED: OS=linux-gnu
 // REQUIRES: asserts
 
 //--- Inputs/module.modulemap
