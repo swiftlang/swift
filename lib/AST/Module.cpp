@@ -4004,8 +4004,27 @@ bool IsNonUserModuleRequest::evaluate(Evaluator &evaluator, ModuleDecl *mod) con
   auto sdkOrPlatform = searchPathOpts.getSDKPlatformPath(FS).value_or(sdkPath);
 
   StringRef runtimePath = searchPathOpts.RuntimeResourcePath;
-  return (!runtimePath.empty() && pathStartsWith(runtimePath, modulePath)) ||
-      (!sdkOrPlatform.empty() && pathStartsWith(sdkOrPlatform, modulePath));
+  if (!runtimePath.empty() && pathStartsWith(runtimePath, modulePath)) {
+    return true;
+  }
+  if (!sdkOrPlatform.empty() && pathStartsWith(sdkOrPlatform, modulePath)) {
+    return true;
+  }
+
+  // `getSDKPlatformPath` returns a real path but the module might have path
+  // inside a symlink pointing to that real path. To catch this case, also check
+  // whether the module's real path is inside the SDK's real path.
+  llvm::SmallString<128> moduleRealPath;
+  if (FS->getRealPath(modulePath, moduleRealPath)) {
+    modulePath = moduleRealPath;
+  }
+  if (!runtimePath.empty() && pathStartsWith(runtimePath, moduleRealPath)) {
+    return true;
+  }
+  if (!sdkOrPlatform.empty() && pathStartsWith(sdkOrPlatform, moduleRealPath)) {
+    return true;
+  }
+  return false;
 }
 
 version::Version ModuleDecl::getLanguageVersionBuiltWith() const {
