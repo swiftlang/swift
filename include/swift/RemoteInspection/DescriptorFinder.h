@@ -93,6 +93,26 @@ struct FieldDescriptorBase {
   getFieldRecords() = 0;
 };
 
+struct MultiPayloadEnumDescriptorBase {
+  virtual ~MultiPayloadEnumDescriptorBase(){};
+
+  virtual llvm::StringRef getMangledTypeName() = 0;
+
+  virtual uint32_t getContentsSizeInWords() const = 0;
+
+  virtual size_t getSizeInBytes() const = 0;
+
+  virtual uint32_t getFlags() const = 0;
+
+  virtual bool usesPayloadSpareBits() const = 0;
+
+  virtual uint32_t getPayloadSpareBitMaskByteOffset() const = 0;
+
+  virtual uint32_t getPayloadSpareBitMaskByteCount() const = 0;
+
+  virtual const uint8_t *getPayloadSpareBits() const = 0;
+
+};
 /// Interface for finding type descriptors. Implementors may provide descriptors
 /// that live inside or outside reflection metadata.
 struct DescriptorFinder {
@@ -104,6 +124,9 @@ struct DescriptorFinder {
 
   virtual std::unique_ptr<FieldDescriptorBase>
   getFieldDescriptor(const TypeRef *TR) = 0;
+
+  virtual std::unique_ptr<MultiPayloadEnumDescriptorBase>
+  getMultiPayloadEnumDescriptor(const TypeRef *TR) { abort(); };
 };
 
 } // namespace reflection
