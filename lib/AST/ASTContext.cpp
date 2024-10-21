@@ -19,7 +19,7 @@
 #include "ForeignRepresentationInfo.h"
 #include "SubstitutionMapStorage.h"
 #include "swift/ABI/MetadataValues.h"
-#include "swift/AST/AvailabilityContext.h"
+#include "swift/AST/AvailabilityContextStorage.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -594,8 +594,8 @@ struct ASTContext::Implementation {
     /// The set of substitution maps (uniqued by their storage).
     llvm::FoldingSet<SubstitutionMap::Storage> SubstitutionMaps;
 
-    /// The set of unique AvailabilityContexts.
-    llvm::FoldingSet<AvailabilityContext> AvailabilityContexts;
+    /// The set of unique AvailabilityContexts (uniqued by their storage).
+    llvm::FoldingSet<AvailabilityContext::Storage> AvailabilityContexts;
 
     ~Arena() {
       for (auto &conformance : SpecializedConformances)
@@ -5582,8 +5582,9 @@ SubstitutionMap::Storage *SubstitutionMap::Storage::get(
   return result;
 }
 
-const AvailabilityContext *
-AvailabilityContext::get(const PlatformInfo &platformInfo, ASTContext &ctx) {
+const AvailabilityContext::Storage *
+AvailabilityContext::Storage::get(const PlatformInfo &platformInfo,
+                                  ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
   platformInfo.Profile(id);
 
@@ -5594,9 +5595,9 @@ AvailabilityContext::get(const PlatformInfo &platformInfo, ASTContext &ctx) {
   if (existing)
     return existing;
 
-  void *mem =
-      ctx.Allocate(sizeof(AvailabilityContext), alignof(AvailabilityContext));
-  auto *newNode = ::new (mem) AvailabilityContext(platformInfo);
+  void *mem = ctx.Allocate(sizeof(AvailabilityContext::Storage),
+                           alignof(AvailabilityContext::Storage));
+  auto *newNode = ::new (mem) AvailabilityContext::Storage(platformInfo);
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;

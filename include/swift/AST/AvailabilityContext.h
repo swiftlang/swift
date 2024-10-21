@@ -21,7 +21,6 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/FoldingSet.h"
 #include <optional>
 
 namespace swift {
@@ -33,123 +32,70 @@ class Decl;
 /// specific scope, such as within a declaration or at a particular source
 /// location in a function body. This context is sufficient to determine whether
 /// a declaration is available or not in that scope.
-class AvailabilityContext : public llvm::FoldingSetNode {
-  /// Summarizes platform specific availability constraints.
-  struct PlatformInfo {
-    /// The introduction version.
-    AvailabilityRange Range;
+class AvailabilityContext {
+public:
+  class Storage;
 
-    /// When `IsUnavailable` is true, this value stores the broadest platform
-    /// kind for which the context is unavailable.
-    PlatformKind UnavailablePlatform;
+private:
+  struct PlatformInfo;
 
-    /// Whether or not the context is considered unavailable on the current
-    /// platform.
-    unsigned IsUnavailable : 1;
+  /// A non-null pointer to uniqued storage for this availability context.
+  const Storage *Info;
 
-    /// Whether or not the context is considered deprecated on the current
-    /// platform.
-    unsigned IsDeprecated : 1;
-
-    /// Sets `Range` to `other` if `other` is more restrictive. Returns true if
-    /// any property changed as a result of adding this constraint.
-    bool constrainRange(const AvailabilityRange &other) {
-      if (!other.isContainedIn(Range))
-        return false;
-
-      Range = other;
-      return true;
-    }
-
-    /// Sets `Range` to the platform introduction range of `decl` if that range
-    /// is more restrictive. Returns true if
-    /// any property changed as a result of adding this constraint.
-    bool constrainRange(const Decl *decl);
-
-    /// Updates `UnavailablePlatform` and `IsUnavailable` to reflect the status
-    /// of `decl` if its platform unavailability is more restrictive. Returns
-    /// true if any property changed as a result of adding this constraint.
-    bool constrainUnavailability(const Decl *decl);
-
-    /// If `decl` is deprecated, sets `IsDeprecated` to true. Returns true if
-    /// any property changed as a result of adding this constraint.
-    bool constrainDeprecated(const Decl *decl);
-
-    /// Returns true if `other` is as available or is more available.
-    bool isContainedIn(const PlatformInfo &other) const;
-
-    void Profile(llvm::FoldingSetNodeID &ID) const {
-      Range.getRawVersionRange().Profile(ID);
-      ID.AddBoolean(IsUnavailable);
-      ID.AddInteger(static_cast<uint8_t>(UnavailablePlatform));
-      ID.AddBoolean(IsDeprecated);
-    }
-  };
-  PlatformInfo PlatformAvailability;
-
-  AvailabilityContext(const PlatformInfo &platformInfo)
-      : PlatformAvailability(platformInfo){};
-
-  static const AvailabilityContext *get(const PlatformInfo &platformInfo,
-                                        ASTContext &ctx);
+  AvailabilityContext(const Storage *info) : Info(info) { assert(info); };
 
 public:
+  AvailabilityContext(const AvailabilityContext &other) : Info(other.Info){};
+
   /// Retrieves the default `AvailabilityContext`, which is maximally available.
   /// The platform availability range will be set to the deployment target (or
   /// minimum inlining target when applicable).
-  static const AvailabilityContext *getDefault(ASTContext &ctx);
+  static AvailabilityContext getDefault(ASTContext &ctx);
 
   /// Retrieves a uniqued `AvailabilityContext` with the given platform
   /// availability parameters.
-  static const AvailabilityContext *
+  static AvailabilityContext
   get(const AvailabilityRange &platformAvailability,
       std::optional<PlatformKind> unavailablePlatform, bool deprecated,
-      ASTContext &ctx) {
-    PlatformInfo platformInfo{platformAvailability,
-                              unavailablePlatform.has_value()
-                                  ? *unavailablePlatform
-                                  : PlatformKind::none,
-                              unavailablePlatform.has_value(), deprecated};
-    return get(platformInfo, ctx);
-  }
+      ASTContext &ctx);
 
   /// Returns the range of platform versions which may execute code in the
   /// availability context, starting at its introduction version.
-  AvailabilityRange getPlatformRange() const {
-    return PlatformAvailability.Range;
-  }
+  AvailabilityRange getPlatformRange() const;
 
   /// When the context is unavailable on the current platform this returns the
   /// broadest `PlatformKind` for which the context is unavailable. Otherwise,
   /// returns `nullopt`.
-  std::optional<PlatformKind> getUnavailablePlatformKind() const {
-    if (PlatformAvailability.IsUnavailable)
-      return PlatformAvailability.UnavailablePlatform;
-    return std::nullopt;
-  }
+  std::optional<PlatformKind> getUnavailablePlatformKind() const;
 
   /// Returns true if this context is deprecated on the current platform.
-  bool isDeprecated() const { return PlatformAvailability.IsDeprecated; }
+  bool isDeprecated() const;
 
-  /// Returns the unique context that is the result of constraining the current
-  /// context's platform availability range with `platformRange`.
-  const AvailabilityContext *
-  constrainWithPlatformRange(const AvailabilityRange &platformRange,
-                             ASTContext &ctx) const;
+  /// Constrain the platform availability range with `platformRange`.
+  void constrainWithPlatformRange(const AvailabilityRange &platformRange,
+                                  ASTContext &ctx);
 
-  /// Returns the unique context that is the result of constraining the current
-  /// context both with the availability attributes of `decl` and with
-  /// `platformRange`.
-  const AvailabilityContext *constrainWithDeclAndPlatformRange(
-      Decl *decl, const AvailabilityRange &platformRange) const;
+  /// Constrain the platform availability range with both the availability
+  /// attributes of `decl` and with `platformRange`.
+  void
+  constrainWithDeclAndPlatformRange(Decl *decl,
+                                    const AvailabilityRange &platformRange);
 
   /// Returns true if `other` is as available or is more available.
-  bool isContainedIn(const AvailabilityContext *other) const;
+  bool isContainedIn(const AvailabilityContext other) const;
+
+  friend bool operator==(const AvailabilityContext &lhs,
+                         const AvailabilityContext &rhs) {
+    return lhs.Info == rhs.Info;
+  }
+
+  friend bool operator!=(const AvailabilityContext &lhs,
+                         const AvailabilityContext &rhs) {
+    return lhs.Info != rhs.Info;
+  }
 
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP;
-
-  void Profile(llvm::FoldingSetNodeID &ID) const;
 };
 
 } // end namespace swift

@@ -12,6 +12,7 @@
 
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilityContextStorage.h"
 #include "swift/AST/Decl.h"
 #include "swift/Basic/Assertions.h"
 
@@ -76,29 +77,57 @@ bool AvailabilityContext::PlatformInfo::isContainedIn(
   return true;
 }
 
-const AvailabilityContext *AvailabilityContext::getDefault(ASTContext &ctx) {
+void AvailabilityContext::Storage::Profile(llvm::FoldingSetNodeID &id) const {
+  Platform.Profile(id);
+}
+
+AvailabilityContext AvailabilityContext::getDefault(ASTContext &ctx) {
   PlatformInfo platformInfo{AvailabilityRange::forInliningTarget(ctx),
                             PlatformKind::none,
                             /*IsUnavailable*/ false,
                             /*IsDeprecated*/ false};
-  return AvailabilityContext::get(platformInfo, ctx);
+  return AvailabilityContext(Storage::get(platformInfo, ctx));
 }
 
-/// Returns the unique context that is the result of constraining the current
-/// context's platform availability range with `platformRange`.
-const AvailabilityContext *AvailabilityContext::constrainWithPlatformRange(
-    const AvailabilityRange &platformRange, ASTContext &ctx) const {
-  PlatformInfo platformAvailability{PlatformAvailability};
-  if (platformAvailability.constrainRange(platformRange))
-    return get(platformAvailability, ctx);
-
-  return this;
+AvailabilityContext
+AvailabilityContext::get(const AvailabilityRange &platformAvailability,
+                         std::optional<PlatformKind> unavailablePlatform,
+                         bool deprecated, ASTContext &ctx) {
+  PlatformInfo platformInfo{platformAvailability,
+                            unavailablePlatform.has_value()
+                                ? *unavailablePlatform
+                                : PlatformKind::none,
+                            unavailablePlatform.has_value(), deprecated};
+  return AvailabilityContext(Storage::get(platformInfo, ctx));
 }
 
-const AvailabilityContext *
-AvailabilityContext::constrainWithDeclAndPlatformRange(
-    Decl *decl, const AvailabilityRange &platformRange) const {
-  PlatformInfo platformAvailability{PlatformAvailability};
+AvailabilityRange AvailabilityContext::getPlatformRange() const {
+  return Info->Platform.Range;
+}
+
+std::optional<PlatformKind>
+AvailabilityContext::getUnavailablePlatformKind() const {
+  if (Info->Platform.IsUnavailable)
+    return Info->Platform.UnavailablePlatform;
+  return std::nullopt;
+}
+
+bool AvailabilityContext::isDeprecated() const {
+  return Info->Platform.IsDeprecated;
+}
+
+void AvailabilityContext::constrainWithPlatformRange(
+    const AvailabilityRange &platformRange, ASTContext &ctx) {
+  PlatformInfo platformAvailability{Info->Platform};
+  if (!platformAvailability.constrainRange(platformRange))
+    return;
+
+  Info = Storage::get(platformAvailability, ctx);
+}
+
+void AvailabilityContext::constrainWithDeclAndPlatformRange(
+    Decl *decl, const AvailabilityRange &platformRange) {
+  PlatformInfo platformAvailability{Info->Platform};
   bool isConstrained = false;
   isConstrained |= platformAvailability.constrainRange(decl);
   isConstrained |= platformAvailability.constrainRange(platformRange);
@@ -106,14 +135,13 @@ AvailabilityContext::constrainWithDeclAndPlatformRange(
   isConstrained |= platformAvailability.constrainDeprecated(decl);
 
   if (!isConstrained)
-    return this;
+    return;
 
-  return get(platformAvailability, decl->getASTContext());
+  Info = Storage::get(platformAvailability, decl->getASTContext());
 }
 
-bool AvailabilityContext::isContainedIn(
-    const AvailabilityContext *other) const {
-  if (!PlatformAvailability.isContainedIn(other->PlatformAvailability))
+bool AvailabilityContext::isContainedIn(const AvailabilityContext other) const {
+  if (!Info->Platform.isContainedIn(other.Info->Platform))
     return false;
 
   return true;
@@ -140,7 +168,3 @@ void AvailabilityContext::print(llvm::raw_ostream &os) const {
 }
 
 void AvailabilityContext::dump() const { print(llvm::errs()); }
-
-void AvailabilityContext::Profile(llvm::FoldingSetNodeID &id) const {
-  PlatformAvailability.Profile(id);
-}
