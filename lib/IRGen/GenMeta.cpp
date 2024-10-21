@@ -3391,15 +3391,18 @@ static void emitInitializeValueMetadata(IRGenFunction &IGF,
                                         MetadataDependencyCollector *collector) {
   auto &IGM = IGF.IGM;
   auto loweredTy = IGM.getLoweredType(nominalDecl->getDeclaredTypeInContext());
+  auto &concreteTI = IGM.getTypeInfo(loweredTy);
+
   bool useLayoutStrings =
       layoutStringsEnabled(IGM) &&
       IGM.Context.LangOpts.hasFeature(
           Feature::LayoutStringValueWitnessesInstantiation) &&
-      IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation;
+      IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation &&
+      concreteTI.isCopyable(ResilienceExpansion::Maximal);
 
   if (auto sd = dyn_cast<StructDecl>(nominalDecl)) {
-    auto &fixedTI = IGM.getTypeInfo(loweredTy);
-    if (isa<FixedTypeInfo>(fixedTI)) return;
+    if (isa<FixedTypeInfo>(concreteTI))
+      return;
 
     // Use a different runtime function to initialize the value witness table
     // if the struct has a raw layout. The existing swift_initStructMetadata
