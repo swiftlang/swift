@@ -425,9 +425,11 @@ StepResult ComponentStep::take(bool prevFailed) {
     case StepKind::Binding:
       return suspend(
           std::make_unique<TypeVariableStep>(*bestBindings, Solutions));
-    case StepKind::Disjunction:
+    case StepKind::Disjunction: {
+      CS.retireConstraint(disjunction);
       return suspend(
           std::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
+    }
     case StepKind::Conjunction:
       return suspend(
           std::make_unique<ConjunctionStep>(CS, conjunction, Solutions));

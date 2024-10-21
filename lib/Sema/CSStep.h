@@ -684,7 +684,6 @@ protected:
 class DisjunctionStep final : public BindingStep<DisjunctionChoiceProducer> {
   Constraint *Disjunction;
   SmallVector<Constraint *, 4> DisabledChoices;
-  ConstraintList::iterator AfterDisjunction;
 
   std::optional<Score> BestNonGenericScore;
   std::optional<std::pair<Constraint *, Score>> LastSolvedChoice;
@@ -692,8 +691,7 @@ class DisjunctionStep final : public BindingStep<DisjunctionChoiceProducer> {
 public:
   DisjunctionStep(ConstraintSystem &cs, Constraint *disjunction,
                   SmallVectorImpl<Solution> &solutions)
-      : BindingStep(cs, {cs, disjunction}, solutions), Disjunction(disjunction),
-        AfterDisjunction(erase(disjunction)) {
+      : BindingStep(cs, {cs, disjunction}, solutions), Disjunction(disjunction) {
     assert(Disjunction->getKind() == ConstraintKind::Disjunction);
     pruneOverloadSet(Disjunction);
     ++cs.solverState->NumDisjunctions;
@@ -702,8 +700,6 @@ public:
   ~DisjunctionStep() override {
     // Rewind back any changes left after attempting last choice.
     ActiveChoice.reset();
-    // Return disjunction constraint back to the system.
-    restore(AfterDisjunction, Disjunction);
     // Re-enable previously disabled overload choices.
     for (auto *choice : DisabledChoices)
       choice->setEnabled();
