@@ -8144,7 +8144,10 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
 
       // parsingLimitedSyntax mode cannot have a body.
       if (parsingLimitedSyntax) {
-        diagnose(Tok, diag::expected_getset_in_protocol);
+        auto diag = Context.LangOpts.hasFeature(Feature::CoroutineAccessors)
+                        ? diag::expected_getreadset_in_protocol
+                        : diag::expected_getset_in_protocol;
+        diagnose(Tok, diag);
         Status |= makeParserError();
         break;
       }
@@ -8178,7 +8181,10 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
     // avoid having to deal with them everywhere.
     if (parsingLimitedSyntax && !isAllowedWhenParsingLimitedSyntax(
                                     Kind, SF.Kind == SourceFileKind::SIL)) {
-      diagnose(Loc, diag::expected_getset_in_protocol);
+      auto diag = Context.LangOpts.hasFeature(Feature::CoroutineAccessors)
+                      ? diag::expected_getreadset_in_protocol
+                      : diag::expected_getset_in_protocol;
+      diagnose(Loc, diag);
       continue;
     }
 
