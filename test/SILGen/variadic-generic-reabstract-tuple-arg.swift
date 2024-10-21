@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -disable-availability-checking %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -target %target-swift-5.9-abi-triple %s | %FileCheck %s
 
 func takeEscapingFunction<each Input, Output>(function: @escaping ((repeat each Input)) -> Output) {}
 func returnFunction<each Input, Output>(args: (repeat each Input).Type, result: Output.Type) -> (_: (repeat each Input)) -> Output {}

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.9-abi-triple
 
 func tuplify<each T>(_ t: repeat each T) -> (repeat each T) {
   return (repeat each t)

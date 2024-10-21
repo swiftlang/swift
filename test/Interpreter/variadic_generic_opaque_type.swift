@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 //
-// RUN: %target-build-swift-dylib(%t/%target-library-name(variadic_generic_opaque_type_other)) %S/Inputs/variadic_generic_opaque_type_other.swift -emit-module -emit-module-path %t/variadic_generic_opaque_type_other.swiftmodule -module-name variadic_generic_opaque_type_other -Xfrontend -disable-availability-checking -enable-library-evolution
+// RUN: %target-build-swift-dylib(%t/%target-library-name(variadic_generic_opaque_type_other)) %S/Inputs/variadic_generic_opaque_type_other.swift -emit-module -emit-module-path %t/variadic_generic_opaque_type_other.swiftmodule -module-name variadic_generic_opaque_type_other -target %target-swift-5.9-abi-triple -enable-library-evolution
 // RUN: %target-codesign %t/%target-library-name(variadic_generic_opaque_type_other)
 //
 // RUN: %target-build-swift %s -I %t -o %t/main.out -L %t %target-rpath(%t) -lvariadic_generic_opaque_type_other

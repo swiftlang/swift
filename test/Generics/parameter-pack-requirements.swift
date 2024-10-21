@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -disable-availability-checking 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -target %target-swift-5.9-abi-triple 2>&1 | %FileCheck %s
 
 protocol P {
   associatedtype A: P
