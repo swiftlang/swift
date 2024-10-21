@@ -1065,7 +1065,8 @@ private:
       auto child = Node->getChild(firstRequirement);
       if (child->getKind() == Node::Kind::Type)
         child = child->getChild(0);
-      if (child->getKind() != Node::Kind::DependentGenericParamPackMarker) {
+      if (child->getKind() != Node::Kind::DependentGenericParamPackMarker &&
+          child->getKind() != Node::Kind::DependentGenericParamValueMarker) {
         break;
       }
     }
