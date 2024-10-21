@@ -1197,12 +1197,15 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     // Open up the type of the requirement.
     reqLocator =
         cs->getConstraintLocator(req, ConstraintLocator::ProtocolRequirement);
-    OpenedTypeMap reqReplacements;
+
+    auto *innerDC = req->getInnermostDeclContext();
+    auto genericSig = innerDC->getGenericSignatureOfContext();
+    auto reqReplacements = cs->openGenericParameters(genericSig, reqLocator);
+
     reqType = cs->getTypeOfMemberReference(selfTy, req, dc,
                                            /*isDynamicResult=*/false,
                                            FunctionRefKind::DoubleApply,
-                                           reqLocator,
-                                           &reqReplacements)
+                                           reqLocator, reqReplacements)
         .adjustedReferenceType;
     reqType = reqType->getRValueType();
 

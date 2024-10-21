@@ -56,12 +56,18 @@ STATISTIC(TotalNumTypeVariables, "# of type variables created");
 #include "swift/Sema/ConstraintSolverStats.def"
 STATISTIC(LargestSolutionAttemptNumber, "# of the largest solution attempt");
 
-TypeVariableType *ConstraintSystem::createTypeVariable(
+TypeVariableType *ConstraintSystem::createTypeVariableImpl(
                                      ConstraintLocator *locator,
                                      unsigned options) {
   ++TotalNumTypeVariables;
-  auto tv = TypeVariableType::getNew(getASTContext(), assignTypeVariableID(),
-                                     locator, options);
+  return TypeVariableType::getNew(getASTContext(), assignTypeVariableID(),
+                                  locator, options);
+}
+
+TypeVariableType *ConstraintSystem::createTypeVariable(
+                                     ConstraintLocator *locator,
+                                     unsigned options) {
+  auto *tv = createTypeVariableImpl(locator, options);
   addTypeVariable(tv);
   return tv;
 }

@@ -425,15 +425,22 @@ static bool isProtocolExtensionAsSpecializedAs(DeclContext *dc1,
   // Form a constraint system where we've opened up all of the requirements of
   // the second protocol extension.
   ConstraintSystem cs(dc1, std::nullopt);
-  OpenedTypeMap replacements;
-  cs.openGeneric(dc2, sig2, ConstraintLocatorBuilder(nullptr), replacements);
+  ArrayRef<OpenedType> replacements;
+  if (sig2) {
+    replacements = cs.openGenericParameters(sig2, ConstraintLocatorBuilder(nullptr));
+    cs.introduceGenericParameters(replacements);
+    cs.openGenericRequirements(dc2, sig2, ConstraintLocatorBuilder(nullptr), replacements);
+  }
 
   // Bind the 'Self' type from the first extension to the type parameter from
   // opening 'Self' of the second extension.
   Type selfType1 = sig1.getGenericParams()[0];
   Type selfType2 = sig2.getGenericParams()[0];
+  ASSERT(selfType1->isEqual(selfType2));
+  ASSERT(replacements[0].first->isEqual(selfType2));
+
   cs.addConstraint(ConstraintKind::Bind,
-                   replacements[cast<GenericTypeParamType>(selfType2->getCanonicalType())],
+                   replacements[0].second,
                    dc1->mapTypeIntoContext(selfType1),
                    nullptr);
 
@@ -578,16 +585,21 @@ bool CompareDeclSpecializationRequest::evaluate(
 
   auto openType = [&](ConstraintSystem &cs, DeclContext *innerDC,
                       DeclContext *outerDC, Type type,
-                      OpenedTypeMap &replacements,
+                      ArrayRef<OpenedType> &replacements,
                       ConstraintLocator *locator) -> Type {
-    if (auto *funcType = type->getAs<AnyFunctionType>()) {
-      return cs.openFunctionType(funcType, locator, replacements, outerDC);
+    if (auto sig = innerDC->getGenericSignatureOfContext()) {
+      replacements = cs.openGenericParameters(sig, locator);
+      cs.introduceGenericParameters(replacements);
+      cs.openGenericRequirements(outerDC, sig, locator, replacements);
+
+      if (auto *funcType = type->getAs<AnyFunctionType>()) {
+        return cs.openFunctionType(funcType, locator, replacements);
+      }
+
+      return cs.openType(type, replacements, locator);
     }
 
-    cs.openGeneric(outerDC, innerDC->getGenericSignatureOfContext(), locator,
-                   replacements);
-
-    return cs.openType(type, replacements, locator);
+    return type;
   };
 
   bool knownNonSubtype = false;
@@ -596,12 +608,11 @@ bool CompareDeclSpecializationRequest::evaluate(
   // FIXME: Locator when anchored on a declaration.
   // Get the type of a reference to the second declaration.
 
-  OpenedTypeMap unused, replacements;
-  auto openedType2 = openType(cs, innerDC1, outerDC2, type2, unused, locator);
-  auto openedType1 =
-      openType(cs, innerDC2, outerDC1, type1, replacements, locator);
+  ArrayRef<OpenedType> unused, replacements;
+  auto openedType2 = openType(cs, innerDC2, outerDC2, type2, unused, locator);
+  auto openedType1 = openType(cs, innerDC1, outerDC1, type1, replacements, locator);
 
-  for (const auto &replacement : replacements) {
+  for (auto replacement : replacements) {
     if (auto mapped = innerDC1->mapTypeIntoContext(replacement.first)) {
       cs.addConstraint(ConstraintKind::Bind, replacement.second, mapped,
                        locator);
