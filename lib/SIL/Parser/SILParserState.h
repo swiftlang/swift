@@ -62,6 +62,8 @@ public:
   bool parseSILCoverageMap(Parser &P) override;
   bool parseSILProperty(Parser &P) override;
   bool parseSILScope(Parser &P) override;
+
+  void markZombies();
 };
 
 } // end namespace swift
