@@ -993,6 +993,11 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
   // derivable from the CheckKind of the mark instruction.
 
   SILValue operand = address->getOperand();
+
+  if (auto *mdi = dyn_cast<MarkDependenceInst>(operand)) {
+    operand = mdi->getValue();
+  }
+
   {
     // Then check if our markedValue is from an argument that is in,
     // in_guaranteed, inout, or inout_aliasable, consider the marked address to
