@@ -2335,7 +2335,7 @@ static void resolveCursorFromUSR(
 
   class CursorInfoConsumer : public SwiftASTConsumer {
     std::string InputFile;
-    StringRef USR;
+    std::string USR;
     SwiftLangSupport &Lang;
     SwiftInvocationRef ASTInvok;
     const bool TryExistingAST;
@@ -2376,7 +2376,7 @@ static void resolveCursorFromUSR(
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
 
-      if (USR.starts_with("c:")) {
+      if (StringRef(USR).starts_with("c:")) {
         LOG_WARN_FUNC("lookup for C/C++/ObjC USRs not implemented");
         CursorInfoData Info;
         Info.InternalDiagnostic = "Lookup for C/C++/ObjC USRs not implemented.";
