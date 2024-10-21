@@ -159,7 +159,6 @@ static bool treeContains(Demangle::NodePointer Nd, Demangle::Node::Kind Kind) {
 }
 
 void Mangler::verify(StringRef nameStr) {
-#ifndef NDEBUG
   SmallString<128> buffer;
   if (!nameStr.starts_with(MANGLING_PREFIX_STR) &&
       !nameStr.starts_with("_Tt") &&
@@ -191,7 +190,6 @@ void Mangler::verify(StringRef nameStr) {
                   "original     = " << nameStr << "\n"
                   "remangled    = " << Remangled << "\n";
   abort();
-#endif
 }
 
 void Mangler::appendIdentifier(StringRef ident) {
