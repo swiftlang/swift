@@ -85,6 +85,26 @@ struct BridgedLocatedIdentifier {
   BridgedSourceLoc NameLoc;
 };
 
+struct BridgedConsumedLookupResult {
+  SWIFT_NAME("name")
+  BridgedIdentifier Name;
+
+  SWIFT_NAME("nameLoc")
+  BridgedSourceLoc NameLoc;
+  
+  SWIFT_NAME("flag")
+  SwiftInt Flag;
+  
+#ifdef USED_IN_CPP_SOURCE
+  BridgedConsumedLookupResult(swift::Identifier name,
+                              swift::SourceLoc sourceLoc,
+                              SwiftInt flag
+                              ) : Name(BridgedIdentifier(name)),
+                                  NameLoc(BridgedSourceLoc(sourceLoc)),
+                                  Flag(flag) {}
+#endif
+};
+
 class BridgedDeclBaseName {
   BridgedIdentifier Ident;
 
