@@ -80,6 +80,7 @@ FEATURE(ClearSensitive,                                 FUTURE)
 FEATURE(UpdatePureObjCClassMetadata,                    FUTURE)
 FEATURE(ValueGenericType,                               FUTURE)
 FEATURE(InitRawStructMetadata2,                         FUTURE)
+FEATURE(RetainReleaseMultiple,                          FUTURE)
 
 #undef FEATURE
 #undef FUTURE
