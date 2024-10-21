@@ -62,6 +62,7 @@ class ArgumentList;
 class AssociatedTypeDecl;
 class ASTContext;
 enum BufferPointerTypeKind : unsigned;
+struct BuiltinNameStringLiteral;
 class BuiltinTupleDecl;
 class ClassDecl;
 class ClangModuleLoader;
@@ -1508,6 +1509,9 @@ public:
   /// return `None`.
   std::optional<TangentSpace>
   getAutoDiffTangentSpace(LookupConformanceFn lookupConformance);
+
+  /// Return the kind of generic parameter that this type can be matched to.
+  GenericTypeParamKind getMatchingParamKind();
 };
 
 /// AnyGenericType - This abstract class helps types ensure that fields
@@ -1648,8 +1652,9 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnresolvedType, Type)
 /// BuiltinType - An abstract class for all the builtin types.
 class BuiltinType : public TypeBase {
 protected:
-  BuiltinType(TypeKind kind, const ASTContext &canTypeCtx)
-  : TypeBase(kind, &canTypeCtx, RecursiveTypeProperties()) {}
+  BuiltinType(TypeKind kind, const ASTContext &canTypeCtx,
+              RecursiveTypeProperties properties = {})
+  : TypeBase(kind, &canTypeCtx, properties) {}
 public:
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_BuiltinType &&
@@ -1671,6 +1676,113 @@ public:
   bool isBitwiseCopyable() const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinType, Type)
+
+/// BuiltinUnboundGenericType - the base declaration of a generic builtin type
+/// that has not yet had generic parameters applied.
+///
+/// Referring to an unbound generic type by itself is invalid, but this
+/// representation is used as an intermediate during type resolution when
+/// resolving a type reference such as `Builtin.Int<31>`. Applying
+/// the generic parameters produces the actual builtin type based on the
+/// kind of the base.
+class BuiltinUnboundGenericType : public BuiltinType {
+  friend class ASTContext;
+  TypeKind BoundGenericTypeKind;
+  
+  BuiltinUnboundGenericType(const ASTContext &C,
+                            TypeKind genericTypeKind)
+    : BuiltinType(TypeKind::BuiltinUnboundGeneric, C),
+      BoundGenericTypeKind(genericTypeKind)
+  {}
+    
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinUnboundGeneric;
+  }
+  
+  /// Produce the unqualified name of the type.
+  BuiltinNameStringLiteral getBuiltinTypeName() const;
+  StringRef getBuiltinTypeNameString() const;
+  
+  static BuiltinUnboundGenericType *get(TypeKind genericTypeKind,
+                                        const ASTContext &C);
+
+  /// Get the generic signature with which to substitute this type.
+  GenericSignature getGenericSignature() const;
+
+  /// Get the type that results from binding the generic parameters of this
+  /// builtin to the given substitutions.
+  ///
+  /// Produces an ErrorType if the substitution is invalid.
+  Type getBound(SubstitutionMap subs) const;
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinUnboundGenericType, BuiltinType)
+
+/// BuiltinFixedArrayType - The builtin type representing N values stored
+/// inline contiguously.
+///
+/// All elements of a value of this type must be fully initialized any time the
+/// value may be copied, moved, or destroyed.
+class BuiltinFixedArrayType : public BuiltinType, public llvm::FoldingSetNode {
+  friend class ASTContext;
+  
+  CanType Size;
+  CanType ElementType;
+  
+  static RecursiveTypeProperties
+  getRecursiveTypeProperties(CanType Size, CanType Element) {
+    RecursiveTypeProperties properties;
+    properties |= Size->getRecursiveProperties();
+    properties |= Element->getRecursiveProperties();
+    return properties;
+  }
+  
+  BuiltinFixedArrayType(CanType Size,
+                        CanType ElementType)
+    : BuiltinType(TypeKind::BuiltinFixedArray, ElementType->getASTContext(),
+                  getRecursiveTypeProperties(Size, ElementType)),
+        Size(Size),
+        ElementType(ElementType)
+  {}
+  
+public:
+  /// Arrays with more elements than this are always treated as in-memory values.
+  ///
+  /// (4096 is the hardcoded limit above which we refuse to import C arrays
+  /// as tuples. From first principles, a much lower threshold would probably
+  /// make sense, but we don't want to break the type lowering of C types
+  /// as they appear in existing Swift code.)
+  static constexpr const uint64_t MaximumLoadableSize = 4096;
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinFixedArray;
+  }
+  
+  static BuiltinFixedArrayType *get(CanType Size,
+                                    CanType ElementType);
+                       
+  /// Get the integer generic parameter representing the number of elements.
+  CanType getSize() const { return Size; }
+  
+  /// Get the fixed integer number of elements if known and zero or greater.
+  std::optional<uint64_t> getFixedInhabitedSize() const;
+  
+  /// True if the type is statically negative-sized (and therefore uninhabited).
+  bool isFixedNegativeSize() const;
+  
+  /// Get the element type.
+  CanType getElementType() const { return ElementType; }
+  
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    Profile(ID, getSize(), getElementType());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      CanType Size, CanType ElementType) {
+    ID.AddPointer(Size.getPointer());
+    ID.AddPointer(ElementType.getPointer());
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinFixedArrayType, BuiltinType)
 
 /// BuiltinRawPointerType - The builtin raw (and dangling) pointer type.  This
 /// pointer is completely unmanaged and is equivalent to i8* in LLVM IR.

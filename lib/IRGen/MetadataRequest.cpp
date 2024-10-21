@@ -1268,6 +1268,28 @@ static MetadataResponse emitDynamicTupleTypeMetadataRef(IRGenFunction &IGF,
   return MetadataResponse::handle(IGF, request, result);
 }
 
+static MetadataResponse emitFixedArrayMetadataRef(IRGenFunction &IGF,
+                                              CanBuiltinFixedArrayType type,
+                                              DynamicMetadataRequest request) {
+  if (type->isFixedNegativeSize()
+      || type->getFixedInhabitedSize() == 0) {
+    // Empty or negative-sized arrays are empty types.
+    return MetadataResponse::forComplete(
+                                        emitEmptyTupleTypeMetadataRef(IGF.IGM));
+  }
+  
+    auto call = IGF.Builder.CreateCall(
+      IGF.IGM.getGetFixedArrayTypeMetadataFunctionPointer(),
+      {request.get(IGF),
+       IGF.emitValueGenericRef(type->getSize()),
+       IGF.emitTypeMetadataRef(type->getElementType(), MetadataState::Abstract)
+          .getMetadata()});
+    call->setCallingConv(IGF.IGM.SwiftCC);
+    call->setDoesNotThrow();
+
+    return MetadataResponse::handle(IGF, request, call);
+}
+
 static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
                                                  CanTupleType type,
                                                  DynamicMetadataRequest request) {
@@ -1288,8 +1310,7 @@ static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
                                         emitEmptyTupleTypeMetadataRef(IGF.IGM));
 
   case 1:
-    // For metadata purposes, we consider a singleton tuple to be
-    // isomorphic to its element type. ???
+    // A singleton tuple is isomorphic to its element type.
     return IGF.emitTypeMetadataRef(type.getElementType(0), request);
 
   case 2: {
@@ -1861,7 +1882,24 @@ namespace {
                            DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);
     }
+    
+    MetadataResponse
+    visitBuiltinUnboundGenericType(CanBuiltinUnboundGenericType type,
+                                   DynamicMetadataRequest request) {
+      llvm_unreachable("not a real type");
+    }
 
+    MetadataResponse
+    visitBuiltinFixedArrayType(CanBuiltinFixedArrayType type,
+                               DynamicMetadataRequest request) {
+      if (auto cached = tryGetLocal(type, request))
+        return cached;
+
+      auto response = emitFixedArrayMetadataRef(IGF, type, request);
+
+      return setLocal(type, response);
+    }
+    
     MetadataResponse visitNominalType(CanNominalType type,
                                       DynamicMetadataRequest request) {
       assert(!type->isExistentialType());
