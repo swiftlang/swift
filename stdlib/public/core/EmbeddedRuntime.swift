@@ -38,19 +38,20 @@ public struct HeapObject {
   // to think about supporting (or banning) weak and/or unowned references.
   var refcount: Int
 
+  // Note: The immortalRefCount value is also hard-coded in IRGen in `irgen::emitConstantObject`.
 #if _pointerBitWidth(_64)
-  static let doNotFreeBit = Int(bitPattern: 0x8000_0000_0000_0000)
-  static let refcountMask = Int(bitPattern: 0x7fff_ffff_ffff_ffff)
+  static let doNotFreeBit     = Int(bitPattern: 0x8000_0000_0000_0000)
+  static let refcountMask     = Int(bitPattern: 0x7fff_ffff_ffff_ffff)
+  static let immortalRefCount = Int(bitPattern: 0x7fff_ffff_ffff_ffff) // Make sure we don't have doNotFreeBit set
 #elseif _pointerBitWidth(_32)
-  static let doNotFreeBit = Int(bitPattern: 0x8000_0000)
-  static let refcountMask = Int(bitPattern: 0x7fff_ffff)
+  static let doNotFreeBit     = Int(bitPattern: 0x8000_0000)
+  static let refcountMask     = Int(bitPattern: 0x7fff_ffff)
+  static let immortalRefCount = Int(bitPattern: 0x7fff_ffff) // Make sure we don't have doNotFreeBit set
 #elseif _pointerBitWidth(_16)
-  static let doNotFreeBit = Int(bitPattern: 0x8000)
-  static let refcountMask = Int(bitPattern: 0x7fff)
+  static let doNotFreeBit     = Int(bitPattern: 0x8000)
+  static let refcountMask     = Int(bitPattern: 0x7fff)
+  static let immortalRefCount = Int(bitPattern: 0x7fff) // Make sure we don't have doNotFreeBit set
 #endif
-
-  // Note: The immortalRefCount value of -1 is also hard-coded in IRGen in `irgen::emitConstantObject`.
-  static let immortalRefCount = -1
 
 #if _pointerBitWidth(_64)
   static let immortalObjectPointerBit = UInt(0x8000_0000_0000_0000)
@@ -158,7 +159,7 @@ public func swift_initStaticObject(metadata: Builtin.RawPointer, object: Builtin
 
 func swift_initStaticObject(metadata: UnsafeMutablePointer<ClassMetadata>, object: UnsafeMutablePointer<HeapObject>) -> UnsafeMutablePointer<HeapObject> {
   _swift_embedded_set_heap_object_metadata_pointer(object, metadata)
-  object.pointee.refcount = HeapObject.immortalRefCount
+  object.pointee.refcount = HeapObject.immortalRefCount | HeapObject.doNotFreeBit
   return object
 }
 
@@ -251,7 +252,7 @@ public func swift_retain_n(object: Builtin.RawPointer, n: UInt32) -> Builtin.Raw
 
 func swift_retain_n_(object: UnsafeMutablePointer<HeapObject>, n: UInt32) -> UnsafeMutablePointer<HeapObject> {
   let refcount = refcountPointer(for: object)
-  if loadRelaxed(refcount) == HeapObject.immortalRefCount {
+  if loadRelaxed(refcount) & HeapObject.refcountMask == HeapObject.immortalRefCount {
     return object
   }
 
@@ -294,7 +295,8 @@ func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32) {
   }
 
   let refcount = refcountPointer(for: object)
-  if loadRelaxed(refcount) == HeapObject.immortalRefCount {
+  let loadedRefcount = loadRelaxed(refcount)
+  if loadedRefcount & HeapObject.refcountMask == HeapObject.immortalRefCount {
     return
   }
 
@@ -309,7 +311,8 @@ func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32) {
     // There can only be one thread with a reference at this point (because
     // we're releasing the last existing reference), so a relaxed store is
     // enough.
-    storeRelaxed(refcount, newValue: HeapObject.immortalRefCount)
+    let doNotFree = (loadedRefcount & HeapObject.doNotFreeBit) != 0
+    storeRelaxed(refcount, newValue: HeapObject.immortalRefCount | (doNotFree ? HeapObject.doNotFreeBit : 0))
 
     _swift_embedded_invoke_heap_object_destroy(object)
   } else if resultingRefcount < 0 {
