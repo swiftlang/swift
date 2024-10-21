@@ -166,6 +166,7 @@ class swift::SourceLookupCache {
   ValueDeclMap TopLevelValues;
   ValueDeclMap ClassMembers;
   bool MemberCachePopulated = false;
+  CustomDerivativesLookupResult CustomDerivatives;
   DeclName UniqueMacroNamePlaceholder;
 
   template<typename T>
@@ -204,6 +205,8 @@ public:
   /// Retrieves all the precedence groups. The order of the results is not
   /// guaranteed to be meaningful.
   void getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl *> &results);
+
+  CustomDerivativesLookupResult getCustomDerivativeDecls();
 
   /// Look up an operator declaration.
   ///
@@ -275,6 +278,11 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range items,
         if (!onlyOperators && VD->getAttrs().hasAttribute<CustomAttr>()) {
           MayHaveAuxiliaryDecls.push_back(VD);
         }
+
+        if (!onlyOperators)
+          if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
+            if (AFD->getAttrs().hasAttribute<DerivativeAttr>())
+              CustomDerivatives.push_back(AFD);
       }
     }
 
@@ -570,6 +578,10 @@ void SourceLookupCache::getOperatorDecls(
     SmallVectorImpl<OperatorDecl *> &results) {
   for (auto &ops : Operators)
     results.append(ops.second.begin(), ops.second.end());
+}
+
+CustomDerivativesLookupResult SourceLookupCache::getCustomDerivativeDecls() {
+  return CustomDerivatives;
 }
 
 void SourceLookupCache::lookupOperator(Identifier name, OperatorFixity fixity,
@@ -1576,6 +1588,13 @@ void SourceFile::lookupOperatorDirect(
     Identifier name, OperatorFixity fixity,
     TinyPtrVector<OperatorDecl *> &results) const {
   getCache().lookupOperator(name, fixity, results);
+}
+
+CustomDerivativesLookupResult
+CustomDerivativesLookupRequest::evaluate(Evaluator &evaluator,
+                                         ModuleDecl *module) const {
+  assert(isParsedModule(module));
+  return module->getSourceLookupCache().getCustomDerivativeDecls();
 }
 
 void DirectPrecedenceGroupLookupRequest::writeDependencySink(

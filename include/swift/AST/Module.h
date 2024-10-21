@@ -240,6 +240,7 @@ class ModuleDecl
     : public DeclContext, public TypeDecl, public ASTAllocated<ModuleDecl> {
   friend class DirectOperatorLookupRequest;
   friend class DirectPrecedenceGroupLookupRequest;
+  friend class CustomDerivativesLookupRequest;
 
   /// The ABI name of the module, if it differs from the module name.
   mutable Identifier ModuleABIName;
