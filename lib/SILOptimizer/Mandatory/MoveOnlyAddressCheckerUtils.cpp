@@ -987,35 +987,15 @@ static bool findNonEscapingPartialApplyUses(PartialApplyInst *pai,
   return true;
 }
 
-void UseState::initializeLiveness(
-    FieldSensitiveMultiDefPrunedLiveRange &liveness) {
-  assert(liveness.getNumSubElements() == getNumSubelements());
-  // We begin by initializing all of our init uses.
-  for (auto initInstAndValue : initInsts) {
-    LLVM_DEBUG(llvm::dbgs() << "Found def: " << *initInstAndValue.first);
-
-    liveness.initializeDef(initInstAndValue.first, initInstAndValue.second);
-  }
-
-  // If we have a reinitInstAndValue that we are going to be able to convert
-  // into a simple init, add it as an init. We are going to consider the rest of
-  // our reinit uses to be liveness uses.
-  for (auto reinitInstAndValue : reinitInsts) {
-    if (isReinitToInitConvertibleInst(reinitInstAndValue.first)) {
-      LLVM_DEBUG(llvm::dbgs() << "Found def: " << *reinitInstAndValue.first);
-      liveness.initializeDef(reinitInstAndValue.first,
-                             reinitInstAndValue.second);
-    }
-  }
-  
+static bool
+addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
   // FIXME: Whether the initial use is an initialization ought to be entirely
   // derivable from the CheckKind of the mark instruction.
 
-  // Then check if our markedValue is from an argument that is in,
-  // in_guaranteed, inout, or inout_aliasable, consider the marked address to be
-  // the initialization point.
-  bool beginsInitialized = false;
   {
+    // Then check if our markedValue is from an argument that is in,
+    // in_guaranteed, inout, or inout_aliasable, consider the marked address to
+    // be the initialization point.
     SILValue operand = address->getOperand();
     if (auto *c = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(operand))
       operand = c->getOperand();
@@ -1034,7 +1014,7 @@ void UseState::initializeLiveness(
                "an init... adding mark_unresolved_non_copyable_value as "
                "init!\n");
         // We cheat here slightly and use our address's operand.
-        beginsInitialized = true;
+        return true;
         break;
       case swift::SILArgumentConvention::Indirect_Out:
         llvm_unreachable("Should never have out addresses here");
@@ -1059,7 +1039,7 @@ void UseState::initializeLiveness(
       LLVM_DEBUG(llvm::dbgs()
                  << "Found move only arg closure box use... "
                     "adding mark_unresolved_non_copyable_value as init!\n");
-      beginsInitialized = true;
+      return true;
       break;
     case SILAccessKind::Init:
       break;
@@ -1081,14 +1061,14 @@ void UseState::initializeLiveness(
         LLVM_DEBUG(llvm::dbgs()
                    << "Found move only arg closure box use... "
                       "adding mark_unresolved_non_copyable_value as init!\n");
-        beginsInitialized = true;
+        return true;
       }
     } else if (auto *box = dyn_cast<AllocBoxInst>(
                    lookThroughOwnershipInsts(projectBox->getOperand()))) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Found move only var allocbox use... "
                     "adding mark_unresolved_non_copyable_value as init!\n");
-      beginsInitialized = true;
+      return true;
     }
   }
 
@@ -1099,7 +1079,7 @@ void UseState::initializeLiveness(
     LLVM_DEBUG(llvm::dbgs()
                << "Found ref_element_addr use... "
                   "adding mark_unresolved_non_copyable_value as init!\n");
-    beginsInitialized = true;
+    return true;
   }
 
   // Check if our address is from a global_addr. In such a case, we treat the
@@ -1109,7 +1089,7 @@ void UseState::initializeLiveness(
     LLVM_DEBUG(llvm::dbgs()
                << "Found global_addr use... "
                   "adding mark_unresolved_non_copyable_value as init!\n");
-    beginsInitialized = true;
+    return true;
   }
 
   if (auto *ptai = dyn_cast<PointerToAddressInst>(
@@ -1118,21 +1098,21 @@ void UseState::initializeLiveness(
     LLVM_DEBUG(llvm::dbgs()
                << "Found pointer to address use... "
                   "adding mark_unresolved_non_copyable_value as init!\n");
-    beginsInitialized = true;
+    return true;
   }
   
   if (auto *bai = dyn_cast_or_null<BeginApplyInst>(
         stripAccessMarkers(address->getOperand())->getDefiningInstruction())) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding accessor coroutine begin_apply as init!\n");
-    beginsInitialized = true;
+    return true;
   }
   
   if (auto *eai = dyn_cast<UncheckedTakeEnumDataAddrInst>(
           stripAccessMarkers(address->getOperand()))) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding enum projection as init!\n");
-    beginsInitialized = true;
+    return true;
   }
 
   // Assume a strict check of a temporary or formal access is initialized
@@ -1142,30 +1122,55 @@ void UseState::initializeLiveness(
       asi && address->isStrict()) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding strict-marked alloc_stack as init!\n");
-    beginsInitialized = true;
+    return true;
   }
 
   // Assume a strict-checked value initialized before the check.
   if (address->isStrict()) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding strict marker as init!\n");
-    beginsInitialized = true;
+    return true;
   }
 
   // Assume a value whose deinit has been dropped has been initialized.
   if (auto *ddi = dyn_cast<DropDeinitInst>(address->getOperand())) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding copyable_to_move_only_wrapper as init!\n");
-    beginsInitialized = true;
+    return true;
   }
 
   // Assume a value wrapped in a MoveOnlyWrapper is initialized.
   if (auto *m2c = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(address->getOperand())) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding copyable_to_move_only_wrapper as init!\n");
-    beginsInitialized = true;
+    return true;
   }
-  
+  return false;
+}
+
+void UseState::initializeLiveness(
+    FieldSensitiveMultiDefPrunedLiveRange &liveness) {
+  assert(liveness.getNumSubElements() == getNumSubelements());
+  // We begin by initializing all of our init uses.
+  for (auto initInstAndValue : initInsts) {
+    LLVM_DEBUG(llvm::dbgs() << "Found def: " << *initInstAndValue.first);
+
+    liveness.initializeDef(initInstAndValue.first, initInstAndValue.second);
+  }
+
+  // If we have a reinitInstAndValue that we are going to be able to convert
+  // into a simple init, add it as an init. We are going to consider the rest of
+  // our reinit uses to be liveness uses.
+  for (auto reinitInstAndValue : reinitInsts) {
+    if (isReinitToInitConvertibleInst(reinitInstAndValue.first)) {
+      LLVM_DEBUG(llvm::dbgs() << "Found def: " << *reinitInstAndValue.first);
+      liveness.initializeDef(reinitInstAndValue.first,
+                             reinitInstAndValue.second);
+    }
+  }
+
+  bool beginsInitialized = addressBeginsInitialized(address);
+
   if (beginsInitialized) {
     recordInitUse(address, address, liveness.getTopLevelSpan());
     liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
