@@ -32,7 +32,9 @@ struct View : ~Escapable {
     self.ptr = k.ptr
     self.c = k.c
   }
-  init(_ k: consuming View) {
+  // This overload requires a separate label because overloading
+  // on borrowing/consuming attributes is not allowed
+  init(consumingView k: consuming View) {
     self.ptr = k.ptr
     self.c = k.c
   }
@@ -65,7 +67,7 @@ func consume(_ o : consuming MutableView) {}
 
 @lifetime(x)
 func getConsumingView(_ x: consuming View) -> View {
-  return View(x)
+  return View(consumingView: x)
 }
 
 @lifetime(borrow x)
