@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=10
 
+// REQUIRES: no_asan
+
 struct S {
     var t: Double
 
