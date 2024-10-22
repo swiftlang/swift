@@ -16,9 +16,9 @@ $ swiftc main.swift other.swift stuff.swift
 \IndexDefinition{top-level code declaration}
 Executables must define a \emph{main function}, which is the entry point invoked when the executable is run. There are three mechanisms for doing so:
 \begin{enumerate}
-\item If only a single source file was provided, this file becomes the \emph{main source file} of the module. If there are multiple source files and one of them is named \texttt{main.swift}, then this file becomes the main source file. The main source file is special, in that it can contain statements at the top level, outside of a function body. Top-level statements are collected into \emph{top-level code declarations}, and the frontend generates a main function which executes each top-level code declaration in source order. Source files other than the main source file cannot contain statements at the top level.
-\item In the absence of a main source file, a struct, enum or class declaration can instead be annotated with the \texttt{@main} attribute, in which case the declaration must contain a static method named \texttt{main()}. This method becomes the main entry point. This attribute was introduced in \IndexSwift{5.3}Swift 5.3~\cite{se0281}.
-\item The older \texttt{@NSApplicationMain} and \texttt{@UIApplicationMain} attributes, deprecated since \IndexSwift{5.a@5.10}Swift 5.10~\cite{se0383}, provided a similar mechanism specific to Apple platforms. Attaching one of these attributes to a class conforming to \texttt{NSApplicationMain} or \texttt{UIApplicationMain}, respectively, will generate a main entry point which calls the \texttt{NSApplicationMain()} or \texttt{UIApplicationMain()} system framework function.
+\item If the user invokes the driver with a single source file, this file becomes the \emph{main source file} of the module. If there are multiple source files and one of them is named \texttt{main.swift}, then this file becomes the main source file. The main source file is special, in that it can contain statements at the top level, outside of a function body. Top-level statements are collected into \emph{top-level code declarations}, and the frontend generates a main function which executes each top-level code declaration in source order. Source files other than the main source file cannot contain statements at the top level.
+\item In the absence of a main source file, the user can annotate a struct, enum or class declaration with the \texttt{@main} attribute, in which case the declaration must contain a static method named \texttt{main()}. This method becomes the main entry point. This attribute was introduced in \IndexSwift{5.3}Swift 5.3~\cite{se0281}.
+\item The older \texttt{@NSApplicationMain} and \texttt{@UIApplicationMain} attributes, deprecated since \IndexSwift{5.a@5.10}Swift 5.10~\cite{se0383}, provide a similar mechanism specific to Apple platforms. Attaching one of these attributes to a class conforming to \texttt{NSApplicationMain} or \texttt{UIApplicationMain}, respectively, will generate a main entry point which calls the \texttt{NSApplicationMain()} or \texttt{UIApplicationMain()} system framework function.
 \end{enumerate}
 
 Invoking the driver with the \IndexFlag{emit-library}\texttt{-emit-library} and \IndexFlag{emit-module}\texttt{-emit-module} flags instructs it to generate a shared library, together with the serialized module file consumed by the compiler when importing the library (\SecRef{module system}):
@@ -468,7 +468,7 @@ There's a bit more to the incremental build story than this; in particular, we h
 
 \section{Module System}\label{module system}
 
-The frontend represents a module by a \IndexDefinition{module declaration}\emph{module declaration} containing one or more \IndexDefinition{file unit}\emph{file units}. The list of source files in a compiler invocation form the \IndexDefinition{main module}\emph{main module}. The main module is special, because its \index{abstract syntax tree}abstract syntax tree is constructed directly by parsing source code; the file units are \IndexDefinition{source file}\emph{source files}. There are three other kinds of modules:
+The frontend represents a module by a \IndexDefinition{module declaration}\emph{module declaration} containing one or more \IndexDefinition{file unit}\emph{file units}. The list of source files in a compiler invocation form the \index{main module}\emph{main module}. The main module is special, because its \index{abstract syntax tree}abstract syntax tree is constructed directly by parsing source code; the file units are \IndexDefinition{source file}\emph{source files}. There are three other kinds of modules:
 \begin{itemize}
 \item \textbf{Serialized modules} containing one or more \IndexDefinition{serialized AST file unit}\emph{serialized AST file units}. When the main module imports another module written in Swift, the frontend reads a serialized module that was previously built.
 
@@ -518,7 +518,7 @@ Note that (1) above means the textual interface format is target-specific; a sep
 
 When a module defined by a textual interface is imported for the first time, a frontend job parses and type checks the textual interface, and generates a serialized module file which is then consumed by the original frontend job. Serialized module files generated in this manner are cached, and can be reused between invocations of the same compiler version.
 
-The \texttt{@inlinable} attribute was introduced in \IndexSwift{4.2}Swift 4.2~\cite{se0193}. The Swift \index{ABI}ABI was formally stabilized in \IndexSwift{5.0}Swift 5, when the standard library became part of the operating system on Apple platforms. Library evolution support and textual interfaces became user-visible features in \IndexSwift{5.1}Swift 5.1~\cite{se0260}.
+The \texttt{@inlinable} attribute was introduced in \IndexSwift{4.2}Swift 4.2~\cite{se0193}. The Swift \index{ABI}ABI was formally stabilized in \IndexSwift{5.0}Swift 5, when the standard library became part of the operating system on Apple platforms. Library evolution support and textual interfaces became user-visible features in \IndexSwift{5.1}Swift 5.1~\cite{se0260}. A recent paper describes a formal model for reasoning about the Swift ABI \cite{formalabi}.
 
 \section{Source Code Reference}\label{compilation model source reference}
 
@@ -641,12 +641,10 @@ Flags passed as part of an \texttt{UnqualifiedLookupDescriptor}.
 \item \texttt{UnqualifiedLookupFlags::IncludeOuterResults} if set, lookup stops after finding results in an innermost scope, or to always proceed to a top-level lookup.
 \end{itemize}
 
-\index{declaration context}
-\IndexSource{qualified lookup}
 \apiref{DeclContext}{class}
-Declaration contexts will be introduced in \ChapRef{decls}, and the \texttt{DeclContext} class in \SecRef{declarationssourceref}.
+Declaration contexts will be \IndexSource{declaration context}introduced in \ChapRef{decls}, and the \texttt{DeclContext} class in \SecRef{declarationssourceref}.
 \begin{itemize}
-\item \texttt{lookupQualified()} has various overloads, which perform a qualified name lookup into one of various combinations of types or declarations. The ``\texttt{this}'' parameter---the \texttt{DeclContext~*} which the method is called on determines the visibility of declarations found via lookup through imports and access control; it is not the base type of the lookup.
+\item \texttt{lookupQualified()} has various overloads, which perform a \IndexSource{qualified lookup}qualified name lookup into one of various combinations of types or declarations. The ``\texttt{this}'' parameter---the \texttt{DeclContext~*} which the method is called on determines the visibility of declarations found via lookup through imports and access control; it is not the base type of the lookup.
 \end{itemize}
 
 \apiref{NLOptions}{enum}

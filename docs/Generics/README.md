@@ -63,21 +63,16 @@ The following chapters need some editing:
 
 - Part II:
   - Substitution Maps
-  - Conformances
 - Part III:
   - Conformance Paths
 - Part V:
-  - Symbols, Terms, and Rules
   - Completion
-- Type Substitution Summary
 
 The following chapters are not yet written:
 
 - Part IV:
   - Opaque Return Types
   - Existential Types
-  - Subclassing
 - Part V:
   - The Property Map
-  - Concrete Conformances
   - Rule Minimization
