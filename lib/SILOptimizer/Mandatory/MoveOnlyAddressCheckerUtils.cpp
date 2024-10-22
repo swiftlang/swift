@@ -987,6 +987,172 @@ static bool findNonEscapingPartialApplyUses(PartialApplyInst *pai,
   return true;
 }
 
+static bool
+addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
+  // FIXME: Whether the initial use is an initialization ought to be entirely
+  // derivable from the CheckKind of the mark instruction.
+
+  SILValue operand = address->getOperand();
+
+  if (auto *mdi = dyn_cast<MarkDependenceInst>(operand)) {
+    operand = mdi->getValue();
+  }
+
+  {
+    // Then check if our markedValue is from an argument that is in,
+    // in_guaranteed, inout, or inout_aliasable, consider the marked address to
+    // be the initialization point.
+    if (auto *c = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(operand))
+      operand = c->getOperand();
+    if (auto *fArg = dyn_cast<SILFunctionArgument>(operand)) {
+      switch (fArg->getArgumentConvention()) {
+      case swift::SILArgumentConvention::Indirect_In:
+      case swift::SILArgumentConvention::Indirect_In_Guaranteed:
+      case swift::SILArgumentConvention::Indirect_Inout:
+      case swift::SILArgumentConvention::Indirect_InoutAliasable:
+      case swift::SILArgumentConvention::Indirect_In_CXX:
+        // We need to add our address to the initInst array to make sure that
+        // later invariants that we assert upon remain true.
+        LLVM_DEBUG(
+            llvm::dbgs()
+            << "Found in/in_guaranteed/inout/inout_aliasable argument as "
+               "an init... adding mark_unresolved_non_copyable_value as "
+               "init!\n");
+        // We cheat here slightly and use our address's operand.
+        return true;
+        break;
+      case swift::SILArgumentConvention::Indirect_Out:
+        llvm_unreachable("Should never have out addresses here");
+      case swift::SILArgumentConvention::Direct_Owned:
+      case swift::SILArgumentConvention::Direct_Unowned:
+      case swift::SILArgumentConvention::Direct_Guaranteed:
+      case swift::SILArgumentConvention::Pack_Inout:
+      case swift::SILArgumentConvention::Pack_Guaranteed:
+      case swift::SILArgumentConvention::Pack_Owned:
+      case swift::SILArgumentConvention::Pack_Out:
+        llvm_unreachable("Working with addresses");
+      }
+    }
+  }
+
+  // A read or write access always begins on an initialized value.
+  if (auto access = dyn_cast<BeginAccessInst>(operand)) {
+    switch (access->getAccessKind()) {
+    case SILAccessKind::Deinit:
+    case SILAccessKind::Read:
+    case SILAccessKind::Modify:
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Found move only arg closure box use... "
+                    "adding mark_unresolved_non_copyable_value as init!\n");
+      return true;
+      break;
+    case SILAccessKind::Init:
+      break;
+    }
+  }
+
+  // See if our address is from a closure guaranteed box that we did not promote
+  // to an address. In such a case, just treat our
+  // mark_unresolved_non_copyable_value as the init of our value.
+  if (auto *projectBox =
+          dyn_cast<ProjectBoxInst>(stripAccessMarkers(operand))) {
+    if (auto *fArg = dyn_cast<SILFunctionArgument>(projectBox->getOperand())) {
+      if (fArg->isClosureCapture()) {
+        assert(fArg->getArgumentConvention() ==
+                   SILArgumentConvention::Direct_Guaranteed &&
+               "Just a paranoid assert check to make sure this code is thought "
+               "about if we change the convention in some way");
+        // We need to add our address to the initInst array to make sure that
+        // later invariants that we assert upon remain true.
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Found move only arg closure box use... "
+                      "adding mark_unresolved_non_copyable_value as init!\n");
+        return true;
+      }
+    } else if (auto *box = dyn_cast<AllocBoxInst>(
+                   lookThroughOwnershipInsts(projectBox->getOperand()))) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Found move only var allocbox use... "
+                    "adding mark_unresolved_non_copyable_value as init!\n");
+      return true;
+    }
+  }
+
+  // Check if our address is from a ref_element_addr. In such a case, we treat
+  // the mark_unresolved_non_copyable_value as the initialization.
+  if (auto *refEltAddr =
+          dyn_cast<RefElementAddrInst>(stripAccessMarkers(operand))) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Found ref_element_addr use... "
+                  "adding mark_unresolved_non_copyable_value as init!\n");
+    return true;
+  }
+
+  // Check if our address is from a global_addr. In such a case, we treat the
+  // mark_unresolved_non_copyable_value as the initialization.
+  if (auto *globalAddr =
+          dyn_cast<GlobalAddrInst>(stripAccessMarkers(operand))) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Found global_addr use... "
+                  "adding mark_unresolved_non_copyable_value as init!\n");
+    return true;
+  }
+
+  if (auto *ptai =
+          dyn_cast<PointerToAddressInst>(stripAccessMarkers(operand))) {
+    assert(ptai->isStrict());
+    LLVM_DEBUG(llvm::dbgs()
+               << "Found pointer to address use... "
+                  "adding mark_unresolved_non_copyable_value as init!\n");
+    return true;
+  }
+
+  if (auto *bai = dyn_cast_or_null<BeginApplyInst>(
+          stripAccessMarkers(operand)->getDefiningInstruction())) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Adding accessor coroutine begin_apply as init!\n");
+    return true;
+  }
+
+  if (auto *eai = dyn_cast<UncheckedTakeEnumDataAddrInst>(
+          stripAccessMarkers(operand))) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Adding enum projection as init!\n");
+    return true;
+  }
+
+  // Assume a strict check of a temporary or formal access is initialized
+  // before the check.
+  if (auto *asi = dyn_cast<AllocStackInst>(stripAccessMarkers(operand));
+      asi && address->isStrict()) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Adding strict-marked alloc_stack as init!\n");
+    return true;
+  }
+
+  // Assume a strict-checked value initialized before the check.
+  if (address->isStrict()) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Adding strict marker as init!\n");
+    return true;
+  }
+
+  // Assume a value whose deinit has been dropped has been initialized.
+  if (auto *ddi = dyn_cast<DropDeinitInst>(operand)) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Adding copyable_to_move_only_wrapper as init!\n");
+    return true;
+  }
+
+  // Assume a value wrapped in a MoveOnlyWrapper is initialized.
+  if (auto *m2c = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(operand)) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Adding copyable_to_move_only_wrapper as init!\n");
+    return true;
+  }
+  return false;
+}
+
 void UseState::initializeLiveness(
     FieldSensitiveMultiDefPrunedLiveRange &liveness) {
   assert(liveness.getNumSubElements() == getNumSubelements());
@@ -1007,165 +1173,9 @@ void UseState::initializeLiveness(
                              reinitInstAndValue.second);
     }
   }
-  
-  // FIXME: Whether the initial use is an initialization ought to be entirely
-  // derivable from the CheckKind of the mark instruction.
 
-  // Then check if our markedValue is from an argument that is in,
-  // in_guaranteed, inout, or inout_aliasable, consider the marked address to be
-  // the initialization point.
-  bool beginsInitialized = false;
-  {
-    SILValue operand = address->getOperand();
-    if (auto *c = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(operand))
-      operand = c->getOperand();
-    if (auto *fArg = dyn_cast<SILFunctionArgument>(operand)) {
-      switch (fArg->getArgumentConvention()) {
-      case swift::SILArgumentConvention::Indirect_In:
-      case swift::SILArgumentConvention::Indirect_In_Guaranteed:
-      case swift::SILArgumentConvention::Indirect_Inout:
-      case swift::SILArgumentConvention::Indirect_InoutAliasable:
-      case swift::SILArgumentConvention::Indirect_In_CXX:
-        // We need to add our address to the initInst array to make sure that
-        // later invariants that we assert upon remain true.
-        LLVM_DEBUG(
-            llvm::dbgs()
-            << "Found in/in_guaranteed/inout/inout_aliasable argument as "
-               "an init... adding mark_unresolved_non_copyable_value as "
-               "init!\n");
-        // We cheat here slightly and use our address's operand.
-        beginsInitialized = true;
-        break;
-      case swift::SILArgumentConvention::Indirect_Out:
-        llvm_unreachable("Should never have out addresses here");
-      case swift::SILArgumentConvention::Direct_Owned:
-      case swift::SILArgumentConvention::Direct_Unowned:
-      case swift::SILArgumentConvention::Direct_Guaranteed:
-      case swift::SILArgumentConvention::Pack_Inout:
-      case swift::SILArgumentConvention::Pack_Guaranteed:
-      case swift::SILArgumentConvention::Pack_Owned:
-      case swift::SILArgumentConvention::Pack_Out:
-        llvm_unreachable("Working with addresses");
-      }
-    }
-  }
+  bool beginsInitialized = addressBeginsInitialized(address);
 
-  // A read or write access always begins on an initialized value.
-  if (auto access = dyn_cast<BeginAccessInst>(address->getOperand())) {
-    switch (access->getAccessKind()) {
-    case SILAccessKind::Deinit:
-    case SILAccessKind::Read:
-    case SILAccessKind::Modify:
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Found move only arg closure box use... "
-                    "adding mark_unresolved_non_copyable_value as init!\n");
-      beginsInitialized = true;
-      break;
-    case SILAccessKind::Init:
-      break;
-    }
-  }
-
-  // See if our address is from a closure guaranteed box that we did not promote
-  // to an address. In such a case, just treat our
-  // mark_unresolved_non_copyable_value as the init of our value.
-  if (auto *projectBox = dyn_cast<ProjectBoxInst>(stripAccessMarkers(address->getOperand()))) {
-    if (auto *fArg = dyn_cast<SILFunctionArgument>(projectBox->getOperand())) {
-      if (fArg->isClosureCapture()) {
-        assert(fArg->getArgumentConvention() ==
-                   SILArgumentConvention::Direct_Guaranteed &&
-               "Just a paranoid assert check to make sure this code is thought "
-               "about if we change the convention in some way");
-        // We need to add our address to the initInst array to make sure that
-        // later invariants that we assert upon remain true.
-        LLVM_DEBUG(llvm::dbgs()
-                   << "Found move only arg closure box use... "
-                      "adding mark_unresolved_non_copyable_value as init!\n");
-        beginsInitialized = true;
-      }
-    } else if (auto *box = dyn_cast<AllocBoxInst>(
-                   lookThroughOwnershipInsts(projectBox->getOperand()))) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Found move only var allocbox use... "
-                    "adding mark_unresolved_non_copyable_value as init!\n");
-      beginsInitialized = true;
-    }
-  }
-
-  // Check if our address is from a ref_element_addr. In such a case, we treat
-  // the mark_unresolved_non_copyable_value as the initialization.
-  if (auto *refEltAddr = dyn_cast<RefElementAddrInst>(
-          stripAccessMarkers(address->getOperand()))) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "Found ref_element_addr use... "
-                  "adding mark_unresolved_non_copyable_value as init!\n");
-    beginsInitialized = true;
-  }
-
-  // Check if our address is from a global_addr. In such a case, we treat the
-  // mark_unresolved_non_copyable_value as the initialization.
-  if (auto *globalAddr =
-          dyn_cast<GlobalAddrInst>(stripAccessMarkers(address->getOperand()))) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "Found global_addr use... "
-                  "adding mark_unresolved_non_copyable_value as init!\n");
-    beginsInitialized = true;
-  }
-
-  if (auto *ptai = dyn_cast<PointerToAddressInst>(
-          stripAccessMarkers(address->getOperand()))) {
-    assert(ptai->isStrict());
-    LLVM_DEBUG(llvm::dbgs()
-               << "Found pointer to address use... "
-                  "adding mark_unresolved_non_copyable_value as init!\n");
-    beginsInitialized = true;
-  }
-  
-  if (auto *bai = dyn_cast_or_null<BeginApplyInst>(
-        stripAccessMarkers(address->getOperand())->getDefiningInstruction())) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "Adding accessor coroutine begin_apply as init!\n");
-    beginsInitialized = true;
-  }
-  
-  if (auto *eai = dyn_cast<UncheckedTakeEnumDataAddrInst>(
-          stripAccessMarkers(address->getOperand()))) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "Adding enum projection as init!\n");
-    beginsInitialized = true;
-  }
-
-  // Assume a strict check of a temporary or formal access is initialized
-  // before the check.
-  if (auto *asi = dyn_cast<AllocStackInst>(
-          stripAccessMarkers(address->getOperand()));
-      asi && address->isStrict()) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "Adding strict-marked alloc_stack as init!\n");
-    beginsInitialized = true;
-  }
-
-  // Assume a strict-checked value initialized before the check.
-  if (address->isStrict()) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "Adding strict marker as init!\n");
-    beginsInitialized = true;
-  }
-
-  // Assume a value whose deinit has been dropped has been initialized.
-  if (auto *ddi = dyn_cast<DropDeinitInst>(address->getOperand())) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "Adding copyable_to_move_only_wrapper as init!\n");
-    beginsInitialized = true;
-  }
-
-  // Assume a value wrapped in a MoveOnlyWrapper is initialized.
-  if (auto *m2c = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(address->getOperand())) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "Adding copyable_to_move_only_wrapper as init!\n");
-    beginsInitialized = true;
-  }
-  
   if (beginsInitialized) {
     recordInitUse(address, address, liveness.getTopLevelSpan());
     liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
