@@ -399,7 +399,7 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
   auto referencedTypeVars = constraint->getTypeVariables();
   for (auto typeVar : referencedTypeVars) {
     // Record the change, if there are active scopes.
-    if (CS.isRecordingChanges())
+    if (CS.solverState)
       CS.recordChange(SolverTrail::Change::AddedConstraint(typeVar, constraint));
 
     addConstraint(typeVar, constraint);
@@ -419,7 +419,7 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
   // track it as such.
   if (referencedTypeVars.empty()) {
     // Record the change, if there are active scopes.
-    if (CS.isRecordingChanges())
+    if (CS.solverState)
       CS.recordChange(SolverTrail::Change::AddedConstraint(nullptr, constraint));
 
     addConstraint(nullptr, constraint);
@@ -454,7 +454,7 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
     }
 
     // Record the change, if there are active scopes.
-    if (CS.isRecordingChanges())
+    if (CS.solverState)
       CS.recordChange(SolverTrail::Change::RemovedConstraint(typeVar, constraint));
 
     removeConstraint(typeVar, constraint);
@@ -463,7 +463,7 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
   // If this is an orphaned constraint, remove it from the list.
   if (referencedTypeVars.empty()) {
     // Record the change, if there are active scopes.
-    if (CS.isRecordingChanges())
+    if (CS.solverState)
       CS.recordChange(SolverTrail::Change::RemovedConstraint(nullptr, constraint));
 
     removeConstraint(nullptr, constraint);
