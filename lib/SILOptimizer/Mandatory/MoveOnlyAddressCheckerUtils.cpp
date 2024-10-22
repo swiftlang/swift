@@ -2379,7 +2379,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       if (moveChecker.canonicalizer.foundAnyConsumingUses()) {
         LLVM_DEBUG(llvm::dbgs()
                    << "Found mark must check [nocopy] error: " << *user);
-        auto operand = stripAccessMarkers(markedValue->getOperand());
+        auto operand = stripAccessAndIdentityCasts(markedValue->getOperand());
         auto *fArg = dyn_cast<SILFunctionArgument>(operand);
         auto *ptrToAddr = dyn_cast<PointerToAddressInst>(operand);
             
