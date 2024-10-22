@@ -6756,6 +6756,11 @@ ERROR(availability_parameterized_protocol_only_version_newer, none,
       "runtime support for parameterized protocol types is only available in "
       "%0 %1 or newer",
       (StringRef, llvm::VersionTuple))
+      
+ERROR(non_runtime_objc_protocol_metadata_not_available,none,
+      "this Objective-C protocol '%0' has the non_runtime_protocol attribute"
+      " and its metadata is not available in Swift.",
+      (StringRef))
 
 ERROR(availability_isolated_any_only_version_newer, none,
       "runtime support for @isolated(any) function types is only available in "
