@@ -17,6 +17,14 @@ struct CxxStruct {
     int x;
 };
 
+struct CxxStruct2 {
+    inline CxxStruct2(int x) : x(x) {}
+    inline CxxStruct2(const CxxStruct &other) : x(other.x) {}
+    inline ~CxxStruct2() {}
+
+    int x;
+};
+
 //--- module.modulemap
 module CxxTest {
     header "header.h"
@@ -30,6 +38,12 @@ public func retCxxStruct() -> CxxStruct {
     return CxxStruct(2)
 }
 
+#if !os(Windows)
+public func retCxxStruct2() -> CxxStruct2? {
+    return CxxStruct2(2)
+}
+#endif
+
 //--- use-swift-cxx-types.cpp
 
 #include "header.h"
@@ -38,5 +52,8 @@ public func retCxxStruct() -> CxxStruct {
 
 int main() {
   auto x = UseCxx::retCxxStruct();
+#ifndef _WIN32
+  auto y = UseCxx::retCxxStruct2();
+#endif
   return 0;
 }
