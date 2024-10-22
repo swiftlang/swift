@@ -1996,12 +1996,21 @@ public:
           // We don't have typeinfo; something is very broken.
           Invalid = true;
           return nullptr;
+	} else if (Case.Indirect) {
+	  // An indirect case is non-empty (it stores a pointer)
+	  // and acts like a non-generic (because the pointer has spare bits)
+	  ++NonGenericNonEmptyPayloadCases;
+          LastPayloadCaseTR = CaseTR;
         } else if (Case.Generic) {
+	  // Otherwise, we never consider spare bits from generic cases
           ++GenericPayloadCases;
           LastPayloadCaseTR = CaseTR;
         } else if (CaseTI->getSize() == 0) {
+	  // Needed to distinguish a "single-payload enum"
+	  // whose only case is empty.
           ++NonGenericEmptyPayloadCases;
         } else {
+	  // Finally, we consider spare bits from regular payloads
           ++NonGenericNonEmptyPayloadCases;
           LastPayloadCaseTR = CaseTR;
         }
