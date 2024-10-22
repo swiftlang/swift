@@ -133,7 +133,7 @@ extension Outer {
 
   @available(*, unavailable)
   func osx_universally_unavailable_call_osx() {
-    osx() // OK
+    osx() // expected-error {{'osx()' is unavailable in macOS}}
   }
   
   // rdar://92551870

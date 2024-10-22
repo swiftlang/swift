@@ -40,8 +40,15 @@ struct AvailabilityContext::PlatformInfo {
   /// platform.
   unsigned IsDeprecated : 1;
 
-  /// Sets `Range` to `other` if `other` is more restrictive. Returns true if
-  /// any property changed as a result of adding this constraint.
+  /// Sets each field to the value of the corresponding field in `other` if the
+  /// other is more restrictive. Returns true if any field changed as a result
+  /// of adding this constraint.
+  bool constrainWith(const PlatformInfo &other);
+
+  /// Updates each field to reflect the availability of `decl`, if that
+  /// availability is more restrictive. Returns true if any field was updated.
+  bool constrainWith(const Decl *decl);
+
   bool constrainRange(const AvailabilityRange &other) {
     if (!other.isContainedIn(Range))
       return false;
@@ -50,19 +57,9 @@ struct AvailabilityContext::PlatformInfo {
     return true;
   }
 
-  /// Sets `Range` to the platform introduction range of `decl` if that range
-  /// is more restrictive. Returns true if
-  /// any property changed as a result of adding this constraint.
-  bool constrainRange(const Decl *decl);
+  bool constrainUnavailability(std::optional<PlatformKind> unavailablePlatform);
 
-  /// Updates `UnavailablePlatform` and `IsUnavailable` to reflect the status
-  /// of `decl` if its platform unavailability is more restrictive. Returns
-  /// true if any property changed as a result of adding this constraint.
-  bool constrainUnavailability(const Decl *decl);
-
-  /// If `decl` is deprecated, sets `IsDeprecated` to true. Returns true if
-  /// any property changed as a result of adding this constraint.
-  bool constrainDeprecated(const Decl *decl);
+  bool constrainDeprecated(bool deprecated);
 
   /// Returns true if `other` is as available or is more available.
   bool isContainedIn(const PlatformInfo &other) const;
