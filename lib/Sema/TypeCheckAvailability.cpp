@@ -47,23 +47,13 @@ using namespace swift;
 static const Decl *
 concreteSyntaxDeclForAvailableAttribute(const Decl *AbstractSyntaxDecl);
 
-ExportContext::ExportContext(
-    DeclContext *DC, AvailabilityRange runningOSVersion,
-    FragileFunctionKind kind, bool spi, bool exported, bool implicit,
-    bool deprecated, std::optional<PlatformKind> unavailablePlatformKind)
-    : DC(DC), RunningOSVersion(runningOSVersion), FragileKind(kind) {
+ExportContext::ExportContext(DeclContext *DC, AvailabilityContext availability,
+                             FragileFunctionKind kind, bool spi, bool exported,
+                             bool implicit)
+    : DC(DC), Availability(availability), FragileKind(kind) {
   SPI = spi;
   Exported = exported;
   Implicit = implicit;
-  Deprecated = deprecated;
-  if (unavailablePlatformKind) {
-    Unavailable = 1;
-    Platform = unsigned(*unavailablePlatformKind);
-  } else {
-    Unavailable = 0;
-    Platform = 0;
-  }
-
   Reason = unsigned(ExportabilityReason::General);
 }
 
@@ -196,10 +186,8 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
   }
 }
 
-static void
-computeExportContextBits(ASTContext &Ctx, Decl *D, bool *spi, bool *implicit,
-                         bool *deprecated,
-                         std::optional<PlatformKind> *unavailablePlatformKind) {
+static void computeExportContextBits(ASTContext &Ctx, Decl *D, bool *spi,
+                                     bool *implicit) {
   if (D->isSPI() ||
       D->isAvailableAsSPI())
     *spi = true;
@@ -211,18 +199,10 @@ computeExportContextBits(ASTContext &Ctx, Decl *D, bool *spi, bool *implicit,
   if (D->isImplicit() && !isDeferBody)
     *implicit = true;
 
-  if (D->getAttrs().isDeprecated(Ctx))
-    *deprecated = true;
-
-  if (auto *A = D->getAttrs().getUnavailable(Ctx)) {
-    *unavailablePlatformKind = A->Platform;
-  }
-
   if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i < e; ++i) {
       if (auto *VD = PBD->getAnchoringVarDecl(i))
-        computeExportContextBits(Ctx, VD, spi, implicit, deprecated,
-                                 unavailablePlatformKind);
+        computeExportContextBits(Ctx, VD, spi, implicit);
     }
   }
 }
@@ -232,56 +212,40 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
 
   auto *DC = D->getInnermostDeclContext();
   auto fragileKind = DC->getFragileFunctionKind();
-  auto runningOSVersion =
+  auto availabilityContext =
       (Ctx.LangOpts.DisableAvailabilityChecking
-           ? AvailabilityRange::alwaysAvailable()
-           : TypeChecker::overApproximateAvailabilityAtLocation(D->getLoc(),
-                                                                DC));
+           ? AvailabilityContext::getDefault(Ctx)
+           : TypeChecker::availabilityAtLocation(D->getLoc(), DC));
   bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
-  bool deprecated = false;
-  std::optional<PlatformKind> unavailablePlatformKind;
-  computeExportContextBits(Ctx, D, &spi, &implicit, &deprecated,
-                           &unavailablePlatformKind);
-  forEachOuterDecl(D->getDeclContext(),
-                   [&](Decl *D) {
-                     computeExportContextBits(Ctx, D,
-                                              &spi, &implicit, &deprecated,
-                                              &unavailablePlatformKind);
-                   });
+  computeExportContextBits(Ctx, D, &spi, &implicit);
+  forEachOuterDecl(D->getDeclContext(), [&](Decl *D) {
+    computeExportContextBits(Ctx, D, &spi, &implicit);
+  });
 
   bool exported = ::isExported(D);
 
-  return ExportContext(DC, runningOSVersion, fragileKind,
-                       spi, exported, implicit, deprecated,
-                       unavailablePlatformKind);
+  return ExportContext(DC, availabilityContext, fragileKind, spi, exported,
+                       implicit);
 }
 
 ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
   auto &Ctx = DC->getASTContext();
 
   auto fragileKind = DC->getFragileFunctionKind();
-  auto runningOSVersion =
+  auto availabilityContext =
       (Ctx.LangOpts.DisableAvailabilityChecking
-           ? AvailabilityRange::alwaysAvailable()
-           : TypeChecker::overApproximateAvailabilityAtLocation(loc, DC));
-
+           ? AvailabilityContext::getDefault(Ctx)
+           : TypeChecker::availabilityAtLocation(loc, DC));
   bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
-  bool deprecated = false;
-  std::optional<PlatformKind> unavailablePlatformKind;
-  forEachOuterDecl(DC,
-                   [&](Decl *D) {
-                     computeExportContextBits(Ctx, D,
-                                              &spi, &implicit, &deprecated,
-                                              &unavailablePlatformKind);
-                   });
+  forEachOuterDecl(
+      DC, [&](Decl *D) { computeExportContextBits(Ctx, D, &spi, &implicit); });
 
   bool exported = false;
 
-  return ExportContext(DC, runningOSVersion, fragileKind,
-                       spi, exported, implicit, deprecated,
-                       unavailablePlatformKind);
+  return ExportContext(DC, availabilityContext, fragileKind, spi, exported,
+                       implicit);
 }
 
 ExportContext ExportContext::forConformance(DeclContext *DC,
@@ -310,14 +274,9 @@ ExportContext ExportContext::withExported(bool exported) const {
 ExportContext ExportContext::withRefinedAvailability(
     const AvailabilityRange &availability) const {
   auto copy = *this;
-  copy.RunningOSVersion.intersectWith(availability);
+  copy.Availability.constrainWithPlatformRange(availability,
+                                               DC->getASTContext());
   return copy;
-}
-
-std::optional<PlatformKind> ExportContext::getUnavailablePlatformKind() const {
-  if (Unavailable)
-    return PlatformKind(Platform);
-  return std::nullopt;
 }
 
 bool ExportContext::mustOnlyReferenceExportedDecls() const {

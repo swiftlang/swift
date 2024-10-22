@@ -14,7 +14,7 @@
 #define SWIFT_SEMA_TYPE_CHECK_AVAILABILITY_H
 
 #include "swift/AST/AttrKind.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
@@ -103,20 +103,16 @@ enum class ExportabilityReason : unsigned {
 /// without producing a warning or error, respectively.
 class ExportContext {
   DeclContext *DC;
-  AvailabilityRange RunningOSVersion;
+  AvailabilityContext Availability;
   FragileFunctionKind FragileKind;
   unsigned SPI : 1;
   unsigned Exported : 1;
-  unsigned Deprecated : 1;
   unsigned Implicit : 1;
-  unsigned Unavailable : 1;
-  unsigned Platform : 8;
   unsigned Reason : 3;
 
-  ExportContext(DeclContext *DC, AvailabilityRange runningOSVersion,
+  ExportContext(DeclContext *DC, AvailabilityContext availability,
                 FragileFunctionKind kind, bool spi, bool exported,
-                bool implicit, bool deprecated,
-                std::optional<PlatformKind> unavailablePlatformKind);
+                bool implicit);
 
 public:
 
@@ -161,7 +157,7 @@ public:
   DeclContext *getDeclContext() const { return DC; }
 
   AvailabilityRange getAvailabilityRange() const {
-    return RunningOSVersion;
+    return Availability.getPlatformRange();
   }
 
   /// If not 'None', the context has the inlinable function body restriction.
@@ -180,9 +176,11 @@ public:
 
   /// If true, the context is part of a deprecated declaration and can
   /// reference other deprecated declarations without warning.
-  bool isDeprecated() const { return Deprecated; }
+  bool isDeprecated() const { return Availability.isDeprecated(); }
 
-  std::optional<PlatformKind> getUnavailablePlatformKind() const;
+  std::optional<PlatformKind> getUnavailablePlatformKind() const {
+    return Availability.getUnavailablePlatformKind();
+  }
 
   /// If true, the context can only reference exported declarations, either
   /// because it is the signature context of an exported declaration, or
