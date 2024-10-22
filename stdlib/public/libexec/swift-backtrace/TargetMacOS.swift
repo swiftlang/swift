@@ -129,21 +129,28 @@ class Target {
     }
   }
 
-  static func isPlatformBinary(pid: pid_t) -> Bool {
+  static func isPrivileged(pid: pid_t) -> Bool {
     var flags = UInt32(0)
 
-    return csops(pid,
-                 UInt32(CS_OPS_STATUS),
-                 &flags,
-                 MemoryLayout<UInt32>.size) != 0 ||
-      (flags & UInt32(CS_PLATFORM_BINARY | CS_PLATFORM_PATH)) != 0
+    guard csops(pid,
+                UInt32(CS_OPS_STATUS),
+                &flags,
+                MemoryLayout<UInt32>.size) == 0 else {
+      return true
+    }
+
+    if (flags & UInt32(CS_PLATFORM_BINARY | CS_PLATFORM_PATH | CS_RUNTIME)) != 0 {
+      return true
+    }
+
+    return (flags & UInt32(CS_GET_TASK_ALLOW)) == 0
   }
 
   init(crashInfoAddr: UInt64, limit: Int?, top: Int, cache: Bool,
        symbolicate: SwiftBacktrace.Symbolication) {
     pid = getppid()
 
-    if Self.isPlatformBinary(pid: pid) {
+    if Self.isPrivileged(pid: pid) {
       /* Exit silently in this case; either
 
          1. We can't call csops(), because we're sandboxed, or
