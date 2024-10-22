@@ -320,6 +320,16 @@ func unavailableOnMacOS() {
 }
 
 // CHECK-NEXT: {{^}}  (decl_implicit version=50 decl=extension.SomeEnum
+// CHECK-NEXT: {{^}}    (decl version=51 decl=extension.SomeEnum
+// CHECK-NEXT: {{^}}      (decl_implicit version=51 decl=unavailableOnMacOS
+// CHECK-NEXT: {{^}}        (decl_implicit version=51 unavailable=macOS decl=unavailableOnMacOS
+@available(OSX 51, *)
+extension SomeEnum {
+  @available(macOS, unavailable)
+  var unavailableOnMacOS: Int { 1 }
+}
+
+// CHECK-NEXT: {{^}}  (decl_implicit version=50 decl=extension.SomeEnum
 // CHECK-NEXT: {{^}}    (decl_implicit version=50 unavailable=macOS decl=extension.SomeEnum
 // CHECK-NEXT: {{^}}      (decl_implicit version=50 unavailable=macOS decl=availableMacOS_52
 // CHECK-NEXT: {{^}}        (decl version=52 unavailable=macOS decl=availableMacOS_52

@@ -348,8 +348,7 @@ static const AvailableAttr *getActiveAvailableAttribute(const Decl *D,
 
 /// Returns true if there is any availability attribute on the declaration
 /// that is active on the target platform.
-static bool hasActiveAvailableAttribute(Decl *D,
-                                           ASTContext &AC) {
+static bool hasActiveAvailableAttribute(const Decl *D, ASTContext &AC) {
   return getActiveAvailableAttribute(D, AC);
 }
 
@@ -718,8 +717,12 @@ private:
     return nullptr;
   }
 
-  const AvailabilityContext getEffectiveAvailabilityForDeclSignature(Decl *D) {
+  const AvailabilityContext
+  getEffectiveAvailabilityForDeclSignature(const Decl *D) {
     auto EffectiveIntroduction = AvailabilityRange::alwaysAvailable();
+
+    // Availability attributes are found abstract syntax decls.
+    D = abstractSyntaxDeclForAvailableAttribute(D);
 
     // As a special case, extension decls are treated as effectively as
     // available as the nominal type they extend, up to the deployment target.
@@ -754,7 +757,7 @@ private:
   /// are not constrained since they appear in the interface of the module and
   /// may be consumed by clients with lower deployment targets, but there are
   /// some exceptions.
-  bool shouldConstrainSignatureToDeploymentTarget(Decl *D) {
+  bool shouldConstrainSignatureToDeploymentTarget(const Decl *D) {
     if (isCurrentTRCContainedByDeploymentTarget())
       return false;
 
