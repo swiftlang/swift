@@ -752,34 +752,29 @@ public:
               ->getCanonicalType();
     }
 
-    auto blockStorageTy = SILBlockStorageType::get(
-        checkedBridging ? ctx.TheAnyType : continuationTy);
+    auto blockStorageTy = SILBlockStorageType::get(ctx.TheAnyType);
     auto blockStorage = SGF.emitTemporaryAllocation(
         loc, SILType::getPrimitiveAddressType(blockStorageTy));
 
     auto continuationAddr = SGF.B.createProjectBlockStorage(loc, blockStorage);
 
     // Stash continuation in a buffer for a block object.
+    auto conformances =
+        collectExistentialConformances(continuationTy, ctx.TheAnyType);
+
+    // In this case block storage captures `Any` which would be initialized
+    // with a continuation.
+    auto underlyingContinuationAddr = SGF.B.createInitExistentialAddr(
+        loc, continuationAddr, continuationTy,
+        SGF.getLoweredType(continuationTy), conformances);
 
     if (checkedBridging) {
       auto createIntrinsic =
           throws ? SGF.SGM.getCreateCheckedThrowingContinuation()
                  : SGF.SGM.getCreateCheckedContinuation();
-
-      auto conformances = collectExistentialConformances(
-          continuationTy, ctx.TheAnyType);
-
-      // In this case block storage captures `Any` which would be initialized
-      // with an checked continuation.
-      auto underlyingContinuationAddr =
-          SGF.B.createInitExistentialAddr(loc, continuationAddr, continuationTy,
-                                          SGF.getLoweredType(continuationTy),
-                                          conformances);
-
-      auto subs = SubstitutionMap::get(createIntrinsic->getGenericSignature(),
-                                       {calleeTypeInfo.substResultType},
-                                       conformances);
-
+      auto subs =
+          SubstitutionMap::get(createIntrinsic->getGenericSignature(),
+                               {calleeTypeInfo.substResultType}, conformances);
       InitializationPtr underlyingInit(
           new KnownAddressInitialization(underlyingContinuationAddr));
       auto continuationMV =
@@ -788,7 +783,7 @@ public:
                                       {continuationMV}, SGFContext())
           .forwardInto(SGF, loc, underlyingInit.get());
     } else {
-      SGF.B.createStore(loc, wrappedContinuation, continuationAddr,
+      SGF.B.createStore(loc, wrappedContinuation, underlyingContinuationAddr,
                         StoreOwnershipQualifier::Trivial);
     }
 
@@ -917,7 +912,7 @@ public:
             SGF.B.createProjectBlockStorage(loc, blockStorage);
 
         ManagedValue continuation;
-        if (checkedBridging) {
+        {
           FormalEvaluationScope scope(SGF);
 
           auto underlyingValueTy =
@@ -930,11 +925,11 @@ public:
           continuation = SGF.B.createUncheckedAddrCast(
               loc, underlyingValueAddr,
               SILType::getPrimitiveAddressType(continuationTy));
-        } else {
-          auto continuationVal = SGF.B.createLoad(
-              loc, continuationAddr, LoadOwnershipQualifier::Trivial);
-          continuation =
-              ManagedValue::forObjectRValueWithoutOwnership(continuationVal);
+
+          // If we are calling the unsafe variant, we always pass the value in
+          // registers.
+          if (!checkedBridging)
+            continuation = SGF.B.createLoadTrivial(loc, continuation);
         }
 
         auto mappedOutContinuationTy =
