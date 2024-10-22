@@ -87,11 +87,11 @@ function(remove_sdk_unsupported_archs name os sdk_path deployment_version archit
       # 32-bit iOS simulator is not listed explicitly in SDK settings.
       message(STATUS "Assuming ${name} SDK at ${sdk_path} supports architecture ${arch}")
       list(APPEND architectures ${arch})
-    elseif(arch STREQUAL "armv7k" AND os STREQUAL "watchos" AND deployment_version VERSION_LESS "9.0")
+    elseif(arch STREQUAL "armv7k" AND os STREQUAL "watchos")
       # 32-bit watchOS is not listed explicitly in SDK settings.
       message(STATUS "Assuming ${name} SDK at ${sdk_path} supports architecture ${arch}")
       list(APPEND architectures ${arch})
-    elseif(arch STREQUAL "i386" AND os STREQUAL "watchsimulator" AND deployment_version VERSION_LESS "7.0")
+    elseif(arch STREQUAL "i386" AND os STREQUAL "watchsimulator")
       # 32-bit watchOS simulator is not listed explicitly in SDK settings.
       message(STATUS "Assuming ${name} SDK at ${sdk_path} supports architecture ${arch}")
       list(APPEND architectures ${arch})
