@@ -3002,6 +3002,16 @@ namespace {
 
       auto result = results.front();
       if (auto protocol = dyn_cast<ProtocolDecl>(result)) {
+        for (auto attr : decl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
+          auto existingProtocol = attr->getProtocol();
+          if (existingProtocol == protocol) {
+            HeaderLoc attrLoc(conformsToAttr->getLocation());
+            Impl.diagnose(attrLoc, diag::redundant_conformance_protocol,
+                          decl->getDeclaredInterfaceType(), existingProtocol->getName());
+            return;
+          }
+        }
+          
         decl->getAttrs().add(
             new (Impl.SwiftContext) SynthesizedProtocolAttr(protocol, &Impl, false));
       } else {
