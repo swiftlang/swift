@@ -1,5 +1,7 @@
 // RUN: %scale-test --invert-result --begin 2 --end 5 --step 1 --select NumLeafScopes %s
 
+// REQUIRES: no_asan
+
 func g<T: Equatable>(_: T, _: T) {}
 
 let base: UInt64 = 0

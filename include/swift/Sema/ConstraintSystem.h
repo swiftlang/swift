@@ -2538,13 +2538,6 @@ private:
     #define CS_STATISTIC(Name, Description) unsigned Name = 0;
     #include "ConstraintSolverStats.def"
 
-    /// Mark given constraint as retired along current solver path.
-    ///
-    /// \param constraint The constraint to retire temporarily.
-    void retireConstraint(Constraint *constraint) {
-      Trail.recordChange(SolverTrail::Change::RetiredConstraint(constraint));
-    }
-
     /// Add new "generated" constraint along the current solver path.
     ///
     /// \param constraint The newly generated constraint.
@@ -3924,7 +3917,10 @@ public:
   /// Remove an inactive constraint from the current constraint graph.
   void removeInactiveConstraint(Constraint *constraint) {
     CG.removeConstraint(constraint);
-    InactiveConstraints.erase(constraint);
+
+    auto where = InactiveConstraints.erase(constraint);
+    if (solverState)
+      recordChange(SolverTrail::Change::RetiredConstraint(where, constraint));
 
     if (isDebugMode() && getPhase() == ConstraintSystemPhase::Solving) {
       auto &log = llvm::errs();
@@ -3934,9 +3930,6 @@ public:
                         solverState->getCurrentIndent() + 4);
       log << ")\n";
     }
-
-    if (solverState)
-      solverState->retireConstraint(constraint);
   }
 
   /// Transfer given constraint from to active list

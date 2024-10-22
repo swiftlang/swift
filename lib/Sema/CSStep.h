@@ -202,18 +202,6 @@ protected:
     return StepResult::unsolved(followup);
   }
 
-  /// Erase constraint from the constraint system (include constraint graph)
-  /// and return the constraint which follows it.
-  ConstraintList::iterator erase(Constraint *constraint) {
-    CS.CG.removeConstraint(constraint);
-    return CS.InactiveConstraints.erase(constraint);
-  }
-
-  void restore(ConstraintList::iterator &iterator, Constraint *constraint) {
-    CS.InactiveConstraints.insert(iterator, constraint);
-    CS.CG.addConstraint(constraint);
-  }
-
   void recordDisjunctionChoice(ConstraintLocator *disjunctionLocator,
                                unsigned index) const {
     CS.recordDisjunctionChoice(disjunctionLocator, index);
@@ -684,7 +672,6 @@ protected:
 class DisjunctionStep final : public BindingStep<DisjunctionChoiceProducer> {
   Constraint *Disjunction;
   SmallVector<Constraint *, 4> DisabledChoices;
-  ConstraintList::iterator AfterDisjunction;
 
   std::optional<Score> BestNonGenericScore;
   std::optional<std::pair<Constraint *, Score>> LastSolvedChoice;
@@ -692,8 +679,7 @@ class DisjunctionStep final : public BindingStep<DisjunctionChoiceProducer> {
 public:
   DisjunctionStep(ConstraintSystem &cs, Constraint *disjunction,
                   SmallVectorImpl<Solution> &solutions)
-      : BindingStep(cs, {cs, disjunction}, solutions), Disjunction(disjunction),
-        AfterDisjunction(erase(disjunction)) {
+      : BindingStep(cs, {cs, disjunction}, solutions), Disjunction(disjunction) {
     assert(Disjunction->getKind() == ConstraintKind::Disjunction);
     pruneOverloadSet(Disjunction);
     ++cs.solverState->NumDisjunctions;
@@ -702,8 +688,6 @@ public:
   ~DisjunctionStep() override {
     // Rewind back any changes left after attempting last choice.
     ActiveChoice.reset();
-    // Return disjunction constraint back to the system.
-    restore(AfterDisjunction, Disjunction);
     // Re-enable previously disabled overload choices.
     for (auto *choice : DisabledChoices)
       choice->setEnabled();
@@ -919,10 +903,6 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
 
   /// Conjunction constraint associated with this step.
   Constraint *Conjunction;
-  /// Position of the conjunction in the inactive constraints
-  /// list which is required to re-instate it to the system
-  /// after this step is done.
-  ConstraintList::iterator AfterConjunction;
 
   /// Indicates that one of the elements failed inference.
   bool HadFailure = false;
@@ -950,7 +930,7 @@ public:
                     conjunction->isIsolated() ? IsolatedSolutions : solutions),
         BestScore(getBestScore()),
         OuterScopeCount(cs.CountScopes, 0), Conjunction(conjunction),
-        AfterConjunction(erase(conjunction)), OuterSolutions(solutions) {
+        OuterSolutions(solutions) {
     assert(conjunction->getKind() == ConstraintKind::Conjunction);
 
     // Make a snapshot of the constraint system state before conjunction.
@@ -968,9 +948,6 @@ public:
 
     // Return all of the type variables and constraints back.
     Snapshot.reset();
-
-    // Restore conjunction constraint.
-    restore(AfterConjunction, Conjunction);
 
     // Restore best score only if conjunction fails because
     // successful outcome should keep a score set by `restoreOuterState`.
