@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-sil -sil-verify-all -verify -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses %s -Xllvm -sil-print-final-ossa-module | %FileCheck %s
-// RUN: %target-swift-emit-sil -O -sil-verify-all -verify -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses %s
+// RUN: %target-swift-emit-sil -sil-verify-all -verify -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses -enable-experimental-feature NonescapableTypes %s -Xllvm -sil-print-final-ossa-module | %FileCheck %s
+// RUN: %target-swift-emit-sil -O -sil-verify-all -verify -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses -enable-experimental-feature NonescapableTypes %s
 
 // This file contains tests that used to crash due to verifier errors. It must
 // be separate from moveonly_addresschecker_diagnostics since when we fail on
@@ -45,4 +45,19 @@ struct S
         utf8.withUnsafeBufferPointer { _ in }
         fatalError()
     }
+}
+
+struct TestCoroAccessorOfCoroAccessor<T : ~Escapable> : ~Copyable & ~Escapable {
+  var t: T
+
+  var inner: TestCoroAccessorOfCoroAccessor<T> {
+    _read {
+      fatalError()
+    }
+  }
+  var outer: TestCoroAccessorOfCoroAccessor<T> {
+    _read {
+      yield inner
+    }
+  }
 }
