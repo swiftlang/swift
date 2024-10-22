@@ -296,6 +296,16 @@ SolverTrail::Change::RecordedKeyPath(KeyPathExpr *expr) {
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::RetiredConstraint(ConstraintList::iterator where,
+                                       Constraint *constraint) {
+  Change result;
+  result.Kind = ChangeKind::RetiredConstraint;
+  result.Retiree.Where = where;
+  result.Retiree.Constraint = constraint;
+  return result;
+}
+
 SyntacticElementTargetKey
 SolverTrail::Change::getSyntacticElementTargetKey() const {
   ASSERT(Kind == ChangeKind::RecordedTarget);
@@ -481,7 +491,8 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   }
 
   case ChangeKind::RetiredConstraint:
-    cs.InactiveConstraints.push_back(TheConstraint.Constraint);
+    cs.InactiveConstraints.insert(Retiree.Where,
+                                  Retiree.Constraint);
     break;
   }
 }
@@ -672,6 +683,13 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
   case ChangeKind::RecordedKeyPath:
     out << "(RecordedKeyPath ";
     simple_display(out, KeyPath.Expr);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RetiredConstraint:
+    out << "(RetiredConstraint ";
+    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
+                                    indent + 2);
     out << ")\n";
     break;
   }
