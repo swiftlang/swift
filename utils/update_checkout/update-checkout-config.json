@@ -162,7 +162,7 @@
                 "swift-docc-symbolkit": "main",
                 "swift-markdown": "main",
                 "swift-nio": "2.65.0",
-                "swift-experimental-string-processing": "swift/main",
+                "swift-experimental-string-processing": "main",
                 "swift-sdk-generator": "main",
                 "wasi-libc": "wasi-sdk-22",
                 "wasmkit": "0.1.2",
