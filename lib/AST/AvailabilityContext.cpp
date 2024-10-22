@@ -39,15 +39,21 @@ bool AvailabilityContext::PlatformInfo::constrainUnavailability(
   if (!unavailablePlatform)
     return false;
 
-  // Check whether the decl's unavailability reason is the same.
-  if (IsUnavailable && UnavailablePlatform == *unavailablePlatform)
-    return false;
+  if (IsUnavailable) {
+    // Universal unavailability cannot be refined.
+    if (UnavailablePlatform == PlatformKind::none)
+      return false;
 
-  // Check whether the decl's unavailability reason is more specific.
-  if (*unavailablePlatform != PlatformKind::none &&
-      inheritsAvailabilityFromPlatform(*unavailablePlatform,
-                                       UnavailablePlatform))
-    return false;
+    // There's nothing to do if the platforms already match.
+    if (UnavailablePlatform == *unavailablePlatform)
+      return false;
+
+    // The new platform must be more restrictive.
+    if (*unavailablePlatform != PlatformKind::none &&
+        inheritsAvailabilityFromPlatform(*unavailablePlatform,
+                                         UnavailablePlatform))
+      return false;
+  }
 
   IsUnavailable = true;
   UnavailablePlatform = *unavailablePlatform;
