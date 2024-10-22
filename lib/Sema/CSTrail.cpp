@@ -730,21 +730,10 @@ void SolverTrail::undo(unsigned toIndex) {
   ASSERT(!UndoActive);
   UndoActive = true;
 
-  // FIXME: Undo all changes in the correct order!
   for (unsigned i = Changes.size(); i > toIndex; i--) {
     auto change = Changes[i - 1];
-    if (change.Kind == ChangeKind::UpdatedTypeVariable) {
-      LLVM_DEBUG(llvm::dbgs() << "- "; change.dump(llvm::dbgs(), CS, 0));
-      change.undo(CS);
-    }
-  }
-
-  for (unsigned i = Changes.size(); i > toIndex; i--) {
-    auto change = Changes[i - 1];
-    if (change.Kind != ChangeKind::UpdatedTypeVariable) {
-      LLVM_DEBUG(llvm::dbgs() << "- "; change.dump(llvm::dbgs(), CS, 0));
-      change.undo(CS);
-    }
+    LLVM_DEBUG(llvm::dbgs() << "- "; change.dump(llvm::dbgs(), CS, 0));
+    change.undo(CS);
   }
 
   Changes.resize(toIndex);
