@@ -1215,8 +1215,12 @@ bool BindingSet::isViable(PotentialBinding &binding, bool isTransitive) {
     // as a binding because `$T0` could be inferred to
     // `(key: String, value: Int)` and binding `$T1` to `Array<(String, Int)>`
     // eagerly would be incorrect.
-    if (existing->Kind != binding.Kind)
-      continue;
+    if (existing->Kind != binding.Kind) {
+      // Array, Set and Dictionary allow conversions, everything else
+      // requires their generic arguments to match exactly.
+      if (existingType->isKnownStdlibCollectionType())
+        continue;
+    }
 
     // If new type has a type variable it shouldn't
     // be considered  viable.
