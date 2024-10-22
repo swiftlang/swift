@@ -352,6 +352,36 @@ void ConstraintGraphNode::retractFromInference(Constraint *constraint) {
   }
 }
 
+void ConstraintGraphNode::retractFromInference(Type fixedType) {
+  // Notify all of the type variables that reference this one.
+  //
+  // Since this type variable has been replaced with a fixed type
+  // all of the concrete types that reference it are going to change,
+  // which means that all of the not-yet-attempted bindings should
+  // change as well.
+  notifyReferencingVars(
+    [&](ConstraintGraphNode &node, Constraint *constraint) {
+      node.retractFromInference(constraint);
+    });
+
+  if (!fixedType->hasTypeVariable())
+    return;
+
+  SmallPtrSet<TypeVariableType *, 4> referencedVars;
+  fixedType->getTypeVariables(referencedVars);
+
+  for (auto *referencedVar : referencedVars) {
+    auto &node = CG[referencedVar];
+
+    // Newly referred vars need to re-introduce all constraints associated
+    // with this type variable since they are now going to be used in
+    // all of the constraints that reference bound type variable.
+    for (auto *constraint : getConstraints()) {
+      if (isUsefulForReferencedVars(constraint))
+        node.retractFromInference(constraint);
+    }
+  }
+}
 
 void ConstraintGraphNode::introduceToInference(Type fixedType) {
   // Notify all of the type variables that reference this one.
@@ -362,7 +392,6 @@ void ConstraintGraphNode::introduceToInference(Type fixedType) {
   // change as well.
   notifyReferencingVars(
     [&](ConstraintGraphNode &node, Constraint *constraint) {
-      node.retractFromInference(constraint);
       node.introduceToInference(constraint);
     });
 
@@ -380,7 +409,6 @@ void ConstraintGraphNode::introduceToInference(Type fixedType) {
     // all of the constraints that reference bound type variable.
     for (auto *constraint : getConstraints()) {
       if (isUsefulForReferencedVars(constraint)) {
-        node.retractFromInference(constraint);
         node.introduceToInference(constraint);
       }
     }
@@ -546,6 +574,10 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
     if (CS.isRecordingChanges())
       CS.recordChange(SolverTrail::Change::RelatedTypeVariables(typeVar, otherTypeVar));
   }
+}
+
+void ConstraintGraph::retractFromInference(TypeVariableType *typeVar, Type fixed) {
+  (*this)[typeVar].retractFromInference(fixed);
 }
 
 void ConstraintGraph::introduceToInference(TypeVariableType *typeVar, Type fixed) {
