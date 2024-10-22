@@ -177,7 +177,9 @@ void ConstraintGraphNode::removeConstraint(Constraint *constraint) {
   Constraints.pop_back();
 }
 
-void ConstraintGraphNode::notifyReferencingVars() const {
+void ConstraintGraphNode::notifyReferencingVars(
+    llvm::function_ref<void(ConstraintGraphNode &,
+                            Constraint *)> notification) const {
   SmallVector<TypeVariableType *, 4> stack;
 
   stack.push_back(TypeVar);
@@ -199,7 +201,7 @@ void ConstraintGraphNode::notifyReferencingVars() const {
             affectedVar->getImpl().getRepresentative(/*record=*/nullptr);
 
         if (!repr->getImpl().getFixedType(/*record=*/nullptr))
-          CG[repr].reintroduceToInference(constraint);
+          notification(CG[repr], constraint);
       }
     }
   };
@@ -236,7 +238,7 @@ void ConstraintGraphNode::notifyReferencingVars() const {
 }
 
 void ConstraintGraphNode::notifyReferencedVars(
-    llvm::function_ref<void(ConstraintGraphNode &)> notification) {
+    llvm::function_ref<void(ConstraintGraphNode &)> notification) const {
   for (auto *fixedBinding : getReferencedVars()) {
     notification(CG[fixedBinding]);
   }
@@ -265,7 +267,14 @@ void ConstraintGraphNode::addToEquivalenceClass(
         });
       }
 
-      node.notifyReferencingVars();
+      // FIXME: Perhaps this also needs to be split up into two stages,
+      // where the first stage runs before we merge the equivalence
+      // classes
+      node.notifyReferencingVars(
+        [&](ConstraintGraphNode &node, Constraint *constraint) {
+          node.retractFromInference(constraint);
+          node.introduceToInference(constraint);
+        });
     }
   }
 }
@@ -343,10 +352,6 @@ void ConstraintGraphNode::retractFromInference(Constraint *constraint) {
   }
 }
 
-void ConstraintGraphNode::reintroduceToInference(Constraint *constraint) {
-  retractFromInference(constraint);
-  introduceToInference(constraint);
-}
 
 void ConstraintGraphNode::introduceToInference(Type fixedType) {
   // Notify all of the type variables that reference this one.
@@ -355,7 +360,11 @@ void ConstraintGraphNode::introduceToInference(Type fixedType) {
   // all of the concrete types that reference it are going to change,
   // which means that all of the not-yet-attempted bindings should
   // change as well.
-  notifyReferencingVars();
+  notifyReferencingVars(
+    [&](ConstraintGraphNode &node, Constraint *constraint) {
+      node.retractFromInference(constraint);
+      node.introduceToInference(constraint);
+    });
 
   if (!fixedType->hasTypeVariable())
     return;
@@ -370,8 +379,10 @@ void ConstraintGraphNode::introduceToInference(Type fixedType) {
     // with this type variable since they are now going to be used in
     // all of the constraints that reference bound type variable.
     for (auto *constraint : getConstraints()) {
-      if (isUsefulForReferencedVars(constraint))
-        node.reintroduceToInference(constraint);
+      if (isUsefulForReferencedVars(constraint)) {
+        node.retractFromInference(constraint);
+        node.introduceToInference(constraint);
+      }
     }
   }
 }
