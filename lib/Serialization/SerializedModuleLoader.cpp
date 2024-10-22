@@ -1379,10 +1379,19 @@ void swift::serialization::diagnoseSerializedASTLoadFailureTransitive(
   }
 }
 
+static bool tripleNeedsSubarchitectureAdjustment(const llvm::Triple &lhs, const llvm::Triple &rhs) {
+  return (lhs.getSubArch() != rhs.getSubArch() &&
+          lhs.getArch() == rhs.getArch() &&
+          lhs.getVendor() == rhs.getVendor() &&
+          lhs.getOS() == rhs.getOS() &&
+          lhs.getEnvironment() == rhs.getEnvironment());
+}
+
 bool swift::extractCompilerFlagsFromInterface(
     StringRef interfacePath, StringRef buffer, llvm::StringSaver &ArgSaver,
     SmallVectorImpl<const char *> &SubArgs,
-    std::optional<llvm::Triple> PreferredTarget) {
+    std::optional<llvm::Triple> PreferredTarget,
+    std::optional<llvm::Triple> PreferredTargetVariant) {
   SmallVector<StringRef, 1> FlagMatches;
   auto FlagRe = llvm::Regex("^// swift-module-flags:(.*)$", llvm::Regex::Newline);
   if (!FlagRe.match(buffer, &FlagMatches))
@@ -1395,19 +1404,19 @@ bool swift::extractCompilerFlagsFromInterface(
   // we have loaded a Swift interface from a different-but-compatible
   // architecture slice. Use the compatible subarchitecture.
   for (unsigned I = 1; I < SubArgs.size(); ++I) {
-    // FIXME: Also fix up -target-variant (rdar://135322077).
-    if (strcmp(SubArgs[I - 1], "-target") != 0) {
-      continue;
+    if (strcmp(SubArgs[I - 1], "-target") == 0) {
+      llvm::Triple target(SubArgs[I]);
+      if (PreferredTarget &&
+          tripleNeedsSubarchitectureAdjustment(target, *PreferredTarget))
+        target.setArch(PreferredTarget->getArch(), PreferredTarget->getSubArch());
+      SubArgs[I] = ArgSaver.save(target.str()).data();
+    } else if (strcmp(SubArgs[I - 1], "-target-variant") == 0) {
+      llvm::Triple targetVariant(SubArgs[I]);
+      if (PreferredTargetVariant &&
+          tripleNeedsSubarchitectureAdjustment(targetVariant, *PreferredTargetVariant))
+        targetVariant.setArch(PreferredTargetVariant->getArch(), PreferredTargetVariant->getSubArch());
+      SubArgs[I] = ArgSaver.save(targetVariant.str()).data();
     }
-    llvm::Triple target(SubArgs[I]);
-    if (PreferredTarget &&
-        target.getSubArch() != PreferredTarget->getSubArch() &&
-        target.getArch() == PreferredTarget->getArch() &&
-        target.getVendor() == PreferredTarget->getVendor() &&
-        target.getOS() == PreferredTarget->getOS() &&
-        target.getEnvironment() == PreferredTarget->getEnvironment())
-      target.setArch(PreferredTarget->getArch(), PreferredTarget->getSubArch());
-    SubArgs[I] = ArgSaver.save(target.str()).data();
   }
 
   SmallVector<StringRef, 1> IgnFlagMatches;
