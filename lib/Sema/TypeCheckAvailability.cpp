@@ -3237,10 +3237,14 @@ static void diagnoseNonRuntimeProtocol(SourceLoc Loc, TypeDecl *D) {
     auto *clangImporter = static_cast<ClangImporter *>(D->getASTContext().getClangModuleLoader());
     assert(clangImporter && "Must have a clang importer");
 
-    D->getASTContext()
-        .Diags
-        .diagnose(Loc, diag::non_runtime_objc_protocol_metadata_not_available,
-                  D->getNameStr())
+
+    auto &Diags = D->getASTContext().Diags;
+    Diags.diagnose(Loc, diag::non_runtime_objc_protocol_metadata_not_available,
+                   D->getNameStr());
+    Diags
+        .diagnose(clangImporter->importSourceLocation(proto->getLocation()),
+                  diag::non_runtime_objc_protocol_metadata_not_available_note,
+                  proto->getNameAsString())
         .highlight(clangImporter->importSourceRange(
             proto->getAttr<clang::ObjCNonRuntimeProtocolAttr>()->getRange()));
   }
