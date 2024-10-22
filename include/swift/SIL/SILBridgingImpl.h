@@ -1387,6 +1387,10 @@ void BridgedInstruction::MarkDependenceInst_resolveToNonEscaping() const {
   getAs<swift::MarkDependenceInst>()->resolveToNonEscaping();
 }
 
+void BridgedInstruction::MarkDependenceInst_settleToEscaping() const {
+  getAs<swift::MarkDependenceInst>()->settleToEscaping();
+}
+
 SwiftInt BridgedInstruction::BeginAccessInst_getAccessKind() const {
   return (SwiftInt)getAs<swift::BeginAccessInst>()->getAccessKind();
 }

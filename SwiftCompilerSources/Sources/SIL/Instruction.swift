@@ -976,6 +976,10 @@ class MarkDependenceInst : SingleValueInstruction {
   public func resolveToNonEscaping() {
     bridged.MarkDependenceInst_resolveToNonEscaping()
   }
+
+  public func settleToEscaping() {
+    bridged.MarkDependenceInst_settleToEscaping()
+  }
 }
 
 final public class RefToBridgeObjectInst : SingleValueInstruction {
