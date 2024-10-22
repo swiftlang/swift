@@ -45,8 +45,6 @@ private:
   AvailabilityContext(const Storage *info) : Info(info) { assert(info); };
 
 public:
-  AvailabilityContext(const AvailabilityContext &other) : Info(other.Info){};
-
   /// Retrieves the default `AvailabilityContext`, which is maximally available.
   /// The platform availability range will be set to the deployment target (or
   /// minimum inlining target when applicable).
