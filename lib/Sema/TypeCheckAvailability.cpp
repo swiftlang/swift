@@ -695,7 +695,7 @@ private:
       return nullptr;
 
     // Declarations with explicit availability attributes always get a TRC.
-    if (AvailabilityInference::attrForAnnotatedAvailableRange(D)) {
+    if (hasActiveAvailableAttribute(D, Context)) {
       return TypeRefinementContext::createForDecl(
           Context, D, getCurrentTRC(),
           getEffectiveAvailabilityForDeclSignature(D),

@@ -311,7 +311,7 @@ func testStringInterpolation() {
     """
 }
 
-// CHECK-NEXT: {{^}}  (decl_implicit version=50 unavailable=macOS decl=unavailableOnMacOS()
+// CHECK-NEXT: {{^}}  (decl version=50 unavailable=macOS decl=unavailableOnMacOS()
 // CHECK-NEXT: {{^}}    (decl_implicit version=50 unavailable=macOS decl=x
 
 @available(macOS, unavailable)
@@ -322,7 +322,7 @@ func unavailableOnMacOS() {
 // CHECK-NEXT: {{^}}  (decl_implicit version=50 decl=extension.SomeEnum
 // CHECK-NEXT: {{^}}    (decl version=51 decl=extension.SomeEnum
 // CHECK-NEXT: {{^}}      (decl_implicit version=51 decl=unavailableOnMacOS
-// CHECK-NEXT: {{^}}        (decl_implicit version=51 unavailable=macOS decl=unavailableOnMacOS
+// CHECK-NEXT: {{^}}        (decl version=51 unavailable=macOS decl=unavailableOnMacOS
 @available(OSX 51, *)
 extension SomeEnum {
   @available(macOS, unavailable)
@@ -330,10 +330,10 @@ extension SomeEnum {
 }
 
 // CHECK-NEXT: {{^}}  (decl_implicit version=50 decl=extension.SomeEnum
-// CHECK-NEXT: {{^}}    (decl_implicit version=50 unavailable=macOS decl=extension.SomeEnum
+// CHECK-NEXT: {{^}}    (decl version=50 unavailable=macOS decl=extension.SomeEnum
 // CHECK-NEXT: {{^}}      (decl_implicit version=50 unavailable=macOS decl=availableMacOS_52
 // CHECK-NEXT: {{^}}        (decl version=52 unavailable=macOS decl=availableMacOS_52
-// CHECK-NEXT: {{^}}      (decl_implicit version=50 unavailable=* decl=neverAvailable()
+// CHECK-NEXT: {{^}}      (decl version=50 unavailable=* decl=neverAvailable()
 
 @available(macOS, unavailable)
 extension SomeEnum {
@@ -347,7 +347,8 @@ extension SomeEnum {
   func neverAvailable() {}
 }
 
-// CHECK-NEXT: {{^}}  (decl_implicit version=50 unavailable=* decl=NeverAvailable
+// CHECK-NEXT: {{^}}  (decl version=50 unavailable=* decl=NeverAvailable
+// CHECK-NEXT: {{^}}    (decl version=50 unavailable=* decl=unavailableOnMacOS()
 
 @available(*, unavailable)
 struct NeverAvailable {
@@ -355,7 +356,7 @@ struct NeverAvailable {
   func unavailableOnMacOS() {}
 }
 
-// CHECK-NEXT: {{^}}  (decl_implicit version=50 deprecated decl=deprecatedOnMacOS()
+// CHECK-NEXT: {{^}}  (decl version=50 deprecated decl=deprecatedOnMacOS()
 // CHECK-NEXT: {{^}}    (decl_implicit version=50 deprecated decl=x
 
 @available(macOS, deprecated)
