@@ -253,6 +253,18 @@ final class CowTest {
   var container = CowContainer()
 }
 
+@MainActor
+final class MainActorBoundType { }
+
+final class NonSendable { }
+
+@MainActor
+@Observable
+final class MainActorBoundObservable {
+  var mainActorBoundType = MainActorBoundType()
+  var nonSendable = NonSendable()
+}
+
 @main
 struct Validator {
   @MainActor

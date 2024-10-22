@@ -249,7 +249,7 @@ extension ObservableMacro: MemberMacro {
     for member in declaration.memberBlock.members {
       if let property = member.decl.as(VariableDeclSyntax.self) {
         if property.isValidForObservation, let identifier = property.identifier?.trimmed {
-          cachedKeypaths.append("  static let \(identifier.text) = \\\(observableType.trimmed.text).\(identifier.text)")
+          cachedKeypaths.append("  static let \(identifier.text): KeyPath & Sendable = \\\(observableType.trimmed.text).\(identifier.text)")
         }
       }
     }
