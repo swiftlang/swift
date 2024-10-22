@@ -75,6 +75,7 @@ extension Parser.ExperimentalFeatures {
     mapFeature(.NonescapableTypes, to: .nonescapableTypes)
     mapFeature(.TrailingComma, to: .trailingComma)
     mapFeature(.CoroutineAccessors, to: .coroutineAccessors)
+    mapFeature(.ValueGenerics, to: .valueGenerics)
   }
 }
 
