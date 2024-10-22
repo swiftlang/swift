@@ -95,12 +95,14 @@ public var irm: Int {
 // CHECK-SAME:   [[TOKEN:%[^,]+]],
 // CHECK-SAME:   [[ALLOCATION:%[^)]+]])
 // CHECK-SAME:  = begin_apply [[MODIFY_ACCESSOR]]([[SELF_ACCESS]])
-// CHECK:       yield [[VALUE_ADDRESS:%[^,]+]] : $*Int, resume bb1, unwind bb2
-// CHECK:     bb1:
+// CHECK:       yield [[VALUE_ADDRESS]] 
+// CHECK-SAME:      resume [[RESUME_BB:bb[0-9]+]]
+// CHECK-SAME:      unwind [[UNWIND_BB:bb[0-9]+]]
+// CHECK:     [[RESUME_BB]]:
 // CHECK:       end_apply [[TOKEN]]
 // CHECK:       end_access [[SELF_ACCESS]]
 // CHECK:       dealloc_stack [[ALLOCATION]]
-// CHECK:     bb2:
+// CHECK:     [[UNWIND_BB]]:
 // CHECK:       end_apply [[TOKEN]]
 // CHECK:       dealloc_stack [[ALLOCATION]]
 // CHECK:       end_access [[SELF_ACCESS]]
