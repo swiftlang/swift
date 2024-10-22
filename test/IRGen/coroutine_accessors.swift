@@ -37,10 +37,11 @@ public var irm: Int {
   modify {
     yield &_i
   }
-// CHECK-OLD-LABEL: define{{.*}} {{i64|i32}} @"$s19coroutine_accessors1SV3irmSivg"(
-// CHECK-OLD-SAME:      ptr %0,
-// CHECK-OLD-SAME:      [[INT]] %1
-// CHECK-OLD-SAME:  ) #0
+// CHECK-OLD-LABEL: define{{.*}} { ptr, {{i64|i32}} } @"$s19coroutine_accessors1SV3irmSivr"(
+// CHECK-OLD-SAME:      ptr noalias dereferenceable({{32|16}}) %0,
+// CHECK-OLD-SAME:      ptr %1,
+// CHECK-OLD-SAME:      [[INT]] %2
+// CHECK-OLD-SAME:  )
 // CHECK-OLD-SAME:  {
 // CHECK-OLD:       }
 // CHECK-OLD-LABEL: define{{.*}} void @"$s19coroutine_accessors1SV3irmSivs"(

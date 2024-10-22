@@ -326,3 +326,18 @@ var ir_rm_m: Int {
     fatalError()
   }
 }
+
+// =============================================================================
+// Protocol Requirements
+// =============================================================================
+
+protocol P {
+  var goodP: Int { read set } //expected-disabled-error{{property in protocol must have explicit { get } or { get set } specifier}}
+                              //expected-disabled-error@-1{{expected get or set in a protocol property}}
+  var badP: Int { read modify } //expected-enabled-error{{expected get or set in a protocol property}}
+                                //expected-disabled-error@-1{{property in protocol must have explicit { get } or { get set } specifier}}
+                                //expected-disabled-error@-2{{expected get or set in a protocol property}}
+  subscript(goodS goodS: Int) -> Int { read set } //expected-disabled-error{{expected get or set in a protocol property}}
+  subscript(badS badS: Int) -> Int { read modify } //expected-enabled-error{{expected get or set in a protocol property}}
+                                                   //expected-disabled-error@-1{{expected get or set in a protocol property}}
+}
