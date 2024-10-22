@@ -2090,6 +2090,14 @@ def load_plugin_executable:
            "of module names where the macro types are declared">,
   MetaVarName<"<path>#<module-names>">;
 
+def load_resolved_plugin:
+  Separate<["-"], "load-resolved-plugin">, Group<plugin_search_Group>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  HelpText<"Path to resolved plugin configuration and a comma-separated list "
+           "of module names where the macro types are declared. Library path "
+           "and exectuable path can be empty if not used">,
+  MetaVarName<"<library-path>#<executable-path>#<module-names>">;
+
 def in_process_plugin_server_path : Separate<["-"], "in-process-plugin-server-path">,
   Flags<[FrontendOption, ArgumentIsPath]>,
   HelpText<"Path to dynamic library plugin server">;

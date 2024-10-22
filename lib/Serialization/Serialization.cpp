@@ -1237,6 +1237,18 @@ void Serializer::writeHeader() {
                 uint8_t(PluginSearchOptionKind::LoadPluginExecutable), optStr);
             continue;
           }
+          case PluginSearchOption::Kind::ResolvedPluginConfig: {
+            auto &opt = elem.get<PluginSearchOption::ResolvedPluginConfig>();
+            std::string optStr =
+                opt.LibraryPath + "#" + opt.ExecutablePath + "#";
+            llvm::interleave(
+                opt.ModuleNames, [&](auto &name) { optStr += name; },
+                [&]() { optStr += ","; });
+            PluginSearchOpt.emit(
+                ScratchRecord,
+                uint8_t(PluginSearchOptionKind::ResolvedPluginConfig), optStr);
+            continue;
+          }
           }
         }
       }
