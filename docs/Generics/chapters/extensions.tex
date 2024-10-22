@@ -22,7 +22,7 @@ extension Outer.Middle {
 If a third module subsequently imports both the first and second module, it will see the members \texttt{Outer.Middle.foo()} and \texttt{Outer.Middle.Inner} just as if they were defined inside \texttt{Outer.Middle} itself. 
 
 \paragraph{Extensions and generics.}
-The \index{generic parameter declaration}generic parameters of the extended type are visible in the \index{scope tree}scope of the extension's body. Each extension has a generic signature, which describes the \index{interface type}interface types of its members. The generic signature of an ``unconstrained'' extension is the same as that of the extended type. Extensions can impose additional requirements on their generic parameters via a \Index{where clause@\texttt{where} clause}\texttt{where} clause; this declares a \emph{constrained extension} with its own generic signature (\SecRef{constrained extensions}). An extension can also state a conformance to a protocol, which is represented as \index{normal conformance}normal conformance visible to global conformance lookup. If the extension is unconstrained, this is essentially equivalent to stating a conformance on the extended type. If the extension is constrained, the conformance becomes a \emph{conditional conformance} (\SecRef{conditional conformance}).
+The \index{generic parameter declaration}generic parameters of the extended type are visible in the \index{scope tree}scope of the extension's body. Each extension has a generic signature, which describes the \index{interface type!extension member}interface types of its members. The generic signature of an ``unconstrained'' extension is the same as that of the extended type. Extensions can impose additional requirements on their generic parameters via a \Index{where clause@\texttt{where} clause!extension declaration}\texttt{where} clause; this declares a \emph{constrained extension} with its own generic signature (\SecRef{constrained extensions}). An extension can also state a conformance to a protocol, which is represented as \index{normal conformance}normal conformance visible to global conformance lookup. If the extension is unconstrained, this is essentially equivalent to stating a conformance on the extended type. If the extension is constrained, the conformance becomes a \emph{conditional conformance} (\SecRef{conditional conformance}).
 
 Let's begin by taking a closer look at \index{generic parameter list}generic parameter lists of extensions, by way of our nested type \texttt{Outer.Middle} and its extension above. Recall how generic parameters of nominal types work from \SecRef{generic params}: their names are lexically scoped to the body of the type declaration, and each generic parameter uniquely identified by its \index{depth}depth and \index{index}index. We can represent the declaration context nesting and generic parameter lists of our nominal type declaration \texttt{Outer.Middle} with a diagram like the following:
 \begin{quote}
@@ -94,13 +94,13 @@ When an extension declares a nested generic type, the depth of the nested type's
 
 \end{tikzpicture}
 \end{quote}
-The \index{declared interface type}declared interface type of an extension is the declared interface type of the extended type; the \index{self interface type}self interface type of an extension is the self interface type of the extended type. The two concepts coincide except when the extended type is a \index{protocol extension}protocol, in which case the declared interface type is the protocol type, whereas the self interface type is the \IndexSelf protocol \tSelf\ type.
+The \index{declared interface type!extension declaration}declared interface type of an extension is the declared interface type of the extended type; the \index{self interface type!extension declaration}self interface type of an extension is the self interface type of the extended type. The two concepts coincide except when the extended type is a \index{protocol extension}protocol, in which case the declared interface type is the protocol type, whereas the self interface type is the \IndexSelf protocol \tSelf\ type.
 
 \paragraph{Other behaviors.} An extension member generally behaves as if were declared inside the extended type itself, with some differences:
 \begin{itemize}
 \item Members of \index{protocol extension}\emph{protocol extensions} are not requirements imposed on the concrete type in the way that members of a protocol declaration are; they actually have a body.
 
-A protocol extension member with the same name and \index{interface type}interface type as a protocol requirement acts as a \IndexDefinition{default witness}\emph{default witness}, to be used if the conforming type does not provide its own witness for this requirement:
+A protocol extension member with the same name and \index{interface type!extension member}interface type as a protocol requirement acts as a \IndexDefinition{default witness}\emph{default witness}, to be used if the conforming type does not provide its own witness for this requirement:
 \begin{Verbatim}
 protocol P {
   func f()
@@ -135,7 +135,7 @@ All stored properties must be initialized by all declared constructors; extensio
 
 \index{class declaration}
 \index{vtable}
-\item When the extended type is a class, the methods of the extension are implicitly \texttt{final}, and the extension's methods are not permitted to override methods from the superclass. Non-\texttt{final} methods declared inside a class are dispatched through a vtable of function pointers attached to the runtime metadata of the class, and there is no mechanism for extensions to add new entries or replace existing entries inherited from the superclass.
+\item When the extended type is a \index{class type!extended type}class, the methods of the extension are implicitly \texttt{final}, and the extension's methods are not permitted to override methods from the superclass. Non-\texttt{final} methods declared inside a class are dispatched through a vtable of function pointers attached to the runtime metadata of the class, and there is no mechanism for extensions to add new entries or replace existing entries inherited from the superclass.
 
 \index{nested type declaration}
 \item The rules for nested types in extensions are the same as those for other nominal types (\SecRef{nested nominal types}). An extension of a struct, enum or class may contain nested structs, enums and classes, while a protocol extension cannot just as a protocol cannot. Extensions themselves must be at the top level of a source file, but the extended type can be nested inside of another nominal type (or extension).
@@ -149,11 +149,11 @@ A complication is that the extended type of an extension can itself be declared 
 \begin{algorithm}[Bind extensions]\label{extension binding algorithm}
 Takes a list of all extensions in the main module as input, in any order.
 \begin{enumerate}
-\item Initialize the pending list, adding all extension declarations.
-\item Initialize the delayed list to be empty.
-\item Initialize the flag to be clear.
+\item Enqueue all extension declarations on the pending list.
+\item Clear the delayed list.
+\item Clear the flag.
 \item (Check) If the pending list is empty, go to Step~6.
-\item (Resolve) Remove an extension from the pending list and attempt to resolve its extended type. If resolution succeeds, associate the extension with the resolved nominal type declaration and set the flag. If resolution fails, add the extension to the delayed list but do not emit any diagnostics and leave the flag unchanged. Go to Step~4.
+\item (Resolve) Remove an extension from the pending list and attempt to resolve its extended type. If resolution succeeds, associate the extension with the resolved nominal type declaration and set the flag. If resolution fails, add the extension to the delayed list but do not emit any diagnostics and leave the flag unchanged. Go back to Step~4.
 \item (Retry) If the flag is set, move the entire contents of the delayed list to the pending list, clear the delayed list, clear the flag, and go to Step~4. Otherwise, return.
 \end{enumerate}
 \end{algorithm}
@@ -161,7 +161,7 @@ The worklist-driven extension binding algorithm was introduced in \IndexSwift{5.
 
 \paragraph{Invalid extensions.} If extension binding fails to resolve the extended type of an extension, it simply remains on the delayed list without any diagnostics emitted. Invalid extensions are \index{diagnostic!extension binding}diagnosed later, when the \index{type-check source file request}\Request{type-check source file request} visits all \index{primary file}primary files and attempts to resolve the extended types of any extensions again.
 
-Extension binding uses a more limited form of type resolution, because we only need to resolve the type representation to a \emph{type declaration} and not a \emph{type}. This type declaration must be a \index{nominal type}nominal type declaration, so the extended type is typically written as an \index{identifier type representation}\emph{identifier} or \index{member type representation}\emph{member} type representation (Sections \ref{identtyperepr}~and~\ref{member type repr}). Extension binding runs early in the type checking process, immediately after parsing and import resolution. We cannot build \index{generic signature}generic signatures or \index{conformance checker}check conformances in extension binding, because those requests assume that extension binding has already taken place, freely relying on qualified lookup to find members of arbitrary extensions.
+Extension binding uses a more limited form of type resolution, because we only need to resolve the type representation to a \emph{type declaration} and not a \emph{type}. This type declaration must be a \index{nominal type}nominal type declaration, so the extended type is typically written as an \index{identifier type representation}\emph{identifier} or \index{member type representation}\emph{member} type representation (Sections \ref{identtyperepr}~and~\ref{member type repr}). Extension binding runs early in the type checking process, immediately after parsing and import resolution. We cannot build \index{generic signature!extension binding}generic signatures or \index{conformance checker!extension binding}check conformances in extension binding, because those requests assume that extension binding has already taken place, freely relying on qualified lookup to find members of arbitrary extensions.
 
 In particular, extension binding \index{limitation!extension binding}cannot find declarations \index{synthesized declaration}synthesized by the compiler, including type aliases created by \index{associated type inference}associated type inference. Also, it cannot perform type substitution; this rules out extensions of \index{generic type alias}generic type aliases whose underlying type is itself a type parameter.
 
@@ -393,15 +393,13 @@ Lazy member loading was introduced in \IndexSwift{4.1}Swift~4.1 to avoid wasted 
 
 \section{Constrained Extensions}\label{constrained extensions}
 
-\IndexDefinition{constrained extension}
-\IndexDefinition{unconstrained extension}
-An extension can impose its own requirements on the generic parameters of the extended type; we refer to this as a \emph{constrained extension}. These requirements are always additive; the generic signature of a constrained extension is built from the generic signature of the extended type, together with the new requirements. The members of a constrained extension are then only available on specializations of the extended type that satisfy these requirements. There are three ways to declare a constrained extension:
+An extension can impose its own requirements on the generic parameters of the extended type; we refer to this as a \IndexDefinition{constrained extension}\emph{constrained extension}. These requirements are always additive; the generic signature of a constrained extension is built from the generic signature of the extended type, together with the new requirements. The members of a constrained extension are then only available on specializations of the extended type that satisfy these requirements. There are three ways to declare a constrained extension:
 \begin{enumerate}
-\item using a \Index{where clause@\texttt{where} clause}\texttt{where} clause,
-\item by writing a bound generic type as the extended type,
-\item by writing a generic type alias type as the extended type, with some restrictions.
+\item using a \Index{where clause@\texttt{where} clause!extension declaration}\texttt{where} clause,
+\item by writing a \index{generic nominal type!extended type}bound generic type as the extended type,
+\item by writing a generic \index{type alias type!extended type}type alias type as the extended type, with some restrictions.
 \end{enumerate}
-Case~1 is the most general form; Case~2 and Case~3 can be expressed by writing the appropriate requirements in a \texttt{where} clause. An extension that does not fall under one of these three cases is sometimes called an \emph{unconstrained extension} when it is important to distinguish it from a constrained extension. The generic signature of an unconstrained extension is the same as the generic signature of the extended type. 
+Case~1 is the most general form; Case~2 and Case~3 can be expressed by writing the appropriate requirements in a \texttt{where} clause. An extension that does not fall under one of these three cases is sometimes called an \IndexDefinition{unconstrained extension}\emph{unconstrained extension} when it is important to distinguish it from a constrained extension. The generic signature of an unconstrained extension is the same as the generic signature of the extended type. 
 
 Here is a constrained extension of \texttt{Set} which constrains the \texttt{Element} type to \texttt{Int}:
 \begin{Verbatim}
@@ -443,20 +441,20 @@ struct Range<Bound: Comparable> {...}
 Prior to \IndexSwift{4.2}Swift 4.2, the standard library also had a separate \texttt{CountableRange} type with a different set of requirements:
 \begin{Verbatim}
 struct CountableRange<Bound: Stridable>
-    where Bound.Stride: SingedInteger {}
+    where Bound.Stride: SignedInteger {}
 \end{Verbatim}
-The \texttt{Stridable} protocol inherits from \texttt{Comparable}, so every valid generic argument of \texttt{CountableRange} was also also suitable for \texttt{Range}. Also, \texttt{CountableRange} offered a superset of the API of \texttt{Range}. The only difference between the two was that \texttt{CountableRange} conformed to more protocols than \texttt{Range}. After conditional conformances were added to the language, \texttt{CountableRange} no longer made sense as a separate type. Swift~4.2 replaced \texttt{CountableRange} with a generic type alias:
+The \texttt{Stridable} protocol inherits from \texttt{Comparable}, so a generic argument satisfying the requirements of \texttt{CountableRange} also satisfies the requirements of \texttt{Range}. The only difference between the two types was that \texttt{CountableRange} conformed to more protocols than \texttt{Range}. After conditional conformances were added to the language, \texttt{CountableRange} no longer made sense to keep around as a separate type. To preserve source compatibility, Swift~4.2 replaced \texttt{CountableRange} with a generic type alias:
 \begin{Verbatim}
 typealias CountableRange<Bound: Stridable> = Range<Bound>
     where Bound.Stride: SignedInteger
 \end{Verbatim}
-In \IndexSwift{4.1}Swift 4.1, the following were extensions of two different nominal types:
+In \IndexSwift{4.1}Swift 4.1, the following were two extensions of different nominal types:
 \begin{Verbatim}
 extension Range {...}
 
 extension CountableRange {...}
 \end{Verbatim}
-In Swift 4.2, the second extension became equivalent to a constrained extension of \texttt{Range}, once the compiler understood pass-through type aliases:
+As of Swift 4.2, the second extension is interpreted as a constrained extension of \texttt{Range} via the pass-through type alias \texttt{CountableRange}:
 \begin{Verbatim}
 extension Range
     where Bound: Stridable,
@@ -533,56 +531,63 @@ struct G<T> {}
 
 extension G: Sequence where T: Sequence, T.Element: Hashable {...}
 \end{Verbatim}
-\paragraph{Specialized conditional conformances.} Building upon \SecRef{conformance lookup}, we now describe how substitution relates to conditional conformances. If $\texttt{T}_d$ is the declared interface type of some nominal type declaration~$d$ that \emph{unconditionally} conforms to \texttt{P}, and $\texttt{T}=\texttt{T}_d\otimes\Sigma$ is a \index{specialized type}specialized type of~$d$ for some substitution map $\Sigma$, then looking up the conformance of \texttt{T} to $\pP$ returns a \index{specialized conformance}specialized conformance with \index{conformance substitution map}conformance substitution map~$\Sigma$:
-\[\pP\otimes\texttt{T}=\ConfReq{$\texttt{T}_d$}{P}\otimes\Sigma\]
-If $\ConfReq{$\texttt{T}_d$}{P}$ is conditional though, we cannot take~$\Sigma$ to be the \index{context substitution map!for a declaration context}context substitution map of~\texttt{T}. The \index{type witness}type witnesses of $\ConfReq{$\texttt{T}_d$}{P}$ might contain type parameters of the constrained extension, and not just the conforming type; however the context substitution map of \texttt{T} has the generic signature of the conforming type. We must set $\Sigma$ to be the context substitution map of \texttt{T} for the generic signature of the constrained extension, as in \SecRef{member type repr}. Indeed, this is the same problem as member type resolution when the referenced type declaration is declared in a constrained extension; we must perform some additional \index{global conformance lookup}global conformance lookups to populate the substitution map completely.
+\paragraph{Specialized conditional conformances.} Building upon \SecRef{conformance lookup}, we now describe how substitution relates to conditional conformances. If $\tXd$ is the \index{declared interface type!nominal type declaration}declared interface type of some nominal type declaration~$d$ that \emph{unconditionally} conforms to \tP, and $\tX = \tXd \otimes \Sigma$ is a \index{specialized type}specialized type of~$d$ for some substitution map $\Sigma$, then looking up the conformance of \tX\ to $\texttt{P}$ returns a \index{specialized conformance!conditional conformance}specialized conformance with \index{conformance substitution map}conformance substitution map~$\Sigma$:
+\[\PP\otimes\tX=\ConfReq{$\tXd$}{P}\otimes\Sigma\]
+If $\ConfReq{$\tXd$}{P}$ is conditional though, we cannot take~$\Sigma$ to be the \index{context substitution map!for a declaration context}context substitution map of~\tX. The \index{type witness!of conditional conformance}type witnesses of $\ConfReq{$\tXd$}{P}$ might contain type parameters of the constrained extension, and not just the conforming type; however the context substitution map of \tX\ has the generic signature of the conforming type. We must set $\Sigma$ to be the context substitution map of \tX\ for the generic signature of the constrained extension, as in \SecRef{member type repr}. Indeed, this is the same problem as member type resolution when the referenced type declaration is declared in a constrained extension; we must perform some additional \index{global conformance lookup!substitution map}global conformance lookups to populate the substitution map completely.
 
-The conditional requirements of the specialized conformance $\TP$ are the \index{substituted requirement}substituted requirements obtained by applying $\Sigma$ to each conditional requirement of \ConfReq{$\texttt{T}_d$}{P}. This makes the following \index{commutative diagram}diagram commute for each conditional requirement~$R$:
-\begin{quote}
+The conditional requirements of the specialized conformance $\XP$ are the \index{substituted requirement}substituted requirements obtained by applying $\Sigma$ to each conditional requirement of \ConfReq{$\tXd$}{P}. This makes the following \index{commutative diagram!conditional conformance}diagram commute for each conditional requirement~$R$:
+\begin{center}
 \newcommand{\GetConditionalRequirements}{\def\arraystretch{0.65}\arraycolsep=0pt\begin{array}{c}\text{get conditional}\\\text{requirement}\end{array}}
 \begin{tikzcd}[column sep=3cm,row sep=1cm]
-\ConfReq{$\texttt{T}_d$}{P} \arrow[d, "\GetConditionalRequirements"{left}] \arrow[r, "\text{apply $\Sigma$}"] &\TP \arrow[d, "\GetConditionalRequirements"] \\
+\ConfReq{$\tXd$}{P} \arrow[d, "\GetConditionalRequirements"{left}] \arrow[r, "\text{apply $\Sigma$}"] &\XP \arrow[d, "\GetConditionalRequirements"] \\
 R \arrow[r, "\text{apply $\Sigma$}"]&R\otimes\Sigma
 \end{tikzcd}
-\end{quote}
+\end{center}
 
-Consider the $\ConfReq{Array<\ttgp{0}{0}>}{Equatable}$ conformance from the standard library. The generic signature of \texttt{Array} is \texttt{<\ttgp{0}{0}>} with no requirements, while the conformance context is the constrained extension with signature \texttt{<\ttgp{0}{0} where \ttgp{0}{0}:~Equatable>}. The context substitution map of \texttt{Array<Int>} for the constrained extension is:
-\[\Sigma := \SubstMapLongC{\SubstType{\ttgp{0}{0}}{Int}}{\SubstConf{\ttgp{0}{0}}{Int}{Equatable}}\]
+Consider the $\ConfReq{Array<\rT>}{Equatable}$ conformance from the standard library. The generic signature of \texttt{Array} is \texttt{<\rT>} with no requirements, while the conformance context is the constrained extension with signature \texttt{<\rT\ where \rT:~Equatable>}. The context substitution map of \texttt{Array<Int>} for the constrained extension is:
+\begin{align*}
+\Sigma := \SubstMapC{
+&\SubstType{\rT}{Int}}{
+\\
+&\SubstConf{\rT}{Int}{Equatable}}
+\end{align*}
 We compose this substitution map with the normal conformance, and obtain a specialized conditional conformance, denoted \ConfReq{Array<Int>}{Equatable}:
 \[
-\ConfReq{Array<\ttgp{0}{0}>}{Equatable} \otimes \Sigma = \ConfReq{Array<Int>}{Equatable}
+\ConfReq{Array<\rT>}{Equatable} \otimes \Sigma = \ConfReq{Array<Int>}{Equatable}
 \]
-The normal conformance has a single conditional requirement, $\ConfReq{\ttgp{0}{0}}{Equatable}$. We apply $\Sigma$ to get the conditional requirement of the specialized conformance:
+The normal conformance has a single conditional requirement, $\ConfReq{\rT}{Equatable}$. We apply $\Sigma$ to get the conditional requirement of the specialized conformance:
 \[
-\ConfReq{\ttgp{0}{0}}{Equatable} \otimes \Sigma = \ConfReq{Int}{Equatable}
+\ConfReq{\rT}{Equatable} \otimes \Sigma = \ConfReq{Int}{Equatable}
 \]
 
 \paragraph{Global conformance lookup.}
-\index{global conformance lookup}
+\index{global conformance lookup!conditional conformance}
 Global conformance lookup purposely does not check conditional requirements, allowing callers to answer two different questions:
 \begin{enumerate}
 \item Does this specialized type with its specific list of generic arguments conform to the protocol?
 \item What requirements should a list of generic arguments satisfy to make the type conform?
 \end{enumerate}
-When the first interpretation is desired, a convenience entry point can be used that combines global conformance lookup followed by \AlgRef{reqissatisfied} to check any conditional requirements.
+When the first interpretation is desired, a convenience entry point can be used that combines global conformance lookup with \AlgRef{reqissatisfied} to check any conditional requirements.
 
 Checking conditional requirements is more subtle than checking for the presence of invalid conformances in the conformance substitution map. It is true that their presence indicates a conditional requirement is unsatisfied; for example, \texttt{Array<AnyObject>} does not conditionally conform to \texttt{Equatable}, since an \texttt{AnyObject} is not \texttt{Equatable}, and we get the following specialized conformance:
-\begin{gather*}
-\protosym{Equatable} \otimes \texttt{Array<AnyObject>}\\
-= \ConfReq{Array<\ttgp{0}{0}>}{Equatable} \otimes \SubstMapLongC{\SubstType{\ttgp{0}{0}}{AnyObject}}{\ConfReq{\ttgp{0}{0}}{Equatable}\mapsto\text{invalid}}\\
-= \ConfReq{Array<AnyObject>}{Equatable}
+\begin{gather*} % I couldn't get align* working here...
+\Proto{Equatable} \otimes \texttt{Array<AnyObject>}\\
+{} = \ConfReq{Array<\rT>}{Equatable} \otimes \SubstMapC{\SubstType{\rT}{AnyObject}}{\\
+% Notice the hack using \phantom
+\phantom{{} = \ConfReq{Array<\rT>}{Equatable} \otimes \{} \ConfReq{\rT}{Equatable}\mapsto\text{invalid}}\\
+{} = \ConfReq{Array<AnyObject>}{Equatable}
 \end{gather*}
-However, the failure of conditional requirements of other kinds, such as \index{same-type requirement}same-type, \index{superclass requirement}superclass and \index{layout requirement}layout requirements, is not immediately apparent from the structure of the substitution map. In the below, the conformance $\ConfReq{Pair<Int, String>}{Diagonal}$ might look fine at first sight because it does not contain any invalid conformances, but it does not satisfy the conditional requirement $\SameReq{\ttgp{0}{0}}{\ttgp{0}{0}}$:
+However, looking at the substitution map cannot tell us  if other kinds of conditional requirements are unsatisfied, such as \index{same-type requirement!conditional conformance}same-type, \index{superclass requirement!conditional conformance}superclass and \index{layout requirement!conditional conformance}layout requirements. For example, the conformance substitution map of $\ConfReq{Pair<Int, String>}{Diagonal}$ does not contain any invalid conformances, but it does not satisfy the conditional requirement $\SameReq{\rT}{\rU}$:
 \begin{Verbatim}
 protocol Diagonal {}
 struct Pair<T, U> {}
 extension Pair: Diagonal where T == U {}
 \end{Verbatim}
-Thus, conditional requirements must always be checked by~\AlgRef{reqissatisfied}, and not in some ``ad-hoc'' way by digging through the substitution map for instance.
+Thus, conditional requirements must always be checked by~\AlgRef{reqissatisfied}, and not in some ``ad-hoc'' manner by digging through the substitution map.
 
 \paragraph{Protocol inheritance.}
 \index{inherited protocol}
-Protocol inheritance is modeled as an \index{associated conformance requirement}associated conformance requirement on \tSelf, so for instance \verb|Derived| has an associated conformance requirement $\ConfReq{Self}{Base}$:
+Protocol inheritance is modeled as an \index{associated conformance requirement!protocol inheritance}associated conformance requirement on \tSelf, so for instance \verb|Derived| has an associated conformance requirement $\ConfReq{Self}{Base}$:
 \begin{Verbatim}
 protocol Base {...}
 protocol Derived: Base {...}
@@ -595,7 +600,7 @@ extension Pair: Derived {...}
 \end{Verbatim}
 The nominal type's \index{conformance lookup table}conformance lookup table synthesizes these implied conformances and makes them available to global conformance lookup. With conditional conformances, such implied conformances are not synthesized because there is no way to guess what the conditional requirements should be. The conformance checker still checks the associated conformance requirement on \tSelf\ though, so the user must first explicitly declare a conformance to each base protocol when writing a conditional conformance.
 
-Suppose we wish for \texttt{Pair} to conform to \texttt{Derived} when $\SameReq{\ttgp{0}{0}}{Int}$:
+Suppose we wish for \texttt{Pair} to conform to \texttt{Derived} when $\SameReq{\rT}{Int}$:
 \begin{Verbatim}
 extension Pair: Derived where T == Int {...}
 \end{Verbatim}
@@ -617,8 +622,8 @@ To each associated requirement, we apply the \index{protocol substitution map}pr
 \]
 
 The next step asks \AlgRef{reqissatisfied} if the substituted requirement is satisfied. This issues a global conformance lookup and proceeds to check its conditional requirements:
-\[\protosym{Base}\otimes \texttt{Pair<$\archetype{T}$,Int>} = \ConfReq{\texttt{Pair<$\archetype{T}$,Int>}}{Base} \]
-Since $\texttt{Pair<$\archetype{T}$,Int>}\in\TypeObj{\EquivClass{G_2}}$, we get $\protosym{Base}\otimes \texttt{Pair<$\archetype{T}$,Int>}\in\ConfObj{\EquivClass{G_2}}$. The conditional requirements of this conformance are the requirements of $G_1$ substituted with the \index{primary archetype}primary archetypes of $G_2$. Knowing if they are satisfied or not determines the validity of the conformance to \texttt{Derived}.
+\[\Proto{Base}\otimes \texttt{Pair<$\archetype{T}$,Int>} = \ConfReq{\texttt{Pair<$\archetype{T}$,Int>}}{Base} \]
+Since $\texttt{Pair<$\archetype{T}$,Int>}\in\TypeObj{\EquivClass{G_2}}$, we get $\Proto{Base}\otimes \texttt{Pair<$\archetype{T}$,Int>}\in\ConfObj{\EquivClass{G_2}}$. The conditional requirements of this conformance are the requirements of $G_1$ substituted with the \index{primary archetype}primary archetypes of $G_2$. Knowing if they are satisfied or not determines the validity of the conformance to \texttt{Derived}.
 
 We now look at three different definitions of the conformance $\ConfReq{Pair}{Base}$, and see how each one impacts the validity of the conformance $\ConfReq{Pair}{Derived}$:
 \begin{enumerate}
@@ -627,25 +632,25 @@ The conditional conformance of \texttt{Pair} to \texttt{Base} might also require
 \begin{Verbatim}
 extension Pair: Base where T == Int {...}
 \end{Verbatim}
-The conditional requirement here is $\SameReq{\ttgp{0}{0}}{Int}$, the same as in the \texttt{Derived} conformance, and after substitution we get:
-\[\SameReq{\ttgp{0}{0}}{Int}\otimes \SubstMap{\SubstType{\ttgp{0}{0}}{Int},\,\SubstType{\ttgp{0}{1}}{$\archetype{U}$}}=\SameReq{Int}{Int}\]
+The conditional requirement here is $\SameReq{\rT}{Int}$, the same as in the \texttt{Derived} conformance, and after substitution we get:
+\[\SameReq{\rT}{Int}\otimes \SubstMap{\SubstType{\rT}{Int},\,\SubstType{\rU}{$\archetype{U}$}}=\SameReq{Int}{Int}\]
 This requirement is satisfied by \AlgRef{reqissatisfied}, so the conditional requirements of $\ConfReq{Pair}{Derived}$ imply the conditional requirements of $\ConfReq{Pair}{Base}$, and the conformance to \texttt{Derived} is valid.
 
 \item Instead, we could conform \texttt{Pair} to \texttt{Base} when \texttt{T} conforms to \texttt{Equatable}:
 \begin{Verbatim}
 extension Pair: Base where T: Equatable {...}
 \end{Verbatim}
-Now, $\ConfReq{Pair}{Base}$ has the conditional requirement $\ConfReq{\ttgp{0}{0}}{Equatable}$, and after substitution we get:
-\[\ConfReq{\ttgp{0}{0}}{Equatable}\otimes\SubstMap{\SubstType{\ttgp{0}{0}}{Int},\,\SubstType{\ttgp{0}{1}}{$\archetype{U}$}}=\ConfReq{Int}{Equatable}\]
+Now, $\ConfReq{Pair}{Base}$ has the conditional requirement $\ConfReq{\rT}{Equatable}$, and after substitution we get:
+\[\ConfReq{\rT}{Equatable}\otimes\SubstMap{\SubstType{\rT}{Int},\,\SubstType{\rU}{$\archetype{U}$}}=\ConfReq{Int}{Equatable}\]
 This is also satisfied, so once again our conditional conformance $\ConfReq{Pair}{Derived}$ is valid.
 
 \item Finally consider this, which renders invalid our conformance to \texttt{Derived}:
 \begin{Verbatim}
 extension Pair: Base where U: Equatable {...}
 \end{Verbatim}
-The conditional requirement $\ConfReq{\ttgp{0}{0}}{Equatable}$ becomes $\ConfReq{$\archetype{U}$}{Equatable}$ after substitution:
-\[\ConfReq{\ttgp{0}{1}}{Equatable}\otimes \SubstMap{\SubstType{\ttgp{0}{0}}{Int},\,\SubstType{\ttgp{0}{1}}{$\archetype{U}$}}=\ConfReq{$\archetype{U}$}{Equatable}\]
-The archetype $\archetype{U}$ does not conform to \texttt{Equatable} because $\ConfReq{\ttgp{0}{1}}{Equatable}$ is not a \index{derived requirement}derived requirement of $G_2$, so the conditional requirement $\SameReq{\ttgp{0}{0}}{Int}$ of $\ConfReq{Pair}{Derived}$ does not imply the conditional requirement $\ConfReq{\ttgp{0}{1}}{Equatable}$ of $\ConfReq{Pair}{Base}$. For this reason, when $\ConfReq{Pair}{Base}$ is written as above, the compiler rejects our conformance $\ConfReq{Pair}{Derived}$.
+The conditional requirement $\ConfReq{\rU}{Equatable}$ becomes $\ConfReq{$\archetype{U}$}{Equatable}$ after substitution:
+\[\ConfReq{\rU}{Equatable}\otimes \SubstMap{\SubstType{\rT}{Int},\,\SubstType{\rU}{$\archetype{U}$}}=\ConfReq{$\archetype{U}$}{Equatable}\]
+The archetype $\archetype{U}$ does not conform to \texttt{Equatable} because $\ConfReq{\rU}{Equatable}$ is not a derived requirement of $G_2$, so the conditional requirement $\SameReq{\rT}{Int}$ of $\ConfReq{Pair}{Derived}$ does not imply the conditional requirement $\ConfReq{\rU}{Equatable}$ of $\ConfReq{Pair}{Base}$. For this reason, when $\ConfReq{Pair}{Base}$ is written as above, the compiler rejects our conformance $\ConfReq{Pair}{Derived}$.
 \end{enumerate}
 
 \paragraph{Termination.}
@@ -675,27 +680,34 @@ The \texttt{takesP()} function has the below generic signature:
 <τ_0_0 where τ_0_0: P>
 \end{verbatim}
 \end{quote}
-In the snippet, this function is called with \texttt{G<S>} as the generic argument for \ttgp{0}{0}. This substitution map for this call also needs to store the conformance $\ConfReq{G<S>}{P}$, but this conformance cannot be constructed. The normal conformance $\ConfReq{G<\ttgp{0}{0}>}{P}$ is declared on a constrained extension with the following generic signature:
+In the snippet, this function is called with \texttt{G<S>} as the generic argument for \rT. This substitution map for this call also needs to store the conformance $\ConfReq{G<S>}{P}$, but this conformance cannot be constructed. The normal conformance $\ConfReq{G<\rT>}{P}$ is declared on a constrained extension with the following generic signature:
 \begin{quote}
 \begin{verbatim}
 <τ_0_0 where τ_0_0: Q, τ_0_0.[Q]A: P>
 \end{verbatim}
 \end{quote}
-To construct the specialized conformance $\ConfReq{G<S>}{P}$ from this normal conformance, we must first construct the conformance substitution map. The substitution map should map \ttgp{0}{0} to \texttt{S}, and store a pair of conformances, for the conformance requirements $\ConfReq{\ttgp{0}{0}}{Q}$ and $\ConfReq{\ttgp{0}{0}.[Q]A}{P}$:
-\[\Sigma := \SubstMapLongC{\SubstType{\ttgp{0}{0}}{S}}{
-\SubstConf{\ttgp{0}{0}}{S}{Q}\\
-\ConfReq{\ttgp{0}{0}.[Q]A}{P}\mapsto\text{???}
-}\]
-The conforming type of the first conformance should be $\ttgp{0}{0}\otimes\Sigma=\texttt{S}$, so the first conformance is the normal conformance $\ConfReq{S}{Q}$. The conforming type of the second conformance should be 
-$\AssocType{[Q]A}\otimes\ConfReq{S}{Q}=\texttt{G<S>}$; so the second conformance is exactly $\ConfReq{G<S>}{P}$, the conformance we're in the process of constructing. A substitution map cannot form a cycle with a specialized conformance it contains.
+To construct the specialized conformance $\ConfReq{G<S>}{P}$ from this normal conformance, we must first construct the conformance substitution map. The substitution map should map \rT\ to \texttt{S}, and store a pair of conformances, for the conformance requirements $\ConfReq{\rT}{Q}$ and $\ConfReq{\rT.[Q]A}{P}$:
+\begin{align*}
+\Sigma := \SubstMapC{
+&\SubstType{\rT}{S}}{
+\\
+&\SubstConf{\rT}{S}{Q},\\
+&\ConfReq{\rT.[Q]A}{P}\mapsto\text{???}
+}
+\end{align*}
+The conforming type of the first conformance should be $\rT\otimes\Sigma=\texttt{S}$, so the first conformance is the normal conformance $\ConfReq{S}{Q}$. The conforming type of the second conformance should be 
+$\AssocType{Q}{A}\otimes\ConfReq{S}{Q}=\texttt{G<S>}$; so the second conformance is exactly $\ConfReq{G<S>}{P}$, the conformance we're in the process of constructing. A substitution map cannot form a cycle with a specialized conformance it contains.
 
 Now, suppose we could represent a circular substitution map of this kind:
-\[\Sigma := \SubstMapLongC{\SubstType{\ttgp{0}{0}}{S}}{
-\SubstConf{\ttgp{0}{0}}{S}{Q}\\
-\ConfReq{\ttgp{0}{0}.[Q]A}{P}\mapsto\ConfReq{G<\ttgp{0}{0}>}{P}\otimes\Sigma
-}\]
-Unfortunately, this would still not allow our example to type check. The next problem we would encounter is checking the conditional requirement, $\ConfReq{\ttgp{0}{0}.[Q]A}{P}$. Applying $\Sigma$ gives us the substituted conditional requirement:
-\[\ConfReq{\ttgp{0}{0}.[Q]A}{P}\otimes\Sigma=\ConfReq{G<S>}{P}\]
+\begin{align*}
+\Sigma := \SubstMapC{&\SubstType{\rT}{S}}{
+\\
+&\SubstConf{\rT}{S}{Q},\\
+&\ConfReq{\rT.[Q]A}{P}\mapsto\ConfReq{G<\rT>}{P}\otimes\Sigma
+}
+\end{align*}
+Unfortunately, this would still not allow our example to type check. The next problem we would encounter is checking the conditional requirement, $\ConfReq{\rT.[Q]A}{P}$. Applying $\Sigma$ gives us the substituted conditional requirement:
+\[\ConfReq{\rT.[Q]A}{P}\otimes\Sigma=\ConfReq{G<S>}{P}\]
 So \texttt{G<S>} conditionally conforms to \texttt{P} if the conditional requirement $\ConfReq{G<S>}{P}$ is satisfied; this conditional requirement is satisfied if \texttt{G<S>} conditionally conforms to \texttt{P}. At this point, we are stuck in a loop, again. For now, the compiler crashes on this example while constructing the conformance substitution map; hopefully a future update to this book will describe the eventual resolution of this bug by imposing an iteration limit.
 
 Our example only encodes an infinite loop, but conditional conformances can actually express arbitrary computation. This is shown for the \index{Rust}Rust programming language, which also has conditional conformances, in \cite{rustturing}. We'll also see another example of non-terminating compile-time computation in \SecRef{recursive conformances}.
@@ -707,7 +719,7 @@ If $\Sigma$ is a substitution map with \index{input generic signature}input gene
 \end{definition}
 (The restriction to fully-concrete replacement types is not a real limitation; as we saw in \SecRef{checking generic arguments}, we can first compose $\Sigma$ with the \index{forwarding substitution map}forwarding substitution map~$1_{\EquivClass{H}}$ for some generic signature~$H$ if necessary).
 
-If the \index{derived requirement}derived requirements of $G$ are an infinite set, we cannot directly check if~$\Sigma$ is well-formed. \AlgRef{check generic arguments algorithm} only checks if $\Sigma$ satisfies each \emph{explicit} requirement of~$G$, and unfortunately, \index{limitation!conditional conformance soundness hole}this is not sufficient.
+If $G$ has an \index{generic signature!infinite}infinite theory of derived requirements, we cannot directly check if~$\Sigma$ is well-formed. \AlgRef{check generic arguments algorithm} only checks if $\Sigma$ satisfies each \emph{explicit} requirement of~$G$, and unfortunately, \index{limitation!conditional conformance soundness hole}this is not sufficient.
 
 An immediate counter-example appears when the substituted requirement depends on a conformance that does not satisfy the \index{associated requirement}associated requirements of its protocol. For example, we might declare a \texttt{Bad} type conforming to \texttt{Sequence} whose \texttt{Iterator} \index{type witness}type witness does not conform to \texttt{IteratorProtocol}:
 \begin{Verbatim}
@@ -716,7 +728,7 @@ struct Bad: Sequence {
 }
 \end{Verbatim}
 The substitution map
-$\Sigma:=\SubstMapC{\SubstType{\ttgp{0}{0}}{Bad}}{\SubstConf{\ttgp{0}{0}}{Bad}{Sequence}}$ satisfies all explicit requirements of its generic signature, but it does not satisfy the derived requirement $\ConfReq{\ttgp{0}{0}.[Sequence]Iterator}{IteratorProtocol}$. However, \emph{this} is not the soundness hole; we diagnose an error when we check the conformance, so the program is invalid.
+$\Sigma:=\SubstMapC{\SubstType{\rT}{Bad}}{\SubstConf{\rT}{Bad}{Sequence}}$ satisfies all explicit requirements of its generic signature, but it does not satisfy the derived requirement $\ConfReq{\rT.[Sequence]Iterator}{IteratorProtocol}$. However, \emph{this} is not the soundness hole; we diagnose an error when we check the conformance, so the program is invalid.
 
 We now show an example where we can write down a substitution map that is not well-formed, and yet \AlgRef{check generic arguments algorithm} does not produce any diagnostics at all, including from checking conformances. We start with two protocols:
 \begin{Verbatim}
@@ -730,7 +742,7 @@ protocol Pub {
   func pour() -> Beer
 }
 \end{Verbatim}
-We declare a function generic over types that conform to both \texttt{Bar} and \texttt{Pub}, so it has the generic signature \texttt{<\ttgp{0}{0} where \ttgp{0}{0}:~Bar, \ttgp{0}{0}:~Pub>}:
+We declare a function generic over types that conform to both \texttt{Bar} and \texttt{Pub}, so it has the generic signature \texttt{<\rT\ where \rT:~Bar, \rT:~Pub>}:
 \begin{Verbatim}
 func both<T: Bar & Pub>(_ t: T) -> (T.Beer, T.Beer) {
   return (t.brew(), t.pour())
@@ -742,18 +754,19 @@ struct BrewPub<T> {}
 let result = both(BrewPub<Int>())
 \end{Verbatim}
 For this call expression to type check, \texttt{BrewPub} must conform to \texttt{Bar} and \texttt{Pub}; assume for a moment these conformances have already been declared. Let $\Sigma$ be the \index{substitution map}substitution map for the call:
-\[
-\Sigma := \SubstMapLongC{\SubstType{\ttgp{0}{0}}{BrewPub<Int>}}{
-\SubstConf{\ttgp{0}{0}}{BrewPub<Int>}{Bar}\\
-\SubstConf{\ttgp{0}{0}}{BrewPub<Int>}{Pub}
+\begin{align*}
+\Sigma := \SubstMapC{
+&\SubstType{\rT}{BrewPub<Int>}}{\\
+&\SubstConf{\rT}{BrewPub<Int>}{Bar},\\
+&\SubstConf{\rT}{BrewPub<Int>}{Pub}
 }
-\]
-Applying $\Sigma$ to \texttt{\ttgp{0}{0}.[Bar]Beer} and \texttt{\ttgp{0}{0}.[Pub]Beer} projects the \index{type witness}type witness from each conformance:
+\end{align*}
+Applying $\Sigma$ to \texttt{\rT.[Bar]Beer} and \texttt{\rT.[Pub]Beer} projects the \index{type witness}type witness from each conformance:
 \begin{gather*}
-\texttt{\ttgp{0}{0}.[Bar]Beer}\otimes\Sigma = \AssocType{[Bar]Beer}\otimes\ConfReq{BrewPub<Int>}{Bar}\\
-\texttt{\ttgp{0}{0}.[Pub]Beer}\otimes\Sigma = \AssocType{[Pub]Beer}\otimes\ConfReq{BrewPub<Int>}{Pub}
+\texttt{\rT.[Bar]Beer}\otimes\Sigma = \AssocType{Bar}{Beer}\otimes\ConfReq{BrewPub<Int>}{Bar}\\
+\texttt{\rT.[Pub]Beer}\otimes\Sigma = \AssocType{Pub}{Beer}\otimes\ConfReq{BrewPub<Int>}{Pub}
 \end{gather*}
-For $\Sigma$ to be well-formed, both type witnesses must be \index{canonical type equality}canonically equal, because in the generic signature of \texttt{both()}, the \index{bound dependent member type}bound dependent member types \texttt{\ttgp{0}{0}.[Bar]Beer} and \texttt{\ttgp{0}{0}.[Pub]Beer} are both equivalent to the \index{unbound dependent member type}unbound dependent type \texttt{\ttgp{0}{0}.Beer}.
+For $\Sigma$ to be well-formed, both type witnesses must be \index{canonical type equality}canonically equal, because in the generic signature of \texttt{both()}, the \index{bound dependent member type!equivalence}bound dependent member types \texttt{\rT.[Bar]Beer} and \texttt{\rT.[Pub]Beer} are both equivalent to the \index{unbound dependent member type!equivalence}unbound dependent type \texttt{\rT.Beer}.
 
 If \texttt{BrewPub} conforms to these protocols unconditionally, the redeclaration checking rules prevent us from declaring the two conformances to have distinct type witnesses:
 \begin{Verbatim}
@@ -779,7 +792,7 @@ extension BrewPub: Pub where T: ExpressibleByIntegerLiteral {
   func pour() -> String { return "" }
 }
 \end{Verbatim}
-When we call our \texttt{both()} function, the caller expects to receive a tuple of two elements both having the same reduced type \texttt{\ttgp{0}{0}.[Bar]Beer}. Inside the function, the type checker thinks that the calls to \texttt{brew()} and \texttt{pour()} return the same type. However, what actually happens is that one returns a \texttt{Float} while the other returns a \texttt{String}. This quickly results in undefined behavior. This soundness hole remains unfixed at the time of writing. There are two possible approaches to solving this problem:
+When we call our \texttt{both()} function, the caller expects to receive a tuple of two elements both having the same reduced type \texttt{\rT.[Bar]Beer}. Inside the function, the type checker thinks that the calls to \texttt{brew()} and \texttt{pour()} return the same type. However, what actually happens is that one returns a \texttt{Float} while the other returns a \texttt{String}. This quickly results in undefined behavior. This soundness hole remains unfixed at the time of writing. There are two possible approaches to solving this problem:
 \begin{enumerate}
 \item We can tighten the rules around redeclarations of type aliases in constrained extensions, requiring that all such type aliases have canonically equal underlying types. This would reject the conditional conformances written above as invalid.
 \item We can extend \AlgRef{check generic arguments algorithm} to look for incompatible conformances in the given substitution map. This would accept the conformances, but reject the call to \texttt{both()} written above.
