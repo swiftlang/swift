@@ -473,11 +473,11 @@ class TypeRefinementContextBuilder : private ASTWalker {
     return ContextStack.back().ContainedByDeploymentTarget;
   }
 
-  const AvailabilityContext *constrainCurrentAvailabilityWithPlatformRange(
+  const AvailabilityContext constrainCurrentAvailabilityWithPlatformRange(
       const AvailabilityRange &platformRange) {
-    return getCurrentTRC()
-        ->getAvailabilityContext()
-        ->constrainWithPlatformRange(platformRange, Context);
+    auto availability = getCurrentTRC()->getAvailabilityContext();
+    availability.constrainWithPlatformRange(platformRange, Context);
+    return availability;
   }
 
   void pushContext(TypeRefinementContext *TRC, ParentTy PopAfterNode) {
@@ -718,7 +718,7 @@ private:
     return nullptr;
   }
 
-  const AvailabilityContext *getEffectiveAvailabilityForDeclSignature(Decl *D) {
+  const AvailabilityContext getEffectiveAvailabilityForDeclSignature(Decl *D) {
     auto EffectiveIntroduction = AvailabilityRange::alwaysAvailable();
 
     // As a special case, extension decls are treated as effectively as
@@ -744,9 +744,9 @@ private:
       EffectiveIntroduction.intersectWith(
           AvailabilityRange::forDeploymentTarget(Context));
 
-    return getCurrentTRC()
-        ->getAvailabilityContext()
-        ->constrainWithDeclAndPlatformRange(D, EffectiveIntroduction);
+    auto availability = getCurrentTRC()->getAvailabilityContext();
+    availability.constrainWithDeclAndPlatformRange(D, EffectiveIntroduction);
+    return availability;
   }
 
   /// Checks whether the entire declaration, including its signature, should be
@@ -814,7 +814,7 @@ private:
   // target for `range` in decl `D`.
   TypeRefinementContext *
   createImplicitDeclContextForDeploymentTarget(Decl *D, SourceRange range){
-    const AvailabilityContext *Availability =
+    const AvailabilityContext Availability =
         constrainCurrentAvailabilityWithPlatformRange(
             AvailabilityRange::forDeploymentTarget(Context));
     return TypeRefinementContext::createForDeclImplicit(
@@ -974,7 +974,7 @@ private:
     if (ThenRange.has_value()) {
       // Create a new context for the Then branch and traverse it in that new
       // context.
-      auto *AvailabilityContext =
+      auto AvailabilityContext =
           constrainCurrentAvailabilityWithPlatformRange(ThenRange.value());
       auto *ThenTRC = TypeRefinementContext::createForIfStmtThen(
           Context, IS, getCurrentTRC(), AvailabilityContext);
@@ -997,7 +997,7 @@ private:
     if (ElseRange.has_value()) {
       // Create a new context for the Then branch and traverse it in that new
       // context.
-      auto *AvailabilityContext =
+      auto AvailabilityContext =
           constrainCurrentAvailabilityWithPlatformRange(ElseRange.value());
       auto *ElseTRC = TypeRefinementContext::createForIfStmtElse(
           Context, IS, getCurrentTRC(), AvailabilityContext);
@@ -1018,7 +1018,7 @@ private:
     if (BodyRange.has_value()) {
       // Create a new context for the body and traverse it in the new
       // context.
-      auto *AvailabilityContext =
+      auto AvailabilityContext =
           constrainCurrentAvailabilityWithPlatformRange(BodyRange.value());
       auto *BodyTRC = TypeRefinementContext::createForWhileStmtBody(
           Context, WS, getCurrentTRC(), AvailabilityContext);
@@ -1051,7 +1051,7 @@ private:
 
     if (Stmt *ElseBody = GS->getBody()) {
       if (ElseRange.has_value()) {
-        auto *AvailabilityContext =
+        auto AvailabilityContext =
             constrainCurrentAvailabilityWithPlatformRange(ElseRange.value());
         auto *TrueTRC = TypeRefinementContext::createForGuardStmtElse(
             Context, GS, getCurrentTRC(), AvailabilityContext);
@@ -1068,7 +1068,7 @@ private:
       return;
 
     // Create a new context for the fallthrough.
-    auto *FallthroughAvailability =
+    auto FallthroughAvailability =
         constrainCurrentAvailabilityWithPlatformRange(FallthroughRange.value());
     auto *FallthroughTRC = TypeRefinementContext::createForGuardStmtFallthrough(
         Context, GS, ParentBrace, getCurrentTRC(), FallthroughAvailability);
@@ -1226,7 +1226,7 @@ private:
       // ranges of the form [x, y).
       FalseFlow.unionWith(CurrentInfo);
 
-      auto *ConstrainedAvailability =
+      auto ConstrainedAvailability =
           constrainCurrentAvailabilityWithPlatformRange(NewConstraint);
       auto *TRC = TypeRefinementContext::createForConditionFollowingQuery(
           Context, Query, LastElement, CurrentTRC, ConstrainedAvailability);
