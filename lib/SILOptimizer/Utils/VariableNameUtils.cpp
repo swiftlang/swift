@@ -642,6 +642,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
         isa<ProjectBoxInst>(searchValue) || isa<CopyValueInst>(searchValue) ||
         isa<ConvertFunctionInst>(searchValue) ||
         isa<MarkUninitializedInst>(searchValue) ||
+        isa<MarkDependenceInst>(searchValue) ||
         isa<CopyableToMoveOnlyWrapperAddrInst>(searchValue) ||
         isa<MoveOnlyWrapperToCopyableAddrInst>(searchValue) ||
         isa<MoveOnlyWrapperToCopyableValueInst>(searchValue) ||
