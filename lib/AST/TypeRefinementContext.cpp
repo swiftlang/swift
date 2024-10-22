@@ -31,20 +31,19 @@ using namespace swift;
 TypeRefinementContext::TypeRefinementContext(ASTContext &Ctx, IntroNode Node,
                                              TypeRefinementContext *Parent,
                                              SourceRange SrcRange,
-                                             const AvailabilityContext *Info)
+                                             const AvailabilityContext Info)
     : Node(Node), SrcRange(SrcRange), AvailabilityInfo(Info) {
   if (Parent) {
     assert(SrcRange.isValid());
     Parent->addChild(this, Ctx);
-    assert(Info->getPlatformRange().isContainedIn(
-        Parent->getPlatformAvailabilityRange()));
+    assert(Info.isContainedIn(Parent->getAvailabilityContext()));
   }
   Ctx.addDestructorCleanup(Children);
 }
 
 TypeRefinementContext *
 TypeRefinementContext::createForSourceFile(SourceFile *SF,
-                                           const AvailabilityContext *Info) {
+                                           const AvailabilityContext Info) {
   assert(SF);
 
   ASTContext &Ctx = SF->getASTContext();
@@ -81,7 +80,7 @@ TypeRefinementContext::createForSourceFile(SourceFile *SF,
 
 TypeRefinementContext *TypeRefinementContext::createForDecl(
     ASTContext &Ctx, Decl *D, TypeRefinementContext *Parent,
-    const AvailabilityContext *Info, SourceRange SrcRange) {
+    const AvailabilityContext Info, SourceRange SrcRange) {
   assert(D);
   assert(Parent);
   return new (Ctx) TypeRefinementContext(Ctx, D, Parent, SrcRange, Info);
@@ -89,7 +88,7 @@ TypeRefinementContext *TypeRefinementContext::createForDecl(
 
 TypeRefinementContext *TypeRefinementContext::createForDeclImplicit(
     ASTContext &Ctx, Decl *D, TypeRefinementContext *Parent,
-    const AvailabilityContext *Info, SourceRange SrcRange) {
+    const AvailabilityContext Info, SourceRange SrcRange) {
   assert(D);
   assert(Parent);
   return new (Ctx) TypeRefinementContext(
@@ -99,7 +98,7 @@ TypeRefinementContext *TypeRefinementContext::createForDeclImplicit(
 TypeRefinementContext *
 TypeRefinementContext::createForIfStmtThen(ASTContext &Ctx, IfStmt *S,
                                            TypeRefinementContext *Parent,
-                                           const AvailabilityContext *Info) {
+                                           const AvailabilityContext Info) {
   assert(S);
   assert(Parent);
   return new (Ctx)
@@ -110,7 +109,7 @@ TypeRefinementContext::createForIfStmtThen(ASTContext &Ctx, IfStmt *S,
 TypeRefinementContext *
 TypeRefinementContext::createForIfStmtElse(ASTContext &Ctx, IfStmt *S,
                                            TypeRefinementContext *Parent,
-                                           const AvailabilityContext *Info) {
+                                           const AvailabilityContext Info) {
   assert(S);
   assert(Parent);
   return new (Ctx)
@@ -121,7 +120,7 @@ TypeRefinementContext::createForIfStmtElse(ASTContext &Ctx, IfStmt *S,
 TypeRefinementContext *TypeRefinementContext::createForConditionFollowingQuery(
     ASTContext &Ctx, PoundAvailableInfo *PAI,
     const StmtConditionElement &LastElement, TypeRefinementContext *Parent,
-    const AvailabilityContext *Info) {
+    const AvailabilityContext Info) {
   assert(PAI);
   assert(Parent);
   SourceRange Range(PAI->getEndLoc(), LastElement.getEndLoc());
@@ -130,7 +129,7 @@ TypeRefinementContext *TypeRefinementContext::createForConditionFollowingQuery(
 
 TypeRefinementContext *TypeRefinementContext::createForGuardStmtFallthrough(
     ASTContext &Ctx, GuardStmt *RS, BraceStmt *ContainingBraceStmt,
-    TypeRefinementContext *Parent, const AvailabilityContext *Info) {
+    TypeRefinementContext *Parent, const AvailabilityContext Info) {
   assert(RS);
   assert(ContainingBraceStmt);
   assert(Parent);
@@ -142,7 +141,7 @@ TypeRefinementContext *TypeRefinementContext::createForGuardStmtFallthrough(
 TypeRefinementContext *
 TypeRefinementContext::createForGuardStmtElse(ASTContext &Ctx, GuardStmt *RS,
                                               TypeRefinementContext *Parent,
-                                              const AvailabilityContext *Info) {
+                                              const AvailabilityContext Info) {
   assert(RS);
   assert(Parent);
   return new (Ctx)
@@ -153,7 +152,7 @@ TypeRefinementContext::createForGuardStmtElse(ASTContext &Ctx, GuardStmt *RS,
 TypeRefinementContext *
 TypeRefinementContext::createForWhileStmtBody(ASTContext &Ctx, WhileStmt *S,
                                               TypeRefinementContext *Parent,
-                                              const AvailabilityContext *Info) {
+                                              const AvailabilityContext Info) {
   assert(S);
   assert(Parent);
   return new (Ctx) TypeRefinementContext(Ctx, S, Parent,
@@ -400,7 +399,8 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
   OS.indent(Indent);
   OS << "(" << getReasonName(getReason());
 
-  OS << " version=" << stringForAvailability(getPlatformAvailabilityRange());
+  OS << " ";
+  AvailabilityInfo.print(OS);
 
   if (getReason() == Reason::Decl || getReason() == Reason::DeclImplicit) {
     Decl *D = Node.getAsDecl();
@@ -581,8 +581,7 @@ void TypeRefinementContext::verify(const TypeRefinementContext *parent,
                         {{"child", this}, {"parent", parent}});
   }
 
-  if (!getPlatformAvailabilityRange().isContainedIn(
-          parent->getPlatformAvailabilityRange()))
+  if (!getAvailabilityContext().isContainedIn(parent->getAvailabilityContext()))
     verificationError(ctx, "child availability range not contained",
                       {{"child", this}, {"parent", parent}});
 }

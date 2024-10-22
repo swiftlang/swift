@@ -64,47 +64,6 @@ AvailabilityRange AvailabilityRange::forRuntimeTarget(const ASTContext &Ctx) {
   return AvailabilityRange(VersionRange::allGTE(Ctx.LangOpts.RuntimeVersion));
 }
 
-bool AvailabilityContext::PlatformInfo::constrainRange(const Decl *decl) {
-  if (auto range = AvailabilityInference::annotatedAvailableRange(decl))
-    return constrainRange(*range);
-
-  return false;
-}
-
-const AvailabilityContext *AvailabilityContext::getDefault(ASTContext &ctx) {
-  PlatformInfo platformInfo{AvailabilityRange::forInliningTarget(ctx)};
-  return AvailabilityContext::get(platformInfo, ctx);
-}
-
-/// Returns the unique context that is the result of constraining the current
-/// context's platform availability range with `platformRange`.
-const AvailabilityContext *AvailabilityContext::constrainWithPlatformRange(
-    const AvailabilityRange &platformRange, ASTContext &ctx) const {
-  PlatformInfo platformAvailability{PlatformAvailability};
-  if (platformAvailability.constrainRange(platformRange))
-    return get(platformAvailability, ctx);
-
-  return this;
-}
-
-const AvailabilityContext *
-AvailabilityContext::constrainWithDeclAndPlatformRange(
-    Decl *decl, const AvailabilityRange &platformRange) const {
-  PlatformInfo platformAvailability{PlatformAvailability};
-  bool isConstrained = false;
-  isConstrained |= platformAvailability.constrainRange(decl);
-  isConstrained |= platformAvailability.constrainRange(platformRange);
-
-  if (!isConstrained)
-    return this;
-
-  return get(platformAvailability, decl->getASTContext());
-}
-
-void AvailabilityContext::Profile(llvm::FoldingSetNodeID &id) const {
-  PlatformAvailability.Profile(id);
-}
-
 namespace {
 
 /// The inferred availability required to access a group of declarations
