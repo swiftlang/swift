@@ -20,7 +20,7 @@
 \item The optimizer can generate a \textbf{specialization} of a generic function in the case where the definition is visible at the call site. This eliminates the overhead of runtime type metadata and abstract value manipulation.
 \end{enumerate}
 
-The author's philosophy is that \textsl{a compiler is a library for modeling the concepts of the target language}. The Swift generics implementation defines four fundamental kinds of semantic objects: \emph{generic signatures}, \emph{substitution maps}, \emph{requirement signatures}, and \emph{conformances}. As we will see, they are understood as much by their inherent structure, as their relationships with each other. Subsequent chapters will dive into all the details, but first, we're going to present a series of worked examples.
+We're going to think of the compiler as \textsl{a library for modeling the concepts of the target language}. The Swift generics implementation defines four fundamental kinds of semantic objects: \emph{generic signatures}, \emph{substitution maps}, \emph{requirement signatures}, and \emph{conformances}. As we will see, they are understood as much by their inherent structure, as their relationships with each other. Subsequent chapters will dive into all the details, but first, we're going to present a series of worked examples.
 
 \section{Functions}
 
@@ -104,7 +104,7 @@ We've now successfully type checked our function declaration. How might we gener
 func identity(_ x: Int) -> Int { return x }
 func identity(_ x: String) -> String { return x }
 \end{Verbatim}
-The calling conventions of these functions differ significantly:
+The \index{calling convention}calling conventions of these functions differ significantly:
 \begin{enumerate}
 \item The first function receives and returns the \texttt{Int} value in a machine register. The \texttt{Int} type is \emph{trivial},\footnote{Or POD, for you C++ folks.} meaning it can be copied and moved at will.
 \item The second function is trickier. A \texttt{String} is stored as a 16-byte value in memory, and contains a pointer to a reference-counted buffer. When manipulating values of a non-trivial type like \texttt{String}, memory ownership comes into play.
@@ -264,7 +264,7 @@ Once we have a generic signature, we can type check the body of \verb|drawShapes
 
 Our generic signature has the conformance requirement $\ConfReq{S}{Shape}$, so the caller must provide a replacement type for \texttt{S} conforming to \texttt{Shape}. We'll return to the caller's side of the equation shortly, but inside the callee, the requirement also tells us that the archetype $\archetype{S}$ conforms to \texttt{Shape}. To resolve the member expression, the type checker performs a \index{qualified lookup}\emph{qualified lookup} of the identifier \texttt{draw} with a base type of $\archetype{S}$. A qualified lookup into an archetype checks each protocol the archetype conforms to, so we find and return the \texttt{draw()} method of the \texttt{Shape} protocol.
 
-How does the compiler generate code for the call \verb|shape.draw()|? Together with the runtime type metadata for \texttt{S}, the calling convention for \verb|drawShapes(_:)| passes an additional argument, corresponding to the conformance requirement $\ConfReq{S}{Shape}$. This argument is the \index{witness table}\emph{witness table} for the conformance. The layout of a witness table is determined by the protocol's members; a witness table for a conformance to \texttt{Shape} has a single entry, the implementation of the \texttt{draw()} method. To call \texttt{shape.draw()}, we load the function pointer from the witness table, and invoke it with the value of \texttt{shape}.
+How does the compiler generate code for the call \verb|shape.draw()|? Together with the runtime type metadata for \texttt{S}, the \index{calling convention}calling convention for \verb|drawShapes(_:)| passes an additional argument, corresponding to the conformance requirement $\ConfReq{S}{Shape}$. This argument is the \index{witness table}\emph{witness table} for the conformance. The layout of a witness table is determined by the protocol's members; a witness table for a conformance to \texttt{Shape} has a single entry, the implementation of the \texttt{draw()} method. To call \texttt{shape.draw()}, we load the function pointer from the witness table, and invoke it with the value of \texttt{shape}.
 
 \begin{MoreDetails}
 \item Name lookup: \SecRef{name lookup}
@@ -285,7 +285,7 @@ drawShapes([Circle(radius: 1), Circle(radius: 2)])
 When the callee's generic signature has conformance requirements, the substitution map must store a conformance for each conformance requirement. This is the ``proof'' that the \index{conforming type}concrete replacement type actually conforms to the protocol, as required. We denote a substitution map with conformances as follows:
 \[\SubstMapC{\SubstType{S}{Circle}}{\SubstConf{S}{Circle}{Shape}}\]
 To find the normal conformance, the type checker performs a \index{global conformance lookup}\emph{global conformance lookup} with the concrete type and protocol:
-\[\protosym{Shape}\otimes\texttt{Circle}=\ConfReq{Circle}{Shape}\]
+\[\Proto{Shape}\otimes\texttt{Circle}=\ConfReq{Circle}{Shape}\]
 
 When generating code for the call to \verb|drawShapes(_:)|, we visit each entry in the substitution map, emitting a reference to runtime type metadata for each replacement type, and a reference to the witness table for each conformance. In our case, we pass the runtime type metadata for \texttt{Circle} and witness table for $\ConfReq{Circle}{Shape}$.
 
@@ -321,7 +321,7 @@ protocol IteratorProtocol {
 \end{Verbatim}
 A conforming type must declare a member type named \texttt{Element}, and a \texttt{next()} method returning an optional value of this type. This member type, which can be a type alias or nominal type, is the \emph{type witness} for the associated type \texttt{Element}.
 
-We declare a \texttt{Nat} type conforming to \texttt{IteratorProtocol} with an \texttt{Element} type of \texttt{Int}, for generating an infinite stream of consecutive \index{natural numbers}natural numbers:
+We declare a \texttt{Nat} type conforming to \texttt{IteratorProtocol} with an \texttt{Element} type of \texttt{Int}, for generating an infinite stream of consecutive natural numbers:
 \begin{Verbatim}
 struct Nat: IteratorProtocol {
   typealias Element = Int
@@ -334,11 +334,12 @@ struct Nat: IteratorProtocol {
 }
 \end{Verbatim}
 We say that \texttt{Int} is the \emph{type witness} for \texttt{[IteratorProtocol]Element} in the conformance $\ConfReq{Nat}{IteratorProtocol}$. We can express this in our type substitution algebra, using the type witness \emph{projection} operation on normal conformances:
-\[\AssocType{[IteratorProtocol]Element}\otimes \ConfReq{Nat}{IteratorProtocol} = \texttt{Int}\]
-In this case, we could have omitted the declaration of the type alias, relying on \index{associated type inference}\emph{associated type inference} to deduce the type witness. Also, more accurately, the type witness here is the \texttt{Element} \index{type alias type}\emph{type alias type}, whose \index{underlying type}underlying type is \texttt{Int}. A type alias type is an example of a \index{sugared type}\emph{sugared type}, equivalent semantically to its underlying type. The \index{optional sugared type}\emph{optional type} \texttt{Int?} is another sugared type, equivalent to \texttt{Optional<Int>}.
+\[\AssocType{IteratorProtocol}{Element}\otimes \ConfReq{Nat}{IteratorProtocol} = \texttt{Int}\]
+More accurately, the type witness here is the \texttt{Element} \index{type alias type}\emph{type alias type}, whose \index{underlying type}underlying type is \texttt{Int}. A type alias type is an example of a \index{sugared type}\emph{sugared type}. The \index{optional sugared type}\emph{optional type} \texttt{Int?} is another sugared type, equivalent to \texttt{Optional<Int>}. Finally, we can actually omit the declaration of \texttt{Element} here, and instead rely on \index{associated type inference}\emph{associated type inference}.
 
 \begin{MoreDetails}
 \item Type witnesses: \SecRef{type witnesses}
+\item Associated type inference: \SecRef{associated conformances}
 \end{MoreDetails}
 
 \paragraph{Dependent member types.} This function reads a pair of elements from an iterator:
@@ -355,12 +356,15 @@ var iter = Nat()
 print(readTwo(&iter))
 \end{Verbatim}
 The substitution map for the call stores the replacement type \texttt{Nat} and the conformance of \texttt{Nat} to \texttt{IteratorProtocol}. We'll call this substitution map~$\Sigma$:
-\[\Sigma := \SubstMapLongC{\SubstType{I}{Nat}}{\SubstConf{I}{Nat}{IteratorProtocol}}\]
+\begin{align*}
+\Sigma := \SubstMapC{&\SubstType{I}{Nat}}{\\
+&\SubstConf{I}{Nat}{IteratorProtocol}}
+\end{align*}
 The type of the call expression is then $\texttt{Pair<I.Element>}\otimes\Sigma$. Applying a substitution map to a generic nominal type recursively substitutes the generic arguments. Since the dependent member type \texttt{I.Element} abstracts over the type witness in the conformance, we could guess $\texttt{I.Element}\otimes\Sigma=\texttt{Int}$. We will eventually understand the next equation, to relate dependent member type substitution with type witness projection:
 \begin{gather*}
 \texttt{I.Element}\otimes\Sigma\\
-\qquad {} = \AssocType{[IteratorProtocol]Element}\otimes \ConfReq{I}{IteratorProtocol}\otimes\Sigma\\
-\qquad {} = \AssocType{[IteratorProtocol]Element}\otimes \ConfReq{Nat}{IteratorProtocol}\\
+\qquad {} = \AssocType{IteratorProtocol}{Element}\otimes \ConfReq{I}{IteratorProtocol}\otimes\Sigma\\
+\qquad {} = \AssocType{IteratorProtocol}{Element}\otimes \ConfReq{Nat}{IteratorProtocol}\\
 \qquad {} = \texttt{Int}
 \end{gather*}
 We can finally say that $\texttt{Pair<I.Element>}\otimes\Sigma=\texttt{Pair<Int>}$ is the return type of our call to \verb|readTwo(_:)|.
@@ -407,7 +411,7 @@ The generic signature of our \verb|readTwoParallel(_:)| states the \emph{same-ty
             I.Element == J.Element>
 \end{verbatim}
 \end{quote}
-This generic signature defines four type parameters, \texttt{I}, \texttt{J}, \texttt{I.Element}, and \texttt{J.Element}, where the final two abstract over the same concrete type, forming an \index{equivalence class}\emph{equivalence class}. It is often convenient to refer to an entire equivalence class by a representative type parameter. To make this choice in a deterministic fashion, we \emph{order} type parameters and say the smallest type parameter inside an equivalence class is a \index{reduced type}\emph{reduced type}. In our example, \texttt{I.Element} is the reduced type of \texttt{J.Element}.
+This generic signature defines four type parameters, \texttt{I}, \texttt{J}, \texttt{I.Element}, and \texttt{J.Element}, where the final two abstract over the same concrete type, forming an \index{equivalence class!of type parameters}\emph{equivalence class}. It is often convenient to refer to an entire equivalence class by a representative type parameter. To make this choice in a deterministic fashion, we \emph{order} type parameters and say the smallest type parameter inside an equivalence class is a \index{reduced type}\emph{reduced type}. In our example, \texttt{I.Element} is the reduced type of \texttt{J.Element}.
 
 In the presence of same-type requirements, an archetype represents a reduced type parameter (and thus an entire equivalence class of type parameters). In the body of \verb|readTwoParallel(_:)|, the expressions \verb|i.next()!| and \verb|j.next()!| both return the type $\archetype{I.Element}$, and the call to the \texttt{Pair} constructor is made with this substitution map:
 \[\SubstMap{\SubstType{T}{$\archetype{I.Element}$}}\]
@@ -425,12 +429,12 @@ var j = CatNames()
 print(readTwoParallel(&i, &j))
 \end{Verbatim}
 We're making the call with this substitution map:
-\[
-\Sigma := \SubstMapLongC{\SubstType{I}{BabyNames}\\
-\SubstType{J}{CatNames}}{
-\SubstConf{I}{BabyNames}{IteratorProtocol}\\
-\SubstConf{J}{CatNames}{IteratorProtocol}}
-\]
+\begin{align*}
+\Sigma := \SubstMapC{&\SubstType{I}{BabyNames},\\
+&\SubstType{J}{CatNames}}{\\
+&\SubstConf{I}{BabyNames}{IteratorProtocol}\\
+&\SubstConf{J}{CatNames}{IteratorProtocol}}
+\end{align*}
 The type checker applies $\Sigma$ to both sides of the same-type requirement, which gives us $\texttt{I.Element}\otimes\Sigma=\texttt{String}$ and $\texttt{J.Element}\otimes\Sigma=\texttt{String}$. The result is \texttt{String} in both cases, so we get the following \index{substituted requirement}\emph{substituted requirement}:
 \[\SameReq{I.Element}{J.Element}\otimes\Sigma=\SameReq{String}{String}\]
 The substituted requirement is satisfied so the code is well-typed, and we see that the call returns \texttt{Pair<String>}. Suppose instead we had substituted \texttt{I} with \texttt{Nat}:
@@ -464,7 +468,7 @@ This protocol states two associated requirements:
 \end{itemize}
 Associated requirements are like the requirements in a generic signature, except they are rooted in the \IndexSelf protocol \tSelf\ type. Once again, there are multiple equivalent syntactic forms for stating them. For example, we could write out the conformance requirement explicitly, and the above \texttt{where} clause could be attached to the protocol itself for the same semantic effect.
 
-The associated requirements of a protocol are recorded by the protocol's \index{requirement signature}\emph{requirement signature}. The \texttt{Sequence} protocol has the following requirement signature:
+The associated requirements of a protocol are recorded in the protocol's \index{requirement signature}\emph{requirement signature}. The \texttt{Sequence} protocol has the following requirement signature:
 \begin{quote}
 \begin{verbatim}
 <Self where Self.Element == Self.Iterator.Element,
@@ -518,7 +522,7 @@ Similarly, at runtime, starting from a witness table for a conformance to \textt
 
 \section{Related Work}
 
-A calling convention centered on a runtime representation of types was explored in a 1996 paper \cite{intensional}. Swift protocols are similar in spirit to \index{Haskell}Haskell type classes, described in \cite{typeclass}, and subsequently \cite{typeclasshaskell} and \cite{peytonjones1997type}. Swift witness tables follow the ``dictionary passing'' implementation strategy for type classes. Two papers subsequently introduced type classes with associated types, but without associated requirements. Using our Swift lingo, the first paper defined a formal model for associated types witnessed by \index{nested type declaration}nested nominal types \cite{assoctype}. In this model, every \index{type witness}type witness is a distinct concrete type. To translate their example into Swift:
+A \index{calling convention}calling convention centered on a runtime representation of types was explored in a 1996 paper \cite{intensional}. Swift protocols are similar in spirit to \index{Haskell}Haskell type classes, described in \cite{typeclass}, and subsequently \cite{typeclasshaskell} and \cite{peytonjones1997type}. Swift witness tables follow the ``dictionary passing'' implementation strategy for type classes. Two papers subsequently introduced type classes with associated types, but without associated requirements. Using our Swift lingo, the first paper defined a formal model for associated types witnessed by \index{nested type declaration}nested nominal types \cite{assoctype}. In this model, every \index{type witness}type witness is a distinct concrete type. To translate their example into Swift:
 \begin{Verbatim}
 protocol ArrayElem {
   associatedtype Array

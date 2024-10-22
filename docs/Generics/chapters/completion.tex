@@ -6,7 +6,7 @@
 
 \IndexDefinition{Knuth-Bendix algorithm}%
 \index{completion!z@\igobble|seealso{Knuth-Bendix algorithm}}
-\lettrine{K}{nuth-Bendix completion} is the central algorithm in the Requirement Machine. Completion attempts to construct a \index{convergent rewriting system}convergent rewriting system from a list of rewrite rules, and a convergent rewriting system allows us to decide if two terms have the same normal form in a finite number of steps, solving the word problem. As we saw in the previous chapter, our initial rewrite rules are defined by the explicit requirements of a generic signature and its protocol dependencies. A desirable property of this mapping was given by \ThmRef{derivation to path}: a \emph{derived} requirement defines a rewrite path over these rewrite rules representing explicit requirements. All of this means that completion gives us a \emph{decision procedure} for the \index{derived requirement}derived requirements formalism: the question of whether any given derived requirement is satisfied---that is, if there exists a valid derivation built from explicit requirements---is easily solved by term reduction in a convergent rewriting system. This is the foundation on which we build both \index{generic signature query}generic signature queries and \index{requirement minimization}minimization.
+\lettrine{K}{nuth-Bendix completion} is the central algorithm in the Requirement Machine. Completion attempts to construct a \index{convergent rewriting system}convergent rewriting system from a list of rewrite rules, and a convergent rewriting system allows us to decide if two terms have the same normal form in a finite number of steps, solving the word problem. As we saw in the previous chapter, our initial rewrite rules are defined by the explicit requirements of a generic signature and its protocol dependencies. A desirable property of this mapping was given by \ThmRef{derivation to path}: a \emph{derived} requirement defines a rewrite path over these rewrite rules representing explicit requirements. All of this means that completion gives us a \emph{decision procedure} for the \index{derived requirement!decision procedure}derived requirements formalism: the question of whether any given derived requirement is satisfied---that is, if there exists a valid derivation built from explicit requirements---is easily solved by term reduction in a convergent rewriting system. This is the foundation on which we build both \index{generic signature query}generic signature queries and \index{requirement minimization}minimization.
 
 \paragraph{The algorithm.} We'll give a self-contained description first, with much of the rest of the chapter devoted to examples. Our description can be supplemented with any text on rewrite systems, such as \cite{book2012string} or \cite{andallthat}. The algorithm is somewhat clever; to really ``get it'' might require several attempts. \index{Donald~Knuth}Donald~E.~Knuth and \index{Peter Bendix}Peter Bendix described the algorithm for term rewrite systems in a 1970 paper \cite{Knuth1983}; a correctness proof was later given by \index{Gerard Huet@G\'erard Huet}G\'erard Huet in \cite{HUET198111}. In our application, the terms are elements of a free monoid, so we have a string rewrite system; this special case was studied in \cite{narendran}. A survey of related techniques appears in \cite{BUCHBERGER19873}.
 
@@ -180,7 +180,7 @@ v_1z&&xv_2
  We \IndexDefinition{resolving critical pair}\emph{resolve} a critical pair $(t_1,t_2)$ by reducing both sides with the reduction relation as constructed so far and comparing the reduced terms. There are four possible outcomes:
 \begin{enumerate}
 \item If $t_1$ and $t_2$ reduce to the same term $t^\prime$, we say the \IndexDefinition{trivial critical pair}critical pair is \emph{trivial}. (Note that this terminology offers an alternate definition of local confluence: a reduction relation is locally confluent if all critical pairs are trivial.)
-\item If $t_1\rightarrow t_1^\prime$ and $t_2\rightarrow t_2^\prime$ with $t_1^\prime\neq t_2^\prime$, we found two distinct \index{reduced term}reduced terms in the same \index{equivalence class}equivalence class: a \index{confluence violation}\emph{confluence violation}. If $t_2^\prime < t_1^\prime$, we repair the confluence violation by adding a new rewrite rule $(t_1^\prime, t_2^\prime)$. Having done so, if we then define $t^\prime:=t_2^\prime$, we once again see that both $t_1$ and $t_2$ reduce to the same term $t^\prime$.
+\item If $t_1\rightarrow t_1^\prime$ and $t_2\rightarrow t_2^\prime$ with $t_1^\prime\neq t_2^\prime$, we found two distinct \index{reduced term}reduced terms in the same \index{equivalence class!of terms}equivalence class: a \index{confluence violation}\emph{confluence violation}. If $t_2^\prime < t_1^\prime$, we repair the confluence violation by adding a new rewrite rule $(t_1^\prime, t_2^\prime)$. Having done so, if we then define $t^\prime:=t_2^\prime$, we once again see that both $t_1$ and $t_2$ reduce to the same term $t^\prime$.
 
 \item If instead $t_1^\prime<t_2^\prime$, we have the same situation except we resolve it by adding a new rewrite rule $(t_2^\prime, t_1^\prime)$, and we let $t^\prime:=t_1^\prime$.
 
@@ -299,7 +299,7 @@ We now proceed to prove that this is indeed the case. First, suppose two importe
 \item There is an overlap of the second kind, and the second rule's left-hand side starts with an associated type symbol.
 \item There is an overlap of the second kind, and the second rule's left-hand side starts with a protocol symbol.
 \end{itemize}
-In all three cases, we will conclude that both rules either originate from the same \index{protocol component}protocol component, or two distinct components where one imports the other. This implies that the \index{trivial critical pair}critical pair is now trivial, having been resolved by completion of that protocol component which contains the other.
+In all three cases, we will conclude that both rules either originate from the same \index{protocol component!completion}protocol component, or two distinct components where one imports the other. This implies that the \index{trivial critical pair}critical pair is now trivial, having been resolved by completion of that protocol component which contains the other.
 
 In the first case, it is immediate that both rules were imported from the same protocol component for \tP:
 \begin{align*}
@@ -324,9 +324,9 @@ Next, we claim that imported rules cannot overlap with local rules. In a generic
 \end{align*}
 As before, \tQ\ must be a \index{protocol dependency graph}protocol dependency of \tP. But this time, we have the further assumption that \tQ\ belongs to the \emph{current} protocol component, so the appearance of \tP\ means that \tP\ must \emph{also} be a protocol dependency of \tQ. Thus, \tP\ and \tQ\ depend on each other, and are actually part of the same component; therefore both rules are local.
 
-\paragraph{Another optimization.} If we fix a rule and position, we can find all overlaps involving this rule and position by performing a lookup into the rule trie, which we previously used to speed up term reduction in \SecRef{term reduction}. This further cuts down the work in enumerating overlaps. While the underlying data structure is the same, the lookup algorithm here differs from that used by term reduction; we must enumerate all matches, instead of stopping after the first one.
+\paragraph{Another optimization.} If we fix a rule and position, we can find all overlaps involving this rule and position by performing a lookup into the \index{rule trie}rule \index{trie}trie, which we previously used to speed up term reduction in \SecRef{term reduction}. This further cuts down the work in enumerating overlaps. While the underlying data structure is the same, the lookup algorithm here differs from that used by term reduction; we must enumerate all matches, instead of stopping after the first one.
 
-Consider a set of rewrite rules having the terms $a$, $ab$, $bc$, $bd$ and $acd$ as their left-hand sides. The rule with left-hand side $ab$ has overlaps with all other rules except for $acd$. Here is the rule trie, with thick borders denoting nodes associated  with rewrite rules:
+Consider a set of rewrite rules having the terms $a$, $ab$, $bc$, $bd$ and $acd$ as their left-hand sides. The rule with left-hand side $ab$ has overlaps with all other rules except for $acd$. Here is the rule trie, with thick borders denoting nodes associated with rewrite rules:
 \begin{center}
 \begin{tikzpicture}
   [level distance=10mm,
@@ -416,7 +416,7 @@ protocol Z14 {
 }
 \end{Verbatim}
 
-If completion fails when building a rewrite system for \index{requirement minimization}minimization, we have a source location associated with some protocol or generic declaration. An error is diagnosed at this source location, and we proceed with minimization producing an empty list of requirements. If completion fails on a rewrite system built from an existing generic signature or \index{protocol component}protocol component, there is no source location we can use for diagnostics; the compiler dumps the entire rewrite system and aborts with a fatal error. The latter scenario is unusual; if we successfully constructed a generic signature from user-written requirements, we should be able to build a rewrite system for it again.
+If completion fails when building a rewrite system for \index{requirement minimization}minimization, we have a source location associated with some protocol or generic declaration. An error is diagnosed at this source location, and we proceed with minimization producing an empty list of requirements. If completion fails on a rewrite system built from an existing generic signature or \index{protocol component!completion}protocol component, there is no source location we can use for diagnostics; the compiler dumps the entire rewrite system and aborts with a fatal error. The latter scenario is unusual; if we successfully constructed a generic signature from user-written requirements, we should be able to build a rewrite system for it again.
 
 \paragraph{Debugging flags.}
 A pair of debugging options can help us understand the operation of the completion procedure; both can be set together\footnote{With a single \texttt{-debug-requirement-machine=} flag, separating the subflags with commas.}, but be warned that they produce a large volume of output:
@@ -539,7 +539,7 @@ What we call reduced rewrite systems are sometimes ``normalized'', ``canonical''
 
 \section{Associated Types}\label{critical pairs}
 
-A conformance rule $t\cdot\pP\Rightarrow t$ always overlaps with an associated type rule $\pP\cdot\nA\Rightarrow\aPA$, and resolving this critical pair defines a rule $t\cdot\nA\Rightarrow t\cdot\aPA$ (unless the right-hand side reduces further). These rewrite rules reduce those terms representing \index{unbound type parameter}unbound type parameters to \index{bound type parameter}bound type parameters. Thus, we will see how the bound and unbound type parameters from \SecRef{type params} manifest in our rewriting system.
+A conformance rule $t\cdot\pP\Rightarrow t$ always overlaps with an associated type rule $\pP\cdot\nA\Rightarrow\aPA$, and resolving this critical pair defines a rule $t\cdot\nA\Rightarrow t\cdot\aPA$ (unless the right-hand side reduces further). These rewrite rules reduce those terms representing \index{unbound type parameter!in requirement machine}unbound type parameters to \index{bound type parameter!in requirement machine}bound type parameters. Thus, we will see how the bound and unbound type parameters from \SecRef{bound type params} manifest in our rewriting system.
 
 \begin{example}\label{assoc type completion example}
 We're going to look at this pair of protocol declarations, and the \index{protocol generic signature}protocol generic signature $\GP$:
@@ -560,17 +560,17 @@ Protocol \tP\ has an \index{associated conformance requirement}associated confor
 \midrule
 &\AssocIntro{P}{A}\tag{2}&\\
 &\ProtoConf{\aPA}{Q}\tag{3}&\\
-&\aPA\cdot\nB\Rightarrow\aPA\cdot\assocsym{Q}{B}\tag{*4}&\\
+&\aPA\cdot\nB\Rightarrow\aPA\cdot\assocsym{Q}{B}\tag{\CRule{4}}&\\
 \midrule
 &\ProtoConf{\rT}{P}\tag{5}&\\
-&\rT\cdot\nA\Rightarrow\rT\cdot\aPA\tag{*6}&\\
+&\rT\cdot\nA\Rightarrow\rT\cdot\aPA\tag{\CRule{6}}&\\
 \bottomrule
 \end{flalign*}
 We can categorize these rewrite rules as follows:
 \begin{itemize}
 \item Associated type rules: (1) and (2).
 \item Conformance requirements: (3) and (5).
-\item Rules added by completion are indicated with an asterisk: (*4) and (*6).
+\item Rules added by completion are indicated with an asterisk: (\CRule{4}) and (\CRule{6}).
 \end{itemize}
 We omit the identity conformance rules $\ProtoConf{\pQ}{Q}$ and $\ProtoConf{\pP}{P}$; in this example they would only clutter the presentation. They will serve a useful purpose later, in \ExRef{proto assoc rule}.
 
@@ -589,11 +589,11 @@ We need to check the left-hand side of rules (2) and (3) for overlaps with other
 \aPA\cdot{}&\pQ\\
 &\pQ\cdot\nB
 \end{align*}
-Rule (3) is local to \tP, while (1) was imported from \tQ. The two sides of the critical pair reduce to $\aPA\cdot\nB$ and $\aPA\cdot\assocsym{Q}{B}$. Resolving this critical pair introduces rule (*4):
+Rule (3) is local to \tP, while (1) was imported from \tQ. The two sides of the critical pair reduce to $\aPA\cdot\nB$ and $\aPA\cdot\assocsym{Q}{B}$. Resolving this critical pair introduces rule (\CRule{4}):
 \[
-\aPA\cdot\nB\Rightarrow\aPA\cdot\assocsym{Q}{B}\tag{*4}
+\aPA\cdot\nB\Rightarrow\aPA\cdot\assocsym{Q}{B}\tag{\CRule{4}}
 \]
-We also record a rewrite loop that defines rule (*4) via rules (3) and (1):
+We also record a rewrite loop that defines rule (\CRule{4}) via rules (3) and (1):
 \begin{center}
 \begin{tikzcd}
 &\aPA\cdot\pQ\cdot\nB
@@ -615,11 +615,11 @@ $\rT\cdot\pP\cdot\nA$:
 \rT\cdot{}&\pP\\
 &\pP\cdot\nA
 \end{align*}
-Resolving this critical pair introduces rule (*6):
+Resolving this critical pair introduces rule (\CRule{6}):
 \[
-\rT\cdot\nA\Rightarrow\rT\cdot\aPA\tag{*6}
+\rT\cdot\nA\Rightarrow\rT\cdot\aPA\tag{\CRule{6}}
 \]
-We also record a rewrite loop that defines rule (*6) via rules (5) and (2):
+We also record a rewrite loop that defines rule (\CRule{6}) via rules (5) and (2):
 \begin{center}
 \begin{tikzcd}
 &\rT\cdot\pP\cdot\nA\arrow[ld, Rightarrow, "(\ProtoConf{\rT}{P})\cdot\nA"', bend right]\\
@@ -627,7 +627,7 @@ We also record a rewrite loop that defines rule (*6) via rules (5) and (2):
 \rT\cdot\aPA\arrow[ul, Rightarrow, "\rT\cdot(\AssocIntroInv{P}{A})"', bend right]
 \end{tikzcd}
 \end{center}
-At this point, there might be overlaps involving one of rule (5) or (*6); a quick check shows none remain, so we have a convergent rewriting system for $\GP$.
+At this point, there might be overlaps involving one of rule (5) or (\CRule{6}); a quick check shows none remain, so we have a convergent rewriting system for $\GP$.
 
 Now, we get to the interesting part. Consider these two type parameters of $\GP$, and their corresponding terms:
 \begin{enumerate}
@@ -678,7 +678,7 @@ Unlike $p$, $p^\prime$ is \emph{not} a positive rewrite path, because the first 
 \end{tikzcd}
 \end{center}
 
-We now have two \index{parallel rewrite paths}parallel rewrite paths: $p$ (output by the normal form algorithm), and $p^\prime$ (constructed from our derivation). Their composition $p^\prime\circ p^{-1}$ is a rewrite loop; we can represent it as a diagram, with rules (*4) and (*6) indicated by dashed arrows:
+We now have two \index{parallel rewrite paths}parallel rewrite paths: $p$ (output by the normal form algorithm), and $p^\prime$ (constructed from our derivation). Their composition $p^\prime\circ p^{-1}$ is a rewrite loop; we can represent it as a diagram, with rules (\CRule{4}) and (\CRule{6}) indicated by dashed arrows:
 \begin{center}
 \begin{tikzcd}[column sep=-5pt]
 &\rT\cdot\pP\cdot\nA\cdot\nB\arrow[ld, Rightarrow, bend right]
@@ -719,12 +719,12 @@ When type checking these declarations, we need to build a generic signature for 
 &\ProtoConf{\rT\cdot\aPA\cdot\assocsym{Q}{B}}{R}\tag{8*}&\\
 \bottomrule
 \end{flalign*}
-Rule (7) corresponds to the user-written requirement. Rule (*8) is added by completion, resolving the overlap between rule (7) and (6) on the term $\rT\cdot\nA\cdot\nB\cdot\pR$:
+Rule (7) corresponds to the user-written requirement. Rule (\CRule{8}) is added by completion, resolving the overlap between rule (7) and (6) on the term $\rT\cdot\nA\cdot\nB\cdot\pR$:
 \begin{align*}
 &\rT\cdot\nA\cdot\nB\cdot\pR\\
 &\rT\cdot\nA
 \end{align*}
-We record a rewrite loop defining rule (*8) via rule (4), (6) and (7):
+We record a rewrite loop defining rule (\CRule{8}) via rule (4), (6) and (7):
 \begin{center}
 \begin{tikzcd}
 &\rT\cdot\nA\cdot\nB\cdot\pR
@@ -745,7 +745,7 @@ We record a rewrite loop defining rule (*8) via rule (4), (6) and (7):
 \arrow[u, Rightarrow, "\rT\cdot(\aPA\cdot\assocsym{Q}{B}\Rightarrow\aPA\cdot\nB)"']&&
 \end{tikzcd}
 \end{center}
-Note that this was an overlap of the first kind, so rule (7) is now marked \index{left-simplified rule}\textbf{left-simplified}. Thus, rule (*8) completely supersedes rule (7). Rule (*8) survives minimization and maps to the requirement $\ConfReq{\rT.[P]A.[Q]B}{R}$, which appears in the generic signature that we output for this protocol extension:
+Note that this was an overlap of the first kind, so rule (7) is now marked \index{left-simplified rule}\textbf{left-simplified}. Thus, rule (\CRule{8}) completely supersedes rule (7). Rule (\CRule{8}) survives minimization and maps to the requirement $\ConfReq{\rT.[P]A.[Q]B}{R}$, which appears in the generic signature that we output for this protocol extension:
 \begin{quote}
 \begin{verbatim}
 <τ_0_0 where τ_0_0: P, τ_0_0.[P]A.[Q]B: R>
@@ -755,7 +755,7 @@ Note that this was an overlap of the first kind, so rule (7) is now marked \inde
 If our compiler invocation is generating a \index{serialized module}serialized module, we serialize the \index{protocol extension}protocol extension's generic signature and do not compute it again when this module is imported in the future. We might still need a rewrite system for generic signature queries though, in which scenario we build a ``second-generation'' rewrite system:
 \begin{enumerate}
 \item We originally built a convergent rewriting system from the user-written requirements of the protocol extension.
-\item After finding a minimal set of rules, we convert minimal rules to requirements, and serialize the resulting \index{generic signature}generic signature.
+\item After finding a minimal set of rules, we convert minimal rules to requirements, and serialize the resulting generic signature.
 \item In a subsequent compiler invocation, we deserialize this generic signature.
 \item Then, we build a convergent rewriting system from the requirements of this generic signature; rule (8) is now one of our initial rules.
 \end{enumerate}
@@ -818,7 +818,7 @@ We're going to look at this generic signature:
 \begin{quote}
 \texttt{<\rT\ where \rT:~P1, \rT:~P2>}
 \end{quote}
-Every \index{equivalence class}equivalence class of type parameters can be uniquely identified by some \index{unbound type parameter}unbound type parameter. In the above, the type parameters \texttt{\rT.[P1]A} and \texttt{\rT.[P2]A} must therefore be equivalent to \texttt{\rT.A}. We're going to see how this works out in the rewrite system. Here is the convergent rewriting system for the above generic signature:
+Every \index{equivalence class!of type parameters}equivalence class of type parameters can be uniquely identified by some \index{unbound type parameter!in requirement machine}unbound type parameter. In the above, the type parameters \texttt{\rT.[P1]A} and \texttt{\rT.[P2]A} must therefore be equivalent to \texttt{\rT.A}. We're going to see how this works out in the rewrite system. Here is the convergent rewriting system for the above generic signature:
 \begin{flalign*}
 \toprule
 &\AssocIntro{P1}{A}\tag{1}&\\
@@ -827,20 +827,20 @@ Every \index{equivalence class}equivalence class of type parameters can be uniqu
 \midrule
 &\ProtoConf{\rT}{P1}\tag{3}&\\
 &\ProtoConf{\rT}{P2}\tag{4}&\\
-&\rT\cdot\nA\Rightarrow\rT\cdot\assocsym{P1}{A}\tag{*5}&\\
-&\rT\cdot\assocsym{P2}{A}\Rightarrow\rT\cdot\assocsym{P1}{A}\tag{*6}&\\
+&\rT\cdot\nA\Rightarrow\rT\cdot\assocsym{P1}{A}\tag{\CRule{5}}&\\
+&\rT\cdot\assocsym{P2}{A}\Rightarrow\rT\cdot\assocsym{P1}{A}\tag{\CRule{6}}&\\
 \bottomrule
 \end{flalign*}
-Rules (1) and (2) are imported from \texttt{P1} and \texttt{P2}, and rules (3) and (4) correspond to the conformance requirements $\ConfReq{\rT}{P1}$ and $\ConfReq{\rT}{P2}$. Completion also adds two additional rules. Rule (*5) is added when resolving the overlap between rule (3) and rule (1), exactly as in \ExRef{assoc type completion example}.
+Rules (1) and (2) are imported from \texttt{P1} and \texttt{P2}, and rules (3) and (4) correspond to the conformance requirements $\ConfReq{\rT}{P1}$ and $\ConfReq{\rT}{P2}$. Completion also adds two additional rules. Rule (\CRule{5}) is added when resolving the overlap between rule (3) and rule (1), exactly as in \ExRef{assoc type completion example}.
 
 Rule (4) overlaps with rule (2) on the term $\rT\cdot\protosym{P2}\cdot\nA$:
 \begin{align*}
 \rT.&\protosym{P2}\\
 &\protosym{P2}\cdot\nA
 \end{align*}
-This gives us rule (*6), which has a new form we haven't seen before. One side of the critical pair reduces to $\rT\cdot\assocsym{P2}{A}$, and the other reduces to $\rT\cdot\assocsym{P1}{A}$ via rule (5).
+This gives us rule (\CRule{6}), which has a new form we haven't seen before. One side of the critical pair reduces to $\rT\cdot\assocsym{P2}{A}$, and the other reduces to $\rT\cdot\assocsym{P1}{A}$ via rule (5).
 
-We record a rewrite loop defining rule (*6) via (2), (4) and (5):
+We record a rewrite loop defining rule (\CRule{6}) via (2), (4) and (5):
 \[
 \FourLoopDerived%
 {\rT\cdot\protosym{P2}\cdot\nA}%
@@ -853,7 +853,7 @@ We record a rewrite loop defining rule (*6) via (2), (4) and (5):
 {(\ProtoConf{\rT}{P2}}
 \]
 
-We can ``glue'' the rewrite loops defining rule (*5) and (*6) together into a single diagram:
+We can ``glue'' the rewrite loops defining rule (\CRule{5}) and (\CRule{6}) together into a single diagram:
 \[
 \begin{tikzcd}
 &\rT\cdot\protosym{P2}\cdot\nA\arrow[ld, Rightarrow, bend right]&\\
@@ -862,7 +862,7 @@ We can ``glue'' the rewrite loops defining rule (*5) and (*6) together into a si
 &&\rT\cdot\protosym{P1}\cdot\nA\arrow[uu, Rightarrow, bend right]
 \end{tikzcd}
 \]
-The two dashed arrows are rules (*5) and (*6). The solid arrows indicate a rewrite path joining $\rT\cdot\assocsym{P1}{A}$ with $\rT\cdot\assocsym{P2}{A}$ involving the initial rules only. This rewrite path corresponds to the following derivation:
+The two dashed arrows are rules (\CRule{5}) and (\CRule{6}). The solid arrows indicate a rewrite path joining $\rT\cdot\assocsym{P1}{A}$ with $\rT\cdot\assocsym{P2}{A}$ involving the initial rules only. This rewrite path corresponds to the following derivation:
 \begin{gather*}
 \ConfStep{\rT}{P1}{1}\\
 \AssocBindStep{1}{\rT.[P1]A}{\rT.A}{2}\\
@@ -904,21 +904,21 @@ We're going to examine the rewrite system for the generic signature $G_\texttt{B
 \midrule
 &\AssocIntro{Bot}{A}\tag{3}&\\
 &\ProtoInherit{Bot}{Mid}\tag{4}&\\
-&\protosym{Bot}\cdot\assocsym{Mid}{A}\Rightarrow\assocsym{Bot}{A}\tag{*5}&\\
-&\ProtoInherit{Bot}{Top}\tag{*6}&\\
+&\protosym{Bot}\cdot\assocsym{Mid}{A}\Rightarrow\assocsym{Bot}{A}\tag{\CRule{5}}&\\
+&\ProtoInherit{Bot}{Top}\tag{\CRule{6}}&\\
 \midrule
 &\ProtoConf{\rT}{Bot}\tag{7}&\\
-&\ProtoConf{\rT}{Mid}\tag{*8}&\\
+&\ProtoConf{\rT}{Mid}\tag{\CRule{8}}&\\
 &\ProtoConf{\rT}{Top}\tag{*9}&\\
 &\rT\cdot\nA\Rightarrow\rT\cdot\assocsym{Bot}{A}\tag{*10}&\\
-&\rT\cdot\assocsym{Mid}{A}\Rightarrow\rT\cdot\assocsym{Bot}{A}\tag{*11}&\\
+&\rT\cdot\assocsym{Mid}{A}\Rightarrow\rT\cdot\assocsym{Bot}{A}\tag{\CRule{11}}&\\
 \bottomrule
 \end{flalign*}
 We're going to focus on a handful of interesting rules:
 \begin{itemize}
-\item While \texttt{Bot} does not declare any associated types, it inherits \nA\ from \texttt{Mid}; rule (3) is the \index{inherited associated type rule}inherited associated type rule for \nA.
-\item Rules (*5) and (*11) are added by completion as are a consequence of the inherited associated type rule.
-\item Rules (*6), (*8) and (*9) are also from completion. They express the ``transitive'' conformance requirements $\ConfReq{Self}{Top}_\texttt{Bottom}$, $\ConfReq{\rT}{Top}$ and $\ConfReq{\rT}{Mid}$.
+\item While \texttt{Bot} does not declare any associated types, it inherits \nA\ from \texttt{Mid}; rule (3) is the \index{associated type rule}associated type rule for \nA.
+\item Rules (\CRule{5}) and (\CRule{11}) are added by completion as are a consequence of the associated type rule.
+\item Rules (\CRule{6}), (\CRule{8}) and (*9) are also from completion. They express the ``transitive'' conformance requirements $\ConfReq{Self}{Top}_\texttt{Bottom}$, $\ConfReq{\rT}{Top}$ and $\ConfReq{\rT}{Mid}$.
 \end{itemize}
 
 Rule (4) overlaps with rule (1) on the term $\protosym{Bot}\cdot\protosym{Mid}\cdot\nA$:
@@ -926,7 +926,7 @@ Rule (4) overlaps with rule (1) on the term $\protosym{Bot}\cdot\protosym{Mid}\c
 \protosym{Bot}\cdot{}&\protosym{Mid}\\
 &\protosym{Mid}\cdot\nA
 \end{align*}
-Resolving this critical pair records a rewrite loop defining rule (*5) via (1), (3) and (4):
+Resolving this critical pair records a rewrite loop defining rule (\CRule{5}) via (1), (3) and (4):
 \begin{center}
 \FourLoopDerived%
 {\protosym{Bot}\cdot\protosym{Mid}\cdot\nA}%
@@ -938,14 +938,14 @@ Resolving this critical pair records a rewrite loop defining rule (*5) via (1), 
 {(\AssocIntroInv{Bot}{A})}%
 {(\ProtoInheritInv{Bot}{Mid})\cdot\nA}
 \end{center}
-Rule (*5) says, if a term conforming to \texttt{Bot} is followed by $\assocsym{Mid}{A}$, we can reduce it to $\assocsym{Bot}{A}$.
+Rule (\CRule{5}) says, if a term conforming to \texttt{Bot} is followed by $\assocsym{Mid}{A}$, we can reduce it to $\assocsym{Bot}{A}$.
 
 Rule (4) overlaps with rule (3) on the term $\protosym{Bot}\cdot\protosym{Mid}\cdot\protosym{Top}$:
 \begin{align*}
 \protosym{Bot}\cdot{}&\protosym{Mid}\\
 &\protosym{Mid}\cdot\protosym{Top}
 \end{align*}
-Resolving this critical pair records a rewrite loop defining rule (*6) via rule (2) and (4):
+Resolving this critical pair records a rewrite loop defining rule (\CRule{6}) via rule (2) and (4):
 \begin{center}
 \FourLoopDerived%
 {\protosym{Bot}\cdot\protosym{Mid}\cdot\protosym{Top}}%
@@ -957,7 +957,7 @@ Resolving this critical pair records a rewrite loop defining rule (*6) via rule 
 {(\ProtoInheritInv{Bot}{Mid})}%
 {\protosym{Bot}\cdot(\ProtoInheritInv{Mid}{Top})}
 \end{center}
-Rule (*6) says, if a term conforms to \texttt{Bot}, it also conforms to \texttt{Top}. In general, after completion, rewrite rules of the form $\pP\cdot\pQ\Rightarrow\pP$ will encode the \index{transitive closure}transitive closure of the \index{inherited protocol}protocol inheritance relation.
+Rule (\CRule{6}) says, if a term conforms to \texttt{Bot}, it also conforms to \texttt{Top}. In general, after completion, rewrite rules of the form $\pP\cdot\pQ\Rightarrow\pP$ will encode the \index{transitive closure}transitive closure of the \index{inherited protocol}protocol inheritance relation.
 
 This completes the rewrite system for \texttt{Bot}. Moving on to $G_\texttt{Bot}$, we see that rule (7) overlaps with rule (4) on the term $\rT\cdot\protosym{Bot}\cdot\protosym{Mid}$:
 \begin{align*}
@@ -967,7 +967,7 @@ This completes the rewrite system for \texttt{Bot}. Moving on to $G_\texttt{Bot}
 
 \pagebreak
 
-\noindent Resolving this critical pair defines rule (*8) via rules (4), (7) and (*8):
+\noindent Resolving this critical pair defines rule (\CRule{8}) via rules (4), (7) and (\CRule{8}):
 \begin{center}
 \FourLoopDerived%
 {\rT\cdot\protosym{Bot}\cdot\protosym{Mid}}%
@@ -979,17 +979,17 @@ This completes the rewrite system for \texttt{Bot}. Moving on to $G_\texttt{Bot}
 {(\ProtoConfInv{\rT}{Bot})}%
 {\rT\cdot(\ProtoInheritInv{Bot}{Mid})}
 \end{center}
-Rule (*8) is the derived requirement $\ConfReq{\rT}{Mid}$. Rule (7) overlaps with rule (5) in the same way, defining rule (*9), which is the derived requirement $\ConfReq{\rT}{Top}$. Once again, we see the transitive closure of the protocol inheritance relation being computed.
+Rule (\CRule{8}) is the derived requirement $\ConfReq{\rT}{Mid}$. Rule (7) overlaps with rule (5) in the same way, defining rule (*9), which is the derived requirement $\ConfReq{\rT}{Top}$. Once again, we see the transitive closure of the protocol inheritance relation being computed.
 
 Rule (7) overlaps with rule (3) on the term $\rT\cdot\protosym{Bot}\cdot\nA$, defining rule (*10), by the same general principle as in \ExRef{assoc type completion example}.
 
-Finally, rule (*8) overlaps with rule (1) on the term $\rT\cdot\protosym{Mid}\cdot\nA$:
+Finally, rule (\CRule{8}) overlaps with rule (1) on the term $\rT\cdot\protosym{Mid}\cdot\nA$:
 \begin{align*}
 \rT\cdot{}&\protosym{Mid}\\
 &\protosym{Mid}\cdot\nA
 \end{align*}
 
-Resolving this critical pair defines rule (*11) via rule (1), (3) and (*8):
+Resolving this critical pair defines rule (\CRule{11}) via rule (1), (3) and (\CRule{8}):
 \begin{center}
 \FourLoopDerived%
 {\rT\cdot\protosym{Mid}\cdot\nA}%
@@ -1002,7 +1002,7 @@ Resolving this critical pair defines rule (*11) via rule (1), (3) and (*8):
 {(\ProtoConfInv{\rT}{Mid}).\nA}
 \end{center}
 
-In this example, the relationship between \index{type parameter}type parameters and \index{term!in requirement machine}terms is more subtle than we've previously seen, because the two distinct \index{associated type symbol}associated type symbols $\assocsym{Mid}{A}$ and $\assocsym{Bot}{A}$ both correspond to the same associated type \emph{declaration}. On one hand, the \index{equivalence class}equivalence class of \texttt{\rT.[Mid]A} contains one other type parameter, \texttt{\rT.A}. However, we have \emph{three} equivalent terms: $\rT\cdot\assocsym{Mid}{A}$, $\rT\cdot\assocsym{Bot}{A}$, and $\rT\cdot\nA$. Not only that, but applying \AlgRef{build term generic} to the \index{reduced type parameter}reduced type parameter \texttt{\rT.[Mid]A} outputs $\rT\cdot\assocsym{Mid}{A}$, which is \emph{not} \index{reduced term}reduced; the reduced term here is $\rT\cdot\assocsym{Bot}{A}$, because $\assocsym{Bot}{A}<\assocsym{Mid}{A}$ in the \index{reduction order!in requirement machine}reduction order (\AlgRef{protocol reduction order}):
+In this example, the relationship between \index{type parameter}type parameters and \index{term!in requirement machine}terms is more subtle than we've previously seen, because the two distinct \index{associated type symbol}associated type symbols $\assocsym{Mid}{A}$ and $\assocsym{Bot}{A}$ both correspond to the same associated type \emph{declaration}. On one hand, the \index{equivalence class!of terms}equivalence class of \texttt{\rT.[Mid]A} contains one other type parameter, \texttt{\rT.A}. However, we have \emph{three} equivalent terms: $\rT\cdot\assocsym{Mid}{A}$, $\rT\cdot\assocsym{Bot}{A}$, and $\rT\cdot\nA$. Not only that, but applying \AlgRef{build term generic} to the \index{reduced type parameter}reduced type parameter \texttt{\rT.[Mid]A} outputs $\rT\cdot\assocsym{Mid}{A}$, which is \emph{not} \index{reduced term}reduced; the reduced term here is $\rT\cdot\assocsym{Bot}{A}$, because $\assocsym{Bot}{A}<\assocsym{Mid}{A}$ in the \index{reduction order!in requirement machine}reduction order (\AlgRef{protocol reduction order}):
 \begin{center}
 \begin{tabular}{ll}
 \textbf{Type}&\textbf{Term}\\
@@ -1168,29 +1168,29 @@ One side of this critical pair reduces to $\protosym{S}\cdot\assocsym{S}{A}$, wh
 In the same way we get such a rule for every associated type:
 \begin{flalign*}
 \toprule
-&\protosym{S}\cdot\assocsym{S}{A}\Rightarrow\assocsym{S}{A}\tag{*8}&\\
+&\protosym{S}\cdot\assocsym{S}{A}\Rightarrow\assocsym{S}{A}\tag{\CRule{8}}&\\
 &\protosym{S}\cdot\assocsym{S}{B}\Rightarrow\assocsym{S}{B}\tag{*9}&\\
 &\protosym{S}\cdot\assocsym{S}{C}\Rightarrow\assocsym{S}{C}\tag{*10}&\\
 \bottomrule
 \end{flalign*}
-While we could have also written down similar rules in previous examples, they would not have illustrated anything of consequence. They will shortly; but first, we have a few overlaps between conformance rules and associated type rules. As in previous examples, we get the usual rules (*11), (*12), and (*13) for reducing unbound type parameters; we also left-simplify (5), (6) and (7), replacing them with rules (*14), (*15), and (*16):
+While we could have also written down similar rules in previous examples, they would not have illustrated anything of consequence. They will shortly; but first, we have a few overlaps between conformance rules and associated type rules. As in previous examples, we get the usual rules (\CRule{11}), (\CRule{12}), and (\CRule{13}) for reducing unbound type parameters; we also left-simplify (5), (6) and (7), replacing them with rules (\CRule{14}), (\CRule{15}), and (\CRule{16}):
 \begin{flalign*}
 \toprule
-&\assocsym{S}{C}\cdot\nA\Rightarrow\assocsym{S}{C}\cdot\assocsym{S}{A}\tag{*11}&\\
-&\assocsym{S}{C}\cdot\nB\Rightarrow\assocsym{S}{C}\cdot\assocsym{S}{B}\tag{*12}&\\
-&\assocsym{S}{C}\cdot\nC\Rightarrow\protosym{S}\tag{*13}&\\
-&\ProtoConf{\assocsym{S}{C}}{S}\tag{*14}&\\
-&\assocsym{S}{C}\cdot\assocsym{S}{C}\Rightarrow\protosym{S}\tag{*15}&\\
-&\assocsym{S}{C}\cdot\assocsym{S}{A}\Rightarrow\assocsym{S}{B}\tag{*16}&\\
+&\assocsym{S}{C}\cdot\nA\Rightarrow\assocsym{S}{C}\cdot\assocsym{S}{A}\tag{\CRule{11}}&\\
+&\assocsym{S}{C}\cdot\nB\Rightarrow\assocsym{S}{C}\cdot\assocsym{S}{B}\tag{\CRule{12}}&\\
+&\assocsym{S}{C}\cdot\nC\Rightarrow\protosym{S}\tag{\CRule{13}}&\\
+&\ProtoConf{\assocsym{S}{C}}{S}\tag{\CRule{14}}&\\
+&\assocsym{S}{C}\cdot\assocsym{S}{C}\Rightarrow\protosym{S}\tag{\CRule{15}}&\\
+&\assocsym{S}{C}\cdot\assocsym{S}{A}\Rightarrow\assocsym{S}{B}\tag{\CRule{16}}&\\
 \bottomrule
 \end{flalign*}
 
-Here is the main event: rule (*15) overlaps with (*16) on the term $\assocsym{S}{C}\cdot\assocsym{S}{C}\cdot\assocsym{S}{A}$:
+Here is the main event: rule (\CRule{15}) overlaps with (\CRule{16}) on the term $\assocsym{S}{C}\cdot\assocsym{S}{C}\cdot\assocsym{S}{A}$:
 \begin{align*}
 \assocsym{S}{C}\cdot{}&\assocsym{S}{C}\\
 &\assocsym{S}{C}\cdot\assocsym{S}{A}
 \end{align*}
-The right-hand side of this critical pair reduces the overlap term $\assocsym{S}{C}\cdot\assocsym{S}{C}\cdot\assocsym{S}{A}$ with rule (*15), which gives us $\protosym{S}\cdot\assocsym{S}{A}$. Previously, terms for bound type parameters would begin with \emph{either} a protocol symbol or an associated type symbol, but not both; the associated type symbol already encodes the protocol. Indeed, this funny-looking term reduces to just $\assocsym{S}{A}$ via rule (*8), defined as a consequence of that mysterious identity conformance rule (1).
+The right-hand side of this critical pair reduces the overlap term $\assocsym{S}{C}\cdot\assocsym{S}{C}\cdot\assocsym{S}{A}$ with rule (\CRule{15}), which gives us $\protosym{S}\cdot\assocsym{S}{A}$. Previously, terms for bound type parameters would begin with \emph{either} a protocol symbol or an associated type symbol, but not both; the associated type symbol already encodes the protocol. Indeed, this funny-looking term reduces to just $\assocsym{S}{A}$ via rule (\CRule{8}), defined as a consequence of that mysterious identity conformance rule (1).
 \begin{center}
 \FourLoopDerived%
 {\assocsym{S}{C}\cdot\assocsym{S}{C}\cdot\assocsym{S}{A}}%
@@ -1206,11 +1206,11 @@ The right-hand side of this critical pair reduces the overlap term $\assocsym{S}
 At last, and as predicated, we get the rule that proves $G_\texttt{S}\vdash\SameReq{\rT.A}{\rT.C.B}$:
 \begin{flalign*}
 \toprule
-&\assocsym{S}{C}\cdot\assocsym{S}{B}\Rightarrow\assocsym{S}{A}\tag{*17}&\\
+&\assocsym{S}{C}\cdot\assocsym{S}{B}\Rightarrow\assocsym{S}{A}\tag{\CRule{17}}&\\
 \bottomrule
 \end{flalign*}
 
-Now the \emph{encore}: rule (*15) overlaps with rule (*14) on the term $\assocsym{S}{C}\cdot\assocsym{S}{C}\cdot\protosym{S}$:
+Now the \emph{encore}: rule (\CRule{15}) overlaps with rule (\CRule{14}) on the term $\assocsym{S}{C}\cdot\assocsym{S}{C}\cdot\protosym{S}$:
 \begin{align*}
 \assocsym{S}{C}\cdot{}&\assocsym{S}{C}\\
 &\assocsym{S}{C}\cdot\protosym{S}
@@ -1287,7 +1287,7 @@ Tietze transformations are fundamental to the study of \emph{combinatorial group
 
 \section{Recursive Conformances}\label{recursive conformances redux}
 
-From previous examples, it may look like completion essentially enumerates \emph{all} derived requirements, but this cannot be true in general. We know from \SecRef{recursive conformances} that \index{recursive conformance requirement}recursive conformance requirements allow us to define generic signatures with an infinite set of \index{derived requirement}derived requirements. If the compiler is to allow such generic signatures, this infinite set of derived requirements must be encoded by a finite number of rewrite rules.
+From previous examples, it may look like completion essentially enumerates \emph{all} derived requirements, but this cannot be true in general. We know from \SecRef{recursive conformances} that \index{recursive conformance requirement}recursive conformance requirements allow us to define \index{generic signature!infinite}generic signatures with an \index{theory!infinite}infinite theory of derived requirements. If the compiler is to allow such generic signatures, this infinite set of derived requirements must be encoded by a finite number of rewrite rules.
 
 We will see that with recursive conformance requirements, successful termination of the Knuth-Bendix algorithm depends both on the existence of associated type symbols (and rules), and our choice of reduction order. This furnishes the concrete example for a scenario mentioned in \SecRef{word problem}.
 
@@ -1304,15 +1304,15 @@ Let's look at the convergent rewriting system for $G_\texttt{N}$:
 &\ProtoInherit{N}{N}\tag{1}&\\
 &\AssocIntro{N}{A}\tag{2}&\\
 &\ProtoConf{\protosym{N}\cdot\nA}{N}\tag{3}&\\
-&\ProtoConf{\aNA}{N}\tag{*4}\\
-&\protosym{N}\cdot\aNA\Rightarrow\aNA\tag{*5}&\\
-&\aNA\cdot\nA\Rightarrow\aNA\cdot\aNA\tag{*6}&\\
+&\ProtoConf{\aNA}{N}\tag{\CRule{4}}\\
+&\protosym{N}\cdot\aNA\Rightarrow\aNA\tag{\CRule{5}}&\\
+&\aNA\cdot\nA\Rightarrow\aNA\cdot\aNA\tag{\CRule{6}}&\\
 \midrule
 &\ProtoConf{\rT}{N}\tag{7}&\\
-&\rT\cdot\nA\Rightarrow\rT\cdot\aNA\tag{*8}&\\
+&\rT\cdot\nA\Rightarrow\rT\cdot\aNA\tag{\CRule{8}}&\\
 \bottomrule
 \end{flalign*}
-Rules (*4), (*5), (*6) and (*8) are defined by the rewrite loops shown in \FigRef{recursive n loops}. Rule~(3) is marked \textbf{left-simplified} because its left-hand side $\protosym{N}\cdot\nA\cdot\protosym{N}$ can always be reduced by the rewrite path $(\AssocIntro{N}{A}).\protosym{N}\circ(\ProtoConf{\aNA}{N})$.
+Rules (\CRule{4}), (\CRule{5}), (\CRule{6}) and (\CRule{8}) are defined by the rewrite loops shown in \FigRef{recursive n loops}. Rule~(3) is marked \textbf{left-simplified} because its left-hand side $\protosym{N}\cdot\nA\cdot\protosym{N}$ can always be reduced by the rewrite path $(\AssocIntro{N}{A}).\protosym{N}\circ(\ProtoConf{\aNA}{N})$.
 
 \begin{figure}\captionabove{Critical pairs in $G_\texttt{N}$}\label{recursive n loops}
 \begin{center}
@@ -1374,20 +1374,20 @@ The reduced terms are those that do not contain \nA; that is, a reduced term has
 \bottomrule
 \end{tabular}
 \end{center}
-Each derived requirement corresponds to an equivalence of terms $t.\protosym{N}\sim t$, where $t$ is a type parameter term. We can explicitly construct rewrite paths that witness these equivalences. Let's temporarily denote the positive rewrite step for rules (*4), (*6) and (*8) by $\alpha$, $\beta$ and $\gamma$ respectively:
+Each derived requirement corresponds to an equivalence of terms $t\cdot\protosym{N}\sim t$, where $t$ is a type parameter term. We can explicitly construct rewrite paths that witness these equivalences. Let's temporarily denote the positive rewrite step for rules (\CRule{4}), (\CRule{6}) and (\CRule{8}) by $\alpha$, $\beta$ and $\gamma$ respectively:
 \begin{gather*}
 \alpha := (\ProtoConf{\aNA}{N})\\
 \beta := (\aNA\cdot\nA\Rightarrow\aNA\cdot\aNA)\\
 \gamma := (\rT\cdot\nA\Rightarrow\rT\cdot\aNA)
 \end{gather*}
-For a derived requirement with bound subject type, $t=\rT\cdot\aNA^n$. We can rewrite $t.\protosym{N}$ to $t$ with a single rewrite step, using rule $\alpha$ to eliminate the suffix $\protosym{N}$ while leaving the rest of the term unchanged:
+For a derived requirement with bound subject type, $t=\rT\cdot\aNA^n$. We can rewrite $t\cdot\protosym{N}$ to $t$ with a single rewrite step, using rule $\alpha$ to eliminate the suffix $\protosym{N}$ while leaving the rest of the term unchanged:
 \begin{gather*}
 \rT\WL\alpha\\
 \rT\cdot\aNA\WL\alpha\\
 \rT\cdot\aNA\cdot\aNA\WL\alpha\\
 \ldots
 \end{gather*}
-For those derived requirements with unbound subject types, $t=\rT\cdot\nA$. To rewrite $t.\protosym{N}$ to $t$, we first reduce $t\rightarrow t^\prime$, eliminate $\protosym{N}$ with rule $\alpha$, and reverse the reduction to obtain~$t$. The reduction is given by a path $p_n$, where each $p_n$ rewrites $\rT\cdot\nA^n\rightarrow\rT\cdot\aNA^n$:
+For those derived requirements with unbound subject types, $t=\rT\cdot\nA$. To rewrite $t\cdot\protosym{N}$ to $t$, we first reduce $t\rightarrow t^\prime$, eliminate $\protosym{N}$ with rule $\alpha$, and reverse the reduction to obtain~$t$. The reduction is given by a path $p_n$, where each $p_n$ rewrites $\rT\cdot\nA^n\rightarrow\rT\cdot\aNA^n$:
 \begin{gather*}
 p_1:=\gamma\\
 p_2:=(\gamma\WR\nA\cdot\protosym{N})\circ(\rT\WL\beta\WR\protosym{N})\\
@@ -1520,12 +1520,12 @@ The generic signature $G_\tQ$ has all the derived requirements of $G_\texttt{N}$
 
 \ListingRef{rewrite system q} shows the convegent rewrite system for \tQ, which imports rules from protocol~\texttt{N}. Completion discovers the following critical pairs; we will be content to just summarize because they are similar to previous examples:
 \begin{itemize}
-\item Rule (6) overlaps with (7) on $\pQ\cdot\pQ\cdot\nA$. We define rule (*10) (this general principle was established in \ExRef{proto assoc rule}).
-\item Rule (8) overlaps with (2) on $\pQ\cdot\protosym{N}\cdot\nA$. We define rule (*11) (\ExRef{protocol inheritance completion example}).
-\item Rule (9) overlaps with (7) on $\pQ\cdot\nA\cdot\pQ$. We define rule (*12), and mark rule (9) as \index{left-simplified rule}\textbf{left-simplified} (\ExRef{overlap of first kind example}).
-\item Rule (*12) overlaps with (8) on $\assocsym{Q}{A}\cdot\pQ\cdot\protosym{N}$. We define rule (*13).
-\item Rule (*12) overlaps with (7) on $\assocsym{Q}{A}\cdot\pQ\cdot\nA$. We define rule (*14) (\ExRef{assoc type completion example}).
-\item Rule (*13) overlaps with (2) on $\assocsym{Q}{A}\cdot\protosym{N}\cdot\nA$. We define rule (*15).
+\item Rule (6) overlaps with (7) on $\pQ\cdot\pQ\cdot\nA$. We define rule (\CRule{10}) (this general principle was established in \ExRef{proto assoc rule}).
+\item Rule (8) overlaps with (2) on $\pQ\cdot\protosym{N}\cdot\nA$. We define rule (\CRule{11}) (\ExRef{protocol inheritance completion example}).
+\item Rule (9) overlaps with (7) on $\pQ\cdot\nA\cdot\pQ$. We define rule (\CRule{12}), and mark rule (9) as \index{left-simplified rule}\textbf{left-simplified} (\ExRef{overlap of first kind example}).
+\item Rule (\CRule{12}) overlaps with (8) on $\assocsym{Q}{A}\cdot\pQ\cdot\protosym{N}$. We define rule (\CRule{13}).
+\item Rule (\CRule{12}) overlaps with (7) on $\assocsym{Q}{A}\cdot\pQ\cdot\nA$. We define rule (\CRule{14}) (\ExRef{assoc type completion example}).
+\item Rule (\CRule{13}) overlaps with (2) on $\assocsym{Q}{A}\cdot\protosym{N}\cdot\nA$. We define rule (\CRule{15}).
 \end{itemize}
 
 
@@ -1535,19 +1535,19 @@ The generic signature $G_\tQ$ has all the derived requirements of $G_\texttt{N}$
 &\ProtoInherit{N}{N}\tag{1}&\\
 &\AssocIntro{N}{A}\tag{2}&\\
 &\ProtoConf{\aNA}{N}\tag{3}\\
-&\protosym{N}\cdot\aNA\Rightarrow\aNA\tag{*4}&\\
-&\aNA\cdot\nA\Rightarrow\aNA\cdot\aNA\tag{*5}&\\
+&\protosym{N}\cdot\aNA\Rightarrow\aNA\tag{\CRule{4}}&\\
+&\aNA\cdot\nA\Rightarrow\aNA\cdot\aNA\tag{\CRule{5}}&\\
 \midrule
 &\ProtoInherit{Q}{Q}\tag{6}&\\
 &\AssocIntro{Q}{A}\tag{7}&\\
 &\ProtoInherit{Q}{N}\tag{8}&\\
 &\ProtoConf{\pQ\cdot\nA}{Q}\tag{9}&\\
-&\pQ\cdot\assocsym{Q}{A}\Rightarrow\assocsym{Q}{A}\tag{*10}\\
-&\pQ\cdot\aNA\Rightarrow\assocsym{Q}{A}\tag{*11}\\
-&\ProtoConf{\assocsym{Q}{A}}{Q}\tag{*12}&\\
-&\ProtoConf{\assocsym{Q}{A}}{N}\tag{*13}&\\
-&\assocsym{Q}{A}\cdot\nA\Rightarrow\assocsym{Q}{A}\cdot\assocsym{Q}{A}\tag{*14}\\
-&\assocsym{Q}{A}\cdot\aNA\Rightarrow\assocsym{Q}{A}\cdot\assocsym{Q}{A}\tag{*15}\\
+&\pQ\cdot\assocsym{Q}{A}\Rightarrow\assocsym{Q}{A}\tag{\CRule{10}}\\
+&\pQ\cdot\aNA\Rightarrow\assocsym{Q}{A}\tag{\CRule{11}}\\
+&\ProtoConf{\assocsym{Q}{A}}{Q}\tag{\CRule{12}}&\\
+&\ProtoConf{\assocsym{Q}{A}}{N}\tag{\CRule{13}}&\\
+&\assocsym{Q}{A}\cdot\nA\Rightarrow\assocsym{Q}{A}\cdot\assocsym{Q}{A}\tag{\CRule{14}}\\
+&\assocsym{Q}{A}\cdot\aNA\Rightarrow\assocsym{Q}{A}\cdot\assocsym{Q}{A}\tag{\CRule{15}}\\
 \bottomrule
 \end{flalign*}
 \end{listing}
@@ -1556,7 +1556,7 @@ Here's a question. What if we only had associated type symbols that directly cor
 
 \pagebreak
 
-Rule (8) still overlaps with rule (2), but instead of rule (*11), we now get a rule $\pQ\cdot\nA\Rightarrow\pQ\cdot\aNA$ when we resolve this critical pair:
+Rule (8) still overlaps with rule (2), but instead of rule (\CRule{11}), we now get a rule $\pQ\cdot\nA\Rightarrow\pQ\cdot\aNA$ when we resolve this critical pair:
 \begin{center}
 \begin{tikzcd}
 &\pQ\cdot\protosym{N}\cdot\nA\arrow[ld, Rightarrow, bend right, "(\pQ\cdot\protosym{N}\Rightarrow\pQ)\cdot\nA"']\\
@@ -1845,12 +1845,13 @@ See also \SecRef{symbols terms rules sourceref}.
 \item \texttt{addRule()} implements \AlgRef{add rule derived algo}.
 \item \texttt{recordRewriteLoop()} records a \index{rewrite loop}rewrite loop if this rewrite system is used for minimization.
 \item \IndexSource{critical pair}\texttt{computeCriticalPair()} implements \AlgRef{critical pair algo}.
-\item \IndexSource{Knuth-Bendix algorithm}\texttt{computeConfluentCompletion()} implements \AlgRef{knuthbendix}.
+\item \IndexSource{Knuth-Bendix algorithm}\texttt{performKnuthBendix()} implements \AlgRef{knuthbendix}.
 \item \texttt{simplifyLeftHandSides()} \IndexSource{left simplification}\IndexSource{reduced rewrite system}\IndexSource{left-reduced rewrite system}implements \AlgRef{left simplification}.
 \item \texttt{simplifyRightHandSides()} \IndexSource{right simplification}\IndexSource{right-reduced rewrite system}implements \AlgRef{right simplification}.
 \end{itemize}
 
 \apiref{rewriting::Trie}{template class}
+See also \SecRef{symbols terms rules sourceref}.
 \begin{itemize}
 \item \texttt{findAll()} finds all \index{rule trie}overlapping rules using \AlgRef{find overlapping rule algo}.
 \end{itemize}
