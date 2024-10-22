@@ -3887,6 +3887,19 @@ namespace {
       auto swiftParams = result->getParameters();
       bool hasSelf = result->hasImplicitSelfDecl() && !isa<ConstructorDecl>(result);
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
+
+      // Unsafe APIs might have incomplete lifetime contracts. The onus is on
+      // the consumers to use it correctly.
+      if (result->getAttrs().hasAttribute<UnsafeAttr>()) {
+        // Avoid compiler errors for missing lifetimes of non-escapable types.
+        lifetimeDependencies.push_back(
+            LifetimeDependenceInfo(nullptr, nullptr, 0, /*isImmortal*/ true));
+        Impl.SwiftContext.evaluator.cacheOutput(
+            LifetimeDependenceInfoRequest{result},
+            Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
+        return;
+      }
+
       SmallBitVector inheritLifetimeParamIndicesForReturn(swiftParams->size() +
                                                           hasSelf);
       SmallBitVector scopedLifetimeParamIndicesForReturn(swiftParams->size() +

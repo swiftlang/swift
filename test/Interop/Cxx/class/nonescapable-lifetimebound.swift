@@ -1,7 +1,6 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs  %t/test.swift -enable-experimental-feature NonescapableTypes -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1
-// RUN: %target-swift-frontend -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs -emit-sil %t/test.swift -enable-experimental-feature NonescapableTypes -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs -emit-sil %t/test.swift -enable-experimental-feature NonescapableTypes -enable-experimental-feature AllowUnsafeAttribute  -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
 
 //--- Inputs/module.modulemap
 module Test {
@@ -77,6 +76,14 @@ private:
     const int *member;
 };
 
+SWIFT_IMPORT_AS_UNSAFE
+View getViewPartiallyAnnotated(const Owner& owner [[clang::lifetimebound]], const Owner& owner2) {
+    if (coinFlip)
+        return View(&owner.data);
+    else
+        return View(&owner2.data);
+}
+
 // CHECK: sil [clang makeOwner] {{.*}}: $@convention(c) () -> Owner
 // CHECK: sil [clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @autoreleased View
 // CHECK: sil [clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow 0) @autoreleased View
@@ -86,6 +93,7 @@ private:
 // CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@guaranteed View, @guaranteed View) -> @lifetime(copy 0, copy 1) @autoreleased View
 // CHECK: sil [clang View.init] {{.*}} : $@convention(c) () -> @lifetime(immortal) @out View
 // CHECK: sil [clang OtherView.init] {{.*}} : $@convention(c) (@guaranteed View) -> @lifetime(copy 0) @out OtherView
+// CHECK: sil [clang getViewPartiallyAnnotated] {{.*}} : $@convention(c) (@lifetime(immortal) @in_guaranteed Owner, @in_guaranteed Owner) -> @autoreleased View
 
 //--- test.swift
 
@@ -102,4 +110,5 @@ public func test() {
     let _ = getViewFromEither(v1, v2)
     let defaultView = View()
     let _ = OtherView(defaultView)
+    let _ = getViewPartiallyAnnotated(o, o2)
 }

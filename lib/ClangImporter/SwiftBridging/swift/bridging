@@ -106,6 +106,12 @@
   __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(release:immortal))))   \
   __attribute__((swift_attr("unsafe")))
 
+
+/// Specifies that a C++ type or function should be imported as unsafe to Swift.
+/// This is useful to override the default heuristics how to import a certain type.
+/// One example is to mark a partially lifetimebound annotated function unsafe.
+#define SWIFT_IMPORT_AS_UNSAFE __attribute__((swift_attr("unsafe")))
+
 /// Specifies a name that will be used in Swift for this declaration instead of its original name.
 #define SWIFT_NAME(_name) __attribute__((swift_name(#_name)))
 
@@ -189,6 +195,7 @@
 #define SWIFT_IMMORTAL_REFERENCE
 #define SWIFT_UNSAFE_REFERENCE
 #define SWIFT_NAME(_name)
+#define SWIFT_IMPORT_AS_UNSAFE
 #define SWIFT_CONFORMS_TO_PROTOCOL(_moduleName_protocolName)
 #define SWIFT_COMPUTED_PROPERTY
 #define SWIFT_MUTATING 
