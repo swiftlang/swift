@@ -75,10 +75,10 @@ public:
   void constrainWithPlatformRange(const AvailabilityRange &platformRange,
                                   ASTContext &ctx);
 
-  /// Constrain the platform availability range with both the availability
-  /// attributes of `decl` and with `platformRange`.
+  /// Constrain with the availability attributes of `decl`, intersecting the
+  /// platform range of `decl` with `platformRange`.
   void
-  constrainWithDeclAndPlatformRange(Decl *decl,
+  constrainWithDeclAndPlatformRange(const Decl *decl,
                                     const AvailabilityRange &platformRange);
 
   /// Returns true if `other` is as available or is more available.

@@ -18,37 +18,44 @@
 
 using namespace swift;
 
-bool AvailabilityContext::PlatformInfo::constrainRange(const Decl *decl) {
-  if (auto range = AvailabilityInference::annotatedAvailableRange(decl))
-    return constrainRange(*range);
+bool AvailabilityContext::PlatformInfo::constrainWith(const Decl *decl) {
+  bool isConstrained = false;
+  auto &ctx = decl->getASTContext();
 
-  return false;
+  if (auto range = AvailabilityInference::annotatedAvailableRange(decl))
+    isConstrained |= constrainRange(*range);
+
+  if (auto *attr = decl->getAttrs().getUnavailable(ctx))
+    isConstrained |= constrainUnavailability(attr->Platform);
+
+  if (!IsDeprecated)
+    isConstrained |= constrainDeprecated(decl->getAttrs().isDeprecated(ctx));
+
+  return isConstrained;
 }
 
 bool AvailabilityContext::PlatformInfo::constrainUnavailability(
-    const Decl *decl) {
-  auto &ctx = decl->getASTContext();
-  auto *attr = decl->getAttrs().getUnavailable(ctx);
-  if (!attr)
+    std::optional<PlatformKind> unavailablePlatform) {
+  if (!unavailablePlatform)
     return false;
 
   // Check whether the decl's unavailability reason is the same.
-  if (IsUnavailable && UnavailablePlatform == attr->Platform)
+  if (IsUnavailable && UnavailablePlatform == *unavailablePlatform)
     return false;
 
   // Check whether the decl's unavailability reason is more specific.
-  if (attr->Platform != PlatformKind::none &&
-      inheritsAvailabilityFromPlatform(attr->Platform, UnavailablePlatform))
+  if (*unavailablePlatform != PlatformKind::none &&
+      inheritsAvailabilityFromPlatform(*unavailablePlatform,
+                                       UnavailablePlatform))
     return false;
 
   IsUnavailable = true;
-  UnavailablePlatform = attr->Platform;
+  UnavailablePlatform = *unavailablePlatform;
   return true;
 }
 
-bool AvailabilityContext::PlatformInfo::constrainDeprecated(const Decl *decl) {
-  auto &ctx = decl->getASTContext();
-  if (IsDeprecated || !decl->getAttrs().isDeprecated(ctx))
+bool AvailabilityContext::PlatformInfo::constrainDeprecated(bool deprecated) {
+  if (IsDeprecated || !deprecated)
     return false;
 
   IsDeprecated = true;
@@ -126,13 +133,11 @@ void AvailabilityContext::constrainWithPlatformRange(
 }
 
 void AvailabilityContext::constrainWithDeclAndPlatformRange(
-    Decl *decl, const AvailabilityRange &platformRange) {
+    const Decl *decl, const AvailabilityRange &platformRange) {
   PlatformInfo platformAvailability{Info->Platform};
   bool isConstrained = false;
-  isConstrained |= platformAvailability.constrainRange(decl);
+  isConstrained |= platformAvailability.constrainWith(decl);
   isConstrained |= platformAvailability.constrainRange(platformRange);
-  isConstrained |= platformAvailability.constrainUnavailability(decl);
-  isConstrained |= platformAvailability.constrainDeprecated(decl);
 
   if (!isConstrained)
     return;
