@@ -40,10 +40,13 @@ struct AvailabilityContext::PlatformInfo {
   /// platform.
   unsigned IsDeprecated : 1;
 
-  /// Sets `Range` to `other` if `other` is more restrictive. Returns true if
-  /// any property changed as a result of adding this constraint.
+  /// Sets each field to the value of the corresponding field in `other` if the
+  /// other is more restrictive. Returns true if any field changed as a result
+  /// of adding this constraint.
+  bool constrainWith(const PlatformInfo &other);
+
   /// Updates each field to reflect the availability of `decl`, if that
-  /// availability is more restrictive. Return true if any field was updated.
+  /// availability is more restrictive. Returns true if any field was updated.
   bool constrainWith(const Decl *decl);
 
   bool constrainRange(const AvailabilityRange &other) {

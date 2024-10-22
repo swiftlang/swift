@@ -71,6 +71,12 @@ public:
   /// Returns true if this context is deprecated on the current platform.
   bool isDeprecated() const;
 
+  /// Constrain with another `AvailabilityContext`.
+  void constrainWithContext(const AvailabilityContext &other, ASTContext &ctx);
+
+  /// Constrain with the availability attributes of `decl`.
+  void constrainWithDecl(const Decl *decl);
+
   /// Constrain the platform availability range with `platformRange`.
   void constrainWithPlatformRange(const AvailabilityRange &platformRange,
                                   ASTContext &ctx);

@@ -998,6 +998,13 @@ bool isAvailabilitySafeForConformance(
     const ValueDecl *witness, const DeclContext *dc,
     AvailabilityRange &requiredAvailability);
 
+/// Returns the most refined `AvailabilityContext` for the given location.
+/// If `MostRefined` is not `nullptr`, it will be set to the most refined TRC
+/// that contains the given location.
+AvailabilityContext
+availabilityAtLocation(SourceLoc loc, const DeclContext *DC,
+                       const TypeRefinementContext **MostRefined = nullptr);
+
 /// Returns an over-approximation of the range of operating system versions
 /// that could the passed-in location could be executing upon for
 /// the target platform. If MostRefined != nullptr, set to the most-refined

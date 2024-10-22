@@ -1411,9 +1411,9 @@ evaluator::SideEffect ExpandChildTypeRefinementContextsRequest::evaluate(
   return evaluator::SideEffect();
 }
 
-AvailabilityRange TypeChecker::overApproximateAvailabilityAtLocation(
-    SourceLoc loc, const DeclContext *DC,
-    const TypeRefinementContext **MostRefined) {
+AvailabilityContext
+TypeChecker::availabilityAtLocation(SourceLoc loc, const DeclContext *DC,
+                                    const TypeRefinementContext **MostRefined) {
   SourceFile *SF;
   if (loc.isValid())
     SF = DC->getParentModule()->getSourceFileContainingLocation(loc);
@@ -1436,7 +1436,7 @@ AvailabilityRange TypeChecker::overApproximateAvailabilityAtLocation(
   // this will be a real problem.
 
   // We can assume we are running on at least the minimum inlining target.
-  auto OverApproximateContext = AvailabilityRange::forInliningTarget(Context);
+  auto baseAvailability = AvailabilityContext::getDefault(Context);
   auto isInvalidLoc = [SF](SourceLoc loc) {
     return SF ? loc.isInvalid() : true;
   };
@@ -1445,34 +1445,35 @@ AvailabilityRange TypeChecker::overApproximateAvailabilityAtLocation(
     if (!D)
       break;
 
+    baseAvailability.constrainWithDecl(D);
     loc = D->getLoc();
-
-    std::optional<AvailabilityRange> Info =
-        AvailabilityInference::annotatedAvailableRange(D);
-
-    if (Info.has_value()) {
-      OverApproximateContext.constrainWith(Info.value());
-    }
-
     DC = D->getDeclContext();
   }
 
-  if (SF && loc.isValid()) {
-    TypeRefinementContext *rootTRC = getOrBuildTypeRefinementContext(SF);
-    if (rootTRC) {
-      TypeRefinementContext *TRC =
-          rootTRC->findMostRefinedSubContext(loc, Context);
-      if (TRC) {
-        OverApproximateContext.constrainWith(
-            TRC->getPlatformAvailabilityRange());
-        if (MostRefined) {
-          *MostRefined = TRC;
-        }
-      }
-    }
+  if (!SF || loc.isInvalid())
+    return baseAvailability;
+
+  TypeRefinementContext *rootTRC = getOrBuildTypeRefinementContext(SF);
+  if (!rootTRC)
+    return baseAvailability;
+
+  TypeRefinementContext *TRC = rootTRC->findMostRefinedSubContext(loc, Context);
+  if (!TRC)
+    return baseAvailability;
+
+  if (MostRefined) {
+    *MostRefined = TRC;
   }
 
-  return OverApproximateContext;
+  auto availability = TRC->getAvailabilityContext();
+  availability.constrainWithContext(baseAvailability, Context);
+  return availability;
+}
+
+AvailabilityRange TypeChecker::overApproximateAvailabilityAtLocation(
+    SourceLoc loc, const DeclContext *DC,
+    const TypeRefinementContext **MostRefined) {
+  return availabilityAtLocation(loc, DC, MostRefined).getPlatformRange();
 }
 
 bool TypeChecker::isDeclarationUnavailable(

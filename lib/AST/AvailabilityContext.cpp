@@ -18,6 +18,18 @@
 
 using namespace swift;
 
+bool AvailabilityContext::PlatformInfo::constrainWith(
+    const PlatformInfo &other) {
+  bool isConstrained = false;
+  isConstrained |= constrainRange(other.Range);
+  if (other.IsUnavailable) {
+    isConstrained |= constrainUnavailability(other.UnavailablePlatform);
+  }
+  isConstrained |= constrainDeprecated(other.IsDeprecated);
+
+  return isConstrained;
+}
+
 bool AvailabilityContext::PlatformInfo::constrainWith(const Decl *decl) {
   bool isConstrained = false;
   auto &ctx = decl->getASTContext();
@@ -127,6 +139,18 @@ AvailabilityContext::getUnavailablePlatformKind() const {
 
 bool AvailabilityContext::isDeprecated() const {
   return Info->Platform.IsDeprecated;
+}
+
+void AvailabilityContext::constrainWithContext(const AvailabilityContext &other,
+                                               ASTContext &ctx) {
+  PlatformInfo platformAvailability{Info->Platform};
+  if (platformAvailability.constrainWith(other.Info->Platform)) {
+    Info = Storage::get(platformAvailability, ctx);
+  }
+}
+
+void AvailabilityContext::constrainWithDecl(const Decl *decl) {
+  constrainWithDeclAndPlatformRange(decl, AvailabilityRange::alwaysAvailable());
 }
 
 void AvailabilityContext::constrainWithPlatformRange(
