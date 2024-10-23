@@ -17,6 +17,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTSynthesis.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
@@ -58,6 +59,10 @@ IntrinsicInfo::getOrCreateAttributes(ASTContext &Ctx) const {
 }
 
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
+  if (Name == "FixedArray") {
+    return BuiltinUnboundGenericType::get(TypeKind::BuiltinFixedArray, Context);
+  }
+
   // Vectors are VecNxT, where "N" is the number of elements and
   // T is the element type.
   if (Name.starts_with("Vec")) {
@@ -112,6 +117,10 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   if (Name == "IntLiteral")
     return Context.TheIntegerLiteralType;
 
+  if (Name == "Int") {
+    return BuiltinUnboundGenericType::get(TypeKind::BuiltinInteger, Context);
+  }
+  
   // Handle 'int8' and friends.
   if (Name.substr(0, 3) == "Int") {
     unsigned BitWidth;
@@ -2217,6 +2226,21 @@ static ValueDecl *getAddressOfRawLayout(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getEmplace(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1);
+
+  auto T = makeGenericParam();
+
+  auto fnParamTy = FunctionType::get(FunctionType::Param(ctx.TheRawPointerType),
+                                     ctx.TheEmptyTupleType,
+                                     ASTExtInfo().withNoEscape());
+
+  builder.addParameter(makeConcrete(fnParamTy), ParamSpecifier::Borrowing);
+  builder.setResult(T);
+
+  return builder.build(id);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -3300,6 +3324,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::AddressOfRawLayout:
     return getAddressOfRawLayout(Context, Id);
+    
+  case BuiltinValueKind::Emplace:
+    return getEmplace(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");
@@ -3354,7 +3381,16 @@ bool BuiltinType::isBitwiseCopyable() const {
   case BuiltinTypeKind::BuiltinUnsafeValueBuffer:
   case BuiltinTypeKind::BuiltinDefaultActorStorage:
   case BuiltinTypeKind::BuiltinNonDefaultDistributedActorStorage:
+  case BuiltinTypeKind::BuiltinUnboundGeneric:
     return false;
+    
+  case BuiltinTypeKind::BuiltinFixedArray: {
+    // Bitwise-copyability depends on the element type.
+    auto bfa = cast<BuiltinFixedArrayType>(this);
+    auto &C = bfa->getASTContext();
+    return (bool)lookupConformance(bfa->getElementType(),
+                           C.getProtocol(KnownProtocolKind::BitwiseCopyable));
+  }
   }
 }
 
@@ -3462,8 +3498,131 @@ StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
     }
     break;
   }
+  case BuiltinTypeKind::BuiltinFixedArray: {
+    auto bfa = cast<BuiltinFixedArrayType>(this);
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_FIXEDARRAY)
+            << '<';
+    bfa->getSize()->print(printer);
+    printer << ", ";
+    bfa->getElementType()->print(printer);
+    printer << '>';
+    break;
+  }
+  case BuiltinTypeKind::BuiltinUnboundGeneric: {
+    auto bug = cast<BuiltinUnboundGenericType>(this);
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(bug->getBuiltinTypeName());
+    break;
+  }
   }
 #undef MAYBE_GET_NAMESPACED_BUILTIN
 
   return printer.str();
+}
+
+BuiltinNameStringLiteral
+BuiltinUnboundGenericType::getBuiltinTypeName() const {
+  switch (BoundGenericTypeKind) {
+  case TypeKind::BuiltinFixedArray:
+    return BUILTIN_TYPE_NAME_FIXEDARRAY;
+  case TypeKind::BuiltinInteger:
+    return BUILTIN_TYPE_NAME_INT;
+    
+  default:
+    llvm_unreachable("not a generic builtin kind");
+  }
+}
+
+StringRef
+BuiltinUnboundGenericType::getBuiltinTypeNameString() const {
+  return getBuiltinTypeName();
+}
+
+GenericSignature
+BuiltinUnboundGenericType::getGenericSignature() const {
+  auto &C = getASTContext();
+  
+  switch (BoundGenericTypeKind) {
+  case TypeKind::BuiltinFixedArray: {
+    auto Count = GenericTypeParamType::get(C.getIdentifier("Count"),
+                                           GenericTypeParamKind::Value,
+                                           0, 0, C.getIntType(), C);
+    auto Element = GenericTypeParamType::get(C.getIdentifier("Element"),
+                                             GenericTypeParamKind::Type,
+                                             0, 1, Type(), C);
+    return GenericSignature::get({Count, Element}, {});
+  }
+  
+  case TypeKind::BuiltinInteger: {
+    auto bits = GenericTypeParamType::get(C.getIdentifier("Bits"),
+                                          GenericTypeParamKind::Type,
+                                          0, 0, C.getIntType(), C);
+    return GenericSignature::get(bits, {});
+  }
+  default:
+    llvm_unreachable("not a generic builtin");
+  }
+}
+
+Type
+BuiltinUnboundGenericType::getBound(SubstitutionMap subs) const {
+  if (!subs.getGenericSignature()->isEqual(getGenericSignature())) {
+    return ErrorType::get(const_cast<BuiltinUnboundGenericType*>(this));
+  }
+
+  switch (BoundGenericTypeKind) {
+  case TypeKind::BuiltinFixedArray: {
+    auto types = subs.getReplacementTypes();
+  
+    auto size = types[0]->getCanonicalType();
+    if (size->getMatchingParamKind() != GenericTypeParamKind::Value) {
+      return ErrorType::get(const_cast<BuiltinUnboundGenericType*>(this));
+    }
+    auto element = types[1]->getCanonicalType();
+    if (element->getMatchingParamKind() != GenericTypeParamKind::Type) {
+      return ErrorType::get(const_cast<BuiltinUnboundGenericType*>(this));
+    }
+    
+    return BuiltinFixedArrayType::get(size, element);
+  }
+  
+  case TypeKind::BuiltinInteger: {
+    auto size = subs.getReplacementTypes()[0];
+    if (size->getMatchingParamKind() != GenericTypeParamKind::Value) {
+      return ErrorType::get(const_cast<BuiltinUnboundGenericType*>(this));
+    }
+    
+    // TODO: support actual generic parameters
+    auto literalSize = size->getAs<IntegerType>();
+    
+    if (!literalSize) {
+      return ErrorType::get(const_cast<BuiltinUnboundGenericType*>(this));
+    }
+    
+    return BuiltinIntegerType::get(literalSize->getValue().getLimitedValue(),
+                                   getASTContext());
+  }
+    
+  default:
+    llvm_unreachable("not a generic builtin kind");
+  }
+}
+
+std::optional<uint64_t>
+BuiltinFixedArrayType::getFixedInhabitedSize() const {
+  if (auto intSize = getSize()->getAs<IntegerType>()) {
+    if (intSize->getValue().isNegative()) {
+      return std::nullopt;
+    }
+    return intSize->getValue().getLimitedValue();
+  }
+  
+  return std::nullopt;
+}
+
+bool
+BuiltinFixedArrayType::isFixedNegativeSize() const {
+  if (auto intSize = getSize()->getAs<IntegerType>()) {
+    return intSize->getValue().isNegative();
+  }
+  return false;
 }

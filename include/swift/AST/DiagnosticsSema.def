@@ -4641,6 +4641,8 @@ ERROR(cannot_explicitly_specialize_function,none,
       "cannot explicitly specialize %kind0", (ValueDecl *))
 ERROR(not_a_generic_type,none,
       "cannot specialize non-generic type %0", (Type))
+ERROR(invalid_generic_builtin_type,none,
+      "invalid generic arguments to builtin type %0", (Type))
 ERROR(not_a_generic_macro,none,
       "cannot specialize a non-generic external macro %0", (const ValueDecl *))
 ERROR(protocol_declares_unknown_primary_assoc_type,none,
