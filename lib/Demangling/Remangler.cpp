@@ -4009,9 +4009,10 @@ ManglingError Remangler::mangleNegativeInteger(Node *node, unsigned int depth) {
 
 ManglingError Remangler::mangleDependentGenericParamValueMarker(Node *node,
                                                                unsigned depth) {
-  DEMANGLER_ASSERT(node->getNumChildren() == 1, node);
-  DEMANGLER_ASSERT(node->getChild(0)->getKind() == Node::Kind::Type, node);
-  RETURN_IF_ERROR(mangleType(node->getChild(0)->getChild(1), depth + 1));
+  DEMANGLER_ASSERT(node->getNumChildren() == 2, node);
+  DEMANGLER_ASSERT(node->getChild(0)->getChild(0)->getKind() == Node::Kind::DependentGenericParamType, node);
+  DEMANGLER_ASSERT(node->getChild(1)->getKind() == Node::Kind::Type, node);
+  RETURN_IF_ERROR(mangleType(node->getChild(1), depth + 1));
   Buffer << "RV";
   mangleDependentGenericParamIndex(node->getChild(0)->getChild(0));
   return ManglingError::Success;
