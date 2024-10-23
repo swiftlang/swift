@@ -859,6 +859,9 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
     return OpaqueReadOwnership::Borrowed;
   };
 
+  if (storage->getAccessor(AccessorKind::Read2))
+    return OpaqueReadOwnership::Borrowed;
+
   if (storage->getAttrs().hasAttribute<BorrowedAttr>())
     return usesBorrowed(DiagKind::BorrowedAttr);
 
@@ -3846,8 +3849,12 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
       readImpl = ReadImplKind::Get;
       writeImpl = WriteImplKind::Set;
       readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
-    } else if (storage->getParsedAccessor(AccessorKind::Get)) {
+    }
+    if (storage->getParsedAccessor(AccessorKind::Get)) {
       readImpl = ReadImplKind::Get;
+    }
+    if (storage->getParsedAccessor(AccessorKind::Read2)) {
+      readImpl = ReadImplKind::Read2;
     }
 
     StorageImplInfo info(readImpl, writeImpl, readWriteImpl);
