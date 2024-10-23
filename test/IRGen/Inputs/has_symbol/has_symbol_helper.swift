@@ -64,3 +64,5 @@ public actor A {
   public func asyncMethod() async {}
 }
 #endif
+
+public struct Generic<T> {}
