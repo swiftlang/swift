@@ -7661,6 +7661,16 @@ static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
       }))
     return false;
 
+  // The copy constructor might be templated.
+  if (decl->hasUserDeclaredConstructor())
+    for (auto member : decl->decls())
+      if (auto memberTemplate = dyn_cast<clang::FunctionTemplateDecl>(member))
+        if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(
+                memberTemplate->getTemplatedDecl()))
+          if (ctor->isCopyConstructor() && !ctor->isDeleted() &&
+              ctor->getAccess() == clang::AccessSpecifier::AS_public)
+            return true;
+
   return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
     return ctor->isCopyConstructor();
   });
