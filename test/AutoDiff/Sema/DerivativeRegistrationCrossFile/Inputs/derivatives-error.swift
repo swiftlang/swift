@@ -19,7 +19,7 @@ func minVJP<T: Comparable & Differentiable>(
 
 extension Struct {
     @inlinable
-    @derivative(of: max)
+    @derivative(of: max) // expected-error {{cannot find 'max' in scope}}
     static func maxVJP<T: Comparable & Differentiable>(
         _ x: T,
         _ y: T
