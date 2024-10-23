@@ -3076,6 +3076,15 @@ static bool isDeclaredInModule(const ClangModuleUnit *ModuleFilter,
   if (VD->getModuleContext()->getName().str() == CLANG_HEADER_MODULE_NAME) {
     return true;
   }
+  // Because the ClangModuleUnit saved as a decl context will be saved as the top-level module, but
+  // the ModuleFilter we're given might be a submodule (if a submodule was passed to
+  // getTopLevelDecls, for example), we should compare the underlying Clang modules to determine
+  // module membership.
+  if (auto ClangNode = VD->getClangNode()) {
+    if (auto *ClangModule = ClangNode.getOwningClangModule()) {
+      return ModuleFilter->getClangModule() == ClangModule;
+    }
+  }
   auto ContainingUnit = VD->getDeclContext()->getModuleScopeContext();
   return ModuleFilter == ContainingUnit;
 }
@@ -3248,7 +3257,7 @@ public:
   FilteringDeclaredDeclConsumer(swift::VisibleDeclConsumer &consumer,
                                 const ClangModuleUnit *CMU)
       : NextConsumer(consumer), ModuleFilter(CMU) {
-    assert(CMU && CMU->isTopLevel() && "Only top-level modules supported");
+    assert(CMU);
   }
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
@@ -3599,9 +3608,6 @@ public:
 };
 } // unnamed namespace
 
-// FIXME(https://github.com/apple/swift-docc/issues/190): Should submodules still be crawled for the symbol graph?
-bool ClangModuleUnit::shouldCollectDisplayDecls() const { return isTopLevel(); }
-
 void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
   VectorDeclPtrConsumer consumer(results);
   FilteringDeclaredDeclConsumer filterConsumer(consumer, this);
@@ -3622,10 +3628,12 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
 
     // Add the extensions produced by importing categories.
     for (auto category : lookupTable->categories()) {
-      if (auto extension = cast_or_null<ExtensionDecl>(
-              owner.importDecl(category, owner.CurrentVersion,
-                               /*UseCanonical*/false))) {
-        results.push_back(extension);
+      if (category->getOwningModule() == clangModule) {
+        if (auto extension = cast_or_null<ExtensionDecl>(
+          owner.importDecl(category, owner.CurrentVersion,
+                          /*UseCanonical*/false))) {
+          results.push_back(extension);
+        }
       }
     }
 
