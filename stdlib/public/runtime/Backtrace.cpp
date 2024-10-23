@@ -260,7 +260,7 @@ const char *presetToString(Preset preset) {
 bool isPrivileged() {
   return getauxval(AT_SECURE);
 }
-#elif defined(__APPLE__)
+#elif defined(TARGET_OS_OSX) || defined(TARGET_OS_MACCATALYST)
 bool isPrivileged() {
   if (issetugid())
     return true;
@@ -277,7 +277,7 @@ bool isPrivileged() {
 
   return !(flags & CS_GET_TASK_ALLOW);
 }
-#elif defined(__FreeBSD__) || defined(__OpenBSD__)
+#elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 bool isPrivileged() {
   return issetugid();
 }
