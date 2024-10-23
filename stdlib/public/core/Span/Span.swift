@@ -635,7 +635,7 @@ extension Span where Element: ~Copyable  {
   public func withUnsafeBufferPointer<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
-    guard let pointer = _pointer, count > 0 else {
+    guard let pointer = _pointer else {
       return try body(.init(start: nil, count: 0))
     }
     let binding = Builtin.bindMemory(
