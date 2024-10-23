@@ -598,11 +598,11 @@ extension String {
     var leftPad = ""
     var rightPad = ""
 
-    for _ in 0..<Int(floor(Double(lengthDifference) / 2.0)) {
+    for _ in 0..<(lengthDifference / 2) {
       leftPad += " "
     }
 
-    for _ in 0..<Int(ceil(Double(lengthDifference) / 2.0)) {
+    for _ in 0..<((lengthDifference + 1) / 2) {
       rightPad += " "
     }
 

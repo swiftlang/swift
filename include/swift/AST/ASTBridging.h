@@ -91,17 +91,15 @@ struct BridgedConsumedLookupResult {
 
   SWIFT_NAME("nameLoc")
   BridgedSourceLoc NameLoc;
-  
+
   SWIFT_NAME("flag")
   SwiftInt Flag;
-  
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedConsumedLookupResult(swift::Identifier name,
-                              swift::SourceLoc sourceLoc,
-                              SwiftInt flag
-                              ) : Name(BridgedIdentifier(name)),
-                                  NameLoc(BridgedSourceLoc(sourceLoc)),
-                                  Flag(flag) {}
+                              swift::SourceLoc sourceLoc, SwiftInt flag)
+      : Name(BridgedIdentifier(name)), NameLoc(BridgedSourceLoc(sourceLoc)),
+        Flag(flag) {}
 #endif
 };
 

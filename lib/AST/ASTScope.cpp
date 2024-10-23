@@ -43,6 +43,7 @@ using namespace ast_scope;
 class LoggingASTScopeDeclConsumer
     : public namelookup::AbstractASTScopeDeclConsumer {
 private:
+  const int shouldLookInMembers = 0b10;
   namelookup::AbstractASTScopeDeclConsumer *originalConsumer;
 
 public:
@@ -69,21 +70,21 @@ public:
   /// \return true if the lookup should be stopped at this point.
   bool consume(ArrayRef<ValueDecl *> values,
                NullablePtr<DeclContext> baseDC = nullptr) override {
-    bool result = originalConsumer->consume(values, baseDC);
+    bool endOfLookup = originalConsumer->consume(values, baseDC);
 
     for (auto value : values) {
       if (auto sourceLoc = value->getLoc()) {
         recordedElements.push_back(BridgedConsumedLookupResult(
-            value->getBaseIdentifier(), sourceLoc, result));
+            value->getBaseIdentifier(), sourceLoc, endOfLookup));
       } else {
         // If sourceLoc is unavailable, use location of it's parent.
         recordedElements.push_back(BridgedConsumedLookupResult(
             value->getBaseIdentifier(),
-            value->getDeclContext()->getAsDecl()->getLoc(), result));
+            value->getDeclContext()->getAsDecl()->getLoc(), endOfLookup));
       }
     }
 
-    return result;
+    return endOfLookup;
   };
 
   /// Look for members of a nominal type or extension scope.
@@ -93,19 +94,19 @@ public:
   ///
   /// \return true if the lookup should be stopped at this point.
   bool lookInMembers(const DeclContext *scopeDC) const override {
-    bool result = originalConsumer->lookInMembers(scopeDC);
+    bool endOfLookup = originalConsumer->lookInMembers(scopeDC);
 
     if (auto *extDecl = dyn_cast<ExtensionDecl>(scopeDC)) {
       recordedElements.push_back(BridgedConsumedLookupResult(
           Identifier(), extDecl->getExtendedTypeRepr()->getLoc(),
-          0b10 + result));
+          shouldLookInMembers + endOfLookup));
     } else {
       recordedElements.push_back(BridgedConsumedLookupResult(
           scopeDC->getSelfNominalTypeDecl()->getBaseIdentifier(),
-          scopeDC->getAsDecl()->getLoc(), 0b10 + result));
+          scopeDC->getAsDecl()->getLoc(), shouldLookInMembers + endOfLookup));
     }
 
-    return result;
+    return endOfLookup;
   };
 
   /// Called for local VarDecls that might not yet be in scope.
