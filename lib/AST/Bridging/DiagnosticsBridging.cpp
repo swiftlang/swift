@@ -34,12 +34,18 @@ BridgedDiagnosticArgument::BridgedDiagnosticArgument(BridgedStringRef s)
 static_assert(sizeof(BridgedDiagnosticFixIt) >= sizeof(DiagnosticInfo::FixIt),
               "BridgedDiagnosticFixIt has wrong size");
 
+const swift::DiagnosticInfo::FixIt &unbridge(const BridgedDiagnosticFixIt &fixit) {
+  return *reinterpret_cast<const swift::DiagnosticInfo::FixIt *>(&fixit.storage);
+}
+
 BridgedDiagnosticFixIt::BridgedDiagnosticFixIt(BridgedSourceLoc start,
                                                uint32_t length,
-                                               BridgedStringRef text)
-    : BridgedDiagnosticFixIt(DiagnosticInfo::FixIt(
+                                               BridgedStringRef text) {
+  DiagnosticInfo::FixIt fixit(
           CharSourceRange(start.unbridged(), length), text.unbridged(),
-          llvm::ArrayRef<DiagnosticArgument>())) {}
+          llvm::ArrayRef<DiagnosticArgument>());
+  *reinterpret_cast<swift::DiagnosticInfo::FixIt *>(&storage) = fixit;
+}
 
 void BridgedDiagnosticEngine_diagnose(
     BridgedDiagnosticEngine bridgedEngine, BridgedSourceLoc loc,
@@ -66,8 +72,8 @@ void BridgedDiagnosticEngine_diagnose(
   // Add fix-its.
   for (const BridgedDiagnosticFixIt &fixIt :
        bridgedFixIts.unbridged<BridgedDiagnosticFixIt>()) {
-    auto range = fixIt.unbridged().getRange();
-    auto text = fixIt.unbridged().getText();
+    auto range = unbridge(fixIt).getRange();
+    auto text = unbridge(fixIt).getText();
     inflight.fixItReplaceChars(range.getStart(), range.getEnd(), text);
   }
 }
