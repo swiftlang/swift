@@ -251,7 +251,7 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   public func _extracting(_ bounds: Range<Int>) -> Self {
     _precondition(
-      UInt(bitPattern: bounds.lowerBound) <  UInt(bitPattern: _count) &&
+      UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
       UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
       "byte offset range out of bounds"
     )
@@ -454,8 +454,8 @@ extension RawSpan {
     fromByteOffset offset: Int = 0, as: T.Type
   ) -> T {
     _precondition(
-      UInt(bitPattern: offset) <  UInt(bitPattern: _count) &&
-      UInt(bitPattern: offset&+MemoryLayout<T>.size) <= UInt(bitPattern: _count),
+      UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
+      MemoryLayout<T>.size <= (_count &- offset),
       "byte offset range out of bounds"
     )
     return unsafeLoad(fromUncheckedByteOffset: offset, as: T.self)
@@ -511,8 +511,8 @@ extension RawSpan {
     fromByteOffset offset: Int = 0, as: T.Type
   ) -> T {
     _precondition(
-      UInt(bitPattern: offset) <  UInt(bitPattern: _count) &&
-      UInt(bitPattern: offset&+MemoryLayout<T>.size) <= UInt(bitPattern: _count),
+      UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
+      MemoryLayout<T>.size <= (_count &- offset),
       "byte offset range out of bounds"
     )
     return unsafeLoadUnaligned(fromUncheckedByteOffset: offset, as: T.self)

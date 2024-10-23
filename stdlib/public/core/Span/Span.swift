@@ -492,7 +492,7 @@ extension Span where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public func _extracting(_ bounds: Range<Index>) -> Self {
     _precondition(
-      UInt(bitPattern: bounds.lowerBound) <  UInt(bitPattern: _count) &&
+      UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
       UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
       "index range out of bounds"
     )
