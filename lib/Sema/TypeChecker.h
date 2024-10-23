@@ -1052,33 +1052,20 @@ checkConformanceAvailability(const RootProtocolConformance *Conf,
                              const ExtensionDecl *Ext,
                              const ExportContext &Where);
 
+bool checkAvailability(SourceRange ReferenceRange,
+                       AvailabilityRange RequiredAvailability,
+                       Diag<StringRef, llvm::VersionTuple> Diag,
+                       const DeclContext *ReferenceDC);
+
+void checkConcurrencyAvailability(SourceRange ReferenceRange,
+                                  const DeclContext *ReferenceDC);
+/// @}
+
 /// Checks an "ignored" expression to see if it's okay for it to be ignored.
 ///
 /// An ignored expression is one that is not nested within a larger
 /// expression or statement.
 void checkIgnoredExpr(Expr *E);
-
-// Emits a diagnostic for a reference to a declaration that is potentially
-// unavailable at the given source location. Returns true if an error diagnostic
-// was emitted.
-bool diagnosePotentialUnavailability(const ValueDecl *D,
-                                     SourceRange ReferenceRange,
-                                     const DeclContext *ReferenceDC,
-                                     const AvailabilityRange &Availability,
-                                     bool WarnBeforeDeploymentTarget);
-
-// Emits a diagnostic for a protocol conformance that is potentially
-// unavailable at the given source location.
-void diagnosePotentialUnavailability(const RootProtocolConformance *rootConf,
-                                     const ExtensionDecl *ext,
-                                     SourceLoc loc,
-                                     const DeclContext *dc,
-                                     const AvailabilityRange &availability);
-
-void diagnosePotentialUnavailability(SourceRange ReferenceRange,
-                                     Diag<StringRef, llvm::VersionTuple> Diag,
-                                     const DeclContext *ReferenceDC,
-                                     const AvailabilityRange &Availability);
 
 /// Type check a 'distributed actor' declaration.
 void checkDistributedActor(SourceFile *SF, NominalTypeDecl *decl);
@@ -1087,36 +1074,6 @@ void checkDistributedActor(SourceFile *SF, NominalTypeDecl *decl);
 ///
 /// Returns `true` if there was an error.
 bool checkDistributedFunc(FuncDecl *func);
-
-bool checkAvailability(SourceRange ReferenceRange,
-                       AvailabilityRange RequiredAvailability,
-                       Diag<StringRef, llvm::VersionTuple> Diag,
-                       const DeclContext *ReferenceDC);
-
-void checkConcurrencyAvailability(SourceRange ReferenceRange,
-                                  const DeclContext *ReferenceDC);
-
-/// Emits a diagnostic for a reference to a storage accessor that is
-/// potentially unavailable.
-void diagnosePotentialAccessorUnavailability(
-    const AccessorDecl *Accessor, SourceRange ReferenceRange,
-    const DeclContext *ReferenceDC, const AvailabilityRange &Availability,
-    bool ForInout);
-
-/// Returns the availability attribute indicating deprecation if the
-/// declaration is deprecated or null otherwise.
-const AvailableAttr *getDeprecated(const Decl *D);
-
-/// Emits a diagnostic for a reference to a declaration that is deprecated.
-void diagnoseIfDeprecated(SourceRange SourceRange, const ExportContext &Where,
-                          const ValueDecl *DeprecatedDecl, const Expr *Call);
-
-/// Emits a diagnostic for a reference to a conformance that is deprecated.
-bool diagnoseIfDeprecated(SourceLoc loc,
-                          const RootProtocolConformance *rootConf,
-                          const ExtensionDecl *ext,
-                          const ExportContext &where);
-/// @}
 
 /// If `LangOptions::DebugForbidTypecheckPrefixes` is set and the given decl
 /// name starts with any of those prefixes, an llvm fatal error is triggered.
