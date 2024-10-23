@@ -47,6 +47,31 @@ using namespace swift;
 static const Decl *
 concreteSyntaxDeclForAvailableAttribute(const Decl *AbstractSyntaxDecl);
 
+/// Emit a diagnostic for references to declarations that have been
+/// marked as unavailable, either through "unavailable" or "obsoleted:".
+static bool diagnoseExplicitUnavailability(
+    SourceLoc loc, const RootProtocolConformance *rootConf,
+    const ExtensionDecl *ext, const ExportContext &where,
+    bool warnIfConformanceUnavailablePreSwift6 = false);
+
+/// Emit a diagnostic for references to declarations that have been
+/// marked as unavailable, either through "unavailable" or "obsoleted:".
+static bool diagnoseExplicitUnavailability(
+    const ValueDecl *D, SourceRange R, const ExportContext &Where,
+    DeclAvailabilityFlags Flags,
+    llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts);
+
+static bool diagnoseSubstitutionMapAvailability(
+    SourceLoc loc, SubstitutionMap subs, const ExportContext &where,
+    Type depTy = Type(), Type replacementTy = Type(),
+    bool warnIfConformanceUnavailablePreSwift6 = false,
+    bool suppressParameterizationCheckForOptional = false);
+
+/// Diagnose uses of unavailable declarations in types.
+static bool
+diagnoseTypeReprAvailability(const TypeRepr *T, const ExportContext &where,
+                             DeclAvailabilityFlags flags = std::nullopt);
+
 ExportContext::ExportContext(DeclContext *DC, AvailabilityContext availability,
                              FragileFunctionKind kind, bool spi, bool exported,
                              bool implicit)
@@ -2057,7 +2082,7 @@ static void fixAvailability(SourceRange ReferenceRange,
   }
 }
 
-void TypeChecker::diagnosePotentialUnavailability(
+static void diagnosePotentialUnavailability(
     SourceRange ReferenceRange, Diag<StringRef, llvm::VersionTuple> Diag,
     const DeclContext *ReferenceDC, const AvailabilityRange &Availability) {
   ASTContext &Context = ReferenceDC->getASTContext();
@@ -2139,10 +2164,14 @@ static Diagnostic getPotentialUnavailabilityDiagnostic(
                     Availability.getRawMinimumVersion());
 }
 
-bool TypeChecker::diagnosePotentialUnavailability(
-    const ValueDecl *D, SourceRange ReferenceRange,
-    const DeclContext *ReferenceDC, const AvailabilityRange &Availability,
-    bool WarnBeforeDeploymentTarget = false) {
+// Emits a diagnostic for a reference to a declaration that is potentially
+// unavailable at the given source location. Returns true if an error diagnostic
+// was emitted.
+static bool
+diagnosePotentialUnavailability(const ValueDecl *D, SourceRange ReferenceRange,
+                                const DeclContext *ReferenceDC,
+                                const AvailabilityRange &Availability,
+                                bool WarnBeforeDeploymentTarget = false) {
   ASTContext &Context = ReferenceDC->getASTContext();
 
   bool IsError;
@@ -2162,7 +2191,9 @@ bool TypeChecker::diagnosePotentialUnavailability(
   return IsError;
 }
 
-void TypeChecker::diagnosePotentialAccessorUnavailability(
+/// Emits a diagnostic for a reference to a storage accessor that is
+/// potentially unavailable.
+static void diagnosePotentialAccessorUnavailability(
     const AccessorDecl *Accessor, SourceRange ReferenceRange,
     const DeclContext *ReferenceDC, const AvailabilityRange &Availability,
     bool ForInout) {
@@ -2207,10 +2238,13 @@ behaviorLimitForExplicitUnavailability(
   return DiagnosticBehavior::Unspecified;
 }
 
-void TypeChecker::diagnosePotentialUnavailability(
-    const RootProtocolConformance *rootConf, const ExtensionDecl *ext,
-    SourceLoc loc, const DeclContext *dc,
-    const AvailabilityRange &availability) {
+/// Emits a diagnostic for a protocol conformance that is potentially
+/// unavailable at the given source location.
+static void
+diagnosePotentialUnavailability(const RootProtocolConformance *rootConf,
+                                const ExtensionDecl *ext, SourceLoc loc,
+                                const DeclContext *dc,
+                                const AvailabilityRange &availability) {
   ASTContext &ctx = dc->getASTContext();
 
   {
@@ -2233,7 +2267,9 @@ void TypeChecker::diagnosePotentialUnavailability(
   fixAvailability(loc, dc, availability, ctx);
 }
 
-const AvailableAttr *TypeChecker::getDeprecated(const Decl *D) {
+/// Returns the availability attribute indicating deprecation of the
+/// declaration is deprecated or null otherwise.
+static const AvailableAttr *getDeprecated(const Decl *D) {
   auto &Ctx = D->getASTContext();
   if (auto *Attr = D->getAttrs().getDeprecated(Ctx))
     return Attr;
@@ -2661,11 +2697,12 @@ describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
   return ReplacementDeclKind::None;
 }
 
-void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
-                                       const ExportContext &Where,
-                                       const ValueDecl *DeprecatedDecl,
-                                       const Expr *Call) {
-  const AvailableAttr *Attr = TypeChecker::getDeprecated(DeprecatedDecl);
+/// Emits a diagnostic for a reference to a declaration that is deprecated.
+static void diagnoseIfDeprecated(SourceRange ReferenceRange,
+                                 const ExportContext &Where,
+                                 const ValueDecl *DeprecatedDecl,
+                                 const Expr *Call) {
+  const AvailableAttr *Attr = getDeprecated(DeprecatedDecl);
   if (!Attr)
     return;
 
@@ -2745,11 +2782,12 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
   }
 }
 
-bool TypeChecker::diagnoseIfDeprecated(SourceLoc loc,
-                                       const RootProtocolConformance *rootConf,
-                                       const ExtensionDecl *ext,
-                                       const ExportContext &where) {
-  const AvailableAttr *attr = TypeChecker::getDeprecated(ext);
+/// Emits a diagnostic for a reference to a conformance that is deprecated.
+static bool diagnoseIfDeprecated(SourceLoc loc,
+                                 const RootProtocolConformance *rootConf,
+                                 const ExtensionDecl *ext,
+                                 const ExportContext &where) {
+  const AvailableAttr *attr = getDeprecated(ext);
   if (!attr)
     return false;
 
@@ -2971,7 +3009,7 @@ getExplicitUnavailabilityDiagnosticInfo(const Decl *decl,
   }
 }
 
-bool swift::diagnoseExplicitUnavailability(
+bool diagnoseExplicitUnavailability(
     SourceLoc loc, const RootProtocolConformance *rootConf,
     const ExtensionDecl *ext, const ExportContext &where,
     bool warnIfConformanceUnavailablePreSwift6) {
@@ -3348,10 +3386,8 @@ static void checkFunctionConversionAvailability(Type srcType, Type destType,
   }
 }
 
-bool swift::diagnoseExplicitUnavailability(
-    const ValueDecl *D,
-    SourceRange R,
-    const ExportContext &Where,
+bool diagnoseExplicitUnavailability(
+    const ValueDecl *D, SourceRange R, const ExportContext &Where,
     DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts) {
   auto diagnosticInfo = getExplicitUnavailabilityDiagnosticInfo(D, Where);
@@ -4030,11 +4066,11 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   // Make sure not to diagnose an accessor's deprecation if we already
   // complained about the property/subscript.
   bool isAccessorWithDeprecatedStorage =
-    accessor && TypeChecker::getDeprecated(accessor->getStorage());
+      accessor && getDeprecated(accessor->getStorage());
 
   // Diagnose for deprecation
   if (!isAccessorWithDeprecatedStorage)
-    TypeChecker::diagnoseIfDeprecated(R, Where, D, call);
+    diagnoseIfDeprecated(R, Where, D, call);
 
   if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol)
         && isa<ProtocolDecl>(D))
@@ -4056,11 +4092,10 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
 
   if (accessor) {
     bool forInout = Flags.contains(DeclAvailabilityFlag::ForInout);
-    TypeChecker::diagnosePotentialAccessorUnavailability(
-        accessor, R, DC, requiredAvailability, forInout);
+    diagnosePotentialAccessorUnavailability(accessor, R, DC,
+                                            requiredAvailability, forInout);
   } else {
-    if (!TypeChecker::diagnosePotentialUnavailability(D, R, DC,
-                                                      requiredAvailability))
+    if (!diagnosePotentialUnavailability(D, R, DC, requiredAvailability))
       return false;
   }
 
@@ -4246,7 +4281,8 @@ public:
   PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
     if (auto *IP = dyn_cast<IsPattern>(P)) {
       auto where = ExportContext::forFunctionBody(DC, P->getLoc());
-      diagnoseTypeAvailability(IP->getCastType(), P->getLoc(), where);
+      diagnoseTypeAvailability(IP->getCastTypeRepr(), IP->getCastType(),
+                               P->getLoc(), where, std::nullopt);
     }
 
     return Action::Continue(P);
@@ -4346,9 +4382,9 @@ public:
 
 }
 
-bool swift::diagnoseTypeReprAvailability(const TypeRepr *T,
-                                         const ExportContext &where,
-                                         DeclAvailabilityFlags flags) {
+/// Diagnose uses of unavailable declarations in types.
+bool diagnoseTypeReprAvailability(const TypeRepr *T, const ExportContext &where,
+                                  DeclAvailabilityFlags flags) {
   if (!T)
     return false;
   TypeReprAvailabilityWalker walker(where, flags);
@@ -4441,20 +4477,15 @@ public:
 
 }
 
-void swift::diagnoseTypeAvailability(Type T, SourceLoc loc,
-                                     const ExportContext &where,
-                                     DeclAvailabilityFlags flags) {
-  if (!T)
-    return;
-  T.walk(ProblematicTypeFinder(loc, where, flags));
-}
-
 void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
                                      const ExportContext &where,
                                      DeclAvailabilityFlags flags) {
   if (diagnoseTypeReprAvailability(TR, where, flags))
     return;
-  diagnoseTypeAvailability(T, loc, where, flags);
+
+  if (!T)
+    return;
+  T.walk(ProblematicTypeFinder(loc, where, flags));
 }
 
 static void diagnoseMissingConformance(
@@ -4534,14 +4565,14 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
     auto maybeUnavail = TypeChecker::checkConformanceAvailability(
         rootConf, ext, where);
     if (maybeUnavail.has_value()) {
-      TypeChecker::diagnosePotentialUnavailability(rootConf, ext, loc, DC,
-                                                   maybeUnavail.value());
+      diagnosePotentialUnavailability(rootConf, ext, loc, DC,
+                                      maybeUnavail.value());
       maybeEmitAssociatedTypeNote();
       return true;
     }
 
     // Diagnose for deprecation
-    if (TypeChecker::diagnoseIfDeprecated(loc, rootConf, ext, where)) {
+    if (diagnoseIfDeprecated(loc, rootConf, ext, where)) {
       maybeEmitAssociatedTypeNote();
 
       // Deprecation is just a warning, so keep going with checking the
@@ -4559,13 +4590,10 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
   return false;
 }
 
-bool
-swift::diagnoseSubstitutionMapAvailability(SourceLoc loc,
-                                           SubstitutionMap subs,
-                                           const ExportContext &where,
-                                           Type depTy, Type replacementTy,
-                                           bool warnIfConformanceUnavailablePreSwift6,
-                                           bool suppressParameterizationCheckForOptional) {
+bool diagnoseSubstitutionMapAvailability(
+    SourceLoc loc, SubstitutionMap subs, const ExportContext &where, Type depTy,
+    Type replacementTy, bool warnIfConformanceUnavailablePreSwift6,
+    bool suppressParameterizationCheckForOptional) {
   bool hadAnyIssues = false;
   for (ProtocolConformanceRef conformance : subs.getConformances()) {
     if (diagnoseConformanceAvailability(loc, conformance, where,
