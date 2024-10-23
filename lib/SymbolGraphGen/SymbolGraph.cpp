@@ -783,6 +783,21 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
   // thing is also private. We could be looking at the `B` of `_A.B`.
   if (const auto *DC = D->getDeclContext()) {
     if (const auto *Parent = DC->getAsDecl()) {
+      // Exception: Children of underscored protocols should be considered
+      // public, even though the protocols themselves aren't. This way,
+      // synthesized copies of those symbols are correctly added to the public
+      // API of public types that conform to underscored protocols.
+      if (isa<ProtocolDecl>(Parent) && Parent->hasUnderscoredNaming()) {
+        return false;
+      }
+      if (const auto *ParentExtension = dyn_cast<ExtensionDecl>(Parent)) {
+        if (const auto *ParentNominal = ParentExtension->getExtendedNominal()) {
+          if (isa<ProtocolDecl>(ParentNominal) &&
+              ParentNominal->hasUnderscoredNaming()) {
+            return false;
+          }
+        }
+      }
       return isImplicitlyPrivate(Parent, IgnoreContext);
     }
   }

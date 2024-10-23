@@ -20,6 +20,29 @@
 using namespace swift;
 using namespace symbolgraphgen;
 
+namespace {
+
+bool parentDeclIsPrivate(const ValueDecl *VD, SymbolGraph *Graph) {
+  if (!VD)
+    return false;
+
+  auto *ParentDecl = VD->getDeclContext()->getAsDecl();
+
+  if (auto *ParentExtension = dyn_cast_or_null<ExtensionDecl>(ParentDecl)) {
+    if (auto *Nominal = ParentExtension->getExtendedNominal()) {
+      return Graph->isImplicitlyPrivate(Nominal);
+    }
+  }
+
+  if (ParentDecl) {
+    return Graph->isImplicitlyPrivate(ParentDecl);
+  } else {
+    return false;
+  }
+}
+
+} // anonymous namespace
+
 void Edge::serialize(llvm::json::OStream &OS) const {
   OS.object([&](){
     OS.attribute("kind", Kind.Name);
@@ -62,7 +85,7 @@ void Edge::serialize(llvm::json::OStream &OS) const {
 
     // If our source symbol is a inheriting decl, write in information about
     // where it's inheriting docs from.
-    if (InheritingDecl) {
+    if (InheritingDecl && !parentDeclIsPrivate(InheritingDecl, Graph)) {
       Symbol inheritedSym(Graph, InheritingDecl, nullptr);
       SmallString<256> USR, Display;
       llvm::raw_svector_ostream DisplayOS(Display);
