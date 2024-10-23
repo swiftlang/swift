@@ -121,9 +121,21 @@ Output:
 
 
 def call_quietly(*args, **kwargs):
+    """
+    Runs the command described by `args` and returns its combined stdout and
+    stderr output.
+    """
+
     kwargs["encoding"] = "utf-8"
     try:
-        return subprocess.check_output(*args, stderr=subprocess.STDOUT, **kwargs)
+        return subprocess.run(
+            *args,
+            check=True,
+            capture_output=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            **kwargs,
+        ).stdout
     except subprocess.SubprocessError as e:
         raise PrintableSubprocessError(underlying_error=e) from e
 
