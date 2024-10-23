@@ -2099,6 +2099,10 @@ public:
 struct BridgedConformance {
   void * _Nullable opaqueValue;
 
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedConformance() {}
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedConformance(swift::ProtocolConformanceRef conformance)
       : opaqueValue(conformance.getOpaqueValue()) {}
@@ -2121,6 +2125,10 @@ struct BridgedConformance {
 
 struct BridgedConformanceArray {
   BridgedArrayRef pcArray;
+
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedConformanceArray() {}
 
 #ifdef USED_IN_CPP_SOURCE
   BridgedConformanceArray(llvm::ArrayRef<swift::ProtocolConformanceRef> conformances)

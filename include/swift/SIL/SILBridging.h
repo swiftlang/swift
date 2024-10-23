@@ -1015,6 +1015,10 @@ struct BridgedSuccessorArray {
 struct BridgedDeclRef {
   uint64_t storage[4];
 
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedDeclRef() {}
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedDeclRef(swift::SILDeclRef declRef) {
     *reinterpret_cast<swift::SILDeclRef *>(&storage) = declRef;
@@ -1038,6 +1042,10 @@ struct BridgedVTableEntry {
     Inherited,
     Override
   };
+
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedVTableEntry() {}
 
 #ifdef USED_IN_CPP_SOURCE
   BridgedVTableEntry(const swift::SILVTableEntry &entry) {
@@ -1089,6 +1097,10 @@ struct BridgedWitnessTableEntry {
     associatedConformance,
     baseProtocol
   };
+
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedWitnessTableEntry() {}
 
 #ifdef USED_IN_CPP_SOURCE
   BridgedWitnessTableEntry(const swift::SILWitnessTable::Entry &entry) {
