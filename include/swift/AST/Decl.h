@@ -6029,15 +6029,14 @@ public:
     return getOpaqueReadOwnership() != OpaqueReadOwnership::Borrowed;
   }
 
-  /// Does this storage require a 'read' accessor in its opaque-accessors set?
-  bool requiresOpaqueReadCoroutine() const {
-    return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
-  }
+  /// Does this storage require a '_read' accessor in its opaque-accessors set?
+  bool requiresOpaqueReadCoroutine() const;
 
   /// Does this storage require a 'set' accessor in its opaque-accessors set?
   bool requiresOpaqueSetter() const { return supportsMutation(); }
 
-  /// Does this storage require a 'modify' accessor in its opaque-accessors set?
+  /// Does this storage require a '_modify' accessor in its opaque-accessors
+  /// set?
   bool requiresOpaqueModifyCoroutine() const;
 
   /// Does this storage have any explicit observers (willSet or didSet) attached

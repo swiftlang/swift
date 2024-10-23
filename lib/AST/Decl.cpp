@@ -3006,6 +3006,10 @@ bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
   llvm_unreachable("bad accessor kind");
 }
 
+bool AbstractStorageDecl::requiresOpaqueReadCoroutine() const {
+  return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
+}
+
 bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
