@@ -254,6 +254,9 @@ class ModuleDecl
 
   mutable Identifier PublicModuleName;
 
+  /// Indicates that version of the Swift compiler this module was built with.
+  mutable llvm::VersionTuple SwiftCompilerVersion;
+
 public:
   /// Produces the components of a given module's full name in reverse order.
   ///
@@ -518,11 +521,20 @@ public:
     PublicModuleName = name;
   }
 
+  /// The version of the Swift compiler this module was built with.
+  llvm::VersionTuple getSwiftCompilerVersion() const {
+    return SwiftCompilerVersion;
+  }
+
+  void setSwiftCompilerVersion(llvm::VersionTuple version) {
+    SwiftCompilerVersion = version;
+  }
+
   /// Retrieve the actual module name of an alias used for this module (if any).
   ///
-  /// For example, if '-module-alias Foo=Bar' is passed in when building the main module,
-  /// and this module is (a) not the main module and (b) is named Foo, then it returns
-  /// the real (physically on-disk) module name Bar.
+  /// For example, if '-module-alias Foo=Bar' is passed in when building the
+  /// main module, and this module is (a) not the main module and (b) is named
+  /// Foo, then it returns the real (physically on-disk) module name Bar.
   ///
   /// If no module aliasing is set, it will return getName(), i.e. Foo.
   Identifier getRealName() const;
