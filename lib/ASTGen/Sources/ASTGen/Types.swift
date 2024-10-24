@@ -120,7 +120,7 @@ extension ASTGenVisitor {
     }
 
     let genericArguments = generics.arguments.lazy.map {
-      self.generate(type: $0.argument)
+      self.generate(genericArgument: $0.argument)
     }
 
     return BridgedUnqualifiedIdentTypeRepr.createParsed(
@@ -140,7 +140,7 @@ extension ASTGenVisitor {
     let angleRange: BridgedSourceRange
     if let generics = node.genericArgumentClause {
       genericArguments = generics.arguments.lazy.map {
-        self.generate(type: $0.argument)
+        self.generate(genericArgument: $0.argument)
       }.bridgedArray(in: self)
 
       angleRange = self.generateSourceRange(start: generics.leftAngle, end: generics.rightAngle)

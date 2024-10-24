@@ -298,3 +298,13 @@ BridgedExistentialTypeRepr_createParsed(BridgedASTContext cContext,
   return new (context)
       ExistentialTypeRepr(cAnyLoc.unbridged(), baseTy.unbridged());
 }
+
+BridgedIntegerTypeRepr
+BridgedIntegerTypeRepr_createParsed(BridgedASTContext cContext,
+                                    BridgedStringRef cString,
+                                    BridgedSourceLoc cLoc,
+                                    BridgedSourceLoc cMinusLoc) {
+  ASTContext &context = cContext.unbridged();
+  return new (context) IntegerTypeRepr(cString.unbridged(), cLoc.unbridged(),
+                                       cMinusLoc.unbridged());
+}

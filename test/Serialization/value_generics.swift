@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -emit-module -enable-experimental-feature ValueGenerics -enable-experimental-feature RawLayout -disable-availability-checking -disable-experimental-parser-round-trip -parse-as-library -o %t
+// RUN: %target-swift-frontend %s -emit-module -enable-experimental-feature ValueGenerics -enable-experimental-feature RawLayout -disable-availability-checking -parse-as-library -o %t
 // RUN: %target-sil-opt -enable-sil-verify-all %t/value_generics.swiftmodule -o - | %FileCheck %s
 
 // CHECK: @_rawLayout(likeArrayOf: Element, count: Count) struct Vector<Element, let Count : Int> : ~Copyable where Element : ~Copyable {

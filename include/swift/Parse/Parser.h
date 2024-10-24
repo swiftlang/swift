@@ -1417,6 +1417,11 @@ public:
   ParserResult<TypeRepr> parseTypeSimple(
       Diag<> MessageID, ParseTypeReason reason);
 
+  ParserResult<TypeRepr> parseTypeOrValue();
+  ParserResult<TypeRepr> parseTypeOrValue(Diag<> MessageID,
+                          ParseTypeReason reason = ParseTypeReason::Unspecified,
+                          bool fromASTGen = false);
+
   /// Parse layout constraint.
   LayoutConstraint parseLayoutConstraint(Identifier LayoutConstraintID);
 

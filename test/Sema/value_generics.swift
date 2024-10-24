@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature ValueGenerics -enable-experimental-feature NonescapableTypes -disable-availability-checking -disable-experimental-parser-round-trip
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature ValueGenerics -enable-experimental-feature NonescapableTypes -disable-availability-checking
 
 protocol P {}
 
@@ -49,18 +49,21 @@ struct Generic<T: ~Copyable & ~Escapable> {}
 struct GenericWithIntParam<T: ~Copyable & ~Escapable, let N: Int> {}
 
 extension Generic where T == 123 {} // expected-error {{cannot constrain type parameter 'T' to be integer '123'}}
-extension Generic where T == 123.Type {} // expected-error {{integer unexpectedly used in a type position}}
+extension Generic where T == 123.Type {} // expected-error {{cannot constrain type parameter 'T' to be integer '123'}}
+                                         // expected-error@-1 {{expected '{' in extension}}
+extension Generic where T == 123? {} // expected-error {{cannot constrain type parameter 'T' to be integer '123'}}
+                                     // expected-error@-1 {{expected '{' in extension}}
 
 func f(_: Generic<123>) {} // expected-error {{integer unexpectedly used in a type position}}
 func g<let N: Int>(_: Generic<N>) {} // expected-error {{cannot use value type 'N' for generic argument 'T'}}
-func h(_: (Int, 123)) {} // expected-error {{integer unexpectedly used in a type position}}
-func i(_: () -> 123) {} // expected-error {{integer unexpectedly used in a type position}}
+func h(_: (Int, 123)) {} // expected-error {{expected type}}
+func i(_: () -> 123) {} // expected-error {{expected type}}
 func j(_: (A<123>) -> ()) {} // OK
-func k(_: some 123) {} // expected-error {{integer unexpectedly used in a type position}}
+func k(_: some 123) {} // expected-error {{expected parameter type following ':'}}
 func l(_: GenericWithIntParam<123, Int>) {} // expected-error {{cannot pass type 'Int' as a value for generic value 'N'}}
 func m(_: GenericWithIntParam<Int, 123>) {} // OK
 
-typealias One = 1 // expected-error {{integer unexpectedly used in a type position}}
+typealias One = 1 // expected-error {{expected type in type alias declaration}}
 
 struct B<let N: UInt8> {} // expected-error {{'UInt8' is not a supported value type for 'N'}}
 

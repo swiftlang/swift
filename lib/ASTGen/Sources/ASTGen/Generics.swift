@@ -11,6 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 import ASTBridging
+
+@_spi(ExperimentalLanguageFeatures)
+@_spi(RawSyntax)
 import SwiftSyntax
 
 extension ASTGenVisitor {
@@ -72,8 +75,8 @@ extension ASTGenVisitor {
         return BridgedRequirementRepr(
           SeparatorLoc: self.generateSourceLoc(sameType.equal),
           Kind: .sameType,
-          FirstType: self.generate(type: sameType.leftType),
-          SecondType: self.generate(type: sameType.rightType)
+          FirstType: self.generate(sameTypeLeftType: sameType.leftType),
+          SecondType: self.generate(sameTypeRightType: sameType.rightType)
         )
       case .layoutRequirement(_):
         // FIXME: Implement layout requirement translation.
@@ -85,6 +88,73 @@ extension ASTGenVisitor {
       self.ctx,
       whereKeywordLoc: self.generateSourceLoc(node.whereKeyword),
       requirements: requirements.bridgedArray(in: self)
+    )
+  }
+
+  func generate(sameTypeLeftType node: SameTypeRequirementSyntax.LeftType) -> BridgedTypeRepr {
+    switch node {
+    case .type(let type):
+      return self.generate(type: type)
+
+    case .expr(let expr):
+      return self.generateIntegerType(expr: expr).asTypeRepr
+    }
+  }
+
+  func generate(sameTypeRightType node: SameTypeRequirementSyntax.RightType) -> BridgedTypeRepr {
+    switch node {
+    case .type(let type):
+      return self.generate(type: type)
+
+    case .expr(let expr):
+      return self.generateIntegerType(expr: expr).asTypeRepr
+    }
+  }
+
+  func generate(genericArgument node: GenericArgumentSyntax.Argument) -> BridgedTypeRepr {
+    switch node {
+    case .type(let type):
+      return self.generate(type: type)
+
+    case .expr(let expr):
+      return self.generateIntegerType(expr: expr).asTypeRepr
+    }
+  }
+
+  func generateIntegerType(expr node: ExprSyntax) -> BridgedIntegerTypeRepr {
+    var minusLoc = BridgedSourceLoc()
+    let literalExpr: IntegerLiteralExprSyntax
+
+    // The only expressions generic argument types support right now are
+    // integer literals, '123', and prefix operators for negative integer
+    // literals, '-123'.
+    switch node.as(ExprSyntaxEnum.self) {
+    case .integerLiteralExpr(let node):
+      literalExpr = node
+
+    case .prefixOperatorExpr(let node):
+      let op = node.operator
+
+      guard op.text == "-" else {
+        fatalError("Unknown prefix operator for generic argument type")
+      }
+
+      guard let node = node.expression.as(IntegerLiteralExprSyntax.self) else {
+        fatalError("Unknown expression kind for generic argument type")
+      }
+
+      minusLoc = self.generateSourceLoc(op)
+      literalExpr = node
+
+    default:
+      fatalError("Unknown expression kind for generic argument type")
+    }
+
+    return .createParsed(
+      self.ctx,
+      string: self.copyAndStripUnderscores(text: literalExpr.literal.rawText),
+      loc: self.generateSourceLoc(literalExpr),
+      minusLoc: minusLoc
     )
   }
 }
