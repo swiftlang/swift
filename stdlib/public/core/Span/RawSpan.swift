@@ -179,7 +179,7 @@ extension RawSpan {
   ) {
     _precondition(count >= 0, "Count must not be negative")
     self.init(
-      _unchecked: pointer, byteCount: count*MemoryLayout<T>.stride
+      _unchecked: pointer, byteCount: count * MemoryLayout<T>.stride
     )
   }
 
@@ -601,8 +601,8 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   public func _extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements.")
-    let dc = min(k, byteCount)
-    return Self(_unchecked: _pointer, byteCount: byteCount&-dc)
+    let droppedCount = min(k, byteCount)
+    return Self(_unchecked: _pointer, byteCount: byteCount &- droppedCount)
   }
 
   /// Returns a span containing the trailing bytes of the span,
@@ -625,7 +625,7 @@ extension RawSpan {
   public func _extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length.")
     let newCount = min(maxLength, byteCount)
-    let newStart = _pointer?.advanced(by: byteCount&-newCount)
+    let newStart = _pointer?.advanced(by: byteCount &- newCount)
     return Self(_unchecked: newStart, byteCount: newCount)
   }
 
@@ -647,8 +647,8 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   public func _extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements.")
-    let dc = min(k, byteCount)
-    let newStart = _pointer?.advanced(by: dc)
-    return Self(_unchecked: newStart, byteCount: byteCount&-dc)
+    let droppedCount = min(k, byteCount)
+    let newStart = _pointer?.advanced(by: droppedCount)
+    return Self(_unchecked: newStart, byteCount: byteCount &- droppedCount)
   }
 }
