@@ -103,6 +103,9 @@ class ModuleFileSharedCore {
   /// Name to use in public facing diagnostics and documentation.
   StringRef PublicModuleName;
 
+  /// The version of the Swift compiler used to build this module.
+  llvm::VersionTuple SwiftCompilerVersion;
+
   /// \c true if this module has incremental dependency information.
   bool HasIncrementalInfo = false;
 

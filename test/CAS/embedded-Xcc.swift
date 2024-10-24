@@ -20,10 +20,10 @@
 
 // RUN: llvm-bcanalyzer --dump %t/Test.swiftmodule | %FileCheck %s
 
-// CHECK: <XCC abbrevid=6/> blob data = '-cc1'
-// CHECK: <XCC abbrevid=6/> blob data = '-D'
-// CHECK: <XCC abbrevid=6/> blob data = 'TEST=1'
-// CHECK-NOT: <XCC abbrevid=6/> blob data = '--target=
+// CHECK: <XCC abbrevid=7/> blob data = '-cc1'
+// CHECK: <XCC abbrevid=7/> blob data = '-D'
+// CHECK: <XCC abbrevid=7/> blob data = 'TEST=1'
+// CHECK-NOT: <XCC abbrevid=7/> blob data = '--target=
 
 //--- main.swift
 public func test() {}
