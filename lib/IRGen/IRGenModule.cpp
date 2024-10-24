@@ -100,6 +100,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   assert(Importer && "No clang module loader!");
   auto &ClangContext = Importer->getClangASTContext();
 
+  auto &CGTI = Importer->getTargetInfo();
   auto &CGO = Importer->getCodeGenOpts();
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
 
@@ -154,7 +155,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   auto *ClangCodeGen = clang::CreateLLVMCodeGen(ClangContext.getDiagnostics(),
                                                 ModuleName, &VFS, HSI, PPO, CGO,
                                                 LLVMContext);
-  ClangCodeGen->Initialize(ClangContext);
+  ClangCodeGen->Initialize(ClangContext, CGTI);
   return ClangCodeGen;
 }
 
@@ -996,6 +997,14 @@ namespace RuntimeConstants {
 
   RuntimeAvailability InitRawStructMetadata2Availability(ASTContext &Context) {
     auto featureAvailability = Context.getInitRawStructMetadata2Availability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability ValueGenericTypeAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getValueGenericTypeAvailability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }

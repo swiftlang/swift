@@ -2075,14 +2075,6 @@ struct ClosureIsolatedByPreconcurrency {
   bool operator()(const ClosureExpr *expr) const;
 };
 
-/// Determine whether the given expression is part of the left-hand side
-/// of an assignment expression.
-struct IsInLeftHandSideOfAssignment {
-  ConstraintSystem &cs;
-
-  bool operator()(Expr *expr) const;
-};
-
 /// Describes the type produced when referencing a declaration.
 struct DeclReferenceType {
   /// The "opened" type, which is the type of the declaration where any
@@ -4374,39 +4366,6 @@ public:
                                   bool wantInterfaceType = false,
                                   bool adjustForPreconcurrency = true);
 
-  /// Return the type-of-reference of the given value.
-  ///
-  /// \param baseType if non-null, return the type of a member reference to
-  ///   this value when the base has the given type
-  ///
-  /// \param UseDC The context of the access.  Some variables have different
-  ///   types depending on where they are used.
-  ///
-  /// \param locator The locator anchored at this value reference, when
-  /// it is a member reference.
-  ///
-  /// \param wantInterfaceType Whether we want the interface type, if available.
-  ///
-  /// \param getType Optional callback to extract a type for given declaration.
-  static Type
-  getUnopenedTypeOfReference(
-      VarDecl *value, Type baseType, DeclContext *UseDC,
-      llvm::function_ref<Type(VarDecl *)> getType,
-      ConstraintLocator *locator,
-      bool wantInterfaceType = false,
-      bool adjustForPreconcurrency = true,
-      llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType =
-        [](const AbstractClosureExpr *) {
-          return Type();
-        },
-      llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency =
-        [](const ClosureExpr *closure) {
-          return closure->isIsolatedByPreconcurrency();
-        },
-      llvm::function_ref<bool(Expr *)> isAssignTarget = [](Expr *) {
-        return false;
-      });
-
   /// Given the opened type and a pile of information about a member reference,
   /// determine the reference type of the member reference.
   Type getMemberReferenceTypeFromOpenedType(
@@ -4642,7 +4601,7 @@ public:
   /// \param getFix Optional callback to determine a fix for a given
   /// choice (first argument is a position of current choice,
   /// second - the choice in question).
-  void generateConstraints(
+  void generateOverloadConstraints(
       SmallVectorImpl<Constraint *> &constraints, Type type,
       ArrayRef<OverloadChoice> choices, DeclContext *useDC,
       ConstraintLocator *locator,
@@ -4761,10 +4720,10 @@ public:
   /// Subroutine of \c matchTypes(), which matches up a value to an
   /// existential type.
   ///
-  /// \param kind Either ConstraintKind::SelfObjectOfProtocol or
-  /// ConstraintKind::ConformsTo. Usually this uses SelfObjectOfProtocol,
-  /// but when matching the instance type of a metatype with the instance type
-  /// of an existential metatype, since we want an actual conformance check.
+  /// \param kind Either ConstraintKind::Subtype or ConstraintKind::ConformsTo.
+  /// Usually this uses Subtype, but when matching the instance type of a
+  /// metatype with the instance type of an existential metatype, since we
+  /// want an actual conformance check.
   TypeMatchResult matchExistentialTypes(Type type1, Type type2,
                                         ConstraintKind kind,
                                         TypeMatchOptions flags,
@@ -4971,7 +4930,7 @@ private:
   ///
   /// \param type The type being tested.
   /// \param protocol The protocol to which the type should conform.
-  /// \param kind Either ConstraintKind::SelfObjectOfProtocol or
+  /// \param kind Either ConstraintKind::Subtype or
   /// ConstraintKind::ConformsTo.
   /// \param locator Locator describing where this constraint occurred.
   SolutionKind simplifyConformsToConstraint(Type type, ProtocolDecl *protocol,

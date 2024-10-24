@@ -757,6 +757,8 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName,
 
   NodePointer topLevel = createNode(Node::Kind::Global);
 
+  NodePointer suffix = popNode(Node::Kind::Suffix);
+
   NodePointer Parent = topLevel;
   while (NodePointer FuncAttr = popNode(isFunctionAttr)) {
     Parent->addChild(FuncAttr, *this);
@@ -774,6 +776,9 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName,
         break;
     }
   }
+  if (suffix)
+    topLevel->addChild(suffix, *this);
+
   if (topLevel->getNumChildren() == 0)
     return nullptr;
 
@@ -1462,6 +1467,18 @@ NodePointer Demangler::demangleBuiltinType() {
       name.append(EltType->getText().substr(BUILTIN_TYPE_NAME_PREFIX.size()),
                   *this);
       Ty = createNode(Node::Kind::BuiltinTypeName, name);
+      break;
+    }
+    case 'V': {
+      NodePointer element = popNode(Node::Kind::Type);
+      if (!element)
+        return nullptr;
+      NodePointer size = popNode(Node::Kind::Type);
+      if (!size)
+        return nullptr;
+      Ty = createNode(Node::Kind::BuiltinFixedArray);
+      Ty->addChild(size, *this);
+      Ty->addChild(element, *this);
       break;
     }
     case 'O':

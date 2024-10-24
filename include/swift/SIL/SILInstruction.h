@@ -8549,6 +8549,7 @@ class StrongRetainInst
   StrongRetainInst(SILDebugLocation DebugLoc, SILValue Operand,
                    Atomicity atomicity)
       : UnaryInstructionBase(DebugLoc, Operand) {
+    assert(!Operand->getType().getAs<BuiltinFixedArrayType>());
     setAtomicity(atomicity);
   }
 };
