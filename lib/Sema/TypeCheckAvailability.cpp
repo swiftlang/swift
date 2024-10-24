@@ -315,6 +315,19 @@ ExportContext::getExportabilityReason() const {
   return std::nullopt;
 }
 
+std::optional<AvailabilityRange>
+UnmetAvailabilityRequirement::getRequiredNewerAvailabilityRange(
+    ASTContext &ctx) const {
+  switch (kind) {
+  case Kind::AlwaysUnavailable:
+  case Kind::RequiresVersion:
+  case Kind::Obsoleted:
+    return std::nullopt;
+  case Kind::IntroducedInNewerVersion:
+    return AvailabilityInference::availableRange(attr, ctx);
+  }
+}
+
 /// Returns the first availability attribute on the declaration that is active
 /// on the target platform.
 static const AvailableAttr *getActiveAvailableAttribute(const Decl *D,
@@ -3065,6 +3078,51 @@ bool diagnoseExplicitUnavailability(
   return true;
 }
 
+std::optional<UnmetAvailabilityRequirement>
+swift::checkDeclarationAvailability(const Decl *decl,
+                                    const DeclContext *declContext,
+                                    AvailabilityContext availabilityContext) {
+  auto &ctx = declContext->getASTContext();
+  if (ctx.LangOpts.DisableAvailabilityChecking)
+    return std::nullopt;
+
+  // Generic parameters are always available.
+  if (isa<GenericTypeParamDecl>(decl))
+    return std::nullopt;
+
+  if (auto attr = AvailableAttr::isUnavailable(decl)) {
+    if (isInsideCompatibleUnavailableDeclaration(decl, availabilityContext,
+                                                 attr))
+      return std::nullopt;
+
+    switch (attr->getVersionAvailability(ctx)) {
+    case AvailableVersionComparison::Available:
+    case AvailableVersionComparison::PotentiallyUnavailable:
+      llvm_unreachable("Decl should be unavailable");
+
+    case AvailableVersionComparison::Unavailable:
+      if ((attr->isLanguageVersionSpecific() ||
+           attr->isPackageDescriptionVersionSpecific()) &&
+          attr->Introduced.has_value())
+        return UnmetAvailabilityRequirement::forRequiresVersion(attr);
+
+      return UnmetAvailabilityRequirement::forAlwaysUnavailable(attr);
+
+    case AvailableVersionComparison::Obsoleted:
+      return UnmetAvailabilityRequirement::forObsoleted(attr);
+    }
+  }
+
+  // Check whether the declaration is available in a newer platform version.
+  auto rangeAndAttr = AvailabilityInference::availableRangeAndAttr(decl);
+  if (!availabilityContext.getPlatformRange().isContainedIn(rangeAndAttr.first))
+    return UnmetAvailabilityRequirement::forIntroducedInNewerVersion(
+        rangeAndAttr.second);
+
+  return std::nullopt;
+}
+
+
 /// Check if this is a subscript declaration inside String or
 /// Substring that returns String, and if so return true.
 bool isSubscriptReturningString(const ValueDecl *D, ASTContext &Context) {
@@ -4057,8 +4115,20 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
       return false;
   }
 
-  if (diagnoseExplicitUnavailability(D, R, Where, call, Flags))
-    return true;
+  auto *DC = Where.getDeclContext();
+  auto &ctx = DC->getASTContext();
+  auto unmetRequirement =
+      checkDeclarationAvailability(D, DC, Where.getAvailability());
+  auto requiredRange =
+      unmetRequirement
+          ? unmetRequirement->getRequiredNewerAvailabilityRange(ctx)
+          : std::nullopt;
+
+  if (unmetRequirement && !requiredRange) {
+    // FIXME: diagnoseExplicitUnavailability should take an unmet requirement
+    if (diagnoseExplicitUnavailability(D, R, Where, call, Flags))
+      return true;
+  }
 
   if (diagnoseDeclAsyncAvailability(D, R, call, Where))
     return true;
@@ -4079,25 +4149,21 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
     return false;
 
   // Diagnose (and possibly signal) for potential unavailability
-  auto maybeUnavail = TypeChecker::checkDeclarationAvailability(D, Where);
-  if (!maybeUnavail.has_value())
+  if (!requiredRange)
     return false;
 
-  auto requiredAvailability = maybeUnavail.value();
-  auto *DC = Where.getDeclContext();
-  auto &ctx = DC->getASTContext();
   if (Flags.contains(
           DeclAvailabilityFlag::
               AllowPotentiallyUnavailableAtOrBelowDeploymentTarget) &&
-      requiresDeploymentTargetOrEarlier(requiredAvailability, ctx))
+      requiresDeploymentTargetOrEarlier(*requiredRange, ctx))
     return false;
 
   if (accessor) {
     bool forInout = Flags.contains(DeclAvailabilityFlag::ForInout);
-    diagnosePotentialAccessorUnavailability(accessor, R, DC,
-                                            requiredAvailability, forInout);
+    diagnosePotentialAccessorUnavailability(accessor, R, DC, *requiredRange,
+                                            forInout);
   } else {
-    if (!diagnosePotentialUnavailability(D, R, DC, requiredAvailability))
+    if (!diagnosePotentialUnavailability(D, R, DC, *requiredRange))
       return false;
   }
 
