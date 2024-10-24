@@ -38,24 +38,26 @@ public var irm: Int {
   modify {
     yield &_i
   }
-// CHECK-LABEL: sil {{.*}}[ossa] @$s19coroutine_accessors1SV3irmSivg :
-// CHECK-SAME:      $@convention(method)
+// CHECK-LABEL: sil{{.*}} [ossa] @$s19coroutine_accessors1SV3irmSivr :
+// CHECK-SAME:      $@yield_once
+// CHECK-SAME:      @convention(method)
 // CHECK-SAME:      (@guaranteed S)
 // CHECK-SAME:      ->
-// CHECK-SAME:      Int
+// CHECK-SAME:      @yields Int
 // CHECK-SAME:  {
 // CHECK:       bb0(
-// CHECK-SAME:      [[SELF:%[^,]+]] :
-// CHECK-SAME:  ):
-// CHECK:         [[READ_ACCESSOR:%[^,]+]] = function_ref @$s19coroutine_accessors1SV3irmSivy
-// CHECK:         ([[VALUE:%[^,]+]],
-// CHECK-SAME:     [[TOKEN:%[^,]+]],
-// CHECK-SAME:     [[ALLOCATION:%[^)]+]])
-// CHECK-SAME:    = begin_apply [[READ_ACCESSOR]]([[SELF]])
+// CHECK:           [[SELF:%[^,]+]] :
+// CHECK:       ):
+// CHECK:         [[READER2:%[^,]+]] = function_ref @$s19coroutine_accessors1SV3irmSivy
+// CHECK:         ([[VALUE_ADDRESS:%[^,]+]], [[TOKEN:%[^,]+]], [[ALLOCATION:%[^,]+]]) = begin_apply [[READER2]]([[SELF]])
 // CHECK:         end_apply [[TOKEN]]
-// CHECK:         dealloc_stack [[ALLOCATION]]
-// CHECK:         return [[VALUE:%[^,]+]]
-// CHECK-LABEL: } // end sil function '$s19coroutine_accessors1SV3irmSivg'
+// CHECK:         yield [[VALUE_ADDRESS]] : $Int, resume bb1, unwind bb2
+// CHECK:       bb1:
+// CHECK:         dealloc_stack [[ALLOCATION]] : $*Builtin.SILToken
+// CHECK:       bb2:
+// CHECK:         dealloc_stack [[ALLOCATION]] : $*Builtin.SILToken
+// CHECK:         unwind
+// CHECK-LABEL: } // end sil function '$s19coroutine_accessors1SV3irmSivr'
 
 // CHECK-LABEL: sil {{.*}}[ossa] @$s19coroutine_accessors1SV3irmSivs :
 // CHECK-SAME:      $@convention(method)
@@ -95,12 +97,14 @@ public var irm: Int {
 // CHECK-SAME:   [[TOKEN:%[^,]+]],
 // CHECK-SAME:   [[ALLOCATION:%[^)]+]])
 // CHECK-SAME:  = begin_apply [[MODIFY_ACCESSOR]]([[SELF_ACCESS]])
-// CHECK:       yield [[VALUE_ADDRESS:%[^,]+]] : $*Int, resume bb1, unwind bb2
-// CHECK:     bb1:
+// CHECK:       yield [[VALUE_ADDRESS]] 
+// CHECK-SAME:      resume [[RESUME_BB:bb[0-9]+]]
+// CHECK-SAME:      unwind [[UNWIND_BB:bb[0-9]+]]
+// CHECK:     [[RESUME_BB]]:
 // CHECK:       end_apply [[TOKEN]]
 // CHECK:       end_access [[SELF_ACCESS]]
 // CHECK:       dealloc_stack [[ALLOCATION]]
-// CHECK:     bb2:
+// CHECK:     [[UNWIND_BB]]:
 // CHECK:       end_apply [[TOKEN]]
 // CHECK:       dealloc_stack [[ALLOCATION]]
 // CHECK:       end_access [[SELF_ACCESS]]
@@ -123,7 +127,7 @@ public var irm: Int {
 // CHECK:      store [[NEW_VALUE:%[^,]+]] to [trivial] [[NEW_VALUE_ADDR]]
 // CHECK:      [[SELF_ACCESS:%[^,]+]] = begin_access [modify] [unknown] [[SELF]]
 // CHECK:      [[MODIFY_ACCESSOR:%[^,]+]] = function_ref @$s19coroutine_accessors1SV3irmSivx
-// CHECK:      ([[VALUE_ADDR:%[^,]+]], 
+// CHECK:      ([[VALUE_ADDR:%[^,]+]],
 // CHECK-SAME:  [[TOKEN:%[^,]+]],
 // CHECK-SAME:  [[ALLOCATION:%[^)]+]])
 // CHECK-SAME: = begin_apply [[MODIFY_ACCESSOR]]([[SELF_ACCESS]])
@@ -163,4 +167,66 @@ func update<T : Equatable>(at location: inout T, to newValue: T) throws -> T {
   }
   location = newValue
   return oldValue
+}
+
+protocol ReadableTitle {
+  var title: String { read }
+}
+class OverridableGetter : ReadableTitle {
+  var title: String = ""
+}
+//   The read witness thunk does a direct call to the concrete read accessor.
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s19coroutine_accessors17OverridableGetterCAA13ReadableTitleA2aDP5titleSSvrTW
+// CHECK:       function_ref @$s19coroutine_accessors17OverridableGetterC5titleSSvr
+// CHECK-LABEL: // end sil function '$s19coroutine_accessors17OverridableGetterCAA13ReadableTitleA2aDP5titleSSvrTW'
+//   The concrete read accessor is generated on-demand and does a class dispatch to the getter.
+// CHECK-LABEL: sil shared [ossa] @$s19coroutine_accessors17OverridableGetterC5titleSSvr
+// CHECK:       class_method %0 : $OverridableGetter, #OverridableGetter.title!getter
+// CHECK-LABEL: // end sil function '$s19coroutine_accessors17OverridableGetterC5titleSSvr'
+
+class ImplementedReader : ReadableTitle {
+  var _title: String = ""
+  var title: String {
+    read {
+      yield _title
+    }
+  }
+}
+
+protocol GettableTitle {
+  var title: String { get }
+}
+
+// CHECK-LABEL: sil{{.*}} [ossa] @$s19coroutine_accessors17OverridableReaderCAA13GettableTitleA2aDP5titleSSvgTW : {{.*}} {
+// CHECK:       bb0(
+// CHECK-SAME:      [[SELF_ADDR:%[^,]+]] :
+// CHECK-SAME:  ):
+// CHECK:         [[SELF:%[^,]+]] = load_borrow [[SELF_ADDR]]
+// CHECK:         [[GETTER:%[^,]+]] = function_ref @$s19coroutine_accessors17OverridableReaderC5titleSSvg
+// CHECK:         [[RETVAL:%[^,]+]] = apply [[GETTER]]([[SELF]])
+// CHECK:         end_borrow [[SELF]]
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function '$s19coroutine_accessors17OverridableReaderCAA13GettableTitleA2aDP5titleSSvgTW'
+// CHECK-LABEL: sil{{.*}} [ossa] @$s19coroutine_accessors17OverridableReaderC5titleSSvg : {{.*}} {
+// CHECK:       bb0(
+// CHECK-SAME:      [[SELF:%[^,]+]] :
+// CHECK-SAME:  ):
+// CHECK:         [[READER:%[^,]+]] = class_method [[SELF]] : $OverridableReader, #OverridableReader.title!read
+// CHECK:         ([[TITLE:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[READER]]([[SELF]])
+// CHECK:         [[RETVAL:%[^,]+]] = copy_value [[TITLE]]
+// CHECK:         end_apply [[TOKEN]] as $()
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function '$s19coroutine_accessors17OverridableReaderC5titleSSvg'
+
+// CHECK-LABEL: sil_witness_table{{.*}} OverridableReader: GettableTitle {{.*}} {
+// CHECK-NEXT:    method #GettableTitle.title!getter
+// CHECK-SAME:        @$s19coroutine_accessors17OverridableReaderCAA13GettableTitleA2aDP5titleSSvgTW
+// CHECK-NEXT:  }
+class OverridableReader : GettableTitle {
+  var _title: String = ""
+  var title: String {
+    read {
+      yield _title
+    }
+  }
 }

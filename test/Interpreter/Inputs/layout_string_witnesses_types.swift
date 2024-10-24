@@ -617,6 +617,7 @@ public enum MultiPayloadError {
     case empty
     case error1(Int, Error)
     case error2(Int, Error)
+    case error3(Int, Error)
 }
 
 public enum TwoPayloadInner {
@@ -659,6 +660,11 @@ public enum OneExtraTagValue {
     case x3(E4, Int8, Int16, Int32)
     case y(SimpleClass)
     case z
+}
+
+public enum ErrorWrapper {
+    case x(Error)
+    case y(Error)
 }
 
 @inline(never)

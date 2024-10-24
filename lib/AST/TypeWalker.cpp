@@ -297,6 +297,16 @@ class Traversal : public TypeVisitor<Traversal, bool>
     }
     return false;
   }
+  
+  bool visitBuiltinFixedArrayType(BuiltinFixedArrayType *ty) {
+    if (ty->getSize() && doIt(ty->getSize()))  {
+      return true;
+    }
+    if (ty->getElementType() && doIt(ty->getElementType())) {
+      return true;
+    }
+    return false;
+  }
 
 public:
   explicit Traversal(TypeWalker &walker) : Walker(walker) {}

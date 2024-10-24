@@ -226,6 +226,9 @@ public func testExistentialParameter(_ p: any P) {
 public func testMetatypes() {
   // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper1SVTwS"()
   if #_hasSymbol(S.self) {}
+
+  // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper7GenericVTwS"()
+  if #_hasSymbol(Generic<Void>.self) {}
 }
 
 // --- S.self ---
@@ -236,3 +239,7 @@ public func testMetatypes() {
 // CHECK:   [[V3:%.*]] = icmp ne ptr @"$s17has_symbol_helper1SVMa", null
 // CHECK:   [[RES:%.*]] = and i1 [[V2]], [[V3]]
 // CHECK:   ret i1 [[RES]]
+
+// --- Generic<Void>.self ---
+// CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper7GenericVTwS"()
+// CHECK:   ret i1 and (i1 icmp ne (ptr @"$s17has_symbol_helper7GenericVMn", ptr null), i1 icmp ne (ptr @"$s17has_symbol_helper7GenericVMa", ptr null))
