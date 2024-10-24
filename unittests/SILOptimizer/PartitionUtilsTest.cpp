@@ -100,7 +100,7 @@ struct MockedPartitionOpEvaluatorWithFailureCallback final
       llvm_unreachable("Unsupported");
     case PartitionOpError::LocalUseAfterSend: {
       auto state = error.getLocalUseAfterSendError();
-      failureCallback(state.op, state.sentElement, state.sendingOp);
+      failureCallback(*state.op, state.sentElement, state.sendingOp);
     }
     }
   }
