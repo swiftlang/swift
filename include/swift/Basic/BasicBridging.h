@@ -32,6 +32,11 @@
 // and C++, we need to be careful to match the return convention
 // matches between the non-USED_IN_CPP_SOURCE (Swift) side and the
 // USE_IN_CPP_SOURCE (C++) side.
+//
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !! Do not put any constructors inside an `#ifdef USED_IN_CPP_SOURCE` block !!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 #include "swift/Basic/BridgedSwiftObject.h"
 #include "swift/Basic/Compiler.h"
 
@@ -72,7 +77,14 @@
 
 namespace llvm {
 class raw_ostream;
+class StringRef;
 } // end namespace llvm
+
+namespace swift {
+class SourceLoc;
+class SourceRange;
+class CharSourceRange;
+}
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -205,12 +217,8 @@ class BridgedStringRef {
   size_t Length;
 
 public:
-#ifdef USED_IN_CPP_SOURCE
-  BridgedStringRef(llvm::StringRef sref)
-      : Data(sref.data()), Length(sref.size()) {}
-
-  llvm::StringRef unbridged() const { return llvm::StringRef(Data, Length); }
-#endif
+  BRIDGED_INLINE BridgedStringRef(llvm::StringRef sref);
+  BRIDGED_INLINE llvm::StringRef unbridged() const;
 
   BridgedStringRef() : Data(nullptr), Length(0) {}
 
@@ -236,15 +244,9 @@ class BridgedOwnedString {
   size_t Length;
 
 public:
-  // Ensure that this struct value type will be indirectly returned on
-  // Windows ARM64
-  BridgedOwnedString() {}
+  BridgedOwnedString(llvm::StringRef stringToCopy);
 
-#ifdef USED_IN_CPP_SOURCE
-  BridgedOwnedString(const std::string &stringToCopy);
-
-  llvm::StringRef unbridgedRef() const { return llvm::StringRef(Data, Length); }
-#endif
+  BRIDGED_INLINE llvm::StringRef unbridgedRef() const;
 
   void destroy() const;
 } SWIFT_SELF_CONTAINED;
@@ -305,14 +307,9 @@ public:
   SWIFT_NAME("init(raw:)")
   BridgedSourceLoc(const void *_Nullable raw) : Raw(raw) {}
 
-#ifdef USED_IN_CPP_SOURCE
-  BridgedSourceLoc(swift::SourceLoc loc) : Raw(loc.getOpaquePointerValue()) {}
+  BRIDGED_INLINE BridgedSourceLoc(swift::SourceLoc loc);
 
-  swift::SourceLoc unbridged() const {
-    return swift::SourceLoc(
-        llvm::SMLoc::getFromPointer(static_cast<const char *>(Raw)));
-  }
-#endif
+  BRIDGED_INLINE swift::SourceLoc unbridged() const;
 
   SWIFT_IMPORT_UNSAFE
   const void *_Nullable getOpaquePointerValue() const { return Raw; }
@@ -343,14 +340,9 @@ public:
   BridgedSourceRange(BridgedSourceLoc start, BridgedSourceLoc end)
       : Start(start), End(end) {}
 
-#ifdef USED_IN_CPP_SOURCE
-  BridgedSourceRange(swift::SourceRange range)
-      : Start(range.Start), End(range.End) {}
+  BRIDGED_INLINE BridgedSourceRange(swift::SourceRange range);
 
-  swift::SourceRange unbridged() const {
-    return swift::SourceRange(Start.unbridged(), End.unbridged());
-  }
-#endif
+  BRIDGED_INLINE swift::SourceRange unbridged() const;
 };
 
 //===----------------------------------------------------------------------===//
@@ -369,14 +361,9 @@ public:
   BridgedCharSourceRange(BridgedSourceLoc start, unsigned byteLength)
       : Start(start), ByteLength(byteLength) {}
 
-#ifdef USED_IN_CPP_SOURCE
-  BridgedCharSourceRange(swift::CharSourceRange range)
-      : Start(range.getStart()), ByteLength(range.getByteLength()) {}
+  BRIDGED_INLINE BridgedCharSourceRange(swift::CharSourceRange range);
 
-  swift::CharSourceRange unbridged() const {
-    return swift::CharSourceRange(Start.unbridged(), ByteLength);
-  }
-#endif
+  BRIDGED_INLINE swift::CharSourceRange unbridged() const;
 };
 
 SWIFT_NAME("getter:BridgedCharSourceRange.start(self:)")

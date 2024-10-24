@@ -1652,7 +1652,7 @@ BridgedOwnedString BridgedPassContext::getModuleDescription() const {
   llvm::raw_string_ostream os(str);
   invocation->getPassManager()->getModule()->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 bool BridgedPassContext::tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const {
@@ -1815,7 +1815,7 @@ BridgedOwnedString BridgedPassContext::mangleOutlinedVariable(BridgedFunction fu
     GlobalVariableMangler mangler;
     std::string name = mangler.mangleOutlinedVariable(f, idx);
     if (!mod.lookUpGlobalVariable(name))
-      return name;
+      return BridgedOwnedString(name);
     idx++;
   }
 }
@@ -1829,7 +1829,7 @@ BridgedOwnedString BridgedPassContext::mangleAsyncRemoved(BridgedFunction functi
   Mangle::FunctionSignatureSpecializationMangler Mangler(
       P, F->getSerializedKind(), F);
   Mangler.setRemovedEffect(EffectKind::Async);
-  return Mangler.mangle();
+  return BridgedOwnedString(Mangler.mangle());
 }
 
 BridgedOwnedString BridgedPassContext::mangleWithDeadArgs(const SwiftInt * _Nullable deadArgs,
@@ -1842,7 +1842,7 @@ BridgedOwnedString BridgedPassContext::mangleWithDeadArgs(const SwiftInt * _Null
   for (SwiftInt idx = 0; idx < numDeadArgs; idx++) {
     Mangler.setArgumentDead((unsigned)idx);
   }
-  return Mangler.mangle();
+  return BridgedOwnedString(Mangler.mangle());
 }
 
 BridgedOwnedString BridgedPassContext::mangleWithClosureArgs(
@@ -1876,7 +1876,7 @@ BridgedOwnedString BridgedPassContext::mangleWithClosureArgs(
     }
   }
 
-  return mangler.mangle();
+  return BridgedOwnedString(mangler.mangle());
 }
 
 BridgedGlobalVar BridgedPassContext::createGlobalVariable(BridgedStringRef name, BridgedType type, bool isPrivate) const {
