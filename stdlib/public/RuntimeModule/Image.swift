@@ -23,17 +23,15 @@ struct ImageSymbol {
 }
 
 internal protocol Image {
-  associatedtype Source: ImageSource
-
   typealias UUID = [UInt8]
-  typealias Address = Source.Address
+  typealias Address = ImageSource.Address
 
-  init(source: Source, baseAddress: Address, endAddress: Address) throws
+  init(source: ImageSource, baseAddress: Address, endAddress: Address) throws
 
   var baseAddress: Address { get set }
   var endAddress: Address { get set }
 
-  var source: Source { get }
+  var source: ImageSource { get }
   var uuid: UUID? { get }
   var shouldByteSwap: Bool { get }
 

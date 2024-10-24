@@ -1493,6 +1493,10 @@ def create_argument_parser():
            default=True,
            help='Enable Volatile module.')
 
+    option('--enable-runtime-module', toggle_true,
+           default=True,
+           help='Enable Runtime module.')
+
     option('--enable-experimental-parser-validation', toggle_true,
            default=True,
            help='Enable experimental Swift Parser validation by default.')

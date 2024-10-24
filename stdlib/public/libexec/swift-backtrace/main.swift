@@ -22,10 +22,10 @@ import Musl
 import CRT
 #endif
 
-@_spi(Formatting) import _Backtracing
-@_spi(Contexts) import _Backtracing
-@_spi(Registers) import _Backtracing
-@_spi(MemoryReaders) import _Backtracing
+@_spi(Formatting) import Runtime
+@_spi(Contexts) import Runtime
+@_spi(Registers) import Runtime
+@_spi(MemoryReaders) import Runtime
 
 @main
 internal struct SwiftBacktrace {
@@ -144,8 +144,8 @@ internal struct SwiftBacktrace {
   }
 
   static func measureDuration(_ body: () -> ()) -> timespec {
-    var startTime = timespec()
-    var endTime = timespec()
+    var startTime = timespec(tv_sec: 0, tv_nsec: 0)
+    var endTime = timespec(tv_sec: 0, tv_nsec: 0)
 
     clock_gettime(CLOCK_MONOTONIC, &startTime)
     body()
@@ -786,13 +786,6 @@ Generate a backtrace for the parent process.
       }
     }
 
-    let addressWidthInChars: Int
-    switch crashingThread.backtrace {
-      case let .raw(backtrace):
-        addressWidthInChars = (backtrace.addressWidth + 3) / 4
-      case let .symbolicated(backtrace):
-        addressWidthInChars = (backtrace.addressWidth + 3) / 4
-    }
     switch args.showImages! {
       case .none:
         break
@@ -804,12 +797,10 @@ Generate a backtrace for the parent process.
         } else {
           writeln("\n\nImages:\n")
         }
-        writeln(formatter.format(images: images,
-                                 addressWidth: addressWidthInChars))
+        writeln(formatter.format(images: images))
       case .all:
         writeln("\n\nImages:\n")
-        writeln(formatter.format(images: target.images,
-                                 addressWidth: addressWidthInChars))
+        writeln(formatter.format(images: target.images))
     }
   }
 
@@ -891,20 +882,15 @@ Generate a backtrace for the parent process.
           let formatter = backtraceFormatter()
           switch thread.backtrace {
             case let .raw(backtrace):
-              let addressWidthInChars = (backtrace.addressWidth + 3) / 4
-              if let frame = backtrace.frames.first {
-                let formatted = formatter.format(frame: frame,
-                                                 addressWidth: addressWidthInChars)
+              if let frame = backtrace.frames.unsafeFirst {
+                let formatted = formatter.format(frame: frame)
                 writeln("\(formatted)")
               }
             case let .symbolicated(backtrace):
-              let addressWidthInChars = (backtrace.addressWidth + 3) / 4
-
               if let frame = backtrace.frames.drop(while: {
                 $0.isSwiftRuntimeFailure
-              }).first {
-                let formatted = formatter.format(frame: frame,
-                                                 addressWidth: addressWidthInChars)
+              }).unsafeFirst {
+                let formatted = formatter.format(frame: frame)
                 writeln("\(formatted)")
               }
           }
@@ -975,12 +961,10 @@ Generate a backtrace for the parent process.
 
             switch thread.backtrace {
               case let .raw(backtrace):
-                let addressWidthInChars = (backtrace.addressWidth + 3) / 4
-
-                if let frame = backtrace.frames.first {
+                if let frame = backtrace.frames.unsafeFirst {
                   rows += formatter.formatRows(
-                    frame: frame,
-                    addressWidth: addressWidthInChars).map{ row in
+                    frame: frame
+                  ).map{ row in
 
                     switch row {
                       case let .columns(columns):
@@ -991,14 +975,12 @@ Generate a backtrace for the parent process.
                   }
                 }
               case let .symbolicated(backtrace):
-                let addressWidthInChars = (backtrace.addressWidth + 3) / 4
-
                 if let frame = backtrace.frames.drop(while: {
                   $0.isSwiftRuntimeFailure
-                }).first {
+                }).unsafeFirst {
                   rows += formatter.formatRows(
-                    frame: frame,
-                    addressWidth: addressWidthInChars).map{ row in
+                    frame: frame
+                  ).map{ row in
 
                     switch row {
                       case let .columns(columns):
@@ -1020,15 +1002,7 @@ Generate a backtrace for the parent process.
         case "images":
           let formatter = backtraceFormatter()
           let images = target.images
-          let addressWidthInChars: Int
-          switch target.threads[currentThread].backtrace {
-            case let .raw(backtrace):
-              addressWidthInChars = (backtrace.addressWidth + 3) / 4
-            case let .symbolicated(backtrace):
-              addressWidthInChars = (backtrace.addressWidth + 3) / 4
-          }
-          let output = formatter.format(images: images,
-                                        addressWidth: addressWidthInChars)
+          let output = formatter.format(images: images)
 
           writeln(output)
         case "set":

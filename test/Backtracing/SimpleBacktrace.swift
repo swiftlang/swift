@@ -10,7 +10,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-import _Backtracing
+import Runtime
 
 func level1() {
   level2()

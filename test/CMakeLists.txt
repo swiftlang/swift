@@ -82,6 +82,11 @@ function(get_test_dependencies SDK result_var_name)
 
   set(deps_binaries)
 
+  if (SWIFT_ENABLE_BACKTRACING)
+    list(APPEND deps_binaries
+      swift-backtrace)
+  endif()
+
   if (SWIFT_INCLUDE_TOOLS)
     list(APPEND deps_binaries
       libMockPlugin
@@ -251,6 +256,7 @@ normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_UNICODE_DATA)
 normalize_boolean_spelling(SWIFT_ENABLE_DISPATCH)
 normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
 normalize_boolean_spelling(SWIFT_ENABLE_BACKTRACING)
+normalize_boolean_spelling(SWIFT_ENABLE_RUNTIME_MODULE)
 normalize_boolean_spelling(SWIFT_BUILD_SWIFT_SYNTAX)
 normalize_boolean_spelling(SWIFT_ENABLE_SYNCHRONIZATION)
 normalize_boolean_spelling(SWIFT_ENABLE_VOLATILE)
@@ -471,6 +477,10 @@ foreach(SDK ${SWIFT_SDKS})
 
         if(SWIFT_ENABLE_VOLATILE)
           list(APPEND LIT_ARGS "--param" "volatile")
+        endif()
+
+        if(SWIFT_ENABLE_RUNTIME_MODULE)
+          list(APPEND LIT_ARGS "--param" "runtime_module")
         endif()
 
         if(SWIFT_BUILD_REMOTE_MIRROR)

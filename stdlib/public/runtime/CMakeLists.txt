@@ -144,7 +144,7 @@ foreach(sdk ${SWIFT_SDKS})
   endif()
 endforeach()
 
-add_swift_target_library(swiftRuntime OBJECT_LIBRARY
+add_swift_target_library(swiftRuntimeCore OBJECT_LIBRARY
   ${swift_runtime_sources}
   ${swift_runtime_objc_sources}
   ${swift_runtime_leaks_sources}

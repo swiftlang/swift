@@ -25,8 +25,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(Linux)
-
 import Swift
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
@@ -56,18 +54,26 @@ let lzma_stream_init = swift.runtime.lzma_stream_init
 // .. CompressedStream .........................................................
 
 protocol CompressedStream {
-  typealias InputSource = () throws -> UnsafeBufferPointer<UInt8>
+  typealias InputSource = () throws -> UnsafeRawBufferPointer
   typealias OutputSink = (_ used: UInt, _ done: Bool) throws
-    -> UnsafeMutableBufferPointer<UInt8>?
+    -> UnsafeMutableRawBufferPointer?
 
   func decompress(input: InputSource, output: OutputSink) throws -> UInt
 }
 
 // .. Compression library bindings .............................................
 
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+private var lzmaHandle = dlopen("liblzma.dylib", RTLD_LAZY)
+private var zlibHandle = dlopen("libz.dylib", RTLD_LAZY)
+private var zstdHandle = dlopen("libzstd.dylib", RTLD_LAZY)
+#elseif os(Linux)
 private var lzmaHandle = dlopen("liblzma.so.5", RTLD_LAZY)
 private var zlibHandle = dlopen("libz.so.1", RTLD_LAZY)
 private var zstdHandle = dlopen("libzstd.so.1", RTLD_LAZY)
+#elseif os(Windows)
+// ###TODO
+#endif
 
 private func symbol<T>(_ handle: UnsafeMutableRawPointer?, _ name: String) -> T? {
   guard let handle = handle, let result = dlsym(handle, name) else {
@@ -152,7 +158,9 @@ struct ZLibStream: CompressedStream {
         let buffer = try input()
 
         // Not really mutable; this is just an issue with z_const
-        stream.next_in = UnsafeMutablePointer(mutating: buffer.baseAddress)
+        stream.next_in = UnsafeMutablePointer(
+          mutating: buffer.baseAddress?.assumingMemoryBound(to: UInt8.self)
+        )
         stream.avail_in = CUnsignedInt(buffer.count)
       }
 
@@ -161,7 +169,7 @@ struct ZLibStream: CompressedStream {
           throw CompressedImageSourceError.outputOverrun
         }
 
-        stream.next_out = buffer.baseAddress
+        stream.next_out = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self)
         stream.avail_out = CUnsignedInt(buffer.count)
         outputBufferSize = UInt(buffer.count)
       }
@@ -211,7 +219,7 @@ struct ZStdStream: CompressedStream {
       if inBuffer.size == inBuffer.pos {
         let buffer = try input()
 
-        inBuffer.src = UnsafeRawPointer(buffer.baseAddress)
+        inBuffer.src = buffer.baseAddress
         inBuffer.size = buffer.count
         inBuffer.pos = 0
       }
@@ -225,7 +233,7 @@ struct ZStdStream: CompressedStream {
           throw CompressedImageSourceError.outputOverrun
         }
 
-        outBuffer.dst = UnsafeMutableRawPointer(buffer.baseAddress)
+        outBuffer.dst = buffer.baseAddress
         outBuffer.size = buffer.count
         outBuffer.pos = 0
       }
@@ -280,7 +288,7 @@ struct LZMAStream: CompressedStream {
     while true {
       if stream.avail_in == 0 {
         let buffer = try input()
-        stream.next_in = buffer.baseAddress
+        stream.next_in = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self)
         stream.avail_in = buffer.count
       }
 
@@ -289,7 +297,7 @@ struct LZMAStream: CompressedStream {
           throw CompressedImageSourceError.outputOverrun
         }
 
-        stream.next_out = buffer.baseAddress
+        stream.next_out = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self)
         stream.avail_out = buffer.count
         outputBufferSize = UInt(buffer.count)
       }
@@ -310,230 +318,130 @@ struct LZMAStream: CompressedStream {
 
 // .. Image Sources ............................................................
 
-fileprivate func decompress<S: CompressedStream, I: ImageSource>(
-  stream: S, source: I, dataBounds: I.Bounds, uncompressedSize: UInt? = nil)
-  throws -> [UInt8] {
+fileprivate func decompress<S: CompressedStream>(
+  stream: S,
+  source: ImageSource,
+  offset: Int,
+  output: inout ImageSource
+) throws {
+  let totalBytes = try stream.decompress(
+    input: {
+      () throws -> UnsafeRawBufferPointer in
 
-  var pos = dataBounds.base
-  var remaining = dataBounds.size
+      return UnsafeRawBufferPointer(rebasing: source.bytes[offset...])
+    },
+    output: {
+      (used: UInt, done: Bool) throws -> UnsafeMutableRawBufferPointer? in
 
-  let bufSize = 65536
-
-  if let uncompressedSize = uncompressedSize {
-    // If we know the uncompressed size, we can decompress directly into the
-    // array.
-
-    let inputBuffer
-      = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: bufSize)
-    defer {
-      inputBuffer.deallocate()
-    }
-
-    return try [UInt8].init(unsafeUninitializedCapacity: Int(uncompressedSize)) {
-      (outputBuffer: inout UnsafeMutableBufferPointer<UInt8>,
-       count: inout Int) in
-
-      count = Int(try stream.decompress(
-        input: { () throws -> UnsafeBufferPointer<UInt8> in
-
-          let chunkSize = min(Int(remaining), inputBuffer.count)
-          let slice = inputBuffer[0..<chunkSize]
-          let buffer = UnsafeMutableBufferPointer(rebasing: slice)
-
-          try source.fetch(from: pos, into: buffer)
-
-          pos += I.Address(chunkSize)
-          remaining -= I.Size(chunkSize)
-
-          return UnsafeBufferPointer(buffer)
-        },
-        output: {
-          (used: UInt, done: Bool) throws -> UnsafeMutableBufferPointer<UInt8>? in
-
-          if used == 0 {
-            return outputBuffer
-          } else {
-            return nil
-          }
-        }
-      ))
-    }
-  } else {
-    // Otherwise, we decompress in chunks and append them to the array.
-
-    let buffer
-      = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: 2 * bufSize)
-    defer {
-      buffer.deallocate()
-    }
-
-    let inputBuffer = UnsafeMutableBufferPointer(rebasing: buffer[0..<bufSize])
-    let outputBuffer = UnsafeMutableBufferPointer(rebasing: buffer[bufSize...])
-
-    var data = [UInt8]()
-
-    _ = try stream.decompress(
-      input: { () throws -> UnsafeBufferPointer<UInt8> in
-
-        let chunkSize = min(Int(remaining), inputBuffer.count)
-        let slice = inputBuffer[0..<chunkSize]
-        let buffer = UnsafeMutableBufferPointer(rebasing: slice)
-
-        try source.fetch(from: pos, into: buffer)
-
-        pos += I.Address(chunkSize)
-        remaining -= I.Size(chunkSize)
-
-        return UnsafeBufferPointer(buffer)
-      },
-      output: {
-        (used: UInt, done: Bool) throws -> UnsafeMutableBufferPointer<UInt8>? in
-
-        data.append(contentsOf: outputBuffer[..<Int(used)])
-        if !done {
-          return outputBuffer
-        } else {
-          return nil
-        }
+      if used == 0 {
+        return output.unusedBytes
+      } else {
+        return nil
       }
-    )
-
-    return data
-  }
+    }
+  )
+  output.used(bytes: Int(totalBytes))
 }
 
-internal struct ElfCompressedImageSource<Traits: ElfTraits>: ImageSource {
+fileprivate func decompressChunked<S: CompressedStream>(
+  stream: S,
+  source: ImageSource,
+  offset: Int,
+  output: inout ImageSource
+) throws {
+  let bufSize = 65536
+  let outputBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: bufSize,
+                                                            alignment: 16)
+  defer {
+    outputBuffer.deallocate()
+  }
 
-  private var data: [UInt8]
+  let _ = try stream.decompress(
+    input: {
+      () throws -> UnsafeRawBufferPointer in
 
-  var isMappedImage: Bool { return false }
-  var path: String? { return nil }
-  var bounds: Bounds? { return Bounds(base: Address(0), size: Size(data.count)) }
+      return UnsafeRawBufferPointer(rebasing: source.bytes[offset...])
+    },
+    output: {
+      (used: UInt, done: Bool) throws -> UnsafeMutableRawBufferPointer? in
 
-  init(source: some ImageSource) throws {
-    guard let bounds = source.bounds else {
-      throw CompressedImageSourceError.unboundedImageSource
+      output.append(
+        bytes: UnsafeRawBufferPointer(rebasing: outputBuffer[..<Int(used)])
+      )
+      if !done {
+        return outputBuffer
+      } else {
+        return nil
+      }
     }
+  )
+}
 
-    if bounds.size < MemoryLayout<Traits.Chdr>.size {
+extension ImageSource {
+  @_specialize(kind: full, where Traits == Elf32Traits)
+  @_specialize(kind: full, where Traits == Elf64Traits)
+  init<Traits: ElfTraits>(elfCompressedImageSource source: ImageSource,
+                          traits: Traits.Type) throws {
+    if source.bytes.count < MemoryLayout<Traits.Chdr>.size {
       throw CompressedImageSourceError.badCompressedData
     }
 
-    let chdr = try source.fetch(from: bounds.base,
-                                as: Traits.Chdr.self)
-    let dataBounds = bounds.adjusted(by: MemoryLayout<Traits.Chdr>.stride)
+    let rawChdr = try source.fetch(from: 0, as: Traits.Chdr.self)
+    let chdr: Traits.Chdr
+    switch rawChdr.ch_type {
+      case .ELFCOMPRESS_ZLIB.byteSwapped, .ELFCOMPRESS_ZSTD.byteSwapped:
+        chdr = rawChdr.byteSwapped
+      default:
+        chdr = rawChdr
+    }
+
     let uncompressedSize = UInt(chdr.ch_size)
+
+    self.init(capacity: Int(uncompressedSize), isMappedImage: false, path: nil)
 
     switch chdr.ch_type {
       case .ELFCOMPRESS_ZLIB:
-        data = try decompress(stream: ZLibStream(),
-                              source: source, dataBounds: dataBounds,
-                              uncompressedSize: uncompressedSize)
+        try decompress(stream: ZLibStream(),
+                       source: source, offset: MemoryLayout<Traits.Chdr>.stride,
+                       output: &self)
       case .ELFCOMPRESS_ZSTD:
-        data = try decompress(stream: ZStdStream(),
-                              source: source, dataBounds: dataBounds,
-                              uncompressedSize: uncompressedSize)
+        try decompress(stream: ZStdStream(),
+                       source: source, offset: MemoryLayout<Traits.Chdr>.stride,
+                       output: &self)
       default:
         throw CompressedImageSourceError.unsupportedFormat
     }
   }
 
-  public func fetch(from addr: Address,
-                    into buffer: UnsafeMutableRawBufferPointer) throws {
-    let toFetch = buffer.count
-    if addr < 0 || addr > data.count || data.count - Int(addr) < toFetch {
-      throw CompressedImageSourceError.outOfRangeFetch(addr, toFetch)
-    }
-
-    buffer.withMemoryRebound(to: UInt8.self) { outBuf in
-      for n in 0..<toFetch {
-        outBuf[n] = data[Int(addr) + n]
-      }
-    }
-  }
-
-}
-
-internal struct ElfGNUCompressedImageSource: ImageSource {
-
-  private var data: [UInt8]
-
-  var isMappedImage: Bool { return false }
-  var path: String? { return nil }
-  var bounds: Bounds? { return Bounds(base: Address(0), size: Size(data.count)) }
-
-  init(source: some ImageSource) throws {
-    guard let bounds = source.bounds else {
-      throw CompressedImageSourceError.unboundedImageSource
-    }
-
-    if bounds.size < 12 {
+  init(gnuCompressedImageSource source: ImageSource) throws {
+    if source.bytes.count < 12 {
       throw CompressedImageSourceError.badCompressedData
     }
 
-    let magic = try source.fetch(from: bounds.base, as: UInt32.self)
-    if magic != 0x42494c5a {
-      throw CompressedImageSourceError.badCompressedData
+    let magic = try source.fetch(from: 0, as: UInt32.self)
+    let rawUncompressedSize = try source.fetch(from: 4, as: UInt64.self)
+    let uncompressedSize: UInt64
+    switch magic {
+      case 0x42494c5a: // BILZ
+        uncompressedSize = rawUncompressedSize.byteSwapped
+      case 0x5a4c4942: // ZLIB
+        uncompressedSize = rawUncompressedSize
+      default:
+        throw CompressedImageSourceError.badCompressedData
     }
 
-    let uncompressedSize
-      = UInt(try source.fetch(from: bounds.base + 4, as: UInt64.self).byteSwapped)
+    self.init(capacity: Int(uncompressedSize), isMappedImage: false, path: nil)
 
-    data = try decompress(stream: ZLibStream(),
-                          source: source,
-                          dataBounds: bounds.adjusted(by: 12),
-                          uncompressedSize: uncompressedSize)
+    try decompress(stream: ZLibStream(),
+                   source: source, offset: 12,
+                   output: &self)
   }
 
-  public func fetch(from addr: Address,
-                    into buffer: UnsafeMutableRawBufferPointer) throws {
-    let toFetch = buffer.count
-    if addr < 0 || addr > data.count || data.count - Int(addr) < toFetch {
-      throw CompressedImageSourceError.outOfRangeFetch(addr, toFetch)
-    }
+  init(lzmaCompressedImageSource source: ImageSource) throws {
+    self.init(isMappedImage: false, path: nil)
 
-    buffer.withMemoryRebound(to: UInt8.self) { outBuf in
-      for n in 0..<toFetch {
-        outBuf[n] = data[Int(addr) + n]
-      }
-    }
+    try decompressChunked(stream: LZMAStream(),
+                          source: source, offset: 0,
+                          output: &self)
   }
-
 }
-
-internal struct LZMACompressedImageSource: ImageSource {
-
-  private var data: [UInt8]
-
-  var isMappedImage: Bool { return false }
-  var path: String? { return nil }
-  var bounds: Bounds? { return Bounds(base: Address(0), size: Size(data.count)) }
-
-  init(source: some ImageSource) throws {
-    // Only supported for bounded image sources
-    guard let bounds = source.bounds else {
-      throw CompressedImageSourceError.unboundedImageSource
-    }
-
-    data = try decompress(stream: LZMAStream(),
-                          source: source,
-                          dataBounds: bounds)
-  }
-
-  public func fetch(from addr: Address,
-                    into buffer: UnsafeMutableRawBufferPointer) throws {
-    let toFetch = buffer.count
-    if addr < 0 || addr > data.count || data.count - Int(addr) < toFetch {
-      throw CompressedImageSourceError.outOfRangeFetch(addr, toFetch)
-    }
-
-    buffer.withMemoryRebound(to: UInt8.self) { outBuf in
-      for n in 0..<toFetch {
-        outBuf[n] = data[Int(addr) + n]
-      }
-    }
-  }
-
-}
-
-#endif // os(Linux)

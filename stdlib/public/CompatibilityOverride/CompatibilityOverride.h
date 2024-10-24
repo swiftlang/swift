@@ -123,7 +123,7 @@ namespace swift {
 // Include path computation. Code that includes this file can write `#include
 // "..CompatibilityOverride/CompatibilityOverrideIncludePath.h"` to include the
 // appropriate .def file for the current library.
-#define COMPATIBILITY_OVERRIDE_INCLUDE_PATH_swiftRuntime                       \
+#define COMPATIBILITY_OVERRIDE_INCLUDE_PATH_swiftRuntimeCore                   \
   "../CompatibilityOverride/CompatibilityOverrideRuntime.def"
 #define COMPATIBILITY_OVERRIDE_INCLUDE_PATH_swift_Concurrency                  \
   "../CompatibilityOverride/CompatibilityOverrideConcurrency.def"
@@ -155,7 +155,7 @@ namespace swift {
 // resolve to string literal containing the appropriate section name for the
 // current library.
 // Turns into '__swift<major><minor>_hooks'
-#define COMPATIBILITY_OVERRIDE_SECTION_NAME_swiftRuntime "__swift" \
+#define COMPATIBILITY_OVERRIDE_SECTION_NAME_swiftRuntimeCore "__swift" \
   SWIFT_VERSION_MAJOR \
   SWIFT_VERSION_MINOR \
   "_hooks"

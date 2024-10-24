@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_spi(Formatting) import _Backtracing
+@_spi(Formatting) import Runtime
 
 protocol ErrorAndWarningTheme {
   func crashReason(_ s: String) -> String

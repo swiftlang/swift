@@ -9,7 +9,7 @@
 // REQUIRES: backtracing
 // REQUIRES: OS=macosx || OS=linux-gnu
 
-import _Backtracing
+import Runtime
 
 func kablam() {
   kerpow()
@@ -32,7 +32,9 @@ func splat() {
 }
 
 func pow() {
-  let backtrace = try! Backtrace.capture().symbolicated(useSymbolCache: false)!
+  let backtrace = try! Backtrace.capture().symbolicated(
+    options: [ .showInlineFrames, .showSourceLocations ]
+  )!
 
   // CHECK:      0{{[ \t]+}}0x{{[0-9a-f]+}} [ra] [0] SymbolicatedBacktrace pow()
   // CHECK:      1{{[ \t]+}}0x{{[0-9a-f]+}} [ra] [0] SymbolicatedBacktrace splat()
