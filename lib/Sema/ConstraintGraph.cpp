@@ -177,7 +177,9 @@ void ConstraintGraphNode::removeConstraint(Constraint *constraint) {
   Constraints.pop_back();
 }
 
-void ConstraintGraphNode::notifyReferencingVars() const {
+void ConstraintGraphNode::notifyReferencingVars(
+    llvm::function_ref<void(ConstraintGraphNode &,
+                            Constraint *)> notification) const {
   SmallVector<TypeVariableType *, 4> stack;
 
   stack.push_back(TypeVar);
@@ -199,7 +201,7 @@ void ConstraintGraphNode::notifyReferencingVars() const {
             affectedVar->getImpl().getRepresentative(/*record=*/nullptr);
 
         if (!repr->getImpl().getFixedType(/*record=*/nullptr))
-          CG[repr].reintroduceToInference(constraint);
+          notification(CG[repr], constraint);
       }
     }
   };
@@ -236,7 +238,7 @@ void ConstraintGraphNode::notifyReferencingVars() const {
 }
 
 void ConstraintGraphNode::notifyReferencedVars(
-    llvm::function_ref<void(ConstraintGraphNode &)> notification) {
+    llvm::function_ref<void(ConstraintGraphNode &)> notification) const {
   for (auto *fixedBinding : getReferencedVars()) {
     notification(CG[fixedBinding]);
   }
@@ -265,7 +267,14 @@ void ConstraintGraphNode::addToEquivalenceClass(
         });
       }
 
-      node.notifyReferencingVars();
+      // FIXME: Perhaps this also needs to be split up into two stages,
+      // where the first stage runs before we merge the equivalence
+      // classes
+      node.notifyReferencingVars(
+        [&](ConstraintGraphNode &node, Constraint *constraint) {
+          node.retractFromInference(constraint);
+          node.introduceToInference(constraint);
+        });
     }
   }
 }
@@ -343,19 +352,17 @@ void ConstraintGraphNode::retractFromInference(Constraint *constraint) {
   }
 }
 
-void ConstraintGraphNode::reintroduceToInference(Constraint *constraint) {
-  retractFromInference(constraint);
-  introduceToInference(constraint);
-}
-
-void ConstraintGraphNode::introduceToInference(Type fixedType) {
+void ConstraintGraphNode::retractFromInference(Type fixedType) {
   // Notify all of the type variables that reference this one.
   //
   // Since this type variable has been replaced with a fixed type
   // all of the concrete types that reference it are going to change,
   // which means that all of the not-yet-attempted bindings should
   // change as well.
-  notifyReferencingVars();
+  notifyReferencingVars(
+    [&](ConstraintGraphNode &node, Constraint *constraint) {
+      node.retractFromInference(constraint);
+    });
 
   if (!fixedType->hasTypeVariable())
     return;
@@ -371,7 +378,39 @@ void ConstraintGraphNode::introduceToInference(Type fixedType) {
     // all of the constraints that reference bound type variable.
     for (auto *constraint : getConstraints()) {
       if (isUsefulForReferencedVars(constraint))
-        node.reintroduceToInference(constraint);
+        node.retractFromInference(constraint);
+    }
+  }
+}
+
+void ConstraintGraphNode::introduceToInference(Type fixedType) {
+  // Notify all of the type variables that reference this one.
+  //
+  // Since this type variable has been replaced with a fixed type
+  // all of the concrete types that reference it are going to change,
+  // which means that all of the not-yet-attempted bindings should
+  // change as well.
+  notifyReferencingVars(
+    [&](ConstraintGraphNode &node, Constraint *constraint) {
+      node.introduceToInference(constraint);
+    });
+
+  if (!fixedType->hasTypeVariable())
+    return;
+
+  SmallPtrSet<TypeVariableType *, 4> referencedVars;
+  fixedType->getTypeVariables(referencedVars);
+
+  for (auto *referencedVar : referencedVars) {
+    auto &node = CG[referencedVar];
+
+    // Newly referred vars need to re-introduce all constraints associated
+    // with this type variable since they are now going to be used in
+    // all of the constraints that reference bound type variable.
+    for (auto *constraint : getConstraints()) {
+      if (isUsefulForReferencedVars(constraint)) {
+        node.introduceToInference(constraint);
+      }
     }
   }
 }
@@ -399,7 +438,7 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
   auto referencedTypeVars = constraint->getTypeVariables();
   for (auto typeVar : referencedTypeVars) {
     // Record the change, if there are active scopes.
-    if (CS.isRecordingChanges())
+    if (CS.solverState)
       CS.recordChange(SolverTrail::Change::AddedConstraint(typeVar, constraint));
 
     addConstraint(typeVar, constraint);
@@ -419,7 +458,7 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
   // track it as such.
   if (referencedTypeVars.empty()) {
     // Record the change, if there are active scopes.
-    if (CS.isRecordingChanges())
+    if (CS.solverState)
       CS.recordChange(SolverTrail::Change::AddedConstraint(nullptr, constraint));
 
     addConstraint(nullptr, constraint);
@@ -454,7 +493,7 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
     }
 
     // Record the change, if there are active scopes.
-    if (CS.isRecordingChanges())
+    if (CS.solverState)
       CS.recordChange(SolverTrail::Change::RemovedConstraint(typeVar, constraint));
 
     removeConstraint(typeVar, constraint);
@@ -463,7 +502,7 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
   // If this is an orphaned constraint, remove it from the list.
   if (referencedTypeVars.empty()) {
     // Record the change, if there are active scopes.
-    if (CS.isRecordingChanges())
+    if (CS.solverState)
       CS.recordChange(SolverTrail::Change::RemovedConstraint(nullptr, constraint));
 
     removeConstraint(nullptr, constraint);
@@ -535,6 +574,10 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
     if (CS.isRecordingChanges())
       CS.recordChange(SolverTrail::Change::RelatedTypeVariables(typeVar, otherTypeVar));
   }
+}
+
+void ConstraintGraph::retractFromInference(TypeVariableType *typeVar, Type fixed) {
+  (*this)[typeVar].retractFromInference(fixed);
 }
 
 void ConstraintGraph::introduceToInference(TypeVariableType *typeVar, Type fixed) {

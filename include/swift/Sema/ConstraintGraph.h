@@ -137,14 +137,12 @@ private:
   /// gets removed for a constraint graph.
   void retractFromInference(Constraint *constraint);
 
-  /// Re-evaluate the given constraint. This happens when there are changes
-  /// in associated type variables e.g. bound/unbound to/from a fixed type,
-  /// equivalence class changes.
-  void reintroduceToInference(Constraint *constraint);
+  /// Perform graph updates that must be undone after we bind a fixed type
+  /// to a type variable.
+  void retractFromInference(Type fixedType);
 
-  /// Similar to \c introduceToInference(Constraint *, ...) this method is going
-  /// to notify inference that this type variable has been bound to a concrete
-  /// type.
+  /// Perform graph updates that must be undone before we bind a fixed type
+  /// to a type variable.
   ///
   /// The reason why this can't simplify be a part of \c bindTypeVariable
   /// is related to the fact that it's sometimes expensive to re-compute
@@ -161,11 +159,13 @@ private:
   ///
   /// This is useful in situations when type variable gets bound and unbound,
   /// or equivalence class changes.
-  void notifyReferencingVars() const;
+  void notifyReferencingVars(
+      llvm::function_ref<void(ConstraintGraphNode &,
+                              Constraint *)> notification) const;
 
   /// Notify all of the type variables referenced by this one about a change.
   void notifyReferencedVars(
-      llvm::function_ref<void(ConstraintGraphNode &)> notification);
+      llvm::function_ref<void(ConstraintGraphNode &)> notification) const;
 
   /// }
 
@@ -270,7 +270,12 @@ public:
   /// Bind the given type variable to the given fixed type.
   void bindTypeVariable(TypeVariableType *typeVar, Type fixedType);
 
-  /// Introduce the type variable's fixed type to inference.
+  /// Perform graph updates that must be undone after we bind a fixed type
+  /// to a type variable.
+  void retractFromInference(TypeVariableType *typeVar, Type fixedType);
+
+  /// Perform graph updates that must be undone before we bind a fixed type
+  /// to a type variable.
   void introduceToInference(TypeVariableType *typeVar, Type fixedType);
 
   /// Describes which constraints \c gatherConstraints should gather.
