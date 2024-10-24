@@ -54,7 +54,7 @@ func foo() {
 
 // func myLoop() {
   // CHECK: define {{.*}} @"$s4main6myLoopyyF"
-  // CHECK: call void @llvm.dbg.declare(metadata ptr %index.debug, {{.*}}), !dbg ![[FORLOOP:[0-9]+]]
+  // CHECK: #dbg_declare(ptr %index.debug, {{.*}}, ![[FORLOOP:[0-9]+]]
   // CHECK: phi i64 [ %{{.[0-9]+}}, %{{.[0-9]+}} ], !dbg ![[FORLOOP]]
   // CHECK: call {{.*}} @"$s4main8markUsedyyxlF"{{.*}}, !dbg ![[FORBODY:[0-9]+]]
   // CHECK: ret void
@@ -70,8 +70,8 @@ func foo() {
 // func foo()
   // CHECK: define {{.*}} @"$s4main3fooyyF"
   // CHECK: %[[MYARRAY:.*]] = alloca
-  // CHECK: call void @llvm.dbg.declare(metadata ptr %[[MYARRAY]],
-  // CHECK-SAME: !dbg ![[ARRAY:[0-9]+]]
+  // CHECK: #dbg_declare(ptr %[[MYARRAY]], !{{.*}}, !DIExpression
+  // CHECK-SAME: ![[ARRAY:[0-9]+]]
   // CHECK: call swiftcc { {{.*}} } @"${{.*}}_allocateUninitializedArray{{.*}}"
   // CHECK-SAME: !dbg ![[ARRAY_ALLOC:[0-9]+]]
   // CHECK: ret void

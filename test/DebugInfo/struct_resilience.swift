@@ -22,9 +22,9 @@ public func f() {
   let s1 = Size(w: 1, h: 2)
   takesSize(s1)
   // CHECK: %[[ADDR:.*]] = alloca ptr
-  // CHECK: call void @llvm.dbg.declare(metadata ptr %[[ADDR]],
-  // CHECK-SAME:                        metadata ![[V1:[0-9]+]],
-  // CHECK-SAME:                        metadata !DIExpression(DW_OP_deref))
+  // CHECK: #dbg_declare(ptr %[[ADDR]],
+  // CHECK-SAME:                        ![[V1:[0-9]+]],
+  // CHECK-SAME:                        !DIExpression(DW_OP_deref)
   // CHECK: %[[S1:.*]] = alloca i8,
   // CHECK: store ptr %[[S1]], ptr %[[ADDR]]
 }

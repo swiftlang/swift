@@ -3113,7 +3113,7 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
     // Index of swiftasync context | ((index of swiftself) << 8).
     arguments.push_back(IGM.getInt32(paramAttributeFlags));
     arguments.push_back(currentResumeFn);
-    auto resumeProjFn = IGF.getOrCreateResumePrjFn(true /*forProlog*/);
+    auto resumeProjFn = IGF.getOrCreateResumePrjFn();
     arguments.push_back(
         Builder.CreateBitOrPointerCast(resumeProjFn, IGM.Int8PtrTy));
     auto dispatchFn = IGF.createAsyncDispatchFn(

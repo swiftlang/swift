@@ -13,13 +13,13 @@ class AppDelegate {
   // CHECK: define hidden {{.*}}i1 {{.*}}11AppDelegateC1f
   func f() -> Bool {
     // Test for -O0 shadow copies.
-    // CHECK: call void @llvm.dbg.declare({{.*}}, metadata ![[SELF:.*]], metadata !DIExpression())
-    // CHECK-NOT: call void @llvm.dbg.value
-    // CHECK: call void @llvm.dbg.declare({{.*}}, metadata ![[A:.*]], metadata !DIExpression())
+    // CHECK: #dbg_declare({{.*}}, ![[SELF:.*]], !DIExpression()
+    // CHECK-NOT: #dbg_value
+    // CHECK: #dbg_declare({{.*}}, ![[A:.*]], !DIExpression()
     let a = "let"
-    // CHECK-NOT: call void @llvm.dbg.value
-    // CHECK: call void @llvm.dbg.declare({{.*}}, metadata ![[B:.*]], metadata !DIExpression())
-    // CHECK-NOT: call void @llvm.dbg.value
+    // CHECK-NOT: #dbg_value
+    // CHECK: #dbg_declare({{.*}}, ![[B:.*]], !DIExpression()
+    // CHECK-NOT: #dbg_value
     // CHECK: ret
     // CHECK-DAG: ![[SELF]] = !DILocalVariable(name: "self", arg: 1{{.*}} line: [[@LINE-10]],
     // CHECK-DAG: ![[A]] = !DILocalVariable(name: "a",{{.*}} line: [[@LINE-6]],

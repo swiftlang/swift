@@ -32,6 +32,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILModule.h"
+#include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Support/BLAKE3.h"
 
 using namespace swift;
@@ -322,8 +323,16 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
       }
       case BuiltinValueKind::ZExtOrBitCast: {
         auto *val = emitConstantValue(IGM, args[0]).claimNextConstant();
-        return llvm::ConstantExpr::getZExtOrBitCast(val,
-                                                    IGM.getStorageType(BI->getType()));
+        auto storageTy = IGM.getStorageType(BI->getType());
+
+        if (val->getType() == storageTy)
+          return val;
+
+        auto *result = llvm::ConstantFoldCastOperand(
+            llvm::Instruction::ZExt, val, storageTy, IGM.DataLayout);
+        ASSERT(result != nullptr &&
+               "couldn't constant fold initializer expression");
+        return result;
       }
       case BuiltinValueKind::StringObjectOr: {
         // It is a requirement that the or'd bits in the left argument are
@@ -395,8 +404,7 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
     auto authInfo = PointerAuthInfo::forFunctionPointer(IGM, fnType);
     if (authInfo.isSigned()) {
       auto constantDiscriminator =
-          cast<llvm::Constant>(authInfo.getDiscriminator());
-      assert(!constantDiscriminator->getType()->isPointerTy());
+          cast<llvm::ConstantInt>(authInfo.getDiscriminator());
       fnPtr = IGM.getConstantSignedPointer(fnPtr, authInfo.getKey(), nullptr,
         constantDiscriminator);
     }

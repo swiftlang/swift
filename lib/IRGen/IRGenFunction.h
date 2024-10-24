@@ -178,7 +178,7 @@ public:
                                        bool restoreCurrentContext = true);
 
   llvm::Value *emitAsyncResumeProjectContext(llvm::Value *callerContextAddr);
-  llvm::Function *getOrCreateResumePrjFn(bool forPrologue = false);
+  llvm::Function *getOrCreateResumePrjFn();
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                         ArrayRef<llvm::Value *> args);
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,

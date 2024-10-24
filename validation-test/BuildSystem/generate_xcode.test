@@ -1,3 +1,5 @@
+# REQUIRES: rdar133492917
+
 # RUN: %empty-directory(%t)
 # RUN: %empty-directory(%t/Xcode)
 

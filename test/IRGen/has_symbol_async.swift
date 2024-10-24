@@ -17,11 +17,15 @@ public func testGlobalFunctions() {
 
 // --- asyncFunc() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper9asyncFuncyyYaFTwS"()
-// CHECK:   ret i1 and (i1 icmp ne (ptr @"$s17has_symbol_helper9asyncFuncyyYaF", ptr null), i1 icmp ne (ptr @"$s17has_symbol_helper9asyncFuncyyYaFTu", ptr null))
+// CHECK:   [[V0:%.*]] = icmp ne ptr @"$s17has_symbol_helper9asyncFuncyyYaF", null
+// CHECK:   [[V1:%.*]] = icmp ne ptr @"$s17has_symbol_helper9asyncFuncyyYaFTu", null
+// CHECK:   [[RES:%.*]] = and i1 [[V0]], [[V1]]
+// CHECK:   ret i1 [[RES]]
 
 // --- isolatedFunc() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper12isolatedFuncyyFTwS"()
-// CHECK:   ret i1 icmp ne (ptr @"$s17has_symbol_helper12isolatedFuncyyF", ptr null)
+// CHECK:   [[RES:%.*]] = icmp ne ptr @"$s17has_symbol_helper12isolatedFuncyyF", null
+// CHECK:   ret i1 [[RES]]
 
 public func testActor(_ a: A) {
   // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper1ACACycfcTwS"()
@@ -35,8 +39,16 @@ public func testActor(_ a: A) {
 
 // --- A.init() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper1ACACycfcTwS"()
-// CHECK:   ret i1 and (i1 icmp ne (ptr @"$s17has_symbol_helper1ACACycfc", ptr null), i1 icmp ne (ptr @"$s17has_symbol_helper1ACACycfC", ptr null))
+// CHECK:   [[V0:%.*]] = icmp ne ptr @"$s17has_symbol_helper1ACACycfc", null
+// CHECK:   [[V1:%.*]] = icmp ne ptr @"$s17has_symbol_helper1ACACycfC", null
+// CHECK:   [[RES:%.*]] = and i1 [[V0]], [[V1]]
+// CHECK:   ret i1 [[RES]]
 
 // --- A.asyncMethod() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper1AC11asyncMethodyyYaFTwS"()
-// CHECK:   ret i1 and (i1 and (i1 icmp ne (ptr @"$s17has_symbol_helper1AC11asyncMethodyyYaFTj", ptr null), i1 icmp ne (ptr @"$s17has_symbol_helper1AC11asyncMethodyyYaFTjTu", ptr null)), i1 icmp ne (ptr @"$s17has_symbol_helper1AC11asyncMethodyyYaFTq", ptr null))
+// CHECK:   [[V0:%.*]] = icmp ne ptr @"$s17has_symbol_helper1AC11asyncMethodyyYaFTj", null
+// CHECK:   [[V1:%.*]] = icmp ne ptr @"$s17has_symbol_helper1AC11asyncMethodyyYaFTjTu", null
+// CHECK:   [[V2:%.*]] = and i1 [[V0]], [[V1]]
+// CHECK:   [[V3:%.*]] = icmp ne ptr @"$s17has_symbol_helper1AC11asyncMethodyyYaFTq", null
+// CHECK:   [[RES:%.*]] = and i1 [[V2]], [[V3]]
+// CHECK:   ret i1 [[RES]]

@@ -22,7 +22,7 @@ public protocol SwiftProto {
   @objc optional func swiftReq()
 }
 
-//--- frameworks/OptionalRequirementOf.framework/module.map
+//--- frameworks/OptionalRequirementOf.framework/Modules/module.modulemap
 framework module OptionalRequirementOf {
   header "req.h"
   export *

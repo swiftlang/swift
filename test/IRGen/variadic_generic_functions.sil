@@ -126,13 +126,13 @@ sil @associatedtype_with_added_conformance_2_callee : $<each T : R> () -> () {}
 // CHECK-SAME:        ptr %"each T",
 // CHECK-SAME:        ptr %"each T.Q")
 // CHECK:             [[GEN2_TYPES:%[^,]+]] = alloca ptr, [[INT]] [[SHAPE]]
-// CHECK:             [[STORED_STACK_LOC:%[^,]+]] = call ptr @llvm.stacksave()
+// CHECK:             [[STORED_STACK_LOC:%[^,]+]] = call ptr @llvm.stacksave.p0()
 // CHECK:             [[GEN2_CONFORMANCES_TO_Q:%[^,]+]] = alloca ptr, [[INT]] [[SHAPE]]
 // CHECK:             call swiftcc void @associatedtype_with_forwarded_conformance_1_callee(
 // CHECK-SAME:            [[INT]] [[SHAPE]],
 // CHECK-SAME:            ptr [[GEN2_TYPES]],
 // CHECK-SAME:            ptr [[GEN2_CONFORMANCES_TO_Q]])
-// CHECK:             call void @llvm.stackrestore(ptr [[STORED_STACK_LOC]])
+// CHECK:             call void @llvm.stackrestore.p0(ptr [[STORED_STACK_LOC]])
 sil @associatedtype_with_forwarded_conformance_1 : $<each T : Q> () -> () {
     %i = function_ref @associatedtype_with_forwarded_conformance_1_callee : $@convention(thin) <each T : Q> () -> ()
     apply %i<Pack{repeat Gen2<each T>}>() : $@convention(thin) <each T : Q> () -> ()
@@ -149,14 +149,14 @@ sil @associatedtype_with_forwarded_conformance_1_callee : $<each T : Q> () -> ()
 // CHECK-SAME:        ptr %"each T.PA",
 // CHECK-SAME:        ptr %"(each T).A.Q")
 // CHECK:         [[GEN1_TYPES:%[^,]+]] = alloca ptr, [[INT]] [[SHAPE]]
-// CHECK:         [[STORED_STACK_LOC:%[^,]+]] = call ptr @llvm.stacksave()
+// CHECK:         [[STORED_STACK_LOC:%[^,]+]] = call ptr @llvm.stacksave.p0()
 // CHECK:         [[GEN1_CONFORMANCES_TO_PA:%[^,]+]] = alloca ptr, [[INT]] [[SHAPE]]
 // CHECK:         call swiftcc void @generictype_with_forwarded_conformance_2_callee(
 // CHECK-SAME:        [[INT]] [[SHAPE]],
 // CHECK-SAME:        ptr [[GEN1_TYPES]],
 // CHECK-SAME:        ptr [[GEN1_CONFORMANCES_TO_PA]],
 // CHECK-SAME:        ptr %"(each T).A.Q")
-// CHECK:         call void @llvm.stackrestore(ptr [[STORED_STACK_LOC]])
+// CHECK:         call void @llvm.stackrestore.p0(ptr [[STORED_STACK_LOC]])
 sil @generictype_with_forwarded_conformance_2 : $<each T : PA where repeat (each T).A : Q>() -> () {
     %callee = function_ref @generictype_with_forwarded_conformance_2_callee : $@convention(thin) <each T : PA where repeat (each T).A : Q> () -> ()
     apply %callee<Pack{repeat Gen1<each T>}>() : $@convention(thin) <each T : PA where repeat (each T).A : Q> () -> ()
@@ -172,14 +172,14 @@ sil @generictype_with_forwarded_conformance_2_callee : $<each T : PA where repea
 // CHECK-SAME:        ptr %"each T.PA",
 // CHECK-SAME:        ptr %"(each T).A.Q")
 // CHECK:         [[GEN1_GEN1_TYPES:%[^,]+]] = alloca ptr, [[INT]] [[SHAPE]]
-// CHECK:         [[STORED_STACK_LOC:%[^,]+]] = call ptr @llvm.stacksave()
+// CHECK:         [[STORED_STACK_LOC:%[^,]+]] = call ptr @llvm.stacksave.p0()
 // CHECK:         [[GEN1_GEN1_CONFORMANCES_TO_PA:%[^,]+]] = alloca ptr, [[INT]] [[SHAPE]]
 // CHECK:         call swiftcc void @generic_with_forwarded_conformance_3_callee(
 // CHECK-SAME:        [[INT]] [[SHAPE]],
 // CHECK-SAME:        ptr [[GEN1_GEN1_TYPES]],
 // CHECK-SAME:        ptr [[GEN1_GEN1_CONFORMANCES_TO_PA]],
 // CHECK-SAME:        ptr %"(each T).A.Q")
-// CHECK:         call void @llvm.stackrestore(ptr [[STORED_STACK_LOC]])
+// CHECK:         call void @llvm.stackrestore.p0(ptr [[STORED_STACK_LOC]])
 sil @generic_with_forwarded_conformance_3 : $<each T : PA where repeat (each T).A : Q> () -> () {
     %callee = function_ref @generic_with_forwarded_conformance_3_callee : $@convention(thin) <each T : PA where repeat (each T).A : Q> () -> ()
     apply %callee<Pack{repeat Gen1<Gen1<each T>>}>() : $@convention(thin) <each T : PA where repeat (each T).A : Q> () -> ()

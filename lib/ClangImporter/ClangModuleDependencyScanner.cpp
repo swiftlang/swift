@@ -113,14 +113,10 @@ static std::vector<std::string> getClangDepScanningInvocationArguments(
     commandLineArgs.erase(moduleFormatPos-1, moduleFormatPos+1);
   }
 
-  // HACK: No -fsyntax-only here?
-  {
-    auto syntaxOnlyPos = std::find(commandLineArgs.begin(),
-                                   commandLineArgs.end(),
-                                   "-fsyntax-only");
-    assert(syntaxOnlyPos != commandLineArgs.end());
-    *syntaxOnlyPos = "-c";
-  }
+  // Use `-fsyntax-only` to do dependency scanning and assert if not there.
+  assert(std::find(commandLineArgs.begin(), commandLineArgs.end(),
+                   "-fsyntax-only") != commandLineArgs.end() &&
+         "missing -fsyntax-only option");
 
   // The Clang modules produced by ClangImporter are always embedded in an
   // ObjectFilePCHContainer and contain -gmodules debug info.

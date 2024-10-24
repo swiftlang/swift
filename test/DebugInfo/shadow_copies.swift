@@ -46,8 +46,8 @@ class ClassC
     // CHECK-NOT: alloca
     // NOCOPY-NOT: alloca
 
-    // CHECK:  call void @llvm.dbg.value(metadata i{{(64|32)}} 10
-    // NOCOPY: call void @llvm.dbg.value(metadata i{{(64|32)}} 10
+    // CHECK:  #dbg_value(i{{(64|32)}} 10
+    // NOCOPY: #dbg_value(i{{(64|32)}} 10
         let x = 10
 
         use(x)

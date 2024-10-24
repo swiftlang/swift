@@ -583,9 +583,6 @@ function set_build_options_for_host() {
         watchsimulator-*    | \
         xros-*              | \
         xrsimulator-*)
-            swift_cmake_options+=(
-              -DPython3_EXECUTABLE="$(xcrun -f python3)"
-            )
             case ${host} in
                 macosx-x86_64)
                     SWIFT_HOST_TRIPLE="x86_64-apple-macosx${DARWIN_DEPLOYMENT_VERSION_OSX}"
@@ -1698,7 +1695,7 @@ for host in "${ALL_HOSTS[@]}"; do
             libcxx)
                 build_targets=(cxx)
                 cmake_options=(
-                    -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi" -DLIBCXX_INSTALL_LIBRARY=OFF
+                    -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind" -DLIBCXX_INSTALL_LIBRARY=OFF
                     "${cmake_options[@]}"
                     "${llvm_cmake_options[@]}"
                 )
@@ -2763,32 +2760,20 @@ for host in "${ALL_HOSTS[@]}"; do
                 echo "--- Running LLDB unit tests ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
-                echo "--- Running LLDB tests (Swift Config: Precise/ClangImporter) ---"
+                echo "--- Running LLDB tests (Swift Config: ClangImporter) ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
                 with_pushd ${results_dir} \
                     call "${llvm_build_dir}/bin/llvm-lit" \
                          "${lldb_build_dir}/test" \
                          ${LLVM_LIT_ARGS} ${LLVM_LIT_FILTER_ARG} \
-                         --param dotest-args="--setting symbols.use-swift-clangimporter=true --setting symbols.swift-precise-compiler-invocation=true"
-                echo "--- Rerun LLDB Swift API tests (Swift Config: Precise/DWARFImporter) ---"
+                         --param dotest-args="--setting symbols.use-swift-clangimporter=true"
+                echo "--- Rerun LLDB Swift API tests (Swift Config: DWARFImporter) ---"
                 with_pushd ${results_dir} \
                     call "${llvm_build_dir}/bin/llvm-lit" \
                          "${lldb_build_dir}/test" \
                          ${LLVM_LIT_ARGS} ${FILTER_SWIFT_API_OPTION} \
-                         --param dotest-args="--setting symbols.use-swift-clangimporter=false --setting symbols.swift-precise-compiler-invocation=true"
-                echo "--- Rerun LLDB Swift API tests (Swift Config: Classic/ClangImporter) ---"
-                with_pushd ${results_dir} \
-                    call "${llvm_build_dir}/bin/llvm-lit" \
-                         "${lldb_build_dir}/test" \
-                         ${LLVM_LIT_ARGS} ${FILTER_SWIFT_API_OPTION} \
-                         --param dotest-args="--setting symbols.use-swift-clangimporter=true --setting symbols.swift-precise-compiler-invocation=false"
-                echo "--- Rerun LLDB Swift API tests (Swift Config: Classic/DWARFImporter) ---"
-                with_pushd ${results_dir} \
-                    call "${llvm_build_dir}/bin/llvm-lit" \
-                         "${lldb_build_dir}/test" \
-                         ${LLVM_LIT_ARGS} ${FILTER_SWIFT_API_OPTION} \
-                         --param dotest-args="--setting symbols.use-swift-clangimporter=false --setting symbols.swift-precise-compiler-invocation=false"
+                         --param dotest-args="--setting symbols.use-swift-clangimporter=false"
 
                 if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
                     echo "Running LLDB swift compatibility tests against" \
@@ -2801,18 +2786,6 @@ for host in "${ALL_HOSTS[@]}"; do
                             --param dotest-args="${DOTEST_ARGS}" \
                             --filter=compat
                 fi
-
-                if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "FALSE" ]]; then
-                    echo "--- Rerun LLDB API tests (Config: Redecl completion) ---"
-                     with_pushd ${results_dir} \
-                        call "${llvm_build_dir}/bin/llvm-lit" \
-                             "${lldb_build_dir}/test/API" \
-                             ${LLVM_LIT_ARGS} \
-                             --param dotest-args="--setting plugin.typesystem.clang.experimental-redecl-completion=true" \
-                             --filter="lang|functionalities|types|commands"
-
-                    # FIXME: run shell-tests with new setting. LLDB doesn't support that yet.
-                 fi
                 continue
                 ;;
             llbuild)

@@ -2822,11 +2822,12 @@ IRGenFunction::emitAsyncResumeProjectContext(llvm::Value *calleeContext) {
   return callerContext;
 }
 
-llvm::Function *IRGenFunction::getOrCreateResumePrjFn(bool forPrologue) {
-  // The prologue version lacks artificial debug info as this would cause
-  // verification errors when it gets inlined.
-  auto name = forPrologue ? "__swift_async_resume_project_context_prologue"
-                          : "__swift_async_resume_project_context";
+llvm::Function *IRGenFunction::getOrCreateResumePrjFn() {
+  auto name = "__swift_async_resume_project_context";
+  // This is effectively an outlined function with `alwaysinline`. Don't emit
+  // debug locations for those to avoid creating unnecessary inlined frames.
+  // Instead, rely on the inliner to propagate the call site debug location.
+  const bool skipDebugInfo = true;
   auto Fn = cast<llvm::Function>(IGM.getOrCreateHelperFunction(
       name, IGM.Int8PtrTy, {IGM.Int8PtrTy},
       [&](IRGenFunction &IGF) {
@@ -2836,7 +2837,7 @@ llvm::Function *IRGenFunction::getOrCreateResumePrjFn(bool forPrologue) {
         auto callerContext = IGF.emitAsyncResumeProjectContext(addr);
         Builder.CreateRet(callerContext);
       },
-      false /*isNoInline*/, forPrologue));
+      false /*isNoInline*/, skipDebugInfo));
   Fn->addFnAttr(llvm::Attribute::AlwaysInline);
   return Fn;
 }
@@ -2875,9 +2876,6 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
   dispatch->setDoesNotThrow();
   dispatch->addFnAttr(llvm::Attribute::AlwaysInline);
   IRGenFunction dispatchIGF(IGM, dispatch);
-  // Don't emit debug info if we are generating a function for the prologue.
-  if (IGM.DebugInfo && Builder.getCurrentDebugLocation())
-    IGM.DebugInfo->emitOutlinedFunction(dispatchIGF, dispatch, CurFn->getName());
   auto &Builder = dispatchIGF.Builder;
   auto it = dispatchIGF.CurFn->arg_begin(), end = dispatchIGF.CurFn->arg_end();
   llvm::Value *fnPtrArg = &*(it++);
@@ -2932,7 +2930,7 @@ llvm::Function *IRGenFunction::getOrCreateResumeFromSuspensionFn() {
         auto &Builder = IGF.Builder;
         Builder.CreateRet(&*IGF.CurFn->arg_begin());
       },
-      false /*isNoInline*/));
+      false /*isNoInline*/, true /*forPrologue*/));
   fn->addFnAttr(llvm::Attribute::AlwaysInline);
   return fn;
 }
@@ -2961,9 +2959,6 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
   suspendFn->setDoesNotThrow();
   suspendFn->addFnAttr(llvm::Attribute::AlwaysInline);
   IRGenFunction suspendIGF(IGM, suspendFn);
-  if (IGM.DebugInfo)
-    IGM.DebugInfo->emitOutlinedFunction(suspendIGF, suspendFn,
-                                        CurFn->getName());
   auto &Builder = suspendIGF.Builder;
 
   llvm::Value *resumeFunction = suspendFn->getArg(0);
